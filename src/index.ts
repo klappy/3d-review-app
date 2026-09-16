@@ -26,7 +26,8 @@ export async function contextForRequest(req: Request, env: Env): Promise<Ctx> {
 for (const cap of capabilities) {
   if (cap.tool === "danger" && cap.http.method.toUpperCase() === "GET")
     throw new Error(`danger twin cannot be GET: ${cap.id}`);
-  const path = cap.http.path.replace(/\{([^}]+)\}/g, ":$1");
+  // Hono cannot split two parameters in one path segment (`{id}@{ver}`).
+  const path = cap.http.path.replace("{id}@{ver}", ":idVersion").replace(/\{([^}]+)\}/g, ":$1");
   app.on(cap.http.method.toUpperCase(), path, async (c) => {
     const ctx = await contextForRequest(c.req.raw, c.env);
     try {
@@ -43,10 +44,19 @@ for (const cap of capabilities) {
           return json(fail("INVALID_PARAMS", "JSON object body required", undefined, cap.id, ctx.traceId), 400);
         }
       }
+      const routeParams: Record<string, string> = c.req.param();
+      if (typeof routeParams.idVersion === "string") {
+        const separator = routeParams.idVersion.lastIndexOf("@");
+        if (separator < 1 || separator === routeParams.idVersion.length - 1)
+          return json(fail("INVALID_PARAMS", "template id@version required", undefined, cap.id, ctx.traceId), 400);
+        routeParams.id = routeParams.idVersion.slice(0, separator);
+        routeParams.ver = routeParams.idVersion.slice(separator + 1);
+        delete routeParams.idVersion;
+      }
       const params: Record<string, unknown> = {
         ...(c.req.method === "GET" ? Object.fromEntries(new URL(c.req.url).searchParams) : {}),
         ...(body.params && typeof body.params === "object" && !Array.isArray(body.params) ? body.params as Record<string, unknown> : body),
-        ...c.req.param(),
+        ...routeParams,
       };
       if (cap.id === "cap.auth.logout") params.__token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "") ?? c.req.header("cookie")?.match(/session=([^;]+)/)?.[1];
       if (cap.tool === "danger" && !body.params) {
