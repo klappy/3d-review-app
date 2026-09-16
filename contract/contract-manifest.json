@@ -1,0 +1,213 @@
+{
+  "contract": "contract-v0.1",
+  "status": "DRAFT — no bundle frozen",
+  "source_sha": "59be64c",
+  "rule": "a bundle freezes when Lane A marks it frozen_sha; one open bundle does not hold frozen ones (MASTER §per-bundle)",
+  "params_schemas": "OWED — per-capability input/output schemas are the next A1 increment; this draft fixes ids, classes, tools, twins, roles, inverses and the shared envelope",
+  "bundles": {
+    "A": {
+      "section": "A. Entry, identity, session",
+      "capabilities": [
+        "cap.entry.intents",
+        "cap.entry.example",
+        "cap.auth.request_link",
+        "cap.auth.consume_link",
+        "cap.auth.logout",
+        "cap.auth.me",
+        "cap.participant.redeem_code",
+        "cap.participant.open_link"
+      ],
+      "state": "open",
+      "frozen_sha": null,
+      "open_items": []
+    },
+    "B": {
+      "section": "B. Workspace",
+      "capabilities": [
+        "cap.workspace.create",
+        "cap.workspace.list",
+        "cap.workspace.get",
+        "cap.workspace.update",
+        "cap.workspace.archive",
+        "cap.workspace.unarchive",
+        "cap.workspace.delete",
+        "cap.workspace.add_project",
+        "cap.workspace.remove_project"
+      ],
+      "state": "open",
+      "frozen_sha": null,
+      "open_items": [
+        "cap.workspace.archive: path inferred, confirm",
+        "cap.workspace.unarchive: path inferred, confirm",
+        "cap.workspace.add_project: path inferred, confirm",
+        "cap.workspace.remove_project: path inferred, confirm"
+      ]
+    },
+    "C": {
+      "section": "C. Project",
+      "capabilities": [
+        "cap.project.create",
+        "cap.project.list",
+        "cap.project.get",
+        "cap.project.update",
+        "cap.project.archive",
+        "cap.project.unarchive",
+        "cap.project.delete"
+      ],
+      "state": "open",
+      "frozen_sha": null,
+      "open_items": [
+        "cap.project.update: path inferred, confirm",
+        "cap.project.archive: path inferred, confirm",
+        "cap.project.unarchive: path inferred, confirm",
+        "cap.project.delete: path inferred, confirm"
+      ]
+    },
+    "D": {
+      "section": "D. Assessment (main page)",
+      "capabilities": [
+        "cap.assessment.create",
+        "cap.assessment.list",
+        "cap.assessment.get",
+        "cap.assessment.update",
+        "cap.assessment.set_stage",
+        "cap.assessment.archive",
+        "cap.assessment.unarchive",
+        "cap.assessment.delete",
+        "cap.assessment.notes.update"
+      ],
+      "state": "open",
+      "frozen_sha": null,
+      "open_items": [
+        "cap.assessment.list: path inferred, confirm",
+        "cap.assessment.get: path inferred, confirm",
+        "cap.assessment.update: path inferred, confirm",
+        "cap.assessment.set_stage: path inferred, confirm",
+        "cap.assessment.archive: path inferred, confirm",
+        "cap.assessment.unarchive: path inferred, confirm",
+        "cap.assessment.delete: path inferred, confirm",
+        "cap.assessment.notes.update: path inferred, confirm"
+      ]
+    },
+    "E": {
+      "section": "E. Surveys (templates + assessment surveys)",
+      "capabilities": [
+        "cap.template.list",
+        "cap.template.get",
+        "cap.template.render",
+        "cap.template.publish_version",
+        "cap.survey.select",
+        "cap.survey.deselect",
+        "cap.survey.get_status",
+        "cap.survey.print"
+      ],
+      "state": "open",
+      "frozen_sha": null,
+      "open_items": [
+        "cap.template.render: path inferred, confirm",
+        "cap.survey.deselect: path inferred, confirm",
+        "cap.survey.get_status: path inferred, confirm",
+        "cap.survey.print: path inferred, confirm"
+      ]
+    },
+    "F": {
+      "section": "F. Invitations, codes, collaborators",
+      "capabilities": [
+        "cap.survey.issue_link",
+        "cap.survey.send_links",
+        "cap.survey.issue_codes",
+        "cap.survey.export_codes",
+        "cap.survey.revoke_link",
+        "cap.survey.revoke_code",
+        "cap.grant.invite",
+        "cap.grant.revoke_invitation",
+        "cap.grant.accept",
+        "cap.grant.list",
+        "cap.grant.update_role",
+        "cap.grant.revoke",
+        "cap.grant.transfer_owner",
+        "cap.request.create"
+      ],
+      "state": "open",
+      "frozen_sha": null,
+      "open_items": [
+        "cap.survey.issue_link: path inferred, confirm",
+        "cap.survey.send_links: path inferred, confirm",
+        "cap.survey.issue_codes: path inferred, confirm",
+        "cap.survey.export_codes: path inferred, confirm",
+        "cap.survey.revoke_link: path inferred, confirm",
+        "cap.survey.revoke_code: path inferred, confirm",
+        "cap.grant.update_role: path inferred, confirm",
+        "cap.grant.revoke: path inferred, confirm",
+        "cap.grant.transfer_owner: path inferred, confirm"
+      ]
+    },
+    "G": {
+      "section": "G. Participation",
+      "capabilities": [
+        "cap.response.form",
+        "cap.response.submit",
+        "cap.response.receipt",
+        "cap.response.assisted_next",
+        "cap.response.list",
+        "cap.response.purge"
+      ],
+      "state": "open",
+      "frozen_sha": null,
+      "open_items": [
+        "cap.response.purge: path inferred, confirm"
+      ]
+    },
+    "H": {
+      "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
+      "capabilities": [
+        "cap.results.summary",
+        "cap.report.build",
+        "cap.report.get",
+        "cap.report.list",
+        "cap.recommendation.propose",
+        "cap.recommendation.review",
+        "cap.rollup.project",
+        "cap.rollup.workspace"
+      ],
+      "state": "open",
+      "frozen_sha": null,
+      "open_items": [
+        "cap.report.get: path inferred, confirm",
+        "cap.report.list: path inferred, confirm",
+        "cap.recommendation.propose: path inferred, confirm",
+        "cap.recommendation.review: path inferred, confirm",
+        "cap.rollup.project: path inferred, confirm",
+        "cap.rollup.workspace: path inferred, confirm"
+      ]
+    },
+    "I": {
+      "section": "I. Support & platform",
+      "capabilities": [
+        "cap.support.acts_as",
+        "cap.support.unlock_participant",
+        "cap.import.batch"
+      ],
+      "state": "open",
+      "frozen_sha": null,
+      "open_items": [
+        "cap.support.unlock_participant: path inferred, confirm"
+      ]
+    },
+    "J": {
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "capabilities": [
+        "cap.ops.trace",
+        "cap.ops.health",
+        "cap.ops.feedback",
+        "cap.ops.undo",
+        "cap.docs.get",
+        "cap.docs.openapi",
+        "cap.docs.capabilities"
+      ],
+      "state": "open",
+      "frozen_sha": null,
+      "open_items": []
+    }
+  }
+}

@@ -1,0 +1,1862 @@
+{
+  "contract": "contract-v0.1",
+  "status": "DRAFT — projected by Fable from cookbook 04 @ 59be64c; Lane A (Astra/Otto) accepts, amends or replaces",
+  "generated_at": "2026-09-16T20:04:22Z",
+  "source": {
+    "repo": "klappy/3d-review-cookbook",
+    "path": "planning/2026-09-16-parity-build/04-CAPABILITY-MATRIX.md",
+    "sha": "59be64c"
+  },
+  "counts": {
+    "total": 79,
+    "read": 28,
+    "write.effect": 6,
+    "write.reversible": 38,
+    "write.dangerous": 7,
+    "v2.0-bcs": 71,
+    "v2.1-oct": 8,
+    "paths_inferred": 37,
+    "inverse_unassessed": 0
+  },
+  "tools": [
+    "docs",
+    "read",
+    "write",
+    "danger"
+  ],
+  "errors": [
+    "NOT_AUTHENTICATED",
+    "NOT_AUTHORIZED_AT_SCOPE",
+    "WRONG_TOOL_FOR_CLASS",
+    "CONFIRM_REQUIRED",
+    "CONFIRM_EXPIRED",
+    "INVALID_PARAMS",
+    "NOT_FOUND_OR_NOT_VISIBLE",
+    "STAGE_CONFLICT",
+    "RESERVED_NOT_BUILT",
+    "NO_INVERSE"
+  ],
+  "suppressed_is_success": true,
+  "capabilities": [
+    {
+      "id": "cap.entry.intents",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/entry",
+        "path_inferred": false
+      },
+      "roles": "V",
+      "slice": "v2.0-bcs",
+      "section": "A. Entry, identity, session",
+      "ui_surface": "public entry (what / how / example / take survey / manage / view results)",
+      "notes": "bee:10379165",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": true
+    },
+    {
+      "id": "cap.entry.example",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/example",
+        "path_inferred": false
+      },
+      "roles": "V",
+      "slice": "v2.0-bcs",
+      "section": "A. Entry, identity, session",
+      "ui_surface": "sample assessment browsable without login",
+      "notes": "REQ (09-08); read-only fixture",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": true
+    },
+    {
+      "id": "cap.auth.request_link",
+      "class": "write.effect",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/auth/link",
+        "path_inferred": false
+      },
+      "roles": "V",
+      "slice": "v2.0-bcs",
+      "section": "A. Entry, identity, session",
+      "ui_surface": "\"sign in\"",
+      "notes": "**email-code via Cloudflare** (OF-7 ruled) — code **mail sent** → effect; compensate=expire link (not undo); the sign-in submit is the intent-bound confirm",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "expire link "
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "external"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.auth.consume_link",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/auth/session",
+        "path_inferred": false
+      },
+      "roles": "V",
+      "slice": "v2.0-bcs",
+      "section": "A. Entry, identity, session",
+      "ui_surface": "—",
+      "notes": "issues session",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "cap.auth.logout (compensating)"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.auth.logout",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "DELETE",
+        "path": "/v2/auth/session",
+        "path_inferred": false
+      },
+      "roles": "any",
+      "slice": "v2.0-bcs",
+      "section": "A. Entry, identity, session",
+      "ui_surface": "header",
+      "notes": "",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "sign in again"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.auth.me",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/me",
+        "path_inferred": false
+      },
+      "roles": "any",
+      "slice": "v2.0-bcs",
+      "section": "A. Entry, identity, session",
+      "ui_surface": "header/scope badge",
+      "notes": "grants + roles per scope",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.participant.redeem_code",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/participate/code",
+        "path_inferred": false
+      },
+      "roles": "V",
+      "slice": "v2.0-bcs",
+      "section": "A. Entry, identity, session",
+      "ui_surface": "\"Take a survey / find my invitation\"",
+      "notes": "short access code → participant token (bee:10424888)",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "token expiry (compensating)"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.participant.open_link",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/participate/link",
+        "path_inferred": false
+      },
+      "roles": "V",
+      "slice": "v2.0-bcs",
+      "section": "A. Entry, identity, session",
+      "ui_surface": "invitation URL",
+      "notes": "link token → participant token",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "token expiry (compensating)"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.workspace.create",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/workspaces",
+        "path_inferred": false
+      },
+      "roles": "provisioned creator (D1)",
+      "slice": "v2.0-bcs",
+      "section": "B. Workspace",
+      "ui_surface": "\"Organize projects in a workspace\"",
+      "notes": "request route for others: cap.request.create",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.workspace.archive",
+        "provenance": "proposed (D5: create reverses to archive, never delete)"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.workspace.list",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/workspaces",
+        "path_inferred": false
+      },
+      "roles": "Vw+",
+      "slice": "v2.0-bcs",
+      "section": "B. Workspace",
+      "ui_surface": "context panel",
+      "notes": "",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.workspace.get",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/workspaces/{id}",
+        "path_inferred": false
+      },
+      "roles": "Vw+",
+      "slice": "v2.0-bcs",
+      "section": "B. Workspace",
+      "ui_surface": "workspace page",
+      "notes": "listing of grouped projects only",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.workspace.update",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "PATCH",
+        "path": "/v2/workspaces/{id}",
+        "path_inferred": false
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "B. Workspace",
+      "ui_surface": "settings",
+      "notes": "rename",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "self:restore-prior",
+        "provenance": "proposed (receipt carries prior values)"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.workspace.archive",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/workspaces/{id}/archive",
+        "path_inferred": true
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "B. Workspace",
+      "ui_surface": "menu",
+      "notes": "undo=cap.workspace.unarchive",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.workspace.unarchive",
+        "provenance": "04"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.workspace.unarchive",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/workspaces/{id}/unarchive",
+        "path_inferred": true
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "B. Workspace",
+      "ui_surface": "menu",
+      "notes": "",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.workspace.archive",
+        "provenance": "04"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.workspace.delete",
+      "class": "write.dangerous",
+      "tool": "danger",
+      "http": {
+        "method": "DELETE",
+        "path": "/v2/workspaces/{id}",
+        "path_inferred": false
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "B. Workspace",
+      "ui_surface": "menu (danger)",
+      "notes": "D5",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "destructive"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.workspace.add_project",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/workspaces/{id}/projects/{pid}",
+        "path_inferred": true
+      },
+      "roles": "O, M with share authority (D2)",
+      "slice": "v2.0-bcs",
+      "section": "B. Workspace",
+      "ui_surface": "sharing preview",
+      "notes": "preview shows affected grants",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.workspace.remove_project",
+        "provenance": "proposed"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.workspace.remove_project",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "DELETE",
+        "path": "/v2/workspaces/{id}/projects/{pid}",
+        "path_inferred": true
+      },
+      "roles": "O, M with share authority (D2)",
+      "slice": "v2.0-bcs",
+      "section": "B. Workspace",
+      "ui_surface": "sharing preview",
+      "notes": "preview shows affected grants",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.workspace.add_project",
+        "provenance": "proposed"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.project.create",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/projects",
+        "path_inferred": false
+      },
+      "roles": "provisioned creator (D1)",
+      "slice": "v2.0-bcs",
+      "section": "C. Project",
+      "ui_surface": "\"Create or choose a project\"",
+      "notes": "",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.project.archive",
+        "provenance": "proposed (D5)"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.project.list",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/projects",
+        "path_inferred": false
+      },
+      "roles": "Vw+",
+      "slice": "v2.0-bcs",
+      "section": "C. Project",
+      "ui_surface": "All projects; context panel",
+      "notes": "direct-assessment grantees do **not** see parent",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.project.get",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/projects/{id}",
+        "path_inferred": false
+      },
+      "roles": "Vw+",
+      "slice": "v2.0-bcs",
+      "section": "C. Project",
+      "ui_surface": "All projects; context panel",
+      "notes": "direct-assessment grantees do **not** see parent",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.project.update",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "PATCH",
+        "path": "/v2/projects/{id}",
+        "path_inferred": true
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "C. Project",
+      "ui_surface": "settings",
+      "notes": "metadata incl. org/language (metadata only)",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "self:restore-prior",
+        "provenance": "proposed"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.project.archive",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/projects/{id}/archive",
+        "path_inferred": true
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "C. Project",
+      "ui_surface": "menu",
+      "notes": "undo=cap.project.unarchive",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.project.unarchive",
+        "provenance": "04"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.project.unarchive",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/projects/{id}/unarchive",
+        "path_inferred": true
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "C. Project",
+      "ui_surface": "menu",
+      "notes": "",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.project.archive",
+        "provenance": "04"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.project.delete",
+      "class": "write.dangerous",
+      "tool": "danger",
+      "http": {
+        "method": "DELETE",
+        "path": "/v2/projects/{id}",
+        "path_inferred": true
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "C. Project",
+      "ui_surface": "danger",
+      "notes": "D5",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "destructive"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.assessment.create",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/projects/{pid}/assessments",
+        "path_inferred": false
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "D. Assessment (main page)",
+      "ui_surface": "\"Start an assessment\"",
+      "notes": "creates in `prepare`",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.assessment.archive",
+        "provenance": "proposed (D5)"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.assessment.list",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/projects/{pid}/assessments",
+        "path_inferred": true
+      },
+      "roles": "Vw+",
+      "slice": "v2.0-bcs",
+      "section": "D. Assessment (main page)",
+      "ui_surface": "context panel; header",
+      "notes": "scope/role badge",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.assessment.get",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/assessments/{id}",
+        "path_inferred": true
+      },
+      "roles": "Vw+",
+      "slice": "v2.0-bcs",
+      "section": "D. Assessment (main page)",
+      "ui_surface": "context panel; header",
+      "notes": "scope/role badge",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.assessment.update",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "PATCH",
+        "path": "/v2/assessments/{id}",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "D. Assessment (main page)",
+      "ui_surface": "Prepare",
+      "notes": "name, purpose, period, language, format",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "self:restore-prior",
+        "provenance": "proposed"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.assessment.set_stage",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/assessments/{id}/stage",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "D. Assessment (main page)",
+      "ui_surface": "stage bar",
+      "notes": "prepare↔collect↔understand↔improve; receipt",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "self:reverse-step",
+        "provenance": "proposed (04-ACCEPTANCE row 16)"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.assessment.archive",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/assessments/{id}/archive",
+        "path_inferred": true
+      },
+      "roles": "project O, M",
+      "slice": "v2.0-bcs",
+      "section": "D. Assessment (main page)",
+      "ui_surface": "menu",
+      "notes": "03 project add/remove assessments; grant checked at project scope (D2: no inheritance); undo=cap.assessment.unarchive",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.assessment.unarchive",
+        "provenance": "04"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.assessment.unarchive",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/assessments/{id}/unarchive",
+        "path_inferred": true
+      },
+      "roles": "project O, M",
+      "slice": "v2.0-bcs",
+      "section": "D. Assessment (main page)",
+      "ui_surface": "menu",
+      "notes": "same project grant as archive",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.assessment.archive",
+        "provenance": "04"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.assessment.delete",
+      "class": "write.dangerous",
+      "tool": "danger",
+      "http": {
+        "method": "DELETE",
+        "path": "/v2/assessments/{id}",
+        "path_inferred": true
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "D. Assessment (main page)",
+      "ui_surface": "danger",
+      "notes": "D5",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "destructive"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.assessment.notes.update",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "PATCH",
+        "path": "/v2/assessments/{id}/notes",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "D. Assessment (main page)",
+      "ui_surface": "Improve (reflection, next steps)",
+      "notes": "",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "self:restore-prior",
+        "provenance": "proposed"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.template.list",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/templates",
+        "path_inferred": false
+      },
+      "roles": "any signed-in",
+      "slice": "v2.0-bcs",
+      "section": "E. Surveys (templates + assessment surveys)",
+      "ui_surface": "Collect: \"add a survey\"",
+      "notes": "platform-managed; nine source variants and instrument/scoring/source pins per 14",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.template.get",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/templates/{id}@{ver}",
+        "path_inferred": false
+      },
+      "roles": "any signed-in",
+      "slice": "v2.0-bcs",
+      "section": "E. Surveys (templates + assessment surveys)",
+      "ui_surface": "Collect: \"add a survey\"",
+      "notes": "platform-managed (bee:10381612)",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.template.render",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/templates/{id}@{ver}/render",
+        "path_inferred": true
+      },
+      "roles": "any",
+      "slice": "v2.0-bcs",
+      "section": "E. Surveys (templates + assessment surveys)",
+      "ui_surface": "preview / participant form",
+      "notes": "render-ready pinned items+options; TR/ML-Q10 multi-select; stable IDs and null/zero semantics (14)",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": true
+    },
+    {
+      "id": "cap.template.publish_version",
+      "class": "write.dangerous",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/templates/{id}/versions",
+        "path_inferred": false
+      },
+      "roles": "S",
+      "slice": "v2.0-bcs",
+      "section": "E. Surveys (templates + assessment surveys)",
+      "ui_surface": "admin",
+      "notes": "platform only",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "destructive"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.survey.select",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/assessments/{aid}/surveys",
+        "path_inferred": false
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "E. Surveys (templates + assessment surveys)",
+      "ui_surface": "Collect",
+      "notes": "template@version into assessment (D4 wording)",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.survey.deselect",
+        "provenance": "proposed (only while no responses)"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.survey.deselect",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "DELETE",
+        "path": "/v2/assessments/{aid}/surveys/{sid}",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "E. Surveys (templates + assessment surveys)",
+      "ui_surface": "Collect",
+      "notes": "after responses exist: archive + preserve, never silent loss",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.survey.select",
+        "provenance": "proposed (only while no responses; else archive-preserve, inverse none)"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.survey.get_status",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/assessments/{aid}/surveys/{sid}",
+        "path_inferred": true
+      },
+      "roles": "Vw+",
+      "slice": "v2.0-bcs",
+      "section": "E. Surveys (templates + assessment surveys)",
+      "ui_surface": "Collect card",
+      "notes": "counts by perspective",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.survey.print",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/assessments/{aid}/surveys/{sid}/print",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "E. Surveys (templates + assessment surveys)",
+      "ui_surface": "\"Print survey\"",
+      "notes": "**blank form** (no credentials, no responses) — HTML print stylesheet + PDF via browser (bee:10424888); served by the API so agents get the same artifact (not browser-only)",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.survey.issue_link",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/assessments/{aid}/surveys/{sid}/links",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "Collect: \"Prepare links\"",
+      "notes": "**prepare/create only** (D1 `invitation` row, unsent); undo=cap.survey.revoke_link (true inverse while unsent)",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.survey.revoke_link",
+        "provenance": "04 (true inverse while unsent)"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.survey.send_links",
+      "class": "write.effect",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/assessments/{aid}/surveys/{sid}/deliveries",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "Collect: \"Send links\" (impact preview → confirm)",
+      "notes": "**split from issue_link** (#13 gap 2; PR #18 example 1): external mail + link disclosure; compensate=cap.survey.revoke_link (access control, not undo); intent bound to recipients/content/expiry/revision; idempotency key; accepted ≠ delivered; delivery/job receipt; no addresses in telemetry",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "cap.survey.revoke_link"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "external"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.survey.issue_codes",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/assessments/{aid}/surveys/{sid}/codes",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "Collect: \"Access codes\"",
+      "notes": "batch short codes; D1 `access_code` (durable for field collect, not KV); undo=cap.survey.revoke_code while unredeemed. POST result is count/ids/receipt only — **omits code values**. **Printing/exporting the codes is credential-bearing output** → `cap.survey.export_codes` (E) below, distinct from a blank-form print",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.survey.revoke_code",
+        "provenance": "04 (while unredeemed)"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.survey.export_codes",
+      "class": "write.effect",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/assessments/{aid}/surveys/{sid}/codes/export",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "\"Print access codes\" (impact preview → confirm)",
+      "notes": "credential-bearing disclosure (release); compensate=revoke codes; audit row; no codes in telemetry; danger body: `mode` + `confirm_token` (+ `lang`); **never GET** (not cacheable/prefetchable; confirm token is not a query string)",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "revoke codes"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "external"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.survey.revoke_link",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "DELETE",
+        "path": "/v2/assessments/{aid}/surveys/{sid}/links/{id}",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "",
+      "notes": "compensating control for send_links; undo=null once sent (re-issue instead)",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "re-issue (04: undo=null once sent)"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.survey.revoke_code",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "DELETE",
+        "path": "/v2/assessments/{aid}/surveys/{sid}/codes/{id}",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "",
+      "notes": "",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "re-issue"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.grant.invite",
+      "class": "write.effect",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/{scope}/{id}/invitations",
+        "path_inferred": false
+      },
+      "roles": "O, M(≤M)",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "\"Invite collaborator\" + impact preview → confirm",
+      "notes": "invitation **mail sent** → effect; viewers cannot invite; D3 (proposed); compensate=cap.grant.revoke_invitation",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "cap.grant.revoke_invitation"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "external"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.grant.revoke_invitation",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "DELETE",
+        "path": "/v2/invitations/{id}",
+        "path_inferred": false
+      },
+      "roles": "O, M(≤M)",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "collaborators panel",
+      "notes": "compensating control (does not unsend)",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "re-invite (04: does not unsend)"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.grant.accept",
+      "class": "write.effect",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/invitations/{token}/accept",
+        "path_inferred": false
+      },
+      "roles": "invitee",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "",
+      "notes": "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "cap.grant.revoke"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "external"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.grant.list",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/{scope}/{id}/grants",
+        "path_inferred": false
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "collaborators panel",
+      "notes": "",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.grant.update_role",
+      "class": "write.effect",
+      "tool": "danger",
+      "http": {
+        "method": "PATCH",
+        "path": "/v2/{scope}/{id}/grants/{gid}",
+        "path_inferred": true
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "impact preview → confirm",
+      "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed)",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "external"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.grant.revoke",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "DELETE",
+        "path": "/v2/{scope}/{id}/grants/{gid}",
+        "path_inferred": true
+      },
+      "roles": "O, M(≤M)",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "",
+      "notes": "cannot remove owner; last-owner protected; undo=null (what was seen stays seen) — re-invite instead",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "re-invite (04: what was seen stays seen)"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.grant.transfer_owner",
+      "class": "write.dangerous",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/{scope}/{id}/transfer",
+        "path_inferred": true
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "danger",
+      "notes": "D3",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "destructive"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.request.create",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/requests",
+        "path_inferred": false
+      },
+      "roles": "any signed-in",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "\"Request a project/workspace\"",
+      "notes": "D1 request route",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "UNASSESSED — withdraw route not in 04"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.response.form",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/participate/form",
+        "path_inferred": false
+      },
+      "roles": "P",
+      "slice": "v2.0-bcs",
+      "section": "G. Participation",
+      "ui_surface": "survey form",
+      "notes": "from template.render + language/cycle context; version bound at presentation; participant labels and validation per 14",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.response.submit",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/participate/responses",
+        "path_inferred": false
+      },
+      "roles": "P",
+      "slice": "v2.0-bcs",
+      "section": "G. Participation",
+      "ui_surface": "review → submit",
+      "notes": "append-only; idempotency key; receipt (D6); **undo=null** (append-only is not an inverse — amendment/retraction policy held under D6); the review screen is the participant's confirm",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "amendment/retraction policy held under D6 (04)"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.response.receipt",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/participate/receipt",
+        "path_inferred": false
+      },
+      "roles": "P",
+      "slice": "v2.0-bcs",
+      "section": "G. Participation",
+      "ui_surface": "receipt screen",
+      "notes": "reopen link shows retained receipt",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.response.assisted_next",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/participate/next",
+        "path_inferred": false
+      },
+      "roles": "P (assisted collector)",
+      "slice": "v2.0-bcs",
+      "section": "G. Participation",
+      "ui_surface": "\"Next person\"",
+      "notes": "distinct respondent, no duplicate retry (D6)",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "none needed — starts a distinct respondent (D6)"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.response.list",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/assessments/{aid}/responses",
+        "path_inferred": false
+      },
+      "roles": "O, M",
+      "slice": "v2.0-bcs",
+      "section": "G. Participation",
+      "ui_surface": "Understand",
+      "notes": "**always-on small-cell suppression** (July D2 ruling) applied server-side before serialization; threshold/role details held → affected disclosure blocked until set; viewers see summary only; `SUPPRESSED` is a typed `ok:true` result (never an `ok:false` error)",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.response.purge",
+      "class": "write.dangerous",
+      "tool": "danger",
+      "http": {
+        "method": "DELETE",
+        "path": "/v2/assessments/{aid}/responses",
+        "path_inferred": true
+      },
+      "roles": "O",
+      "slice": "v2.0-bcs",
+      "section": "G. Participation",
+      "ui_surface": "danger",
+      "notes": "retention D5",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "destructive"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.results.summary",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/assessments/{aid}/results",
+        "path_inferred": false
+      },
+      "roles": "Vw+",
+      "slice": "v2.0-bcs",
+      "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
+      "ui_surface": "Understand (incl. insufficient-data + suppressed states)",
+      "notes": "counts, coverage, band-level summary (DEC-0001 bands over scores); **suppression integral from first implementation** (July D2): applied before aggregation disclosure/cache/serialization; UI/MCP cannot request unsuppressed mode; threshold/differencing rules held → real private results blocked until set, synthetic fixtures may show states; output carries snapshot/algorithm/policy versions (PR #18 example 2)",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.report.build",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/assessments/{aid}/reports",
+        "path_inferred": false
+      },
+      "roles": "O, M",
+      "slice": "v2.1-oct",
+      "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
+      "ui_surface": "(Oct)",
+      "notes": "**unimplemented** in v2.0 → documented 501 + docs pointer; counts ❌ whole-product; suppression + human review of generated interpretation required when built (bee:9416233 per PR #18 BEE-HISTORY)",
+      "status": "RESERVED_NOT_BUILT",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "v2.1-oct — UNASSESSED"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.report.get",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/reports/{id}",
+        "path_inferred": true
+      },
+      "roles": "Vw+",
+      "slice": "v2.1-oct",
+      "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
+      "ui_surface": "viewer link",
+      "notes": "unimplemented (501) in v2.0; suppression on disclosure when built",
+      "status": "RESERVED_NOT_BUILT",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.report.list",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/assessments/{aid}/reports",
+        "path_inferred": true
+      },
+      "roles": "Vw+",
+      "slice": "v2.1-oct",
+      "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
+      "ui_surface": "viewer link",
+      "notes": "unimplemented (501) in v2.0",
+      "status": "RESERVED_NOT_BUILT",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.recommendation.propose",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/assessments/{aid}/recommendations",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.1-oct",
+      "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
+      "ui_surface": "(Oct)",
+      "notes": "AI-assisted with human review (DEC-0002, POL-0001) — reserved",
+      "status": "RESERVED_NOT_BUILT",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "v2.1-oct — UNASSESSED"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.recommendation.review",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "PATCH",
+        "path": "/v2/assessments/{aid}/recommendations/{id}",
+        "path_inferred": true
+      },
+      "roles": "O, M",
+      "slice": "v2.1-oct",
+      "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
+      "ui_surface": "(Oct)",
+      "notes": "accept/reject with provenance — reserved",
+      "status": "RESERVED_NOT_BUILT",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "v2.1-oct — UNASSESSED"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.rollup.project",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/projects/{id}/rollup",
+        "path_inferred": true
+      },
+      "roles": "Vw+",
+      "slice": "v2.1-oct",
+      "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
+      "ui_surface": "(Oct)",
+      "notes": "unimplemented (501) in v2.0 (D7); suppression on disclosure when built",
+      "status": "RESERVED_NOT_BUILT",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.rollup.workspace",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/workspaces/{id}/rollup",
+        "path_inferred": true
+      },
+      "roles": "Vw+",
+      "slice": "v2.1-oct",
+      "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
+      "ui_surface": "(Oct)",
+      "notes": "unimplemented (501) in v2.0 (D7); suppression on disclosure when built",
+      "status": "RESERVED_NOT_BUILT",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.support.acts_as",
+      "class": "write.dangerous",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/support/acts-as",
+        "path_inferred": false
+      },
+      "roles": "S",
+      "slice": "v2.0-bcs",
+      "section": "I. Support & platform",
+      "ui_surface": "admin",
+      "notes": "HUMAN-ONLY provisioning; audit row (D8)",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+      },
+      "undo_token": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "destructive"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.support.unlock_participant",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/support/unlock",
+        "path_inferred": true
+      },
+      "roles": "S",
+      "slice": "v2.0-bcs",
+      "section": "I. Support & platform",
+      "ui_surface": "",
+      "notes": "reissue code",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "cap.survey.revoke_code",
+        "provenance": "proposed"
+      },
+      "undo_token": true,
+      "public": false
+    },
+    {
+      "id": "cap.import.batch",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/imports",
+        "path_inferred": false
+      },
+      "roles": "S",
+      "slice": "v2.1-oct",
+      "section": "I. Support & platform",
+      "ui_surface": "reserved",
+      "notes": "July `import_batch`; not this build",
+      "status": "RESERVED_NOT_BUILT",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "v2.1-oct — UNASSESSED"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.ops.trace",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/ops/traces/{trace_id}",
+        "path_inferred": false
+      },
+      "roles": "actor of that trace, S",
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "ui_surface": "\"why was this slow?\"",
+      "notes": "**scoped + redacted** projection of the span log (auth, policy, D1 timing, render) — no answers, addresses or bearer material in spans; a trace id is not authorization: substituted id → `NOT_FOUND_OR_NOT_VISIBLE`; test it (05 J7)",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false
+    },
+    {
+      "id": "cap.ops.health",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/health",
+        "path_inferred": false
+      },
+      "roles": "V",
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "ui_surface": "",
+      "notes": "",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": true
+    },
+    {
+      "id": "cap.ops.feedback",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/feedback",
+        "path_inferred": false
+      },
+      "roles": "any",
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "ui_surface": "\"Was this helpful?\"",
+      "notes": "bee:10447875",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "append-only"
+      },
+      "undo_token": false,
+      "public": true
+    },
+    {
+      "id": "cap.ops.undo",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "POST",
+        "path": "/v2/undo/{token}",
+        "path_inferred": false
+      },
+      "roles": "actor",
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "ui_surface": "toast \"Undo\"",
+      "notes": "reverses **only** rows that declare a true inverse (`undo: cap.x.y`), by invoking that inverse under the same grant; `NO_INVERSE` otherwise; **not a generic 24h undo**; E-class rows never mint undo tokens",
+      "status": "target",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "n/a — this is the undo mechanism"
+      },
+      "undo_token": false,
+      "public": false
+    },
+    {
+      "id": "cap.docs.get",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/docs",
+        "path_inferred": false
+      },
+      "roles": "any",
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "ui_surface": "help; MCP `docs`",
+      "notes": "role-aware capability index; glossary; policies",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": true
+    },
+    {
+      "id": "cap.docs.openapi",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/openapi.yaml",
+        "path_inferred": false
+      },
+      "roles": "any",
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "ui_surface": "",
+      "notes": "contract artifacts",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": true
+    },
+    {
+      "id": "cap.docs.capabilities",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/capabilities.json",
+        "path_inferred": false
+      },
+      "roles": "any",
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "ui_surface": "",
+      "notes": "contract artifacts",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": true
+    }
+  ]
+}

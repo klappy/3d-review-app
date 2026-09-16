@@ -1,0 +1,11 @@
+# real participant data never enters this repo (cookbook CON-PRIV-003)
+data/
+fixtures/real/
+*.csv
+!fixtures/synthetic/**/*.csv
+.env
+.env.*
+*.pem
+.dev.vars
+node_modules/
+.wrangler/
