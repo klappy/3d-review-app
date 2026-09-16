@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { crossLensReference, rollupReference, type ScoredRow } from "../src/reference-rollup";
+import model from "../src/pinned-report-model.json";
 
-const include = new Set([JSON.stringify(["Translation Team", "Understanding the Source"]),
-  JSON.stringify(["Translation Team", "Consistency"])]);
+const include = new Set(model.subdimensions.filter(row => row.included_in_lens_score)
+  .map(row => JSON.stringify([row.lens, row.sub_dimension])));
 
 describe("pinned Steve 04_aggregate reference arithmetic (internal only)", () => {
+  it("loads all pinned lens and cross-lens definitions without inventing a composite", () => {
+    expect(model.commit).toBe("f042cde553761a6a7f24132cef7802f956378ee0");
+    expect(model.subdimensions).toHaveLength(17);
+    expect(model.constructs).toHaveLength(8);
+    expect(model.constructs.find(c => c.code === "translation-type-agreement")?.categorical).toBe(true);
+    expect(model.constructs.find(c => c.code === "impact-use")?.item_ids)
+      .toEqual(["CW-Q9", "CW-Q10", "CA-Q9", "CA-Q10", "CV-Q9", "CV-Q10", "CHCP-Q12", "CHCP-Q13"]);
+  });
   it("averages scored response rows, then included subdimensions, not items first", () => {
     const rows: ScoredRow[] = [
       ...[85, 85, 85].map(score => ({ assessment_id: "a1", item_id: "TR-Q9",

@@ -4,6 +4,7 @@ import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import type { Ctx } from "../src/handlers/types";
 import { buildReportSnapshot, getReportSnapshot, listReportSnapshots, PINNED_SOURCE } from "../src/report-snapshot";
 import { scoreSourceItem, type SourceItem } from "../src/source-item-score";
+import model from "../src/pinned-report-model.json";
 
 const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "report-snapshot",
   modules: true, script: "export default { fetch() { return new Response('ok') } }",
@@ -50,6 +51,13 @@ describe("internal immutable report snapshots (not public results)", () => {
     const writtenItems = JSON.parse(writtenTemplate!.items_json) as SourceItem[];
     expect(scoreSourceItem(writtenItems.find(item => item.id === "CW-Q2")!, ["other"]))
       .toMatchObject({ status: "scored", score: 75 });
+    const allTemplates = await db.prepare("SELECT items_json FROM survey_template WHERE version = 2")
+      .all<{ items_json: string }>();
+    const allItemIds = new Set((allTemplates.results ?? []).flatMap(row =>
+      (JSON.parse(row.items_json) as SourceItem[]).map(item => item.id)));
+    expect(allItemIds.size).toBe(111);
+    for (const construct of model.constructs)
+      for (const itemId of construct.item_ids) expect(allItemIds.has(itemId)).toBe(true);
     const ctx = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "test" }, db,
       principal: { kind: "user", id }, traceId: "tr_test", now: () => new Date("2026-09-16T20:00:00Z"), log: () => {} });
 
