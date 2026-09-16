@@ -1,0 +1,147 @@
+const $ = id => document.getElementById(id);
+const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), project: null, assessment: null, survey: null, form: null, answers: null, responseKey: null };
+const path = (value) => encodeURIComponent(value);
+function note(message) { $('notice').textContent = message; $('error').hidden = true; }
+function fail(message) { $('error').textContent = message; $('error').hidden = false; $('notice').textContent = 'Action needs attention. No completion is assumed.'; }
+function text(node, value) { node.textContent = value == null ? '' : String(value); }
+function option(select, value, label) { select.add(new Option(label, value)); }
+function resetSelect(select, label) { select.replaceChildren(new Option(label, '')); }
+function required(value, message) { if (!value) throw new Error(message); return value; }
+async function api(url, { method = 'GET', body, participant = false } = {}) {
+  const token = participant ? state.participant : state.session;
+  const headers = { accept: 'application/json' };
+  if (body !== undefined) headers['content-type'] = 'application/json';
+  if (token) headers.authorization = `Bearer ${token}`;
+  let response;
+  try { response = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin' }); }
+  catch { throw new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); }
+  let data;
+  try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
+  if (!response.ok || !data.ok) throw new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`);
+  const li = document.createElement('li'); li.textContent = `${method} ${url} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
+  return data.result;
+}
+async function run(label, task) {
+  note(label); const buttons = [...document.querySelectorAll('button')]; buttons.forEach(b => b.disabled = true);
+  try { await task(); note(`${label} — complete.`); } catch (error) { fail(error.message); }
+  finally { buttons.forEach(b => b.disabled = false); }
+}
+function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget))); }); }
+function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler)); }
+async function identity() {
+  if (!state.session) { text($('identity'), 'Not signed in'); return; }
+  const result = await api('/v2/me'); text($('identity'), `${result.principal.kind} · ${result.principal.id}`);
+}
+async function projects() {
+  const result = await api('/v2/projects'); resetSelect($('projects'), 'Choose project');
+  for (const p of result.projects || []) option($('projects'), p.id, `${p.name} · ${p.role}`);
+  if (state.project) $('projects').value = state.project;
+}
+async function chooseProject() {
+  state.project = $('projects').value || null; state.assessment = null; state.survey = null;
+  resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
+  if (!state.project) return;
+  const result = await api(`/v2/projects/${path(state.project)}`);
+  text($('project-detail'), `${result.project.name} · ${result.project.role} · ${result.languages.length} language(s)`);
+  resetSelect($('languages'), 'Choose language'); for (const language of result.languages || []) option($('languages'), language.id, language.name);
+  await assessments();
+}
+async function assessments() {
+  const pid = required(state.project, 'Choose a project.');
+  const result = await api(`/v2/projects/${path(pid)}/assessments`); resetSelect($('assessments'), 'Choose assessment');
+  for (const a of result.assessments || []) option($('assessments'), a.id, `${a.name} · ${a.stage} · ${a.role}`);
+  if (state.assessment) $('assessments').value = state.assessment;
+}
+async function chooseAssessment() {
+  state.assessment = $('assessments').value || null; state.survey = null; resetSelect($('surveys'), 'Choose survey');
+  if (!state.assessment) return;
+  const result = await api(`/v2/assessments/${path(state.assessment)}`);
+  text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
+  for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
+  if (result.surveys?.length === 1) { $('surveys').value = result.surveys[0].id; state.survey = result.surveys[0].id; }
+}
+async function templates() {
+  const result = await api('/v2/templates'); resetSelect($('templates'), 'Choose template');
+  for (const t of result.templates || []) option($('templates'), `${t.id}@${t.version}`, `${t.name} · ${t.perspective} · v${t.version}`);
+}
+function drawQuestion(item) {
+  const field = document.createElement('fieldset'); field.dataset.item = item.id;
+  const legend = document.createElement('legend'); legend.textContent = item.text || item.id; field.append(legend);
+  if (item.type === 'scale') { const input = document.createElement('input'); input.name = item.id; input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; input.required = true; field.append(input); }
+  else if (item.type === 'text') { const input = document.createElement('textarea'); input.name = item.id; input.required = true; field.append(input); }
+  else if (item.type === 'single' || item.type === 'multi') {
+    for (const opt of item.options || []) { const label = document.createElement('label'); const input = document.createElement('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = opt.code; input.required = item.type === 'single'; label.append(input, document.createTextNode(opt.label || opt.text || opt.code)); field.append(label); }
+  } else { const warning = document.createElement('p'); warning.textContent = `Unsupported item type ${item.type}; cannot submit.`; field.append(warning); }
+  return field;
+}
+function answersFromForm() {
+  const values = new FormData($('answers')); const answers = {};
+  for (const item of state.form.items) {
+    let value = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id);
+    if (item.type === 'scale') value = Number(value);
+    if (value === null || value === '' || (Array.isArray(value) && !value.length)) throw new Error(`Answer required: ${item.text || item.id}`);
+    answers[item.id] = value;
+  }
+  return answers;
+}
+bindForm('request-login', 'Requesting local code…', async fd => {
+  const result = await api('/v2/auth/link', { method: 'POST', body: { email: String(fd.get('email')).trim() } });
+  text($('dev-code'), result.dev_only_code ? `Local synthetic code: ${result.dev_only_code}` : 'Code requested. Delivery is not configured on this local phase.');
+  $('consume-login').elements.email.value = fd.get('email');
+});
+bindForm('consume-login', 'Signing in…', async fd => {
+  const result = await api('/v2/auth/session', { method: 'POST', body: { email: String(fd.get('email')).trim(), code: String(fd.get('code')).trim() } });
+  state.session = result.session; sessionStorage.setItem('facilitatorToken', state.session); await identity(); await projects(); await templates();
+});
+bindClick('signout', 'Signing out…', async () => { await api('/v2/auth/session', { method: 'DELETE' }); state.session = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); });
+bindClick('load-projects', 'Loading projects…', projects);
+$('projects').addEventListener('change', () => run('Loading project…', chooseProject));
+bindForm('create-project', 'Creating project…', async fd => { const result = await api('/v2/projects', { method: 'POST', body: { name: String(fd.get('name')).trim() } }); state.project = result.project.id; await projects(); $('projects').value = state.project; await chooseProject(); });
+bindClick('load-assessments', 'Loading assessments…', assessments);
+$('assessments').addEventListener('change', () => run('Loading assessment…', chooseAssessment));
+bindForm('create-assessment', 'Creating assessment…', async fd => {
+  const pid = required(state.project, 'Choose a project.'); const result = await api(`/v2/projects/${path(pid)}/assessments`, { method: 'POST', body: { name: String(fd.get('name')).trim(), language_id: String(fd.get('language')) } });
+  state.assessment = result.assessment.id; await assessments(); $('assessments').value = state.assessment; await chooseAssessment();
+});
+bindClick('load-templates', 'Loading templates…', templates);
+bindClick('select-survey', 'Selecting survey…', async () => {
+  const aid = required(state.assessment, 'Choose an assessment.'); const selected = required($('templates').value, 'Choose a template.');
+  const [template_id, version] = selected.split('@'); const result = await api(`/v2/assessments/${path(aid)}/surveys`, { method: 'POST', body: { template_id, version: Number(version) } });
+  const sid = result.survey.id; await chooseAssessment(); state.survey = sid; $('surveys').value = sid; await surveyStatus();
+});
+$('surveys').addEventListener('change', () => { state.survey = $('surveys').value || null; });
+async function surveyStatus() {
+  const aid = required(state.assessment, 'Choose an assessment.'), sid = required(state.survey, 'Choose a survey.');
+  const result = await api(`/v2/assessments/${path(aid)}/surveys/${path(sid)}`);
+  text($('survey-detail'), `${result.survey.template_name} · ${result.survey.collection_status} · ${result.counts.responses} response(s)`);
+}
+bindClick('survey-status', 'Checking survey…', surveyStatus);
+bindClick('load-results', 'Reading result state…', async () => {
+  const aid = required(state.assessment, 'Choose an assessment.'); const result = await api(`/v2/assessments/${path(aid)}/results`);
+  text($('results'), result.suppressed ? `Suppressed / ${result.status}: ${result.reason || 'Disclosure policy pending'}` : JSON.stringify(result));
+});
+bindForm('redeem', 'Redeeming access code…', async fd => {
+  const result = await api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } });
+  state.participant = result.participant_token; sessionStorage.setItem('participantToken', state.participant);
+  await loadForm();
+});
+async function loadForm() {
+  const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null; state.responseKey = null;
+  text($('form-context'), `${result.assessment} · ${result.language} · ${result.template.id}@${result.template.version}`);
+  $('questions').replaceChildren(...result.items.map(drawQuestion)); $('answers').hidden = false; $('review').hidden = true; $('receipt').hidden = true; $('recover').hidden = false;
+}
+bindForm('answers', 'Preparing answer review…', async () => {
+  state.answers = answersFromForm(); $('review-answers').replaceChildren();
+  for (const item of state.form.items) { const p = document.createElement('p'); p.textContent = `${item.text || item.id}: ${JSON.stringify(state.answers[item.id])}`; $('review-answers').append(p); }
+  $('answers').hidden = true; $('review').hidden = false;
+});
+$('edit').addEventListener('click', () => { $('answers').hidden = false; $('review').hidden = true; });
+bindClick('submit', 'Submitting response…', async () => {
+  required(state.answers, 'Review answers first.');
+  if (!state.responseKey) { state.responseKey = crypto.randomUUID(); sessionStorage.setItem('responseKey', state.responseKey); }
+  const result = await api('/v2/participate/responses', { method: 'POST', participant: true, body: { answers: state.answers, idempotency_key: state.responseKey } });
+  showReceipt(result);
+});
+function showReceipt(result) { text($('receipt'), result.submitted === false ? 'No submission recorded.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`); $('receipt').hidden = false; $('review').hidden = true; $('answers').hidden = true; }
+bindClick('recover', 'Recovering receipt…', async () => showReceipt(await api('/v2/participate/receipt', { participant: true })));
+run('Checking session…', async () => { try { await identity(); if (state.session) { await projects(); await templates(); } if (state.participant) $('recover').hidden = false; } catch { state.session = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); } });
