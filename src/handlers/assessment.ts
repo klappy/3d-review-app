@@ -24,7 +24,7 @@ export const create: Handler = async (ctx, params) => {
   const period = params.period === undefined ? null : reqStr(params, "period");
   const format = params.format === undefined ? null : reqStr(params, "format");
   await ctx.db.batch([
-    ctx.db.prepare("INSERT INTO assessment (id, project_id, language_id, name, purpose, period, format, stage, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'prepare', ?)").bind(id, pid, language_id, name, purpose, period, format, at),
+    ctx.db.prepare("INSERT INTO assessment (id, project_id, language_id, name, purpose, period, format, stage, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'prepare', ?, ?)").bind(id, pid, language_id, name, purpose, period, format, at, ctx.principal.id),
     ctx.db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(newId("grant"), ctx.principal.id, "assessment", id, "owner", at),
   ]);
   return { result: { assessment: { id, project_id: pid, language_id, name, purpose, period, format, stage: "prepare", archived_at: null, created_at: at, role: "owner" } }, scope: { type: "assessment", id } };
@@ -37,7 +37,7 @@ export const list: Handler = async (ctx, params) => {
 };
 export const get: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id);
-  const {results} = await ctx.db.prepare("SELECT s.id, s.template_id, s.template_version, s.state, s.archived_at, s.created_at, t.name AS template_name, t.perspective FROM assessment_survey s JOIN survey_template t ON t.id = s.template_id AND t.version = s.template_version WHERE s.assessment_id = ? ORDER BY s.created_at").bind(id).all();
+  const {results} = await ctx.db.prepare("SELECT s.id, s.template_id, s.template_version, s.state, s.collection_status, s.archived_at, s.created_at, t.name AS template_name, t.perspective FROM assessment_survey s JOIN survey_template t ON t.id = s.template_id AND t.version = s.template_version WHERE s.assessment_id = ? ORDER BY s.created_at").bind(id).all();
   return { result: { assessment: view(row, role), surveys: results }, scope: { type: "assessment", id } };
 };
 export const update: Handler = async (ctx, params) => {

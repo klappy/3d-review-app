@@ -12,7 +12,7 @@ export const get: Handler = async (ctx,params) => {
   requireUser(ctx);
   const id=reqStr(params,"id"), version=optInt(params,"ver",0,0);
   const row=await loadTemplate(ctx,id,version || undefined);
-  return {result:{template:{...meta(row),items:parseItems(row)}}};
+  return {result:{template:{...meta(row),items:parseItems(row),rubric_ref:(row as TemplateRow & {rubric_ref?:string|null}).rubric_ref}}};
 };
 export const render: Handler = async (ctx,params) => {
   const id=reqStr(params,"id"), version=optInt(params,"ver",0,0);
@@ -25,13 +25,13 @@ export const publish_version: Handler = async (ctx,params,opts) => {
   const id=reqStr(params,"id"), name=reqStr(params,"name"), perspective=reqStr(params,"perspective");
   const items=params.items, scoring=params.scoring;
   if(!Array.isArray(items)||!scoring||typeof scoring!=="object"||Array.isArray(scoring)) throw new CapError("INVALID_PARAMS","items array and scoring object required");
-  const source_ref=reqStr(params,"source_ref");
+  const source_ref=reqStr(params,"source_ref"), rubric_ref=reqStr(params,"rubric_ref");
   const row=await ctx.db.prepare("SELECT MAX(version) AS version FROM survey_template WHERE id = ?").bind(id).first<{version:number|null}>();
   const version=Number(row?.version??0)+1;
   const impact={affected:[{template:id,new_version:version}],irreversible:true,effect:"destructive" as const,retention:"Published versions are immutable; a later version supersedes rather than overwrites"};
   if(opts?.dryRun) return {result:{template_id:id,version},scope:{type:"platform",id},impact};
   const at=nowIso(ctx);
-  await ctx.db.prepare("INSERT INTO survey_template (id, version, name, perspective, source_ref, items_json, scoring_json, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(id,version,name,perspective,source_ref,JSON.stringify(items),JSON.stringify(scoring),at).run();
-  return {result:{template:{id,version,name,perspective,source_ref,published_at:at}},scope:{type:"platform",id},impact};
+  await ctx.db.prepare("INSERT INTO survey_template (id, version, name, perspective, source_ref, items_json, scoring_json, rubric_ref, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id,version,name,perspective,source_ref,JSON.stringify(items),JSON.stringify(scoring),rubric_ref,at).run();
+  return {result:{template:{id,version,name,perspective,source_ref,rubric_ref,published_at:at}},scope:{type:"platform",id},impact};
 };
 export const handlers:Record<string,Handler>={"cap.template.list":list,"cap.template.get":get,"cap.template.render":render,"cap.template.publish_version":publish_version};

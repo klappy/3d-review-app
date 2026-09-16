@@ -25,17 +25,17 @@ export const select:Handler=async(ctx,params)=>{
     return {result:{survey:{...existing,state:"selected",archived_at:null},selected:true},scope:{type:"assessment",id:aid},priorState:{state:existing.state,archived_at:existing.archived_at}};
   }
   const id=newId("survey"), at=nowIso(ctx);
-  await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,created_at) VALUES (?, ?, ?, ?, 'selected', ?)").bind(id,aid,t.id,t.version,at).run();
-  return {result:{survey:{id,assessment_id:aid,template_id:t.id,template_version:t.version,state:"selected",created_at:at},selected:true},scope:{type:"assessment",id:aid}};
+  await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?, ?, ?, ?, 'selected', 'closed', ?)").bind(id,aid,t.id,t.version,at).run();
+  return {result:{survey:{id,assessment_id:aid,template_id:t.id,template_version:t.version,state:"selected",collection_status:"closed",created_at:at},selected:true},scope:{type:"assessment",id:aid}};
 };
 export const deselect:Handler=async(ctx,params)=>{
   const {aid,sid}=ids(params), row=await survey(ctx,aid,sid,"member");
   const responses=await countScalar(ctx,"SELECT COUNT(*) AS n FROM response WHERE assessment_survey_id = ?",sid);
   const codes=await countScalar(ctx,"SELECT COUNT(*) AS n FROM access_code WHERE assessment_survey_id = ?",sid);
-  const invitations=await countScalar(ctx,"SELECT COUNT(*) AS n FROM invitation WHERE scope_type = 'survey' AND scope_id = ?",sid);
+  const invitations=await countScalar(ctx,"SELECT COUNT(*) AS n FROM invitation WHERE assessment_survey_id = ?",sid);
   if(responses||codes||invitations){
     const at=nowIso(ctx);
-    await ctx.db.prepare("UPDATE assessment_survey SET state = 'archived', archived_at = ? WHERE id = ?").bind(at,sid).run();
+    await ctx.db.prepare("UPDATE assessment_survey SET state = 'archived', archived_at = ?, collection_status = 'closed' WHERE id = ?").bind(at,sid).run();
     return {result:{id:sid,archived:true,preserved_responses:responses,preserved_codes:codes,preserved_invitations:invitations,undo:null},scope:{type:"assessment",id:aid},priorState:{state:row.state,archived_at:row.archived_at}};
   }
   await ctx.db.prepare("DELETE FROM assessment_survey WHERE id = ?").bind(sid).run();
@@ -58,11 +58,11 @@ export const print:Handler=async(ctx,params)=>{
 };
 export const issue_link:Handler=async(ctx,params)=>{
   const {aid,sid}=ids(params); await survey(ctx,aid,sid,"member");
-  const email_hash=typeof params.email_hash==="string"?params.email_hash:null;
+  const invitee_hash=typeof params.invitee_hash==="string"?params.invitee_hash:null;
   const id=newId("invite"), token=randomToken("link"), at=nowIso(ctx);
-  await ctx.db.prepare("INSERT INTO invitation (id,scope_type,scope_id,role,email_hash,token_hash,state,created_by,created_at) VALUES (?, 'survey', ?, 'participant', ?, ?, 'prepared', ?, ?)").bind(id,sid,email_hash,await sha256(token),ctx.principal.id,at).run();
+  await ctx.db.prepare("INSERT INTO invitation (id,scope_type,scope_id,assessment_survey_id,role,invitee_hash,token_hash,status,created_by,created_at) VALUES (?, 'survey', ?, ?, 'participant', ?, ?, 'pending', ?, ?)").bind(id,sid,sid,invitee_hash,await sha256(token),ctx.principal.id,at).run();
   // Preparing is not disclosure; the token remains server-side until the separately confirmed send flow.
-  return {result:{id,state:"prepared",sent:false},scope:{type:"assessment",id:aid}};
+  return {result:{id,status:"pending",sent:false},scope:{type:"assessment",id:aid}};
 };
 export const send_links:Handler=async(ctx,params,opts)=>{
   const {aid,sid}=ids(params); await survey(ctx,aid,sid,"member");
@@ -75,23 +75,23 @@ export const send_links:Handler=async(ctx,params,opts)=>{
 };
 export const issue_codes:Handler=async(ctx,params)=>{
   const {aid,sid}=ids(params); await survey(ctx,aid,sid,"member");
-  // Persisting plaintext code_value is not acceptable; hashes alone cannot power later export.
+  // Hashes alone cannot power later export; no credential escrow is provisioned.
   throw new CapError("RESERVED_NOT_BUILT","secure code release is not implemented","Requires encrypted-at-rest escrow or one-time confirmed disclosure");
 };
 export const export_codes:Handler=async(ctx,params,opts)=>{
   const {aid,sid}=ids(params); await survey(ctx,aid,sid,"member");
-  const count=await countScalar(ctx,"SELECT COUNT(*) AS n FROM access_code WHERE assessment_survey_id = ? AND state = 'issued'",sid);
+  const count=await countScalar(ctx,"SELECT COUNT(*) AS n FROM access_code WHERE assessment_survey_id = ? AND redeemed_at IS NULL",sid);
   const impact={affected:[{survey:sid,codes:count}],irreversible:true,effect:"disclosure" as const,compensating_control:"revoke codes"};
   if(opts?.dryRun) return {result:{count},scope:{type:"assessment",id:aid},impact};
-  throw new CapError("RESERVED_NOT_BUILT","secure code export is not implemented","Do not release plaintext code_value from D1");
+  throw new CapError("RESERVED_NOT_BUILT","secure code export is not implemented","Requires one-time confirmed disclosure or encrypted escrow");
 };
 export const revoke_link:Handler=async(ctx,params)=>{
   const {aid,sid}=ids(params); await survey(ctx,aid,sid,"member");
   const id=reqStr(params,"id");
-  const row=await ctx.db.prepare("SELECT id,state FROM invitation WHERE id = ? AND scope_type = 'survey' AND scope_id = ?").bind(id,sid).first<{id:string;state:string}>();
+  const row=await ctx.db.prepare("SELECT id,status FROM invitation WHERE id = ? AND assessment_survey_id = ?").bind(id,sid).first<{id:string;status:string}>();
   if(!row) throw notVisible("link");
-  await ctx.db.prepare("UPDATE invitation SET state = 'revoked' WHERE id = ?").bind(id).run();
-  return {result:{id,state:"revoked"},scope:{type:"assessment",id:aid},priorState:{state:row.state}};
+  await ctx.db.prepare("UPDATE invitation SET status = 'revoked' WHERE id = ?").bind(id).run();
+  return {result:{id,status:"revoked"},scope:{type:"assessment",id:aid},priorState:{status:row.status}};
 };
 export const revoke_code:Handler=async(ctx,params)=>{
   const {aid,sid}=ids(params); await survey(ctx,aid,sid,"member");
@@ -99,7 +99,7 @@ export const revoke_code:Handler=async(ctx,params)=>{
   const row=await ctx.db.prepare("SELECT id,redeemed_at FROM access_code WHERE id = ? AND assessment_survey_id = ?").bind(id,sid).first<{id:string;redeemed_at:string|null}>();
   if(!row) throw notVisible("code");
   if(row.redeemed_at) throw new CapError("INVALID_PARAMS","redeemed code cannot be revoked","revoke participant session instead");
-  await ctx.db.prepare("UPDATE access_code SET state = 'revoked', code_value = NULL WHERE id = ?").bind(id).run();
+  await ctx.db.prepare("DELETE FROM access_code WHERE id = ?").bind(id).run();
   return {result:{id,revoked:true},scope:{type:"assessment",id:aid}};
 };
 export const handlers:Record<string,Handler>={
