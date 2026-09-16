@@ -113,6 +113,13 @@ describe("one-time code escrow and confirmed release",()=>{
     const undoneSelection=await execute(context(),"cap.ops.undo",{token:selected.receipt?.undo_token},{tool:"write"});
     expect(undoneSelection.ok).toBe(true);
     expect(await db.prepare("SELECT id FROM assessment_survey WHERE id = ?").bind(selectedSid).first()).toBeNull();
+    const selectedAgain=await execute(context(),"cap.survey.select",{aid:"assess_tavo_collect",template_id:"tpl_audio",version:1},{tool:"write"});
+    expect(selectedAgain.ok).toBe(true);
+    if(!selectedAgain.ok) throw new Error("second survey select failed");
+    const deselected=await execute(context(),"cap.survey.deselect",{aid:"assess_tavo_collect",sid:selectedAgain.result.sid},{tool:"write"});
+    expect(deselected.ok).toBe(true);
+    expect(deselected.receipt?.inverse).toBe("none");
+    expect(deselected.receipt?.undo_token).toBeUndefined();
 
     const audit=await db.prepare("SELECT prior_state_json,confirm_token FROM receipt").all<{prior_state_json:string;confirm_token:string|null}>();
     const traces=await db.prepare("SELECT spans_json FROM trace").all<{spans_json:string}>();

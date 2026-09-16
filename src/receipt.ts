@@ -94,16 +94,17 @@ export interface MintInput {
 }
 
 export function inverseLabel(cap: Capability): string {
-  // A batch of codes cannot be safely reversed by the single-code revoke
-  // handler. Hold the contract's proposed inverse until batch undo exists.
-  if(cap.id==="cap.survey.issue_codes") return "none";
+  // These proposed inverses are not yet true inverses of the implemented effects:
+  // batch issue needs batch revoke; deselect loses the template identity needed
+  // to reselect; support reissue cannot restore an already revoked old code.
+  if(["cap.survey.issue_codes", "cap.survey.deselect", "cap.support.unlock_participant"].includes(cap.id)) return "none";
   return cap.inverse.kind === "true" && cap.inverse.via ? cap.inverse.via : "none";
 }
 
 export async function mintReceipt(ctx: Ctx, input: MintInput): Promise<Receipt> {
   const { cap } = input;
   const at = ctx.now().toISOString();
-  const trueInverse = cap.id!=="cap.survey.issue_codes" && cap.inverse.kind === "true" && input.mode !== "dry_run";
+  const trueInverse = inverseLabel(cap)!=="none" && cap.inverse.kind === "true" && input.mode !== "dry_run";
   const receipt: Receipt = {
     id: newReceiptId(),
     actor: ctx.principal.id,

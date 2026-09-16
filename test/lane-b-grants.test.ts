@@ -81,6 +81,9 @@ describe("Lane B: grant / request / support.unlock (D3, no inheritance, existenc
     expect(u.ok).toBe(true);
     if (!u.ok) throw new Error("support unlock dispatch failed");
     expect(u.result.old_revoked).toBe(true);
+    expect(Object.keys(u.result).sort()).toEqual(["aid", "audit", "new_code_id", "old_code", "old_revoked", "sid", "value_via"]);
+    expect(u.receipt?.inverse).toBe("none");
+    expect(u.receipt?.undo_token).toBeUndefined();
     expect(await db.prepare("SELECT id FROM access_code WHERE id = ?").bind("code_old").first()).toBeNull();
     expect((await db.prepare("SELECT COUNT(*) AS n FROM receipt WHERE class = 'audit' AND capability = ?").bind("cap.support.unlock_participant").first<{ n: number }>())!.n).toBe(1);
     const reissuedId = u.result.new_code_id as string;
