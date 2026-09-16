@@ -104,14 +104,12 @@ def main() -> None:
         "-- 9 variants, 111 source items, 498 source options. Version 1 and its responses remain unchanged.",
         "-- Scoring and disclosure policy remain HELD; source scores/weights/flags are provenance only.",
         "-- Source manifest: " + json.dumps(manifest, sort_keys=True),
-        "BEGIN TRANSACTION;",
     ]
     for (lens, form), items in sorted(by_form.items()):
         template_id = FORM_IDS[(lens, form)]
         payload = json.dumps(items, ensure_ascii=False, separators=(",", ":"))
         scoring = json.dumps({"status": "held", "source_commit": SOURCE_SHA, "no_score_calculation": True}, separators=(",", ":"))
         lines.append(f"INSERT INTO survey_template (id, version, name, perspective, source_ref, items_json, scoring_json, rubric_ref, published_at) VALUES ({quoted(template_id)}, 2, {quoted(form)}, {quoted(lens)}, {quoted(source_ref)}, {quoted(payload)}, {quoted(scoring)}, {quoted(source_ref)}, strftime('%Y-%m-%dT%H:%M:%fZ','now'));")
-    lines.append("COMMIT;")
     output = Path(args.output)
     output.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps({"output": str(output), **manifest}, sort_keys=True))

@@ -70,11 +70,11 @@ async function templates() {
 }
 function drawQuestion(item) {
   const field = document.createElement('fieldset'); field.dataset.item = item.id;
-  const legend = document.createElement('legend'); legend.textContent = item.text || item.id; field.append(legend);
-  if (item.type === 'scale') { const input = document.createElement('input'); input.name = item.id; input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; input.required = true; field.append(input); }
-  else if (item.type === 'text') { const input = document.createElement('textarea'); input.name = item.id; input.required = true; field.append(input); }
+  const legend = document.createElement('legend'); legend.textContent = `${item.text || item.id}${item.required === false ? ' (optional)' : ''}`; field.append(legend);
+  if (item.type === 'scale') { const input = document.createElement('input'); input.name = item.id; input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; input.required = item.required !== false; field.append(input); }
+  else if (item.type === 'text') { const input = document.createElement('textarea'); input.name = item.id; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'single' || item.type === 'multi') {
-    for (const opt of item.options || []) { const label = document.createElement('label'); const input = document.createElement('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = opt.code; input.required = item.type === 'single'; label.append(input, document.createTextNode(opt.label || opt.text || opt.code)); field.append(label); }
+    for (const opt of item.options || []) { const label = document.createElement('label'); const input = document.createElement('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = opt.code; input.required = item.type === 'single' && item.required !== false; label.append(input, document.createTextNode(opt.label || opt.text || opt.code)); field.append(label); }
   } else { const warning = document.createElement('p'); warning.textContent = `Unsupported item type ${item.type}; cannot submit.`; field.append(warning); }
   return field;
 }
@@ -82,8 +82,11 @@ function answersFromForm() {
   const values = new FormData($('answers')); const answers = {};
   for (const item of state.form.items) {
     let value = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id);
-    if (item.type === 'scale') value = Number(value);
-    if (value === null || value === '' || (Array.isArray(value) && !value.length)) throw new Error(`Answer required: ${item.text || item.id}`);
+    if (value === null || value === '' || (Array.isArray(value) && !value.length)) {
+      if (item.required === false) value = null;
+      else throw new Error(`Answer required: ${item.text || item.id}`);
+    }
+    if (item.type === 'scale' && value !== null) value = Number(value);
     answers[item.id] = value;
   }
   return answers;

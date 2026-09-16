@@ -175,6 +175,8 @@ export interface TemplateItem {
   group: string;                       // sub-dimension (steve: rubric_item.sub_dimension)
   text: string;
   type: "scale" | "multi" | "single" | "text";
+  required?: boolean;                    // absent on legacy v1 means required
+  source_type?: string;                   // pinned CSV type, not a score
   scale?: { min: number; max: number };
   options?: { code: string; text: string; weight?: number }[];
   max_select?: number;
@@ -189,6 +191,8 @@ export function renderItems(items: TemplateItem[], lang: string): Record<string,
     id: it.id,
     group: it.group,
     type: it.type,
+    required: it.required !== false,
+    ...(it.source_type ? { source_type: it.source_type } : {}),
     text: it.text,
     lang,
     ...(it.scale ? { scale: it.scale } : {}),
