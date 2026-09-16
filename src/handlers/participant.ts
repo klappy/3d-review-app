@@ -2,6 +2,7 @@
 import type { Handler, Ctx } from "./types";
 import { CapError, notVisible } from "./errors";
 import { newId, nowIso, randomToken, reqStr, sha256 } from "./common";
+import { codeHash } from "../code-escrow";
 
 interface CodeEntry { id: string; assessment_survey_id: string; expires_at: string | null; redeemed_at: string | null; respondent_id: string | null }
 interface LinkEntry { id: string; scope_type: string; assessment_survey_id: string | null; expires_at: string | null; status: string }
@@ -23,8 +24,18 @@ async function issue(ctx: Ctx, surveyId: string, respondentId: string, allowClos
 
 export const redeem_code: Handler = async (ctx, params) => {
   const code = reqStr(params, "code").trim().toUpperCase();
-  const row = await ctx.db.prepare("SELECT id, assessment_survey_id, expires_at, redeemed_at, respondent_id FROM access_code WHERE code_hash = ?")
-    .bind(await sha256(code)).first<CodeEntry>();
+  // New batches use an HKDF-separated keyed digest; the SHA branch is limited
+  // to pre-escrow rows (batch_id NULL), including isolated synthetic fixtures.
+  // Both lookups run when a key is configured so a miss does not reveal which
+  // hash generation is in use through an early return.
+  const keyed = ctx.env.CODE_ESCROW_SECRET ? await codeHash(ctx.env.CODE_ESCROW_SECRET, code) : null;
+  const [newRow, legacyRow] = await Promise.all([
+    keyed ? ctx.db.prepare("SELECT id, assessment_survey_id, expires_at, redeemed_at, respondent_id FROM access_code WHERE code_hash = ? AND batch_id IS NOT NULL")
+      .bind(keyed).first<CodeEntry>() : Promise.resolve(null),
+    ctx.db.prepare("SELECT id, assessment_survey_id, expires_at, redeemed_at, respondent_id FROM access_code WHERE code_hash = ? AND batch_id IS NULL")
+      .bind(await sha256(code)).first<CodeEntry>(),
+  ]);
+  const row = newRow ?? legacyRow;
   if (!row || row.redeemed_at || (row.expires_at && row.expires_at <= nowIso(ctx))) throw notVisible("access code");
   await ensureSurveyOpen(ctx, row.assessment_survey_id);
   const respondentId = row.respondent_id ?? newId("respondent");

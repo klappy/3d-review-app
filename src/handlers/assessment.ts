@@ -55,7 +55,13 @@ export const set_stage: Handler = async (ctx, params) => {
   const current = STAGES.indexOf(row.stage), next = STAGES.indexOf(stage as typeof STAGES[number]);
   if (next < 0) throw new CapError("INVALID_PARAMS", "invalid stage");
   if (Math.abs(next-current) !== 1) throw new CapError("STAGE_CONFLICT", "move one stage at a time");
-  await ctx.db.prepare("UPDATE assessment SET stage = ? WHERE id = ?").bind(stage, id).run();
+  // The stage change is the explicit collection gate. Reading an assessment
+  // never opens it, and the update is scoped to this assessment's selections.
+  await ctx.db.batch([
+    ctx.db.prepare("UPDATE assessment SET stage = ? WHERE id = ?").bind(stage, id),
+    ctx.db.prepare("UPDATE assessment_survey SET collection_status = ? WHERE assessment_id = ? AND state = 'selected'")
+      .bind(stage === "collect" ? "open" : "closed", id),
+  ]);
   return {result:{assessment:view({...row, stage:stage as typeof row.stage},role)},scope:{type:"assessment",id},priorState:{stage:row.stage}};
 };
 async function archiveChange(ctx: Ctx, params: Record<string,unknown>, archived: boolean) {

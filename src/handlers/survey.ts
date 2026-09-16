@@ -2,6 +2,8 @@
 import type { Ctx, Handler, Role } from "./types";
 import { CapError, notVisible } from "./errors";
 import { countScalar, gate, loadTemplate, newId, nowIso, optInt, parseItems, randomToken, renderItems, reqStr, roleAt, sha256, type AssessmentRow, type SurveyRow } from "./common";
+import { codeHash, decryptCode, encryptCode } from "../code-escrow";
+import { randomCode } from "./common";
 
 async function assessment(ctx:Ctx,id:string,min:Role="viewer") {
   const row=await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
@@ -15,18 +17,41 @@ async function survey(ctx:Ctx,aid:string,sid:string,min:Role="viewer") {
   return row;
 }
 function ids(params:Record<string,unknown>) {return {aid:reqStr(params,"aid"),sid:reqStr(params,"sid")};}
+function only(params:Record<string,unknown>, allowed:string[]) {
+  const extra=Object.keys(params).find(k=>!allowed.includes(k));
+  if(extra) throw new CapError("INVALID_PARAMS",`unknown parameter ${extra}`);
+}
+function codeIds(params:Record<string,unknown>):string[] {
+  const value=params.ids;
+  if(!Array.isArray(value)||value.length===0||value.length>100||value.some(v=>typeof v!=="string"||!v)||new Set(value).size!==value.length)
+    throw new CapError("INVALID_PARAMS","ids must be a nonempty unique code-id array (max 100)");
+  return value as string[];
+}
+interface EscrowRow {id:string;assessment_survey_id:string;batch_id:string|null;code_ciphertext:string|null;code_iv:string|null;exported_at:string|null;redeemed_at:string|null}
+async function exactBatch(ctx:Ctx,sid:string,requested:string[]):Promise<{batchId:string;rows:EscrowRow[]}> {
+  const first=await ctx.db.prepare("SELECT id, assessment_survey_id, batch_id, code_ciphertext, code_iv, exported_at, redeemed_at FROM access_code WHERE id = ? AND assessment_survey_id = ?")
+    .bind(requested[0],sid).first<EscrowRow>();
+  if(!first?.batch_id) throw notVisible("code batch");
+  const {results}=await ctx.db.prepare("SELECT id, assessment_survey_id, batch_id, code_ciphertext, code_iv, exported_at, redeemed_at FROM access_code WHERE batch_id = ? AND assessment_survey_id = ? ORDER BY id")
+    .bind(first.batch_id,sid).all<EscrowRow>();
+  if(results.length!==requested.length||results.some(r=>!requested.includes(r.id))) throw new CapError("INVALID_PARAMS","complete issued batch ids required");
+  if(results.some(r=>r.exported_at||r.redeemed_at||!r.code_ciphertext||!r.code_iv)) throw new CapError("STAGE_CONFLICT","batch is no longer available for first export","revoke and reissue if the release was lost");
+  return {batchId:first.batch_id,rows:results};
+}
 export const select:Handler=async(ctx,params)=>{
-  const aid=reqStr(params,"aid"); await assessment(ctx,aid,"member");
+  const aid=reqStr(params,"aid"), {row}=await assessment(ctx,aid,"member");
   const template_id=reqStr(params,"template_id"), version=optInt(params,"version",0,0);
   const t=await loadTemplate(ctx,template_id,version||undefined);
+  const collection_status=row.stage==="collect"?"open":"closed";
   const existing=await ctx.db.prepare("SELECT * FROM assessment_survey WHERE assessment_id = ? AND template_id = ? AND template_version = ?").bind(aid,t.id,t.version).first<SurveyRow>();
   if(existing){
-    if(existing.state==="archived") await ctx.db.prepare("UPDATE assessment_survey SET state = 'selected', archived_at = NULL WHERE id = ?").bind(existing.id).run();
-    return {result:{survey:{...existing,state:"selected",archived_at:null},selected:true},scope:{type:"assessment",id:aid},priorState:{state:existing.state,archived_at:existing.archived_at}};
+    if(existing.state==="selected") throw new CapError("STAGE_CONFLICT","template version is already selected");
+    await ctx.db.prepare("UPDATE assessment_survey SET state = 'selected', archived_at = NULL, collection_status = ? WHERE id = ?").bind(collection_status,existing.id).run();
+    return {result:{sid:existing.id,survey:{...existing,state:"selected",archived_at:null,collection_status},selected:true},scope:{type:"assessment",id:aid},priorState:{state:existing.state,archived_at:existing.archived_at}};
   }
   const id=newId("survey"), at=nowIso(ctx);
-  await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?, ?, ?, ?, 'selected', 'closed', ?)").bind(id,aid,t.id,t.version,at).run();
-  return {result:{survey:{id,assessment_id:aid,template_id:t.id,template_version:t.version,state:"selected",collection_status:"closed",created_at:at},selected:true},scope:{type:"assessment",id:aid}};
+  await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?, ?, ?, ?, 'selected', ?, ?)").bind(id,aid,t.id,t.version,collection_status,at).run();
+  return {result:{sid:id,survey:{id,assessment_id:aid,template_id:t.id,template_version:t.version,state:"selected",collection_status,created_at:at},selected:true},scope:{type:"assessment",id:aid}};
 };
 export const deselect:Handler=async(ctx,params)=>{
   const {aid,sid}=ids(params), row=await survey(ctx,aid,sid,"member");
@@ -74,16 +99,33 @@ export const send_links:Handler=async(ctx,params,opts)=>{
   throw new CapError("RESERVED_NOT_BUILT","link delivery is not configured","No mail transport; prepared links remain unsent");
 };
 export const issue_codes:Handler=async(ctx,params)=>{
-  const {aid,sid}=ids(params); await survey(ctx,aid,sid,"member");
-  // Hashes alone cannot power later export; no credential escrow is provisioned.
-  throw new CapError("RESERVED_NOT_BUILT","secure code release is not implemented","Requires encrypted-at-rest escrow or one-time confirmed disclosure");
+  only(params,["aid","sid","count"]);
+  const {aid,sid}=ids(params), selected=await survey(ctx,aid,sid,"member");
+  if(selected.state!=="selected") throw new CapError("STAGE_CONFLICT","archived survey cannot issue codes");
+  const count=optInt(params,"count",1,1,100), batchId=newId("batch"), at=nowIso(ctx);
+  const minted:{id:string;hash:string;ciphertext:string;iv:string}[]=[];
+  for(let n=0;n<count;n++) {
+    const id=newId("code"), code=randomCode();
+    const {ciphertext,iv}=await encryptCode(ctx.env.CODE_ESCROW_SECRET,code,id,sid,batchId);
+    minted.push({id,hash:await codeHash(ctx.env.CODE_ESCROW_SECRET,code),ciphertext,iv});
+  }
+  await ctx.db.batch(minted.map(c=>ctx.db.prepare("INSERT INTO access_code (id, assessment_survey_id, code_hash, code_ciphertext, code_iv, batch_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(c.id,sid,c.hash,c.ciphertext,c.iv,batchId,at)));
+  return {result:{count,ids:minted.map(c=>c.id)},scope:{type:"assessment",id:aid}};
 };
 export const export_codes:Handler=async(ctx,params,opts)=>{
-  const {aid,sid}=ids(params); await survey(ctx,aid,sid,"member");
-  const count=await countScalar(ctx,"SELECT COUNT(*) AS n FROM access_code WHERE assessment_survey_id = ? AND redeemed_at IS NULL",sid);
-  const impact={affected:[{survey:sid,codes:count}],irreversible:true,effect:"disclosure" as const,compensating_control:"revoke codes"};
-  if(opts?.dryRun) return {result:{count},scope:{type:"assessment",id:aid},impact};
-  throw new CapError("RESERVED_NOT_BUILT","secure code export is not implemented","Requires one-time confirmed disclosure or encrypted escrow");
+  only(params,["aid","sid","ids"]);
+  const {aid,sid}=ids(params), selected=await survey(ctx,aid,sid,"member");
+  if(selected.state!=="selected") throw new CapError("STAGE_CONFLICT","archived survey cannot export codes");
+  const requested=codeIds(params), {batchId,rows}=await exactBatch(ctx,sid,requested);
+  const impact={affected:[{survey:sid,code_ids:requested}],irreversible:true,effect:"disclosure" as const,compensating_control:"cap.survey.revoke_code"};
+  if(opts?.dryRun) return {result:{count:rows.length,ids:requested},scope:{type:"assessment",id:aid},impact};
+  // Decrypt before claiming the release; on failure nothing is marked exported.
+  const codes=await Promise.all(rows.map(async r=>({id:r.id,code:await decryptCode(ctx.env.CODE_ESCROW_SECRET,r.code_ciphertext!,r.code_iv!,r.id,sid,batchId)})));
+  const changed=await ctx.db.prepare("UPDATE access_code SET code_ciphertext = NULL, code_iv = NULL, exported_at = ? WHERE batch_id = ? AND assessment_survey_id = ? AND exported_at IS NULL AND redeemed_at IS NULL")
+    .bind(nowIso(ctx),batchId,sid).run();
+  if(changed.meta.changes!==rows.length) throw new CapError("STAGE_CONFLICT","batch changed during export","revoke and reissue");
+  return {result:{count:codes.length,codes},scope:{type:"assessment",id:aid},impact};
 };
 export const revoke_link:Handler=async(ctx,params)=>{
   const {aid,sid}=ids(params); await survey(ctx,aid,sid,"member");

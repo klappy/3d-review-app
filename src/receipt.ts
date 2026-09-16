@@ -94,13 +94,17 @@ export interface MintInput {
 }
 
 export function inverseLabel(cap: Capability): string {
+  // These proposed inverses are not yet true inverses of the implemented effects:
+  // batch issue needs batch revoke; deselect loses the template identity needed
+  // to reselect; support reissue cannot restore an already revoked old code.
+  if(["cap.survey.issue_codes", "cap.survey.deselect", "cap.support.unlock_participant"].includes(cap.id)) return "none";
   return cap.inverse.kind === "true" && cap.inverse.via ? cap.inverse.via : "none";
 }
 
 export async function mintReceipt(ctx: Ctx, input: MintInput): Promise<Receipt> {
   const { cap } = input;
   const at = ctx.now().toISOString();
-  const trueInverse = cap.inverse.kind === "true" && input.mode !== "dry_run";
+  const trueInverse = inverseLabel(cap)!=="none" && cap.inverse.kind === "true" && input.mode !== "dry_run";
   const receipt: Receipt = {
     id: newReceiptId(),
     actor: ctx.principal.id,
@@ -118,20 +122,56 @@ export async function mintReceipt(ctx: Ctx, input: MintInput): Promise<Receipt> 
 }
 
 async function persistReceipt(ctx: Ctx, r: Receipt, capabilityId: string, input: MintInput): Promise<void> {
-  // prior_state carries what undo needs: the prior values, the original params and the result ids.
-  const priorBlob = JSON.stringify({ prior: input.priorState ?? null, params: input.params, result_ids: pickIds(input.result) });
+  // A receipt is durable and may be inspected later. Persist only the fields
+  // needed by known inverse handlers; never store bearer tokens, codes, answers,
+  // addresses, arbitrary user payloads, or a reusable confirmation token.
+  const priorBlob = JSON.stringify({
+    prior: receiptFields(input.priorState, PRIOR_FIELDS[capabilityId] ?? []),
+    params: receiptFields(input.params, PARAM_FIELDS[capabilityId] ?? []),
+    result_ids: pickIds(input.result),
+  });
   try {
     await ctx.db
       .prepare(
         `INSERT INTO receipt (id, actor, capability, scope_type, scope_id, class, inverse, undo_token, confirm_token, trace_id, prior_state_json, at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
       )
-      .bind(r.id, r.actor, capabilityId, r.scope.type, r.scope.id, r.class, r.inverse, r.undo_token ?? null, input.confirmToken ?? null, r.trace_id, priorBlob, r.at)
+      .bind(r.id, r.actor, capabilityId, r.scope.type, r.scope.id, r.class, r.inverse, r.undo_token ?? null, null, r.trace_id, priorBlob, r.at)
       .run();
   } catch (e) {
     ctx.log("receipt.persist.failed", { error: String(e) });
     throw e;
   }
+}
+
+const PARAM_FIELDS: Record<string, readonly string[]> = {
+  "cap.workspace.update": ["id"], "cap.workspace.archive": ["id"], "cap.workspace.unarchive": ["id"],
+  "cap.workspace.add_project": ["id","pid"], "cap.workspace.remove_project": ["id","pid"],
+  "cap.project.update": ["id"], "cap.project.archive": ["id"], "cap.project.unarchive": ["id"],
+  "cap.assessment.update": ["id"], "cap.assessment.set_stage": ["id"],
+  "cap.assessment.archive": ["id"], "cap.assessment.unarchive": ["id"], "cap.assessment.notes.update": ["id"],
+  "cap.survey.select": ["aid"], "cap.survey.deselect": ["aid","sid"],
+};
+const PRIOR_FIELDS: Record<string, readonly string[]> = {
+  "cap.workspace.update": ["name"], "cap.workspace.archive": ["archived_at"], "cap.workspace.unarchive": ["archived_at"],
+  "cap.workspace.add_project": ["workspace_id"], "cap.workspace.remove_project": ["workspace_id"],
+  "cap.project.update": ["name","organization"], "cap.project.archive": ["archived_at"], "cap.project.unarchive": ["archived_at"],
+  "cap.assessment.update": ["name","purpose","period","language_id","format"],
+  "cap.assessment.set_stage": ["stage"], "cap.assessment.archive": ["archived_at"], "cap.assessment.unarchive": ["archived_at"],
+  // Declared self:restore-prior undo requires the previous notes. This is
+  // sensitive application data; receipt access and retention need owner review.
+  "cap.assessment.notes.update": ["notes_reflection","notes_next_steps"],
+  "cap.survey.select": ["state","archived_at"], "cap.survey.deselect": ["state","archived_at"],
+};
+function receiptFields(source: Record<string,unknown> | undefined, allowed: readonly string[]): Record<string,unknown> | null {
+  if(!source) return null;
+  const out:Record<string,unknown>={};
+  for(const key of allowed) {
+    const value=source[key];
+    if(value===null||typeof value==="string"||typeof value==="number"||typeof value==="boolean") out[key]=value;
+    else if(key==="ids"&&Array.isArray(value)&&value.every(x=>typeof x==="string")) out[key]=value;
+  }
+  return out;
 }
 
 /** Keys that look like ids (id, aid, sid, *_id) — what an inverse capability needs to address the row. */

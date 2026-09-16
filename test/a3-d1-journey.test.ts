@@ -16,6 +16,7 @@ describe("A-3 restored-schema D1 journey", () => {
       .split("\n").filter((line) => !line.trimStart().startsWith("--")).join("\n");
     const statements = (path: string) => sql(path).split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s));
     await db.batch(statements("../migrations/0001_init.sql"));
+    await db.batch(statements("../migrations/0002_code_escrow.sql"));
     await db.batch(statements("../seed/synthetic.sql"));
     const code = "A3-TEST-CODE";
     await db.prepare("INSERT INTO access_code (id, assessment_survey_id, code_hash, created_at) VALUES (?, ?, ?, ?)")

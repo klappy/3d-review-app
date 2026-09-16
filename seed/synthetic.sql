@@ -1,7 +1,8 @@
 -- Invented demonstration identities and languages only; no real participants.
 PRAGMA foreign_keys = ON;
 INSERT INTO principal (id,email_hash,provisioned,support,created_at) VALUES
- ('person_mara', 'synthetic_hash_mara', 1, 0, '2026-09-16T12:00:00.000Z'),
+ -- SHA-256(lowercase('demo.owner@example.invalid')): local-only reserved-domain sign-in fixture.
+ ('person_mara', 'd18a316e892d81bd12c1e2178a94eb8005c0ee9dffe74525c11ac25cd57e5cf5', 1, 0, '2026-09-16T12:00:00.000Z'),
  ('person_ion', 'synthetic_hash_ion', 0, 0, '2026-09-16T12:00:00.000Z');
 INSERT INTO workspace (id,name,created_at,created_by) VALUES
  ('ws_cedar','Cedar Workshop','2026-09-16T12:00:00.000Z','person_mara');
