@@ -94,13 +94,16 @@ export interface MintInput {
 }
 
 export function inverseLabel(cap: Capability): string {
+  // A batch of codes cannot be safely reversed by the single-code revoke
+  // handler. Hold the contract's proposed inverse until batch undo exists.
+  if(cap.id==="cap.survey.issue_codes") return "none";
   return cap.inverse.kind === "true" && cap.inverse.via ? cap.inverse.via : "none";
 }
 
 export async function mintReceipt(ctx: Ctx, input: MintInput): Promise<Receipt> {
   const { cap } = input;
   const at = ctx.now().toISOString();
-  const trueInverse = cap.inverse.kind === "true" && input.mode !== "dry_run";
+  const trueInverse = cap.id!=="cap.survey.issue_codes" && cap.inverse.kind === "true" && input.mode !== "dry_run";
   const receipt: Receipt = {
     id: newReceiptId(),
     actor: ctx.principal.id,
@@ -154,7 +157,9 @@ const PRIOR_FIELDS: Record<string, readonly string[]> = {
   "cap.project.update": ["name","organization"], "cap.project.archive": ["archived_at"], "cap.project.unarchive": ["archived_at"],
   "cap.assessment.update": ["name","purpose","period","language_id","format"],
   "cap.assessment.set_stage": ["stage"], "cap.assessment.archive": ["archived_at"], "cap.assessment.unarchive": ["archived_at"],
-  // Free-text notes are deliberately not retained in durable receipt rows.
+  // Declared self:restore-prior undo requires the previous notes. This is
+  // sensitive application data; receipt access and retention need owner review.
+  "cap.assessment.notes.update": ["notes_reflection","notes_next_steps"],
   "cap.survey.select": ["state","archived_at"], "cap.survey.deselect": ["state","archived_at"],
 };
 function receiptFields(source: Record<string,unknown> | undefined, allowed: readonly string[]): Record<string,unknown> | null {

@@ -15,6 +15,17 @@ function keyBytes(secret: string | undefined): Uint8Array {
 async function key(secret: string | undefined): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", keyBytes(secret), "AES-GCM", false, ["encrypt", "decrypt"]);
 }
+async function hashKey(secret: string | undefined): Promise<CryptoKey> {
+  const material=await crypto.subtle.importKey("raw",keyBytes(secret),"HKDF",false,["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    {name:"HKDF",hash:"SHA-256",salt:enc.encode("3d-review/code-hash/salt/v1"),info:enc.encode("3d-review/code-hash/hmac/v1")},
+    material,{name:"HMAC",hash:"SHA-256",length:256},false,["sign"]);
+}
+/** Opaque keyed lookup digest. A leaked D1 database alone cannot brute-force short codes. */
+export async function codeHash(secret:string|undefined,code:string):Promise<string> {
+  const mac=await crypto.subtle.sign("HMAC",await hashKey(secret),enc.encode(code.trim().toUpperCase()));
+  return [...new Uint8Array(mac)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
 function aad(id: string, surveyId: string, batchId: string): Uint8Array {
   return enc.encode(JSON.stringify([id, surveyId, batchId]));
 }

@@ -7,6 +7,7 @@ import { sha256 } from "../src/handlers/common";
 import type { Ctx } from "../src/handlers/types";
 import { b64url, checkConfirmToken, paramsHash } from "../src/receipt";
 import { sourceSha } from "../src/registry";
+import { codeHash } from "../src/code-escrow";
 
 const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:"escrow",modules:true,script:"export default { fetch() { return new Response('ok') } }",d1Databases:{DB:"escrow-test-db"}}]}));
 afterAll(()=>mf.dispose());
@@ -29,6 +30,8 @@ describe("one-time code escrow and confirmed release",()=>{
     const issue=await execute(context(),"cap.survey.issue_codes",{aid:"assess_tavo_collect",sid:"survey_tavo",count:3},{tool:"write"});
     expect(issue.ok).toBe(true);
     if(!issue.ok) throw new Error("issue failed");
+    expect(issue.receipt?.undo_token).toBeUndefined(); // batch inverse held, never fake an undo
+    expect(issue.receipt?.inverse).toBe("none");
     expect(Object.keys(issue.result).sort()).toEqual(["count","ids"]);
     const ids=issue.result.ids as string[];
     expect(ids).toHaveLength(3);
@@ -56,7 +59,10 @@ describe("one-time code escrow and confirmed release",()=>{
     if(!released.ok) throw new Error("release failed");
     const codes=released.result.codes as {id:string;code:string}[];
     expect(codes).toHaveLength(3);
-    for(const c of codes) expect(stored.results.find(r=>r.id===c.id)?.code_hash).toBe(await sha256(c.code));
+    for(const c of codes) {
+      expect(stored.results.find(r=>r.id===c.id)?.code_hash).toBe(await codeHash(secret,c.code));
+      expect(stored.results.find(r=>r.id===c.id)?.code_hash).not.toBe(await sha256(c.code));
+    }
     const cleared=await db.prepare("SELECT code_ciphertext,code_iv,exported_at FROM access_code WHERE id IN (?, ?, ?)").bind(...ids).all<{code_ciphertext:string|null;code_iv:string|null;exported_at:string|null}>();
     expect(cleared.results.every(r=>r.code_ciphertext===null&&r.code_iv===null&&!!r.exported_at)).toBe(true);
     const exportReceipt=await db.prepare("SELECT confirm_token,prior_state_json FROM receipt WHERE capability = 'cap.survey.export_codes'").first<{confirm_token:string|null;prior_state_json:string}>();
@@ -88,6 +94,25 @@ describe("one-time code escrow and confirmed release",()=>{
     const arbitrary="generic-param-secret-sentinel";
     const logout=await execute(context(),"cap.auth.logout",{arbitrary},{tool:"write"});
     expect(logout.ok).toBe(true);
+
+    const firstNotes=await execute(context(),"cap.assessment.notes.update",{id:"assess_tavo_collect",notes_reflection:"Synthetic first reflection"},{tool:"write"});
+    expect(firstNotes.ok).toBe(true);
+    const secondNotes=await execute(context(),"cap.assessment.notes.update",{id:"assess_tavo_collect",notes_reflection:"Synthetic second reflection"},{tool:"write"});
+    expect(secondNotes.ok).toBe(true);
+    if(!secondNotes.ok) throw new Error("notes update failed");
+    const noteReceipt=await db.prepare("SELECT prior_state_json FROM receipt WHERE id = ?").bind(secondNotes.receipt?.id).first<{prior_state_json:string}>();
+    expect(JSON.parse(noteReceipt!.prior_state_json)).toMatchObject({prior:{notes_reflection:"Synthetic first reflection"},params:{id:"assess_tavo_collect"}});
+    const undone=await execute(context(),"cap.ops.undo",{token:secondNotes.receipt?.undo_token},{tool:"write"});
+    expect(undone.ok).toBe(true);
+    const restored=await db.prepare("SELECT notes_reflection FROM assessment WHERE id = ?").bind("assess_tavo_collect").first<{notes_reflection:string}>();
+    expect(restored?.notes_reflection).toBe("Synthetic first reflection");
+    const selected=await execute(context(),"cap.survey.select",{aid:"assess_tavo_collect",template_id:"tpl_audio",version:1},{tool:"write"});
+    expect(selected.ok).toBe(true);
+    if(!selected.ok) throw new Error("survey select failed");
+    const selectedSid=selected.result.sid as string;
+    const undoneSelection=await execute(context(),"cap.ops.undo",{token:selected.receipt?.undo_token},{tool:"write"});
+    expect(undoneSelection.ok).toBe(true);
+    expect(await db.prepare("SELECT id FROM assessment_survey WHERE id = ?").bind(selectedSid).first()).toBeNull();
 
     const audit=await db.prepare("SELECT prior_state_json,confirm_token FROM receipt").all<{prior_state_json:string;confirm_token:string|null}>();
     const traces=await db.prepare("SELECT spans_json FROM trace").all<{spans_json:string}>();

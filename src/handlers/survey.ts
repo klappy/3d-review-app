@@ -2,7 +2,7 @@
 import type { Ctx, Handler, Role } from "./types";
 import { CapError, notVisible } from "./errors";
 import { countScalar, gate, loadTemplate, newId, nowIso, optInt, parseItems, randomToken, renderItems, reqStr, roleAt, sha256, type AssessmentRow, type SurveyRow } from "./common";
-import { decryptCode, encryptCode } from "../code-escrow";
+import { codeHash, decryptCode, encryptCode } from "../code-escrow";
 import { randomCode } from "./common";
 
 async function assessment(ctx:Ctx,id:string,min:Role="viewer") {
@@ -44,12 +44,13 @@ export const select:Handler=async(ctx,params)=>{
   const t=await loadTemplate(ctx,template_id,version||undefined);
   const existing=await ctx.db.prepare("SELECT * FROM assessment_survey WHERE assessment_id = ? AND template_id = ? AND template_version = ?").bind(aid,t.id,t.version).first<SurveyRow>();
   if(existing){
+    if(existing.state==="selected") throw new CapError("STAGE_CONFLICT","template version is already selected");
     if(existing.state==="archived") await ctx.db.prepare("UPDATE assessment_survey SET state = 'selected', archived_at = NULL WHERE id = ?").bind(existing.id).run();
-    return {result:{survey:{...existing,state:"selected",archived_at:null},selected:true},scope:{type:"assessment",id:aid},priorState:{state:existing.state,archived_at:existing.archived_at}};
+    return {result:{sid:existing.id,survey:{...existing,state:"selected",archived_at:null},selected:true},scope:{type:"assessment",id:aid},priorState:{state:existing.state,archived_at:existing.archived_at}};
   }
   const id=newId("survey"), at=nowIso(ctx);
   await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?, ?, ?, ?, 'selected', 'closed', ?)").bind(id,aid,t.id,t.version,at).run();
-  return {result:{survey:{id,assessment_id:aid,template_id:t.id,template_version:t.version,state:"selected",collection_status:"closed",created_at:at},selected:true},scope:{type:"assessment",id:aid}};
+  return {result:{sid:id,survey:{id,assessment_id:aid,template_id:t.id,template_version:t.version,state:"selected",collection_status:"closed",created_at:at},selected:true},scope:{type:"assessment",id:aid}};
 };
 export const deselect:Handler=async(ctx,params)=>{
   const {aid,sid}=ids(params), row=await survey(ctx,aid,sid,"member");
@@ -105,7 +106,7 @@ export const issue_codes:Handler=async(ctx,params)=>{
   for(let n=0;n<count;n++) {
     const id=newId("code"), code=randomCode();
     const {ciphertext,iv}=await encryptCode(ctx.env.CODE_ESCROW_SECRET,code,id,sid,batchId);
-    minted.push({id,hash:await sha256(code),ciphertext,iv});
+    minted.push({id,hash:await codeHash(ctx.env.CODE_ESCROW_SECRET,code),ciphertext,iv});
   }
   await ctx.db.batch(minted.map(c=>ctx.db.prepare("INSERT INTO access_code (id, assessment_survey_id, code_hash, code_ciphertext, code_iv, batch_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .bind(c.id,sid,c.hash,c.ciphertext,c.iv,batchId,at)));
