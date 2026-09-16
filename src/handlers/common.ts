@@ -130,7 +130,7 @@ export interface AssessmentRow {
   stage: Stage; notes_reflection: string | null; notes_next_steps: string | null; archived_at: string | null; created_at: string;
 }
 export interface TemplateRow { id: string; name: string; version: number; perspective: string; source_ref: string | null; items_json: string; scoring_json: string; published_at: string | null }
-export interface SurveyRow { id: string; assessment_id: string; template_id: string; template_version: number; state: "selected" | "archived"; archived_at: string | null; created_at: string }
+export interface SurveyRow { id: string; assessment_id: string; template_id: string; template_version: number; state: "selected" | "archived"; collection_status: "open" | "closed"; archived_at: string | null; created_at: string }
 
 export async function loadWorkspace(ctx: Ctx, id: string, min: Role = "viewer"): Promise<{ row: WorkspaceRow; role: Role }> {
   const row = await ctx.db.prepare("SELECT * FROM workspace WHERE id = ?").bind(id).first<WorkspaceRow>();

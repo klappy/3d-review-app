@@ -39,18 +39,19 @@ async function exactBatch(ctx:Ctx,sid:string,requested:string[]):Promise<{batchI
   return {batchId:first.batch_id,rows:results};
 }
 export const select:Handler=async(ctx,params)=>{
-  const aid=reqStr(params,"aid"); await assessment(ctx,aid,"member");
+  const aid=reqStr(params,"aid"), {row}=await assessment(ctx,aid,"member");
   const template_id=reqStr(params,"template_id"), version=optInt(params,"version",0,0);
   const t=await loadTemplate(ctx,template_id,version||undefined);
+  const collection_status=row.stage==="collect"?"open":"closed";
   const existing=await ctx.db.prepare("SELECT * FROM assessment_survey WHERE assessment_id = ? AND template_id = ? AND template_version = ?").bind(aid,t.id,t.version).first<SurveyRow>();
   if(existing){
     if(existing.state==="selected") throw new CapError("STAGE_CONFLICT","template version is already selected");
-    if(existing.state==="archived") await ctx.db.prepare("UPDATE assessment_survey SET state = 'selected', archived_at = NULL WHERE id = ?").bind(existing.id).run();
-    return {result:{sid:existing.id,survey:{...existing,state:"selected",archived_at:null},selected:true},scope:{type:"assessment",id:aid},priorState:{state:existing.state,archived_at:existing.archived_at}};
+    await ctx.db.prepare("UPDATE assessment_survey SET state = 'selected', archived_at = NULL, collection_status = ? WHERE id = ?").bind(collection_status,existing.id).run();
+    return {result:{sid:existing.id,survey:{...existing,state:"selected",archived_at:null,collection_status},selected:true},scope:{type:"assessment",id:aid},priorState:{state:existing.state,archived_at:existing.archived_at}};
   }
   const id=newId("survey"), at=nowIso(ctx);
-  await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?, ?, ?, ?, 'selected', 'closed', ?)").bind(id,aid,t.id,t.version,at).run();
-  return {result:{sid:id,survey:{id,assessment_id:aid,template_id:t.id,template_version:t.version,state:"selected",collection_status:"closed",created_at:at},selected:true},scope:{type:"assessment",id:aid}};
+  await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?, ?, ?, ?, 'selected', ?, ?)").bind(id,aid,t.id,t.version,collection_status,at).run();
+  return {result:{sid:id,survey:{id,assessment_id:aid,template_id:t.id,template_version:t.version,state:"selected",collection_status,created_at:at},selected:true},scope:{type:"assessment",id:aid}};
 };
 export const deselect:Handler=async(ctx,params)=>{
   const {aid,sid}=ids(params), row=await survey(ctx,aid,sid,"member");
