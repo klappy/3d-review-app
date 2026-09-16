@@ -90,7 +90,7 @@ function answersFromForm() {
 }
 bindForm('request-login', 'Requesting local code…', async fd => {
   const result = await api('/v2/auth/link', { method: 'POST', body: { email: String(fd.get('email')).trim() } });
-  text($('dev-code'), result.dev_only_code ? `Local synthetic code: ${result.dev_only_code}` : 'Code requested. Delivery is not configured on this local phase.');
+  text($('dev-code'), result.dev_only_code ? `Synthetic sandbox code: ${result.dev_only_code}` : 'Code requested. Delivery is not configured for this phase.');
   $('consume-login').elements.email.value = fd.get('email');
 });
 bindForm('consume-login', 'Signing in…', async fd => {
