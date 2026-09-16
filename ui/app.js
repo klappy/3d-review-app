@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), project: null, assessment: null, survey: null, form: null, answers: null, responseKey: null };
+const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), project: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null };
 const path = (value) => encodeURIComponent(value);
 function note(message) { $('notice').textContent = message; $('error').hidden = true; }
 function fail(message) { $('error').textContent = message; $('error').hidden = false; $('notice').textContent = 'Action needs attention. No completion is assumed.'; }
@@ -13,7 +13,7 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   if (body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
   let response;
-  try { response = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin' }); }
+  try { response = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); }
   catch { throw new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); }
   let data;
   try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
@@ -24,7 +24,7 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
 async function run(label, task) {
   note(label); const buttons = [...document.querySelectorAll('button')]; buttons.forEach(b => b.disabled = true);
   try { await task(); note(`${label} — complete.`); } catch (error) { fail(error.message); }
-  finally { buttons.forEach(b => b.disabled = false); }
+  finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : false); }
 }
 function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget))); }); }
 function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler)); }
@@ -39,6 +39,7 @@ async function projects() {
 }
 async function chooseProject() {
   state.project = $('projects').value || null; state.assessment = null; state.survey = null;
+  clearCodeBatch();
   resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
   if (!state.project) return;
   const result = await api(`/v2/projects/${path(state.project)}`);
@@ -54,9 +55,12 @@ async function assessments() {
 }
 async function chooseAssessment() {
   state.assessment = $('assessments').value || null; state.survey = null; resetSelect($('surveys'), 'Choose survey');
+  clearCodeBatch();
   if (!state.assessment) return;
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
+  const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
+  if (next) $('stage-target').value = next;
   for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
   if (result.surveys?.length === 1) { $('surveys').value = result.surveys[0].id; state.survey = result.surveys[0].id; }
 }
@@ -99,6 +103,12 @@ $('projects').addEventListener('change', () => run('Loading project…', chooseP
 bindForm('create-project', 'Creating project…', async fd => { const result = await api('/v2/projects', { method: 'POST', body: { name: String(fd.get('name')).trim() } }); state.project = result.project.id; await projects(); $('projects').value = state.project; await chooseProject(); });
 bindClick('load-assessments', 'Loading assessments…', assessments);
 $('assessments').addEventListener('change', () => run('Loading assessment…', chooseAssessment));
+bindClick('set-stage', 'Moving assessment stage…', async () => {
+  const aid = required(state.assessment, 'Choose an assessment.');
+  await api(`/v2/assessments/${path(aid)}/stage`, { method: 'POST', body: { stage: $('stage-target').value } });
+  await chooseAssessment();
+  if (state.survey) await surveyStatus();
+});
 bindForm('create-assessment', 'Creating assessment…', async fd => {
   const pid = required(state.project, 'Choose a project.'); const result = await api(`/v2/projects/${path(pid)}/assessments`, { method: 'POST', body: { name: String(fd.get('name')).trim(), language_id: String(fd.get('language')) } });
   state.assessment = result.assessment.id; await assessments(); $('assessments').value = state.assessment; await chooseAssessment();
@@ -109,13 +119,46 @@ bindClick('select-survey', 'Selecting survey…', async () => {
   const [template_id, version] = selected.split('@'); const result = await api(`/v2/assessments/${path(aid)}/surveys`, { method: 'POST', body: { template_id, version: Number(version) } });
   const sid = result.survey.id; await chooseAssessment(); state.survey = sid; $('surveys').value = sid; await surveyStatus();
 });
-$('surveys').addEventListener('change', () => { state.survey = $('surveys').value || null; });
+$('surveys').addEventListener('change', () => { state.survey = $('surveys').value || null; clearCodeBatch(); });
 async function surveyStatus() {
   const aid = required(state.assessment, 'Choose an assessment.'), sid = required(state.survey, 'Choose a survey.');
   const result = await api(`/v2/assessments/${path(aid)}/surveys/${path(sid)}`);
   text($('survey-detail'), `${result.survey.template_name} · ${result.survey.collection_status} · ${result.counts.responses} response(s)`);
 }
 bindClick('survey-status', 'Checking survey…', surveyStatus);
+function clearCodeBatch() {
+  state.codeIds = null; state.confirmToken = null;
+  text($('issued-ids'), 'No code batch issued in this page session.');
+  text($('export-impact'), ''); text($('codes-output'), ''); $('codes-output').hidden = true;
+  $('release-codes').disabled = true;
+}
+function codeRoute() {
+  const aid = required(state.assessment, 'Choose an assessment.'), sid = required(state.survey, 'Choose a survey.');
+  return `/v2/assessments/${path(aid)}/surveys/${path(sid)}/codes`;
+}
+bindClick('issue-codes', 'Issuing code IDs…', async () => {
+  const count = Number($('code-count').value);
+  if (!Number.isInteger(count) || count < 1 || count > 100) throw new Error('Code count must be 1–100.');
+  const result = await api(codeRoute(), { method: 'POST', body: { count } });
+  state.codeIds = result.ids; state.confirmToken = null;
+  text($('issued-ids'), `${result.count} code ID(s) issued: ${result.ids.join(', ')}`);
+  text($('export-impact'), 'Preview and confirm to reveal code values.');
+  text($('codes-output'), ''); $('codes-output').hidden = true;
+});
+bindClick('preview-export', 'Previewing credential release…', async () => {
+  const ids = required(state.codeIds, 'Issue a code batch in this page session first.');
+  const result = await api(`${codeRoute()}/export`, { method: 'POST', body: { params: { ids }, mode: 'dry_run' } });
+  state.confirmToken = result.confirm_token;
+  text($('export-impact'), `Release ${result.count} code value(s) once; impact: ${JSON.stringify(result.impact)}. Confirmation expires in ${result.expires_in} seconds.`);
+});
+bindClick('release-codes', 'Releasing credential values…', async () => {
+  const ids = required(state.codeIds, 'Issue a code batch first.'), confirm_token = required(state.confirmToken, 'Preview export again.');
+  state.confirmToken = null; // a failed/uncertain release requires a fresh preview
+  const result = await api(`${codeRoute()}/export`, { method: 'POST', body: { params: { ids }, mode: 'execute', confirm_token } });
+  text($('codes-output'), result.codes.map(entry => `${entry.id}: ${entry.code}`).join('\n'));
+  $('codes-output').hidden = false;
+  text($('export-impact'), 'Released once. Save/print now; these values cannot be exported again.');
+});
 bindClick('load-results', 'Reading result state…', async () => {
   const aid = required(state.assessment, 'Choose an assessment.'); const result = await api(`/v2/assessments/${path(aid)}/results`);
   text($('results'), result.suppressed ? `Suppressed / ${result.status}: ${result.reason || 'Disclosure policy pending'}` : JSON.stringify(result));

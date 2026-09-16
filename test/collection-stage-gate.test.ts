@@ -18,6 +18,7 @@ describe("explicit Collect stage gates selected surveys", () => {
       .split("\n").filter(line => !line.trimStart().startsWith("--")).join("\n")
       .split(";").map(s => s.trim()).filter(Boolean).map(s => db.prepare(s));
     await db.batch(statements("../migrations/0001_init.sql"));
+    await db.batch(statements("../migrations/0002_code_escrow.sql"));
     await db.batch(statements("../seed/synthetic.sql"));
     const ctx: Ctx = { env: { DB: db, SESSION_SECRET: "synthetic-only" }, db,
       principal: { kind: "user", id: "person_mara" }, traceId: "tr_collection_gate",

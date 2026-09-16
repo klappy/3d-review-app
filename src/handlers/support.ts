@@ -3,7 +3,8 @@
 // cap.support.acts_as stays 501 (HUMAN-ONLY provisioning + audit design is Lane A's escrow/receipt work).
 import type { Handler } from "./types";
 import { CapError, notVisible } from "./errors";
-import { auditRow, newId, nowIso, randomCode, reqStr, requireSupport, sha256 } from "./common";
+import { auditRow, newId, nowIso, randomCode, reqStr, requireSupport } from "./common";
+import { codeHash, encryptCode } from "../code-escrow";
 
 export const unlock_participant: Handler = async (ctx, p) => {
   requireSupport(ctx);
@@ -13,8 +14,10 @@ export const unlock_participant: Handler = async (ctx, p) => {
   if (!old) throw notVisible("code");
   const survey = await ctx.db.prepare("SELECT id, assessment_id FROM assessment_survey WHERE id = ?").bind(old.assessment_survey_id).first<{ id: string; assessment_id: string }>();
   if (!survey) throw notVisible("survey");
-  const newId_ = newId("code"); const value = randomCode();
-  const stmts = [ctx.db.prepare("INSERT INTO access_code (id, assessment_survey_id, code_hash, created_at) VALUES (?,?,?,?)").bind(newId_, survey.id, await sha256(value), nowIso(ctx))];
+  const newId_ = newId("code"), batchId = newId("batch"), value = randomCode();
+  const { ciphertext, iv } = await encryptCode(ctx.env.CODE_ESCROW_SECRET, value, newId_, survey.id, batchId);
+  const stmts = [ctx.db.prepare("INSERT INTO access_code (id, assessment_survey_id, code_hash, code_ciphertext, code_iv, batch_id, created_at) VALUES (?,?,?,?,?,?,?)")
+    .bind(newId_, survey.id, await codeHash(ctx.env.CODE_ESCROW_SECRET, value), ciphertext, iv, batchId, nowIso(ctx))];
   if (!old.redeemed_at) stmts.push(ctx.db.prepare("DELETE FROM access_code WHERE id = ?").bind(old.id));
   await ctx.db.batch(stmts);
   const scope = { type: "assessment" as const, id: survey.assessment_id };

@@ -1,6 +1,7 @@
 // Separate 256-bit key, independent of session/confirmation signing.
-// Rotate by retiring unexported batches first; old ciphertext cannot be
-// decrypted after rotation. Never log the key, code, plaintext, or ciphertext.
+// Rotation also invalidates keyed lookup for exported but unredeemed codes.
+// Retire/revoke all outstanding codes before rotation, or introduce versioned
+// lookup keys. Never log the key, code, plaintext, or ciphertext.
 import { CapError } from "./handlers/errors";
 import { b64url, b64urlDecode } from "./receipt";
 
