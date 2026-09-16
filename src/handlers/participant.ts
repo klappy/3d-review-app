@@ -5,15 +5,15 @@ import { newId, nowIso, randomToken, reqStr, sha256 } from "./common";
 
 interface Entry { id: string; assessment_survey_id: string; state: string; expires_at?: string | null }
 
-async function ensureSurveyOpen(ctx: Ctx, surveyId: string) {
+async function ensureSurveyOpen(ctx: Ctx, surveyId: string, allowClosed = false) {
   const survey = await ctx.db.prepare("SELECT s.id, s.state, a.stage FROM assessment_survey s JOIN assessment a ON a.id = s.assessment_id WHERE s.id = ?")
     .bind(surveyId).first<{ id: string; state: string; stage: string }>();
   if (!survey) throw notVisible("invitation");
-  if (survey.state !== "selected" || survey.stage !== "collect") throw new CapError("STAGE_CONFLICT", "survey is not collecting responses");
+  if (survey.state !== "selected" || (!allowClosed && survey.stage !== "collect")) throw new CapError("STAGE_CONFLICT", "survey is not collecting responses");
 }
 
-async function issue(ctx: Ctx, surveyId: string, respondentId: string) {
-  await ensureSurveyOpen(ctx, surveyId);
+async function issue(ctx: Ctx, surveyId: string, respondentId: string, allowClosed = false) {
+  await ensureSurveyOpen(ctx, surveyId, allowClosed);
   const token = randomToken("pt");
   await ctx.db.prepare("INSERT INTO participant_session (id, assessment_survey_id, respondent_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(newId("ps"), surveyId, respondentId, await sha256(token), nowIso(ctx), new Date(ctx.now().getTime() + 12 * 3600_000).toISOString()).run();
@@ -40,7 +40,7 @@ export const open_link: Handler = async (ctx, params) => {
   if (!row || (row as any).scope_type !== "survey" || (row.expires_at && row.expires_at <= nowIso(ctx)) || row.state !== "sent") throw notVisible("invitation");
   // Invitation links are reusable so that reopening a receipt remains possible.
   const respondentId = `invitee_${row.id}`;
-  return issue(ctx, (row as any).scope_id, respondentId);
+  return issue(ctx, (row as any).scope_id, respondentId, true);
 };
 
 export const handlers: Record<string, Handler> = {
