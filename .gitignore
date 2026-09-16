@@ -9,3 +9,5 @@ fixtures/real/
 .dev.vars
 node_modules/
 .wrangler/
+
+dist/

@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+const base=process.env.API_URL||'http://127.0.0.1:8787';
+let cookie='',token='';
+async function call(path,{method='GET',body,participant=false,key}={}){
+ const headers={Origin:'http://127.0.0.1:5173'};
+ if(body!==undefined)headers['Content-Type']='application/json';
+ if(cookie&&!participant)headers.Cookie=cookie;
+ if(participant&&token)headers.Authorization=`Bearer ${token}`;
+ if(method!=='GET')headers['Idempotency-Key']=key||crypto.randomUUID();
+ const r=await fetch(base+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});
+ const c=r.headers.get('set-cookie');if(c)cookie=c.split(';')[0];
+ const j=await r.json();return {status:r.status,body:j,result:j.result};
+}
+const login=await call('/v2/dev/session',{method:'POST',body:{}});assert.equal(login.body.ok,true,JSON.stringify(login.body));
+const p=await call('/v2/projects',{method:'POST',body:{name:'Integration smoke synthetic'}});assert.equal(p.body.ok,true,JSON.stringify(p.body));
+const a=await call(`/v2/projects/${p.result.project_id}/assessments`,{method:'POST',body:{name:'Synthetic review',language:{new:{label:'Synthetic language',code:'syn'}}}});assert.equal(a.body.ok,true,JSON.stringify(a.body));
+const aid=a.result.assessment_id;
+const t=await call('/v2/templates');assert.equal(t.body.ok,true);const template=t.result.items[0];
+const s=await call(`/v2/assessments/${aid}/surveys`,{method:'POST',body:{template_id:template.template_id,template_version:template.version}});assert.equal(s.body.ok,true,JSON.stringify(s.body));
+const current=await call(`/v2/assessments/${aid}`);
+const stage=await call(`/v2/assessments/${aid}/stage`,{method:'POST',body:{stage:'collect',expected_revision:current.result.revision}});assert.equal(stage.body.ok,true,JSON.stringify(stage.body));
+const path=`/v2/assessments/${aid}/surveys/${s.result.assessment_survey_id}`;
+const batch=await call(path+'/codes',{method:'POST',body:{count:1}});assert.equal(batch.body.ok,true,JSON.stringify(batch.body));assert.ok(!JSON.stringify(batch.result).includes('"code":'));
+const dry=await call(path+'/codes/export',{method:'POST',body:{batch_id:batch.result.batch_id,mode:'dry_run'}});assert.equal(dry.body.ok,true,JSON.stringify(dry.body));
+const exp=await call(path+'/codes/export',{method:'POST',body:{batch_id:batch.result.batch_id,mode:'execute',confirm_token:dry.result.confirm_token}});assert.equal(exp.body.ok,true,JSON.stringify(exp.body));
+const redeemed=await call('/v2/participate/code',{method:'POST',body:{code:exp.result.codes[0].code},participant:true});assert.equal(redeemed.body.ok,true,JSON.stringify(redeemed.body));token=redeemed.result.participant_token;
+const form=await call('/v2/participate/form',{participant:true});assert.equal(form.body.ok,true,JSON.stringify(form.body));
+const answers=form.result.items.map(item=>({item_id:item.item_id,value:item.options?.length?item.options[0].option_id:'Synthetic response'}));
+const payload={template_version:form.result.template_version,form_revision:form.result.form_revision,answers};const key=crypto.randomUUID();
+const submitted=await call('/v2/participate/responses',{method:'POST',body:payload,participant:true,key});assert.equal(submitted.body.ok,true,JSON.stringify(submitted.body));
+const replay=await call('/v2/participate/responses',{method:'POST',body:payload,participant:true,key});assert.equal(replay.body.ok,true);assert.equal(replay.result.response_id,submitted.result.response_id);assert.equal(replay.body.receipt.id,submitted.body.receipt.id);
+const receipt=await call('/v2/participate/receipt',{participant:true});assert.equal(receipt.result.response_id,submitted.result.response_id);
+const denied=await call(`/v2/assessments/${aid}/results`,{participant:true});assert.notEqual(denied.body.ok,true);
+const result=await call(`/v2/assessments/${aid}/results`);assert.equal(result.body.ok,true,JSON.stringify(result.body));assert.equal(result.result.synthetic_submission_count,1);assert.equal(result.result.suppressed,true);
+console.log(JSON.stringify({passed:true,assertions:['durable collection journey','credential-free issue','confirmed export','participant scope','idempotent response and receipt','honest held scoring'],assessment_id:aid,response_id:submitted.result.response_id,summary:result.result},null,2));

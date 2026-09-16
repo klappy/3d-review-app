@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS languages (id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(id),label TEXT NOT NULL,code TEXT);

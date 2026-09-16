@@ -1,0 +1,4 @@
+ALTER TABLE assessments ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE access_codes ADD COLUMN batch_id TEXT;
+ALTER TABLE intents ADD COLUMN code_ids TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE intents ADD COLUMN batch_id TEXT;
