@@ -33,9 +33,17 @@ describe("pinned source per-item projection, never public aggregates", () => {
     expect(scoreSourceItem(indicator, ["leave-it"])).toMatchObject({ status: "scored", score: 0, standalone_indicator: true });
     expect(scoreSourceItem(indicator, ["other"])).toMatchObject({ status: "missing", score: null });
   });
-  it("refuses to resolve multi-problem Other without qualitative adjudication", () => {
+  it("reproduces pinned executable multi-problem Other behavior, without ratifying the draft", () => {
     const problem: SourceItem = { id: "CW-Q2", group: "Challenges", text: "Problems", type: "multi",
-      source_type: "multi-problem-scored" };
-    expect(scoreSourceItem(problem, ["other"])).toMatchObject({ status: "held", score: null });
+      source_type: "multi-problem-scored", options: [
+        { code: "unfamiliar-words", text: "Unfamiliar", flag: "problem" },
+        { code: "long-sentences", text: "Long", flag: "problem" },
+        { code: "wrong-dialect", text: "Dialect", flag: "problem" },
+        { code: "unnatural-speech", text: "Speech", flag: "problem" },
+        { code: "other", text: "Other", flag: "other-problem" },
+      ] };
+    expect(scoreSourceItem(problem, ["other"])).toMatchObject({ status: "scored", score: 75 });
+    expect(scoreSourceItem(problem, ["unfamiliar-words", "other"])).toMatchObject({ status: "scored", score: 50 });
+    expect(scoreSourceItem(problem, null)).toMatchObject({ status: "missing", score: null });
   });
 });

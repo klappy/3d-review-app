@@ -1,7 +1,8 @@
 /**
  * Internal per-item source projection only. This is not a report, lens mean,
  * agreement metric or D7-safe disclosure. It follows pinned rubric item rules
- * that are unambiguous; unresolved multi-problem/Other adjudication stays held.
+ * as Steve's executable scoring_rules.py in pinned f042cde. Narrative tensions
+ * remain recorded separately; this does not ratify a new policy or disclose.
  */
 import type { TemplateItem } from "./handlers/common";
 
@@ -49,8 +50,21 @@ export function scoreSourceItem(item: SourceItem, answer: unknown): ItemScore {
     const numerator = actual.reduce((n, o) => n + (o.weight ?? 0), 0);
     return result(item, "scored", Math.min(100, numerator / denominator * 100), "pinned-capability-weights-other-excluded");
   }
-  if (item.source_type === "multi-problem-scored")
-    return result(item, "held", null, "FIX-T04-other-and-skipped-unresolved");
+  if (item.source_type === "multi-problem-scored") {
+    if (!Array.isArray(answer) || !answer.length || new Set(answer).size !== answer.length)
+      throw new Error(`invalid multi answer for ${item.id}`);
+    const options = item.options ?? [];
+    if (!answer.every(code => typeof code === "string" && options.some(o => o.code === code)))
+      throw new Error(`unrecognized option for ${item.id}`);
+    const denominator = options.filter(o => o.flag === "problem").length;
+    if (!denominator) return result(item, "held", null, "invalid-source-denominator");
+    const selected = options.filter(o => answer.includes(o.code));
+    const numerator = selected.filter(o => o.flag === "problem" || o.flag === "other-problem").length;
+    // Exact pinned executable baseline: Other counts in numerator, not
+    // denominator. The draft's qualitative-review tension is not resolved.
+    return result(item, "scored", Math.max(0, 100 - numerator / denominator * 100),
+      "pinned-multi-problem-reference");
+  }
   if (item.source_type === "descriptive")
     return result(item, "categorical", null, "source-descriptive-not-scored");
   return result(item, "categorical", null, "source-open-text-not-scored");

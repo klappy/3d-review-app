@@ -45,6 +45,11 @@ describe("internal immutable report snapshots (not public results)", () => {
     const midItems = JSON.parse(midTemplate!.items_json) as SourceItem[];
     expect(scoreSourceItem(midItems.find(item => item.id === "ML-Q10")!, ["consult-trained"]))
       .toMatchObject({ status: "scored", score: 40, standalone_indicator: true });
+    const writtenTemplate = await db.prepare("SELECT items_json FROM survey_template WHERE id = 'tpl_written' AND version = 2")
+      .first<{ items_json: string }>();
+    const writtenItems = JSON.parse(writtenTemplate!.items_json) as SourceItem[];
+    expect(scoreSourceItem(writtenItems.find(item => item.id === "CW-Q2")!, ["other"]))
+      .toMatchObject({ status: "scored", score: 75 });
     const ctx = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "test" }, db,
       principal: { kind: "user", id }, traceId: "tr_test", now: () => new Date("2026-09-16T20:00:00Z"), log: () => {} });
 
