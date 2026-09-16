@@ -63,5 +63,5 @@ for (const cap of capabilities) {
   });
 }
 
-// MCP is mounted by Lane A-1 when its adapter is integrated; both call execute().
+// MCP is mounted with Lane B-1's adapter; both transports call execute().
 export default app;
