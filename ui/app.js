@@ -70,11 +70,13 @@ async function templates() {
 }
 function drawQuestion(item) {
   const field = document.createElement('fieldset'); field.dataset.item = item.id;
-  const legend = document.createElement('legend'); legend.textContent = `${item.text || item.id}${item.required === false ? ' (optional)' : ''}`; field.append(legend);
+  const legend = document.createElement('legend'); legend.textContent = `${item.text || item.id}${item.requiredness === 'unresolved' ? ' (may leave unanswered; policy held)' : ''}`; field.append(legend);
+  if (item.answer_semantics === 'unresolved_no_problems_vs_skipped') { const note = document.createElement('p'); note.textContent = 'Leaving this blank records an unknown answer, not “no problems.”'; field.append(note); }
   if (item.type === 'scale') { const input = document.createElement('input'); input.name = item.id; input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'text') { const input = document.createElement('textarea'); input.name = item.id; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'single' || item.type === 'multi') {
     for (const opt of item.options || []) { const label = document.createElement('label'); const input = document.createElement('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = opt.code; input.required = item.type === 'single' && item.required !== false; label.append(input, document.createTextNode(opt.label || opt.text || opt.code)); field.append(label); }
+    if (item.type === 'multi' && (item.options || []).some(opt => opt.exclusive)) { const note = document.createElement('p'); note.textContent = 'An exclusion choice cannot be combined with any other choice.'; field.append(note); }
   } else { const warning = document.createElement('p'); warning.textContent = `Unsupported item type ${item.type}; cannot submit.`; field.append(warning); }
   return field;
 }
@@ -87,6 +89,7 @@ function answersFromForm() {
       else throw new Error(`Answer required: ${item.text || item.id}`);
     }
     if (item.type === 'scale' && value !== null) value = Number(value);
+    if (item.type === 'multi' && Array.isArray(value) && value.length > 1 && (item.options || []).some(opt => opt.exclusive && value.includes(opt.code))) throw new Error(`An exclusion choice cannot be combined: ${item.text || item.id}`);
     answers[item.id] = value;
   }
   return answers;

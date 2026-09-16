@@ -39,6 +39,8 @@ function validateAnswers(items: TemplateItem[], value: unknown): Record<string, 
       throw new CapError("INVALID_PARAMS", `invalid option for ${item.id}`);
     if (item.type === "multi" && (!Array.isArray(answer) || answer.length === 0 || (item.max_select && answer.length > item.max_select) || new Set(answer).size !== answer.length || !answer.every((a) => typeof a === "string" && item.options?.some((o) => o.code === a))))
       throw new CapError("INVALID_PARAMS", `invalid options for ${item.id}`);
+    if (item.type === "multi" && Array.isArray(answer) && answer.length > 1 && item.options?.some((o) => o.flag === "exclusion" && answer.includes(o.code)))
+      throw new CapError("INVALID_PARAMS", `exclusion choice cannot be combined for ${item.id}`);
     normalized[item.id] = answer;
   }
   return normalized;

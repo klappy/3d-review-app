@@ -61,13 +61,16 @@ def main() -> None:
         if key not in FORM_IDS or row["item_type"] not in TYPE_MAP:
             raise ValueError(f"unknown pinned form/type: {key}, {row['item_type']}")
         kind = TYPE_MAP[row["item_type"]]
-        # The CSV supplies no explicit required/branch field. Only open text
-        # and problem follow-ups are optional; no branching/scoring is invented.
-        optional = row["item_type"] in {"open-text", "multi-problem-scored"}
+        # CSV has no required/branch/cardinality field. Permit omission of
+        # open text/problem follow-ups as NULL while explicitly keeping their
+        # requiredness and no-problems-vs-skipped semantics unresolved (FIX-T04).
+        unresolved = row["item_type"] in {"open-text", "multi-problem-scored"}
         options = sorted(by_item[row["item_id"]], key=lambda o: int(o["option_order"]))
         item = {
             "id": row["item_id"], "group": row["sub_dimension"],
-            "text": row["question_text"], "type": kind, "required": not optional,
+            "text": row["question_text"], "type": kind, "required": not unresolved,
+            "requiredness": "unresolved" if unresolved else "working-required",
+            "answer_semantics": "unresolved_no_problems_vs_skipped" if row["item_type"] == "multi-problem-scored" else None,
             "source_type": row["item_type"], "source_q_num": int(row["q_num"]),
             "source_score_max": float(row["score_max"]) if row["score_max"] else None,
             "source_weight_in_subdim": float(row["weight_in_subdim"]) if row["weight_in_subdim"] else None,

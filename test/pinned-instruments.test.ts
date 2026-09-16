@@ -34,7 +34,8 @@ describe("pinned source instruments as immutable v2",()=>{
     expect(v2.every(r=>r.source_ref.includes(SOURCE)&&JSON.parse(r.scoring_json).status==="held")).toBe(true);
     expect(items.every(item=>["single","multi","text"].includes(item.type))).toBe(true);
     expect(items.every(item=>item.type==="text"||!!item.options?.length)).toBe(true);
-    expect(items.filter(item=>item.required===false)).toHaveLength(12); // 9 open-text + 3 conditional problem follow-ups
+    expect(items.filter(item=>item.required===false&&item.requiredness==="unresolved")).toHaveLength(12); // 9 open-text + 3 problem follow-ups; source requiredness is held
+    expect(items.filter(item=>item.answer_semantics==="unresolved_no_problems_vs_skipped")).toHaveLength(3);
     for(const row of v2) {
       const rendered=renderItems(JSON.parse(row.items_json),"Synthetic language");
       expect(rendered.every(item=>typeof item.required==="boolean"&&["single","multi","text"].includes(item.type as string))).toBe(true);
@@ -70,5 +71,17 @@ describe("pinned source instruments as immutable v2",()=>{
     const second=await submit(secondCtx,{idempotency_key:"valid-pinned-multi",answers:withMulti});
     const secondRow=await db.prepare("SELECT answers_json FROM response WHERE id = ?").bind(second.result.response_id).first<{answers_json:string}>();
     expect(JSON.parse(secondRow!.answers_json)[multi.id]).toEqual(withMulti[multi.id]);
+    await db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES ('survey_pinned_validation','assess_tavo_collect','tpl_validation',2,'selected','open','2026-09-16T20:00:00Z')").run();
+    const validationCtx:Ctx={...ctx,principal:{kind:"participant",id:"respondent_validation",participantSurveyId:"survey_pinned_validation",respondentId:"respondent_validation"},traceId:"tr_pinned_validation"};
+    const validation=(await form(validationCtx,{})).result.items as Array<{id:string;type:string;required:boolean;options?:Array<{code:string;exclusive?:boolean}>}>;
+    const exclusion=validation.find(item=>item.type==="multi"&&item.options?.some(option=>option.exclusive))!;
+    expect(exclusion).toBeTruthy();
+    const exclusionCode=exclusion.options!.find(option=>option.exclusive)!.code;
+    const otherCode=exclusion.options!.find(option=>!option.exclusive)!.code;
+    const validationAnswers:Record<string,unknown>={};
+    for(const item of validation) if(item.required) validationAnswers[item.id]=item.type==="multi"?[item.options![0].code]:item.type==="single"?item.options![0].code:"Sample text";
+    await expect(submit(validationCtx,{idempotency_key:"bad-exclusion",answers:{...validationAnswers,[exclusion.id]:[exclusionCode,otherCode]}})).rejects.toMatchObject({code:"INVALID_PARAMS"});
+    const allowed=await submit(validationCtx,{idempotency_key:"exclusion-only",answers:{...validationAnswers,[exclusion.id]:[exclusionCode]}});
+    expect(allowed.result.duplicate).toBe(false);
   },30000);
 });
