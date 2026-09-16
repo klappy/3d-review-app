@@ -67,3 +67,17 @@ describe("pickIds lifts nested created-row ids for the inverse", () => {
     expect(pickIds({ id: "top", grant: { id: "g1", scope_id: "ws_1" } })).toEqual({ id: "top", scope_id: "ws_1" });
   });
 });
+
+import { authRequestLink } from "../src/handlers/platform";
+describe("auth.request_link access boundary (cookbook #14)", () => {
+  it("dev accepts only reserved .invalid synthetic identities", async () => {
+    const ctx = { ...context(), env: { ...context().env, ENVIRONMENT: "dev" } } as Ctx;
+    await expect(authRequestLink(ctx, { email: "someone@gmail.com" })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
+    const dry = await authRequestLink(ctx, { email: "demo.owner@example.invalid" }, { dryRun: true });
+    expect(dry.impact?.effect).toBe("external");
+  });
+  it("production reports RESERVED_NOT_BUILT instead of pretending a code was sent", async () => {
+    const ctx = { ...context(), env: { ...context().env, ENVIRONMENT: "production" } } as Ctx;
+    await expect(authRequestLink(ctx, { email: "demo.owner@example.invalid" })).rejects.toMatchObject({ code: "RESERVED_NOT_BUILT" });
+  });
+});

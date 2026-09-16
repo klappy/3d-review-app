@@ -13,8 +13,18 @@ export const entryExample: Handler = async () => ({ result: { fixture: true, ass
   surveys: [{ id: "srv_example", template: "translation-team@1", responses: 12 }], summary: { coverage: { translator: 5, community: 4, church: 3 }, bands: { clarity: "mid", naturalness: "high", accuracy: "mid" } } } } });
 
 /** phase 0: no email send — the code is logged with a DEV marker. Effect row; dry_run shows the address hash only. */
+/**
+ * Access boundary (cookbook #14, 2026-09-16): ENVIRONMENT=dev is a shared SYNTHETIC sandbox. It issues the code
+ * in-band (dev_only_code) and therefore accepts ONLY reserved synthetic identities (RFC 2606 `.invalid` domains) —
+ * no real mailbox can be impersonated. Production sign-in is Cloudflare email-code (OF-7); until that path is wired
+ * production reports RESERVED_NOT_BUILT rather than pretending a code was sent.
+ */
+const SYNTHETIC_DOMAIN = /\.invalid$/i;
 export const authRequestLink: Handler = async (ctx, p, o) => {
   if (!p.email || typeof p.email !== "string") throw new CapError("INVALID_PARAMS", "email required");
+  const env = ctx.env.ENVIRONMENT ?? "dev";
+  if (env === "dev" && !SYNTHETIC_DOMAIN.test(p.email)) throw new CapError("INVALID_PARAMS", "dev sandbox accepts only synthetic identities (name@…example.invalid)", "no real email is ever accepted or contacted from the dev environment", "cap.auth.request_link");
+  if (env !== "dev") throw new CapError("RESERVED_NOT_BUILT", "email-code delivery is not wired in this environment yet", "production sign-in is Cloudflare email-code (OF-7); pending the auth lane", "cap.auth.request_link");
   const eh = await sha256(p.email.toLowerCase());
   if (o?.dryRun) return { result: {}, impact: { affected: [{ email_hash: eh.slice(0, 12) }], irreversible: true, effect: "external", compensating_control: "expire code" } };
   const code = String(Math.floor(100000 + Math.random() * 900000));

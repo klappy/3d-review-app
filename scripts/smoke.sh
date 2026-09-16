@@ -4,11 +4,11 @@ set -u; cd "$(dirname "$0")/.."; B=localhost:8787
 npx wrangler dev --local --port 8787 > /tmp/wr.log 2>&1 & WP=$!
 for i in $(seq 1 40); do sleep 2; curl -sf $B/v2/health >/dev/null && break; done
 j() { python3 -c "import sys,json;d=json.load(sys.stdin);print($1)"; }
-E=$(curl -s $B/v2/auth/link -H 'content-type: application/json' -d '{"email":"owner@example.test"}'); echo "login: $(echo "$E" | j 'd["ok"], d["result"].get("sent")')"
+E=$(curl -s $B/v2/auth/link -H 'content-type: application/json' -d '{"email":"owner@example.invalid"}'); echo "login: $(echo "$E" | j 'd["ok"], d["result"].get("sent")')"
 CODE=$(echo "$E" | j 'd["result"]["dev_only_code"]')
-SESS=$(curl -s $B/v2/auth/session -H 'content-type: application/json' -d "{\"email\":\"owner@example.test\",\"code\":\"$CODE\"}" | j 'd["result"]["session"]'); H="Authorization: Bearer $SESS"
+SESS=$(curl -s $B/v2/auth/session -H 'content-type: application/json' -d "{\"email\":\"owner@example.invalid\",\"code\":\"$CODE\"}" | j 'd["result"]["session"]'); H="Authorization: Bearer $SESS"
 echo "me: $(curl -s $B/v2/me -H "$H" | j 'd["ok"], d["result"]["principal"]["kind"]')"
-npx wrangler d1 execute 3d-review --local --command "UPDATE principal SET provisioned=1 WHERE email_hash='$(printf owner@example.test | sha256sum | cut -d' ' -f1)'" >/dev/null 2>&1
+npx wrangler d1 execute 3d-review --local --command "UPDATE principal SET provisioned=1 WHERE email_hash='$(printf owner@example.invalid | sha256sum | cut -d' ' -f1)'" >/dev/null 2>&1
 W=$(curl -s $B/v2/workspaces -H "$H" -H 'content-type: application/json' -d '{"name":"Smoke WS"}'); echo "create: $(echo "$W" | j 'd["ok"], d["receipt"]["inverse"], "undo" in d["receipt"]')"
 WS=$(echo "$W" | j 'd["result"]["workspace"]["id"]')
 UT=$(curl -s -X PATCH $B/v2/workspaces/$WS -H "$H" -H 'content-type: application/json' -d '{"name":"Renamed"}' | j 'd["receipt"]["undo_token"]')
