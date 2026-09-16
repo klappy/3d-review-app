@@ -18,7 +18,7 @@ database_id = "5d4cc260-a7b1-47cc-b03d-ed4f60d324c3"
 
 [[rules]]
 type = "Text"
-globs = ["**/*.yaml"]
+globs = ["**/*.yaml", "seed/*.sql"]
 fallthrough = true
 
 # Serve the provisional functional shell at / while /v2 and MCP stay on the Worker.
