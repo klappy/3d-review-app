@@ -1,14 +1,28 @@
-name = "3d-review"
+# Deploys ONLY via Cloudflare Workers Builds (git push → build → deploy). Never `wrangler deploy` from a seat.
+#   dev : branch phase-0/walking-skeleton → worker 3d-review-dev  (D1 3d-review-dev)   https://3d-review-dev.klappy.workers.dev
+#   prod: branch main                     → worker 3d-review      (D1 3d-review)       promoted by PR merge into main
+name = "3d-review-dev"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
+
 [vars]
 ENVIRONMENT = "dev"
+
 [[d1_databases]]
 binding = "DB"
-database_name = "3d-review"
-database_id = "REPLACE-WITH-REAL-ID"
+database_name = "3d-review-dev"
+database_id = "5d4cc260-a7b1-47cc-b03d-ed4f60d324c3"
 
 [[rules]]
 type = "Text"
 globs = ["**/*.yaml"]
 fallthrough = true
+
+[env.production]
+name = "3d-review"
+[env.production.vars]
+ENVIRONMENT = "production"
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "3d-review"
+database_id = "2641de99-670e-46a2-872e-a2498189e287"
