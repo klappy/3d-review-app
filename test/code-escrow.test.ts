@@ -30,8 +30,8 @@ describe("one-time code escrow and confirmed release",()=>{
     const issue=await execute(context(),"cap.survey.issue_codes",{aid:"assess_tavo_collect",sid:"survey_tavo",count:3},{tool:"write"});
     expect(issue.ok).toBe(true);
     if(!issue.ok) throw new Error("issue failed");
-    expect(issue.receipt?.undo_token).toBeUndefined(); // batch inverse held, never fake an undo
-    expect(issue.receipt?.inverse).toBe("none");
+    expect(issue.receipt?.undo_token).toBeDefined(); // batch inverse: handlers/undo.ts revokes the whole batch or nothing
+    expect(issue.receipt?.inverse).toBe("cap.survey.revoke_code");
     expect(Object.keys(issue.result).sort()).toEqual(["count","ids"]);
     const ids=issue.result.ids as string[];
     expect(ids).toHaveLength(3);

@@ -95,9 +95,9 @@ export interface MintInput {
 
 export function inverseLabel(cap: Capability): string {
   // These proposed inverses are not yet true inverses of the implemented effects:
-  // batch issue needs batch revoke; deselect loses the template identity needed
-  // to reselect; support reissue cannot restore an already revoked old code.
-  if(["cap.survey.issue_codes", "cap.survey.deselect", "cap.support.unlock_participant"].includes(cap.id)) return "none";
+  // deselect loses the template identity needed to reselect; support reissue cannot
+  // restore an already revoked old code. (issue_codes → batch revoke lives in handlers/undo.ts.)
+  if(["cap.survey.deselect", "cap.support.unlock_participant"].includes(cap.id)) return "none";
   return cap.inverse.kind === "true" && cap.inverse.via ? cap.inverse.via : "none";
 }
 
@@ -151,6 +151,7 @@ const PARAM_FIELDS: Record<string, readonly string[]> = {
   "cap.assessment.update": ["id"], "cap.assessment.set_stage": ["id"],
   "cap.assessment.archive": ["id"], "cap.assessment.unarchive": ["id"], "cap.assessment.notes.update": ["id"],
   "cap.survey.select": ["aid"], "cap.survey.deselect": ["aid","sid"],
+  "cap.survey.issue_codes": ["aid","sid"],
 };
 const PRIOR_FIELDS: Record<string, readonly string[]> = {
   "cap.workspace.update": ["name"], "cap.workspace.archive": ["archived_at"], "cap.workspace.unarchive": ["archived_at"],
@@ -179,6 +180,8 @@ export function pickIds(o: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const isId = (k: string, v: unknown) => (k === "id" || /^[a-z]*id$/.test(k) || k.endsWith("_id")) && (typeof v === "string" || typeof v === "number");
   for (const [k, v] of Object.entries(o ?? {})) if (isId(k, v)) out[k] = v;
+  // Batch creators return { ids: [...] } — kept so a batch inverse can address every row.
+  if (Array.isArray(o?.ids) && o.ids.every(x => typeof x === "string")) out.ids = o.ids;
   // Handlers return the created row nested under its noun ({ assessment: { id, project_id } }); the
   // inverse (archive/revoke) takes those ids as top-level params, so lift one level when nothing was found there.
   for (const v of Object.values(o ?? {})) {
