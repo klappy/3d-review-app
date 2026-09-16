@@ -31,10 +31,12 @@ export const select:Handler=async(ctx,params)=>{
 export const deselect:Handler=async(ctx,params)=>{
   const {aid,sid}=ids(params), row=await survey(ctx,aid,sid,"member");
   const responses=await countScalar(ctx,"SELECT COUNT(*) AS n FROM response WHERE assessment_survey_id = ?",sid);
-  if(responses){
+  const codes=await countScalar(ctx,"SELECT COUNT(*) AS n FROM access_code WHERE assessment_survey_id = ?",sid);
+  const invitations=await countScalar(ctx,"SELECT COUNT(*) AS n FROM invitation WHERE scope_type = 'survey' AND scope_id = ?",sid);
+  if(responses||codes||invitations){
     const at=nowIso(ctx);
     await ctx.db.prepare("UPDATE assessment_survey SET state = 'archived', archived_at = ? WHERE id = ?").bind(at,sid).run();
-    return {result:{id:sid,archived:true,preserved_responses:responses,undo:null},scope:{type:"assessment",id:aid},priorState:{state:row.state,archived_at:row.archived_at}};
+    return {result:{id:sid,archived:true,preserved_responses:responses,preserved_codes:codes,preserved_invitations:invitations,undo:null},scope:{type:"assessment",id:aid},priorState:{state:row.state,archived_at:row.archived_at}};
   }
   await ctx.db.prepare("DELETE FROM assessment_survey WHERE id = ?").bind(sid).run();
   return {result:{id:sid,deselected:true,preserved_responses:0},scope:{type:"assessment",id:aid},priorState:{survey:row}};
