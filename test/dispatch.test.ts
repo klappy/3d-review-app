@@ -32,7 +32,7 @@ describe("shared dispatch boundary", () => {
   });
 
   it("mounts the HTTP twin with a JSON envelope and 501 for an unbuilt handler", async () => {
-    const response = await app.request("http://local.test/v2/templates", {}, context().env);
+    const response = await app.request("http://local.test/v2/requests", { method: "POST" }, context().env);
     expect(response.status).toBe(501);
     expect(await response.json()).toMatchObject({ ok: false, error: { code: "RESERVED_NOT_BUILT" } });
   });
