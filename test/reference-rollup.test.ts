@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crossLensReference, rollupReference, type ScoredRow } from "../src/reference-rollup";
+import { crossLensReference, rollupReference, translationTypeReference, type ScoredRow } from "../src/reference-rollup";
 import model from "../src/pinned-report-model.json";
 
 const include = new Set(model.subdimensions.filter(row => row.included_in_lens_score)
@@ -44,5 +44,19 @@ describe("pinned Steve 04_aggregate reference arithmetic (internal only)", () =>
         { assessment_id: "a2", construct_code: "source-understanding", triangulated_mean: 67,
           agreement_range: null, n_lenses_included: 1,
           per_lens: [{ lens: "Translation Team", score: 67 }] }]);
+  });
+  it("matches pinned categorical translation-type comparison, including unknown/null", () => {
+    expect(translationTypeReference([
+      { assessment_id: "match", item_id: "TR-Q2", option_codes: ["corresponding"] },
+      { assessment_id: "match", item_id: "CHCP-Q1", option_codes: ["corresponding"] },
+      { assessment_id: "mismatch", item_id: "ML-Q2", option_codes: ["clarifying"] },
+      { assessment_id: "mismatch", item_id: "CHDL-Q1", option_codes: ["simplifying"] },
+      { assessment_id: "one-side", item_id: "TR-Q2", option_codes: ["resembling"] },
+      { assessment_id: "ignored", item_id: "TR-Q2", option_codes: ["other", "no-agreement"] },
+    ])).toEqual([
+      { assessment_id: "match", team_values: ["corresponding"], church_values: ["corresponding"], agree: true },
+      { assessment_id: "mismatch", team_values: ["clarifying"], church_values: ["simplifying"], agree: false },
+      { assessment_id: "one-side", team_values: ["resembling"], church_values: [], agree: null },
+    ]);
   });
 });

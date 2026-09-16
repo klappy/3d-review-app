@@ -31,6 +31,10 @@ export interface CrossLensResult {
   triangulated_mean: number; agreement_range: number | null;
   n_lenses_included: number; per_lens: { lens: string; score: number }[];
 }
+export interface TranslationTypeResponse { assessment_id: string; item_id: string; option_codes: string[] | null }
+export interface TranslationTypeResult {
+  assessment_id: string; team_values: string[]; church_values: string[]; agree: boolean | null;
+}
 
 function mean(values: number[]): number { return values.reduce((sum, v) => sum + v, 0) / values.length; }
 function key(parts: string[]): string { return JSON.stringify(parts); }
@@ -105,4 +109,27 @@ export function crossLensReference(rows: ScoredRow[], constructs: Record<string,
     }
   }
   return sorted(out, r => key([r.assessment_id, r.construct_code]));
+}
+
+/** Pinned 04_aggregate.py categorical exception; never coerce missing to disagreement. */
+export function translationTypeReference(rows: TranslationTypeResponse[]): TranslationTypeResult[] {
+  const teamItems = new Set(["TR-Q2", "ML-Q2"]);
+  const churchItems = new Set(["CHIP-Q1", "CHCP-Q1", "CHDL-Q1"]);
+  const comparable = new Set(["corresponding", "resembling", "clarifying", "simplifying"]);
+  const groups = new Map<string, { team: Set<string>; church: Set<string> }>();
+  for (const row of rows) {
+    const side = teamItems.has(row.item_id) ? "team" : churchItems.has(row.item_id) ? "church" : null;
+    if (!side) continue;
+    const codes = (row.option_codes ?? []).filter(code => comparable.has(code));
+    if (!codes.length) continue;
+    const group = groups.get(row.assessment_id) ?? { team: new Set<string>(), church: new Set<string>() };
+    for (const code of codes) group[side].add(code);
+    groups.set(row.assessment_id, group);
+  }
+  return sorted([...groups].map(([assessment_id, group]) => {
+    const team_values = [...group.team].sort(), church_values = [...group.church].sort();
+    const agree = !team_values.length || !church_values.length ? null :
+      team_values.some(code => group.church.has(code));
+    return { assessment_id, team_values, church_values, agree };
+  }), r => r.assessment_id);
 }
