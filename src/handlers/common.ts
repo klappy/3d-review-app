@@ -145,8 +145,9 @@ export async function loadProject(ctx: Ctx, id: string, min: Role = "viewer"): P
   return { row, role: gate(role, min, "project") };
 }
 /** Role at an assessment = direct grant, or the project grant (project members see assessments; 03 matrix). */
+/** D2/D9 (settled): NO inheritance — only an explicit assessment grant opens an assessment. A project grant lists, it does not open (Astra #14 c5704047932). */
 export async function assessmentRole(ctx: Ctx, a: { id: string; project_id: string }): Promise<Role | null> {
-  return maxRole(await roleAt(ctx, "assessment", a.id), await roleAt(ctx, "project", a.project_id));
+  return roleAt(ctx, "assessment", a.id);
 }
 export async function loadAssessment(ctx: Ctx, id: string, min: Role = "viewer"): Promise<{ row: AssessmentRow; role: Role }> {
   const row = await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
