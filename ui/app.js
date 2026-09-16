@@ -1,3 +1,4 @@
+import { initLanguageControls } from './language.js';
 const $ = id => document.getElementById(id);
 const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), project: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null };
 const path = (value) => encodeURIComponent(value);
@@ -26,6 +27,7 @@ async function run(label, task) {
   try { await task(); note(`${label} — complete.`); } catch (error) { fail(error.message); }
   finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : false); }
 }
+const languageControls = initLanguageControls({ api, run, getProject: () => state.project });
 function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget))); }); }
 function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler)); }
 async function identity() {
@@ -41,10 +43,10 @@ async function chooseProject() {
   state.project = $('projects').value || null; state.assessment = null; state.survey = null;
   clearCodeBatch();
   resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
-  if (!state.project) return;
+  if (!state.project) { await languageControls.refresh(); return; }
   const result = await api(`/v2/projects/${path(state.project)}`);
   text($('project-detail'), `${result.project.name} · ${result.project.role} · ${result.languages.length} language(s)`);
-  resetSelect($('languages'), 'Choose language'); for (const language of result.languages || []) option($('languages'), language.id, language.name);
+  await languageControls.refresh();
   await assessments();
 }
 async function assessments() {
