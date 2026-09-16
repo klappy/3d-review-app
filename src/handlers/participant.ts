@@ -3,13 +3,14 @@ import type { Handler, Ctx } from "./types";
 import { CapError, notVisible } from "./errors";
 import { newId, nowIso, randomToken, reqStr, sha256 } from "./common";
 
-interface Entry { id: string; assessment_survey_id: string; state: string; expires_at?: string | null }
+interface CodeEntry { id: string; assessment_survey_id: string; expires_at: string | null; redeemed_at: string | null; respondent_id: string | null }
+interface LinkEntry { id: string; scope_type: string; assessment_survey_id: string | null; expires_at: string | null; status: string }
 
 async function ensureSurveyOpen(ctx: Ctx, surveyId: string, allowClosed = false) {
-  const survey = await ctx.db.prepare("SELECT s.id, s.state, a.stage FROM assessment_survey s JOIN assessment a ON a.id = s.assessment_id WHERE s.id = ?")
-    .bind(surveyId).first<{ id: string; state: string; stage: string }>();
+  const survey = await ctx.db.prepare("SELECT s.id, s.state, s.collection_status FROM assessment_survey s WHERE s.id = ?")
+    .bind(surveyId).first<{ id: string; state: string; collection_status: string }>();
   if (!survey) throw notVisible("invitation");
-  if (survey.state !== "selected" || (!allowClosed && survey.stage !== "collect")) throw new CapError("STAGE_CONFLICT", "survey is not collecting responses");
+  if (survey.state !== "selected" || (!allowClosed && survey.collection_status !== "open")) throw new CapError("STAGE_CONFLICT", "survey is not collecting responses");
 }
 
 async function issue(ctx: Ctx, surveyId: string, respondentId: string, allowClosed = false) {
@@ -22,25 +23,25 @@ async function issue(ctx: Ctx, surveyId: string, respondentId: string, allowClos
 
 export const redeem_code: Handler = async (ctx, params) => {
   const code = reqStr(params, "code").trim().toUpperCase();
-  const row = await ctx.db.prepare("SELECT id, assessment_survey_id, state FROM access_code WHERE code_hash = ?")
-    .bind(await sha256(code)).first<Entry>();
-  if (!row || row.state !== "issued") throw notVisible("access code");
+  const row = await ctx.db.prepare("SELECT id, assessment_survey_id, expires_at, redeemed_at, respondent_id FROM access_code WHERE code_hash = ?")
+    .bind(await sha256(code)).first<CodeEntry>();
+  if (!row || row.redeemed_at || (row.expires_at && row.expires_at <= nowIso(ctx))) throw notVisible("access code");
   await ensureSurveyOpen(ctx, row.assessment_survey_id);
-  const respondentId = newId("respondent");
-  const changed = await ctx.db.prepare("UPDATE access_code SET state = 'redeemed', redeemed_at = ?, code_value = NULL WHERE id = ? AND state = 'issued'")
-    .bind(nowIso(ctx), row.id).run();
+  const respondentId = row.respondent_id ?? newId("respondent");
+  const changed = await ctx.db.prepare("UPDATE access_code SET redeemed_at = ?, respondent_id = ? WHERE id = ? AND redeemed_at IS NULL")
+    .bind(nowIso(ctx), respondentId, row.id).run();
   if (changed.meta.changes !== 1) throw notVisible("access code");
   return issue(ctx, row.assessment_survey_id, respondentId);
 };
 
 export const open_link: Handler = async (ctx, params) => {
   const token = reqStr(params, "token");
-  const row = await ctx.db.prepare("SELECT id, scope_type, scope_id, expires_at, state FROM invitation WHERE token_hash = ?")
-    .bind(await sha256(token)).first<Entry>();
-  if (!row || (row as any).scope_type !== "survey" || (row.expires_at && row.expires_at <= nowIso(ctx)) || row.state !== "sent") throw notVisible("invitation");
+  const row = await ctx.db.prepare("SELECT id, scope_type, assessment_survey_id, expires_at, status FROM invitation WHERE token_hash = ?")
+    .bind(await sha256(token)).first<LinkEntry>();
+  if (!row || row.scope_type !== "survey" || !row.assessment_survey_id || (row.expires_at && row.expires_at <= nowIso(ctx)) || !["pending", "accepted"].includes(row.status)) throw notVisible("invitation");
   // Invitation links are reusable so that reopening a receipt remains possible.
   const respondentId = `invitee_${row.id}`;
-  return issue(ctx, (row as any).scope_id, respondentId, true);
+  return issue(ctx, row.assessment_survey_id, respondentId, true);
 };
 
 export const handlers: Record<string, Handler> = {

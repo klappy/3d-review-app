@@ -2,19 +2,19 @@ import type { Ctx, Handler } from "./types";
 import { CapError, notVisible } from "./errors";
 import { gate, newId, nowIso, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
 
-interface ParticipantSurvey { id: string; assessment_id: string; template_id: string; template_version: number; state: string; stage: string; name: string; language_name: string; period: string | null; items_json: string; scoring_json: string; perspective: string; source_ref: string | null; published_at: string | null }
+interface ParticipantSurvey { id: string; assessment_id: string; template_id: string; template_version: number; state: string; collection_status: string; name: string; language_name: string; period: string | null; items_json: string; scoring_json: string; perspective: string; source_ref: string | null; published_at: string | null }
 
 async function scopedSurvey(ctx: Ctx, requireOpen = false): Promise<ParticipantSurvey> {
   if (ctx.principal.kind !== "participant" || !ctx.principal.participantSurveyId || !ctx.principal.respondentId)
     throw new CapError("NOT_AUTHENTICATED", "participant token required");
-  const s = await ctx.db.prepare(`SELECT s.*, a.name, a.period, a.stage, l.name AS language_name,
+  const s = await ctx.db.prepare(`SELECT s.*, a.name, a.period, l.name AS language_name,
     t.items_json, t.scoring_json, t.perspective, t.source_ref, t.published_at
     FROM assessment_survey s JOIN assessment a ON a.id = s.assessment_id
     JOIN language l ON l.id = a.language_id
     JOIN survey_template t ON t.id = s.template_id AND t.version = s.template_version
     WHERE s.id = ?`).bind(ctx.principal.participantSurveyId).first<ParticipantSurvey>();
   if (!s) throw notVisible("survey");
-  if (requireOpen && (s.state !== "selected" || s.stage !== "collect"))
+  if (requireOpen && (s.state !== "selected" || s.collection_status !== "open"))
     throw new CapError("STAGE_CONFLICT", "survey is not collecting responses");
   return s;
 }
@@ -53,8 +53,8 @@ export const submit: Handler = async (ctx, params) => {
   const idempotencyKey = reqStr(params, "idempotency_key");
   if (idempotencyKey.length > 200) throw new CapError("INVALID_PARAMS", "idempotency_key is too long");
   const respondentId = ctx.principal.respondentId!;
-  const prior = await ctx.db.prepare("SELECT id, assessment_survey_id, respondent_id, submitted_at FROM response WHERE idempotency_key = ?")
-    .bind(idempotencyKey).first<{ id: string; assessment_survey_id: string; respondent_id: string; submitted_at: string }>();
+  const prior = await ctx.db.prepare("SELECT id, assessment_survey_id, respondent_id, submitted_at FROM response WHERE assessment_survey_id = ? AND idempotency_key = ?")
+    .bind(s.id, idempotencyKey).first<{ id: string; assessment_survey_id: string; respondent_id: string; submitted_at: string }>();
   if (prior) {
     if (prior.respondent_id !== respondentId || prior.assessment_survey_id !== s.id) throw new CapError("INVALID_PARAMS", "idempotency key already used");
     return { result: { response_id: prior.id, submitted_at: prior.submitted_at, duplicate: true, undo: null }, scope: { type: "survey", id: s.id } };
@@ -68,19 +68,19 @@ export const submit: Handler = async (ctx, params) => {
   const responseId = newId("resp");
   const submittedAt = nowIso(ctx);
   await ctx.db.prepare(`INSERT INTO response
-    (id, assessment_survey_id, respondent_id, idempotency_key, answers_json, perspective, submitted_at, source, provenance_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(responseId, s.id, respondentId, idempotencyKey, JSON.stringify(answers), s.perspective, submittedAt, "web",
-      JSON.stringify({ template_id: s.template_id, template_version: s.template_version, trace_id: ctx.traceId })).run();
+    (id, assessment_survey_id, respondent_id, idempotency_key, answers_json, template_id, template_version, provenance_json, source, submitted_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(responseId, s.id, respondentId, idempotencyKey, JSON.stringify(answers), s.template_id, s.template_version,
+      JSON.stringify({ presented_template_id: s.template_id, presented_template_version: s.template_version, trace_id: ctx.traceId }), "participant", submittedAt).run();
   return { result: { response_id: responseId, submitted_at: submittedAt, duplicate: false, undo: null }, scope: { type: "survey", id: s.id } };
 };
 
 export const receipt: Handler = async (ctx) => {
   const s = await scopedSurvey(ctx);
-  const row = await ctx.db.prepare("SELECT id, submitted_at FROM response WHERE assessment_survey_id = ? AND respondent_id = ? ORDER BY submitted_at DESC LIMIT 1")
-    .bind(s.id, ctx.principal.respondentId).first<{ id: string; submitted_at: string }>();
+  const row = await ctx.db.prepare("SELECT id, submitted_at, template_id, template_version FROM response WHERE assessment_survey_id = ? AND respondent_id = ? ORDER BY submitted_at DESC LIMIT 1")
+    .bind(s.id, ctx.principal.respondentId).first<{ id: string; submitted_at: string; template_id: string; template_version: number }>();
   return { result: { submitted: !!row, response_id: row?.id ?? null, submitted_at: row?.submitted_at ?? null,
-    template: row ? { id: s.template_id, version: s.template_version } : null }, scope: { type: "survey", id: s.id } };
+    template: row ? { id: row.template_id, version: row.template_version } : null }, scope: { type: "survey", id: s.id } };
 };
 
 export const assisted_next: Handler = async (ctx) => {
