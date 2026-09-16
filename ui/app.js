@@ -42,6 +42,8 @@ async function projects() {
 async function chooseProject() {
   state.project = $('projects').value || null; state.assessment = null; state.survey = null;
   clearCodeBatch();
+  text($('project-detail'), ''); text($('assessment-detail'), ''); text($('survey-detail'), '');
+  text($('results'), 'Select an assessment.');
   resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
   if (!state.project) { await languageControls.refresh(); return; }
   const result = await api(`/v2/projects/${path(state.project)}`);
@@ -58,6 +60,7 @@ async function assessments() {
 async function chooseAssessment() {
   state.assessment = $('assessments').value || null; state.survey = null; resetSelect($('surveys'), 'Choose survey');
   clearCodeBatch();
+  text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
   if (!state.assessment) return;
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
