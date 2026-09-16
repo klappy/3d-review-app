@@ -1,0 +1,5 @@
+# Local phase-0 code escrow
+
+Apply `migrations/0002_code_escrow.sql` after `0001_init.sql` to the **local** D1 database. Set `CODE_ESCROW_SECRET` to a separately generated 32-byte, base64url-encoded random value in an ignored `.dev.vars` file before starting `wrangler dev --local`. For example, generate a value with `openssl rand -base64 32` and convert it to URL-safe base64 (replace `+`/`/`, remove padding); do not commit or paste the value into a task, trace, or receipt. `SESSION_SECRET` remains a different key for confirmation tokens.
+
+Issue returns only code IDs and count. Export requires the complete IDs from one issued batch, an exact-scope assessment grant, and a fresh 300-second confirmation. Export returns codes once, then clears encrypted escrow; the client must print/save the one-time response. D1 retains only hashes for redemption. A lost response cannot be re-exported; revoke and reissue instead. This is a local phase-0 design, not a production deployment or an at-rest key management review.
