@@ -32,10 +32,10 @@ if (ws.body.ok) {
   row("J1a", pj.body.ok === true, `project ${pj.body.result?.project?.id ?? pj.body.error?.code} ${pj.body.error?.hint ?? ""}`);
   const pid = pj.body.result?.project?.id;
   if (pid) {
-    // CONTRACT GAP (cookbook #13): no cap.language.create — a fresh project has no language row, so
-    // assessment.create is bound to the seeded proj_rill/lang_tavo until the language capability lands.
-    const apid = process.env.ASSESS_PROJECT ?? "proj_rill", lang = process.env.LANGUAGE_ID ?? "lang_tavo";
-    const a = await call("POST", `/v2/projects/${apid}/assessments`, { name: "Runner cycle " + Date.now(), language_id: lang }, sess);
+    const lg = await call("POST", `/v2/projects/${pid}/languages`, { name: "Kelo (invented)", code: "qak" }, sess);
+    row("J1b0", lg.body.ok === true, `language ${lg.body.result?.language?.id ?? lg.body.error?.code} ${lg.body.error?.message ?? ""}`);
+    const apid = pid, lang = lg.body.result?.language?.id;
+    const a = await call("POST", `/v2/projects/${apid}/assessments`, { name: "Kelo cycle 1", language_id: lang }, sess);
     row("J1b", a.body.ok === true, `assessment ${a.body.result?.assessment?.id ?? a.body.error?.code}: ${a.body.error?.message ?? ""} ${a.body.error?.hint ?? ""}`);
     const aid = a.body.result?.assessment?.id;
     if (aid) {

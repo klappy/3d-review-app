@@ -16,6 +16,9 @@ INVERSE = {
     "cap.workspace.archive": ("cap.workspace.unarchive", "04"),
     "cap.workspace.unarchive": ("cap.workspace.archive", "04"),
     "cap.project.archive": ("cap.project.unarchive", "04"),
+    "cap.language.create": ("cap.language.archive", "proposed (D9 gap: create reverses to archive, never delete)"),
+    "cap.language.archive": ("cap.language.unarchive", "04"),
+    "cap.language.unarchive": ("cap.language.archive", "04"),
     "cap.project.unarchive": ("cap.project.archive", "04"),
     "cap.assessment.archive": ("cap.assessment.unarchive", "04"),
     "cap.assessment.unarchive": ("cap.assessment.archive", "04"),
@@ -98,7 +101,7 @@ for line in text.splitlines():
         cid, cls, http, who, ui, notes, slc = (cells + [""] * 7)[:7]
         rows.append(dict(id=cid, cls=cls, http=http, who=who, ui=ui, notes=notes, slice=slc, section=section))
 
-assert len(rows) == 79, len(rows)
+assert len(rows) == 83, len(rows)  # 79 + cap.language.{create,list,archive,unarchive} (cookbook PR #12 @ 0f44137)
 
 def infer_http(r):
     cid, http = r["id"], r["http"].replace("**", "")

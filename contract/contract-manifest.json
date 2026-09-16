@@ -1,7 +1,7 @@
 {
   "contract": "contract-v0.1",
   "status": "DRAFT — no bundle frozen",
-  "source_sha": "59be64c",
+  "source_sha": "0f4413768c4365054372d917619311d7c2a00e96",
   "rule": "a bundle freezes when Lane A marks it frozen_sha; one open bundle does not hold frozen ones (MASTER §per-bundle)",
   "params_schemas": "OWED — per-capability input/output schemas are the next A1 increment; this draft fixes ids, classes, tools, twins, roles, inverses and the shared envelope",
   "bundles": {
@@ -52,7 +52,11 @@
         "cap.project.update",
         "cap.project.archive",
         "cap.project.unarchive",
-        "cap.project.delete"
+        "cap.project.delete",
+        "cap.language.create",
+        "cap.language.list",
+        "cap.language.archive",
+        "cap.language.unarchive"
       ],
       "state": "open",
       "frozen_sha": null,

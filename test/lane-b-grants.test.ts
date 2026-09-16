@@ -23,6 +23,7 @@ describe("Lane B: grant / request / support.unlock (D3, no inheritance, existenc
     const stmts = (path: string) => sql(path).split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s));
     await db.batch(stmts("../migrations/0001_init.sql"));
     await db.batch(stmts("../migrations/0002_code_escrow.sql"));
+    await db.batch(stmts("../migrations/0003_language_archive.sql"));
     await db.batch(stmts("../seed/synthetic.sql"));
     const now = new Date("2026-09-16T21:00:00.000Z");
     let trace = 0;

@@ -11,8 +11,9 @@ async function exact(ctx: Ctx, id: string, min: Role = "viewer") {
 }
 const view = (a: AssessmentRow, role: Role) => ({ ...a, role });
 async function language(ctx: Ctx, pid: string, languageId: string) {
-  const row = await ctx.db.prepare("SELECT id FROM language WHERE id = ? AND project_id = ?").bind(languageId, pid).first<{id:string}>();
+  const row = await ctx.db.prepare("SELECT id, archived_at FROM language WHERE id = ? AND project_id = ?").bind(languageId, pid).first<{id:string; archived_at: string | null}>();
   if (!row) throw notVisible("language");
+  if (row.archived_at) throw new CapError("INVALID_PARAMS", "language is archived", "cap.language.unarchive it or pick another");
 }
 export const create: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");

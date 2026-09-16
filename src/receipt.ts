@@ -152,6 +152,7 @@ const PARAM_FIELDS: Record<string, readonly string[]> = {
   "cap.assessment.archive": ["id"], "cap.assessment.unarchive": ["id"], "cap.assessment.notes.update": ["id"],
   "cap.survey.select": ["aid"], "cap.survey.deselect": ["aid","sid"],
   "cap.survey.issue_codes": ["aid","sid"],
+  "cap.language.archive": ["id"], "cap.language.unarchive": ["id"],
 };
 const PRIOR_FIELDS: Record<string, readonly string[]> = {
   "cap.workspace.update": ["name"], "cap.workspace.archive": ["archived_at"], "cap.workspace.unarchive": ["archived_at"],
@@ -163,6 +164,7 @@ const PRIOR_FIELDS: Record<string, readonly string[]> = {
   // sensitive application data; receipt access and retention need owner review.
   "cap.assessment.notes.update": ["notes_reflection","notes_next_steps"],
   "cap.survey.select": ["state","archived_at"], "cap.survey.deselect": ["state","archived_at"],
+  "cap.language.archive": ["archived_at"], "cap.language.unarchive": ["archived_at"],
 };
 function receiptFields(source: Record<string,unknown> | undefined, allowed: readonly string[]): Record<string,unknown> | null {
   if(!source) return null;

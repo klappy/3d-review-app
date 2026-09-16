@@ -2,9 +2,9 @@ openapi: 3.1.0
 info:
   title: 3D Review API — contract-v0.1 (DRAFT)
   version: 0.1.0-draft
-  description: Projected from cookbook 04 @ 59be64c by Fable. 79 capabilities; every capability is also reachable via MCP
-    docs/read/write/danger over the same handlers (prd/18-D). Paths marked x-path-inferred were elided in 04 and need Lane
-    A confirmation. SUPPRESSED is ok:true. Danger twins are never GET.
+  description: Projected from cookbook 04 @ 0f4413768c4365054372d917619311d7c2a00e96 by Fable. 79 capabilities; every capability
+    is also reachable via MCP docs/read/write/danger over the same handlers (prd/18-D). Paths marked x-path-inferred were
+    elided in 04 and need Lane A confirmation. SUPPRESSED is ok:true. Danger twins are never GET.
 servers:
 - url: https://{host}/
   variables:
@@ -1096,6 +1096,183 @@ paths:
         provenance: '04'
       x-roles: O
       x-path-inferred: true
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/projects/{pid}/languages:
+    post:
+      operationId: cap.language.create
+      summary: 'cap.language.create — write.reversible — roles: O, M'
+      x-capability: cap.language.create
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.language.archive
+        provenance: 'proposed (D9 gap: create reverses to archive, never delete)'
+      x-roles: O, M
+      x-path-inferred: false
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: cap.language.list
+      summary: 'cap.language.list — read — roles: Vw+'
+      x-capability: cap.language.list
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: false
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/languages/{id}/archive:
+    post:
+      operationId: cap.language.archive
+      summary: 'cap.language.archive — write.reversible — roles: O, M'
+      x-capability: cap.language.archive
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.language.unarchive
+        provenance: '04'
+      x-roles: O, M
+      x-path-inferred: false
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/languages/{id}/unarchive:
+    post:
+      operationId: cap.language.unarchive
+      summary: 'cap.language.unarchive — write.reversible — roles: O, M'
+      x-capability: cap.language.unarchive
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.language.archive
+        provenance: '04'
+      x-roles: O, M
+      x-path-inferred: false
       tags:
       - C. Project
       responses:
@@ -3380,7 +3557,7 @@ paths:
 x-contract:
   name: contract-v0.1
   status: DRAFT
-  source_sha: 59be64c
+  source_sha: 0f4413768c4365054372d917619311d7c2a00e96
   tools:
   - docs
   - read

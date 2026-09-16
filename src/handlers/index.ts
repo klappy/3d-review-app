@@ -6,6 +6,7 @@ import { opsUndo } from "./undo";
 import { handlers as workspace } from "./workspace";
 import { handlers as project } from "./project";
 import { handlers as assessment } from "./assessment";
+import { handlers as language } from "./language";
 import { handlers as template } from "./template";
 import { handlers as survey } from "./survey";
 import { handlers as participant } from "./participant";
@@ -33,6 +34,7 @@ export const handlers: Record<string, Handler> = {
   ...workspace,
   ...project,
   ...assessment,
+  ...language,
   ...template,
   ...survey,
   ...participant,

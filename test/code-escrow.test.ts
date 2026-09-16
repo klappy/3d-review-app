@@ -23,6 +23,7 @@ describe("one-time code escrow and confirmed release",()=>{
     const db=await mf.getD1Database("DB");
     await db.batch(statements(db,"../migrations/0001_init.sql"));
     await db.batch(statements(db,"../migrations/0002_code_escrow.sql"));
+    await db.batch(statements(db,"../migrations/0003_language_archive.sql"));
     await db.batch(statements(db,"../seed/synthetic.sql"));
     let serial=0;
     const logs:unknown[]=[];
