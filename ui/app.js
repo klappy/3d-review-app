@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), project: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null };
+const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), project: null, assessment: null, survey: null, form: null, answers: null, responseKey: sessionStorage.getItem('responseKey'), codeIds: null, confirmToken: null };
 const path = (value) => encodeURIComponent(value);
 function note(message) { $('notice').textContent = message; $('error').hidden = true; }
 function fail(message) { $('error').textContent = message; $('error').hidden = false; $('notice').textContent = 'Action needs attention. No completion is assumed.'; }
@@ -166,10 +166,11 @@ bindClick('load-results', 'Reading result state…', async () => {
 bindForm('redeem', 'Redeeming access code…', async fd => {
   const result = await api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } });
   state.participant = result.participant_token; sessionStorage.setItem('participantToken', state.participant);
+  state.responseKey = null; sessionStorage.removeItem('responseKey');
   await loadForm();
 });
 async function loadForm() {
-  const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null; state.responseKey = null;
+  const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null;
   text($('form-context'), `${result.assessment} · ${result.language} · ${result.template.id}@${result.template.version}`);
   $('questions').replaceChildren(...result.items.map(drawQuestion)); $('answers').hidden = false; $('review').hidden = true; $('receipt').hidden = true; $('recover').hidden = false;
 }
@@ -187,4 +188,4 @@ bindClick('submit', 'Submitting response…', async () => {
 });
 function showReceipt(result) { text($('receipt'), result.submitted === false ? 'No submission recorded.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`); $('receipt').hidden = false; $('review').hidden = true; $('answers').hidden = true; }
 bindClick('recover', 'Recovering receipt…', async () => showReceipt(await api('/v2/participate/receipt', { participant: true })));
-run('Checking session…', async () => { try { await identity(); if (state.session) { await projects(); await templates(); } if (state.participant) $('recover').hidden = false; } catch { state.session = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); } });
+run('Checking session…', async () => { try { await identity(); if (state.session) { await projects(); await templates(); } } catch { state.session = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); } if (state.participant) { $('recover').hidden = false; await loadForm(); } });
