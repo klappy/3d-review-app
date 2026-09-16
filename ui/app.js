@@ -67,7 +67,7 @@ async function chooseAssessment() {
   text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
   const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
   if (next) $('stage-target').value = next;
-  for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
+  for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · v${survey.template_version} · ${survey.collection_status}`);
   if (result.surveys?.length === 1) { $('surveys').value = result.surveys[0].id; state.survey = result.surveys[0].id; }
 }
 async function templates() {
@@ -141,7 +141,7 @@ $('surveys').addEventListener('change', () => { state.survey = $('surveys').valu
 async function surveyStatus() {
   const aid = required(state.assessment, 'Choose an assessment.'), sid = required(state.survey, 'Choose a survey.');
   const result = await api(`/v2/assessments/${path(aid)}/surveys/${path(sid)}`);
-  text($('survey-detail'), `${result.survey.template_name} · ${result.survey.collection_status} · ${result.counts.responses} response(s)`);
+  text($('survey-detail'), `${result.survey.template_name} · v${result.survey.template_version} · ${result.survey.collection_status} · ${result.counts.responses} response(s)`);
 }
 bindClick('survey-status', 'Checking survey…', surveyStatus);
 function clearCodeBatch() {
