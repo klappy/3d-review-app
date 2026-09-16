@@ -1,56 +1,84 @@
-/** Worker entry. HTTP twins generated from the registry + POST /mcp. Both call execute(). Lane A owns the domain handlers; this file is shared. */
 import { Hono } from "hono";
-import type { Ctx, Env } from "./handlers/types";
-import { capabilities } from "./registry";
+import { resolvePrincipal } from "./auth";
 import { execute } from "./dispatch";
+import { fail, statusFor } from "./envelope";
+import type { Ctx, Env } from "./handlers/types";
+import { CapError } from "./handlers/types";
+import { capabilities } from "./registry";
+import { newTraceId } from "./receipt";
 import { handleMcp } from "./mcp";
 import { docs } from "./handlers/docs";
-import { resolvePrincipal } from "./auth";
-import { ok, fail } from "./envelope";
+import { ok } from "./envelope";
 import openapiText from "../contract/openapi.yaml";
 
 const app = new Hono<{ Bindings: Env }>();
-
-async function mkCtx(req: Request, env: Env): Promise<Ctx & { spans: any[] }> {
-  const spans: any[] = [];
-  const t0 = Date.now();
-  const principal = await resolvePrincipal(req, env);
-  spans.push({ span: "auth", ms: Date.now() - t0, kind: principal.kind });
-  return { env, db: env.DB, principal, traceId: `tr_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`, now: () => new Date(),
-    log: (span, data) => spans.push({ span, at: Date.now() - t0, ...(data ?? {}) }), spans };
-}
-async function persistTrace(ctx: Ctx & { spans: any[] }, cf: { waitUntil: (p: Promise<any>) => void }) {
-  cf.waitUntil(ctx.db.prepare("INSERT OR IGNORE INTO trace (trace_id, actor, spans_json, at) VALUES (?,?,?,?)").bind(ctx.traceId, ctx.principal.id, JSON.stringify(ctx.spans), new Date().toISOString()).run().catch(() => {}));
-}
-
-app.get("/v2/openapi.yaml", (c) => c.text(openapiText as unknown as string, 200, { "content-type": "application/yaml" }));
-
-app.post("/mcp", async (c) => {
-  const ctx = await mkCtx(c.req.raw, c.env);
-  const res = await handleMcp(c.req.raw, ctx, execute, async (cx, a) => { try { const r = await docs(cx, a); return ok("cap.docs.get", r.result, cx.traceId); } catch (e: any) { return fail(e.code ?? "INVALID_PARAMS", e.message, e.hint, "cap.docs.get", cx.traceId); } });
-  await persistTrace(ctx, c.executionCtx as any);
-  return res;
+const json = (value: unknown, status: number) => new Response(JSON.stringify(value), {
+  status, headers: { "content-type": "application/json; charset=utf-8" },
 });
 
-// HTTP twins from the registry. Danger twins are never GET (contract guarantees it).
+export async function contextForRequest(req: Request, env: Env): Promise<Ctx> {
+  return {
+    env, db: env.DB, principal: await resolvePrincipal(req, env),
+    traceId: newTraceId(), now: () => new Date(), log: () => {},
+  };
+}
+
 for (const cap of capabilities) {
-  const path = cap.http.path.replace(/\{(\w+)\}/g, ":$1").replace("@:ver", "@:ver");
-  const method = cap.http.method.toLowerCase() as "get" | "post" | "patch" | "delete";
-  app[method](path, async (c) => {
-    const ctx = await mkCtx(c.req.raw, c.env);
-    let body: any = {};
-    if (method !== "get") { try { body = await c.req.json(); } catch { body = {}; } }
-    const { mode: _m, confirm_token: _c, ...bodyParams } = body.params ?? body;
-    const params: Record<string, any> = { ...c.req.query(), ...c.req.param(), ...bodyParams };
-    if (cap.id === "cap.auth.logout") params.__token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "") ?? c.req.header("cookie")?.match(/session=([^;]+)/)?.[1];
-    const r = await execute(ctx, cap.id, params, "http", body.mode, body.confirm_token);
-    await persistTrace(ctx, c.executionCtx as any);
-    const headers: Record<string, string> = { "x-trace-id": ctx.traceId };
-    if (cap.id === "cap.auth.consume_link" && r.body.ok) headers["set-cookie"] = `session=${r.body.result.session}; HttpOnly; Path=/; SameSite=Lax`;
-    if (cap.id === "cap.auth.logout") headers["set-cookie"] = "session=; Max-Age=0; Path=/";
-    return c.json(r.body, r.status as any, headers);
+  if (cap.tool === "danger" && cap.http.method.toUpperCase() === "GET")
+    throw new Error(`danger twin cannot be GET: ${cap.id}`);
+  const path = cap.http.path.replace(/\{([^}]+)\}/g, ":$1");
+  app.on(cap.http.method.toUpperCase(), path, async (c) => {
+    const ctx = await contextForRequest(c.req.raw, c.env);
+    try {
+      let body: Record<string, unknown> = {};
+      if (!["GET", "HEAD"].includes(c.req.method)) {
+        try {
+          const raw = await c.req.text();
+          if (raw) {
+            const parsed: unknown = JSON.parse(raw);
+            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("body is not an object");
+            body = parsed as Record<string, unknown>;
+          }
+        } catch {
+          return json(fail("INVALID_PARAMS", "JSON object body required", undefined, cap.id, ctx.traceId), 400);
+        }
+      }
+      const params: Record<string, unknown> = {
+        ...(c.req.method === "GET" ? Object.fromEntries(new URL(c.req.url).searchParams) : {}),
+        ...(body.params && typeof body.params === "object" && !Array.isArray(body.params) ? body.params as Record<string, unknown> : body),
+        ...c.req.param(),
+      };
+      if (cap.id === "cap.auth.logout") params.__token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "") ?? c.req.header("cookie")?.match(/session=([^;]+)/)?.[1];
+      if (cap.tool === "danger" && !body.params) {
+        delete params.mode;
+        delete params.confirm_token;
+      }
+      const result = await execute(ctx, cap.id, params, {
+        tool: cap.tool,
+        mode: cap.tool === "danger" ? body.mode as "dry_run" | "execute" : undefined,
+        confirm_token: cap.tool === "danger" ? body.confirm_token as string | undefined : undefined,
+        transport: "http",
+      });
+      const res = json(result, result.ok ? 200 : statusFor(result.error.code));
+      if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Path=/; SameSite=Lax`);
+      if (cap.id === "cap.auth.logout") res.headers.append("set-cookie", "session=; Max-Age=0; Path=/");
+      return res;
+    } catch (e) {
+      if (e instanceof CapError) return json(fail(e.code, e.message, e.hint, e.docs, ctx.traceId), statusFor(e.code));
+      console.error("http.execute.failed", ctx.traceId, String(e));
+      return json(fail("INVALID_PARAMS", "request could not be completed", undefined, cap.id, ctx.traceId), 500);
+    }
   });
 }
 
-app.notFound((c) => c.json(fail("NOT_FOUND_OR_NOT_VISIBLE", "no such route", "GET /v2/capabilities.json lists every route", "cap.docs.capabilities"), 404));
+// MCP (Lane B-1): same execute(), four tools.
+app.post("/mcp", async (c) => {
+  const ctx = await contextForRequest(c.req.raw, c.env);
+  return handleMcp(c.req.raw, ctx, execute as any, async (cx, a) => {
+    try { const r = await docs(cx, a); return ok("cap.docs.get", r.result, cx.traceId); }
+    catch (e: any) { return fail(e.code ?? "INVALID_PARAMS", e.message, e.hint, "cap.docs.get", cx.traceId); }
+  });
+});
+app.get("/v2/openapi.yaml", (c) => c.text(openapiText as unknown as string, 200, { "content-type": "application/yaml" }));
+app.notFound((c) => json(fail("NOT_FOUND_OR_NOT_VISIBLE", "no such route", "GET /v2/capabilities.json lists every route", "cap.docs.capabilities"), 404));
 export default app;

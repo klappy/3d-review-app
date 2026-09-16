@@ -7,7 +7,7 @@
 import type { Ctx } from "./handlers/types";
 import { tools as toolNames } from "./registry";
 
-export type Execute = (ctx: Ctx, capability: string, params: Record<string, any>, viaTool: string, mode?: string, confirmToken?: string) => Promise<{ status: number; body: any }>;
+export type Execute = (ctx: Ctx, capability: string, params: Record<string, any>, options: { tool?: any; mode?: "dry_run" | "execute"; confirm_token?: string; transport?: "http" | "mcp" }) => Promise<any>;
 export type Docs = (ctx: Ctx, args: Record<string, any>) => Promise<any>;
 
 const TOOL_DEFS = [
@@ -44,8 +44,8 @@ export async function handleMcp(req: Request, ctx: Ctx, execute: Execute, docs: 
         if (!toolNames.includes(name)) { out.push(rpc(m.id, undefined, { code: -32602, message: `unknown tool ${name}; tools are ${toolNames.join(", ")}` })); break; }
         let env: any;
         if (name === "docs") env = await docs(ctx, a);
-        else if (name === "write" && a.undo) env = (await execute(ctx, "cap.ops.undo", { token: a.undo }, "write")).body;
-        else env = (await execute(ctx, a.capability, a.params ?? {}, name, a.mode, a.confirm_token)).body;
+        else if (name === "write" && a.undo) env = await execute(ctx, "cap.ops.undo", { token: a.undo }, { tool: "write", transport: "mcp" });
+        else env = await execute(ctx, a.capability, a.params ?? {}, { tool: name, mode: a.mode, confirm_token: a.confirm_token, transport: "mcp" });
         out.push(rpc(m.id, { content: [{ type: "text", text: JSON.stringify(env) }], structuredContent: env, isError: env?.ok === false }));
         break;
       }

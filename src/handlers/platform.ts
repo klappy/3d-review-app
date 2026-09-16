@@ -18,8 +18,8 @@ export const authRequestLink: Handler = async (ctx, p, o) => {
   const eh = await sha256(p.email.toLowerCase());
   if (o?.dryRun) return { result: {}, impact: { affected: [{ email_hash: eh.slice(0, 12) }], irreversible: true, effect: "external", compensating_control: "expire code" } };
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  await ctx.db.prepare("INSERT INTO login_code (email_hash, code_hash, expires_at) VALUES (?,?,?)").bind(eh, await sha256(code), new Date(Date.now() + 10 * 60e3).toISOString()).run();
-  await ctx.db.prepare("INSERT OR IGNORE INTO principal (id, email_hash, display_name, provisioned, support, created_at) VALUES (?,?,?,?,?,?)").bind(id("usr"), eh, p.email.split("@")[0], 0, 0, new Date().toISOString()).run();
+  await ctx.db.prepare("INSERT INTO login_code (id, email_hash, code_hash, expires_at, created_at) VALUES (?,?,?,?,?)").bind(id("lc"), eh, await sha256(code), Date.now() + 10 * 60e3, Date.now()).run();
+  await ctx.db.prepare("INSERT OR IGNORE INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id("usr"), eh, 0, 0, new Date().toISOString()).run();
   ctx.log("auth.code_issued", { dev_only_code: ctx.env.ENVIRONMENT === "dev" ? code : "hidden" });
   return { result: { sent: true, expires_in: 600, ...(ctx.env.ENVIRONMENT === "dev" ? { dev_only_code: code } : {}) }, scope: { type: "platform", id: "auth" } };
 };
@@ -27,11 +27,11 @@ export const authRequestLink: Handler = async (ctx, p, o) => {
 export const authConsumeLink: Handler = async (ctx, p) => {
   if (!p.email || !p.code) throw new CapError("INVALID_PARAMS", "email and code required");
   const eh = await sha256(String(p.email).toLowerCase());
-  const row = await ctx.db.prepare("SELECT rowid, expires_at, used_at FROM login_code WHERE email_hash = ? AND code_hash = ? ORDER BY rowid DESC LIMIT 1").bind(eh, await sha256(String(p.code))).first<any>();
+  const row = await ctx.db.prepare("SELECT id, expires_at, redeemed_at AS used_at FROM login_code WHERE email_hash = ? AND code_hash = ? ORDER BY created_at DESC LIMIT 1").bind(eh, await sha256(String(p.code))).first<any>();
   if (!row) throw new CapError("INVALID_PARAMS", "code invalid", "request a new code", "cap.auth.request_link");
   if (row.used_at) throw new CapError("INVALID_PARAMS", "code_used", "codes are single-use; request a new one");
-  if (row.expires_at < new Date().toISOString()) throw new CapError("INVALID_PARAMS", "code_expired", "request a new code");
-  await ctx.db.prepare("UPDATE login_code SET used_at = ? WHERE rowid = ?").bind(new Date().toISOString(), row.rowid).run();
+  if (row.expires_at < Date.now()) throw new CapError("INVALID_PARAMS", "code_expired", "request a new code");
+  await ctx.db.prepare("UPDATE login_code SET redeemed_at = ? WHERE id = ?").bind(Date.now(), row.id).run();
   const pr = await ctx.db.prepare("SELECT id, support FROM principal WHERE email_hash = ?").bind(eh).first<any>();
   const token = await mintSession(ctx.env, pr.id, pr.support ? "support" : "user");
   return { result: { session: token, principal_id: pr.id, note: "phase 0: same token works as cookie `session` and as Bearer (delegated identity contract = 18-D open item D-1)" }, scope: { type: "platform", id: "auth" } };
@@ -58,8 +58,8 @@ export const opsHealth: Handler = async (ctx) => {
 export const opsFeedback: Handler = async (ctx, p) => {
   const stripped = "answers" in p;
   const { answers: _drop, ...rest } = p;
-  await ctx.db.prepare("INSERT INTO feedback (id, principal_id, context, text, stripped, at) VALUES (?,?,?,?,?,?)")
-    .bind(id("fb"), ctx.principal.id, String(rest.context ?? ""), String(rest.text ?? ""), stripped ? 1 : 0, new Date().toISOString()).run();
+  await ctx.db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
+    .bind(id("fb"), ctx.principal.id, String(rest.scope_type ?? "platform"), String(rest.scope_id ?? "-"), JSON.stringify({ context: rest.context ?? null, text: rest.text ?? "", stripped }), new Date().toISOString()).run();
   return { result: { recorded: true, stripped }, scope: { type: "platform", id: "feedback" } };
 };
 

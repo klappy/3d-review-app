@@ -1,57 +1,98 @@
-/** One execute() for HTTP twins and MCP tools. Lane A may extend receipts/handlers; the flow here is the contract (18-D MCP-REQ-002…006, 010, 012). */
-import type { Ctx, Handler } from "./handlers/types";
-import { CapError, id, sha256 } from "./handlers/types";
-import { byId, toolForClass } from "./registry";
-import { authorize } from "./policy";
-import { ok, fail, statusFor, type Receipt } from "./envelope";
-import { handlers } from "./handlers/index";
+import { fail, ok } from "./envelope";
+import type { Ctx, ScopeType } from "./handlers/types";
+import { CapError } from "./handlers/types";
+import { CapError as HandlerCapError } from "./handlers/errors";
+import { handlers } from "./handlers";
+import { authorize, targetScope } from "./policy";
+import { byId, sourceSha, toolForClass, type Tool } from "./registry";
+import { checkConfirmToken, mintConfirmToken, mintReceipt, paramsHash, persistTrace, type Span } from "./receipt";
 
-const CONFIRM_TTL_MS = 300_000; // inherited from 05 sketch — 18-C decides
+export interface ExecuteOptions {
+  tool?: Tool | "docs";
+  mode?: "dry_run" | "execute";
+  confirm_token?: string;
+  transport?: "http" | "mcp";
+}
 
-export async function execute(ctx: Ctx, capability: string, params: Record<string, any>, viaTool: string, mode?: string, confirmToken?: string): Promise<{ status: number; body: any }> {
-  const t = ctx.traceId;
-  const cap = byId.get(capability);
-  if (!cap) return { status: 400, body: fail("INVALID_PARAMS", `unknown capability ${capability}`, "call docs with no arguments for the index", "docs", t) };
-  const want = toolForClass(cap.class);
-  if (viaTool !== "http" && viaTool !== want) return { status: 400, body: fail("WRONG_TOOL_FOR_CLASS", `${capability} is ${cap.class}`, `use the ${want} tool`, capability, t) };
-  if (cap.slice === "v2.1-oct") return { status: 501, body: fail("RESERVED_NOT_BUILT", `${capability} is planned for v2.1-oct`, "not built yet — see docs", capability, t) };
-  const h: Handler | undefined = (handlers as Record<string, Handler>)[capability];
-  if (!h) return { status: 501, body: fail("RESERVED_NOT_BUILT", `${capability} not built yet (phase 0)`, "target v2.0-bcs; lane ticket open", capability, t) };
+export type ExecuteEnvelope = ReturnType<typeof ok> | ReturnType<typeof fail>;
+
+const reserved = (id: string, traceId: string) =>
+  fail("RESERVED_NOT_BUILT", "not built yet (phase 0)", "This capability is documented but unavailable in phase 0.", id, traceId);
+
+/** The single execution path for HTTP and MCP. No transport-specific authorization or handler calls. */
+export async function execute(
+  ctx: Ctx,
+  capabilityId: string,
+  params: Record<string, unknown>,
+  options: ExecuteOptions = {},
+): Promise<ExecuteEnvelope> {
+  const spans: Span[] = [];
+  const log = ctx.log;
+  ctx.log = (span, data) => {
+    spans.push({ span, t: ctx.now().getTime(), data });
+    log(span, data);
+  };
+  let outcome: ExecuteEnvelope | undefined;
   try {
+    if (!params || typeof params !== "object" || Array.isArray(params))
+      throw new CapError("INVALID_PARAMS", "params must be an object");
+    const cap = byId.get(capabilityId);
+    if (!cap) throw new CapError("INVALID_PARAMS", "unknown capability", "See the capabilities registry.");
+    const expectedTool = toolForClass(cap.class);
+    if (options.tool && options.tool !== expectedTool)
+      throw new CapError("WRONG_TOOL_FOR_CLASS", `${capabilityId} requires the ${expectedTool} tool`, `Use ${expectedTool}.`, capabilityId);
+    if (cap.slice === "v2.1-oct" || !handlers[capabilityId]) return (outcome = reserved(capabilityId, ctx.traceId));
     await authorize(ctx, cap, params);
-    const isDanger = cap.tool === "danger";
-    // 04: for cap.auth.request_link the sign-in submit IS the intent-bound confirm — one step, no token.
-    const implicitConfirm = capability === "cap.auth.request_link" && !mode;
-    if (isDanger && !implicitConfirm) {
-      if (mode !== "dry_run" && mode !== "execute") throw new CapError("INVALID_PARAMS", "mode must be dry_run or execute", "danger rows are two-step", capability);
-      if (mode === "dry_run") {
-        const r = await h(ctx, params, { dryRun: true });
-        const token = `cf_${crypto.randomUUID().replace(/-/g, "")}`;
-        await ctx.db.prepare("INSERT INTO confirm_token (token_hash, capability, params_hash, actor, expires_at) VALUES (?,?,?,?,?)")
-          .bind(await sha256(token), capability, await sha256(JSON.stringify(params)), ctx.principal.id, new Date(Date.now() + CONFIRM_TTL_MS).toISOString()).run();
-        return { status: 200, body: ok(capability, { impact: r.impact ?? { affected: [], irreversible: true, effect: cap.danger?.effect ?? "destructive" }, confirm_token: token, expires_in: CONFIRM_TTL_MS / 1000 }, t) };
-      }
-      if (!confirmToken) throw new CapError("CONFIRM_REQUIRED", "execute needs a confirm_token from dry_run", "call with mode:'dry_run' first", capability);
-      const row = await ctx.db.prepare("SELECT capability, params_hash, actor, expires_at, used_at FROM confirm_token WHERE token_hash = ?").bind(await sha256(confirmToken)).first<any>();
-      const ph = await sha256(JSON.stringify(params));
-      if (!row || row.used_at || row.expires_at < new Date().toISOString() || row.capability !== capability || row.params_hash !== ph || row.actor !== ctx.principal.id)
-        throw new CapError("CONFIRM_EXPIRED", "confirm_token expired or does not match this intent", "run dry_run again", capability);
-      await ctx.db.prepare("UPDATE confirm_token SET used_at = ? WHERE token_hash = ?").bind(new Date().toISOString(), await sha256(confirmToken)).run();
+
+    const danger = expectedTool === "danger";
+    const mode = danger ? options.mode : undefined;
+    // 04 §A: for cap.auth.request_link the sign-in submit IS the intent-bound confirm — one step, no token (Lane B fold).
+    const implicitConfirm = capabilityId === "cap.auth.request_link" && !options.mode;
+    if (danger && !implicitConfirm && mode !== "dry_run" && mode !== "execute")
+      throw new CapError("INVALID_PARAMS", "danger requires mode dry_run or execute", "Start with dry_run.", capabilityId);
+    if (!danger && options.mode) throw new CapError("INVALID_PARAMS", "mode applies only to danger capabilities", undefined, capabilityId);
+
+    const scope = targetScope(cap, params as Record<string, any>) ?? { type: "platform" as ScopeType, id: "global" };
+    const intent = danger ? {
+      capability: capabilityId,
+      params_hash: await paramsHash(params),
+      actor: ctx.principal.id,
+      scope: `${scope.type}:${scope.id}`,
+      revision: sourceSha,
+    } : undefined;
+    if (danger && mode === "execute") {
+      if (!options.confirm_token) throw new CapError("CONFIRM_REQUIRED", "confirmation token required", "Call dry_run with the same params first.", capabilityId);
+      const check = await checkConfirmToken(ctx.env.SESSION_SECRET, options.confirm_token, intent!, ctx.now());
+      if (check !== "ok") throw new CapError(check === "expired" ? "CONFIRM_EXPIRED" : "CONFIRM_REQUIRED", "confirmation expired or does not match this intent", "Call dry_run again.", capabilityId);
     }
-    const r = await h(ctx, params);
-    if (cap.class === "read") return { status: 200, body: ok(capability, r.result, t) };
-    const receipt: Receipt = {
-      id: id("rcpt"), actor: ctx.principal.id, scope: r.scope ?? { type: "platform", id: "-" }, class: cap.class,
-      inverse: cap.inverse.kind === "true" ? (cap.inverse.via ?? "none") : "none", trace_id: t, at: ctx.now().toISOString(),
-      ...(cap.inverse.kind === "true" ? { undo_token: `undo_${crypto.randomUUID().replace(/-/g, "")}` } : {}),
-      ...(cap.inverse.compensating_control ? { compensating_control: cap.inverse.compensating_control } : {}),
-    };
-    await ctx.db.prepare("INSERT INTO receipt (id, actor, capability, scope_type, scope_id, class, inverse, undo_token, trace_id, prior_state_json, params_json, at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-      .bind(receipt.id, receipt.actor, capability, receipt.scope.type, receipt.scope.id, receipt.class, receipt.inverse, receipt.undo_token ?? null, t, r.priorState ? JSON.stringify(r.priorState) : null, JSON.stringify(params), ctx.now().toISOString()).run();
-    return { status: cap.http.method === "POST" && /create|issue|select|invite|submit|accept/.test(capability) ? 201 : 200, body: ok(capability, r.result, t, receipt) };
-  } catch (e: any) {
-    if (e instanceof CapError) return { status: statusFor(e.code), body: fail(e.code, e.message, e.hint, e.docs ?? capability, t) };
-    ctx.log("error", { message: String(e?.message ?? e) });
-    return { status: 500, body: fail("INVALID_PARAMS", "internal error", "see trace", capability, t) };
+
+    const handled = await handlers[capabilityId](ctx, params, danger ? { dryRun: mode === "dry_run" } : undefined);
+    if (danger && mode === "dry_run") {
+      if (!handled.impact) throw new Error(`dry_run missing impact: ${capabilityId}`);
+      const { token, expires_in } = await mintConfirmToken(ctx.env.SESSION_SECRET, intent!, ctx.now());
+      return (outcome = ok(capabilityId, { ...handled.result, impact: handled.impact, confirm_token: token, expires_in }, ctx.traceId));
+    }
+    const receipt = cap.class === "read" ? undefined : await mintReceipt(ctx, {
+      cap,
+      scope: handled.scope ?? scope,
+      priorState: handled.priorState,
+      params,
+      result: handled.result,
+      mode,
+      confirmToken: options.confirm_token,
+    });
+    return (outcome = ok(capabilityId, handled.result, ctx.traceId, receipt));
+  } catch (e) {
+    if (!(e instanceof CapError || e instanceof HandlerCapError)) throw e;
+    return (outcome = fail(e.code, e.message, e.hint, e instanceof CapError ? e.docs : undefined, ctx.traceId));
+  } finally {
+    ctx.log = log;
+    await persistTrace(ctx, spans, {
+      capability: capabilityId,
+      transport: options.transport ?? "http",
+      tool: options.tool,
+      ok: outcome?.ok ?? false,
+      ...(!outcome?.ok && outcome ? { code: outcome.error.code } : {}),
+    });
   }
 }
