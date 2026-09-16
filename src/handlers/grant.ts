@@ -55,8 +55,11 @@ export const revoke_invitation: Handler = async (ctx, p) => {
 export const accept: Handler = async (ctx, p, o) => {
   if (ctx.principal.kind !== "user") throw new CapError("NOT_AUTHENTICATED", "sign in to accept an invitation");
   const token = reqStr(p, "token");
-  const inv = await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status, expires_at FROM invitation WHERE token_hash = ?").bind(await sha256(token)).first<any>();
+  const inv = await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash FROM invitation WHERE token_hash = ?").bind(await sha256(token)).first<any>();
   if (!inv || inv.status === "revoked") throw notVisible("invitation");
+  // Invitations are NOT transferable bearer tokens: the invited email must be the signed-in principal's (Astra c5704773599). Mismatch is hidden, never explained.
+  const me = await ctx.db.prepare("SELECT email_hash FROM principal WHERE id = ?").bind(ctx.principal.id).first<{ email_hash: string | null }>();
+  if (!me?.email_hash || me.email_hash !== inv.invitee_hash) throw notVisible("invitation");
   if (inv.status === "accepted") throw new CapError("INVALID_PARAMS", "invitation_used", "ask for a new invitation");
   if (inv.expires_at && inv.expires_at < nowIso(ctx)) throw new CapError("INVALID_PARAMS", "invitation_expired", "ask for a new invitation");
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
@@ -110,6 +113,7 @@ export const transfer_owner: Handler = async (ctx, p, o) => {
   if (ctx.principal.kind === "support" && (await roleAt(ctx, scope.type, scope.id)) !== "owner")
     throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "transfer by support without the owner's consent is not ruled", "proposed, pending source — the owner runs this step");
   await callerAt(ctx, scope, "owner");
+  if (to === ctx.principal.id) throw new CapError("INVALID_PARAMS", "cannot transfer ownership to yourself", "name another principal");
   if (!(await ctx.db.prepare("SELECT id FROM principal WHERE id = ?").bind(to).first())) throw new CapError("INVALID_PARAMS", "unknown principal", "to must be a signed-up principal id");
   const current = await owners(ctx, scope);
   const stepDown = p.step_down === true;
