@@ -1,0 +1,9 @@
+name = "3d-review"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+[vars]
+ENVIRONMENT = "dev"
+[[d1_databases]]
+binding = "DB"
+database_name = "3d-review"
+database_id = "REPLACE-WITH-REAL-ID"
