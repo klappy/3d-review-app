@@ -45,7 +45,9 @@ if (ws.body.ok) {
       row("J1d", st.body.ok === true, `set_stage collect → ${st.body.ok ? st.body.result?.assessment?.stage ?? "ok" : st.body.error?.code} ${st.body.error?.message ?? ""}`);
       const sid = sel.body.result?.survey?.id;
       if (sid) { const ic2 = await call("POST", `/v2/assessments/${aid}/surveys/${sid}/codes`, { count: 2 }, sess); row("J1e", ic2.status === 501 ? "501" : ic2.body.ok === true, `issue_codes → ${ic2.body.ok ? "ok" : ic2.body.error?.code} (${ic2.body.error?.message ?? ""})`); 
-        const pr = await call("GET", `/v2/assessments/${aid}/surveys/${sid}/print`, null, sess); row("J1f", pr.body.ok === true, `print blank form → ${pr.body.ok ? "ok" : pr.body.error?.code}`); }
+        const pr = await call("GET", `/v2/assessments/${aid}/surveys/${sid}/print`, null, sess); row("J1f", pr.body.ok === true, `print blank form → ${pr.body.ok ? "ok" : pr.body.error?.code}`);
+        const ut = ic2.body.receipt?.undo_token; const bu = ut ? await call("POST", `/v2/undo/${ut}`, null, sess) : null;
+        row("J1g", bu?.body.ok === true && bu.body.result?.count === 2, `undo issue_codes batch → ${bu?.body.ok ? `revoked ${bu.body.result?.count}` : bu?.body.error?.code ?? "no undo token"}`); }
       const undo = a.body.receipt?.undo_token; const un = undo ? await call("POST", `/v2/undo/${undo}`, null, sess) : null;
       row("J9", un?.body.ok === true, `undo assessment.create via ${un?.body.result?.via ?? un?.body.error?.code ?? "no token"}`);
     }
