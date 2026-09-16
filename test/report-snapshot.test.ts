@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import type { Ctx } from "../src/handlers/types";
 import { buildReportSnapshot, getReportSnapshot, listReportSnapshots, PINNED_SOURCE } from "../src/report-snapshot";
+import { scoreSourceItem, type SourceItem } from "../src/source-item-score";
 
 const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "report-snapshot",
   modules: true, script: "export default { fetch() { return new Response('ok') } }",
@@ -33,6 +34,17 @@ describe("internal immutable report snapshots (not public results)", () => {
         for (const trigger of triggers) await db.prepare(trigger).run();
       } else await db.batch(statements(db, path));
     }
+    const validationTemplate = await db.prepare("SELECT items_json FROM survey_template WHERE id = 'tpl_validation' AND version = 2")
+      .first<{ items_json: string }>();
+    const validationItems = JSON.parse(validationTemplate!.items_json) as SourceItem[];
+    const trQ14 = validationItems.find(item => item.id === "TR-Q14")!;
+    expect(scoreSourceItem(trQ14, ["paratext"]).score).toBe(50);
+    expect(scoreSourceItem(trQ14, ["paratext", "other"]).score).toBe(50);
+    const midTemplate = await db.prepare("SELECT items_json FROM survey_template WHERE id = 'tpl_mid_level' AND version = 2")
+      .first<{ items_json: string }>();
+    const midItems = JSON.parse(midTemplate!.items_json) as SourceItem[];
+    expect(scoreSourceItem(midItems.find(item => item.id === "ML-Q10")!, ["consult-trained"]))
+      .toMatchObject({ status: "scored", score: 40, standalone_indicator: true });
     const ctx = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "test" }, db,
       principal: { kind: "user", id }, traceId: "tr_test", now: () => new Date("2026-09-16T20:00:00Z"), log: () => {} });
 
