@@ -1,4 +1,5 @@
 import { initLanguageControls } from './language.js';
+import { reviewAnswer, templateChoices } from './present.js';
 const $ = id => document.getElementById(id);
 const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), project: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null };
 const path = (value) => encodeURIComponent(value);
@@ -70,8 +71,14 @@ async function chooseAssessment() {
   if (result.surveys?.length === 1) { $('surveys').value = result.surveys[0].id; state.survey = result.surveys[0].id; }
 }
 async function templates() {
-  const result = await api('/v2/templates'); resetSelect($('templates'), 'Choose template');
-  for (const t of result.templates || []) option($('templates'), `${t.id}@${t.version}`, `${t.name} · ${t.perspective} · v${t.version}`);
+  const result = await api('/v2/templates'); resetSelect($('templates'), 'Choose current pinned template');
+  for (const choice of templateChoices(result.templates || [])) {
+    const entry = new Option(choice.label, choice.value);
+    entry.disabled = choice.disabled;
+    $('templates').add(entry);
+  }
+  const pinned = [...$('templates').options].find(entry => entry.value && !entry.disabled);
+  if (pinned) $('templates').value = pinned.value;
 }
 function drawQuestion(item) {
   const field = document.createElement('fieldset'); field.dataset.item = item.id;
@@ -186,7 +193,7 @@ async function loadForm() {
 }
 bindForm('answers', 'Preparing answer review…', async () => {
   state.answers = answersFromForm(); $('review-answers').replaceChildren();
-  for (const item of state.form.items) { const p = document.createElement('p'); p.textContent = `${item.text || item.id}: ${JSON.stringify(state.answers[item.id])}`; $('review-answers').append(p); }
+  for (const item of state.form.items) { const p = document.createElement('p'); p.textContent = `${item.text || item.id}: ${reviewAnswer(item, state.answers[item.id])}`; $('review-answers').append(p); }
   $('answers').hidden = true; $('review').hidden = false;
 });
 $('edit').addEventListener('click', () => { $('answers').hidden = false; $('review').hidden = true; });

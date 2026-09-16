@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const upstream = process.env.UI_API_ORIGIN || 'http://127.0.0.1:8787';
-const files = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/language.js': ['language.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
+const files = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/language.js': ['language.js', 'text/javascript'], '/present.js': ['present.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
 createServer(async (req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   if (path.startsWith('/v2/')) {
