@@ -25,5 +25,5 @@ export const unlock_participant: Handler = async (ctx, p) => {
   return { result: { old_code: old.id, old_revoked: !old.redeemed_at, new_code_id: newId_, sid: survey.id, aid: survey.assessment_id, value_via: "cap.survey.export_codes (confirmed disclosure)", audit }, scope };
 };
 
-// HELD as RESERVED_NOT_BUILT until Lane A's keyed-digest + encrypted escrow lands (Astra audit c5704769544): a SHA-256-only code is offline-guessable and this value could never be exported.
-export const handlers: Record<string, Handler> = {};
+// Enabled only with keyed digest + encrypted escrow; missing key fails closed.
+export const handlers: Record<string, Handler> = { "cap.support.unlock_participant": unlock_participant };

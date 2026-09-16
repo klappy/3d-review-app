@@ -7,8 +7,9 @@
     "dev": "wrangler dev --local --port 8787",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "migrate:local": "wrangler d1 execute 3d-review --local --file=migrations/0001_init.sql",
-    "seed:local": "wrangler d1 execute 3d-review --local --file=seed/synthetic.sql",
+    "migrate:local": "wrangler d1 execute 3d-review-dev --local --file=migrations/0001_init.sql",
+    "migrate:escrow:local": "wrangler d1 execute 3d-review-dev --local --file=migrations/0002_code_escrow.sql",
+    "seed:local": "wrangler d1 execute 3d-review-dev --local --file=seed/synthetic.sql",
     "parity": "node scripts/parity.mjs"
   },
   "dependencies": { "hono": "^4.6.0" },

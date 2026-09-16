@@ -75,10 +75,12 @@ describe("Lane B: grant / request / support.unlock (D3, no inheritance, existenc
     const sid = "survey_tavo";
     await db.prepare("INSERT INTO access_code (id, assessment_survey_id, code_hash, created_at) VALUES (?,?,?,?)").bind("code_old", sid, await sha256("OLD-CODE"), now.toISOString()).run();
     const { handlers: supportHandlers } = await import("../src/handlers/support");
-    expect(supportHandlers["cap.support.unlock_participant"]).toBeUndefined(); // HELD until escrow (Astra c5704769544)
+    expect(supportHandlers["cap.support.unlock_participant"]).toBe(unlock_participant);
     await expect(unlock_participant(owner, { code_id: "code_old", reason: "lost" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
-    const u = await unlock_participant(support, { code_id: "code_old", reason: "participant lost the sheet" });
-    expect(u.result.old_revoked).toBe(true); expect(JSON.stringify(u.result).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "<uuid>")).not.toMatch(/\b[A-Z2-9]{4}-[A-Z2-9]{4}\b/); // uuid digit runs are not a code
+    const u = await execute(support, "cap.support.unlock_participant", { code_id: "code_old", reason: "participant lost the sheet" }, { tool: "write" });
+    expect(u.ok).toBe(true);
+    if (!u.ok) throw new Error("support unlock dispatch failed");
+    expect(u.result.old_revoked).toBe(true);
     expect(await db.prepare("SELECT id FROM access_code WHERE id = ?").bind("code_old").first()).toBeNull();
     expect((await db.prepare("SELECT COUNT(*) AS n FROM receipt WHERE class = 'audit' AND capability = ?").bind("cap.support.unlock_participant").first<{ n: number }>())!.n).toBe(1);
     const reissuedId = u.result.new_code_id as string;
