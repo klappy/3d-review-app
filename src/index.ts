@@ -10,6 +10,9 @@ import { handleMcp } from "./mcp";
 import { docs } from "./handlers/docs";
 import { ok } from "./envelope";
 import openapiText from "../contract/openapi.yaml";
+import { verifyAccessJwt } from "./access";
+import { mintSession } from "./auth";
+import { sha256 } from "./handlers/common";
 
 const app = new Hono<{ Bindings: Env }>();
 const json = (value: unknown, status: number) => new Response(JSON.stringify(value), {
@@ -88,6 +91,27 @@ app.post("/mcp", async (c) => {
     try { const r = await docs(cx, a); return ok("cap.docs.get", r.result, cx.traceId); }
     catch (e: any) { return fail(e.code ?? "INVALID_PARAMS", e.message, e.hint, "cap.docs.get", cx.traceId); }
   });
+});
+// Cloudflare email-code sign-in (OF-7). Transport route, not a capability: the browser is sent here by Cloudflare
+// Access after proving its email by one-time PIN; we verify the Access JWT, mint our session, and return to the UI.
+// Agents never use it (they hold a delegated bearer); the MCP surface is unchanged.
+app.get("/v2/auth/access", async (c) => {
+  const env = c.env;
+  try {
+    const id = await verifyAccessJwt(env, c.req.header("cf-access-jwt-assertion") ?? undefined);
+    const eh = await sha256(id.email);
+    await env.DB.prepare("INSERT OR IGNORE INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)")
+      .bind(`usr_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`, eh, 0, 0, new Date().toISOString()).run();
+    const pr = await env.DB.prepare("SELECT id, support FROM principal WHERE email_hash = ?").bind(eh).first<{ id: string; support: number }>();
+    if (!pr) throw new CapError("NOT_AUTHENTICATED", "principal could not be established");
+    const token = await mintSession(env, pr.id, pr.support ? "support" : "user", { via: "cloudflare-access", sub: id.sub });
+    const headers = new Headers({ location: `/#session=${token}` });
+    headers.append("set-cookie", `session=${token}; HttpOnly; Path=/; SameSite=Lax; Secure`);
+    return new Response(null, { status: 302, headers });
+  } catch (e: any) {
+    const code = e instanceof CapError ? e.code : "NOT_AUTHENTICATED";
+    return json(fail(code, e.message ?? "sign-in failed", e.hint, "cap.auth.consume_link", newTraceId()), statusFor(code));
+  }
 });
 app.get("/v2/openapi.yaml", (c) => c.text(openapiText as unknown as string, 200, { "content-type": "application/yaml" }));
 app.notFound((c) => json(fail("NOT_FOUND_OR_NOT_VISIBLE", "no such route", "GET /v2/capabilities.json lists every route", "cap.docs.capabilities"), 404));

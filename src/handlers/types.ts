@@ -10,7 +10,7 @@ export interface Principal {
   participantSurveyId?: string;
   respondentId?: string;
 }
-export interface Env { DB: D1Database; SESSION_SECRET: string; CODE_ESCROW_SECRET?: string; ENVIRONMENT?: string }
+export interface Env { DB: D1Database; SESSION_SECRET: string; CODE_ESCROW_SECRET?: string; ENVIRONMENT?: string; ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string }
 export interface Ctx {
   env: Env;
   db: D1Database;
