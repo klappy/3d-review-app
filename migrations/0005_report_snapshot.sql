@@ -1,5 +1,5 @@
 -- Internal immutable report evidence. This migration does not publish results.
--- D7 disclosure and FIX-T01..T07 scoring decisions remain held.
+-- Steve's pinned executable scoring is the gold standard; D7 disclosure is held.
 CREATE TABLE report_snapshot (
   id TEXT PRIMARY KEY,
   assessment_id TEXT NOT NULL REFERENCES assessment(id),

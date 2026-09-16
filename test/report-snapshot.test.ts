@@ -5,6 +5,7 @@ import type { Ctx } from "../src/handlers/types";
 import { buildReportSnapshot, getReportSnapshot, listReportSnapshots, PINNED_SOURCE } from "../src/report-snapshot";
 import { scoreSourceItem, type SourceItem } from "../src/source-item-score";
 import model from "../src/pinned-report-model.json";
+import { projectReferenceAssessment } from "../src/reference-projection";
 
 const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "report-snapshot",
   modules: true, script: "export default { fetch() { return new Response('ok') } }",
@@ -85,6 +86,13 @@ describe("internal immutable report snapshots (not public results)", () => {
     expect(JSON.parse(first.evidence_json)).toMatchObject({ response_ids: ["resp_v2_1"],
       templates: ["tpl_validation@2"] });
     expect(first.evidence_json).toContain(PINNED_SOURCE);
+    const projected = await projectReferenceAssessment(ctx("person_mara"), "assess_tavo_collect");
+    expect(projected.status).toBe("reference_unpublished");
+    expect(projected.snapshot_id).toBe(first.id);
+    expect(projected.item_scores.find(row => row.item_id === "TR-Q1" && row.response_id === "resp_v2_1"))
+      .toMatchObject({ score: 100, status: "scored" });
+    expect(projected.subdimensions).toContainEqual({ assessment_id: "assess_tavo_collect",
+      lens: "Translation Team", sub_dimension: "Translation Process & Brief", score: 100, n_items_included: 1 });
     await expect(db.prepare("UPDATE report_snapshot SET state = 'held' WHERE id = ?").bind(first.id).run())
       .rejects.toThrow(/immutable/);
     await expect(db.prepare("DELETE FROM report_snapshot WHERE id = ?").bind(first.id).run())

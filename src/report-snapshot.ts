@@ -1,8 +1,9 @@
 /**
  * Internal T06 report input snapshots. There is deliberately no public handler:
- * D7 disclosure and the FIX-T01..T07 scoring contract are still held. In
- * particular, IDs, input hashes and snapshot cadence cannot leak through a
- * viewer route while differencing policy remains undecided.
+ * Steve's pinned executable source is the scoring gold standard; differences
+ * from historical drafts are tracked as tensions, not a blanket build hold.
+ * D7 disclosure remains held. IDs, hashes and snapshot cadence cannot leak
+ * through viewer routes while differencing policy remains undecided.
  */
 import type { Ctx } from "./handlers/types";
 import { gate, newId, nowIso, roleAt, sha256 } from "./handlers/common";
@@ -47,7 +48,7 @@ function stateFor(rows: ResponseInput[]): SnapshotRow["state"] {
   // nor may a response silently switch away from the presented template.
   if (rows.some(row => row.template_id !== row.selected_template_id || row.template_version !== row.selected_template_version ||
       row.template_version !== 2 || !row.source_ref?.startsWith(PINNED_SOURCE))) return "incompatible";
-  return "held";
+  return "held"; // disclosure state, not a scoring-implementation stop
 }
 
 /** Durable, idempotent snapshot of exact append-only response inputs. */
