@@ -57,3 +57,13 @@ describe("shared dispatch boundary", () => {
     expect(effects).toBe(1);
   });
 });
+
+import { pickIds } from "../src/receipt";
+describe("pickIds lifts nested created-row ids for the inverse", () => {
+  it("finds id/project_id one level down", () => {
+    expect(pickIds({ assessment: { id: "assess_1", project_id: "proj_1", name: "x" } })).toEqual({ id: "assess_1", project_id: "proj_1" });
+  });
+  it("top-level ids win over nested", () => {
+    expect(pickIds({ id: "top", grant: { id: "g1", scope_id: "ws_1" } })).toEqual({ id: "top", scope_id: "ws_1" });
+  });
+});

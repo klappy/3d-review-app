@@ -137,8 +137,13 @@ async function persistReceipt(ctx: Ctx, r: Receipt, capabilityId: string, input:
 /** Keys that look like ids (id, aid, sid, *_id) — what an inverse capability needs to address the row. */
 export function pickIds(o: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(o ?? {})) {
-    if ((k === "id" || /^[a-z]*id$/.test(k) || k.endsWith("_id")) && (typeof v === "string" || typeof v === "number")) out[k] = v;
+  const isId = (k: string, v: unknown) => (k === "id" || /^[a-z]*id$/.test(k) || k.endsWith("_id")) && (typeof v === "string" || typeof v === "number");
+  for (const [k, v] of Object.entries(o ?? {})) if (isId(k, v)) out[k] = v;
+  // Handlers return the created row nested under its noun ({ assessment: { id, project_id } }); the
+  // inverse (archive/revoke) takes those ids as top-level params, so lift one level when nothing was found there.
+  for (const v of Object.values(o ?? {})) {
+    if (!v || typeof v !== "object" || Array.isArray(v)) continue;
+    for (const [k, nv] of Object.entries(v as Record<string, unknown>)) if (isId(k, nv) && out[k] === undefined) out[k] = nv;
   }
   return out;
 }
