@@ -6,7 +6,7 @@ ENVIRONMENT = "dev"
 [[d1_databases]]
 binding = "DB"
 database_name = "3d-review"
-database_id = "REPLACE-WITH-REAL-ID"
+database_id = "5d4cc260-a7b1-47cc-b03d-ed4f60d324c3"
 
 [[rules]]
 type = "Text"
