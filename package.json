@@ -9,7 +9,7 @@
     "test": "vitest run",
     "migrate:local": "wrangler d1 execute 3d-review-dev --local --file=migrations/0001_init.sql",
     "migrate:escrow:local": "wrangler d1 execute 3d-review-dev --local --file=migrations/0002_code_escrow.sql",
-    "seed:local": "wrangler d1 execute 3d-review-dev --local --file=seed/synthetic.sql",
+    "seed:local": "wrangler d1 execute 3d-review-dev --local --file=seed/synthetic.sql && wrangler d1 execute 3d-review-dev --local --file=seed/synthetic-responses.sql",
     "parity": "node scripts/parity.mjs"
   },
   "dependencies": { "hono": "^4.6.0" },
