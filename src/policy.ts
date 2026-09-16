@@ -16,7 +16,7 @@ export function targetScope(cap: Capability, params: Record<string, any>): { typ
 }
 
 export async function roleAt(ctx: Ctx, scope: { type: ScopeType; id: string }): Promise<Role | null> {
-  const r = await ctx.db.prepare("SELECT role FROM grant_ WHERE principal_id = ? AND scope_type = ? AND scope_id = ?")
+  const r = await ctx.db.prepare("SELECT role FROM grant WHERE principal_id = ? AND scope_type = ? AND scope_id = ?")
     .bind(ctx.principal.id, scope.type, scope.id).first<{ role: Role }>();
   return r?.role ?? null;
 }

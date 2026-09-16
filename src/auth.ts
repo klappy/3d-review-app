@@ -16,7 +16,7 @@ export async function resolvePrincipal(req: Request, env: Env): Promise<Principa
   const row = await env.DB.prepare(
     "SELECT s.principal_id, s.kind, s.delegated_by, s.expires_at, s.participant_survey_id, s.respondent_id, p.email_hash, p.provisioned, p.support FROM session s LEFT JOIN principal p ON p.id = s.principal_id WHERE s.token_hash = ?"
   ).bind(h).first<any>();
-  if (!row || (row.expires_at && row.expires_at < Date.now())) return { kind: "anonymous", id: "anon" };
+  if (!row || (row.expires_at && row.expires_at < new Date().toISOString())) return { kind: "anonymous", id: "anon" };
   if (row.kind === "participant") return { kind: "participant", id: row.principal_id, participantSurveyId: row.participant_survey_id, respondentId: row.respondent_id };
   if (row.kind === "support" || row.support) return { kind: "support", id: row.principal_id, supportActor: row.delegated_by ?? undefined, provisioned: true };
   return { kind: "user", id: row.principal_id, provisioned: !!row.provisioned, delegatedBy: bearer ? row.delegated_by ?? undefined : undefined };
@@ -26,7 +26,7 @@ export async function mintSession(env: Env, principalId: string, kind: "user" | 
   const token = `${kind === "participant" ? "pt" : "st"}_${crypto.randomUUID().replace(/-/g, "")}`;
   await env.DB.prepare(
     "INSERT INTO session (token_hash, principal_id, kind, delegated_by, participant_survey_id, respondent_id, expires_at, created_at) VALUES (?,?,?,?,?,?,?,?)"
-  ).bind(await sha256(token), principalId, kind, (extra.delegated_by as string) ?? null, (extra.participant_survey_id as string) ?? null, (extra.respondent_id as string) ?? null, Date.now() + ttlMs, Date.now()).run();
+  ).bind(await sha256(token), principalId, kind, (extra.delegated_by as string) ?? null, (extra.participant_survey_id as string) ?? null, (extra.respondent_id as string) ?? null, new Date(Date.now() + ttlMs).toISOString(), new Date().toISOString()).run();
   return token;
 }
 

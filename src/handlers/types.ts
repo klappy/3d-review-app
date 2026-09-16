@@ -34,10 +34,7 @@ export interface HandlerResult {
 }
 export type Handler = (ctx: Ctx, params: Record<string, any>, opts?: { dryRun?: boolean }) => Promise<HandlerResult>;
 
-export class CapError extends Error {
-  constructor(public code: string, message: string, public hint?: string, public docs?: string) { super(message); }
-}
-export const notVisible = () => new CapError("NOT_FOUND_OR_NOT_VISIBLE", "not found or not visible", "check the id and your grants; existence is not disclosed");
+export { CapError, notVisible } from "./errors";
 export const id = (p: string) => `${p}_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
 export async function sha256(s: string): Promise<string> {
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));

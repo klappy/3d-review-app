@@ -15,11 +15,13 @@ export type CapErrorCode =
 export class CapError extends Error {
   readonly code: CapErrorCode;
   readonly hint?: string;
-  constructor(code: CapErrorCode, message: string, hint?: string) {
+  readonly docs?: string;
+  constructor(code: CapErrorCode, message: string, hint?: string, docs?: string) {
     super(message);
     this.name = "CapError";
     this.code = code;
     this.hint = hint;
+    this.docs = docs;
   }
 }
 
