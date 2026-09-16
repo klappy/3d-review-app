@@ -11,6 +11,9 @@ import { handlers as survey } from "./survey";
 import { handlers as participant } from "./participant";
 import { handlers as response } from "./response";
 import { handlers as results } from "./results";
+import { handlers as grant } from "./grant";
+import { handlers as request } from "./request";
+import { handlers as support } from "./support";
 
 export const handlers: Record<string, Handler> = {
   "cap.entry.intents": p.entryIntents,
@@ -35,4 +38,8 @@ export const handlers: Record<string, Handler> = {
   ...participant,
   ...response,
   ...results,
+  // Lane B (Fable) — per #14 c5704577820
+  ...grant,
+  ...request,
+  ...support,
 };
