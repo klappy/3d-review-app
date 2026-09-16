@@ -1,6 +1,7 @@
 export interface Receipt {
   id: string; actor: string; scope: { type: string; id: string }; class: string;
   inverse: string; undo_token?: string; compensating_control?: string; trace_id: string; at: string;
+  mode?: "dry_run" | "execute";
 }
 export const ok = (capability: string, result: Record<string, unknown>, trace_id: string, receipt?: Receipt) =>
   ({ ok: true as const, capability, result, trace_id, ...(receipt ? { receipt } : {}) });
