@@ -1,3 +1,5 @@
+import { initLanguageControls } from './language.js';
+import { reviewAnswer, templateChoices } from './present.js';
 const $ = id => document.getElementById(id);
 const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), project: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null };
 const path = (value) => encodeURIComponent(value);
@@ -26,6 +28,7 @@ async function run(label, task) {
   try { await task(); note(`${label} — complete.`); } catch (error) { fail(error.message); }
   finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : false); }
 }
+const languageControls = initLanguageControls({ api, run, getProject: () => state.project });
 function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget))); }); }
 function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler)); }
 async function identity() {
@@ -40,11 +43,13 @@ async function projects() {
 async function chooseProject() {
   state.project = $('projects').value || null; state.assessment = null; state.survey = null;
   clearCodeBatch();
+  text($('project-detail'), ''); text($('assessment-detail'), ''); text($('survey-detail'), '');
+  text($('results'), 'Select an assessment.');
   resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
-  if (!state.project) return;
+  if (!state.project) { await languageControls.refresh(); return; }
   const result = await api(`/v2/projects/${path(state.project)}`);
   text($('project-detail'), `${result.project.name} · ${result.project.role} · ${result.languages.length} language(s)`);
-  resetSelect($('languages'), 'Choose language'); for (const language of result.languages || []) option($('languages'), language.id, language.name);
+  await languageControls.refresh();
   await assessments();
 }
 async function assessments() {
@@ -56,6 +61,7 @@ async function assessments() {
 async function chooseAssessment() {
   state.assessment = $('assessments').value || null; state.survey = null; resetSelect($('surveys'), 'Choose survey');
   clearCodeBatch();
+  text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
   if (!state.assessment) return;
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
@@ -65,16 +71,24 @@ async function chooseAssessment() {
   if (result.surveys?.length === 1) { $('surveys').value = result.surveys[0].id; state.survey = result.surveys[0].id; }
 }
 async function templates() {
-  const result = await api('/v2/templates'); resetSelect($('templates'), 'Choose template');
-  for (const t of result.templates || []) option($('templates'), `${t.id}@${t.version}`, `${t.name} · ${t.perspective} · v${t.version}`);
+  const result = await api('/v2/templates'); resetSelect($('templates'), 'Choose current pinned template');
+  for (const choice of templateChoices(result.templates || [])) {
+    const entry = new Option(choice.label, choice.value);
+    entry.disabled = choice.disabled;
+    $('templates').add(entry);
+  }
+  const pinned = [...$('templates').options].find(entry => entry.value && !entry.disabled);
+  if (pinned) $('templates').value = pinned.value;
 }
 function drawQuestion(item) {
   const field = document.createElement('fieldset'); field.dataset.item = item.id;
-  const legend = document.createElement('legend'); legend.textContent = item.text || item.id; field.append(legend);
-  if (item.type === 'scale') { const input = document.createElement('input'); input.name = item.id; input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; input.required = true; field.append(input); }
-  else if (item.type === 'text') { const input = document.createElement('textarea'); input.name = item.id; input.required = true; field.append(input); }
+  const legend = document.createElement('legend'); legend.textContent = `${item.text || item.id}${item.requiredness === 'unresolved' ? ' (may leave unanswered; policy held)' : ''}`; field.append(legend);
+  if (item.answer_semantics === 'unresolved_no_problems_vs_skipped') { const note = document.createElement('p'); note.textContent = 'Leaving this blank records an unknown answer, not “no problems.”'; field.append(note); }
+  if (item.type === 'scale') { const input = document.createElement('input'); input.name = item.id; input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; input.required = item.required !== false; field.append(input); }
+  else if (item.type === 'text') { const input = document.createElement('textarea'); input.name = item.id; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'single' || item.type === 'multi') {
-    for (const opt of item.options || []) { const label = document.createElement('label'); const input = document.createElement('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = opt.code; input.required = item.type === 'single'; label.append(input, document.createTextNode(opt.label || opt.text || opt.code)); field.append(label); }
+    for (const opt of item.options || []) { const label = document.createElement('label'); const input = document.createElement('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = opt.code; input.required = item.type === 'single' && item.required !== false; label.append(input, document.createTextNode(opt.label || opt.text || opt.code)); field.append(label); }
+    if (item.type === 'multi' && (item.options || []).some(opt => opt.exclusive)) { const note = document.createElement('p'); note.textContent = 'An exclusion choice cannot be combined with any other choice.'; field.append(note); }
   } else { const warning = document.createElement('p'); warning.textContent = `Unsupported item type ${item.type}; cannot submit.`; field.append(warning); }
   return field;
 }
@@ -82,8 +96,12 @@ function answersFromForm() {
   const values = new FormData($('answers')); const answers = {};
   for (const item of state.form.items) {
     let value = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id);
-    if (item.type === 'scale') value = Number(value);
-    if (value === null || value === '' || (Array.isArray(value) && !value.length)) throw new Error(`Answer required: ${item.text || item.id}`);
+    if (value === null || value === '' || (Array.isArray(value) && !value.length)) {
+      if (item.required === false) value = null;
+      else throw new Error(`Answer required: ${item.text || item.id}`);
+    }
+    if (item.type === 'scale' && value !== null) value = Number(value);
+    if (item.type === 'multi' && Array.isArray(value) && value.length > 1 && (item.options || []).some(opt => opt.exclusive && value.includes(opt.code))) throw new Error(`An exclusion choice cannot be combined: ${item.text || item.id}`);
     answers[item.id] = value;
   }
   return answers;
@@ -175,7 +193,7 @@ async function loadForm() {
 }
 bindForm('answers', 'Preparing answer review…', async () => {
   state.answers = answersFromForm(); $('review-answers').replaceChildren();
-  for (const item of state.form.items) { const p = document.createElement('p'); p.textContent = `${item.text || item.id}: ${JSON.stringify(state.answers[item.id])}`; $('review-answers').append(p); }
+  for (const item of state.form.items) { const p = document.createElement('p'); p.textContent = `${item.text || item.id}: ${reviewAnswer(item, state.answers[item.id])}`; $('review-answers').append(p); }
   $('answers').hidden = true; $('review').hidden = false;
 });
 $('edit').addEventListener('click', () => { $('answers').hidden = false; $('review').hidden = true; });

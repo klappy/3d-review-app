@@ -22,11 +22,15 @@ async function scopedSurvey(ctx: Ctx, requireOpen = false): Promise<ParticipantS
 function validateAnswers(items: TemplateItem[], value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new CapError("INVALID_PARAMS", "answers must be an object");
   const answers = value as Record<string, unknown>;
+  const normalized: Record<string, unknown> = {};
   const ids = new Set(items.map((i) => i.id));
   for (const key of Object.keys(answers)) if (!ids.has(key)) throw new CapError("INVALID_PARAMS", `unknown answer item ${key}`);
   for (const item of items) {
     const answer = answers[item.id];
-    if (answer === undefined || answer === null || answer === "") throw new CapError("INVALID_PARAMS", `answer required for ${item.id}`);
+    if (answer === undefined || answer === null || answer === "" || (item.type === "multi" && Array.isArray(answer) && answer.length === 0)) {
+      if (item.required === false) { normalized[item.id] = null; continue; }
+      throw new CapError("INVALID_PARAMS", `answer required for ${item.id}`);
+    }
     if (item.type === "scale" && (typeof answer !== "number" || !Number.isInteger(answer) || !item.scale || answer < item.scale.min || answer > item.scale.max))
       throw new CapError("INVALID_PARAMS", `invalid scale answer for ${item.id}`);
     if (item.type === "text" && (typeof answer !== "string" || answer.length > 5000))
@@ -35,8 +39,11 @@ function validateAnswers(items: TemplateItem[], value: unknown): Record<string, 
       throw new CapError("INVALID_PARAMS", `invalid option for ${item.id}`);
     if (item.type === "multi" && (!Array.isArray(answer) || answer.length === 0 || (item.max_select && answer.length > item.max_select) || new Set(answer).size !== answer.length || !answer.every((a) => typeof a === "string" && item.options?.some((o) => o.code === a))))
       throw new CapError("INVALID_PARAMS", `invalid options for ${item.id}`);
+    if (item.type === "multi" && Array.isArray(answer) && answer.length > 1 && item.options?.some((o) => o.flag === "exclusion" && answer.includes(o.code)))
+      throw new CapError("INVALID_PARAMS", `exclusion choice cannot be combined for ${item.id}`);
+    normalized[item.id] = answer;
   }
-  return answers;
+  return normalized;
 }
 
 export const form: Handler = async (ctx) => {

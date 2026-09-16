@@ -175,8 +175,12 @@ export interface TemplateItem {
   group: string;                       // sub-dimension (steve: rubric_item.sub_dimension)
   text: string;
   type: "scale" | "multi" | "single" | "text";
+  required?: boolean;                    // absent on legacy v1 means required
+  requiredness?: "unresolved" | "working-required";
+  answer_semantics?: string | null;
+  source_type?: string;                   // pinned CSV type, not a score
   scale?: { min: number; max: number };
-  options?: { code: string; text: string; weight?: number }[];
+  options?: { code: string; text: string; weight?: number | null; flag?: string | null }[];
   max_select?: number;
   standalone_indicator?: boolean;      // e.g. ML-Q10: never pooled into group means (FIX-03)
 }
@@ -189,10 +193,14 @@ export function renderItems(items: TemplateItem[], lang: string): Record<string,
     id: it.id,
     group: it.group,
     type: it.type,
+    required: it.required !== false,
+    ...(it.requiredness ? { requiredness: it.requiredness } : {}),
+    ...(it.answer_semantics ? { answer_semantics: it.answer_semantics } : {}),
+    ...(it.source_type ? { source_type: it.source_type } : {}),
     text: it.text,
     lang,
     ...(it.scale ? { scale: it.scale } : {}),
-    ...(it.options ? { options: it.options.map((o) => ({ code: o.code, text: o.text })) } : {}),
+    ...(it.options ? { options: it.options.map((o) => ({ code: o.code, text: o.text, ...(o.flag === "exclusion" ? { exclusive: true } : {}) })) } : {}),
     ...(it.max_select ? { max_select: it.max_select } : {}),
     ...(it.standalone_indicator ? { standalone_indicator: true } : {}),
   }));
