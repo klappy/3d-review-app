@@ -1,7 +1,8 @@
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
+import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
 const $ = id => document.getElementById(id);
-const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), project: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null };
+const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null };
 const path = (value) => encodeURIComponent(value);
 function note(message) { $('notice').textContent = message; $('error').hidden = true; }
 function fail(message) { $('error').textContent = message; $('error').hidden = false; $('notice').textContent = 'Action needs attention. No completion is assumed.'; }
@@ -28,12 +29,39 @@ async function run(label, task) {
   try { await task(); note(`${label} — complete.`); } catch (error) { fail(error.message); }
   finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : false); }
 }
-const languageControls = initLanguageControls({ api, run, getProject: () => state.project });
+function showAuthorizedWork(me) {
+  const visible = hasProjectWork(me);
+  for (const id of ['project-card', 'assessment-card', 'survey-card', 'results-card']) $(id).hidden = !visible;
+  $('create-project').hidden = !me.principal.provisioned;
+  text($('access-state'), visible ? '' : 'No project access is assigned to this identity. Scoped project work is hidden.');
+}
+function resetClientIdentity() {
+  clearIdentityData(state, sessionStorage);
+  clearCodeBatch();
+  for (const id of ['project-card', 'assessment-card', 'survey-card', 'results-card']) $(id).hidden = true;
+  $('create-project').hidden = true;
+  for (const [id, label] of [['projects', 'Choose project'], ['assessments', 'Choose assessment'], ['surveys', 'Choose survey'], ['languages', 'Choose language'], ['templates', 'Choose template']]) resetSelect($(id), label);
+  for (const id of ['project-detail', 'assessment-detail', 'survey-detail', 'form-context', 'dev-code']) text($(id), '');
+  text($('results'), 'Select an assessment.'); text($('identity'), 'Not signed in');
+  text($('access-state'), 'Sign in to see authorized project work.');
+  $('questions').replaceChildren(); $('review-answers').replaceChildren(); $('events').replaceChildren();
+  text($('receipt'), '');
+  for (const id of ['answers', 'review', 'receipt', 'recover']) $(id).hidden = true;
+  $('redeem').reset(); $('consume-login').reset(); $('create-project').reset(); $('create-assessment').reset(); $('create-language').reset();
+  text($('participant-error'), ''); $('participant-error').hidden = true;
+  text($('language-status'), 'Choose a project to list its languages.');
+}
+const languageControls = initLanguageControls({ api, run, getProject: () => state.project, onLanguages: active => {
+  if (state.projectView) text($('project-detail'), `${state.projectView.name} · ${state.projectView.role} · ${active.length} active language(s)`);
+} });
 function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget))); }); }
 function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler)); }
 async function identity() {
   if (!state.session) { text($('identity'), 'Not signed in'); return; }
-  const result = await api('/v2/me'); text($('identity'), `${result.principal.kind} · ${result.principal.id}`);
+  const result = await api('/v2/me'); state.principal = result.principal;
+  text($('identity'), `${result.principal.kind} · ${result.principal.id}`);
+  showAuthorizedWork(result);
+  return result;
 }
 async function projects() {
   const result = await api('/v2/projects'); resetSelect($('projects'), 'Choose project');
@@ -41,14 +69,14 @@ async function projects() {
   if (state.project) $('projects').value = state.project;
 }
 async function chooseProject() {
-  state.project = $('projects').value || null; state.assessment = null; state.survey = null;
+  state.project = $('projects').value || null; state.projectView = null; state.assessment = null; state.survey = null;
   clearCodeBatch();
   text($('project-detail'), ''); text($('assessment-detail'), ''); text($('survey-detail'), '');
   text($('results'), 'Select an assessment.');
   resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
   if (!state.project) { await languageControls.refresh(); return; }
   const result = await api(`/v2/projects/${path(state.project)}`);
-  text($('project-detail'), `${result.project.name} · ${result.project.role} · ${result.languages.length} language(s)`);
+  state.projectView = result.project;
   await languageControls.refresh();
   await assessments();
 }
@@ -113,9 +141,16 @@ bindForm('request-login', 'Requesting local code…', async fd => {
 });
 bindForm('consume-login', 'Signing in…', async fd => {
   const result = await api('/v2/auth/session', { method: 'POST', body: { email: String(fd.get('email')).trim(), code: String(fd.get('code')).trim() } });
-  state.session = result.session; sessionStorage.setItem('facilitatorToken', state.session); await identity(); await projects(); await templates();
+  resetClientIdentity(); state.session = result.session; sessionStorage.setItem('facilitatorToken', state.session);
+  const me = await identity(); if (hasProjectWork(me)) { await projects(); await templates(); }
 });
-bindClick('signout', 'Signing out…', async () => { await api('/v2/auth/session', { method: 'DELETE' }); state.session = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); });
+bindClick('signout', 'Signing out…', async () => {
+  let remoteError;
+  try { if (state.session) await api('/v2/auth/session', { method: 'DELETE' }); }
+  catch (error) { remoteError = error; }
+  finally { resetClientIdentity(); }
+  if (remoteError) throw new Error(`Local session cleared; server sign-out could not be confirmed: ${remoteError.message}`);
+});
 bindClick('load-projects', 'Loading projects…', projects);
 $('projects').addEventListener('change', () => run('Loading project…', chooseProject));
 bindForm('create-project', 'Creating project…', async fd => { const result = await api('/v2/projects', { method: 'POST', body: { name: String(fd.get('name')).trim() } }); state.project = result.project.id; await projects(); $('projects').value = state.project; await chooseProject(); });
@@ -123,9 +158,11 @@ bindClick('load-assessments', 'Loading assessments…', assessments);
 $('assessments').addEventListener('change', () => run('Loading assessment…', chooseAssessment));
 bindClick('set-stage', 'Moving assessment stage…', async () => {
   const aid = required(state.assessment, 'Choose an assessment.');
+  const sid = state.survey;
   await api(`/v2/assessments/${path(aid)}/stage`, { method: 'POST', body: { stage: $('stage-target').value } });
+  await assessments(); $('assessments').value = aid;
   await chooseAssessment();
-  if (state.survey) await surveyStatus();
+  if (sid && [...$('surveys').options].some(entry => entry.value === sid)) { $('surveys').value = sid; state.survey = sid; await surveyStatus(); }
 });
 bindForm('create-assessment', 'Creating assessment…', async fd => {
   const pid = required(state.project, 'Choose a project.'); const result = await api(`/v2/projects/${path(pid)}/assessments`, { method: 'POST', body: { name: String(fd.get('name')).trim(), language_id: String(fd.get('language')) } });
@@ -182,9 +219,16 @@ bindClick('load-results', 'Reading result state…', async () => {
   text($('results'), result.suppressed ? `Suppressed / ${result.status}: ${result.reason || 'Disclosure policy pending'}` : JSON.stringify(result));
 });
 bindForm('redeem', 'Redeeming access code…', async fd => {
-  const result = await api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } });
-  state.participant = result.participant_token; sessionStorage.setItem('participantToken', state.participant);
-  await loadForm();
+  text($('participant-error'), ''); $('participant-error').hidden = true;
+  try {
+    const result = await api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } });
+    state.participant = result.participant_token; sessionStorage.setItem('participantToken', state.participant);
+    await loadForm();
+  } catch (error) {
+    text($('participant-error'), codeEntryFailure);
+    $('participant-error').hidden = false; $('participant-error').focus();
+    throw error;
+  }
 });
 async function loadForm() {
   const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null; state.responseKey = null;
@@ -206,5 +250,5 @@ bindClick('submit', 'Submitting response…', async () => {
 function showReceipt(result) { text($('receipt'), result.submitted === false ? 'No submission recorded.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`); $('receipt').hidden = false; $('review').hidden = true; $('answers').hidden = true; }
 bindClick('recover', 'Recovering receipt…', async () => showReceipt(await api('/v2/participate/receipt', { participant: true })));
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
-{ const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); } }
-run('Checking session…', async () => { try { await identity(); if (state.session) { await projects(); await templates(); } if (state.participant) $('recover').hidden = false; } catch { state.session = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); } });
+{ const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); } }
+run('Checking session…', async () => { try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } if (state.participant) $('recover').hidden = false; } catch { resetClientIdentity(); } });
