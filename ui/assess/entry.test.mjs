@@ -15,7 +15,8 @@ test('E1: the shell way back is /#facilitator, hidden until a session is observe
   const html = read('./index.html');
   assert.match(html, /<a id="legacy-link" href="\/#facilitator" hidden>Workspaces &amp; people<\/a>/);
   assert.ok(html.includes('<p class="storage-note" id="whats-here" hidden></p>'));
-  assert.ok(MOUNTED.length >= 2 && ELSEWHERE.items.includes('stage change') && ELSEWHERE.items.includes('reports and results'));
+  assert.deepEqual(MOUNTED, ['assessment view', 'survey set (three lenses, include/remove)', 'survey counts', 'survey screen', 'print blank survey']); // explicit reconciled union with #62
+  assert.deepEqual(ELSEWHERE.items, ['workspaces', 'project and assessment creation', 'stage change', 'invitations and roles', 'survey links and codes', 'reports and results']);
   assert.ok(!/coming soon/i.test(whatsHere()));
   assert.ok(read('../.assetsignore').split('\n').includes('assess/entry.test.mjs'));
 });
