@@ -19,3 +19,19 @@
 .rv #participant:has(.participant-intro) > p.note:not([id]),
 .rv #participant:has(.participant-intro) > #redeem > label,
 .rv #participant:has(.participant-intro) > #redeem > button{display:none}
+
+/* Shared participant route: brand + right side only; no staff chrome or wording.
+   Presentation only — authority-bearing hidden flags and identity text are untouched. */
+@media screen {
+  body[data-workspace-route="participant"] #workspace > .headrow,
+  body[data-workspace-route="participant"] #workspace > .introduction,
+  body[data-workspace-route="participant"] aside.tree,
+  body[data-workspace-route="participant"] #signout { display:none; }
+  /* #identity is a route signal read by public-entry/stage-composition: hidden visually, text intact. */
+  body[data-workspace-route="participant"] #identity {
+    position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;
+    clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;
+  }
+  body[data-workspace-route="participant"] #participant { max-width:640px;width:100%;margin-inline:auto; }
+  body:not([data-workspace-route="participant"]) .participant-footer { display:none; }
+}
