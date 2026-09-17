@@ -1,6 +1,7 @@
 import { mountParticipantView } from './participant-view.js';
 import { redactDiagnosticPath } from './diagnostic-path.js';
 import { createCollabHooks } from './collab-mount.js';
+import { mountEntityScreen } from './entity-screen.js';
 import { loadRoleHelp, loadBlankPrint, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
@@ -23,6 +24,7 @@ const sharedMode = sharedToken !== null || sharedResume !== null;
 const state = { session: sharedMode ? null : sessionStorage.getItem('facilitatorToken'), participant: sharedMode ? null : sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null, assessmentRole: null, reportConfirm: null, reportCursor: null };
 state.responseKey = sharedMode ? null : savedSubmitKey(sessionStorage, state.participant);
 const collab = createCollabHooks({ document, api, sharedMode, onReload: async () => { const me = await identity(); if (me && hasProjectWork(me)) await projects(); } });
+const entityScreen = sharedMode || typeof window === 'undefined' ? null : mountEntityScreen(document, window, { isStaff: () => collab.isStaff(), selectedWorkspace: () => collab.selectedWorkspace(), backToWorkspaces: () => collab.backToWorkspaces() });
 const path = (value) => encodeURIComponent(value);
 let stageGeneration = 0;
 let stageContext = null;
@@ -96,7 +98,7 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   catch { throw new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); }
   let data;
   try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
-  if (!response.ok || !data.ok) throw new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`);
+  if (!response.ok || !data.ok) throw Object.assign(new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
   const li = document.createElement('li'); li.textContent = `${method} ${redactDiagnosticPath(url)} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
   return data.result;
 }
@@ -122,6 +124,7 @@ function showAuthorizedWork(me) {
 }
 function resetClientIdentity() {
   collab.reset(); // W/I managers clear synchronously before any other identity work
+  entityScreen?.reset();
   participantView?.destroy(); participantView = null;
   clearStageScreens();
   clearIdentityData(state, sessionStorage);
@@ -190,6 +193,7 @@ async function chooseAssessment() {
   clearCodeBatch(); clearShareLink();
   state.assessmentRole = null; clearReportState(); showReportControls();
   $('granted-assessments').value = ''; text($('granted-detail'), ''); // one state.assessment, exactly one visible source
+  collab.setScope(null); // R2: downstream collaborator scope resets synchronously before any await
   text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
   if (!state.assessment) return;
   const stageRead = stageSnapshot();

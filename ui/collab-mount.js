@@ -8,7 +8,7 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload }) 
   const wRoot = doc.getElementById('workspace-manager-root');
   const iRoot = doc.getElementById('scope-invitations-root');
   const acceptButton = doc.getElementById('accept-invitation');
-  if (sharedMode || !wRoot || !iRoot) return { reset() {}, identity() {}, projects() {}, setScope() {}, destroy() {} };
+  if (sharedMode || !wRoot || !iRoot) return { reset() {}, identity() {}, projects() {}, setScope() {}, destroy() {}, selectedWorkspace() { return null; }, isStaff() { return false; }, backToWorkspaces() {} };
 
   // Immutable per-identity snapshot; `generation` changes on every identity reset so stale async work is discarded.
   const snapshot = { generation: 0, principal: null, authorizedProjects: [] };
@@ -18,11 +18,11 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload }) 
     shared: false, participant: false, provisioned: !!snapshot.principal?.provisioned,
     authorizedProjects: snapshot.authorizedProjects.map(p => ({ id: p.id, name: p.name, role: p.role })),
   });
-  let invitations = null, workspaces = null;
+  let invitations = null, workspaces = null, selectedWorkspace = null;
   invitations = mountScopeInvitations({ document: doc, root: iRoot, request, getContext, onGrantsChanged: () => onReload() });
   workspaces = mountWorkspaceManager({
     document: doc, root: wRoot, request, getContext,
-    onWorkspaceSelected: ws => { if (ws) invitations.setScope({ type: 'workspace', id: ws.id, role: ws.role }); else invitations.reset(); },
+    onWorkspaceSelected: ws => { selectedWorkspace = ws ? { id: ws.id, role: ws.role } : null; if (ws) invitations.setScope({ type: 'workspace', id: ws.id, role: ws.role }); else invitations.reset(); },
     onMutation: () => onReload(),
   });
   acceptButton?.addEventListener('click', () => invitations.openAcceptance());
@@ -30,7 +30,10 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload }) 
   return {
     // Identity change: synchronous reset of both modules before any other async work.
     // Both modules own their root's hidden flag; the hooks only drive lifecycle and the snapshot.
-    reset() { snapshot.generation += 1; snapshot.principal = null; snapshot.authorizedProjects = []; invitations.reset(); workspaces.reset(); if (acceptButton) acceptButton.hidden = true; },
+    reset() { snapshot.generation += 1; snapshot.principal = null; snapshot.authorizedProjects = []; selectedWorkspace = null; invitations.reset(); workspaces.reset(); if (acceptButton) acceptButton.hidden = true; },
+    selectedWorkspace() { return selectedWorkspace; },
+    isStaff() { const k = snapshot.principal?.kind; return k === 'user' || k === 'support'; },
+    backToWorkspaces() { selectedWorkspace = null; invitations.reset(); return workspaces.refresh(); },
     // Staff identity observed (any signed-in user, zero grants included): acceptance entry is reachable outside the member gate.
     identity(me) { snapshot.principal = me?.principal ?? null; const staff = me?.principal?.kind === 'user' || me?.principal?.kind === 'support'; if (acceptButton) acceptButton.hidden = !(staff && me.principal.kind === 'user'); if (staff) { invitations.setScope(null); workspaces.refresh(); } },
     projects(list) { snapshot.authorizedProjects = (list || []).map(p => ({ id: p.id, name: p.name, role: p.role })); workspaces.refresh(); },
