@@ -98,10 +98,11 @@ const countFor = sid => state.counts.get(sid) || { status: 'loading' };
 // Cut 2A counts: one cap.survey.get_status read per included active survey, in parallel. Results are bound to the entity
 // (aid, sid): they are stored and painted only while that entity is current; cells for other entities never exist, so
 // nothing can land elsewhere (Auditor 2A-3). `gen` is kept for the refusal repaint only.
-function loadCounts(current, { retry = null } = {}) {
+function loadCounts(current, { retry = null, only = null } = {}) {
   const aid = current.assessment.id, ep = epoch;
   for (const s of activeSurveys(current)) {
     if (retry && s.id !== retry) continue;
+    if (only && s.id !== only) continue;
     // Settled (loaded/failed/gone/unauthenticated) or in-flight reads are never re-issued by a paint; only the user's Retry
     // for that one row, or fresh entity data (which clears state.counts), issues a new read (Bugbot 4041134416).
     if (!retry && (state.counts.has(s.id) || state.countInflight.has(s.id))) continue;
@@ -187,11 +188,10 @@ function bindPrint(current, s) {
     if (gen !== generation) return; // navigated away: nothing paints; the next paint() already reset state.print (HIGH 4040990731)
     btn.disabled = false;
     if (!model.visible) { state.print = { sid: s.id, status: 'error', text: model.reason === 'unsafe-print' ? 'The print payload was refused because it carried credentials.' : `Blank questionnaire unavailable (${redact(model.reason)}).` }; app.querySelector('#print-status').textContent = state.print.text; return; }
-    state.print = { sid: s.id, status: 'ready' };
-    // renderBlankPrint draws the preview + Print button; printing itself mounts a .stage-print-only child DIRECTLY on <body>
-    // (stage-screens.js printBlankForm) so stage-screens.css hides every sibling under @media print (Auditor 2A-1).
-    renderBlankPrint(document, app.querySelector('#print-root'), model, { paper: 'a4' });
-    app.querySelector('#print-status').textContent = `${model.items.length} questions ready. Use Print below.`;
+    // P2 (Auditor c5721040053): the loaded model is cached keyed to the exact entity data it came from, so a later repaint of
+    // the SAME survey with the SAME survey-set data can replay it without a read; anything else drops it (see paint()).
+    state.print = { aid, sid: s.id, epoch, status: 'ready', model };
+    replayPrint(model);
   };
 }
 function context(current) {
@@ -275,16 +275,29 @@ async function render() {
     paint(r, gen);
   } else { state.current = null; if (gen !== generation) return; app.className = ''; app.innerHTML = projectsView(); bind(null); document.title = '3D Review · Assessments'; }
 }
+// Pure replay from the cached model: renderBlankPrint draws the preview + Print button (printing mounts a .stage-print-only
+// child DIRECTLY on <body>, Auditor 2A-1); the status line is derived from the model, never from the previous DOM.
+function replayPrint(model) {
+  renderBlankPrint(document, app.querySelector('#print-root'), model, { paper: 'a4' });
+  app.querySelector('#print-status').textContent = `${model.items.length} questions ready. Use Print below.`;
+}
+// P2 keep test: the cached paper survives a repaint only for the same survey route, the same assessment, the same survey-set
+// data (epoch) and a role that still allows printing — read from state.current after any refetch, not from the DOM.
+function keepPrint(r) {
+  const p = state.print;
+  return !!p && p.status === 'ready' && r.kind === 'survey' && p.aid === state.current.assessment.id && p.sid === r.sid && p.epoch === epoch && printAllowed(state.current.assessment.role);
+}
 // paint(): the DOM from state only — no network. Every rebuild resets per-paint UI state (print preview) and re-derives
 // disabled/banner/message from dirty + cached counts, so a state change never leaves controls looking live (MED 4040990777).
 function paint(r = route(location.hash), gen = generation) {
   if (!state.current || (r.kind !== 'assessment' && r.kind !== 'survey') || state.current.assessment.id !== r.id) return;
-  state.print = null;
+  if (!keepPrint(r)) state.print = null;
   app.className = 'workspace-layout';
   if (r.kind === 'survey') {
     const s = activeSurveys(state.current).find(x => x.id === r.sid);
     app.innerHTML = context(state.current) + (s ? surveyScreen(state.current, s) : surveyUnavailable(r.id, r.sid)) + '</section>';
-    bind(state.current); if (s) { bindPrint(state.current, s); loadCounts(state.current); }
+    // `only` FILTERS the child paint to its own survey; it never forces (settled/in-flight guard intact; only Retry re-reads).
+    bind(state.current); if (s) { bindPrint(state.current, s); loadCounts(state.current, { only: s.id }); if (state.print && s.id === state.print.sid) replayPrint(state.print.model); }
     document.title = `${s ? s.template_name + ' · ' : ''}${state.current.assessment.name} · 3D Review`;
   } else {
     app.innerHTML = context(state.current) + screen(state.current) + '</section>'; bind(state.current); loadCounts(state.current);
