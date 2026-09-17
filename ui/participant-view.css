@@ -2,6 +2,7 @@
 .rv #participant:has(.participant-intro){max-width:640px;width:100%;margin-inline:auto}
 .rv #participant .participant-intro,.rv #participant .participant-pager{max-width:640px;margin:0 auto 16px}
 .rv #participant .participant-intro h2{font-size:24px;line-height:1.25}
+.rv #participant .participant-intro p{overflow-wrap:anywhere}
 .rv #participant .participant-progress{font-size:13px;color:var(--secondary);margin:8px 0}
 .rv #participant .participant-page-actions{display:flex;justify-content:space-between;gap:12px}
 .rv #participant .participant-page-error{color:var(--warning-ink);background:var(--warning-fill);padding:12px;border-radius:var(--r-button)}
