@@ -21,6 +21,7 @@ async function api(url, { method = 'GET', body } = {}) {
   return j.result;
 }
 const state = { principal: null, projects: [], assessmentsByProject: new Map(), templates: null, current: null, busy: false, message: '' };
+let generation = 0;
 
 export function groupByLens({ surveys = [], templates = [] }) {
   const groups = LENSES.map(lens => ({ lens, included: [], available: [] }));
@@ -78,29 +79,38 @@ function bind(current) {
   app.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => act('Removing survey…', () => api(`/v2/assessments/${encodeURIComponent(aid)}/surveys/${encodeURIComponent(b.dataset.remove)}`, { method: 'DELETE' })));
 }
 async function act(label, fn) {
-  if (state.busy) return; state.busy = true; state.message = ''; note.textContent = label; render();
-  try { await fn(); await load(state.current.assessment.id); note.textContent = ''; }
-  catch (e) { state.message = e.message; note.textContent = ''; }
+  if (state.busy) return;
+  const aid = state.current.assessment.id;
+  state.busy = true; state.message = ''; note.textContent = label; render();
+  try { await fn(); await load(aid); note.textContent = ''; }
+  catch (e) { if (route(location.hash).id === aid) state.message = e.message; note.textContent = ''; }
   finally { state.busy = false; render(); }
 }
 async function load(aid) {
+  const gen = generation;
   const r = await api(`/v2/assessments/${encodeURIComponent(aid)}`);
+  if (gen !== generation || route(location.hash).id !== aid) return;
   state.current = { assessment: r.assessment, surveys: r.surveys || [] };
   if (!state.templates) { try { state.templates = (await api('/v2/templates')).templates || []; } catch { state.templates = null; } }
-  await assessmentsFor(r.assessment.project_id);
+  if (gen !== generation || route(location.hash).id !== aid) return;
+  try { await assessmentsFor(r.assessment.project_id); } catch { /* exact assessment grant authorizes the assessment GET, not the project list */ }
 }
 async function render() {
-  const r = route(location.hash);
+  const gen = ++generation, r = route(location.hash);
   if (r.kind === 'assessment') {
-    if (state.current?.assessment.id !== r.id) { try { await load(r.id); } catch (e) { state.current = null; app.className = ''; app.innerHTML = `<div class="narrow panel"><h1>Assessment unavailable</h1><p class="muted">${esc(e.message)}</p><a href="#">All projects</a></div>`; return; } }
+    if (state.current?.assessment.id !== r.id) {
+      state.message = '';
+      try { await load(r.id); } catch (e) { if (gen !== generation) return; state.current = null; app.className = ''; app.innerHTML = `<div class="narrow panel"><h1>Assessment unavailable</h1><p class="muted">${esc(e.message)}</p><a href="#">All projects</a></div>`; return; }
+    }
+    if (gen !== generation || state.current?.assessment.id !== r.id) return;
     const phase = r.phase || state.current.assessment.stage;
     app.className = 'workspace-layout'; app.innerHTML = context(state.current) + screen(state.current, phase) + '</section>'; bind(state.current);
     document.title = `${state.current.assessment.name} · 3D Review`;
-  } else { state.current = null; app.className = ''; app.innerHTML = projectsView(); bind(null); document.title = '3D Review · Assessments'; }
+  } else { state.message = ''; state.current = null; if (gen !== generation) return; app.className = ''; app.innerHTML = projectsView(); bind(null); document.title = '3D Review · Assessments'; }
 }
 async function boot() {
   try { const me = await api('/v2/me'); state.principal = me.principal; }
-  catch { who.textContent = 'Not signed in'; app.className = ''; app.innerHTML = '<div class="narrow panel"><h1>Sign in to open an assessment</h1><p class="muted">This screen uses your existing session.</p><a class="button primary" href="/#facilitator">Go to sign in</a></div>'; return; }
+  catch { who.textContent = 'Not signed in'; app.className = ''; app.innerHTML = '<div class="narrow panel"><h1>Sign in to open an assessment</h1><p class="muted">This screen uses your existing session.</p><a class="button primary" href="/v2/auth/access">Go to sign in</a></div>'; return; }
   who.textContent = `${state.principal.kind} · ${state.principal.id}`;
   state.projects = (await api('/v2/projects')).projects || [];
   window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
