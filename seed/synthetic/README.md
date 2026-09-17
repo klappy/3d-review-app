@@ -30,6 +30,18 @@ reaches Audio **and** Video-Sign. It is Steve's generator with a smaller `n`, no
 Do **not** describe all nine forms as answer-set or end-to-end covered. Closing the two gaps needs a source decision
 (a role row or org profile in Steve's repo), not invented rows here — tension filed on cookbook #13.
 
+## Honest limit — these are import-shaped rows, not app-valid submissions
+
+Steve's personas carry a `missing_rate`, so his generator leaves some **required** items blank: **203 of 425** named-persona
+submissions and **240 of 525** org-comparison submissions have at least one blank required item (`manifest.json → sql.*.
+submissions_with_blank_required_items`, asserted by test, independently re-counted by the PR reviewer). Every answer that IS
+present is a valid option code, but `cap.response.submit` would refuse these rows — the app could never have produced them.
+They are right for differential scoring against Steve's pipeline (blank → null after `02_clean`) and wrong as evidence that
+"the submit path accepts 950 responses". Results code must tolerate a missing required item.
+
+Assessment `format` follows the community medium surveyed in the cycle (`audio`, `video-sign`, else `written`); the source's
+`assessments.csv` says `written` for every cycle, including its audio cohorts.
+
 ## Regenerate (byte-reproducible)
 
 ```

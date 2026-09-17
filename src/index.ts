@@ -115,7 +115,7 @@ app.get("/v2/auth/access", async (c) => {
   }
 });
 // DEV BOOTSTRAP — explicitly OUTSIDE capability parity (Astra 5706308285): loads the committed synthetic answer sets
-// (seed/synthetic-responses.sql, Steve Watters' persona generator @ f042cde) into this environment's D1. Not a
+// (seed/synthetic-responses.sql + seed/synthetic-responses-org.sql, Steve Watters' generators @ f042cde) into this environment's D1. Not a
 // capability, not on MCP, mints no receipt, refused outside dev, requires a signed-in user, INSERT OR IGNORE → idempotent.
 // It is labelled "dev.bootstrap.seed_synthetic" so it can never be mistaken for cap.ops.health or counted as parity.
 app.post("/v2/ops/seed/synthetic", async (c) => {

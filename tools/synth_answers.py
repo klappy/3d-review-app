@@ -80,7 +80,7 @@ if DATASET == "named-personas":
            "rubric": {"items": len(items), "options": len(opts), "forms": forms},
            "rendered": rendered, "unmatched_columns": unmatched,
            "sha256": {n: sha(n) for n in ["answer-sets.json", "personas.json"]},
-           **({k: prior[k] for k in ["datasets", "form_coverage"] if k in prior})}
+           **({k: prior[k] for k in ["datasets", "form_coverage", "sql"] if k in prior})}
 else:
     man = json.load(open(os.path.join(out, "manifest.json")))
     man.setdefault("datasets", {})[DATASET] = {"generator": GENERATOR, "file": OUTFILE, "rendered": rendered, "unmatched_columns": unmatched, "sha256": sha(OUTFILE), "reads_real_exports": False}

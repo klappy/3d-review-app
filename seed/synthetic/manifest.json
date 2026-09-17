@@ -77,5 +77,27 @@
    "sha256": "70b836b4cd94a2b4df6914e1f32537cda77a0568f20fe91b95acb0c3cbee126e",
    "reads_real_exports": false
   }
+ },
+ "sql": {
+  "named-personas": {
+   "file": "seed/synthetic-responses.sql",
+   "sha256": "09a2b1588083f1cc5479e889ad004017359c149bf98b9188b189ee72d923ec7e",
+   "projects": 10,
+   "assessments": 34,
+   "surveys": 112,
+   "responses": 425,
+   "grants": 44,
+   "submissions_with_blank_required_items": 203
+  },
+  "org-comparison": {
+   "file": "seed/synthetic-responses-org.sql",
+   "sha256": "079e6131973255b6e72ccb10bf25638fa63b39160fd0e8f11cc610c8d43195b6",
+   "projects": 9,
+   "assessments": 45,
+   "surveys": 135,
+   "responses": 525,
+   "grants": 54,
+   "submissions_with_blank_required_items": 240
+  }
  }
 }
