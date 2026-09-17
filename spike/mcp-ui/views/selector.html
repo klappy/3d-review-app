@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3d-review survey selector (spike)</title>
+<!-- Design tokens and components copied verbatim from ui/design-system/ of klappy/3d-review-app @ main b0bb9c9.
+     Copied, not linked: the served resource must be self-contained. -->
+<style>
+/* GENERATED from tokens.json — do not edit. 3D Review glass 2 */
+:root, [data-theme="light"] {
+  --ink: #172e40;
+  --secondary: #526779;
+  --paper: #f8fbff;
+  --line: #c9d8e5;
+  --green: #14685f;
+  --glass: rgba(255,255,255,.68);
+  --glass-edge: rgba(255,255,255,.9);
+  --depth: rgba(37,67,99,.09);
+  --ground: #edf3f8;
+  --aurora-mint: #c3e7e0;
+  --aurora-lilac: #d8d5f2;
+  --aurora-sky: #d2e5f6;
+  --aside-fill: rgba(247,251,255,.36);
+  --button-fill: rgba(255,255,255,.8);
+  --nav-active: rgba(255,255,255,.78);
+  --focus: #287f97;
+  --note-fill: #e8f1f3;
+  --warning-fill: #f5ecd1;
+  --warning-ink: #65511c;
+  --badge-fill: #e3efeb;
+  --badge-ink: #31584e;
+  --demo-fill: rgba(255,255,255,.75);
+  --lens-green: #49a076;
+  --lens-blue: #4885bb;
+  --lens-yellow: #d8ae3c;
+  --welcome-ink: #193548;
+  --welcome-green: #16675e;
+  --welcome-glass: rgba(255,255,255,.66);
+  --welcome-solid: #f6faff;
+  --welcome-edge: rgba(255,255,255,.9);
+  --welcome-ground: #edf4f9;
+  --perspective-fill: rgba(255,255,255,.55);
+  --perspective-team: #5bbd98;
+  --perspective-community: #78aee0;
+  --perspective-church: #e8c568;
+  --pip: #cfdee5;
+  --pip-done: #367e73;
+  --chip-fill: #e4efee;
+  --door-line: #c8d9df;
+  --band-strong: #6fa2d1;
+  --band-growing: #83b996;
+  --band-needs-support: #dfc065;
+  --band-urgent: #da8b83;
+  --face-team: #86b5df;
+  --face-community: #9bcba9;
+  --face-church: #e6d087;
+  --face-stroke: #23433d;
+  --track: #e9eee7;
+  --track-fill: #3b8270;
+  --choice-selected: #e9f4ec;
+  --choice-selected-edge: #36775e;
+  --receipt: #246951;
+  --toast: #195b47;
+  --primary-ink: #ffffff;
+  --shadow-panel: 0 12px 35px rgba(37,67,99,.09), inset 0 1px 0 rgba(255,255,255,.9);
+  --shadow-button: 0 2px 6px rgba(37,67,99,.09);
+  --shadow-button-hover: 0 4px 12px rgba(37,67,99,.09);
+  --shadow-primary: 0 6px 18px rgba(37,67,99,.09);
+  --shadow-nav-active: 0 4px 14px rgba(37,67,99,.09);
+  --shadow-stage: 0 20px 70px rgba(50,70,105,.1), inset 0 1px 0 rgba(255,255,255,.9);
+  --shadow-welcome-primary: 0 7px 20px rgba(25,99,91,.18);
+  --inset-dot: inset 0 2px 3px rgba(255,255,255,.4);
+}
+[data-theme="dark"] {
+  --ink: #edf5fc;
+  --secondary: #b7c8d8;
+  --paper: #172738;
+  --line: #435368;
+  --green: #26786f;
+  --glass: rgba(22,39,58,.78);
+  --glass-edge: rgba(192,218,244,.18);
+  --depth: rgba(0,0,0,.23);
+  --ground: #101d2c;
+  --aurora-mint: #164746;
+  --aurora-lilac: #352e54;
+  --aurora-sky: #163750;
+  --aside-fill: rgba(16,29,44,.34);
+  --button-fill: rgba(38,55,75,.9);
+  --nav-active: rgba(66,94,109,.68);
+  --focus: #8dd9ee;
+  --note-fill: #253e4a;
+  --warning-fill: #4a4027;
+  --warning-ink: #f5e4ad;
+  --badge-fill: #294b45;
+  --badge-ink: #c6e7dd;
+  --demo-fill: rgba(43,61,80,.9);
+  --welcome-ink: #edf6ff;
+  --welcome-green: #287b70;
+  --welcome-glass: rgba(25,43,64,.78);
+  --welcome-solid: #20354b;
+  --welcome-edge: rgba(207,230,255,.2);
+  --welcome-ground: #111e2e;
+  --perspective-fill: rgba(25,43,61,.55);
+  --perspective-team: #72c9a6;
+  --perspective-community: #8cbdeb;
+  --perspective-church: #e7ca7a;
+  --pip: #476070;
+  --pip-done: #88cbbd;
+  --chip-fill: #304d52;
+  --door-line: #496073;
+  --track: #253e4a;
+  --track-fill: #88cbbd;
+  --choice-selected: #294b45;
+  --choice-selected-edge: #88cbbd;
+  --receipt: #88cbbd;
+  --toast: #c6e7dd;
+  --shadow-panel: 0 12px 35px rgba(0,0,0,.23), inset 0 1px 0 rgba(192,218,244,.18);
+  --shadow-button: 0 2px 6px rgba(0,0,0,.23);
+  --shadow-button-hover: 0 4px 12px rgba(0,0,0,.23);
+  --shadow-primary: 0 6px 18px rgba(0,0,0,.23);
+  --shadow-nav-active: 0 4px 14px rgba(0,0,0,.23);
+  --shadow-stage: 0 20px 70px rgba(0,0,0,.23), inset 0 1px 0 rgba(207,230,255,.2);
+  --shadow-welcome-primary: 0 7px 20px rgba(0,0,0,.2);
+}
+:root {
+  --shell-panel-w: 260px;
+  --top-pad-y: 22px;
+  --top-pad-x: 28px;
+  --aside-pad-y: 27px;
+  --aside-pad-x: 18px;
+  --main-pad: 30px;
+  --panel-pad: 23px;
+  --stage-pad: 40px;
+  --phone-pad: 25px;
+  --phone-max-w: 430px;
+  --stage-max-w: 840px;
+  --h1-max-w: 650px;
+  --gap-grid: 18px;
+  --gap-three: 15px;
+  --gap-perspectives: 14px;
+  --gap-row: 12px;
+  --gap-pip: 7px;
+  --page-min-h: 780px;
+  --button-min-h: 42px;
+  --input-pad: 11px;
+  --note-pad-y: 13px;
+  --note-pad-x: 16px;
+  --badge-pad-y: 5px;
+  --badge-pad-x: 10px;
+  --track-h: 7px;
+  --pip-h: 5px;
+  --dot-perspective: 24px;
+  --dot-legend: 9px;
+  --face: 54px;
+  --mobile-bp: 760px;
+  --focus-w: 3px;
+  --lens-w: 4px;
+  --r-page: 24px;
+  --r-stage: 28px;
+  --r-panel: 20px;
+  --r-perspective: 18px;
+  --r-example: 16px;
+  --r-button: 12px;
+  --r-input: 11px;
+  --r-brand: 10px;
+  --r-choice: 9px;
+  --r-linkbox: 8px;
+  --r-pip: 6px;
+  --r-pill: 20px;
+  --r-round: 50%;
+  --blur-top: 28px;
+  --blur-panel: 24px;
+  --sat-top: 125%;
+  --sat-stage: 120%;
+  --sat-panel: 115%;
+  --dur-button: 150ms;
+  --fw-regular: 400;
+  --fw-label: 550;
+  --fw-semibold: 600;
+  --fw-eyebrow: 650;
+  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-scripture-latin: "Noto Serif", Georgia, serif;
+}
+.fs-h1 { font-family: var(--font-ui); font-size: 31px; line-height: 1.18; font-weight: 600; letter-spacing: -1px; }
+.fs-h2 { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; }
+.fs-brand { font-family: var(--font-ui); font-size: 23px; line-height: 1.2; font-weight: 650; letter-spacing: -1px; }
+.fs-metric { font-family: var(--font-ui); font-size: 25px; line-height: 1.2; font-weight: 600; }
+.fs-h3 { font-family: var(--font-ui); font-size: 16px; line-height: 1.4; font-weight: 600; }
+.fs-body { font-family: var(--font-ui); font-size: 15px; line-height: 1.5; font-weight: 400; }
+.fs-label { font-family: var(--font-ui); font-size: 13px; line-height: 1.4; font-weight: 550; }
+.fs-badge { font-family: var(--font-ui); font-size: 12px; line-height: 1.2; font-weight: 400; letter-spacing: 0.04em; }
+.fs-eyebrow { font-family: var(--font-ui); font-size: 11px; line-height: 1.2; font-weight: 650; letter-spacing: 0.13em; }
+.fs-receipt { font-family: var(--font-ui); font-size: 42px; line-height: 1; font-weight: 400; }
+
+/* 3D Review glass — preview scaffolding.
+   Values are the cookbook's glass.css / mock inline styles, addressed through this system's tokens.
+   Behaviours (hover, focus, reduced transparency, live regions) follow Generative Glass where the mocks agree. */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;500&display=swap");
+
+:root{
+  --aurora-ground:
+    radial-gradient(ellipse at 0% 8%, var(--aurora-mint), transparent 55%),
+    radial-gradient(ellipse at 96% 28%, var(--aurora-lilac), transparent 58%),
+    radial-gradient(ellipse at 48% 95%, var(--aurora-sky), transparent 60%),
+    var(--ground);
+}
+
+.rv{font:15px/1.5 var(--font-ui);color:var(--ink);background:var(--aurora-ground);border-radius:var(--r-page);overflow:clip;min-height:100%}
+.rv *{box-sizing:border-box}
+.rv button,.rv input,.rv select,.rv textarea{font:inherit}
+.rv .glass{background:var(--glass);backdrop-filter:blur(var(--blur-panel)) saturate(var(--sat-panel));-webkit-backdrop-filter:blur(var(--blur-panel)) saturate(var(--sat-panel));border:1px solid var(--glass-edge);border-radius:var(--r-panel);box-shadow:var(--shadow-panel)}
+.rv .panel{padding:var(--panel-pad);margin-bottom:var(--gap-grid)}
+.rv .top{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;padding:var(--top-pad-y) var(--top-pad-x);background:var(--glass);backdrop-filter:blur(var(--blur-top)) saturate(var(--sat-top));-webkit-backdrop-filter:blur(var(--blur-top)) saturate(var(--sat-top));border-bottom:1px solid var(--glass-edge)}
+.rv aside{padding:var(--aside-pad-y) var(--aside-pad-x);background:var(--aside-fill);backdrop-filter:blur(var(--blur-panel));-webkit-backdrop-filter:blur(var(--blur-panel));border-right:1px solid var(--glass-edge)}
+.rv .brand{font-size:23px;font-weight:650;letter-spacing:-1px}
+.rv .brand span{display:inline-block;background:var(--green);color:var(--primary-ink);padding:2px 9px;border-radius:var(--r-brand);margin-right:8px}
+.rv .eyebrow{font-size:11px;letter-spacing:.13em;text-transform:uppercase;font-weight:650;color:var(--secondary)}
+.rv h1{font-size:31px;line-height:1.18;letter-spacing:-1px;margin:8px 0 12px;font-weight:600;max-width:var(--h1-max-w)}
+.rv h2{font-size:20px;line-height:1.3;margin:0 0 12px;font-weight:600}
+.rv h3{font-size:16px;margin:0 0 7px}
+.rv p{margin:7px 0 17px}
+.rv .muted{color:var(--secondary)}
+.rv .metric{font-size:25px;font-weight:600}
+.rv button{cursor:pointer;min-height:var(--button-min-h);padding:9px 15px;border-radius:var(--r-button);border:1px solid var(--glass-edge);background:var(--button-fill);color:var(--ink);box-shadow:var(--shadow-button);transition:background var(--dur-button),box-shadow var(--dur-button)}
+.rv button:hover{box-shadow:var(--shadow-button-hover)}
+.rv button:focus-visible,.rv input:focus-visible,.rv select:focus-visible,.rv a:focus-visible{outline:var(--focus-w) solid var(--focus);outline-offset:var(--focus-w)}
+.rv button.primary{background:var(--green);color:var(--primary-ink);border-color:transparent;box-shadow:var(--shadow-primary)}
+.rv button.quiet{background:transparent;border-color:transparent;box-shadow:none}
+.rv button[disabled]{opacity:.5;cursor:default}
+.rv .nav{display:block;width:100%;text-align:left;margin:5px 0;box-shadow:none;background:transparent;border-color:transparent}
+.rv .nav.active{background:var(--nav-active);border-color:var(--glass-edge);box-shadow:var(--shadow-nav-active);color:var(--ink)}
+.rv .nav small{display:block;color:var(--secondary);font-size:11px;margin-left:24px}
+.rv .badge{display:inline-block;font-size:12px;letter-spacing:.04em;border-radius:var(--r-pill);padding:var(--badge-pad-y) var(--badge-pad-x);background:var(--badge-fill);color:var(--badge-ink)}
+.rv .badge.demo{background:var(--demo-fill);color:var(--secondary);border:1px solid var(--glass-edge);letter-spacing:.06em}
+.rv .note{padding:var(--note-pad-y) var(--note-pad-x);border-radius:var(--r-button);background:var(--note-fill);font-size:13px}
+.rv .warning{background:var(--warning-fill);color:var(--warning-ink)}
+.rv .linkbox{font-size:13px;background:var(--note-fill);border:1px dashed var(--line);border-radius:var(--r-button);padding:12px;overflow-wrap:anywhere}
+.rv input:not([type=checkbox]):not([type=radio]),.rv select,.rv textarea{display:block;width:100%;padding:var(--input-pad);margin-top:6px;border:1px solid var(--line);border-radius:var(--r-input);background:var(--paper);color:var(--ink);font-size:16px}
+.rv label{display:block;font-size:13px;font-weight:550;margin-bottom:14px}
+.rv .row{display:flex;gap:var(--gap-row);align-items:center;flex-wrap:wrap}
+.rv .grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-grid)}
+.rv .three{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap-three)}
+.rv .track{height:var(--track-h);background:var(--track);border-radius:10px;margin:12px 0}
+.rv .fill{height:100%;background:var(--track-fill);border-radius:10px}
+.rv .lens{border-top:var(--lens-w) solid var(--lens-green)}
+.rv .lens.blue{border-top-color:var(--lens-blue)}
+.rv .lens.yellow{border-top-color:var(--lens-yellow)}
+.rv .face{width:var(--face);height:var(--face);margin-bottom:15px}
+.rv .legend{font-size:12px;display:flex;gap:16px;flex-wrap:wrap;margin:12px 0 20px}
+.rv .dot{display:inline-block;width:var(--dot-legend);height:var(--dot-legend);border-radius:var(--r-round);margin-right:5px}
+.rv .choice{display:block;border:1px solid var(--line);border-radius:var(--r-choice);padding:14px;margin:9px 0;font-size:15px;background:var(--paper)}
+.rv .choice:has(input:checked){background:var(--choice-selected);border-color:var(--choice-selected-edge)}
+.rv .toast{margin-top:15px;color:var(--toast);font-size:13px}
+.rv .phone{max-width:var(--phone-max-w);margin:0 auto;padding:var(--phone-pad)}
+.rv .footer{font-size:12px;color:var(--secondary);margin-top:22px}
+.rv .rw-perspective{padding:18px 14px;border-radius:var(--r-perspective);background:var(--perspective-fill);border:1px solid var(--welcome-edge)}
+.rv .rw-dot{display:block;width:var(--dot-perspective);height:var(--dot-perspective);border-radius:var(--r-round);margin-bottom:13px;box-shadow:var(--inset-dot)}
+.rv .rw-progress{display:flex;gap:var(--gap-pip);margin:0 0 25px}
+.rv .rw-progress span{height:var(--pip-h);flex:1;border-radius:var(--r-pip);background:var(--pip)}
+.rv .rw-progress span.done{background:var(--pip-done)}
+.rv [hidden]{display:none!important}
+
+@media (prefers-reduced-transparency:reduce){.rv .glass,.rv .top,.rv aside,.rv .rw-perspective{background:var(--paper);backdrop-filter:none;-webkit-backdrop-filter:none}}
+@media (prefers-reduced-motion:reduce){.rv button{transition:none}}
+
+/* ── ContextTree: the left pane. Workspace › Project › Assessment › Survey; Notion-feel navigation, bounded to access layering (06 §brief). ── */
+.rv .tree{display:flex;flex-direction:column;gap:14px;min-width:0;width:auto}
+.rv .tree .eyebrow{margin:0 0 4px 8px}
+.rv .tree-search{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--glass-edge);border-radius:var(--r-button);background:var(--button-fill);box-shadow:var(--shadow-button);color:var(--secondary);font-size:13px}
+.rv .tree-search input:not([type=checkbox]){all:unset;flex:1;min-width:0;color:var(--ink);font:inherit;font-size:13px;display:block;width:auto;margin:0;padding:2px 0;border:0;background:transparent;box-shadow:none;min-height:0}
+.rv label.tree-search{margin:0;font-weight:500}
+.rv .tree-search input:focus{outline:none}
+.rv .tree-search:focus-within{outline:var(--focus-w) solid var(--focus);outline-offset:1px}
+.rv .tree-search kbd{font:11px/1 var(--font-ui);padding:3px 5px;border:1px solid var(--line);border-radius:5px;color:var(--secondary)}
+.rv .tree-section{display:flex;flex-direction:column;gap:1px}
+.rv .tree-node{position:relative}
+.rv .tree-kids{position:relative;margin-left:12px;padding-left:4px;border-left:1px solid var(--line)}
+.rv .tree-row{display:flex;align-items:center;gap:5px;min-height:32px;padding:3px 6px 3px 2px;border-radius:var(--r-button);color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:500;border:1px solid transparent;line-height:1.25}
+.rv .tree-row:hover{background:var(--chip-fill)}
+.rv .tree-row.on{background:var(--nav-active);border-color:var(--glass-edge);box-shadow:var(--shadow-nav-active);font-weight:600}
+.rv .tree-row:focus-visible{outline:var(--focus-w) solid var(--focus);outline-offset:1px}
+.rv .tree-row .tree-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rv .tree-row .tree-label small{display:block;font-size:11px;font-weight:400;color:var(--secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rv .tree-row .tree-meta{font-size:11px;color:var(--secondary);font-weight:400;white-space:nowrap}
+.rv .tree-row.add{color:var(--secondary);font-weight:400;font-size:13px;min-height:30px}
+.rv .tree-row.add:hover{color:var(--ink)}
+.rv .tree-row.lvl-2,.rv .tree-row.lvl-3,.rv .tree-row.lvl-4{font-weight:500}
+.rv .tree-ico{width:18px;text-align:center;color:var(--secondary);font-size:13px;flex:none}
+.rv .tree-caret{flex:none;width:20px;height:20px;padding:0;margin:0;min-height:0;border:0;background:transparent;box-shadow:none;border-radius:6px;color:var(--secondary);font-size:11px;line-height:20px;cursor:pointer}
+.rv .tree-caret:hover{background:var(--badge-fill);color:var(--ink)}
+.rv .tree-caret.none{display:inline-block;pointer-events:none}
+.rv .tree-role{flex:none;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:var(--r-pill);background:var(--badge-fill);color:var(--badge-ink);font-weight:600;opacity:.85}
+.rv .tree-node.cur>.tree-row:not(.on){font-weight:600}
+.rv .tree-empty,.rv .tree-note{font-size:12px;color:var(--secondary);padding:6px 8px 6px 12px}
+.rv .tree-note{border-left:2px solid var(--line);margin:4px 0 0 8px}
+.rv .tree-tools{margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
+.rv .tree-footer{font-size:12px;color:var(--secondary);display:grid;gap:8px}
+.rv .tree-me{color:var(--ink)}
+.rv .tree-viewas{display:grid;gap:4px;font-size:11px}
+.rv .tree-viewas select{font-size:12px;min-height:30px;padding:3px 8px}
+.rv .crumbs{display:flex;align-items:center;gap:6px;min-width:0;flex:1;font-size:13px;color:var(--secondary);padding:0 8px}
+.rv .crumbs a{color:inherit;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;padding:4px 6px;border-radius:6px}
+.rv .crumbs a:hover{background:var(--chip-fill);color:var(--ink)}
+.rv .crumbs a[aria-current]{color:var(--ink);font-weight:600}
+.rv .crumbs .sep{opacity:.6}
+.rv .glass.focus{outline:2px solid var(--focus);outline-offset:2px}
+@media (max-width:760px){.rv .tree{width:auto;flex-direction:column;gap:8px}.rv .tree-tools,.rv .tree-footer .footer{display:none}.rv .crumbs{display:none}}
+
+/* ── C1 states: skeleton (loading), compensating toast, proposed chip ── */
+.rv .skeleton .sk{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--chip-fill),var(--nav-active),var(--chip-fill));background-size:200% 100%;animation:sk 1.4s linear infinite;margin:10px 0;max-width:100%}
+.rv .skeleton .sk-h{height:26px;width:46%;margin-bottom:16px}
+.rv .skeleton .sk-short{width:38%}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.rv .skeleton .sk{animation:none}}
+.toastc.compensate b{color:var(--secondary)}
+.toastc small{font-size:11px}
+.rv .chip.proposed{font-size:11px;background:var(--warning-fill);color:var(--warning-ink);text-decoration:none;vertical-align:middle;border:1px dashed var(--warning-ink)}
+
+
+/* spike-only additions (not part of the app design system) */
+.wrap { max-width: 72rem; margin: 0 auto; padding: 1.5rem; }
+.fixture-badge { display: inline-block; margin: 0 0 .5rem; padding: .15rem .6rem; border-radius: 999px;
+  background: rgba(255, 196, 0, .18); border: 1px solid rgba(255, 196, 0, .5); font-size: .8rem; letter-spacing: .02em; }
+.lens-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; }
+.lens-group h2 { margin-top: 0; font-size: 1.05rem; }
+.lens-included { list-style: none; padding: 0; margin: .5rem 0 0; }
+.lens-included li { padding: .3rem 0; border-top: 1px solid rgba(255,255,255,.08); font-size: .92rem; }
+.response-total { font-weight: 600; margin: .1rem 0 .3rem; }
+.view-header h1 { margin: .2rem 0; }
+.view-footer { display: flex; gap: .75rem; align-items: center; margin-top: 1.25rem; flex-wrap: wrap; }
+.envelope { white-space: pre-wrap; padding: .75rem; border-radius: .5rem; background: rgba(0,0,0,.28);
+  border: 1px solid rgba(255,255,255,.12); font-size: .85rem; overflow-x: auto; }
+.check { display: flex; align-items: center; gap: .45rem; }
+.pending-flag { font-weight: 600; }
+input:disabled + span { opacity: .65; }
+.note { font-size: .85rem; opacity: .85; }
+
+</style>
+<script>
+/*__APP_SDK_BUNDLE__*/
+</script>
+</head>
+<body data-view-state="loading">
+<main class="wrap" id="root">
+  <p class="muted">Waiting for the host to deliver a tool result…</p>
+</main>
+<script>
+(function () {
+  const LENSES = ["Translation Team", "Church", "Community"];
+
+  /* groupByLens copied verbatim from ui/lens-surveys.js (klappy/3d-review-app @ main b0bb9c9) */
+  function groupByLens({ surveys = [], templates = [] }) {
+    const included = surveys.filter(s => s.state === 'selected' && !s.archived_at);
+    const groups = LENSES.map(lens => ({ lens, included: [], available: [] }));
+    const other = { lens: 'Other perspective', included: [], available: [] };
+    const groupFor = p => groups.find(g => g.lens === p) || other;
+    for (const s of included) groupFor(s.perspective).included.push(s);
+    const latest = new Map();
+    for (const t of templates) { const cur = latest.get(t.id); if (!cur || t.version > cur.version) latest.set(t.id, t); }
+    for (const t of latest.values()) { if (!included.some(s => s.template_id === t.id)) groupFor(t.perspective).available.push(t); }
+    return other.included.length || other.available.length ? [...groups, other] : groups;
+  }
+
+  const NOTE = "Real cap.survey.select / deselect return an undo_token; this spike does not offer Undo because no reversal is exercised.";
+  const root = document.getElementById("root");
+  const el = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
+
+  let data = null;          // last tool result payload
+  let current = new Set();  // template ids included per the fixture (current state)
+  let pending = new Set();  // template ids the viewer has toggled towards
+  let preview = null;       // rendered preview text, or null
+
+  const keyOf = (x) => x.template_id || x.id;
+
+  function resetPending() { pending = new Set(current); preview = null; render(); }
+
+  function render() {
+    if (!data) return;
+    root.replaceChildren();
+    const a = data.assessment || {};
+    const mayEdit = a.role === "owner" || a.role === "member";
+
+    const header = el("header", undefined, "view-header");
+    header.append(el("p", (data.fixture && data.fixture.label) || "Fixture data — not live", "badge fixture-badge"));
+    header.append(el("h1", "Surveys by lens"));
+    header.append(el("p", `${a.name || "(unnamed assessment)"} · stage: ${a.stage || "unknown"} · role: ${a.role || "unknown"} · fixture: ${data.fixture_name || "default"}`, "muted"));
+    if (!mayEdit) header.append(el("p", `fixture role: ${a.role} — controls disabled`, "note role-note"));
+    if (data.fixture && data.fixture.sources) header.append(el("p", "Sources: " + data.fixture.sources.join(" · "), "note"));
+    root.append(header);
+
+    const wrap = el("div", undefined, "three lens-groups");
+    const groups = groupByLens(data);
+    if (!groups.some(g => g.included.length || g.available.length)) {
+      const panel = el("section", undefined, "glass panel");
+      panel.setAttribute("data-state", "empty");
+      panel.append(el("h2", "No surveys included"));
+      root.append(panel);
+    }
+    for (const g of groups) {
+      const card = el("section", undefined, "glass panel lens-group");
+      card.setAttribute("aria-label", g.lens);
+      card.setAttribute("data-lens", g.lens);
+      card.append(el("h2", g.lens));
+      card.append(el("p", `${g.included.length} included now`, "muted included-count"));
+      const list = el("ul", undefined, "lens-included");
+      const row = (label, id, isCurrent) => {
+        const li = el("li");
+        const lab = el("label", undefined, "check");
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.checked = pending.has(id);
+        box.disabled = !mayEdit;
+        box.dataset.templateId = id;
+        box.addEventListener("change", () => { if (box.checked) pending.add(id); else pending.delete(id); preview = null; render(); });
+        lab.append(box);
+        lab.append(el("span", label));
+        const state = pending.has(id) === isCurrent
+          ? (isCurrent ? "included (unchanged)" : "not included (unchanged)")
+          : (pending.has(id) ? "pending: include" : "pending: remove");
+        lab.append(el("span", " · " + state, pending.has(id) === isCurrent ? "muted" : "pending-flag"));
+        li.append(lab);
+        return li;
+      };
+      for (const s of g.included) list.append(row(`${s.template_name} · v${s.template_version} · ${s.collection_status}`, keyOf(s), true));
+      for (const t of g.available) list.append(row(`${t.name} · v${t.version} · available`, keyOf(t), false));
+      if (!g.included.length && !g.available.length) list.append(el("li", "Nothing for this lens in the fixture.", "muted"));
+      card.append(list);
+      wrap.append(card);
+    }
+    root.append(wrap);
+
+    const controls = el("div", undefined, "row view-footer");
+    const previewBtn = el("button", "Preview selection", "primary");
+    previewBtn.type = "button"; previewBtn.id = "preview-selection"; previewBtn.disabled = !mayEdit;
+    previewBtn.addEventListener("click", () => {
+      const byId = new Map();
+      for (const s of (data.surveys || [])) byId.set(keyOf(s), `${s.template_name} (${s.perspective})`);
+      for (const t of (data.templates || [])) if (!byId.has(t.id)) byId.set(t.id, `${t.name} (${t.perspective})`);
+      const names = [...pending].map(id => byId.get(id) || id).sort();
+      const added = [...pending].filter(id => !current.has(id)).map(id => byId.get(id) || id);
+      const removed = [...current].filter(id => !pending.has(id)).map(id => byId.get(id) || id);
+      preview = [
+        `Pending selection (${names.length}): ${names.length ? names.join(", ") : "(none)"}`,
+        `Would include: ${added.length ? added.join(", ") : "(nothing new)"}`,
+        `Would remove: ${removed.length ? removed.join(", ") : "(nothing)"}`,
+        "No write was performed. This is a preview only.",
+      ].join("\n");
+      render();
+    });
+    const resetBtn = el("button", "Reset pending", "quiet");
+    resetBtn.type = "button"; resetBtn.id = "reset-pending"; resetBtn.disabled = !mayEdit;
+    resetBtn.addEventListener("click", resetPending);
+    controls.append(previewBtn, resetBtn);
+    root.append(controls);
+
+    if (preview) {
+      const out = el("pre", preview, "envelope");
+      out.id = "preview-output";
+      root.append(out);
+    }
+    root.append(el("p", NOTE, "note undo-note"));
+    document.body.dataset.viewState = data.fixture_name || "default";
+  }
+
+  function handle(result) {
+    const sc = result && result.structuredContent;
+    if (!sc || (result && result.isError)) {
+      root.replaceChildren(el("p", "Tool returned no usable fixture payload.", "note"));
+      return;
+    }
+    data = sc;
+    current = new Set((sc.surveys || []).filter(s => s.state === "selected" && !s.archived_at).map(keyOf));
+    pending = new Set(current);
+    preview = null;
+    render();
+  }
+
+  const app = new window.McpApps.App({ name: "3d-review survey selector (spike)", version: "0.0.0" });
+  /* listener registered BEFORE connect */
+  app.addEventListener("toolresult", handle);
+  app.onerror = (e) => console.error("[selector]", e);
+
+  app.connect().then(() => {
+    console.info("[selector] host capabilities:", JSON.stringify(app.getHostCapabilities()));
+  }).catch((e) => console.error("[selector] connect failed", e));
+})();
+</script>
+
+</body>
+</html>

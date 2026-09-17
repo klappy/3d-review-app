@@ -1,0 +1,144 @@
+<main class="wrap" id="root">
+  <p class="muted">Waiting for the host to deliver a tool result…</p>
+</main>
+<script>
+(function () {
+  const LENSES = ["Translation Team", "Church", "Community"];
+
+  /* groupByLens copied verbatim from ui/lens-surveys.js (klappy/3d-review-app @ main b0bb9c9) */
+  function groupByLens({ surveys = [], templates = [] }) {
+    const included = surveys.filter(s => s.state === 'selected' && !s.archived_at);
+    const groups = LENSES.map(lens => ({ lens, included: [], available: [] }));
+    const other = { lens: 'Other perspective', included: [], available: [] };
+    const groupFor = p => groups.find(g => g.lens === p) || other;
+    for (const s of included) groupFor(s.perspective).included.push(s);
+    const latest = new Map();
+    for (const t of templates) { const cur = latest.get(t.id); if (!cur || t.version > cur.version) latest.set(t.id, t); }
+    for (const t of latest.values()) { if (!included.some(s => s.template_id === t.id)) groupFor(t.perspective).available.push(t); }
+    return other.included.length || other.available.length ? [...groups, other] : groups;
+  }
+
+  const NOTE = "Real cap.survey.select / deselect return an undo_token; this spike does not offer Undo because no reversal is exercised.";
+  const root = document.getElementById("root");
+  const el = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
+
+  let data = null;          // last tool result payload
+  let current = new Set();  // template ids included per the fixture (current state)
+  let pending = new Set();  // template ids the viewer has toggled towards
+  let preview = null;       // rendered preview text, or null
+
+  const keyOf = (x) => x.template_id || x.id;
+
+  function resetPending() { pending = new Set(current); preview = null; render(); }
+
+  function render() {
+    if (!data) return;
+    root.replaceChildren();
+    const a = data.assessment || {};
+    const mayEdit = a.role === "owner" || a.role === "member";
+
+    const header = el("header", undefined, "view-header");
+    header.append(el("p", (data.fixture && data.fixture.label) || "Fixture data — not live", "badge fixture-badge"));
+    header.append(el("h1", "Surveys by lens"));
+    header.append(el("p", `${a.name || "(unnamed assessment)"} · stage: ${a.stage || "unknown"} · role: ${a.role || "unknown"} · fixture: ${data.fixture_name || "default"}`, "muted"));
+    if (!mayEdit) header.append(el("p", `fixture role: ${a.role} — controls disabled`, "note role-note"));
+    if (data.fixture && data.fixture.sources) header.append(el("p", "Sources: " + data.fixture.sources.join(" · "), "note"));
+    root.append(header);
+
+    const wrap = el("div", undefined, "three lens-groups");
+    const groups = groupByLens(data);
+    if (!groups.some(g => g.included.length || g.available.length)) {
+      const panel = el("section", undefined, "glass panel");
+      panel.setAttribute("data-state", "empty");
+      panel.append(el("h2", "No surveys included"));
+      root.append(panel);
+    }
+    for (const g of groups) {
+      const card = el("section", undefined, "glass panel lens-group");
+      card.setAttribute("aria-label", g.lens);
+      card.setAttribute("data-lens", g.lens);
+      card.append(el("h2", g.lens));
+      card.append(el("p", `${g.included.length} included now`, "muted included-count"));
+      const list = el("ul", undefined, "lens-included");
+      const row = (label, id, isCurrent) => {
+        const li = el("li");
+        const lab = el("label", undefined, "check");
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.checked = pending.has(id);
+        box.disabled = !mayEdit;
+        box.dataset.templateId = id;
+        box.addEventListener("change", () => { if (box.checked) pending.add(id); else pending.delete(id); preview = null; render(); });
+        lab.append(box);
+        lab.append(el("span", label));
+        const state = pending.has(id) === isCurrent
+          ? (isCurrent ? "included (unchanged)" : "not included (unchanged)")
+          : (pending.has(id) ? "pending: include" : "pending: remove");
+        lab.append(el("span", " · " + state, pending.has(id) === isCurrent ? "muted" : "pending-flag"));
+        li.append(lab);
+        return li;
+      };
+      for (const s of g.included) list.append(row(`${s.template_name} · v${s.template_version} · ${s.collection_status}`, keyOf(s), true));
+      for (const t of g.available) list.append(row(`${t.name} · v${t.version} · available`, keyOf(t), false));
+      if (!g.included.length && !g.available.length) list.append(el("li", "Nothing for this lens in the fixture.", "muted"));
+      card.append(list);
+      wrap.append(card);
+    }
+    root.append(wrap);
+
+    const controls = el("div", undefined, "row view-footer");
+    const previewBtn = el("button", "Preview selection", "primary");
+    previewBtn.type = "button"; previewBtn.id = "preview-selection"; previewBtn.disabled = !mayEdit;
+    previewBtn.addEventListener("click", () => {
+      const byId = new Map();
+      for (const s of (data.surveys || [])) byId.set(keyOf(s), `${s.template_name} (${s.perspective})`);
+      for (const t of (data.templates || [])) if (!byId.has(t.id)) byId.set(t.id, `${t.name} (${t.perspective})`);
+      const names = [...pending].map(id => byId.get(id) || id).sort();
+      const added = [...pending].filter(id => !current.has(id)).map(id => byId.get(id) || id);
+      const removed = [...current].filter(id => !pending.has(id)).map(id => byId.get(id) || id);
+      preview = [
+        `Pending selection (${names.length}): ${names.length ? names.join(", ") : "(none)"}`,
+        `Would include: ${added.length ? added.join(", ") : "(nothing new)"}`,
+        `Would remove: ${removed.length ? removed.join(", ") : "(nothing)"}`,
+        "No write was performed. This is a preview only.",
+      ].join("\n");
+      render();
+    });
+    const resetBtn = el("button", "Reset pending", "quiet");
+    resetBtn.type = "button"; resetBtn.id = "reset-pending"; resetBtn.disabled = !mayEdit;
+    resetBtn.addEventListener("click", resetPending);
+    controls.append(previewBtn, resetBtn);
+    root.append(controls);
+
+    if (preview) {
+      const out = el("pre", preview, "envelope");
+      out.id = "preview-output";
+      root.append(out);
+    }
+    root.append(el("p", NOTE, "note undo-note"));
+    document.body.dataset.viewState = data.fixture_name || "default";
+  }
+
+  function handle(result) {
+    const sc = result && result.structuredContent;
+    if (!sc || (result && result.isError)) {
+      root.replaceChildren(el("p", "Tool returned no usable fixture payload.", "note"));
+      return;
+    }
+    data = sc;
+    current = new Set((sc.surveys || []).filter(s => s.state === "selected" && !s.archived_at).map(keyOf));
+    pending = new Set(current);
+    preview = null;
+    render();
+  }
+
+  const app = new window.McpApps.App({ name: "3d-review survey selector (spike)", version: "0.0.0" });
+  /* listener registered BEFORE connect */
+  app.addEventListener("toolresult", handle);
+  app.onerror = (e) => console.error("[selector]", e);
+
+  app.connect().then(() => {
+    console.info("[selector] host capabilities:", JSON.stringify(app.getHostCapabilities()));
+  }).catch((e) => console.error("[selector] connect failed", e));
+})();
+</script>

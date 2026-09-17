@@ -1,0 +1,9 @@
+### tools/list response (_meta.ui.resourceUri)
+{"ts": "2026-09-17T19:12:25.721Z", "direction": "response", "payload": {"result": {"tools": [{"name": "assessment_overview", "title": "Assessment overview (fixture)", "description": "Renders a 3d-review assessment overview from fixture data. No live cap.* call.", "inputSchema": {"type": "object", "$schema": "https://json-schema.org/draft/2020-12/schema", "properties": {"fixture": {"type": "string", "enum": ["default", "empty", "error"]}}}, "_meta": {"ui": {"resourceUri": "ui://3d-review/overview.html"}, "ui/resourc …[truncated]
+
+### tools/call request
+{"ts": "2026-09-17T19:12:25.979Z", "direction": "request", "payload": {"method": "tools/call", "params": {"name": "assessment_overview", "arguments": {"fixture": "default"}}, "jsonrpc": "2.0", "id": 3}}
+
+### resources/read response (mimeType)
+{"ts": "2026-09-17T19:12:26.009Z", "direction": "response", "payload": {"result": {"contents": [{"uri": "ui://3d-review/overview.html", "mimeType": "text/html;profile=mcp-app", "text": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>3d-review assessment overview (spike)</title>\n<!-- Design tokens and components copied verbatim from ui/design-system/ of klappy/3d-review-app @ main b0bb9c9.\n     Copied, not link …[truncated]
+

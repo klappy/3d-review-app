@@ -1,0 +1,22 @@
+{
+  "name": "3d-review-spike-mcp-ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Isolated MCP Apps UI spike for 3d-review-app. Fixture data only; no live cap.* calls.",
+  "scripts": {
+    "build:sdk-bundle": "esbuild views/vendor/app-global-entry.mjs --bundle --format=iife --global-name=McpApps --outfile=views/vendor/app-global.js --minify",
+    "start": "node server.mjs",
+    "test": "node --test *.spec.mjs",
+    "build:views": "node build-views.mjs",
+    "build": "npm run build:sdk-bundle && npm run build:views"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/ext-apps": "^2.0.0",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  }
+}
