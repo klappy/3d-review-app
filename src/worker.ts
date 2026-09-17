@@ -17,7 +17,7 @@ const apiHandler = {
     const props = ctx.props;
     if (!props || !("external" in props && props.external)) {
       const principal = props ? await principalFromProps(env, props as OAuthProps) : null;
-      if (!principal) return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": 'Bearer realm="OAuth", error="invalid_token"' } });
+      if (!principal) return invalidToken(request);
       oauthPrincipals.set(request, principal);
     }
     return app.fetch(request, env, ctx);
@@ -49,6 +49,9 @@ const provider = new OAuthProvider<OAuthEnv>({
 const FIRST_PARTY = /^(st|pt)_[A-Za-z0-9_-]{32}$/;                       // src/auth.ts mintSession, handlers/common.ts randomToken
 const PROVIDER_TOKEN = /^[^:\s]{1,128}:[^:\s]{1,128}:[A-Za-z0-9_-]{16,256}$/; // workers-oauth-provider: userId:grantId:secret
 const ANON_PATHS = new Set(["/register", "/authorize", "/oauth/consent"]);
+/** 401 carrying the RFC 9728 discovery pointer, byte-compatible with what the provider itself answers for /mcp. */
+const invalidToken = (request: Request) => new Response(JSON.stringify({ error: "invalid_token", error_description: "Invalid access token" }), { status: 401,
+  headers: { "content-type": "application/json", "www-authenticate": `Bearer realm="OAuth", resource_metadata="${new URL(request.url).origin}/.well-known/oauth-protected-resource/mcp", error="invalid_token"` } });
 const tooMany = () => new Response(JSON.stringify({ error: "rate_limited", error_description: "too many requests — wait up to 60 seconds" }),
   { status: 429, headers: { "content-type": "application/json", "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) } });
 
@@ -57,13 +60,15 @@ export default {
     const path = new URL(request.url).pathname;
     if (request.method !== "OPTIONS") {
       const key = `ip:${clientIp(request)}`;
-      const isMcp = path === "/mcp" || path.startsWith("/mcp/");
+      const isMcp = path.startsWith("/mcp"); // EXACTLY the provider's apiRoute match (prefix) — /mcpx, /mcp.json must not slip past (re-review #15)
       if (isMcp) {
-        const bearer = request.headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
-        const plausible = !!bearer && (FIRST_PARTY.test(bearer) || PROVIDER_TOKEN.test(bearer));
+        const authorization = request.headers.get("authorization");
+        const credential = authorization?.replace(/^Bearer\s+/i, "") ?? "";
+        const plausible = !!authorization && (FIRST_PARTY.test(credential) || PROVIDER_TOKEN.test(credential));
         if (!(await allow(env, plausible ? "RL_MCP_CEILING" : "RL_MCP_ANON", key))) return tooMany();
-        // A bearer that cannot be ours never reaches a storage lookup.
-        if (bearer && !plausible) return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": 'Bearer realm="OAuth", error="invalid_token"' } });
+        // ANY Authorization header that is not exactly one plausible token (junk, two tokens, another scheme) stops here:
+        // no storage lookup, and the same discovery pointer the provider would send.
+        if (authorization && !plausible) return invalidToken(request);
       } else if (path === "/token") { if (!(await allow(env, "RL_MCP_CEILING", key))) return tooMany(); }
       else if (ANON_PATHS.has(path) && !(await allow(env, "RL_MCP_ANON", key))) return tooMany();
     }

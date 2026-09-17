@@ -140,6 +140,13 @@ describe("MCP authorization (borrowed provider + Access email-code + consent)", 
     const codes: number[] = []; for (let i = 0; i < 5; i++) codes.push((await hit(`Bearer junk-${i}`)).status);
     expect(codes).toEqual([401, 401, 401, 429, 429]); expect(prepares).toBe(0);
     expect((await hit(undefined, "/mcp/")).status).toBe(429); // trailing slash is metered too (#15-5)
+    // the provider matches its API route by PREFIX; so does the meter (re-review #15): /mcpx with junk never reaches storage
+    const e3 = { ...e2, RL_MCP_ANON: limiter(2) }; const before = prepares;
+    const hx = (auth: string, path: string) => worker.fetch(new Request(ORIGIN + path, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.77", authorization: auth }, body: "{}" }), e3, ectx());
+    expect([(await hx("Bearer junk", "/mcpx")).status, (await hx("Bearer a:b:c", "/mcp.json")).status, (await hx("Bearer junk", "/mcp-anything")).status]).toEqual([401, 401, 429]);
+    const twoTokens = await worker.fetch(new Request(ORIGIN + "/mcp", { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.78", authorization: `Bearer st_${"0".repeat(32)} extra` }, body: "{}" }), e3, ectx());
+    expect(twoTokens.status).toBe(401); expect(prepares).toBe(before);
+    expect(twoTokens.headers.get("www-authenticate")).toBe(`Bearer realm="OAuth", resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp", error="invalid_token"`);
     // well-shaped but unknown bearers are bounded by the ceiling
     const shaped: number[] = []; for (let i = 0; i < 7; i++) shaped.push((await hit(`Bearer st_${String(i).padStart(32, "0")}`)).status);
     expect(shaped).toEqual([401, 401, 401, 401, 401, 429, 429]);
