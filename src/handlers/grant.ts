@@ -39,6 +39,19 @@ async function scopeExists(ctx: Ctx, scope: Scope): Promise<boolean> {
   return !!(await ctx.db.prepare(`SELECT id FROM ${t} WHERE id = ?`).bind(scope.id).first());
 }
 
+/** The ONE place the post-send status is decided (independent review AMEND 53c5716917027). `target` is the status this send
+ *  would write, or null when the outcome transitions nothing (provider refusal, not_sent). A transition is conditional on the
+ *  row still being 'pending', because the send awaited the network and a concurrent revoke or accept may already have written
+ *  a terminal state. Every path that does not win the transition — including every null-target path — re-reads the STORED
+ *  status and reports that. delivery.state is reported separately and always carries only the provider's own outcome. */
+async function transitionOrRead(ctx: Ctx, id: string, target: string | null): Promise<string> {
+  if (target) {
+    const up = await ctx.db.prepare("UPDATE invitation SET status = ? WHERE id = ? AND status = 'pending'").bind(target, id).run();
+    if ((up.meta.changes ?? 0) === 1) return target; // we won the transition; no need to read it back
+  }
+  return (await ctx.db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status ?? "pending";
+}
+
 /** E: invite → the invitation mail leaves the system (IRR-001) when a sender is configured and the environment policy allows
  *  this recipient (src/mail.ts, OF-3). `delivered` is the provider's acceptance and nothing more; `delivery.state` says which
  *  kind of outcome it was ("accepted" | "refused" | "unconfirmed" | "not_sent") and `delivery.reason` why, when it was not
@@ -91,14 +104,10 @@ export const invite: Handler = async (ctx, p, o) => {
   // that window a revoke or an accept may already have written a terminal state — a blind post-network UPDATE would resurrect
   // it. On a lost race the stored status is re-read, so the result reports what is ACTUALLY stored, separately from what the
   // provider said (delivery.state is always the provider's answer).
+  // No-transition outcomes (refused, not_sent) go through the SAME helper with target === null, so a branch cannot drift
+  // into reporting a stale default 'pending' over a concurrently stored 'revoked' / 'accepted'.
   const target = delivery.delivered ? "sent" : delivery.state === "unconfirmed" ? "unconfirmed" : null;
-  let stored = "pending";
-  if (target) {
-    const up = await ctx.db.prepare("UPDATE invitation SET status = ? WHERE id = ? AND status = 'pending'").bind(target, id).run();
-    stored = (up.meta.changes ?? 0) === 1
-      ? target // we won the transition; no need to read it back
-      : (await ctx.db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status ?? "pending";
-  }
+  const stored = await transitionOrRead(ctx, id, target);
   ctx.log("grant.invite.mail", { delivered: delivery.delivered, state: delivery.state, reason: delivery.reason ?? null, provider_status: delivery.provider_status ?? null, stored_status: stored }); // never the address, nor a hash of it
   const note = stored !== (target ?? "pending")
     ? `the invitation is ${stored}: it changed while the send was in flight, and that state was not overwritten. delivery.state reports only what the provider said.`

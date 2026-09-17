@@ -107,10 +107,10 @@ import { readFileSync } from "node:fs";
 import { afterAll } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { execute } from "../src/dispatch";
-const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "mailh", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "mailh-db", DB2: "mailh-db2", DB3: "mailh-db3", DB4: "mailh-db4", DB5: "mailh-db5", DB6: "mailh-db6", DB7: "mailh-db7", DB8: "mailh-db8" } }] }));
+const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "mailh", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "mailh-db", DB2: "mailh-db2", DB3: "mailh-db3", DB4: "mailh-db4", DB5: "mailh-db5", DB6: "mailh-db6", DB7: "mailh-db7", DB8: "mailh-db8", DB9: "mailh-db9", DB10: "mailh-db10", DB11: "mailh-db11" } }] }));
 afterAll(() => mf.dispose());
 /** A fresh schema + synthetic seed on one of this file's two isolated D1 bindings. */
-async function freshDb(binding: "DB" | "DB2" | "DB3" | "DB4" | "DB5" | "DB6" | "DB7" | "DB8") {
+async function freshDb(binding: "DB" | "DB2" | "DB3" | "DB4" | "DB5" | "DB6" | "DB7" | "DB8" | "DB9" | "DB10" | "DB11") {
   const db = await mf.getD1Database(binding);
   const stmts = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n").split(";\n").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s));
   for (const m of ["0001_init.sql", "0002_code_escrow.sql", "0003_language_archive.sql"]) await db.batch(stmts(`../migrations/${m}`));
@@ -209,7 +209,7 @@ const rowCount = async (db: any, hash: string) => (await db.prepare("SELECT COUN
 const SCOPE = { scope: "assessment", id: "assess_tavo_collect" };
 
 /** owner-at-scope ctx factory on a fresh db, with a movable clock. */
-async function bed(binding: "DB3" | "DB4" | "DB5" | "DB6" | "DB7" | "DB8", email: string) {
+async function bed(binding: "DB3" | "DB4" | "DB5" | "DB6" | "DB7" | "DB8" | "DB9" | "DB10" | "DB11", email: string) {
   const db = await freshDb(binding);
   const env = await devMail(email);
   env.DB = db; env.SESSION_SECRET = "synthetic-mail";
@@ -264,6 +264,65 @@ describe("cap.grant.invite — the post-network status write never resurrects a 
     expect(r.result.status).toBe("accepted");
     expect(r.result.delivery).toMatchObject({ state: "accepted" });
     expect(await db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_id = ?').bind("person_invitee", SCOPE.id).first()).toBeTruthy();
+  }, 30_000);
+
+  // A provider REFUSAL transitions nothing, so before the AMEND it reported the default 'pending' regardless of what the row
+  // actually said. The no-transition branches now re-read the stored status through the same helper.
+  it("a delayed provider REFUSAL after a concurrent revoke reports the STORED 'revoked', not the default 'pending': delivery.state is 'refused' with its provider_status and the token is dead", async () => {
+    const email = "race.refuse.revoke@real-domain.dev";
+    const { db, ctx, asRecipient } = await bed("DB9", email);
+    const { entered, release } = parkedFetch();
+    const call = invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    const init = await entered;
+    const id = idOf(init), token = tokenOf(init);
+    expect((await statusOf(db, id)).status).toBe("pending");
+    const rv = await revoke_invitation(ctx(), { id });   // the human revokes DURING the send
+    expect(rv.result).toMatchObject({ id, status: "revoked" });
+    release(new Response(JSON.stringify({ message: "domain not verified" }), { status: 422 })); // …and the provider then REFUSES
+    const r: any = await call;
+    expect((await statusOf(db, id)).status).toBe("revoked");
+    expect(r.result.status).toBe("revoked");                         // the stored status, re-read on a no-transition outcome
+    expect(r.result.delivered).toBe(false);
+    expect(r.result.delivery).toMatchObject({ state: "refused", provider: "resend", provider_status: 422 });
+    await expect(accept(await asRecipient(), { token })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
+  }, 30_000);
+
+  it("a delayed provider REFUSAL after a concurrent accept reports the STORED 'accepted' with accepted_at and the grant preserved", async () => {
+    const email = "race.refuse.accept@real-domain.dev";
+    const { db, ctx, asRecipient } = await bed("DB10", email);
+    const recipient = await asRecipient();
+    const { entered, release } = parkedFetch();
+    const call = invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    const init = await entered;
+    const id = idOf(init), token = tokenOf(init);
+    const acc = await accept(recipient, { token });     // the recipient accepts DURING the send
+    expect(acc.result).toMatchObject({ granted: true, role: "viewer" });
+    const afterAccept = await statusOf(db, id);
+    expect(afterAccept.status).toBe("accepted"); expect(afterAccept.accepted_at).toBeTruthy();
+    release(new Response(JSON.stringify({ message: "rate limited" }), { status: 429 }));
+    const r: any = await call;
+    const afterSend = await statusOf(db, id);
+    expect(afterSend.status).toBe("accepted");
+    expect(afterSend.accepted_at).toBe(afterAccept.accepted_at);     // the refusal rewrote nothing
+    expect(r.result.status).toBe("accepted");
+    expect(r.result.delivered).toBe(false);
+    expect(r.result.delivery).toMatchObject({ state: "refused", provider_status: 429 });
+    expect(await db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_id = ?').bind("person_invitee", SCOPE.id).first()).toBeTruthy();
+  }, 30_000);
+
+  it("a plain refusal with no concurrent change still reports 'pending' (regression): the re-read reports the row as it stands", async () => {
+    const email = "plain.refuse@real-domain.dev";
+    const { db, ctx } = await bed("DB11", email);
+    const { entered, release } = parkedFetch();
+    const call = invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    const init = await entered;
+    const id = idOf(init);
+    release(new Response(JSON.stringify({ message: "invalid from address" }), { status: 400 }));
+    const r: any = await call;
+    expect((await statusOf(db, id)).status).toBe("pending");
+    expect(r.result.status).toBe("pending");
+    expect(r.result.delivered).toBe(false);
+    expect(r.result.delivery).toMatchObject({ state: "refused", provider_status: 400 });
   }, 30_000);
 });
 
