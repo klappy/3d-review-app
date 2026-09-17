@@ -1,0 +1,12 @@
+data/
+fixtures/real/
+*.csv
+# The pinned authored instrument (Steve Watters rubric @ f042cde) is source, not data — the only CSVs allowed in.
+!seed/source/rubric_csv/*.csv
+.env
+.env.*
+*.pem
+.dev.vars
+node_modules/
+.wrangler/
+_inputs/

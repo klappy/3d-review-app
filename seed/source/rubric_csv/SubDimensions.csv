@@ -1,0 +1,18 @@
+lens,sub_dimension,description,included_in_lens_score,notes
+Translation Team,Translation Process & Brief,"Translation brief, process steps, exegesis, internal checking, community feedback, revision",Yes,
+Translation Team,Understanding the Source,Confidence in original-text meaning and handling of difficult exegetical questions,Yes,"Both TR and ML forms include this sub-dimension, but ML-Q9 is excluded. ML therefore has only one item (ML-Q10) — reported as a single-item indicator, not a sub-dimension score."
+Translation Team,External Review,Presence and identity of reviewers outside the drafting team,Yes,
+Translation Team,Consistency,Management and tooling for consistent key terms and proper names,Yes,
+Translation Team,Governance,"Project management, oversight, and publication decision process",Yes,
+Community,Understandable,Ease of comprehension and natural-language quality,Yes,
+Community,Appealing — Written,Visual appeal of the written form (Written variant only),Yes,
+Community,Appealing — Audio,Audio quality and accompanying soundscape (Audio variant only),Yes,
+Community,Appealing — Video/Sign,Signing quality and accompanying visuals (Video/Sign variant only),Yes,
+Community,Impactful,"Frequency and breadth of use, emotional and behavioral impact",Yes,
+Community,Trust / Open Feedback,Trust in the translation; open-text reflections (open items not scored),Yes,
+Church,Confidence in the Translation,"Confidence in process, source understanding, consistency, accuracy (Consultant + Pastor forms)",Yes,
+Church,Readiness,Whether translation is ready for distribution (Consultant form),Yes,
+Church,Translation Brief,Awareness of and fidelity to a community-agreed translation type (Pastor forms),Yes,
+Church,Church Involvement,Denominational breadth and ministry use (Pastor forms),Yes,
+Church,Affirmation,"Pastor judgment on clarity, appeal, and readiness (Pastor forms)",Yes,
+Church,Impact Observation,Pastor's own use and observed congregational impact (Community Pastor form),Yes,

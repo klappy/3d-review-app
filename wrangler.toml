@@ -1,0 +1,93 @@
+# Deploys ONLY via Cloudflare Workers Builds (git push → build → deploy). Never `wrangler deploy` from a seat.
+#   dev : branch phase-0/walking-skeleton → worker 3d-review-dev  (D1 3d-review-dev)   https://3d-review-dev.klappy.workers.dev
+#   prod: branch main                     → worker 3d-review      (D1 3d-review)       promoted by PR merge into main
+name = "3d-review-dev"
+main = "src/worker.ts"
+compatibility_date = "2026-09-01"
+
+[vars]
+ENVIRONMENT = "dev"
+# Cloudflare Access (one-time PIN) guards GET /v2/auth/access on this hostname — see src/access.ts. AUD is public.
+ACCESS_TEAM_DOMAIN = "klappy.cloudflareaccess.com"
+ACCESS_AUD = "8a1c350783d5c2d075188d66f22b5b8d6bb9ecb31694acf7f4042c1567035998"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "3d-review-dev"
+database_id = "5d4cc260-a7b1-47cc-b03d-ed4f60d324c3"
+
+# Workers Rate Limiting bindings — src/ratelimit.ts. namespace_id is any account-unique integer; period is 10 or 60 (s).
+# Bindings are NOT inherited by [env.production]; they are repeated there with separate namespaces.
+[[ratelimits]]
+name = "RL_MCP_ANON"
+namespace_id = "30101"
+simple = { limit = 30, period = 60 }
+[[ratelimits]]
+name = "RL_HTTP_ANON"
+# 30104/30204 are RL_MCP_CEILING on fable/mcp-oauth (stacked on this branch); keep RL_HTTP_ANON distinct at the merged head.
+namespace_id = "30105"
+simple = { limit = 60, period = 60 }
+[[ratelimits]]
+name = "RL_AUTH"
+namespace_id = "30102"
+simple = { limit = 10, period = 60 }
+[[ratelimits]]
+name = "RL_REDEEM"
+namespace_id = "30103"
+simple = { limit = 60, period = 60 }
+[[ratelimits]]
+name = "RL_MCP_CEILING"
+namespace_id = "30104"
+simple = { limit = 600, period = 60 }
+
+# OAuth provider storage (src/worker.ts, src/oauth.ts): hashed grants/tokens/clients + parked authorization requests.
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "05b0c783c8d14c2ebce39f3e5073d91f"   # 3d-review-dev-oauth
+
+[[rules]]
+type = "Text"
+globs = ["**/*.yaml", "seed/*.sql"]
+fallthrough = true
+
+# Serve the provisional functional shell at / while /v2 and MCP stay on the Worker.
+[assets]
+directory = "./ui"
+run_worker_first = ["/v2/*", "/mcp", "/mcp/*", "/authorize", "/token", "/register", "/oauth/*", "/.well-known/*"]
+
+[env.production]
+name = "3d-review"
+[env.production.vars]
+ENVIRONMENT = "production"
+ACCESS_TEAM_DOMAIN = "klappy.cloudflareaccess.com"
+ACCESS_AUD = "584596733c47a7337d5369c2fda819d25c48573c40c4b6ccc78476813f3a20e0"
+[[env.production.routes]]
+pattern = "3d-review.klappy.dev"
+custom_domain = true
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "3d-review"
+database_id = "2641de99-670e-46a2-872e-a2498189e287"
+[[env.production.ratelimits]]
+name = "RL_MCP_ANON"
+namespace_id = "30201"
+simple = { limit = 30, period = 60 }
+[[env.production.ratelimits]]
+name = "RL_HTTP_ANON"
+namespace_id = "30205"
+simple = { limit = 60, period = 60 }
+[[env.production.ratelimits]]
+name = "RL_AUTH"
+namespace_id = "30202"
+simple = { limit = 10, period = 60 }
+[[env.production.ratelimits]]
+name = "RL_REDEEM"
+namespace_id = "30203"
+simple = { limit = 60, period = 60 }
+[[env.production.ratelimits]]
+name = "RL_MCP_CEILING"
+namespace_id = "30204"
+simple = { limit = 600, period = 60 }
+[[env.production.kv_namespaces]]
+binding = "OAUTH_KV"
+id = "6a2ed9c9512c4ed7a9565ca32aba61a9"   # 3d-review-oauth

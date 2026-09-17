@@ -1,0 +1,3560 @@
+openapi: 3.1.0
+info:
+  title: 3D Review API — contract-v0.1 (DRAFT)
+  version: 0.1.0-draft
+  description: Projected from cookbook 04 @ 0f4413768c4365054372d917619311d7c2a00e96 by Fable. 83 capabilities; every capability
+    is also reachable via MCP docs/read/write/danger over the same handlers (prd/18-D). Paths marked x-path-inferred were
+    elided in 04 and need Lane A confirmation. SUPPRESSED is ok:true. Danger twins are never GET.
+servers:
+- url: https://{host}/
+  variables:
+    host:
+      default: TBD-OF-2
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Cloudflare email-code login → HttpOnly cookie (18-C)
+    bearer:
+      type: http
+      scheme: bearer
+      description: delegated agent bearer — acts as a user, never as a role (18-C / MCP-REQ-007)
+    participant:
+      type: http
+      scheme: bearer
+      description: participant token from redeem_code / open_link, bound to one assessment survey
+  schemas:
+    Receipt:
+      type: object
+      required:
+      - id
+      - actor
+      - scope
+      - class
+      - trace_id
+      - at
+      properties:
+        id:
+          type: string
+        actor:
+          type: string
+        scope:
+          type: object
+          properties:
+            type:
+              type: string
+              enum:
+              - workspace
+              - project
+              - assessment
+              - survey
+              - platform
+            id:
+              type: string
+        class:
+          type: string
+          enum:
+          - read
+          - write.reversible
+          - write.effect
+          - write.dangerous
+        undo_token:
+          type: string
+          description: present only when the row declares a true inverse
+        inverse:
+          type: string
+          description: capability id or 'none'
+        compensating_control:
+          type: string
+        trace_id:
+          type: string
+        at:
+          type: string
+          format: date-time
+    Envelope:
+      type: object
+      required:
+      - ok
+      - capability
+      - result
+      properties:
+        ok:
+          const: true
+        capability:
+          type: string
+        result:
+          type: object
+          additionalProperties: true
+          properties:
+            suppressed:
+              type: boolean
+              description: small-cell suppression applied; this is a success state
+        receipt:
+          $ref: '#/components/schemas/Receipt'
+    ErrorEnvelope:
+      type: object
+      required:
+      - ok
+      - error
+      properties:
+        ok:
+          const: false
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+              enum:
+              - NOT_AUTHENTICATED
+              - NOT_AUTHORIZED_AT_SCOPE
+              - WRONG_TOOL_FOR_CLASS
+              - CONFIRM_REQUIRED
+              - CONFIRM_EXPIRED
+              - INVALID_PARAMS
+              - NOT_FOUND_OR_NOT_VISIBLE
+              - STAGE_CONFLICT
+              - RESERVED_NOT_BUILT
+              - NO_INVERSE
+              - RATE_LIMITED
+            message:
+              type: string
+            hint:
+              type: string
+            docs:
+              type: string
+              description: capability id or topic
+    Impact:
+      type: object
+      required:
+      - affected
+      - irreversible
+      - effect
+      properties:
+        affected:
+          type: array
+          items:
+            type: object
+        irreversible:
+          type: boolean
+        effect:
+          type: string
+          enum:
+          - external
+          - disclosure
+          - destructive
+        retention:
+          type: string
+        compensating_control:
+          type: string
+    DangerBody:
+      type: object
+      required:
+      - mode
+      properties:
+        mode:
+          type: string
+          enum:
+          - dry_run
+          - execute
+        confirm_token:
+          type: string
+          description: required for execute; bound to intent; TTL per 18-C
+        params:
+          type: object
+          additionalProperties: true
+    DryRunResult:
+      type: object
+      properties:
+        impact:
+          $ref: '#/components/schemas/Impact'
+        confirm_token:
+          type: string
+        expires_in:
+          type: integer
+paths:
+  /v2/entry:
+    get:
+      operationId: cap.entry.intents
+      summary: 'cap.entry.intents — read — roles: V'
+      x-capability: cap.entry.intents
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: V
+      x-path-inferred: false
+      tags:
+      - A. Entry, identity, session
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security: []
+  /v2/example:
+    get:
+      operationId: cap.entry.example
+      summary: 'cap.entry.example — read — roles: V'
+      x-capability: cap.entry.example
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: V
+      x-path-inferred: false
+      tags:
+      - A. Entry, identity, session
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security: []
+  /v2/auth/link:
+    post:
+      operationId: cap.auth.request_link
+      summary: 'cap.auth.request_link — write.effect — roles: V'
+      x-capability: cap.auth.request_link
+      x-class: write.effect
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: 'expire link '
+      x-roles: V
+      x-path-inferred: false
+      tags:
+      - A. Entry, identity, session
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+  /v2/auth/session:
+    post:
+      operationId: cap.auth.consume_link
+      summary: 'cap.auth.consume_link — write.reversible — roles: V'
+      x-capability: cap.auth.consume_link
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: cap.auth.logout (compensating)
+      x-roles: V
+      x-path-inferred: false
+      tags:
+      - A. Entry, identity, session
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+    delete:
+      operationId: cap.auth.logout
+      summary: 'cap.auth.logout — write.reversible — roles: any'
+      x-capability: cap.auth.logout
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: sign in again
+      x-roles: any
+      x-path-inferred: false
+      tags:
+      - A. Entry, identity, session
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+  /v2/me:
+    get:
+      operationId: cap.auth.me
+      summary: 'cap.auth.me — read — roles: any'
+      x-capability: cap.auth.me
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: any
+      x-path-inferred: false
+      tags:
+      - A. Entry, identity, session
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+  /v2/participate/code:
+    post:
+      operationId: cap.participant.redeem_code
+      summary: 'cap.participant.redeem_code — write.reversible — roles: V'
+      x-capability: cap.participant.redeem_code
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: token expiry (compensating)
+      x-roles: V
+      x-path-inferred: false
+      tags:
+      - A. Entry, identity, session
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+  /v2/participate/link:
+    post:
+      operationId: cap.participant.open_link
+      summary: 'cap.participant.open_link — write.reversible — roles: V'
+      x-capability: cap.participant.open_link
+      x-shared-link-lifetime: "New context requires collecting and unarchived assessment/survey. Resume requires same active link and sole live bound session; closure may resume private receipt. No person uniqueness guarantee."
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: token expiry (compensating)
+      x-roles: V
+      x-path-inferred: false
+      tags:
+      - A. Entry, identity, session
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"participant_token":{"type":"string","pattern":"^pt_[A-Za-z0-9_-]{32}$"},"survey_id":{"type":"string"},"respondent_id":{"type":"string"},"expires_at":{"type":"string","format":"date-time"},"expires_in":{"type":"integer"},"resumed":{"type":"boolean"}},"required":["participant_token","survey_id","respondent_id","expires_at","expires_in","resumed"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type":"object","properties":{"token":{"type":"string","minLength":1},"resume_token":{"type":"string","pattern":"^pt_[A-Za-z0-9_-]{32}$"}},"required":["token"],"additionalProperties":false}
+  /v2/workspaces:
+    post:
+      operationId: cap.workspace.create
+      summary: 'cap.workspace.create — write.reversible — roles: provisioned creator (D1)'
+      x-capability: cap.workspace.create
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.workspace.archive
+        provenance: 'proposed (D5: create reverses to archive, never delete)'
+      x-roles: provisioned creator (D1)
+      x-path-inferred: false
+      tags:
+      - B. Workspace
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+    get:
+      operationId: cap.workspace.list
+      summary: 'cap.workspace.list — read — roles: Vw+'
+      x-capability: cap.workspace.list
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: false
+      tags:
+      - B. Workspace
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+  /v2/workspaces/{id}:
+    get:
+      operationId: cap.workspace.get
+      summary: 'cap.workspace.get — read — roles: Vw+'
+      x-capability: cap.workspace.get
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: false
+      tags:
+      - B. Workspace
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      operationId: cap.workspace.update
+      summary: 'cap.workspace.update — write.reversible — roles: O'
+      x-capability: cap.workspace.update
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: self:restore-prior
+        provenance: proposed (receipt carries prior values)
+      x-roles: O
+      x-path-inferred: false
+      tags:
+      - B. Workspace
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: cap.workspace.delete
+      summary: 'cap.workspace.delete — write.dangerous — roles: O'
+      x-capability: cap.workspace.delete
+      x-class: write.dangerous
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: UNASSESSED — see 17-IRREVERSIBILITY
+      x-roles: O
+      x-path-inferred: false
+      tags:
+      - B. Workspace
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/workspaces/{id}/archive:
+    post:
+      operationId: cap.workspace.archive
+      summary: 'cap.workspace.archive — write.reversible — roles: O'
+      x-capability: cap.workspace.archive
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.workspace.unarchive
+        provenance: '04'
+      x-roles: O
+      x-path-inferred: true
+      tags:
+      - B. Workspace
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/workspaces/{id}/unarchive:
+    post:
+      operationId: cap.workspace.unarchive
+      summary: 'cap.workspace.unarchive — write.reversible — roles: O'
+      x-capability: cap.workspace.unarchive
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.workspace.archive
+        provenance: '04'
+      x-roles: O
+      x-path-inferred: true
+      tags:
+      - B. Workspace
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/workspaces/{id}/projects/{pid}:
+    post:
+      operationId: cap.workspace.add_project
+      summary: 'cap.workspace.add_project — write.reversible — roles: O, M with share authority (D2)'
+      x-capability: cap.workspace.add_project
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.workspace.remove_project
+        provenance: proposed
+      x-roles: O, M with share authority (D2)
+      x-path-inferred: true
+      tags:
+      - B. Workspace
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: cap.workspace.remove_project
+      summary: 'cap.workspace.remove_project — write.reversible — roles: O, M with share authority (D2)'
+      x-capability: cap.workspace.remove_project
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.workspace.add_project
+        provenance: proposed
+      x-roles: O, M with share authority (D2)
+      x-path-inferred: true
+      tags:
+      - B. Workspace
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/projects:
+    post:
+      operationId: cap.project.create
+      summary: 'cap.project.create — write.reversible — roles: provisioned creator (D1)'
+      x-capability: cap.project.create
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.project.archive
+        provenance: proposed (D5)
+      x-roles: provisioned creator (D1)
+      x-path-inferred: false
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+    get:
+      operationId: cap.project.list
+      summary: 'cap.project.list — read — roles: Vw+'
+      x-capability: cap.project.list
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: false
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+  /v2/projects/{id}:
+    get:
+      operationId: cap.project.get
+      summary: 'cap.project.get — read — roles: Vw+'
+      x-capability: cap.project.get
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: false
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      operationId: cap.project.update
+      summary: 'cap.project.update — write.reversible — roles: O'
+      x-capability: cap.project.update
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: self:restore-prior
+        provenance: proposed
+      x-roles: O
+      x-path-inferred: true
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: cap.project.delete
+      summary: 'cap.project.delete — write.dangerous — roles: O'
+      x-capability: cap.project.delete
+      x-class: write.dangerous
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: UNASSESSED — see 17-IRREVERSIBILITY
+      x-roles: O
+      x-path-inferred: true
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/projects/{id}/archive:
+    post:
+      operationId: cap.project.archive
+      summary: 'cap.project.archive — write.reversible — roles: O'
+      x-capability: cap.project.archive
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.project.unarchive
+        provenance: '04'
+      x-roles: O
+      x-path-inferred: true
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/projects/{id}/unarchive:
+    post:
+      operationId: cap.project.unarchive
+      summary: 'cap.project.unarchive — write.reversible — roles: O'
+      x-capability: cap.project.unarchive
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.project.archive
+        provenance: '04'
+      x-roles: O
+      x-path-inferred: true
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/projects/{pid}/languages:
+    post:
+      operationId: cap.language.create
+      summary: 'cap.language.create — write.reversible — roles: O, M'
+      x-capability: cap.language.create
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.language.archive
+        provenance: 'proposed (D9 gap: create reverses to archive, never delete)'
+      x-roles: O, M
+      x-path-inferred: false
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: cap.language.list
+      summary: 'cap.language.list — read — roles: Vw+'
+      x-capability: cap.language.list
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: false
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/languages/{id}/archive:
+    post:
+      operationId: cap.language.archive
+      summary: 'cap.language.archive — write.reversible — roles: O, M'
+      x-capability: cap.language.archive
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.language.unarchive
+        provenance: '04'
+      x-roles: O, M
+      x-path-inferred: false
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/languages/{id}/unarchive:
+    post:
+      operationId: cap.language.unarchive
+      summary: 'cap.language.unarchive — write.reversible — roles: O, M'
+      x-capability: cap.language.unarchive
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.language.archive
+        provenance: '04'
+      x-roles: O, M
+      x-path-inferred: false
+      tags:
+      - C. Project
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/projects/{pid}/assessments:
+    post:
+      operationId: cap.assessment.create
+      summary: 'cap.assessment.create — write.reversible — roles: O, M'
+      x-capability: cap.assessment.create
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.assessment.archive
+        provenance: proposed (D5)
+      x-roles: O, M
+      x-path-inferred: false
+      tags:
+      - D. Assessment (main page)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: cap.assessment.list
+      summary: 'cap.assessment.list — read — roles: Vw+'
+      x-capability: cap.assessment.list
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: true
+      tags:
+      - D. Assessment (main page)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{id}:
+    get:
+      operationId: cap.assessment.get
+      summary: 'cap.assessment.get — read — roles: Vw+'
+      x-capability: cap.assessment.get
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: true
+      tags:
+      - D. Assessment (main page)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      operationId: cap.assessment.update
+      summary: 'cap.assessment.update — write.reversible — roles: O, M'
+      x-capability: cap.assessment.update
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: self:restore-prior
+        provenance: proposed
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - D. Assessment (main page)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: cap.assessment.delete
+      summary: 'cap.assessment.delete — write.dangerous — roles: O'
+      x-capability: cap.assessment.delete
+      x-class: write.dangerous
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: UNASSESSED — see 17-IRREVERSIBILITY
+      x-roles: O
+      x-path-inferred: true
+      tags:
+      - D. Assessment (main page)
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{id}/stage:
+    post:
+      operationId: cap.assessment.set_stage
+      summary: 'cap.assessment.set_stage — write.reversible — roles: O, M'
+      x-capability: cap.assessment.set_stage
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: self:reverse-step
+        provenance: proposed (04-ACCEPTANCE row 16)
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - D. Assessment (main page)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{id}/archive:
+    post:
+      operationId: cap.assessment.archive
+      summary: 'cap.assessment.archive — write.reversible — roles: project O, M'
+      x-capability: cap.assessment.archive
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.assessment.unarchive
+        provenance: '04'
+      x-roles: project O, M
+      x-path-inferred: true
+      tags:
+      - D. Assessment (main page)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{id}/unarchive:
+    post:
+      operationId: cap.assessment.unarchive
+      summary: 'cap.assessment.unarchive — write.reversible — roles: project O, M'
+      x-capability: cap.assessment.unarchive
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.assessment.archive
+        provenance: '04'
+      x-roles: project O, M
+      x-path-inferred: true
+      tags:
+      - D. Assessment (main page)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{id}/notes:
+    patch:
+      operationId: cap.assessment.notes.update
+      summary: 'cap.assessment.notes.update — write.reversible — roles: O, M'
+      x-capability: cap.assessment.notes.update
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: self:restore-prior
+        provenance: proposed
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - D. Assessment (main page)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/templates:
+    get:
+      operationId: cap.template.list
+      summary: 'cap.template.list — read — roles: any signed-in'
+      x-capability: cap.template.list
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: any signed-in
+      x-path-inferred: false
+      tags:
+      - E. Surveys (templates + assessment surveys)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+  /v2/templates/{id}@{ver}:
+    get:
+      operationId: cap.template.get
+      summary: 'cap.template.get — read — roles: any signed-in'
+      x-capability: cap.template.get
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: any signed-in
+      x-path-inferred: false
+      tags:
+      - E. Surveys (templates + assessment surveys)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: ver
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/templates/{id}@{ver}/render:
+    get:
+      operationId: cap.template.render
+      summary: 'cap.template.render — read — roles: any'
+      x-capability: cap.template.render
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: any
+      x-path-inferred: true
+      tags:
+      - E. Surveys (templates + assessment surveys)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: ver
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/templates/{id}/versions:
+    post:
+      operationId: cap.template.publish_version
+      summary: 'cap.template.publish_version — write.dangerous — roles: S'
+      x-capability: cap.template.publish_version
+      x-class: write.dangerous
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: UNASSESSED — see 17-IRREVERSIBILITY
+      x-roles: S
+      x-path-inferred: false
+      tags:
+      - E. Surveys (templates + assessment surveys)
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/surveys:
+    post:
+      operationId: cap.survey.select
+      summary: 'cap.survey.select — write.reversible — roles: O, M'
+      x-capability: cap.survey.select
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.survey.deselect
+        provenance: proposed (only while no responses)
+      x-roles: O, M
+      x-path-inferred: false
+      tags:
+      - E. Surveys (templates + assessment surveys)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/surveys/{sid}:
+    delete:
+      operationId: cap.survey.deselect
+      summary: 'cap.survey.deselect — write.reversible — roles: O, M'
+      x-capability: cap.survey.deselect
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.survey.select
+        provenance: proposed (only while no responses; else archive-preserve, inverse none)
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - E. Surveys (templates + assessment surveys)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: cap.survey.get_status
+      summary: 'cap.survey.get_status — read — roles: Vw+'
+      x-capability: cap.survey.get_status
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: true
+      tags:
+      - E. Surveys (templates + assessment surveys)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/surveys/{sid}/print:
+    get:
+      operationId: cap.survey.print
+      summary: 'cap.survey.print — read — roles: O, M'
+      x-capability: cap.survey.print
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - E. Surveys (templates + assessment surveys)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/surveys/{sid}/links:
+    post:
+      operationId: cap.survey.issue_link
+      summary: 'cap.survey.issue_link — write.effect — roles: O, M'
+      x-capability: cap.survey.issue_link
+      x-shared-link-lifetime: "Creation discloses a reusable bearer once in execute; not email delivery. Revocation is compensating, not unsending."
+      x-class: write.effect
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse: {kind: none, compensating_control: cap.survey.revoke_link}
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - {"type":"object","properties":{"result":{"oneOf":[{"type":"object","properties":{"survey_id":{"type":"string"},"expires_at":{"type":["string","null"],"format":"date-time"},"impact":{"type":"object"},"confirm_token":{"type":"string"},"expires_in":{"type":"integer"}},"required":["survey_id","expires_at","impact","confirm_token","expires_in"],"additionalProperties":false},{"type":"object","properties":{"link_id":{"type":"string"},"link_token":{"type":"string"},"expires_at":{"type":["string","null"],"format":"date-time"},"entry_fragment":{"type":"string","pattern":"^#survey="}},"required":["link_id","link_token","expires_at","entry_fragment"],"additionalProperties":false}]}},"required":["result"],"additionalProperties":true}
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type":"object","properties":{"params":{"type":"object","properties":{"expires_at":{"type":["string","null"],"format":"date-time"}},"required":[],"additionalProperties":false},"mode":{"enum":["dry_run","execute"]},"confirm_token":{"type":"string"}},"required":["params","mode"],"additionalProperties":false}
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/surveys/{sid}/deliveries:
+    post:
+      operationId: cap.survey.send_links
+      summary: 'cap.survey.send_links — write.effect — roles: O, M'
+      x-capability: cap.survey.send_links
+      x-class: write.effect
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: cap.survey.revoke_link
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/surveys/{sid}/codes:
+    post:
+      operationId: cap.survey.issue_codes
+      summary: 'cap.survey.issue_codes — write.reversible — roles: O, M'
+      x-capability: cap.survey.issue_codes
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.survey.revoke_code
+        provenance: 04 (while unredeemed)
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/surveys/{sid}/codes/export:
+    post:
+      operationId: cap.survey.export_codes
+      summary: 'cap.survey.export_codes — write.effect — roles: O, M'
+      x-capability: cap.survey.export_codes
+      x-class: write.effect
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: revoke codes
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/surveys/{sid}/links/{id}:
+    delete:
+      operationId: cap.survey.revoke_link
+      summary: 'cap.survey.revoke_link — write.reversible — roles: O, M'
+      x-capability: cap.survey.revoke_link
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: 're-issue (04: undo=null once sent)'
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/surveys/{sid}/codes/{id}:
+    delete:
+      operationId: cap.survey.revoke_code
+      summary: 'cap.survey.revoke_code — write.reversible — roles: O, M'
+      x-capability: cap.survey.revoke_code
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: re-issue
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/{scope}/{id}/invitations:
+    post:
+      operationId: cap.grant.invite
+      summary: 'cap.grant.invite — write.effect — roles: O, M(≤M)'
+      x-capability: cap.grant.invite
+      x-class: write.effect
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: cap.grant.revoke_invitation
+      x-roles: O, M(≤M)
+      x-path-inferred: false
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: scope
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/invitations/{id}:
+    delete:
+      operationId: cap.grant.revoke_invitation
+      summary: 'cap.grant.revoke_invitation — write.reversible — roles: O, M(≤M)'
+      x-capability: cap.grant.revoke_invitation
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: 're-invite (04: does not unsend)'
+      x-roles: O, M(≤M)
+      x-path-inferred: false
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/invitations/{token}/accept:
+    post:
+      operationId: cap.grant.accept
+      summary: 'cap.grant.accept — write.effect — roles: invitee'
+      x-capability: cap.grant.accept
+      x-class: write.effect
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: cap.grant.revoke
+      x-roles: invitee
+      x-path-inferred: false
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/{scope}/{id}/grants:
+    get:
+      operationId: cap.grant.list
+      summary: 'cap.grant.list — read — roles: O, M'
+      x-capability: cap.grant.list
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: O, M
+      x-path-inferred: false
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: scope
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/{scope}/{id}/grants/{gid}:
+    patch:
+      operationId: cap.grant.update_role
+      summary: 'cap.grant.update_role — write.effect — roles: O'
+      x-capability: cap.grant.update_role
+      x-class: write.effect
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: UNASSESSED — see 17-IRREVERSIBILITY
+      x-roles: O
+      x-path-inferred: true
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: scope
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: gid
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: cap.grant.revoke
+      summary: 'cap.grant.revoke — write.reversible — roles: O, M(≤M)'
+      x-capability: cap.grant.revoke
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: 're-invite (04: what was seen stays seen)'
+      x-roles: O, M(≤M)
+      x-path-inferred: true
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: scope
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: gid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/{scope}/{id}/transfer:
+    post:
+      operationId: cap.grant.transfer_owner
+      summary: 'cap.grant.transfer_owner — write.dangerous — roles: O'
+      x-capability: cap.grant.transfer_owner
+      x-class: write.dangerous
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: UNASSESSED — see 17-IRREVERSIBILITY
+      x-roles: O
+      x-path-inferred: true
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: scope
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/requests:
+    post:
+      operationId: cap.request.create
+      summary: 'cap.request.create — write.reversible — roles: any signed-in'
+      x-capability: cap.request.create
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: UNASSESSED — withdraw route not in 04
+      x-roles: any signed-in
+      x-path-inferred: false
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+  /v2/participate/form:
+    get:
+      operationId: cap.response.form
+      summary: 'cap.response.form — read — roles: P'
+      x-capability: cap.response.form
+      x-shared-link-lifetime: "Shared session and invitation live, selected survey and assessment collecting/unarchived. Source template validation unchanged."
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: P
+      x-path-inferred: false
+      tags:
+      - G. Participation
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"survey_id":{"type":"string"},"assessment":{"type":"string"},"language":{"type":"string"},"period":{"type":["string","null"]},"template":{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"},"perspective":{"type":"string"},"source_ref":{"type":["string","null"]}},"required":["id","version","perspective","source_ref"],"additionalProperties":false},"items":{"type":"array","items":{"type":"object","description":"Pinned source renderItems output, stable source item IDs, required/option/exclusion semantics unchanged."}},"participant_labels":{"type":"array","items":{"type":"string"}}},"required":["survey_id","assessment","language","period","template","items","participant_labels"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - participant: []
+  /v2/participate/responses:
+    post:
+      operationId: cap.response.submit
+      summary: 'cap.response.submit — write.reversible — roles: P'
+      x-capability: cap.response.submit
+      x-shared-link-lifetime: "New response atomically requires live shared session/link and collecting/unarchived assessment/survey. Exact normalized-payload/key replay returns own response after closure while authority remains valid. Different key conflicts; changed same-key payload invalid."
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: amendment/retraction policy held under D6 (04)
+      x-roles: P
+      x-path-inferred: false
+      tags:
+      - G. Participation
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"response_id":{"type":"string"},"submitted_at":{"type":"string","format":"date-time"},"duplicate":{"type":"boolean"},"undo":{"type":"null"}},"required":["response_id","submitted_at","duplicate","undo"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type":"object","properties":{"idempotency_key":{"type":"string","minLength":1,"maxLength":200},"answers":{"type":"object","description":"Known pinned item IDs only; server validates required, type, option, multi and exclusion rules before canonical hashing."}},"required":["idempotency_key","answers"],"additionalProperties":false}
+  /v2/participate/receipt:
+    get:
+      operationId: cap.response.receipt
+      summary: 'cap.response.receipt — read — roles: P'
+      x-capability: cap.response.receipt
+      x-shared-link-lifetime: "Private to authenticated respondent/survey; shared link/session must remain live. Closure/archive does not delete or expose receipts; revocation/expiry denies access."
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: P
+      x-path-inferred: false
+      tags:
+      - G. Participation
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"submitted":{"type":"boolean"},"response_id":{"type":["string","null"]},"submitted_at":{"type":["string","null"],"format":"date-time"},"template":{"oneOf":[{"type":"null"},{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"}},"required":["id","version"],"additionalProperties":false}]}},"required":["submitted","response_id","submitted_at","template"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - participant: []
+  /v2/participate/next:
+    post:
+      operationId: cap.response.assisted_next
+      summary: 'cap.response.assisted_next — write.reversible — roles: P (assisted collector)'
+      x-capability: cap.response.assisted_next
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: none needed — starts a distinct respondent (D6)
+      x-roles: P (assisted collector)
+      x-path-inferred: false
+      tags:
+      - G. Participation
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+  /v2/assessments/{aid}/responses:
+    get:
+      operationId: cap.response.list
+      summary: 'cap.response.list — read — roles: O, M'
+      x-capability: cap.response.list
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: O, M
+      x-path-inferred: false
+      tags:
+      - G. Participation
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: cap.response.purge
+      summary: 'cap.response.purge — write.dangerous — roles: O'
+      x-capability: cap.response.purge
+      x-class: write.dangerous
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: UNASSESSED — see 17-IRREVERSIBILITY
+      x-roles: O
+      x-path-inferred: true
+      tags:
+      - G. Participation
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/results:
+    get:
+      operationId: cap.results.summary
+      summary: 'cap.results.summary — read — roles: Vw+'
+      x-capability: cap.results.summary
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: false
+      tags:
+      - H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/reports:
+    post:
+      operationId: cap.report.build
+      summary: 'cap.report.build — write.reversible — roles: O, M'
+      x-capability: cap.report.build
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.1-oct
+      x-inverse:
+        kind: none
+        compensating_control: v2.1-oct — UNASSESSED
+      x-roles: O, M
+      x-path-inferred: false
+      tags:
+      - H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)
+      responses:
+        '501':
+          description: RESERVED_NOT_BUILT — documented, docs pointer; v2.1-oct
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-status: RESERVED_NOT_BUILT
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: cap.report.list
+      summary: 'cap.report.list — read — roles: Vw+'
+      x-capability: cap.report.list
+      x-class: read
+      x-tool: read
+      x-slice: v2.1-oct
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: true
+      tags:
+      - H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)
+      responses:
+        '501':
+          description: RESERVED_NOT_BUILT — documented, docs pointer; v2.1-oct
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-status: RESERVED_NOT_BUILT
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/reports/{id}:
+    get:
+      operationId: cap.report.get
+      summary: 'cap.report.get — read — roles: Vw+'
+      x-capability: cap.report.get
+      x-class: read
+      x-tool: read
+      x-slice: v2.1-oct
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: true
+      tags:
+      - H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)
+      responses:
+        '501':
+          description: RESERVED_NOT_BUILT — documented, docs pointer; v2.1-oct
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-status: RESERVED_NOT_BUILT
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/recommendations:
+    post:
+      operationId: cap.recommendation.propose
+      summary: 'cap.recommendation.propose — write.reversible — roles: O, M'
+      x-capability: cap.recommendation.propose
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.1-oct
+      x-inverse:
+        kind: none
+        compensating_control: v2.1-oct — UNASSESSED
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)
+      responses:
+        '501':
+          description: RESERVED_NOT_BUILT — documented, docs pointer; v2.1-oct
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-status: RESERVED_NOT_BUILT
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/assessments/{aid}/recommendations/{id}:
+    patch:
+      operationId: cap.recommendation.review
+      summary: 'cap.recommendation.review — write.reversible — roles: O, M'
+      x-capability: cap.recommendation.review
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.1-oct
+      x-inverse:
+        kind: none
+        compensating_control: v2.1-oct — UNASSESSED
+      x-roles: O, M
+      x-path-inferred: true
+      tags:
+      - H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)
+      responses:
+        '501':
+          description: RESERVED_NOT_BUILT — documented, docs pointer; v2.1-oct
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-status: RESERVED_NOT_BUILT
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: aid
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/projects/{id}/rollup:
+    get:
+      operationId: cap.rollup.project
+      summary: 'cap.rollup.project — read — roles: Vw+'
+      x-capability: cap.rollup.project
+      x-class: read
+      x-tool: read
+      x-slice: v2.1-oct
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: true
+      tags:
+      - H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)
+      responses:
+        '501':
+          description: RESERVED_NOT_BUILT — documented, docs pointer; v2.1-oct
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-status: RESERVED_NOT_BUILT
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/workspaces/{id}/rollup:
+    get:
+      operationId: cap.rollup.workspace
+      summary: 'cap.rollup.workspace — read — roles: Vw+'
+      x-capability: cap.rollup.workspace
+      x-class: read
+      x-tool: read
+      x-slice: v2.1-oct
+      x-inverse:
+        kind: n/a
+      x-roles: Vw+
+      x-path-inferred: true
+      tags:
+      - H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)
+      responses:
+        '501':
+          description: RESERVED_NOT_BUILT — documented, docs pointer; v2.1-oct
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-status: RESERVED_NOT_BUILT
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/support/acts-as:
+    post:
+      operationId: cap.support.acts_as
+      summary: 'cap.support.acts_as — write.dangerous — roles: S'
+      x-capability: cap.support.acts_as
+      x-class: write.dangerous
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: UNASSESSED — see 17-IRREVERSIBILITY
+      x-roles: S
+      x-path-inferred: false
+      tags:
+      - I. Support & platform
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+  /v2/support/unlock:
+    post:
+      operationId: cap.support.unlock_participant
+      summary: 'cap.support.unlock_participant — write.reversible — roles: S'
+      x-capability: cap.support.unlock_participant
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: cap.survey.revoke_code
+        provenance: proposed
+      x-roles: S
+      x-path-inferred: true
+      tags:
+      - I. Support & platform
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+  /v2/imports:
+    post:
+      operationId: cap.import.batch
+      summary: 'cap.import.batch — write.reversible — roles: S'
+      x-capability: cap.import.batch
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.1-oct
+      x-inverse:
+        kind: none
+        compensating_control: v2.1-oct — UNASSESSED
+      x-roles: S
+      x-path-inferred: false
+      tags:
+      - I. Support & platform
+      responses:
+        '501':
+          description: RESERVED_NOT_BUILT — documented, docs pointer; v2.1-oct
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-status: RESERVED_NOT_BUILT
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+  /v2/ops/traces/{trace_id}:
+    get:
+      operationId: cap.ops.trace
+      summary: 'cap.ops.trace — read — roles: actor of that trace, S'
+      x-capability: cap.ops.trace
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: actor of that trace, S
+      x-path-inferred: false
+      tags:
+      - J. Ops, telemetry, xray, docs, feedback
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      parameters:
+      - name: trace_id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/health:
+    get:
+      operationId: cap.ops.health
+      summary: 'cap.ops.health — read — roles: V'
+      x-capability: cap.ops.health
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: V
+      x-path-inferred: false
+      tags:
+      - J. Ops, telemetry, xray, docs, feedback
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security: []
+  /v2/feedback:
+    post:
+      operationId: cap.ops.feedback
+      summary: 'cap.ops.feedback — write.reversible — roles: any'
+      x-capability: cap.ops.feedback
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: append-only
+      x-roles: any
+      x-path-inferred: false
+      tags:
+      - J. Ops, telemetry, xray, docs, feedback
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+  /v2/undo/{token}:
+    post:
+      operationId: cap.ops.undo
+      summary: 'cap.ops.undo — write.reversible — roles: actor'
+      x-capability: cap.ops.undo
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: n/a — this is the undo mechanism
+      x-roles: actor
+      x-path-inferred: false
+      tags:
+      - J. Ops, telemetry, xray, docs, feedback
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      - participant: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: params — shape owed per capability (A1 open item)
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+  /v2/docs:
+    get:
+      operationId: cap.docs.get
+      summary: 'cap.docs.get — read — roles: any'
+      x-capability: cap.docs.get
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: any
+      x-path-inferred: false
+      tags:
+      - J. Ops, telemetry, xray, docs, feedback
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security: []
+  /v2/openapi.yaml:
+    get:
+      operationId: cap.docs.openapi
+      summary: 'cap.docs.openapi — read — roles: any'
+      x-capability: cap.docs.openapi
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: any
+      x-path-inferred: false
+      tags:
+      - J. Ops, telemetry, xray, docs, feedback
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security: []
+  /v2/capabilities.json:
+    get:
+      operationId: cap.docs.capabilities
+      summary: 'cap.docs.capabilities — read — roles: any'
+      x-capability: cap.docs.capabilities
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: any
+      x-path-inferred: false
+      tags:
+      - J. Ops, telemetry, xray, docs, feedback
+      responses:
+        '200':
+          description: ok envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security: []
+x-contract:
+  name: contract-v0.1
+  status: DRAFT
+  source_sha: 0f4413768c4365054372d917619311d7c2a00e96
+  tools:
+  - docs
+  - read
+  - write
+  - danger
+  parity_rule: for every capability, HTTP twin and MCP tool return receipts equal after normalizing id/trace_id/at (MCP-REQ-013)

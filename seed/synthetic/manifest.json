@@ -1,0 +1,40 @@
+{
+ "source": {
+  "repo": "klappy/3d-quality-review",
+  "pin": "f042cde553761a6a7f24132cef7802f956378ee0",
+  "generator": "survey-pipeline/run_synthetic_pipeline.py",
+  "reads_real_exports": false
+ },
+ "rubric": {
+  "items": 111,
+  "options": 498,
+  "forms": [
+   "Audio",
+   "Community-Pastor",
+   "Consultant",
+   "Denom-Leader",
+   "Involved-Pastor",
+   "Mid-Level",
+   "Validation",
+   "Video-Sign",
+   "Written"
+  ]
+ },
+ "rendered": {
+  "submissions": 425,
+  "assessment_cycles": 34,
+  "projects": 10,
+  "by_form": {
+   "Consultant": 10,
+   "Involved-Pastor": 78,
+   "Validation": 133,
+   "Written": 204
+  },
+  "answers_total": 4783
+ },
+ "unmatched_columns": {},
+ "sha256": {
+  "answer-sets.json": "efc50c5ff9139d9235e4323233d27c54059527f92c54099e2f9dbf0cd71df1b5",
+  "personas.json": "9181ec780dbbfae570089f493d1d46fbdf3ff056f681af8f1e2e32ef0b4164a3"
+ }
+}

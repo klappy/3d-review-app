@@ -1,0 +1,566 @@
+{
+  "contract": "contract-v0.1",
+  "source": "cookbook 05-NLX-AGENT-USAGE.md @ 59be64c (J1–J14) + 04-ACCEPTANCE.md",
+  "runner": "B2: each row runs on contract mocks first, then live (S1a/S1); $vars are fixture bindings; every must_observe is an assertion; every negative must also hold",
+  "journeys": [
+    {
+      "id": "J1",
+      "actor": "facilitator via agent",
+      "utterance": "Set up an assessment for the Kelo project, pick translator + community surveys, give me 20 access codes and a printable",
+      "steps": [
+        {
+          "tool": "write",
+          "capability": "cap.assessment.create",
+          "params": {
+            "pid": "$pid",
+            "name": "Kelo cycle 1",
+            "language_id": "$lang"
+          }
+        },
+        {
+          "tool": "write",
+          "capability": "cap.survey.select",
+          "params": {
+            "aid": "$aid",
+            "template_id": "translation-team",
+            "version": 1
+          }
+        },
+        {
+          "tool": "write",
+          "capability": "cap.survey.select",
+          "params": {
+            "aid": "$aid",
+            "template_id": "community",
+            "version": 1
+          }
+        },
+        {
+          "tool": "write",
+          "capability": "cap.survey.issue_codes",
+          "params": {
+            "aid": "$aid",
+            "sid": "$sid",
+            "count": 20
+          }
+        },
+        {
+          "tool": "danger",
+          "capability": "cap.survey.export_codes",
+          "params": {
+            "aid": "$aid",
+            "sid": "$sid",
+            "mode": "dry_run"
+          }
+        },
+        {
+          "tool": "danger",
+          "capability": "cap.survey.export_codes",
+          "params": {
+            "aid": "$aid",
+            "sid": "$sid",
+            "mode": "execute",
+            "confirm_token": "$ct"
+          }
+        }
+      ],
+      "must_observe": [
+        "issue_codes result has count=20 and ids, no code values",
+        "export dry_run returns impact + confirm_token; execute returns codes once + receipt",
+        "cap.survey.print returns the blank form, never codes"
+      ],
+      "negative": [
+        "issue_codes on an assessment in prepare → INVALID_PARAMS not_collecting",
+        "export execute without token → CONFIRM_REQUIRED"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J2",
+      "actor": "participant via code",
+      "utterance": "I have code 7K3-P9Q",
+      "steps": [
+        {
+          "tool": "write",
+          "capability": "cap.participant.redeem_code",
+          "params": {
+            "code": "$code"
+          }
+        },
+        {
+          "tool": "read",
+          "capability": "cap.response.form",
+          "params": {}
+        },
+        {
+          "tool": "write",
+          "capability": "cap.response.submit",
+          "params": {
+            "idempotency_key": "$k",
+            "answers": "$answers"
+          }
+        },
+        {
+          "tool": "read",
+          "capability": "cap.response.receipt",
+          "params": {}
+        }
+      ],
+      "must_observe": [
+        "form version bound at presentation",
+        "submit returns receipt with inverse none",
+        "retry with same idempotency_key returns same receipt, idempotent:true"
+      ],
+      "negative": [
+        "same code twice → INVALID_PARAMS code_used"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J3",
+      "actor": "project owner",
+      "utterance": "Invite rina@… as a member on this assessment only",
+      "steps": [
+        {
+          "tool": "danger",
+          "capability": "cap.grant.invite",
+          "params": {
+            "scope": "assessment",
+            "id": "$aid",
+            "email": "$email",
+            "role": "member",
+            "mode": "dry_run"
+          }
+        },
+        {
+          "tool": "danger",
+          "capability": "cap.grant.invite",
+          "params": {
+            "scope": "assessment",
+            "id": "$aid",
+            "email": "$email",
+            "role": "member",
+            "mode": "execute",
+            "confirm_token": "$ct"
+          }
+        }
+      ],
+      "must_observe": [
+        "dry_run impact names what she will see",
+        "as rina: cap.assessment.list shows only $aid"
+      ],
+      "negative": [
+        "as rina: cap.assessment.get on a sibling → NOT_FOUND_OR_NOT_VISIBLE"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J4",
+      "actor": "member",
+      "utterance": "Remove the owner",
+      "steps": [
+        {
+          "tool": "write",
+          "capability": "cap.grant.revoke",
+          "params": {
+            "scope": "assessment",
+            "id": "$aid",
+            "gid": "$owner_grant"
+          }
+        }
+      ],
+      "must_observe": [
+        "NOT_AUTHORIZED_AT_SCOPE with hint naming D3"
+      ],
+      "negative": [
+        "is itself the negative"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J5",
+      "actor": "owner",
+      "utterance": "Delete this assessment",
+      "steps": [
+        {
+          "tool": "danger",
+          "capability": "cap.assessment.delete",
+          "params": {
+            "id": "$aid",
+            "mode": "dry_run"
+          }
+        },
+        {
+          "tool": "danger",
+          "capability": "cap.assessment.delete",
+          "params": {
+            "id": "$aid",
+            "mode": "execute",
+            "confirm_token": "$ct"
+          }
+        }
+      ],
+      "must_observe": [
+        "dry_run impact shows response count",
+        "execute only with token; receipt inverse none"
+      ],
+      "negative": [
+        "execute without token → CONFIRM_REQUIRED; stale token → CONFIRM_EXPIRED"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J6",
+      "actor": "viewer",
+      "utterance": "Show me results",
+      "steps": [
+        {
+          "tool": "read",
+          "capability": "cap.results.summary",
+          "params": {
+            "aid": "$aid"
+          }
+        },
+        {
+          "tool": "read",
+          "capability": "cap.response.list",
+          "params": {
+            "aid": "$aid"
+          }
+        },
+        {
+          "tool": "danger",
+          "capability": "cap.grant.invite",
+          "params": {
+            "scope": "assessment",
+            "id": "$aid",
+            "email": "x@example.test",
+            "role": "viewer",
+            "mode": "dry_run"
+          }
+        }
+      ],
+      "must_observe": [
+        "summary returned or ok:true suppressed:true",
+        "response.list → NOT_AUTHORIZED_AT_SCOPE (no raw responses)"
+      ],
+      "negative": [
+        "invite → NOT_AUTHORIZED_AT_SCOPE"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J7",
+      "actor": "actor of a trace, then a stranger",
+      "utterance": "Why did that take 4 seconds?",
+      "steps": [
+        {
+          "tool": "read",
+          "capability": "cap.ops.trace",
+          "params": {
+            "trace_id": "$own_trace"
+          }
+        },
+        {
+          "tool": "read",
+          "capability": "cap.ops.trace",
+          "params": {
+            "trace_id": "$other_trace"
+          }
+        }
+      ],
+      "must_observe": [
+        "own trace: scoped, redacted spans"
+      ],
+      "negative": [
+        "other actor's trace id → NOT_FOUND_OR_NOT_VISIBLE"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J8",
+      "actor": "agent as viewer",
+      "utterance": "What can I do here?",
+      "steps": [
+        {
+          "tool": "docs",
+          "capability": "cap.docs.get",
+          "params": {}
+        },
+        {
+          "tool": "docs",
+          "capability": "cap.docs.get",
+          "params": {
+            "role": "viewer",
+            "scope": {
+              "type": "assessment",
+              "id": "$aid"
+            }
+          }
+        }
+      ],
+      "must_observe": [
+        "role-aware index in ≤2 calls",
+        "no write/danger verbs listed for a viewer"
+      ],
+      "negative": [
+        "unknown capability → the index, not a guess"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J9",
+      "actor": "owner",
+      "utterance": "Undo the last thing",
+      "steps": [
+        {
+          "tool": "write",
+          "capability": "cap.workspace.update",
+          "params": {
+            "id": "$ws",
+            "name": "Renamed"
+          }
+        },
+        {
+          "tool": "write",
+          "capability": "cap.ops.undo",
+          "params": {
+            "token": "$undo"
+          }
+        },
+        {
+          "tool": "write",
+          "capability": "cap.ops.undo",
+          "params": {
+            "token": "$submit_undo"
+          }
+        }
+      ],
+      "must_observe": [
+        "rename undone via self:restore-prior"
+      ],
+      "negative": [
+        "response.submit has no undo token; a fake token → NOT_FOUND_OR_NOT_VISIBLE; a row with inverse none → NO_INVERSE naming the compensating control"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J10",
+      "actor": "support",
+      "utterance": "Act as rina to unlock her code",
+      "steps": [
+        {
+          "tool": "danger",
+          "capability": "cap.support.acts_as",
+          "params": {
+            "principal_id": "$rina",
+            "mode": "dry_run"
+          }
+        },
+        {
+          "tool": "danger",
+          "capability": "cap.support.acts_as",
+          "params": {
+            "principal_id": "$rina",
+            "mode": "execute",
+            "confirm_token": "$ct"
+          }
+        },
+        {
+          "tool": "write",
+          "capability": "cap.support.unlock_participant",
+          "params": {
+            "code_id": "$code_id"
+          }
+        }
+      ],
+      "must_observe": [
+        "audit receipt attributes the support actor (delegated_by)"
+      ],
+      "negative": [
+        "non-support actor → NOT_AUTHORIZED_AT_SCOPE"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J11",
+      "actor": "link participant",
+      "utterance": "I got a link to a survey, help me answer it",
+      "steps": [
+        {
+          "tool": "write",
+          "capability": "cap.participant.open_link",
+          "params": {
+            "token": "$link"
+          }
+        },
+        {
+          "tool": "read",
+          "capability": "cap.response.form",
+          "params": {}
+        },
+        {
+          "tool": "write",
+          "capability": "cap.response.submit",
+          "params": {
+            "idempotency_key": "$k",
+            "answers": "$answers"
+          }
+        },
+        {
+          "tool": "read",
+          "capability": "cap.response.receipt",
+          "params": {}
+        }
+      ],
+      "must_observe": [
+        "form at the version bound at presentation",
+        "receipt returned; participant never sees results"
+      ],
+      "negative": [
+        "same link again → INVALID_PARAMS link_used; expired → link_expired"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J12",
+      "actor": "KCS super-admin",
+      "utterance": "Transfer ownership of the Kelo workspace to Mei",
+      "steps": [
+        {
+          "tool": "danger",
+          "capability": "cap.grant.transfer_owner",
+          "params": {
+            "scope": "workspace",
+            "id": "$ws",
+            "to": "$mei",
+            "mode": "dry_run"
+          }
+        },
+        {
+          "tool": "danger",
+          "capability": "cap.grant.transfer_owner",
+          "params": {
+            "scope": "workspace",
+            "id": "$ws",
+            "to": "$mei",
+            "mode": "execute",
+            "confirm_token": "$ct"
+          }
+        }
+      ],
+      "must_observe": [
+        "impact lists current owners, projects, assessments, Mei's resulting role",
+        "receipt inverse none; last-owner protection (D3)"
+      ],
+      "negative": [
+        "execute without token → CONFIRM_REQUIRED; via write → WRONG_TOOL_FOR_CLASS; member → NOT_AUTHORIZED_AT_SCOPE",
+        "support-without-owner-consent: PROPOSED pending source (Astra 5703469487)"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J13",
+      "actor": "facilitator (member)",
+      "utterance": "Add Pastor Lee as an owner / Make me a new workspace for the Tamsi team",
+      "steps": [
+        {
+          "tool": "danger",
+          "capability": "cap.grant.invite",
+          "params": {
+            "scope": "assessment",
+            "id": "$aid",
+            "email": "$lee",
+            "role": "owner",
+            "mode": "dry_run"
+          }
+        },
+        {
+          "tool": "write",
+          "capability": "cap.workspace.create",
+          "params": {
+            "name": "Tamsi team"
+          }
+        },
+        {
+          "tool": "write",
+          "capability": "cap.request.create",
+          "params": {
+            "kind": "workspace",
+            "target": "Tamsi team"
+          }
+        }
+      ],
+      "must_observe": [
+        "invite above own level → NOT_AUTHORIZED_AT_SCOPE, hint names D3 and seeds 'invite as member'",
+        "workspace.create without D1 → NOT_AUTHORIZED_AT_SCOPE, hint names cap.request.create",
+        "request.create returns a request id — never a dead end"
+      ],
+      "negative": [
+        "is itself the negative"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    },
+    {
+      "id": "J14",
+      "actor": "any agent, then a visitor",
+      "utterance": "Give me the project roll-up / What is this site and can I see an example?",
+      "steps": [
+        {
+          "tool": "read",
+          "capability": "cap.rollup.project",
+          "params": {
+            "id": "$pid"
+          }
+        },
+        {
+          "tool": "write",
+          "capability": "cap.recommendation.propose",
+          "params": {
+            "aid": "$aid"
+          }
+        },
+        {
+          "tool": "read",
+          "capability": "cap.entry.intents",
+          "params": {}
+        },
+        {
+          "tool": "read",
+          "capability": "cap.entry.example",
+          "params": {}
+        },
+        {
+          "tool": "read",
+          "capability": "cap.ops.health",
+          "params": {}
+        },
+        {
+          "tool": "read",
+          "capability": "cap.template.render",
+          "params": {
+            "id": "translation-team",
+            "ver": "1",
+            "lang": "en"
+          }
+        },
+        {
+          "tool": "read",
+          "capability": "cap.assessment.list",
+          "params": {
+            "pid": "$pid"
+          }
+        }
+      ],
+      "must_observe": [
+        "v2.1-oct rows → RESERVED_NOT_BUILT with docs pointer on HTTP and MCP; no fabricated summary",
+        "without a session the seven public rows succeed (entry.intents, entry.example, ops.health, template.render, docs.get, docs.openapi, docs.capabilities)"
+      ],
+      "negative": [
+        "any 200 body on a v2.1-oct row fails the scenario",
+        "assessment.list with no session → NOT_AUTHENTICATED"
+      ],
+      "source": "cookbook 05 @ 59be64c"
+    }
+  ]
+}

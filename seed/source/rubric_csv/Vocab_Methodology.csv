@@ -1,0 +1,27 @@
+field,code,name,description,select_type
+drafting_source,original-languages,Original-language exegesis,Original-language exegesis (Greek / Hebrew / Aramaic),single-select
+drafting_source,lwc-text,LWC text,LWC (Language of Wider Communication) translation as primary source,single-select
+drafting_source,related-language-text,Related-language text,Adaptation from a closely-related language translation,single-select
+drafting_source,ai-llm,AI / LLM drafting,"AI / Large Language Model drafting, followed by human review",single-select
+drafting_source,computer-rule-based,Computer rule-based,"Rule-based or trained computer drafting (e.g., NT-trained tool drafting OT)",single-select
+drafting_source,mixed,Mixed sources,Different books or stages use different sources,single-select
+drafting_source,unknown,Unknown,Not captured at intake,single-select
+drafting_modality,text-based,Text-based drafting,Team exegetes written source text and produces written drafts,single-select
+drafting_modality,oral-internalisation,Oral internalisation,"Team familiarises with and internalises source material, then retells orally or in sign (FIA / storying / performance-based drafting)",single-select
+drafting_modality,signed,Signed (non-internalisation),Sign-language video drafting not involving prior oral internalisation,single-select
+drafting_modality,mixed,Mixed modalities,Combines text-based and oral-internalisation / signed at different stages,single-select
+drafting_modality,unknown,Unknown,Not captured at intake,single-select
+advisor_locus,external-expat-consultant,External expat consultant,External consultant who is not a mother-tongue speaker of the receptor language,multi-select
+advisor_locus,external-mtt-consultant,External MTT consultant,External consultant who is a mother-tongue or near-mother-tongue speaker,multi-select
+advisor_locus,local-advisor,Local advisor,Local expert (often mother-tongue) advises throughout; no external consultant in the standard sense,multi-select
+advisor_locus,unknown,Unknown,Not captured at intake,multi-select
+church_role,frontier,Frontier,Little or no faith community yet exists in the receptor language group; translation is pioneering work,single-select
+church_role,discipleship-network,Discipleship network,An emerging or informal network of disciples exists but is not a formally constituted church; this community participates in QA,single-select
+church_role,church-minimal,Church minimal,Established church exists but engagement limited to structured community testing; process is consultant/team-driven,single-select
+church_role,church-participatory,Church participatory,Established church actively involved throughout drafting and review; final authority rests with a credentialed consultant,single-select
+church_role,church-centric,Church centric,Church community drives and owns the process; translation is an explicit church-formation activity; affirmation authority rests with the church body,single-select
+church_role,unknown,Unknown,Not captured at intake,single-select
+product_modality,written,Written,Written text product,single-select
+product_modality,audio,Audio,Audio recording product,single-select
+product_modality,video-sign,Video/Sign,Video or sign language product,single-select
+product_modality,multi,Multi,Multiple product modalities,single-select

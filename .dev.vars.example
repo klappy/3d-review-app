@@ -1,0 +1,3 @@
+# Copy to ignored .dev.vars for LOCAL development only. Use independent random values.
+SESSION_SECRET=replace-with-separate-session-secret
+CODE_ESCROW_SECRET=replace-with-base64url-of-32-random-bytes
