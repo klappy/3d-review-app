@@ -17,7 +17,7 @@ export const COVERAGE = Object.freeze({
   J8: { label: "EXECUTED", capabilities: ["cap.docs.get"] },
   J9: { label: "PARTIAL", capabilities: ["cap.ops.undo"] },
   J10: { label: "NOT-EXECUTED-BY-THIS-RUNNER", capabilities: [] },
-  J11: { label: "EXECUTED", capabilities: ["cap.participant.open_link", "cap.response.form", "cap.response.submit", "cap.response.receipt"] },
+  J11: { label: "PARTIAL", capabilities: ["cap.participant.open_link", "cap.response.form", "cap.response.submit", "cap.response.receipt"] },
   J12: { label: "NOT-EXECUTED-BY-THIS-RUNNER", capabilities: [] },
   J13: { label: "PARTIAL", capabilities: ["cap.request.create"] },
   J14: { label: "PARTIAL", capabilities: ["cap.entry.intents", "cap.entry.example", "cap.ops.health", "cap.template.render", "cap.docs.capabilities"] },
@@ -33,14 +33,14 @@ export function specIdFor(rowId) {
   return m ? m[1] : null;
 }
 
-export function coverageGaps(specJourneys = J.journeys) {
+export function coverageGaps(specJourneys = J.journeys, coverage = COVERAGE) {
   const specIds = specJourneys.map((j) => j.id).sort();
-  const mapIds = Object.keys(COVERAGE).sort();
+  const mapIds = Object.keys(coverage).sort();
   const extras = mapIds.filter((id) => !specIds.includes(id));
   const missing = specIds.filter((id) => !mapIds.includes(id));
   const illegalExecuted = [];
   for (const j of specJourneys) {
-    const cov = COVERAGE[j.id];
+    const cov = coverage[j.id];
     if (!cov) continue;
     const needed = [...new Set(j.steps.map((s) => s.capability))];
     const asserted = new Set(cov.capabilities);

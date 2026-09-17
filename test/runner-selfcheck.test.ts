@@ -145,6 +145,7 @@ describe("NC-6 hand-maintained coverage (falsifies D2 as execution claim)", () =
     expect(gaps.missing).toEqual([]);
     expect(gaps.illegalExecuted).toEqual([]);
     expect(COVERAGE.J1.label).toBe("PARTIAL");
+    expect(COVERAGE.J11.label).toBe("PARTIAL");
     expect(COVERAGE.J1.capabilities).not.toContain("cap.survey.issue_codes");
     expect(COVERAGE.J1.capabilities).not.toContain("cap.survey.export_codes");
     const j1 = spec.journeys.find((j: { id: string }) => j.id === "J1");
@@ -156,6 +157,20 @@ describe("NC-6 hand-maintained coverage (falsifies D2 as execution claim)", () =
       "cap.survey.export_codes",
       "cap.survey.export_codes",
     ]);
+    const planted = {
+      ...COVERAGE,
+      J1: { label: "EXECUTED", capabilities: [...COVERAGE.J1.capabilities] },
+    };
+    const plantedGaps = coverageGaps(spec.journeys, planted);
+    expect(plantedGaps.illegalExecuted).not.toEqual([]);
+    expect(plantedGaps.illegalExecuted).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "J1",
+          missingCaps: expect.arrayContaining(["cap.survey.issue_codes", "cap.survey.export_codes"]),
+        }),
+      ]),
+    );
   });
 });
 
