@@ -95,12 +95,11 @@ async function act(label, fn) {
   finally { state.busy = false; render(); }
 }
 async function load(aid) {
-  const gen = generation;
   const r = await api(`/v2/assessments/${encodeURIComponent(aid)}`);
-  if (gen !== generation || route(location.hash).id !== aid) return;
+  if (route(location.hash).id !== aid) return;
   state.current = { assessment: r.assessment, surveys: r.surveys || [] };
   if (!state.templates) { try { state.templates = (await api('/v2/templates')).templates || []; } catch { state.templates = null; } }
-  if (gen !== generation || route(location.hash).id !== aid) return;
+  if (route(location.hash).id !== aid) return;
   await assessmentsFor(r.assessment.project_id);
 }
 async function render() {
