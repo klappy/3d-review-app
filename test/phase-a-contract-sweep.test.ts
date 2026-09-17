@@ -43,7 +43,8 @@ beforeAll(async () => {
   const db = await mf.getD1Database("DB");
   for (const m of ["0001_init.sql", "0002_code_escrow.sql", "0003_language_archive.sql", "0004_pinned_instruments.sql"]) await db.batch(statements(db, `../migrations/${m}`));
   await db.batch(statements(db, "../seed/synthetic.sql"));
-  env = { DB: db, SESSION_SECRET: "synthetic-sweep", ENVIRONMENT: "dev" };
+  const b64u = (b: Uint8Array) => btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  env = { DB: db, SESSION_SECRET: "synthetic-sweep", ENVIRONMENT: "dev", CODE_ESCROW_SECRET: b64u(crypto.getRandomValues(new Uint8Array(32))) };
   owner = await mintSession(env, "person_mara", "user");
   await db.prepare("INSERT OR IGNORE INTO principal (id, email_hash, provisioned, support, created_at) VALUES ('usr_stranger','h_stranger',1,0,'2026-09-16T00:00:00Z')").run();
   stranger = await mintSession(env, "usr_stranger", "user");
@@ -86,13 +87,22 @@ describe("Phase A — contract sweep over all capabilities, both faces", () => {
     const realFor = (c: Capability): Record<string, string> => {
       const id = c.id.startsWith("cap.workspace.") || c.id === "cap.rollup.workspace" ? real.id : c.id.startsWith("cap.project.") || c.id === "cap.rollup.project" ? real.pid
         : c.id.startsWith("cap.assessment.") ? real.aid : c.id.startsWith("cap.language.") ? lang : c.id.startsWith("cap.grant.") ? real.aid : real.id;
-      return { ...real, id, scope: c.id.startsWith("cap.grant.") ? "assessment" : real.scope, trace_id: ownerTrace };
+      const own: Record<string, string> = { "cap.grant.revoke_invitation": madeInvitation, "cap.survey.revoke_link": madeLink, "cap.survey.revoke_code": madeCode };
+      return { ...real, id: own[c.id] ?? id, scope: c.id.startsWith("cap.grant.") ? "assessment" : real.scope, trace_id: ownerTrace };
     };
+    // The owner creates one real invitation, one real participant link and one real access code, so the id-addressed revoke rows
+    // are swept against REAL ids too (re-review #17: the earlier exemption reasons were not all true).
+    const asOwner = async (method: string, path: string, body: unknown) => (await (await app.fetch(new Request("https://t.invalid" + path, { method, headers: { "content-type": "application/json", authorization: `Bearer ${owner}` }, body: JSON.stringify(body) }), env)).json()) as any;
+    const dryInv = await asOwner("POST", `/v2/assessment/${real.aid}/invitations`, { params: { email: "sweep.invitee@example.invalid", role: "viewer" }, mode: "dry_run" });
+    const madeInvitation = (await asOwner("POST", `/v2/assessment/${real.aid}/invitations`, { params: { email: "sweep.invitee@example.invalid", role: "viewer" }, mode: "execute", confirm_token: dryInv.result.confirm_token })).result.invitation_id as string;
+    const madeLink = (await asOwner("POST", `/v2/assessments/${real.aid}/surveys/${real.sid}/links`, {})).result.id as string;
+    const madeCode = (await asOwner("POST", `/v2/assessments/${real.aid}/surveys/${real.sid}/codes`, { count: 1 })).result.ids?.[0] as string;
+    expect([madeInvitation, madeLink, madeCode].every((x) => typeof x === "string" && x.length > 4), `fixtures: ${madeInvitation} ${madeLink} ${madeCode}`).toBe(true);
     /** Not swept, each for a stated reason — token/version-addressed rows have no "someone else's real id" to aim at. */
     const EXEMPT: Record<string, string> = { "cap.template.get": "templates are readable by any signed-in caller", "cap.template.publish_version": "support-only; refusal is NOT_AUTHORIZED by role, not by scope",
-      "cap.grant.accept": "token-addressed", "cap.ops.undo": "token-addressed", "cap.grant.revoke_invitation": "no seeded invitation id; covered in lane-b-grants", "cap.survey.revoke_link": "no seeded link id", "cap.survey.revoke_code": "no seeded code id" };
+      "cap.grant.accept": "token-addressed", "cap.ops.undo": "token-addressed" };
     const scoped = capabilities.filter((c) => !c.public && !RESERVED.includes(c.id) && /\{\w+\}/.test(c.http.path) && !EXEMPT[c.id]);
-    expect(scoped.length).toBeGreaterThanOrEqual(40);
+    expect(scoped.length).toBeGreaterThanOrEqual(45);
     expect(real.sid, "seed must provide a real survey id").not.toBe("srv_nope");
     const codes = new Map<string, number>(); let ownerOk = 0; const ownerOkCaps: string[] = [];
     for (const c of scoped) {
