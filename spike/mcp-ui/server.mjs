@@ -15,7 +15,7 @@ import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@model
 
 const DIR = import.meta.dirname;
 const PORT = Number(process.env.PORT ?? 3001);
-const RPC_LOG = process.env.RPC_LOG ?? path.join(DIR, "..", "..", "out", "rpc-log.jsonl");
+const RPC_LOG = process.env.RPC_LOG ?? path.join(DIR, "out", "rpc-log.jsonl");
 
 const OVERVIEW_URI = "ui://3d-review/overview.html";
 const SELECTOR_URI = "ui://3d-review/selector.html";

@@ -30,8 +30,11 @@ const page = (title, body) => `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
-<!-- Design tokens and components copied verbatim from ui/design-system/ of klappy/3d-review-app @ main b0bb9c9.
-     Copied, not linked: the served resource must be self-contained. -->
+<!-- Design tokens and components copied from ui/design-system/ of klappy/3d-review-app @ main b0bb9c9.
+     Copied, not linked: the served resource must be self-contained.
+     One deliberate edit to the copy: the Google Fonts @import at components.css:4 is stripped
+     (no-CDN rule). body carries class="rv" because the app's components.css is scoped under .rv
+     (ui/index.html: <body class="rv" ...>). -->
 <style>
 ${tokens}
 ${components}
@@ -41,7 +44,7 @@ ${spikeCss}
 /*__APP_SDK_BUNDLE__*/
 </script>
 </head>
-<body data-view-state="loading">
+<body class="rv" data-view-state="loading">
 ${body}
 </body>
 </html>

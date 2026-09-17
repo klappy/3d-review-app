@@ -1,7 +1,9 @@
 /* 3D Review glass — preview scaffolding.
    Values are the cookbook's glass.css / mock inline styles, addressed through this system's tokens.
    Behaviours (hover, focus, reduced transparency, live regions) follow Generative Glass where the mocks agree. */
-@import url("https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;500&display=swap");
+/* A Google Fonts @import (Noto Serif) sits at ui/design-system/components.css:4 in the app
+   source. It is stripped from this copy so the served resource loads nothing off-origin;
+   serif text falls back to the local stack in --font-scripture-latin. */
 
 :root{
   --aurora-ground:

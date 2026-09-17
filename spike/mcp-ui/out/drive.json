@@ -1,0 +1,143 @@
+{
+  "report": {
+    "overview-default:openLinkOutcome": "Open in app\nLink handed to the host.",
+    "overview-default": {
+      "state": "default",
+      "textHead": "Fixture data — not live\n\nKimeru NT quality review 2026\n\nSTAGE: collect · role: owner · fixture: default\n\nSources: cap.assessment.get · cap.survey.get_status (per survey; N+1 in live wiring)\n\nTranslation Team\n\n2 included\n\n9 responses · 7 respondents\n\nMid-Level · v2 · open · 6 responses\nValidation · v2 · open · 3 responses\nChurch\n\n4 included\n\n12 responses · 11 respondents\n\nCommunity-Pastor · v2 · open · 5 responses\nConsultant · v2 · open · 2 responses\nDenom-Leader · v2 · open · 1 response\nInvolved-Pastor · v2 · open · 4 responses\nCommunity\n\n2 included\n\n9 responses · 8 respondents\n\nAudio · v2 · open · 7 responses\nWritten · v2 · open · 2 responses\nOpen in app\nDev root; no deep link.",
+      "preview": null,
+      "sandboxAttrs": {
+        "outer": {
+          "sandbox": "allow-scripts allow-same-origin allow-forms",
+          "allow": null,
+          "src": "http://localhost:8081/sandbox.html"
+        }
+      },
+      "innerAttrs": {
+        "sandbox": "allow-scripts allow-same-origin allow-forms",
+        "allow": null,
+        "hasSrcdoc": false
+      }
+    },
+    "overview-empty": {
+      "state": "empty",
+      "textHead": "Fixture data — not live\n\nKimeru NT quality review 2026\n\nSTAGE: collect · role: owner · fixture: empty\n\nSources: cap.assessment.get · cap.survey.get_status (per survey; N+1 in live wiring)\n\nNo surveys included\n\nNothing is included for any lens in this fixture, so no responses can be counted.\n\nOpen in app\nDev root; no deep link.",
+      "preview": null,
+      "sandboxAttrs": {
+        "outer": {
+          "sandbox": "allow-scripts allow-same-origin allow-forms",
+          "allow": null,
+          "src": "http://localhost:8081/sandbox.html"
+        }
+      },
+      "innerAttrs": {
+        "sandbox": "allow-scripts allow-same-origin allow-forms",
+        "allow": null,
+        "hasSrcdoc": false
+      }
+    },
+    "overview-error": {
+      "state": "error",
+      "textHead": "Fixture data — not live\n\nThis assessment could not be shown\n\nNOT_FOUND_OR_NOT_VISIBLE\n\nassessment not found or not visible\n\nAsk an owner for a grant at this scope, or check the assessment id.\n\nTRACE_ID: tr_fixture_error\n\nTOOL ERROR ENVELOPE, VERBATIM:\n\n{\n  \"ok\": false,\n  \"error\": {\n    \"code\": \"NOT_FOUND_OR_NOT_VISIBLE\",\n    \"message\": \"assessment not found or not visible\",\n    \"hint\": \"Ask an owner for a grant at this scope, or check the assessment id.\"\n  },\n  \"trace_id\": \"tr_fixture_error\"\n}",
+      "preview": null,
+      "sandboxAttrs": {
+        "outer": {
+          "sandbox": "allow-scripts allow-same-origin allow-forms",
+          "allow": null,
+          "src": "http://localhost:8081/sandbox.html"
+        }
+      },
+      "innerAttrs": {
+        "sandbox": "allow-scripts allow-same-origin allow-forms",
+        "allow": null,
+        "hasSrcdoc": false
+      }
+    },
+    "selector-default:previewDisabled": false,
+    "selector-default:resetDisabled": false,
+    "selector-default": {
+      "state": "default",
+      "textHead": "Fixture data — not live\n\nSurveys by lens\n\nKimeru NT quality review 2026 · stage: collect · role: owner · fixture: default\n\nSources: cap.assessment.get · cap.survey.get_status (per survey; N+1 in live wiring)\n\nTranslation Team\n\n2 included now\n\nMid-Level · v2 · open · included (unchanged)\nValidation · v2 · open · included (unchanged)\nChurch\n\n4 included now\n\nCommunity-Pastor · v2 · open · included (unchanged)\nConsultant · v2 · open · included (unchanged)\nDenom-Leader · v2 · open · included (unchanged)\nInvolved-Pastor · v2 · open · included (unchanged)\nCommunity\n\n2 included now\n\nAudio · v2 · open · included (unchanged)\nWritten · v2 · open · included (unchanged)\nVideo-Sign · v2 · available · not ",
+      "preview": "Pending selection (8): Audio (Community), Community-Pastor (Church), Consultant (Church), Denom-Leader (Church), Involved-Pastor (Church), Mid-Level (Translation Team), Validation (Translation Team), Written (Community)\nWould include: (nothing new)\nWould remove: (nothing)\nNo write was performed. This is a preview only.",
+      "sandboxAttrs": {
+        "outer": {
+          "sandbox": "allow-scripts allow-same-origin allow-forms",
+          "allow": null,
+          "src": "http://localhost:8081/sandbox.html"
+        }
+      },
+      "innerAttrs": {
+        "sandbox": "allow-scripts allow-same-origin allow-forms",
+        "allow": null,
+        "hasSrcdoc": false
+      }
+    },
+    "selector-viewer:previewDisabled": true,
+    "selector-viewer:resetDisabled": true,
+    "selector-viewer": {
+      "state": "viewer",
+      "textHead": "Fixture data — not live\n\nSurveys by lens\n\nKimeru NT quality review 2026 · stage: collect · role: viewer · fixture: viewer\n\nfixture role: viewer — controls disabled\n\nSources: cap.assessment.get · cap.survey.get_status (per survey; N+1 in live wiring)\n\nTranslation Team\n\n2 included now\n\nMid-Level · v2 · open · included (unchanged)\nValidation · v2 · open · included (unchanged)\nChurch\n\n4 included now\n\nCommunity-Pastor · v2 · open · included (unchanged)\nConsultant · v2 · open · included (unchanged)\nDenom-Leader · v2 · open · included (unchanged)\nInvolved-Pastor · v2 · open · included (unchanged)\nCommunity\n\n2 included now\n\nAudio · v2 · open · included (unchanged)\nWritten · v2 · open · included (unc",
+      "preview": null,
+      "sandboxAttrs": {
+        "outer": {
+          "sandbox": "allow-scripts allow-same-origin allow-forms",
+          "allow": null,
+          "src": "http://localhost:8081/sandbox.html"
+        }
+      },
+      "innerAttrs": {
+        "sandbox": "allow-scripts allow-same-origin allow-forms",
+        "allow": null,
+        "hasSrcdoc": false
+      }
+    }
+  },
+  "caps": [
+    "[info] [overview] host capabilities: {\"openLinks\":{},\"serverTools\":{\"listChanged\":true},\"serverResources\":{\"listChanged\":true},\"updateModelContext\":{\"text\":{}}}",
+    "[info] [overview] host capabilities: {\"openLinks\":{},\"serverTools\":{\"listChanged\":true},\"serverResources\":{\"listChanged\":true},\"updateModelContext\":{\"text\":{}}}",
+    "[info] [overview] host capabilities: {\"openLinks\":{},\"serverTools\":{\"listChanged\":true},\"serverResources\":{\"listChanged\":true},\"updateModelContext\":{\"text\":{}}}",
+    "[info] [selector] host capabilities: {\"openLinks\":{},\"serverTools\":{\"listChanged\":true},\"serverResources\":{\"listChanged\":true},\"updateModelContext\":{\"text\":{}}}",
+    "[info] [selector] host capabilities: {\"openLinks\":{},\"serverTools\":{\"listChanged\":true},\"serverResources\":{\"listChanged\":true},\"updateModelContext\":{\"text\":{}}}"
+  ],
+  "logs": [
+    "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
+    "[debug] Sending message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
+    "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
+    "[debug] Sending message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
+    "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
+    "[log] [HOST] Connecting to server: http://localhost:3001/mcp",
+    "[log] [HOST] Connected via Streamable HTTP transport",
+    "[error] Failed to load resource: the server responded with a status of 405 (Method Not Allowed)",
+    "[log] [HOST] Server tools: [assessment_overview, survey_selector]",
+    "[log] [HOST] Server resources: [ui://3d-review/overview.html, ui://3d-review/selector.html]",
+    "[log] [HOST] Calling tool survey_selector with input {fixture: viewer}",
+    "[log] [HOST] Reading UI resource: ui://3d-review/selector.html",
+    "[log] [HOST] Resource content keys: [uri, mimeType, text]",
+    "[log] [HOST] Resource content._meta: undefined",
+    "[log] [HOST] Resource listing._meta: undefined",
+    "[log] [HOST] Loading sandbox proxy... ",
+    "[log] [HOST] Sandbox proxy loaded",
+    "[log] [HOST] Sending UI resource HTML to MCP App  ",
+    "[debug] Sending message {jsonrpc: 2.0, method: ui/notifications/sandbox-resource-ready, params: Object}",
+    "[log] [HOST] Waiting for MCP App to initialize...",
+    "[debug] Sending message {method: ui/initialize, params: Object, jsonrpc: 2.0, id: 0}",
+    "[debug] Parsed message {jsonrpc: 2.0, id: 0, method: ui/initialize, params: Object}",
+    "[debug] Sending message {result: Object, jsonrpc: 2.0, id: 0}",
+    "[debug] Parsed message {jsonrpc: 2.0, id: 0, result: Object}",
+    "[debug] Sending message {jsonrpc: 2.0, method: ui/notifications/initialized}",
+    "[info] [selector] host capabilities: {\"openLinks\":{},\"serverTools\":{\"listChanged\":true},\"serverResources\":{\"listChanged\":true},\"updateModelContext\":{\"text\":{}}}",
+    "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/initialized}",
+    "[log] [HOST] MCP App initialized",
+    "[log] [HOST] Sending tool call input to MCP App: {fixture: viewer}",
+    "[debug] Sending message {jsonrpc: 2.0, method: ui/notifications/tool-input, params: Object}",
+    "[log] [HOST] Sending tool call result to MCP App: {content: Array(1), structuredContent: Object}",
+    "[debug] Sending message {jsonrpc: 2.0, method: ui/notifications/tool-result, params: Object}",
+    "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/tool-input, params: Object}",
+    "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/tool-result, params: Object}",
+    "[debug] Sending message {jsonrpc: 2.0, method: ui/notifications/size-changed, params: Object}",
+    "[debug] Sending message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
+    "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/size-changed, params: Object}",
+    "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
+    "[debug] Sending message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
+    "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}"
+  ]
+}

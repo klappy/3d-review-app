@@ -122,7 +122,10 @@
   function handle(result) {
     const sc = result && result.structuredContent;
     if (!sc || (result && result.isError)) {
-      root.replaceChildren(el("p", "Tool returned no usable fixture payload.", "note"));
+      root.replaceChildren(
+        el("p", "Fixture data — not live", "badge fixture-badge"),
+        el("p", "Tool returned no usable fixture payload.", "note"),
+      );
       return;
     }
     data = sc;

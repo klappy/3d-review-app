@@ -4,8 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>3d-review survey selector (spike)</title>
-<!-- Design tokens and components copied verbatim from ui/design-system/ of klappy/3d-review-app @ main b0bb9c9.
-     Copied, not linked: the served resource must be self-contained. -->
+<!-- Design tokens and components copied from ui/design-system/ of klappy/3d-review-app @ main b0bb9c9.
+     Copied, not linked: the served resource must be self-contained.
+     One deliberate edit to the copy: the Google Fonts @import at components.css:4 is stripped
+     (no-CDN rule). body carries class="rv" because the app's components.css is scoped under .rv
+     (ui/index.html: <body class="rv" ...>). -->
 <style>
 /* GENERATED from tokens.json — do not edit. 3D Review glass 2 */
 :root, [data-theme="light"] {
@@ -196,7 +199,9 @@
 /* 3D Review glass — preview scaffolding.
    Values are the cookbook's glass.css / mock inline styles, addressed through this system's tokens.
    Behaviours (hover, focus, reduced transparency, live regions) follow Generative Glass where the mocks agree. */
-@import url("https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;500&display=swap");
+/* A Google Fonts @import (Noto Serif) sits at ui/design-system/components.css:4 in the app
+   source. It is stripped from this copy so the served resource loads nothing off-origin;
+   serif text falls back to the local stack in --font-scripture-latin. */
 
 :root{
   --aurora-ground:
@@ -341,7 +346,7 @@ input:disabled + span { opacity: .65; }
 /*__APP_SDK_BUNDLE__*/
 </script>
 </head>
-<body data-view-state="loading">
+<body class="rv" data-view-state="loading">
 <main class="wrap" id="root">
   <p class="muted">Waiting for the host to deliver a tool result…</p>
 </main>
@@ -466,7 +471,10 @@ input:disabled + span { opacity: .65; }
   function handle(result) {
     const sc = result && result.structuredContent;
     if (!sc || (result && result.isError)) {
-      root.replaceChildren(el("p", "Tool returned no usable fixture payload.", "note"));
+      root.replaceChildren(
+        el("p", "Fixture data — not live", "badge fixture-badge"),
+        el("p", "Tool returned no usable fixture payload.", "note"),
+      );
       return;
     }
     data = sc;

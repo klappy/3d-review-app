@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
-const OUT = "/home/claude/spike-work/out";
+// Screenshots and drive.json land in spike/mcp-ui/out/ (same tree as the committed artifacts).
+const OUT = process.env.OUT ?? new URL("./out/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
 
 const CASES = [
@@ -61,6 +62,7 @@ for (const [name, tool, args] of CASES) {
       await page.waitForTimeout(300);
     }
     report[name + ":previewDisabled"] = disabled;
+    report[name + ":resetDisabled"] = await app.locator("#reset-pending").isDisabled().catch(() => null);
   }
   await page.screenshot({ path: `${OUT}/${name}.png` });
   // record sandbox attributes as the host applied them

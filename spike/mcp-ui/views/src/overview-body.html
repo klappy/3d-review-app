@@ -34,6 +34,13 @@
     const message = (envelope && envelope.error && envelope.error.message) || "No message in the tool error envelope.";
     panel.append(el("p", code, "eyebrow"));
     panel.append(el("p", message));
+    const hint = envelope && envelope.error && envelope.error.hint;
+    if (hint) panel.append(el("p", hint, "muted"));
+    const trace = (envelope && envelope.trace_id) || "(none in envelope)";
+    const traceLine = el("p", undefined, "muted");
+    traceLine.append(el("span", "trace_id: ", "eyebrow"));
+    traceLine.append(el("code", trace, "trace-id"));
+    panel.append(traceLine);
     panel.append(el("p", "Tool error envelope, verbatim:", "eyebrow"));
     const pre = el("pre", JSON.stringify(envelope, null, 2), "envelope");
     panel.append(pre);
