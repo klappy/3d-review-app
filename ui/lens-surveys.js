@@ -48,7 +48,8 @@ export function mountLensSurveys({ document: doc, root, actions }) {
         const add = el('div', undefined, 'lens-available'); add.append(el('p', 'Available to include', 'eyebrow'));
         for (const t of g.available) { const row = el('div', undefined, 'row'); row.append(el('span', `${t.name} · v${t.version}`), button('Include', () => actions.select(t.id, t.version))); add.append(row); }
         card.append(add);
-      } else if (mayEdit) card.append(el('p', 'Every survey for this lens is included.', 'muted'));
+      } else if (mayEdit && !snapshot.templates.length) card.append(el('p', 'Template catalogue not loaded, so nothing can be offered here yet. Use Refresh templates.', 'muted'));
+      else if (mayEdit) card.append(el('p', 'Every current survey for this lens is included.', 'muted'));
       wrap.append(card);
     }
     root.append(wrap);

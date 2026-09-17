@@ -21,9 +21,11 @@ export function deepLinkFor({ project, assessment }) {
 }
 export function mountEntityScreen(doc, win, { isStaff, selectedWorkspace, backToWorkspaces }) {
   const body = doc.body, projects = doc.getElementById('projects'), assessments = doc.getElementById('assessments'), surveys = doc.getElementById('surveys');
+  const granted = doc.getElementById('granted-assessments'); // assessment-only entry (no project): its selection is an assessment too (Bugbot 4037616728)
+  const assessmentValue = () => assessments.value || granted?.value || '';
   const back = doc.getElementById('entity-back');
   let pending = null; // unresolved deep link, retried once after the next option refresh
-  function level() { return entityLevel({ staff: isStaff(), workspace: selectedWorkspace(), project: projects.value, assessment: assessments.value, survey: surveys?.value }); }
+  function level() { return entityLevel({ staff: isStaff(), workspace: selectedWorkspace(), project: projects.value, assessment: assessmentValue(), survey: surveys?.value }); }
   function select(sel, id) { if (!sel || sel.value === id) return true; sel.value = id; if (sel.value !== id) return false; sel.dispatchEvent(new win.Event('change', { bubbles: true })); return true; }
   function resolve() {
     if (!pending || !isStaff()) return;
@@ -41,22 +43,22 @@ export function mountEntityScreen(doc, win, { isStaff, selectedWorkspace, backTo
       if (back.textContent !== text) back.textContent = text; // write only on change: this node sits inside observed roots
     }
     // The URL reflects the selected entity; never a token, never the participant/shared fragments.
-    if (l && isStaff()) { const want = deepLinkFor({ project: projects.value, assessment: assessments.value }); const cur = win.location?.hash ?? ''; if (want && cur !== want && !/^#(session=|survey=|participant|facilitator|reports-card|workspace|evidence)/.test(cur) && (cur === '' || parseDeepLink(cur))) win.history?.replaceState(null, '', win.location.pathname + want); else if (!want && parseDeepLink(cur)) win.history?.replaceState(null, '', win.location.pathname); }
+    if (l && isStaff()) { const want = deepLinkFor({ project: projects.value, assessment: assessments.value }); /* deep links stay project-rooted; a granted-only assessment has no #p/ link */ const cur = win.location?.hash ?? ''; if (want && cur !== want && !/^#(session=|survey=|participant|facilitator|reports-card|workspace|evidence)/.test(cur) && (cur === '' || parseDeepLink(cur))) win.history?.replaceState(null, '', win.location.pathname + want); else if (!want && parseDeepLink(cur)) win.history?.replaceState(null, '', win.location.pathname); }
   }
   back?.addEventListener?.('click', () => {
     const l = level();
     if (l === 'survey') select(surveys, '');
-    else if (l === 'assessment') select(assessments, '');
+    else if (l === 'assessment') { if (assessments.value) select(assessments, ''); else if (granted?.value) select(granted, ''); }
     else if (l === 'project') { select(projects, ''); }
     else if (l === 'workspace') backToWorkspaces();
     render();
   });
   if (typeof win.MutationObserver === 'function') { // option refreshes, identity text and W renders arrive without events; the selects' change events still drive render without an observer
     const observer = new win.MutationObserver(() => { resolve(); render(); });
-    for (const id of ['projects', 'assessments', 'surveys', 'identity', 'workspace-manager-root']) { const n = doc.getElementById(id); if (n) observer.observe(n, { childList: true, subtree: true, attributes: true, characterData: true }); }
+    for (const id of ['projects', 'assessments', 'surveys', 'granted-assessments', 'identity', 'workspace-manager-root']) { const n = doc.getElementById(id); if (n) observer.observe(n, { childList: true, subtree: true, attributes: true, characterData: true }); }
     { const n = doc.getElementById('facilitator'); if (n) observer.observe(n, { attributes: true, attributeFilter: ['hidden'] }); }
   }
-  projects.addEventListener('change', render); assessments.addEventListener('change', render); surveys?.addEventListener('change', render);
+  projects.addEventListener('change', render); assessments.addEventListener('change', render); surveys?.addEventListener('change', render); granted?.addEventListener('change', render);
   win.addEventListener?.('hashchange', () => { pending = parseDeepLink(win.location.hash); resolve(); render(); });
   pending = parseDeepLink(win.location?.hash);
   render();

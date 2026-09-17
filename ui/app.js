@@ -283,14 +283,18 @@ async function chooseGrantedAssessment() {
   clearCodeBatch(); clearShareLink(); clearReportState(); showReportControls();
   $('assessments').value = ''; text($('assessment-detail'), ''); resetSelect($('surveys'), 'Choose survey');
   text($('survey-detail'), ''); text($('results'), 'Select an assessment.'); text($('granted-detail'), '');
+  collab.setScope(null); lensSurveys?.reset(); entityScreen?.render(); // Bugbot 4037616728: the granted entry is an assessment selection too
   if (!state.assessment) return;
   try {
     const stageRead = stageSnapshot();
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   if (!stageCurrent(stageRead)) return;
     state.assessmentRole = result.assessment.role; showReportControls();
+    collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
     text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
     for (const survey of result.surveys || []) option($('surveys'), survey.id, survey.template_name || survey.id);
+    lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [] });
+    entityScreen?.render();
     await refreshStageScreens(result.assessment, result.surveys || []);
   } catch (error) { state.assessmentRole = null; showReportControls(); clearReportState(); throw error; }
 }

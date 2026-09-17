@@ -27,6 +27,11 @@ test('three lenses in the captain\'s order; groups come from the server perspect
   assert.deepEqual(g[2].included,[],'archived survey is not included');
   assert.deepEqual(g[2].available.map(t=>t.name),['Audio','Video-Sign','Written']);
 });
+test('empty catalogue is stated as not loaded, never as "every survey included"',()=>{
+  const src=read('./lens-surveys.js');
+  assert.ok(src.includes("!snapshot.templates.length) card.append(el('p', 'Template catalogue not loaded"));
+  assert.ok(src.indexOf('Template catalogue not loaded')<src.indexOf('Every current survey for this lens is included.'),'the not-loaded branch is checked first');
+});
 test('an unknown perspective is shown as a fourth "Other perspective" group, never folded into a lens',()=>{
   const g=groupByLens({surveys:[],templates:[{id:'x',version:1,name:'X',perspective:'Somewhere'}]});
   assert.equal(g.length,4); assert.equal(g[3].lens,'Other perspective'); assert.equal(g[3].available[0].name,'X');

@@ -24,7 +24,7 @@
   /* At the workspaces list no scope is selected: the I manager's "select a scope" placeholder adds nothing —
      but the acceptance form (R9: reachable with zero grants and no entity) must never be hidden, so only the
      placeholder state (no form, no acceptance heading) is quieted. */
-  .rv[data-entity-level="workspaces"] #scope-invitations-root:not(:has(form)) { display:none; }
+  .rv[data-entity-level="workspaces"] #scope-invitations-root:not(:has(form)) > :not(.scope-invitations-actions) { display:none; }
 
   /* Project: the project overview + assessments table + collaborators. The workspace manager leaves the screen;
      the assessment card keeps only the authorized "Start an assessment" form (revealed by the overview action). */
