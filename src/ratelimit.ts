@@ -55,13 +55,14 @@ export async function enforceCapabilityLimit(ctx: Ctx, capabilityId: string, par
   if (name === "RL_AUTH" && params.email !== undefined && typeof params.email !== "string")
     throw new CapError("INVALID_PARAMS", "email must be a string", undefined, capabilityId); // a non-string must not dodge the email key (review #12-2)
   if (!(await allow(ctx.env, name, `ip:${ip}`))) throw limited(capabilityId);
-  if (name === "RL_AUTH" && typeof params.email === "string" && params.email) {
+  // Per-email key on request_link only: stops code-issuance spam at one mailbox from rotating addresses.
+  // consume_link is deliberately per-address only. Re-review #12: an email+address key on the same binding can never be the
+  // key that refuses (the address key always counts at least as high), and a bare email key lets a stranger lock the victim
+  // out. KNOWN RESIDUAL, recorded in INTERFACE.md: there is no per-email guess limit on consume_link; rotating addresses can
+  // guess a 6-digit, 10-minute code at 10/min each. It is reachable only where codes exist — dev, which returns the code
+  // in-band anyway; production sign-in is Cloudflare Access. The durable fix is an attempts counter on login_code (migration).
+  if (capabilityId === "cap.auth.request_link" && typeof params.email === "string" && params.email) {
     const eh = (await sha256(params.email.trim().toLowerCase())).slice(0, 32);
-    // request_link: per email (stops code-issuance spam at one mailbox from rotating addresses).
-    // consume_link: per email AND address — a stranger spending the victim's bucket must not lock the victim out of
-    // their own sign-in (review #12-3). Guess-rate from rotating addresses is bounded by the code's 10-minute life and,
-    // in the only environment where this path is live (dev), the code is returned in-band anyway.
-    const key = capabilityId === "cap.auth.consume_link" ? `em:${eh}|ip:${ip}` : `em:${eh}`;
-    if (!(await allow(ctx.env, name, key))) throw limited(capabilityId);
+    if (!(await allow(ctx.env, name, `em:${eh}`))) throw limited(capabilityId);
   }
 }

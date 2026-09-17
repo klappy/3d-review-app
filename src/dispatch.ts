@@ -43,7 +43,7 @@ export async function execute(
     if (options.tool && options.tool !== expectedTool)
       throw new CapError("WRONG_TOOL_FOR_CLASS", `${capabilityId} requires the ${expectedTool} tool`, `Use ${expectedTool}.`, capabilityId);
     if (cap.slice === "v2.1-oct" || !handlers[capabilityId]) return (outcome = reserved(capabilityId, ctx.traceId));
-    await enforceCapabilityLimit(ctx, capabilityId, params); // both faces; before authorize and before any storage access
+    await enforceCapabilityLimit(ctx, capabilityId, params); // both faces; before authorize and before the handler touches storage
     await authorize(ctx, cap, params);
 
     const danger = expectedTool === "danger";
