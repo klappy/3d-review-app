@@ -134,10 +134,16 @@ describe('real authenticated report transport and receipt',()=>{
   try{expect((await http('/v2/reports/'+b.result.report.id)).status).toBe(200);expect((await http('/v2/assessments/'+aid+'/reports',{mode:'dry_run'})).status).toBe(404);}finally{await run('UPDATE "grant" SET role=? WHERE principal_id=? AND scope_id=?','owner','person_mara',aid);}
   await run('UPDATE assessment SET archived_at=? WHERE id=?','2026-09-17T08:00:00Z',aid);try{expect((await http('/v2/reports/'+b.result.report.id)).status).toBe(404);}finally{await run('UPDATE assessment SET archived_at=NULL WHERE id=?',aid);}
  });
+ const publicCorpusDeadlineMs=120000;
  it('all34 attested contexts cross the real public handler and preserve accepted payload shape',async()=>{
+  const corpusStarted=performance.now();
+  console.log('PUBLIC_REPORT_CORPUS_START '+JSON.stringify({runtime:process.version,deadlineMs:publicCorpusDeadlineMs,expectedContexts:34}));
   const aids=(await db.prepare("SELECT id FROM assessment WHERE id LIKE 'assess_syn_%' ORDER BY id").all<{id:string}>()).results;expect(aids).toHaveLength(34);
   for(const a of aids){const b=await build(a.id);expect(b.ok).toBe(true);const got=await http('/v2/reports/'+b.result.report.id);expect(got.status).toBe(200);expect(got.body.result.report.payload).toEqual(b.result.report.payload);}
- },60000);
+  console.log('PUBLIC_REPORT_CORPUS '+JSON.stringify({runtime:process.version,deadlineMs:publicCorpusDeadlineMs,elapsedMs:performance.now()-corpusStarted,contexts:aids.length,measurementKind:'local Node plus Miniflare wall time; not Worker CPU or product latency budget'}));
+ // This aggregate public-handler corpus needs the same finite harness margin as
+ // the complete store corpus; keep every context and assertion, without retries.
+ },publicCorpusDeadlineMs);
 
  it('HTTP and protected MCP operational failure envelopes match after trace normalization',async()=>{
   const original=env.DB;env.DB=intercept(async(sql,_a,_m,next)=>{if(sql.includes('WITH target AS'))throw Error('injected unavailable');return next();});
