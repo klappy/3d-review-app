@@ -55,6 +55,18 @@
   .rv[data-entity-level="survey"] #survey-card > [data-stage-content="prepare"] > label,
   .rv[data-entity-level="survey"] #survey-card > [data-stage-content="prepare"] > #select-survey { display:none; }
 
+  /* Mobile: the selected entity is the screen. Below 760px style.css stacks the shell into one column with the
+     navigation tree first, which puts every other project above the entity the person opened. When an entity is
+     selected (any level but the workspaces list, which IS the tree's screen) the entity comes first and the tree
+     follows beneath it — unchanged, fully reachable. Desktop, public, participant and print are untouched. */
+  @media (max-width:760px) {
+    /* Guarded by the active workspace route too: the entity level persists while a signed-in person visits
+       #participant or #evidence, and those routes keep their own composition. */
+    .rv[data-workspace-route="workspace"][data-entity-level]:not([data-entity-level="workspaces"]) .shell { display:flex; flex-direction:column; }
+    .rv[data-workspace-route="workspace"][data-entity-level]:not([data-entity-level="workspaces"]) .shell > aside.tree { order:2; border-bottom:0; border-top:1px solid var(--glass-edge); }
+    .rv[data-workspace-route="workspace"][data-entity-level]:not([data-entity-level="workspaces"]) .shell > .content { order:1; }
+  }
+
   /* Back link: one row above the screen content. */
   .rv #entity-back { display:inline-flex; align-items:center; min-height:36px; margin:0 0 8px; font-size:14px; }
   .rv #entity-back[hidden] { display:none; }
