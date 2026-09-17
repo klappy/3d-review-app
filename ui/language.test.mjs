@@ -19,6 +19,7 @@ test('lists only active project languages and selects a newly created one', asyn
   globalThis.FormData = class { get(key) { return { name: 'Invented Tavo', code: 'qaa' }[key]; } };
   let pending;
   const requests = [];
+  const counts = [];
   const api = async (url, opts = {}) => {
     requests.push([url, opts]);
     if (opts.method === 'POST') return { language: { id: 'lang_new' } };
@@ -28,12 +29,13 @@ test('lists only active project languages and selects a newly created one', asyn
     ] };
   };
   try {
-    const controls = initLanguageControls({ api, run: (_label, task) => { pending = task(); }, getProject: () => 'proj_new' });
+    const controls = initLanguageControls({ api, run: (_label, task) => { pending = task(); }, getProject: () => 'proj_new', onLanguages: active => counts.push(active.length) });
     await controls.refresh();
     assert.deepEqual(select.options.map(o => o.value), ['', 'lang_new']);
     assert.match(status.textContent, /1 active project language; 1 archived/);
     listeners.submit({ preventDefault() {} }); await pending;
     assert.equal(select.value, 'lang_new');
+    assert.deepEqual(counts, [1, 1]);
     assert.deepEqual(requests[1], ['/v2/projects/proj_new/languages', { method: 'POST', body: { name: 'Invented Tavo', code: 'qaa' } }]);
   } finally {
     globalThis.document = previousDocument; globalThis.Option = previousOption; globalThis.FormData = previousFormData;

@@ -1,6 +1,6 @@
 // Provisional project-language controls. All mutations and reads use the /v2
 // envelope supplied by app.js; no browser-side language registry is kept.
-export function initLanguageControls({ api, run, getProject }) {
+export function initLanguageControls({ api, run, getProject, onLanguages = () => {} }) {
   const form = document.getElementById('create-language');
   const refreshButton = document.getElementById('load-languages');
   const select = document.getElementById('languages');
@@ -12,6 +12,7 @@ export function initLanguageControls({ api, run, getProject }) {
     select.replaceChildren(new Option('Choose language', ''));
     if (!pid) {
       status.textContent = 'Choose a project to list its languages.';
+      onLanguages([], []);
       return [];
     }
     const result = await api(`/v2/projects/${encodeURIComponent(pid)}/languages`);
@@ -22,6 +23,7 @@ export function initLanguageControls({ api, run, getProject }) {
     ));
     if (active.some(language => language.id === previousId)) select.value = previousId;
     status.textContent = `${active.length} active project language${active.length === 1 ? '' : 's'}; ${(result.languages || []).length - active.length} archived.`;
+    onLanguages(active, result.languages || []);
     return active;
   }
 
