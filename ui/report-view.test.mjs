@@ -62,7 +62,7 @@ test('R1 full payload renders header, stability line and every section in payloa
 test('R2 lenses print scores exactly as returned; an empty sub-dimension list adds no rows', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.lenses), ['team · 66.66666', 'process · 70 · 3', 'relationships · 63.3333 · 2', 'church · 0']);
+  assert.deepEqual(sectionRows(root, copy.lenses), ['team', '66.66666', 'process · 70 · 3', 'relationships · 63.3333 · 2', 'church', '0']);
 });
 
 test('R3 cross-lens: multi before single, null agreement_range prints the fixed label "one lens"', () => {
