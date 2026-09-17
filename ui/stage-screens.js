@@ -21,18 +21,18 @@ export const HELP_ROLES = Object.freeze(['owner', 'member', 'viewer']);
 export const STAGE_TOUR = Object.freeze({
   prepare: Object.freeze([
     'Name the cycle and its language; pick the perspectives.',
-    'Nothing is sent yet. Links and codes appear once you open collection.',
-    'Browsing the four phases never changes the stage; the button on the right does.',
+    'Participants open a shared survey link; collaborators receive workspace access. The two never mix.',
+    'Browsing the four phases never changes the stage.',
   ]),
   collect: Object.freeze([
-    'Each survey card holds its links, codes and the print form.',
-    'Counts are responses over invited; small groups stay protected in results.',
-    'Close collection when you have the voices you need; that moves the stage to Understand.',
+    'Invite the people whose voices matter.',
+    'Participants open a shared survey link; collaborators receive workspace access. The two never mix.',
+    'Browsing the four phases never changes the stage.',
   ]),
   understand: Object.freeze([
-    'Bands, not scores. Withheld means a small group, not a poor result.',
-    'Results are per language and per cycle; check the evidence notes before sharing.',
-    'Share a viewer link only after the review gate; viewers see output, never input.',
+    'Read the perspectives together.',
+    'Keep perspectives separate, check the evidence and talk through differences.',
+    'Differences are a reason to investigate, not a reason to hide the evidence in one overall score.',
   ]),
   improve: Object.freeze([
     'Write the reflection and the next step; they stay with this cycle.',
@@ -270,7 +270,7 @@ export function renderBlankPrint(doc, root, model, { paper = 'a4', onPrint } = {
   const printBtn = el(doc, 'button', 'Print');
   printBtn.type = 'button';
   printBtn.className = 'primary';
-  printBtn.addEventListener('click', () => { if (onPrint) onPrint(); });
+  printBtn.addEventListener('click', () => printBlankForm(doc, model, { paper, print: onPrint }));
   tools.append(printBtn);
   tools.append(el(doc, 'span', `${model.items.length} questions · ${paper.toUpperCase()} · nothing personal on the page`));
   root.append(tools);
@@ -312,7 +312,7 @@ export function renderBlankPrint(doc, root, model, { paper = 'a4', onPrint } = {
   header.append(qr);
   article.append(header);
 
-  article.append(el(doc, 'p', 'Your answers are grouped with others; nothing here asks who you are. Mark one box per question unless it says choose all that apply.'));
+  article.append(el(doc, 'p', 'Write your response on the blank lines below each question.'));
   const list = el(doc, 'ol');
   list.className = 'p-items';
   for (const [index, text] of model.items.entries()) {
@@ -323,7 +323,10 @@ export function renderBlankPrint(doc, root, model, { paper = 'a4', onPrint } = {
     const n = el(doc, 'span', String(index + 1));
     n.className = 'p-n';
     q.append(n, el(doc, 'span', text));
-    item.append(q);
+    const lines = el(doc, 'div');
+    lines.className = 'p-lines';
+    lines.append(el(doc, 'div'), el(doc, 'div'));
+    item.append(q, lines);
     list.append(item);
   }
   article.append(list);
@@ -335,6 +338,25 @@ export function renderBlankPrint(doc, root, model, { paper = 'a4', onPrint } = {
   foot.append(el(doc, 'span', 'Facilitator: this page never prints codes or credentials'));
   article.append(foot);
   root.append(article);
+}
+
+// Print only a newly rendered blank form in a direct body child. Never clone the workspace.
+// C must call this wrapper (the rendered Print button already does), not window.print alone.
+export function printBlankForm(doc, model, { paper = 'a4', print } = {}) {
+  if (!model || model.visible !== true || model.blank !== true) return false;
+  const preview = el(doc, 'div');
+  renderBlankPrint(doc, preview, model, { paper });
+  const article = preview.children[preview.children.length - 1];
+  const isolated = el(doc, 'div');
+  isolated.className = 'stage-print-only';
+  isolated.append(article);
+  doc.body.append(isolated);
+  try {
+    (print || (() => doc.defaultView.print()))();
+  } finally {
+    isolated.remove();
+  }
+  return true;
 }
 
 function stripTags(value) {

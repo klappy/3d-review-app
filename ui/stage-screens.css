@@ -34,3 +34,11 @@
 @page{margin:12mm}
 @media print{html,body{background:#fff}.no-print,#toasts,#layer{display:none!important}.paper{margin:0;padding:6mm 4mm;box-shadow:none;width:auto;min-height:0}.p-page::after{content:"Page " counter(page)}}
 @media(max-width:700px){.stage-tabs button{flex:1 1 40%}.p-head{grid-template-columns:1fr}.paper.a4,.paper.letter{width:auto;min-height:0;margin:12px}}
+
+/* Dedicated print child is normally absent/hidden; print excludes every workspace sibling. */
+.stage-print-only{display:none}
+@media print {
+  body:has(> .stage-print-only) > :not(.stage-print-only){display:none!important}
+  body > .stage-print-only{display:block!important}
+  body:has(> .stage-print-only){display:block!important;overflow:visible!important;min-height:0!important}
+}

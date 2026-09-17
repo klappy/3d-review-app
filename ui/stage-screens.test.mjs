@@ -8,7 +8,7 @@ import {
   shouldShowStageTour, dismissStageTour,
   credentialFields, itemsFromPrintHtml, printTitleFromHtml,
   loadRoleHelp, loadBlankPrint,
-  renderStageTabs, renderRoleHelp, renderStageTour, renderBlankPrint,
+  renderStageTabs, renderRoleHelp, renderStageTour, renderBlankPrint, printBlankForm,
 } from './stage-screens.js';
 
 function fakeNode(tag, id) {
@@ -265,3 +265,35 @@ function findClass(node, className) {
   }
   return null;
 }
+
+
+test('tour omits unsupported bands, suppression, invited denominator and review gates', () => {
+  assert.doesNotMatch(Object.values(STAGE_TOUR).flat().join(' '), /Bands|Withheld|small group|over invited|review gate|moves the stage/);
+});
+test('blank print instructions correspond to actual empty answer lines', () => {
+  const doc=fakeDocument(), root=doc.createElement('div');
+  renderBlankPrint(doc,root,{visible:true,blank:true,items:['First?','Second?']});
+  assert.match(text(root),/Write your response on the blank lines/);
+  assert.doesNotMatch(text(root),/Mark one box|choose all/);
+  const lines=walk(root).filter(n=>n.className==='p-lines');
+  assert.equal(lines.length,2);
+  assert.ok(lines.every(n=>n.children.length===2 && n.children.every(c=>text(c)==='')));
+});
+test('print wrapper contains only new blank article and cleans up even on print failure', () => {
+  const doc=fakeDocument(); doc.body=fakeNode('body');
+  const create=doc.createElement;
+  doc.createElement=tag=>{const n=create(tag);n.remove=()=>{doc.body.children=doc.body.children.filter(c=>c!==n);};return n;};
+  const workspace=fakeNode('main');workspace.textContent='PRIVATE WORKSPACE';doc.body.append(workspace);
+  const model={visible:true,blank:true,items:['Question?']};
+  assert.throws(()=>printBlankForm(doc,model,{print(){
+    const isolated=doc.body.children[1];
+    assert.equal(isolated.className,'stage-print-only');
+    assert.equal(isolated.children.length,1);
+    assert.equal(isolated.children[0].tag,'article');
+    assert.doesNotMatch(text(isolated),/PRIVATE WORKSPACE/);
+    throw new Error('cancelled');
+  }}),/cancelled/);
+  assert.deepEqual(doc.body.children,[workspace]);
+  let calls=0;assert.equal(printBlankForm(doc,{...model,blank:false},{print(){calls++;}}),false);
+  assert.equal(calls,0);
+});
