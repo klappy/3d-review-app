@@ -62,10 +62,25 @@ export function cookieValue(req: Request, name: string): string | undefined {
   return (req.headers.get("cookie") ?? "").match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`))?.[1];
 }
 const parkCookie = (value: string, maxAge: number) => `${PARK_COOKIE}=${value}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${maxAge}`;
+/** Every page: no scripts, no frames, form posts only to us — unless the caller widens form-action to the one provider-validated
+ *  client destination (consent page only; see consentCsp). Error pages never widen. */
+const CSP_SELF = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
+/** CSP3 runs form-action on every redirect of the form navigation, so the consent POST's 302 to the client is blocked by
+ *  'self' alone (Bugbot 4032352529 / review #15-1; reproduced in headless Chromium). Widen to exactly one source derived from
+ *  the provider-validated redirect URI: its origin for http/https, `<scheme>:` for custom schemes (origin is "null" there).
+ *  Never the raw query string. */
+export function consentCsp(validatedRedirectUri: string): string {
+  let source = "";
+  try {
+    const u = new URL(validatedRedirectUri);
+    source = u.origin !== "null" ? u.origin : /^[a-z][a-z0-9+.-]*:$/i.test(u.protocol) ? u.protocol : "";
+  } catch { /* unparseable → no widening */ }
+  return source ? `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${source}; frame-ancestors 'none'` : CSP_SELF;
+}
 const html = (body: string, status = 200, extra: Record<string, string> = {}) => new Response(
   `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>3D Review — connect an app</title>
 <style>body{font:16px/1.5 system-ui,sans-serif;max-width:32rem;margin:10vh auto;padding:0 1rem;color:#1b1f23}h1{font-size:1.25rem}.who{background:#f3f5f7;border-radius:.5rem;padding:.75rem 1rem;margin:1rem 0}button{font:inherit;padding:.6rem 1.2rem;border-radius:.4rem;border:1px solid #1b1f23;background:#fff;cursor:pointer;margin-right:.5rem}button.go{background:#1b1f23;color:#fff}small{color:#57606a}</style>${body}</html>`,
-  { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'", "referrer-policy": "no-referrer", ...extra } });
+  { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "content-security-policy": CSP_SELF, "referrer-policy": "no-referrer", ...extra } });
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 /** GET /authorize — validate with the provider, park, send the browser to the Access email-code route. */
@@ -83,6 +98,14 @@ export async function handleAuthorize(req: Request, env: OAuthEnv): Promise<Resp
     return html(`<h1>This connection request is not valid</h1><p><small>${esc(e?.description ?? e?.message ?? "invalid request")}</small></p>`, 400);
   }
   if (!(await env.OAUTH_PROVIDER.lookupClient(parsed.clientId))) return html("<h1>Unknown app</h1>", 400);
+  // PKCE S256 for EVERY client (review #15-3): the provider only requires it for public clients, and registration is open, so a
+  // caller could opt out by registering a secret. Same error-redirect shape as above; parsed.redirectUri is provider-validated.
+  if (!parsed.codeChallenge || parsed.codeChallengeMethod !== "S256") {
+    const r = new URL(parsed.redirectUri); r.searchParams.set("error", "invalid_request");
+    r.searchParams.set("error_description", "code_challenge with code_challenge_method=S256 is required");
+    if (parsed.state) r.searchParams.set("state", parsed.state); if (parsed.issuer) r.searchParams.set("iss", parsed.issuer);
+    return Response.redirect(r.toString(), 302);
+  }
   const parkId = b64u(crypto.getRandomValues(new Uint8Array(24)));
   await env.OAUTH_KV.put(PARK_PREFIX + parkId, JSON.stringify(parsed), { expirationTtl: PARK_TTL_S });
   return new Response(null, { status: 302, headers: { location: "/v2/auth/access?next=oauth", "set-cookie": parkCookie(parkId, PARK_TTL_S), "cache-control": "no-store" } });
@@ -104,14 +127,15 @@ export async function renderConsentIfParked(req: Request, env: OAuthEnv, princip
 <p>It will be able to do what <b>you</b> can do in 3D Review — read and change the projects and assessments you have been granted — and every call it makes is traced as made through this app on your behalf. It gets no access you do not have. You can disconnect it at any time.</p>
 <form method="post" action="/oauth/consent"><input type="hidden" name="ticket" value="${esc(ticket)}">
 <button class="go" name="decision" value="approve">Connect</button><button name="decision" value="deny">Cancel</button></form>
-<p><small>Only connect apps you started connecting yourself.</small></p>`);
+<p><small>Only connect apps you started connecting yourself.</small></p>`, 200, { "content-security-policy": consentCsp(parsed.redirectUri) });
 }
 
 /** POST /oauth/consent — single use: the parked request is deleted before anything is granted.
- *  Known residual (review #15-2): KV get→delete is not atomic, so two truly concurrent posts of the SAME ticket from the SAME
- *  browser can both pass and mint two codes for the same client, PKCE challenge, redirect and user. It needs the HMAC ticket
- *  and the HttpOnly __Host- cookie, grants nothing new, and the provider revokes the earlier grant. Atomic single-use needs
- *  D1 (DELETE … RETURNING) and a migration; deferred, recorded in INTERFACE.md. */
+ *  Known residual (review #15-2, #15 finding 4): KV get→delete is not atomic, so two truly concurrent posts of the SAME ticket
+ *  from the SAME browser can both pass and mint two codes for the same client, PKCE challenge, redirect and user. It needs the
+ *  HMAC ticket and the HttpOnly __Host- cookie, grants nothing new, and the provider revokes the earlier grant. Atomic
+ *  single-use needs a D1 row (the same INSERT OR FAIL pattern that now gates code redemption in src/worker.ts); deferred,
+ *  recorded in INTERFACE.md. */
 export async function handleConsent(req: Request, env: OAuthEnv): Promise<Response> {
   if (!env.OAUTH_PROVIDER || !env.OAUTH_KV) return html("<h1>Authorization is not configured here</h1>", 501);
   const form = await req.formData().catch(() => null);
