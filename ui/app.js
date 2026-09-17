@@ -184,7 +184,7 @@ async function chooseProject() {
   text($('results'), 'Select an assessment.');
   resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
   collab.setScope(null);
-  if (!state.project) { await languageControls.refresh(); return; }
+  if (!state.project) { const ws = collab.selectedWorkspace(); if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role }); await languageControls.refresh(); return; } // leaving a project restores the still-selected workspace scope
   const result = await api(`/v2/projects/${path(state.project)}`);
   state.projectView = result.project;
   collab.setScope({ type: 'project', id: result.project.id, role: result.project.role });
