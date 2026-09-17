@@ -51,7 +51,7 @@ const redact = m => redactDiagnosticPath(String(m || 'Request could not be compl
 //                                                  (Bugbot 4041134416). Results are bound to (aid, epoch) (Auditor 2A-3).
 //   generation   counter                           a later render supersedes an earlier one's DOM write (supplier 1114cb1)
 let generation = 0, epoch = 0;
-const state = { principal: null, projects: [], lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null };
+const state = { principal: null, projects: [], workspaces: new Map(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null };
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']); // visibility/authz codes (supplier 97f7402 + policy.ts)
@@ -76,6 +76,7 @@ export function route(hash) {
   const parts = hash.replace(/^#/, '').split('/').map(p => { try { return decodeURIComponent(p); } catch { return ''; } });
   // One page per scope: entry → workspaces → ONE workspace → ONE project → ONE assessment (five views) → survey.
   if (!parts[0]) return { kind: 'entry' };
+  if (['how', 'example', 'signin', 'survey'].includes(parts[0]) && !parts[1]) return { kind: 'entry', intent: parts[0] };
   if (parts[0] === 'workspaces') return { kind: 'workspaces' };
   if (parts[0] === 'workspace' && parts[1]) return { kind: 'workspace', id: parts[1] };
   if (parts[0] === 'projects') return { kind: 'projects' };
@@ -171,7 +172,7 @@ function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'O
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
   const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted">collection ${esc(s.collection_status)} · ${countCell(s)}</p></div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
-  return `<section class="panel"><p class="eyebrow">${title(a.stage)}</p><h2>${{ prepare: 'Prepare this assessment', collect: 'Collect perspectives', understand: 'Bring the perspectives together', improve: 'What comes next?' }[a.stage]}</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey for its own screen: counts and a printable blank questionnaire. Changing the stage, invitations, links, reports and notes are not on this screen yet.</p></section>`;
+  return `<section class="panel"><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey for its own screen: counts and a printable blank questionnaire. Changing the stage, invitations, links, reports and notes are not on this screen yet.</p></section>`;
 }
 // Cut 2A child screen: ONE survey. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
@@ -211,7 +212,13 @@ function bindPrint(current, s) {
   };
 }
 function context(current) {
-  const projects = state.projects.map(p => {
+  // Reference shape (showcase context(), SOURCE-MAP): the ONE current workspace's projects with nested assessments. Projects the
+  // identity holds a role on but that sit outside this workspace are reachable from All projects, not listed here. Fallbacks:
+  // project without a workspace, or workspace not visible → that project alone; no project role → "Granted to you" (A6).
+  const curProj = current && state.projects.find(p => p.id === current.assessment.project_id);
+  const ws = curProj?.workspace_id ? state.workspaces.get(curProj.workspace_id) : null;
+  const listed = current ? (ws ? state.projects.filter(p => ws.projects.includes(p.id)) : (curProj ? [curProj] : [])) : state.projects;
+  const projects = listed.map(p => {
     const l = listFor(p.id);
     const open = current?.assessment.project_id === p.id || l.status !== 'unloaded';
     const body = !open ? '' : l.status === 'loaded' ? (l.list.map(x => `<a class="assessment-link" href="#assessment/${encodeURIComponent(x.id)}" ${current && x.id === current.assessment.id ? 'aria-current="page"' : ''}>${esc(x.name)}<small>${stageLabel(x.stage)}</small></a>`).join('') || '<p class="small muted" style="margin:4px 0 0 18px">No assessments yet.</p>')
@@ -225,7 +232,8 @@ function context(current) {
   // Notion-style context: the scope chain above (Workspaces › Projects › this project), siblings at this level below.
   const proj = current && state.projects.find(p => p.id === current.assessment.project_id);
   const chain = `<nav class="crumbs" aria-label="Scope"><a href="${cards.routes.workspaces}">Workspaces</a><span>›</span><a href="${cards.routes.projects}">Projects</a>${proj ? `<span>›</span><a href="${cards.routes.project(proj.id)}">${esc(proj.name)}</a>` : ''}</nav>`;
-  return `<aside class="context-panel">${chain}<p class="eyebrow">Projects</p><nav aria-label="Project and assessment navigation">${direct}${projects || (direct ? '' : '<p class="small muted">No project on this account.</p>')}</nav><div class="line links">${state.projects.length ? `<a href="${cards.routes.projects}">All projects</a>` : ''}<a href="${cards.routes.workspaces}">Workspaces</a></div></aside><section class="assessment-body">`;
+  const wsHead = ws ? `<a class="project-name" href="${cards.routes.workspace(ws.id)}" style="padding-left:0">${esc(ws.name)}</a>` : '';
+  return `<aside class="context-panel">${chain}${wsHead}<p class="eyebrow">${ws ? 'Projects in this workspace' : 'Projects'}</p><nav aria-label="Project and assessment navigation">${direct}${projects || (direct ? '' : '<p class="small muted">No project on this account.</p>')}</nav><div class="line links">${state.projects.length ? `<a href="${cards.routes.projects}">All projects</a>` : ''}<a href="${cards.routes.workspaces}">Workspaces</a></div></aside><section class="assessment-body">`;
 }
 // AMEND 2 (Auditor c5719472446): stage change is not wired, so the phase strip is a non-interactive indicator — no links, no buttons.
 function stages(a) { return `<div class="tabs" role="list" aria-label="Assessment stages">${PHASES.map(p => `<span role="listitem" ${p === a.stage ? 'aria-current="step"' : ''}>${title(p)}</span>`).join('')}</div>`; }
@@ -300,10 +308,16 @@ async function act(aid, label, fn) {
 }
 // The entity read. Returns the data; the caller decides whether it is still wanted. On success for `aid` the dirty
 // mark is cleared because the screen now reflects the committed server state.
+// Workspace tree read for the sidebar: one call per workspace id, cached; refusal/failure → tree unavailable (project-only fallback).
+async function workspaceFor(pid) {
+  const p = state.projects.find(x => x.id === pid); const wid = p?.workspace_id; if (!wid) return null;
+  if (!state.workspaces.has(wid)) { try { const r = await api(`/v2/workspaces/${encodeURIComponent(wid)}`); state.workspaces.set(wid, { id: wid, name: r.workspace.name, projects: (r.projects || []).map(x => x.id) }); } catch { state.workspaces.set(wid, null); } }
+  return state.workspaces.get(wid);
+}
 async function fetchAssessment(aid) {
   const r = await api(`/v2/assessments/${encodeURIComponent(aid)}`);
   if (!state.templates) { try { state.templates = (await api('/v2/templates')).templates || []; } catch { state.templates = null; } }
-  await assessmentsFor(r.assessment.project_id);
+  await assessmentsFor(r.assessment.project_id); await workspaceFor(r.assessment.project_id);
   return { assessment: r.assessment, surveys: r.surveys || [] };
 }
 async function render() {
@@ -386,11 +400,17 @@ function paint(r = route(location.hash), gen = generation) {
     document.title = `${title(tab)} · ${state.current.assessment.name} · 3D Review`;
   }
 }
-// Auth A13: /assess/ never renders or echoes a credential-bearing hash. #invite= belongs to the legacy root (acceptance surface);
-// the hash is stripped from this page's history first, then the root is opened with it. Access callback unchanged.
+// Root entry switch (A7): `/` is the product shell. Hashes the legacy surface owns are forwarded to `/legacy/` unrendered —
+// `#invite=` (acceptance; Auth A13), `#survey=` (shared link), `#participant`, `#facilitator`, `#workspace`, `#reports-card`,
+// `#evidence`. `#session=` is the Access return leg (src/index.ts:138, callback unchanged): consumed here exactly as legacy does —
+// same `facilitatorToken` key, stripped from history before any render, never echoed. Nothing else stores a credential.
+const LEGACY_HASHES = new Set(['#participant', '#facilitator', '#workspace', '#reports-card', '#evidence']);
 function scrubCredentialHash() {
   const h = location.hash || '';
-  if (/^#(invite|session)=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} if (h.startsWith('#invite=')) location.replace('/' + h); return true; }
+  if (/^#(invite|survey)=/.test(h) || LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return true; }
+  const m = /^#session=([A-Za-z0-9_]+)$/.exec(h);
+  if (m) { try { history.replaceState(null, '', location.pathname + '#workspaces'); } catch {} token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} return false; }
+  if (/^#session=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} } // malformed: drop, never render
   return false;
 }
 let listening = false;

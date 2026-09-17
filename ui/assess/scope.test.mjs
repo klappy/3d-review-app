@@ -178,7 +178,7 @@ test('entry: survey code stores participant token and hands off to legacy /#part
   const ctx = ctxWith({ 'POST /v2/participate/code': { participant_token: 'ptok', survey_id: 's1' } });
   const m = await pages.entry.load(ctx, {}); m.mode = 'survey'; const root = mount(pages.entry, ctx, m);
   const form = root.querySelector('#code-form'); form.elements.code.value = 'ABC'; await form.fire('submit');
-  assert.equal(stored.participantToken, 'ptok'); assert.deepEqual(assigned, ['/#participant']);
+  assert.equal(stored.participantToken, 'ptok'); assert.deepEqual(assigned, ['/legacy/#participant']);
 });
 
 // ---------- writes ----------

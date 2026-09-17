@@ -150,26 +150,21 @@ test('permissions: refusal → "Not visible to you"; no-inheritance line on ever
   const html = views.permissions.render(ctx, await views.permissions.load(ctx, { scope: 'projects', id: 'p1' }));
   assert.ok(html.includes(NOT_VISIBLE)); assert.match(html, /Permissions apply to this project only; nothing is inherited\./);
   assert.doesNotMatch(html, /data-invite-form|data-revoke|Retry/);
-  const w = fakeApi({ 'GET /v2/workspace/w1/grants': { grants: [{ id: 'g1', principal_id: 'me', role: 'owner' }, { id: 'g2', principal_id: 'u2', role: 'member' }], pending_invitations: [] } });
-  const c2 = ctxFor(w.api); const m = await views.permissions.load(c2, { scope: 'workspaces', id: 'w1' }); const h2 = views.permissions.render(c2, m);
-  assert.equal(m.myRole, 'owner'); assert.match(h2, /Permissions apply to this workspace only; nothing is inherited\./);
-  assert.match(h2, /data-invite-form/); assert.match(h2, /data-revoke="g2"/); assert.doesNotMatch(h2, /data-revoke="g1"/); assert.match(h2, /data-transfer-form/);
-  assert.ok(!w.calls.some(c => /transfer|invitations/.test(c.url)), 'danger twins are never GET');
 });
 
-test('permissions: invite is two-step (dry_run then execute with confirm_token); buttons disabled in flight', async () => {
-  const { api, calls } = fakeApi({ 'GET /v2/assessment/a1/grants': { grants: [{ id: 'g1', principal_id: 'me', role: 'member' }], pending_invitations: [] },
-    'POST /v2/assessment/a1/invitations': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct1', expires_in: 300 } : { invitation_id: 'inv1', status: 'sent', delivered: true, accepted: true } });
-  let reloaded = 0; const ctx = ctxFor(api, { go: () => { reloaded++; }, current: { assessment: { ...assessment, role: 'member' }, surveys } }); const m = await views.permissions.load(ctx, { scope: 'assessments', id: 'a1' }); assert.equal(m.myRole, 'member');
-  const html = views.permissions.render(ctx, m); assert.doesNotMatch(html, /<option value="owner"/); // member invites ≤ member
-  const form = el({ 'data-invite-form': '' }), prev = el({ tag: 'button', 'data-invite-preview': '' }), conf = el({ tag: 'button', 'data-confirm': 'invite' }), status = el({ 'data-permissions-status': '' });
-  conf.hidden = true; makeRoot([form, prev, conf, status, el({ name: 'email', value: 'x@y.z' }), el({ name: 'role', value: 'viewer' })]); views.permissions.bind(ctx, root, m);
-  await form.onsubmit({ preventDefault() {} });
-  assert.deepEqual(calls[1].body, { params: { email: 'x@y.z', role: 'viewer' }, mode: 'dry_run' }); assert.equal(conf.hidden, false); assert.match(status.textContent, /Nothing has changed yet/);
-  await conf.onclick();
-  assert.deepEqual(calls[2].body, { params: { email: 'x@y.z', role: 'viewer' }, mode: 'execute', confirm_token: 'ct1' });
-  assert.match(status.textContent, /Invitation sent/); assert.equal(reloaded, 1); assert.equal(prev.disabled, false);
-  await conf.onclick(); assert.match(status.textContent, /Preview the invitation again/); assert.equal(calls.length, 3);
+// F2 (PR65 bf9be9b verdict): the AS1 grants contract is read-only. Grants + pending invitations render; no mutation control
+// (invite, revoke, role change, transfer) exists in the DOM at any role, and no write or danger twin is ever requested.
+test('permissions: read-only — grants and pending invitations listed, zero mutation controls, no writes, danger twins never requested', async () => {
+  const w = fakeApi({ 'GET /v2/workspace/w1/grants': { grants: [{ id: 'g1', principal_id: 'me', role: 'owner' }, { id: 'g2', principal_id: 'u2', role: 'member' }], pending_invitations: [{ id: 'inv1', role: 'viewer', created_at: '2026-09-17T00:00:00Z' }] } });
+  const ctx = ctxFor(w.api); const m = await views.permissions.load(ctx, { scope: 'workspaces', id: 'w1' }); const html = views.permissions.render(ctx, m);
+  assert.equal(m.myRole, 'owner'); assert.match(html, /Permissions apply to this workspace only; nothing is inherited\./);
+  assert.match(html, /<td>me <span class="muted small">\(you\)<\/span><\/td><td>owner<\/td>/); assert.match(html, /<td>u2<\/td><td>member<\/td>/);
+  assert.match(html, /Pending invitations/); assert.match(html, /viewer · invited 2026-09-17T00:00:00Z/);
+  assert.doesNotMatch(html, /data-invite-form|data-revoke|data-transfer-form|data-confirm|<form|<button|<select|Change role|Remove|Transfer ownership|Invite someone/);
+  assert.match(html, /not done here yet/); assert.match(html, /href="\/legacy\/#facilitator"/);
+  const root = makeRoot([]); views.permissions.bind(ctx, root, m);
+  assert.deepEqual(w.calls.map(c => `${c.method || 'GET'} ${c.url}`), ['GET /v2/workspace/w1/grants']);
+  for (const role of ['member', 'viewer']) { const c = ctxFor(w.api, { current: { assessment: { ...assessment, role }, surveys } }); const h = views.permissions.render(c, await views.permissions.load(c, { scope: 'assessments', id: 'a1', role })); assert.doesNotMatch(h, /<form|<button|<select/, role); }
 });
 
 test('css export is a string', () => { assert.equal(typeof css, 'string'); assert.match(css, /\.grants/); });

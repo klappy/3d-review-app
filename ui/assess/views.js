@@ -158,63 +158,18 @@ const permissions = {
     const myRole = role || (scope === 'assessments' && ctx.current?.assessment?.id === id ? ctx.current.assessment.role : null) || grants.find(g => g.principal_id === me)?.role || null;
     return { scope, id, status: r.status, error: r.error, grants, pending, myRole, me, confirm: null };
   },
+  // F2 (PR65 verdict): the AS1 grants contract is READ-ONLY — grants + pending invitations. Invite / revoke / role change /
+  // ownership transfer are deferred behind G1 with a separate security review; the legacy surface keeps them meanwhile.
   render(ctx, m) {
     const esc = ctx.esc, noun = SCOPE_NOUN[m.scope] || m.scope;
     const head = `<p class="eyebrow">Permissions</p><h2>Who can open this ${esc(noun)}</h2><p class="note small">Permissions apply to this ${esc(noun)} only; nothing is inherited.</p>`;
     if (m.status !== 'loaded') return `<section class="panel narrow" data-permissions>${head}${refusalLine(ctx, m.status, 'data-retry="grants"', 'Permissions')}</section>`;
-    const owner = m.myRole === 'owner', editor = isEditor(m.myRole);
-    const mayRevoke = g => g.role !== 'owner' && (owner || RANK[g.role] <= RANK.member);
-    const rows = m.grants.map(g => `<tr data-grant="${esc(g.id)}"><td>${esc(g.principal_id)}${g.principal_id === m.me ? ' <span class="small muted">(you)</span>' : ''}</td><td>${owner && g.role !== 'owner' ? `<select data-role-for="${esc(g.id)}" aria-label="Role">${ROLES.map(r => `<option value="${r}" ${r === g.role ? 'selected' : ''}>${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}">Change role</button> <button type="button" data-confirm="role:${esc(g.id)}" hidden>Confirm change</button>` : esc(g.role)}</td><td>${mayRevoke(g) && editor ? `<button type="button" class="quiet" data-revoke="${esc(g.id)}">Remove</button>` : ''}</td></tr>`).join('');
-    const pending = m.pending.length ? `<h3 style="margin-top:22px">Pending invitations</h3><table class="grants"><thead><tr><th>Role</th><th>Status</th><th>Expires</th><th></th></tr></thead><tbody>${m.pending.map(i => `<tr data-invitation="${esc(i.id)}"><td>${esc(i.role)}</td><td>${esc(i.status)}</td><td>${esc(i.expires_at || '')}</td><td>${editor && (owner || RANK[i.role] <= RANK.member) ? `<button type="button" class="quiet" data-revoke-invitation="${esc(i.id)}">Revoke</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '';
-    const invite = editor ? `<form class="inline-form line" data-invite-form><h3>Invite someone</h3><label>Email<input name="email" type="email" required autocomplete="off"></label><label>Role<select name="role">${ROLES.filter(r => owner || r !== 'owner').map(r => `<option value="${r}">${r}</option>`).join('')}</select></label><div class="actions"><button type="submit" data-invite-preview>Preview invitation</button><button type="button" class="primary" data-confirm="invite" hidden>Send invitation</button></div><p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p></form>` : '';
-    const transfer = owner ? `<form class="inline-form line" data-transfer-form><h3>Transfer ownership</h3><p class="small muted">Ownership moves to another signed-up principal. This cannot be undone from here.</p><label>New owner's principal id<input name="to" required autocomplete="off"></label><label class="check"><input name="step_down" type="checkbox"> Step down to member after the transfer</label><div class="actions"><button type="submit" data-transfer-preview>Preview transfer</button><button type="button" class="primary" data-confirm="transfer" hidden>Confirm transfer</button></div></form>` : '';
-    return `<section class="panel" data-permissions>${head}<table class="grants"><thead><tr><th>Principal</th><th>Role</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="muted">No grants listed.</td></tr>'}</tbody></table>${pending}${invite}${transfer}<p class="status" role="status" aria-live="polite" data-permissions-status></p></section>`;
+    const rows = m.grants.map(g => `<tr><td>${esc(g.principal_id)}${g.principal_id === m.me ? ' <span class="muted small">(you)</span>' : ''}</td><td>${esc(g.role)}</td></tr>`).join('');
+    const pending = m.pending.length ? `<h3 style="margin-top:18px">Pending invitations</h3><ul class="small">${m.pending.map(i => `<li>${esc(i.role)} · invited ${esc(i.created_at || '')}${i.id ? ` · <span class="muted">${esc(i.id)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="small muted" style="margin-top:14px">No pending invitations.</p>';
+    return `<section class="panel" data-permissions>${head}<table class="grants"><thead><tr><th>Principal</th><th>Role</th></tr></thead><tbody>${rows || '<tr><td colspan="2" class="muted">No grants listed.</td></tr>'}</tbody></table>${pending}<p class="small muted line">Inviting people, changing roles, revoking access and transferring ownership are not done here yet; use the legacy <a href="/legacy/#facilitator">Links, codes &amp; people</a> surface.</p></section>`;
   },
   bind(ctx, root, m) {
-    const base = `/v2/${SCOPE_SEG[m.scope]}/${ctx.enc(m.id)}`, status = root.querySelector('[data-permissions-status]');
-    const say = (text, alert = false) => { if (status) { status.setAttribute('role', alert ? 'alert' : 'status'); status.textContent = text; } };
-    const fail = (e, what) => { const k = classify(e); say(k === 'refused' ? `${NOT_VISIBLE}: ${what} was not applied.` : k === 'unauthenticated' ? `Your sign-in is no longer active; ${what} was not applied.` : k === 'not_built' ? `${what} is not built yet.` : `${what} failed: ${String(e.message || 'request failed')}`, true); };
-    const reload = () => ctx.go(ctx.routes.permissions ? ctx.routes.permissions(m.scope, m.id) : `#permissions/${ctx.enc(m.scope)}/${ctx.enc(m.id)}`, { reload: true });
-    const buttons = () => root.querySelectorAll('button');
-    const busy = async (fn) => { const bs = buttons(); bs.forEach(b => b.disabled = true); try { return await fn(); } finally { bs.forEach(b => b.disabled = false); } };
-    root.querySelectorAll('[data-retry]').forEach(el => el.onclick = e => { e.preventDefault(); reload(); });
-    // Danger two-step: dry_run → impact + confirm_token shown; the confirm button executes with that token. Never a GET.
-    const danger = async (url, params, key, what, describe) => {
-      const r = await ctx.api(url, { method: key === 'role' ? 'PATCH' : 'POST', body: { params, mode: 'dry_run' } });
-      m.confirm = { key, url, params, token: r.confirm_token, expires: Date.now() + Number(r.expires_in || 300) * 1000 };
-      const btn = root.querySelector(`[data-confirm="${key}"]`); if (btn) btn.hidden = false;
-      say(`${describe(r)} Nothing has changed yet; confirm to ${what}.${r.expires_in ? ` This confirmation expires in ${r.expires_in} seconds.` : ''}`);
-    };
-    const execute = async (key, what, onDone) => {
-      const c = m.confirm; if (!c || c.key !== key || !c.token || Date.now() > c.expires) { m.confirm = null; say(`Preview ${what} again before confirming.`, true); return; }
-      m.confirm = null; const btn = root.querySelector(`[data-confirm="${key}"]`); if (btn) btn.hidden = true;
-      const r = await ctx.api(c.url, { method: key === 'role' ? 'PATCH' : 'POST', body: { params: c.params, mode: 'execute', confirm_token: c.token } });
-      onDone(r);
-    };
-    const inviteForm = root.querySelector('[data-invite-form]');
-    if (inviteForm) {
-      inviteForm.onsubmit = e => { e.preventDefault(); busy(async () => { try {
-        const params = { email: inviteForm.querySelector('[name=email]').value.trim(), role: inviteForm.querySelector('[name=role]').value };
-        await danger(`${base}/invitations`, params, 'invite', 'send the invitation', () => `Inviting as ${params.role}: they will see this ${SCOPE_NOUN[m.scope]}'s contents at that role.`);
-      } catch (err) { fail(err, 'The invitation preview'); } }); };
-      const c = root.querySelector('[data-confirm="invite"]'); if (c) c.onclick = () => busy(async () => { try { await execute('invite', 'the invitation', r => { say(r.delivered ? 'Invitation sent; the recipient has not accepted it yet.' : `Invitation recorded as ${r.status || 'pending'}; ${r.note || 'nothing was sent.'}`); reload(); }); } catch (err) { fail(err, 'The invitation'); } });
-    }
-    root.querySelectorAll('[data-revoke]').forEach(b => b.onclick = () => busy(async () => { try { const r = await ctx.api(`${base}/grants/${ctx.enc(b.dataset.revoke)}`, { method: 'DELETE' }); if (r?.revoked) { say('Access removed.'); reload(); } else say('The server did not confirm the removal.', true); } catch (err) { fail(err, 'Removing access'); } }));
-    root.querySelectorAll('[data-revoke-invitation]').forEach(b => b.onclick = () => busy(async () => { try { const r = await ctx.api(`/v2/invitations/${ctx.enc(b.dataset.revokeInvitation)}`, { method: 'DELETE' }); if (r?.status === 'revoked') { say('Invitation revoked (an email already sent is not unsent).'); reload(); } else say('The server did not confirm the revocation.', true); } catch (err) { fail(err, 'Revoking the invitation'); } }));
-    root.querySelectorAll('[data-change-role]').forEach(b => b.onclick = () => busy(async () => { try {
-      const gid = b.dataset.changeRole, role = root.querySelector(`[data-role-for="${gid}"]`).value, cur = m.grants.find(g => g.id === gid);
-      if (cur && cur.role === role) { say('That is already the role.'); return; }
-      await danger(`${base}/grants/${ctx.enc(gid)}`, { role }, `role:${gid}`, 'change the role', () => `Changing ${cur?.principal_id || gid} from ${cur?.role || '?'} to ${role}.`);
-    } catch (err) { fail(err, 'The role change preview'); } }));
-    root.querySelectorAll('[data-confirm^="role:"]').forEach(b => b.onclick = () => busy(async () => { try { await execute(b.dataset.confirm, 'the role change', r => { say(`Role is now ${r.role}.`); reload(); }); } catch (err) { fail(err, 'The role change'); } }));
-    const transferForm = root.querySelector('[data-transfer-form]');
-    if (transferForm) {
-      transferForm.onsubmit = e => { e.preventDefault(); busy(async () => { try {
-        const params = { to: transferForm.querySelector('[name=to]').value.trim(), step_down: !!transferForm.querySelector('[name=step_down]').checked };
-        await danger(`${base}/transfer`, params, 'transfer', 'transfer ownership', r => { const a = r.impact?.affected?.[0]; return a ? `${a.to} becomes owner; you become ${a.caller_becomes}.` : `${params.to} becomes owner.`; });
-      } catch (err) { fail(err, 'The transfer preview'); } }); };
-      const c = root.querySelector('[data-confirm="transfer"]'); if (c) c.onclick = () => busy(async () => { try { await execute('transfer', 'the transfer', r => { say(r.transferred ? `Ownership transferred to ${r.new_owner}; your role is now ${r.caller_role}.` : 'The server did not confirm the transfer.', !r.transferred); reload(); }); } catch (err) { fail(err, 'The transfer'); } });
-    }
+    root.querySelector('[data-retry="grants"]')?.addEventListener('click', e => { e.preventDefault(); ctx.go(location.hash, { reload: true }); });
   },
 };
 

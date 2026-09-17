@@ -110,7 +110,8 @@ function signinView(ctx, model) {
   return `<section class="panel narrow"><p class="eyebrow">Facilitators</p><h1>Sign in</h1><p class="muted">Production sign-in uses an email code: <a href="/v2/auth/access">continue with email code</a>. The form below is the direct link flow.</p><form id="signin-form" data-stage="${codeStep ? 'code' : 'email'}"><label class="field">Email<input name="email" type="email" required autocomplete="email" value="${ctx.esc(s.email)}"${codeStep ? ' readonly' : ''}></label>${codeStep ? `${s.devCode ? `<p class="note small">Sandbox code: <strong>${ctx.esc(s.devCode)}</strong></p>` : '<p class="small muted">Code requested. Enter the code you received.</p>'}<label class="field">Code<input name="code" required autocomplete="one-time-code" inputmode="numeric"></label>` : ''}<div class="actions"><button class="primary" type="submit">${codeStep ? 'Sign in' : 'Send me a code'}</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form></section>`;
 }
 const entry = {
-  async load(ctx, params = {}) { return entryModel({ params }); },
+  // Legacy public deep links kept: #how → tour, #example → example, #signin → sign-in (the four entry choices stay addressable).
+  async load(ctx, params = {}) { const mode = { how: 'tour', example: 'welcome', signin: 'signin', survey: 'survey' }[params.intent] || 'welcome'; return entryModel({ params, mode }); },
   render(ctx, model) {
     const signedIn = !!ctx.state.principal;
     switch (model.mode) {
@@ -123,6 +124,7 @@ const entry = {
   },
   bind(ctx, root, model) {
     const paint = () => { root.innerHTML = entry.render(ctx, model); entry.bind(ctx, root, model); };
+    if (model.params?.intent === 'example' && !model.exampleStatus) { model.params = {}; root.querySelector('[data-act=example]')?.click(); }
     root.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', async () => {
       switch (b.dataset.act) {
         case 'welcome': model.mode = 'welcome'; model.step = 0; return paint();
@@ -153,7 +155,7 @@ const entry = {
       const token = r.participant_token || r.participant;
       if (!token) return ctx.note('The server accepted the code but returned no participant token.', true);
       storeSession('participantToken', token);
-      window.location.assign('/#participant');
+      window.location.assign('/legacy/#participant'); // participant flow stays on the legacy surface (unchanged)
     });
     root.querySelector('#signin-form')?.addEventListener('submit', async ev => {
       ev.preventDefault();
