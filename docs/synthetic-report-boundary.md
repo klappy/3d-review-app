@@ -45,3 +45,45 @@ Local timings are harness wall-clock measurements including the local D1 bridge 
 ## Remaining gates
 
 Independent exact-candidate B1 review is still required. B2 store/immutability/get/list, renderer/version/schema integration, contract/confirmation/cursor projection, public routes/UI, actual effective-runtime acceptance and additive DEV rollout remain separately gated. No migration reservation is exercised here. Changes to A's utility, Auth, seeds, packages or existing source are outside B1 custody. Cookbook authority concerns semantic conformance; this SQL is a reviewed implementation choice, not a permanent required architecture for all future builds.
+
+# B2: local immutable store candidate, production renderer disabled
+
+B2 builds on independently accepted B1 `ceeba19635421a70e84903b17fd4e1494eb9b5f7`. It adds the reviewed additive `0008_synthetic_report.sql` table/index/immutability triggers and an internal store. That migration is applied **only to disposable local test D1** here; reservation/publication is not remote rollout authority. It does not depend on historical `0005`, modify `0006`/`0007`, install a renderer or expose any handler.
+
+Production contains one private `APPROVED_RENDERER` constant set to **null**. Build, commit, read and list all fail closed while it is null. There is no exported renderer setter/factory, registration mechanism, request-supplied rendered-product argument or activation setting. Future C integration requires a reviewed compiled descriptor with its source/index/version tuple, deterministic renderer and strict capture-bound output validator. Replacing null is a later code change, not permission supplied by this candidate.
+
+## Internal store operations and observation points
+
+- `buildMaterialized(ctx, assessmentId)` captures through B1, then calls the guarded commit path.
+- `commitMaterialized(ctx, assessmentId, captured)` reattests the original raw token and renders internally through the compiled descriptor. It ignores asserted digest/row eligibility on a supplied object; it accepts no arbitrary rendered JSON. This internal entry supports an existing capture, not a public API.
+- `readMaterialized(ctx, reportId)` resolves report-to-assessment, exact grant, archive state and complete current input in one SELECT.
+- `listMaterialized(ctx, assessmentId, afterId, pageSize)` accepts a validated internal ID and size 1–5, fetches up to one lookahead and validates the entire selected page. It exposes no total or payload in summaries. `afterId` is **not a public cursor**; authenticated/encrypted principal/assessment/version/expiry-bound transport cursors remain a separate C contract.
+
+Internal success is `{ok:true,value}`. Bounded failures contain only `HELD`, `UNAVAILABLE`, `CONFLICT` or `DETERMINISM`, never an attempted report ID, count, answers, labels or database message. Public mapping, consent, receipts and error semantics remain contract-owner work. A withheld/failed build result does not mean that no immutable row was committed.
+
+The table-free B1 query remains byte-identical. One shared producer reuses all its grant/integrity/bounds/packing predicates, restoring only the independently reviewed report-ID target for store statements. Actual bind arities are capture 5, commit 18, get 5, build-result 6 and list 7. `INSERT … SELECT … ON CONFLICT(assessment_id,report_key) DO NOTHING` checks a fresh member grant, nonarchive and exact raw current-token equality. Unexpected SQL constraints/failures do not become duplicates. Every commit, including a no-op duplicate, is followed by a fresh authorized build-result SELECT and full stored/current validation before returning any metadata.
+
+Report identity hashes the exact accepted `3d-materialized-report-key-v1` preimage with domain `3d-materialized-report-v1` plus a zero byte. It includes original capture digest, assessment, source pin, attestation index root and all four approved semantic versions. It excludes actor/time. Payload hash binds exact UTF-8 bytes. A same-key row with different exact payload bytes is a determinism failure; it is never updated or silently reused.
+
+Get/list reattest stored and current captures independently, bind the original digest to the stored digest, compare source/index/versions with the compiled descriptor, recompute the full report key and verify exact payload hash/size/schema. The output validator also binds output identity to the original attested capture. A known synthetic append can preserve old output and permit exact duplicate recovery; unknown, mixed or mutated current inputs suppress access. Recomputing a payload's self-hash does not bypass schema/identity checks. These unkeyed hashes do not prove integrity against an administrator able to rewrite the database and application authority together.
+
+Read/list disclosure linearizes at their one primary SELECT. Changes before it refuse; changes afterward affect subsequent calls without retroactively retracting the captured result. List attests the common current token once only after confirming each returned row has the same token; it validates every original capture, including lookahead. One bad selected row suppresses the whole page. The authorized-empty sentinel takes its assessment ID from the authorized capture, not a nullable report field. No cross-request eligibility cache is used.
+
+## Local marker tests and measurements
+
+```sh
+npm exec vitest run test/synthetic-report-materialization.test.ts test/synthetic-report-boundary.test.ts
+npm run typecheck
+```
+
+Tests use existing esbuild to bundle the same store source with exactly one asserted substitution of the private null declaration. The marker and transform live only in the test file and temporary output. A reversible textual comparison proves that no SQL/store/validation algorithm changed; `B2_MARKER_PROOF` emits source/descriptor/transformed hashes and replacement count. A separate test calls the unmodified production module and proves all operations refuse without querying. No temporary marker bundle is committed or deployed.
+
+The pinned test tuple uses `test-marker-scorer-v1`, `test-marker-narrative-v1`, `test-marker-policy-v1` and `test-marker-output-v1`, with A's exact source pin/root. Its only output fields are schema, assessment ID, capture digest and sorted response IDs, all bound to the attested original capture. A separate scorer-v2 bundle proves version identity change and rejection of an unknown old tuple. Neither is a real report renderer or a production version assignment. An independently calculated Python SHA-256 vector checks the first gold capture's complete report key.
+
+Local tests cover same-key concurrency, immutable triggers, forced constraint rollback, capture changes before insert, authority loss after insert, exact duplicate recovery after known append, get/list scope and as-of-query races, every stored identity/version field, recomputed corrupt payload hashes, full-page/lookahead refusal, empty-page identity and byte ceilings. Removing the commit equality guard writes an unintended inconsistent row; supplying a stale read bypasses current archive state. Those negative controls fail the same safety oracles that the real implementation passes.
+
+Actual local D1 accepts all five binding variants; insufficient binds fail. The largest SQL is 5,363 bytes and the maximum parameter count is 18. A six-row marker page measured 886,159 JSON-serialized bytes, maximum row 150,351 bytes. These are marker/gold measurements, not real-renderer worst cases. `B2_PAGE_MEASUREMENTS` records local D1 metadata, query walltime and a Node memory sample; the sample includes test harness, fixture and bundle overhead and is neither peak isolated Worker memory nor Worker CPU.
+
+A deliberately malformed stored capture and payload at their respective 524,288-byte schema ceilings produced 1,111,298 raw selected field bytes but **2,172,407 JSON-serialized row bytes** because of escaping. Local D1 returned the row; strict validation withheld all output. One byte above either schema ceiling was rejected by D1. Do not confuse raw field limits with serialized transport overhead or describe this as below 2 MB in every representation. Actual deployment transport, CPU/memory and worst admitted page/real-payload margins remain explicit review/release holds.
+
+This finishes only the local B2 ingredient when independently accepted. Effective account limits and isolated runtime proof, real C renderer/output-schema/source acceptance, Auth/public contract/confirmation/cursor integration, Design consumption, independent integrated browser/transport review and separately authorized additive DEV rollout remain open. Production renderer stays null; no source scoring/report completion, live release or production promotion follows from marker test success.

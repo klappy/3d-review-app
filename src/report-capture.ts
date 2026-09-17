@@ -92,6 +92,19 @@ WITH target AS (
 
 SELECT assessment_id, capture_json FROM captured;
 `;
+// One shared producer retains every B1 membership/authority/packing predicate.
+// Only the independently reviewed report-ID target is restored for B2 statements.
+const CAPTURE_SUFFIX = '\nSELECT assessment_id, capture_json FROM captured;\n';
+const TABLE_FREE_TARGET = '    AND ?2 IS NULL AND a.id = ?3';
+const REPORT_TARGET = `    AND ((?2 IS NULL AND a.id = ?3)
+      OR (?3 IS NULL AND EXISTS (
+        SELECT 1 FROM synthetic_report m WHERE m.id = ?2 AND m.assessment_id = a.id)))`;
+function reportCapturePrefix(): string {
+  if (!B1_CAPTURE_SQL.endsWith(CAPTURE_SUFFIX) || B1_CAPTURE_SQL.split(TABLE_FREE_TARGET).length !== 2) throw new Error('CAPTURE_SQL_SHAPE');
+  return B1_CAPTURE_SQL.slice(0, -CAPTURE_SUFFIX.length).replace(TABLE_FREE_TARGET, REPORT_TARGET)
+    .replace('-- B1 capture only: aid selects assessment; rid must be NULL. No report table reference.', '-- B2: aid selects build/list; rid selects report get. Exactly one is set.');
+}
+export const REPORT_CAPTURE_CTE = reportCapturePrefix();
 export const CAPTURE_LIMITS = Object.freeze({ packedBytes: 524288, responses: 425, templates: 9, answersBytes: 8192, itemsBytes: 65536, templateBytes: 65536, idBytes: 256, submittedBytes: 128 });
 export type CapturedAssessment = Readonly<{
   assessmentId: string;
