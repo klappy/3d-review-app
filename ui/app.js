@@ -2,10 +2,15 @@ import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
 import { resumeTarget, savedSubmitKey } from './participant-resume.js';
-import { copy as sharedCopy, createSharedLinkClient, digestNamespace, parseEntryFragment, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, unavailableState } from './shared-link.js';
+import { copy as sharedCopy, createSharedLinkClient, currentNamespace, digestNamespace, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment } from './shared-link.js';
 const $ = id => document.getElementById(id);
-const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null };
-state.responseKey = savedSubmitKey(sessionStorage, state.participant);
+// Shared-link mode is decided first so no global (code-path) key is read or written in that mode.
+const sharedToken = parseEntryFragment(location.hash);
+if (sharedToken !== null) stripFragment(window);
+const sharedResume = sharedToken === null ? currentNamespace(sessionStorage) : null;
+const sharedMode = sharedToken !== null || sharedResume !== null;
+const state = { session: sharedMode ? null : sessionStorage.getItem('facilitatorToken'), participant: sharedMode ? null : sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null };
+state.responseKey = sharedMode ? null : savedSubmitKey(sessionStorage, state.participant);
 const path = (value) => encodeURIComponent(value);
 function note(message) { $('notice').textContent = message; $('error').hidden = true; }
 function fail(message) { $('error').textContent = message; $('error').hidden = false; $('notice').textContent = 'Action needs attention. No completion is assumed.'; }
@@ -304,8 +309,17 @@ bindForm('answers', 'Preparing answer review…', async () => {
 $('edit').addEventListener('click', () => { $('answers').hidden = false; $('review').hidden = true; });
 bindClick('submit', 'Submitting response…', async () => {
   required(state.answers, 'Review answers first.');
+  if (state.shared) { // scoped namespace only; the global responseKey is never touched in this mode
+    let result;
+    try { result = await state.shared.submit(state.answers); }
+    catch (error) {
+      if (errorKind(error) === 'conflict') { const resolved = await resolveConflict(state.shared); if (resolved.state === 'receipt') { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); showReceipt(resolved.receipt); return; } showSharedUnavailable(resolved.state); }
+      else text($('participant-resume'), sharedCopy.submitFailed);
+      throw error;
+    }
+    showReceipt(result); return;
+  }
   if (!state.responseKey) { state.responseKey = crypto.randomUUID(); sessionStorage.setItem('responseKey', state.responseKey); }
-  if (state.shared) { let result; try { result = await state.shared.submit(state.answers); } catch (error) { text($('participant-resume'), sharedCopy.submitFailed); throw error; } showReceipt(result); return; }
   const result = await api('/v2/participate/responses', { method: 'POST', participant: true, body: { answers: state.answers, idempotency_key: state.responseKey } });
   showReceipt(result);
   state.responseKey = null; sessionStorage.removeItem('responseKey');
@@ -323,30 +337,33 @@ bindClick('recover', 'Recovering receipt…', async () => {
 });
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
 { const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); } }
-async function sharedLinkEntry(token) {
+function showSharedUnavailable(kind) {
+  text($('participant-error'), kind === 'closed' ? sharedCopy.collectionClosed : sharedCopy.linkUnavailable); $('participant-error').hidden = false;
+  $('answers').hidden = true; $('review').hidden = true;
+}
+async function sharedLinkEntry(token, namespace) {
   $('facilitator').hidden = true; document.querySelector('aside').hidden = true; $('participant').querySelector('p.note').hidden = true;
   for (const el of $('redeem').querySelectorAll('label,button')) el.hidden = true; // code entry hidden; the alert slot stays
-  state.participant = null; state.responseKey = null; // ignore the global code-path token in this mode
-  state.sharedStore = scopedStorage(sessionStorage, await digestNamespace(token));
+  namespace = namespace || await digestNamespace(token);
+  state.sharedStore = scopedStorage(sessionStorage, namespace);
+  rememberCurrent(sessionStorage, namespace); // digest only; the raw token is never persisted
   state.shared = createSharedLinkClient({ store: state.sharedStore, onEvent: e => { const li = document.createElement('li'); li.textContent = `${e.method} ${e.url} · ${e.capability || 'v2'} · ${e.receipt?.id || e.receipt?.receipt_id || 'read'} · ${e.trace_id || 'no trace'}`; $('events').prepend(li); } });
   try {
-    await state.shared.open(token);
-    const receipt = await state.shared.receipt();
+    // With a fragment: open (resume_token when this namespace holds a bearer). Without one (reload):
+    // the raw token is not persisted, so resume goes straight to the receipt with the stored bearer.
+    if (token !== null) await state.shared.open(token);
+    else if (!state.shared.bearer) { showSharedUnavailable('unavailable'); return; }
+    const receipt = await state.shared.receipt(); // receipt is checked before any editable form
     $('recover').hidden = false;
     if (resumeTarget(receipt) === 'receipt') showReceipt(receipt); else await loadForm();
   } catch (error) {
-    const unavailable = unavailableState(error);
-    if (unavailable === 'closed') {
-      text($('participant-error'), sharedCopy.collectionClosed); $('participant-error').hidden = false;
-      if (state.shared.bearer) { try { const receipt = await state.shared.receipt(); if (receipt.submitted) showReceipt(receipt); } catch { /* no own receipt to replay */ } }
-      return;
-    }
-    text($('participant-error'), sharedCopy.linkUnavailable); $('participant-error').hidden = false;
+    const kind = errorKind(error);
+    if (kind === 'conflict') { const resolved = await resolveConflict(state.shared); if (resolved.state === 'receipt') { $('recover').hidden = false; showReceipt(resolved.receipt); return; } showSharedUnavailable(resolved.state); return; }
+    showSharedUnavailable('unavailable');
     throw error;
   }
 }
-const sharedToken = parseEntryFragment(location.hash);
-if (sharedToken !== null) { stripFragment(window); run(sharedCopy.labelOpening, () => sharedLinkEntry(sharedToken)); }
+if (sharedMode) run(sharedCopy.labelOpening, () => sharedLinkEntry(sharedToken, sharedResume));
 else run('Checking session…', async () => {
   try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } }
   catch { state.session = null; state.principal = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); }
