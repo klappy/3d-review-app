@@ -44,11 +44,11 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload, on
     // Both modules own their root's hidden flag; the hooks only drive lifecycle and the snapshot.
     reset() { snapshot.generation += 1; readiness = Promise.resolve(); workspaceReadFailed = false; snapshot.principal = null; snapshot.authorizedProjects = []; selectedWorkspace = null; currentScope = null; invitations.reset(); workspaces.reset(); if (acceptButton) acceptButton.hidden = true; },
     clearAcceptance() { invitations.reset(); },
-    async openAcceptance(token) {
+    async openAcceptance(token, isCurrent = () => true) {
       const generation = snapshot.generation, principal = snapshot.principal?.id;
       if (!principal || snapshot.principal.kind !== 'user' || doc.body.dataset.invitationIntent !== 'active') return false;
       await readiness;
-      if (generation !== snapshot.generation || principal !== snapshot.principal?.id || snapshot.principal.kind !== 'user' || workspaceReadFailed || doc.body.dataset.invitationIntent !== 'active') return false;
+      if (!isCurrent() || generation !== snapshot.generation || principal !== snapshot.principal?.id || snapshot.principal.kind !== 'user' || workspaceReadFailed || doc.body.dataset.invitationIntent !== 'active') return false;
       invitations.openAcceptance(token); return true;
     },
     selectedWorkspace() { return selectedWorkspace; },

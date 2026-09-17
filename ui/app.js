@@ -20,7 +20,9 @@ let submitState = 'none'; // 'none' | 'uncertain'
 const $ = id => document.getElementById(id);
 let pendingInvitation = location.hash.startsWith('#invite=') ? parseInvitationFragment(location.hash) : null;
 const invitationEntry = pendingInvitation !== null;
+let invitationGeneration = 0;
 function endInvitation() {
+  invitationGeneration++;
   pendingInvitation = null;
   if (document.body) delete document.body.dataset.invitationIntent;
   $('invitation-entry-notice')?.remove?.();
@@ -689,14 +691,12 @@ async function sharedLinkEntry(token, namespace) {
     throw new HandledFailure(); // participant copy already shown; run() must not paint the raw error
   }
 }
-if (sharedMode) run(sharedCopy.labelOpening, () => sharedLinkEntry(sharedToken, sharedResume));
-else run('Checking session…', async () => {
-  try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } }
-  catch { state.session = null; state.principal = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); }
+async function openPendingInvitation(generation) {
+  if (generation !== invitationGeneration) return;
   if (pendingInvitation && document.body.dataset.invitationIntent === 'active') {
     if (state.principal?.kind === 'user') {
       const token = pendingInvitation; pendingInvitation = null;
-      if (!await collab.openAcceptance(token)) { endInvitation(); throw new Error('Invitation could not be opened. Reopen the invitation link after checking your sign-in and access.'); }
+      if (!await collab.openAcceptance(token, () => generation === invitationGeneration)) { if (generation !== invitationGeneration) return; endInvitation(); throw new Error('Invitation could not be opened. Reopen the invitation link after checking your sign-in and access.'); }
     } else {
       // Deliberately no persisted invitation credential or altered Access callback.
       pendingInvitation = null;
@@ -708,6 +708,28 @@ else run('Checking session…', async () => {
       $('signin-panel').querySelector('a[href="/v2/auth/access"]')?.focus();
     }
   }
+}
+const invitationBootstrap = sharedMode ? run(sharedCopy.labelOpening, () => sharedLinkEntry(sharedToken, sharedResume))
+: run('Checking session…', async () => {
+  try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } }
+  catch { state.session = null; state.principal = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); }
+  await openPendingInvitation(invitationGeneration);
   if (state.participant) await restoreParticipant();
 });
-if (typeof window !== 'undefined') window.addEventListener('hashchange', () => { if (document.body.dataset.invitationIntent === 'active') { collab.clearAcceptance(); endInvitation(); } });
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('hashchange', () => {
+  if (location.hash.startsWith('#invite=')) {
+    // A participant bootstrap is isolated and cannot become staff by changing a hash.
+    // Reload the actual invite URL to select the staff bootstrap; fragments never go to the server.
+    if (sharedMode) { location.reload(); return; }
+    const token = parseInvitationFragment(location.hash);
+    history.replaceState(null, '', location.pathname + location.search);
+    collab.clearAcceptance(); endInvitation();
+    if (!token) return;
+    pendingInvitation = token; document.body.dataset.invitationIntent = 'active';
+    const generation = invitationGeneration;
+    void run('Opening invitation…', async () => { await invitationBootstrap; await openPendingInvitation(generation); });
+    return;
+  }
+  // Staff navigation anchors do not cancel an invitation preview or confirmation.
+  if (document.body.dataset.invitationIntent === 'active' && !['', '#facilitator', '#workspace', '#reports-card'].includes(location.hash)) { collab.clearAcceptance(); endInvitation(); }
+});
