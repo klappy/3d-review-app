@@ -100,7 +100,9 @@ test("tools/call error fixture returns the fail envelope with isError", async ()
   assert.deepEqual(env.ok, false);
   assert.equal(env.error.code, "NOT_FOUND_OR_NOT_VISIBLE");
   assert.equal(env.error.message, "assessment not found or not visible");
-  assert.equal(typeof env.error.hint, "string");
+  // notVisible() sets no hint: the envelope error object is exactly {code, message}.
+  assert.deepEqual(Object.keys(env.error), ["code", "message"]);
+  assert.equal("hint" in env.error, false);
   assert.match(env.trace_id, /^tr_/);
   assert.deepEqual(Object.keys(env), ["ok", "error", "trace_id"]);
 });

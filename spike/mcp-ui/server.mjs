@@ -110,15 +110,33 @@ const http = createHttpServer(async (req, res) => {
   if (req.method === "OPTIONS") return res.writeHead(204, CORS).end();
   if (url.pathname !== "/mcp") return res.writeHead(404, CORS).end("not found");
 
+  // Non-POST (basic-host probes GET /mcp for an SSE stream before its first POST,
+  // and that request carries no JSON body / no application/json content-type).
+  // This server is responseMode:"json" only, so answer with a plain HTTP status and
+  // do NOT manufacture a JSON-RPC error response for something that is not a JSON-RPC request.
+  if (req.method !== "POST") {
+    return res.writeHead(405, { ...CORS, allow: "POST, OPTIONS", "content-type": "text/plain" }).end("method not allowed (JSON responseMode; POST only)");
+  }
+
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const body = Buffer.concat(chunks);
+  let parsed = null;
   if (body.length) {
     try {
-      logRpc("request", JSON.parse(body.toString("utf8")));
+      parsed = JSON.parse(body.toString("utf8"));
+      logRpc("request", parsed);
     } catch {
       logRpc("request", { raw: body.toString("utf8").slice(0, 400) });
+      return res.writeHead(400, { ...CORS, "content-type": "text/plain" }).end("malformed JSON body");
     }
+  }
+
+  // JSON-RPC notifications (no "id") get 202 Accepted with no body and no JSON-RPC reply.
+  const isNotification = (m) => m && typeof m === "object" && !Array.isArray(m) && !("id" in m) && typeof m.method === "string";
+  const allNotifications = Array.isArray(parsed) ? parsed.length > 0 && parsed.every(isNotification) : isNotification(parsed);
+  if (allNotifications) {
+    return res.writeHead(202, CORS).end();
   }
 
   const headers = new Headers();

@@ -1,5 +1,10 @@
 // Generates the two self-contained view files: design-system CSS copied inline,
 // spike CSS inline, SDK bundle marker for server.mjs to inline at read time.
+//
+// Where the Google Fonts @import strip happens: NOT here. This script reads
+// views/vendor/components.css, which is the already-stripped vendored copy —
+// the @import at ui/design-system/components.css:4 was removed when that file was
+// copied into views/vendor/, and this script copies it through verbatim.
 import { readFileSync, writeFileSync } from "node:fs";
 const S = import.meta.dirname;
 const B = `${S}/views/src`;

@@ -1,5 +1,5 @@
 {
-  "_note": "Shapes copied verbatim from src/handlers/assessment.ts (cap.assessment.get -> {assessment, surveys}) and src/handlers/survey.ts (cap.survey.get_status -> {survey, counts:{responses,respondents}}). counts is keyed by assessment_survey id; in live wiring it is one call per survey (N+1). templates mirrors the catalogue rows of migrations/0004_pinned_instruments.sql. No live cap.* call is made by this spike. templates[] mirrors the host app's template-list source: the snapshot shape {aid, role, stage, surveys, templates} documented at ui/lens-surveys.js:60, whose templates come from the template catalogue rows of migrations/0004_pinned_instruments.sql. error mirrors src/envelope.ts fail() with the message from src/handlers/errors.ts notVisible(\"assessment\").",
+  "_note": "Shapes copied verbatim from src/handlers/assessment.ts (cap.assessment.get -> {assessment, surveys}) and src/handlers/survey.ts (cap.survey.get_status -> {survey, counts:{responses,respondents}}). counts is keyed by assessment_survey id; in live wiring it is one call per survey (N+1). templates mirrors the catalogue rows of migrations/0004_pinned_instruments.sql. No live cap.* call is made by this spike. templates[] mirrors the host app's template-list source: the snapshot shape {aid, role, stage, surveys, templates} documented at ui/lens-surveys.js:60, whose templates come from the template catalogue rows of migrations/0004_pinned_instruments.sql. error mirrors src/envelope.ts fail() with the message from src/handlers/errors.ts notVisible(\"assessment\"); notVisible() sets no hint, so the envelope has exactly code and message.",
   "variants": {
     "default": {
       "assessment": {
@@ -198,7 +198,7 @@
         }
       },
       "fixture": {
-        "label": "Fixture data \u2014 not live",
+        "label": "Fixture data — not live",
         "sources": [
           "cap.assessment.get",
           "cap.survey.get_status (per survey; N+1 in live wiring)"
@@ -402,7 +402,7 @@
         }
       },
       "fixture": {
-        "label": "Fixture data \u2014 not live",
+        "label": "Fixture data — not live",
         "sources": [
           "cap.assessment.get",
           "cap.survey.get_status (per survey; N+1 in live wiring)"
@@ -484,7 +484,7 @@
       ],
       "counts": {},
       "fixture": {
-        "label": "Fixture data \u2014 not live",
+        "label": "Fixture data — not live",
         "sources": [
           "cap.assessment.get",
           "cap.survey.get_status (per survey; N+1 in live wiring)"
@@ -496,8 +496,7 @@
     "ok": false,
     "error": {
       "code": "NOT_FOUND_OR_NOT_VISIBLE",
-      "message": "assessment not found or not visible",
-      "hint": "Ask an owner for a grant at this scope, or check the assessment id."
+      "message": "assessment not found or not visible"
     },
     "trace_id": "tr_fixture_error"
   }

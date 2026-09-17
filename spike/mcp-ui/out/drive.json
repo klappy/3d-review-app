@@ -37,7 +37,7 @@
     },
     "overview-error": {
       "state": "error",
-      "textHead": "Fixture data — not live\n\nThis assessment could not be shown\n\nNOT_FOUND_OR_NOT_VISIBLE\n\nassessment not found or not visible\n\nAsk an owner for a grant at this scope, or check the assessment id.\n\nTRACE_ID: tr_fixture_error\n\nTOOL ERROR ENVELOPE, VERBATIM:\n\n{\n  \"ok\": false,\n  \"error\": {\n    \"code\": \"NOT_FOUND_OR_NOT_VISIBLE\",\n    \"message\": \"assessment not found or not visible\",\n    \"hint\": \"Ask an owner for a grant at this scope, or check the assessment id.\"\n  },\n  \"trace_id\": \"tr_fixture_error\"\n}",
+      "textHead": "Fixture data — not live\n\nThis assessment could not be shown\n\nNOT_FOUND_OR_NOT_VISIBLE\n\nassessment not found or not visible\n\nTRACE_ID: tr_fixture_error\n\nTOOL ERROR ENVELOPE, VERBATIM:\n\n{\n  \"ok\": false,\n  \"error\": {\n    \"code\": \"NOT_FOUND_OR_NOT_VISIBLE\",\n    \"message\": \"assessment not found or not visible\"\n  },\n  \"trace_id\": \"tr_fixture_error\"\n}",
       "preview": null,
       "sandboxAttrs": {
         "outer": {
@@ -54,6 +54,19 @@
     },
     "selector-default:previewDisabled": false,
     "selector-default:resetDisabled": false,
+    "selector-default:checkboxDisabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "selector-default:checkboxCount": 9,
+    "selector-default:allCheckboxesDisabled": false,
     "selector-default": {
       "state": "default",
       "textHead": "Fixture data — not live\n\nSurveys by lens\n\nKimeru NT quality review 2026 · stage: collect · role: owner · fixture: default\n\nSources: cap.assessment.get · cap.survey.get_status (per survey; N+1 in live wiring)\n\nTranslation Team\n\n2 included now\n\nMid-Level · v2 · open · included (unchanged)\nValidation · v2 · open · included (unchanged)\nChurch\n\n4 included now\n\nCommunity-Pastor · v2 · open · included (unchanged)\nConsultant · v2 · open · included (unchanged)\nDenom-Leader · v2 · open · included (unchanged)\nInvolved-Pastor · v2 · open · included (unchanged)\nCommunity\n\n2 included now\n\nAudio · v2 · open · included (unchanged)\nWritten · v2 · open · included (unchanged)\nVideo-Sign · v2 · available · not ",
@@ -73,6 +86,19 @@
     },
     "selector-viewer:previewDisabled": true,
     "selector-viewer:resetDisabled": true,
+    "selector-viewer:checkboxDisabled": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "selector-viewer:checkboxCount": 9,
+    "selector-viewer:allCheckboxesDisabled": true,
     "selector-viewer": {
       "state": "viewer",
       "textHead": "Fixture data — not live\n\nSurveys by lens\n\nKimeru NT quality review 2026 · stage: collect · role: viewer · fixture: viewer\n\nfixture role: viewer — controls disabled\n\nSources: cap.assessment.get · cap.survey.get_status (per survey; N+1 in live wiring)\n\nTranslation Team\n\n2 included now\n\nMid-Level · v2 · open · included (unchanged)\nValidation · v2 · open · included (unchanged)\nChurch\n\n4 included now\n\nCommunity-Pastor · v2 · open · included (unchanged)\nConsultant · v2 · open · included (unchanged)\nDenom-Leader · v2 · open · included (unchanged)\nInvolved-Pastor · v2 · open · included (unchanged)\nCommunity\n\n2 included now\n\nAudio · v2 · open · included (unchanged)\nWritten · v2 · open · included (unc",
@@ -99,8 +125,8 @@
     "[info] [selector] host capabilities: {\"openLinks\":{},\"serverTools\":{\"listChanged\":true},\"serverResources\":{\"listChanged\":true},\"updateModelContext\":{\"text\":{}}}"
   ],
   "logs": [
-    "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
     "[debug] Sending message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
+    "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
     "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
     "[debug] Sending message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",
     "[debug] Parsed message {jsonrpc: 2.0, method: ui/notifications/host-context-changed, params: Object}",

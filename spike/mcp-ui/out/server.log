@@ -1,7 +1,2 @@
 responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
-spike MCP server (fixture only) on http://localhost:3001/mcp — rpc log: /home/claude/spike-work/spike/mcp-ui/out/rpc-log.jsonl
-[mcp] Error: Unsupported Media Type: Content-Type must be application/json
-    at handle (file:///home/claude/spike-work/spike/mcp-ui/node_modules/@modelcontextprotocol/server/dist/index.mjs:1329:32)
-    at Object.fetchFace [as fetch] (file:///home/claude/spike-work/spike/mcp-ui/node_modules/@modelcontextprotocol/server/dist/index.mjs:1355:17)
-    at Server.<anonymous> (file:///home/claude/spike-work/spike/mcp-ui/server.mjs:130:30)
-    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+spike MCP server (fixture only) on http://localhost:3001/mcp — rpc log: /tmp/claude-0/-home-claude/d024a550-5083-5955-bf40-f608ca81b8a5/scratchpad/wk-spike/spike/mcp-ui/out/rpc-log.jsonl

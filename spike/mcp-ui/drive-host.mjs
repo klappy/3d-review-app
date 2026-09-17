@@ -63,8 +63,23 @@ for (const [name, tool, args] of CASES) {
     }
     report[name + ":previewDisabled"] = disabled;
     report[name + ":resetDisabled"] = await app.locator("#reset-pending").isDisabled().catch(() => null);
+    // Measure EVERY checkbox, not a sample: the array and its length are persisted in drive.json.
+    const checkboxDisabled = await app
+      .locator("body")
+      .evaluate(() => [...document.querySelectorAll("input[type=checkbox]")].map((c) => c.disabled))
+      .catch(() => null);
+    report[name + ":checkboxDisabled"] = checkboxDisabled;
+    report[name + ":checkboxCount"] = Array.isArray(checkboxDisabled) ? checkboxDisabled.length : null;
+    report[name + ":allCheckboxesDisabled"] =
+      Array.isArray(checkboxDisabled) && checkboxDisabled.length > 0 && checkboxDisabled.every(Boolean);
+  }
+  // The checkbox list sits below the fold at 1280x900; take the viewer shot taller so it is visible.
+  if (name === "selector-viewer") {
+    await page.setViewportSize({ width: 1280, height: 1400 });
+    await page.waitForTimeout(500);
   }
   await page.screenshot({ path: `${OUT}/${name}.png` });
+  if (name === "selector-viewer") await page.setViewportSize({ width: 1280, height: 900 });
   // record sandbox attributes as the host applied them
   const sandboxAttrs = await page.evaluate(() => {
     const outerIframe = document.querySelector("iframe");

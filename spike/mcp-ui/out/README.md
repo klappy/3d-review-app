@@ -72,7 +72,8 @@ Notes on two deliberate deviations:
   `new URL("https://…")` values that are never fetched. The DEV root in the overview view is a
   JS string handed to `ui/open-link`, so it appears in none of the four reference forms.)
 - **Design-system reuse is real in this run.** `components.css` is scoped entirely under `.rv`
-  (102 selectors; `tokens.css` is unscoped `:root` custom properties). The app roots it on the
+  (119 of 122 selectors carry `.rv`; `:root` and two `.toastc` rules do not; `tokens.css` is
+  unscoped `:root` custom properties). The app roots it on the
   document body — `ui/index.html`: `<body class="rv" data-entry-view="home">` — so
   `build-views.mjs` emits `<body class="rv" data-view-state="loading">` and the views pick up
   the same aurora ground, glass panels, `.eyebrow`/`.badge`/`.metric` type scale and primary
@@ -80,7 +81,7 @@ Notes on two deliberate deviations:
   cards with the token radii and shadow, uppercase `STAGE:` eyebrow, the green primary
   "Open in app" button. `server.spec.mjs` asserts the `class="rv"` body on both views.
 
-## What rendered (screenshots, 1280×900)
+## What rendered (screenshots, 1280×900; `selector-viewer` at 1280×1400)
 
 Each was captured after the host completed `tools/call` → `resources/read` → sandbox load →
 `toolresult`, with the view's own `body[data-view-state]` confirming the state.
@@ -89,9 +90,9 @@ Each was captured after the host completed `tools/call` → `resources/read` →
 | --- | --- | --- |
 | `out/overview-default.png` | `assessment_overview` `{fixture:"default"}` | Name, `stage: collect`, "Fixture data — not live" badge, three lens cards 2/4/2 with summed counts (9·7, 12·11, 9·8), "Open in app" button present |
 | `out/overview-empty.png` | `assessment_overview` `{fixture:"empty"}` | "No surveys included" empty state |
-| `out/overview-error.png` | `assessment_overview` `{fixture:"error"}` | Error state rendering the app's real failure envelope — `src/envelope.ts` `fail()` shape, message from `src/handlers/errors.ts` `notVisible("assessment")`: `{"ok":false,"error":{"code":"NOT_FOUND_OR_NOT_VISIBLE","message":"assessment not found or not visible","hint":"Ask an owner for a grant at this scope, or check the assessment id."},"trace_id":"tr_fixture_error"}`. The view shows code, message, hint, `trace_id` and the envelope verbatim (tool returned `isError: true`) |
-| `out/selector-default.png` | `survey_selector` `{fixture:"default"}` | Three lens groups, 8 included checkboxes + `Video-Sign` available, controls enabled (role owner), "Preview selection" clicked — pending list rendered as text, no write; measured: `previewDisabled === false`, `resetDisabled === false` |
-| `out/selector-viewer.png` | `survey_selector` `{fixture:"viewer"}` | "fixture role: viewer — controls disabled"; every checkbox and both buttons disabled — measured: `previewDisabled === true` **and** `resetDisabled === true` (`#reset-pending`), both recorded in `out/drive.json` |
+| `out/overview-error.png` | `assessment_overview` `{fixture:"error"}` | Error state rendering the fixture failure envelope, whose code/message/shape/`trace_id` follow `src/envelope.ts` `fail()` with the message from `src/handlers/errors.ts` `notVisible("assessment")`: `{"ok":false,"error":{"code":"NOT_FOUND_OR_NOT_VISIBLE","message":"assessment not found or not visible"},"trace_id":"tr_fixture_error"}`. `notVisible()` sets no hint, so `error` has exactly `code` and `message` — asserted in `server.spec.mjs` (`Object.keys(env.error)` deep-equals `["code","message"]`, and `"hint" in env.error === false`). The view shows code, message, `trace_id` and the envelope verbatim (tool returned `isError: true`) |
+| `out/selector-default.png` | `survey_selector` `{fixture:"default"}` | Three lens groups, 8 included checkboxes + `Video-Sign` available, controls enabled (role owner), "Preview selection" clicked — pending list rendered as text, no write; measured over every checkbox: 9 of 9 `disabled === false`, `previewDisabled === false`, `resetDisabled === false` |
+| `out/selector-viewer.png` | `survey_selector` `{fixture:"viewer"}` | "fixture role: viewer — controls disabled". Measured programmatically over EVERY checkbox in the view — `[...document.querySelectorAll('input[type=checkbox]')].map(c=>c.disabled)` — all **9 of 9** checkboxes `true`, plus both buttons disabled (`previewDisabled === true`, `resetDisabled === true` for `#reset-pending`). The array, its count (9) and the all-disabled verdict are in `out/drive.json` as `selector-viewer:checkboxDisabled` / `:checkboxCount` / `:allCheckboxesDisabled`. This one shot is taken at 1280×1400 so the whole 9-checkbox list is in frame |
 
 Driver output (states, extracted frame text, preview text, iframe attributes, host
 capabilities, console log) is committed as `out/drive.json`; `out/drive.err` is the driver's
@@ -159,7 +160,7 @@ attribute (`hasSrcdoc: false` in `out/drive.json`).
 
 ## JSON-RPC log
 
-`out/rpc-log.jsonl` — the committed log is **one run of all five cases, 61 lines**, written
+`out/rpc-log.jsonl` — the committed log is **one run of all five cases, 55 lines**, written
 by the spike server (`{ts, direction, payload}` per line; `direction` is `request` or
 `response` as seen by the server). It is **trimmed, and here is exactly how**: the raw
 one-run log is 2.5 MB because each of the five `resources/read` responses embeds the whole
@@ -167,7 +168,14 @@ self-contained view (~500 KB each), which is over the 2 MB the review allows. Th
 replaces `contents[0].text` in those five response lines with
 `<elided by the trim step: N bytes of self-contained view HTML>`; **every other byte of
 every line, and every line, is verbatim** — nothing was dropped, no run was merged, and the
-five cases are all present. Trimmed size: 31 KB.
+five cases are all present. Trimmed size: 32 KB.
+
+`grep -c '\-32000' out/rpc-log.jsonl` is **0**: the node:http bridge now answers JSON-RPC
+notifications (any message with no `id`, e.g. `notifications/initialized`) with **HTTP 202,
+no body, no JSON-RPC reply**, and answers basic-host's pre-POST `GET /mcp` SSE probe with a
+plain `405` (this server is `responseMode: "json"`; a non-JSON-RPC request gets an HTTP
+status, not a manufactured `-32000` "response"). The previous run record's log carried six
+`-32000` lines from those two paths; none remain, and no notification is answered at all.
 
 The log contains, for each case: `initialize` (client capabilities `{}`),
 `notifications/initialized`, `tools/list` (response carries `_meta.ui.resourceUri` for both

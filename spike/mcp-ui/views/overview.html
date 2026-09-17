@@ -383,8 +383,6 @@ input:disabled + span { opacity: .65; }
     const message = (envelope && envelope.error && envelope.error.message) || "No message in the tool error envelope.";
     panel.append(el("p", code, "eyebrow"));
     panel.append(el("p", message));
-    const hint = envelope && envelope.error && envelope.error.hint;
-    if (hint) panel.append(el("p", hint, "muted"));
     const trace = (envelope && envelope.trace_id) || "(none in envelope)";
     const traceLine = el("p", undefined, "muted");
     traceLine.append(el("span", "trace_id: ", "eyebrow"));
