@@ -378,7 +378,7 @@ bindClick('recover', 'Recovering receipt…', async () => {
       const kind = errorKind(error);
       if (kind === 'unavailable') showSharedUnavailable(submitState === 'uncertain' ? 'cannotResume' : 'unavailable');
       else if (submitState === 'uncertain') text($('participant-resume'), sharedCopy.submitUncertain); // keep the uncertainty; the form stays
-      else showSharedUnavailable(kind);
+      else text($('participant-resume'), kind === 'rateLimited' ? sharedCopy.rateLimited : sharedCopy.transient); // live form: a probe blip is not a revoked session
       throw new HandledFailure();
     }
   } else receipt = await api('/v2/participate/receipt', { participant: true });
