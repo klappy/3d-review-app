@@ -85,7 +85,7 @@ const PROJECTS = { projects: [
 ] };
 const PROJECT_P1 = { project: PROJECTS.projects[0], languages: [{ id: 'l1', code: 'xyz', name: 'Coast language' }] };
 const ASSESSMENTS_P1 = { assessments: [
-  { id: 'a1', project_id: 'p1', language_id: 'l1', name: 'October cycle', purpose: null, period: 'October 2026', format: null, stage: 'collect', archived_at: null, created_at: '2026-03-01', role: 'owner' },
+  { id: 'a1', project_id: 'p1', language_id: 'l1', name: 'October cycle', purpose: null, period: 'October 2026', format: 'Written', stage: 'collect', archived_at: null, created_at: '2026-03-01', role: 'owner' },
   { id: 'a2', project_id: 'p1', language_id: 'l1', name: 'April cycle', purpose: null, period: 'April 2026', format: null, stage: 'understand', archived_at: null, created_at: '2026-02-01', role: 'member' },
 ] };
 const ROUTES = { '/v2/projects': PROJECTS, '/v2/projects/p1': PROJECT_P1, '/v2/projects/p1/assessments': ASSESSMENTS_P1 };
@@ -214,11 +214,11 @@ test('C: crumbs carry project › assessment with aria-current and the deepest r
   assert.equal(nav.children[0].getAttribute('aria-current'), null);
   assert.equal(nav.children[2].getAttribute('aria-current'), 'location');
   assert.equal(nav.children[3].className, 'badge', 'the a2 row role, not the project role');
-  // S4 #13: with an assessment selected the overview collapses to one line and never hides itself.
+  // S4 #13: the overview keeps its crumbs and the assessment header, and never hides itself.
   assert.equal(w.node('overview').hidden, false);
   assert.equal(w.node('overview-all').hidden, true);
   assert.equal(w.node('overview-project').children.length, 1);
-  assert.match(text(w.node('overview-project')), /Coast · Partner org · your role: owner/);
+  assert.equal(w.node('overview-project').children[0].className, 'headrow');
 });
 
 test('an assessment-only viewer with no project grants gets no overview at all', async () => {
@@ -242,6 +242,71 @@ test('an empty list clears an overview a previous identity had painted', async (
   mounted.schedule(); await w.settle();
   assert.equal(w.node('overview').hidden, true);
   assert.deepEqual(w.node('overview-all').children, []);
+});
+
+// views-coordinator.js assessmentShell L59-62.
+async function atAssessment(aid) {
+  const w = fakeWorld(); w.setRoutes(ROUTES);
+  w.projects.options = [option(''), option('p1')]; w.projects.value = 'p1';
+  w.assessments.options = [option(''), option('a1'), option('a2'), option('a9')]; w.assessments.value = aid;
+  w.mount(); await w.settle();
+  return w;
+}
+const headrowOf = w => w.node('overview-project').children[0];
+
+test('assessment state renders the source headrow from the real row', async () => {
+  const w = await atAssessment('a1');
+  const headrow = headrowOf(w);
+  assert.equal(headrow.className, 'headrow');
+  const title = headrow.children[0];
+  assert.equal(title.children[0].className, 'eyebrow');
+  assert.equal(title.children[0].textContent, 'Coast / October cycle');
+  assert.equal(title.children[1].tag, 'h1');
+  assert.equal(title.children[1].textContent, 'October cycle');
+  assert.equal(title.children[2].className, 'muted');
+  assert.equal(title.children[2].textContent, 'October 2026 · Coast language · Written');
+  assert.equal(title.children.length, 3, 'eyebrow, h1, muted — nothing else');
+});
+
+test('the headrow omits the kit words the app has no field for, and never repeats the stage', async () => {
+  const w = await atAssessment('a1');
+  const page = text(headrowOf(w));
+  assert.equal(/Sample/.test(page), false, 'the kit fixture badge is not real data');
+  assert.equal(/kind|Current project review|Follow-up/.test(page), false, 'no kind field exists');
+  assert.equal(/prepare|collect|understand|improve|Preparing|Collecting/i.test(page), false, 'the phase tabs already show the stage');
+  assert.equal(/owner|member|viewer/.test(page), false, 'the role sits in the crumbs badge, not twice');
+  assert.equal(/Partner org|your role/.test(page), false, 'the project row copy is gone from this state');
+});
+
+test('a null field adds no separator and no placeholder', async () => {
+  const w = await atAssessment('a2'); // April cycle: period + language, format null
+  const title = headrowOf(w).children[0];
+  assert.equal(title.children[1].textContent, 'April cycle');
+  assert.equal(title.children[2].textContent, 'April 2026 · Coast language');
+  assert.equal(/· *$|· ·|null|undefined|—/.test(text(headrowOf(w))), false);
+});
+
+test('a selected assessment the list does not carry falls back to the project row, with no h1', async () => {
+  const w = await atAssessment('a9'); // authorized elsewhere, or simply not in this list
+  const root = w.node('overview-project');
+  assert.equal(root.hidden, false);
+  assert.equal(root.children.length, 1);
+  assert.equal(root.children[0].className, 'muted', 'the project row, not a headrow');
+  assert.equal(walk(root).some(n => n.tag === 'h1'), false, 'no name is invented for an unseen assessment');
+  assert.match(text(root), /Coast · Partner org · your role: owner/);
+  assert.equal(/a9/.test(text(root)), false, 'not even the raw id is passed off as a name');
+  // The crumbs stay at the project, because that is the deepest scope actually read.
+  const nav = w.node('overview-crumbs').children[0];
+  assert.deepEqual(nav.children.map(c => c.textContent), ['Coast', 'owner']);
+  assert.equal(w.body.dataset.overviewState, 'assessment', 'the live selection still owns the composition');
+});
+
+test('the headrow stays inside #overview-project and survives a stale list', async () => {
+  const w = await atAssessment('a1');
+  const before = w.sibling.children.length;
+  assert.equal(w.node('overview-all').children.length, 0);
+  assert.equal(w.sibling.children.length, before);
+  assert.equal(w.node('overview-crumbs').children[0].className, 'crumbs');
 });
 
 test('shared route: nothing is requested and nothing is rendered', async () => {

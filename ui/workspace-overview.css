@@ -119,3 +119,10 @@ body[data-overview-state="assessment"] #reports-card { order: 2; }
 body[data-overview-state="assessment"] #results-card { order: 3; }
 body[data-overview-state="assessment"] #project-card { order: 8; }
 body[data-overview-state="assessment"] #assessment-card { order: 9; }
+
+/* Assessment header (views-coordinator assessmentShell L59-62). The kit sets the h1 tight against
+   its muted line; the page h1 rules are sized for the workspace title this state hides, so restate
+   the spacing here, scoped to this root. No global heading rule is touched. */
+.rv #overview .headrow h1 { margin: 0 0 4px; font-size: 26px; line-height: 1.2; }
+.rv #overview .headrow .eyebrow { margin: 0 0 4px; }
+.rv #overview .headrow .muted { margin: 0; }
