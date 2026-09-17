@@ -120,6 +120,7 @@ components:
               - STAGE_CONFLICT
               - RESERVED_NOT_BUILT
               - NO_INVERSE
+              - RATE_LIMITED
             message:
               type: string
             hint:

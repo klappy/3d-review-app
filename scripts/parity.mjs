@@ -15,6 +15,8 @@ for (const c of contract.capabilities) {
   const isDanger = c.tool === "danger";
   const body = c.http.method === "GET" ? undefined : JSON.stringify({ params, ...(isDanger ? { mode: "dry_run" } : {}) });
   const h = await fetch(BASE + path, { method: c.http.method, headers: H, body }).then((r) => r.json()).catch((e) => ({ fetch_error: String(e) }));
+  // Anonymous /mcp is rate limited (30/60 s per address, src/ratelimit.ts): pace anonymous runs; signed-in runs (SESS) are not counted.
+  if (!SESS) await new Promise((r) => setTimeout(r, 2100));
   const m = await fetch(BASE + "/mcp", { method: "POST", headers: H, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: c.tool, arguments: { capability: c.id, params, ...(isDanger ? { mode: "dry_run" } : {}) } } }) }).then((r) => r.json()).then((j) => j.result?.structuredContent ?? j.error);
   const eq = norm(h) === norm(m); if (eq) same++;
   rows.push(`${eq ? "✅" : "❌"} ${c.id.padEnd(34)} ${c.http.method.padEnd(6)} ${c.class.padEnd(16)} http=${h?.ok ? "ok" : h?.error?.code ?? "?"} mcp=${m?.ok ? "ok" : m?.error?.code ?? "?"}`);

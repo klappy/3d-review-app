@@ -43,3 +43,15 @@ export interface Env { DB: D1Database; SESSION_SECRET: string; ENVIRONMENT?: str
 | `GET /v2/openapi.yaml` | contract projection | static |
 | `GET /v2/auth/access` | Cloudflare Access email-code return leg (browser redirect) | agents hold a bearer; browsers only |
 | `POST /v2/ops/seed/synthetic` | **dev bootstrap**: loads `seed/synthetic-responses.sql` into dev D1; signed-in, idempotent, refused unless `ENVIRONMENT` is exactly `dev` (a missing variable fails closed); label `dev.bootstrap.seed_synthetic`, no receipt | environment plumbing, not product behavior |
+
+## Rate limits (src/ratelimit.ts)
+
+Borrowed substrate: Cloudflare Workers Rate Limiting bindings (`[[ratelimits]]` in `wrangler.toml`, repeated under `[env.production]` — bindings are not inherited). Enforced inside `execute()` so the HTTP twin and the MCP tool share one budget, before authorization and before the capability's handler touches storage. Precisely: a request that presents **no credential** is refused with zero storage access; a request that presents a credential costs one indexed D1 session lookup (`resolvePrincipal`) before the limiter runs. A refused call returns the contract error `RATE_LIMITED` (HTTP 429 + `retry-after: 60`; on MCP the envelope error, or JSON-RPC `-32029` with `data.code = "RATE_LIMITED"` when the anonymous transport limit trips) and writes **no** trace row.
+
+| Binding | Counts | Key | Limit |
+|---|---|---|---|
+| `RL_MCP_ANON` | every anonymous `POST /mcp`, **one unit per JSON-RPC message** in a batch (signed-in callers are not counted); any batch over 10 messages is refused (`-32600`) for every caller | caller address | 30 / 60 s |
+| `RL_AUTH` | `cap.auth.request_link`, `cap.auth.consume_link` | caller address; plus sha256(email) for `request_link`, sha256(email)+address for `consume_link` (so a stranger cannot lock a victim out); a non-string `email` is `INVALID_PARAMS` | 10 / 60 s each |
+| `RL_REDEEM` | `cap.participant.redeem_code`, `cap.participant.open_link` | caller address | 60 / 60 s (a workshop room shares one address) |
+
+Posture: binding absent → allowed only when `ENVIRONMENT` is exactly `dev`; otherwise refused (fail closed). Binding throws → allowed and logged. Known limit of the borrow: counters are per Cloudflare location and eventually consistent — a dampener, not a lockout; no durable per-credential lockout exists yet (residual, tracked in cookbook `prd/18-I-testing.md` phase C).
