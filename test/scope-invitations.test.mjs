@@ -53,6 +53,7 @@ test('invite is two step, honest non-delivery, private reveal cleared on context
 });
 test('missing dev token never invents a handoff or email success',async()=>{
  const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'i1',delivered:false});await w.api.setScope(scope);await emailPreview(w);w.button('Confirm invitation').click();await flush();assert.match(text(w.root),/No invitation credential/);assert.ok(!w.buttons().includes('Reveal private invitation token'));
+ assert.ok(!w.buttons().includes('Finish handoff and refresh access'));assert.ok(w.buttons().includes('Continue and refresh access'));assert.ok(!text(w.root).includes('Complete the private handoff'));
 });
 test('zero-grant recipient previews actual scope and accepts with stronger role preserved',async()=>{
  const w=world((_u,o)=>o.body.mode==='dry_run'?confirmResult:{granted:true,scope:{type:'assessment',id:'a1'},role:'owner'});await acceptPreview(w);assert.match(text(w.root),/member access at assessment a1/);assert.match(text(w.root),/Current access: owner/);assert.ok(!text(w.root).includes('SECRET_TOKEN'));w.button('Confirm acceptance').click();await flush();assert.equal(w.changes,1);assert.match(text(w.root),/granted as owner/);assert.ok(!walk(w.root).some(n=>n.value==='SECRET_TOKEN'));assert.equal(w.calls.length,2);assert.equal(w.calls[1].body.confirm_token,'confirmation-secret');

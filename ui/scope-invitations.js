@@ -132,9 +132,10 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     if (!scope || !canManageScope(scope.role)) { root.append(el('p', 'Select a scope where you are an owner or member to manage collaborators.')); return; }
     root.append(el('h3', `Collaborators · ${scope.type}`), el('p', scope.id, 'scope-invitations-context'));
     if (completedInvitation) {
+      const needsHandoff = !completedInvitation.delivered && credential;
       root.append(el('p', `${completedInvitation.id} · ${completedInvitation.role} · awaiting acceptance`));
-      root.append(el('p', completedInvitation.delivered ? 'Email delivery does not mean the recipient has accepted. Continue to refresh the pending list.' : 'Complete the private handoff before continuing. Finishing discards any remaining token; it cannot be recovered here. Changing identity or scope also clears it.'));
-      root.append(button(completedInvitation.delivered ? 'Continue and refresh access' : 'Finish handoff and refresh access', refreshList, {secondary:true}));
+      root.append(el('p', needsHandoff ? 'Complete the private handoff before continuing. Finishing discards any remaining token; it cannot be recovered here. Changing identity or scope also clears it.' : 'Email delivery does not mean the recipient has accepted. Continue to refresh the pending list.'));
+      root.append(button(needsHandoff ? 'Finish handoff and refresh access' : 'Continue and refresh access', refreshList, {secondary:true}));
       return;
     }
     root.append(button('Refresh access', refreshList, {secondary:true}));
