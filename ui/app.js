@@ -270,6 +270,7 @@ bindClick('submit', 'Submitting response…', async () => {
   const result = await api('/v2/participate/responses', { method: 'POST', participant: true, body: { answers: state.answers, idempotency_key: state.responseKey } });
   showReceipt(result);
   state.responseKey = null; sessionStorage.removeItem('responseKey');
+  text($('participant-resume'), '');
 });
 function showReceipt(result) {
   text($('receipt'), result.submitted === false ? 'No submission recorded yet.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`);
@@ -279,7 +280,7 @@ function showReceipt(result) {
 bindClick('recover', 'Recovering receipt…', async () => {
   const receipt = await api('/v2/participate/receipt', { participant: true });
   showReceipt(receipt);
-  if (receipt.submitted) { state.responseKey = null; sessionStorage.removeItem('responseKey'); }
+  if (receipt.submitted) { state.responseKey = null; sessionStorage.removeItem('responseKey'); text($('participant-resume'), ''); }
 });
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
 { const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); } }
