@@ -1,6 +1,7 @@
 /** entry / auth / ops / docs-file handlers (Lane B). Domain handlers are Lane A's. */
 import type { Handler } from "./types";
 import { CapError, id, sha256, notVisible } from "./types";
+import { normalizeEmail } from "./common";
 import { mintSession, revokeSessionByHash } from "../auth";
 import contract from "../../contract/capabilities.json";
 import { capabilities, byId } from "../registry";
@@ -24,9 +25,10 @@ export const authRequestLink: Handler = async (ctx, p, o) => {
   if (!p.email || typeof p.email !== "string") throw new CapError("INVALID_PARAMS", "email required");
   // Fail CLOSED: only an explicit ENVIRONMENT="dev" is the synthetic sandbox; a missing variable is treated as production.
   const dev = ctx.env.ENVIRONMENT === "dev";
-  if (dev && !SYNTHETIC_DOMAIN.test(p.email)) throw new CapError("INVALID_PARAMS", "dev sandbox accepts only synthetic identities (name@…example.invalid)", "no real email is ever accepted or contacted from the dev environment", "cap.auth.request_link");
+  const email = normalizeEmail(p.email); // same normaliser as the limiter's em: key (review #12-11)
+  if (dev && !SYNTHETIC_DOMAIN.test(email)) throw new CapError("INVALID_PARAMS", "dev sandbox accepts only synthetic identities (name@…example.invalid)", "no real email is ever accepted or contacted from the dev environment", "cap.auth.request_link");
   if (!dev) throw new CapError("RESERVED_NOT_BUILT", "email-code delivery is not wired in this environment yet", "production sign-in is Cloudflare email-code (OF-7); pending the auth lane", "cap.auth.request_link");
-  const eh = await sha256(p.email.toLowerCase());
+  const eh = await sha256(email);
   if (o?.dryRun) return { result: {}, impact: { affected: [{ email_hash: eh.slice(0, 12) }], irreversible: true, effect: "external", compensating_control: "expire code" } };
   const code = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)); // CSPRNG, not Math.random
   await ctx.db.prepare("INSERT INTO login_code (id, email_hash, code_hash, expires_at, created_at) VALUES (?,?,?,?,?)").bind(id("lc"), eh, await sha256(code), Date.now() + 10 * 60e3, Date.now()).run();
@@ -37,7 +39,7 @@ export const authRequestLink: Handler = async (ctx, p, o) => {
 
 export const authConsumeLink: Handler = async (ctx, p) => {
   if (!p.email || !p.code) throw new CapError("INVALID_PARAMS", "email and code required");
-  const eh = await sha256(String(p.email).toLowerCase());
+  const eh = await sha256(normalizeEmail(String(p.email)));
   const row = await ctx.db.prepare("SELECT id, expires_at, redeemed_at AS used_at FROM login_code WHERE email_hash = ? AND code_hash = ? ORDER BY created_at DESC LIMIT 1").bind(eh, await sha256(String(p.code))).first<any>();
   if (!row) throw new CapError("INVALID_PARAMS", "code invalid", "request a new code", "cap.auth.request_link");
   if (row.used_at) throw new CapError("INVALID_PARAMS", "code_used", "codes are single-use; request a new one");
