@@ -23,3 +23,8 @@
   .rv:not([data-entry-view="workspace"]) #notice,
   .rv[data-workspace-route="participant"] #notice { display:none; }
 }
+/* E1 (cookbook #16 c5720843488): real-app navigation to the assessment shell for a confirmed staff identity on the staff
+   surface only. Signed-out, public, and participant routes never show it; the href carries no token (same-origin session). */
+.rv:not([data-staff-confirmed="true"]) #assess-link,
+.rv:not([data-entry-view="workspace"]) #assess-link,
+.rv[data-workspace-route="participant"] #assess-link { display:none; }
