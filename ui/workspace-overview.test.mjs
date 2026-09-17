@@ -181,6 +181,10 @@ test('B: the level menu offers Assessments and Languages only, and Languages lis
   assert.equal(/Details|People & access/.test(text(w.node('overview-project'))), false);
   nav.children[1].click(); await w.settle();
   assert.match(text(w.node('overview-project')), /Coast language · xyz/);
+  const navAfter = walk(w.node('overview-project')).find(n => n.className === 'phases');
+  navAfter.children[0].click(); await w.settle();
+  assert.match(text(w.node('overview-project')), /October cycle/);
+  assert.ok(walk(w.node('overview-project')).find(n => n.className === 'table'), 'Assessments restores the table after Languages');
 });
 
 test('C: crumbs carry project › assessment with aria-current and the deepest role badge', async () => {

@@ -302,7 +302,11 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
     stand(allRoot); // exactly one of A / B occupies the overview
     renderCrumbs(project, assessment);
     if (assessment) renderProjectRow(project);
-    else renderProject(project, rows, languages, () => { if (gen === generation) renderProject(project, rows, languages, () => {}); });
+    else {
+      // Recursive so each rebuilt menu keeps a live repaint, not a no-op.
+      const repaint = () => { if (gen === generation) renderProject(project, rows, languages, repaint); };
+      renderProject(project, rows, languages, repaint);
+    }
   }
 
   // Coalesce the burst of option mutations app.js produces while repopulating a select.
