@@ -45,6 +45,8 @@ describe("Lane B: grant / request / support.unlock (D3, no inheritance, existenc
     expect(dry.impact?.effect).toBe("external");
     const sent = await invite(owner, { ...scope, email: "rina@example.invalid", role: "member" });
     const token = sent.result.dev_only_link_token as string; expect(token).toBeTruthy();
+    // OF-3: dev never mails; the result says so instead of pretending
+    expect(sent.result.delivered).toBe(false); expect((sent.result.delivery as any).reason).toMatch(/synthetic_recipient|not_configured|not_production/);
     await expect(accept(mk({ kind: "anonymous", id: "anon" }), { token })).rejects.toMatchObject({ code: "NOT_AUTHENTICATED" });
     // wrong identity (usr_x is not rina@) → hidden, no grant
     await expect(accept(stranger, { token })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });

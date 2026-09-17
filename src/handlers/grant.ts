@@ -4,6 +4,8 @@ import type { Ctx, Handler, Role, ScopeType } from "./types";
 import { CapError, notVisible } from "./errors";
 import { ROLE_RANK, atLeast, countScalar, gate, newId, nowIso, randomToken, reqRole, reqScope, reqStr, roleAt, sha256 } from "./common";
 
+import { invitationMessage, publicOrigin, sendMail, type MailEnv, type MailResult } from "../mail";
+
 type Scope = { type: "workspace" | "project" | "assessment"; id: string };
 const INVITE_TTL_S = 7 * 24 * 3600;
 
@@ -25,7 +27,9 @@ async function scopeExists(ctx: Ctx, scope: Scope): Promise<boolean> {
   return !!(await ctx.db.prepare(`SELECT id FROM ${t} WHERE id = ?`).bind(scope.id).first());
 }
 
-/** E: invite → mail would be sent. Phase 0 sends nothing; the invitation is recorded 'sent' and, in dev only, the link token is returned so the flow can be exercised. */
+/** E: invite → the invitation mail leaves the system (IRR-001) when a sender is configured in production (src/mail.ts, OF-3).
+ *  `delivered` is the provider's acceptance, never assumed; when it is false `delivery.reason` says why. Dev returns the
+ *  link token in-band so the flow can be exercised without any mailbox. */
 export const invite: Handler = async (ctx, p, o) => {
   const scope = reqScope(p); const role = reqRole(p); const email = reqStr(p, "email").toLowerCase();
   const caller = await callerAt(ctx, scope, "member");
@@ -36,7 +40,14 @@ export const invite: Handler = async (ctx, p, o) => {
   const id = newId("inv"); const token = randomToken("il");
   await ctx.db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
     .bind(id, scope.type, scope.id, inviteeHash, await sha256(token), role, "sent", ctx.principal.id, nowIso(ctx), new Date(ctx.now().getTime() + INVITE_TTL_S * 1000).toISOString()).run();
-  return { result: { invitation_id: id, role, status: "sent", accepted: true, delivered: false, note: "phase 0: no mail transport; delivered=false is honest", ...(ctx.env.ENVIRONMENT === "dev" ? { dev_only_link_token: token } : {}) }, scope, impact };
+  const env = ctx.env as MailEnv; const origin = publicOrigin(env);
+  let delivery: MailResult = { delivered: false, reason: "not_configured" };
+  if (origin) {
+    const msg = invitationMessage(origin, token, role, scope.type, INVITE_TTL_S / 86400);
+    delivery = await sendMail(env, { to: email, subject: msg.subject, text: msg.text, html: msg.html, idempotencyKey: `invite/${id}` });
+  }
+  ctx.log("grant.invite.mail", { delivered: delivery.delivered, reason: delivery.reason ?? null, provider_status: delivery.provider_status ?? null, invitee: inviteeHash.slice(0, 8) }); // never the address
+  return { result: { invitation_id: id, role, status: "sent", accepted: true, delivered: delivery.delivered, delivery: { provider: delivery.provider ?? null, reason: delivery.reason ?? null }, ...(ctx.env.ENVIRONMENT === "dev" ? { dev_only_link_token: token } : {}) }, scope, impact };
 };
 
 export const revoke_invitation: Handler = async (ctx, p) => {
