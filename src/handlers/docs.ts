@@ -40,6 +40,52 @@ const allowedFor = (role: Role | "anonymous" | "participant" | "support") =>
     return !/^S$/.test(c.roles) && !c.roles.startsWith("P");
   }).map((c) => c.id);
 
+
+/** Frozen Auth Slice0 stopword allowlist (B1 seed). Byte-identical lock in test/docs-search.test.ts. */
+export const DOCS_SEARCH_STOPWORDS = Object.freeze([
+  "a", "an", "the", "how", "do", "i", "my", "for", "to",
+] as const);
+
+const STOPWORD_SET = new Set<string>(DOCS_SEARCH_STOPWORDS);
+
+/** Normalize + tokenize a docs `q`; drops frozen stopwords. Empty ⇒ truthful miss. */
+export function tokenizeDocsQuery(q: string): string[] {
+  const normalized = String(q).toLowerCase().trim().replace(/[^a-z0-9]+/g, " ");
+  return normalized.split(/\s+/).filter((t) => t.length > 0 && !STOPWORD_SET.has(t));
+}
+
+function idTokens(c: Capability): Set<string> {
+  const bag = new Set<string>();
+  for (const part of c.id.toLowerCase().split(/[._]/)) if (part) bag.add(part);
+  return bag;
+}
+
+function proseTokens(c: Capability): Set<string> {
+  const bag = new Set<string>();
+  const prose = `${c.notes ?? ""} ${c.ui_surface ?? ""}`.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  for (const t of prose.split(/\s+/)) if (t) bag.add(t);
+  return bag;
+}
+
+/** AND overlap: every query token must hit id or prose. Id matches weighted higher for rank. */
+function scoreCapability(c: Capability, tokens: string[]): number {
+  if (tokens.length === 0) return 0;
+  const idBag = idTokens(c);
+  const proseBag = proseTokens(c);
+  let idHits = 0;
+  let proseHits = 0;
+  for (const t of tokens) {
+    const inId = idBag.has(t);
+    const inProse = proseBag.has(t);
+    if (!inId && !inProse) return 0; // unknown token vs this capability
+    if (inId) idHits += 1;
+    else proseHits += 1;
+  }
+  return idHits * 10 + proseHits;
+}
+
+const DOCS_SEARCH_HIT_CAP = 5;
+
 export const docs: Handler = async (ctx, a) => {
   if (a.capability) {
     const c = byId.get(a.capability);
@@ -56,8 +102,16 @@ export const docs: Handler = async (ctx, a) => {
     return { result: t ? { topic: a.topic, text: t } : { message: `unknown topic ${a.topic}`, topics: Object.keys(TOPICS) } };
   }
   if (a.q) {
-    const q = String(a.q).toLowerCase();
-    return { result: { q, hits: capabilities.filter((c) => (c.id + " " + c.notes + " " + c.ui_surface).toLowerCase().includes(q)).map((c) => ({ id: c.id, class: c.class, section: c.section })) } };
+    const raw = String(a.q);
+    const q = raw.toLowerCase();
+    const tokens = tokenizeDocsQuery(raw);
+    const ranked = capabilities
+      .map((c) => ({ c, score: scoreCapability(c, tokens) }))
+      .filter((row) => row.score > 0)
+      .sort((a, b) => b.score - a.score || a.c.id.localeCompare(b.c.id))
+      .slice(0, DOCS_SEARCH_HIT_CAP)
+      .map(({ c }) => ({ id: c.id, class: c.class, section: c.section }));
+    return { result: { q, hits: ranked } };
   }
   if (a.role || a.scope) {
     let role: any = a.role ?? ctx.principal.kind;
