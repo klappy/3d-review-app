@@ -327,7 +327,8 @@ reportAction('preview-report', 'Previewing report build…', async () => {
   const result = await api(reportRoute(), { method: 'POST', body: { mode: 'dry_run' } });
   dropReportConfirm();
   $('build-report').disabled = true;
-  if (result.suppressed) { text($('report-preview'), `${result.reason} No report will be built.`); return; }
+  // Held: the whole block is cleared first, so a reason never sits beside a report opened earlier.
+  if (result.suppressed) { clearReportState(); text($('report-preview'), `${result.reason} No report will be built.`); return; }
   text($('report-preview'), `Building a report makes this assessment's synthetic results visible to everyone with access to it. Nothing is built until you choose Build report. This confirmation expires in ${result.expires_in} seconds.`);
   const timer = setTimeout(() => { dropReportConfirm(); $('build-report').disabled = true; }, Number(result.expires_in) * 1000);
   state.reportConfirm = { token: result.confirm_token, expiresAt: Date.now() + Number(result.expires_in) * 1000, timer };
@@ -337,13 +338,13 @@ reportAction('build-report', 'Building report…', async () => {
   const confirm_token = required(state.reportConfirm, 'Preview the report again.').token;
   dropReportConfirm(); $('build-report').disabled = true; text($('report-preview'), '');
   const result = await api(reportRoute(), { method: 'POST', body: { mode: 'execute', confirm_token } });
-  if (result.suppressed) { text($('report-status'), result.reason); return; }
+  if (result.suppressed) { clearReportState(); text($('report-status'), result.reason); return; }
   upsertRow({ doc: document, list: $('report-list'), report: { id: result.report.id, created_at: result.report.created_at }, onOpen: id => run('Opening report…', () => openReport(id)) });
   await openReport(result.report.id);
 });
 async function listReports() {
   const result = await api(reportRoute());
-  if (result.suppressed) { text($('report-status'), result.reason); $('report-list').replaceChildren(); $('load-more-reports').hidden = true; state.reportCursor = null; return; }
+  if (result.suppressed) { clearReportState(); text($('report-status'), result.reason); return; }
   openReports(result.reports || []);
   state.reportCursor = typeof result.next_cursor === 'string' ? result.next_cursor : null;
   $('load-more-reports').hidden = !state.reportCursor;
@@ -355,7 +356,7 @@ reportAction('load-more-reports', 'Loading more reports…', async () => {
   let result;
   try { result = await api(`${reportRoute()}?cursor=${path(cursor)}`); }
   catch (error) { state.reportCursor = null; $('load-more-reports').hidden = true; throw error; }
-  if (result.suppressed) { text($('report-status'), result.reason); $('report-list').replaceChildren(); $('load-more-reports').hidden = true; state.reportCursor = null; return; }
+  if (result.suppressed) { clearReportState(); text($('report-status'), result.reason); return; }
   const holder = document.createElement('ol');
   renderList({ doc: document, list: holder, reports: result.reports || [], onOpen: id => run('Opening report…', () => openReport(id)) });
   for (const row of [...holder.children]) $('report-list').append(row);
