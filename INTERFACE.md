@@ -51,7 +51,7 @@ Borrowed substrate: Cloudflare Workers Rate Limiting bindings (`[[ratelimits]]` 
 | Binding | Counts | Key | Limit |
 |---|---|---|---|
 | `RL_MCP_ANON` | every anonymous `POST /mcp`, **one unit per JSON-RPC message** in a batch (signed-in callers are not counted); any batch over 10 messages is refused (`-32600`) for every caller | caller address | 30 / 60 s |
-| `RL_AUTH` | `cap.auth.request_link`, `cap.auth.consume_link` | caller address; plus sha256(email) for `request_link`, sha256(email)+address for `consume_link` (so a stranger cannot lock a victim out); a non-string `email` is `INVALID_PARAMS` | 10 / 60 s each |
+| `RL_AUTH` | `cap.auth.request_link`, `cap.auth.consume_link` | caller address; `request_link` additionally per sha256(email). A non-string `email` is `INVALID_PARAMS`. **Known residual:** no per-email guess limit on `consume_link` (a bare email key would let a stranger lock a victim out; needs an attempts counter on `login_code` = a migration). Dev-only path; dev returns the code in-band | 10 / 60 s each |
 | `RL_REDEEM` | `cap.participant.redeem_code`, `cap.participant.open_link` | caller address | 60 / 60 s (a workshop room shares one address) |
 
 Posture: binding absent → allowed only when `ENVIRONMENT` is exactly `dev`; otherwise refused (fail closed). Binding throws → allowed and logged. Known limit of the borrow: counters are per Cloudflare location and eventually consistent — a dampener, not a lockout; no durable per-credential lockout exists yet (residual, tracked in cookbook `prd/18-I-testing.md` phase C).

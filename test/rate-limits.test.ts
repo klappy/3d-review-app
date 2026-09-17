@@ -60,7 +60,7 @@ describe("rate limits", () => {
     for (let i = 0; i < 2; i++) expect((await post(env, "/v2/auth/link", { email }, `192.0.2.${i + 1}`)).status).toBe(200);
     // third attempt from a FRESH address: the ip key passes, the email key refuses
     expect((await post(env, "/v2/auth/link", { email }, "192.0.2.50")).status).toBe(429);
-    // consume is keyed per email+address: a stranger exhausting it from elsewhere does not lock the victim out (review #12-3)
+    // consume is per address only: a stranger exhausting their own address does not lock the victim out (review #12-3)
     for (let i = 0; i < 2; i++) expect((await post(env, "/v2/auth/session", { email, code: "000000" }, "192.0.2.66")).status).toBe(400);
     expect((await post(env, "/v2/auth/session", { email, code: "000000" }, "192.0.2.66")).status).toBe(429);
     expect((await post(env, "/v2/auth/session", { email, code: "000000" }, "192.0.2.67")).status).toBe(400); // victim's own address still served
@@ -70,7 +70,7 @@ describe("rate limits", () => {
     const keys = [...env.RL_AUTH.seen.keys()];
     expect(keys.some((k) => k.includes("demo.owner"))).toBe(false);
     expect(keys.filter((k) => /^em:[0-9a-f]{32}$/.test(k)).length).toBe(1);
-    expect(keys.filter((k) => k.includes("|ip:")).length).toBe(2);
+    expect(keys.filter((k) => k.includes("|")).length).toBe(0); // no dead composite key (re-review #12)
   }, 30_000);
 
   it("absent binding: allowed only when ENVIRONMENT is exactly dev; anywhere else it refuses (fail closed)", async () => {
