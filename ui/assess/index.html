@@ -9,12 +9,14 @@
 .workspace-layout{max-width:1280px;display:grid;grid-template-columns:240px minmax(0,1fr);gap:28px}.context-panel{border-right:1px solid #ffffffc0;padding:8px 22px 20px 0}.context-project{margin-bottom:20px}.project-name{display:block;color:var(--ink);font-weight:650;text-decoration:none;padding:8px 10px}.assessment-link{display:block;padding:12px;margin:3px 0 3px 8px;color:var(--muted);text-decoration:none;border:1px solid transparent;border-radius:12px;font-size:14px}.assessment-link small{display:block;margin-top:4px;font-size:12px}.assessment-link[aria-current=page]{background:#ffffffb5;border-color:var(--edge);color:var(--ink);box-shadow:0 4px 14px #2543630d}.assessment-body{min-width:0}.context-panel .links a{font-size:14px}@media(max-width:900px){.workspace-layout{grid-template-columns:190px minmax(0,1fr);gap:20px}.workspace-layout .grid{grid-template-columns:1fr}.context-panel{padding-right:12px}}@media(max-width:650px){.workspace-layout{display:block}.context-panel{border-right:0;border-bottom:1px solid #ffffffc0;padding:0 0 18px;margin-bottom:22px}.context-panel nav{display:flex;gap:18px;flex-wrap:wrap}.context-project{flex:1;min-width:150px;margin-bottom:0}.context-panel .line{margin-top:12px;padding-top:12px;display:flex;flex-wrap:wrap;gap:16px}.assessment-link{margin-left:0}}
 /* stage indicator (AMEND 2): same look as the showcase tabs, but spans — not controls */
 .tabs span{flex:1;text-align:center;padding:11px 12px;color:var(--muted);border-radius:11px;font-weight:600}.tabs span[aria-current=step]{color:var(--ink);background:#ffffffd0;box-shadow:0 4px 14px #2543630d}
+.shell-nav{display:flex;align-items:center;gap:14px}.shell-nav a{font-weight:600}#whats-here{margin:6px auto 0}
 </style>
 <link rel="stylesheet" href="/stage-screens.css">
 <style>@media screen{#print-root .paper{width:auto;max-width:100%;min-height:0;margin:12px 0}#print-root .print-tools{padding:14px 0}}</style>
 </head>
 <body>
-<header><a class="brand" href="#assessment">3D <span>Review</span></a><span class="sample" id="who">Checking session…</span></header>
+<header><a class="brand" href="#">3D <span>Review</span></a><nav class="shell-nav" aria-label="Workspace navigation"><a id="legacy-link" href="/#facilitator" hidden>Workspaces &amp; people</a><span class="sample" id="who">Checking session…</span></nav></header>
+<p class="storage-note" id="whats-here" hidden></p>
 <main id="app"><p class="muted" style="padding:24px">Loading…</p></main>
 <p class="storage-note" id="note" role="status" aria-live="polite"></p>
 <script type="module" src="/assess/assess.js"></script>

@@ -21,3 +21,4 @@ diagnostic-path.test.mjs
 collab-mount.test.mjs
 entity-screen.test.mjs
 lens-surveys.test.mjs
+assess/entry.test.mjs
