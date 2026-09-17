@@ -27,8 +27,13 @@ test('app.js lifecycle: reset first on identity change; identity/projects snapsh
   assert.ok(app.includes("collab.projects(result.projects);"));
   assert.ok(app.includes("collab.setScope({ type: 'project', id: result.project.id, role: result.project.role });"));
   assert.ok(app.includes("collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });"));
+  assert.ok(app.includes("if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.role });"),'leaving an assessment restores the still-selected project');
   assert.ok(app.includes("createCollabHooks({ document, api, sharedMode,"));
   const mount=read('./collab-mount.js');
   assert.ok(mount.includes("if (sharedMode || !wRoot || !iRoot) return {"),'no-op on shared/participant routes');
+  assert.ok(mount.includes('else if (hostScope) invitations.setScope(hostScope);'),'workspace deselect does not wipe project/assessment collaborator scope');
+  assert.ok(mount.includes('if (staff && !mutating && !selectedWorkspace) workspaces.refresh();'));
+  assert.ok(mount.includes('if (!mutating && !selectedWorkspace) workspaces.refresh();'));
+  assert.ok(!mount.includes('invitations.setScope(null)'),'identity re-observation does not drop the current host scope');
   assert.ok(!/sessionStorage|localStorage|facilitatorToken/.test(mount),'hooks never touch token storage');
 });

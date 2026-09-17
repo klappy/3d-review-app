@@ -196,6 +196,7 @@ async function assessments() {
   if (state.assessment) $('assessments').value = state.assessment;
 }
 async function chooseAssessment() {
+  if (!$('assessments').value && $('granted-assessments').value) return chooseGrantedAssessment();
   clearStageScreens();
   state.assessment = $('assessments').value || null; state.survey = null; resetSelect($('surveys'), 'Choose survey');
   clearCodeBatch(); clearShareLink();
@@ -204,7 +205,10 @@ async function chooseAssessment() {
   collab.setScope(null); // R2: downstream collaborator scope resets synchronously before any await
   lensSurveys?.reset();
   text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
-  if (!state.assessment) return;
+  if (!state.assessment) {
+    if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.role });
+    return;
+  }
   const stageRead = stageSnapshot();
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   if (!stageCurrent(stageRead)) return;
@@ -283,14 +287,19 @@ async function chooseGrantedAssessment() {
   clearCodeBatch(); clearShareLink(); clearReportState(); showReportControls();
   $('assessments').value = ''; text($('assessment-detail'), ''); resetSelect($('surveys'), 'Choose survey');
   text($('survey-detail'), ''); text($('results'), 'Select an assessment.'); text($('granted-detail'), '');
+  collab.setScope(null); // R2: downstream collaborator scope resets synchronously before any await
+  lensSurveys?.reset();
   if (!state.assessment) return;
   try {
     const stageRead = stageSnapshot();
-  const result = await api(`/v2/assessments/${path(state.assessment)}`);
-  if (!stageCurrent(stageRead)) return;
+    if (!state.templates) await templates();
+    const result = await api(`/v2/assessments/${path(state.assessment)}`);
+    if (!stageCurrent(stageRead)) return;
     state.assessmentRole = result.assessment.role; showReportControls();
+    collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
     text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
     for (const survey of result.surveys || []) option($('surveys'), survey.id, survey.template_name || survey.id);
+    lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [] });
     await refreshStageScreens(result.assessment, result.surveys || []);
   } catch (error) { state.assessmentRole = null; showReportControls(); clearReportState(); throw error; }
 }

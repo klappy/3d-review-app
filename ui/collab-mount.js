@@ -18,26 +18,33 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload }) 
     shared: false, participant: false, provisioned: !!snapshot.principal?.provisioned,
     authorizedProjects: snapshot.authorizedProjects.map(p => ({ id: p.id, name: p.name, role: p.role })),
   });
-  let invitations = null, workspaces = null, selectedWorkspace = null;
+  let invitations = null, workspaces = null, selectedWorkspace = null, hostScope = null, mutating = false;
   invitations = mountScopeInvitations({ document: doc, root: iRoot, request, getContext, onGrantsChanged: () => onReload() });
   workspaces = mountWorkspaceManager({
     document: doc, root: wRoot, request, getContext,
-    onWorkspaceSelected: ws => { selectedWorkspace = ws ? { id: ws.id, role: ws.role } : null; if (ws) invitations.setScope({ type: 'workspace', id: ws.id, role: ws.role }); else invitations.reset(); },
-    onMutation: () => onReload(),
+    onWorkspaceSelected: ws => {
+      selectedWorkspace = ws ? { id: ws.id, role: ws.role } : null;
+      // A workspace list refresh always reports null; do not drop project/assessment collaborator scope.
+      if (ws) invitations.setScope({ type: 'workspace', id: ws.id, role: ws.role });
+      else if (hostScope) invitations.setScope(hostScope);
+      else invitations.reset();
+    },
+    onMutation: async () => { mutating = true; try { await onReload(); } finally { mutating = false; } },
   });
   acceptButton?.addEventListener('click', () => invitations.openAcceptance());
 
   return {
     // Identity change: synchronous reset of both modules before any other async work.
     // Both modules own their root's hidden flag; the hooks only drive lifecycle and the snapshot.
-    reset() { snapshot.generation += 1; snapshot.principal = null; snapshot.authorizedProjects = []; selectedWorkspace = null; invitations.reset(); workspaces.reset(); if (acceptButton) acceptButton.hidden = true; },
+    reset() { snapshot.generation += 1; snapshot.principal = null; snapshot.authorizedProjects = []; selectedWorkspace = null; hostScope = null; invitations.reset(); workspaces.reset(); if (acceptButton) acceptButton.hidden = true; },
     selectedWorkspace() { return selectedWorkspace; },
     isStaff() { const k = snapshot.principal?.kind; return k === 'user' || k === 'support'; },
-    backToWorkspaces() { selectedWorkspace = null; invitations.reset(); return workspaces.refresh(); },
+    backToWorkspaces() { selectedWorkspace = null; hostScope = null; invitations.reset(); return workspaces.refresh(); },
     // Staff identity observed (any signed-in user, zero grants included): acceptance entry is reachable outside the member gate.
-    identity(me) { snapshot.principal = me?.principal ?? null; const staff = me?.principal?.kind === 'user' || me?.principal?.kind === 'support'; if (acceptButton) acceptButton.hidden = !(staff && me.principal.kind === 'user'); if (staff) { invitations.setScope(null); workspaces.refresh(); } },
-    projects(list) { snapshot.authorizedProjects = (list || []).map(p => ({ id: p.id, name: p.name, role: p.role })); workspaces.refresh(); },
-    setScope(scope) { if (scope) invitations.setScope(scope); else invitations.reset(); },
+    // Re-observation must not reset host collaborator scope or nested-refresh an in-flight workspace mutation.
+    identity(me) { snapshot.principal = me?.principal ?? null; const staff = me?.principal?.kind === 'user' || me?.principal?.kind === 'support'; if (acceptButton) acceptButton.hidden = !(staff && me.principal.kind === 'user'); if (staff && !mutating && !selectedWorkspace) workspaces.refresh(); },
+    projects(list) { snapshot.authorizedProjects = (list || []).map(p => ({ id: p.id, name: p.name, role: p.role })); if (!mutating && !selectedWorkspace) workspaces.refresh(); },
+    setScope(scope) { hostScope = scope || null; if (scope) invitations.setScope(scope); else invitations.reset(); },
     destroy() { invitations.destroy(); workspaces.destroy(); },
   };
 }

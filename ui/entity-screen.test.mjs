@@ -11,6 +11,7 @@ test('level is derived from actual selection, deepest wins; signed out has no le
   assert.equal(entityLevel({staff:true,workspace:{id:'w'},project:'',assessment:''}),'workspace');
   assert.equal(entityLevel({staff:true,workspace:{id:'w'},project:'p',assessment:''}),'project');
   assert.equal(entityLevel({staff:true,workspace:null,project:'p',assessment:'a'}),'assessment');
+  assert.equal(entityLevel({staff:true,workspace:null,project:'',assessment:'granted'}),'assessment');
   assert.equal(entityLevel({staff:true,workspace:null,project:'p',assessment:'a',survey:'s'}),'survey');
 });
 test('deep links: #p/<pid> and #p/<pid>/a/<aid> only; tokens and other fragments never parse',()=>{
@@ -31,11 +32,16 @@ test('css is level-scoped, keeps the next-entity paths and the stage control rea
   assert.ok(!/#projects\b|#assessments\b/.test(css.replace(/#project-card|#assessment-card|#load-assessments/g,'')),'selects are hidden only via their card chrome, never removed');
 });
 test('wiring: assets, back link inside #collab, entity screen mounted after collab and reset on identity change',()=>{
-  const html=read('./index.html'),app=read('./app.js'),server=read('./server.mjs');
+  const html=read('./index.html'),app=read('./app.js'),server=read('./server.mjs'),src=read('./entity-screen.js');
   assert.ok(html.includes('<link rel="stylesheet" href="/entity-screen.css">'));
   assert.ok(server.includes("'/entity-screen.js':")&&server.includes("'/entity-screen.css':"));
   assert.ok(html.includes('<section id="collab" class="collab" aria-label="Workspaces and collaborators"><button id="entity-back" class="rv-btn quiet" type="button" hidden></button>'));
   assert.ok(app.includes("const entityScreen = sharedMode || typeof window === 'undefined' ? null : mountEntityScreen(document, window, {"));
   assert.ok(app.includes("  collab.reset(); // W/I managers clear synchronously before any other identity work\n  entityScreen?.reset();"));
+  assert.ok(src.includes('assessment: assessments.value || granted?.value'),'assessment-only grants count as an assessment selection');
+  assert.ok(src.includes("granted?.addEventListener('change', render)"));
+  assert.ok(app.includes("collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });"));
+  assert.ok(app.includes("lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [] });"));
+  assert.ok(app.includes('async function chooseGrantedAssessment()')&&app.includes('if (!state.templates) await templates();'));
   assert.ok(read('./.assetsignore').split('\n').includes('entity-screen.test.mjs'));
 });
