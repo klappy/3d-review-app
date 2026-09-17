@@ -20,6 +20,12 @@ export const copy = {
   copyLink: 'Copy link',
   linkCopied: 'Link copied.',
   refreshCounts: 'Refresh counts',
+  linkNotConstructed: 'The survey link could not be built from the server reply. Preview and create it again.',
+  labelOpening: 'Opening survey…',
+  labelPreviewLink: 'Previewing survey link…',
+  labelCreateLink: 'Creating survey link…',
+  labelCopyLink: 'Copying link…',
+  labelRefreshCounts: 'Refreshing counts…',
 };
 
 const FRAGMENT = /^#survey=([^&]+)$/;
@@ -88,6 +94,10 @@ export function saveDraft(store, form, values) {
 }
 
 // Server error codes → participant state. Codes assumed; see return notes.
+// AMBIGUITY for the API owner: the base API also raises STAGE_CONFLICT for "already submitted"
+// (a second submit on a submitted context), so mapping STAGE_CONFLICT to 'closed' can show
+// "Collection has closed" to a respondent whose real state is "already submitted". Left as is;
+// a distinct code (or field) from the API disambiguates it.
 const REVOKED = new Set(['LINK_REVOKED', 'LINK_EXPIRED', 'LINK_NOT_FOUND', 'NOT_FOUND_OR_NOT_VISIBLE', 'INVALID_TOKEN']);
 const CLOSED = new Set(['COLLECTION_CLOSED', 'STAGE_CONFLICT', 'SURVEY_CLOSED']);
 export function unavailableState(error) {
@@ -98,7 +108,7 @@ export function unavailableState(error) {
 }
 
 export function shareUrl(origin, entryFragment) {
-  if (typeof entryFragment !== 'string' || !parseEntryFragment(entryFragment)) throw new Error('Link could not be constructed.');
+  if (typeof entryFragment !== 'string' || !parseEntryFragment(entryFragment)) throw new Error(copy.linkNotConstructed);
   return `${origin}/${entryFragment}`;
 }
 

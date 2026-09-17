@@ -224,14 +224,14 @@ function linkRoute() {
   return `/v2/assessments/${path(aid)}/surveys/${path(sid)}/links`;
 }
 function clearShareLink() { state.linkConfirm = null; state.shareUrl = null; text($('issue-link-impact'), ''); text($('share-url'), ''); $('share-url').hidden = true; $('copy-link').hidden = true; text($('copy-state'), ''); $('issue-link-confirm').disabled = true; }
-bindClick('issue-link-preview', 'Previewing survey link…', async () => {
+bindClick('issue-link-preview', sharedCopy.labelPreviewLink, async () => {
   clearShareLink();
   const result = await api(linkRoute(), { method: 'POST', body: { params: {}, mode: 'dry_run' } });
   state.linkConfirm = result.confirm_token;
   text($('issue-link-impact'), `${sharedCopy.issuePreview} Impact: ${JSON.stringify(result.impact)}. Confirmation expires in ${result.expires_in} seconds.`);
   $('issue-link-confirm').disabled = false;
 });
-bindClick('issue-link-confirm', 'Creating survey link…', async () => {
+bindClick('issue-link-confirm', sharedCopy.labelCreateLink, async () => {
   const confirm_token = required(state.linkConfirm, 'Preview the survey link again.');
   state.linkConfirm = null; $('issue-link-confirm').disabled = true;
   const result = await api(linkRoute(), { method: 'POST', body: { params: {}, mode: 'execute', confirm_token } });
@@ -239,8 +239,8 @@ bindClick('issue-link-confirm', 'Creating survey link…', async () => {
   text($('share-url'), state.shareUrl); $('share-url').hidden = false; $('copy-link').hidden = false;
   text($('issue-link-impact'), `${sharedCopy.issueDone}${result.expires_at ? ` Expires ${result.expires_at}.` : ''}`);
 });
-bindClick('copy-link', 'Copying link…', async () => { await navigator.clipboard.writeText(required(state.shareUrl, 'Create a survey link first.')); text($('copy-state'), sharedCopy.linkCopied); });
-bindClick('refresh-counts', 'Refreshing counts…', surveyStatus);
+bindClick('copy-link', sharedCopy.labelCopyLink, async () => { await navigator.clipboard.writeText(required(state.shareUrl, 'Create a survey link first.')); text($('copy-state'), sharedCopy.linkCopied); });
+bindClick('refresh-counts', sharedCopy.labelRefreshCounts, surveyStatus);
 bindClick('load-results', 'Reading result state…', async () => {
   const aid = required(state.assessment, 'Choose an assessment.'); const result = await api(`/v2/assessments/${path(aid)}/results`);
   text($('results'), result.suppressed ? `Suppressed / ${result.status}: ${result.reason || 'Disclosure policy pending'}` : JSON.stringify(result));
@@ -341,12 +341,12 @@ async function sharedLinkEntry(token) {
       if (state.shared.bearer) { try { const receipt = await state.shared.receipt(); if (receipt.submitted) showReceipt(receipt); } catch { /* no own receipt to replay */ } }
       return;
     }
-    text($('participant-error'), unavailable === 'revoked' ? sharedCopy.linkUnavailable : 'Participant session could not be reopened.'); $('participant-error').hidden = false;
+    text($('participant-error'), sharedCopy.linkUnavailable); $('participant-error').hidden = false;
     throw error;
   }
 }
 const sharedToken = parseEntryFragment(location.hash);
-if (sharedToken !== null) { stripFragment(window); run('Opening survey…', () => sharedLinkEntry(sharedToken)); }
+if (sharedToken !== null) { stripFragment(window); run(sharedCopy.labelOpening, () => sharedLinkEntry(sharedToken)); }
 else run('Checking session…', async () => {
   try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } }
   catch { state.session = null; state.principal = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); }
