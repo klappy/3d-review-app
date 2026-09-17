@@ -247,6 +247,9 @@ function fakeDocument() {
     e.dispatch = async (t: string) => { for (const f of e.listeners[t] || []) await f({ preventDefault() {}, currentTarget: e }); };
     e.append = (...c: any[]) => e.children.push(...c); e.prepend = (...c: any[]) => e.children.unshift(...c);
     e.replaceChildren = (...c: any[]) => { e.children = c; }; e.add = (o: any) => e.options.push(o);
+    e.setAttribute = (k: string, v: string) => { e[k] = v; };
+    e.removeEventListener = (t: string, f: Function) => { e.listeners[t] = (e.listeners[t] || []).filter((x: Function) => x !== f); };
+    e.contains = (n: any): boolean => e === n || e.children.some((c: any) => c.contains?.(n));
     e.querySelector = () => el("p"); e.querySelectorAll = () => []; e.reset = () => {}; e.focus = () => {};
     e.remove = () => { if (id) { byId.delete(id); removed.add(id); } };
     return e;
@@ -259,6 +262,9 @@ function fakeDocument() {
     createElement: (t: string) => el(t), querySelector: () => el("aside"), querySelectorAll: () => [],
     body: { get textContent() { return allText(); } },
   };
+  // Real participant mount anchors; preserve existing fake-DOM fault assertions.
+  const reviewButton = document.getElementById('participant-review-original'); reviewButton.type = 'submit';
+  document.getElementById('answers').append(document.getElementById('questions'), reviewButton);
   return { document, $: (id: string) => document.getElementById(id) };
 }
 const ATTENTION = "Action needs attention. No completion is assumed.";

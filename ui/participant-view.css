@@ -11,3 +11,11 @@
 .rv #participant #questions legend{font-size:22px;line-height:1.3;margin-bottom:18px;font-weight:600}
 .rv #participant #questions legend:focus{outline:2px solid var(--focus);outline-offset:4px}
 @media(max-width:700px){.rv #participant #questions legend{font-size:20px}}
+
+/* Intro offers Begin only; recovery remains independently available. */
+.rv #participant:has(.participant-intro:not([hidden])) #participant-review-original{display:none}
+.rv #participant:has(.participant-intro) > h2,
+.rv #participant:has(.participant-intro) > #about,
+.rv #participant:has(.participant-intro) > p.note,
+.rv #participant:has(.participant-intro) > #redeem > label,
+.rv #participant:has(.participant-intro) > #redeem > button{display:none}
