@@ -13,9 +13,9 @@
     .rv .public-choices .rv-btn { white-space:normal; }
   }
 
-  /* Real sign-in stays the primary control above; sandbox code controls sit in a labelled box beneath it. */
+  /* Real sign-in is the only control in the primary flow; sandbox code controls open only by explicit choice. */
   .rv .sandbox-signin { margin-top:14px; padding:12px 14px; border:1px dashed var(--glass-edge); border-radius:var(--r-button); }
-  .rv .sandbox-signin h4 { margin:0 0 6px; font-size:13px; font-weight:600; color:var(--secondary); }
+  .rv .sandbox-signin > summary { font-size:13px; font-weight:600; color:var(--secondary); cursor:pointer; }
 
   /* "Sign out" is meaningless while no staff identity is observed (stage-composition sets data-staff-confirmed). */
   .rv[data-staff-confirmed="false"] #signout { display:none; }
