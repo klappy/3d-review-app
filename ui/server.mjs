@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const upstream = process.env.UI_API_ORIGIN || 'http://127.0.0.1:8787';
-const files = { '/design-system/tokens.css': ['design-system/tokens.css', 'text/css'], '/design-system/components.css': ['design-system/components.css', 'text/css'], '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/language.js': ['language.js', 'text/javascript'], '/present.js': ['present.js', 'text/javascript'], '/visibility.js': ['visibility.js', 'text/javascript'], '/participant-resume.js': ['participant-resume.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
+const files = { '/shared-link.js': ['shared-link.js', 'text/javascript'], '/changelog.js': ['changelog.js', 'text/javascript'], '/report-view.js': ['report-view.js', 'text/javascript'], '/context-tree.js': ['context-tree.js', 'text/javascript'], '/design-system/tokens.css': ['design-system/tokens.css', 'text/css'], '/design-system/components.css': ['design-system/components.css', 'text/css'], '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/language.js': ['language.js', 'text/javascript'], '/present.js': ['present.js', 'text/javascript'], '/visibility.js': ['visibility.js', 'text/javascript'], '/participant-resume.js': ['participant-resume.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
 createServer(async (req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   if (path.startsWith('/v2/')) {

@@ -61,15 +61,13 @@ body.rv{border-radius:0;min-height:100vh;overflow:visible}
 .rv .skip-link:focus{top:12px}
 .rv :is(a,summary,textarea,button,input,select):focus-visible{outline:var(--focus-w) solid var(--focus);outline-offset:var(--focus-w)}
 /* A hidden access-controlled card never becomes visible through navigation. */
-.rv .tree-kids{display:none}
-.rv:has(#project-card:not([hidden])) .tree-kids{display:block}
 .rv .shell:has(>aside[hidden]){grid-template-columns:minmax(0,1fr)}
 @media(max-width:760px){
  .rv .top{padding:16px;gap:12px}
  .rv .top-right{gap:8px}
  .rv .shell{grid-template-columns:minmax(0,1fr)}
  .rv .tree{padding:10px 14px;border-right:0;border-bottom:1px solid var(--glass-edge);display:block}
- .rv .tree>.eyebrow,.rv .tree-footer,.rv .tree-kids{display:none!important}
+ .rv .tree>.eyebrow,.rv .tree-footer{display:none!important}
  .rv .tree-section{display:flex;flex-direction:row;gap:4px;flex-wrap:wrap}
  .rv .tree-row{padding:9px 6px;min-height:44px;font-size:13px}
  .rv .tree-row .tree-label small{display:none}
@@ -86,3 +84,11 @@ body.rv{border-radius:0;min-height:100vh;overflow:visible}
 @media(prefers-reduced-motion:reduce){.rv *{scroll-behavior:auto}}
 /* Shared survey routes hide the facilitator; keep its moved sign-out control hidden too. */
 .rv:has(#facilitator[hidden]) #signout{display:none}
+
+/* The live tree mirrors only current authorized select options. */
+.rv .context-branches{list-style:none;margin:0;padding:0;min-width:0}
+.rv .context-branches.tree-kids{margin-left:12px;padding-left:4px}
+.rv button.context-node{display:block;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;min-height:36px;font-size:13px;box-shadow:none;background:transparent;border:1px solid transparent;margin:2px 0;padding:8px}
+.rv button.context-node.on{background:var(--nav-active);border-color:var(--glass-edge);box-shadow:var(--shadow-nav-active)}
+.rv #context-tree{min-width:0}
+@media(max-width:760px){.rv #context-tree{flex-basis:100%;order:4}.rv .context-branches.tree-kids{display:block}.rv button.context-node{min-height:44px}.rv #context-tree .tree-empty{margin:0;padding:4px 8px}}
