@@ -29,10 +29,16 @@ const redact = m => redactDiagnosticPath(String(m || 'Request could not be compl
 //   message      { aid, text, alert } | null       feedback scoped to the entity it belongs to; other screens never show it
 //   lists        Map<pid, {status, list}>          status 'loaded' (authorized, may be empty) | 'refused' (no role on the
 //                                                  project — durable for this identity) | 'failed' (transient — retryable)
+//                                                  | 'unauthenticated' (session expired/revoked — sign in again or retry; never durable)
+//   inflight     Map<pid, Promise>                 one read per project at a time; overlapping callers share it, and only the
+//                                                  newest issued read may write (seq), so a slower failure cannot clobber a success
 //   generation   counter                           a later render supersedes an earlier one's DOM write (supplier 1114cb1)
 let generation = 0;
-const state = { principal: null, projects: [], lists: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Set() };
-const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', 'NOT_AUTHENTICATED', '401', '403', '404']); // codes from supplier 97f7402 + auth.ts
+const state = { principal: null, projects: [], lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Set() };
+// Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
+const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
+const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']); // visibility/authz codes (supplier 97f7402 + policy.ts)
+const SIGNIN = '<a href="/v2/auth/access">Sign in again</a>';
 const listFor = pid => state.lists.get(pid) || { status: 'unloaded', list: null };
 const showMessage = current => state.message && current && state.message.aid === current.assessment.id ? state.message : null;
 
@@ -59,9 +65,20 @@ async function assessmentsFor(pid, { retry = false } = {}) {
   // later call with retry (or an unloaded/failed status) reads again.
   const cur = listFor(pid);
   if (cur.status === 'loaded' || (cur.status === 'refused' && !retry)) return cur;
-  try { const r = await api(`/v2/projects/${encodeURIComponent(pid)}/assessments`); state.lists.set(pid, { status: 'loaded', list: r.assessments || [] }); }
-  catch (e) { state.lists.set(pid, { status: REFUSED.has(String(e.code)) ? 'refused' : 'failed', list: null, error: redact(e.message) }); }
-  return listFor(pid);
+  // Bugbot 4040745888: dedupe — an overlapping caller joins the read in flight; a fresh read gets a new seq and only the
+  // newest seq may write state, so an older, slower response (success or failure) is discarded.
+  if (state.inflight.has(pid)) return state.inflight.get(pid);
+  const seq = (state.seq.get(pid) || 0) + 1; state.seq.set(pid, seq);
+  const run = (async () => {
+    let next;
+    try { const r = await api(`/v2/projects/${encodeURIComponent(pid)}/assessments`); next = { status: 'loaded', list: r.assessments || [] }; }
+    catch (e) { const code = String(e.code); next = { status: UNAUTHENTICATED.has(code) ? 'unauthenticated' : REFUSED.has(code) ? 'refused' : 'failed', list: null, error: redact(e.message) }; }
+    finally { state.inflight.delete(pid); }
+    if (state.seq.get(pid) === seq) state.lists.set(pid, next);
+    return listFor(pid);
+  })();
+  state.inflight.set(pid, run);
+  return run;
 }
 function context(current) {
   const projects = state.projects.map(p => {
@@ -69,7 +86,8 @@ function context(current) {
     const open = current?.assessment.project_id === p.id || l.status !== 'unloaded';
     const body = !open ? '' : l.status === 'loaded' ? (l.list.map(x => `<a class="assessment-link" href="#assessment/${encodeURIComponent(x.id)}" ${current && x.id === current.assessment.id ? 'aria-current="page"' : ''}>${esc(x.name)}<small>${stageLabel(x.stage)}</small></a>`).join('') || '<p class="small muted" style="margin:4px 0 0 18px">No assessments yet.</p>')
       : l.status === 'refused' ? '<p class="small muted" style="margin:4px 0 0 18px">Not listed: you have no role on this project.</p>'
-      : l.status === 'failed' ? `<p class="small muted" style="margin:4px 0 0 18px" role="alert">Could not load assessments. <a href="#" data-retry-list="${esc(p.id)}">Retry</a></p>` : '<p class="small muted" style="margin:4px 0 0 18px">Loading…</p>';
+      : l.status === 'failed' ? `<p class="small muted" style="margin:4px 0 0 18px" role="alert">Could not load assessments. <a href="#" data-retry-list="${esc(p.id)}">Retry</a></p>`
+      : l.status === 'unauthenticated' ? `<p class="small muted" style="margin:4px 0 0 18px" role="alert">Your sign-in is no longer active. ${SIGNIN} or <a href="#" data-retry-list="${esc(p.id)}">Retry</a></p>` : '<p class="small muted" style="margin:4px 0 0 18px">Loading…</p>';
     return `<div class="context-project"><a class="project-name" href="#" data-project="${esc(p.id)}">${esc(p.name)}</a>${body}</div>`;
   }).join('');
   // Direct assessment grant without a project role: the open assessment is listed under its own heading, truthfully.
@@ -96,10 +114,10 @@ function screen(current) {
 }
 function projectsView() {
   if (!state.projects.length) return `<div class="narrow panel"><p class="eyebrow">Your projects</p><h1>No project on this account</h1><p class="muted">This screen lists projects you hold a role on. An assessment you were granted directly, without a project role, is not listed here yet; the current workspace still opens it.</p></div>`;
-  return `<div class="title"><div><p class="eyebrow">Your projects</p><h1>Choose an assessment</h1></div></div><div class="project-grid">${state.projects.map(p => { const l = listFor(p.id); return `<div class="panel project-card"><p class="eyebrow">Project</p><h2>${esc(p.name)}</h2>${l.status === 'loaded' ? (l.list.length ? `<div class="links">${l.list.map(x => `<a href="#assessment/${encodeURIComponent(x.id)}">${esc(x.name)} <span class="small muted">· ${stageLabel(x.stage)}</span></a>`).join('')}</div>` : '<p class="small muted">No assessments yet.</p>') : l.status === 'failed' ? `<p class="small muted" role="alert">Could not load assessments. <a href="#" data-retry-list="${esc(p.id)}">Retry</a></p>` : l.status === 'refused' ? '<p class="small muted">Not listed: you have no role on this project.</p>' : `<a href="#" class="small" data-project="${esc(p.id)}">Show assessments</a>`}</div>`; }).join('')}</div>`;
+  return `<div class="title"><div><p class="eyebrow">Your projects</p><h1>Choose an assessment</h1></div></div><div class="project-grid">${state.projects.map(p => { const l = listFor(p.id); return `<div class="panel project-card"><p class="eyebrow">Project</p><h2>${esc(p.name)}</h2>${l.status === 'loaded' ? (l.list.length ? `<div class="links">${l.list.map(x => `<a href="#assessment/${encodeURIComponent(x.id)}">${esc(x.name)} <span class="small muted">· ${stageLabel(x.stage)}</span></a>`).join('')}</div>` : '<p class="small muted">No assessments yet.</p>') : l.status === 'failed' ? `<p class="small muted" role="alert">Could not load assessments. <a href="#" data-retry-list="${esc(p.id)}">Retry</a></p>` : l.status === 'unauthenticated' ? `<p class="small muted" role="alert">Your sign-in is no longer active. ${SIGNIN} or <a href="#" data-retry-list="${esc(p.id)}">Retry</a></p>` : l.status === 'refused' ? '<p class="small muted">Not listed: you have no role on this project.</p>' : `<a href="#" class="small" data-project="${esc(p.id)}">Show assessments</a>`}</div>`; }).join('')}</div>`;
 }
 function bind(current) {
-  app.querySelectorAll('[data-project]').forEach(el => el.onclick = async e => { e.preventDefault(); await assessmentsFor(el.dataset.project); render(); });
+  app.querySelectorAll('[data-project]').forEach(el => el.onclick = async e => { e.preventDefault(); await assessmentsFor(el.dataset.project, { retry: listFor(el.dataset.project).status !== 'refused' }); render(); });
   app.querySelectorAll('[data-retry-list]').forEach(el => el.onclick = async e => { e.preventDefault(); await assessmentsFor(el.dataset.retryList, { retry: true }); render(); });
   if (!current) return;
   const aid = current.assessment.id;
@@ -134,7 +152,7 @@ async function render() {
       catch (e) {
         if (gen !== generation) return;
         if (state.current?.assessment.id === aid) { /* dirty refresh failed: keep the last screen, keep the dirty banner (retry offered) */ }
-        else { state.current = null; app.className = ''; app.innerHTML = `<div class="narrow panel"><h1>Assessment unavailable</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#assessment/${encodeURIComponent(aid)}" data-refresh="${esc(aid)}">Try again</a> <a href="#">All projects</a></p></div>`; app.querySelector('[data-refresh]').onclick = ev => { ev.preventDefault(); render(); }; return; }
+        else { state.current = null; app.className = ''; const expired = UNAUTHENTICATED.has(String(e.code)); app.innerHTML = `<div class="narrow panel"><h1>${expired ? 'Your sign-in is no longer active' : 'Assessment unavailable'}</h1><p class="muted">${esc(redact(e.message))}</p><p>${expired ? `<a class="button primary" href="/v2/auth/access">Sign in again</a> ` : ''}<a class="button" href="#assessment/${encodeURIComponent(aid)}" data-refresh="${esc(aid)}">Try again</a> <a href="#">All projects</a></p></div>`; app.querySelector('[data-refresh]').onclick = ev => { ev.preventDefault(); render(); }; return; }
       }
     }
     if (gen !== generation || state.current?.assessment.id !== aid) return;
