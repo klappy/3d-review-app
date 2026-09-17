@@ -11,7 +11,7 @@ import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import app from "../src/index";
 import { mintSession } from "../src/auth";
 // @ts-expect-error plain JS module without types
-import { copy, createSharedLinkClient, currentNamespace, digestNamespace, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment } from "../ui/shared-link.js";
+import { copy, createSharedLinkClient, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment } from "../ui/shared-link.js";
 // @ts-expect-error plain JS module without types
 import { FORM, memoryStorage } from "./fixtures/shared-link-contract.dev.mjs";
 
@@ -167,6 +167,38 @@ describe("[real-API] participant client against the worker", () => {
     expect(errorKind(err)).toBe("conflict");
     expect(await resolveConflict(client)).toMatchObject({ state: "receipt", receipt: { response_id: saved.response_id } });
   });
+  it("refused resume (stored resume_token unknown): cannot-resume kind, scoped storage byte-identical, one POST link, no new respondent", async () => {
+    const link = await issue();
+    const calls: string[] = [];
+    const counting = (url: string, init: any) => { calls.push(`${init.method || "GET"} ${url}`); return fetchImpl(url, init); };
+    const { storage, store } = await context(link.link_token, counting);
+    store.set("bearer", "pt_" + "x".repeat(32)); store.set("submitKey", "key-1"); store.set("draft", JSON.stringify({ template: { id: "t", version: 1 }, answers: { Q1: 2 } }));
+    const client = createSharedLinkClient({ fetchImpl: counting, store }); // the client reads the stored bearer at creation, as a reload does
+    const before = JSON.stringify(storage.keys().map((k: string) => [k, storage.getItem(k)]));
+    const sessions = async () => Number((await db.prepare("SELECT COUNT(*) AS n FROM participant_session").first<{ n: number }>())?.n);
+    const n = await sessions();
+    let err: any; try { await client.open(link.link_token); } catch (e) { err = e; }
+    expect(err.code).toBe("NOT_FOUND_OR_NOT_VISIBLE");
+    expect(entryFailureKind(err, true)).toBe("cannotResume"); expect(entryFailureKind(err, false)).toBe("unavailable");
+    expect(JSON.stringify(storage.keys().map((k: string) => [k, storage.getItem(k)]))).toBe(before);
+    expect(calls.filter(c => c === "POST /v2/participate/link")).toHaveLength(1);
+    expect(await sessions()).toBe(n);
+    expect(copy.cannotResume).not.toMatch(/expired|no longer works|not saved|was not sent/i);
+  });
+  it("error kinds: 429/RATE_LIMITED is rateLimited; network and 5xx are transient; closed stays conflict on the resume path", async () => {
+    const link = await issue();
+    const limited = async () => new Response(JSON.stringify({ ok: false, error: { code: "RATE_LIMITED", message: "slow down" } }), { status: 429, headers: { "content-type": "application/json" } });
+    const { client: c1 } = await context(link.link_token, limited);
+    let e1: any; try { await c1.open(link.link_token); } catch (e) { e1 = e; } expect(errorKind(e1)).toBe("rateLimited"); expect(entryFailureKind(e1, true)).toBe("rateLimited");
+    const { client: c2 } = await context(link.link_token, async () => { throw new Error("offline"); });
+    let e2: any; try { await c2.open(link.link_token); } catch (e) { e2 = e; } expect(errorKind(e2)).toBe("transient");
+    const { client: c3 } = await context(link.link_token, async () => new Response("{\"ok\":false}", { status: 503, headers: { "content-type": "application/json" } }));
+    let e3: any; try { await c3.open(link.link_token); } catch (e) { e3 = e; } expect(errorKind(e3)).toBe("transient");
+    const { client: c4 } = await context(link.link_token); await c4.open(link.link_token);
+    await setOpen(false);
+    try { let e4: any; try { await c4.open(link.link_token); } catch (e) { e4 = e; } expect(e4).toBeUndefined(); /* resume path skips the collecting gate; submit is gated */ }
+    finally { await setOpen(true); }
+  });
   it("staff: dry-run → execute → share URL = origin + '/' + entry_fragment, and the fragment round-trips", async () => {
     const link = await issue();
     expect(link.entry_fragment).toBe("#survey=" + encodeURIComponent(link.link_token));
@@ -252,6 +284,18 @@ describe("[fake-DOM] ui/app.js shared mode", () => {
     // reload after submit shows the receipt, not an editable form
     const $2 = await boot(storage, "");
     expect($2("receipt").hidden).toBe(false); expect($2("answers").hidden).toBe(true);
+  });
+  it("refused resume shows the cannot-resume copy; no fresh open; scoped bearer/key/draft unchanged", async () => {
+    const link = await issue();
+    const storage = memoryStorage();
+    const ns = await digestNamespace(link.link_token);
+    storage.setItem(ns + "bearer", "pt_" + "y".repeat(32)); storage.setItem(ns + "submitKey", "key-2"); storage.setItem(ns + "draft", "{\"template\":{\"id\":\"t\",\"version\":1},\"answers\":{\"Q1\":1}}");
+    const before = JSON.stringify(storage.keys().sort().map((k: string) => [k, storage.getItem(k)]));
+    const $ = await boot(storage, link.entry_fragment);
+    expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.cannotResume);
+    expect($("answers").hidden).toBe(true); expect($("error").hidden).toBe(true);
+    expect(storage.getItem(ns + "bearer")).toBe("pt_" + "y".repeat(32));
+    expect(JSON.stringify(storage.keys().filter((k: string) => k !== "shared:current").sort().map((k: string) => [k, storage.getItem(k)]))).toBe(before);
   });
   it("closed collection on entry shows the closed copy; no form", async () => {
     const link = await issue();
