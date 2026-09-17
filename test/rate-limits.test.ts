@@ -77,4 +77,17 @@ describe("rate limits", () => {
     const env = mkEnv({ RL_REDEEM: { limit: async () => { throw new Error("edge hiccup"); } }, RL_MCP_ANON: limiter(100) });
     expect((await post(env, "/v2/participate/code", { code: "NOPE-0010" })).status).toBe(404);
   }, 30_000);
+  it("a JSON-RPC batch spends one unit per message; oversized batches are refused for everyone (Bugbot 9ea1c79e)", async () => {
+    const env = mkEnv({ RL_MCP_ANON: limiter(5) });
+    const batch = (n: number) => Array.from({ length: n }, (_, i) => ({ jsonrpc: "2.0", id: i + 1, method: "tools/list" }));
+    expect((await post(env, "/mcp", batch(4))).status).toBe(200);          // 4 of 5 spent
+    expect((await post(env, "/mcp", batch(2))).status).toBe(429);          // needs 2, 1 left
+    expect(env.RL_MCP_ANON.seen.get("ip:203.0.113.7")).toBeGreaterThanOrEqual(5);
+    const big = await post(env, "/mcp", batch(11), "198.51.100.77");
+    expect(big.status).toBe(400); expect(((await big.json()) as any).error.code).toBe(-32600);
+    expect(env.RL_MCP_ANON.seen.has("ip:198.51.100.77")).toBe(false);     // refused before spending
+    const bearer = await mintSession(env, "person_mara", "user");
+    expect((await post(env, "/mcp", batch(11), "203.0.113.7", bearer)).status).toBe(400); // cap applies signed-in too
+    expect((await post(env, "/mcp", batch(10), "203.0.113.7", bearer)).status).toBe(200);
+  }, 30_000);
 });

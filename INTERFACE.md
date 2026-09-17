@@ -50,7 +50,7 @@ Borrowed substrate: Cloudflare Workers Rate Limiting bindings (`[[ratelimits]]` 
 
 | Binding | Counts | Key | Limit |
 |---|---|---|---|
-| `RL_MCP_ANON` | every anonymous `POST /mcp` (signed-in callers are not counted) | caller address | 30 / 60 s |
+| `RL_MCP_ANON` | every anonymous `POST /mcp`, **one unit per JSON-RPC message** in a batch (signed-in callers are not counted); any batch over 10 messages is refused (`-32600`) for every caller | caller address | 30 / 60 s |
 | `RL_AUTH` | `cap.auth.request_link`, `cap.auth.consume_link` | caller address, and sha256(email) prefix | 10 / 60 s each |
 | `RL_REDEEM` | `cap.participant.redeem_code`, `cap.participant.open_link` | caller address | 60 / 60 s (a workshop room shares one address) |
 

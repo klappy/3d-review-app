@@ -7,7 +7,7 @@
  * not a lockout. The secrets it shields are not guessable at these rates (access codes are 8 chars of a 32-symbol
  * alphabet ≈ 1.1e12; sessions are 24 random bytes). Windows are 60 s because the binding only offers 10 s or 60 s.
  *
- *   RL_MCP_ANON  anonymous POST /mcp (any JSON-RPC method)                 key ip           30 / 60 s
+ *   RL_MCP_ANON  anonymous POST /mcp — one unit per JSON-RPC message        key ip           30 / 60 s
  *   RL_AUTH      cap.auth.request_link + cap.auth.consume_link             key ip, email    10 / 60 s each
  *   RL_REDEEM    cap.participant.redeem_code + cap.participant.open_link   key ip           60 / 60 s
  *                (60 because a whole workshop room shares one NAT address — 18-I phase C: 50 concurrent participants)
@@ -22,6 +22,8 @@ import { sha256 } from "./handlers/common";
 
 export type LimiterName = "RL_MCP_ANON" | "RL_AUTH" | "RL_REDEEM";
 export const RATE_LIMIT_WINDOW_SECONDS = 60;
+/** Largest JSON-RPC batch any caller may POST to /mcp; an anonymous batch spends one RL_MCP_ANON unit per message. */
+export const MCP_MAX_BATCH = 10;
 
 const CAP_LIMITER: Record<string, LimiterName> = {
   "cap.auth.request_link": "RL_AUTH",
