@@ -17,3 +17,4 @@ workspace-overview.test.mjs
 participant-view.test.mjs
 public-choices.test.mjs
 diagnostic-path.test.mjs
+collab-mount.test.mjs

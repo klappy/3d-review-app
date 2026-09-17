@@ -1,5 +1,6 @@
 import { mountParticipantView } from './participant-view.js';
 import { redactDiagnosticPath } from './diagnostic-path.js';
+import { createCollabHooks } from './collab-mount.js';
 import { loadRoleHelp, loadBlankPrint, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
@@ -21,6 +22,7 @@ const sharedResume = sharedToken === null ? currentNamespace(sessionStorage) : n
 const sharedMode = sharedToken !== null || sharedResume !== null;
 const state = { session: sharedMode ? null : sessionStorage.getItem('facilitatorToken'), participant: sharedMode ? null : sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null, assessmentRole: null, reportConfirm: null, reportCursor: null };
 state.responseKey = sharedMode ? null : savedSubmitKey(sessionStorage, state.participant);
+const collab = createCollabHooks({ document, api, sharedMode, onReload: async () => { const me = await identity(); if (me && hasProjectWork(me)) await projects(); } });
 const path = (value) => encodeURIComponent(value);
 let stageGeneration = 0;
 let stageContext = null;
@@ -119,6 +121,7 @@ function showAuthorizedWork(me) {
   text($('access-state'), visible ? '' : 'No project access is assigned to this identity. Scoped project work is hidden.');
 }
 function resetClientIdentity() {
+  collab.reset(); // W/I managers clear synchronously before any other identity work
   participantView?.destroy(); participantView = null;
   clearStageScreens();
   clearIdentityData(state, sessionStorage);
@@ -149,10 +152,12 @@ async function identity() {
   const result = await api('/v2/me'); state.principal = result.principal;
   text($('identity'), `${result.principal.kind} · ${result.principal.id}`);
   showAuthorizedWork(result);
+  collab.identity(result);
   return result;
 }
 async function projects() {
   const result = await api('/v2/projects'); resetSelect($('projects'), 'Choose project');
+  collab.projects(result.projects);
   for (const p of result.projects || []) option($('projects'), p.id, `${p.name} · ${p.role}`);
   if (state.project) $('projects').value = state.project;
 }
@@ -165,9 +170,11 @@ async function chooseProject() {
   text($('project-detail'), ''); text($('assessment-detail'), ''); text($('survey-detail'), '');
   text($('results'), 'Select an assessment.');
   resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
+  collab.setScope(null);
   if (!state.project) { await languageControls.refresh(); return; }
   const result = await api(`/v2/projects/${path(state.project)}`);
   state.projectView = result.project;
+  collab.setScope({ type: 'project', id: result.project.id, role: result.project.role });
   await languageControls.refresh();
   await assessments();
 }
@@ -189,6 +196,7 @@ async function chooseAssessment() {
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   if (!stageCurrent(stageRead)) return;
   state.assessmentRole = result.assessment.role; showReportControls();
+  collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
   text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
   const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
   if (next) $('stage-target').value = next;
