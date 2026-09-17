@@ -586,14 +586,18 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     expectUncertain($, storage, snap);
     expect($("review").hidden).toBe(false);
   });
-  it("F11c recover with GET /receipt → 503 before any submit: transient copy, form and Recover stay, storage byte-identical", async () => {
-    const link = await issue(); const { $, storage, ns, plan } = await openForm(link);
-    const snap = await armed(storage, ns);
-    plan.receipt = refuse(503, "INTERNAL");
+  for (const [row, status, code, expected] of [["F11c", 503, "INTERNAL", "transient"], ["F11d", 429, "RATE_LIMITED", "rateLimited"]] as const) it(`${row} fresh open, Recover with GET /receipt → ${status}: ${expected} copy in #participant-resume, form and Recover stay, #error empty, storage byte-identical`, async () => {
+    const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
+    const $ = await boot(storage, link.entry_fragment, fetcher); strict($);
+    expect($("answers").hidden).toBe(false); expect($("recover").hidden).toBe(false);
+    const snap = snapshot(storage);
+    plan.receipt = refuse(status, code);
     await $("recover").dispatch("click"); await settled($); strict($);
-    expect($("participant-resume").textContent).toBe(copy.transient);
-    expect($("review").hidden).toBe(false); expect($("recover").hidden).toBe(false);
-    expect($("participant-error").hidden).toBe(true); expect(snapshot(storage)).toBe(snap);
+    expect($("participant-resume").textContent).toBe(copy[expected]);
+    expect($("participant-error").hidden).toBe(true);
+    expect($("answers").hidden).toBe(false); expect($("review").hidden).toBe(true); expect($("recover").hidden).toBe(false);
+    expect($("notice").textContent).toBe(ATTENTION);
+    expect(snapshot(storage)).toBe(snap);
   });
   it("F10 fragment entry with GET /receipt → 503: transient copy shown, #error stays empty and hidden", async () => {
     const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
