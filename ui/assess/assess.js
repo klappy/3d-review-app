@@ -113,7 +113,13 @@ async function render() {
 }
 async function boot() {
   try { const me = await api('/v2/me'); state.principal = me.principal; }
-  catch { who.textContent = 'Not signed in'; app.className = ''; app.innerHTML = `<div class="narrow panel"><h1>Sign in to open an assessment</h1><p class="muted">This screen uses your existing session. Sign in on the current workspace in this same tab, then come back to <code>${esc(location.pathname + location.hash)}</code>.</p><a class="button primary" href="/#facilitator">Go to sign in</a></div>`; return; }
+  catch {
+    // Real sign-in only (captain: synthetic-only sign-in rejected). /v2/auth/access is the existing Cloudflare email-code
+    // route; it sets the session cookie and returns to the workspace home (/#session=…), not here — stated, not hidden.
+    who.textContent = 'Not signed in'; app.className = '';
+    const here = location.pathname + location.hash;
+    app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this assessment</h1><p class="muted">Sign in with the one-time email code. It brings you back to the workspace home in this tab; then open this address again:</p><p><code>${esc(here)}</code></p><a class="button primary" href="/v2/auth/access">Sign in with an email code</a></div>`;
+    return; }
   who.textContent = `${state.principal.kind} · ${state.principal.id}`;
   state.projects = (await api('/v2/projects')).projects || [];
   window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
