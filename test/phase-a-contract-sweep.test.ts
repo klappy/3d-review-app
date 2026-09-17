@@ -117,7 +117,9 @@ describe("Phase A — contract sweep over all capabilities, both faces", () => {
     const dry = await call("dry_run"); expect(dry.ok).toBe(true);
     const exec = await call("execute", dry.result.confirm_token); expect(exec.error?.code).toBe("RESERVED_NOT_BUILT");
     // cap.auth.request_link outside dev
-    const prodEnv = { ...env, ENVIRONMENT: "production" };
+    // limiter bindings present (as in a real production Worker): with app #12 merged, production WITHOUT them refuses 429 by design
+    const open_ = { limit: async () => ({ success: true }) };
+    const prodEnv = { ...env, ENVIRONMENT: "production", RL_MCP_ANON: open_, RL_AUTH: open_, RL_REDEEM: open_, RL_MCP_CEILING: open_ };
     const r = await app.fetch(new Request("https://t.invalid/v2/auth/link", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "demo.owner@example.invalid" }) }), prodEnv);
     expect(r.status).toBe(501);
   }, 60_000);
