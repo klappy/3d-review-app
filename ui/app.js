@@ -246,6 +246,7 @@ async function restoreParticipant() {
     $('recover').hidden = false;
     if (resumeTarget(receipt) === 'receipt') {
       showReceipt(receipt);
+      state.responseKey = null; sessionStorage.removeItem('responseKey');
       text($('participant-resume'), 'Saved submission restored from the server.');
     } else {
       await loadForm();
@@ -275,7 +276,11 @@ function showReceipt(result) {
   $('receipt').hidden = false;
   if (result.submitted !== false) { $('review').hidden = true; $('answers').hidden = true; }
 }
-bindClick('recover', 'Recovering receipt…', async () => showReceipt(await api('/v2/participate/receipt', { participant: true })));
+bindClick('recover', 'Recovering receipt…', async () => {
+  const receipt = await api('/v2/participate/receipt', { participant: true });
+  showReceipt(receipt);
+  if (receipt.submitted) { state.responseKey = null; sessionStorage.removeItem('responseKey'); }
+});
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
 { const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); } }
 run('Checking session…', async () => {
