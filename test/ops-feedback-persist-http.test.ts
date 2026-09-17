@@ -276,4 +276,27 @@ describe("ops feedback persist HTTP — Prefer 5732375 F1–F7 / N1–N9", () =>
     expect(bad.json).toMatchObject({ ok: false, error: { code: "NOT_FOUND_OR_NOT_VISIBLE" } });
     expect(JSON.stringify(bad.json.error)).not.toMatch(/not-json|SyntaxError|JSON/i);
   });
+
+  it("object-valued legacy text is malformed-row NOT_FOUND_OR_NOT_VISIBLE", async () => {
+    await db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
+      .bind("fb_object_text", "anon", "platform", "-", JSON.stringify({ text: { legacy: "value" }, stripped: false }), "2026-09-16T00:00:00.000Z").run();
+    const got = await getFeedback("fb_object_text", supportToken);
+    expect(got.status).toBe(404);
+    expect(got.json).toMatchObject({ ok: false, error: { code: "NOT_FOUND_OR_NOT_VISIBLE" } });
+    expect(JSON.stringify(got.json)).not.toContain("legacy");
+    expect(got.json.result).toBeUndefined();
+  });
+
+  it("malformed stored helpful/score types are malformed-row NOT_FOUND_OR_NOT_VISIBLE", async () => {
+    await db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
+      .bind("fb_bad_helpful", "anon", "platform", "-", JSON.stringify({ helpful: "yes", stripped: false }), "2026-09-16T00:00:00.000Z").run();
+    await db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
+      .bind("fb_bad_score", "anon", "platform", "-", JSON.stringify({ satisfaction: 1.5, stripped: false }), "2026-09-16T00:00:00.000Z").run();
+    for (const id of ["fb_bad_helpful", "fb_bad_score"]) {
+      const got = await getFeedback(id, supportToken);
+      expect(got.status).toBe(404);
+      expect(got.json).toMatchObject({ ok: false, error: { code: "NOT_FOUND_OR_NOT_VISIBLE" } });
+      expect(got.json.result).toBeUndefined();
+    }
+  });
 });

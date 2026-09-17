@@ -90,10 +90,6 @@ const FEEDBACK_WRITE_KEYS = new Set([
 ]);
 const FEEDBACK_SCORE_KEYS = ["satisfaction", "confusion", "frustration"] as const;
 const FEEDBACK_CODE_UNIT_128 = ["sentiment_journey", "cast_id", "persona", "goal_id"] as const;
-const FEEDBACK_BODY_READ_KEYS = [
-  "helpful", "note", "context", "satisfaction", "confusion", "frustration",
-  "sentiment_journey", "cast_id", "persona", "goal_id",
-] as const;
 
 const utf8Bytes = (s: string): number => new TextEncoder().encode(s).length;
 const invalidFeedback = (message: string) => new CapError("INVALID_PARAMS", message);
@@ -167,6 +163,41 @@ export const opsFeedback: Handler = async (ctx, p) => {
   return { result: { recorded: true, stripped, feedback_id: feedbackId }, scope: { type: "platform", id: "feedback" } };
 };
 
+/** Present typed stored fields must match the read projection; otherwise the row is malformed. */
+function projectStoredFeedbackBody(raw: Record<string, unknown>): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if ("helpful" in raw) {
+    if (typeof raw.helpful !== "boolean") throw notVisible("feedback");
+    body.helpful = raw.helpful;
+  }
+  if ("note" in raw) {
+    if (typeof raw.note !== "string") throw notVisible("feedback");
+    body.note = raw.note;
+  } else if ("text" in raw) {
+    if (typeof raw.text !== "string") throw notVisible("feedback");
+    body.note = raw.text;
+  }
+  if ("context" in raw) body.context = raw.context;
+  for (const key of FEEDBACK_SCORE_KEYS) {
+    if (!(key in raw)) continue;
+    const value = raw[key];
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 5) throw notVisible("feedback");
+    body[key] = value;
+  }
+  for (const key of FEEDBACK_CODE_UNIT_128) {
+    if (!(key in raw)) continue;
+    if (typeof raw[key] !== "string") throw notVisible("feedback");
+    body[key] = raw[key];
+  }
+  if ("stripped" in raw) {
+    if (typeof raw.stripped !== "boolean") throw notVisible("feedback");
+    body.stripped = raw.stripped;
+  } else {
+    body.stripped = false;
+  }
+  return body;
+}
+
 /** S-only per-row read. Role gate is policy.ts N6; missing/malformed rows are existence-hidden. */
 export const opsFeedbackGet: Handler = async (ctx, p) => {
   if (typeof p.id !== "string" || !p.id) throw new CapError("INVALID_PARAMS", "id required");
@@ -176,15 +207,7 @@ export const opsFeedbackGet: Handler = async (ctx, p) => {
   let stored: unknown;
   try { stored = JSON.parse(row.body); } catch { throw notVisible("feedback"); }
   if (!stored || typeof stored !== "object" || Array.isArray(stored)) throw notVisible("feedback");
-  const raw = stored as Record<string, unknown>;
-  const body: Record<string, unknown> = {};
-  for (const key of FEEDBACK_BODY_READ_KEYS) {
-    if (key === "note") continue;
-    if (key in raw) body[key] = raw[key];
-  }
-  if ("note" in raw) body.note = raw.note;
-  else if ("text" in raw) body.note = raw.text;
-  body.stripped = typeof raw.stripped === "boolean" ? raw.stripped : false;
+  const body = projectStoredFeedbackBody(stored as Record<string, unknown>);
   return {
     result: {
       id: row.id,

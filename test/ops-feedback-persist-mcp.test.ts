@@ -204,4 +204,29 @@ describe("ops feedback persist MCP twins — Prefer 5732375 F1–F7 / N1–N9", 
     expect((await mcp("read", "cap.ops.feedback", { note: "x" })).env.error.code).toBe("WRONG_TOOL_FOR_CLASS");
     expect((await mcp("write", "cap.ops.feedback_get", { id: "fb_x" }, supportToken)).env.error.code).toBe("WRONG_TOOL_FOR_CLASS");
   });
+
+  it("ordinary legacy string text maps to note on MCP read", async () => {
+    await db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
+      .bind("fb_legacy_mcp", "anon", "platform", "-", JSON.stringify({ text: "legacy-mcp", context: { page: "x" }, stripped: false }), "2026-09-16T00:00:00.000Z").run();
+    const read = await staffRead("fb_legacy_mcp");
+    expect(read.body.note).toBe("legacy-mcp");
+    expect(read.body.context).toEqual({ page: "x" });
+    expect(read.body).not.toHaveProperty("text");
+    expect(read.body).not.toHaveProperty("helpful");
+  });
+
+  it("object-valued legacy text and malformed helpful/score types refuse on MCP read", async () => {
+    await db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
+      .bind("fb_object_text_mcp", "anon", "platform", "-", JSON.stringify({ text: { legacy: "value" }, stripped: false }), "2026-09-16T00:00:00.000Z").run();
+    await db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
+      .bind("fb_bad_helpful_mcp", "anon", "platform", "-", JSON.stringify({ helpful: "yes", stripped: false }), "2026-09-16T00:00:00.000Z").run();
+    await db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
+      .bind("fb_bad_score_mcp", "anon", "platform", "-", JSON.stringify({ confusion: 1.5, stripped: false }), "2026-09-16T00:00:00.000Z").run();
+    for (const id of ["fb_object_text_mcp", "fb_bad_helpful_mcp", "fb_bad_score_mcp"]) {
+      const got = await readFeedback(id, supportToken);
+      expect(got.env).toMatchObject({ ok: false, error: { code: "NOT_FOUND_OR_NOT_VISIBLE" } });
+      expect(got.env.result).toBeUndefined();
+      expect(JSON.stringify(got.env)).not.toContain("legacy");
+    }
+  });
 });
