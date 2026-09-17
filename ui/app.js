@@ -1,3 +1,4 @@
+import { mountParticipantView } from './participant-view.js';
 import { loadRoleHelp, loadBlankPrint, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
@@ -9,6 +10,7 @@ import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, dig
 // needing attention without painting raw server text into #error.
 class HandledFailure extends Error { constructor() { super('handled'); this.name = 'HandledFailure'; } }
 // In-memory only (per page): whether an earlier submit on this page had an unknown outcome.
+let participantView = null;
 let submitState = 'none'; // 'none' | 'uncertain'
 const $ = id => document.getElementById(id);
 // Shared-link mode is decided first so no global (code-path) key is read or written in that mode.
@@ -116,6 +118,7 @@ function showAuthorizedWork(me) {
   text($('access-state'), visible ? '' : 'No project access is assigned to this identity. Scoped project work is hidden.');
 }
 function resetClientIdentity() {
+  participantView?.destroy(); participantView = null;
   clearStageScreens();
   clearIdentityData(state, sessionStorage);
   clearCodeBatch(); clearShareLink(); // sign-out/sign-in: the once-shown link and confirm token never outlive the identity
@@ -446,6 +449,7 @@ bindForm('redeem', 'Redeeming access code…', async fd => {
     () => api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } }),
     result => {
     state.participant = result.participant_token; sessionStorage.setItem('participantToken', state.participant);
+    participantView?.destroy(); participantView = null;
     state.form = null; state.answers = null;
     $('questions').replaceChildren(); $('review-answers').replaceChildren();
     for (const id of ['form-context', 'receipt']) text($(id), '');
@@ -465,8 +469,11 @@ async function loadForm() {
   const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null;
   clearParticipantError();
   text($('form-context'), `${result.assessment} · ${result.language} · ${result.template.id}@${result.template.version}`);
+  participantView?.destroy(); participantView = null;
   $('questions').replaceChildren(...result.items.map(drawQuestion)); $('answers').hidden = false; $('review').hidden = true; $('receipt').hidden = true; $('recover').hidden = false;
   if (state.shared) restoreSharedDraft();
+  participantView = mountParticipantView({doc:document, root:$('participant-view-root'), form:$('answers'), questions:$('questions'), review:$('review'), reviewAnswers:$('review-answers'), receipt:$('receipt'), context:$('form-context'), model:result, reviewButton:$('participant-review-original'), onEdit:()=>{ $('answers').hidden=false; $('review').hidden=true; }});
+  if (state.shared && state.sharedStore.get('draft')) participantView.showForm();
 }
 function draftValues() {
   const values = new FormData($('answers')); const out = {};
@@ -504,8 +511,9 @@ bindForm('answers', 'Preparing answer review…', async () => {
   state.answers = answersFromForm(); $('review-answers').replaceChildren();
   for (const item of state.form.items) { const p = document.createElement('p'); p.textContent = `${item.text || item.id}: ${reviewAnswer(item, state.answers[item.id])}`; $('review-answers').append(p); }
   $('answers').hidden = true; $('review').hidden = false;
+  participantView?.showReview();
 });
-$('edit').addEventListener('click', () => { $('answers').hidden = false; $('review').hidden = true; });
+$('edit').addEventListener('click', () => { $('answers').hidden = false; $('review').hidden = true; participantView?.showForm(); });
 bindClick('submit', 'Submitting response…', async () => {
   required(state.answers, 'Review answers first.');
   if (state.shared) { // scoped namespace only; the global responseKey is never touched in this mode
@@ -552,7 +560,7 @@ function showReceipt(result) {
   text($('receipt'), result.submitted === false ? 'No submission recorded yet.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`);
   text($('participant-resume'), resumeNoticeAfterReceipt(result, $('participant-resume').textContent));
   $('receipt').hidden = false;
-  if (result.submitted !== false) { $('review').hidden = true; $('answers').hidden = true; }
+  if (result.submitted !== false) { $('review').hidden = true; $('answers').hidden = true; participantView?.showReceipt(); }
   if (state.shared && result.submitted !== false) text($('participant-resume'), `${sharedCopy.receiptThanks} ${sharedCopy.sameLinkOthers}`);
 }
 bindClick('recover', 'Recovering receipt…', async () => {
@@ -580,7 +588,7 @@ function showSharedUnavailable(kind) {
   const message = { closed: sharedCopy.collectionClosed, cannotResume: sharedCopy.cannotResume, rateLimited: sharedCopy.rateLimited, transient: sharedCopy.transient }[kind] || sharedCopy.linkUnavailable;
   text($('participant-error'), message); $('participant-error').hidden = false;
   text($('participant-resume'), ''); // terminal copy replaces any sticky retry instruction
-  $('answers').hidden = true; $('review').hidden = true; $('recover').hidden = true;
+  $('answers').hidden = true; $('review').hidden = true; $('recover').hidden = true; participantView?.showReceipt();
 }
 async function sharedLinkEntry(token, namespace) {
   $('facilitator').hidden = true; $('evidence').remove(); document.querySelector('aside').hidden = true; $('participant').querySelector('p.note').hidden = true; // evidence is removed, not hidden: no trace/receipt text exists on the shared route
