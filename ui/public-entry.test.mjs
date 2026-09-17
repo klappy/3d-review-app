@@ -14,3 +14,5 @@ test('public intents reach real existing app controls without declaring authenti
 });
 
 test('session restoration waits in existing workspace without flashing public home',()=>assert.equal(publicView({shared:false,authenticated:false,checking:true,hash:''}),'workspace'));
+
+test('legacy participant reload stays on the existing recovery screen without treating its token as staff identity',()=>{assert.equal(publicView({shared:false,authenticated:false,participantResume:true,hash:''}),'workspace');assert.equal(observedIdentity('Not signed in'),false);assert.equal(publicView({shared:false,authenticated:false,participantResume:false,hash:''}),'home');});

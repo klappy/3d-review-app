@@ -1,8 +1,8 @@
 import {parseEntryFragment,currentNamespace} from './shared-link.js';
 
 // Screen selection only. Authorization and all writes remain in the existing app.
-export function publicView({shared,authenticated,checking=false,hash}) {
-  if(shared||authenticated||checking)return 'workspace';
+export function publicView({shared,authenticated,checking=false,participantResume=false,hash}) {
+  if(shared||authenticated||checking||participantResume)return 'workspace';
   if(hash==='#how')return 'how';
   if(hash==='#example')return 'example';
   if(['#facilitator','#participant','#reports-card','#workspace','#evidence'].includes(hash))return 'workspace';
@@ -16,7 +16,9 @@ export function mountPublicEntry(document,window) {
   const sharedAtEntry=parseEntryFragment(window.location.hash)!==null || currentNamespace(window.sessionStorage)!==null;
   function render(){
     const shared=sharedAtEntry||document.getElementById('facilitator')?.hidden===true;
-    const view=publicView({shared,authenticated:observedIdentity(identity?.textContent),checking:identity?.textContent==='Checking session…',hash:window.location.hash});
+    // Presence selects the existing recovery screen only; restoreParticipant still validates the session.
+    const participantResume=!shared && !!window.sessionStorage.getItem('participantToken');
+    const view=publicView({shared,participantResume,authenticated:observedIdentity(identity?.textContent),checking:identity?.textContent==='Checking session…',hash:window.location.hash});
     document.body.dataset.entryView=view;
     for(const name of ['home','how','example'])document.getElementById('public-'+name).hidden=view!==name;
     document.getElementById('public-entry').hidden=view==='workspace';
