@@ -1,6 +1,6 @@
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
-import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork } from './visibility.js';
+import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
 import { renderList, renderReport, upsertRow } from './report-view.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
 import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
@@ -50,7 +50,10 @@ function showAuthorizedWork(me) {
   for (const id of ['project-card', 'assessment-card', 'survey-card', 'results-card']) $(id).hidden = !visible;
   // An assessment-only grantee reaches reports without any project navigation.
   const reports = hasReportWork(me);
-  $('reports-card').hidden = !reports; $('shared-assessments').hidden = !reports;
+  $('reports-card').hidden = !reports;
+  // The granted picker is the assessment-only entry: a project identity reaches the same assessment
+  // through the project path, so it never becomes a second source for state.assessment.
+  $('shared-assessments').hidden = !hasSharedAssessmentEntry(me);
   resetSelect($('granted-assessments'), 'Choose');
   for (const grant of assessmentGrants(me)) option($('granted-assessments'), grant.scope_id, `${grant.scope_id} · ${grant.role}`);
   $('create-project').hidden = !me.principal.provisioned;
@@ -196,20 +199,15 @@ async function chooseGrantedAssessment() {
     const result = await api(`/v2/assessments/${path(state.assessment)}`);
     state.assessmentRole = result.assessment.role; showReportControls();
     text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
-    const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
-    if (next) $('stage-target').value = next;
-    for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
-    if (result.surveys?.length === 1) { $('surveys').value = result.surveys[0].id; state.survey = result.surveys[0].id; }
   } catch (error) { state.assessmentRole = null; showReportControls(); clearReportState(); throw error; }
 }
 $('granted-assessments').addEventListener('change', () => run('Loading assessment…', chooseGrantedAssessment));
 bindClick('set-stage', 'Moving assessment stage…', async () => {
   const aid = required(state.assessment, 'Choose an assessment.');
   const sid = state.survey;
-  const granted = !!$('granted-assessments').value;
   await api(`/v2/assessments/${path(aid)}/stage`, { method: 'POST', body: { stage: $('stage-target').value } });
-  if (granted) await chooseGrantedAssessment();
-  else { await assessments(); $('assessments').value = aid; await chooseAssessment(); }
+  await assessments(); $('assessments').value = aid;
+  await chooseAssessment();
   if (sid && [...$('surveys').options].some(entry => entry.value === sid)) { $('surveys').value = sid; state.survey = sid; await surveyStatus(); }
 });
 bindForm('create-assessment', 'Creating assessment…', async fd => {
@@ -220,10 +218,7 @@ bindClick('load-templates', 'Loading templates…', templates);
 bindClick('select-survey', 'Selecting survey…', async () => {
   const aid = required(state.assessment, 'Choose an assessment.'); const selected = required($('templates').value, 'Choose a template.');
   const [template_id, version] = selected.split('@'); const result = await api(`/v2/assessments/${path(aid)}/surveys`, { method: 'POST', body: { template_id, version: Number(version) } });
-  const sid = result.survey.id;
-  if ($('granted-assessments').value) await chooseGrantedAssessment();
-  else await chooseAssessment();
-  state.survey = sid; $('surveys').value = sid; await surveyStatus();
+  const sid = result.survey.id; await chooseAssessment(); state.survey = sid; $('surveys').value = sid; await surveyStatus();
 });
 $('surveys').addEventListener('change', () => { state.survey = $('surveys').value || null; clearCodeBatch(); clearShareLink(); });
 async function surveyStatus() {

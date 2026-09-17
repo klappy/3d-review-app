@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork } from './visibility.js';
+import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
 
 test('ungranted or assessment-only identity does not see project work', () => {
   assert.equal(hasProjectWork({ principal: { provisioned: false }, grants: [] }), false);
@@ -29,6 +29,21 @@ test('report work is reachable for an assessment-only grantee and for every proj
   assert.equal(hasReportWork({ principal: { provisioned: false }, grants: [{ scope_type: 'project', role: 'viewer' }] }), true);
   assert.equal(hasReportWork({ principal: { provisioned: false }, grants: [] }), false);
   assert.equal(hasReportWork(null), false);
+});
+
+test('the granted picker is the assessment-only entry, never a second source for a project identity', () => {
+  const grant = { scope_type: 'assessment', scope_id: 'assess_1', role: 'viewer' };
+  const projectIdentity = { principal: { provisioned: true }, grants: [grant] };
+  const granteeOfBoth = { principal: { provisioned: false }, grants: [{ scope_type: 'project', scope_id: 'proj_1', role: 'owner' }, grant] };
+  const assessmentOnly = { principal: { provisioned: false }, grants: [grant] };
+  for (const me of [projectIdentity, granteeOfBoth]) {
+    assert.equal(hasSharedAssessmentEntry(me), false, 'a project identity uses the project path');
+    assert.equal(hasReportWork(me), true, 'the reports card still shows');
+  }
+  assert.equal(hasSharedAssessmentEntry(assessmentOnly), true);
+  assert.equal(hasReportWork(assessmentOnly), true);
+  assert.equal(hasSharedAssessmentEntry({ principal: { provisioned: false }, grants: [] }), false);
+  assert.equal(hasSharedAssessmentEntry(null), false);
 });
 
 test('identity switch clears facilitator, participant and scoped client state', () => {

@@ -13,6 +13,12 @@ export function hasReportWork(me) {
   return hasProjectWork(me) || assessmentGrants(me).length > 0;
 }
 
+// Only an assessment-only grantee gets the granted picker; a project identity would otherwise hold
+// two visible sources for one state.assessment and desync project-scoped writes.
+export function hasSharedAssessmentEntry(me) {
+  return !hasProjectWork(me) && assessmentGrants(me).length > 0;
+}
+
 export const codeEntryFailure = 'Could not open this code. Check it and try again.';
 
 export function clearIdentityData(state, storage) {
