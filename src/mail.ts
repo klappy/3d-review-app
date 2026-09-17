@@ -11,20 +11,34 @@
  *   - only ENVIRONMENT === "production" sends. The dev sandbox never contacts a mailbox (access-boundary ruling, #14).
  *   - reserved synthetic domains (*.invalid, *.test, *.example, example.com/net/org) are never sent to, anywhere.
  *   - the address never reaches a log, a span or a result; callers log a hash prefix at most.
- *   - one Idempotency-Key per logical message, so a retried request cannot mail twice.
+ *   - the caller passes an Idempotency-Key; de-duplication of the INTENT (same scope + invitee) is the handler's job —
+ *     see grant.invite: one live invitation per scope+invitee per 10 minutes, 30 invitations per inviter per hour.
  */
 import type { Env } from "./handlers/types";
 
 export type MailEnv = Env & { RESEND_API_KEY?: string; MAIL_FROM?: string; PUBLIC_ORIGIN?: string };
-export type MailReason = "not_configured" | "not_production" | "synthetic_recipient" | "provider_error" | "provider_unreachable";
+export type MailReason = "invalid_address" | "duplicate_recent" | "not_configured" | "not_production" | "synthetic_recipient" | "provider_error" | "provider_unreachable";
 export interface MailResult { delivered: boolean; provider?: "resend"; provider_message_id?: string; reason?: MailReason; provider_status?: number }
 export interface MailMessage { to: string; subject: string; text: string; html?: string; idempotencyKey: string }
 
-const SYNTHETIC = /(\.invalid|\.test|\.example|@example\.(com|net|org))$/i;
+/** One plain mailbox: no display names, lists, quotes, whitespace, control characters, trailing dots or dotless hosts. */
+const ADDRESS = /^[A-Za-z0-9._%+-]{1,64}@([A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,63}$/;
+/** Reserved / non-routable: RFC 2606 + RFC 6761 names and any subdomain of them. */
+const RESERVED_TLD = /\.(invalid|test|example|localhost|local)$/i;
+const RESERVED_DOMAIN = /(^|\.)example\.(com|net|org)$/i;
+/** Normalised address, or null when it is not exactly one plain mailbox. Handlers validate with this BEFORE doing anything. */
+export function normalizeAddress(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const a = raw.trim().toLowerCase();
+  return a.length <= 254 && ADDRESS.test(a) ? a : null;
+}
+export const isSyntheticAddress = (normalized: string): boolean => { const d = normalized.slice(normalized.lastIndexOf("@") + 1); return RESERVED_TLD.test("." + d) || RESERVED_DOMAIN.test(d); };
 export const mailConfigured = (env: MailEnv) => !!(env.RESEND_API_KEY && env.MAIL_FROM);
 
 export async function sendMail(env: MailEnv, m: MailMessage): Promise<MailResult> {
-  if (SYNTHETIC.test(m.to.trim())) return { delivered: false, reason: "synthetic_recipient" };
+  const to = normalizeAddress(m.to);
+  if (!to) return { delivered: false, reason: "invalid_address" };
+  if (isSyntheticAddress(to)) return { delivered: false, reason: "synthetic_recipient" };
   if (env.ENVIRONMENT !== "production") return { delivered: false, reason: "not_production" };
   if (!mailConfigured(env)) return { delivered: false, reason: "not_configured" };
   let res: Response;
@@ -32,7 +46,8 @@ export async function sendMail(env: MailEnv, m: MailMessage): Promise<MailResult
     res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json", "idempotency-key": m.idempotencyKey },
-      body: JSON.stringify({ from: env.MAIL_FROM, to: [m.to], subject: m.subject, text: m.text, ...(m.html ? { html: m.html } : {}) }),
+      signal: AbortSignal.timeout(8000), // a provider stall must not stall the capability
+      body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject: m.subject, text: m.text, ...(m.html ? { html: m.html } : {}) }),
     });
   } catch { return { delivered: false, provider: "resend", reason: "provider_unreachable" }; }
   if (!res.ok) return { delivered: false, provider: "resend", reason: "provider_error", provider_status: res.status };
@@ -47,7 +62,7 @@ export const publicOrigin = (env: MailEnv): string | null => (env.PUBLIC_ORIGIN 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 /** Collaborator invitation. Plain, short, no tracking, no images. Names no project contents — the scope name is disclosed only after accept. */
 export function invitationMessage(origin: string, token: string, role: string, scopeType: string, expiresDays: number) {
-  const link = `${origin}/?invite=${encodeURIComponent(token)}`;
+  const link = `${origin}/#invite=${encodeURIComponent(token)}`; // fragment, like /#session= — never sent to a server, never in edge logs
   const subject = "You have been invited to 3D Review";
   const text = [
     `You have been invited to join a ${scopeType} in 3D Review as ${role}.`,

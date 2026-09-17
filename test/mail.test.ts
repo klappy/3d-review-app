@@ -8,12 +8,16 @@ const msg = { to: "person@real-domain.dev", subject: "s", text: "t", idempotency
 
 describe("mail adapter", () => {
   it("never pretends: unconfigured, non-production and synthetic recipients are delivered:false with a reason and no network call", async () => {
-    const f = vi.spyOn(globalThis, "fetch");
+    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "re_x" }), { status: 200 }));
     expect(await sendMail({ ...prod, RESEND_API_KEY: undefined }, msg)).toEqual({ delivered: false, reason: "not_configured" });
     expect(await sendMail({ ...prod, MAIL_FROM: undefined }, msg)).toEqual({ delivered: false, reason: "not_configured" });
     for (const ENVIRONMENT of ["dev", undefined, "staging"]) expect(await sendMail({ ...prod, ENVIRONMENT }, msg)).toEqual({ delivered: false, reason: "not_production" });
-    for (const to of ["rina@example.invalid", "a@b.test", "x@example.com", "y@thing.example"]) expect(await sendMail(prod, { ...msg, to })).toEqual({ delivered: false, reason: "synthetic_recipient" });
-    expect(f).not.toHaveBeenCalled();
+    for (const to of ["rina@example.invalid", "a@b.test", "x@example.com", "y@thing.example", " X@Example.COM ", "x@sub.example.com", "x@bar.example.org", "x@host.localhost"]) expect(await sendMail(prod, { ...msg, to }), to).toEqual({ delivered: false, reason: "synthetic_recipient" });
+    // exactly one plain mailbox or nothing leaves (review #16-3)
+    for (const to of ["Rina <rina@real-domain.dev>", "x@real-domain.dev.", "x@localhost", "a@x.dev, b@y.dev", "x@real-domain.dev\r\nBcc: y@evil.dev", "x y@real-domain.dev", "@real-domain.dev", "x@", ""]) expect(await sendMail(prod, { ...msg, to }), JSON.stringify(to)).toEqual({ delivered: false, reason: "invalid_address" });
+    expect(await sendMail(prod, { ...msg, to: "person@foo.contest" })).not.toEqual({ delivered: false, reason: "synthetic_recipient" }); // no false positive on a real TLD
+    expect(f.mock.calls.filter(([u]) => !String(u).includes("resend")).length).toBe(f.mock.calls.length - f.mock.calls.filter(([u]) => String(u).includes("resend")).length);
+    expect(f.mock.calls.filter(([u]) => String(u).includes("resend")).length).toBe(1); // only the .contest probe reached the provider stub
   });
   it("production + configured: one POST to Resend with the idempotency key; delivered only on provider acceptance", async () => {
     const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "re_msg_1" }), { status: 200 }));
@@ -31,8 +35,49 @@ describe("mail adapter", () => {
   });
   it("invitation text carries the link, the expiry, the no-password instruction — and no project contents", () => {
     const m = invitationMessage("https://3d-review.klappy.dev", "il_abc/+", "member", "assessment", 7);
-    expect(m.link).toBe("https://3d-review.klappy.dev/?invite=il_abc%2F%2B");
+    expect(m.link).toBe("https://3d-review.klappy.dev/#invite=il_abc%2F%2B");
     expect(m.text).toContain(m.link); expect(m.text).toContain("7 days"); expect(m.text).toContain("no password");
     expect(m.html).not.toMatch(/<img|<script/i);
   });
+});
+
+// Handler-level production path (review #16-1, #16-2, #16-7): through execute(), provider stubbed at fetch.
+import { readFileSync } from "node:fs";
+import { afterAll } from "vitest";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
+import { execute } from "../src/dispatch";
+const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "mailh", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "mailh-db" } }] }));
+afterAll(() => mf.dispose());
+describe("cap.grant.invite in production, provider stubbed", () => {
+  it("a replayed confirm_token mails ONCE; the row is 'sent' only on acceptance; nothing identifying the invitee is persisted; the hourly cap holds", async () => {
+    const db = await mf.getD1Database("DB");
+    const stmts = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n").split(";\n").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s));
+    for (const m of ["0001_init.sql", "0002_code_escrow.sql", "0003_language_archive.sql", "0004_pinned_instruments.sql"]) await db.batch(stmts(`../migrations/${m}`));
+    await db.batch(stmts("../seed/synthetic.sql"));
+    const env: any = { DB: db, SESSION_SECRET: "synthetic-mail", ...prod };
+    let n = 0; const ctx = () => ({ env, db, principal: { kind: "user", id: "person_mara", provisioned: true }, traceId: `tr_mail_${++n}`, now: () => new Date(), log: () => {} }) as any;
+    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "re_msg_9" }), { status: 200 }));
+    const params = { scope: "assessment", id: "assess_tavo_collect", email: "Victim.Person@Real-Domain.dev", role: "viewer" };
+    const dry: any = await execute(ctx(), "cap.grant.invite", params, { tool: "danger", mode: "dry_run" });
+    const runs: any[] = []; for (let i = 0; i < 3; i++) runs.push(await execute(ctx(), "cap.grant.invite", params, { tool: "danger", mode: "execute", confirm_token: dry.result.confirm_token }));
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(runs.map((r) => r.result.delivered)).toEqual([true, false, false]);
+    expect(runs[1].result.delivery.reason).toBe("duplicate_recent"); expect(runs[1].result.invitation_id).toBe(runs[0].result.invitation_id);
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM invitation WHERE scope_id = 'assess_tavo_collect' AND role = 'viewer'").first<{ n: number }>())!.n).toBe(1);
+    expect((await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(runs[0].result.invitation_id).first<{ status: string }>())!.status).toBe("sent");
+    const dump = JSON.stringify([(await db.prepare("SELECT * FROM trace").all()).results, (await db.prepare("SELECT * FROM receipt").all()).results, (await db.prepare("SELECT * FROM invitation").all()).results, runs]);
+    expect(dump.toLowerCase()).not.toContain("victim"); expect(dump.toLowerCase()).not.toContain("real-domain");
+    // provider refusal → row stays pending
+    f.mockResolvedValueOnce(new Response("{}", { status: 500 }));
+    const p2 = { ...params, email: "other.person@real-domain.dev" };
+    const d2: any = await execute(ctx(), "cap.grant.invite", p2, { tool: "danger", mode: "dry_run" });
+    const r2: any = await execute(ctx(), "cap.grant.invite", p2, { tool: "danger", mode: "execute", confirm_token: d2.result.confirm_token });
+    expect(r2.result.status).toBe("pending"); expect(r2.result.delivery.reason).toBe("provider_error");
+    // hourly cap per inviter
+    await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at) SELECT 'inv_fill_' || value, 'assessment', 'assess_tavo_collect', 'h_' || value, 't_' || value, 'viewer', 'pending', 'person_mara', ? FROM json_each('[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28]')").bind(new Date().toISOString()).run();
+    const p3 = { ...params, email: "third.person@real-domain.dev" };
+    const d3: any = await execute(ctx(), "cap.grant.invite", p3, { tool: "danger", mode: "dry_run" });
+    const r3: any = await execute(ctx(), "cap.grant.invite", p3, { tool: "danger", mode: "execute", confirm_token: d3.result.confirm_token });
+    expect(r3.ok).toBe(false); expect(r3.error.code).toBe("RATE_LIMITED");
+  }, 60_000);
 });
