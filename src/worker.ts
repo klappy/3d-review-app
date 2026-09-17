@@ -9,7 +9,7 @@
  * The provider is built PER ENV (WeakMap below): its tokenExchangeCallback receives no env, and the callback needs
  * env.DB for the authorization-code redemption record (fix/pr15-auth-hardening A2).
  */
-import OAuthProvider, { OAuthError, getOAuthApi, type OAuthProviderOptions } from "@cloudflare/workers-oauth-provider";
+import OAuthProvider, { OAuthError, type OAuthProviderOptions } from "@cloudflare/workers-oauth-provider";
 import app from "./index";
 import { resolvePrincipal } from "./auth";
 import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
@@ -48,14 +48,14 @@ export function providerOptions(env: OAuthEnv): OAuthProviderOptions<OAuthEnv> {
     // Review #15 finding 2: the provider's "code already used" check is a KV read→check→write (not atomic), so N truly
     // concurrent redemptions of one code all minted tokens. This callback runs AFTER the provider's client + PKCE checks and
     // BEFORE its KV write; the D1 PRIMARY KEY on grant_id (1:1 with the code) is the atomic gate. A wrong verifier never
-    // reaches it, so it does not burn the code. On a duplicate: revoke the grant (OAuth 2.1 §4.1.2 SHOULD; parity with the
-    // provider's own sequential-reuse path) — best-effort under true concurrency, see INTERFACE.md — then refuse.
+    // reaches it, so it does not burn the code. A concurrent loser is refused and does NOT revoke the grant (plan recheck
+    // NEW-2: a revoke here would race the winner's own KV write); sequential reuse is refused AND revoked by the provider
+    // itself before this callback runs. Asymmetry recorded in INTERFACE.md.
     tokenExchangeCallback: async ({ grantType, grantId, userId }) => {
       if (grantType !== "authorization_code") return;
       try {
         await env.DB.prepare("INSERT OR FAIL INTO oauth_code_redemption (grant_id, user_id, redeemed_at) VALUES (?, ?, ?)").bind(grantId, userId, new Date().toISOString()).run();
       } catch {
-        try { await getOAuthApi(options, env).revokeGrant(grantId, userId); } catch { /* revocation is best-effort; the refusal below is not */ }
         throw new OAuthError("invalid_grant", { description: "Authorization code already used" });
       }
     },

@@ -116,8 +116,23 @@ describe("A2 authorization code is single-use under concurrency (D1 INSERT OR FA
     expect(bodies.filter((b) => b.access_token).length).toBe(1);
     expect(await redemptions(env.DB) - before).toBe(1);
     expect(sqls.filter((s) => s.startsWith("INSERT OR FAIL INTO oauth_code_redemption")).length).toBe(5); // one attempt each; the PK decides
-    // sequential reuse afterwards is still refused (by the provider's own check now, before the callback)
-    const again = await token(e, params); expect(again.status).toBe(400); expect(((await again.json()) as any).error).toBe("invalid_grant");
+    // the winner's token serves (a concurrent loser does not revoke the grant — NEW-2)
+    const access = bodies.find((b) => b.access_token).access_token as string;
+    const me: any = await (await mcpCall(e, `Bearer ${access}`)).json();
+    expect(me.result.structuredContent.ok).toBe(true); expect(me.result.structuredContent.result.principal.delegated_by).toBe(`oauth:${h.clientId}`);
+    const [userId, grantId] = code.split(":"); expect(await env.OAUTH_KV.get(`grant:${userId}:${grantId}`)).not.toBeNull();
+  }, 60_000);
+
+  it("sequential reuse: second redemption → 400 invalid_grant and the provider revokes the grant (winner's token dies)", async () => {
+    const h = await register(); const p = await pkce(); const code = await getCode(env, h.clientId, h.redirect, p.challenge);
+    const [userId, grantId] = code.split(":");
+    const params = { grant_type: "authorization_code", code, client_id: h.clientId, redirect_uri: h.redirect, code_verifier: p.verifier };
+    const first = await token(env, params); expect(first.status).toBe(200); const access = ((await first.json()) as any).access_token as string;
+    expect((await mcpCall(env, `Bearer ${access}`)).status).toBe(200);
+    const second = await token(env, params); expect(second.status).toBe(400);
+    expect(((await second.json()) as any).error_description).toBe("Authorization code already used");
+    expect(await env.OAUTH_KV.get(`grant:${userId}:${grantId}`)).toBeNull();
+    expect((await mcpCall(env, `Bearer ${access}`)).status).toBe(401);
   }, 60_000);
 
   it("a wrong verifier does not burn the code (callback runs after the PKCE check): wrong then correct → 200", async () => {
@@ -134,15 +149,17 @@ describe("A2 authorization code is single-use under concurrency (D1 INSERT OR FA
     expect(me.result.structuredContent.result.principal.delegated_by).toBe(`oauth:${h.clientId}`);
   }, 60_000);
 
-  it("duplicate path revokes the grant before refusing (parity with the provider's sequential-reuse path)", async () => {
-    const h = await register(); const p = await pkce(); const code = await getCode(env, h.clientId, h.redirect, p.challenge);
+  it("concurrent-loser path refuses with invalid_grant and does NOT touch the grant (NEW-2)", async () => {
+    const { e, kv } = counting(env);
+    const h = await register(); const p = await pkce(); const code = await getCode(e, h.clientId, h.redirect, p.challenge);
     const [userId, grantId] = code.split(":");
-    expect(await env.OAUTH_KV.get(`grant:${userId}:${grantId}`)).not.toBeNull();
     // simulate the loser: the row already exists when this redemption reaches the callback
     await env.DB.prepare("INSERT INTO oauth_code_redemption (grant_id, user_id, redeemed_at) VALUES (?, ?, ?)").bind(grantId, userId, "2026-09-16T00:00:00.000Z").run();
-    const r = await token(env, { grant_type: "authorization_code", code, client_id: h.clientId, redirect_uri: h.redirect, code_verifier: p.verifier });
+    kv.length = 0;
+    const r = await token(e, { grant_type: "authorization_code", code, client_id: h.clientId, redirect_uri: h.redirect, code_verifier: p.verifier });
     expect(r.status).toBe(400); expect(((await r.json()) as any).error).toBe("invalid_grant");
-    expect(await env.OAUTH_KV.get(`grant:${userId}:${grantId}`)).toBeNull();
+    expect(kv.filter((op) => op === "delete" || op === "put")).toEqual([]); // no revoke, no grant write
+    expect(await env.OAUTH_KV.get(`grant:${userId}:${grantId}`)).not.toBeNull();
   }, 60_000);
 
   it("provider is built per env: the redemption row lands in THAT env's DB (two distinct env objects)", async () => {
@@ -204,6 +221,8 @@ describe("A4 minors (review #15 findings 5–9, 11)", () => {
       expect(early.headers.get("www-authenticate")).toBe(provider.headers.get("www-authenticate"));
       expect(early.headers.get("www-authenticate")).toBe(`Bearer realm="OAuth", resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource${path}", error="invalid_token", scope="3dreview"`);
     }
+    const q = await mcpCall(e, "Bearer junk", {}, "/mcp?x=1"); expect(q.headers.get("www-authenticate")).toContain(`resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp"`);
+    const none = await mcpCall(e, undefined); expect(none.status).toBe(401); expect(none.headers.get("www-authenticate")).toBe(`Bearer realm="OAuth", resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp", scope="3dreview"`);
     const prm: any = await (await call("/.well-known/oauth-protected-resource/mcp")).json();
     expect(prm.scopes_supported).toEqual(["3dreview"]); expect(prm.resource).toBe(ORIGIN + "/mcp");
     const as: any = await (await call("/.well-known/oauth-authorization-server")).json();
