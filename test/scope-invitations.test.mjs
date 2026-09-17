@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mountScopeInvitations, invitationRoles, canRevokeGrant, canUpdateGrant} from '../ui/scope-invitations.js';
+import {mountScopeInvitations, invitationOutcome, invitationRoles, canRevokeGrant, canUpdateGrant} from '../ui/scope-invitations.js';
 function node(tag) {
  const n={tag,children:[],listeners:{},attributes:{},hidden:false,disabled:false,value:'',textContent:'',className:'',type:'',required:false,
  append(...xs){this.children.push(...xs)},replaceChildren(...xs){this.children=[...xs]},setAttribute(k,v){this.attributes[k]=v},
@@ -129,4 +129,47 @@ test('supplied private acceptance token requires explicit preview and is wiped b
 test('acceptance confirmation Cancel wipes private entry and ends intent; invitation cancel does not',async()=>{
  const w=world(()=>confirmResult);await acceptPreview(w,'CANCEL_SENTINEL');w.button('Cancel').click();assert.equal(w.ended,1);assert.ok(!walk(w.root).some(n=>n.name==='invitation-token'||n.value==='CANCEL_SENTINEL'));assert.ok(!w.buttons().includes('Confirm acceptance'));assert.equal(w.calls.length,1);
  const inviter=world((_u,o)=>o.method==='GET'?list():confirmResult);await inviter.api.setScope(scope);await emailPreview(inviter);inviter.button('Cancel').click();assert.equal(inviter.ended,0);assert.ok(inviter.buttons().includes('Preview invitation'));assert.ok(!inviter.buttons().includes('Confirm invitation'));
+});
+
+// M1 backend result shape (cap.grant.invite) against the invitation UI: the presenter must read
+// the stored status and the provider delivery state as separate facts, and must not invent an
+// inbox proof, a non-delivery claim, or a private handoff the backend did not authorize.
+test('M1 mailer result shapes render truthful copy and no unauthorized handoff',async()=>{
+ const invite=result=>world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:result);
+ const run=async result=>{const w=invite(result);await w.api.setScope(scope);await emailPreview(w);w.button('Confirm invitation').click();await flush();return{w,t:text(w.root)}};
+
+ // (a) provider accepted the message: accepted copy, explicitly not inbox proof, no handoff.
+ const accepted={invitation_id:'i-a',role:'member',status:'sent',accepted:true,delivered:true,delivery:{provider:'resend',state:'accepted',provider_message_id:'m1'},note:'sent'};
+ assert.equal(invitationOutcome(accepted).handoff,false);
+ {const{w,t}=await run({...accepted,dev_only_link_token:'PRIVATE_A'});
+  assert.match(t,/The email provider accepted the invitation for delivery\. Inbox arrival is not confirmed\./);
+  assert.match(t,/awaiting acceptance/);assert.ok(!/not delivered|could not be confirmed/.test(t));
+  assert.ok(!t.includes('PRIVATE_A'));assert.ok(!w.buttons().includes('Reveal private invitation token'));}
+
+ // (b) duplicate with an uncertain earlier delivery: unknown, never "not delivered", never handoff.
+ const uncertain={invitation_id:'i-b',role:'member',status:'unconfirmed',accepted:false,delivered:false,delivery:{provider:'resend',state:'unconfirmed',reason:'duplicate_uncertain'},note:'reused'};
+ assert.equal(invitationOutcome(uncertain).handoff,false);
+ {const{w,t}=await run({...uncertain,dev_only_link_token:'PRIVATE_B'});
+  assert.match(t,/Email delivery could not be confirmed\. Check with the recipient before taking further action\./);
+  assert.match(t,/awaiting acceptance; delivery unconfirmed/);
+  assert.ok(!t.includes('not delivered'));assert.ok(!t.includes('No email was sent'));
+  assert.ok(!t.includes('PRIVATE_B'));assert.ok(!w.buttons().includes('Reveal private invitation token'));
+  assert.ok(!t.includes('No invitation credential is available'));}
+
+ // (c) a deleted invitation is nonexistent, not a live row awaiting acceptance.
+ const deleted={invitation_id:'i-c',role:'viewer',status:'deleted',accepted:false,delivered:false,delivery:{provider:'resend',state:'not_sent',reason:'invitation_deleted'},note:'gone'};
+ assert.equal(invitationOutcome(deleted).row,'no longer available');
+ assert.equal(invitationOutcome(deleted).handoff,false);
+ {const{w,t}=await run({...deleted,dev_only_link_token:'PRIVATE_C'});
+  assert.match(t,/no longer available/);assert.ok(!t.includes('awaiting acceptance'));
+  assert.ok(!t.includes('PRIVATE_C'));assert.ok(!w.buttons().includes('Reveal private invitation token'));}
+
+ // (d) pre-M1 legacy shape (no delivery object at all) still renders, with the handoff path intact.
+ const legacy={invitation_id:'i-d',delivered:false,accepted:true};
+ assert.equal(invitationOutcome(legacy).row,'awaiting acceptance');
+ assert.equal(invitationOutcome(legacy).handoff,true);
+ {const{w,t}=await run({...legacy,dev_only_link_token:'PRIVATE_D'});
+  assert.match(t,/Email delivery could not be confirmed/);assert.match(t,/awaiting acceptance/);
+  assert.ok(!t.includes('PRIVATE_D'));assert.ok(w.buttons().includes('Reveal private invitation token'));}
+ assert.equal(invitationOutcome({invitation_id:'i-e',delivered:true}).handoff,false);
 });
