@@ -22,9 +22,10 @@ export const entryExample: Handler = async () => ({ result: { fixture: true, ass
 const SYNTHETIC_DOMAIN = /\.invalid$/i;
 export const authRequestLink: Handler = async (ctx, p, o) => {
   if (!p.email || typeof p.email !== "string") throw new CapError("INVALID_PARAMS", "email required");
-  const env = ctx.env.ENVIRONMENT ?? "dev";
-  if (env === "dev" && !SYNTHETIC_DOMAIN.test(p.email)) throw new CapError("INVALID_PARAMS", "dev sandbox accepts only synthetic identities (name@…example.invalid)", "no real email is ever accepted or contacted from the dev environment", "cap.auth.request_link");
-  if (env !== "dev") throw new CapError("RESERVED_NOT_BUILT", "email-code delivery is not wired in this environment yet", "production sign-in is Cloudflare email-code (OF-7); pending the auth lane", "cap.auth.request_link");
+  // Fail CLOSED: only an explicit ENVIRONMENT="dev" is the synthetic sandbox; a missing variable is treated as production.
+  const dev = ctx.env.ENVIRONMENT === "dev";
+  if (dev && !SYNTHETIC_DOMAIN.test(p.email)) throw new CapError("INVALID_PARAMS", "dev sandbox accepts only synthetic identities (name@…example.invalid)", "no real email is ever accepted or contacted from the dev environment", "cap.auth.request_link");
+  if (!dev) throw new CapError("RESERVED_NOT_BUILT", "email-code delivery is not wired in this environment yet", "production sign-in is Cloudflare email-code (OF-7); pending the auth lane", "cap.auth.request_link");
   const eh = await sha256(p.email.toLowerCase());
   if (o?.dryRun) return { result: {}, impact: { affected: [{ email_hash: eh.slice(0, 12) }], irreversible: true, effect: "external", compensating_control: "expire code" } };
   const code = String(Math.floor(100000 + Math.random() * 900000));
