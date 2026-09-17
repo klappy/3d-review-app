@@ -9,12 +9,16 @@
 //
 // Commit sha: in CI (CI=true or WORKERS_CI=1) WORKERS_CI_COMMIT_SHA is REQUIRED; absent -> exit 1, never a
 // fabricated sha. Locally: `git rev-parse HEAD`.
+// Output location: STAMP_OUT_DIR=<dir> (or --out <dir>) redirects both generated files under <dir> (tests use a temp
+// dir so the real generated files are never rewritten mid-run); default is the repo root.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const outArg = process.argv.indexOf("--out");
+const outDir = outArg >= 0 && process.argv[outArg + 1] ? process.argv[outArg + 1] : (process.env.STAMP_OUT_DIR || root);
 const readJson = (p) => JSON.parse(readFileSync(join(root, p), "utf8"));
 const fail = (msg) => { console.error(`stamp-version: ${msg}`); process.exit(1); };
 
@@ -69,7 +73,7 @@ const versions = [...releases.versions].sort((a, b) => cmp(a.version, b.version)
 });
 const changelog = JSON.stringify({ current: releases.current, versions }, null, 2) + "\n";
 
-const writeIfChanged = (p, content) => { const f = join(root, p); mkdirSync(dirname(f), { recursive: true }); if (existsSync(f) && readFileSync(f, "utf8") === content) return false; writeFileSync(f, content); return true; };
+const writeIfChanged = (p, content) => { const f = join(outDir, p); mkdirSync(dirname(f), { recursive: true }); if (existsSync(f) && readFileSync(f, "utf8") === content) return false; writeFileSync(f, content); return true; };
 const a = writeIfChanged("src/version.generated.ts", ts);
 const b = writeIfChanged("ui/changelog.json", changelog);
-console.log(`stamp-version: ${stamp} (release_source ${manifest.cookbook_commit.slice(0, 7)}${buildUuid ? `, build ${buildUuid}` : ""})${a || b ? "" : " — unchanged"}`);
+console.log(`stamp-version: ${stamp} (release_source ${manifest.cookbook_commit.slice(0, 7)}${buildUuid ? `, build ${buildUuid}` : ""})${outDir !== root ? ` → ${outDir}` : ""}${a || b ? "" : " — unchanged"}`);

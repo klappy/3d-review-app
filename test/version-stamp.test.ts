@@ -3,7 +3,9 @@
 // generated src/version.generated.ts → health / MCP serverInfo / ui/changelog.json. Every hop is asserted equal here.
 // The generated file is produced by the pretest hook (scripts/stamp-version.mjs); it is git-ignored, never tracked.
 import { createHash } from "node:crypto";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
@@ -130,14 +132,17 @@ describe("runtime surfaces: health and MCP serverInfo", () => {
 });
 
 describe("stamp script (subprocess): CI without WORKERS_CI_COMMIT_SHA fails, never fabricates", () => {
+  // Every run writes to a temp dir via STAMP_OUT_DIR — the real src/version.generated.ts and ui/changelog.json produced by
+  // the pretest hook are never rewritten mid-run (review 5710626841 finding 2).
   const script = new URL("scripts/stamp-version.mjs", root).pathname;
   const cwd = root.pathname;
+  const out = mkdtempSync(join(tmpdir(), "stamp-out-"));
+  afterAll(() => rmSync(out, { recursive: true, force: true }));
   const clean = { ...process.env } as Record<string, string | undefined>;
-  delete clean.CI; delete clean.WORKERS_CI; delete clean.WORKERS_CI_COMMIT_SHA; delete clean.WORKERS_CI_BUILD_UUID;
-  const run = (env: Record<string, string>) => spawnSync(process.execPath, [script], { cwd, env: { ...clean, ...env } as any, encoding: "utf8" });
-  afterAll(() => { // restore the real generated files for whatever runs next
-    const r = run({}); if (r.status !== 0) throw new Error(`restore stamp failed: ${r.stderr}`);
-  });
+  delete clean.CI; delete clean.WORKERS_CI; delete clean.WORKERS_CI_COMMIT_SHA; delete clean.WORKERS_CI_BUILD_UUID; delete clean.STAMP_OUT_DIR;
+  const realGen = readFileSync(new URL("src/version.generated.ts", root), "utf8");
+  const realChangelog = readFileSync(new URL("ui/changelog.json", root), "utf8");
+  const run = (env: Record<string, string>) => spawnSync(process.execPath, [script], { cwd, env: { ...clean, STAMP_OUT_DIR: out, ...env } as any, encoding: "utf8" });
   it("CI=true with no WORKERS_CI_COMMIT_SHA → exit 1 with a clear message; WORKERS_CI=1 likewise", () => {
     const r1 = run({ CI: "true" });
     expect(r1.status).toBe(1); expect(r1.stderr).toMatch(/WORKERS_CI_COMMIT_SHA/);
@@ -145,22 +150,31 @@ describe("stamp script (subprocess): CI without WORKERS_CI_COMMIT_SHA fails, nev
     expect(r2.status).toBe(1); expect(r2.stderr).toMatch(/WORKERS_CI_COMMIT_SHA/);
     const r3 = run({ WORKERS_CI: "1", WORKERS_CI_COMMIT_SHA: "not-a-sha" });
     expect(r3.status).toBe(1);
+    expect(existsSync(join(out, "src/version.generated.ts"))).toBe(false);
   });
-  it("CI=true with a 40-hex WORKERS_CI_COMMIT_SHA → exit 0 and the generated file carries that sha and build uuid", () => {
+  it("CI=true with a 40-hex WORKERS_CI_COMMIT_SHA → exit 0 and the generated file (in the temp dir) carries that sha and build uuid", () => {
     const sha = "a".repeat(40);
     const r = run({ CI: "true", WORKERS_CI_COMMIT_SHA: sha, WORKERS_CI_BUILD_UUID: "11111111-2222-3333-4444-555555555555" });
     expect(r.status, r.stderr).toBe(0);
-    const gen = readFileSync(new URL("src/version.generated.ts", root), "utf8");
+    const gen = readFileSync(join(out, "src/version.generated.ts"), "utf8");
     expect(gen).toContain(`export const APP_COMMIT = "${sha}";`);
     expect(gen).toContain(`export const APP_STAMP = "0.1.0+aaaaaaa";`);
     expect(gen).toContain(`export const BUILD_UUID: string | null = "11111111-2222-3333-4444-555555555555";`);
     expect(r.stdout).toContain("0.1.0+aaaaaaa");
+    expect(readFileSync(join(out, "ui/changelog.json"), "utf8")).toBe(realChangelog);
   });
-  it("local run is idempotent and fast: second run reports unchanged, well under 1s", () => {
-    run({});
-    const t0 = Date.now(); const r = run({}); const dt = Date.now() - t0;
-    expect(r.status).toBe(0); expect(r.stdout).toContain("unchanged"); expect(dt).toBeLessThan(1000);
-    expect(existsSync(new URL("ui/changelog.json", root))).toBe(true);
+  it("--out <dir> works like STAMP_OUT_DIR; local run is idempotent and fast (second run unchanged, under 1s)", () => {
+    const out2 = mkdtempSync(join(tmpdir(), "stamp-out2-"));
+    try {
+      const first = spawnSync(process.execPath, [script, "--out", out2], { cwd, env: clean as any, encoding: "utf8" });
+      expect(first.status).toBe(0); expect(existsSync(join(out2, "ui/changelog.json"))).toBe(true);
+      const t0 = Date.now(); const r = spawnSync(process.execPath, [script, "--out", out2], { cwd, env: clean as any, encoding: "utf8" }); const dt = Date.now() - t0;
+      expect(r.status).toBe(0); expect(r.stdout).toContain("unchanged"); expect(dt).toBeLessThan(1000);
+    } finally { rmSync(out2, { recursive: true, force: true }); }
+  });
+  it("the real generated files are byte-identical after the subprocess runs", () => {
+    expect(readFileSync(new URL("src/version.generated.ts", root), "utf8")).toBe(realGen);
+    expect(readFileSync(new URL("ui/changelog.json", root), "utf8")).toBe(realChangelog);
   });
   it("git ignores both generated files", () => {
     const r = spawnSync("git", ["check-ignore", "src/version.generated.ts", "ui/changelog.json"], { cwd, encoding: "utf8" });
