@@ -42,7 +42,7 @@ export interface Env { DB: D1Database; SESSION_SECRET: string; ENVIRONMENT?: str
 | `POST /mcp` | JSON-RPC face of the same `execute()` | it *is* the second face |
 | `GET /v2/openapi.yaml` | contract projection | static |
 | `GET /v2/auth/access` | Cloudflare Access email-code return leg (browser redirect) | agents hold a bearer; browsers only |
-| `POST /v2/ops/seed/synthetic` | **dev bootstrap**: loads `seed/synthetic-responses.sql` into dev D1; signed-in, idempotent, refused outside `ENVIRONMENT=dev`; label `dev.bootstrap.seed_synthetic`, no receipt | environment plumbing, not product behavior |
+| `POST /v2/ops/seed/synthetic` | **dev bootstrap**: loads `seed/synthetic-responses.sql` into dev D1; signed-in, idempotent, refused unless `ENVIRONMENT` is exactly `dev` (a missing variable fails closed); label `dev.bootstrap.seed_synthetic`, no receipt | environment plumbing, not product behavior |
 
 ## Rate limits (src/ratelimit.ts)
 
