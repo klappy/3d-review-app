@@ -28,11 +28,13 @@ test('app.js lifecycle: reset first on identity change; identity/projects snapsh
   assert.ok(app.includes("collab.setScope({ type: 'project', id: result.project.id, role: result.project.role });"));
   assert.ok(app.includes("collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });"));
   assert.ok(app.includes("if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.role });"),'leaving an assessment restores the still-selected project');
+  assert.ok(app.includes("if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role })"),'leaving a project restores the still-selected workspace');
   assert.ok(app.includes("createCollabHooks({ document, api, sharedMode,"));
   const mount=read('./collab-mount.js');
   assert.ok(mount.includes("if (sharedMode || !wRoot || !iRoot) return {"),'no-op on shared/participant routes');
   assert.ok(mount.includes("else if (currentScope?.type === 'workspace') { currentScope = null; invitations.reset(); }"),'workspace deselect clears only a workspace scope (Bugbot 4037616741)');
   assert.ok(mount.includes('if (staff && refreshedGeneration !== snapshot.generation) {'),'W list is read once per identity generation, never on reloads');
+  assert.ok(mount.includes('if (!selectedWorkspace) await workspaces.refresh()'),'invitation accept re-reads W when none is selected');
   assert.ok(!/projects\(list\) \{[^}]*workspaces\.refresh/.test(mount),'projects() never refreshes W');
   assert.ok(mount.includes('if (!currentScope) invitations.setScope(null);'),'identity re-observation keeps a current host scope');
   assert.ok(!/sessionStorage|localStorage|facilitatorToken/.test(mount),'hooks never touch token storage');

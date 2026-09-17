@@ -19,7 +19,8 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload }) 
     authorizedProjects: snapshot.authorizedProjects.map(p => ({ id: p.id, name: p.name, role: p.role })),
   });
   let invitations = null, workspaces = null, selectedWorkspace = null, currentScope = null, refreshedGeneration = -1;
-  invitations = mountScopeInvitations({ document: doc, root: iRoot, request, getContext, onGrantsChanged: () => onReload() });
+  // onMutation already load()s after onReload; accept has no such path, so re-read W when none is selected.
+  invitations = mountScopeInvitations({ document: doc, root: iRoot, request, getContext, onGrantsChanged: async () => { await onReload(); if (!selectedWorkspace) await workspaces.refresh(); } });
   workspaces = mountWorkspaceManager({
     document: doc, root: wRoot, request, getContext,
     // A null workspace (deselect/refresh/deletion) only clears a WORKSPACE scope; a project/assessment scope is untouched (Bugbot 4037616741).
