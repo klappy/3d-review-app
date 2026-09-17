@@ -517,6 +517,7 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     const snap = await armed(storage, ns);
     plan.responses = refuse(404, "NOT_FOUND_OR_NOT_VISIBLE"); await submit($);
     expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.linkUnavailable);
+    expect($("participant-resume").textContent).toBe(""); expect($("recover").hidden).toBe(true);
     expect($("answers").hidden).toBe(true); expect($("review").hidden).toBe(true);
     expect(snapshot(storage)).toBe(snap);
   });
@@ -541,6 +542,7 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     const snap = await armed(storage, ns);
     plan.responses = refuse(400, "INVALID_PARAMS"); plan.receipt = refuse(404, "NOT_FOUND_OR_NOT_VISIBLE"); await submit($);
     expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.cannotResume);
+    expect($("participant-resume").textContent).toBe(""); expect($("recover").hidden).toBe(true);
     expect($("answers").hidden).toBe(true); expect(snapshot(storage)).toBe(snap);
   });
   it("F7e lost success → edit → 400 with a live probe: the committed receipt is shown; draft and key cleared; counts unchanged", async () => {

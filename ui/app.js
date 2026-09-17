@@ -381,7 +381,8 @@ bindClick('recover', 'Recovering receipt…', async () => {
 function showSharedUnavailable(kind) {
   const message = { closed: sharedCopy.collectionClosed, cannotResume: sharedCopy.cannotResume, rateLimited: sharedCopy.rateLimited, transient: sharedCopy.transient }[kind] || sharedCopy.linkUnavailable;
   text($('participant-error'), message); $('participant-error').hidden = false;
-  $('answers').hidden = true; $('review').hidden = true;
+  text($('participant-resume'), ''); // terminal copy replaces any sticky retry instruction
+  $('answers').hidden = true; $('review').hidden = true; $('recover').hidden = true;
 }
 async function sharedLinkEntry(token, namespace) {
   $('facilitator').hidden = true; $('evidence').remove(); document.querySelector('aside').hidden = true; $('participant').querySelector('p.note').hidden = true; // evidence is removed, not hidden: no trace/receipt text exists on the shared route
