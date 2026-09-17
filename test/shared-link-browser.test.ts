@@ -264,7 +264,7 @@ function fakeDocument() {
   const document = {
     getElementById: (id: string) => { if (removed.has(id)) return null; if (!byId.has(id)) byId.set(id, el("div", id)); return byId.get(id); },
     createElement: (t: string) => el(t), querySelector: () => el("aside"), querySelectorAll: () => [],
-    body: { get textContent() { return allText(); } },
+    body: { dataset: {} as Record<string,string>, get textContent() { return allText(); } },
   };
   // Real participant mount anchors; preserve existing fake-DOM fault assertions.
   const reviewButton = document.getElementById('participant-review-original'); reviewButton.type = 'submit';
@@ -281,6 +281,11 @@ async function boot(storage: any, hash: string, fetcher: typeof fetchImpl = fetc
   const { document, $ } = fakeDocument();
   const g: any = globalThis;
   g.document = document; g.window = g; g.sessionStorage = storage;
+  // Real window event seam: each boot is a new document, so prior listeners do not survive.
+  const windowListeners = new Map<string, Function[]>();
+  g.MutationObserver = class { observe() {} disconnect() {} }; // presentation observers; mutation scheduling is covered by actual Chromium
+  g.addEventListener = (type: string, listener: Function) => { windowListeners.set(type, [...(windowListeners.get(type) || []), listener]); };
+  g.dispatchEvent = (event: {type: string}) => { for (const listener of windowListeners.get(event.type) || []) listener(event); return true; };
   g.location = { hash, pathname: "/", search: "", origin: ORIGIN }; g.history = { replaceState: () => { g.location.hash = ""; } };
   Object.defineProperty(g, "navigator", { value: { clipboard: { writeText: async () => {} } }, configurable: true }); g.CSS = { escape: (s: string) => s };
   g.fetch = fetcher;
@@ -292,6 +297,14 @@ async function boot(storage: any, hash: string, fetcher: typeof fetchImpl = fetc
 }
 
 describe("[fake-DOM] ui/app.js shared mode", () => {
+  it("registers actual hash lifecycle events without breaking the shared participant session", async () => {
+    const link = await issue(); const storage = memoryStorage(); const $ = await boot(storage, link.entry_fragment);
+    const ns = await digestNamespace(link.link_token); const bearer = storage.getItem(ns + "bearer");
+    const g: any = globalThis; g.location.hash = "#workspace";
+    expect(() => g.dispatchEvent({type:"hashchange"})).not.toThrow();
+    expect($("facilitator").hidden).toBe(true); expect(storage.getItem(ns + "bearer")).toBe(bearer);
+    expect($("answers").hidden).toBe(false);
+  });
   it("opens from the fragment, strips it, remembers only the digest, and a reload without a fragment resumes the same context", async () => {
     const link = await issue();
     const storage = memoryStorage();

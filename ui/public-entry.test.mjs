@@ -24,3 +24,19 @@ test('Access email-code return stays in workspace while a facilitator token is s
 });
 
 test('legacy participant reload stays on the existing recovery screen without treating its token as staff identity',()=>{assert.equal(publicView({shared:false,authenticated:false,participantResume:true,hash:''}),'workspace');assert.equal(observedIdentity('Not signed in'),false);assert.equal(publicView({shared:false,authenticated:false,participantResume:false,hash:''}),'home');});
+
+test('explicit invitation presentation bypasses saved participant landing without implying identity',()=>{
+ assert.equal(publicView({invitation:true,shared:true,participantResume:true,authenticated:false,hash:''}),'workspace');
+ assert.equal(observedIdentity('Invitation'),false);
+});
+
+test('explicit invite page load stays isolated from saved participant storage after the intent ends (Bugbot 4039886032)',()=>{
+ const identity={textContent:'user · usr_1'};
+ const nodes={identity,'public-home':{hidden:false},'public-how':{hidden:true},'public-example':{hidden:true},'public-entry':{hidden:false},facilitator:{hidden:false,scrollIntoView(){}}};
+ let render=null;
+ const document={body:{dataset:{invitationEntry:'true'}},getElementById:id=>nodes[id],querySelectorAll:()=>[],querySelector:()=>null};
+ mountPublicEntry(document,{location:{hash:''},sessionStorage:{getItem:k=>k==='participantToken'?'pt_leftover':k==='shared:current'?'ns_leftover':null},addEventListener(){},MutationObserver:class{constructor(fn){render=render||fn}observe(){}}});
+ // intent already ended (no data-invitation-intent): a leftover participant token must not select the participant recovery screen
+ assert.equal(document.body.dataset.entryView,'workspace');
+ assert.equal(nodes['public-entry'].hidden,true);
+});
