@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import app from "../src/index";
 import { mintSession, FIRST_PARTY_TOKEN } from "../src/auth";
-import { randomToken, sha256 } from "../src/handlers/common";
+import { normalizeEmail, randomToken, sha256 } from "../src/handlers/common";
 import { LIMITER_NAMES } from "../src/ratelimit";
 
 const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "lb", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "lb-test-db" } }] }));
@@ -188,19 +188,16 @@ describe("B3 — token-shape gate in resolvePrincipal (Otto P1 5706955103 / audi
     for (let i = 0; i < 50; i++) expect((await post(env, "/v2/auth/link", { email: "x@example.invalid" }, "192.0.2.21", { authorization: `Bearer bogus-${i}-${"x".repeat(i % 40)}` })).status).toBe(429);
     expect(counted.counts).toEqual({ reads: 0, writes: 0 });
   }, 30_000);
-  it("a well-formed unknown st_ token costs ≤2 SELECTs and is then metered as anonymous by RL_HTTP_ANON (recorded residual)", async () => {
+  it("residual R1 (true statement): a well-formed unknown st_ token costs exactly 2 SELECTs on EVERY request, refused ones included — reads unbounded, writes 0", async () => {
     const env = mkEnv({ RL_HTTP_ANON: limiter(2) });
     const token = `st_${crypto.randomUUID().replace(/-/g, "")}`;
     expect(FIRST_PARTY_TOKEN.test(token)).toBe(true);
-    counted.reset();
-    expect((await get(env, "/v2/entry", "192.0.2.22", { authorization: `Bearer ${token}` })).status).toBe(200);
-    expect(counted.counts.reads).toBeLessThanOrEqual(2);
-    expect((await get(env, "/v2/entry", "192.0.2.22", { authorization: `Bearer ${token}` })).status).toBe(200);
-    counted.reset();
-    const r = await get(env, "/v2/entry", "192.0.2.22", { authorization: `Bearer ${token}` });
-    expect(r.status).toBe(429); // third: resolution still costs the lookups, then the anonymous budget refuses
-    expect(counted.counts.reads).toBeLessThanOrEqual(2); expect(counted.counts.writes).toBe(0);
-    expect(env.RL_HTTP_ANON.seen.get("ip:192.0.2.22")).toBe(3);
+    for (let i = 0; i < 2; i++) { counted.reset(); expect((await get(env, "/v2/entry", "192.0.2.22", { authorization: `Bearer ${token}` })).status).toBe(200); expect(counted.counts.reads).toBe(2); }
+    counted.reset(); const before = await traces();
+    for (let i = 0; i < 10; i++) expect((await get(env, "/v2/entry", "192.0.2.22", { authorization: `Bearer ${token}` })).status).toBe(429);
+    expect(counted.counts).toEqual({ reads: 20, writes: 0 }); // 2 reads per refused request: the limiter does NOT bound reads
+    expect(await traces()).toBe(before);
+    expect(env.RL_HTTP_ANON.seen.get("ip:192.0.2.22")).toBe(12);
   }, 30_000);
   it("both minted shapes pass the gate; the old fixture shape and near-misses do not", () => {
     expect(FIRST_PARTY_TOKEN.test(randomToken("pt"))).toBe(true);
@@ -240,6 +237,27 @@ describe("B5 — one trace id per JSON-RPC message (auditor #7)", () => {
     expect(await traces()).toBe(before + 3);
     for (const id of ids) expect((await raw.prepare("SELECT trace_id FROM trace WHERE trace_id = ?").bind(id).first())).toBeTruthy();
   }, 30_000);
+});
+
+describe("promoted nits — each has its own falsifier (#12-6, #12-8, #12-11)", () => {
+  it("#12-6: a signed-in MCP capability refusal (200 + envelope, no header) carries error.data.retry_after = 60", async () => {
+    const env = mkEnv({ RL_REDEEM: limiter(0) });
+    const bearer = await mintSession(env, "person_mara", "user");
+    const j: any = await (await post(env, "/mcp", call("cap.participant.redeem_code", { code: "NOPE-0001" }, "write"), "192.0.2.70", { authorization: `Bearer ${bearer}` })).json();
+    expect(j.result.structuredContent.error).toMatchObject({ code: "RATE_LIMITED", data: { retry_after: 60 } });
+    const h = await post(env, "/v2/participate/code", { code: "NOPE-0001" }, "192.0.2.71");
+    expect(h.status).toBe(429); expect(((await h.json()) as any).error.data.retry_after).toBe(60); // HTTP twin: header AND envelope
+  }, 30_000);
+  it("#12-8: an absent RL_AUTH binding outside dev refuses (already true) AND logs ratelimit.binding_absent naming the binding (new)", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect((await post(mkEnv({ RL_AUTH: undefined, ENVIRONMENT: "production" }), "/v2/auth/link", { email: "x@example.invalid" }, "192.0.2.72")).status).toBe(429);
+      expect(err.mock.calls.filter((c) => c[0] === "ratelimit.binding_absent").map((c) => c[1])).toEqual(["RL_AUTH"]);
+    } finally { err.mockRestore(); }
+  }, 30_000);
+  it("#12-11: normalizeEmail is trim + lowercase and is what both the em: key and the handler hash", () => {
+    expect(normalizeEmail("  A.B@Example.INVALID \t")).toBe("a.b@example.invalid");
+  });
 });
 
 describe("email normaliser — limiter key and handler hash agree (auditor #11)", () => {

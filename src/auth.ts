@@ -11,8 +11,8 @@ function cookie(req: Request, name: string): string | undefined {
  * Shape of every credential this code mints: mintSession → `st_`/`pt_` + 32 hex; randomToken("pt") (participant
  * open_link) → `pt_` + 32 base64url chars. Anything else cannot be a live row, so it is refused with ZERO storage access
  * (Otto P1 5706955103, auditor 5707673911 #3): a malformed or provider-shaped (`a:b:c`) bearer costs no D1 read.
- * Residual, recorded in INTERFACE.md: a WELL-FORMED unknown token still costs the two indexed lookups before the
- * anonymous limiter bounds the next request from that address.
+ * Residual R1, recorded in INTERFACE.md: a WELL-FORMED unknown token costs the two indexed lookups on EVERY request,
+ * including ones a limiter then refuses — reads are unbounded per address; only writes are bounded (anonymous budget).
  */
 export const FIRST_PARTY_TOKEN = /^(st|pt)_[A-Za-z0-9_-]{32}$/;
 
