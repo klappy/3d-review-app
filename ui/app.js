@@ -386,6 +386,7 @@ bindClick('recover', 'Recovering receipt…', async () => {
     }
   } else receipt = await api('/v2/participate/receipt', { participant: true });
   await recoverParticipant(receipt, !!state.form, loadForm, showReceipt);
+  if (!receipt.submitted && state.shared && submitState === 'uncertain') throw new HandledFailure(); // no "— complete." beside kept uncertainty
   if (!receipt.submitted) return;
   if (state.shared) { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); } // scoped namespace only; globals untouched in shared mode
   else { state.responseKey = null; sessionStorage.removeItem('responseKey'); }

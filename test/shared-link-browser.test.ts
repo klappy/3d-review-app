@@ -594,7 +594,7 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     const snap = await armed(storage, ns);
     plan.responses = null;
     await $("recover").dispatch("click"); await settled($); strict($);
-    expect($("receipt").hidden).toBe(true);
+    expect($("receipt").hidden).toBe(true); expect($("notice").textContent).toBe(ATTENTION);
     expect($("participant-resume").textContent).toBe(copy.submitUncertain);
     const body = (globalThis as any).document.body.textContent as string;
     expect(body).not.toContain("No submission recorded yet"); expect(body).not.toContain(copy.submitFailed);
@@ -608,6 +608,7 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     const snap = snapshot(storage);
     await $("recover").dispatch("click"); await settled($); strict($);
     expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toBe("No submission recorded yet.");
+    expect($("notice").textContent).toBe("Recovering receipt… — complete.");
     expect($("participant-resume").textContent).not.toBe(copy.submitUncertain);
     expect($("answers").hidden).toBe(false); expect($("recover").hidden).toBe(false);
     expect(snapshot(storage)).toBe(snap);
