@@ -24,3 +24,8 @@ test('Access email-code return stays in workspace while a facilitator token is s
 });
 
 test('legacy participant reload stays on the existing recovery screen without treating its token as staff identity',()=>{assert.equal(publicView({shared:false,authenticated:false,participantResume:true,hash:''}),'workspace');assert.equal(observedIdentity('Not signed in'),false);assert.equal(publicView({shared:false,authenticated:false,participantResume:false,hash:''}),'home');});
+
+test('explicit invitation presentation bypasses saved participant landing without implying identity',()=>{
+ assert.equal(publicView({invitation:true,shared:true,participantResume:true,authenticated:false,hash:''}),'workspace');
+ assert.equal(observedIdentity('Invitation'),false);
+});

@@ -48,7 +48,7 @@ test('form edit invalidates pending preview and confirm credential',async()=>{
  const wait=deferred();const w=world((_u,o)=>o.method==='GET'?list():wait.promise);await w.api.setScope(scope);w.input('invite-email').value='first@example.invalid';w.button('Preview invitation').click();w.input('invite-email').value='second@example.invalid';w.input('invite-email').fire('input');wait.resolve(confirmResult);await flush();assert.ok(!w.buttons().includes('Confirm invitation'));assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,0);
 });
 test('invite is two step, honest non-delivery, private reveal cleared on context change',async()=>{
- const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'i1',delivered:false,status:'sent',accepted:true,dev_only_link_token:'PRIVATE_HANDOFF'});await w.api.setScope(scope);await emailPreview(w);assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,0);w.button('Confirm invitation').click();await flush();assert.match(text(w.root),/email not delivered/);assert.match(text(w.root),/has not accepted/);assert.ok(!text(w.root).includes('PRIVATE_HANDOFF'));
+ const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'i1',delivered:false,status:'sent',accepted:true,dev_only_link_token:'PRIVATE_HANDOFF'});await w.api.setScope(scope);await emailPreview(w);assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,0);w.button('Confirm invitation').click();await flush();assert.match(text(w.root),/Email delivery could not be confirmed/);assert.match(text(w.root),/awaiting acceptance/);assert.ok(!text(w.root).includes('PRIVATE_HANDOFF'));
  w.button('Reveal private invitation token').click();assert.equal(walk(w.root).find(n=>n.attributes['aria-label']==='Private invitation token').value,'PRIVATE_HANDOFF');await w.api.setScope({...scope,id:'other'});assert.ok(!walk(w.root).some(n=>n.value==='PRIVATE_HANDOFF'));
 });
 test('missing dev token never invents a handoff or email success',async()=>{
@@ -105,7 +105,23 @@ test('completed invitation requires explicit handoff completion before refresh o
 test('server-confirmed email delivery is reported without false failure or recipient acceptance',async()=>{
  const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'mailed-i',delivered:true,dev_only_link_token:'UNNEEDED_SECRET'});
  await w.api.setScope(scope);await emailPreview(w);w.button('Confirm invitation').click();await flush();
- assert.match(text(w.root),/server reports email delivery/);assert.match(text(w.root),/recipient has not accepted/);
+ assert.match(text(w.root),/provider accepted/);assert.match(text(w.root),/Inbox arrival is not confirmed/);assert.match(text(w.root),/awaiting acceptance/);
  assert.ok(!text(w.root).includes('email not delivered'));assert.ok(!text(w.root).includes('outcome could not be confirmed'));assert.ok(!w.buttons().includes('Reveal private invitation token'));
  assert.ok(w.buttons().includes('Continue and refresh access'));
+});
+
+test('provider and row state table never confuses unknown delivery or terminal rows with a live invitation',async()=>{
+ for(const delivery of ['accepted','refused','not_sent','unconfirmed','unknown'])for(const status of ['pending','sent','unconfirmed','accepted','revoked','deleted']){
+  const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'i',delivered:delivery==='accepted',delivery:{state:delivery,reason:delivery==='unconfirmed'?'duplicate_uncertain':'duplicate_recent'},status,dev_only_link_token:'PRIVATE'});
+  await w.api.setScope(scope);await emailPreview(w);w.button('Confirm invitation').click();await flush();const t=text(w.root),terminal=['accepted','revoked','deleted'].includes(status);
+  if(terminal){assert.ok(!t.includes('awaiting acceptance'));assert.ok(!w.buttons().includes('Reveal private invitation token'));}
+  if(['unconfirmed','unknown'].includes(delivery)){assert.match(t,/could not be confirmed/);assert.ok(!t.includes('not delivered'));assert.ok(!w.buttons().includes('Reveal private invitation token'));}
+  assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,1);
+ }
+});
+test('unconfirmed pending rows remain visible for explicit revoke, without a resend action',async()=>{
+ const w=world(()=>({...list(),pending_invitations:[{id:'uncertain',role:'member',status:'unconfirmed'}]}));await w.api.setScope(scope);assert.match(text(w.root),/awaiting acceptance; delivery unconfirmed/);assert.ok(w.buttons().includes('Revoke invitation'));assert.ok(!w.buttons().some(x=>/resend/i.test(x)));
+});
+test('supplied private acceptance token requires explicit preview and is wiped by reset',async()=>{
+ const w=world(()=>confirmResult);w.api.openAcceptance('SUPPLIED_SENTINEL');assert.equal(w.input('invitation-token').value,'SUPPLIED_SENTINEL');assert.equal(w.calls.length,0);assert.ok(!text(w.root).includes('SUPPLIED_SENTINEL'));w.button('Preview acceptance').click();await flush();assert.equal(w.calls.length,1);w.api.reset();assert.ok(!walk(w.root).some(x=>x.value==='SUPPLIED_SENTINEL'));
 });

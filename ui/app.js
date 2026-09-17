@@ -1,3 +1,4 @@
+import { parseInvitationFragment } from './public-entry.js';
 import { mountParticipantView } from './participant-view.js';
 import { redactDiagnosticPath } from './diagnostic-path.js';
 import { createCollabHooks } from './collab-mount.js';
@@ -17,19 +18,29 @@ class HandledFailure extends Error { constructor() { super('handled'); this.name
 let participantView = null;
 let submitState = 'none'; // 'none' | 'uncertain'
 const $ = id => document.getElementById(id);
+let pendingInvitation = location.hash.startsWith('#invite=') ? parseInvitationFragment(location.hash) : null;
+const invitationEntry = pendingInvitation !== null;
+function endInvitation() {
+  pendingInvitation = null;
+  if (document.body) delete document.body.dataset.invitationIntent;
+  $('invitation-entry-notice')?.remove?.();
+}
+if (invitationEntry) document.body.dataset.invitationIntent = 'active';
+if (location.hash.startsWith('#invite=')) history.replaceState(null, '', location.pathname + location.search);
 // Shared-link mode is decided first so no global (code-path) key is read or written in that mode.
 const sharedToken = parseEntryFragment(location.hash);
 if (sharedToken !== null) stripFragment(window);
-const sharedResume = sharedToken === null ? currentNamespace(sessionStorage) : null;
+const sharedResume = !invitationEntry && sharedToken === null ? currentNamespace(sessionStorage) : null;
 const sharedMode = sharedToken !== null || sharedResume !== null;
-const state = { session: sharedMode ? null : sessionStorage.getItem('facilitatorToken'), participant: sharedMode ? null : sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null, assessmentRole: null, reportConfirm: null, reportCursor: null };
+const state = { session: sharedMode ? null : sessionStorage.getItem('facilitatorToken'), participant: sharedMode || invitationEntry ? null : sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null, assessmentRole: null, reportConfirm: null, reportCursor: null };
 state.responseKey = sharedMode ? null : savedSubmitKey(sessionStorage, state.participant);
-const collab = createCollabHooks({ document, api, sharedMode, onReload: async () => { const me = await identity(); if (me && hasProjectWork(me)) await projects(); },
+const collab = createCollabHooks({ document, api, sharedMode, onAcceptanceEnded: endInvitation, onReload: async () => { const me = await identity(); if (me && hasProjectWork(me)) await projects(); },
   // Opening a workspace makes it the selected entity: side-effect-free downstream clear (no change handlers, so no
   // fetch, no transient project scope, no run() notice — Bugbot 4038374305). Same synchronous resets chooseProject
   // performs before its await; the workspace scope is painted by the hook right after this returns.
   onWorkspaceOpened: () => clearEntitySelection() });
 function clearEntitySelection() {
+  endInvitation();
   clearStageScreens();
   state.project = null; state.projectView = null; state.assessment = null; state.survey = null;
   clearCodeBatch(); clearShareLink();
@@ -156,6 +167,7 @@ function showAuthorizedWork(me) {
 function resetClientIdentity() {
   collab.reset(); // W/I managers clear synchronously before any other identity work
   entityScreen?.reset(); lensSurveys?.reset();
+  endInvitation();
   participantView?.destroy(); participantView = null;
   clearStageScreens();
   clearIdentityData(state, sessionStorage);
@@ -681,5 +693,21 @@ if (sharedMode) run(sharedCopy.labelOpening, () => sharedLinkEntry(sharedToken, 
 else run('Checking session…', async () => {
   try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } }
   catch { state.session = null; state.principal = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); }
+  if (pendingInvitation && document.body.dataset.invitationIntent === 'active') {
+    if (state.principal?.kind === 'user') {
+      const token = pendingInvitation; pendingInvitation = null;
+      if (!await collab.openAcceptance(token)) { endInvitation(); throw new Error('Invitation could not be opened. Reopen the invitation link after checking your sign-in and access.'); }
+    } else {
+      // Deliberately no persisted invitation credential or altered Access callback.
+      pendingInvitation = null;
+      const note = document.createElement('div'); note.id = 'invitation-entry-notice';
+      const message = document.createElement('p');
+      message.textContent = state.principal ? 'Sign in as the invited person, then reopen the invitation link.' : 'Sign in with the email address that was invited. After signing in, reopen the invitation link to review and accept it.';
+      const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancel invitation'; cancel.addEventListener('click', endInvitation);
+      note.append(message, cancel); $('facilitator').prepend(note);
+      $('signin-panel').querySelector('a[href="/v2/auth/access"]')?.focus();
+    }
+  }
   if (state.participant) await restoreParticipant();
 });
+if (typeof window !== 'undefined') window.addEventListener('hashchange', () => { if (document.body.dataset.invitationIntent === 'active') { collab.clearAcceptance(); endInvitation(); } });

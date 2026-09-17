@@ -13,7 +13,20 @@ export function invitationRoles(role) { return role === 'owner' ? ['viewer', 'me
 export function canRevokeGrant(caller, target) { return canManageScope(caller) && (target === 'viewer' || target === 'member'); }
 export function canUpdateGrant(caller, target) { return caller === 'owner' && (target === 'viewer' || target === 'member'); }
 
-export function mountScopeInvitations({document: doc, root, request, getContext, onGrantsChanged = () => {}}) {
+// Provider acceptance and invitation state are separate facts; neither proves inbox arrival.
+export function invitationOutcome(result) {
+  const state = result.delivery?.state;
+  const legacy = result.delivery === undefined;
+  const live = ['pending','sent','unconfirmed'].includes(result.status) || (legacy && result.status === undefined);
+  const row = {pending:'awaiting acceptance',sent:'awaiting acceptance',unconfirmed:'awaiting acceptance; delivery unconfirmed',accepted:'already accepted',revoked:'revoked',deleted:'no longer available'}[result.status] || (legacy && result.status === undefined ? 'awaiting acceptance' : 'invitation state unknown');
+  const message = state === 'accepted' || (legacy && result.delivered) ? 'The email provider accepted the invitation for delivery. Inbox arrival is not confirmed.'
+    : state === 'refused' ? 'The email provider refused this delivery attempt.'
+    : state === 'not_sent' ? 'No email was sent by this attempt.' + (result.delivery.reason === 'duplicate_recent' ? ' An existing invitation was reused; its earlier delivery outcome is unchanged.' : '')
+    : 'Email delivery could not be confirmed. Check with the recipient before taking further action.';
+  return {message, row, handoff:live && (['refused','not_sent'].includes(state) || (legacy && !result.delivered))};
+}
+
+export function mountScopeInvitations({document: doc, root, request, getContext, onGrantsChanged = () => {}, onAcceptanceEnded = () => {}}) {
   let scope = null, mode = 'manager', list = null, pending = null, credential = null, completedInvitation = null;
   let message = '', failure = false, busy = false, destroyed = false, epoch = 0, renderId = 0;
   let status, confirmation, credentialBox, controls = [], confirmButton;
@@ -60,7 +73,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
       if (!current(s)) return;
       if (result.scope?.type !== scope.type || result.scope?.id !== scope.id || !Array.isArray(result.grants) || !Array.isArray(result.pending_invitations)) throw new Error('Wrong scope');
       // No names or email addresses are inferred from principal IDs.
-      list = {grants: result.grants.filter(g => object(g) && typeof g.id === 'string' && typeof g.principal_id === 'string' && roles.has(g.role)), pending: result.pending_invitations.filter(i => object(i) && typeof i.id === 'string' && roles.has(i.role) && ['sent', 'pending'].includes(i.status))};
+      list = {grants: result.grants.filter(g => object(g) && typeof g.id === 'string' && typeof g.principal_id === 'string' && roles.has(g.role)), pending: result.pending_invitations.filter(i => object(i) && typeof i.id === 'string' && roles.has(i.role) && ['sent', 'pending', 'unconfirmed'].includes(i.status))};
       message = ''; failure = false;
     } catch (error) { if (current(s)) { list = null; message = safeFailure(error, false); failure = true; } }
     finally { if (current(s)) { lock(false); render(); } }
@@ -97,9 +110,10 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
       if (!current(s)) return;
       if (intent.kind === 'invite') {
         if (typeof result.invitation_id !== 'string' || typeof result.delivered !== 'boolean') throw new Error('Unexpected delivery result');
-        completedInvitation = {id: result.invitation_id, role: intent.body.role, delivered: result.delivered};
-        credential = !result.delivered && typeof result.dev_only_link_token === 'string' && result.dev_only_link_token ? result.dev_only_link_token : null;
-        message = result.delivered ? 'Invitation created; the server reports email delivery. The recipient has not accepted yet.' : 'Invitation created; email not delivered. The recipient has not accepted yet.';
+        const outcome = invitationOutcome(result);
+        completedInvitation = {id: result.invitation_id, role: intent.body.role, ...outcome};
+        credential = outcome.handoff && typeof result.dev_only_link_token === 'string' && result.dev_only_link_token ? result.dev_only_link_token : null;
+        message = outcome.message;
       } else if (intent.kind === 'accept') {
         if (result.granted !== true || result.scope?.type !== intent.acceptanceScope.type || result.scope?.id !== intent.acceptanceScope.id || !roles.has(result.role)) throw new Error('Invalid acceptance');
         message = `Invitation accepted. Access granted as ${result.role} at ${result.scope.type}.`;
@@ -107,6 +121,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
         render();
         try { await onGrantsChanged(); } catch { if (current(s)) setStatus('Invitation accepted, but access could not be refreshed. Refresh before continuing.', true); }
         if (!current(s)) return;
+        onAcceptanceEnded();
       } else {
         if (result.grant !== intent.grantId || result.role !== intent.body.role) throw new Error('Wrong grant');
         list = null; message = 'Role updated. Refresh access to see the current list.';
@@ -132,9 +147,9 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     if (!scope || !canManageScope(scope.role)) { root.append(el('p', 'Select a scope where you are an owner or member to manage collaborators.')); return; }
     root.append(el('h3', `Collaborators · ${scope.type}`), el('p', scope.id, 'scope-invitations-context'));
     if (completedInvitation) {
-      const needsHandoff = !completedInvitation.delivered && credential;
-      root.append(el('p', `${completedInvitation.id} · ${completedInvitation.role} · awaiting acceptance`));
-      root.append(el('p', needsHandoff ? 'Complete the private handoff before continuing. Finishing discards any remaining token; it cannot be recovered here. Changing identity or scope also clears it.' : 'Email delivery does not mean the recipient has accepted. Continue to refresh the pending list.'));
+      const needsHandoff = completedInvitation.handoff && credential;
+      root.append(el('p', `${completedInvitation.id} · ${completedInvitation.role} · ${completedInvitation.row}`));
+      root.append(el('p', needsHandoff ? 'Complete the private handoff before continuing. Finishing discards any remaining token; it cannot be recovered here. Changing identity or scope also clears it.' : 'Continue to refresh access and invitation status.'));
       root.append(button(needsHandoff ? 'Finish handoff and refresh access' : 'Continue and refresh access', refreshList, {secondary:true}));
       return;
     }
@@ -162,15 +177,15 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     root.append(el('h4','Current grants'),grants);
     const invitations = el('ul', undefined, 'scope-invitations-list');
     for (const i of list.pending) {
-      const row = el('li'); row.append(el('span', `${i.id} · ${i.role} · awaiting acceptance`));
+      const row = el('li'); row.append(el('span', `${i.id} · ${i.role} · ${i.status === 'unconfirmed' ? 'awaiting acceptance; delivery unconfirmed' : 'awaiting acceptance'}`));
       if (invitationRoles(scope.role).includes(i.role)) row.append(button('Revoke invitation', () => revoke(`/v2/invitations/${enc(i.id)}`,'Invitation revocation',i.id,'invitation'), {secondary:true}));
       invitations.append(row);
     }
     root.append(el('h4','Pending invitations'),invitations);
   }
-  function renderAcceptance() {
+  function renderAcceptance(suppliedToken) {
     root.append(el('h3','Accept an invitation'),el('p','Sign in with the email address that was invited. This grants access only after you review and confirm.'));
-    const form = el('form',undefined,'scope-invitations-form'), token = input('password','invitation-token'); token.maxLength = 4096;
+    const form = el('form',undefined,'scope-invitations-form'), token = input('password','invitation-token'); token.maxLength = 4096; token.value = suppliedToken || '';
     form.append(field('Private invitation token',token),button('Preview acceptance', () => {
       if (!form.reportValidity()) return;
       const value=token.value.trim(); if(!value)return;
@@ -178,34 +193,36 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     }));
     form.addEventListener('submit',e=>e.preventDefault()); root.append(form);
   }
-  function render() {
+  function render(suppliedToken) {
     renderId++; controls=[]; root.replaceChildren(); root.classList.add('scope-invitations');
     const c=context(); root.hidden=destroyed||!staff(c); if(root.hidden)return;
     const menu=el('div',undefined,'scope-invitations-actions');
     if(c.kind==='user'&&mode!=='accept'&&!completedInvitation)menu.append(button('Accept an invitation',openAcceptance,{secondary:true}));
-    if(mode==='accept')menu.append(button('Back to collaborators',()=>{clearIntent();mode='manager';message='';render();},{secondary:true}));
+    if(mode==='accept')menu.append(button('Back to collaborators',()=>{clearIntent();mode='manager';message='';render();onAcceptanceEnded();},{secondary:true}));
     root.append(menu);
-    if(mode==='accept'&&c.kind==='user')renderAcceptance();else renderManager();
+    if(mode==='accept'&&c.kind==='user')renderAcceptance(suppliedToken);else renderManager();
     status=el('p',message,'scope-invitations-status');status.setAttribute('role',failure?'alert':'status');status.setAttribute('aria-live','polite');
     confirmation=el('div',undefined,'scope-invitations-confirmation');credentialBox=el('div',undefined,'scope-invitations-credential');
     root.append(status,confirmation,credentialBox);
     if(credential) {
-      credentialBox.append(el('p','Email was not delivered. Reveal this private token only for an authorized handoff to the invited recipient. Do not record it.'));
+      credentialBox.append(el('p','This response permits a private handoff to the invited recipient. Reveal the token only for that authorized handoff. Do not record it.'));
       credentialBox.append(button('Reveal private invitation token',()=>{
         const value=credential;credential=null;credentialBox.replaceChildren();
         const secret=el('input');secret.type='text';secret.readOnly=true;secret.value=value;secret.setAttribute('aria-label','Private invitation token');secret.autocomplete='off';
         credentialBox.append(secret,button('Hide private token',()=>credentialBox.replaceChildren(),{secondary:true}));
       },{secondary:true}));
-    } else if(completedInvitation && !completedInvitation.delivered) credentialBox.append(el('p','No invitation credential is available in this response. Email was not delivered.'));
+    } else if(completedInvitation && completedInvitation.handoff) credentialBox.append(el('p','No invitation credential is available in this response.'));
     lock(busy);
   }
   function setScope(value) {
     clearIntent(); scope=value&&scopes.has(value.type)&&typeof value.id==='string'&&value.id&&roles.has(value.role)?{type:value.type,id:value.id,role:value.role}:null;
     mode='manager';list=null;message='';failure=false;render();return refreshList();
   }
-  function openAcceptance() {
+  function openAcceptance(suppliedToken) {
     if(!staff(context())||context().kind!=='user')return;
-    clearIntent();mode='accept';list=null;message='';failure=false;render();
+    clearIntent();mode='accept';list=null;message='';failure=false;render(suppliedToken);
+    const previewButton = Array.from(root.querySelectorAll?.('button') || []).find(n => n.textContent === 'Preview acceptance');
+    previewButton?.focus?.(); previewButton?.scrollIntoView?.({block:'center'});
   }
   function reset() {clearIntent();scope=null;list=null;mode='manager';message='';failure=false;renderId++;root.replaceChildren();root.hidden=true;}
   function destroy(){reset();destroyed=true;}
