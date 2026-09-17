@@ -38,7 +38,8 @@ export function mountLensSurveys({ document: doc, root, actions }) {
         const li = el('li'); const c = counts.get(s.id);
         li.append(el('strong', s.template_name), el('span', ` · v${s.template_version} · ${s.collection_status}${c ? ` · ${c.responses} response${c.responses === 1 ? '' : 's'}` : ''}`, 'muted'));
         const row = el('div', undefined, 'row');
-        row.append(button('Open', () => actions.open(s.id)));
+        if (snapshot.canOpen !== false) row.append(button('Open', () => actions.open(s.id)));
+        else row.append(el('span', 'Survey work screen needs project access', 'muted')); // assessment-only grant: no survey card exists, so no Open (Bugbot 4037753271)
         if (mayEdit) row.append(button('Remove from assessment', () => actions.deselect(s.id)));
         li.append(row); list.append(li);
       }

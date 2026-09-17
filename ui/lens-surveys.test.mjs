@@ -43,8 +43,11 @@ test('wiring: root inside the stage workspace, assets, app.js actions use the ex
   assert.ok(app.includes("await api(`/v2/assessments/${path(aid)}/surveys`, { method: 'POST', body: { template_id, version: Number(version) } }); await chooseAssessment();"));
   assert.ok(app.includes("await api(`/v2/assessments/${path(aid)}/surveys/${path(sid)}`, { method: 'DELETE' }); await chooseAssessment();"));
   assert.ok(app.includes("open: sid => { $('surveys').value = sid; if ($('surveys').value === sid) $('surveys').dispatchEvent(new Event('change')); }"));
-  assert.ok(app.includes("lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [] });"));
+  assert.ok(app.includes("lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [], canOpen: !$('survey-card').hidden });"));
   assert.ok(app.includes("entityScreen?.reset(); lensSurveys?.reset();"));
+  assert.ok(app.includes("canOpen: !$('survey-card').hidden"),'Open only where the survey screen exists (Bugbot 4037753271)');
+  assert.ok(read('./lens-surveys.js').includes("if (snapshot.canOpen !== false) row.append(button('Open'"));
+  assert.ok(app.includes("if (grantedBefore && state.assessment === grantedBefore) $('granted-assessments').value = grantedBefore;"),'identity rebuild keeps the selected granted assessment (Bugbot 4037753258)');
   assert.ok(!app.includes("if (result.surveys?.length === 1) { $('surveys').value = result.surveys[0].id;"),'no auto-selecting a single survey: the assessment is a collection');
   assert.match(css,/body\[data-workspace-phase="understand"\] #lens-surveys-root,\s*body\[data-workspace-phase="improve"\] #lens-surveys-root \{ display:none; \}/);
   assert.ok(read('./.assetsignore').split('\n').includes('lens-surveys.test.mjs'));

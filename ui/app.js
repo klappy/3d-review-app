@@ -125,8 +125,10 @@ function showAuthorizedWork(me) {
   // The granted picker is the assessment-only entry: a project identity reaches the same assessment
   // through the project path, so it never becomes a second source for state.assessment.
   $('shared-assessments').hidden = !hasSharedAssessmentEntry(me);
+  const grantedBefore = $('granted-assessments').value; // identity re-observation (onGrantsChanged/onMutation) must not drop the selected granted assessment (Bugbot 4037753258)
   resetSelect($('granted-assessments'), 'Choose');
   for (const grant of assessmentGrants(me)) option($('granted-assessments'), grant.scope_id, `${grant.scope_id} · ${grant.role}`);
+  if (grantedBefore && state.assessment === grantedBefore) $('granted-assessments').value = grantedBefore;
   $('create-project').hidden = !me.principal.provisioned;
   text($('access-state'), visible ? '' : 'No project access is assigned to this identity. Scoped project work is hidden.');
 }
@@ -204,8 +206,9 @@ async function chooseAssessment() {
   collab.setScope(null); // R2: downstream collaborator scope resets synchronously before any await
   lensSurveys?.reset();
   text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
-  if (!state.assessment) return;
+  if (!state.assessment) { if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.role }); return; } // leaving an assessment restores the still-selected project scope (supplier a974903 intent)
   const stageRead = stageSnapshot();
+  if (!state.templates) await templates(); // the lens catalogue must be loaded before the snapshot (Auditor P2 root cause)
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   if (!stageCurrent(stageRead)) return;
   state.assessmentRole = result.assessment.role; showReportControls();
@@ -214,7 +217,7 @@ async function chooseAssessment() {
   const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
   if (next) $('stage-target').value = next;
   for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
-  lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [] });
+  lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [], canOpen: !$('survey-card').hidden });
   await refreshStageScreens(result.assessment, result.surveys || []);
 }
 async function templates() {
@@ -287,13 +290,14 @@ async function chooseGrantedAssessment() {
   if (!state.assessment) return;
   try {
     const stageRead = stageSnapshot();
+    if (!state.templates) await templates();
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   if (!stageCurrent(stageRead)) return;
     state.assessmentRole = result.assessment.role; showReportControls();
     collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
     text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
     for (const survey of result.surveys || []) option($('surveys'), survey.id, survey.template_name || survey.id);
-    lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [] });
+    lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [], canOpen: !$('survey-card').hidden });
     entityScreen?.render();
     await refreshStageScreens(result.assessment, result.surveys || []);
   } catch (error) { state.assessmentRole = null; showReportControls(); clearReportState(); throw error; }
