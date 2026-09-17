@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
+import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork } from './visibility.js';
 
 test('ungranted or assessment-only identity does not see project work', () => {
   assert.equal(hasProjectWork({ principal: { provisioned: false }, grants: [] }), false);
@@ -10,6 +10,25 @@ test('ungranted or assessment-only identity does not see project work', () => {
 test('provisioned creator or exact project grantee can see project navigation', () => {
   assert.equal(hasProjectWork({ principal: { provisioned: true }, grants: [] }), true);
   assert.equal(hasProjectWork({ principal: { provisioned: false }, grants: [{ scope_type: 'project', role: 'viewer' }] }), true);
+});
+
+test('assessmentGrants returns only the identity’s own assessment rows, in order', () => {
+  const me = { principal: { provisioned: false }, grants: [
+    { scope_type: 'project', scope_id: 'proj_1', role: 'owner' },
+    { scope_type: 'assessment', scope_id: 'assess_2', role: 'viewer' },
+    { scope_type: 'assessment', scope_id: 'assess_1', role: 'member' },
+  ] };
+  assert.deepEqual(assessmentGrants(me).map(g => g.scope_id), ['assess_2', 'assess_1']);
+  assert.deepEqual(assessmentGrants({ principal: {}, grants: [] }), []);
+  assert.deepEqual(assessmentGrants(undefined), []);
+});
+
+test('report work is reachable for an assessment-only grantee and for every project identity', () => {
+  assert.equal(hasReportWork({ principal: { provisioned: false }, grants: [{ scope_type: 'assessment', scope_id: 'a1', role: 'viewer' }] }), true);
+  assert.equal(hasReportWork({ principal: { provisioned: true }, grants: [] }), true);
+  assert.equal(hasReportWork({ principal: { provisioned: false }, grants: [{ scope_type: 'project', role: 'viewer' }] }), true);
+  assert.equal(hasReportWork({ principal: { provisioned: false }, grants: [] }), false);
+  assert.equal(hasReportWork(null), false);
 });
 
 test('identity switch clears facilitator, participant and scoped client state', () => {

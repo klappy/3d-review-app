@@ -1,7 +1,7 @@
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
-import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
-import { createReportState, renderList, renderReport } from './report-view.js';
+import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork } from './visibility.js';
+import { renderList, renderReport } from './report-view.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
 import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
 // Thrown by shared-link paths that already showed the participant copy: run() marks the action as
@@ -15,7 +15,7 @@ const sharedToken = parseEntryFragment(location.hash);
 if (sharedToken !== null) stripFragment(window);
 const sharedResume = sharedToken === null ? currentNamespace(sessionStorage) : null;
 const sharedMode = sharedToken !== null || sharedResume !== null;
-const state = { session: sharedMode ? null : sessionStorage.getItem('facilitatorToken'), participant: sharedMode ? null : sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null, assessmentRole: null, ...createReportState() };
+const state = { session: sharedMode ? null : sessionStorage.getItem('facilitatorToken'), participant: sharedMode ? null : sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null, assessmentRole: null, reportConfirm: null, reportCursor: null };
 state.responseKey = sharedMode ? null : savedSubmitKey(sessionStorage, state.participant);
 const path = (value) => encodeURIComponent(value);
 function note(message) { $('notice').textContent = message; $('error').hidden = true; }
@@ -48,6 +48,11 @@ async function run(label, task) {
 function showAuthorizedWork(me) {
   const visible = hasProjectWork(me);
   for (const id of ['project-card', 'assessment-card', 'survey-card', 'results-card']) $(id).hidden = !visible;
+  // An assessment-only grantee reaches reports without any project navigation.
+  const reports = hasReportWork(me);
+  $('reports-card').hidden = !reports; $('shared-assessments').hidden = !reports;
+  resetSelect($('granted-assessments'), 'Choose');
+  for (const grant of assessmentGrants(me)) option($('granted-assessments'), grant.scope_id, `${grant.scope_id} · ${grant.role}`);
   $('create-project').hidden = !me.principal.provisioned;
   text($('access-state'), visible ? '' : 'No project access is assigned to this identity. Scoped project work is hidden.');
 }
@@ -55,8 +60,9 @@ function resetClientIdentity() {
   clearIdentityData(state, sessionStorage);
   clearCodeBatch(); clearShareLink(); // sign-out/sign-in: the once-shown link and confirm token never outlive the identity
   state.assessmentRole = null; clearReportState(); showReportControls();
-  for (const id of ['project-card', 'assessment-card', 'survey-card', 'results-card']) $(id).hidden = true;
+  for (const id of ['project-card', 'assessment-card', 'survey-card', 'results-card', 'reports-card', 'shared-assessments']) $(id).hidden = true;
   $('create-project').hidden = true;
+  resetSelect($('granted-assessments'), 'Choose'); text($('granted-detail'), '');
   for (const [id, label] of [['projects', 'Choose project'], ['assessments', 'Choose assessment'], ['surveys', 'Choose survey'], ['languages', 'Choose language'], ['templates', 'Choose template']]) resetSelect($(id), label);
   for (const id of ['project-detail', 'assessment-detail', 'survey-detail', 'form-context', 'dev-code']) text($(id), '');
   text($('participant-resume'), '');
@@ -90,6 +96,7 @@ async function chooseProject() {
   state.project = $('projects').value || null; state.projectView = null; state.assessment = null; state.survey = null;
   clearCodeBatch(); clearShareLink();
   state.assessmentRole = null; clearReportState(); showReportControls();
+  $('granted-assessments').value = ''; text($('granted-detail'), '');
   text($('project-detail'), ''); text($('assessment-detail'), ''); text($('survey-detail'), '');
   text($('results'), 'Select an assessment.');
   resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
@@ -109,6 +116,7 @@ async function chooseAssessment() {
   state.assessment = $('assessments').value || null; state.survey = null; resetSelect($('surveys'), 'Choose survey');
   clearCodeBatch(); clearShareLink();
   state.assessmentRole = null; clearReportState(); showReportControls();
+  $('granted-assessments').value = ''; text($('granted-detail'), ''); // one state.assessment, exactly one visible source
   text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
   if (!state.assessment) return;
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
@@ -177,6 +185,20 @@ $('projects').addEventListener('change', () => run('Loading project…', chooseP
 bindForm('create-project', 'Creating project…', async fd => { const result = await api('/v2/projects', { method: 'POST', body: { name: String(fd.get('name')).trim() } }); state.project = result.project.id; await projects(); $('projects').value = state.project; await chooseProject(); });
 bindClick('load-assessments', 'Loading assessments…', assessments);
 $('assessments').addEventListener('change', () => run('Loading assessment…', chooseAssessment));
+// Assessment-only entry: an exact assessment grant, authorized server-side, with no project navigation.
+async function chooseGrantedAssessment() {
+  state.assessment = $('granted-assessments').value || null; state.survey = null; state.assessmentRole = null;
+  clearCodeBatch(); clearShareLink(); clearReportState(); showReportControls();
+  $('assessments').value = ''; text($('assessment-detail'), ''); resetSelect($('surveys'), 'Choose survey');
+  text($('survey-detail'), ''); text($('results'), 'Select an assessment.'); text($('granted-detail'), '');
+  if (!state.assessment) return;
+  try {
+    const result = await api(`/v2/assessments/${path(state.assessment)}`);
+    state.assessmentRole = result.assessment.role; showReportControls();
+    text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
+  } catch (error) { state.assessmentRole = null; showReportControls(); clearReportState(); throw error; }
+}
+$('granted-assessments').addEventListener('change', () => run('Loading assessment…', chooseGrantedAssessment));
 bindClick('set-stage', 'Moving assessment stage…', async () => {
   const aid = required(state.assessment, 'Choose an assessment.');
   const sid = state.survey;
@@ -264,8 +286,10 @@ bindClick('load-results', 'Reading result state…', async () => {
 });
 // Reports. Nothing here is cached: the pending confirmation, the list cursor and the opened report
 // are page-memory only and are cleared on every identity, project or assessment change.
+// The pending confirmation and its expiry timer are page memory only.
+function dropReportConfirm() { if (state.reportConfirm?.timer) clearTimeout(state.reportConfirm.timer); state.reportConfirm = null; }
 function clearReportState() {
-  state.clear(); // reportConfirm (+ its expiry timer) and reportCursor
+  dropReportConfirm(); state.reportCursor = null;
   $('report-view').replaceChildren(); $('report-view').hidden = true;
   $('report-list').replaceChildren();
   text($('report-preview'), ''); text($('report-status'), '');
@@ -293,17 +317,17 @@ async function openReport(id) {
 }
 reportAction('preview-report', 'Previewing report build…', async () => {
   const result = await api(reportRoute(), { method: 'POST', body: { mode: 'dry_run' } });
-  state.clear();
+  dropReportConfirm();
   $('build-report').disabled = true;
   if (result.suppressed) { text($('report-preview'), `${result.reason} No report will be built.`); return; }
   text($('report-preview'), `Building a report makes this assessment's synthetic results visible to everyone with access to it. Nothing is built until you choose Build report. This confirmation expires in ${result.expires_in} seconds.`);
-  const timer = setTimeout(() => { state.clear(); $('build-report').disabled = true; }, Number(result.expires_in) * 1000);
+  const timer = setTimeout(() => { dropReportConfirm(); $('build-report').disabled = true; }, Number(result.expires_in) * 1000);
   state.reportConfirm = { token: result.confirm_token, expiresAt: Date.now() + Number(result.expires_in) * 1000, timer };
   $('build-report').disabled = false;
 });
 reportAction('build-report', 'Building report…', async () => {
   const confirm_token = required(state.reportConfirm, 'Preview the report again.').token;
-  state.clear(); $('build-report').disabled = true; text($('report-preview'), '');
+  dropReportConfirm(); $('build-report').disabled = true; text($('report-preview'), '');
   const result = await api(reportRoute(), { method: 'POST', body: { mode: 'execute', confirm_token } });
   if (result.suppressed) { text($('report-status'), result.reason); return; }
   const li = document.createElement('li');
