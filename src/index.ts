@@ -35,6 +35,14 @@ for (const cap of capabilities) {
   const path = cap.http.path.replace("{id}@{ver}", ":idVersion").replace(/\{([^}]+)\}/g, ":$1");
   app.on(cap.http.method.toUpperCase(), path, async (c) => {
     const ctx = await contextForRequest(c.req.raw, c.env);
+    // Anonymous HTTP traffic on EVERY twin is dampened per address (auditor 5707673911 #2: ~75 twins wrote a trace row
+    // per anonymous request with no limit). Spent after credential resolution and before the body is parsed; a refusal
+    // returns the contract error and writes nothing. Credential holders are not counted here. Mirrors /mcp below.
+    if (ctx.principal.kind === "anonymous" && !(await allow(c.env, "RL_HTTP_ANON", `ip:${ctx.clientIp}`))) {
+      const res = json(fail("RATE_LIMITED", "too many anonymous requests — sign in, or wait up to 60 seconds", `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again`, cap.id, ctx.traceId), 429);
+      res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
+      return res;
+    }
     try {
       let body: Record<string, unknown> = {};
       if (!["GET", "HEAD"].includes(c.req.method)) {

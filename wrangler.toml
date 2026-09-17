@@ -23,6 +23,10 @@ name = "RL_MCP_ANON"
 namespace_id = "30101"
 simple = { limit = 30, period = 60 }
 [[ratelimits]]
+name = "RL_HTTP_ANON"
+namespace_id = "30104"
+simple = { limit = 60, period = 60 }
+[[ratelimits]]
 name = "RL_AUTH"
 namespace_id = "30102"
 simple = { limit = 10, period = 60 }
@@ -58,6 +62,10 @@ database_id = "2641de99-670e-46a2-872e-a2498189e287"
 name = "RL_MCP_ANON"
 namespace_id = "30201"
 simple = { limit = 30, period = 60 }
+[[env.production.ratelimits]]
+name = "RL_HTTP_ANON"
+namespace_id = "30204"
+simple = { limit = 60, period = 60 }
 [[env.production.ratelimits]]
 name = "RL_AUTH"
 namespace_id = "30202"

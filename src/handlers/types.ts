@@ -14,7 +14,7 @@ export interface Principal {
 }
 export interface Env { DB: D1Database; SESSION_SECRET: string; CODE_ESCROW_SECRET?: string; ENVIRONMENT?: string; ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string;
   /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]) — see src/ratelimit.ts. */
-  RL_MCP_ANON?: RateLimit; RL_AUTH?: RateLimit; RL_REDEEM?: RateLimit }
+  RL_MCP_ANON?: RateLimit; RL_HTTP_ANON?: RateLimit; RL_AUTH?: RateLimit; RL_REDEEM?: RateLimit }
 export interface Ctx {
   env: Env;
   db: D1Database;
