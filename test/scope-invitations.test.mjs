@@ -87,3 +87,16 @@ test('revoke checks exact returned target and never reports unrelated success',a
 test('member can revoke member invitation but owner invitation has no revoke control',async()=>{
  const w=world((_u,o)=>o.method==='GET'?{...list(),pending_invitations:[{id:'im',role:'member',status:'sent'},{id:'io',role:'owner',status:'sent'}]}:{id:'im',status:'revoked'});await w.api.setScope({...scope,role:'member'});assert.equal(w.buttons().filter(x=>x==='Revoke invitation').length,1);w.button('Revoke invitation').click();await flush();assert.equal(w.calls[1].url,'/v2/invitations/im');assert.match(text(w.root),/Invitation revocation completed/);
 });
+
+test('completed invitation requires explicit handoff completion before refresh or another invite',async()=>{
+ let created=false;
+ const w=world((_u,o)=>o.method==='GET'?{...list(),pending_invitations:created?[{id:'created-i',role:'viewer',status:'sent'}]:[]}:o.body.mode==='dry_run'?confirmResult:(created=true,{invitation_id:'created-i',delivered:false,dev_only_link_token:'HANDOFF_SENTINEL'}));
+ await w.api.setScope(scope);await emailPreview(w);const oldConfirm=w.button('Confirm invitation');oldConfirm.click();await flush();
+ assert.match(text(w.root),/created-i/);
+ assert.ok(!w.buttons().includes('Refresh access'));assert.ok(!w.buttons().includes('Preview invitation'));assert.ok(!w.buttons().includes('Accept an invitation'));
+ oldConfirm.click();await flush();assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,1);
+ w.button('Reveal private invitation token').click();assert.ok(walk(w.root).some(n=>n.value==='HANDOFF_SENTINEL'));
+ w.button('Finish handoff and refresh access').click();await flush();
+ assert.ok(!walk(w.root).some(n=>n.value==='HANDOFF_SENTINEL'));assert.match(text(w.root),/created-i · viewer · awaiting acceptance/);assert.ok(w.buttons().includes('Preview invitation'));
+ assert.equal(w.calls.filter(x=>x.method==='GET').length,2);
+});

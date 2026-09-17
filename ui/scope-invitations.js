@@ -14,7 +14,7 @@ export function canRevokeGrant(caller, target) { return canManageScope(caller) &
 export function canUpdateGrant(caller, target) { return caller === 'owner' && (target === 'viewer' || target === 'member'); }
 
 export function mountScopeInvitations({document: doc, root, request, getContext, onGrantsChanged = () => {}}) {
-  let scope = null, mode = 'manager', list = null, pending = null, credential = null;
+  let scope = null, mode = 'manager', list = null, pending = null, credential = null, completedInvitation = null;
   let message = '', failure = false, busy = false, destroyed = false, epoch = 0, renderId = 0;
   let status, confirmation, credentialBox, controls = [], confirmButton;
   const context = () => getContext() || {};
@@ -26,7 +26,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
   function setStatus(text, error = false) { message = text; failure = error; if (status) { status.textContent = text; status.setAttribute('role', error ? 'alert' : 'status'); } }
   function lock(value) { busy = value; for (const n of controls) n.disabled = value; }
   function clearIntent() {
-    epoch++; pending = null; credential = null; lock(false);
+    epoch++; pending = null; credential = null; completedInvitation = null; lock(false);
     confirmation?.replaceChildren(); credentialBox?.replaceChildren();
     if (confirmButton) confirmButton = null;
   }
@@ -97,6 +97,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
       if (!current(s)) return;
       if (intent.kind === 'invite') {
         if (typeof result.invitation_id !== 'string' || result.delivered !== false) throw new Error('Unexpected delivery result');
+        completedInvitation = {id: result.invitation_id, role: intent.body.role};
         credential = typeof result.dev_only_link_token === 'string' && result.dev_only_link_token ? result.dev_only_link_token : null;
         message = 'Invitation created; email not delivered. The recipient has not accepted yet.';
       } else if (intent.kind === 'accept') {
@@ -130,6 +131,12 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
   function renderManager() {
     if (!scope || !canManageScope(scope.role)) { root.append(el('p', 'Select a scope where you are an owner or member to manage collaborators.')); return; }
     root.append(el('h3', `Collaborators · ${scope.type}`), el('p', scope.id, 'scope-invitations-context'));
+    if (completedInvitation) {
+      root.append(el('p', `${completedInvitation.id} · ${completedInvitation.role} · awaiting acceptance`));
+      root.append(el('p', 'Complete the private handoff before continuing. Finishing discards any remaining token; it cannot be recovered here. Changing identity or scope also clears it.'));
+      root.append(button('Finish handoff and refresh access', refreshList, {secondary:true}));
+      return;
+    }
     root.append(button('Refresh access', refreshList, {secondary:true}));
     const form = el('form', undefined, 'scope-invitations-form'), email = input('email','invite-email'), role = roleSelect(invitationRoles(scope.role));
     email.maxLength = 320;
@@ -174,7 +181,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     renderId++; controls=[]; root.replaceChildren(); root.classList.add('scope-invitations');
     const c=context(); root.hidden=destroyed||!staff(c); if(root.hidden)return;
     const menu=el('div',undefined,'scope-invitations-actions');
-    if(c.kind==='user'&&mode!=='accept')menu.append(button('Accept an invitation',openAcceptance,{secondary:true}));
+    if(c.kind==='user'&&mode!=='accept'&&!completedInvitation)menu.append(button('Accept an invitation',openAcceptance,{secondary:true}));
     if(mode==='accept')menu.append(button('Back to collaborators',()=>{clearIntent();mode='manager';message='';render();},{secondary:true}));
     root.append(menu);
     if(mode==='accept'&&c.kind==='user')renderAcceptance();else renderManager();
