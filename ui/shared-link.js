@@ -26,7 +26,13 @@ export const copy = {
   labelCreateLink: 'Creating survey link…',
   labelCopyLink: 'Copying link…',
   labelRefreshCounts: 'Refreshing counts…',
+  // Templates: placeholders in braces are filled by fill(); no other interpolation exists in the UI.
+  issueImpact: 'Impact: {impact}. Confirmation expires in {seconds} seconds.',
+  issueExpires: 'Expires {expires_at}.',
+  previewAgain: 'Preview the survey link again.',
+  createFirst: 'Create a survey link first.',
 };
+export function fill(template, values) { return template.replace(/\{(\w+)\}/g, (_, k) => String(values[k])); }
 
 const FRAGMENT = /^#survey=([^&]+)$/;
 
