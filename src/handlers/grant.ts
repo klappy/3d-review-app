@@ -24,6 +24,16 @@ async function owners(ctx: Ctx, scope: Scope): Promise<string[]> {
   const r = await ctx.db.prepare('SELECT principal_id FROM "grant" WHERE scope_type = ? AND scope_id = ? AND role = ?').bind(scope.type, scope.id, "owner").all<{ principal_id: string }>();
   return r.results.map((x) => x.principal_id);
 }
+/** A LIVE invitation for the same scope+invitee, as ONE predicate shared by the de-duplicating INSERT and the read-back.
+ *  Three shapes are live: a 'sent' row inside the cooldown, a 'pending' row younger than PENDING_DEDUPE_S (an in-flight twin),
+ *  and an 'unconfirmed' row for as long as it is unexpired — the mail MAY have gone out, so no cooldown expiry may re-open it
+ *  (independent review AMEND P2). Placeholders are passed in so both statements can number their binds independently. */
+const dupWhere = (scopeT: string, scopeI: string, hash: string, sentSince: string, pendingSince: string, now: string) =>
+  `scope_type = ${scopeT} AND scope_id = ${scopeI} AND invitee_hash = ${hash} AND (`
+  + `(status = 'sent' AND created_at > ${sentSince})`
+  + ` OR (status = 'pending' AND created_at > ${pendingSince})`
+  + ` OR (status = 'unconfirmed' AND (expires_at IS NULL OR expires_at > ${now})))`;
+
 async function scopeExists(ctx: Ctx, scope: Scope): Promise<boolean> {
   const t = scope.type === "workspace" ? "workspace" : scope.type === "project" ? "project" : "assessment";
   return !!(await ctx.db.prepare(`SELECT id FROM ${t} WHERE id = ?`).bind(scope.id).first());
@@ -32,7 +42,9 @@ async function scopeExists(ctx: Ctx, scope: Scope): Promise<boolean> {
 /** E: invite → the invitation mail leaves the system (IRR-001) when a sender is configured and the environment policy allows
  *  this recipient (src/mail.ts, OF-3). `delivered` is the provider's acceptance and nothing more; `delivery.state` says which
  *  kind of outcome it was ("accepted" | "refused" | "unconfirmed" | "not_sent") and `delivery.reason` why, when it was not
- *  accepted. Dev returns the link token in-band so the flow can be exercised without any mailbox. */
+ *  accepted. `status` is the invitation's ACTUALLY stored state, which is not the same thing: 'unconfirmed' rows are LIVE
+ *  (treated like 'sent' by de-duplication, `accept`, `revoke_invitation` and the pending listing).
+ *  Dev returns the link token in-band so the flow can be exercised without any mailbox. */
 export const invite: Handler = async (ctx, p, o) => {
   const scope = reqScope(p); const role = reqRole(p);
   const email = normalizeAddress(reqStr(p, "email"));
@@ -43,22 +55,28 @@ export const invite: Handler = async (ctx, p, o) => {
   const impact = { affected: [{ scope, role, invitee: inviteeHash.slice(0, 12), will_see: `${scope.type} contents at role ${role}` }], irreversible: true, effect: "external" as const, compensating_control: "cap.grant.revoke_invitation (does not unsend)" };
   if (o?.dryRun) return { result: {}, scope, impact };
   // Intent de-duplication + inviter cap, decided and written in ONE statement so concurrent replays cannot both pass a
-  // check-then-insert gap (re-review #16). A live duplicate is: a row already 'sent' inside the cooldown, or a 'pending' row
-  // younger than PENDING_DEDUPE_S (an in-flight twin). Older 'pending' rows were never mailed and must not block a retry.
+  // check-then-insert gap (re-review #16). A live duplicate is: a row already 'sent' inside the cooldown, a 'pending' row
+  // younger than PENDING_DEDUPE_S (an in-flight twin), or an unexpired 'unconfirmed' row (the mail may have gone out —
+  // no cooldown expiry may re-open it; the human path out is revoke_invitation, then invite anew).
   const now = ctx.now().getTime();
+  const nowStr = nowIso(ctx);
   const sentSince = new Date(now - INVITE_COOLDOWN_S * 1000).toISOString(), pendingSince = new Date(now - PENDING_DEDUPE_S * 1000).toISOString(), hourAgo = new Date(now - 3600_000).toISOString();
-  const DUP = `scope_type = ?2 AND scope_id = ?3 AND invitee_hash = ?4 AND ((status = 'sent' AND created_at > ?11) OR (status = 'pending' AND created_at > ?12))`;
+  const DUP = dupWhere("?2", "?3", "?4", "?11", "?12", "?14");
   const id = newId("inv"); const token = randomToken("il");
   const ins = await ctx.db.prepare(`INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at)
       SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'pending', ?8, ?9, ?10
       WHERE NOT EXISTS (SELECT 1 FROM invitation WHERE ${DUP})
         AND (SELECT COUNT(*) FROM invitation WHERE created_by = ?8 AND scope_type <> 'survey' AND created_at > ?13) < ?7`)
-    .bind(id, scope.type, scope.id, inviteeHash, await sha256(token), role, INVITES_PER_INVITER_HOUR, ctx.principal.id, nowIso(ctx), new Date(now + INVITE_TTL_S * 1000).toISOString(), sentSince, pendingSince, hourAgo).run();
+    .bind(id, scope.type, scope.id, inviteeHash, await sha256(token), role, INVITES_PER_INVITER_HOUR, ctx.principal.id, nowStr, new Date(now + INVITE_TTL_S * 1000).toISOString(), sentSince, pendingSince, hourAgo, nowStr).run();
   if ((ins.meta.changes ?? 0) !== 1) {
-    const dup = await ctx.db.prepare("SELECT id, role, status FROM invitation WHERE scope_type = ?1 AND scope_id = ?2 AND invitee_hash = ?3 AND ((status = 'sent' AND created_at > ?4) OR (status = 'pending' AND created_at > ?5)) ORDER BY created_at DESC LIMIT 1")
-      .bind(scope.type, scope.id, inviteeHash, sentSince, pendingSince).first<{ id: string; role: string; status: string }>();
+    const dup = await ctx.db.prepare(`SELECT id, role, status FROM invitation WHERE ${dupWhere("?1", "?2", "?3", "?4", "?5", "?6")} ORDER BY created_at DESC LIMIT 1`)
+      .bind(scope.type, scope.id, inviteeHash, sentSince, pendingSince, nowStr).first<{ id: string; role: string; status: string }>();
     if (!dup) throw new CapError("RATE_LIMITED", `at most ${INVITES_PER_INVITER_HOUR} collaborator invitations per hour`, "this cap resets over the next hour, not the next minute", "cap.grant.invite");
     if (dup.role !== role) throw new CapError("INVALID_PARAMS", `already invited as ${dup.role} a moment ago`, "revoke that invitation first, then invite with the new role", "cap.grant.revoke_invitation");
+    // No token was minted into this row, no new idempotency key exists and no fetch was made. An 'unconfirmed' twin is reported
+    // as what it is — uncertain, not "not sent" — so a surface cannot render it as "email not delivered".
+    if (dup.status === "unconfirmed")
+      return { result: { invitation_id: dup.id, role: dup.role, status: dup.status, accepted: true, delivered: false, delivery: { provider: null, state: "unconfirmed", reason: "duplicate_uncertain" }, note: "an earlier invitation to this address could NOT be confirmed as sent, so nothing was sent again. Check with the recipient; to force a fresh invitation, revoke that one first (cap.grant.revoke_invitation)" }, scope, impact };
     return { result: { invitation_id: dup.id, role: dup.role, status: dup.status, accepted: true, delivered: false, delivery: { provider: null, state: "not_sent", reason: "duplicate_recent" }, note: "already invited moments ago; nothing was sent again" }, scope, impact };
   }
   const env = ctx.env as MailEnv; const origin = publicOrigin(env);
@@ -68,16 +86,28 @@ export const invite: Handler = async (ctx, p, o) => {
     const msg = invitationMessage(origin, token, role, scope.type, INVITE_TTL_S / 86400);
     delivery = await sendMail(env, { to: email, subject: msg.subject, text: msg.text, html: msg.html, idempotencyKey: `invite/${id}` });
   }
-  // The row says 'sent' only when the provider accepted the message; on "unconfirmed" it MAY have gone out but we do not know,
-  // so the row stays 'pending' and nothing is re-sent (review #16-4 + accepted plan 14c5715401704).
-  if (delivery.delivered) await ctx.db.prepare("UPDATE invitation SET status = 'sent' WHERE id = ?").bind(id).run();
-  ctx.log("grant.invite.mail", { delivered: delivery.delivered, state: delivery.state, reason: delivery.reason ?? null, provider_status: delivery.provider_status ?? null }); // never the address, nor a hash of it
-  const note = delivery.state === "accepted"
-    ? "the provider accepted the invitation for delivery; the recipient has not accepted it yet"
-    : delivery.state === "unconfirmed"
-      ? "the send was NOT confirmed: the provider did not answer in time, so it may or may not have gone out. Nothing was re-sent and the recipient has not accepted the invitation. Check with the recipient before inviting again."
-      : "nothing was sent; the recipient has not accepted the invitation";
-  return { result: { invitation_id: id, role, status: delivery.delivered ? "sent" : "pending", accepted: true, delivered: delivery.delivered, delivery: { provider: delivery.provider ?? null, state: delivery.state, reason: delivery.reason ?? null, ...(delivery.provider_status !== undefined ? { provider_status: delivery.provider_status } : {}) }, note, ...(ctx.env.ENVIRONMENT === "dev" ? { dev_only_link_token: token } : {}) }, scope, impact };
+  // The row says 'sent' only when the provider accepted, and 'unconfirmed' when we cannot tell (the mail MAY have gone out).
+  // Both are CONDITIONAL on the row still being 'pending' (independent review AMEND P1): the send awaits the network, and in
+  // that window a revoke or an accept may already have written a terminal state — a blind post-network UPDATE would resurrect
+  // it. On a lost race the stored status is re-read, so the result reports what is ACTUALLY stored, separately from what the
+  // provider said (delivery.state is always the provider's answer).
+  const target = delivery.delivered ? "sent" : delivery.state === "unconfirmed" ? "unconfirmed" : null;
+  let stored = "pending";
+  if (target) {
+    const up = await ctx.db.prepare("UPDATE invitation SET status = ? WHERE id = ? AND status = 'pending'").bind(target, id).run();
+    stored = (up.meta.changes ?? 0) === 1
+      ? target // we won the transition; no need to read it back
+      : (await ctx.db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status ?? "pending";
+  }
+  ctx.log("grant.invite.mail", { delivered: delivery.delivered, state: delivery.state, reason: delivery.reason ?? null, provider_status: delivery.provider_status ?? null, stored_status: stored }); // never the address, nor a hash of it
+  const note = stored !== (target ?? "pending")
+    ? `the invitation is ${stored}: it changed while the send was in flight, and that state was not overwritten. delivery.state reports only what the provider said.`
+    : delivery.state === "accepted"
+      ? "the provider accepted the invitation for delivery; the recipient has not accepted it yet"
+      : delivery.state === "unconfirmed"
+        ? "the send was NOT confirmed: the provider did not answer in time, so it may or may not have gone out. The invitation is kept live as 'unconfirmed' and nothing will be re-sent to this address; revoke it first if you must invite again. The recipient has not accepted it."
+        : "nothing was sent; the recipient has not accepted the invitation";
+  return { result: { invitation_id: id, role, status: stored, accepted: true, delivered: delivery.delivered, delivery: { provider: delivery.provider ?? null, state: delivery.state, reason: delivery.reason ?? null, ...(delivery.provider_status !== undefined ? { provider_status: delivery.provider_status } : {}) }, note, ...(ctx.env.ENVIRONMENT === "dev" ? { dev_only_link_token: token } : {}) }, scope, impact };
 };
 
 export const revoke_invitation: Handler = async (ctx, p) => {
@@ -87,6 +117,7 @@ export const revoke_invitation: Handler = async (ctx, p) => {
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
   const caller = await callerAt(ctx, scope, "member");
   ceiling(caller, inv.role as Role, "revoke invitations");
+  // 'unconfirmed' is revocable: it is the explicit human path out of an uncertain send (revoke, then invite anew).
   if (inv.status === "accepted") throw new CapError("INVALID_PARAMS", "already accepted — revoke the grant instead", undefined, "cap.grant.revoke");
   await ctx.db.prepare("UPDATE invitation SET status = 'revoked' WHERE id = ?").bind(id).run();
   return { result: { id, status: "revoked" }, scope };
@@ -97,6 +128,7 @@ export const accept: Handler = async (ctx, p, o) => {
   if (ctx.principal.kind !== "user") throw new CapError("NOT_AUTHENTICATED", "sign in to accept an invitation");
   const token = reqStr(p, "token");
   const inv = await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash FROM invitation WHERE token_hash = ?").bind(await sha256(token)).first<any>();
+  // 'unconfirmed' is accepted like 'sent': the mail may well have arrived, and the token is proof enough that it did.
   if (!inv || inv.status === "revoked") throw notVisible("invitation");
   // Invitations are NOT transferable bearer tokens: the invited email must be the signed-in principal's (Astra c5704773599). Mismatch is hidden, never explained.
   const me = await ctx.db.prepare("SELECT email_hash FROM principal WHERE id = ?").bind(ctx.principal.id).first<{ email_hash: string | null }>();
@@ -120,7 +152,7 @@ export const list: Handler = async (ctx, p) => {
   const scope = reqScope(p);
   await callerAt(ctx, scope, "member");
   const r = await ctx.db.prepare('SELECT id, principal_id, role, created_at FROM "grant" WHERE scope_type = ? AND scope_id = ? ORDER BY created_at').bind(scope.type, scope.id).all();
-  const inv = await ctx.db.prepare("SELECT id, role, status, created_at, expires_at FROM invitation WHERE scope_type = ? AND scope_id = ? AND status IN ('sent','pending') ORDER BY created_at").bind(scope.type, scope.id).all();
+  const inv = await ctx.db.prepare("SELECT id, role, status, created_at, expires_at FROM invitation WHERE scope_type = ? AND scope_id = ? AND status IN ('sent','pending','unconfirmed') ORDER BY created_at").bind(scope.type, scope.id).all();
   return { result: { scope, grants: r.results, pending_invitations: inv.results }, scope };
 };
 

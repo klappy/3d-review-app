@@ -22,7 +22,8 @@
  *   "accepted"    provider returned 2xx (delivered:true)
  *   "refused"     provider returned non-2xx (provider_status carries it)
  *   "unconfirmed" the request timed out or the provider was unreachable — it MAY have been accepted remotely. Never retried,
- *                 never replayed; the caller must not send a second invitation on the strength of it.
+ *                 never replayed; the caller must not send a second invitation on the strength of it. grant.invite records
+ *                 this by storing the invitation as 'unconfirmed', a LIVE state that blocks a later re-send (docs/mail.md).
  *   "not_sent"    every pre-fetch refusal (address shape, synthetic recipient, environment, allowlist, configuration)
  */
 import type { Env } from "./handlers/types";
@@ -30,7 +31,7 @@ import { sha256 } from "./handlers/common";
 
 export type MailEnv = Env & { RESEND_API_KEY?: string; MAIL_FROM?: string; PUBLIC_ORIGIN?: string; MAIL_ALLOWLIST_SHA256?: string };
 export type MailReason =
-  | "invalid_address" | "duplicate_recent" | "not_configured"
+  | "invalid_address" | "duplicate_recent" | "duplicate_uncertain" | "not_configured"
   | "not_allowed_env" | "not_allowlisted" | "synthetic_recipient"
   | "provider_error" | "provider_unreachable";
 /** What actually happened to the request. "unconfirmed" is NOT "not delivered" — see the header comment. */
@@ -56,12 +57,13 @@ export const mailConfigured = (env: MailEnv) => !!(env.RESEND_API_KEY && env.MAI
 
 const HEX64 = /^[0-9a-f]{64}$/;
 /** The dev allowlist, or null when it is missing, empty or malformed. ONE bad entry invalidates the WHOLE list: a typo must
- *  close the door, not silently shrink it. Entries are sha256 hex of the normalised address — no address sits in config. */
+ *  close the door, not silently shrink it. Entries are sha256 hex of the normalised address — no address sits in config.
+ *  EVERY comma-separated entry, after trimming, must be exactly 64 lowercase hex — an EMPTY entry (a trailing or doubled
+ *  comma, or whitespace alone) is malformed too and closes the list, rather than being quietly dropped. */
 export function parseMailAllowlist(raw: unknown): Set<string> | null {
   if (typeof raw !== "string") return null;
-  const parts = raw.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
-  if (parts.length === 0) return null;
-  if (!parts.every((p) => HEX64.test(p))) return null;
+  const parts = raw.split(",").map((s) => s.trim());
+  if (parts.length === 0 || !parts.every((p) => HEX64.test(p))) return null;
   return new Set(parts);
 }
 /** Fail-closed environment policy. Returns null when sending is permitted, otherwise the refusal reason. */

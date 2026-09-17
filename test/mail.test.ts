@@ -81,6 +81,19 @@ describe("mail adapter", () => {
     for (const bad of [undefined, null, 42, "", " , ", h.toUpperCase(), `${h},x`, h.slice(1), h + "0", "g".repeat(64)]) expect(parseMailAllowlist(bad as any), JSON.stringify(bad)).toBeNull();
   });
 
+  it("an EMPTY comma-separated entry is malformed too: a trailing comma, a doubled comma or a whitespace-only entry closes the whole list", async () => {
+    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(ok());
+    const h = await sha256("person@real-domain.dev");
+    // the parser: a valid hash plus an empty entry is NOT a one-entry list, it is an unreadable list
+    for (const bad of [`${h},`, `,${h}`, `${h},,${h}`, `${h}, ,${h}`, `${h},\t,${h}`, `${h},`.repeat(2)])
+      expect(parseMailAllowlist(bad), JSON.stringify(bad)).toBeNull();
+    // …and the adapter therefore refuses the recipient outright, without touching the provider
+    for (const list of [`${h},`, `${h},,${h}`, `${h}, ,${h}`])
+      expect(await sendMail({ ...prod, ENVIRONMENT: "dev", MAIL_ALLOWLIST_SHA256: list } as any, msg), JSON.stringify(list))
+        .toEqual({ delivered: false, state: "not_sent", reason: "not_allowlisted" });
+    expect(resendCalls(f)).toBe(0);
+  });
+
   it("invitation text carries the link, the expiry, the no-password instruction — and no project contents", () => {
     const m = invitationMessage("https://3d-review.klappy.dev", "il_abc/+", "member", "assessment", 7);
     expect(m.link).toBe("https://3d-review.klappy.dev/#invite=il_abc%2F%2B");
@@ -94,10 +107,10 @@ import { readFileSync } from "node:fs";
 import { afterAll } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { execute } from "../src/dispatch";
-const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "mailh", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "mailh-db", DB2: "mailh-db2" } }] }));
+const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "mailh", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "mailh-db", DB2: "mailh-db2", DB3: "mailh-db3", DB4: "mailh-db4", DB5: "mailh-db5", DB6: "mailh-db6", DB7: "mailh-db7", DB8: "mailh-db8" } }] }));
 afterAll(() => mf.dispose());
 /** A fresh schema + synthetic seed on one of this file's two isolated D1 bindings. */
-async function freshDb(binding: "DB" | "DB2") {
+async function freshDb(binding: "DB" | "DB2" | "DB3" | "DB4" | "DB5" | "DB6" | "DB7" | "DB8") {
   const db = await mf.getD1Database(binding);
   const stmts = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n").split(";\n").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s));
   for (const m of ["0001_init.sql", "0002_code_escrow.sql", "0003_language_archive.sql"]) await db.batch(stmts(`../migrations/${m}`));
@@ -157,7 +170,7 @@ describe("cap.grant.invite in production, provider stubbed", () => {
     expect(r3.ok).toBe(false); expect(r3.error.code).toBe("RATE_LIMITED");
   }, 60_000);
 
-  it("an unconfirmed send leaves the invitation 'pending', says the recipient has not accepted, and is not retried inside the call", async () => {
+  it("an unconfirmed send stores the invitation as 'unconfirmed', says the recipient has not accepted, and is not retried inside the call", async () => {
     const db = await freshDb("DB2");
     const env: any = { DB: db, SESSION_SECRET: "synthetic-mail", ...prod };
     const ctx = () => ({ env, db, principal: { kind: "user", id: "person_mara", provisioned: true }, traceId: `tr_unconf_${Math.random()}`, now: () => new Date(), log: () => {} }) as any;
@@ -168,8 +181,164 @@ describe("cap.grant.invite in production, provider stubbed", () => {
     expect(f).toHaveBeenCalledTimes(1); // one attempt, no retry and no replay
     expect(r.result.delivered).toBe(false);
     expect(r.result.delivery).toMatchObject({ provider: "resend", state: "unconfirmed", reason: "provider_unreachable" });
-    expect(r.result.status).toBe("pending");
+    expect(r.result.status).toBe("unconfirmed"); // AMEND P2: the row records the uncertainty instead of looking never-mailed
     expect(String(r.result.note)).toMatch(/has not accepted/);
-    expect((await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(r.result.invitation_id).first<{ status: string }>())!.status).toBe("pending");
+    expect((await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(r.result.invitation_id).first<{ status: string }>())!.status).toBe("unconfirmed");
+  }, 30_000);
+});
+
+// ── Independent review AMEND: P1 (no terminal state is ever resurrected) and P2 (no replay of an uncertain attempt) ──────────
+// The provider is a fetch stub whose promise this file resolves BY HAND, so a revoke or an accept can be made to land while the
+// send is still in flight. Fake time is ctx.now() — the handlers read the clock from there and nowhere else.
+import { invite, revoke_invitation, accept, list as listGrants } from "../src/handlers/grant";
+
+const devMail = async (...addresses: string[]): Promise<any> => ({
+  ...prod, ENVIRONMENT: "dev", MAIL_ALLOWLIST_SHA256: (await Promise.all(addresses.map((a) => sha256(a)))).join(","),
+});
+/** A fetch stub that parks: `entered` resolves with the request init as soon as the handler calls it, `release` finishes it. */
+function parkedFetch() {
+  let release!: (r: Response) => void; const gate = new Promise<Response>((r) => { release = r; });
+  let saw!: (init: any) => void; const entered = new Promise<any>((r) => { saw = r; });
+  const f = vi.spyOn(globalThis, "fetch").mockImplementation(((_u: any, init: any) => { saw(init); return gate; }) as any);
+  return { f, entered, release };
+}
+const tokenOf = (init: any) => decodeURIComponent(String(JSON.parse(init.body as string).text).match(/#invite=(\S+)/)![1]);
+const idOf = (init: any) => String((init.headers as any)["idempotency-key"]).replace(/^invite\//, "");
+const statusOf = async (db: any, id: string) => (await db.prepare("SELECT status, accepted_at FROM invitation WHERE id = ?").bind(id).first<{ status: string; accepted_at: string | null }>())!;
+const rowCount = async (db: any, hash: string) => (await db.prepare("SELECT COUNT(*) AS n FROM invitation WHERE invitee_hash = ?").bind(hash).first<{ n: number }>())!.n;
+const SCOPE = { scope: "assessment", id: "assess_tavo_collect" };
+
+/** owner-at-scope ctx factory on a fresh db, with a movable clock. */
+async function bed(binding: "DB3" | "DB4" | "DB5" | "DB6" | "DB7" | "DB8", email: string) {
+  const db = await freshDb(binding);
+  const env = await devMail(email);
+  env.DB = db; env.SESSION_SECRET = "synthetic-mail";
+  let clock = Date.parse("2026-09-17T12:00:00.000Z"); let n = 0;
+  const ctx = (principal = "person_mara") => ({ env, db, principal: { kind: "user", id: principal, provisioned: true }, traceId: `tr_amend_${++n}`, now: () => new Date(clock), log: () => {} }) as any;
+  const advance = (ms: number) => { clock += ms; };
+  const asRecipient = async () => { // a signed-in principal whose email_hash is this invitee's
+    await db.prepare("INSERT OR IGNORE INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,1,0,?)").bind("person_invitee", await sha256(email), new Date(clock).toISOString()).run();
+    return ctx("person_invitee");
+  };
+  return { db, ctx, advance, asRecipient, hash: await sha256(email) };
+}
+
+describe("cap.grant.invite — the post-network status write never resurrects a terminal state (AMEND P1)", () => {
+  it("a revoke that lands while the send is in flight survives provider acceptance: stored status stays 'revoked', delivery still reports 'accepted', and the token is dead", async () => {
+    const email = "race.revoke@real-domain.dev";
+    const { db, ctx, asRecipient } = await bed("DB3", email);
+    const { entered, release } = parkedFetch();
+    const call = invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    const init = await entered;                      // the row is written and 'pending'; the send is parked
+    const id = idOf(init), token = tokenOf(init);
+    expect((await statusOf(db, id)).status).toBe("pending");
+    const rv = await revoke_invitation(ctx(), { id }); // the human revokes DURING the send
+    expect(rv.result).toMatchObject({ id, status: "revoked" });
+    release(new Response(JSON.stringify({ id: "re_race_1" }), { status: 200 })); // …and only now the provider says 2xx
+    const r: any = await call;
+    expect((await statusOf(db, id)).status).toBe("revoked");            // the conditional UPDATE did not fire
+    expect(r.result.status).toBe("revoked");                            // the result reports what is STORED
+    expect(r.result.delivered).toBe(true);                              // …separately from what the provider said
+    expect(r.result.delivery).toMatchObject({ state: "accepted", provider: "resend" });
+    expect(String(r.result.note)).toMatch(/revoked/);
+    await expect(accept(await asRecipient(), { token })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
+  }, 30_000);
+
+  it("an accept that lands while the send is in flight is not downgraded: status stays 'accepted', accepted_at is preserved and the grant remains", async () => {
+    const email = "race.accept@real-domain.dev";
+    const { db, ctx, asRecipient } = await bed("DB4", email);
+    const recipient = await asRecipient();
+    const { entered, release } = parkedFetch();
+    const call = invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    const init = await entered;
+    const id = idOf(init), token = tokenOf(init);
+    const acc = await accept(recipient, { token });   // the recipient accepts DURING the send
+    expect(acc.result).toMatchObject({ granted: true, role: "viewer" });
+    const afterAccept = await statusOf(db, id);
+    expect(afterAccept.status).toBe("accepted"); expect(afterAccept.accepted_at).toBeTruthy();
+    release(new Response(JSON.stringify({ id: "re_race_2" }), { status: 200 }));
+    const r: any = await call;
+    const afterSend = await statusOf(db, id);
+    expect(afterSend.status).toBe("accepted");                          // no downgrade to 'sent'
+    expect(afterSend.accepted_at).toBe(afterAccept.accepted_at);        // and nothing was rewritten
+    expect(r.result.status).toBe("accepted");
+    expect(r.result.delivery).toMatchObject({ state: "accepted" });
+    expect(await db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_id = ?').bind("person_invitee", SCOPE.id).first()).toBeTruthy();
+  }, 30_000);
+});
+
+describe("cap.grant.invite — an uncertain attempt is never replayed, across calls, without a schema change (AMEND P2)", () => {
+  it("a timeout stores the invitation as 'unconfirmed', and a later invite at +31 s and at +11 min returns the SAME invitation with duplicate_uncertain, no new row and no second fetch", async () => {
+    const email = "uncertain.person@real-domain.dev";
+    const { db, ctx, advance, hash } = await bed("DB5", email);
+    const f = vi.spyOn(globalThis, "fetch").mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
+    const first: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(first.result.status).toBe("unconfirmed");
+    expect(first.result.delivery).toMatchObject({ state: "unconfirmed", reason: "provider_unreachable" });
+    expect((await statusOf(db, first.result.invitation_id)).status).toBe("unconfirmed");
+    // past PENDING_DEDUPE_S (30 s): a never-mailed 'pending' row would stop blocking here — an 'unconfirmed' row must not
+    advance(31_000);
+    const at31: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    expect(at31.result.invitation_id).toBe(first.result.invitation_id);
+    expect(at31.result.status).toBe("unconfirmed");
+    expect(at31.result.delivery).toMatchObject({ state: "unconfirmed", reason: "duplicate_uncertain" });
+    expect(at31.result.delivered).toBe(false);
+    expect(at31.result.dev_only_link_token).toBeUndefined();            // no token was minted
+    // past INVITE_COOLDOWN_S (10 min): there is no cooldown expiry for an unexpired uncertain row
+    advance(11 * 60_000);
+    const at11m: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    expect(at11m.result.invitation_id).toBe(first.result.invitation_id);
+    expect(at11m.result.delivery).toMatchObject({ state: "unconfirmed", reason: "duplicate_uncertain" });
+    expect(f).toHaveBeenCalledTimes(1);                                 // still exactly one provider attempt, ever
+    expect(await rowCount(db, hash)).toBe(1);                           // and exactly one row
+    // the uncertain row is LIVE in the pending listing, not filtered out as unknown
+    const shown: any = await listGrants(ctx(), SCOPE);
+    expect((shown.result.pending_invitations as any[]).map((i) => i.id)).toContain(first.result.invitation_id);
+  }, 30_000);
+
+  it("two concurrent invites inside the uncertain window produce one row and one invitation id", async () => {
+    const email = "uncertain.concurrent@real-domain.dev";
+    const { db, ctx, advance, hash } = await bed("DB6", email);
+    const f = vi.spyOn(globalThis, "fetch").mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
+    const first: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    expect(first.result.status).toBe("unconfirmed");
+    advance(31_000);
+    const pair: any[] = await Promise.all([invite(ctx(), { ...SCOPE, email, role: "viewer" }), invite(ctx(), { ...SCOPE, email, role: "viewer" })]);
+    expect(new Set(pair.map((r) => r.result.invitation_id))).toEqual(new Set([first.result.invitation_id]));
+    expect(pair.every((r) => r.result.delivery.reason === "duplicate_uncertain")).toBe(true);
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(await rowCount(db, hash)).toBe(1);
+  }, 30_000);
+
+  it("revoke is the way out: revoking the uncertain invitation lets a fresh one be created with exactly one new provider attempt", async () => {
+    const email = "uncertain.retry@real-domain.dev";
+    const { db, ctx, advance, hash } = await bed("DB7", email);
+    const f = vi.spyOn(globalThis, "fetch").mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
+    const first: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    expect(first.result.status).toBe("unconfirmed");
+    await revoke_invitation(ctx(), { id: first.result.invitation_id });  // explicit human decision
+    expect((await statusOf(db, first.result.invitation_id)).status).toBe("revoked");
+    advance(31_000);
+    f.mockReset(); f.mockResolvedValue(new Response(JSON.stringify({ id: "re_retry" }), { status: 200 }) as any);
+    const second: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    expect(second.result.invitation_id).not.toBe(first.result.invitation_id);
+    expect(second.result.status).toBe("sent");
+    expect(second.result.delivery).toMatchObject({ state: "accepted" });
+    expect(f).toHaveBeenCalledTimes(1);                                  // one fresh attempt with a fresh idempotency key
+    expect(String((f.mock.calls[0] as any)[1].headers["idempotency-key"])).toBe(`invite/${second.result.invitation_id}`);
+    expect(await rowCount(db, hash)).toBe(2);
+  }, 30_000);
+
+  it("accept works on an 'unconfirmed' invitation: the mail may have arrived, and the token proves it did", async () => {
+    const email = "uncertain.accepted@real-domain.dev";
+    const { db, ctx, asRecipient } = await bed("DB8", email);
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
+    const r: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
+    expect(r.result.status).toBe("unconfirmed");
+    const acc = await accept(await asRecipient(), { token: r.result.dev_only_link_token });
+    expect(acc.result).toMatchObject({ granted: true, role: "viewer" });
+    const row = await statusOf(db, r.result.invitation_id);
+    expect(row.status).toBe("accepted"); expect(row.accepted_at).toBeTruthy();
   }, 30_000);
 });
