@@ -264,3 +264,46 @@ describe("[fake-DOM] ui/app.js shared mode", () => {
     } finally { await setOpen(true); }
   });
 });
+
+// ---- [fake-DOM] staff link state never outlives its selection or identity (Bugbot 4033211757) ----
+async function staffLink(storage: any) {
+  const $ = await boot(storage, "");
+  $("projects").value = "proj_rill"; await $("projects").dispatch("change"); await settled($);
+  $("assessments").value = "assess_tavo_collect"; await $("assessments").dispatch("change"); await settled($);
+  $("surveys").value = "survey_tavo"; await $("surveys").dispatch("change");
+  await $("issue-link-preview").dispatch("click"); await settled($);
+  expect($("issue-link-confirm").disabled).toBe(false);
+  await $("issue-link-confirm").dispatch("click"); await settled($);
+  expect($("share-url").hidden).toBe(false); expect($("share-url").textContent).toMatch(/^https:\/\/local\.invalid\/#survey=/);
+  expect($("copy-link").hidden).toBe(false);
+  return $;
+}
+function expectCleared($: any, storage: any) {
+  expect($("share-url").hidden).toBe(true); expect($("share-url").textContent).toBe("");
+  expect($("copy-link").hidden).toBe(true); expect($("issue-link-confirm").disabled).toBe(true);
+  expect($("issue-link-impact").textContent).toBe(""); expect($("copy-state").textContent).toBe("");
+  for (const k of storage.keys()) expect(String(storage.getItem(k))).not.toContain("#survey=");
+}
+describe("[fake-DOM] staff share URL lifetime", () => {
+  it("switching assessment clears the once-shown URL and confirm state; nothing is persisted", async () => {
+    const storage = memoryStorage(); storage.setItem("facilitatorToken", owner);
+    const $ = await staffLink(storage);
+    for (const k of storage.keys()) expect(String(storage.getItem(k))).not.toContain("#survey=");
+    $("assessments").value = "assess_tavo_prepare"; await $("assessments").dispatch("change"); await settled($);
+    expectCleared($, storage);
+    // a fresh project selection also starts clean
+    $("projects").value = "proj_aster"; await $("projects").dispatch("change"); await settled($);
+    expectCleared($, storage);
+  });
+  it("sign-out clears the URL and confirm state, and a reload after it shows no link", async () => {
+    const storage = memoryStorage(); storage.setItem("facilitatorToken", owner);
+    const $ = await staffLink(storage);
+    await $("signout").dispatch("click"); await settled($);
+    expectCleared($, storage);
+    expect(storage.getItem("facilitatorToken")).toBeNull();
+    // fresh boot: the fake document has no markup defaults, so check content and storage, not `hidden`
+    const $2 = await boot(storage, "");
+    expect($2("share-url").textContent).toBe(""); expect($2("issue-link-impact").textContent).toBe("");
+    for (const k of storage.keys()) expect(String(storage.getItem(k))).not.toContain("#survey=");
+  });
+});
