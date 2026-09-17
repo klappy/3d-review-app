@@ -2,7 +2,7 @@
 
 **The general shared-DEV and production promotion hold remains in force.** App PRs [6](https://github.com/klappy/3d-review-app/pull/6), [7](https://github.com/klappy/3d-review-app/pull/7), and [8](https://github.com/klappy/3d-review-app/pull/8) merged before required Bugbot SUCCESS without a named override. Later tests cannot make those merges compliant. [The recorded hold](https://github.com/klappy/3d-review-cookbook/issues/14#issuecomment-5706415133) and [kitchen case](https://github.com/klappy/kitchen/blob/main/rail/3-pass/2026-08-11-four-cs-amendment/HYGIENE-trial-line.md) govern. This PR documents corrective controls; it does not authorize its own merge, lift the hold, or authorize production.
 
-## Current corrective checkpoint
+## Current corrective checkpoint — 2026-09-16 20:43 America/New_York
 
 PR #10’s exact guard correction `01e028c313c14b92d5141502527edb3bd7e12ccc` received scoped independent validation (41 repository tests plus four reviewer tests, typecheck) and real Cursor Bugbot SUCCESS before its narrow prospective DEV disposition. Git records its merge as `7f454791867d6b1ab83a170045c2a7e48931b529`; Otto reports that corrected guard is deployed. This is a per-PR DEV correction, not retroactive compliance for PRs 6–8, a blanket hold lift, or main/production authorization. The general hold and all other acceptance gaps remain.
 

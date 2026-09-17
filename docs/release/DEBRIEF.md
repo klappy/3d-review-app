@@ -31,3 +31,5 @@ Earlier “unapplied” statements above describe the authoring checkpoint. Afte
 ## Local integration checkpoint after PR #10
 
 Preserved original `89abccb` checkout. New isolated `/tmp/3d-release-integrated-0916`, branch `governance/release-integrated-0916`, incorporates exact DEV `7f454791867d6b1ab83a170045c2a7e48931b529` with a history-preserving merge. No conflict: DEV’s four auth/interface/test paths and governance’s six paths do not overlap. Current runbook now distinguishes PR #10’s narrow prospective DEV correction from the continuing general hold and marks the `518e083` deployment linkage historical. Deployed PR #10 status is Otto-attributed. No shared merge or feature push; new independent review and fresh remote Bugbot remain required.
+
+Integration verification observed 2026-09-16 20:43 America/New_York (`2026-09-17T00:43:29Z`): full repository suite 41/41 across 17 files, typecheck, JSON parse, relative Markdown link existence and whitespace checks passed. These are author integration checks; independent review and fresh Bugbot remain pending.
