@@ -118,15 +118,19 @@ async function run(label, task) {
 }
 function showAuthorizedWork(me) {
   const visible = hasProjectWork(me);
-  for (const id of ['project-card', 'assessment-card', 'survey-card', 'results-card']) $(id).hidden = !visible;
+  const shared = hasSharedAssessmentEntry(me);
+  for (const id of ['project-card', 'assessment-card', 'results-card']) $(id).hidden = !visible;
   // An assessment-only grantee reaches reports without any project navigation.
   const reports = hasReportWork(me);
   $('reports-card').hidden = !reports;
+  // Open on a granted assessment uses this card (codes, links, status); CSS hides it except at survey level.
+  $('survey-card').hidden = !visible && !shared;
   // The granted picker is the assessment-only entry: a project identity reaches the same assessment
   // through the project path, so it never becomes a second source for state.assessment.
-  $('shared-assessments').hidden = !hasSharedAssessmentEntry(me);
+  $('shared-assessments').hidden = !shared;
   resetSelect($('granted-assessments'), 'Choose');
   for (const grant of assessmentGrants(me)) option($('granted-assessments'), grant.scope_id, `${grant.scope_id} · ${grant.role}`);
+  if (state.assessment && !$('assessments').value) $('granted-assessments').value = state.assessment;
   $('create-project').hidden = !me.principal.provisioned;
   text($('access-state'), visible ? '' : 'No project access is assigned to this identity. Scoped project work is hidden.');
 }

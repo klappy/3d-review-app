@@ -43,5 +43,7 @@ test('wiring: assets, back link inside #collab, entity screen mounted after coll
   assert.ok(app.includes("collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });"));
   assert.ok(app.includes("lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [] });"));
   assert.ok(app.includes('async function chooseGrantedAssessment()')&&app.includes('if (!state.templates) await templates();'));
+  assert.ok(app.includes("if (state.assessment && !$('assessments').value) $('granted-assessments').value = state.assessment"),'identity rebuild keeps the granted assessment selected');
+  assert.ok(app.includes("$('survey-card').hidden = !visible && !shared"),'granted Open can show the survey card');
   assert.ok(read('./.assetsignore').split('\n').includes('entity-screen.test.mjs'));
 });
