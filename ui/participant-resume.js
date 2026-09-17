@@ -7,3 +7,17 @@ export function resumeTarget(receipt) {
 export function savedSubmitKey(storage, participantToken) {
   return participantToken ? storage.getItem('responseKey') : null;
 }
+
+export function resumeNoticeAfterReceipt(receipt, previous) {
+  return receipt?.submitted === false ? previous : '';
+}
+
+// A one-time code can be consumed before the form request fails. Only a failed
+// redeem is a bad code; later form failure must leave the saved token usable.
+export async function redeemAndOpen(redeem, onRedeemed, openForm, onRedeemFailure) {
+  let result;
+  try { result = await redeem(); }
+  catch (error) { onRedeemFailure(error); throw error; }
+  onRedeemed(result);
+  await openForm();
+}

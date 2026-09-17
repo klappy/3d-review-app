@@ -1,7 +1,7 @@
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
-import { resumeTarget, savedSubmitKey } from './participant-resume.js';
+import { redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
 const $ = id => document.getElementById(id);
 const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null };
 state.responseKey = savedSubmitKey(sessionStorage, state.participant);
@@ -223,17 +223,17 @@ bindClick('load-results', 'Reading result state…', async () => {
 });
 bindForm('redeem', 'Redeeming access code…', async fd => {
   text($('participant-error'), ''); $('participant-error').hidden = true;
-  try {
-    const result = await api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } });
+  await redeemAndOpen(
+    () => api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } }),
+    result => {
     state.participant = result.participant_token; sessionStorage.setItem('participantToken', state.participant);
     state.responseKey = null; sessionStorage.removeItem('responseKey');
     text($('participant-resume'), '');
-    await loadForm();
-  } catch (error) {
-    text($('participant-error'), codeEntryFailure);
-    $('participant-error').hidden = false; $('participant-error').focus();
-    throw error;
-  }
+    $('recover').hidden = false;
+    },
+    loadForm,
+    () => { text($('participant-error'), codeEntryFailure); $('participant-error').hidden = false; $('participant-error').focus(); },
+  );
 });
 async function loadForm() {
   const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null;
@@ -273,6 +273,7 @@ bindClick('submit', 'Submitting response…', async () => {
 });
 function showReceipt(result) {
   text($('receipt'), result.submitted === false ? 'No submission recorded yet.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`);
+  text($('participant-resume'), resumeNoticeAfterReceipt(result, $('participant-resume').textContent));
   $('receipt').hidden = false;
   if (result.submitted !== false) { $('review').hidden = true; $('answers').hidden = true; }
 }
