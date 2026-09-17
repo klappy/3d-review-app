@@ -8,7 +8,7 @@ PR #10’s exact guard correction `01e028c313c14b92d5141502527edb3bd7e12ccc` rec
 
 This governance candidate incorporates that exact DEV merge with a history-preserving merge. Its new head needs fresh independent review and real Bugbot SUCCESS; the earlier `89abccb` SUCCESS does not cover it. Any eventual promotion requires a separate explicit per-PR disposition.
 
-## Existing Git hooks
+## Historical Git hooks — superseded target
 
 The mapping below is declared by `wrangler.toml` at `518e083aee6395fef144f8705b888d1d76941ff7`. Re-read the actual Workers Builds trigger before a release; source comments alone do not prove control-plane state.
 
@@ -19,7 +19,20 @@ The mapping below is declared by `wrangler.toml` at `518e083aee6395fef144f8705b8
 
 Otto reported a fresh read-only Cloudflare API observation in this session: DEV trigger `b82be56e-33f0-43d5-bf24-3749dd4dc168`; production trigger `d067de78-0937-42cc-8f3e-cc001c4af8fc`; both use repository root, include `*`, exclude `*.md`, and build with `npm ci && npm run typecheck && npm test`. Historical checkpoint before PR #10: Otto reported a direct read of DEV build `4325a610-a966-43f9-8160-86949a4ba603` for exact `518e083aee6395fef144f8705b888d1d76941ff7`: build log version `19eb6b54-b179-40ea-8bb1-642e087eaafe`, then-active deployment `e1d44aac-50ef-4309-a5da-54957cdd89ad` serving that same version at 100%. These are coordinator-attributed control-plane observations, not direct observations by this author or proof of full-app acceptance. The initial commands relied on config auto-discovery. After independent scoped approval, the root coordinator reports successful PATCH/readback of only each trigger’s `deploy_command` (and server-maintained `modified_on`) to the explicit commands above; build commands, targets, and the then-current DEV build/deployment stayed unchanged by that settings correction. This historical observation is not the latest post-PR #10 deployment receipt. This author did not mutate triggers.
 
-These are commands for the Git-connected build, never instructions to run a seat deploy. There is no `production` branch in this topology. `main` promotion is captain-owned unless explicit current authority says otherwise. Inspect trigger branch, repo, path filters, build/deploy commands and environment against the configuration; record differences before proceeding. Do not upload scripts or versions via the API. Secrets use the authorized secret channel, never git or a review transcript.
+The preceding table, commands and observations describe historical topology, superseded by the governing target below; they are not instructions to promote main to production. Commands are recorded for Git-connected builds, never seat deployment. Re-read actual triggers and preserve this history. No API uploads; secret values use the authorized channel, never Git or review transcripts.
+
+## Governing topology correction — main is DEV
+
+| Git destination | Existing Worker | Selector |
+| --- | --- | --- |
+| `main` | `3d-review-dev` | root `wrangler.toml` |
+| `production` | `3d-review` | `wrangler.toml --env production` |
+
+This is Chris's settled target, not an applied-cutover receipt. A staging branch and explicit Cloudflare staging app are optional future scope. Preserve existing state and the promotion hold. See [the deployment entry point](deploy.md) and [the review-only request artifact](release/a8-control-plane-plan.json).
+
+Under a separately fired cutover order: freeze shared main/phase0 writes and drain identified old builds; protect an absent production branch using only a creation-check exemption; create it at verified empty-main ancestry and immediately tighten/read back protection. Detach the existing production trigger from main first, then retarget existing DEV to still-empty main. Preserve existing commands, Workers, bindings, state and associations; refresh supported request schemas and distinguish request-owned fields from server-maintained metadata. Stop on drift, unexpected builds or failed tightening/readback. No manual build dispatch or production promotion.
+
+Only after whole-baseline independent acceptance, literal exact-head Cursor Bugbot SUCCESS, terminal attached checks, finding dispositions and a prospective candidate-specific hold disposition may the normal protected PR populate main. Verify the resulting main SHA → push-event build → deployed DEV version, unchanged production and drained obsolete queues before releasing the freeze. Source comments, a merge or a health response alone cannot prove deployment. Production remains separately captain-owned and subject to the manifest/version-stamp requirements below.
 
 ## Lawful corrective path
 

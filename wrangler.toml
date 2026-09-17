@@ -1,6 +1,7 @@
 # Deploys ONLY via Cloudflare Workers Builds (git push → build → deploy). Never `wrangler deploy` from a seat.
-#   dev : branch phase-0/walking-skeleton → worker 3d-review-dev  (D1 3d-review-dev)   https://3d-review-dev.klappy.workers.dev
-#   prod: branch main                     → worker 3d-review      (D1 3d-review)       promoted by PR merge into main
+#   dev : branch main → worker 3d-review-dev (D1 3d-review-dev) https://3d-review-dev.klappy.workers.dev
+#   prod: branch production → worker 3d-review (D1 3d-review); separately reviewed captain-owned main-to-production PR
+# Governing target only: actual trigger cutover requires docs/release.md and docs/deploy.md.
 name = "3d-review-dev"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
