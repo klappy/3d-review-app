@@ -31,7 +31,7 @@ const mcpCall = (token: string | undefined, tool: string, capability: string) =>
 
 beforeAll(async () => {
   const db = await mf.getD1Database("DB");
-  for (const m of ["0001_init.sql", "0002_code_escrow.sql", "0003_language_archive.sql", "0004_pinned_instruments.sql"]) await db.batch(statements(db, `../migrations/${m}`));
+  for (const m of ["0001_init.sql", "0002_code_escrow.sql", "0003_language_archive.sql", "0004_pinned_instruments.sql", "0006_oauth_code_redemption.sql"]) await db.batch(statements(db, `../migrations/${m}`));
   await db.batch(statements(db, "../seed/synthetic.sql"));
   env = { DB: db, OAUTH_KV: await mf.getKVNamespace("OAUTH_KV"), SESSION_SECRET: "synthetic-test-secret", ENVIRONMENT: "dev", ACCESS_TEAM_DOMAIN: "team.cloudflareaccess.com", ACCESS_AUD: "aud-1" };
   kp = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
@@ -68,6 +68,8 @@ describe("MCP authorization (borrowed provider + Access email-code + consent)", 
     const clientId = await register(); const { verifier, challenge } = await pkce();
     const { cookie, page, htmlText, ticket } = await toConsent(clientId, challenge, "Demo.Owner@Example.invalid");
     expect(page.status).toBe(200); expect(page.headers.get("x-frame-options")).toBe("DENY");
+    // the consent POST's 302 to the client must pass form-action (Bugbot 4032352529); widened to the validated origin only
+    expect(page.headers.get("content-security-policy")).toBe("default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://client.example; frame-ancestors 'none'");
     expect(htmlText).toContain("demo.owner@example.invalid"); expect(htmlText).toContain("client.example");
     expect(htmlText).toContain("Test Connector &lt;script&gt;"); expect(htmlText).not.toContain("<script>"); // client name is attacker-controlled
     expect(page.headers.get("set-cookie") ?? "").not.toMatch(/session=/); // consent opens no web session
@@ -80,7 +82,7 @@ describe("MCP authorization (borrowed provider + Access email-code + consent)", 
     // wrong PKCE verifier is refused by the provider
     const bad = await call("/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", code, client_id: clientId, redirect_uri: "https://client.example/cb", code_verifier: "wrong-" + verifier }).toString() });
     expect(bad.status).toBeGreaterThanOrEqual(400);
-    // a fresh authorization (codes are single-use even on failure)
+    // a fresh authorization for the happy path (a wrong verifier does NOT burn the code — see mcp-oauth-hardening.test.ts)
     const p2 = await pkce(); const c2 = await toConsent(clientId, p2.challenge, "demo.owner@example.invalid");
     const code2 = new URL((await consent(c2.cookie, c2.ticket!, "approve")).headers.get("location")!).searchParams.get("code")!;
     const tok = await call("/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", code: code2, client_id: clientId, redirect_uri: "https://client.example/cb", code_verifier: p2.verifier }).toString() });
@@ -146,7 +148,7 @@ describe("MCP authorization (borrowed provider + Access email-code + consent)", 
     expect([(await hx("Bearer junk", "/mcpx")).status, (await hx("Bearer a:b:c", "/mcp.json")).status, (await hx("Bearer junk", "/mcp-anything")).status]).toEqual([401, 401, 429]);
     const twoTokens = await worker.fetch(new Request(ORIGIN + "/mcp", { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.78", authorization: `Bearer st_${"0".repeat(32)} extra` }, body: "{}" }), e3, ectx());
     expect(twoTokens.status).toBe(401); expect(prepares).toBe(before);
-    expect(twoTokens.headers.get("www-authenticate")).toBe(`Bearer realm="OAuth", resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp", error="invalid_token"`);
+    expect(twoTokens.headers.get("www-authenticate")).toBe(`Bearer realm="OAuth", resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp", error="invalid_token", scope="3dreview"`);
     // well-shaped but unknown bearers are bounded by the ceiling
     const shaped: number[] = []; for (let i = 0; i < 7; i++) shaped.push((await hit(`Bearer st_${String(i).padStart(32, "0")}`)).status);
     expect(shaped).toEqual([401, 401, 401, 401, 401, 429, 429]);
