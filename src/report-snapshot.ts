@@ -9,11 +9,11 @@ import type { Ctx } from "./handlers/types";
 import { gate, newId, nowIso, roleAt, sha256 } from "./handlers/common";
 import { notVisible } from "./handlers/errors";
 
-export const SNAPSHOT_ALGORITHM_VERSION = "source-input-unscored-v1";
+export const SNAPSHOT_ALGORITHM_VERSION = "source-input-with-template-v2";
 export const SNAPSHOT_POLICY_VERSION = "D7-held";
 export const PINNED_SOURCE = "klappy/3d-quality-review@f042cde553761a6a7f24132cef7802f956378ee0";
 
-interface ResponseInput {
+export interface ResponseInput {
   id: string;
   template_id: string;
   template_version: number;
@@ -22,6 +22,8 @@ interface ResponseInput {
   source_ref: string | null;
   answers_json: string;
   submitted_at: string;
+  items_json: string;
+  perspective: string;
 }
 
 export interface SnapshotRow {
@@ -42,7 +44,7 @@ async function assessmentAccess(ctx: Ctx, aid: string, min: "viewer" | "member")
   gate(await roleAt(ctx, "assessment", aid), min, "assessment");
 }
 
-function stateFor(rows: ResponseInput[]): SnapshotRow["state"] {
+function stateFor(rows: readonly ResponseInput[]): SnapshotRow["state"] {
   if (!rows.length) return "insufficient";
   // No historical one-question synthetic fixture may enter a real scored run,
   // nor may a response silently switch away from the presented template.
@@ -52,19 +54,19 @@ function stateFor(rows: ResponseInput[]): SnapshotRow["state"] {
 }
 
 /** Durable, idempotent snapshot of exact append-only response inputs. */
-export async function buildReportSnapshot(ctx: Ctx, aid: string): Promise<SnapshotRow> {
+export async function captureReportSnapshot(ctx: Ctx, aid: string): Promise<{ snapshot: SnapshotRow; rows: readonly Readonly<ResponseInput>[] }> {
   await assessmentAccess(ctx, aid, "member");
   const { results } = await ctx.db.prepare(`SELECT r.id, r.template_id, r.template_version,
       s.template_id AS selected_template_id, s.template_version AS selected_template_version,
-      t.source_ref, r.answers_json, r.submitted_at
+      t.source_ref, r.answers_json, r.submitted_at, t.items_json, t.perspective
     FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id
     JOIN survey_template t ON t.id = s.template_id AND t.version = s.template_version
     WHERE s.assessment_id = ? ORDER BY r.id`).bind(aid).all<ResponseInput>();
-  const rows = results ?? [];
+  const rows = Object.freeze((results ?? []).map(row => Object.freeze(row)));
   // Answers enter the hash, never evidence_json, receipts, traces or logs.
   const inputHash = await sha256(JSON.stringify(rows.map(row => [row.id, row.template_id,
     row.template_version, row.selected_template_id, row.selected_template_version,
-    row.source_ref, row.answers_json, row.submitted_at])));
+    row.source_ref, row.answers_json, row.submitted_at, row.items_json, row.perspective])));
   const state = stateFor(rows);
   const evidence = {
     response_ids: rows.map(row => row.id),
@@ -81,7 +83,11 @@ export async function buildReportSnapshot(ctx: Ctx, aid: string): Promise<Snapsh
     AND input_hash = ? AND algorithm_version = ? AND policy_version = ?`)
     .bind(aid, inputHash, SNAPSHOT_ALGORITHM_VERSION, SNAPSHOT_POLICY_VERSION).first<SnapshotRow>();
   if (!snapshot) throw new Error("snapshot insert/readback failed");
-  return snapshot;
+  return { snapshot, rows };
+}
+
+export async function buildReportSnapshot(ctx: Ctx, aid: string): Promise<SnapshotRow> {
+  return (await captureReportSnapshot(ctx, aid)).snapshot;
 }
 
 /** Internal-only lookup. Do not expose IDs/list cadence until D7 is decided. */
