@@ -101,7 +101,7 @@ describe('real authenticated report transport and receipt',()=>{
   for(const p of [{aid,renderer:{}},{aid,pageSize:999},{aid,minimum:'viewer'},{aid,payload:{}},{aid,cursor:null}])expect((await execute(ctx(),'cap.report.list',p,{tool:'read'}) as any).error.code).toBe('INVALID_PARAMS');
  });
  it('maintains only three activated rows and private class/role counts; five neighbors remain501',async()=>{
-  expect(capabilities).toHaveLength(83);expect(contract.counts).toMatchObject({'v2.0-bcs':78,'v2.1-oct':5,'write.effect':8,'write.reversible':39});
+  expect(capabilities).toHaveLength(84);expect(contract.counts).toMatchObject({'v2.0-bcs':79,'v2.1-oct':5,'write.effect':8,'write.reversible':39});
   for(const c of capabilities.filter(c=>c.id.startsWith('cap.report.')))expect(c.public).toBe(false);
   const rest=capabilities.filter(c=>c.slice==='v2.1-oct');expect(rest).toHaveLength(5);for(const c of rest)expect((await execute(ctx(),c.id,{},{} ) as any).error.code).toBe('RESERVED_NOT_BUILT');
  });
