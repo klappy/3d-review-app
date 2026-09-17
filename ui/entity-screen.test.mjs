@@ -11,6 +11,7 @@ test('level is derived from actual selection, deepest wins; signed out has no le
   assert.equal(entityLevel({staff:true,workspace:{id:'w'},project:'',assessment:''}),'workspace');
   assert.equal(entityLevel({staff:true,workspace:{id:'w'},project:'p',assessment:''}),'project');
   assert.equal(entityLevel({staff:true,workspace:null,project:'p',assessment:'a'}),'assessment');
+  assert.equal(entityLevel({staff:true,workspace:null,project:'p',assessment:'a',survey:'s'}),'survey');
 });
 test('deep links: #p/<pid> and #p/<pid>/a/<aid> only; tokens and other fragments never parse',()=>{
   assert.deepEqual(parseDeepLink('#p/proj_1'),{project:'proj_1',assessment:null});
@@ -24,7 +25,7 @@ test('css is level-scoped, keeps the next-entity paths and the stage control rea
   const css=read('./entity-screen.css').replace(/\/\*[\s\S]*?\*\//g,'');
   for(const sel of css.replace(/\/\*[\s\S]*?\*\//g,'').split('}').map(c=>c.slice(0,c.indexOf('{')).trim()).filter(Boolean))
     for(const one of sel.split(',').map(x=>x.trim()).filter(x=>x&&!x.startsWith('@')))
-      assert.ok(/^\.rv(\[data-entity-level="(workspaces|workspace|project|assessment)"\]| #entity-back| \.collab-accept| #collab:has\()/.test(one),`unscoped: ${one}`);
+      assert.ok(/^\.rv(\[data-entity-level="(workspaces|workspace|project|assessment|survey)"\]| #entity-back| \.collab-accept| #collab:has\()/.test(one),`unscoped: ${one}`);
   assert.ok(!/#create-project/.test(css),'the authorized create-project form is never hidden');
   assert.ok(!/#set-stage/.test(css)&&!/\[data-entity-level="assessment"\] #assessment-card\s*[,{]/.test(css),'the stage control stays at assessment level');
   assert.ok(!/#projects\b|#assessments\b/.test(css.replace(/#project-card|#assessment-card|#load-assessments/g,'')),'selects are hidden only via their card chrome, never removed');

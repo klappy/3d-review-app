@@ -2,6 +2,7 @@ import { mountParticipantView } from './participant-view.js';
 import { redactDiagnosticPath } from './diagnostic-path.js';
 import { createCollabHooks } from './collab-mount.js';
 import { mountEntityScreen } from './entity-screen.js';
+import { mountLensSurveys } from './lens-surveys.js';
 import { loadRoleHelp, loadBlankPrint, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
@@ -25,6 +26,13 @@ const state = { session: sharedMode ? null : sessionStorage.getItem('facilitator
 state.responseKey = sharedMode ? null : savedSubmitKey(sessionStorage, state.participant);
 const collab = createCollabHooks({ document, api, sharedMode, onReload: async () => { const me = await identity(); if (me && hasProjectWork(me)) await projects(); } });
 const entityScreen = sharedMode || typeof window === 'undefined' ? null : mountEntityScreen(document, window, { isStaff: () => collab.isStaff(), selectedWorkspace: () => collab.selectedWorkspace(), backToWorkspaces: () => collab.backToWorkspaces() });
+// Assessment = three lenses; inclusion goes through the existing select/deselect capabilities and re-reads the assessment.
+const lensSurveys = sharedMode || !$('lens-surveys-root') ? null : mountLensSurveys({ document, root: $('lens-surveys-root'), actions: {
+  select: (template_id, version) => run('Including survey…', async () => { const aid = required(state.assessment, 'Choose an assessment.'); await api(`/v2/assessments/${path(aid)}/surveys`, { method: 'POST', body: { template_id, version: Number(version) } }); await chooseAssessment(); }),
+  deselect: sid => run('Removing survey from assessment…', async () => { const aid = required(state.assessment, 'Choose an assessment.'); await api(`/v2/assessments/${path(aid)}/surveys/${path(sid)}`, { method: 'DELETE' }); await chooseAssessment(); }),
+  open: sid => { $('surveys').value = sid; if ($('surveys').value === sid) $('surveys').dispatchEvent(new Event('change')); },
+  counts: async ids => { const aid = state.assessment; const map = new Map(); for (const sid of ids) { try { const r = await api(`/v2/assessments/${path(aid)}/surveys/${path(sid)}`); if (state.assessment === aid) map.set(sid, r.counts); } catch { /* count unavailable: row shows without it */ } } return map; },
+} });
 const path = (value) => encodeURIComponent(value);
 let stageGeneration = 0;
 let stageContext = null;
@@ -124,7 +132,7 @@ function showAuthorizedWork(me) {
 }
 function resetClientIdentity() {
   collab.reset(); // W/I managers clear synchronously before any other identity work
-  entityScreen?.reset();
+  entityScreen?.reset(); lensSurveys?.reset();
   participantView?.destroy(); participantView = null;
   clearStageScreens();
   clearIdentityData(state, sessionStorage);
@@ -194,6 +202,7 @@ async function chooseAssessment() {
   state.assessmentRole = null; clearReportState(); showReportControls();
   $('granted-assessments').value = ''; text($('granted-detail'), ''); // one state.assessment, exactly one visible source
   collab.setScope(null); // R2: downstream collaborator scope resets synchronously before any await
+  lensSurveys?.reset();
   text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
   if (!state.assessment) return;
   const stageRead = stageSnapshot();
@@ -205,11 +214,12 @@ async function chooseAssessment() {
   const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
   if (next) $('stage-target').value = next;
   for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
-  if (result.surveys?.length === 1) { $('surveys').value = result.surveys[0].id; state.survey = result.surveys[0].id; }
+  lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [] });
   await refreshStageScreens(result.assessment, result.surveys || []);
 }
 async function templates() {
   const result = await api('/v2/templates'); resetSelect($('templates'), 'Choose current pinned template');
+  state.templates = result.templates || [];
   for (const choice of templateChoices(result.templates || [])) {
     const entry = new Option(choice.label, choice.value);
     entry.disabled = choice.disabled;

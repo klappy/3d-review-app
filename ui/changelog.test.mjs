@@ -180,7 +180,7 @@ function appHarness() {
     location: { hash: '' }, history: { replaceState() {} }, crypto: { randomUUID: () => 'synthetic-key' },
     Option: class {}, FormData: class {},
     fetch: async (url, options) => { requests.push({ url, options }); throw Error('unconfigured request'); },
-    redactDiagnosticPath: u => u, createCollabHooks: () => ({ reset() {}, identity() {}, projects() {}, setScope() {}, destroy() {} }), mountEntityScreen: () => ({ render() {}, reset() {} }), // app.js import stripped above; hooks covered by collab-mount.test.mjs + Chromium
+    redactDiagnosticPath: u => u, createCollabHooks: () => ({ reset() {}, identity() {}, projects() {}, setScope() {}, destroy() {} }), mountEntityScreen: () => ({ render() {}, reset() {} }), mountLensSurveys: () => ({ set() {}, reset() {} }), // app.js import stripped above; hooks covered by collab-mount.test.mjs + Chromium
   });
   const source = fs.readFileSync(new URL('./app.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '');
   vm.runInContext(source, context);

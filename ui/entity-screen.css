@@ -43,6 +43,17 @@
   .rv[data-entity-level="assessment"] #create-assessment,
   .rv[data-entity-level="assessment"] #overview-all { display:none; }
   /* #assessment-card itself stays: it holds this assessment's detail line and the stage control (#set-stage). */
+  /* Survey: the selected survey's own screen (survey card); assessment-level chrome and parents leave. */
+  .rv[data-entity-level="survey"] #workspace-manager-root,
+  .rv[data-entity-level="survey"] #project-card,
+  .rv[data-entity-level="survey"] #assessment-card,
+  .rv[data-entity-level="survey"] #overview-all,
+  .rv[data-entity-level="survey"] #scope-invitations-root,
+  .rv[data-entity-level="survey"] #reports-card,
+  .rv[data-entity-level="survey"] #results-card { display:none; }
+  .rv[data-entity-level="survey"] #survey-card > [data-stage-content="prepare"] > #load-templates,
+  .rv[data-entity-level="survey"] #survey-card > [data-stage-content="prepare"] > label,
+  .rv[data-entity-level="survey"] #survey-card > [data-stage-content="prepare"] > #select-survey { display:none; }
 
   /* Back link: one row above the screen content. */
   .rv #entity-back { display:inline-flex; align-items:center; min-height:36px; margin:0 0 8px; font-size:14px; }

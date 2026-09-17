@@ -1,11 +1,12 @@
 // One entity per screen. Source: cookbook 2c29676 views-coordinator (V.projects / V.project) + tree.js crumbs/levelMenu.
-// This controller owns exactly one body attribute, data-entity-level ∈ workspaces | workspace | project | assessment,
+// This controller owns exactly one body attribute, data-entity-level ∈ workspaces | workspace | project | assessment | survey,
 // derived from actual selection state (the existing #projects/#assessments selects and the W manager's selected
 // workspace), plus a deep link (#p/<pid>, #p/<pid>/a/<aid>) resolved ONLY through those selects — set-then-verify,
 // dispatch change, never inject options, never grant. Presentation only: entity-screen.css hides what is not the
 // selected entity; every hidden flag and authority check stays where it was.
-export function entityLevel({ staff, workspace, project, assessment }) {
+export function entityLevel({ staff, workspace, project, assessment, survey }) {
   if (!staff) return null;
+  if (assessment && survey) return 'survey';
   if (assessment) return 'assessment';
   if (project) return 'project';
   if (workspace) return 'workspace';
@@ -19,10 +20,10 @@ export function deepLinkFor({ project, assessment }) {
   return project ? `#p/${encodeURIComponent(project)}${assessment ? `/a/${encodeURIComponent(assessment)}` : ''}` : '';
 }
 export function mountEntityScreen(doc, win, { isStaff, selectedWorkspace, backToWorkspaces }) {
-  const body = doc.body, projects = doc.getElementById('projects'), assessments = doc.getElementById('assessments');
+  const body = doc.body, projects = doc.getElementById('projects'), assessments = doc.getElementById('assessments'), surveys = doc.getElementById('surveys');
   const back = doc.getElementById('entity-back');
   let pending = null; // unresolved deep link, retried once after the next option refresh
-  function level() { return entityLevel({ staff: isStaff(), workspace: selectedWorkspace(), project: projects.value, assessment: assessments.value }); }
+  function level() { return entityLevel({ staff: isStaff(), workspace: selectedWorkspace(), project: projects.value, assessment: assessments.value, survey: surveys?.value }); }
   function select(sel, id) { if (!sel || sel.value === id) return true; sel.value = id; if (sel.value !== id) return false; sel.dispatchEvent(new win.Event('change', { bubbles: true })); return true; }
   function resolve() {
     if (!pending || !isStaff()) return;
@@ -34,7 +35,7 @@ export function mountEntityScreen(doc, win, { isStaff, selectedWorkspace, backTo
     const l = level();
     if (body?.dataset) { if (l) body.dataset.entityLevel = l; else delete body.dataset.entityLevel; }
     if (back) {
-      const label = l === 'assessment' ? 'Back to project' : l === 'project' ? 'Back to workspaces' : l === 'workspace' ? 'Back to workspaces' : '';
+      const label = l === 'survey' ? 'Back to assessment' : l === 'assessment' ? 'Back to project' : l === 'project' ? 'Back to workspaces' : l === 'workspace' ? 'Back to workspaces' : '';
       const text = label ? `← ${label}` : '';
       if (back.hidden !== !label) back.hidden = !label;
       if (back.textContent !== text) back.textContent = text; // write only on change: this node sits inside observed roots
@@ -44,17 +45,18 @@ export function mountEntityScreen(doc, win, { isStaff, selectedWorkspace, backTo
   }
   back?.addEventListener?.('click', () => {
     const l = level();
-    if (l === 'assessment') select(assessments, '');
+    if (l === 'survey') select(surveys, '');
+    else if (l === 'assessment') select(assessments, '');
     else if (l === 'project') { select(projects, ''); }
     else if (l === 'workspace') backToWorkspaces();
     render();
   });
   if (typeof win.MutationObserver === 'function') { // option refreshes, identity text and W renders arrive without events; the selects' change events still drive render without an observer
     const observer = new win.MutationObserver(() => { resolve(); render(); });
-    for (const id of ['projects', 'assessments', 'identity', 'workspace-manager-root']) { const n = doc.getElementById(id); if (n) observer.observe(n, { childList: true, subtree: true, attributes: true, characterData: true }); }
+    for (const id of ['projects', 'assessments', 'surveys', 'identity', 'workspace-manager-root']) { const n = doc.getElementById(id); if (n) observer.observe(n, { childList: true, subtree: true, attributes: true, characterData: true }); }
     { const n = doc.getElementById('facilitator'); if (n) observer.observe(n, { attributes: true, attributeFilter: ['hidden'] }); }
   }
-  projects.addEventListener('change', render); assessments.addEventListener('change', render);
+  projects.addEventListener('change', render); assessments.addEventListener('change', render); surveys?.addEventListener('change', render);
   win.addEventListener?.('hashchange', () => { pending = parseDeepLink(win.location.hash); resolve(); render(); });
   pending = parseDeepLink(win.location?.hash);
   render();
