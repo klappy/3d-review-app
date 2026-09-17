@@ -55,7 +55,7 @@ test('identity reset and late results never resurrect private rows',async()=>{
  const f=fixture();const d=deferred();f.override(()=>d.promise);const pending=f.api.refresh();f.setContext({generation:2,principalId:'other'});f.api.reset();d.resolve({workspaces:[{id:'private',name:'PRIVATE',role:'owner'}]});await pending;assert.equal(f.root.hidden,true);assert.doesNotMatch(text(f.root),/PRIVATE/);
 });
 test('refresh race cannot replace newer list; stale errors do not paint',async()=>{
- const f=fixture();const d=deferred();let first=true;f.override(()=>{if(first){first=false;return d.promise;}});const old=f.api.refresh();await f.api.refresh();d.reject(new Error('private details'));await old;assert.match(text(f.root),/Actual workspace/);assert.doesNotMatch(text(f.root),/private details|could not be confirmed/);
+ const f=fixture();const d=deferred();let first=true;f.override(()=>{if(first){first=false;return d.promise;}});const old=f.api.refresh();await Promise.resolve();assert.equal(f.calls.length,1);await f.api.refresh();d.reject(new Error('private details'));await old;assert.match(text(f.root),/Actual workspace/);assert.doesNotMatch(text(f.root),/private details|could not be confirmed/);
 });
 test('uncertain write receives no automatic retry or false success; explicit refresh recovers',async()=>{
  const f=fixture();await f.open();f.override((p,o)=>o.method==='POST'?Promise.reject(new Error('secret error')):undefined);await f.click('Archive workspace');assert.equal(f.calls.filter(c=>c.method==='POST').length,1);assert.match(text(f.root),/could not be confirmed/);assert.doesNotMatch(text(f.root),/secret error|Workspace updated/);assert.equal(f.changes,0);
