@@ -79,22 +79,48 @@ describe("Phase A — contract sweep over all capabilities, both faces", () => {
   }, 120_000);
 
   it("unauthorized == nonexistent: a signed-in stranger aimed at REAL ids never gets a success or a different refusal than for ids that do not exist", async () => {
-    const scoped = capabilities.filter((c) => !c.public && !RESERVED.includes(c.id) && /\{(pid|aid|sid|gid)\}/.test(c.http.path));
-    expect(scoped.length).toBeGreaterThanOrEqual(20);
+    // Every path-parameter capability, with the REAL id of the right resource for its `{id}` (review #17-1).
+    const db: D1Database = env.DB; const one = async (sql: string) => Object.values((await db.prepare(sql).first()) ?? {})[0] as string;
+    const ownerTrace = (await (await app.fetch(new Request("https://t.invalid/v2/me", { headers: { authorization: `Bearer ${owner}` } }), env)).json() as any).trace_id as string;
+    const lang = await one(`SELECT language_id FROM assessment WHERE id='${real.aid}'`);
+    const realFor = (c: Capability): Record<string, string> => {
+      const id = c.id.startsWith("cap.workspace.") || c.id === "cap.rollup.workspace" ? real.id : c.id.startsWith("cap.project.") || c.id === "cap.rollup.project" ? real.pid
+        : c.id.startsWith("cap.assessment.") ? real.aid : c.id.startsWith("cap.language.") ? lang : c.id.startsWith("cap.grant.") ? real.aid : real.id;
+      return { ...real, id, scope: c.id.startsWith("cap.grant.") ? "assessment" : real.scope, trace_id: ownerTrace };
+    };
+    /** Not swept, each for a stated reason — token/version-addressed rows have no "someone else's real id" to aim at. */
+    const EXEMPT: Record<string, string> = { "cap.template.get": "templates are readable by any signed-in caller", "cap.template.publish_version": "support-only; refusal is NOT_AUTHORIZED by role, not by scope",
+      "cap.grant.accept": "token-addressed", "cap.ops.undo": "token-addressed", "cap.grant.revoke_invitation": "no seeded invitation id; covered in lane-b-grants", "cap.survey.revoke_link": "no seeded link id", "cap.survey.revoke_code": "no seeded code id" };
+    const scoped = capabilities.filter((c) => !c.public && !RESERVED.includes(c.id) && /\{\w+\}/.test(c.http.path) && !EXEMPT[c.id]);
+    expect(scoped.length).toBeGreaterThanOrEqual(40);
     expect(real.sid, "seed must provide a real survey id").not.toBe("srv_nope");
-    const codes = new Map<string, number>(); let ownerOk = 0;
+    const codes = new Map<string, number>(); let ownerOk = 0; const ownerOkCaps: string[] = [];
     for (const c of scoped) {
-      if (c.class === "read" && (await http(c, real, owner)).code === "ok") ownerOk++; // non-vacuous: the same ids DO open for the owner
-      const onReal = await http(c, real, stranger), onNope = await http(c, nope, stranger);
+      const ids = realFor(c);
+      if (c.class === "read" && (await http(c, ids, owner)).code === "ok") { ownerOk++; ownerOkCaps.push(c.id); } // non-vacuous: the same ids DO open for the owner
+      const onReal = await http(c, ids, stranger), onNope = await http(c, { ...nope, scope: ids.scope }, stranger);
       expect(onReal.code, `${c.id} real`).not.toBe("ok");
       expect(onReal, `${c.id} leaks existence`).toEqual(onNope);
-      expect((await mcp(c, real, stranger)).code, `${c.id} mcp`).toBe(onReal.code);
+      expect((await mcp(c, ids, stranger)).code, `${c.id} mcp`).toBe(onReal.code);
       codes.set(onReal.code, (codes.get(onReal.code) ?? 0) + 1);
     }
-    console.log("stranger refusals", Object.fromEntries(codes), "owner reads ok on the same ids:", ownerOk);
-    expect(ownerOk).toBeGreaterThanOrEqual(5);
-    expect(codes.get("NOT_FOUND_OR_NOT_VISIBLE") ?? 0).toBeGreaterThanOrEqual(15);
+    console.log("stranger refusals", Object.fromEntries(codes), "rows", scoped.length, "owner reads ok:", ownerOkCaps.join(","));
+    expect(ownerOk).toBeGreaterThanOrEqual(8);
+    expect([...codes.keys()]).toEqual(["NOT_FOUND_OR_NOT_VISIBLE"]);
   }, 180_000);
+
+  it("rows with a handler that still always answer 501 are pinned too — open v2.0 debt, named (review #17-2)", async () => {
+    // cap.survey.send_links: dry_run works, execute is RESERVED_NOT_BUILT until a mail transport + contract decision exist
+    const p = { aid: "assess_tavo_collect", sid: "survey_tavo", ids: ["invite_x"] };
+    const call = (mode: string, confirm_token?: string) => app.fetch(new Request("https://t.invalid/mcp", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${owner}` },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "danger", arguments: { capability: "cap.survey.send_links", params: p, mode, confirm_token } } }) }), env).then((r) => r.json() as any).then((j) => j.result.structuredContent);
+    const dry = await call("dry_run"); expect(dry.ok).toBe(true);
+    const exec = await call("execute", dry.result.confirm_token); expect(exec.error?.code).toBe("RESERVED_NOT_BUILT");
+    // cap.auth.request_link outside dev
+    const prodEnv = { ...env, ENVIRONMENT: "production" };
+    const r = await app.fetch(new Request("https://t.invalid/v2/auth/link", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "demo.owner@example.invalid" }) }), prodEnv);
+    expect(r.status).toBe(501);
+  }, 60_000);
 
   it("no danger capability has a GET twin", () => {
     expect(capabilities.filter((c) => c.tool === "danger" && c.http.method.toUpperCase() === "GET")).toEqual([]);

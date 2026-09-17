@@ -54,6 +54,7 @@ describe("04-ACCEPTANCE rows 1–2, 32–33 — public entry", () => {
   it("32 ops.health: build + contract + per-dependency status, no session, no configuration values", async () => {
     const h = await call("GET", "/v2/health"); expect(h.status).toBe(200); expect(h.result.deps.d1).toBe("ok"); expect(h.result.contract).toBeTruthy();
     expect(JSON.stringify(h.raw)).not.toMatch(/secret|api_key|workers\.dev|cloudflareaccess/i);
+    expect(Object.keys(h.result.deps)).toEqual(["d1"]); // DIVERGENCE as observed: line asks for D1, KV, email sender (Fable's to add after #15/#16)
     note("32", `health deps reported: ${Object.keys(h.result.deps).join(",")} (line asks for D1, KV, email sender)`);
   });
   it("33 ops.feedback: accepted without a session, receipt", async () => {
@@ -61,8 +62,10 @@ describe("04-ACCEPTANCE rows 1–2, 32–33 — public entry", () => {
     note("33", `feedback → ${f.status} ${f.ok ? "ok receipt=" + !!f.receipt : f.code}`);
     const stripped = await call("POST", "/v2/feedback", { helpful: false, answers: { Q1: "x" } });
     note("33", `feedback with answers field → ${stripped.status} ${stripped.ok ? JSON.stringify(stripped.result).slice(0, 120) : stripped.code}`);
-    expect(f.ok).toBe(true);
-    expect(JSON.stringify((await db.prepare("SELECT * FROM feedback ORDER BY rowid DESC LIMIT 1").first().catch(() => ({}))) ?? {})).not.toContain('"Q1"');
+    expect(f.ok).toBe(true); expect(f.receipt).toBeTruthy();
+    expect(stripped.ok).toBe(true); expect(stripped.result.stripped).toBe(true);
+    const lastFeedback = await db.prepare("SELECT * FROM feedback ORDER BY rowid DESC LIMIT 1").first(); expect(lastFeedback).toBeTruthy();
+    expect(JSON.stringify(lastFeedback)).not.toContain('"Q1"');
   });
 });
 
@@ -88,6 +91,7 @@ describe("rows 5–12 — workspaces, projects, languages", () => {
   let ws: string, pid: string;
   it("5/6/7/8/9 workspace create → list → get → update(+inverse) → archive/unarchive; negatives", async () => {
     const c = await call("POST", "/v2/workspaces", { name: "Acceptance WS" }, NEW); expect(c.ok).toBe(true); expect(c.receipt).toBeTruthy(); ws = c.result.workspace.id;
+    expect(c.status).toBe(200); // DIVERGENCE as observed: line says 201; every create in this API answers 200 with a receipt
     note("5", `create status ${c.status} (line says 201)`);
     const un = await call("POST", "/v2/workspaces", { name: "nope" }, UNPROV); expect(un.code).toBe("NOT_AUTHORIZED_AT_SCOPE"); expect(JSON.stringify(un.error)).toContain("cap.request.create");
     const list = await call("GET", "/v2/workspaces", undefined, NEW); expect(list.result.workspaces.map((w: any) => w.id)).toEqual([ws]); expect(list.result.workspaces[0].role).toBe("owner");
@@ -101,13 +105,14 @@ describe("rows 5–12 — workspaces, projects, languages", () => {
     const ar = await call("POST", `/v2/workspaces/${ws}/archive`, {}, NEW); expect(ar.ok).toBe(true);
     const listed = (await call("GET", "/v2/workspaces", undefined, NEW)).result.workspaces.find((w: any) => w.id === ws);
     note("9", `archived workspace in list → ${listed ? "still listed, archived_at=" + listed.archived_at : "hidden"} (line implies hidden until unarchive)`);
-    if (listed) expect(listed.archived_at).toBeTruthy();
+    expect(listed, "DIVERGENCE as observed: an archived workspace stays listed, flagged").toBeTruthy(); expect(listed.archived_at).toBeTruthy();
     { const un1 = await call("POST", `/v2/workspaces/${ws}/unarchive`, {}, NEW); expect(un1.ok).toBe(true);
-      const un2 = await call("POST", `/v2/workspaces/${ws}/unarchive`, {}, NEW); note("9", `second unarchive → ${un2.ok ? "ok (idempotent) receipt=" + !!un2.receipt : un2.code}`);
+      const un2 = await call("POST", `/v2/workspaces/${ws}/unarchive`, {}, NEW); note("9", `second unarchive → ${un2.ok ? "ok (idempotent) receipt=" + !!un2.receipt : un2.code}`); expect(un2.ok).toBe(true);
       expect((await call("GET", "/v2/workspaces", undefined, NEW)).result.workspaces.find((w: any) => w.id === ws).archived_at).toBeNull(); }
   });
   it("10/10a/10b/11/12 project create → language create/list → update → archive/unarchive; negatives", async () => {
-    const c = await call("POST", "/v2/projects", { name: "Acceptance Project", workspace_id: ws }, NEW); expect(c.ok).toBe(true); pid = c.result.project.id;
+    const ownWs = (await call("POST", "/v2/workspaces", { name: "Acceptance WS for projects" }, NEW)).result.workspace.id; // stands alone (review #17-5)
+    const c = await call("POST", "/v2/projects", { name: "Acceptance Project", workspace_id: ownWs }, NEW); expect(c.ok).toBe(true); pid = c.result.project.id;
     // DIVERGENCE (row 10 negative, Lane A handler): `workspace_id` is silently IGNORED — the project is created outside any
     // workspace instead of refusing a workspace the caller does not own. Not an escalation (nothing lands in ws_cedar), but
     // a caller is told "ok" for a placement that did not happen. Asserted as observed so a fix flips this line.
@@ -147,11 +152,13 @@ describe("rows 13–17 — assessments", () => {
     expect((await call("PATCH", A, { name: "x" }, VW)).code).toBe("NOT_AUTHORIZED_AT_SCOPE");
     const up = await call("PATCH", A, { purpose: "Acceptance purpose" }, O); expect(up.ok).toBe(true); expect(up.receipt.undo_token).toBeTruthy();
     expect((await call("PATCH", A, { stage: "improve" }, O)).code).toBe("INVALID_PARAMS");
-    const jump = await call("POST", `${A}/stage`, { stage: "improve" }, O); expect(jump.ok).toBe(false); note("16", `non-adjacent jump collect→improve → ${jump.code} "${jump.error?.message}"`);
+    const jump = await call("POST", `${A}/stage`, { stage: "improve" }, O); expect(jump.code).toBe("STAGE_CONFLICT"); /* DIVERGENCE as observed: line says INVALID_PARAMS(stage_not_adjacent) */ note("16", `non-adjacent jump collect→improve → ${jump.code} "${jump.error?.message}"`);
     expect((await call("POST", `${A}/stage`, { stage: "understand" }, VW)).code).toBe("NOT_AUTHORIZED_AT_SCOPE");
     const n = await call("PATCH", `${A}/notes`, { notes_reflection: "Acceptance reflection", notes_next_steps: "none" }, O); expect(n.ok).toBe(true); expect(n.receipt.undo_token).toBeTruthy(); note("17", `notes.update → ${n.ok ? "ok undo=" + !!n.receipt?.undo_token : n.code + " " + n.error?.message}`);
     expect((await call("PATCH", `${A}/notes`, { notes_reflection: "x" }, VW)).code).toBe("NOT_AUTHORIZED_AT_SCOPE");
-    const res = await call("GET", `${A}/results`, undefined, O); expect(JSON.stringify(res.raw)).not.toContain("Acceptance reflection");
+    const res = await call("GET", `${A}/results`, undefined, O); expect(res.ok, "results must answer for the owner, or the exclusion check is vacuous").toBe(true);
+    expect(JSON.stringify(res.raw)).not.toContain("Acceptance reflection");
+    expect(JSON.stringify((await call("GET", A, undefined, VW)).raw)).toContain("Acceptance reflection"); // …while Vw+ does see notes on the assessment itself
   });
 });
 
@@ -167,10 +174,11 @@ describe("rows 18–21 — templates", () => {
     const r = await call("GET", "/v2/templates/tpl_validation@2/render?lang=en"); expect(r.ok).toBe(true);
     expect(JSON.stringify(r.result)).not.toMatch(/"weight"|"score"|standalone_indicator/);
     const bad = await call("GET", "/v2/templates/tpl_validation@2/render?lang=zz"); note("20", `render unsupported lang → ${bad.ok ? "ok (falls back)" : bad.code}`);
+    expect(bad.ok).toBe(true); // DIVERGENCE as observed: line asks INVALID_PARAMS + the supported set; the app falls back silently
   });
-  it("21 template.publish_version: danger only, support only", async () => {
+  it("21 (negatives only — support positive still owed) template.publish_version: wrong tool refused; an owner is not support", async () => {
     expect((await mcp("write", "cap.template.publish_version", { id: "tpl_validation" }, O)).code).toBe("WRONG_TOOL_FOR_CLASS");
-    const o = await mcp("danger", "cap.template.publish_version", { id: "tpl_validation" }, O, { mode: "dry_run" }); expect(o.ok).toBe(false); note("21", `owner dry_run → ${o.code}`);
+    const o = await mcp("danger", "cap.template.publish_version", { id: "tpl_validation" }, O, { mode: "dry_run" }); expect(o.code).toBe("NOT_AUTHORIZED_AT_SCOPE"); note("21", `owner dry_run → ${o.code}`);
   });
 });
 
@@ -183,11 +191,13 @@ describe("rows 22–26 — surveys, requests, participation", () => {
     const a = await call("POST", "/v2/requests", { kind: "workspace", target: "Acceptance Org" }, UNPROV); expect(a.ok).toBe(true); expect(a.receipt).toBeTruthy();
     const b = await call("POST", "/v2/requests", { kind: "workspace", target: "Acceptance Org" }, UNPROV);
     note("24", `duplicate request → ${b.ok ? (b.result.request_id === a.result.request_id ? "same id (idempotent)" : "NEW id (not idempotent)") : b.code}`);
+    expect(b.ok).toBe(true); expect(b.result.request_id).toBe(a.result.request_id);
     expect((await call("POST", "/v2/requests", { kind: "workspace", target: "x" })).code).toBe("NOT_AUTHENTICATED");
   });
-  it("25/26 participant form is bound to collect stage and to the token; assisted_next", async () => {
-    expect((await call("GET", "/v2/participate/form")).ok).toBe(false);
-    const n = await call("POST", "/v2/participate/next", {}); note("26", `assisted_next without participant token → ${n.code}`); expect(n.ok).toBe(false);
+  it("25/26 (negatives only — positives still owed) participant form and assisted_next refuse callers without a participant token", async () => {
+    expect((await call("GET", "/v2/participate/form")).code).toBe("NOT_AUTHENTICATED");
+    expect((await call("GET", "/v2/participate/form", undefined, O)).ok, "a facilitator session is not a participant token").toBe(false);
+    const n = await call("POST", "/v2/participate/next", {}); note("26", `assisted_next without participant token → ${n.code}`); expect(n.code).toBe("NOT_AUTHENTICATED");
   });
 });
 
