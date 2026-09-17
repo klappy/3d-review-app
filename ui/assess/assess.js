@@ -125,9 +125,18 @@ function totalTile(current) {
   const total = loaded.reduce((n, s) => n + countFor(s.id).responses, 0); const partial = loaded.length !== act.length;
   return `<div data-total><p class="count" style="margin:0">${total}</p><p class="muted" style="margin:4px 0 0">responses across ${loaded.length} of ${act.length} included survey${act.length === 1 ? '' : 's'} counted${partial ? ' <strong>(partial)</strong>' : ''}</p></div>`;
 }
+function asideFigures(s) {
+  const c = countFor(s.id);
+  return `<div data-aside="${esc(s.id)}"><p class="count">${c.status === 'loaded' ? c.responses : '—'}</p><p class="muted">responses received${c.status === 'loaded' ? ` from ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}` : ''}</p></div>`;
+}
 function paintCounts(current) {
-  for (const s of activeSurveys(current)) { const el = app.querySelector(`[data-count="${CSS.escape(s.id)}"]`); if (el) el.outerHTML = countCell(s); }
+  for (const s of activeSurveys(current)) {
+    const el = app.querySelector(`[data-count="${CSS.escape(s.id)}"]`); if (el) el.outerHTML = countCell(s);
+    const aside = app.querySelector(`[data-aside="${CSS.escape(s.id)}"]`); if (aside) aside.outerHTML = asideFigures(s);
+  }
   const t = app.querySelector('[data-total]'); if (t) t.outerHTML = totalTile(current);
+  // Count refusal marks dirty without a full render; writes must look disabled immediately (Bugbot count-refusal).
+  if (state.dirty.has(current.assessment.id)) app.querySelectorAll('[data-include],[data-remove]').forEach(b => { b.disabled = true; });
   bindCounts(current);
 }
 function bindCounts(current) {
@@ -145,7 +154,7 @@ function surveyScreen(current, s) {
   const a = current.assessment, lens = lensFor(s), mayPrint = printAllowed(a.role);
   const back = `<a class="back" href="#assessment/${encodeURIComponent(a.id)}">← Back to ${esc(a.name)}</a>`;
   const printBlock = mayPrint ? `<section class="panel" id="print-panel"><p class="eyebrow">Paper</p><h2>Print survey</h2><p class="muted">A blank questionnaire with this survey's actual questions — nothing personal, no codes or links on the page.</p><p><button class="primary" id="print-load" ${state.print?.sid === s.id && state.print.status === 'loading' ? 'disabled' : ''}>Print survey</button></p><div id="print-root"></div><p class="status" role="status" aria-live="polite" id="print-status">${state.print?.sid === s.id && state.print.status === 'error' ? esc(state.print.text) : ''}</p></section>` : `<section class="panel"><p class="eyebrow">Paper</p><h2>Print survey</h2><p class="muted">Printing the blank questionnaire needs a member or owner role on this assessment; your role here is ${esc(a.role)}.</p></section>`;
-  return `${back}<div class="title"><div><p class="eyebrow">Survey · ${esc(lens)}</p><h1>${esc(s.template_name)}</h1><p class="muted" style="margin:0">${esc(a.name)} · v${esc(s.template_version)} · collection ${esc(s.collection_status)}</p></div><span class="badge">${countCell(s)}</span></div><div class="grid">${printBlock}<aside class="panel"><p class="eyebrow">This survey</p><p class="count">${countFor(s.id).status === 'loaded' ? countFor(s.id).responses : '—'}</p><p class="muted">responses received${countFor(s.id).status === 'loaded' ? ` from ${countFor(s.id).respondents} respondent${countFor(s.id).respondents === 1 ? '' : 's'}` : ''}</p>${state.dirty.has(a.id) ? '<p class="note" role="alert">This assessment changed; <a href="#" data-refresh="1">Refresh</a> to see the current survey set.</p>' : ''}</aside></div>`;
+  return `${back}<div class="title"><div><p class="eyebrow">Survey · ${esc(lens)}</p><h1>${esc(s.template_name)}</h1><p class="muted" style="margin:0">${esc(a.name)} · v${esc(s.template_version)} · collection ${esc(s.collection_status)}</p></div><span class="badge">${countCell(s)}</span></div><div class="grid">${printBlock}<aside class="panel"><p class="eyebrow">This survey</p>${asideFigures(s)}${state.dirty.has(a.id) ? '<p class="note" role="alert">This assessment changed; <a href="#" data-refresh="1">Refresh</a> to see the current survey set.</p>' : ''}</aside></div>`;
 }
 function surveyUnavailable(aid, sid) { return `<div class="narrow panel"><h1>Survey unavailable</h1><p class="muted">No survey with this address is visible to you in this assessment.</p><a class="button" href="#assessment/${encodeURIComponent(aid)}">Back to assessment</a></div>`; }
 function bindPrint(current, s) {
@@ -154,7 +163,7 @@ function bindPrint(current, s) {
     const gen = generation, aid = current.assessment.id;
     state.print = { sid: s.id, status: 'loading' }; btn.disabled = true;
     const model = await loadBlankPrint({ request: (url, init) => fetch(url, init), token, aid, sid: s.id, role: current.assessment.role });
-    if (gen !== generation) return; // navigated away: nothing paints
+    if (gen !== generation) { if (state.print?.sid === s.id && state.print.status === 'loading') state.print = null; return; } // navigated away: drop leftover loading so a later paint is usable
     btn.disabled = false;
     if (!model.visible) { state.print = { sid: s.id, status: 'error', text: model.reason === 'unsafe-print' ? 'The print payload was refused because it carried credentials.' : `Blank questionnaire unavailable (${redact(model.reason)}).` }; app.querySelector('#print-status').textContent = state.print.text; return; }
     state.print = { sid: s.id, status: 'ready' };
@@ -213,7 +222,8 @@ function bind(current) {
 // Transition: write → (committed ⇒ dirty) → refresh → (landed ⇒ clean). Every outcome is scoped to `aid`, never to
 // whatever is on screen when the promise settles (Bugbot 4040525117 / 4040525128).
 async function act(aid, label, fn) {
-  if (state.busy || state.dirty.has(aid)) return;
+  if (state.busy) return;
+  if (state.dirty.has(aid)) { render(); return; }
   state.busy = true; state.message = null; note.textContent = label; render();
   let text = null;
   try { text = await fn(); state.dirty.add(aid); state.message = { aid, text, alert: false }; }
@@ -230,6 +240,7 @@ async function fetchAssessment(aid) {
 }
 async function render() {
   const gen = ++generation, r = route(location.hash);
+  if (state.print?.status === 'loading') state.print = null;
   if (r.kind === 'assessment' || r.kind === 'survey') {
     const aid = r.id;
     if (state.current?.assessment.id !== aid || state.dirty.has(aid)) {
