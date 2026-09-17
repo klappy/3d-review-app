@@ -7,10 +7,10 @@
 | Provider | Resend HTTP API, one `POST https://api.resend.com/emails`, `Idempotency-Key: invite/<invitation id>` |
 | Who sends | only `ENVIRONMENT === "production"`; dev/anything else → `delivered:false, reason:"not_production"` |
 | Not configured | `RESEND_API_KEY` or `MAIL_FROM` missing → `reason:"not_configured"` |
-| Address shape | exactly one plain mailbox (`normalizeAddress`): display names, lists, whitespace, CRLF, trailing dots, dotless hosts → handler `INVALID_PARAMS`; adapter `reason:"invalid_address"` |
+| Address shape | exactly one plain **ASCII** mailbox (`normalizeAddress`; letters, digits, `. _ % + -`; punycode hosts and TLDs accepted; quoted local parts and `' / =` refused loudly rather than sent and bounced): display names, lists, whitespace, CRLF, trailing dots, dotless hosts → handler `INVALID_PARAMS`; adapter `reason:"invalid_address"` |
 | Synthetic recipients | `.invalid`, `.test`, `.example`, `.localhost`, `.local`, `example.com/net/org` **and their subdomains** are never mailed → `reason:"synthetic_recipient"` |
-| Intent de-duplication | one live invitation per scope+invitee per 10 minutes — a replayed confirm token, a client retry or a loop returns the existing invitation with `reason:"duplicate_recent"` and sends nothing |
-| Inviter cap | 30 invitations per inviter per hour → `RATE_LIMITED` (durable count in D1) |
+| Intent de-duplication | decided and written in **one SQL statement** (`INSERT … SELECT … WHERE NOT EXISTS`), so concurrent replays cannot both pass. A live duplicate = a `sent` row for the same scope+invitee in the last 10 minutes, or a `pending` row younger than 30 s (an in-flight twin). Older `pending` rows were never mailed and do **not** block a retry. Duplicate → existing invitation, `reason:"duplicate_recent"`, nothing sent. Same person, **different role** inside the window → `INVALID_PARAMS` pointing at `cap.grant.revoke_invitation` |
+| Inviter cap | 30 **collaborator** invitations per inviter per hour (participant-link rows from `cap.survey.issue_link` are not counted) → `RATE_LIMITED`. The HTTP `retry-after: 60` header is the generic one; the hint says the cap resets over the hour |
 | Row status | `sent` only after the provider accepted; otherwise `pending` |
 | Timeout | 8 s (`AbortSignal.timeout`) → `provider_unreachable` |
 | Provider says no / is down | `reason:"provider_error"` (+ status) / `"provider_unreachable"`; the capability still succeeds and the invitation exists — re-invite to retry |

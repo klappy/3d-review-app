@@ -21,8 +21,10 @@ export type MailReason = "invalid_address" | "duplicate_recent" | "not_configure
 export interface MailResult { delivered: boolean; provider?: "resend"; provider_message_id?: string; reason?: MailReason; provider_status?: number }
 export interface MailMessage { to: string; subject: string; text: string; html?: string; idempotencyKey: string }
 
-/** One plain mailbox: no display names, lists, quotes, whitespace, control characters, trailing dots or dotless hosts. */
-const ADDRESS = /^[A-Za-z0-9._%+-]{1,64}@([A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,63}$/;
+/** One plain ASCII mailbox: letters, digits and . _ % + - in the local part (no leading/trailing/double dots); hostname labels
+ *  that do not start or end with '-'; alphabetic or punycode TLD. Deliberately stricter than RFC 5322: quoted local parts and
+ *  characters like ' / = are refused LOUDLY (INVALID_PARAMS) rather than sent and bounced. No display names, lists, whitespace. */
+const ADDRESS = /^[A-Za-z0-9_%+-]+(\.[A-Za-z0-9_%+-]+)*@([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+([A-Za-z]{2,63}|xn--[A-Za-z0-9-]{1,59})$/;
 /** Reserved / non-routable: RFC 2606 + RFC 6761 names and any subdomain of them. */
 const RESERVED_TLD = /\.(invalid|test|example|localhost|local)$/i;
 const RESERVED_DOMAIN = /(^|\.)example\.(com|net|org)$/i;
