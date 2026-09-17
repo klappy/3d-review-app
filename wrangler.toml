@@ -16,6 +16,21 @@ binding = "DB"
 database_name = "3d-review-dev"
 database_id = "5d4cc260-a7b1-47cc-b03d-ed4f60d324c3"
 
+# Workers Rate Limiting bindings — src/ratelimit.ts. namespace_id is any account-unique integer; period is 10 or 60 (s).
+# Bindings are NOT inherited by [env.production]; they are repeated there with separate namespaces.
+[[ratelimits]]
+name = "RL_MCP_ANON"
+namespace_id = "30101"
+simple = { limit = 30, period = 60 }
+[[ratelimits]]
+name = "RL_AUTH"
+namespace_id = "30102"
+simple = { limit = 10, period = 60 }
+[[ratelimits]]
+name = "RL_REDEEM"
+namespace_id = "30103"
+simple = { limit = 60, period = 60 }
+
 [[rules]]
 type = "Text"
 globs = ["**/*.yaml", "seed/*.sql"]
@@ -39,3 +54,15 @@ custom_domain = true
 binding = "DB"
 database_name = "3d-review"
 database_id = "2641de99-670e-46a2-872e-a2498189e287"
+[[env.production.ratelimits]]
+name = "RL_MCP_ANON"
+namespace_id = "30201"
+simple = { limit = 30, period = 60 }
+[[env.production.ratelimits]]
+name = "RL_AUTH"
+namespace_id = "30202"
+simple = { limit = 10, period = 60 }
+[[env.production.ratelimits]]
+name = "RL_REDEEM"
+namespace_id = "30203"
+simple = { limit = 60, period = 60 }

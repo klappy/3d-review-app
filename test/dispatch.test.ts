@@ -9,7 +9,7 @@ function context(): Ctx {
   const statement = { bind() { return this; }, async run() { return { success: true }; } };
   const db = { prepare: () => statement } as unknown as D1Database;
   return {
-    env: { DB: db, SESSION_SECRET: "test-only-secret" }, db,
+    env: { DB: db, SESSION_SECRET: "test-only-secret", ENVIRONMENT: "dev" }, db,
     principal: { kind: "anonymous", id: "anon" },
     traceId: "tr_test", now: () => new Date("2026-09-16T20:00:00Z"), log: () => {},
   };
