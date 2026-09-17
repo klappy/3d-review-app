@@ -86,3 +86,4 @@ body.rv{border-radius:0;min-height:100vh;overflow:visible}
 @media(prefers-reduced-motion:reduce){.rv *{scroll-behavior:auto}}
 /* Shared survey routes hide the facilitator; keep its moved sign-out control hidden too. */
 .rv:has(#facilitator[hidden]) #signout{display:none}
+#report-list{font-size:.9rem;overflow-wrap:anywhere}#report-list button{background:transparent;color:#115c9a;border-color:#abb7c3;text-align:left}#report-view{margin-top:1rem}#report-view section{margin:.8rem 0}#report-view h4{margin:.2rem 0}#report-view ul{margin:.2rem 0;padding-left:1.1rem}
