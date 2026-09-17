@@ -373,6 +373,22 @@ test('A2: a hidden form is neither focused nor revealed, and no button is offere
   assert.equal(focusFirstControl(null), null);
 });
 
+test('B: a selected assessment keeps assessment state when the overview GET omits it', async () => {
+  for (const list of [
+    { assessments: [] },
+    { assessments: [{ id: 'a-other', project_id: 'p1', language_id: 'l1', name: 'Other', purpose: null, period: '', format: null, stage: 'collect', archived_at: null, created_at: '2026-03-01', role: 'owner' }] },
+    async () => ({ ok: false, status: 500, json: async () => ({ ok: false, error: { code: 'UNAVAILABLE' } }) }),
+  ]) {
+    const w = fakeWorld();
+    w.setRoutes({ ...ROUTES, '/v2/projects/p1/assessments': list });
+    w.projects.options = [option(''), option('p1')]; w.projects.value = 'p1';
+    w.assessments.options = [option(''), option('a1')]; w.assessments.value = 'a1';
+    w.mount(); await w.settle();
+    assert.equal(w.body.dataset.overviewState, 'assessment', 'the select, not the overview GET, decides composition');
+    assert.equal(w.node('overview-project').children.length, 1, 'collapse to the project line; do not paint a conflicting table');
+  }
+});
+
 test('B: the state attribute walks none → all → project → assessment and back', async () => {
   const w = fakeWorld(); w.setRoutes(ROUTES);
   w.projects.options = [option(''), option('p1')];
