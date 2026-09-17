@@ -364,7 +364,12 @@ bindClick('submit', 'Submitting response…', async () => {
 function showReceipt(result) {
   clearParticipantError();
   text($('receipt'), result.submitted === false ? 'No submission recorded yet.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`);
-  text($('participant-resume'), resumeNoticeAfterReceipt(result, $('participant-resume').textContent));
+  if (result.submitted === false && submitState === 'uncertain') {
+    submitState = 'none'; // a live submitted:false receipt proves this bearer has no response
+    text($('participant-resume'), sharedCopy.submitFailed);
+  } else {
+    text($('participant-resume'), resumeNoticeAfterReceipt(result, $('participant-resume').textContent));
+  }
   $('receipt').hidden = false;
   if (result.submitted !== false) { $('review').hidden = true; $('answers').hidden = true; }
   if (state.shared && result.submitted !== false) text($('participant-resume'), `${sharedCopy.receiptThanks} ${sharedCopy.sameLinkOthers}`);

@@ -586,6 +586,20 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     expectUncertain($, storage, snap);
     expect($("review").hidden).toBe(false);
   });
+  it("F11e recover after 503 with live GET /receipt submitted:false: receipt agrees with submitFailed, uncertain copy gone, review stays, storage byte-identical", async () => {
+    const link = await issue(); const { $, storage, ns, plan } = await openForm(link);
+    const before = await counts();
+    plan.responses = refuse(503, "INTERNAL"); await submit($);
+    expect($("participant-resume").textContent).toBe(copy.submitUncertain); expect(await counts()).toBe(before);
+    const snap = await armed(storage, ns);
+    plan.responses = null;
+    await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toBe("No submission recorded yet.");
+    expect($("participant-resume").textContent).toBe(copy.submitFailed);
+    expect($("review").hidden).toBe(false); expect($("recover").hidden).toBe(false);
+    expect($("participant-error").hidden).toBe(true); expect(snapshot(storage)).toBe(snap);
+    expect(await counts()).toBe(before);
+  });
   for (const [row, status, code, expected] of [["F11c", 503, "INTERNAL", "transient"], ["F11d", 429, "RATE_LIMITED", "rateLimited"]] as const) it(`${row} fresh open, Recover with GET /receipt → ${status}: ${expected} copy in #participant-resume, form and Recover stay, #error empty, storage byte-identical`, async () => {
     const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
     const $ = await boot(storage, link.entry_fragment, fetcher); strict($);
