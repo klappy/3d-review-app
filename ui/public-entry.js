@@ -21,9 +21,10 @@ export function mountPublicEntry(document,window) {
   const explicitSharedAtEntry=parseEntryFragment(window.location.hash)!==null;
   function render(){
     const invitation=document.body.dataset.invitationIntent==='active';
-    const shared=!invitation&&(explicitSharedAtEntry||currentNamespace(window.sessionStorage)!==null||document.getElementById('facilitator')?.hidden===true);
+    const isolated=document.body.dataset.invitationEntry==='true'; // explicit invite load: saved participant route ignored for the page lifetime (Bugbot 4039886032)
+    const shared=!invitation&&(explicitSharedAtEntry||(!isolated&&currentNamespace(window.sessionStorage)!==null)||document.getElementById('facilitator')?.hidden===true);
     // Presence selects the existing recovery screen only; restoreParticipant still validates the session.
-    const participantResume=!shared && !!window.sessionStorage.getItem('participantToken');
+    const participantResume=!shared && !isolated && !!window.sessionStorage.getItem('participantToken');
     // Access return paints Not signed in and clears #session= before /v2/me; a stored token is still restoring.
     const view=publicView({invitation,shared,participantResume,authenticated:observedIdentity(identity?.textContent),checking:identity?.textContent==='Checking session…'||(!!window.sessionStorage.getItem('facilitatorToken')&&!observedIdentity(identity?.textContent)),hash:window.location.hash});
     document.body.dataset.entryView=view;

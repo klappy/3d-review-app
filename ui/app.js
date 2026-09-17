@@ -27,7 +27,7 @@ function endInvitation() {
   if (document.body) delete document.body.dataset.invitationIntent;
   $('invitation-entry-notice')?.remove?.();
 }
-if (invitationEntry) document.body.dataset.invitationIntent = 'active';
+if (invitationEntry) { document.body.dataset.invitationIntent = 'active'; document.body.dataset.invitationEntry = 'true'; } // entry isolation lasts the page lifetime: a saved participant route/namespace is ignored (never deleted) even after the intent ends (Bugbot 4039886032)
 if (location.hash.startsWith('#invite=')) history.replaceState(null, '', location.pathname + location.search);
 // Shared-link mode is decided first so no global (code-path) key is read or written in that mode.
 const sharedToken = parseEntryFragment(location.hash);
@@ -725,7 +725,7 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
     history.replaceState(null, '', location.pathname + location.search);
     collab.clearAcceptance(); endInvitation();
     if (!token) return;
-    pendingInvitation = token; document.body.dataset.invitationIntent = 'active';
+    pendingInvitation = token; document.body.dataset.invitationIntent = 'active'; document.body.dataset.invitationEntry = 'true'; // same-tab invite arrival is isolated from here on, like a page load (Bugbot 4039886032)
     const generation = invitationGeneration;
     void run('Opening invitation…', async () => { await invitationBootstrap; await openPendingInvitation(generation); });
     return;

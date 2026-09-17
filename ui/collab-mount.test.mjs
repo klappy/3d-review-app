@@ -77,3 +77,13 @@ test('failed initial workspace request blocks invitation handoff despite module 
  const hooks=factory(({request})=>({refresh:async()=>{try{await request('/v2/workspaces')}catch{}},reset(){},destroy(){}}),()=>({setScope(){},reset(){},destroy(){},openAcceptance(){opens++}}))({document:doc,api:async()=>{throw Error('refused')},sharedMode:false,onReload:async()=>{}});
  hooks.identity({principal:{id:'person',kind:'user'}});assert.equal(await hooks.openAcceptance('PRIVATE'),false);assert.equal(opens,0);
 });
+
+test('openAcceptance re-reads the workspace list after a failed first read instead of latching (Bugbot 4039886042)',()=>{
+  const mount=read('./collab-mount.js');
+  assert.ok(mount.includes("if (workspaceReadFailed) { workspaceReadFailed = false; readiness = workspaces.refresh().catch(() => {}); await readiness; if (!current()) return false; }"),'one re-read per attempt');
+  assert.ok(mount.includes('if (workspaceReadFailed) return false;'),'only a failure of THIS read refuses the handoff');
+  const app=read('./app.js');
+  assert.ok(app.includes("document.body.dataset.invitationEntry = 'true'"),'invite entry isolation flag set for the page lifetime');
+  assert.ok(!/delete document\.body\.dataset\.invitationEntry/.test(app),'the isolation flag is never cleared');
+  assert.ok(!/removeItem\('participantToken'\)[^\n]*invit/.test(app),'storage is not deleted by the invite path');
+});

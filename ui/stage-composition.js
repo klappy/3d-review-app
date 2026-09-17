@@ -14,10 +14,13 @@ export function mountStageComposition(doc,win) {
   const facilitator=doc.getElementById('facilitator');
   const explicitSharedAtEntry=parseEntryFragment(win.location.hash)!==null;
   function render() {
+    // An explicit #invite= page load is isolated for its whole lifetime: leftover participant storage never becomes a
+    // route, before or after the invitation intent ends (Bugbot 4039886032). Storage itself is untouched.
+    const isolated=doc.body.dataset.invitationEntry==='true';
     const state=compositionState({
       invitation:doc.body.dataset.invitationIntent==='active',
-      shared:explicitSharedAtEntry || currentNamespace(win.sessionStorage)!==null || facilitator.hidden,
-      legacy:!!win.sessionStorage.getItem('participantToken'),
+      shared:explicitSharedAtEntry || (!isolated && currentNamespace(win.sessionStorage)!==null) || facilitator.hidden,
+      legacy:!isolated && !!win.sessionStorage.getItem('participantToken'),
       staff:observedIdentity(identity.textContent),hash:win.location.hash,
       context:!workspace.hidden,
       selected:tabs.querySelector('[role="tab"][aria-selected="true"]')?.dataset.stage,

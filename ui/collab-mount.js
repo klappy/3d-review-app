@@ -48,7 +48,12 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload, on
       const generation = snapshot.generation, principal = snapshot.principal?.id;
       if (!principal || snapshot.principal.kind !== 'user' || doc.body.dataset.invitationIntent !== 'active') return false;
       await readiness;
-      if (!isCurrent() || generation !== snapshot.generation || principal !== snapshot.principal?.id || snapshot.principal.kind !== 'user' || workspaceReadFailed || doc.body.dataset.invitationIntent !== 'active') return false;
+      const current = () => isCurrent() && generation === snapshot.generation && principal === snapshot.principal?.id && snapshot.principal.kind === 'user' && doc.body.dataset.invitationIntent === 'active';
+      if (!current()) return false;
+      // Bugbot 4039886042: a failed first workspace read must not latch. Re-read once for this attempt; only a failure
+      // of THIS read refuses the handoff, so a same-tab reopen after a transient failure recovers.
+      if (workspaceReadFailed) { workspaceReadFailed = false; readiness = workspaces.refresh().catch(() => {}); await readiness; if (!current()) return false; }
+      if (workspaceReadFailed) return false;
       invitations.openAcceptance(token); return true;
     },
     selectedWorkspace() { return selectedWorkspace; },
