@@ -18,7 +18,7 @@ function fakeNode(tag, id) {
     async fire(event) { for (const fn of this.listeners[event] || []) await fn({ preventDefault() {}, currentTarget: this }); },
     append(...nodes) { this.children.push(...nodes); }, replaceChildren(...nodes) { this.children = nodes; },
     focus() { this.focused = true; this.doc.active = this; },
-    showModal() { this.open = true; }, close() { this.open = false; return this.fire('close'); } };
+    showModal() { if (this.open) throw new Error('InvalidStateError: dialog already open'); this.open = true; this.showModalCalls = (this.showModalCalls || 0) + 1; }, close() { this.open = false; return this.fire('close'); } };
 }
 function fakeDocument(ids = ['version', 'changelog', 'changelog-title', 'changelog-build', 'changelog-body', 'changelog-close']) {
   const nodes = new Map();
@@ -87,6 +87,7 @@ test('V1 shared route: badge reads "Version" with no health read on load; health
   assert.equal(badge.textContent, 'Version 0.1.0');
   assert.equal(doc.getElementById('changelog').open, true);
   assert.deepEqual(log.map(r => r.url), ['/v2/health', '/changelog.json']);
+  await doc.getElementById('changelog').close();
   await badge.fire('click'); await api.ready; // second activation: health is not re-read
   assert.deepEqual(log.map(r => r.url), ['/v2/health', '/changelog.json', '/changelog.json']);
 });
@@ -206,6 +207,34 @@ test('V5 run() sweep disables the ordinary button but never #version or #changel
   assert.equal(h.requests.length, 0);
 });
 
+test('V1 shared route: two synchronous activations while reads are in flight → one /v2/health, one /changelog.json, showModal once', async () => {
+  const doc = fakeDocument(), log = [];
+  const slow = body => () => new Promise(r => setTimeout(() => r(json(body)), 5));
+  const api = initVersionBadge({ doc, fetchImpl: fetchFor({ '/v2/health': slow(HEALTH), '/changelog.json': slow(CHANGELOG) }, log), shared: true });
+  const badge = doc.getElementById('version');
+  const first = badge.fire('click'); const second = badge.fire('click'); // no await between activations
+  await Promise.all([first, second, api.ready]); await settle();
+  assert.deepEqual(log.map(r => r.url), ['/v2/health', '/changelog.json']);
+  assert.equal(doc.getElementById('changelog').showModalCalls, 1);
+  assert.equal(doc.getElementById('changelog').open, true);
+  assert.equal(badge.textContent, 'Version 0.1.0');
+});
+
+test('activation while the dialog is already open is a no-op', async () => {
+  const doc = fakeDocument(), log = [];
+  const api = initVersionBadge({ doc, fetchImpl: fetchFor({ '/v2/health': json(HEALTH), '/changelog.json': json(CHANGELOG) }, log), shared: false });
+  await api.ready;
+  const badge = doc.getElementById('version'), dialog = doc.getElementById('changelog');
+  await badge.fire('click'); await api.ready;
+  assert.equal(dialog.open, true);
+  await badge.fire('click'); await api.ready; await settle();
+  assert.equal(dialog.showModalCalls, 1);
+  assert.deepEqual(log.map(r => r.url), ['/v2/health', '/changelog.json']);
+  await dialog.close();
+  await badge.fire('click'); await api.ready; // reopens after close
+  assert.equal(dialog.showModalCalls, 2);
+});
+
 test('V6 request log contains only /v2/health and /changelog.json', async () => {
   const doc = fakeDocument(), log = [];
   const api = initVersionBadge({ doc, fetchImpl: fetchFor({ '/v2/health': json(HEALTH), '/changelog.json': json(CHANGELOG) }, log), shared: false });
@@ -215,4 +244,5 @@ test('V6 request log contains only /v2/health and /changelog.json', async () => 
   assert.deepEqual(log.map(r => r.url), ['/v2/health', '/changelog.json']);
   assert.equal(log.some(r => r.url.includes('/v2/participate/')), false);
   assert.equal(log.some(r => r.options?.headers?.authorization), false, 'no bearer is attached');
+  assert.equal(log.every(r => r.options?.credentials === 'omit'), true, 'credentials omitted on both reads');
 });

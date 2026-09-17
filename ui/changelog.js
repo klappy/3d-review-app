@@ -59,7 +59,7 @@ export function renderChangelog({ doc, body, data, health }) {
 }
 
 async function readJson(fetchImpl, url) {
-  const response = await fetchImpl(url, { headers: { accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store' });
+  const response = await fetchImpl(url, { headers: { accept: 'application/json' }, credentials: 'omit', cache: 'no-store' });
   if (!response || !response.ok) return null;
   return response.json();
 }
@@ -71,6 +71,7 @@ export function initVersionBadge({ fetchImpl = globalThis.fetch, doc = globalThi
   const body = doc.getElementById('changelog-body');
   const close = doc.getElementById('changelog-close');
   const api = { health: null, ready: Promise.resolve() };
+  let healthPromise = null, opening = false;
 
   function markUnavailable() { badge.textContent = copy.unavailable; badge.setAttribute('aria-disabled', 'true'); }
 
@@ -87,17 +88,23 @@ export function initVersionBadge({ fetchImpl = globalThis.fetch, doc = globalThi
     return result;
   }
 
+  // Memoised: the health read happens at most once per page, however many activations race it.
+  function healthOnce() { return (healthPromise ??= readHealth()); }
+
   async function open() {
-    if (badge.getAttribute('aria-disabled') === 'true') return;
-    if (!api.health) { const h = await readHealth(); if (!h) return; }
-    let data = null;
-    try { data = await readJson(fetchImpl, '/changelog.json'); } catch { data = null; }
-    if (!data || typeof data !== 'object') data = null;
-    build.textContent = detailsLine(api.health);
-    renderChangelog({ doc, body, data, health: api.health });
-    dialog.showModal();
-    badge.setAttribute('aria-expanded', 'true');
-    close.focus();
+    if (opening || dialog.open || badge.getAttribute('aria-disabled') === 'true') return;
+    opening = true;
+    try {
+      if (!api.health) { const h = await healthOnce(); if (!h) return; }
+      let data = null;
+      try { data = await readJson(fetchImpl, '/changelog.json'); } catch { data = null; }
+      if (!data || typeof data !== 'object') data = null;
+      build.textContent = detailsLine(api.health);
+      renderChangelog({ doc, body, data, health: api.health });
+      dialog.showModal();
+      badge.setAttribute('aria-expanded', 'true');
+      close.focus();
+    } finally { opening = false; }
   }
 
   badge.addEventListener('click', () => { api.ready = open(); return api.ready; });
@@ -105,13 +112,13 @@ export function initVersionBadge({ fetchImpl = globalThis.fetch, doc = globalThi
   // Covers the Close button, Esc/cancel and any programmatic dialog.close().
   dialog.addEventListener('close', () => { badge.setAttribute('aria-expanded', 'false'); badge.focus(); });
 
-  if (shared) badge.textContent = copy.shared; else api.ready = readHealth();
+  if (shared) badge.textContent = copy.shared; else api.ready = healthOnce();
   return api;
 }
 
 // /v2/health may answer with a non-2xx status and ok:false while still carrying a version.
 async function readJsonAllowingNotOk(fetchImpl, url) {
-  const response = await fetchImpl(url, { headers: { accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store' });
+  const response = await fetchImpl(url, { headers: { accept: 'application/json' }, credentials: 'omit', cache: 'no-store' });
   return response.json();
 }
 
