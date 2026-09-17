@@ -97,6 +97,8 @@ export async function execute(
       tool: options.tool,
       ok: outcome?.ok ?? false,
       ...(!outcome?.ok && outcome ? { code: outcome.error.code } : {}),
+      // which app acted for the user (OAuth connector or delegated session) — every receipt links here by trace_id
+      ...(ctx.principal.delegatedBy ? { delegated_by: ctx.principal.delegatedBy } : {}),
     });
   }
 }

@@ -89,6 +89,9 @@ describe("MCP authorization (borrowed provider + Access email-code + consent)", 
     expect(me.result.structuredContent.ok).toBe(true);
     expect(me.result.structuredContent.result.principal.kind).toBe("user");
     expect(me.result.structuredContent.result.principal.delegated_by).toBe(`oauth:${clientId}`);
+    // the consent page's promise is true: the call is traced with the app that made it
+    const traced = await env.DB.prepare("SELECT spans_json FROM trace WHERE trace_id = ?").bind(me.result.structuredContent.trace_id).first();
+    expect(JSON.parse(traced.spans_json).delegated_by).toBe(`oauth:${clientId}`);
     // the OAuth token is NOT a web session: the HTTP face does not accept it
     expect((await call("/v2/me", { headers: { authorization: `Bearer ${access}` } })).status).toBe(401);
     // logout through MCP revokes the grant; the token stops working

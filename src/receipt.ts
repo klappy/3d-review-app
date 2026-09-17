@@ -217,7 +217,7 @@ export async function consumeUndoToken(ctx: Ctx, receiptId: string): Promise<voi
 export interface Span { span: string; t: number; data?: Record<string, unknown> }
 
 /** Persist the span log. Redacted at write time: never params, codes, addresses, answers (CON-PRIV-004). */
-export async function persistTrace(ctx: Ctx, spans: Span[], meta: { capability: string; transport: "http" | "mcp"; tool?: string; ok: boolean; code?: string }): Promise<void> {
+export async function persistTrace(ctx: Ctx, spans: Span[], meta: { capability: string; transport: "http" | "mcp"; tool?: string; ok: boolean; code?: string; delegated_by?: string }): Promise<void> {
   const safeSpans = spans.map((s) => ({ span: s.span, t: s.t, ...(s.data ? { data: redact(s.data) } : {}) }));
   const blob = JSON.stringify({ ...meta, spans: safeSpans });
   try {

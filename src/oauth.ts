@@ -101,7 +101,7 @@ export async function renderConsentIfParked(req: Request, env: OAuthEnv, princip
   const ticket = await mintTicket(env, parkId, principalId);
   return html(`<h1>Connect “${esc(client.clientName ?? "an app")}” to 3D Review?</h1>
 <div class="who">Signed in as <b>${esc(email)}</b><br><small>The app will return to <b>${esc(host)}</b></small></div>
-<p>It will be able to do what <b>you</b> can do in 3D Review — read and change the projects and assessments you have been granted — and every action is recorded as “${esc(client.clientName ?? parsed.clientId)} on your behalf”. It gets no access you do not have. You can disconnect it at any time.</p>
+<p>It will be able to do what <b>you</b> can do in 3D Review — read and change the projects and assessments you have been granted — and every call it makes is traced as made through this app on your behalf. It gets no access you do not have. You can disconnect it at any time.</p>
 <form method="post" action="/oauth/consent"><input type="hidden" name="ticket" value="${esc(ticket)}">
 <button class="go" name="decision" value="approve">Connect</button><button name="decision" value="deny">Cancel</button></form>
 <p><small>Only connect apps you started connecting yourself.</small></p>`);
