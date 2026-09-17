@@ -10,6 +10,8 @@ type Scope = { type: "workspace" | "project" | "assessment"; id: string };
 const INVITE_TTL_S = 7 * 24 * 3600;
 const INVITE_COOLDOWN_S = 600;        // one live invitation per scope+invitee per 10 minutes (review #16-1)
 const INVITES_PER_INVITER_HOUR = 30;  // outbound mail from the captain's domain is not a loop target (review #16-2)
+/** Durable D1 window for the inviter cap — not the 60 s edge binding. HTTP retry-after uses this. */
+export const INVITE_CAP_WINDOW_SECONDS = 3600;
 
 /** The caller's role at the scope; hidden when none. */
 async function callerAt(ctx: Ctx, scope: Scope, min: Role): Promise<Role> {
@@ -46,9 +48,9 @@ export const invite: Handler = async (ctx, p, o) => {
   const recent = await ctx.db.prepare("SELECT id, role, status FROM invitation WHERE scope_type = ? AND scope_id = ? AND invitee_hash = ? AND status IN ('pending','sent') AND created_at > ? ORDER BY created_at DESC LIMIT 1")
     .bind(scope.type, scope.id, inviteeHash, since).first<{ id: string; role: string; status: string }>();
   if (recent) return { result: { invitation_id: recent.id, role: recent.role, status: recent.status, accepted: true, delivered: false, delivery: { provider: null, reason: "duplicate_recent" }, note: `already invited in the last ${INVITE_COOLDOWN_S / 60} minutes; nothing was sent again` }, scope, impact };
-  const hourAgo = new Date(ctx.now().getTime() - 3600_000).toISOString();
+  const hourAgo = new Date(ctx.now().getTime() - INVITE_CAP_WINDOW_SECONDS * 1000).toISOString();
   const mine = await countScalar(ctx, "SELECT COUNT(*) AS n FROM invitation WHERE created_by = ? AND created_at > ?", ctx.principal.id, hourAgo);
-  if (mine >= INVITES_PER_INVITER_HOUR) throw new CapError("RATE_LIMITED", `at most ${INVITES_PER_INVITER_HOUR} invitations per hour`, "wait and try again", "cap.grant.invite");
+  if (mine >= INVITES_PER_INVITER_HOUR) throw new CapError("RATE_LIMITED", `at most ${INVITES_PER_INVITER_HOUR} invitations per hour`, "wait up to an hour and try again", "cap.grant.invite");
   const id = newId("inv"); const token = randomToken("il");
   await ctx.db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
     .bind(id, scope.type, scope.id, inviteeHash, await sha256(token), role, "pending", ctx.principal.id, nowIso(ctx), new Date(ctx.now().getTime() + INVITE_TTL_S * 1000).toISOString()).run();

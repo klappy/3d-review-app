@@ -14,6 +14,7 @@ import { verifyAccessJwt } from "./access";
 import synthResponsesSql from "../seed/synthetic-responses.sql";
 import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
+import { INVITE_CAP_WINDOW_SECONDS } from "./handlers/grant";
 import { allow, clientIp, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -74,7 +75,8 @@ for (const cap of capabilities) {
         transport: "http",
       });
       const res = json(result, result.ok ? 200 : statusFor(result.error.code));
-      if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
+      if (!result.ok && result.error.code === "RATE_LIMITED")
+        res.headers.set("retry-after", String(cap.id === "cap.grant.invite" ? INVITE_CAP_WINDOW_SECONDS : RATE_LIMIT_WINDOW_SECONDS));
       if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Path=/; SameSite=Lax`);
       if (cap.id === "cap.auth.logout") res.headers.append("set-cookie", "session=; Max-Age=0; Path=/");
       return res;

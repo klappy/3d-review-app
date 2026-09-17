@@ -20,7 +20,7 @@ function page(c: Capability) {
     capability: c.id, class: c.class, tool: c.tool, http: `${c.http.method} ${c.http.path}`, roles: c.roles, slice: c.slice,
     status: c.status, section: c.section, ui_surface: c.ui_surface, rules: c.notes, inverse: c.inverse,
     how_an_agent_calls_it: c.tool === "danger" ? "danger {capability, params, mode:'dry_run'} → impact + confirm_token → danger {…, mode:'execute', confirm_token}" : `${c.tool} {capability, params}`,
-    errors: ["NOT_AUTHENTICATED", "NOT_AUTHORIZED_AT_SCOPE", "WRONG_TOOL_FOR_CLASS", "INVALID_PARAMS", "NOT_FOUND_OR_NOT_VISIBLE", ...(c.tool === "danger" ? ["CONFIRM_REQUIRED", "CONFIRM_EXPIRED"] : []), ...(c.slice === "v2.1-oct" ? ["RESERVED_NOT_BUILT"] : []), ...(["cap.auth.request_link", "cap.auth.consume_link", "cap.participant.redeem_code", "cap.participant.open_link"].includes(c.id) ? ["RATE_LIMITED"] : [])],
+    errors: ["NOT_AUTHENTICATED", "NOT_AUTHORIZED_AT_SCOPE", "WRONG_TOOL_FOR_CLASS", "INVALID_PARAMS", "NOT_FOUND_OR_NOT_VISIBLE", ...(c.tool === "danger" ? ["CONFIRM_REQUIRED", "CONFIRM_EXPIRED"] : []), ...(c.slice === "v2.1-oct" ? ["RESERVED_NOT_BUILT"] : []), ...(["cap.auth.request_link", "cap.auth.consume_link", "cap.participant.redeem_code", "cap.participant.open_link", "cap.grant.invite"].includes(c.id) ? ["RATE_LIMITED"] : [])],
     examples: { http: `${c.http.method} ${c.http.path}`, mcp: { tool: c.tool, arguments: { capability: c.id, params: {}, ...(c.tool === "danger" ? { mode: "dry_run" } : {}) } } },
     projected_from: `${contractName} @ cookbook ${sourceSha}`,
   };

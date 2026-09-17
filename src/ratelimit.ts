@@ -32,6 +32,9 @@ const CAP_LIMITER: Record<string, LimiterName> = {
   "cap.participant.open_link": "RL_REDEEM",
 };
 
+/** True for the 60 s Cloudflare binding dampeners — a flood must not become a storage flood. */
+export const isEdgeRateLimit = (capabilityId: string) => capabilityId in CAP_LIMITER;
+
 export const clientIp = (req: Request): string => req.headers.get("cf-connecting-ip") ?? "unknown";
 
 /** true = allowed. */

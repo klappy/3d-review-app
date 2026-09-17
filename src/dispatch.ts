@@ -5,7 +5,7 @@ import { CapError as HandlerCapError } from "./handlers/errors";
 import { handlers } from "./handlers";
 import { authorize, targetScope } from "./policy";
 import { byId, sourceSha, toolForClass, type Tool } from "./registry";
-import { enforceCapabilityLimit } from "./ratelimit";
+import { enforceCapabilityLimit, isEdgeRateLimit } from "./ratelimit";
 import { checkConfirmToken, mintConfirmToken, mintReceipt, paramsHash, persistTrace, type Span } from "./receipt";
 
 export interface ExecuteOptions {
@@ -89,8 +89,9 @@ export async function execute(
     return (outcome = fail(e.code, e.message, e.hint, e instanceof CapError ? e.docs : undefined, ctx.traceId));
   } finally {
     ctx.log = log;
-    // A refused flood must not become a storage flood: rate-limited calls are not written to the trace table.
-    if (outcome && !outcome.ok && outcome.error.code === "RATE_LIMITED") console.warn("ratelimit.refused", capabilityId, ctx.traceId);
+    // A refused flood must not become a storage flood: edge-limiter RATE_LIMITED calls are not written to the trace table.
+    // The durable inviter cap is an authorized owner's quota, not a flood — it is audited.
+    if (outcome && !outcome.ok && outcome.error.code === "RATE_LIMITED" && isEdgeRateLimit(capabilityId)) console.warn("ratelimit.refused", capabilityId, ctx.traceId);
     else await persistTrace(ctx, spans, {
       capability: capabilityId,
       transport: options.transport ?? "http",

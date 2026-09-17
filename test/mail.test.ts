@@ -45,7 +45,9 @@ describe("mail adapter", () => {
 import { readFileSync } from "node:fs";
 import { afterAll } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
+import { mintSession } from "../src/auth";
 import { execute } from "../src/dispatch";
+import app from "../src/index";
 const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "mailh", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "mailh-db" } }] }));
 afterAll(() => mf.dispose());
 describe("cap.grant.invite in production, provider stubbed", () => {
@@ -79,5 +81,19 @@ describe("cap.grant.invite in production, provider stubbed", () => {
     const d3: any = await execute(ctx(), "cap.grant.invite", p3, { tool: "danger", mode: "dry_run" });
     const r3: any = await execute(ctx(), "cap.grant.invite", p3, { tool: "danger", mode: "execute", confirm_token: d3.result.confirm_token });
     expect(r3.ok).toBe(false); expect(r3.error.code).toBe("RATE_LIMITED");
+    expect(r3.error.hint).toMatch(/hour/);
+    const capped = await db.prepare("SELECT spans_json FROM trace WHERE trace_id = ?").bind(r3.trace_id).first<{ spans_json: string }>();
+    expect(capped).toBeTruthy();
+    expect(capped!.spans_json).toContain("RATE_LIMITED");
+    const bearer = await mintSession(env, "person_mara", "user");
+    const inviteHttp = (body: unknown) => app.fetch(new Request("https://t.invalid/v2/assessment/assess_tavo_collect/invitations", {
+      method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${bearer}` }, body: JSON.stringify(body),
+    }), env);
+    const p4 = { email: "fourth.person@real-domain.dev", role: "viewer" };
+    const dryHttp: any = await (await inviteHttp({ mode: "dry_run", params: p4 })).json();
+    const httpCap = await inviteHttp({ mode: "execute", confirm_token: dryHttp.result.confirm_token, params: p4 });
+    expect(httpCap.status).toBe(429);
+    expect(httpCap.headers.get("retry-after")).toBe("3600");
+    expect(((await httpCap.json()) as any).error.code).toBe("RATE_LIMITED");
   }, 60_000);
 });

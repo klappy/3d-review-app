@@ -10,7 +10,7 @@
 | Address shape | exactly one plain mailbox (`normalizeAddress`): display names, lists, whitespace, CRLF, trailing dots, dotless hosts → handler `INVALID_PARAMS`; adapter `reason:"invalid_address"` |
 | Synthetic recipients | `.invalid`, `.test`, `.example`, `.localhost`, `.local`, `example.com/net/org` **and their subdomains** are never mailed → `reason:"synthetic_recipient"` |
 | Intent de-duplication | one live invitation per scope+invitee per 10 minutes — a replayed confirm token, a client retry or a loop returns the existing invitation with `reason:"duplicate_recent"` and sends nothing |
-| Inviter cap | 30 invitations per inviter per hour → `RATE_LIMITED` (durable count in D1) |
+| Inviter cap | 30 invitations per inviter per hour → `RATE_LIMITED` (durable count in D1; HTTP `retry-after: 3600`; traced — not the 60 s edge flood shortcut) |
 | Row status | `sent` only after the provider accepted; otherwise `pending` |
 | Timeout | 8 s (`AbortSignal.timeout`) → `provider_unreachable` |
 | Provider says no / is down | `reason:"provider_error"` (+ status) / `"provider_unreachable"`; the capability still succeeds and the invitation exists — re-invite to retry |
