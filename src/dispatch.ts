@@ -5,7 +5,7 @@ import { CapError as HandlerCapError } from "./handlers/errors";
 import { handlers } from "./handlers";
 import { authorize, targetScope } from "./policy";
 import { byId, sourceSha, toolForClass, type Tool } from "./registry";
-import { enforceCapabilityLimit } from "./ratelimit";
+import { enforceCapabilityLimit, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { checkConfirmToken, mintConfirmToken, mintReceipt, paramsHash, persistTrace, type Span } from "./receipt";
 
 export interface ExecuteOptions {
@@ -86,7 +86,10 @@ export async function execute(
     return (outcome = ok(capabilityId, handled.result, ctx.traceId, receipt));
   } catch (e) {
     if (!(e instanceof CapError || e instanceof HandlerCapError)) throw e;
-    return (outcome = fail(e.code, e.message, e.hint, e instanceof CapError ? e.docs : undefined, ctx.traceId));
+    // RATE_LIMITED carries retry_after in the envelope so an MCP client (HTTP 200 + envelope, no header) can back off
+    // without parsing a second shape (review #12-6). The HTTP twin also sends the retry-after header.
+    return (outcome = fail(e.code, e.message, e.hint, e instanceof CapError ? e.docs : undefined, ctx.traceId,
+      e.code === "RATE_LIMITED" ? { retry_after: RATE_LIMIT_WINDOW_SECONDS } : undefined));
   } finally {
     ctx.log = log;
     // A refused flood must not become a storage flood: rate-limited calls are not written to the trace table.
