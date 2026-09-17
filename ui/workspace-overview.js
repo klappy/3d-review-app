@@ -29,8 +29,6 @@ export const COPY = Object.freeze({
   // S4 #4: under exact-grant listing, absence is "no grant", never "none exists".
   noAssessmentsAll: 'No assessments you hold a grant on. Start an assessment →',
   noAssessments: 'No assessments you hold a grant on.',
-  // The only string not in the kit: the kit's A state always has projects. Same #4 phrasing family.
-  noProjects: 'No projects you hold a grant on.',
   noLanguages: 'No languages you hold a grant on.',
   crumbsLabel: 'Where you are',
   columns: Object.freeze(['Assessment', 'Period', 'Language', 'Stage']),
@@ -153,7 +151,6 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
       row.append(button(doc, COPY.createProject, 'rv-btn primary', () => { if (!createForm.hidden) createForm.focus(); }));
       nodes.push(row);
     }
-    if (!projects.length) { nodes.push(el(doc, 'div', COPY.noProjects, 'note')); stand(allRoot, ...nodes); return; }
     const grid = el(doc, 'div', undefined, 'three');
     for (const project of projects) {
       const card = el(doc, 'div', undefined, 'glass panel');
@@ -285,6 +282,9 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
     if (gen !== generation) return; // stale: the selection or the identity moved on
     if (!projectsResult) { clear(); overview.hidden = true; return; }
     const projects = projectsResult.projects || [];
+    // No project grants at all: this identity's entry is #shared-assessments, not the overview.
+    // The module says nothing rather than reporting an absence the viewer cannot act on.
+    if (!projects.length) { clear(); overview.hidden = true; return; }
     const pid = ($('projects') || {}).value || '';
     const aid = ($('assessments') || {}).value || '';
     overview.hidden = false;

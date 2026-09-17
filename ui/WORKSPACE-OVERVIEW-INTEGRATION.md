@@ -112,7 +112,11 @@ this module's #10 budget — either accept the mobile behaviour or scope a narro
 Kit copy is verbatim. Two departures, both required and both flagged:
 
 - S4 #4: empty assessments reads **"No assessments you hold a grant on."**, never the kit's "No assessments yet." (the list is an exact-grant join — absence means no grant, not no data). The A-state variant `"No assessments you hold a grant on. Start an assessment →"` is exported as `COPY.noAssessmentsAll` but is currently unreachable: state A fetches no per-card assessments, so no card can be empty of them.
-- `COPY.noProjects` (`"No projects you hold a grant on."`) and `COPY.noLanguages` are the only strings not in the kit — the kit's A state always has fixture projects, and an empty list must still say something. Same #4 phrasing family.
+- `COPY.noLanguages` (`"No languages you hold a grant on."`) is the only string not in the kit. Same #4 phrasing family.
+
+An identity with **no project grants at all** (an assessment-only viewer) gets no overview: an empty
+`GET /v2/projects` clears and hides `#overview` and its three roots, asks for nothing further, and
+paints no absence copy. That viewer's entry is `#shared-assessments`, which this module never touches.
 
 Omitted per the map, with no placeholder left behind: workspace crumb (#5), Request a project,
 Organize projects in a workspace, `proposed()` chips, Archive/Delete menus, Details and

@@ -204,6 +204,29 @@ test('C: crumbs carry project › assessment with aria-current and the deepest r
   assert.match(text(w.node('overview-project')), /Coast · Partner org · your role: owner/);
 });
 
+test('an assessment-only viewer with no project grants gets no overview at all', async () => {
+  const w = fakeWorld({ session: { facilitatorToken: 'st_viewer' } });
+  w.setRoutes({ ...ROUTES, '/v2/projects': { projects: [] } });
+  w.mount(); await w.settle();
+  assert.deepEqual(w.requests.map(r => r.url), ['/v2/projects'], 'an empty list ends the render; nothing else is asked');
+  assert.equal(w.node('overview').hidden, true);
+  for (const id of ['overview-crumbs', 'overview-all', 'overview-project']) {
+    assert.equal(w.node(id).hidden, true, id);
+    assert.deepEqual(w.node(id).children, [], id);
+  }
+  assert.equal(/No projects|grant on/.test([w.node('overview-all'), w.node('overview-project'), w.node('overview-crumbs')].map(text).join(' ')), false, 'no absence copy is painted');
+});
+
+test('an empty list clears an overview a previous identity had painted', async () => {
+  const w = fakeWorld(); w.setRoutes(ROUTES);
+  const mounted = w.mount(); await w.settle();
+  assert.equal(w.node('overview-all').hidden, false);
+  w.setRoutes({ ...ROUTES, '/v2/projects': { projects: [] } });
+  mounted.schedule(); await w.settle();
+  assert.equal(w.node('overview').hidden, true);
+  assert.deepEqual(w.node('overview-all').children, []);
+});
+
 test('shared route: nothing is requested and nothing is rendered', async () => {
   for (const world of [
     fakeWorld({ hash: '#survey=tok_abc', session: { facilitatorToken: 'st_owner' } }),
