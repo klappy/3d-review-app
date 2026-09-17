@@ -223,12 +223,13 @@ bindForm('redeem', 'Redeeming access code…', async fd => {
   try {
     const result = await api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } });
     state.participant = result.participant_token; sessionStorage.setItem('participantToken', state.participant);
-    await loadForm();
   } catch (error) {
     text($('participant-error'), codeEntryFailure);
     $('participant-error').hidden = false; $('participant-error').focus();
     throw error;
   }
+  $('recover').hidden = false;
+  await loadForm();
 });
 async function loadForm() {
   const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null; state.responseKey = null;
@@ -251,4 +252,8 @@ function showReceipt(result) { text($('receipt'), result.submitted === false ? '
 bindClick('recover', 'Recovering receipt…', async () => showReceipt(await api('/v2/participate/receipt', { participant: true })));
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
 { const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); } }
-run('Checking session…', async () => { try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } if (state.participant) $('recover').hidden = false; } catch { resetClientIdentity(); } });
+run('Checking session…', async () => {
+  try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } }
+  catch { if (!state.principal) { state.session = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); } }
+  if (state.participant) $('recover').hidden = false;
+});
