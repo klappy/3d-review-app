@@ -90,7 +90,11 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     // Render only locally described intent. Never dump impact, invitee hash or token.
     confirmation.replaceChildren(el('p', intent.summary, 'scope-invitations-impact'));
     confirmButton = button(intent.confirmLabel, confirm);
-    confirmation.append(confirmButton, button('Cancel', () => { clearIntent(); setStatus('Cancelled. Nothing further was sent.'); }, {secondary:true}));
+    confirmation.append(confirmButton, button('Cancel', () => {
+      clearIntent();
+      if (intent.kind === 'accept') { mode = 'manager'; render(); onAcceptanceEnded(); }
+      setStatus('Cancelled. Nothing further was sent.');
+    }, {secondary:true}));
     setStatus('Review the action, then confirm.');
   }
   async function preview(intent) {

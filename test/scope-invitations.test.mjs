@@ -13,9 +13,9 @@ const text=n=>walk(n).map(x=>x.textContent).join(' ');
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return{promise,resolve,reject}};
 const flush=async()=>{for(let i=0;i<8;i++)await Promise.resolve()};
 function world(respond) {
- let ctx={principalId:'person_a',kind:'user',generation:1,shared:false};const root=node('div'),calls=[];let changes=0;
- const api=mountScopeInvitations({document:{createElement:node},root,getContext:()=>ctx,request:async(url,opts)=>{calls.push({url,...opts});return respond(url,opts)},onGrantsChanged:async()=>{changes++}});
- return{api,root,calls,get changes(){return changes},ctx(c){ctx={...ctx,...c}},button(label){const n=walk(root).find(x=>x.tag==='button'&&x.textContent===label);assert.ok(n,`missing button ${label}: ${text(root)}`);return n},input(name){const n=walk(root).find(x=>x.name===name);assert.ok(n);return n},buttons(){return walk(root).filter(x=>x.tag==='button').map(x=>x.textContent)}};
+ let ctx={principalId:'person_a',kind:'user',generation:1,shared:false};const root=node('div'),calls=[];let changes=0,ended=0;
+ const api=mountScopeInvitations({document:{createElement:node},root,getContext:()=>ctx,request:async(url,opts)=>{calls.push({url,...opts});return respond(url,opts)},onGrantsChanged:async()=>{changes++},onAcceptanceEnded:()=>{ended++}});
+ return{api,root,calls,get changes(){return changes},get ended(){return ended},ctx(c){ctx={...ctx,...c}},button(label){const n=walk(root).find(x=>x.tag==='button'&&x.textContent===label);assert.ok(n,`missing button ${label}: ${text(root)}`);return n},input(name){const n=walk(root).find(x=>x.name===name);assert.ok(n);return n},buttons(){return walk(root).filter(x=>x.tag==='button').map(x=>x.textContent)}};
 }
 const scope={type:'assessment',id:'a1',role:'owner'};
 const list=(s=scope)=>({scope:{type:s.type,id:s.id},grants:[],pending_invitations:[]});
@@ -124,4 +124,9 @@ test('unconfirmed pending rows remain visible for explicit revoke, without a res
 });
 test('supplied private acceptance token requires explicit preview and is wiped by reset',async()=>{
  const w=world(()=>confirmResult);w.api.openAcceptance('SUPPLIED_SENTINEL');assert.equal(w.input('invitation-token').value,'SUPPLIED_SENTINEL');assert.equal(w.calls.length,0);assert.ok(!text(w.root).includes('SUPPLIED_SENTINEL'));w.button('Preview acceptance').click();await flush();assert.equal(w.calls.length,1);w.api.reset();assert.ok(!walk(w.root).some(x=>x.value==='SUPPLIED_SENTINEL'));
+});
+
+test('acceptance confirmation Cancel wipes private entry and ends intent; invitation cancel does not',async()=>{
+ const w=world(()=>confirmResult);await acceptPreview(w,'CANCEL_SENTINEL');w.button('Cancel').click();assert.equal(w.ended,1);assert.ok(!walk(w.root).some(n=>n.name==='invitation-token'||n.value==='CANCEL_SENTINEL'));assert.ok(!w.buttons().includes('Confirm acceptance'));assert.equal(w.calls.length,1);
+ const inviter=world((_u,o)=>o.method==='GET'?list():confirmResult);await inviter.api.setScope(scope);await emailPreview(inviter);inviter.button('Cancel').click();assert.equal(inviter.ended,0);assert.ok(inviter.buttons().includes('Preview invitation'));assert.ok(!inviter.buttons().includes('Confirm invitation'));
 });
