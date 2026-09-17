@@ -68,3 +68,13 @@ test('renaming and archiving use exact routes without danger mode; removed grant
  const f=fixture();await f.open();const rename=walk(f.root).filter(n=>n.tagName==='form')[1];walk(rename).find(n=>n.tagName==='input').value='Renamed';await rename.listeners.submit({preventDefault(){}});assert.deepEqual(f.calls.find(c=>c.method==='PATCH').body,{name:'Renamed'});
  f.override((p,o)=>p==='/v2/workspaces'&&o.method==='GET'?{workspaces:[]}:undefined);await f.click('Archive workspace');assert.equal(f.calls.find(c=>c.path.endsWith('/archive')).body,undefined);assert.equal(f.selected.at(-1),null);assert.doesNotMatch(text(f.root),/Rename workspace/);
 });
+
+test('explicit refresh clears host scope before pending list read and never restores it',async()=>{
+ const f=fixture();await f.open();assert.equal(f.selected.at(-1).id,'ws1');
+ const d=deferred();f.override((p,o)=>p==='/v2/workspaces'&&o.method==='GET'?d.promise:undefined);
+ const pending=f.api.refresh();assert.equal(f.selected.at(-1),null);
+ await Promise.resolve();assert.doesNotMatch(text(f.root),/Rename workspace/);
+ d.resolve({workspaces:[{id:'ws1',name:'Still accessible',role:'viewer'}]});await pending;
+ assert.equal(f.selected.at(-1),null);assert.doesNotMatch(text(f.root),/Rename workspace|Preview deletion/);
+ await f.click('Open workspace');assert.equal(f.selected.at(-1).id,'ws1');
+});

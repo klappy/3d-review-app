@@ -46,7 +46,10 @@ export function mountWorkspaceManager({ document: doc, root, request, getContext
     if (!staff(context())) { reset(); return; }
     // Refresh is also the explicit recovery from uncertain writes. Clear old private state first.
     invalidate(); busy = false; selected = null; detail = null; workspaces = []; message = '';
-    return run(async s => { await load(s); });
+    return run(async s => {
+      await onWorkspaceSelected(null); if (!current(s)) return;
+      await load(s);
+    });
   }
   async function select(id) {
     if (busy || !workspaces.some(w => w.id === id)) return;
