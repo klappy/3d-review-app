@@ -1,0 +1,20 @@
+/* Screen composition only. Existing hidden flags still decide authorization.
+   Print media remains owned by the isolated blank-print wrapper. */
+@media screen {
+  body[data-workspace-route="workspace"] #participant,
+  body[data-workspace-route="workspace"] #evidence,
+  body[data-workspace-route="participant"] #facilitator,
+  body[data-workspace-route="participant"] #evidence,
+  body[data-workspace-route="evidence"] #facilitator,
+  body[data-workspace-route="evidence"] #participant { display:none; }
+  body[data-staff-confirmed="true"] #signin-panel { display:none; }
+  body[data-workspace-phase="prepare"] [data-stage-content]:not([data-stage-content="prepare"]),
+  body[data-workspace-phase="collect"] [data-stage-content]:not([data-stage-content="collect"]),
+  body[data-workspace-phase="understand"] [data-stage-content]:not([data-stage-content="understand"]),
+  body[data-workspace-phase="improve"] [data-stage-content]:not([data-stage-content="improve"]) { display:none; }
+  .rv #stage-workspace { order:-1; }
+  .rv #project-card,.rv #assessment-card,.rv #shared-assessments { padding:18px; }
+  .rv .stage-transition { margin-top:12px; }
+  .rv .stage-transition > summary { cursor:pointer; }
+  .rv #stage-help-root:empty { display:none; }
+}
