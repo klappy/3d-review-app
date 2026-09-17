@@ -26,6 +26,381 @@ components:
       scheme: bearer
       description: participant token from redeem_code / open_link, bound to one assessment survey
   schemas:
+    SyntheticReportPayload:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "synthetic",
+          "source_commit",
+          "versions",
+          "assessment_id",
+          "lenses",
+          "cross_lens_multi",
+          "cross_lens_single",
+          "standalone_indicators",
+          "translation_type_agreement",
+          "evidence",
+          "narrative"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "3d-synthetic-assessment-report-v1"
+          },
+          "synthetic": {
+            "const": true
+          },
+          "source_commit": {
+            "const": "f042cde553761a6a7f24132cef7802f956378ee0"
+          },
+          "versions": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scorer",
+              "narrative",
+              "policy"
+            ],
+            "properties": {
+              "scorer": {
+                "const": "steve-f042cde-single-assessment-v1"
+              },
+              "narrative": {
+                "const": "steve-f042cde-rule-narrative-v1"
+              },
+              "policy": {
+                "const": "synthetic-current-assessment-asof-query-v1"
+              }
+            }
+          },
+          "assessment_id": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "description": "At most256 UTF-8 bytes."
+          },
+          "lenses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "lens",
+                "score",
+                "n_subdims_included",
+                "sub_dimensions"
+              ],
+              "properties": {
+                "lens": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "n_subdims_included": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5743
+                },
+                "sub_dimensions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "sub_dimension",
+                      "score",
+                      "n_items_included"
+                    ],
+                    "properties": {
+                      "sub_dimension": {
+                        "type": "string",
+                        "maxLength": 256
+                      },
+                      "score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "n_items_included": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 5743
+                      }
+                    }
+                  },
+                  "maxItems": 17
+                }
+              }
+            },
+            "maxItems": 3
+          },
+          "cross_lens_multi": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "construct_code",
+                "construct_name",
+                "triangulated_mean",
+                "agreement_range",
+                "n_lenses_included",
+                "lens_scores"
+              ],
+              "properties": {
+                "construct_code": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "construct_name": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "triangulated_mean": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "agreement_range": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "n_lenses_included": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5743
+                },
+                "lens_scores": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "lens",
+                      "score"
+                    ],
+                    "properties": {
+                      "lens": {
+                        "type": "string",
+                        "maxLength": 256
+                      },
+                      "score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      }
+                    }
+                  },
+                  "maxItems": 3
+                }
+              }
+            },
+            "maxItems": 8
+          },
+          "cross_lens_single": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "construct_code",
+                "construct_name",
+                "triangulated_mean",
+                "agreement_range",
+                "n_lenses_included",
+                "lens_scores"
+              ],
+              "properties": {
+                "construct_code": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "construct_name": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "triangulated_mean": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "agreement_range": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "n_lenses_included": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5743
+                },
+                "lens_scores": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "lens",
+                      "score"
+                    ],
+                    "properties": {
+                      "lens": {
+                        "type": "string",
+                        "maxLength": 256
+                      },
+                      "score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      }
+                    }
+                  },
+                  "maxItems": 3
+                }
+              }
+            },
+            "maxItems": 8
+          },
+          "standalone_indicators": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "item_id",
+                "lens",
+                "sub_dimension",
+                "question_text",
+                "score",
+                "n_responses"
+              ],
+              "properties": {
+                "item_id": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "lens": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "sub_dimension": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "question_text": {
+                  "type": "string",
+                  "maxLength": 4096
+                },
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "n_responses": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5743
+                }
+              }
+            },
+            "maxItems": 111
+          },
+          "translation_type_agreement": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "construct_name",
+                  "team_values",
+                  "church_values",
+                  "agree"
+                ],
+                "properties": {
+                  "construct_name": {
+                    "type": "string",
+                    "maxLength": 256
+                  },
+                  "team_values": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 256
+                    },
+                    "maxItems": 9
+                  },
+                  "church_values": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 256
+                    },
+                    "maxItems": 9
+                  },
+                  "agree": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "form_type",
+                "label",
+                "n"
+              ],
+              "properties": {
+                "form_type": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "n": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5743
+                }
+              }
+            },
+            "maxItems": 9
+          },
+          "narrative": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "maxItems": 32
+          }
+        },
+        "description": "Exact source-backed synthetic schema; canonical payload limit524288 UTF-8 bytes. Runtime also verifies exact canonical output from its original attested capture."
+      }
     Receipt:
       type: object
       required:
@@ -2949,108 +3324,815 @@ paths:
           type: string
   /v2/assessments/{aid}/reports:
     post:
-      operationId: cap.report.build
-      summary: 'cap.report.build — write.reversible — roles: O, M'
-      x-capability: cap.report.build
-      x-class: write.reversible
-      x-tool: write
-      x-slice: v2.1-oct
-      x-inverse:
-        kind: none
-        compensating_control: v2.1-oct — UNASSESSED
-      x-roles: O, M
-      x-path-inferred: false
-      tags:
-      - H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)
-      responses:
-        '501':
-          description: RESERVED_NOT_BUILT — documented, docs pointer; v2.1-oct
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-status: RESERVED_NOT_BUILT
-      security:
-      - session: []
-      - bearer: []
-      - participant: []
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-              description: params — shape owed per capability (A1 open item)
-      parameters:
-      - name: aid
-        in: path
-        required: true
-        schema:
-          type: string
+      {
+        "operationId": "cap.report.build",
+        "summary": "cap.report.build — authenticated synthetic-only",
+        "x-capability": "cap.report.build",
+        "x-class": "write.effect",
+        "x-tool": "danger",
+        "x-slice": "v2.0-bcs",
+        "x-status": "implemented-synthetic-only",
+        "x-roles": "O, M",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "aid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 256,
+              "minLength": 1,
+              "description": "At most256 UTF-8 bytes."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eligible or held success; build dry-run adds impact/confirm_token/expires_in. Execute may return a platform receipt without report locators.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "capability",
+                    "result",
+                    "trace_id"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "capability": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "assessment_id",
+                            "suppressed",
+                            "report"
+                          ],
+                          "properties": {
+                            "assessment_id": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "description": "At most256 UTF-8 bytes."
+                            },
+                            "suppressed": {
+                              "const": false
+                            },
+                            "report": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "created_at",
+                                "payload"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "minLength": 1,
+                                  "description": "At most256 UTF-8 bytes."
+                                },
+                                "created_at": {
+                                  "type": "string"
+                                },
+                                "payload": {
+                                  "$ref": "#/components/schemas/SyntheticReportPayload"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "assessment_id",
+                            "suppressed",
+                            "status",
+                            "reason",
+                            "report",
+                            "snapshot_version",
+                            "algorithm_version",
+                            "policy_version"
+                          ],
+                          "properties": {
+                            "assessment_id": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "description": "At most256 UTF-8 bytes."
+                            },
+                            "suppressed": {
+                              "const": true
+                            },
+                            "status": {
+                              "const": "held"
+                            },
+                            "reason": {
+                              "const": "Report unavailable under the current synthetic reporting policy."
+                            },
+                            "report": {
+                              "type": "null"
+                            },
+                            "snapshot_version": {
+                              "type": "null"
+                            },
+                            "algorithm_version": {
+                              "type": "null"
+                            },
+                            "policy_version": {
+                              "const": "synthetic-current-assessment-asof-query-v1"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "assessment_id",
+                            "suppressed",
+                            "status",
+                            "report",
+                            "impact",
+                            "confirm_token",
+                            "expires_in"
+                          ],
+                          "properties": {
+                            "assessment_id": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "description": "At most256 UTF-8 bytes."
+                            },
+                            "suppressed": {
+                              "const": false
+                            },
+                            "status": {
+                              "const": "ready"
+                            },
+                            "report": {
+                              "type": "null"
+                            },
+                            "impact": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "affected",
+                                "irreversible",
+                                "effect",
+                                "compensating_control"
+                              ],
+                              "properties": {
+                                "affected": {
+                                  "type": "array",
+                                  "maxItems": 0
+                                },
+                                "irreversible": {
+                                  "const": true
+                                },
+                                "effect": {
+                                  "const": "disclosure"
+                                },
+                                "compensating_control": {
+                                  "const": "cap.report.get suppression / access control; a built report is never unsent"
+                                }
+                              }
+                            },
+                            "confirm_token": {
+                              "type": "string"
+                            },
+                            "expires_in": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "assessment_id",
+                            "suppressed",
+                            "status",
+                            "reason",
+                            "report",
+                            "snapshot_version",
+                            "algorithm_version",
+                            "policy_version",
+                            "impact",
+                            "confirm_token",
+                            "expires_in"
+                          ],
+                          "properties": {
+                            "assessment_id": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "description": "At most256 UTF-8 bytes."
+                            },
+                            "suppressed": {
+                              "const": true
+                            },
+                            "status": {
+                              "const": "held"
+                            },
+                            "reason": {
+                              "const": "Report unavailable under the current synthetic reporting policy."
+                            },
+                            "report": {
+                              "type": "null"
+                            },
+                            "snapshot_version": {
+                              "type": "null"
+                            },
+                            "algorithm_version": {
+                              "type": "null"
+                            },
+                            "policy_version": {
+                              "const": "synthetic-current-assessment-asof-query-v1"
+                            },
+                            "impact": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "affected",
+                                "irreversible",
+                                "effect",
+                                "compensating_control"
+                              ],
+                              "properties": {
+                                "affected": {
+                                  "type": "array",
+                                  "maxItems": 0
+                                },
+                                "irreversible": {
+                                  "const": true
+                                },
+                                "effect": {
+                                  "const": "disclosure"
+                                },
+                                "compensating_control": {
+                                  "const": "cap.report.get suppression / access control; a built report is never unsent"
+                                }
+                              }
+                            },
+                            "confirm_token": {
+                              "type": "string"
+                            },
+                            "expires_in": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "receipt": {
+                      "$ref": "#/components/schemas/Receipt"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters, cursor, tool or confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Report not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Operational refusal; build execute outcome may be uncertain; read/list/preview do not claim a write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Existing applicable platform rate limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-inverse": {
+          "kind": "none",
+          "compensating_control": "cap.report.get suppression / access control; a built report is never unsent"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mode"
+                ],
+                "properties": {
+                  "mode": {
+                    "enum": [
+                      "dry_run",
+                      "execute"
+                    ]
+                  },
+                  "confirm_token": {
+                    "type": "string"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [],
+                    "properties": {
+                      "aid": {
+                        "type": "string",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "description": "At most256 UTF-8 bytes."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Path aid is authoritative. POST mode dry_run then execute with confirm_token and identical params. Confirmed intent evaluates current eligible inputs at execute; changed-capture retry can create a new immutable report. No automatic retry."
+      }
     get:
-      operationId: cap.report.list
-      summary: 'cap.report.list — read — roles: Vw+'
-      x-capability: cap.report.list
-      x-class: read
-      x-tool: read
-      x-slice: v2.1-oct
-      x-inverse:
-        kind: n/a
-      x-roles: Vw+
-      x-path-inferred: true
-      tags:
-      - H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)
-      responses:
-        '501':
-          description: RESERVED_NOT_BUILT — documented, docs pointer; v2.1-oct
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-status: RESERVED_NOT_BUILT
-      security:
-      - session: []
-      - bearer: []
-      - participant: []
-      parameters:
-      - name: aid
-        in: path
-        required: true
-        schema:
-          type: string
+      {
+        "operationId": "cap.report.list",
+        "summary": "cap.report.list — authenticated synthetic-only",
+        "x-capability": "cap.report.list",
+        "x-class": "read",
+        "x-tool": "read",
+        "x-slice": "v2.0-bcs",
+        "x-status": "implemented-synthetic-only",
+        "x-roles": "Vw+",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "aid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 256,
+              "minLength": 1,
+              "description": "At most256 UTF-8 bytes."
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Confidential live keyset token; no snapshot completeness promise."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eligible or held success; build dry-run adds impact/confirm_token/expires_in. Execute may return a platform receipt without report locators.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "capability",
+                    "result",
+                    "trace_id"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "capability": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "assessment_id",
+                            "suppressed",
+                            "reports",
+                            "next_cursor"
+                          ],
+                          "properties": {
+                            "assessment_id": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "description": "At most256 UTF-8 bytes."
+                            },
+                            "suppressed": {
+                              "const": false
+                            },
+                            "reports": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "id",
+                                  "created_at"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "maxLength": 256,
+                                    "minLength": 1,
+                                    "description": "At most256 UTF-8 bytes."
+                                  },
+                                  "created_at": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "maxItems": 5
+                            },
+                            "next_cursor": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "maxLength": 4096
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "assessment_id",
+                            "suppressed",
+                            "status",
+                            "reason",
+                            "reports",
+                            "snapshot_version",
+                            "algorithm_version",
+                            "policy_version"
+                          ],
+                          "properties": {
+                            "assessment_id": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "description": "At most256 UTF-8 bytes."
+                            },
+                            "suppressed": {
+                              "const": true
+                            },
+                            "status": {
+                              "const": "held"
+                            },
+                            "reason": {
+                              "const": "Report unavailable under the current synthetic reporting policy."
+                            },
+                            "reports": {
+                              "type": "array",
+                              "maxItems": 0
+                            },
+                            "snapshot_version": {
+                              "type": "null"
+                            },
+                            "algorithm_version": {
+                              "type": "null"
+                            },
+                            "policy_version": {
+                              "const": "synthetic-current-assessment-asof-query-v1"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters, cursor, tool or confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Report not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Operational refusal; build execute outcome may be uncertain; read/list/preview do not claim a write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Existing applicable platform rate limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
   /v2/reports/{id}:
     get:
-      operationId: cap.report.get
-      summary: 'cap.report.get — read — roles: Vw+'
-      x-capability: cap.report.get
-      x-class: read
-      x-tool: read
-      x-slice: v2.1-oct
-      x-inverse:
-        kind: n/a
-      x-roles: Vw+
-      x-path-inferred: true
-      tags:
-      - H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)
-      responses:
-        '501':
-          description: RESERVED_NOT_BUILT — documented, docs pointer; v2.1-oct
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-status: RESERVED_NOT_BUILT
-      security:
-      - session: []
-      - bearer: []
-      - participant: []
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
+      {
+        "operationId": "cap.report.get",
+        "summary": "cap.report.get — authenticated synthetic-only",
+        "x-capability": "cap.report.get",
+        "x-class": "read",
+        "x-tool": "read",
+        "x-slice": "v2.0-bcs",
+        "x-status": "implemented-synthetic-only",
+        "x-roles": "Vw+",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 256,
+              "minLength": 1,
+              "description": "At most256 UTF-8 bytes."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eligible or held success; build dry-run adds impact/confirm_token/expires_in. Execute may return a platform receipt without report locators.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ok",
+                    "capability",
+                    "result",
+                    "trace_id"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "capability": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "assessment_id",
+                            "suppressed",
+                            "report"
+                          ],
+                          "properties": {
+                            "assessment_id": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "description": "At most256 UTF-8 bytes."
+                            },
+                            "suppressed": {
+                              "const": false
+                            },
+                            "report": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "id",
+                                "created_at",
+                                "payload"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "maxLength": 256,
+                                  "minLength": 1,
+                                  "description": "At most256 UTF-8 bytes."
+                                },
+                                "created_at": {
+                                  "type": "string"
+                                },
+                                "payload": {
+                                  "$ref": "#/components/schemas/SyntheticReportPayload"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "assessment_id",
+                            "suppressed",
+                            "status",
+                            "reason",
+                            "report",
+                            "snapshot_version",
+                            "algorithm_version",
+                            "policy_version"
+                          ],
+                          "properties": {
+                            "assessment_id": {
+                              "type": "string",
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "description": "At most256 UTF-8 bytes."
+                            },
+                            "suppressed": {
+                              "const": true
+                            },
+                            "status": {
+                              "const": "held"
+                            },
+                            "reason": {
+                              "const": "Report unavailable under the current synthetic reporting policy."
+                            },
+                            "report": {
+                              "type": "null"
+                            },
+                            "snapshot_version": {
+                              "type": "null"
+                            },
+                            "algorithm_version": {
+                              "type": "null"
+                            },
+                            "policy_version": {
+                              "const": "synthetic-current-assessment-asof-query-v1"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters, cursor, tool or confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Report not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Operational refusal; build execute outcome may be uncertain; read/list/preview do not claim a write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Existing applicable platform rate limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
   /v2/assessments/{aid}/recommendations:
     post:
       operationId: cap.recommendation.propose
