@@ -36,5 +36,46 @@
  "sha256": {
   "answer-sets.json": "efc50c5ff9139d9235e4323233d27c54059527f92c54099e2f9dbf0cd71df1b5",
   "personas.json": "9181ec780dbbfae570089f493d1d46fbdf3ff056f681af8f1e2e32ef0b4164a3"
+ },
+ "form_coverage": {
+  "submissions_by_form": {
+   "Audio": 30,
+   "Community-Pastor": 30,
+   "Consultant": 40,
+   "Denom-Leader": 0,
+   "Involved-Pastor": 123,
+   "Mid-Level": 0,
+   "Validation": 328,
+   "Video-Sign": 30,
+   "Written": 369
+  },
+  "forms_without_synthetic_submissions": [
+   "Denom-Leader",
+   "Mid-Level"
+  ]
+ },
+ "datasets": {
+  "org-comparison": {
+   "generator": "survey-pipeline/run_org_comparison_pipeline.py _render(3)",
+   "file": "answer-sets-org-comparison.json",
+   "rendered": {
+    "submissions": 525,
+    "assessment_cycles": 45,
+    "projects": 9,
+    "by_form": {
+     "Audio": 30,
+     "Community-Pastor": 30,
+     "Consultant": 30,
+     "Involved-Pastor": 45,
+     "Validation": 195,
+     "Video-Sign": 30,
+     "Written": 165
+    },
+    "answers_total": 6118
+   },
+   "unmatched_columns": {},
+   "sha256": "70b836b4cd94a2b4df6914e1f32537cda77a0568f20fe91b95acb0c3cbee126e",
+   "reads_real_exports": false
+  }
  }
 }

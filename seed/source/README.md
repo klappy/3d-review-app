@@ -9,4 +9,4 @@ Byte-identical copies from the captain fork **klappy/3d-quality-review @ f042cde
 
 Rule: these files are **read, never edited** here. Regenerate by copying from the pin; a change to the instrument is a new pin, recorded in the cookbook (14-STEVE-REPO-SYNC).
 
-`../synthetic/` holds the answer sets rendered from Steve's persona generator against these items (see `tools/synth_answers.py`). **No real Laos/Aushi export is ever copied into this repo.**
+`../synthetic/` holds the answer sets rendered from Steve's persona generator against these items (see `tools/synth_answers.py` and `../synthetic/README.md` — 7 of 9 forms have synthetic submissions; Mid-Level and Denom-Leader are a named source gap). **No real Laos/Aushi export is ever copied into this repo.**

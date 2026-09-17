@@ -12,6 +12,7 @@ import { ok } from "./envelope";
 import openapiText from "../contract/openapi.yaml";
 import { verifyAccessJwt } from "./access";
 import synthResponsesSql from "../seed/synthetic-responses.sql";
+import synthOrgResponsesSql from "../seed/synthetic-responses-org.sql";
 import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
 
@@ -122,7 +123,7 @@ app.post("/v2/ops/seed/synthetic", async (c) => {
   if ((env.ENVIRONMENT ?? "dev") !== "dev") return json(fail("NOT_AUTHORIZED_AT_SCOPE", "synthetic seed loads only in the dev sandbox", undefined, "dev.bootstrap.seed_synthetic", newTraceId()), 403);
   const ctx = await contextForRequest(c.req.raw, env);
   if (ctx.principal.kind !== "user" && ctx.principal.kind !== "support") return json(fail("NOT_AUTHENTICATED", "sign in first", undefined, "dev.bootstrap.seed_synthetic", ctx.traceId), 401);
-  const stmts = (synthResponsesSql as unknown as string).split("\n").filter((l) => !l.startsWith("--")).join("\n").split(";\n").map((s) => s.trim()).filter(Boolean);
+  const stmts = [synthResponsesSql, synthOrgResponsesSql].map((f) => f as unknown as string).join("\n").split("\n").filter((l) => !l.startsWith("--")).join("\n").split(";\n").map((s) => s.trim()).filter(Boolean);
   let applied = 0;
   for (let i = 0; i < stmts.length; i += 50) { await env.DB.batch(stmts.slice(i, i + 50).map((s) => env.DB.prepare(s))); applied += Math.min(50, stmts.length - i); }
   const n = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM response WHERE source='synthetic') AS responses, (SELECT COUNT(*) FROM assessment WHERE id LIKE 'assess_syn_%') AS assessments, (SELECT COUNT(*) FROM project WHERE id LIKE 'proj_syn_%') AS projects").first();
