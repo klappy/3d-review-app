@@ -126,7 +126,9 @@ app.get("/v2/auth/access", async (c) => {
     const id = await verifyAccessJwt(env, c.req.header("cf-access-jwt-assertion") ?? undefined);
     const eh = await sha256(id.email);
     await env.DB.prepare("INSERT OR IGNORE INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)")
-      .bind(`usr_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`, eh, 0, 0, new Date().toISOString()).run();
+      // provisioned = 1: self-service creation (captain ruling 2026-09-17) — every normal authenticated
+      // principal may create its OWN workspaces/projects, no manual provisioning gate. support stays 0.
+      .bind(`usr_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`, eh, 1, 0, new Date().toISOString()).run();
     const pr = await env.DB.prepare("SELECT id, support FROM principal WHERE email_hash = ?").bind(eh).first<{ id: string; support: number }>();
     if (!pr) throw new CapError("NOT_AUTHENTICATED", "principal could not be established");
     // A connector is waiting on this browser (GET /authorize parked a request): show consent, open no web session.
