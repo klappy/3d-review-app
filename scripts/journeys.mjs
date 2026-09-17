@@ -144,6 +144,18 @@ export function classifyReservedOrPositive(id, status, body, passNote) {
   return makeRow(id, "FAIL", `${passNote} → ${body?.error?.code ?? status}`, evidence);
 }
 
+export function classifyJ1(status, body) {
+  const evidence = evidenceOf(status, body);
+  if (status === 501 || body?.error?.code === "RESERVED_NOT_BUILT") {
+    return makeRow("J1", "RESERVED_501", "issue_codes (seeded) → RESERVED_NOT_BUILT", evidence);
+  }
+  if (body?.ok === true) return makeRow("J1", "PASS", "issue_codes (seeded)", evidence);
+  if (body?.ok === false && body?.error?.code === "NOT_FOUND_OR_NOT_VISIBLE") {
+    return makeRow("J1", "SKIP", "issue_codes (seeded) → NOT_FOUND_OR_NOT_VISIBLE (ungranted principal)", evidence);
+  }
+  return makeRow("J1", "FAIL", `issue_codes (seeded) → ${body?.error?.code ?? status}`, evidence);
+}
+
 export function classifyJ1g(issueStatus, issueBody, undoBody) {
   const evidence = evidenceOf(undoBody ? 200 : issueStatus, undoBody ?? issueBody);
   if (issueStatus === 501 || issueBody?.error?.code === "RESERVED_NOT_BUILT") {
@@ -175,15 +187,18 @@ export function classifyJ14b(status, body) {
 }
 
 export function classifyJ11live(opts) {
-  const { allowWrites, localBase, before, after, opened, submitted, receipt } = opts;
+  const { allowWrites, localBase, before, after, opened, submitted, receipt, form, issued } = opts;
   if (!allowWrites) return makeRow("J11-live", "SKIP", "shared-link write-gated: set ALLOW_WRITES=1 (local only)", {});
   if (!localBase) return makeRow("J11-live", "SKIP", "J11-live local-only; refused remote/DEV target", {});
+  if (issued?.body?.ok === false && issued.body.error?.code === "NOT_FOUND_OR_NOT_VISIBLE") {
+    return makeRow("J11-live", "SKIP", "shared-link seeded write → NOT_FOUND_OR_NOT_VISIBLE (ungranted principal)", evidenceOf(issued.status, issued.body));
+  }
   const evidence = evidenceOf(submitted?.status ?? 0, submitted?.body ?? receipt?.body);
   const delta = (after ?? 0) - (before ?? 0);
-  if (opened?.body?.ok === true && submitted?.body?.ok === true && receipt?.body?.ok === true && delta === 1) {
-    return makeRow("J11-live", "PASS", "shared link issue→open→submit→receipt; owner counts +1", evidence);
+  if (opened?.body?.ok === true && form?.body?.ok === true && submitted?.body?.ok === true && receipt?.body?.ok === true && delta === 1) {
+    return makeRow("J11-live", "PASS", "shared link issue→open→form→submit→receipt; owner counts +1", evidence);
   }
-  return makeRow("J11-live", "FAIL", `shared-link live failed countsΔ=${Number.isFinite(delta) ? delta : "?"} open=${opened?.body?.error?.code ?? (opened?.body?.ok ? "ok" : "?")}`, evidence);
+  return makeRow("J11-live", "FAIL", `shared-link live failed countsΔ=${Number.isFinite(delta) ? delta : "?"} open=${opened?.body?.error?.code ?? (opened?.body?.ok ? "ok" : "?")} form=${form?.body?.error?.code ?? (form?.body?.ok ? "ok" : "?")}`, evidence);
 }
 
 export function countVerdicts(rows) {
@@ -240,7 +255,14 @@ export function scanLeaks(rows) {
 
 export function applyInjectFail(rows, injectId = process.env.INJECT_FAIL) {
   if (!injectId) return rows;
-  return rows.map((r) => (r.id === injectId ? { ...r, verdict: "FAIL", note: `INJECT_FAIL=${injectId}` } : r));
+  let hit = false;
+  const next = rows.map((r) => {
+    if (r.id !== injectId) return r;
+    hit = true;
+    return { ...r, verdict: "FAIL", note: `INJECT_FAIL=${injectId}` };
+  });
+  if (!hit) next.push(makeRow(injectId, "FAIL", `INJECT_FAIL=${injectId} matched no row`));
+  return next;
 }
 
 export function isLocalBase(base) {
@@ -403,7 +425,7 @@ export async function runJourneys({
 
     inFlight = "J1";
     const ic = await call("POST", "/v2/assessments/assess_tavo_collect/surveys/survey_tavo/codes", { count: 2 }, sess);
-    push(classifyReservedOrPositive("J1", ic.status, ic.body, "issue_codes (seeded)"));
+    push(classifyJ1(ic.status, ic.body));
 
     inFlight = "J2-neg";
     const rd = await call("POST", "/v2/participate/code", { code: "NOPE-NOPE" });
@@ -428,8 +450,7 @@ export async function runJourneys({
       const submitted = await call("POST", "/v2/participate/responses", { idempotency_key: `j11-${Date.now()}`, answers: { Q1: 4 } }, pt);
       const receipt = await call("GET", "/v2/participate/receipt", null, pt);
       const after = await ownerGet();
-      void form;
-      push(classifyJ11live({ allowWrites, localBase: true, before, after, opened, submitted, receipt }));
+      push(classifyJ11live({ allowWrites, localBase: true, before, after, opened, submitted, receipt, form, issued }));
     }
 
     inFlight = "J6";

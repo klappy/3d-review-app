@@ -6,7 +6,9 @@ import {
   TOKEN_RE,
   applyInjectFail,
   classifyD1,
+  classifyJ1,
   classifyJ1g,
+  classifyJ11live,
   classifyJ2neg,
   classifyJ6,
   classifyJ6plus,
@@ -197,6 +199,32 @@ describe("NC-7 floor, SKIP/RESERVED, --allow-skip, redaction (rev3)", () => {
     const injected = applyInjectFail([classifyJ6({ ok: false, error: { code: "NOT_FOUND_OR_NOT_VISIBLE" } })], "J6");
     expect(injected[0].verdict).toBe("FAIL");
     expect(injected[0].note).toBe("INJECT_FAIL=J6");
+  });
+  it("INJECT_FAIL on a missing row id is FAIL (never a silent no-op)", () => {
+    const rows = [classifyJ6({ ok: false, error: { code: "NOT_FOUND_OR_NOT_VISIBLE" } })];
+    const injected = applyInjectFail(rows, "J1g");
+    expect(injected.find((r) => r.id === "J6")?.verdict).toBe("PASS");
+    expect(injected.find((r) => r.id === "J1g")).toMatchObject({ verdict: "FAIL", note: "INJECT_FAIL=J1g matched no row" });
+    expect(exitCode([...floorPass(), ...injected], { allowSkip: true })).toBe(1);
+  });
+  it("J1 seeded write SKIPs ungranted visibility; reserved and ok stay RESERVED/PASS", () => {
+    const ungranted = classifyJ1(404, { ok: false, error: { code: "NOT_FOUND_OR_NOT_VISIBLE" } });
+    expect(ungranted.verdict).toBe("SKIP");
+    expect(exitCode([...floorPass(), ungranted], { allowSkip: true })).toBe(0);
+    expect(classifyJ1(501, { ok: false, error: { code: "RESERVED_NOT_BUILT" } }).verdict).toBe("RESERVED_501");
+    expect(classifyJ1(200, { ok: true, result: { count: 2 } }).verdict).toBe("PASS");
+    expect(classifyJ1(400, { ok: false, error: { code: "INVALID_PARAMS" } }).verdict).toBe("FAIL");
+  });
+  it("J11-live requires form ok and SKIPs ungranted seeded writes", () => {
+    const ok = { status: 200, body: { ok: true } };
+    const live = { allowWrites: true, localBase: true, before: 0, after: 1, opened: ok, submitted: ok, receipt: ok };
+    expect(classifyJ11live({ ...live, form: { status: 404, body: { ok: false, error: { code: "NOT_FOUND_OR_NOT_VISIBLE" } } } }).verdict).toBe("FAIL");
+    expect(classifyJ11live({ ...live, form: ok }).verdict).toBe("PASS");
+    expect(classifyJ11live({
+      allowWrites: true,
+      localBase: true,
+      issued: { status: 404, body: { ok: false, error: { code: "NOT_FOUND_OR_NOT_VISIBLE" } } },
+    }).verdict).toBe("SKIP");
   });
   it("summary cites PASS/FAIL/RESERVED/SKIP and never a bare table as acceptance", () => {
     const line = formatJourneysSummary(floorPass(), { allowSkip: true });
