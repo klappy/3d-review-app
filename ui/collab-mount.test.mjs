@@ -5,10 +5,12 @@ import {fileURLToPath} from 'node:url';
 const read=n=>readFileSync(fileURLToPath(new URL(n,import.meta.url)),'utf8');
 const html=read('./index.html'), app=read('./app.js'), server=read('./server.mjs');
 
-test('mount roots and the acceptance entry live inside #facilitator, above the project card, hidden until a staff identity is observed',()=>{
+test('mount roots and the acceptance entry live inside #facilitator, after the current task, hidden until a staff identity is observed',()=>{
   const fac=html.slice(html.indexOf('<section id="facilitator"'),html.indexOf('<section id="participant"'));
   const i=id=>fac.indexOf(`id="${id}"`);
-  assert.ok(i('overview')<i('collab')&&i('collab')<i('project-card'));
+  assert.ok(i('overview')<i('assessment-context')&&i('assessment-context')<i('stage-workspace'));
+  assert.ok(i('stage-workspace')<i('project-card')&&i('project-card')<i('collab'));
+  assert.ok(i('reports-card')<i('collab')&&i('assessment-card')<i('collab'),'secondary collaborators follow the task in keyboard DOM order');
   assert.ok(fac.includes('<button id="accept-invitation" class="rv-btn quiet" type="button" hidden>Accept an invitation</button>'));
   assert.ok(fac.includes('<section id="workspace-manager-root" class="glass panel" hidden></section>'));
   assert.ok(fac.includes('<section id="scope-invitations-root" class="glass panel" hidden></section>'));

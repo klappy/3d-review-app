@@ -63,3 +63,22 @@
      for when that menu is not on screen (module reset), so the two never show together. */
   .rv #collab:has(#scope-invitations-root:not([hidden]) .scope-invitations-actions) .collab-accept { display:none; }
 }
+
+/* Assessment GET supplies the heading independently of project-list visibility.
+   Presentation-only: a selected survey hides it; Back reveals the retained context. */
+@media screen {
+  .rv #assessment-context { display:none; }
+  .rv[data-entity-level="assessment"][data-workspace-route="workspace"] #assessment-context:not(:empty) { display:block; margin:12px 0 22px; }
+  .rv[data-entity-level="assessment"] #assessment-context h1 { margin:0 0 8px; font-size:clamp(26px,3vw,36px); overflow-wrap:anywhere; }
+  .rv[data-entity-level="assessment"] #assessment-context p { margin:0 0 8px; }
+  .rv[data-entity-level="assessment"] #facilitator > h2 { display:none; }
+  .rv[data-entity-level="assessment"] #facilitator > .grid { grid-template-columns:minmax(0,1fr); }
+  .rv[data-entity-level="assessment"] #stage-workspace { grid-column:1/-1; }
+  .rv[data-entity-level="assessment"] #shared-assessments { order:10; }
+  .rv[data-entity-level="assessment"] #collab { margin-top:24px; }
+  /* Empty feedback regions occupy no task space; real feedback remains visible/live. */
+  .rv[data-entity-level="assessment"] #access-state:empty,
+  .rv[data-entity-level="assessment"] #report-preview:empty,
+  .rv[data-entity-level="assessment"] #report-status:empty,
+  .rv[data-entity-level="assessment"] .lens-status:empty { display:none; }
+}
