@@ -42,8 +42,10 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload }) 
     // update the snapshot only, so a just-created or selected workspace is not thrown back to the list (Bugbot 4037616741).
     identity(me) { snapshot.principal = me?.principal ?? null; const staff = me?.principal?.kind === 'user' || me?.principal?.kind === 'support'; if (acceptButton) acceptButton.hidden = !(staff && me.principal.kind === 'user'); if (staff && refreshedGeneration !== snapshot.generation) { refreshedGeneration = snapshot.generation; if (!currentScope) invitations.setScope(null); workspaces.refresh(); } },
     projects(list) { snapshot.authorizedProjects = (list || []).map(p => ({ id: p.id, name: p.name, role: p.role })); },
-    // Bugbot 4037957687: clearing a project/assessment scope (Back, project cleared) restores the selected workspace scope instead of resetting.
-    setScope(scope) { currentScope = scope ? { type: scope.type, id: scope.id, role: scope.role } : (selectedWorkspace ? { type: 'workspace', id: selectedWorkspace.id, role: selectedWorkspace.role } : null); if (currentScope) invitations.setScope(currentScope); else invitations.reset(); },
+    // setScope(null) is a plain reset (prefetch resets in chooseProject/chooseAssessment/chooseGrantedAssessment call it before
+    // their await). It never paints a workspace scope: restoring the selected workspace is the explicit job of the
+    // empty-project path in chooseProject (Bugbot 4038131213 supersedes the generic fallback of 4037957687).
+    setScope(scope) { currentScope = scope ? { type: scope.type, id: scope.id, role: scope.role } : null; if (currentScope) invitations.setScope(currentScope); else invitations.reset(); },
     destroy() { invitations.destroy(); workspaces.destroy(); },
   };
 }

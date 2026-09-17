@@ -38,7 +38,13 @@ test('app.js lifecycle: reset first on identity change; identity/projects snapsh
   assert.ok(!/projects\(list\) \{[^}]*workspaces\.refresh/.test(mount),'projects() never refreshes W');
   assert.ok(mount.includes('if (!currentScope) invitations.setScope(null);'),'identity re-observation keeps a current host scope');
   assert.ok(mount.includes('onGrantsChanged: async () => { await onReload(); if (!selectedWorkspace) await workspaces.refresh(); }'),'accepted workspace invitation reaches the W list (Bugbot 4037957668)');
-  assert.ok(mount.includes("(selectedWorkspace ? { type: 'workspace', id: selectedWorkspace.id, role: selectedWorkspace.role } : null)"),'clearing a child scope restores the selected workspace scope (Bugbot 4037957687)');
+  assert.ok(!mount.includes("selectedWorkspace ? { type: 'workspace'"),'setScope(null) is a plain reset: no generic workspace fallback during prefetch resets (Bugbot 4038131213)');
+  assert.ok(mount.includes("setScope(scope) { currentScope = scope ? { type: scope.type, id: scope.id, role: scope.role } : null; if (currentScope) invitations.setScope(currentScope); else invitations.reset(); }"));
+  { const a=read('./app.js'); const i=a.indexOf('async function chooseProject'); const body=a.slice(i,a.indexOf('async function assessments'));
+    assert.ok(body.includes("if (!state.project) { const ws = collab.selectedWorkspace(); if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role });"),'explicit empty-project restore stays');
+    assert.ok(body.indexOf('collab.setScope(null);')<body.indexOf('if (!state.project)'),'prefetch reset precedes the explicit restore');
+    for (const fn of ['chooseAssessment','chooseGrantedAssessment']) { const j=a.indexOf('async function '+fn); const b=a.slice(j,a.indexOf('\n}\n',j)); assert.ok(b.includes('collab.setScope(null)'),fn+' resets before its await'); const after=b.slice(b.indexOf('await api(')); assert.ok(!after.includes("type: 'workspace'"),fn+' never paints a workspace scope on a non-empty load'); }
+    { const j=a.indexOf('async function chooseGrantedAssessment'); const b=a.slice(j,a.indexOf('\n}\n',j)); assert.ok(b.includes("if (!state.assessment) { const ws = collab.selectedWorkspace(); if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role }); return; }"),'empty direct-grant selection restores the selected workspace explicitly'); } }
   const app2=read('./app.js');
   assert.ok(app2.includes("for (const id of ['issue-codes', 'code-count', 'preview-export', 'release-codes', 'issue-link-preview', 'issue-link-confirm', 'select-survey', 'load-templates']) { const n = $(id); if (n) n.hidden = !mayBuild; }"),'viewer write controls gated on assessmentRole (Auditor P2)');
   assert.ok(!/sessionStorage|localStorage|facilitatorToken/.test(mount),'hooks never touch token storage');

@@ -287,7 +287,7 @@ async function chooseGrantedAssessment() {
   $('assessments').value = ''; text($('assessment-detail'), ''); resetSelect($('surveys'), 'Choose survey');
   text($('survey-detail'), ''); text($('results'), 'Select an assessment.'); text($('granted-detail'), '');
   collab.setScope(null); lensSurveys?.reset(); entityScreen?.render(); // Bugbot 4037616728: the granted entry is an assessment selection too
-  if (!state.assessment) return;
+  if (!state.assessment) { const ws = collab.selectedWorkspace(); if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role }); return; } // empty direct-grant selection: explicit terminal restore of the selected workspace (transition matrix)
   try {
     const stageRead = stageSnapshot();
     if (!state.templates) await templates();
