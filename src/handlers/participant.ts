@@ -3,9 +3,9 @@ import type { Handler, Ctx } from "./types";
 import { CapError, notVisible } from "./errors";
 import { newId, nowIso, randomToken, reqStr, sha256 } from "./common";
 import { codeHash } from "../code-escrow";
+import { openSharedLink } from "./shared-link";
 
 interface CodeEntry { id: string; assessment_survey_id: string; expires_at: string | null; redeemed_at: string | null; respondent_id: string | null }
-interface LinkEntry { id: string; scope_type: string; assessment_survey_id: string | null; expires_at: string | null; status: string }
 
 async function ensureSurveyOpen(ctx: Ctx, surveyId: string, allowClosed = false) {
   const survey = await ctx.db.prepare("SELECT s.id, s.state, s.collection_status FROM assessment_survey s WHERE s.id = ?")
@@ -46,13 +46,8 @@ export const redeem_code: Handler = async (ctx, params) => {
 };
 
 export const open_link: Handler = async (ctx, params) => {
-  const token = reqStr(params, "token");
-  const row = await ctx.db.prepare("SELECT id, scope_type, assessment_survey_id, expires_at, status FROM invitation WHERE token_hash = ?")
-    .bind(await sha256(token)).first<LinkEntry>();
-  if (!row || row.scope_type !== "survey" || !row.assessment_survey_id || (row.expires_at && row.expires_at <= nowIso(ctx)) || !["pending", "accepted"].includes(row.status)) throw notVisible("invitation");
-  // Invitation links are reusable so that reopening a receipt remains possible.
-  const respondentId = `invitee_${row.id}`;
-  return issue(ctx, row.assessment_survey_id, respondentId, true);
+  if (Object.keys(params).some(k => k !== "token" && k !== "resume_token")) throw new CapError("INVALID_PARAMS", "unknown link parameter");
+  return openSharedLink(ctx, reqStr(params, "token"), params.resume_token);
 };
 
 export const handlers: Record<string, Handler> = {

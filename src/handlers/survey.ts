@@ -81,13 +81,22 @@ export const print:Handler=async(ctx,params)=>{
   const html=`<!doctype html><html lang="${esc(lang)}"><meta charset="utf-8"><title>${esc(t.name)}</title><style>@media print{button{display:none}}body{font:16px system-ui;max-width:48rem;margin:2rem auto}li{margin:1.5rem 0}</style><h1>${esc(t.name)}</h1><ol>${items.map(i=>`<li>${esc(String(i.text))}<hr></li>`).join("")}</ol></html>`;
   return {result:{html,content_type:"text/html; charset=utf-8",template_id:t.id,template_version:t.version,blank:true},scope:{type:"assessment",id:aid}};
 };
-export const issue_link:Handler=async(ctx,params)=>{
-  const {aid,sid}=ids(params); await survey(ctx,aid,sid,"member");
-  const invitee_hash=typeof params.invitee_hash==="string"?params.invitee_hash:null;
+export const issue_link:Handler=async(ctx,params,opts)=>{
+  only(params,["aid","sid","expires_at"]);
+  const {aid,sid}=ids(params), selected=await survey(ctx,aid,sid,"member");
+  if(selected.state!=="selected" || selected.archived_at) throw new CapError("STAGE_CONFLICT","archived survey cannot issue links");
+  let expires_at:string|null=null;
+  if(params.expires_at!==undefined && params.expires_at!==null) {
+    if(typeof params.expires_at!=="string" || !/^\d{4}-\d{2}-\d{2}T/.test(params.expires_at) || !Number.isFinite(Date.parse(params.expires_at)) || Date.parse(params.expires_at)<=ctx.now().getTime())
+      throw new CapError("INVALID_PARAMS","expires_at must be a future ISO timestamp or null");
+    expires_at=new Date(params.expires_at).toISOString();
+  }
+  const impact={affected:[{survey:sid}],irreversible:true,effect:"disclosure" as const,compensating_control:"cap.survey.revoke_link"};
+  if(opts?.dryRun) return {result:{survey_id:sid,expires_at},scope:{type:"assessment",id:aid},impact};
   const id=newId("invite"), token=randomToken("link"), at=nowIso(ctx);
-  await ctx.db.prepare("INSERT INTO invitation (id,scope_type,scope_id,assessment_survey_id,role,invitee_hash,token_hash,status,created_by,created_at) VALUES (?, 'survey', ?, ?, 'participant', ?, ?, 'pending', ?, ?)").bind(id,sid,sid,invitee_hash,await sha256(token),ctx.principal.id,at).run();
-  // Preparing is not disclosure; the token remains server-side until the separately confirmed send flow.
-  return {result:{id,status:"pending",sent:false},scope:{type:"assessment",id:aid}};
+  await ctx.db.prepare("INSERT INTO invitation (id,scope_type,scope_id,assessment_survey_id,role,token_hash,status,created_by,created_at,expires_at) VALUES (?, 'survey', ?, ?, 'participant', ?, 'pending', ?, ?, ?)")
+    .bind(id,sid,sid,await sha256(token),ctx.principal.id,at,expires_at).run();
+  return {result:{link_id:id,link_token:token,expires_at,entry_fragment:`#survey=${encodeURIComponent(token)}`},scope:{type:"assessment",id:aid},impact};
 };
 export const send_links:Handler=async(ctx,params,opts)=>{
   const {aid,sid}=ids(params); await survey(ctx,aid,sid,"member");
