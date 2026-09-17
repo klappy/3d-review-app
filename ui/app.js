@@ -25,8 +25,21 @@ const sharedMode = sharedToken !== null || sharedResume !== null;
 const state = { session: sharedMode ? null : sessionStorage.getItem('facilitatorToken'), participant: sharedMode ? null : sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null, assessmentRole: null, reportConfirm: null, reportCursor: null };
 state.responseKey = sharedMode ? null : savedSubmitKey(sessionStorage, state.participant);
 const collab = createCollabHooks({ document, api, sharedMode, onReload: async () => { const me = await identity(); if (me && hasProjectWork(me)) await projects(); },
-  // Opening a workspace makes it the selected entity: clear survey → assessment/granted → project through the existing controls (their change handlers run the usual resets).
-  onWorkspaceOpened: () => { for (const id of ['surveys', 'assessments', 'granted-assessments', 'projects']) { const s = $(id); if (s && s.value) { s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); } } } });
+  // Opening a workspace makes it the selected entity: side-effect-free downstream clear (no change handlers, so no
+  // fetch, no transient project scope, no run() notice — Bugbot 4038374305). Same synchronous resets chooseProject
+  // performs before its await; the workspace scope is painted by the hook right after this returns.
+  onWorkspaceOpened: () => clearEntitySelection() });
+function clearEntitySelection() {
+  clearStageScreens();
+  state.project = null; state.projectView = null; state.assessment = null; state.survey = null;
+  clearCodeBatch(); clearShareLink();
+  state.assessmentRole = null; clearReportState(); showReportControls();
+  $('projects').value = ''; $('granted-assessments').value = ''; text($('granted-detail'), '');
+  text($('project-detail'), ''); text($('assessment-detail'), ''); text($('survey-detail'), '');
+  text($('results'), 'Select an assessment.'); text($('notice'), ''); // a completed notice from the previous entity does not survive the switch
+  resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
+  lensSurveys?.reset(); entityScreen?.render();
+}
 const entityScreen = sharedMode || typeof window === 'undefined' ? null : mountEntityScreen(document, window, { isStaff: () => collab.isStaff(), selectedWorkspace: () => collab.selectedWorkspace(), backToWorkspaces: () => collab.backToWorkspaces() });
 // Assessment = three lenses; inclusion goes through the existing select/deselect capabilities and re-reads the assessment.
 const lensSurveys = sharedMode || !$('lens-surveys-root') ? null : mountLensSurveys({ document, root: $('lens-surveys-root'), actions: {
