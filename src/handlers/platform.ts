@@ -45,7 +45,16 @@ export const authConsumeLink: Handler = async (ctx, p) => {
   if (!row) throw new CapError("INVALID_PARAMS", "code invalid", "request a new code", "cap.auth.request_link");
   if (row.used_at) throw new CapError("INVALID_PARAMS", "code_used", "codes are single-use; request a new one");
   if (row.expires_at < Date.now()) throw new CapError("INVALID_PARAMS", "code_expired", "request a new code");
-  await ctx.db.prepare("UPDATE login_code SET redeemed_at = ? WHERE id = ?").bind(Date.now(), row.id).run();
+  // Atomic single-use (Bugbot 4033370835): the guarded UPDATE is the only authority. Two overlapping consumes both pass
+  // the reads above; only the one whose UPDATE changes the row may mint. On 0 changes, re-read to name the reason.
+  const now = Date.now();
+  const redeemed = await ctx.db.prepare("UPDATE login_code SET redeemed_at = ? WHERE id = ? AND redeemed_at IS NULL AND expires_at >= ?").bind(now, row.id, now).run();
+  if (redeemed.meta.changes !== 1) {
+    const cur = await ctx.db.prepare("SELECT expires_at, redeemed_at AS used_at FROM login_code WHERE id = ?").bind(row.id).first<any>();
+    if (!cur) throw new CapError("INVALID_PARAMS", "code invalid", "request a new code", "cap.auth.request_link");
+    if (cur.used_at) throw new CapError("INVALID_PARAMS", "code_used", "codes are single-use; request a new one");
+    throw new CapError("INVALID_PARAMS", "code_expired", "request a new code");
+  }
   const pr = await ctx.db.prepare("SELECT id, support FROM principal WHERE email_hash = ?").bind(eh).first<any>();
   const token = await mintSession(ctx.env, pr.id, pr.support ? "support" : "user");
   return { result: { session: token, principal_id: pr.id, note: "phase 0: same token works as cookie `session` and as Bearer (delegated identity contract = 18-D open item D-1)" }, scope: { type: "platform", id: "auth" } };
