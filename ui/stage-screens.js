@@ -179,6 +179,21 @@ function el(doc, tag, text) {
   return node;
 }
 
+// Assessment GET owns this context, including direct grants without a visible project.
+// Only returned human-readable facts are shown; language_id is not a language name.
+export function renderAssessmentHeadrow(doc, root, assessment) {
+  root.replaceChildren();
+  if (!assessment || typeof assessment.name !== 'string' || !assessment.name.trim()) return;
+  const title = el(doc, 'h1', assessment.name);
+  root.append(title);
+  const facts = [assessment.period, assessment.format].filter(value => typeof value === 'string' && value.trim());
+  if (facts.length) { const detail = el(doc, 'p', facts.join(' · ')); detail.className = 'muted'; root.append(detail); }
+  if (typeof assessment.role === 'string' && assessment.role) {
+    const role = el(doc, 'span', assessment.role); role.className = 'badge';
+    role.setAttribute('title', 'Your role at this assessment'); root.append(role);
+  }
+}
+
 export function renderStageTabs(doc, root, { assessmentId, stage, selected, storage, onSelect }) {
   root.replaceChildren();
   const nav = el(doc, 'nav');

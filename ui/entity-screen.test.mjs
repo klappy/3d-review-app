@@ -26,16 +26,21 @@ test('css is level-scoped, keeps the next-entity paths and the stage control rea
   const css=read('./entity-screen.css').replace(/\/\*[\s\S]*?\*\//g,'');
   for(const sel of css.replace(/\/\*[\s\S]*?\*\//g,'').split('}').map(c=>c.slice(0,c.indexOf('{')).trim()).filter(Boolean))
     for(const one of sel.split(',').map(x=>x.trim()).filter(x=>x&&!x.startsWith('@')))
-      assert.ok(/^\.rv(\[data-entity-level="(workspaces|workspace|project|assessment|survey)"\]| #entity-back| \.collab-accept| #collab:has\()/.test(one),`unscoped: ${one}`);
+      assert.ok(/^\.rv(\[data-entity-level="(workspaces|workspace|project|assessment|survey)"\]| #assessment-context$| #entity-back| \.collab-accept| #collab:has\()/.test(one),`unscoped: ${one}`);
   assert.ok(!/#create-project/.test(css),'the authorized create-project form is never hidden');
   assert.ok(!/#set-stage/.test(css)&&!/\[data-entity-level="assessment"\] #assessment-card\s*[,{]/.test(css),'the stage control stays at assessment level');
   assert.ok(!/#projects\b|#assessments\b/.test(css.replace(/#project-card|#assessment-card|#load-assessments/g,'')),'selects are hidden only via their card chrome, never removed');
 });
-test('wiring: assets, back link inside #collab, entity screen mounted after collab and reset on identity change',()=>{
+test('wiring: assets, back link before assessment context and task, entity screen mounted after collab and reset on identity change',()=>{
   const html=read('./index.html'),app=read('./app.js'),server=read('./server.mjs'),src=read('./entity-screen.js');
   assert.ok(html.includes('<link rel="stylesheet" href="/entity-screen.css">'));
   assert.ok(server.includes("'/entity-screen.js':")&&server.includes("'/entity-screen.css':"));
-  assert.ok(html.includes('<section id="collab" class="collab" aria-label="Workspaces and collaborators"><button id="entity-back" class="rv-btn quiet" type="button" hidden></button>'));
+  assert.ok(html.includes('<button id="entity-back" class="rv-btn quiet" type="button" hidden></button><header id="assessment-context" aria-label="Assessment context"></header>'));
+  assert.ok(html.indexOf('id="assessment-context"')<html.indexOf('id="stage-workspace"'));
+  assert.ok(read('./entity-screen.css').includes('.rv #assessment-context { display:none; }'));
+  assert.ok(read('./entity-screen.css').includes('[data-entity-level="assessment"][data-workspace-route="workspace"] #assessment-context:not(:empty)'));
+  assert.equal((app.match(/renderAssessmentHeadrow\(document, \$\('assessment-context'\), result.assessment\)/g)||[]).length,2,'both authorized assessment paths supply the actual response');
+  assert.ok(app.includes("$('assessment-context').replaceChildren();"),'context reset clears the actual node');
   assert.ok(app.includes("const entityScreen = sharedMode || typeof window === 'undefined' ? null : mountEntityScreen(document, window, {"));
   assert.ok(app.includes("  collab.reset(); // W/I managers clear synchronously before any other identity work\n  entityScreen?.reset();"));
   assert.ok(src.includes("const assessmentValue = () => assessments.value || granted?.value || '';"),'assessment-only grants count as an assessment selection');
