@@ -3,6 +3,7 @@
  * Written reason for four (canon klappy://canon/constraints/mcp-tool-surface-ceiling): the read/write/danger split is the
  * host-level permission boundary; the telemetry role rides `read cap.ops.trace` + trace_id on every envelope.
  * Every tools/call goes through the same execute() the HTTP twins use — no fifth path.
+ * Authorization happens BEFORE this handler (src/worker.ts): OAuth 2.1 provider token or first-party bearer; no anonymous MCP.
  */
 import type { Ctx } from "./handlers/types";
 import { tools as toolNames } from "./registry";

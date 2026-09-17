@@ -2,6 +2,7 @@
 import type { Handler } from "./types";
 import { CapError, id, sha256, notVisible } from "./types";
 import { mintSession, revokeSessionByHash } from "../auth";
+import { revokeOAuthGrants, type OAuthEnv } from "../oauth";
 import contract from "../../contract/capabilities.json";
 import { capabilities, byId } from "../registry";
 
@@ -51,6 +52,12 @@ export const authConsumeLink: Handler = async (ctx, p) => {
 /** Logout revokes the credential the caller actually presented (cookie or bearer, HTTP or MCP) — never a
  *  client-supplied token. signed_out is true only when a live session row was deleted (Astra 5706310753). */
 export const authLogout: Handler = async (ctx) => {
+  // OAuth-delegated caller (a connector): signing out = revoking that client's grants for this user.
+  if (ctx.principal.oauthClientId) {
+    const n = await revokeOAuthGrants(ctx.env as OAuthEnv, ctx.principal.id, ctx.principal.oauthClientId);
+    if (n === 0) throw new CapError("NOT_AUTHENTICATED", "connection already revoked");
+    return { result: { signed_out: true, revoked_grants: n }, scope: { type: "platform", id: "auth" } };
+  }
   const h = ctx.principal.sessionTokenHash;
   if (!h) throw new CapError("NOT_AUTHENTICATED", "no session to sign out");
   const revoked = await revokeSessionByHash(ctx.env, h);

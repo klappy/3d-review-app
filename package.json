@@ -12,7 +12,10 @@
     "seed:local": "wrangler d1 execute 3d-review-dev --local --file=seed/synthetic.sql && wrangler d1 execute 3d-review-dev --local --file=seed/synthetic-responses.sql",
     "parity": "node scripts/parity.mjs"
   },
-  "dependencies": { "hono": "^4.6.0" },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "0.10.3",
+    "hono": "^4.6.0"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260915.1",
     "typescript": "^5.6.0",

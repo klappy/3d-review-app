@@ -11,10 +11,14 @@ export interface Principal {
   respondentId?: string;
   /** sha256 of the presented session credential (cookie or bearer) — what logout revokes; never client-supplied. */
   sessionTokenHash?: string;
+  /** set when the caller presented a provider-issued OAuth token (src/oauth.ts); logout revokes that client's grants. */
+  oauthClientId?: string;
 }
 export interface Env { DB: D1Database; SESSION_SECRET: string; CODE_ESCROW_SECRET?: string; ENVIRONMENT?: string; ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string;
   /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]) — see src/ratelimit.ts. */
-  RL_MCP_ANON?: RateLimit; RL_AUTH?: RateLimit; RL_REDEEM?: RateLimit }
+  RL_MCP_ANON?: RateLimit; RL_AUTH?: RateLimit; RL_REDEEM?: RateLimit;
+  /** OAuth provider storage + helpers (src/worker.ts); absent in unit tests that drive the Hono app directly. */
+  OAUTH_KV?: KVNamespace; OAUTH_PROVIDER?: import("@cloudflare/workers-oauth-provider").OAuthHelpers }
 export interface Ctx {
   env: Env;
   db: D1Database;

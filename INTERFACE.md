@@ -55,3 +55,21 @@ Borrowed substrate: Cloudflare Workers Rate Limiting bindings (`[[ratelimits]]` 
 | `RL_REDEEM` | `cap.participant.redeem_code`, `cap.participant.open_link` | caller address | 60 / 60 s (a workshop room shares one address) |
 
 Posture: binding absent → allowed only when `ENVIRONMENT` is exactly `dev`; otherwise refused (fail closed). Binding throws → allowed and logged. Known limit of the borrow: counters are per Cloudflare location and eventually consistent — a dampener, not a lockout; no durable per-credential lockout exists yet (residual, tracked in cookbook `prd/18-I-testing.md` phase C).
+
+## MCP authorization (src/worker.ts, src/oauth.ts)
+
+Worker entry is `src/worker.ts`: the borrowed **`@cloudflare/workers-oauth-provider` 0.10.3** (same pin as `klappy/bee-ai-auth-mcp`) sits in front of `POST /mcp`; the Hono app in `src/index.ts` is its default handler and is otherwise unchanged. Storage: KV binding `OAUTH_KV` (hashed clients/grants/tokens + parked authorization requests under `3dr:authreq:`).
+
+| Route | Served by | What |
+|---|---|---|
+| `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource[/mcp]` | provider | discovery |
+| `POST /register` | provider | dynamic client registration |
+| `POST /token` | provider | code + PKCE exchange, refresh, revocation |
+| `GET /authorize` | app glue | provider validates the request → parked 10 min (KV + `oauth_req` cookie) → 302 to `/v2/auth/access?next=oauth` |
+| `GET /v2/auth/access?next=oauth` | app glue (Access-guarded) | identity = verified Access JWT only → consent page naming the app; **no web session is opened** |
+| `POST /oauth/consent` | app glue | HMAC ticket + matching cookie + single-use parked request → `completeAuthorization` (props `{principal_id, client_id}`) or `access_denied` |
+| `POST /mcp` | provider → `handleMcp` | no/invalid credential → **401 + `WWW-Authenticate`**; provider token → principal re-read from D1 every call, `delegated_by = "oauth:<client_id>"`, never `support`; first-party bearer (web session token, participant token) → accepted through `resolveExternalToken`, unchanged behavior |
+
+Rules: anonymous MCP no longer exists (public docs stay on HTTP: `GET /v2/docs…`). A provider token is **not** a web session — the HTTP face refuses it. `write cap.auth.logout` from a delegated caller revokes that user's grants for that client. `/register`, `/token`, `/authorize`, `/oauth/consent` and credential-less `/mcp` share the `RL_MCP_ANON` dampener. `wrangler.toml` `run_worker_first` lists these paths so static assets never shadow them. `scripts/parity.mjs` now requires `SESS`.
+
+One-way door (17-IRREVERSIBILITY): once real users connect apps in production, deleting `OAUTH_KV` or removing the provider disconnects everyone at once.

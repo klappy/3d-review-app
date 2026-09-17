@@ -3,5 +3,6 @@ import fs from "node:fs";
 // wrangler serves *.yaml as Text (wrangler.toml rules); mirror that for vitest.
 export default defineConfig({
   plugins: [{ name: "yaml-as-text", transform(_code, id) { if (id.endsWith(".yaml") || id.endsWith(".sql")) return { code: `export default ${JSON.stringify(fs.readFileSync(id, "utf8"))};`, map: null }; } }],
-  test: { include: ["test/**/*.test.ts"], testTimeout: 30000 },
+  resolve: { alias: { "cloudflare:workers": new URL("./test/stubs/cloudflare-workers.ts", import.meta.url).pathname } },
+  test: { include: ["test/**/*.test.ts"], testTimeout: 30000, server: { deps: { inline: ["@cloudflare/workers-oauth-provider"] } } },
 });

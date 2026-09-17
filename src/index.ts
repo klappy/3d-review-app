@@ -15,6 +15,7 @@ import synthResponsesSql from "../seed/synthetic-responses.sql";
 import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
 import { allow, clientIp, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { handleAuthorize, handleConsent, oauthPrincipals, renderConsentIfParked, type OAuthEnv } from "./oauth";
 
 const app = new Hono<{ Bindings: Env }>();
 const json = (value: unknown, status: number) => new Response(JSON.stringify(value), {
@@ -23,7 +24,7 @@ const json = (value: unknown, status: number) => new Response(JSON.stringify(val
 
 export async function contextForRequest(req: Request, env: Env): Promise<Ctx> {
   return {
-    env, db: env.DB, principal: await resolvePrincipal(req, env), clientIp: clientIp(req),
+    env, db: env.DB, principal: oauthPrincipals.get(req) ?? await resolvePrincipal(req, env), clientIp: clientIp(req),
     traceId: newTraceId(), now: () => new Date(), log: () => {},
   };
 }
@@ -105,6 +106,9 @@ app.post("/mcp", async (c) => {
     catch (e: any) { return fail(e.code ?? "INVALID_PARAMS", e.message, e.hint, "cap.docs.get", cx.traceId); }
   });
 });
+// MCP authorization glue (src/oauth.ts). Discovery, /register and /token are served by the borrowed provider in src/worker.ts.
+app.get("/authorize", (c) => handleAuthorize(c.req.raw, c.env as OAuthEnv));
+app.post("/oauth/consent", (c) => handleConsent(c.req.raw, c.env as OAuthEnv));
 // Cloudflare email-code sign-in (OF-7). Transport route, not a capability: the browser is sent here by Cloudflare
 // Access after proving its email by one-time PIN; we verify the Access JWT, mint our session, and return to the UI.
 // Agents never use it (they hold a delegated bearer); the MCP surface is unchanged.
@@ -117,6 +121,9 @@ app.get("/v2/auth/access", async (c) => {
       .bind(`usr_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`, eh, 0, 0, new Date().toISOString()).run();
     const pr = await env.DB.prepare("SELECT id, support FROM principal WHERE email_hash = ?").bind(eh).first<{ id: string; support: number }>();
     if (!pr) throw new CapError("NOT_AUTHENTICATED", "principal could not be established");
+    // A connector is waiting on this browser (GET /authorize parked a request): show consent, open no web session.
+    const consent = await renderConsentIfParked(c.req.raw, env as OAuthEnv, pr.id, id.email);
+    if (consent) return consent;
     const token = await mintSession(env, pr.id, pr.support ? "support" : "user", { via: "cloudflare-access", sub: id.sub });
     const headers = new Headers({ location: `/#session=${token}` });
     headers.append("set-cookie", `session=${token}; HttpOnly; Path=/; SameSite=Lax; Secure`);
