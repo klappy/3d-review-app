@@ -24,7 +24,8 @@ namespace_id = "30101"
 simple = { limit = 30, period = 60 }
 [[ratelimits]]
 name = "RL_HTTP_ANON"
-namespace_id = "30104"
+# 30104/30204 are RL_MCP_CEILING on fable/mcp-oauth (stacked on this branch); keep RL_HTTP_ANON distinct at the merged head.
+namespace_id = "30105"
 simple = { limit = 60, period = 60 }
 [[ratelimits]]
 name = "RL_AUTH"
@@ -64,7 +65,7 @@ namespace_id = "30201"
 simple = { limit = 30, period = 60 }
 [[env.production.ratelimits]]
 name = "RL_HTTP_ANON"
-namespace_id = "30204"
+namespace_id = "30205"
 simple = { limit = 60, period = 60 }
 [[env.production.ratelimits]]
 name = "RL_AUTH"
