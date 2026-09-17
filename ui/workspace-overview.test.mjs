@@ -313,10 +313,57 @@ test('the module renders text nodes only and ships exactly the two missing class
   assert.equal(/method: '(POST|PUT|DELETE|PATCH)'/.test(js), false);
   assert.match(css, /\.rv \.phases/);
   assert.match(css, /\.rv \.table/);
+  // Every rule is either one of the two classes the app lacks, or scoped inside #overview. No
+  // existing class is redefined for the rest of the app.
+  for (const selector of selectorsOf(css)) {
+    assert.match(selector, /#overview\b|\.phases\b|\.table\b/, `unscoped rule would leak into the app: ${selector}`);
+  }
   for (const existing of ['.glass', '.panel', '.eyebrow', '.three', '.crumbs', '.badge', '.muted', '.note', '.headrow', '.rv-btn']) {
-    assert.equal(new RegExp(`\\${existing}\\s*\\{`).test(css), false, `${existing} already exists and must not be redefined`);
+    for (const selector of selectorsOf(css)) {
+      if (!new RegExp(`\\${existing}(\\b|$)`).test(selector)) continue;
+      assert.match(selector, /#overview\b/, `${existing} already exists; a rule for it must be scoped under #overview, got: ${selector}`);
+    }
   }
   assert.equal(/@import/.test(css), false);
+});
+
+// Every selector list in the stylesheet, comments stripped and at-rule preludes dropped.
+function selectorsOf(css) {
+  const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const out = [];
+  for (const match of clean.matchAll(/([^{}]+)\{/g)) {
+    const prelude = match[1].trim();
+    if (!prelude || prelude.startsWith('@')) continue;
+    for (const selector of prelude.split(',')) { const s = selector.trim(); if (s) out.push(s); }
+  }
+  return out;
+}
+
+test('the crumbs override is scoped under #overview and never touches .rv .crumbs globally', () => {
+  const css = fs.readFileSync(new URL('./workspace-overview.css', import.meta.url), 'utf8');
+  const selectors = selectorsOf(css);
+  const crumbRules = selectors.filter(s => /\.crumbs\b/.test(s));
+  assert.ok(crumbRules.length, 'the override must exist');
+  for (const selector of crumbRules) {
+    assert.match(selector, /#overview\b/, `unscoped crumbs rule: ${selector}`);
+    assert.equal(/^\s*(\.rv\s+)?\.crumbs\b/.test(selector), false, `bare .crumbs selector: ${selector}`);
+  }
+  // The one rule that must beat components.css:113 at every width.
+  const block = css.match(/\.rv #overview \.crumbs \{[^}]*\}/);
+  assert.ok(block, 'the .rv #overview .crumbs block must exist');
+  assert.match(block[0], /display:\s*flex/);
+  assert.match(block[0], /flex-wrap:\s*wrap/);
+  assert.match(block[0], /overflow-wrap:\s*anywhere/);
+  assert.match(block[0], /gap:\s*var\(--gap-pip\)/, 'gap comes from an existing token');
+  // It must not be buried in a width query, or the 760px hide would still win below that width.
+  const guarded = css.slice(0, css.indexOf(block[0])).split('@media').length - 1;
+  const closed = (css.slice(0, css.indexOf(block[0])).match(/\}/g) || []).length;
+  assert.ok(closed >= guarded, 'the override must sit outside every @media block');
+  // The separator and the role badge keep their place at narrow widths.
+  assert.match(css, /#overview \.crumbs \.sep/);
+  assert.match(css, /#overview \.crumbs \.badge/);
+  // No horizontal overflow: nothing in the override may pin a width.
+  assert.equal(/#overview \.crumbs[^{]*\{[^}]*(white-space:\s*nowrap|min-width:\s*[1-9])/.test(css), false);
 });
 
 test('selectAndChange never invents an option when no refresh control is available', async () => {

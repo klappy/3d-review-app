@@ -24,3 +24,40 @@
   .rv .table { display: block; overflow-x: auto; }
   .rv .phases button { flex: 1 1 auto; }
 }
+
+/* Context crumbs inside the overview only.
+   components.css:113 sets `.rv .crumbs{display:none}` below 760px — written for the top bar, where
+   the crumb is a repeat of what the header already says. The overview's crumbs are the only place
+   the current project and assessment are named, so they must survive at 390. The id raises
+   specificity above `.rv .crumbs`, so this holds at every width without a media query and without
+   touching the global class: nothing here selects a bare `.crumbs`. */
+.rv #overview .crumbs {
+  display: flex;
+  flex-wrap: wrap;        /* wrap instead of widening the page */
+  align-items: center;
+  gap: var(--gap-pip);
+  min-width: 0;
+  overflow-wrap: anywhere; /* a long project name breaks rather than overflowing */
+  word-break: normal;
+}
+.rv #overview .crumbs > * { min-width: 0; max-width: 100%; }
+/* The overview's crumbs are buttons (they re-select through the existing selects), so the
+   anchor rules in components.css do not reach them. Same look, scoped to this root. */
+.rv #overview .crumbs button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--secondary);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 4px 6px;
+  min-height: 28px;
+  border-radius: var(--r-linkbox);
+  overflow-wrap: anywhere;
+}
+.rv #overview .crumbs button:hover { background: var(--chip-fill); color: var(--ink); }
+.rv #overview .crumbs button[aria-current] { color: var(--ink); font-weight: 600; }
+.rv #overview .crumbs .sep { opacity: .6; flex: 0 0 auto; }  /* separators stay at every width */
+.rv #overview .crumbs .badge { flex: 0 0 auto; }             /* the role badge stays on the row */
