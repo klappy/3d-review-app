@@ -3,6 +3,7 @@ import { reviewAnswer, templateChoices } from './present.js';
 import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
 import { renderList, renderReport, upsertRow } from './report-view.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
+import { loadBlankPrint, loadRoleHelp, printAllowed, recalledTab, renderBlankPrint, renderRoleHelp, renderStageTabs, renderStageTour, roleHelpVisible } from './stage-screens.js';
 import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
 // Thrown by shared-link paths that already showed the participant copy: run() marks the action as
 // needing attention without painting raw server text into #error.
@@ -45,6 +46,58 @@ async function run(label, task) {
   catch (error) { if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; } else fail(error.message); }
   finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : b.id === 'build-report' ? !state.reportConfirm : false); }
 }
+// Stage screens mount. Read-only: tabs only remember a browsing choice, so nothing here ever posts
+// /stage. Every awaited helper result is dropped unless the generation it started in, and the ids it
+// was started for, still hold — a late answer for an abandoned selection must never paint.
+const STAGE_ROOTS = ['stage-tabs', 'stage-tour', 'role-help', 'blank-print'];
+let stageGen = 0;
+function clearStageMounts() {
+  stageGen += 1;
+  for (const id of STAGE_ROOTS) { const root = $(id); if (!root) continue; root.replaceChildren(); root.hidden = true; }
+}
+// api() already carries the session bearer, unwraps the envelope and logs the read to #events;
+// the module wants a fetch-shaped response, so build one around that single result.
+function stageRequest(url) {
+  return api(url).then(
+    result => ({ ok: true, status: 200, json: async () => ({ ok: true, result }) }),
+    error => ({ ok: false, status: 0, json: async () => ({ ok: false, error: { code: String(error.message).split(':')[0] } }) }),
+  );
+}
+// The role is only ever the exact one the authorized assessment GET returned; it is never inferred.
+function paintStageScreens(aid, stage) {
+  const tabs = $('stage-tabs'), tour = $('stage-tour'), help = $('role-help');
+  if (!tabs || !tour || !help) return;
+  if (state.shared || !aid) return; // shared participants never reach #facilitator, so nothing mounts
+  const gen = stageGen;
+  const role = roleHelpVisible(state.assessmentRole) ? state.assessmentRole : null;
+  let selected = recalledTab(sessionStorage, aid, stage);
+  const paintTour = () => renderStageTour(document, tour, { storage: sessionStorage, assessmentId: aid, stage: selected, role, onDismiss: () => paintTour() });
+  const paintTabs = () => {
+    // Selecting a tab re-paints from memory only. No endpoint is called from here.
+    renderStageTabs(document, tabs, { assessmentId: aid, stage, selected, storage: sessionStorage, onSelect: next => { selected = next; paintTabs(); paintTour(); } });
+    tabs.hidden = false;
+  };
+  paintTabs(); paintTour();
+  if (!role) return; // no authorized role: role help stays hidden and is never fetched
+  loadRoleHelp({ request: stageRequest, assessmentId: aid, stage }).then(model => {
+    if (gen !== stageGen || state.assessment !== aid) return; // stale: the selection moved on
+    renderRoleHelp(document, help, model);
+  });
+}
+// Blank print is owner/member only and needs a selected survey; the rendered Print button routes
+// through printBlankForm, which isolates a freshly built article instead of printing the workspace.
+function paintBlankPrint() {
+  const root = $('blank-print');
+  if (!root) return;
+  root.replaceChildren(); root.hidden = true;
+  const aid = state.assessment, sid = state.survey, role = state.assessmentRole;
+  if (state.shared || !aid || !sid || !printAllowed(role)) return;
+  const gen = stageGen;
+  loadBlankPrint({ request: stageRequest, aid, sid, role }).then(model => {
+    if (gen !== stageGen || state.assessment !== aid || state.survey !== sid) return; // stale
+    renderBlankPrint(document, root, model, { onPrint: () => window.print() });
+  });
+}
 function showAuthorizedWork(me) {
   const visible = hasProjectWork(me);
   for (const id of ['project-card', 'assessment-card', 'survey-card', 'results-card']) $(id).hidden = !visible;
@@ -62,7 +115,7 @@ function showAuthorizedWork(me) {
 function resetClientIdentity() {
   clearIdentityData(state, sessionStorage);
   clearCodeBatch(); clearShareLink(); // sign-out/sign-in: the once-shown link and confirm token never outlive the identity
-  state.assessmentRole = null; clearReportState(); showReportControls();
+  state.assessmentRole = null; clearReportState(); showReportControls(); clearStageMounts();
   for (const id of ['project-card', 'assessment-card', 'survey-card', 'results-card', 'reports-card', 'shared-assessments']) $(id).hidden = true;
   $('create-project').hidden = true;
   resetSelect($('granted-assessments'), 'Choose'); text($('granted-detail'), '');
@@ -98,7 +151,7 @@ async function projects() {
 async function chooseProject() {
   state.project = $('projects').value || null; state.projectView = null; state.assessment = null; state.survey = null;
   clearCodeBatch(); clearShareLink();
-  state.assessmentRole = null; clearReportState(); showReportControls();
+  state.assessmentRole = null; clearReportState(); showReportControls(); clearStageMounts();
   $('granted-assessments').value = ''; text($('granted-detail'), '');
   text($('project-detail'), ''); text($('assessment-detail'), ''); text($('survey-detail'), '');
   text($('results'), 'Select an assessment.');
@@ -118,7 +171,7 @@ async function assessments() {
 async function chooseAssessment() {
   state.assessment = $('assessments').value || null; state.survey = null; resetSelect($('surveys'), 'Choose survey');
   clearCodeBatch(); clearShareLink();
-  state.assessmentRole = null; clearReportState(); showReportControls();
+  state.assessmentRole = null; clearReportState(); showReportControls(); clearStageMounts();
   $('granted-assessments').value = ''; text($('granted-detail'), ''); // one state.assessment, exactly one visible source
   text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
   if (!state.assessment) return;
@@ -129,6 +182,7 @@ async function chooseAssessment() {
   if (next) $('stage-target').value = next;
   for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
   if (result.surveys?.length === 1) { $('surveys').value = result.surveys[0].id; state.survey = result.surveys[0].id; }
+  paintStageScreens(state.assessment, result.assessment.stage); paintBlankPrint();
 }
 async function templates() {
   const result = await api('/v2/templates'); resetSelect($('templates'), 'Choose current pinned template');
@@ -191,7 +245,7 @@ $('assessments').addEventListener('change', () => run('Loading assessment…', c
 // Assessment-only entry: an exact assessment grant, authorized server-side, with no project navigation.
 async function chooseGrantedAssessment() {
   state.assessment = $('granted-assessments').value || null; state.survey = null; state.assessmentRole = null;
-  clearCodeBatch(); clearShareLink(); clearReportState(); showReportControls();
+  clearCodeBatch(); clearShareLink(); clearReportState(); showReportControls(); clearStageMounts();
   $('assessments').value = ''; text($('assessment-detail'), ''); resetSelect($('surveys'), 'Choose survey');
   text($('survey-detail'), ''); text($('results'), 'Select an assessment.'); text($('granted-detail'), '');
   if (!state.assessment) return;
@@ -199,7 +253,8 @@ async function chooseGrantedAssessment() {
     const result = await api(`/v2/assessments/${path(state.assessment)}`);
     state.assessmentRole = result.assessment.role; showReportControls();
     text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
-  } catch (error) { state.assessmentRole = null; showReportControls(); clearReportState(); throw error; }
+    paintStageScreens(state.assessment, result.assessment.stage); paintBlankPrint();
+  } catch (error) { state.assessmentRole = null; showReportControls(); clearReportState(); clearStageMounts(); throw error; }
 }
 $('granted-assessments').addEventListener('change', () => run('Loading assessment…', chooseGrantedAssessment));
 bindClick('set-stage', 'Moving assessment stage…', async () => {
@@ -220,7 +275,7 @@ bindClick('select-survey', 'Selecting survey…', async () => {
   const [template_id, version] = selected.split('@'); const result = await api(`/v2/assessments/${path(aid)}/surveys`, { method: 'POST', body: { template_id, version: Number(version) } });
   const sid = result.survey.id; await chooseAssessment(); state.survey = sid; $('surveys').value = sid; await surveyStatus();
 });
-$('surveys').addEventListener('change', () => { state.survey = $('surveys').value || null; clearCodeBatch(); clearShareLink(); });
+$('surveys').addEventListener('change', () => { state.survey = $('surveys').value || null; clearCodeBatch(); clearShareLink(); stageGen += 1; paintBlankPrint(); });
 async function surveyStatus() {
   const aid = required(state.assessment, 'Choose an assessment.'), sid = required(state.survey, 'Choose a survey.');
   const result = await api(`/v2/assessments/${path(aid)}/surveys/${path(sid)}`);
