@@ -67,6 +67,7 @@ measured integrated cost is **1 KV get + 0 D1**. Changes:
 | `Bearer a:b:c` (not provider-shaped: grant id must be 16 and secret 32 chars) | `RL_MCP_ANON` | 0 | 0 | 401 + resource_metadata pointer, before storage |
 | `Bearer user_x:<16>:<32>` (provider-shaped, unknown) | `RL_MCP_CEILING` | **1 get** | **0** | 401 (provider miss → external fallthrough → shape gate) |
 | `Bearer st_<32>` well-formed unknown first-party (PR #19 residual R1, unchanged) | `RL_MCP_CEILING` on /mcp; `RL_HTTP_ANON` on HTTP twins | 0 | 2 SELECTs | 401 / anonymous |
+| `Bearer garbage` on `/mcp` (no plausible shape) | `RL_MCP_ANON` | 0 | 0 | 401 + resource_metadata pointer, before storage |
 | `Bearer garbage`, junk cookie, two tokens (HTTP twins) | `RL_HTTP_ANON` | 0 | 0 | anonymous path |
 
 ## Verification on this tree
@@ -89,3 +90,9 @@ measured integrated cost is **1 KV get + 0 D1**. Changes:
   branch substitutes for that.
 - Root's disposition on step 4 (PR #15 → `fable/rate-limits` vs. another target).
 - This branch is a preview; delete it after disposition.
+
+## Amendment 1 (combined review 5708670447, APPROVE-WITH-NITS)
+
+- INTERFACE.md residual line: the reconciled 1 KV + 0 D1 statement now cites "measured and accepted by combined review
+  5708670447"; 5708128737 is kept as history for the pre-stitch 1 KV + 2 D1 wording.
+- Cost tables (here and in the PR body): explicit `Bearer garbage` on `/mcp` row (0 KV / 0 D1 under `RL_MCP_ANON`).
