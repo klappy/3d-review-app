@@ -6,39 +6,21 @@
 import type { Ctx } from "./handlers/types";
 import type { SourceItem } from "./source-item-score";
 import { scoreSourceItem } from "./source-item-score";
-import { buildReportSnapshot, PINNED_SOURCE } from "./report-snapshot";
+import { captureReportSnapshot, PINNED_SOURCE } from "./report-snapshot";
 import { crossLensReference, REFERENCE_ROLLUP_VERSION, rollupReference,
   translationTypeReference, type ScoredRow, type TranslationTypeResponse } from "./reference-rollup";
 import model from "./pinned-report-model.json";
 
-interface InputRow {
-  id: string;
-  answers_json: string;
-  template_id: string;
-  template_version: number;
-  selected_template_id: string;
-  selected_template_version: number;
-  items_json: string;
-  perspective: string;
-  source_ref: string | null;
-}
-
 /** Exact assessment-granted, version-bound private projection; never a route. */
 export async function projectReferenceAssessment(ctx: Ctx, aid: string) {
-  const snapshot = await buildReportSnapshot(ctx, aid); // exact member grant + immutable input fingerprint
+  const { snapshot, rows } = await captureReportSnapshot(ctx, aid); // exact member grant + immutable input fingerprint
   if (snapshot.state !== "held") return { status: snapshot.state, snapshot_id: snapshot.id,
     source_commit: model.commit, algorithm_version: REFERENCE_ROLLUP_VERSION,
     item_scores: [], subdimensions: [], lenses: [], indicators: [], cross_lens: [], translation_type: [] };
-  const { results } = await ctx.db.prepare(`SELECT r.id, r.answers_json, r.template_id, r.template_version,
-      s.template_id AS selected_template_id, s.template_version AS selected_template_version,
-      t.items_json, t.perspective, t.source_ref
-    FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id
-    JOIN survey_template t ON t.id = s.template_id AND t.version = s.template_version
-    WHERE s.assessment_id = ? ORDER BY r.id`).bind(aid).all<InputRow>();
   const scoredRows: ScoredRow[] = [];
   const categoricalRows: TranslationTypeResponse[] = [];
   const item_scores: Array<{ response_id: string; item_id: string; score: number | null; status: string; rule: string }> = [];
-  for (const row of results ?? []) {
+  for (const row of rows) {
     if (row.template_id !== row.selected_template_id || row.template_version !== row.selected_template_version ||
         row.template_version !== 2 || !row.source_ref?.startsWith(PINNED_SOURCE))
       throw new Error("report input changed after snapshot");

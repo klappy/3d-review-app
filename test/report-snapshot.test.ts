@@ -101,7 +101,7 @@ describe("internal immutable report snapshots (not public results)", () => {
       (id, assessment_survey_id, respondent_id, idempotency_key, answers_json, template_id, template_version,
        provenance_json, source, submitted_at)
       VALUES ('resp_v2_2', 'survey_v2', 'respondent_2', 'idem_2', ?, 'tpl_validation', 2,
-       '{}', 'participant', '2026-09-16T20:00:02Z')`).bind('{"TR-Q1":"informal"}').run();
+       '{}', 'participant', '2026-09-16T20:00:02Z')`).bind('{"TR-Q1":"documented"}').run();
     const second = await buildReportSnapshot(ctx("person_mara"), "assess_tavo_collect");
     expect(second.id).not.toBe(first.id);
     expect((await listReportSnapshots(ctx("person_mara"), "assess_tavo_collect")).map(r => r.id))
@@ -113,6 +113,63 @@ describe("internal immutable report snapshots (not public results)", () => {
       .rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
     await expect(listReportSnapshots(ctx("person_mara"), "assess_tavo_prepare"))
       .rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" }); // project ownership does not inherit
+
+    // Deterministic interleaving: append after the response SELECT resolves but
+    // before snapshot persistence. A second scoring SELECT would see this row.
+    let injected = false;
+    let responseReads = 0;
+    const interleavedDb = new Proxy(db, { get(target, property) {
+      if (property !== "prepare") return Reflect.get(target, property, target);
+      return (sql: string) => {
+        const statement = target.prepare(sql);
+        if (!sql.includes("FROM response r")) return statement;
+        return { bind: (...values: unknown[]) => {
+          const bound = statement.bind(...values);
+          return { all: async () => {
+            responseReads++;
+            const captured = await bound.all();
+            if (!injected) {
+              injected = true;
+              await db.prepare(`INSERT INTO response
+                (id, assessment_survey_id, respondent_id, idempotency_key, answers_json,
+                 template_id, template_version, provenance_json, source, submitted_at)
+                VALUES ('resp_race', 'survey_v2', 'respondent_race', 'idem_race',
+                '{"TR-Q1":"documented"}', 'tpl_validation', 2, '{}', 'participant', '2026-09-16T20:00:04Z')`).run();
+            }
+            return captured;
+          } };
+        } };
+      };
+    } }) as D1Database;
+    const beforeAppend = await projectReferenceAssessment({ ...ctx("person_mara"), db: interleavedDb }, "assess_tavo_collect");
+    const beforeSnapshot = await getReportSnapshot(ctx("person_mara"), beforeAppend.snapshot_id);
+    const scoredIds = [...new Set(beforeAppend.item_scores.map(row => row.response_id))].sort();
+    expect(scoredIds).toEqual(["resp_v2_1", "resp_v2_2"]);
+    expect(JSON.parse(beforeSnapshot.evidence_json).response_ids).toEqual(scoredIds);
+    expect(beforeSnapshot.input_hash).toBe(second.input_hash);
+    expect(responseReads).toBe(1);
+    const afterAppend = await projectReferenceAssessment(ctx("person_mara"), "assess_tavo_collect");
+    const afterSnapshot = await getReportSnapshot(ctx("person_mara"), afterAppend.snapshot_id);
+    expect(afterSnapshot.input_hash).not.toBe(beforeSnapshot.input_hash);
+    expect([...new Set(afterAppend.item_scores.map(row => row.response_id))].sort())
+      .toEqual(["resp_race", "resp_v2_1", "resp_v2_2"]);
+    expect(JSON.parse(afterSnapshot.evidence_json).response_ids).toContain("resp_race");
+
+    // Scoring metadata is part of input identity, even without response changes.
+    const originalTemplate = await db.prepare("SELECT items_json, perspective FROM survey_template WHERE id='tpl_validation' AND version=2")
+      .first<{ items_json: string; perspective: string }>();
+    await db.prepare("UPDATE survey_template SET perspective=? WHERE id='tpl_validation' AND version=2")
+      .bind("Synthetic changed perspective").run();
+    const perspectiveChanged = await buildReportSnapshot(ctx("person_mara"), "assess_tavo_collect");
+    expect(perspectiveChanged.input_hash).not.toBe(afterSnapshot.input_hash);
+    await db.prepare("UPDATE survey_template SET perspective=?, items_json=? WHERE id='tpl_validation' AND version=2")
+      .bind(originalTemplate!.perspective, originalTemplate!.items_json + " ").run();
+    const itemsChanged = await buildReportSnapshot(ctx("person_mara"), "assess_tavo_collect");
+    expect(itemsChanged.input_hash).not.toBe(afterSnapshot.input_hash);
+    await db.prepare("UPDATE survey_template SET items_json=? WHERE id='tpl_validation' AND version=2")
+      .bind(originalTemplate!.items_json).run();
+    expect((await buildReportSnapshot(ctx("person_mara"), "assess_tavo_collect")).id).toBe(afterSnapshot.id);
+    expect((await getReportSnapshot(ctx("person_mara"), beforeSnapshot.id)).input_hash).toBe(beforeSnapshot.input_hash);
 
     // An old one-question placeholder response is never pooled as v2 evidence.
     await db.prepare(`INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at)
