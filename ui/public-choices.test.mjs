@@ -54,13 +54,18 @@ test('real sign-in is the only control in the primary flow; sandbox code control
 
 test('the participant card explains shared links first and the code as optional',()=>{
   const p=html.slice(html.indexOf('<section id="participant"'));
-  assert.ok(p.indexOf('<p class="note participant-arrival">')<p.indexOf('<details id="about">'));
+  const arrivalIndex=p.indexOf('<p class="note participant-arrival" id="participant-arrival">'), aboutIndex=p.indexOf('<details id="about">');
+  assert.ok(arrivalIndex>=0&&aboutIndex>=0,'both participant landmarks must exist');
+  assert.ok(arrivalIndex<aboutIndex);
   assert.ok(p.includes('open that link and you are already in the right place. If you were given an access code instead, enter it below. No account is needed.'));
 });
 
 test('shared-link entry hides both the arrival note and the code guidance by explicit id (Bugbot 4036816500), not by first-note position',()=>{
   assert.ok(html.includes('<p class="note participant-arrival" id="participant-arrival">'));
-  assert.ok(html.includes('<p class="note" id="participant-code-guidance">Use an access code released above.'));
+  const guidance=html.match(/<p class="note" id="participant-code-guidance">([^<]+)<\/p>/)?.[1];
+  assert.equal(guidance,'If you were given an access code, enter it below. Missing your survey link? Ask the person who invited you or shared the survey to send you the link.');
+  assert.ok(!guidance.includes('released above'));
+  assert.ok(html.includes('<form id="redeem">'),'received-code entry remains available');
   const app=read('./app.js');
   assert.ok(app.includes("$('participant-arrival').hidden = true; $('participant-code-guidance').hidden = true;"));
   assert.ok(!app.includes("$('participant').querySelector('p.note')"),'no positional note selector remains');
@@ -76,4 +81,16 @@ test('stylesheet is wired and its hides are route-scoped: notice off public/part
     for(const one of sel.split(',').map(x=>x.trim()).filter(x=>x&&!x.startsWith('@')))
       assert.ok(one.startsWith('.rv'),`unscoped selector: ${one}`);
   assert.ok(read('./.assetsignore').split('\n').includes('public-choices.test.mjs'));
+});
+
+
+test('global shell makes no dataset claim while actual sample and sandbox disclosures remain',()=>{
+  const header=html.slice(html.indexOf('<header class="top">'),html.indexOf('</header>'));
+  assert.ok(!header.includes('Synthetic sandbox'));
+  assert.ok(!html.includes('Public synthetic sandbox · use .invalid addresses and fake data only'));
+  assert.ok(header.includes('id="identity"')&&header.includes('id="version"'),'session and build identity controls remain');
+  assert.ok(html.includes('Sandbox test identities (dev only) — not a real sign-in'));
+  assert.ok(html.includes('Synthetic sandbox only (dev): .invalid test identities'));
+  assert.ok(html.includes('Everything here is invented.'));
+  assert.ok(html.includes('Browse a sample assessment (invented data)'));
 });

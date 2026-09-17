@@ -1,0 +1,17 @@
+/* Scoped collaborator controls; integration owns placement and app navigation. */
+.rv .scope-invitations { min-width:0; }
+.rv .scope-invitations[hidden] { display:none; }
+.rv .scope-invitations-actions { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px; }
+.rv .scope-invitations-form { display:flex;align-items:end;flex-wrap:wrap;gap:12px; }
+.rv .scope-invitations label { display:grid;gap:5px;min-width:0;flex:1; }
+.rv .scope-invitations input,.rv .scope-invitations select { max-width:100%;min-width:0; }
+.rv .scope-invitations-context,.rv .scope-invitations-status,.rv .scope-invitations-impact { overflow-wrap:anywhere; }
+.rv .scope-invitations-list { list-style:none;padding:0; }
+.rv .scope-invitations-list li { display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--glass-edge); }
+.rv .scope-invitations-list li>span { flex:1;overflow-wrap:anywhere;min-width:0; }
+.rv .scope-invitations-confirmation:not(:empty),.rv .scope-invitations-credential:not(:empty) { padding:12px;border:1px solid var(--glass-edge);border-radius:var(--r-button);margin-top:12px; }
+.rv .scope-invitations-credential input { width:100%; }
+@media(max-width:600px) {
+ .rv .scope-invitations-form { display:grid;grid-template-columns:minmax(0,1fr); }
+ .rv .scope-invitations-list li { align-items:stretch;flex-direction:column; }
+}

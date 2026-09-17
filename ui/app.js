@@ -1,5 +1,9 @@
 import { mountParticipantView } from './participant-view.js';
-import { loadRoleHelp, loadBlankPrint, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
+import { redactDiagnosticPath } from './diagnostic-path.js';
+import { createCollabHooks } from './collab-mount.js';
+import { mountEntityScreen } from './entity-screen.js';
+import { mountLensSurveys } from './lens-surveys.js';
+import { loadRoleHelp, loadBlankPrint, renderAssessmentHeadrow, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
@@ -20,12 +24,42 @@ const sharedResume = sharedToken === null ? currentNamespace(sessionStorage) : n
 const sharedMode = sharedToken !== null || sharedResume !== null;
 const state = { session: sharedMode ? null : sessionStorage.getItem('facilitatorToken'), participant: sharedMode ? null : sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null, assessmentRole: null, reportConfirm: null, reportCursor: null };
 state.responseKey = sharedMode ? null : savedSubmitKey(sessionStorage, state.participant);
+const collab = createCollabHooks({ document, api, sharedMode, onReload: async () => { const me = await identity(); if (me && hasProjectWork(me)) await projects(); },
+  // Opening a workspace makes it the selected entity: side-effect-free downstream clear (no change handlers, so no
+  // fetch, no transient project scope, no run() notice — Bugbot 4038374305). Same synchronous resets chooseProject
+  // performs before its await; the workspace scope is painted by the hook right after this returns.
+  onWorkspaceOpened: () => clearEntitySelection() });
+function clearEntitySelection() {
+  clearStageScreens();
+  state.project = null; state.projectView = null; state.assessment = null; state.survey = null;
+  clearCodeBatch(); clearShareLink();
+  state.assessmentRole = null; clearReportState(); showReportControls();
+  $('projects').value = ''; $('granted-assessments').value = ''; text($('granted-detail'), '');
+  text($('project-detail'), ''); text($('assessment-detail'), ''); text($('survey-detail'), '');
+  text($('results'), 'Select an assessment.'); text($('notice'), ''); // a completed notice from the previous entity does not survive the switch
+  text($('error'), ''); $('error').hidden = true; // nor its error (Bugbot 4038528843)
+  resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
+  // Complete downstream display-state inventory (Bugbot 4038528822): project languages (select + status; no fetch with
+  // no project), the next-stage target, and the per-entity forms that may hold typed input from the previous entity.
+  languageControls.refresh(); $('stage-target').value = '';
+  $('create-assessment').reset(); $('create-language').reset();
+  lensSurveys?.reset(); entityScreen?.render();
+}
+const entityScreen = sharedMode || typeof window === 'undefined' ? null : mountEntityScreen(document, window, { isStaff: () => collab.isStaff(), selectedWorkspace: () => collab.selectedWorkspace(), backToWorkspaces: () => collab.backToWorkspaces() });
+// Assessment = three lenses; inclusion goes through the existing select/deselect capabilities and re-reads the assessment.
+const lensSurveys = sharedMode || !$('lens-surveys-root') ? null : mountLensSurveys({ document, root: $('lens-surveys-root'), actions: {
+  select: (template_id, version) => run('Including survey…', async () => { const aid = required(state.assessment, 'Choose an assessment.'); await api(`/v2/assessments/${path(aid)}/surveys`, { method: 'POST', body: { template_id, version: Number(version) } }); await chooseAssessment(); }),
+  deselect: sid => run('Removing survey from assessment…', async () => { const aid = required(state.assessment, 'Choose an assessment.'); await api(`/v2/assessments/${path(aid)}/surveys/${path(sid)}`, { method: 'DELETE' }); await chooseAssessment(); }),
+  open: sid => { $('surveys').value = sid; if ($('surveys').value === sid) $('surveys').dispatchEvent(new Event('change')); },
+  counts: async ids => { const aid = state.assessment; const map = new Map(); for (const sid of ids) { try { const r = await api(`/v2/assessments/${path(aid)}/surveys/${path(sid)}`); if (state.assessment === aid) map.set(sid, r.counts); } catch { /* count unavailable: row shows without it */ } } return map; },
+} });
 const path = (value) => encodeURIComponent(value);
 let stageGeneration = 0;
 let stageContext = null;
 function clearStageScreens() {
   stageGeneration++;
   stageContext = null;
+  $('assessment-context').replaceChildren();
   $('stage-workspace').hidden = true;
   for (const id of ['stage-tabs-root', 'stage-help-root', 'stage-tour-root', 'stage-print-root']) $(id).replaceChildren();
   $('stage-print-survey').replaceChildren();
@@ -93,8 +127,8 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   catch { throw new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); }
   let data;
   try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
-  if (!response.ok || !data.ok) throw new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`);
-  const li = document.createElement('li'); li.textContent = `${method} ${url} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
+  if (!response.ok || !data.ok) throw Object.assign(new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
+  const li = document.createElement('li'); li.textContent = `${method} ${redactDiagnosticPath(url)} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
   return data.result;
 }
 async function run(label, task) {
@@ -112,12 +146,16 @@ function showAuthorizedWork(me) {
   // The granted picker is the assessment-only entry: a project identity reaches the same assessment
   // through the project path, so it never becomes a second source for state.assessment.
   $('shared-assessments').hidden = !hasSharedAssessmentEntry(me);
+  const grantedBefore = $('granted-assessments').value; // identity re-observation (onGrantsChanged/onMutation) must not drop the selected granted assessment (Bugbot 4037753258)
   resetSelect($('granted-assessments'), 'Choose');
   for (const grant of assessmentGrants(me)) option($('granted-assessments'), grant.scope_id, `${grant.scope_id} · ${grant.role}`);
+  if (grantedBefore && state.assessment === grantedBefore) $('granted-assessments').value = grantedBefore;
   $('create-project').hidden = !me.principal.provisioned;
   text($('access-state'), visible ? '' : 'No project access is assigned to this identity. Scoped project work is hidden.');
 }
 function resetClientIdentity() {
+  collab.reset(); // W/I managers clear synchronously before any other identity work
+  entityScreen?.reset(); lensSurveys?.reset();
   participantView?.destroy(); participantView = null;
   clearStageScreens();
   clearIdentityData(state, sessionStorage);
@@ -148,10 +186,12 @@ async function identity() {
   const result = await api('/v2/me'); state.principal = result.principal;
   text($('identity'), `${result.principal.kind} · ${result.principal.id}`);
   showAuthorizedWork(result);
+  collab.identity(result);
   return result;
 }
 async function projects() {
   const result = await api('/v2/projects'); resetSelect($('projects'), 'Choose project');
+  collab.projects(result.projects);
   for (const p of result.projects || []) option($('projects'), p.id, `${p.name} · ${p.role}`);
   if (state.project) $('projects').value = state.project;
 }
@@ -164,9 +204,11 @@ async function chooseProject() {
   text($('project-detail'), ''); text($('assessment-detail'), ''); text($('survey-detail'), '');
   text($('results'), 'Select an assessment.');
   resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
-  if (!state.project) { await languageControls.refresh(); return; }
+  collab.setScope(null);
+  if (!state.project) { const ws = collab.selectedWorkspace(); if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role }); await languageControls.refresh(); return; } // leaving a project restores the still-selected workspace scope
   const result = await api(`/v2/projects/${path(state.project)}`);
   state.projectView = result.project;
+  collab.setScope({ type: 'project', id: result.project.id, role: result.project.role });
   await languageControls.refresh();
   await assessments();
 }
@@ -182,21 +224,27 @@ async function chooseAssessment() {
   clearCodeBatch(); clearShareLink();
   state.assessmentRole = null; clearReportState(); showReportControls();
   $('granted-assessments').value = ''; text($('granted-detail'), ''); // one state.assessment, exactly one visible source
+  collab.setScope(null); // R2: downstream collaborator scope resets synchronously before any await
+  lensSurveys?.reset();
   text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
-  if (!state.assessment) return;
+  if (!state.assessment) { if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.role }); return; } // leaving an assessment restores the still-selected project scope (supplier a974903 intent)
   const stageRead = stageSnapshot();
+  if (!state.templates) await templates(); // the lens catalogue must be loaded before the snapshot (Auditor P2 root cause)
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   if (!stageCurrent(stageRead)) return;
   state.assessmentRole = result.assessment.role; showReportControls();
+  renderAssessmentHeadrow(document, $('assessment-context'), result.assessment);
+  collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
   text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
   const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
   if (next) $('stage-target').value = next;
   for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
-  if (result.surveys?.length === 1) { $('surveys').value = result.surveys[0].id; state.survey = result.surveys[0].id; }
+  lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [], canOpen: !$('survey-card').hidden });
   await refreshStageScreens(result.assessment, result.surveys || []);
 }
 async function templates() {
   const result = await api('/v2/templates'); resetSelect($('templates'), 'Choose current pinned template');
+  state.templates = result.templates || [];
   for (const choice of templateChoices(result.templates || [])) {
     const entry = new Option(choice.label, choice.value);
     entry.disabled = choice.disabled;
@@ -260,14 +308,20 @@ async function chooseGrantedAssessment() {
   clearCodeBatch(); clearShareLink(); clearReportState(); showReportControls();
   $('assessments').value = ''; text($('assessment-detail'), ''); resetSelect($('surveys'), 'Choose survey');
   text($('survey-detail'), ''); text($('results'), 'Select an assessment.'); text($('granted-detail'), '');
-  if (!state.assessment) return;
+  collab.setScope(null); lensSurveys?.reset(); entityScreen?.render(); // Bugbot 4037616728: the granted entry is an assessment selection too
+  if (!state.assessment) { const ws = collab.selectedWorkspace(); if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role }); return; } // empty direct-grant selection: explicit terminal restore of the selected workspace (transition matrix)
   try {
     const stageRead = stageSnapshot();
+    if (!state.templates) await templates();
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   if (!stageCurrent(stageRead)) return;
     state.assessmentRole = result.assessment.role; showReportControls();
+    renderAssessmentHeadrow(document, $('assessment-context'), result.assessment);
+    collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
     text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
     for (const survey of result.surveys || []) option($('surveys'), survey.id, survey.template_name || survey.id);
+    lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [], canOpen: !$('survey-card').hidden });
+    entityScreen?.render();
     await refreshStageScreens(result.assessment, result.surveys || []);
   } catch (error) { state.assessmentRole = null; showReportControls(); clearReportState(); throw error; }
 }
@@ -385,6 +439,9 @@ function clearReportState() {
 function showReportControls() {
   const mayBuild = state.assessmentRole === 'owner' || state.assessmentRole === 'member';
   $('preview-report').hidden = !mayBuild; $('build-report').hidden = !mayBuild;
+  // Auditor P2: a viewer's write controls on the survey card always 403 at the server; gate them on the same exact
+  // assessment role the report controls use. Reads (survey-status, refresh-counts, blank print) stay. No backend change.
+  for (const id of ['issue-codes', 'code-count', 'preview-export', 'release-codes', 'issue-link-preview', 'issue-link-confirm', 'select-survey', 'load-templates']) { const n = $(id); if (n) n.hidden = !mayBuild; }
 }
 function reportRoute() { return `/v2/assessments/${path(required(state.assessment, 'Choose an assessment.'))}/reports`; }
 // Any failure inside a report action leaves no half-state behind; run()/fail() still shows the API message.

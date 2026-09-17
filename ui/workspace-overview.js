@@ -272,12 +272,6 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
     stand(projectRoot, ...nodes);
   }
 
-  // Collapsed row (S4 #13): with an assessment selected the phase composition owns the space below,
-  // so the overview keeps only its crumbs and one project line, and never hides itself.
-  function renderProjectRow(project) {
-    stand(projectRoot, el(doc, 'p', [project.name, project.organization, `your role: ${project.role}`].filter(Boolean).join(' · '), 'muted'));
-  }
-
   // --- C. Crumbs (tree.js crumbs, L98-110) -------------------------------------------------------
   function renderCrumbs(project, assessment) {
     if (!project) { stand(crumbsRoot); return; }
@@ -335,7 +329,7 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
     // The live #assessments value is the composition authority. This GET is only for names;
     // a miss or failed list must not claim `project` (that state hides the workspace cards).
     setState(aid ? 'assessment' : 'project');
-    if (aid) { renderProjectRow(project); return; }
+    if (aid) { stand(projectRoot); return; }
     // One closure, reused by every repaint: the level menu must survive any number of
     // Assessments/Languages transitions, not just the first.
     const repaint = () => { if (gen === generation) renderProject(project, rows, languages, repaint); };

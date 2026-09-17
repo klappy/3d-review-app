@@ -43,17 +43,36 @@ describe('real compiled renderer with local D1',()=>{
   const corpusStarted=performance.now();
   console.log('C2A_REAL_CORPUS_START '+JSON.stringify({runtime:process.version,deadlineMs:corpusDeadlineMs,expectedContexts:34,expectedResponses:425}));
   const measurements:any[]=[];let total=0,max=0;
+  // Bounded diagnostic wall time only: no source IDs, answers, SQL or credentials.
+  let contextIndex=0,phaseStarted=0;
+  const phaseStart=(phase:string)=>{phaseStarted=performance.now();console.log('C2A_PHASE '+JSON.stringify({contextIndex,phase,event:'START',elapsedMs:phaseStarted-corpusStarted}));};
+  const phaseEnd=(phase:string)=>{const now=performance.now();console.log('C2A_PHASE '+JSON.stringify({contextIndex,phase,event:'END',elapsedMs:now-corpusStarted,durationMs:now-phaseStarted}));};
   for(const id of Object.keys(sourceFixture.contexts)){
+   contextIndex++;
+   phaseStart('capture');
    const c=await capture(id);total+=c.rows.length;max=Math.max(max,c.rows.length);
+   phaseEnd('capture');
+   phaseStart('expected-render');
    const expected=await renderSyntheticReport(id,c.rows);expect(expected.eligible).toBe(true);if(!expected.eligible)throw new Error('gold render refused');
+   phaseEnd('expected-render');
+   phaseStart('build');
    const start=performance.now(),r=await report(id),buildMs=performance.now()-start;
+   phaseEnd('build');
    expect(canonicalJson(r.payload)).toBe(expected.payloadJson);
+   phaseStart('get');
    const readStart=performance.now(),read=await store.readMaterialized(context(),r.id),getMs=performance.now()-readStart;
+   phaseEnd('get');
    expect(read.ok).toBe(true);if(read.ok)expect(canonicalJson(read.value.payload)).toBe(expected.payloadJson);
+   phaseStart('list');
    const listStart=performance.now(),list=await store.listMaterialized(context(),id),listMs=performance.now()-listStart;
+   phaseEnd('list');
    expect(list.ok).toBe(true);if(list.ok){expect(list.value.reports.map(x=>x.id)).toEqual([r.id]);expect(list.value.afterId).toBeNull();}
+   phaseStart('repeat-build');
    const again=await report(id);expect(again.id).toBe(r.id);
+   phaseEnd('repeat-build');
+   phaseStart('raw-row');
    const row=await db.prepare('SELECT * FROM synthetic_report WHERE id=?').bind(r.id).first<any>();
+   phaseEnd('raw-row');
    expect(row.payload_json).toBe(expected.payloadJson);expect(row.payload_sha256).toBe(hash(expected.payloadJson));
    expect([row.source_pin,row.index_root,row.scorer_version,row.narrative_version,row.policy_version,row.output_schema_version]).toEqual([sourceFixture.source_commit,'d964f81639e0929ce5f53156b28e3902732b98d2394c6d8dc31c9d14a22fb7dd',REPORT_VERSIONS.scorer,REPORT_VERSIONS.narrative,REPORT_VERSIONS.policy,REPORT_SCHEMA]);
    if(id===aid)expect(row.report_key).toBe('68b602d11a77162f72320c43827d30d33ed9f95fca9dfe5cb07f18905176a52d');
