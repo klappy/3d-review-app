@@ -39,7 +39,7 @@ for (const cap of capabilities) {
     // per anonymous request with no limit). Spent after credential resolution and before the body is parsed; a refusal
     // returns the contract error and writes nothing. Credential holders are not counted here. Mirrors /mcp below.
     if (ctx.principal.kind === "anonymous" && !(await allow(c.env, "RL_HTTP_ANON", `ip:${ctx.clientIp}`))) {
-      const res = json(fail("RATE_LIMITED", "too many anonymous requests — sign in, or wait up to 60 seconds", `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again`, cap.id, ctx.traceId), 429);
+      const res = json(fail("RATE_LIMITED", `too many anonymous requests — sign in, or wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`, `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again`, cap.id, ctx.traceId, { retry_after: RATE_LIMIT_WINDOW_SECONDS }), 429);
       res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
       return res;
     }
@@ -107,7 +107,7 @@ app.post("/mcp", async (c) => {
   if (units > MCP_MAX_BATCH) return rpcError(400, -32600, `batch too large: at most ${MCP_MAX_BATCH} messages per request`);
   if (ctx.principal.kind === "anonymous") for (let i = 0; i < units; i++)
     if (!(await allow(c.env, "RL_MCP_ANON", `ip:${ctx.clientIp}`)))
-      return rpcError(429, -32029, "rate limited — sign in, or wait up to 60 seconds", { code: "RATE_LIMITED", trace_id: ctx.traceId }, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
+      return rpcError(429, -32029, `rate limited — sign in, or wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`, { code: "RATE_LIMITED", retry_after: RATE_LIMIT_WINDOW_SECONDS, trace_id: ctx.traceId }, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
   return handleMcp(c.req.raw, ctx, execute as any, async (cx, a) => {
     try { const r = await docs(cx, a); return ok("cap.docs.get", r.result, cx.traceId); }
     catch (e: any) { return fail(e.code ?? "INVALID_PARAMS", e.message, e.hint, "cap.docs.get", cx.traceId); }

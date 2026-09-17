@@ -102,7 +102,11 @@ describe("B2 — RL_HTTP_ANON meters every anonymous HTTP twin per address (audi
     const r = await get(env, "/v2/health", "198.51.100.20");
     expect(r.status).toBe(429); expect(r.headers.get("retry-after")).toBe("60");
     const j: any = await r.json(); expect(j.error.code).toBe("RATE_LIMITED"); expect(j.trace_id).toBeTruthy();
+    expect(j.error.data.retry_after).toBe(60); // same value as the header (review 5708112856 #1)
     expect(await traces()).toBe(before);
+    // MCP transport refusal carries the same field in its -32029 data
+    const m = await post(mkEnv({ RL_MCP_ANON: limiter(0) }), "/mcp", rpc("tools/list"), "198.51.100.22");
+    expect(m.status).toBe(429); expect(((await m.json()) as any).error.data).toMatchObject({ code: "RATE_LIMITED", retry_after: 60 });
     expect(counted.counts.writes).toBe(0);
     // credentialed caller on the SAME address: served, and the anonymous counter does not move
     const bearer = await mintSession(env, "person_mara", "user");
