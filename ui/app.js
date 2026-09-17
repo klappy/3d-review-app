@@ -1,4 +1,5 @@
 import { mountParticipantView } from './participant-view.js';
+import { redactDiagnosticPath } from './diagnostic-path.js';
 import { loadRoleHelp, loadBlankPrint, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
@@ -94,7 +95,7 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   let data;
   try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
   if (!response.ok || !data.ok) throw new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`);
-  const li = document.createElement('li'); li.textContent = `${method} ${url} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
+  const li = document.createElement('li'); li.textContent = `${method} ${redactDiagnosticPath(url)} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
   return data.result;
 }
 async function run(label, task) {

@@ -26,6 +26,7 @@ function harness(saved = {}) {
     sessionStorage: {getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
     location:{hash:''}, history:{replaceState(){}}, crypto:{randomUUID:()=> 'synthetic-key'},
     Option:class {}, FormData:class { constructor(target){this.target=target} get(k){return this.target.fields?.[k]??null} },
+    redactDiagnosticPath:u=>u, // app.js import stripped above; the real function is unit-tested in diagnostic-path.test.mjs
     fetch:async(url,options)=>{requests.push({url,options});return responder(url,options)},
   });
   const source = fs.readFileSync(new URL('./app.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
