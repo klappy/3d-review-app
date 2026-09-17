@@ -1,1 +1,110 @@
-:root{font:16px system-ui,sans-serif;color:#17212b;background:#f6f7f8}*{box-sizing:border-box}body{margin:0}header{display:flex;justify-content:space-between;align-items:center;padding:1.5rem 2rem;background:#fff;border-bottom:1px solid #d7dde3}header h1{margin:.2rem 0}small{letter-spacing:.12em;color:#536578}header p,.note{color:#536578;font-size:.88rem}main{display:grid;grid-template-columns:14rem minmax(0,1fr);min-height:calc(100vh - 8rem)}aside{padding:1.5rem;border-right:1px solid #d7dde3}nav{display:grid;gap:.75rem}a{color:#115c9a}.content{padding:1.5rem;max-width:75rem}section{margin:1rem 0 2rem}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));gap:1rem}article{background:#fff;border:1px solid #d7dde3;border-radius:8px;padding:1rem}h2{margin-top:0}h3{margin:.2rem 0 1rem}form,label{display:grid;gap:.4rem}form{margin:.8rem 0 1.4rem}input,select,button{font:inherit;padding:.55rem;border:1px solid #abb7c3;border-radius:5px}input,select{width:100%;background:#fff}button{background:#175d91;color:#fff;border-color:#175d91;cursor:pointer;margin:.3rem .3rem .3rem 0}button:disabled{opacity:.6;cursor:wait}#notice,#error{padding:.7rem 1rem;border-radius:5px;background:#e9f1f6}#error,#participant-error{background:#fce8e8;color:#8c1f1f;padding:.7rem 1rem;border-radius:5px;margin-top:.5rem}#participant,#evidence{background:#fff;border:1px solid #d7dde3;padding:1rem;border-radius:8px}#questions fieldset{margin:1rem 0;border:1px solid #d7dde3}#questions label{display:flex;align-items:center;margin:.5rem 0}#questions label input{width:auto}#events{font: .8rem ui-monospace,monospace;overflow-wrap:anywhere}#receipt{padding:1rem;background:#e7f5ed}.version-badge{background:transparent;color:inherit;border:1px solid #abb7c3;font-size:.8rem;padding:.3rem .6rem;margin:0 0 0 1rem}.version-badge[aria-disabled="true"]{opacity:.6;cursor:default}dialog#changelog{max-width:40rem}[hidden]{display:none!important}@media(max-width:700px){header{display:block}main{display:block}aside{border-right:0;border-bottom:1px solid #d7dde3}.content{padding:1rem}}
+/* Live composition from cookbook design-system@2c29676; no mock runtime. */
+html,body{margin:0;min-height:100%;background:var(--ground)}
+body.rv{border-radius:0;min-height:100vh;overflow:visible}
+[hidden]{display:none!important}
+.rv .top{min-height:84px;padding:22px 28px}
+.rv .brand{text-decoration:none;color:var(--ink);white-space:nowrap}
+.rv .top-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.rv .me{padding:6px 12px;border-radius:var(--r-pill);background:var(--badge-fill);color:var(--badge-ink);font-size:13px;overflow-wrap:anywhere}
+.rv .shell{display:grid;grid-template-columns:var(--shell-panel-w) minmax(0,1fr);min-height:calc(100vh - 84px)}
+.rv .tree{padding:26px 18px;min-width:0}
+.rv .tree-footer{margin-top:auto;padding-top:28px;color:var(--secondary)}
+.rv .content{padding:var(--main-pad);min-width:0;width:100%;max-width:1180px}
+.rv .headrow{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.rv .headrow h1{margin-bottom:0}
+.rv .introduction{margin:0 0 28px}
+.rv .purpose{max-width:760px;font-size:17px;color:var(--secondary);margin-top:0}
+.rv .perspectives{margin-top:24px;gap:var(--gap-perspectives)}
+.rv .rw-perspective p{font-size:13px;margin:4px 0 0;color:var(--secondary)}
+.rv .rw-dot.team{background:var(--perspective-team)}
+.rv .rw-dot.community{background:var(--perspective-community)}
+.rv .rw-dot.church{background:var(--perspective-church)}
+.rv section{scroll-margin-top:24px}
+.rv #facilitator{margin-top:26px}
+.rv #facilitator>.grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.rv article.panel{margin:0;min-width:0}
+.rv #survey-card,.rv #reports-card{grid-column:1/-1}
+.rv .participant-panel,.rv .evidence-panel{margin-top:28px}
+.rv span.note{display:block;margin-top:8px}
+.rv .note{color:var(--secondary);overflow-wrap:anywhere}
+.rv form{margin:16px 0 22px}
+.rv button{margin:3px 4px 3px 0}
+.rv button:disabled{cursor:default}
+.rv a{color:var(--green)}
+.rv .rv-btn{display:inline-flex;align-items:center;justify-content:center;min-height:var(--button-min-h);padding:9px 15px;border-radius:var(--r-button);border:1px solid var(--glass-edge);background:var(--button-fill);color:var(--ink);box-shadow:var(--shadow-button);text-decoration:none;font-weight:500}
+.rv .rv-btn.primary{background:var(--green);color:var(--primary-ink);border-color:transparent;box-shadow:var(--shadow-primary)}
+.rv #notice,.rv #error,.rv #participant-error,.rv #receipt{padding:12px 16px;border-radius:var(--r-button);overflow-wrap:anywhere}
+.rv #notice{background:var(--note-fill);font-size:13px}
+.rv #error,.rv #participant-error{background:var(--warning-fill);color:var(--warning-ink);margin-top:8px}
+.rv #receipt{background:var(--badge-fill);color:var(--badge-ink)}
+.rv #access-state{grid-column:1/-1}
+.rv fieldset{min-width:0;border:1px solid var(--line);border-radius:var(--r-button);margin:16px 0;padding:16px}
+.rv #questions label{display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--line);border-radius:var(--r-choice);background:var(--paper);font-weight:400}
+.rv #questions label:has(input:checked){background:var(--choice-selected);border-color:var(--choice-selected-edge)}
+.rv #questions label input[type=checkbox],.rv #questions label input[type=radio]{width:auto;flex:none;margin-top:4px}
+.rv #questions label:has(textarea),.rv #questions label:has(input:not([type=checkbox]):not([type=radio])){display:block}
+.rv #events{font:12px/1.6 ui-monospace,monospace;overflow-wrap:anywhere;padding-left:20px}
+.rv pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.rv .version-badge{font-size:12px;min-height:32px;margin:0}
+.rv .version-badge[aria-disabled=true]{opacity:.6;cursor:default}
+.rv dialog#changelog{width:min(640px,calc(100% - 32px));max-height:85vh;overflow:auto;background:var(--paper);color:var(--ink);margin:auto}
+.rv dialog::backdrop{background:rgba(23,46,64,.28);backdrop-filter:blur(3px)}
+.rv details{border-top:1px solid var(--line);padding:12px 0}
+.rv summary{cursor:pointer;font-weight:550}
+.rv #report-list{font-size:14px;overflow-wrap:anywhere;padding-left:20px}
+.rv #report-list button{text-align:left;background:var(--button-fill);color:var(--green)}
+.rv #report-view{margin-top:24px}
+.rv #report-view section{margin:16px 0}
+.rv #report-view h4{margin:6px 0}
+.rv #report-view ul{margin:6px 0;padding-left:20px}
+.rv .skip-link{position:absolute;top:-100px;left:16px;z-index:50;background:var(--paper);padding:12px;border-radius:var(--r-button)}
+.rv .skip-link:focus{top:12px}
+.rv :is(a,summary,textarea,button,input,select):focus-visible{outline:var(--focus-w) solid var(--focus);outline-offset:var(--focus-w)}
+/* A hidden access-controlled card never becomes visible through navigation. */
+.rv .shell:has(>aside[hidden]){grid-template-columns:minmax(0,1fr)}
+@media(max-width:760px){
+ .rv .top{padding:16px;gap:12px}
+ .rv .top-right{gap:8px}
+ .rv .shell{grid-template-columns:minmax(0,1fr)}
+ .rv .tree{padding:10px 14px;border-right:0;border-bottom:1px solid var(--glass-edge);display:block}
+ .rv .tree>.eyebrow,.rv .tree-footer{display:none!important}
+ .rv .tree-section{display:flex;flex-direction:row;gap:4px;flex-wrap:wrap}
+ .rv .tree-row{padding:9px 6px;min-height:44px;font-size:13px}
+ .rv .tree-row .tree-label small{display:none}
+ .rv .content{padding:20px 14px}
+ .rv .grid,.rv .three,.rv #facilitator>.grid{grid-template-columns:minmax(0,1fr)}
+ .rv .headrow{margin-bottom:20px}
+ .rv h1{font-size:27px}
+ .rv .glass.panel{padding:20px}
+ .rv .purpose{font-size:16px}
+ .rv #survey-card,.rv #reports-card{grid-column:auto}
+ .rv .rv-btn{max-width:100%;text-align:center}
+}
+@media(prefers-reduced-transparency:reduce){.rv .glass,.rv .top,.rv aside{background:var(--paper);backdrop-filter:none;-webkit-backdrop-filter:none}}
+@media(prefers-reduced-motion:reduce){.rv *{scroll-behavior:auto}}
+/* Shared survey routes hide the facilitator; keep its moved sign-out control hidden too. */
+.rv:has(#facilitator[hidden]) #signout{display:none}
+
+/* The live tree mirrors only current authorized select options. */
+.rv .context-branches{list-style:none;margin:0;padding:0;min-width:0}
+.rv .context-branches.tree-kids{margin-left:12px;padding-left:4px}
+.rv button.context-node{display:block;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;min-height:36px;font-size:13px;box-shadow:none;background:transparent;border:1px solid transparent;margin:2px 0;padding:8px}
+.rv button.context-node.on{background:var(--nav-active);border-color:var(--glass-edge);box-shadow:var(--shadow-nav-active)}
+.rv #context-tree{min-width:0}
+@media(max-width:760px){.rv #context-tree{flex-basis:100%;order:4}.rv .context-branches.tree-kids{display:block}.rv button.context-node{min-height:44px}.rv #context-tree .tree-empty{margin:0;padding:4px 8px}}
+/* Public welcome uses the same pinned stage composition as the reference. */
+.rv #public-entry{padding:0 26px 32px}
+.rv .public-stage{max-width:var(--stage-max-w);margin:24px auto 0;padding:var(--stage-pad);background:var(--welcome-glass);border-radius:var(--r-stage);box-shadow:var(--shadow-stage)}
+.rv .public-stage h1{font-size:40px;line-height:1.12;letter-spacing:-1.7px;max-width:610px}
+.rv .public-stage>.eyebrow{margin:18px 0 12px;font-weight:400}
+.rv .public-lead{max-width:590px;font-size:17px;color:var(--secondary)}
+.rv .public-stage>.perspectives{margin:30px 0}
+.rv .public-stage>p:not(.eyebrow){max-width:650px;color:var(--secondary)}
+.rv .public-pacing{font-size:13px;margin:19px 0}
+.rv .rv-btn.quiet{background:transparent;border-color:transparent;box-shadow:none}
+.rv[data-entry-view=home] .shell,.rv[data-entry-view=how] .shell,.rv[data-entry-view=example] .shell{display:none}
+.rv:not([data-entry-view=workspace]) .top #identity,.rv:not([data-entry-view=workspace]) .top #signout{display:none}
+.rv[data-entry-view=workspace] #public-entry{display:none}
+.rv[data-entry-view=workspace] .introduction{display:none}
+.rv .public-example-phases{margin:24px 0}
+@media(max-width:760px){.rv #public-entry{padding:0 14px 24px}.rv .public-stage{padding:24px 20px;margin-top:16px}.rv .public-stage h1{font-size:32px;letter-spacing:-1px}.rv .public-stage .perspectives{grid-template-columns:1fr}.rv .public-stage .row{gap:8px}}
