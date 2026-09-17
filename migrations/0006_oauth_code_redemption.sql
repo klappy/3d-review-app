@@ -1,4 +1,6 @@
 -- OAuth authorization-code redemption record (fix/pr15-auth-hardening, review #15 finding 2).
+-- Ordinal 0006: 0005 is taken by 0005_report_snapshot.sql on review/report-baseline-20260916 (not merged here); this
+-- migration is independent of it and must keep its filename when the branches meet.
 -- The borrowed provider's "code already used" check is a KV read→check→write and is not atomic: N concurrent
 -- POST /token with one code could all mint tokens. The provider's tokenExchangeCallback runs after the PKCE and
 -- client checks and before the KV write; the worker inserts one row per grant there with INSERT OR FAIL, so the

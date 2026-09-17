@@ -27,8 +27,10 @@ const apiHandler = {
   },
 };
 
-/** Provider options for one env. Exported for tests that need the same options against a counting env. */
-export function providerOptions(env: OAuthEnv): OAuthProviderOptions<OAuthEnv> {
+/** SQLite constraint failure as D1 reports it (miniflare and production both surface the SQLite text). */
+const CONSTRAINT = /UNIQUE constraint failed|PRIMARY KEY constraint failed|SQLITE_CONSTRAINT/i;
+/** Provider options for one env (module-private; the WeakMap factory below is the only builder). */
+function providerOptions(env: OAuthEnv): OAuthProviderOptions<OAuthEnv> {
   const options: OAuthProviderOptions<OAuthEnv> = {
     apiRoute: "/mcp",
     apiHandler: apiHandler as any,
@@ -55,8 +57,14 @@ export function providerOptions(env: OAuthEnv): OAuthProviderOptions<OAuthEnv> {
       if (grantType !== "authorization_code") return;
       try {
         await env.DB.prepare("INSERT OR FAIL INTO oauth_code_redemption (grant_id, user_id, redeemed_at) VALUES (?, ?, ?)").bind(grantId, userId, new Date().toISOString()).run();
-      } catch {
-        throw new OAuthError("invalid_grant", { description: "Authorization code already used" });
+      } catch (e) {
+        // Only a PRIMARY KEY / UNIQUE conflict means the code was redeemed. Any other D1 failure (outage, missing table,
+        // bind error) must not look like invalid_grant — a client treats that as terminal and discards a code that was never
+        // burnt. The provider has not written the grant yet, so after a 503 the same code is still redeemable (Bugbot
+        // 4032844495; review 5708128737).
+        const msg = `${e instanceof Error ? e.message : String(e)} ${e instanceof Error && e.cause instanceof Error ? e.cause.message : ""}`;
+        if (CONSTRAINT.test(msg)) throw new OAuthError("invalid_grant", { description: "Authorization code already used" });
+        throw new OAuthError("temporarily_unavailable", { description: "authorization storage is temporarily unavailable", statusCode: 503 });
       }
     },
   };

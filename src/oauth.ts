@@ -69,11 +69,18 @@ const CSP_SELF = "default-src 'none'; style-src 'unsafe-inline'; form-action 'se
  *  'self' alone (Bugbot 4032352529 / review #15-1; reproduced in headless Chromium). Widen to exactly one source derived from
  *  the provider-validated redirect URI: its origin for http/https, `<scheme>:` for custom schemes (origin is "null" there).
  *  Never the raw query string. */
+const CSP_ORIGIN = /^https?:\/\/(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::[0-9]{1,5})?$/; // host or IPv6 literal, optional port
+const CSP_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:$/;
+const CSP_SCHEME_DENY = new Set(["javascript:", "data:", "vbscript:", "file:", "mailto:", "blob:", "http:", "https:"]); // provider's denylist + "origin was null"
 export function consentCsp(validatedRedirectUri: string): string {
   let source = "";
   try {
     const u = new URL(validatedRedirectUri);
-    source = u.origin !== "null" ? u.origin : /^[a-z][a-z0-9+.-]*:$/i.test(u.protocol) ? u.protocol : "";
+    const candidate = u.origin !== "null" ? u.origin : u.protocol;
+    // Allowlist the emitted token (review 5708128737): only a plain http(s) origin or a bare scheme ever reaches the header.
+    // Anything else (a ';' or '*' or space that URL parsing let through) falls back to 'self' — the flow then blocks, which
+    // is acceptable because that destination is the registrant's own.
+    if (CSP_ORIGIN.test(candidate) || (CSP_SCHEME.test(candidate) && !CSP_SCHEME_DENY.has(candidate.toLowerCase()))) source = candidate;
   } catch { /* unparseable → no widening */ }
   return source ? `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${source}; frame-ancestors 'none'` : CSP_SELF;
 }

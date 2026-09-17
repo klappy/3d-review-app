@@ -81,7 +81,26 @@ describe("A1 consent CSP: form-action widened to exactly the provider-validated 
     expect(consentCsp("not a url")).toBe("default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'");
     // a raw query string can never reach the directive: only a parsed origin/scheme is emitted
     expect(consentCsp("https://client.example/cb 'unsafe-inline' https://evil.example")).not.toContain("evil");
+    // allowlist (review 5708128737): anything that is not a plain http(s) origin or a bare scheme falls back to 'self'
+    const SELF = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
+    expect(consentCsp("https://[::1]:8443/cb")).toContain("form-action 'self' https://[::1]:8443;");
+    expect(consentCsp("https://user:pw@client.example/cb")).toContain("form-action 'self' https://client.example;"); // URL drops userinfo from origin
+    expect(consentCsp("weird;scheme://x/cb")).toBe(SELF);
+    expect(consentCsp("cursor*://x/cb")).toBe(SELF);
+    expect(consentCsp("javascript:alert(1)")).toBe(SELF); expect(consentCsp("data:text/html,x")).toBe(SELF); expect(consentCsp("file:///etc/passwd")).toBe(SELF);
+    expect(consentCsp("http://a b/cb")).toBe(SELF);
   });
+  it("a registered redirect_uri whose host/scheme carries ';' or '*' widens nothing (falls back to 'self')", async () => {
+    // the provider validates redirect URIs by scheme denylist + exact match, so a custom scheme with ';' or '*' registers
+    for (const uri of ["odd;scheme://host/cb", "odd*scheme://host/cb"]) {
+      const r = await call("/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client_name: "Odd", redirect_uris: [uri], token_endpoint_auth_method: "none", grant_types: ["authorization_code"], response_types: ["code"] }) });
+      expect([201, 400], uri).toContain(r.status); if (r.status !== 201) continue; // provider refused it (WHATWG URL rejects the scheme) — nothing to widen
+      const { client_id } = (await r.json()) as any; const p = await pkce();
+      const c = await toConsent(env, client_id, uri, p.challenge);
+      expect(c.page.status, uri).toBe(200);
+      expect(c.page.headers.get("content-security-policy"), uri).toBe("default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'");
+    }
+  }, 60_000);
   it("consent page for an https client, for a custom-scheme client; deny 302 has no CSP; error pages keep 'self'", async () => {
     const h = await register("https://client.example/cb"); const p = await pkce();
     const c1 = await toConsent(env, h.clientId, h.redirect, p.challenge);
@@ -160,6 +179,19 @@ describe("A2 authorization code is single-use under concurrency (D1 INSERT OR FA
     expect(r.status).toBe(400); expect(((await r.json()) as any).error).toBe("invalid_grant");
     expect(kv.filter((op) => op === "delete" || op === "put")).toEqual([]); // no revoke, no grant write
     expect(await env.OAUTH_KV.get(`grant:${userId}:${grantId}`)).not.toBeNull();
+  }, 60_000);
+
+  it("a non-constraint D1 error → 503 temporarily_unavailable (not invalid_grant); the code is not burnt and redeems once D1 is back", async () => {
+    const h = await register(); const p = await pkce(); const code = await getCode(env, h.clientId, h.redirect, p.challenge);
+    const params = { grant_type: "authorization_code", code, client_id: h.clientId, redirect_uri: h.redirect, code_verifier: p.verifier };
+    // INSERT rejects with an outage-shaped error (statement-level, not a constraint); everything else passes through
+    const flaky = new Proxy(env.DB, { get(t, k) { if (k === "prepare") return (sql: string) => { const st = t.prepare(sql); return sql.startsWith("INSERT OR FAIL INTO oauth_code_redemption") ? { bind: () => ({ run: async () => { throw new Error("D1_ERROR: Network connection lost."); } }) } : st; }; const v = Reflect.get(t, k, t); return typeof v === "function" ? v.bind(t) : v; } });
+    const r = await token({ ...env, DB: flaky }, params);
+    expect(r.status).toBe(503); const body: any = await r.json();
+    expect(body.error).toBe("temporarily_unavailable"); expect(body.error).not.toBe("invalid_grant");
+    const [, grantId] = code.split(":"); expect(await env.DB.prepare("SELECT 1 FROM oauth_code_redemption WHERE grant_id = ?").bind(grantId).first()).toBeNull();
+    const ok = await token(env, params); expect(ok.status).toBe(200);
+    expect(await env.DB.prepare("SELECT 1 FROM oauth_code_redemption WHERE grant_id = ?").bind(grantId).first()).not.toBeNull();
   }, 60_000);
 
   it("provider is built per env: the redemption row lands in THAT env's DB (two distinct env objects)", async () => {
