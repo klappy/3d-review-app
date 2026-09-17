@@ -35,5 +35,9 @@ test('app.js lifecycle: reset first on identity change; identity/projects snapsh
   assert.ok(mount.includes('if (staff && refreshedGeneration !== snapshot.generation) {'),'W list is read once per identity generation, never on reloads');
   assert.ok(!/projects\(list\) \{[^}]*workspaces\.refresh/.test(mount),'projects() never refreshes W');
   assert.ok(mount.includes('if (!currentScope) invitations.setScope(null);'),'identity re-observation keeps a current host scope');
+  assert.ok(mount.includes('onGrantsChanged: async () => { await onReload(); if (!selectedWorkspace) await workspaces.refresh(); }'),'accepted workspace invitation reaches the W list (Bugbot 4037957668)');
+  assert.ok(mount.includes("(selectedWorkspace ? { type: 'workspace', id: selectedWorkspace.id, role: selectedWorkspace.role } : null)"),'clearing a child scope restores the selected workspace scope (Bugbot 4037957687)');
+  const app2=read('./app.js');
+  assert.ok(app2.includes("for (const id of ['issue-codes', 'code-count', 'preview-export', 'release-codes', 'issue-link-preview', 'issue-link-confirm', 'select-survey', 'load-templates']) { const n = $(id); if (n) n.hidden = !mayBuild; }"),'viewer write controls gated on assessmentRole (Auditor P2)');
   assert.ok(!/sessionStorage|localStorage|facilitatorToken/.test(mount),'hooks never touch token storage');
 });

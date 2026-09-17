@@ -19,7 +19,9 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload }) 
     authorizedProjects: snapshot.authorizedProjects.map(p => ({ id: p.id, name: p.name, role: p.role })),
   });
   let invitations = null, workspaces = null, selectedWorkspace = null, currentScope = null, refreshedGeneration = -1;
-  invitations = mountScopeInvitations({ document: doc, root: iRoot, request, getContext, onGrantsChanged: () => onReload() });
+  // Bugbot 4037957668: an accepted WORKSPACE invitation must reach the list; the W list is re-read after the identity
+  // reload unless a workspace is currently selected (a nested refresh would throw that selection away, Bugbot 4037616741).
+  invitations = mountScopeInvitations({ document: doc, root: iRoot, request, getContext, onGrantsChanged: async () => { await onReload(); if (!selectedWorkspace) await workspaces.refresh(); } });
   workspaces = mountWorkspaceManager({
     document: doc, root: wRoot, request, getContext,
     // A null workspace (deselect/refresh/deletion) only clears a WORKSPACE scope; a project/assessment scope is untouched (Bugbot 4037616741).
@@ -40,7 +42,8 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload }) 
     // update the snapshot only, so a just-created or selected workspace is not thrown back to the list (Bugbot 4037616741).
     identity(me) { snapshot.principal = me?.principal ?? null; const staff = me?.principal?.kind === 'user' || me?.principal?.kind === 'support'; if (acceptButton) acceptButton.hidden = !(staff && me.principal.kind === 'user'); if (staff && refreshedGeneration !== snapshot.generation) { refreshedGeneration = snapshot.generation; if (!currentScope) invitations.setScope(null); workspaces.refresh(); } },
     projects(list) { snapshot.authorizedProjects = (list || []).map(p => ({ id: p.id, name: p.name, role: p.role })); },
-    setScope(scope) { currentScope = scope ? { type: scope.type, id: scope.id, role: scope.role } : null; if (scope) invitations.setScope(currentScope); else invitations.reset(); },
+    // Bugbot 4037957687: clearing a project/assessment scope (Back, project cleared) restores the selected workspace scope instead of resetting.
+    setScope(scope) { currentScope = scope ? { type: scope.type, id: scope.id, role: scope.role } : (selectedWorkspace ? { type: 'workspace', id: selectedWorkspace.id, role: selectedWorkspace.role } : null); if (currentScope) invitations.setScope(currentScope); else invitations.reset(); },
     destroy() { invitations.destroy(); workspaces.destroy(); },
   };
 }

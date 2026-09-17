@@ -416,6 +416,9 @@ function clearReportState() {
 function showReportControls() {
   const mayBuild = state.assessmentRole === 'owner' || state.assessmentRole === 'member';
   $('preview-report').hidden = !mayBuild; $('build-report').hidden = !mayBuild;
+  // Auditor P2: a viewer's write controls on the survey card always 403 at the server; gate them on the same exact
+  // assessment role the report controls use. Reads (survey-status, refresh-counts, blank print) stay. No backend change.
+  for (const id of ['issue-codes', 'code-count', 'preview-export', 'release-codes', 'issue-link-preview', 'issue-link-confirm', 'select-survey', 'load-templates']) { const n = $(id); if (n) n.hidden = !mayBuild; }
 }
 function reportRoute() { return `/v2/assessments/${path(required(state.assessment, 'Choose an assessment.'))}/reports`; }
 // Any failure inside a report action leaves no half-state behind; run()/fail() still shows the API message.
