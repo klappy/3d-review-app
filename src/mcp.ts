@@ -7,6 +7,7 @@
  */
 import type { Ctx } from "./handlers/types";
 import { tools as toolNames } from "./registry";
+import { newTraceId } from "./receipt";
 
 export type Execute = (ctx: Ctx, capability: string, params: Record<string, any>, options: { tool?: any; mode?: "dry_run" | "execute"; confirm_token?: string; transport?: "http" | "mcp" }) => Promise<any>;
 export type Docs = (ctx: Ctx, args: Record<string, any>) => Promise<any>;
@@ -43,10 +44,14 @@ export async function handleMcp(req: Request, ctx: Ctx, execute: Execute, docs: 
       case "tools/call": {
         const name = m.params?.name; const a = m.params?.arguments ?? {};
         if (!toolNames.includes(name)) { out.push(rpc(m.id, undefined, { code: -32602, message: `unknown tool ${name}; tools are ${toolNames.join(", ")}` })); break; }
+        // One trace id PER MESSAGE: trace.trace_id is the primary key, so a batch sharing the request's id persisted
+        // only its first call and silently dropped the rest (auditor 5707673911 #7). Copying ctx also keeps execute()'s
+        // log swap from leaking between messages.
+        const cx: Ctx = { ...ctx, traceId: newTraceId() };
         let env: any;
-        if (name === "docs") env = await docs(ctx, a);
-        else if (name === "write" && a.undo) env = await execute(ctx, "cap.ops.undo", { token: a.undo }, { tool: "write", transport: "mcp" });
-        else env = await execute(ctx, a.capability, a.params ?? {}, { tool: name, mode: a.mode, confirm_token: a.confirm_token, transport: "mcp" });
+        if (name === "docs") env = await docs(cx, a);
+        else if (name === "write" && a.undo) env = await execute(cx, "cap.ops.undo", { token: a.undo }, { tool: "write", transport: "mcp" });
+        else env = await execute(cx, a.capability, a.params ?? {}, { tool: name, mode: a.mode, confirm_token: a.confirm_token, transport: "mcp" });
         out.push(rpc(m.id, { content: [{ type: "text", text: JSON.stringify(env) }], structuredContent: env, isError: env?.ok === false }));
         break;
       }
