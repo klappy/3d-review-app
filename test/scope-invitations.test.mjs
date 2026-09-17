@@ -53,6 +53,7 @@ test('invite is two step, honest non-delivery, private reveal cleared on context
 });
 test('missing dev token never invents a handoff or email success',async()=>{
  const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'i1',delivered:false});await w.api.setScope(scope);await emailPreview(w);w.button('Confirm invitation').click();await flush();assert.match(text(w.root),/No invitation credential/);assert.ok(!w.buttons().includes('Reveal private invitation token'));
+ assert.ok(!w.buttons().includes('Finish handoff and refresh access'));assert.ok(w.buttons().includes('Continue and refresh access'));assert.ok(!text(w.root).includes('Complete the private handoff'));
 });
 test('zero-grant recipient previews actual scope and accepts with stronger role preserved',async()=>{
  const w=world((_u,o)=>o.body.mode==='dry_run'?confirmResult:{granted:true,scope:{type:'assessment',id:'a1'},role:'owner'});await acceptPreview(w);assert.match(text(w.root),/member access at assessment a1/);assert.match(text(w.root),/Current access: owner/);assert.ok(!text(w.root).includes('SECRET_TOKEN'));w.button('Confirm acceptance').click();await flush();assert.equal(w.changes,1);assert.match(text(w.root),/granted as owner/);assert.ok(!walk(w.root).some(n=>n.value==='SECRET_TOKEN'));assert.equal(w.calls.length,2);assert.equal(w.calls[1].body.confirm_token,'confirmation-secret');
@@ -86,4 +87,25 @@ test('revoke checks exact returned target and never reports unrelated success',a
 });
 test('member can revoke member invitation but owner invitation has no revoke control',async()=>{
  const w=world((_u,o)=>o.method==='GET'?{...list(),pending_invitations:[{id:'im',role:'member',status:'sent'},{id:'io',role:'owner',status:'sent'}]}:{id:'im',status:'revoked'});await w.api.setScope({...scope,role:'member'});assert.equal(w.buttons().filter(x=>x==='Revoke invitation').length,1);w.button('Revoke invitation').click();await flush();assert.equal(w.calls[1].url,'/v2/invitations/im');assert.match(text(w.root),/Invitation revocation completed/);
+});
+
+test('completed invitation requires explicit handoff completion before refresh or another invite',async()=>{
+ let created=false;
+ const w=world((_u,o)=>o.method==='GET'?{...list(),pending_invitations:created?[{id:'created-i',role:'viewer',status:'sent'}]:[]}:o.body.mode==='dry_run'?confirmResult:(created=true,{invitation_id:'created-i',delivered:false,dev_only_link_token:'HANDOFF_SENTINEL'}));
+ await w.api.setScope(scope);await emailPreview(w);const oldConfirm=w.button('Confirm invitation');oldConfirm.click();await flush();
+ assert.match(text(w.root),/created-i/);
+ assert.ok(!w.buttons().includes('Refresh access'));assert.ok(!w.buttons().includes('Preview invitation'));assert.ok(!w.buttons().includes('Accept an invitation'));
+ oldConfirm.click();await flush();assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,1);
+ w.button('Reveal private invitation token').click();assert.ok(walk(w.root).some(n=>n.value==='HANDOFF_SENTINEL'));
+ w.button('Finish handoff and refresh access').click();await flush();
+ assert.ok(!walk(w.root).some(n=>n.value==='HANDOFF_SENTINEL'));assert.match(text(w.root),/created-i · viewer · awaiting acceptance/);assert.ok(w.buttons().includes('Preview invitation'));
+ assert.equal(w.calls.filter(x=>x.method==='GET').length,2);
+});
+
+test('server-confirmed email delivery is reported without false failure or recipient acceptance',async()=>{
+ const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'mailed-i',delivered:true,dev_only_link_token:'UNNEEDED_SECRET'});
+ await w.api.setScope(scope);await emailPreview(w);w.button('Confirm invitation').click();await flush();
+ assert.match(text(w.root),/server reports email delivery/);assert.match(text(w.root),/recipient has not accepted/);
+ assert.ok(!text(w.root).includes('email not delivered'));assert.ok(!text(w.root).includes('outcome could not be confirmed'));assert.ok(!w.buttons().includes('Reveal private invitation token'));
+ assert.ok(w.buttons().includes('Continue and refresh access'));
 });

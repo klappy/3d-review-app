@@ -55,7 +55,7 @@ test('identity reset and late results never resurrect private rows',async()=>{
  const f=fixture();const d=deferred();f.override(()=>d.promise);const pending=f.api.refresh();f.setContext({generation:2,principalId:'other'});f.api.reset();d.resolve({workspaces:[{id:'private',name:'PRIVATE',role:'owner'}]});await pending;assert.equal(f.root.hidden,true);assert.doesNotMatch(text(f.root),/PRIVATE/);
 });
 test('refresh race cannot replace newer list; stale errors do not paint',async()=>{
- const f=fixture();const d=deferred();let first=true;f.override(()=>{if(first){first=false;return d.promise;}});const old=f.api.refresh();await f.api.refresh();d.reject(new Error('private details'));await old;assert.match(text(f.root),/Actual workspace/);assert.doesNotMatch(text(f.root),/private details|could not be confirmed/);
+ const f=fixture();const d=deferred();let first=true;f.override(()=>{if(first){first=false;return d.promise;}});const old=f.api.refresh();await Promise.resolve();assert.equal(f.calls.length,1);await f.api.refresh();d.reject(new Error('private details'));await old;assert.match(text(f.root),/Actual workspace/);assert.doesNotMatch(text(f.root),/private details|could not be confirmed/);
 });
 test('uncertain write receives no automatic retry or false success; explicit refresh recovers',async()=>{
  const f=fixture();await f.open();f.override((p,o)=>o.method==='POST'?Promise.reject(new Error('secret error')):undefined);await f.click('Archive workspace');assert.equal(f.calls.filter(c=>c.method==='POST').length,1);assert.match(text(f.root),/could not be confirmed/);assert.doesNotMatch(text(f.root),/secret error|Workspace updated/);assert.equal(f.changes,0);
@@ -67,4 +67,14 @@ test('expired deletion preview cannot execute',async()=>{
 test('renaming and archiving use exact routes without danger mode; removed grant clears selected host scope',async()=>{
  const f=fixture();await f.open();const rename=walk(f.root).filter(n=>n.tagName==='form')[1];walk(rename).find(n=>n.tagName==='input').value='Renamed';await rename.listeners.submit({preventDefault(){}});assert.deepEqual(f.calls.find(c=>c.method==='PATCH').body,{name:'Renamed'});
  f.override((p,o)=>p==='/v2/workspaces'&&o.method==='GET'?{workspaces:[]}:undefined);await f.click('Archive workspace');assert.equal(f.calls.find(c=>c.path.endsWith('/archive')).body,undefined);assert.equal(f.selected.at(-1),null);assert.doesNotMatch(text(f.root),/Rename workspace/);
+});
+
+test('explicit refresh clears host scope before pending list read and never restores it',async()=>{
+ const f=fixture();await f.open();assert.equal(f.selected.at(-1).id,'ws1');
+ const d=deferred();f.override((p,o)=>p==='/v2/workspaces'&&o.method==='GET'?d.promise:undefined);
+ const pending=f.api.refresh();assert.equal(f.selected.at(-1),null);
+ await Promise.resolve();assert.doesNotMatch(text(f.root),/Rename workspace/);
+ d.resolve({workspaces:[{id:'ws1',name:'Still accessible',role:'viewer'}]});await pending;
+ assert.equal(f.selected.at(-1),null);assert.doesNotMatch(text(f.root),/Rename workspace|Preview deletion/);
+ await f.click('Open workspace');assert.equal(f.selected.at(-1).id,'ws1');
 });
