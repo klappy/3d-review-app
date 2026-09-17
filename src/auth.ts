@@ -7,11 +7,21 @@ function cookie(req: Request, name: string): string | undefined {
   return m?.[1];
 }
 
+/**
+ * Shape of every credential this code mints: mintSession → `st_`/`pt_` + 32 hex; randomToken("pt") (participant
+ * open_link) → `pt_` + 32 base64url chars. Anything else cannot be a live row, so it is refused with ZERO storage access
+ * (Otto P1 5706955103, auditor 5707673911 #3): a malformed or provider-shaped (`a:b:c`) bearer costs no D1 read.
+ * Residual, recorded in INTERFACE.md: a WELL-FORMED unknown token still costs the two indexed lookups before the
+ * anonymous limiter bounds the next request from that address.
+ */
+export const FIRST_PARTY_TOKEN = /^(st|pt)_[A-Za-z0-9_-]{32}$/;
+
 /** Resolve the caller. Session cookie (UI), Bearer (delegated agent, phase 0 = same token), participant token. Stateless: re-read every call. */
 export async function resolvePrincipal(req: Request, env: Env): Promise<Principal> {
   const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   const token = bearer || cookie(req, "session");
   if (!token) return { kind: "anonymous", id: "anon" };
+  if (!FIRST_PARTY_TOKEN.test(token)) return { kind: "anonymous", id: "anon" }; // shape gate: no lookup for what we never minted
   const h = await sha256(token);
   const row = await env.DB.prepare(
     "SELECT s.principal_id, s.kind, s.delegated_by, s.expires_at, s.participant_survey_id, s.respondent_id, p.email_hash, p.provisioned, p.support FROM session s LEFT JOIN principal p ON p.id = s.principal_id WHERE s.token_hash = ?"
