@@ -16,7 +16,8 @@
 .rv #report-view .report-lens-card[data-lens="community" i] { border-top-color:var(--lens-blue); }
 .rv #report-view .report-lens-card[data-lens="church" i] { border-top-color:var(--lens-yellow); }
 .rv #report-view .report-lens-card > h5 { font-size:16px; margin:0 0 7px; }
-.rv #report-view .report-lens-score { font-size:25px; font-weight:600; }
+.rv #report-view .report-lens-score { font-size:clamp(14px,1.3vw,18px); font-weight:600; font-variant-numeric:tabular-nums; }
 @media(max-width:760px) {
   .rv #report-view .report-lens-grid { grid-template-columns:1fr; }
+  .rv #report-view .report-lens-score { font-size:18px; }
 }
