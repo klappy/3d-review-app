@@ -8,6 +8,7 @@
 import type { Ctx } from "./handlers/types";
 import { tools as toolNames } from "./registry";
 import { newTraceId } from "./receipt";
+import { APP_VERSION } from "./version";
 
 export type Execute = (ctx: Ctx, capability: string, params: Record<string, any>, options: { tool?: any; mode?: "dry_run" | "execute"; confirm_token?: string; transport?: "http" | "mcp" }) => Promise<any>;
 export type Docs = (ctx: Ctx, args: Record<string, any>) => Promise<any>;
@@ -36,7 +37,7 @@ export async function handleMcp(req: Request, ctx: Ctx, execute: Execute, docs: 
     if (m.id === undefined) continue; // notifications
     switch (m.method) {
       case "initialize":
-        out.push(rpc(m.id, { protocolVersion: "2025-06-18", capabilities: { tools: { listChanged: false } }, serverInfo: { name: "3d-review", version: "0.0.1-phase0" },
+        out.push(rpc(m.id, { protocolVersion: "2025-06-18", capabilities: { tools: { listChanged: false } }, serverInfo: { name: "3d-review", version: APP_VERSION },
           instructions: "Call docs with no arguments first. Four tools only (docs/read/write/danger); the split is the permission boundary. Every envelope carries trace_id." }));
         break;
       case "ping": out.push(rpc(m.id, {})); break;

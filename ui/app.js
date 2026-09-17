@@ -39,7 +39,7 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   return data.result;
 }
 async function run(label, task) {
-  note(label); const buttons = [...document.querySelectorAll('button')]; buttons.forEach(b => b.disabled = true);
+  note(label); const buttons = [...document.querySelectorAll('button')].filter(b => b.id !== 'version' && b.id !== 'changelog-close'); buttons.forEach(b => b.disabled = true);
   try { await task(); note(`${label} — complete.`); }
   catch (error) { if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; } else fail(error.message); }
   finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : false); }

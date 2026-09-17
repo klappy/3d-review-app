@@ -1,9 +1,13 @@
 {
   "name": "3d-review",
-  "version": "0.0.1-phase0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "stamp": "node scripts/stamp-version.mjs",
+    "pretypecheck": "npm run stamp",
+    "pretest": "npm run stamp",
+    "predev": "npm run stamp",
     "dev": "wrangler dev --local --port 8787",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
