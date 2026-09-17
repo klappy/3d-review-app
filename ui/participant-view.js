@@ -15,7 +15,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   const originalReview = reviewButton || (candidates.length === 1 ? candidates[0] : null);
   if (!originalReview || !form.contains(originalReview) || originalReview.type !== 'submit') throw new Error('Original Review submit button required');
   const initialHidden = fields.map(f=>f.hidden);
-  let index=0, destroyed=false;
+  let index=0, destroyed=false, validatingItem=false;
   const owned=[];
   const changes=[];
   function el(tag,text) {const n=doc.createElement(tag);if(text!==undefined)n.textContent=String(text);return n;}
@@ -50,14 +50,17 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   function validItem(i){
     const message=itemError(items[i],values());
     if(message){showForm(i);error.textContent=message;error.hidden=false;fields[i].querySelector('input,textarea,select')?.focus();return false;}
-    for(const input of fields[i].querySelectorAll('input,textarea,select'))if(!input.checkValidity()){showForm(i);input.reportValidity();return false;}
-    return true;
+    validatingItem=true;
+    try {
+      for(const input of fields[i].querySelectorAll('input,textarea,select'))if(!input.checkValidity()){showForm(i);input.reportValidity();return false;}
+      return true;
+    } finally { validatingItem=false; }
   }
   function beforeReview(event){
     for(let i=0;i<items.length;i++)if(!validItem(i)){event.preventDefault();event.stopImmediatePropagation();return;}
     revealAll(); // native submit and the existing app handler remain the sole review path
   }
-  function onInvalid(){revealAll();intro.hidden=true;nav.hidden=false;}
+  function onInvalid(){if(validatingItem)return;revealAll();intro.hidden=true;nav.hidden=false;}
   originalReview.addEventListener('click',beforeReview,true);
   form.addEventListener('invalid',onInvalid,true);
   fields.forEach(field=>field.hidden=true);

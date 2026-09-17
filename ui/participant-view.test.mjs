@@ -14,3 +14,30 @@ test('exclusive choice cannot combine, ordinary multiple choices preserve all va
   assert.equal(itemError(item,data([['a','none'],['a','a']])),'An exclusion choice cannot be combined: Source question');
   assert.equal(itemError(item,data([['a','none']])),null);
 });
+
+test('invalid Next stays paged; independent native form invalid still reveals hidden targets',async()=>{
+  const {mountParticipantView}=await import('./participant-view.js');
+  class Node {
+    children=[];listeners={};hidden=false;dataset={};type='';
+    append(...nodes){this.children.push(...nodes);}
+    setAttribute(){}
+    addEventListener(type,fn){this.listeners[type]=fn;}
+    removeEventListener(type){delete this.listeners[type];}
+    focus(){}
+    remove(){}
+    querySelector(selector){return selector==='legend'?new Node():this.inputs?.[0];}
+    querySelectorAll(selector){return selector==='button'?[review]:this.inputs||[];}
+  }
+  const root=new Node(),form=new Node(),questions=new Node(),review=new Node();review.type='submit';form.contains=n=>n===review;
+  const fields=[new Node(),new Node()];fields[0].dataset.item='scale';fields[1].dataset.item='text';questions.children=fields;
+  let events=0;
+  const input=new Node();input.checkValidity=()=>{events++;form.listeners.invalid({target:input});return false;};input.reportValidity=()=>{events++;form.listeners.invalid({target:input});return false;};fields[0].inputs=[input];fields[1].inputs=[new Node()];
+  const doc={createElement:()=>new Node(),defaultView:{FormData:class extends FormData{constructor(){super();this.set('scale','9');}}}};
+  const controller=mountParticipantView({doc,root,form,questions,reviewAnswers:new Node(),model:{items:[{id:'scale',type:'scale'},{id:'text',type:'text'}]},reviewButton:review});
+  controller.showForm(0);const next=root.children[1].children[1].children[1];next.listeners.click();
+  assert.equal(events,2);assert.deepEqual(fields.map(f=>f.hidden),[false,true]);
+  assert.equal(root.children[1].children[0].textContent,'Question 1 of 2');
+  form.listeners.invalid({target:fields[1].inputs[0]});assert.deepEqual(fields.map(f=>f.hidden),[false,false]);
+  controller.showForm(0);next.listeners.click();assert.deepEqual(fields.map(f=>f.hidden),[false,true]);
+  controller.destroy();assert.equal(form.listeners.invalid,undefined);
+});
