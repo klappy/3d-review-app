@@ -2,7 +2,7 @@ import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
-import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, digestNamespace, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment } from './shared-link.js';
+import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment } from './shared-link.js';
 const $ = id => document.getElementById(id);
 // Shared-link mode is decided first so no global (code-path) key is read or written in that mode.
 const sharedToken = parseEntryFragment(location.hash);
@@ -324,6 +324,7 @@ bindClick('submit', 'Submitting response…', async () => {
     try { result = await state.shared.submit(state.answers); }
     catch (error) {
       if (errorKind(error) === 'conflict') { const resolved = await resolveConflict(state.shared); if (resolved.state === 'receipt') { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); showReceipt(resolved.receipt); return; } showSharedUnavailable(resolved.state); }
+      else if (errorKind(error) === 'rateLimited') text($('participant-resume'), sharedCopy.rateLimited);
       else text($('participant-resume'), sharedCopy.submitFailed);
       throw error;
     }
@@ -352,7 +353,8 @@ bindClick('recover', 'Recovering receipt…', async () => {
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
 { const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); } }
 function showSharedUnavailable(kind) {
-  text($('participant-error'), kind === 'closed' ? sharedCopy.collectionClosed : sharedCopy.linkUnavailable); $('participant-error').hidden = false;
+  const message = { closed: sharedCopy.collectionClosed, cannotResume: sharedCopy.cannotResume, rateLimited: sharedCopy.rateLimited, transient: sharedCopy.transient }[kind] || sharedCopy.linkUnavailable;
+  text($('participant-error'), message); $('participant-error').hidden = false;
   $('answers').hidden = true; $('review').hidden = true;
 }
 async function sharedLinkEntry(token, namespace) {
@@ -365,15 +367,18 @@ async function sharedLinkEntry(token, namespace) {
   try {
     // With a fragment: open (resume_token when this namespace holds a bearer). Without one (reload):
     // the raw token is not persisted, so resume goes straight to the receipt with the stored bearer.
-    if (token !== null) await state.shared.open(token);
-    else if (!state.shared.bearer) { showSharedUnavailable('unavailable'); return; }
+    const resuming = !!state.shared.bearer; // a stored bearer means open() sends resume_token
+    if (token !== null) {
+      try { await state.shared.open(token); }
+      catch (error) { const kind = entryFailureKind(error, resuming); if (kind !== 'conflict') { showSharedUnavailable(kind); return; } throw error; } // no automatic fresh open; scoped storage untouched
+    } else if (!state.shared.bearer) { showSharedUnavailable('unavailable'); return; }
     const receipt = await state.shared.receipt(); // receipt is checked before any editable form
     $('recover').hidden = false;
     if (resumeTarget(receipt) === 'receipt') showReceipt(receipt); else await loadForm();
   } catch (error) {
     const kind = errorKind(error);
     if (kind === 'conflict') { const resolved = await resolveConflict(state.shared); if (resolved.state === 'receipt') { $('recover').hidden = false; showReceipt(resolved.receipt); return; } showSharedUnavailable(resolved.state); return; }
-    showSharedUnavailable('unavailable');
+    showSharedUnavailable(kind);
     throw error;
   }
 }

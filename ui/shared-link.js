@@ -9,6 +9,9 @@
 export const copy = {
   linkUnavailable: 'This link no longer works. It may have been replaced or the collection may have closed. Ask the person who invited you for a new one. Nothing about the project is shown here.',
   collectionClosed: 'Collection has closed. New answers are not accepted. If you already submitted from this device, your receipt is shown below.',
+  cannotResume: 'Your earlier session on this link could not be resumed from this device. Nothing saved on this device was changed. If you already sent answers, that send may have succeeded without a confirmation shown here; the facilitator can confirm whether it arrived.',
+  rateLimited: 'Too many requests right now. Nothing saved on this device was changed; wait a moment and open your link again.',
+  transient: 'The server could not be reached or did not answer. Nothing saved on this device was changed; open your link again in a moment.',
   draftMismatch: 'Your saved answers were for a different version of this survey and were not restored. Please answer again.',
   draftRestored: 'Your unsent answers were restored on this device.',
   submitFailed: 'Your answers were not submitted. They are still here; try again.',
@@ -106,11 +109,20 @@ export function saveDraft(store, form, values) {
 // STAGE_CONFLICT is therefore ambiguous on its own. Agreed recovery with the API author (no new code):
 // GET /v2/participate/receipt with the same bearer; submitted:true → own receipt; submitted:false →
 // closed; a receipt refusal (NOT_FOUND_OR_NOT_VISIBLE) → link unavailable.
+// Kinds: conflict (STAGE_CONFLICT), rateLimited (RATE_LIMITED / 429), unavailable (refusal), transient (5xx, network, unreadable).
 export function errorKind(error) {
   const code = String(error?.code || '').trim();
   if (code === 'STAGE_CONFLICT') return 'conflict';
+  if (code === 'RATE_LIMITED' || code === '429') return 'rateLimited';
   if (code === 'NOT_FOUND_OR_NOT_VISIBLE' || code === 'NOT_AUTHENTICATED') return 'unavailable';
-  return null;
+  return 'transient';
+}
+// Cookbook #16 c5708870217: a refused open on the RESUME path (stored resume_token) is a truthful
+// cannot-resume state, not a dead link: scoped bearer/key/draft stay unchanged, no automatic fresh
+// open, no new action. Closed/rate-limit/transient keep their own kinds.
+export function entryFailureKind(error, resuming) {
+  const kind = errorKind(error);
+  return kind === 'unavailable' && resuming ? 'cannotResume' : kind;
 }
 // Resolve a STAGE_CONFLICT (or check state before showing an editable form).
 // Returns { state: 'receipt', receipt } | { state: 'closed' } | { state: 'unavailable' }.
