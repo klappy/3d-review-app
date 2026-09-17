@@ -228,6 +228,9 @@ bindForm('redeem', 'Redeeming access code…', async fd => {
     result => {
     state.participant = result.participant_token; sessionStorage.setItem('participantToken', state.participant);
     state.form = null; state.answers = null;
+    $('questions').replaceChildren(); $('review-answers').replaceChildren();
+    for (const id of ['form-context', 'receipt']) text($(id), '');
+    for (const id of ['answers', 'review', 'receipt']) $(id).hidden = true;
     state.responseKey = null; sessionStorage.removeItem('responseKey');
     text($('participant-resume'), '');
     $('recover').hidden = false;
@@ -236,8 +239,12 @@ bindForm('redeem', 'Redeeming access code…', async fd => {
     () => { text($('participant-error'), codeEntryFailure); $('participant-error').hidden = false; $('participant-error').focus(); },
   );
 });
+function clearParticipantError() {
+  text($('participant-error'), ''); $('participant-error').hidden = true;
+}
 async function loadForm() {
   const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null;
+  clearParticipantError();
   text($('form-context'), `${result.assessment} · ${result.language} · ${result.template.id}@${result.template.version}`);
   $('questions').replaceChildren(...result.items.map(drawQuestion)); $('answers').hidden = false; $('review').hidden = true; $('receipt').hidden = true; $('recover').hidden = false;
 }
@@ -273,6 +280,7 @@ bindClick('submit', 'Submitting response…', async () => {
   state.responseKey = null; sessionStorage.removeItem('responseKey');
 });
 function showReceipt(result) {
+  clearParticipantError();
   text($('receipt'), result.submitted === false ? 'No submission recorded yet.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`);
   text($('participant-resume'), resumeNoticeAfterReceipt(result, $('participant-resume').textContent));
   $('receipt').hidden = false;
