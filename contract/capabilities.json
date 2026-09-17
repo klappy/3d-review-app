@@ -10,11 +10,11 @@
   "counts": {
     "total": 83,
     "read": 29,
-    "write.effect": 7,
-    "write.reversible": 40,
+    "write.effect": 8,
+    "write.reversible": 39,
     "write.dangerous": 7,
-    "v2.0-bcs": 75,
-    "v2.1-oct": 8,
+    "v2.0-bcs": 78,
+    "v2.1-oct": 5,
     "paths_inferred": 37,
     "inverse_unassessed": 0
   },
@@ -278,8 +278,9 @@
         "INVALID_PARAMS",
         "NOT_AUTHENTICATED",
         "NOT_FOUND_OR_NOT_VISIBLE",
-        "STAGE_CONFLICT"
-      , "RATE_LIMITED"]
+        "STAGE_CONFLICT",
+        "RATE_LIMITED"
+      ]
     },
     {
       "id": "cap.workspace.create",
@@ -1261,8 +1262,9 @@
         "NOT_AUTHORIZED_AT_SCOPE",
         "CONFIRM_REQUIRED",
         "CONFIRM_EXPIRED",
-        "WRONG_TOOL_FOR_CLASS"
-      , "RATE_LIMITED"]
+        "WRONG_TOOL_FOR_CLASS",
+        "RATE_LIMITED"
+      ]
     },
     {
       "id": "cap.survey.send_links",
@@ -1708,8 +1710,9 @@
         "INVALID_PARAMS",
         "NOT_AUTHENTICATED",
         "NOT_FOUND_OR_NOT_VISIBLE",
-        "STAGE_CONFLICT"
-      , "RATE_LIMITED"]
+        "STAGE_CONFLICT",
+        "RATE_LIMITED"
+      ]
     },
     {
       "id": "cap.response.submit",
@@ -1786,8 +1789,9 @@
         "INVALID_PARAMS",
         "NOT_AUTHENTICATED",
         "NOT_FOUND_OR_NOT_VISIBLE",
-        "STAGE_CONFLICT"
-      , "RATE_LIMITED"]
+        "STAGE_CONFLICT",
+        "RATE_LIMITED"
+      ]
     },
     {
       "id": "cap.response.receipt",
@@ -1875,8 +1879,9 @@
         "INVALID_PARAMS",
         "NOT_AUTHENTICATED",
         "NOT_FOUND_OR_NOT_VISIBLE",
-        "STAGE_CONFLICT"
-      , "RATE_LIMITED"]
+        "STAGE_CONFLICT",
+        "RATE_LIMITED"
+      ]
     },
     {
       "id": "cap.response.assisted_next",
@@ -1973,25 +1978,277 @@
     },
     {
       "id": "cap.report.build",
-      "class": "write.reversible",
-      "tool": "write",
+      "class": "write.effect",
+      "tool": "danger",
       "http": {
         "method": "POST",
         "path": "/v2/assessments/{aid}/reports",
         "path_inferred": false
       },
       "roles": "O, M",
-      "slice": "v2.1-oct",
+      "slice": "v2.0-bcs",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "(Oct)",
-      "notes": "**unimplemented** in v2.0 \u2192 documented 501 + docs pointer; counts \u274c whole-product; suppression + human review of generated interpretation required when built (bee:9416233 per PR #18 BEE-HISTORY)",
-      "status": "RESERVED_NOT_BUILT",
+      "notes": "Synthetic-only source-backed immutable reports; exact assessment grant and current/original attestation required. Real-data reporting remains held.",
+      "status": "implemented-synthetic-only",
       "inverse": {
         "kind": "none",
-        "compensating_control": "v2.1-oct \u2014 UNASSESSED"
+        "compensating_control": "cap.report.get suppression / access control; a built report is never unsent"
       },
       "undo_token": false,
-      "public": false
+      "public": false,
+      "params_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "aid"
+        ],
+        "properties": {
+          "aid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "At most256 UTF-8 bytes."
+          }
+        }
+      },
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "disclosure"
+      },
+      "result_schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assessment_id",
+              "suppressed",
+              "report"
+            ],
+            "properties": {
+              "assessment_id": {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1,
+                "description": "At most256 UTF-8 bytes."
+              },
+              "suppressed": {
+                "const": false
+              },
+              "report": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "created_at",
+                  "payload"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "description": "At most256 UTF-8 bytes."
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "$ref": "openapi.yaml#/components/schemas/SyntheticReportPayload"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assessment_id",
+              "suppressed",
+              "status",
+              "reason",
+              "report",
+              "snapshot_version",
+              "algorithm_version",
+              "policy_version"
+            ],
+            "properties": {
+              "assessment_id": {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1,
+                "description": "At most256 UTF-8 bytes."
+              },
+              "suppressed": {
+                "const": true
+              },
+              "status": {
+                "const": "held"
+              },
+              "reason": {
+                "const": "Report unavailable under the current synthetic reporting policy."
+              },
+              "report": {
+                "type": "null"
+              },
+              "snapshot_version": {
+                "type": "null"
+              },
+              "algorithm_version": {
+                "type": "null"
+              },
+              "policy_version": {
+                "const": "synthetic-current-assessment-asof-query-v1"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assessment_id",
+              "suppressed",
+              "status",
+              "report",
+              "impact",
+              "confirm_token",
+              "expires_in"
+            ],
+            "properties": {
+              "assessment_id": {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1,
+                "description": "At most256 UTF-8 bytes."
+              },
+              "suppressed": {
+                "const": false
+              },
+              "status": {
+                "const": "ready"
+              },
+              "report": {
+                "type": "null"
+              },
+              "impact": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "affected",
+                  "irreversible",
+                  "effect",
+                  "compensating_control"
+                ],
+                "properties": {
+                  "affected": {
+                    "type": "array",
+                    "maxItems": 0
+                  },
+                  "irreversible": {
+                    "const": true
+                  },
+                  "effect": {
+                    "const": "disclosure"
+                  },
+                  "compensating_control": {
+                    "const": "cap.report.get suppression / access control; a built report is never unsent"
+                  }
+                }
+              },
+              "confirm_token": {
+                "type": "string"
+              },
+              "expires_in": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assessment_id",
+              "suppressed",
+              "status",
+              "reason",
+              "report",
+              "snapshot_version",
+              "algorithm_version",
+              "policy_version",
+              "impact",
+              "confirm_token",
+              "expires_in"
+            ],
+            "properties": {
+              "assessment_id": {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1,
+                "description": "At most256 UTF-8 bytes."
+              },
+              "suppressed": {
+                "const": true
+              },
+              "status": {
+                "const": "held"
+              },
+              "reason": {
+                "const": "Report unavailable under the current synthetic reporting policy."
+              },
+              "report": {
+                "type": "null"
+              },
+              "snapshot_version": {
+                "type": "null"
+              },
+              "algorithm_version": {
+                "type": "null"
+              },
+              "policy_version": {
+                "const": "synthetic-current-assessment-asof-query-v1"
+              },
+              "impact": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "affected",
+                  "irreversible",
+                  "effect",
+                  "compensating_control"
+                ],
+                "properties": {
+                  "affected": {
+                    "type": "array",
+                    "maxItems": 0
+                  },
+                  "irreversible": {
+                    "const": true
+                  },
+                  "effect": {
+                    "const": "disclosure"
+                  },
+                  "compensating_control": {
+                    "const": "cap.report.get suppression / access control; a built report is never unsent"
+                  }
+                }
+              },
+              "confirm_token": {
+                "type": "string"
+              },
+              "expires_in": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      }
     },
     {
       "id": "cap.report.get",
@@ -2003,15 +2260,120 @@
         "path_inferred": true
       },
       "roles": "Vw+",
-      "slice": "v2.1-oct",
+      "slice": "v2.0-bcs",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "viewer link",
-      "notes": "unimplemented (501) in v2.0; suppression on disclosure when built",
-      "status": "RESERVED_NOT_BUILT",
+      "notes": "Synthetic-only source-backed immutable reports; exact assessment grant and current/original attestation required. Real-data reporting remains held.",
+      "status": "implemented-synthetic-only",
       "inverse": {
         "kind": "n/a"
       },
-      "public": false
+      "public": false,
+      "params_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "At most256 UTF-8 bytes."
+          }
+        }
+      },
+      "result_schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assessment_id",
+              "suppressed",
+              "report"
+            ],
+            "properties": {
+              "assessment_id": {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1,
+                "description": "At most256 UTF-8 bytes."
+              },
+              "suppressed": {
+                "const": false
+              },
+              "report": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "created_at",
+                  "payload"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "description": "At most256 UTF-8 bytes."
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "$ref": "openapi.yaml#/components/schemas/SyntheticReportPayload"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assessment_id",
+              "suppressed",
+              "status",
+              "reason",
+              "report",
+              "snapshot_version",
+              "algorithm_version",
+              "policy_version"
+            ],
+            "properties": {
+              "assessment_id": {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1,
+                "description": "At most256 UTF-8 bytes."
+              },
+              "suppressed": {
+                "const": true
+              },
+              "status": {
+                "const": "held"
+              },
+              "reason": {
+                "const": "Report unavailable under the current synthetic reporting policy."
+              },
+              "report": {
+                "type": "null"
+              },
+              "snapshot_version": {
+                "type": "null"
+              },
+              "algorithm_version": {
+                "type": "null"
+              },
+              "policy_version": {
+                "const": "synthetic-current-assessment-asof-query-v1"
+              }
+            }
+          }
+        ]
+      }
     },
     {
       "id": "cap.report.list",
@@ -2023,15 +2385,134 @@
         "path_inferred": true
       },
       "roles": "Vw+",
-      "slice": "v2.1-oct",
+      "slice": "v2.0-bcs",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "viewer link",
-      "notes": "unimplemented (501) in v2.0",
-      "status": "RESERVED_NOT_BUILT",
+      "notes": "Synthetic-only source-backed immutable reports; exact assessment grant and current/original attestation required. Real-data reporting remains held.",
+      "status": "implemented-synthetic-only",
       "inverse": {
         "kind": "n/a"
       },
-      "public": false
+      "public": false,
+      "params_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "aid"
+        ],
+        "properties": {
+          "aid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "At most256 UTF-8 bytes."
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Confidential live-keyset cursor; at most4096 UTF-8 bytes."
+          }
+        }
+      },
+      "result_schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assessment_id",
+              "suppressed",
+              "reports",
+              "next_cursor"
+            ],
+            "properties": {
+              "assessment_id": {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1,
+                "description": "At most256 UTF-8 bytes."
+              },
+              "suppressed": {
+                "const": false
+              },
+              "reports": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "created_at"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "description": "At most256 UTF-8 bytes."
+                    },
+                    "created_at": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "maxItems": 5
+              },
+              "next_cursor": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 4096
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assessment_id",
+              "suppressed",
+              "status",
+              "reason",
+              "reports",
+              "snapshot_version",
+              "algorithm_version",
+              "policy_version"
+            ],
+            "properties": {
+              "assessment_id": {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1,
+                "description": "At most256 UTF-8 bytes."
+              },
+              "suppressed": {
+                "const": true
+              },
+              "status": {
+                "const": "held"
+              },
+              "reason": {
+                "const": "Report unavailable under the current synthetic reporting policy."
+              },
+              "reports": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "snapshot_version": {
+                "type": "null"
+              },
+              "algorithm_version": {
+                "type": "null"
+              },
+              "policy_version": {
+                "const": "synthetic-current-assessment-asof-query-v1"
+              }
+            }
+          }
+        ]
+      }
     },
     {
       "id": "cap.recommendation.propose",

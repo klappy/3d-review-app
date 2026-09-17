@@ -128,7 +128,7 @@ async function persistReceipt(ctx: Ctx, r: Receipt, capabilityId: string, input:
   const priorBlob = JSON.stringify({
     prior: receiptFields(input.priorState, PRIOR_FIELDS[capabilityId] ?? []),
     params: receiptFields(input.params, PARAM_FIELDS[capabilityId] ?? []),
-    result_ids: pickIds(input.result),
+    result_ids: capabilityId === "cap.report.build" ? {} : pickIds(input.result),
   });
   try {
     await ctx.db
@@ -231,7 +231,7 @@ export async function persistTrace(ctx: Ctx, spans: Span[], meta: { capability: 
   }
 }
 
-const REDACT_KEYS = /param|code|email|address|answer|token|secret|password|body|response/i;
+const REDACT_KEYS = /param|code|email|address|answer|token|secret|password|body|response|cursor|afterId/i;
 export function redact(data: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(data)) {

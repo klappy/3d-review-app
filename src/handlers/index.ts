@@ -12,6 +12,7 @@ import { handlers as survey } from "./survey";
 import { handlers as participant } from "./participant";
 import { handlers as response } from "./response";
 import { handlers as results } from "./results";
+import { handlers as reports } from "./report";
 import { handlers as grant } from "./grant";
 import { handlers as request } from "./request";
 import { handlers as support } from "./support";
@@ -40,6 +41,7 @@ export const handlers: Record<string, Handler> = {
   ...participant,
   ...response,
   ...results,
+  ...reports,
   // Lane B (Fable) — per #14 c5704577820
   ...grant,
   ...request,
