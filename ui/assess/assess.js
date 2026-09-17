@@ -30,10 +30,11 @@ export function groupByLens({ surveys = [], templates = [] }) {
   const other = { lens: 'Other perspective', included: [], available: [] };
   const groupFor = p => groups.find(g => g.lens === p) || other;
   const included = surveys.filter(s => s.state === 'selected' && !s.archived_at); // same rule as the current lens-surveys.js
+  const occupied = new Set(surveys.map(s => s.template_id)); // archived rows still occupy the template; Include would restore them
   for (const s of included) groupFor(s.perspective).included.push(s);
   const latest = new Map();
   for (const t of templates) { const cur = latest.get(t.id); if (!cur || t.version > cur.version) latest.set(t.id, t); }
-  for (const t of latest.values()) if (!included.some(s => s.template_id === t.id)) groupFor(t.perspective).available.push(t);
+  for (const t of latest.values()) if (!occupied.has(t.id)) groupFor(t.perspective).available.push(t);
   return other.included.length || other.available.length ? [...groups, other] : groups;
 }
 export function route(hash) {
@@ -44,7 +45,11 @@ export function route(hash) {
 
 async function assessmentsFor(pid) {
   // AMEND 4: an assessment-only grantee holds no project role, so the project list read is refused; that is not a screen failure.
-  if (!state.assessmentsByProject.has(pid)) { try { const r = await api(`/v2/projects/${encodeURIComponent(pid)}/assessments`); state.assessmentsByProject.set(pid, r.assessments || []); } catch { state.assessmentsByProject.set(pid, null); } }
+  // Cache only that quiet refusal (and an empty success). Transient/network/5xx stay uncached so Show assessments can retry.
+  if (!state.assessmentsByProject.has(pid)) {
+    try { const r = await api(`/v2/projects/${encodeURIComponent(pid)}/assessments`); state.assessmentsByProject.set(pid, r.assessments || []); }
+    catch (e) { if (e.status === 403 || e.status === 404 || e.code === 'NOT_FOUND_OR_NOT_VISIBLE' || e.code === 'NOT_AUTHORIZED_AT_SCOPE') state.assessmentsByProject.set(pid, null); }
+  }
   return state.assessmentsByProject.get(pid);
 }
 function context(current) {
@@ -90,8 +95,13 @@ async function act(label, fn) {
   if (state.busy) return;
   const aid = state.current.assessment.id;
   state.busy = true; state.message = ''; note.textContent = label; render();
-  try { await fn(); await load(aid); note.textContent = ''; }
-  catch (e) { if (route(location.hash).id === aid) state.message = redact(e.message); note.textContent = ''; }
+  try {
+    await fn();
+    if (route(location.hash).id !== aid) state.message = '';
+    if (state.current?.assessment.id === aid) state.current = null; // force a post-write GET; a dropped/failed refresh must not keep pre-mutation surveys
+    await load(aid); note.textContent = '';
+  }
+  catch (e) { if (route(location.hash).id === aid) state.message = redact(e.message); else state.message = ''; note.textContent = ''; }
   finally { state.busy = false; render(); }
 }
 async function load(aid) {
