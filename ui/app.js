@@ -1,7 +1,7 @@
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
-import { resumeTarget, savedSubmitKey } from './participant-resume.js';
+import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
 import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, digestNamespace, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment } from './shared-link.js';
 const $ = id => document.getElementById(id);
 // Shared-link mode is decided first so no global (code-path) key is read or written in that mode.
@@ -252,20 +252,28 @@ bindClick('load-results', 'Reading result state…', async () => {
 });
 bindForm('redeem', 'Redeeming access code…', async fd => {
   text($('participant-error'), ''); $('participant-error').hidden = true;
-  try {
-    const result = await api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } });
+  await redeemAndOpen(
+    () => api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } }),
+    result => {
     state.participant = result.participant_token; sessionStorage.setItem('participantToken', state.participant);
+    state.form = null; state.answers = null;
+    $('questions').replaceChildren(); $('review-answers').replaceChildren();
+    for (const id of ['form-context', 'receipt']) text($(id), '');
+    for (const id of ['answers', 'review', 'receipt']) $(id).hidden = true;
     state.responseKey = null; sessionStorage.removeItem('responseKey');
     text($('participant-resume'), '');
-    await loadForm();
-  } catch (error) {
-    text($('participant-error'), codeEntryFailure);
-    $('participant-error').hidden = false; $('participant-error').focus();
-    throw error;
-  }
+    $('recover').hidden = false;
+    },
+    loadForm,
+    () => { text($('participant-error'), codeEntryFailure); $('participant-error').hidden = false; $('participant-error').focus(); },
+  );
 });
+function clearParticipantError() {
+  text($('participant-error'), ''); $('participant-error').hidden = true;
+}
 async function loadForm() {
   const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null;
+  clearParticipantError();
   text($('form-context'), `${result.assessment} · ${result.language} · ${result.template.id}@${result.template.version}`);
   $('questions').replaceChildren(...result.items.map(drawQuestion)); $('answers').hidden = false; $('review').hidden = true; $('receipt').hidden = true; $('recover').hidden = false;
   if (state.shared) restoreSharedDraft();
@@ -284,9 +292,10 @@ function restoreSharedDraft() {
 }
 $('answers').addEventListener('input', () => { if (state.shared && state.form) saveDraft(state.sharedStore, state.form, draftValues()); });
 async function restoreParticipant() {
+  // A failed first receipt request must leave the saved session recoverable.
+  $('recover').hidden = false;
   try {
     const receipt = await api('/v2/participate/receipt', { participant: true });
-    $('recover').hidden = false;
     if (resumeTarget(receipt) === 'receipt') {
       showReceipt(receipt);
       state.responseKey = null; sessionStorage.removeItem('responseKey');
@@ -325,15 +334,19 @@ bindClick('submit', 'Submitting response…', async () => {
   state.responseKey = null; sessionStorage.removeItem('responseKey');
 });
 function showReceipt(result) {
+  clearParticipantError();
   text($('receipt'), result.submitted === false ? 'No submission recorded yet.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`);
+  text($('participant-resume'), resumeNoticeAfterReceipt(result, $('participant-resume').textContent));
   $('receipt').hidden = false;
   if (result.submitted !== false) { $('review').hidden = true; $('answers').hidden = true; }
   if (state.shared && result.submitted !== false) text($('participant-resume'), `${sharedCopy.receiptThanks} ${sharedCopy.sameLinkOthers}`);
 }
 bindClick('recover', 'Recovering receipt…', async () => {
   const receipt = await api('/v2/participate/receipt', { participant: true });
-  showReceipt(receipt);
-  if (receipt.submitted) { state.responseKey = null; sessionStorage.removeItem('responseKey'); }
+  await recoverParticipant(receipt, !!state.form, loadForm, showReceipt);
+  if (!receipt.submitted) return;
+  if (state.shared) { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); } // scoped namespace only; globals untouched in shared mode
+  else { state.responseKey = null; sessionStorage.removeItem('responseKey'); }
 });
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
 { const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); } }
