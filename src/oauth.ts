@@ -28,7 +28,7 @@ export const oauthPrincipals = new WeakMap<Request, Principal>();
 export const OAUTH_SCOPE = "3dreview";
 const PARK_PREFIX = "3dr:authreq:";
 const PARK_TTL_S = 600;
-export const PARK_COOKIE = "oauth_req";
+export const PARK_COOKIE = "__Host-oauth_req"; // __Host-: Secure, Path=/, no Domain — a sibling origin cannot set or fixate it (review #15-3)
 
 export async function principalFromProps(env: Env, props: OAuthProps): Promise<Principal | null> {
   if (!props?.principal_id || !props?.client_id) return null;
@@ -107,7 +107,11 @@ export async function renderConsentIfParked(req: Request, env: OAuthEnv, princip
 <p><small>Only connect apps you started connecting yourself.</small></p>`);
 }
 
-/** POST /oauth/consent — single use: the parked request is deleted before anything is granted. */
+/** POST /oauth/consent — single use: the parked request is deleted before anything is granted.
+ *  Known residual (review #15-2): KV get→delete is not atomic, so two truly concurrent posts of the SAME ticket from the SAME
+ *  browser can both pass and mint two codes for the same client, PKCE challenge, redirect and user. It needs the HMAC ticket
+ *  and the HttpOnly __Host- cookie, grants nothing new, and the provider revokes the earlier grant. Atomic single-use needs
+ *  D1 (DELETE … RETURNING) and a migration; deferred, recorded in INTERFACE.md. */
 export async function handleConsent(req: Request, env: OAuthEnv): Promise<Response> {
   if (!env.OAUTH_PROVIDER || !env.OAUTH_KV) return html("<h1>Authorization is not configured here</h1>", 501);
   const form = await req.formData().catch(() => null);

@@ -9,6 +9,7 @@
  *
  *   RL_MCP_ANON  anonymous POST /mcp — one unit per JSON-RPC message        key ip           30 / 60 s
  *   RL_AUTH      cap.auth.request_link + cap.auth.consume_link             key ip, email    10 / 60 s each
+ *   RL_MCP_CEILING  every well-shaped bearer on /mcp, and /token (src/worker.ts)  key ip          600 / 60 s
  *   RL_REDEEM    cap.participant.redeem_code + cap.participant.open_link   key ip           60 / 60 s
  *                (60 because a whole workshop room shares one NAT address — 18-I phase C: 50 concurrent participants)
  *
@@ -20,7 +21,7 @@ import type { Ctx, Env } from "./handlers/types";
 import { CapError } from "./handlers/types";
 import { sha256 } from "./handlers/common";
 
-export type LimiterName = "RL_MCP_ANON" | "RL_AUTH" | "RL_REDEEM";
+export type LimiterName = "RL_MCP_ANON" | "RL_AUTH" | "RL_REDEEM" | "RL_MCP_CEILING";
 export const RATE_LIMIT_WINDOW_SECONDS = 60;
 /** Largest JSON-RPC batch any caller may POST to /mcp; an anonymous batch spends one RL_MCP_ANON unit per message. */
 export const MCP_MAX_BATCH = 10;

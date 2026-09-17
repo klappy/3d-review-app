@@ -103,7 +103,7 @@ describe("MCP authorization (borrowed provider + Access email-code + consent)", 
   it("deny returns access_denied; a ticket is useless without the browser that parked the request", async () => {
     const clientId = await register("Other"); const { challenge } = await pkce();
     const a = await toConsent(clientId, challenge, "demo.member@example.invalid");
-    expect((await consent("oauth_req=someone-else", a.ticket!, "approve")).status).toBe(400);
+    expect((await consent("__Host-oauth_req=someone-else", a.ticket!, "approve")).status).toBe(400);
     expect((await consent(a.cookie, a.ticket!.slice(0, -3) + "AAA", "approve")).status).toBe(400);
     const denied = await consent(a.cookie, a.ticket!, "deny");
     expect(new URL(denied.headers.get("location")!).searchParams.get("error")).toBe("access_denied");
@@ -129,5 +129,23 @@ describe("MCP authorization (borrowed provider + Access email-code + consent)", 
     stubJwks();
     const r = await call("/v2/auth/access", { headers: { "cf-access-jwt-assertion": await accessJwt("demo.owner@example.invalid") } });
     expect(r.status).toBe(302); expect(r.headers.get("location")).toMatch(/^\/#session=/);
+  }, 60_000);
+  it("pre-auth metering: a junk bearer cannot dodge the dampener or buy storage reads (review #15-1)", async () => {
+    const limiter = (limit: number) => { const seen = new Map<string, number>(); return { seen, limit: async ({ key }: { key: string }) => { const n = (seen.get(key) ?? 0) + 1; seen.set(key, n); return { success: n <= limit }; } }; };
+    let prepares = 0;
+    const countingDb = new Proxy(env.DB, { get(t, p) { if (p === "prepare") return (sql: string) => { prepares++; return t.prepare(sql); }; const v = Reflect.get(t, p, t); return typeof v === "function" ? v.bind(t) : v; } });
+    const e2 = { ...env, DB: countingDb, RL_MCP_ANON: limiter(3), RL_MCP_CEILING: limiter(5), RL_AUTH: limiter(100), RL_REDEEM: limiter(100) };
+    const hit = (auth?: string, path = "/mcp") => worker.fetch(new Request(ORIGIN + path, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.9", ...(auth ? { authorization: auth } : {}) }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) }), e2, ectx());
+    // malformed bearers share the anonymous bucket and never touch storage
+    const codes: number[] = []; for (let i = 0; i < 5; i++) codes.push((await hit(`Bearer junk-${i}`)).status);
+    expect(codes).toEqual([401, 401, 401, 429, 429]); expect(prepares).toBe(0);
+    expect((await hit(undefined, "/mcp/")).status).toBe(429); // trailing slash is metered too (#15-5)
+    // well-shaped but unknown bearers are bounded by the ceiling
+    const shaped: number[] = []; for (let i = 0; i < 7; i++) shaped.push((await hit(`Bearer st_${String(i).padStart(32, "0")}`)).status);
+    expect(shaped).toEqual([401, 401, 401, 401, 401, 429, 429]);
+    // a real session is served under the ceiling from another address
+    const session = await mintSession(env, "person_mara", "user");
+    const ok = await worker.fetch(new Request(ORIGIN + "/mcp", { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "198.51.100.3", authorization: `Bearer ${session}` }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) }), e2, ectx());
+    expect(ok.status).toBe(200);
   }, 60_000);
 });

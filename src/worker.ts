@@ -40,15 +40,33 @@ const provider = new OAuthProvider<OAuthEnv>({
   },
 });
 
-// Unauthenticated authorization-server traffic shares the anonymous dampener (src/ratelimit.ts).
-const LIMITED = new Set(["/register", "/token", "/authorize", "/oauth/consent"]);
+// Pre-auth metering (src/ratelimit.ts). Review #15-1: a junk bearer must not dodge the dampener and still buy storage reads.
+//   - no credential, or a bearer that cannot be ours BY SHAPE  → RL_MCP_ANON (30/60 s per address), refused before any storage
+//   - a well-shaped bearer (may still be unknown)              → RL_MCP_CEILING (600/60 s per address) — a ceiling, not a
+//     dampener: hosted connectors reach us from a few shared addresses, so it is generous; it bounds a well-shaped-junk
+//     flood at 10 lookups/s per address per location. /token rides the same ceiling (legitimate refresh traffic is shared too).
+//   - /register, /authorize, /oauth/consent are rare human-paced steps → RL_MCP_ANON.
+const FIRST_PARTY = /^(st|pt)_[A-Za-z0-9_-]{32}$/;                       // src/auth.ts mintSession, handlers/common.ts randomToken
+const PROVIDER_TOKEN = /^[^:\s]{1,128}:[^:\s]{1,128}:[A-Za-z0-9_-]{16,256}$/; // workers-oauth-provider: userId:grantId:secret
+const ANON_PATHS = new Set(["/register", "/authorize", "/oauth/consent"]);
+const tooMany = () => new Response(JSON.stringify({ error: "rate_limited", error_description: "too many requests — wait up to 60 seconds" }),
+  { status: 429, headers: { "content-type": "application/json", "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) } });
 
 export default {
   async fetch(request: Request, env: OAuthEnv, ctx: ExecutionContext): Promise<Response> {
     const path = new URL(request.url).pathname;
-    const unauthenticatedMcp = path === "/mcp" && !request.headers.get("authorization");
-    if ((LIMITED.has(path) || unauthenticatedMcp) && request.method !== "OPTIONS" && !(await allow(env, "RL_MCP_ANON", `ip:${clientIp(request)}`)))
-      return new Response(JSON.stringify({ error: "rate_limited", error_description: "too many requests — wait up to 60 seconds" }), { status: 429, headers: { "content-type": "application/json", "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) } });
+    if (request.method !== "OPTIONS") {
+      const key = `ip:${clientIp(request)}`;
+      const isMcp = path === "/mcp" || path.startsWith("/mcp/");
+      if (isMcp) {
+        const bearer = request.headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
+        const plausible = !!bearer && (FIRST_PARTY.test(bearer) || PROVIDER_TOKEN.test(bearer));
+        if (!(await allow(env, plausible ? "RL_MCP_CEILING" : "RL_MCP_ANON", key))) return tooMany();
+        // A bearer that cannot be ours never reaches a storage lookup.
+        if (bearer && !plausible) return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": 'Bearer realm="OAuth", error="invalid_token"' } });
+      } else if (path === "/token") { if (!(await allow(env, "RL_MCP_CEILING", key))) return tooMany(); }
+      else if (ANON_PATHS.has(path) && !(await allow(env, "RL_MCP_ANON", key))) return tooMany();
+    }
     return provider.fetch(request, env, ctx);
   },
 };
