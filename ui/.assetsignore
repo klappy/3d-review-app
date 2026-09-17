@@ -7,3 +7,5 @@ participant-resume.test.mjs
 participant-dom.test.mjs
 changelog.test.mjs
 report-view.test.mjs
+
+report-card.test.mjs

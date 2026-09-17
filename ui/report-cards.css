@@ -12,9 +12,9 @@
   overflow-wrap:anywhere;
   border-top:var(--lens-w) solid var(--line);
 }
-.rv #report-view .report-lens-card[data-lens="team"] { border-top-color:var(--lens-green); }
-.rv #report-view .report-lens-card[data-lens="community"] { border-top-color:var(--lens-blue); }
-.rv #report-view .report-lens-card[data-lens="church"] { border-top-color:var(--lens-yellow); }
+.rv #report-view .report-lens-card[data-lens="team" i], .rv #report-view .report-lens-card[data-lens="Translation Team"] { border-top-color:var(--lens-green); }
+.rv #report-view .report-lens-card[data-lens="community" i] { border-top-color:var(--lens-blue); }
+.rv #report-view .report-lens-card[data-lens="church" i] { border-top-color:var(--lens-yellow); }
 .rv #report-view .report-lens-card > h5 { font-size:16px; margin:0 0 7px; }
 .rv #report-view .report-lens-score { font-size:25px; font-weight:600; }
 @media(max-width:760px) {
