@@ -1,0 +1,133 @@
+{
+  "status": "PROPOSED_NOT_APPLIED",
+  "purpose": "Review-only request descriptions; no executor, credential or service call. Order B separately gated.",
+  "baseline": {
+    "app": "10f5f444d68475d7114ab8fe0bf269fe106476b1",
+    "empty_main": "895339fb5a289b357148e7050447125791e6a411",
+    "existing_ruleset": 23571595
+  },
+  "preconditions": [
+    "Refresh actual supported API request fields and defaults before mutation; substantive drift returns AMEND.",
+    "Exact candidate review, literal Bugbot SUCCESS, terminal checks, findings and prospective hold disposition.",
+    "Actual executor ACK/fire, owner freeze, fresh complete queues/heads/rules/triggers/active versions.",
+    "Do not change existing main/phase0 rules; no provider action authorized by this artifact."
+  ],
+  "requests": [
+    {
+      "name": "protect-production",
+      "service": "github",
+      "method": "POST",
+      "path": "/repos/klappy/3d-review-app/rulesets",
+      "body": {
+        "name": "3d-review-production-pr-and-bugbot",
+        "target": "branch",
+        "enforcement": "active",
+        "bypass_actors": [],
+        "conditions": {
+          "ref_name": {
+            "include": [
+              "refs/heads/production"
+            ],
+            "exclude": []
+          }
+        },
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "type": "pull_request",
+            "parameters": {
+              "required_approving_review_count": 0,
+              "dismiss_stale_reviews_on_push": true,
+              "require_code_owner_review": false,
+              "require_last_push_approval": false,
+              "required_review_thread_resolution": true
+            }
+          },
+          {
+            "type": "required_status_checks",
+            "parameters": {
+              "strict_required_status_checks_policy": true,
+              "do_not_enforce_on_create": true,
+              "required_status_checks": [
+                {
+                  "context": "Cursor Bugbot",
+                  "integration_id": 1210556
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "readback": "Bind created_ruleset_id only from actual response and GET; compare supported request fields and explicit server defaults; no invented identifier."
+    },
+    {
+      "name": "create-and-tighten-production",
+      "service": "github",
+      "method": "POST",
+      "path": "/repos/klappy/3d-review-app/git/refs",
+      "body": {
+        "ref": "refs/heads/production",
+        "sha": "895339fb5a289b357148e7050447125791e6a411"
+      },
+      "precondition": "Ref absent and empty-main SHA freshly verified; never replace existing ref.",
+      "readback": "Exact ref SHA required, then immediately tighten before trigger attachment or main population.",
+      "then": {
+        "method": "PUT",
+        "path": "/repos/klappy/3d-review-app/rulesets/{created_ruleset_id}",
+        "body_derivation": "Use full just-read ruleset reduced to currently supported request fields; change only required_status_checks.parameters.do_not_enforce_on_create to false.",
+        "readback": "Verify exact ref, ruleset and effective protection; tightening failure stops downstream writes."
+      }
+    },
+    {
+      "name": "detach-production-from-main",
+      "service": "cloudflare",
+      "method": "PATCH",
+      "path": "/accounts/{account_id}/builds/triggers/d067de78-0937-42cc-8f3e-cc001c4af8fc",
+      "body": {
+        "branch_includes": [
+          "production"
+        ],
+        "trigger_name": "Production Deploy (production, via PR)"
+      },
+      "readback": "Compare every other request-owned field to fresh snapshot; modified_on may change as server metadata and must be recorded explicitly. Verify queues and unchanged production version; unexpected build stops main writes."
+    },
+    {
+      "name": "retarget-existing-dev",
+      "service": "cloudflare",
+      "method": "PATCH",
+      "path": "/accounts/{account_id}/builds/triggers/b82be56e-33f0-43d5-bf24-3749dd4dc168",
+      "body": {
+        "branch_includes": [
+          "main"
+        ],
+        "trigger_name": "Dev Deploy (main)"
+      },
+      "precondition": "Production detached/protected; main still verified empty.",
+      "readback": "Compare every other request-owned field to fresh snapshot; record expected modified_on change explicitly, reject other unexplained metadata drift. Preserve existing Worker/state/commands/filters/associations; inspect both queues and versions."
+    },
+    {
+      "name": "conditional-individual-build-cancellation",
+      "service": "cloudflare",
+      "method": "PUT",
+      "path": "/accounts/{account_id}/builds/builds/{observed_build_uuid}/cancel",
+      "condition": "Only individually observed queued/running old-main or old-phase0 builds specifically covered by accepted final cutover disposition; no bulk cancellation.",
+      "readback": "UUID bound to actual observed build, cancellation request followed by terminal status readback; otherwise stop."
+    }
+  ],
+  "identifier_custody": {
+    "account_id": "Existing configured provider context, not a credential or new resource.",
+    "created_ruleset_id": "Response-bound only after actual POST and GET.",
+    "observed_build_uuid": "Observed exact build and accepted cancellation disposition only."
+  },
+  "stop_conditions": [
+    "Unexpected build or active-version change during retarget; inspect source/branch/SHA/commands, no assumed cancellation.",
+    "Ref exists, API refuses protection/bootstrap, tightening/readback fails, queued build unexplained, or any substantive head/rule/schema/settings drift.",
+    "No production promotion, manual build start, upload, migration/seed replay, force reset or new staging resource."
+  ],
+  "later_main_integration": "Whole exact PR3 baseline acceptance and normal protected merge only; prove accepted Git SHA -> main push_event build -> deployed DEV version, preserved state and unchanged production before release of freeze."
+}

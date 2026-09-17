@@ -4,6 +4,7 @@ This app answers to [klappy/kitchen](https://github.com/klappy/kitchen). Fetch i
 
 - **HYGIENE 3:** PR review and finished checks gate every non-rail change. Real `Cursor Bugbot` must conclude `SUCCESS` on the exact current head; all attached checks finish and findings receive dispositions. No self-issued override.
 - **HYGIENE 10a:** deployment happens only through the Git-connected Workers Build. No seat runs a deploy or uploads a Worker version.
+- **Topology:** `main` → existing DEV; `production` → production. Provider cutover remains separately gated; the captain owns production promotion. An explicit staging branch/app is optional future scope only if needed.
 - **HYGIENE 19:** `package.json` is the version source. Every production promotion carries its semver bump and CHANGELOG entry; build/client version evidence must prove the manifest-derived `<version>+<sha7>` stamp.
 
 The repo-specific procedure and current promotion hold are in [docs/release.md](docs/release.md). Read it before any release action. Do not interpret this documentation as lifting that hold or proving version-stamp machinery exists.
