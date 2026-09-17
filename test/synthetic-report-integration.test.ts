@@ -37,8 +37,11 @@ beforeAll(async()=>{
 },60000);
 beforeEach(clearReports);
 afterAll(()=>mf.dispose());
+const corpusDeadlineMs=120000;
 describe('real compiled renderer with local D1',()=>{
  it('roundtrips all34/425 contexts with exact renderer bytes and independently specified tuple key',async()=>{
+  const corpusStarted=performance.now();
+  console.log('C2A_REAL_CORPUS_START '+JSON.stringify({runtime:process.version,deadlineMs:corpusDeadlineMs,expectedContexts:34,expectedResponses:425}));
   const measurements:any[]=[];let total=0,max=0;
   for(const id of Object.keys(sourceFixture.contexts)){
    const c=await capture(id);total+=c.rows.length;max=Math.max(max,c.rows.length);
@@ -58,8 +61,11 @@ describe('real compiled renderer with local D1',()=>{
   }
   expect(measurements).toHaveLength(34);expect(total).toBe(425);expect(max).toBe(23);
   expect((await db.prepare('SELECT count(*) n FROM synthetic_report').first<any>()).n).toBe(34);
-  console.log('C2A_REAL_CORPUS '+JSON.stringify({measurements,totalResponses:total,maxValidSameAssessmentResponses:max,runtime:process.version,measurementKind:'local Node plus Miniflare wall time; not Worker CPU or peak memory'}));
- },60000);
+  console.log('C2A_REAL_CORPUS '+JSON.stringify({elapsedMs:performance.now()-corpusStarted,deadlineMs:corpusDeadlineMs,measurements,totalResponses:total,maxValidSameAssessmentResponses:max,runtime:process.version,measurementKind:'local Node plus Miniflare wall time; not Worker CPU or peak memory'}));
+ // The full 34-context/425-response correctness corpus has passed near 60s on the
+ // provider and also exceeded it in isolation. This finite harness allowance is
+ // not a product latency budget; preserve every roundtrip and coexistence check.
+ },corpusDeadlineMs);
  it('refuses rehashed well-typed semantic forgery, not just malformed schema',async()=>{
   const r=await report(),original=await db.prepare('SELECT payload_json,payload_sha256 FROM synthetic_report WHERE id=?').bind(r.id).first<any>();
   const mutations=[
