@@ -92,3 +92,19 @@ body.rv{border-radius:0;min-height:100vh;overflow:visible}
 .rv button.context-node.on{background:var(--nav-active);border-color:var(--glass-edge);box-shadow:var(--shadow-nav-active)}
 .rv #context-tree{min-width:0}
 @media(max-width:760px){.rv #context-tree{flex-basis:100%;order:4}.rv .context-branches.tree-kids{display:block}.rv button.context-node{min-height:44px}.rv #context-tree .tree-empty{margin:0;padding:4px 8px}}
+/* Public welcome uses the same pinned stage composition as the reference. */
+.rv #public-entry{padding:0 26px 32px}
+.rv .public-stage{max-width:var(--stage-max-w);margin:24px auto 0;padding:var(--stage-pad);background:var(--welcome-glass);border-radius:var(--r-stage);box-shadow:var(--shadow-stage)}
+.rv .public-stage h1{font-size:40px;line-height:1.12;letter-spacing:-1.7px;max-width:610px}
+.rv .public-stage>.eyebrow{margin:18px 0 12px;font-weight:400}
+.rv .public-lead{max-width:590px;font-size:17px;color:var(--secondary)}
+.rv .public-stage>.perspectives{margin:30px 0}
+.rv .public-stage>p:not(.eyebrow){max-width:650px;color:var(--secondary)}
+.rv .public-pacing{font-size:13px;margin:19px 0}
+.rv .rv-btn.quiet{background:transparent;border-color:transparent;box-shadow:none}
+.rv[data-entry-view=home] .shell,.rv[data-entry-view=how] .shell,.rv[data-entry-view=example] .shell{display:none}
+.rv:not([data-entry-view=workspace]) .top #identity,.rv:not([data-entry-view=workspace]) .top #signout{display:none}
+.rv[data-entry-view=workspace] #public-entry{display:none}
+.rv[data-entry-view=workspace] .introduction{display:none}
+.rv .public-example-phases{margin:24px 0}
+@media(max-width:760px){.rv #public-entry{padding:0 14px 24px}.rv .public-stage{padding:24px 20px;margin-top:16px}.rv .public-stage h1{font-size:32px;letter-spacing:-1px}.rv .public-stage .perspectives{grid-template-columns:1fr}.rv .public-stage .row{gap:8px}}
