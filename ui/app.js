@@ -372,7 +372,12 @@ async function sharedLinkEntry(token, namespace) {
       try { await state.shared.open(token); }
       catch (error) { const kind = entryFailureKind(error, resuming); if (kind !== 'conflict') { showSharedUnavailable(kind); return; } throw error; } // no automatic fresh open; scoped storage untouched
     } else if (!state.shared.bearer) { showSharedUnavailable('unavailable'); return; }
-    const receipt = await state.shared.receipt(); // receipt is checked before any editable form
+    let receipt;
+    try { receipt = await state.shared.receipt(); } // receipt is checked before any editable form
+    catch (error) { // R-15: a refused probe on the no-fragment resume path is cannot-resume; raw server text never reaches #error
+      if (token === null && entryFailureKind(error, true) === 'cannotResume') { showSharedUnavailable('cannotResume'); return; }
+      throw error;
+    }
     $('recover').hidden = false;
     if (resumeTarget(receipt) === 'receipt') showReceipt(receipt); else await loadForm();
   } catch (error) {

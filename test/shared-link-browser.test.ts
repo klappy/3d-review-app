@@ -211,6 +211,20 @@ describe("[real-API] participant client against the worker", () => {
     try { let e4: any; try { await c4.open(link.link_token); } catch (e) { e4 = e; } expect(e4).toBeUndefined(); /* resume path skips the collecting gate; submit is gated */ }
     finally { await setOpen(true); }
   });
+  it("R-15 dead stored bearer, no fragment: exactly one GET /receipt, zero POST, NOT_AUTHENTICATED → cannotResume kind, storage byte-identical", async () => {
+    const link = await issue();
+    const calls: string[] = [];
+    const counting = (url: string, init: any) => { calls.push(`${init.method || "GET"} ${url}`); return fetchImpl(url, init); };
+    const { storage, store } = await context(link.link_token, counting);
+    store.set("bearer", "pt_" + "z".repeat(32)); store.set("submitKey", "key-3"); store.set("draft", JSON.stringify({ template: { id: "t", version: 1 }, answers: { Q1: 3 } }));
+    const before = JSON.stringify(storage.keys().sort().map((k: string) => [k, storage.getItem(k)]));
+    const client = createSharedLinkClient({ fetchImpl: counting, store });
+    let err: any; try { await client.receipt(); } catch (e) { err = e; }
+    expect(err.code).toBe("NOT_AUTHENTICATED");
+    expect(entryFailureKind(err, true)).toBe("cannotResume");
+    expect(calls).toEqual(["GET /v2/participate/receipt"]);
+    expect(JSON.stringify(storage.keys().sort().map((k: string) => [k, storage.getItem(k)]))).toBe(before);
+  });
   it("staff: dry-run → execute → share URL = origin + '/' + entry_fragment, and the fragment round-trips", async () => {
     const link = await issue();
     expect(link.entry_fragment).toBe("#survey=" + encodeURIComponent(link.link_token));
@@ -242,13 +256,13 @@ async function settled($: (id: string) => any) { // wait for the startup run() t
   throw new Error("startup did not settle: " + $("notice").textContent);
 }
 let bootCount = 0;
-async function boot(storage: any, hash: string) {
+async function boot(storage: any, hash: string, fetcher: typeof fetchImpl = fetchImpl) {
   const { document, $ } = fakeDocument();
   const g: any = globalThis;
   g.document = document; g.window = g; g.sessionStorage = storage;
   g.location = { hash, pathname: "/", search: "", origin: ORIGIN }; g.history = { replaceState: () => { g.location.hash = ""; } };
   Object.defineProperty(g, "navigator", { value: { clipboard: { writeText: async () => {} } }, configurable: true }); g.CSS = { escape: (s: string) => s };
-  g.fetch = fetchImpl;
+  g.fetch = fetcher;
   g.Option = class { constructor(public text: string, public value: string) {} };
   g.FormData = class { constructor(public form: any) {} get(k: string) { return this.form.values?.[k] ?? null; } getAll(k: string) { const v = this.form.values?.[k]; return Array.isArray(v) ? v : v == null ? [] : [v]; } };
   await import(/* @vite-ignore */ `${new URL("../ui/app.js", import.meta.url).href}?boot=${++bootCount}`); // fresh module instance per boot
@@ -308,6 +322,21 @@ describe("[fake-DOM] ui/app.js shared mode", () => {
     expect($("answers").hidden).toBe(true); expect($("error").hidden).toBe(true);
     expect(storage.getItem(ns + "bearer")).toBe("pt_" + "y".repeat(32));
     expect(JSON.stringify(storage.keys().filter((k: string) => k !== "shared:current").sort().map((k: string) => [k, storage.getItem(k)]))).toBe(before);
+  });
+  it("R-15 boot with no fragment and a dead scoped bearer: cannot-resume copy, no raw text in #error, no POST, storage unchanged", async () => {
+    const link = await issue();
+    const storage = memoryStorage();
+    const ns = await digestNamespace(link.link_token);
+    storage.setItem("shared:current", ns);
+    storage.setItem(ns + "bearer", "pt_" + "w".repeat(32)); storage.setItem(ns + "submitKey", "key-4"); storage.setItem(ns + "draft", "{\"template\":{\"id\":\"t\",\"version\":1},\"answers\":{\"Q1\":2}}");
+    const before = JSON.stringify(storage.keys().sort().map((k: string) => [k, storage.getItem(k)]));
+    const calls: string[] = [];
+    const $ = await boot(storage, "", (url, init) => { calls.push(`${init.method || "GET"} ${url}`); return fetchImpl(url, init); });
+    expect(calls).toEqual(["GET /v2/participate/receipt"]);
+    expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.cannotResume);
+    expect($("error").hidden).toBe(true); expect($("error").textContent).not.toMatch(/NOT_AUTHENTICATED/);
+    expect($("answers").hidden).toBe(true);
+    expect(JSON.stringify(storage.keys().sort().map((k: string) => [k, storage.getItem(k)]))).toBe(before);
   });
   it("closed collection on entry shows the closed copy; no form", async () => {
     const link = await issue();
