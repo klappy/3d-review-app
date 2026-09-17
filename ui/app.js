@@ -346,7 +346,8 @@ async function listReports() {
   text($('report-status'), (result.reports || []).length ? '' : 'No reports have been built for this assessment.');
 }
 reportAction('refresh-reports', 'Loading reports…', listReports);
-reportAction('load-more-reports', 'Loading more reports…', async () => {
+// Load more already has a page: a failed next page must stop paging, not wipe the list via reportAction.
+bindClick('load-more-reports', 'Loading more reports…', async () => {
   const cursor = required(state.reportCursor, 'Refresh reports first.');
   let result;
   try { result = await api(`${reportRoute()}?cursor=${path(cursor)}`); }
@@ -494,7 +495,7 @@ bindClick('recover', 'Recovering receipt…', async () => {
   else { state.responseKey = null; sessionStorage.removeItem('responseKey'); }
 });
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
-{ const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); } }
+{ const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); text($('identity'), 'Checking session…'); } }
 function showSharedUnavailable(kind) {
   const message = { closed: sharedCopy.collectionClosed, cannotResume: sharedCopy.cannotResume, rateLimited: sharedCopy.rateLimited, transient: sharedCopy.transient }[kind] || sharedCopy.linkUnavailable;
   text($('participant-error'), message); $('participant-error').hidden = false;

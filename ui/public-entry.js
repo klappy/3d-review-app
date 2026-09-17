@@ -18,7 +18,8 @@ export function mountPublicEntry(document,window) {
     const shared=sharedAtEntry||document.getElementById('facilitator')?.hidden===true;
     // Presence selects the existing recovery screen only; restoreParticipant still validates the session.
     const participantResume=!shared && !!window.sessionStorage.getItem('participantToken');
-    const view=publicView({shared,participantResume,authenticated:observedIdentity(identity?.textContent),checking:identity?.textContent==='Checking session…',hash:window.location.hash});
+    // Access return paints Not signed in and clears #session= before /v2/me; a stored token is still restoring.
+    const view=publicView({shared,participantResume,authenticated:observedIdentity(identity?.textContent),checking:identity?.textContent==='Checking session…'||(!!window.sessionStorage.getItem('facilitatorToken')&&!observedIdentity(identity?.textContent)),hash:window.location.hash});
     document.body.dataset.entryView=view;
     for(const name of ['home','how','example'])document.getElementById('public-'+name).hidden=view!==name;
     document.getElementById('public-entry').hidden=view==='workspace';
