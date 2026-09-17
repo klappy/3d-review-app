@@ -82,3 +82,15 @@ test('stylesheet is wired and its hides are route-scoped: notice off public/part
       assert.ok(one.startsWith('.rv'),`unscoped selector: ${one}`);
   assert.ok(read('./.assetsignore').split('\n').includes('public-choices.test.mjs'));
 });
+
+
+test('global shell makes no dataset claim while actual sample and sandbox disclosures remain',()=>{
+  const header=html.slice(html.indexOf('<header class="top">'),html.indexOf('</header>'));
+  assert.ok(!header.includes('Synthetic sandbox'));
+  assert.ok(!html.includes('Public synthetic sandbox · use .invalid addresses and fake data only'));
+  assert.ok(header.includes('id="identity"')&&header.includes('id="version"'),'session and build identity controls remain');
+  assert.ok(html.includes('Sandbox test identities (dev only) — not a real sign-in'));
+  assert.ok(html.includes('Synthetic sandbox only (dev): .invalid test identities'));
+  assert.ok(html.includes('Everything here is invented.'));
+  assert.ok(html.includes('Browse a sample assessment (invented data)'));
+});
