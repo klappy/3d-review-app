@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: 3D Review API — contract-v0.1 (DRAFT)
   version: 0.1.0-draft
-  description: Projected from cookbook 04 @ 0f4413768c4365054372d917619311d7c2a00e96 by Fable. 83 capabilities; every capability
+  description: Projected from cookbook 04 @ 0f4413768c4365054372d917619311d7c2a00e96 by Fable. 84 capabilities; every capability
     is also reachable via MCP docs/read/write/danger over the same handlers (prd/18-D). Paths marked x-path-inferred were
     elided in 04 and need Lane A confirmation. SUPPRESSED is ok:true. Danger twins are never GET.
 servers:
@@ -551,6 +551,119 @@ components:
           type: string
         expires_in:
           type: integer
+    FeedbackParams:
+      type: object
+      additionalProperties: false
+      description: cap.ops.feedback write params — AMEND 2c4ee8d CORRECTION. Strip answers/responses/response before unknown reject. Client stripped is rejected.
+      properties:
+        helpful:
+          type: boolean
+        note:
+          type: string
+          description: freeform; ≤4096 UTF-8 bytes
+        text:
+          type: string
+          description: legacy dual-read alias stored as canonical note
+        context:
+          description: opaque JSON value; serialized form ≤1024 UTF-8 bytes; not helpful
+        scope_type:
+          type: string
+          description: opaque label; ≤64 code units; default platform
+        scope_id:
+          type: string
+          description: opaque label; ≤64 code units; default "-"
+        satisfaction:
+          type: integer
+          minimum: 1
+          maximum: 5
+        confusion:
+          type: integer
+          minimum: 1
+          maximum: 5
+        frustration:
+          type: integer
+          minimum: 1
+          maximum: 5
+        sentiment_journey:
+          type: string
+        cast_id:
+          type: string
+        persona:
+          type: string
+        goal_id:
+          type: string
+        answers:
+          description: stripped, never persisted
+        responses:
+          description: stripped, never persisted
+        response:
+          description: stripped, never persisted
+    FeedbackWriteResult:
+      type: object
+      additionalProperties: false
+      required:
+      - recorded
+      - stripped
+      - feedback_id
+      properties:
+        recorded:
+          type: boolean
+          const: true
+        stripped:
+          type: boolean
+        feedback_id:
+          type: string
+          description: opaque locator only; never echoes note/text/context/scores
+    FeedbackGetResult:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - actor
+      - scope_type
+      - scope_id
+      - created_at
+      - body
+      properties:
+        id:
+          type: string
+        actor:
+          type: string
+          description: principal id or anon
+        scope_type:
+          type: string
+        scope_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        body:
+          type: object
+          additionalProperties: false
+          required:
+          - stripped
+          properties:
+            helpful:
+              type: boolean
+            note:
+              type: string
+            context: {}
+            satisfaction:
+              type: integer
+            confusion:
+              type: integer
+            frustration:
+              type: integer
+            sentiment_journey:
+              type: string
+            cast_id:
+              type: string
+            persona:
+              type: string
+            goal_id:
+              type: string
+            stripped:
+              type: boolean
 paths:
   /v2/entry:
     get:
@@ -4480,11 +4593,16 @@ paths:
       - J. Ops, telemetry, xray, docs, feedback
       responses:
         '200':
-          description: ok envelope
+          description: ok envelope; result is {recorded, stripped, feedback_id}
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Envelope'
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - type: object
+                  properties:
+                    result:
+                      $ref: '#/components/schemas/FeedbackWriteResult'
         4XX:
           description: error envelope
           content:
@@ -4497,9 +4615,48 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: true
-              description: params — shape owed per capability (A1 open item)
+              $ref: '#/components/schemas/FeedbackParams'
+  /v2/ops/feedback/{id}:
+    get:
+      operationId: cap.ops.feedback_get
+      summary: 'cap.ops.feedback_get — read — roles: S'
+      x-capability: cap.ops.feedback_get
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: S
+      x-path-inferred: false
+      tags:
+      - J. Ops, telemetry, xray, docs, feedback
+      responses:
+        '200':
+          description: S-only per-row projection
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - type: object
+                  properties:
+                    result:
+                      $ref: '#/components/schemas/FeedbackGetResult'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
   /v2/undo/{token}:
     post:
       operationId: cap.ops.undo

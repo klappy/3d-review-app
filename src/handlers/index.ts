@@ -26,6 +26,7 @@ export const handlers: Record<string, Handler> = {
   "cap.auth.me": p.authMe,
   "cap.ops.health": p.opsHealth,
   "cap.ops.feedback": p.opsFeedback,
+  "cap.ops.feedback_get": p.opsFeedbackGet,
   "cap.ops.trace": p.opsTrace,
   "cap.ops.undo": opsUndo,
   "cap.docs.get": docs,
