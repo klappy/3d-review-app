@@ -26,11 +26,24 @@ test('css is level-scoped, keeps the next-entity paths and the stage control rea
   const css=read('./entity-screen.css').replace(/\/\*[\s\S]*?\*\//g,'');
   for(const sel of css.replace(/\/\*[\s\S]*?\*\//g,'').split('}').map(c=>c.slice(0,c.indexOf('{')).trim()).filter(Boolean))
     for(const one of sel.split(',').map(x=>x.trim()).filter(x=>x&&!x.startsWith('@')))
-      assert.ok(/^\.rv(\[data-entity-level="(workspaces|workspace|project|assessment|survey)"\]| #assessment-context$| #entity-back| \.collab-accept| #collab:has\()/.test(one),`unscoped: ${one}`);
+      assert.ok(/^\.rv(\[data-entity-level="(workspaces|workspace|project|assessment|survey)"\]|\[data-entity-level\]:not\(\[data-entity-level="workspaces"\]\)| #assessment-context$| #entity-back| \.collab-accept| #collab:has\()/.test(one),`unscoped: ${one}`);
   assert.ok(!/#create-project/.test(css),'the authorized create-project form is never hidden');
   assert.ok(!/#set-stage/.test(css)&&!/\[data-entity-level="assessment"\] #assessment-card\s*[,{]/.test(css),'the stage control stays at assessment level');
   assert.ok(!/#projects\b|#assessments\b/.test(css.replace(/#project-card|#assessment-card|#load-assessments/g,'')),'selects are hidden only via their card chrome, never removed');
 });
+test('mobile entity-first: below 760px a selected entity precedes the tree; workspaces level, desktop, print untouched',()=>{
+  const css=read('./entity-screen.css').replace(/\/\*[\s\S]*?\*\//g,'');
+  const block=css.slice(css.indexOf('@media (max-width:760px)'),css.indexOf('}\n  }',css.indexOf('@media (max-width:760px)'))+4);
+  assert.ok(block.startsWith('@media (max-width:760px)'),'mobile block present');
+  assert.ok(css.trimStart().startsWith('@media screen'),'inside @media screen only (print untouched)');
+  assert.match(block,/\.rv\[data-entity-level\]:not\(\[data-entity-level="workspaces"\]\) \.shell \{ display:flex; flex-direction:column; \}/);
+  assert.match(block,/\.rv\[data-entity-level\]:not\(\[data-entity-level="workspaces"\]\) \.shell > aside\.tree \{ order:2;/);
+  assert.match(block,/\.rv\[data-entity-level\]:not\(\[data-entity-level="workspaces"\]\) \.shell > \.content \{ order:1; \}/);
+  for(const sel of block.split('}').map(c=>c.slice(0,c.indexOf('{')).trim()).filter(x=>x&&!x.startsWith('@')))
+    assert.ok(sel.includes('[data-entity-level]:not([data-entity-level="workspaces"])'),'every mobile rule is guarded by an active non-workspaces level: '+sel);
+  assert.ok(!/display:none/.test(block),'the tree is reordered, never hidden');
+});
+
 test('wiring: assets, back link before assessment context and task, entity screen mounted after collab and reset on identity change',()=>{
   const html=read('./index.html'),app=read('./app.js'),server=read('./server.mjs'),src=read('./entity-screen.js');
   assert.ok(html.includes('<link rel="stylesheet" href="/entity-screen.css">'));
