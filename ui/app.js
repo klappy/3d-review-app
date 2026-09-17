@@ -337,7 +337,7 @@ bindClick('submit', 'Submitting response…', async () => {
       else if (kind === 'conflict') {
         const resolved = await resolveConflict(state.shared);
         if (resolved.state === 'receipt') { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); showReceipt(resolved.receipt); return; }
-        if (resolved.state === 'rateLimited' || resolved.state === 'transient') { if (submitState === 'uncertain') uncertain(); else text($('participant-resume'), resolved.state === 'rateLimited' ? sharedCopy.rateLimited : sharedCopy.transient); }
+        if (resolved.state === 'rateLimited' || resolved.state === 'transient') uncertain(); // the probe's wording is not the answers' outcome: unknown means uncertain (auditor F5)
         else showSharedUnavailable(resolved.state);
       }
       else if (kind === 'unavailable') showSharedUnavailable(submitState === 'uncertain' ? 'cannotResume' : 'unavailable');

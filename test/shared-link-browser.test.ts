@@ -599,6 +599,35 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     expect($("notice").textContent).toBe(ATTENTION);
     expect(snapshot(storage)).toBe(snap);
   });
+  const unreadable = async () => new Response("<html>gateway</html>", { status: 502 });
+  const conflictProbes: [string, string, Route][] = [
+    ["F5-M1", "probe 429", refuse(429, "RATE_LIMITED")],
+    ["F5-M2", "probe 503", refuse(503, "INTERNAL")],
+    ["F5-M3", "probe throws", offline],
+    ["F5-M4", "probe unreadable body", unreadable],
+  ];
+  for (const [row, label, probe] of conflictProbes) it(`${row} first submit 409 STAGE_CONFLICT then ${label}: always submitUncertain (never the probe's wording), review and Recover stay, storage byte-identical; released retry commits`, async () => {
+    const link = await issue(); const { $, storage, ns, plan, bodies } = await openForm(link);
+    const before = await counts(); const snap = await armed(storage, ns);
+    plan.responses = refuse(409, "STAGE_CONFLICT"); plan.receipt = probe; await submit($);
+    expectUncertain($, storage, snap);
+    expect($("participant-resume").textContent).not.toBe(copy.rateLimited); expect($("participant-resume").textContent).not.toBe(copy.transient);
+    expect($("review").hidden).toBe(false); expect($("answers").hidden).toBe(true); expect($("recover").hidden).toBe(false);
+    expect(await counts()).toBe(before);
+    plan.responses = null; plan.receipt = null; await submit($);
+    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toMatch(/^Response saved · resp_/);
+    expect(bodies[0].result.duplicate).toBe(false); expect(await counts()).toBe(before + 1);
+    expect(storage.getItem(ns + "draft")).toBeNull(); expect(storage.getItem(ns + "submitKey")).toBeNull();
+  });
+  it("F5-M5 409 STAGE_CONFLICT with a live probe that says submitted:true: own receipt shown, draft and key cleared", async () => {
+    const link = await issue(); const { $, storage, ns, plan, bodies, lost } = await openForm(link);
+    plan.responses = lost; await submit($); // commit whose reply was lost
+    plan.responses = null; await edit($, { Q1: "4" });
+    plan.responses = refuse(409, "STAGE_CONFLICT"); await submit($); // real probe: submitted:true
+    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toContain(bodies[0].result.response_id);
+    expect($("participant-error").hidden).toBe(true);
+    expect(storage.getItem(ns + "draft")).toBeNull(); expect(storage.getItem(ns + "submitKey")).toBeNull();
+  });
   it("F10 fragment entry with GET /receipt → 503: transient copy shown, #error stays empty and hidden", async () => {
     const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
     plan.receipt = refuse(503, "INTERNAL");
