@@ -390,7 +390,7 @@ describe("cap.grant.invite — an uncertain attempt is never replayed, across ca
     expect(await rowCount(db, hash)).toBe(2);
   }, 30_000);
 
-  it("accept works on an 'unconfirmed' invitation: the mail may have arrived, and the token proves it did", async () => {
+  it("accept works on an 'unconfirmed' invitation: token possession plus a matching authenticated recipient email permits acceptance (possession does not establish delivery)", async () => {
     const email = "uncertain.accepted@real-domain.dev";
     const { db, ctx, asRecipient } = await bed("DB8", email);
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));

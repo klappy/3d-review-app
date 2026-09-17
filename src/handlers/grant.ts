@@ -8,7 +8,15 @@ import { invitationMessage, normalizeAddress, publicOrigin, sendMail, type MailE
 type Scope = { type: "workspace" | "project" | "assessment"; id: string };
 const INVITE_TTL_S = 7 * 24 * 3600;
 const INVITE_COOLDOWN_S = 600;        // one live invitation per scope+invitee per 10 minutes (review #16-1)
-const PENDING_DEDUPE_S = 30;          // an in-flight twin; older 'pending' rows were never mailed and must not block a retry
+// Retry/dedupe policy as implemented: a 'sent' row inside INVITE_COOLDOWN_S is live; a 'pending' row younger than
+// PENDING_DEDUPE_S is treated as an in-flight twin; an 'unconfirmed' row stays live with no cooldown expiry; and
+// cap.grant.revoke_invitation is the explicit way out of any of those.
+// UNRESOLVED CRASH WINDOW: a 'pending' row older than PENDING_DEDUPE_S does NOT prove the provider was never contacted.
+// The send and the terminal write are separate steps, so a worker stopped between provider contact and the
+// 'sent'/'unconfirmed' write leaves a stale 'pending' row that MAY already have reached the provider. Such a row does not
+// block a retry, and a re-invite there CAN double-send. No exactly-once delivery is promised; no outbox or retry
+// redesign is added or promised here (independent review AMEND 53c5717369870).
+const PENDING_DEDUPE_S = 30;          // in-flight twin window; see the crash-window note above
 const INVITES_PER_INVITER_HOUR = 30;  // outbound mail from the captain's domain is not a loop target (review #16-2)
 
 /** The caller's role at the scope; hidden when none. */
@@ -147,7 +155,9 @@ export const accept: Handler = async (ctx, p, o) => {
   if (ctx.principal.kind !== "user") throw new CapError("NOT_AUTHENTICATED", "sign in to accept an invitation");
   const token = reqStr(p, "token");
   const inv = await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash FROM invitation WHERE token_hash = ?").bind(await sha256(token)).first<any>();
-  // 'unconfirmed' is accepted like 'sent': the mail may well have arrived, and the token is proof enough that it did.
+  // 'unconfirmed' is accepted like 'sent'. Acceptance is permitted by token possession PLUS the authenticated principal's
+  // email matching the invitee (checked below) — possession does not establish the delivery channel or inbox arrival
+  // (a DEV manual handoff path exists), so it is never treated as proof that mail was delivered.
   if (!inv || inv.status === "revoked") throw notVisible("invitation");
   // Invitations are NOT transferable bearer tokens: the invited email must be the signed-in principal's (Astra c5704773599). Mismatch is hidden, never explained.
   const me = await ctx.db.prepare("SELECT email_hash FROM principal WHERE id = ?").bind(ctx.principal.id).first<{ email_hash: string | null }>();
