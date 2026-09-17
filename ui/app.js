@@ -37,7 +37,12 @@ function clearEntitySelection() {
   $('projects').value = ''; $('granted-assessments').value = ''; text($('granted-detail'), '');
   text($('project-detail'), ''); text($('assessment-detail'), ''); text($('survey-detail'), '');
   text($('results'), 'Select an assessment.'); text($('notice'), ''); // a completed notice from the previous entity does not survive the switch
+  text($('error'), ''); $('error').hidden = true; // nor its error (Bugbot 4038528843)
   resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
+  // Complete downstream display-state inventory (Bugbot 4038528822): project languages (select + status; no fetch with
+  // no project), the next-stage target, and the per-entity forms that may hold typed input from the previous entity.
+  languageControls.refresh(); $('stage-target').value = '';
+  $('create-assessment').reset(); $('create-language').reset();
   lensSurveys?.reset(); entityScreen?.render();
 }
 const entityScreen = sharedMode || typeof window === 'undefined' ? null : mountEntityScreen(document, window, { isStaff: () => collab.isStaff(), selectedWorkspace: () => collab.selectedWorkspace(), backToWorkspaces: () => collab.backToWorkspaces() });
