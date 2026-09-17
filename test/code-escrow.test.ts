@@ -27,7 +27,7 @@ describe("one-time code escrow and confirmed release",()=>{
     await db.batch(statements(db,"../seed/synthetic.sql"));
     let serial=0;
     const logs:unknown[]=[];
-    const context=(actor="person_mara",now=at):Ctx=>({env:{DB:db,SESSION_SECRET:"synthetic-confirm-secret",CODE_ESCROW_SECRET:secret},db,principal:{kind:"user",id:actor},traceId:`tr_escrow_${++serial}`,now:()=>now,log:(span,data)=>{logs.push({span,data});}});
+    const context=(actor="person_mara",now=at):Ctx=>({env:{DB:db,SESSION_SECRET:"synthetic-confirm-secret",CODE_ESCROW_SECRET:secret,ENVIRONMENT:"dev"},db,principal:{kind:"user",id:actor},traceId:`tr_escrow_${++serial}`,now:()=>now,log:(span,data)=>{logs.push({span,data});}});
     const issue=await execute(context(),"cap.survey.issue_codes",{aid:"assess_tavo_collect",sid:"survey_tavo",count:3},{tool:"write"});
     expect(issue.ok).toBe(true);
     if(!issue.ok) throw new Error("issue failed");

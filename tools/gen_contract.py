@@ -185,7 +185,7 @@ manifest_caps = {
                "inverse_unassessed": sum(1 for c in caps if c["inverse"]["kind"] == "UNASSESSED")},
     "tools": ["docs", "read", "write", "danger"],
     "errors": ["NOT_AUTHENTICATED", "NOT_AUTHORIZED_AT_SCOPE", "WRONG_TOOL_FOR_CLASS", "CONFIRM_REQUIRED", "CONFIRM_EXPIRED",
-               "INVALID_PARAMS", "NOT_FOUND_OR_NOT_VISIBLE", "STAGE_CONFLICT", "RESERVED_NOT_BUILT", "NO_INVERSE"],
+               "INVALID_PARAMS", "NOT_FOUND_OR_NOT_VISIBLE", "STAGE_CONFLICT", "RESERVED_NOT_BUILT", "NO_INVERSE", "RATE_LIMITED"],
     "suppressed_is_success": True,
     "capabilities": caps,
 }

@@ -10,7 +10,8 @@ export type CapErrorCode =
   | "NOT_FOUND_OR_NOT_VISIBLE"
   | "STAGE_CONFLICT"
   | "RESERVED_NOT_BUILT"
-  | "NO_INVERSE";
+  | "NO_INVERSE"
+  | "RATE_LIMITED";
 
 export class CapError extends Error {
   readonly code: CapErrorCode;

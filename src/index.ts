@@ -14,6 +14,7 @@ import { verifyAccessJwt } from "./access";
 import synthResponsesSql from "../seed/synthetic-responses.sql";
 import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
+import { allow, clientIp, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 
 const app = new Hono<{ Bindings: Env }>();
 const json = (value: unknown, status: number) => new Response(JSON.stringify(value), {
@@ -22,7 +23,7 @@ const json = (value: unknown, status: number) => new Response(JSON.stringify(val
 
 export async function contextForRequest(req: Request, env: Env): Promise<Ctx> {
   return {
-    env, db: env.DB, principal: await resolvePrincipal(req, env),
+    env, db: env.DB, principal: await resolvePrincipal(req, env), clientIp: clientIp(req),
     traceId: newTraceId(), now: () => new Date(), log: () => {},
   };
 }
@@ -73,6 +74,7 @@ for (const cap of capabilities) {
         transport: "http",
       });
       const res = json(result, result.ok ? 200 : statusFor(result.error.code));
+      if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
       if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Path=/; SameSite=Lax`);
       if (cap.id === "cap.auth.logout") res.headers.append("set-cookie", "session=; Max-Age=0; Path=/");
       return res;
@@ -87,6 +89,17 @@ for (const cap of capabilities) {
 // MCP (Lane B-1): same execute(), four tools.
 app.post("/mcp", async (c) => {
   const ctx = await contextForRequest(c.req.raw, c.env);
+  // Anonymous MCP traffic (initialize, tools/list, docs, public reads) is dampened per address. Signed-in callers are
+  // not counted here; the capability limiters in execute() still apply to them. A JSON-RPC batch spends one unit PER
+  // MESSAGE (Bugbot 9ea1c79e: one POST must not buy many calls), and no caller may batch more than MCP_MAX_BATCH.
+  const rpcError = (status: number, code: number, message: string, data?: Record<string, unknown>, headers: Record<string, string> = {}) =>
+    new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code, message, ...(data ? { data } : {}) } }), { status, headers: { "content-type": "application/json", ...headers } });
+  let units = 1;
+  try { const peek: unknown = await c.req.raw.clone().json(); if (Array.isArray(peek)) units = Math.max(1, peek.length); } catch { /* handleMcp answers the parse error */ }
+  if (units > MCP_MAX_BATCH) return rpcError(400, -32600, `batch too large: at most ${MCP_MAX_BATCH} messages per request`);
+  if (ctx.principal.kind === "anonymous") for (let i = 0; i < units; i++)
+    if (!(await allow(c.env, "RL_MCP_ANON", `ip:${ctx.clientIp}`)))
+      return rpcError(429, -32029, "rate limited — sign in, or wait up to 60 seconds", { code: "RATE_LIMITED", trace_id: ctx.traceId }, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
   return handleMcp(c.req.raw, ctx, execute as any, async (cx, a) => {
     try { const r = await docs(cx, a); return ok("cap.docs.get", r.result, cx.traceId); }
     catch (e: any) { return fail(e.code ?? "INVALID_PARAMS", e.message, e.hint, "cap.docs.get", cx.traceId); }

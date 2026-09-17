@@ -4,8 +4,13 @@ import type { Ctx, Handler, Role, ScopeType } from "./types";
 import { CapError, notVisible } from "./errors";
 import { ROLE_RANK, atLeast, countScalar, gate, newId, nowIso, randomToken, reqRole, reqScope, reqStr, roleAt, sha256 } from "./common";
 
+import { invitationMessage, normalizeAddress, publicOrigin, sendMail, type MailEnv, type MailResult } from "../mail";
+
 type Scope = { type: "workspace" | "project" | "assessment"; id: string };
 const INVITE_TTL_S = 7 * 24 * 3600;
+const INVITE_COOLDOWN_S = 600;        // one live invitation per scope+invitee per 10 minutes (review #16-1)
+const PENDING_DEDUPE_S = 30;          // an in-flight twin; older 'pending' rows were never mailed and must not block a retry
+const INVITES_PER_INVITER_HOUR = 30;  // outbound mail from the captain's domain is not a loop target (review #16-2)
 
 /** The caller's role at the scope; hidden when none. */
 async function callerAt(ctx: Ctx, scope: Scope, min: Role): Promise<Role> {
@@ -25,18 +30,47 @@ async function scopeExists(ctx: Ctx, scope: Scope): Promise<boolean> {
   return !!(await ctx.db.prepare(`SELECT id FROM ${t} WHERE id = ?`).bind(scope.id).first());
 }
 
-/** E: invite → mail would be sent. Phase 0 sends nothing; the invitation is recorded 'sent' and, in dev only, the link token is returned so the flow can be exercised. */
+/** E: invite → the invitation mail leaves the system (IRR-001) when a sender is configured in production (src/mail.ts, OF-3).
+ *  `delivered` is the provider's acceptance, never assumed; when it is false `delivery.reason` says why. Dev returns the
+ *  link token in-band so the flow can be exercised without any mailbox. */
 export const invite: Handler = async (ctx, p, o) => {
-  const scope = reqScope(p); const role = reqRole(p); const email = reqStr(p, "email").toLowerCase();
+  const scope = reqScope(p); const role = reqRole(p);
+  const email = normalizeAddress(reqStr(p, "email"));
+  if (!email) throw new CapError("INVALID_PARAMS", "email must be one plain ASCII address", "letters, digits and . _ % + - before the @; no display names, lists, quotes or spaces", "cap.grant.invite");
   const caller = await callerAt(ctx, scope, "member");
   ceiling(caller, role, "invite");
   const inviteeHash = await sha256(email);
   const impact = { affected: [{ scope, role, invitee: inviteeHash.slice(0, 12), will_see: `${scope.type} contents at role ${role}` }], irreversible: true, effect: "external" as const, compensating_control: "cap.grant.revoke_invitation (does not unsend)" };
   if (o?.dryRun) return { result: {}, scope, impact };
+  // Intent de-duplication + inviter cap, decided and written in ONE statement so concurrent replays cannot both pass a
+  // check-then-insert gap (re-review #16). A live duplicate is: a row already 'sent' inside the cooldown, or a 'pending' row
+  // younger than PENDING_DEDUPE_S (an in-flight twin). Older 'pending' rows were never mailed and must not block a retry.
+  const now = ctx.now().getTime();
+  const sentSince = new Date(now - INVITE_COOLDOWN_S * 1000).toISOString(), pendingSince = new Date(now - PENDING_DEDUPE_S * 1000).toISOString(), hourAgo = new Date(now - 3600_000).toISOString();
+  const DUP = `scope_type = ?2 AND scope_id = ?3 AND invitee_hash = ?4 AND ((status = 'sent' AND created_at > ?11) OR (status = 'pending' AND created_at > ?12))`;
   const id = newId("inv"); const token = randomToken("il");
-  await ctx.db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
-    .bind(id, scope.type, scope.id, inviteeHash, await sha256(token), role, "sent", ctx.principal.id, nowIso(ctx), new Date(ctx.now().getTime() + INVITE_TTL_S * 1000).toISOString()).run();
-  return { result: { invitation_id: id, role, status: "sent", accepted: true, delivered: false, note: "phase 0: no mail transport; delivered=false is honest", ...(ctx.env.ENVIRONMENT === "dev" ? { dev_only_link_token: token } : {}) }, scope, impact };
+  const ins = await ctx.db.prepare(`INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at)
+      SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'pending', ?8, ?9, ?10
+      WHERE NOT EXISTS (SELECT 1 FROM invitation WHERE ${DUP})
+        AND (SELECT COUNT(*) FROM invitation WHERE created_by = ?8 AND scope_type <> 'survey' AND created_at > ?13) < ?7`)
+    .bind(id, scope.type, scope.id, inviteeHash, await sha256(token), role, INVITES_PER_INVITER_HOUR, ctx.principal.id, nowIso(ctx), new Date(now + INVITE_TTL_S * 1000).toISOString(), sentSince, pendingSince, hourAgo).run();
+  if ((ins.meta.changes ?? 0) !== 1) {
+    const dup = await ctx.db.prepare("SELECT id, role, status FROM invitation WHERE scope_type = ?1 AND scope_id = ?2 AND invitee_hash = ?3 AND ((status = 'sent' AND created_at > ?4) OR (status = 'pending' AND created_at > ?5)) ORDER BY created_at DESC LIMIT 1")
+      .bind(scope.type, scope.id, inviteeHash, sentSince, pendingSince).first<{ id: string; role: string; status: string }>();
+    if (!dup) throw new CapError("RATE_LIMITED", `at most ${INVITES_PER_INVITER_HOUR} collaborator invitations per hour`, "this cap resets over the next hour, not the next minute", "cap.grant.invite");
+    if (dup.role !== role) throw new CapError("INVALID_PARAMS", `already invited as ${dup.role} a moment ago`, "revoke that invitation first, then invite with the new role", "cap.grant.revoke_invitation");
+    return { result: { invitation_id: dup.id, role: dup.role, status: dup.status, accepted: true, delivered: false, delivery: { provider: null, reason: "duplicate_recent" }, note: "already invited moments ago; nothing was sent again" }, scope, impact };
+  }
+  const env = ctx.env as MailEnv; const origin = publicOrigin(env);
+  let delivery: MailResult = { delivered: false, reason: "not_configured" };
+  if (origin) {
+    const msg = invitationMessage(origin, token, role, scope.type, INVITE_TTL_S / 86400);
+    delivery = await sendMail(env, { to: email, subject: msg.subject, text: msg.text, html: msg.html, idempotencyKey: `invite/${id}` });
+  }
+  // The row says 'sent' only when the provider accepted the message; otherwise it stays 'pending' (review #16-4).
+  if (delivery.delivered) await ctx.db.prepare("UPDATE invitation SET status = 'sent' WHERE id = ?").bind(id).run();
+  ctx.log("grant.invite.mail", { delivered: delivery.delivered, reason: delivery.reason ?? null, provider_status: delivery.provider_status ?? null }); // never the address, nor a hash of it
+  return { result: { invitation_id: id, role, status: delivery.delivered ? "sent" : "pending", accepted: true, delivered: delivery.delivered, delivery: { provider: delivery.provider ?? null, reason: delivery.reason ?? null }, ...(ctx.env.ENVIRONMENT === "dev" ? { dev_only_link_token: token } : {}) }, scope, impact };
 };
 
 export const revoke_invitation: Handler = async (ctx, p) => {
