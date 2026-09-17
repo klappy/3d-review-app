@@ -3,3 +3,4 @@ server.mjs
 language.test.mjs
 present.test.mjs
 visibility.test.mjs
+participant-resume.test.mjs
