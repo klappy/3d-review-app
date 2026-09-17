@@ -17,17 +17,19 @@ const context=(database=db,id='person_mara',kind:Ctx['principal']['kind']='user'
 const exec=(sql:string,...args:any[])=>db.prepare(sql).bind(...args).run();
 const noUpdate="CREATE TRIGGER synthetic_report_no_update BEFORE UPDATE ON synthetic_report BEGIN SELECT RAISE(ABORT,'synthetic reports are immutable'); END";
 const noDelete="CREATE TRIGGER synthetic_report_no_delete BEFORE DELETE ON synthetic_report BEGIN SELECT RAISE(ABORT,'synthetic reports are immutable'); END";
-const held={ok:false,reason:'HELD'};
+const held={ok:false,reason:'HELD',marker:{assessment_id:aid,eligible:false,policy_version:'synthetic-current-assessment-asof-query-v1'}};
+const invisible={ok:false,reason:'NOT_VISIBLE'};
 const source=readFileSync(new URL('../src/synthetic-report-store.ts',import.meta.url),'utf8');
-const seam='const APPROVED_RENDERER: RendererDescriptor | null = null;';
+const seam='const APPROVED_RENDERER: RendererDescriptor = REAL_RENDERER;';
 const tuple={sourcePin:'f042cde553761a6a7f24132cef7802f956378ee0',indexRoot:'d964f81639e0929ce5f53156b28e3902732b98d2394c6d8dc31c9d14a22fb7dd',scorerVersion:'test-marker-scorer-v1',narrativeVersion:'test-marker-narrative-v1',policyVersion:'test-marker-policy-v1',outputSchemaVersion:'test-marker-output-v1'};
 /** Exactly one private constant replacement. All SQL/store/validation code stays original. */
-async function testBundle(scorerVersion='test-marker-scorer-v1'){
+async function testBundle(scorerVersion='test-marker-scorer-v1',rejectValidation=false){
   expect(source.split(seam)).toHaveLength(2);
-  const descriptor=`const APPROVED_RENDERER: RendererDescriptor | null = {
+  const descriptor=`const APPROVED_RENDERER: RendererDescriptor = {
     tuple:${JSON.stringify({...tuple,scorerVersion})},
     render:c=>({schema:'test-marker-output-v1',assessmentId:c.assessmentId,captureDigest:c.captureDigest,responseIds:[...c.responseIds]}),
-    validate:(p,c)=>{
+    validate:async(p,c)=>{
+      await Promise.resolve();if(${rejectValidation})return false;
       if(!p||typeof p!=='object'||Array.isArray(p))return false;
       if(Object.keys(p).sort().join(',')!=='assessmentId,captureDigest,responseIds,schema')return false;
       if(p.schema!=='test-marker-output-v1'||p.assessmentId!==c.assessmentId||p.captureDigest!==c.captureDigest||!Array.isArray(p.responseIds)||p.responseIds.length<1||p.responseIds.length>425)return false;
@@ -36,7 +38,7 @@ async function testBundle(scorerVersion='test-marker-scorer-v1'){
   };`;
   const transformed=source.replace(seam,descriptor);
   expect(transformed.replace(descriptor,seam)).toBe(source);
-  const output=join(temporary,scorerVersion+'.mjs');
+  const output=join(temporary,scorerVersion+(rejectValidation?'-refuse':'')+'.mjs');
   await build({stdin:{contents:transformed,resolveDir:new URL('../src',import.meta.url).pathname,sourcefile:'synthetic-report-store.ts',loader:'ts'},bundle:true,platform:'node',format:'esm',outfile:output});
   const proof={scorerVersion,originalSha256:createHash('sha256').update(source).digest('hex'),transformedSha256:createHash('sha256').update(transformed).digest('hex'),descriptorSha256:createHash('sha256').update(descriptor).digest('hex'),replacementCount:1,onlyPrivateDeclarationChanged:transformed.replace(descriptor,seam)===source};
   writeFileSync(join(temporary,scorerVersion+'-transform.json'),JSON.stringify(proof));
@@ -66,12 +68,9 @@ function intercept(fn:(sql:string,args:unknown[],method:string,next:()=>Promise<
   return {prepare(sql:string){return{bind(...args:unknown[]){const stmt=db.prepare(sql).bind(...args);return Object.fromEntries(['first','all','run'].map(method=>[method,()=>fn(sql,args,method,()=> (stmt as any)[method]())]));}}}} as unknown as D1Database;
 }
 describe('private marker isolation and exact D1 commands',()=>{
-  it('unmodified production refuses every operation without querying or admitting arbitrary JSON',async()=>{
-    const noDb={prepare(){throw new Error('must not query')}} as unknown as D1Database;const ctx=context(noDb);
-    expect(await production.buildMaterialized(ctx,aid)).toEqual(held);
-    expect(await production.commitMaterialized(ctx,aid,{packedCapture:'{}'} as any)).toEqual(held);
-    expect(await production.readMaterialized(ctx,'anything')).toEqual(held);
-    expect(await production.listMaterialized(ctx,aid)).toEqual(held);
+  it('compiled renderer has no caller registry and cannot turn missing DB authority into a marker',async()=>{
+    const noDb={prepare(){throw new Error('must not authorize')}} as unknown as D1Database;const ctx=context(noDb);
+    for(const r of [await production.buildMaterialized(ctx,aid),await production.commitMaterialized(ctx,aid,{packedCapture:'{}'} as any),await production.readMaterialized(ctx,'anything'),await production.listMaterialized(ctx,aid)])expect(r).toEqual({ok:false,reason:'UNAVAILABLE'});
     expect(Object.keys(production).some(k=>/factory|setRenderer|register|configure/i.test(k))).toBe(false);
     expect(source.split(seam)).toHaveLength(2);
   });
@@ -81,7 +80,7 @@ describe('private marker isolation and exact D1 commands',()=>{
     const created=await marker.buildMaterialized(context(traced),aid);expect(created.ok).toBe(true);if(!created.ok)return;
     expect((await marker.readMaterialized(context(traced),created.value.id)).ok).toBe(true);
     expect((await marker.listMaterialized(context(traced),aid)).ok).toBe(true);
-    const expected=new Map([[B1_CAPTURE_SQL,5],[marker.REPORT_COMMIT_SQL,18],[marker.REPORT_GET_SQL,5],[marker.REPORT_BUILD_RESULT_SQL,6],[marker.REPORT_LIST_SQL,7]]);
+    const expected=new Map([[marker.REPORT_OBSERVE_SQL,5],[marker.REPORT_COMMIT_SQL,18],[marker.REPORT_GET_SQL,5],[marker.REPORT_BUILD_RESULT_SQL,6],[marker.REPORT_LIST_SQL,7]]);
     for(const [sql,n] of expected){const call=calls.find(c=>c.sql===sql);expect(call).toBeDefined();expect(call!.args).toHaveLength(n);await expect(db.prepare(sql).bind(...call!.args.slice(0,-1)).all()).rejects.toThrow();}
     const row=await db.prepare('SELECT * FROM synthetic_report').first<any>();expect(row.id).toBe(created.value.id);
     // Independently frozen Python hashlib vector over explicit accepted preimage.
@@ -89,6 +88,13 @@ describe('private marker isolation and exact D1 commands',()=>{
     expect(created.value.reportKey).toBe('6da8672ed391975ded7fcdf82ed609a18158059f3af7214a32aa347480fa8858');
     expect(createHash('sha256').update(row.payload_json).digest('hex')).toBe(row.payload_sha256);
     console.log('B2_BIND_PROOF '+JSON.stringify(calls.map(c=>({binds:c.args.length,method:c.method,sqlBytes:Buffer.byteLength(c.sql)}))));
+  });
+  it('awaits an asynchronous false validator for build, read and every list row',async()=>{
+    const r=await report();const refusing=await testBundle('test-marker-scorer-v1',true);
+    expect(await refusing.readMaterialized(context(),r.id)).toEqual(held);
+    expect(await refusing.listMaterialized(context(),aid)).toEqual(held);
+    expect(await refusing.buildMaterialized(context(),aid)).toEqual({ok:false,reason:'UNAVAILABLE'});
+    expect((await db.prepare('SELECT count(*) n FROM synthetic_report').first<any>()).n).toBe(1);
   });
   it('preserves the exact reviewed common CTE predicates through the shared producer',()=>{
     const normalized=REPORT_CAPTURE_CTE.split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n').trim();
@@ -146,11 +152,11 @@ describe('guarded identity and immutable content',()=>{
   });
 });
 describe('single-observation disclosure and page suppression',()=>{
-  it('unknown/ungranted/support without grant uniformly hold and viewer cannot build',async()=>{
-    const r=await report();for(const ctx of [context(db,'absent'),context(db,'absent','support'),context(db,'person_mara','participant')]){expect(await marker.readMaterialized(ctx,r.id)).toEqual(held);expect(await marker.listMaterialized(ctx,aid)).toEqual(held);}
-    expect(await marker.readMaterialized(context(),'unknown')).toEqual(held);
+  it('unknown/ungranted/support without grant uniformly stay invisible and viewer cannot build',async()=>{
+    const r=await report();for(const ctx of [context(db,'absent'),context(db,'absent','support'),context(db,'person_mara','participant')]){expect(await marker.readMaterialized(ctx,r.id)).toEqual(invisible);expect(await marker.listMaterialized(ctx,aid)).toEqual(invisible);}
+    expect(await marker.readMaterialized(context(),'unknown')).toEqual(invisible);
     await exec('UPDATE "grant" SET role=? WHERE scope_type=? AND scope_id=? AND principal_id=?','viewer','assessment',aid,'person_mara');
-    try{expect((await marker.readMaterialized(context(),r.id)).ok).toBe(true);expect(await marker.buildMaterialized(context(),aid)).toEqual(held);}finally{await exec('UPDATE "grant" SET role=? WHERE scope_type=? AND scope_id=? AND principal_id=?','owner','assessment',aid,'person_mara');}
+    try{expect((await marker.readMaterialized(context(),r.id)).ok).toBe(true);expect(await marker.buildMaterialized(context(),aid)).toEqual(invisible);}finally{await exec('UPDATE "grant" SET role=? WHERE scope_type=? AND scope_id=? AND principal_id=?','owner','assessment',aid,'person_mara');}
   });
   it('authorized empty page keeps assessment identity and still attests current input',async()=>{
     expect(await marker.listMaterialized(context(),aid)).toEqual({ok:true,value:{reports:[],afterId:null}});
@@ -202,12 +208,12 @@ describe('single-observation disclosure and page suppression',()=>{
     expect(first.value.reports).toHaveLength(5);expect(first.value.afterId).not.toBeNull();expect(Object.keys(first.value).sort()).toEqual(['afterId','reports']);
     expect(first.value.reports.every(r=>!Object.hasOwn(r,'payload'))).toBe(true);
     const second=await marker.listMaterialized(context(),aid,first.value.afterId,5);expect(second.ok).toBe(true);if(second.ok){expect(second.value.reports).toHaveLength(2);expect(second.value.afterId).toBeNull();}
-    expect(await marker.listMaterialized(context(db,'absent'),aid,first.value.afterId,5)).toEqual(held);
+    expect(await marker.listMaterialized(context(db,'absent'),aid,first.value.afterId,5)).toEqual(invisible);
     const sixth=(await db.prepare('SELECT id,payload_sha256 FROM synthetic_report WHERE assessment_id=? ORDER BY id LIMIT 1 OFFSET 5').bind(aid).first<any>());
     await alterReport(sixth.id,{payload_sha256:'0'.repeat(64)});
     try{expect(await marker.listMaterialized(context(),aid,null,5)).toEqual(held);}finally{await alterReport(sixth.id,{payload_sha256:sixth.payload_sha256});}
-    for(const size of [0,6,1.5])expect(await marker.listMaterialized(context(),aid,null,size)).toEqual(held);
-    expect(await marker.listMaterialized(context(),aid,'x'.repeat(257))).toEqual(held);
+    for(const size of [0,6,1.5])expect(await marker.listMaterialized(context(),aid,null,size)).toEqual(invisible);
+    expect(await marker.listMaterialized(context(),aid,'x'.repeat(257))).toEqual(invisible);
   });
   it('guard and fresh-read negative controls fail the same safety oracles',async()=>{
     const original=await captured(),chosen=original.rows[0];const saved=await db.prepare('SELECT * FROM response WHERE id=?').bind(chosen.responseId).first<any>();
@@ -223,7 +229,7 @@ describe('single-observation disclosure and page suppression',()=>{
     const good=await report();const snapshot=await db.prepare(marker.REPORT_GET_SQL).bind('user',good.id,null,'person_mara','viewer').first<any>();
     await exec('UPDATE assessment SET archived_at=? WHERE id=?','2026-09-17',aid);
     try{
-      expect(await marker.readMaterialized(context(),good.id)).toEqual(held);
+      expect(await marker.readMaterialized(context(),good.id)).toEqual(invisible);
       const stale=intercept(async(sql,args,method,next)=>sql===marker.REPORT_GET_SQL?snapshot:next());
       expect((await marker.readMaterialized(context(stale),good.id)).ok).toBe(true);
     }finally{await exec('UPDATE assessment SET archived_at=NULL WHERE id=?',aid);}
