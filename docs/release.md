@@ -1,0 +1,37 @@
+# Release procedure and corrective review hold
+
+**Shared DEV and production promotions remain frozen.** App PRs [6](https://github.com/klappy/3d-review-app/pull/6), [7](https://github.com/klappy/3d-review-app/pull/7), and [8](https://github.com/klappy/3d-review-app/pull/8) merged before required Bugbot SUCCESS without a named override. Later tests cannot make those merges compliant. [The recorded hold](https://github.com/klappy/3d-review-cookbook/issues/14#issuecomment-5706415133) and [kitchen case](https://github.com/klappy/kitchen/blob/main/rail/3-pass/2026-08-11-four-cs-amendment/HYGIENE-trial-line.md) govern. This PR documents corrective controls; it does not authorize its own merge, lift the hold, or authorize production.
+
+## Existing Git hooks
+
+The mapping below is declared by `wrangler.toml` at `518e083aee6395fef144f8705b888d1d76941ff7`. Re-read the actual Workers Builds trigger before a release; source comments alone do not prove control-plane state.
+
+| Git destination | Worker / environment | Observed connected-build command | Human endpoint |
+| --- | --- | --- | --- |
+| `phase-0/walking-skeleton` | `3d-review-dev`, default `dev` | `npx wrangler deploy` | https://3d-review-dev.klappy.workers.dev/ |
+| `main` | `3d-review`, `production` | `npx wrangler deploy --env production` | https://3d-review.klappy.dev/ |
+
+Otto reported a fresh read-only Cloudflare API observation in this session: DEV trigger `b82be56e-33f0-43d5-bf24-3749dd4dc168`; production trigger `d067de78-0937-42cc-8f3e-cc001c4af8fc`; both use repository root, include `*`, exclude `*.md`, and build with `npm ci && npm run typecheck && npm test`. This is coordinator-attributed control-plane evidence, not a direct observation by this author. The existing commands rely on root config auto-discovery; live HYGIENE 10a spells an explicit `--config <repo config>`. Record that difference for the authorized coordinator to reconcile and independently verify; this PR does not change triggers.
+
+These are commands for the Git-connected build, never instructions to run a seat deploy. There is no `production` branch in this topology. `main` promotion is captain-owned unless explicit current authority says otherwise. Inspect trigger branch, repo, path filters, build/deploy commands and environment against the configuration; record differences before proceeding. Do not upload scripts or versions via the API. Secrets use the authorized secret channel, never git or a review transcript.
+
+## Lawful corrective path
+
+1. Preserve the three original merge/check timelines and findings. Inventory the **current** PR heads, review threads, check runs, status contexts, owner claims and DEV deployment. Existing code and data stay in place; no rollback or seed replay is implied.
+2. Put fixes on isolated owned branches. Obtain the appropriate owner's acknowledgment before integrating changes into their paths. Independent review must identify its exact commit, findings and dispositions; same-session self-checks are not independent validation.
+3. Open review-only correction PRs targeting the affected branch. Before any promotion, verify Bugbot is comment-only on a shared promotion head. `.cursor/BUGBOT.md` expresses the policy but does not prove service configuration. An Autofix already running is not permission to discard its branch or accept its output.
+4. Require the **real** `Cursor Bugbot` check from GitHub App `1210556` to be `completed` with `conclusion: success` on the exact current PR head SHA. Enumerate all paginated check runs and status contexts, not just the combined status or UI badge. Missing, unreadable, queued, in-progress, neutral, skipped, cancelled, timed-out or failed required checks block promotion. Every attached check must finish; every adverse conclusion and review finding needs a recorded disposition. Re-read head and checks immediately before the decision; any new commit invalidates the old receipt.
+5. Record independent corrective review, terminal check receipts and remaining findings beside the existing cargo and in issue 14. The responsible authority explicitly records whether the hold is satisfied for a particular promotion; a named, logged override is the only bypass. A worker, green test suite, this document or a GitHub mergeable flag cannot silently lift it.
+6. Only after current authority and gates permit it, merge through the ordinary PR path. Observe the resulting Git SHA, connected build success and deployed version. Independently test the actual deployed API/MCP and human browser journey after merge. A deploy receipt is not full-app acceptance.
+
+## Proposed branch enforcement (not applied)
+
+[`release/proposed-ruleset.json`](release/proposed-ruleset.json) is a reviewable REST create-ruleset body for this repo only. It targets exactly `refs/heads/main` and `refs/heads/phase-0/walking-skeleton`, has no bypass actors, requires PRs plus the real Bugbot app check, disallows deletion/force push, and requires one fresh approval with conversations resolved. Independent review and coordinator authority precede applying it. Read back the resulting ID, active state, targets, bypass list and rule parameters before claiming enforcement. Re-observe existing settings first to avoid duplicating a concurrently installed rule.
+
+**Native enforcement is incomplete:** GitHub's required-status semantics accept `success`, `skipped` and `neutral`. Its ruleset has no literal-success-only parameter. The proposed rule therefore blocks absent/pending/failing Bugbot but does **not** alone satisfy kitchen's stricter SUCCESS rule. Keep the exact-head manual gate and promotion hold; do not manufacture a check named `Cursor Bugbot`, proxy its conclusion to success, or call this proposal complete machine enforcement. See [GitHub's required-status documentation](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks) and [ruleset documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets). Any additional enforcement mechanism is a separately reviewed change.
+
+## Data and production acceptance
+
+Apply only explicitly reviewed additive migrations to the named environment with a current schema/data preflight and readback. Never replay initial migrations or synthetic seeding against existing DEV or production data as a release shortcut. Fable owns auth/contract coordination; remote schema/data work needs its actual claim and authority.
+
+Before production, satisfy live HYGIENE 19: a `package.json` semver bump and CHANGELOG entry in the promotion, manifest-derived `<version>+<sha7>` build/client stamp, and a test proving they agree. This documentation adds no stamp implementation and does not claim that requirement already passes. Full acceptance separately includes reports/results, authentication/security, all persona workflows, source parity, API/MCP and browser evidence. One successful slice or health response cannot close it.
