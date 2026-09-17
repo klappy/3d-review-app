@@ -107,10 +107,10 @@ import { readFileSync } from "node:fs";
 import { afterAll } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { execute } from "../src/dispatch";
-const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "mailh", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "mailh-db", DB2: "mailh-db2", DB3: "mailh-db3", DB4: "mailh-db4", DB5: "mailh-db5", DB6: "mailh-db6", DB7: "mailh-db7", DB8: "mailh-db8", DB9: "mailh-db9", DB10: "mailh-db10", DB11: "mailh-db11" } }] }));
+const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "mailh", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "mailh-db", DB2: "mailh-db2", DB3: "mailh-db3", DB4: "mailh-db4", DB5: "mailh-db5", DB6: "mailh-db6", DB7: "mailh-db7", DB8: "mailh-db8", DB9: "mailh-db9", DB10: "mailh-db10", DB11: "mailh-db11", DB12: "mailh-db12", DB13: "mailh-db13" } }] }));
 afterAll(() => mf.dispose());
 /** A fresh schema + synthetic seed on one of this file's two isolated D1 bindings. */
-async function freshDb(binding: "DB" | "DB2" | "DB3" | "DB4" | "DB5" | "DB6" | "DB7" | "DB8" | "DB9" | "DB10" | "DB11") {
+async function freshDb(binding: "DB" | "DB2" | "DB3" | "DB4" | "DB5" | "DB6" | "DB7" | "DB8" | "DB9" | "DB10" | "DB11" | "DB12" | "DB13") {
   const db = await mf.getD1Database(binding);
   const stmts = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n").split(";\n").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s));
   for (const m of ["0001_init.sql", "0002_code_escrow.sql", "0003_language_archive.sql"]) await db.batch(stmts(`../migrations/${m}`));
@@ -191,6 +191,7 @@ describe("cap.grant.invite in production, provider stubbed", () => {
 // The provider is a fetch stub whose promise this file resolves BY HAND, so a revoke or an accept can be made to land while the
 // send is still in flight. Fake time is ctx.now() — the handlers read the clock from there and nowhere else.
 import { invite, revoke_invitation, accept, list as listGrants } from "../src/handlers/grant";
+import { del as deleteWorkspace } from "../src/handlers/workspace";
 
 const devMail = async (...addresses: string[]): Promise<any> => ({
   ...prod, ENVIRONMENT: "dev", MAIL_ALLOWLIST_SHA256: (await Promise.all(addresses.map((a) => sha256(a)))).join(","),
@@ -209,7 +210,7 @@ const rowCount = async (db: any, hash: string) => (await db.prepare("SELECT COUN
 const SCOPE = { scope: "assessment", id: "assess_tavo_collect" };
 
 /** owner-at-scope ctx factory on a fresh db, with a movable clock. */
-async function bed(binding: "DB3" | "DB4" | "DB5" | "DB6" | "DB7" | "DB8" | "DB9" | "DB10" | "DB11", email: string) {
+async function bed(binding: "DB3" | "DB4" | "DB5" | "DB6" | "DB7" | "DB8" | "DB9" | "DB10" | "DB11" | "DB12" | "DB13", email: string) {
   const db = await freshDb(binding);
   const env = await devMail(email);
   env.DB = db; env.SESSION_SECRET = "synthetic-mail";
@@ -399,5 +400,60 @@ describe("cap.grant.invite — an uncertain attempt is never replayed, across ca
     expect(acc.result).toMatchObject({ granted: true, role: "viewer" });
     const row = await statusOf(db, r.result.invitation_id);
     expect(row.status).toBe("accepted"); expect(row.accepted_at).toBeTruthy();
+  }, 30_000);
+});
+
+// A row can also VANISH while the send is in flight: cap.workspace.delete (src/handlers/workspace.ts:86) and
+// cap.project.delete (src/handlers/project.ts:60) hard-delete the scope's invitation rows. Before this AMEND the re-read
+// fell back to the literal 'pending', reporting a live invitation that no longer existed. It is now reported as 'deleted',
+// and the provider's own outcome is still reported separately — the caller must learn BOTH facts (AMEND 53c5717098103).
+describe("cap.grant.invite — a scope deleted during the send is reported as 'deleted', never as 'pending' (AMEND 53c5717098103)", () => {
+  const WS = { scope: "workspace", id: "ws_empty_race" };
+  /** An EMPTY workspace (phase 0 deletes only those) owned by person_mara, on a fresh db. */
+  async function wsBed(binding: "DB12" | "DB13", email: string) {
+    const b = await bed(binding, email);
+    await b.db.batch([
+      b.db.prepare("INSERT INTO workspace (id,name,created_at,created_by) VALUES (?,?,?,?)").bind(WS.id, "Empty Workshop", "2026-09-17T12:00:00.000Z", "person_mara"),
+      b.db.prepare('INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) VALUES (?,?,?,?,?,?)').bind("grant_mara_ws_empty", "person_mara", "workspace", WS.id, "owner", "2026-09-17T12:00:00.000Z"),
+    ]);
+    return b;
+  }
+
+  it("a provider ACCEPTANCE after a concurrent cap.workspace.delete reports status 'deleted' with delivery.state 'accepted': no row survives and the token is dead", async () => {
+    const email = "race.wsdelete.accept@real-domain.dev";
+    const { db, ctx, asRecipient } = await wsBed("DB12", email);
+    const { entered, release } = parkedFetch();
+    const call = invite(ctx(), { ...WS, email, role: "viewer" });
+    const init = await entered;                       // the row is written and 'pending'; the send is parked
+    const id = idOf(init), token = tokenOf(init);
+    expect((await statusOf(db, id)).status).toBe("pending");
+    const dl: any = await deleteWorkspace(ctx(), { id: WS.id });  // the owner deletes the SCOPE during the send
+    expect(dl.result).toMatchObject({ deleted: true, id: WS.id });
+    release(new Response(JSON.stringify({ id: "re_race_del_1" }), { status: 200 })); // …and only now the provider says 2xx
+    const r: any = await call;
+    expect(await db.prepare("SELECT id FROM invitation WHERE id = ?").bind(id).first()).toBeNull(); // hard-deleted with the scope
+    expect(r.result.status).toBe("deleted");                       // NOT the old literal 'pending'
+    expect(r.result.delivered).toBe(true);                         // the provider outcome is reported unchanged
+    expect(r.result.delivery).toMatchObject({ state: "accepted", provider: "resend" });
+    expect(String(r.result.note)).toMatch(/scope was removed while the message was being sent/);
+    await expect(accept(await asRecipient(), { token })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
+  }, 30_000);
+
+  it("a provider REFUSAL after the same concurrent cap.workspace.delete also reports 'deleted', with delivery.state 'refused' and its provider_status", async () => {
+    const email = "race.wsdelete.refuse@real-domain.dev";
+    const { db, ctx } = await wsBed("DB13", email);
+    const { entered, release } = parkedFetch();
+    const call = invite(ctx(), { ...WS, email, role: "viewer" });
+    const init = await entered;
+    const id = idOf(init);
+    const dl: any = await deleteWorkspace(ctx(), { id: WS.id });
+    expect(dl.result).toMatchObject({ deleted: true, id: WS.id });
+    release(new Response(JSON.stringify({ message: "domain not verified" }), { status: 422 }));
+    const r: any = await call;
+    expect(await db.prepare("SELECT id FROM invitation WHERE id = ?").bind(id).first()).toBeNull();
+    expect(r.result.status).toBe("deleted");                       // a no-transition outcome maps a missing row the same way
+    expect(r.result.delivered).toBe(false);
+    expect(r.result.delivery).toMatchObject({ state: "refused", provider: "resend", provider_status: 422 });
+    expect(String(r.result.note)).toMatch(/no longer exists/);
   }, 30_000);
 });

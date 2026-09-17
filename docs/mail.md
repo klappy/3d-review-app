@@ -12,7 +12,7 @@
 | Synthetic recipients | `.invalid`, `.test`, `.example`, `.localhost`, `.local`, `example.com/net/org` **and their subdomains** are never mailed → `reason:"synthetic_recipient"`. Decided **before** any environment, allowlist or configuration check: a dev allowlist entry cannot re-enable a reserved address |
 | Intent de-duplication | decided and written in **one SQL statement** (`INSERT … SELECT … WHERE NOT EXISTS`), so concurrent replays cannot both pass. A live duplicate = a `sent` row for the same scope+invitee in the last 10 minutes, a `pending` row younger than 30 s (an in-flight twin), or an **unexpired `unconfirmed` row** (no cooldown expiry — see the `unconfirmed` lifecycle below). A `pending` row older than 30 s never reached a provider (the send attempt is in the same call, and it would have moved the row to `sent` or `unconfirmed`), so it does **not** block a retry. Duplicate → existing invitation, `reason:"duplicate_recent"` (or `duplicate_uncertain` for an `unconfirmed` twin), nothing sent. Same person, **different role** inside the window → `INVALID_PARAMS` pointing at `cap.grant.revoke_invitation` |
 | Inviter cap | 30 **collaborator** invitations per inviter per hour (participant-link rows from `cap.survey.issue_link` are not counted) → `RATE_LIMITED`. The HTTP `retry-after: 60` header is the generic one; the hint says the cap resets over the hour |
-| Row status | `sent` only after the provider accepted, `unconfirmed` when the send could not be confirmed, `pending` when nothing was attempted or the provider refused. Every post-send write is **conditional** (`WHERE id = ? AND status = 'pending'`), so a `revoke` or `accept` that lands while the send is in flight is never overwritten; the result's `status` is then the actually-stored state, read back. Outcomes that transition **nothing** (provider refusal, `not_sent`) re-read the stored status through the same helper, so they report `revoked` / `accepted` when a concurrent call wrote one, never a stale default `pending`. `delivery.state` reports only what the provider said |
+| Row status | `sent` only after the provider accepted, `unconfirmed` when the send could not be confirmed, `pending` when nothing was attempted or the provider refused. Every post-send write is **conditional** (`WHERE id = ? AND status = 'pending'`), so a `revoke` or `accept` that lands while the send is in flight is never overwritten; the result's `status` is then the actually-stored state, read back. Outcomes that transition **nothing** (provider refusal, `not_sent`) re-read the stored status through the same helper, so they report `revoked` / `accepted` when a concurrent call wrote one, never a stale default `pending`. `delivery.state` reports only what the provider said. A re-read that finds **no row** is reported as `status:"deleted"` — never as a literal `pending` (see *A scope deleted during the send* below) |
 | Timeout | 8 s (`AbortSignal.timeout`) → `state:"unconfirmed"`, `reason:"provider_unreachable"` |
 | Privacy | the address is never logged, traced or returned — spans carry no hash of it either (an unsalted prefix would let a guessed address be confirmed) |
 | Link | `${PUBLIC_ORIGIN}/#invite=<token>` (fragment, like `/#session=` — never reaches a server or an edge log) — `PUBLIC_ORIGIN` is a per-environment var in `wrangler.toml`. Absent → no link can be built → nothing is sent (`not_configured`) |
@@ -54,6 +54,22 @@ An `unconfirmed` row is **LIVE** — everywhere `sent` is live, `unconfirmed` is
 
 The result of an uncertain send therefore reports `status:"unconfirmed"` **and** `delivery.state:"unconfirmed"`, and no second
 mail can be produced for it by replay, by a later call, or by two concurrent calls inside the uncertain window.
+
+## A scope deleted during the send → `status:"deleted"`
+
+`cap.workspace.delete` (`src/handlers/workspace.ts:86`) and `cap.project.delete` (`src/handlers/project.ts:60`) **hard-delete**
+the scope's `invitation` rows. The invite send awaits the network, so a delete can land in that window and the row is simply
+gone when the post-send re-read runs. That outcome is reported as `status:"deleted"`:
+
+| | |
+|---|---|
+| `status` | `"deleted"` — the invitation no longer exists; its link can never be accepted (`cap.grant.accept` → `NOT_FOUND_OR_NOT_VISIBLE`) |
+| `delivery.state` | unchanged — still only the provider's own outcome (`accepted` / `refused` / `unconfirmed` / `not_sent`) |
+| `note` | says the scope was removed while the message was being sent, and that an accepted message may still arrive |
+
+The call does **not** throw `NOT_FOUND_OR_NOT_VISIBLE` after a send that may already have been accepted: the caller must learn
+**both** facts — the invitation is gone, *and* what happened to the message. There is no `pending` fallback anywhere; the
+post-send helper returns `null` for a missing row and the call site maps that one case.
 
 ## Captain gate (HUMAN-ONLY: secret) — no seat touches the key
 1. Resend → Domains → add and verify a sending domain (DNS records on the klappy.dev zone).

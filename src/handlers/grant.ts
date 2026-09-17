@@ -43,13 +43,16 @@ async function scopeExists(ctx: Ctx, scope: Scope): Promise<boolean> {
  *  would write, or null when the outcome transitions nothing (provider refusal, not_sent). A transition is conditional on the
  *  row still being 'pending', because the send awaited the network and a concurrent revoke or accept may already have written
  *  a terminal state. Every path that does not win the transition — including every null-target path — re-reads the STORED
- *  status and reports that. delivery.state is reported separately and always carries only the provider's own outcome. */
-async function transitionOrRead(ctx: Ctx, id: string, target: string | null): Promise<string> {
+ *  status and reports that. delivery.state is reported separately and always carries only the provider's own outcome.
+ *  There is NO 'pending' fallback: a missing row is reported as `null` and mapped at the call site (AMEND 53c5717098103).
+ *  A row can be missing because `cap.workspace.delete` / `cap.project.delete` hard-delete the scope's `invitation` rows
+ *  (src/handlers/workspace.ts, src/handlers/project.ts), and that can land while the send is in flight. */
+async function transitionOrRead(ctx: Ctx, id: string, target: string | null): Promise<string | null> {
   if (target) {
     const up = await ctx.db.prepare("UPDATE invitation SET status = ? WHERE id = ? AND status = 'pending'").bind(target, id).run();
     if ((up.meta.changes ?? 0) === 1) return target; // we won the transition; no need to read it back
   }
-  return (await ctx.db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status ?? "pending";
+  return (await ctx.db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status ?? null;
 }
 
 /** E: invite → the invitation mail leaves the system (IRR-001) when a sender is configured and the environment policy allows
@@ -106,10 +109,17 @@ export const invite: Handler = async (ctx, p, o) => {
   // provider said (delivery.state is always the provider's answer).
   // No-transition outcomes (refused, not_sent) go through the SAME helper with target === null, so a branch cannot drift
   // into reporting a stale default 'pending' over a concurrently stored 'revoked' / 'accepted'.
+  // A missing row is NOT 'pending': the scope may have been deleted while the send was in flight, which hard-deletes the
+  // invitation (cap.workspace.delete / cap.project.delete). That is reported as status 'deleted' — truthfully — rather than
+  // thrown as NOT_FOUND, because the caller must learn BOTH facts: the invitation is gone AND what the provider did with a
+  // message that may already have been accepted for delivery (AMEND 53c5717098103).
   const target = delivery.delivered ? "sent" : delivery.state === "unconfirmed" ? "unconfirmed" : null;
-  const stored = await transitionOrRead(ctx, id, target);
+  const read = await transitionOrRead(ctx, id, target);
+  const stored = read ?? "deleted";
   ctx.log("grant.invite.mail", { delivered: delivery.delivered, state: delivery.state, reason: delivery.reason ?? null, provider_status: delivery.provider_status ?? null, stored_status: stored }); // never the address, nor a hash of it
-  const note = stored !== (target ?? "pending")
+  const note = read === null
+    ? "the invitation no longer exists: the scope was removed while the message was being sent, and the invitation was deleted with it. delivery.state reports only what the provider said — a message that was accepted may still arrive, but its link can no longer be accepted."
+    : stored !== (target ?? "pending")
     ? `the invitation is ${stored}: it changed while the send was in flight, and that state was not overwritten. delivery.state reports only what the provider said.`
     : delivery.state === "accepted"
       ? "the provider accepted the invitation for delivery; the recipient has not accepted it yet"
