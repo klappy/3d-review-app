@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 const read=n=>readFileSync(fileURLToPath(new URL(n,import.meta.url)),'utf8');
-const html=read('./index.html'), app=read('./app.js'), server=read('./server.mjs');
+// Root entry switch (PR65 checkpoint 2): the legacy surface this suite specifies now lives byte-identical at ./legacy/index.html;
+// `/` is the product shell (its public-home contract is asserted in assess/scope.test.mjs). Behaviour under test is unchanged.
+const html=read('./legacy/index.html'), app=read('./app.js'), server=read('./server.mjs');
 
 test('mount roots and the acceptance entry live inside #facilitator, after the current task, hidden until a staff identity is observed',()=>{
   const fac=html.slice(html.indexOf('<section id="facilitator"'),html.indexOf('<section id="participant"'));

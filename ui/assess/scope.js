@@ -71,11 +71,11 @@ const dropSession = key => { try { sessionStorage.removeItem(key); } catch {} };
 
 // ---------- entry (public) ----------
 export const TOUR = Object.freeze([
-  { label: '01 · Prepare', title: 'Give your review a clear starting point.', desc: 'Choose your project, then set up an assessment for a particular period and target language.', example: 'Project → Assessment. Each new assessment keeps its own responses and findings.', chips: ['Target language', 'Written, audio or sign'] },
-  { label: '02 · Collect', title: 'Invite the people whose voices matter.', desc: 'Choose the relevant surveys and share participant links. Ask people to use the survey link you share.', example: 'A direct route to feedback: participants open their survey link to give feedback.', chips: ['Share a link', 'QR code', 'Facilitated or paper'] },
-  { label: '03 · Understand', title: 'Read the perspectives together.', desc: 'See where experiences align and where they differ. Check whose feedback is missing before drawing conclusions.', example: 'Review translation team, community and church perspectives separately. Small-group results may be withheld to protect participants. A missing response is not a poor result.', chips: [] },
-  { label: '04 · Improve', title: 'Agree on a useful next step.', desc: 'Review the findings before sharing. Choose an action, name an owner and return for a later assessment to learn what changed.', example: 'From discussion to action: what will we try? Who will lead it? When will we review it?', chips: ['Review findings', 'Agree on action', 'Reassess'] },
-  { label: '05 · Repeat', title: 'Repeat when it is appropriate.', desc: 'Start a new assessment when your project is ready to reflect again and learn what changed.', example: 'Choose a useful moment. This could be between books or publishing iterations. There is no fixed weekly, monthly or yearly schedule.', chips: [] },
+  { label: 'Prepare', title: 'Give your review a clear starting point.', desc: 'Choose your project, then set up an assessment for a particular period and target language.', example: 'Project → Assessment. Each new assessment keeps its own responses and findings.', chips: ['Target language', 'Written, audio or sign'] },
+  { label: 'Collect', title: 'Invite the people whose voices matter.', desc: 'Choose the relevant surveys and share participant links. Ask people to use the survey link you share.', example: 'A direct route to feedback: participants open their survey link to give feedback.', chips: ['Share a link', 'QR code', 'Facilitated or paper'] },
+  { label: 'Understand', title: 'Read the perspectives together.', desc: 'See where experiences align and where they differ. Check whose feedback is missing before drawing conclusions.', example: 'Review translation team, community and church perspectives separately. Small-group results may be withheld to protect participants. A missing response is not a poor result.', chips: [] },
+  { label: 'Improve', title: 'Agree on a useful next step.', desc: 'Review the findings before sharing. Choose an action, name an owner and return for a later assessment to learn what changed.', example: 'From discussion to action: what will we try? Who will lead it? When will we review it?', chips: ['Review findings', 'Agree on action', 'Reassess'] },
+  { label: 'Repeat', title: 'Repeat when it is appropriate.', desc: 'Start a new assessment when your project is ready to reflect again and learn what changed.', example: 'Choose a useful moment. This could be between books or publishing iterations. There is no fixed weekly, monthly or yearly schedule.', chips: [] },
 ]);
 const PERSPECTIVES = [['team', 'Translation team', 'Experience of the work'], ['community', 'Community', 'Experience of the translation'], ['church', 'Church', 'Experience of its use']];
 
@@ -86,12 +86,15 @@ function entryModel(over = {}) {
 function hero(ctx, signedIn) {
   const p = ctx.state.principal;
   const continueCards = signedIn ? `<section class="panel"><p class="eyebrow">Signed in${p?.id ? ` · ${ctx.esc(p.id)}` : ''}</p><h2>Continue</h2><div class="project-grid">${ctx.cards.card({ eyebrow: 'Continue', title: 'Workspaces', href: ctx.routes.workspaces, meta: ['Optional groupings of projects you can already open'] })}${ctx.cards.card({ eyebrow: 'Continue', title: 'Projects', href: ctx.routes.projects, meta: ['All projects your account holds a role on'] })}</div><div class="actions"><button type="button" class="quiet" data-act="signout">Sign out</button></div></section>` : '';
-  return `<section class="hero panel"><div class="actions" style="margin-top:0"><button type="button" class="primary" data-act="survey">Here to take the survey? →</button></div><p class="eyebrow">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p><div class="perspectives">${PERSPECTIVES.map(([k, t, s]) => `<div class="perspective"><span class="dot-lg ${k}" aria-hidden="true"></span><strong>${ctx.esc(t)}</strong><small>${ctx.esc(s)}</small></div>`).join('')}</div><div class="actions"><button type="button" class="primary" data-act="tour">Show me how →</button><button type="button" data-act="example">Browse the example →</button>${signedIn ? '' : '<button type="button" data-act="signin">Sign in</button>'}</div><p class="small muted">The how: 5 short steps · Go at your own pace</p><details class="line"><summary>When should I use it? How often?</summary><p class="muted small">Use it when your project is ready to pause, reflect and learn from feedback. Check the recommended stage in the survey you plan to use. Repeat when a new assessment would be useful—for example, between books or publishing iterations. There is no fixed weekly, monthly or yearly schedule.</p></details></section>${continueCards}`;
+  // Public home contract (ui/public-choices.test.mjs, captain-named): exactly these four choices, in this order, above the headline;
+  // Sign in goes straight to the real provider; sandbox sign-in only by explicit choice (#signin). Retired labels never return.
+  const choices = `<nav class="public-choices actions" aria-label="Choose where to start" style="margin-top:0"><a class="rv-btn" href="#public-about">Read about it</a><a class="rv-btn" href="#how">Take the tour</a><a class="rv-btn" href="#participant">Take a survey</a><a class="rv-btn primary" href="/v2/auth/access">Sign in</a></nav>`;
+  return `<section class="hero panel" id="public-home">${choices}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p><div class="perspectives">${PERSPECTIVES.map(([k, t, s]) => `<div class="perspective"><span class="dot-lg ${k}" aria-hidden="true"></span><strong>${ctx.esc(t)}</strong><small>${ctx.esc(s)}</small></div>`).join('')}</div><p class="small muted">The tour: 5 short steps · Go at your own pace · Nothing is sent</p><p class="small"><a href="#example">Browse a sample assessment (invented data) →</a> · <a href="#reports-card">View a shared report</a>${signedIn ? '' : ' · <a href="#signin">Sandbox test identities (dev only) — not a real sign-in</a>'}</p><details class="small"><summary>When should I use it? How often?</summary><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p></details></section>${continueCards}`;
 }
 function tourView(ctx, step) {
   const p = TOUR[step];
   const last = step === TOUR.length - 1;
-  return `<section class="panel stepper" aria-label="Step ${step + 1} of ${TOUR.length}"><div class="progress">${TOUR.map((_, i) => `<span class="${i <= step ? 'done' : ''}"></span>`).join('')}</div><p class="eyebrow">${ctx.esc(p.label)}</p><h1>${ctx.esc(p.title)}</h1><p class="muted lead">${ctx.esc(p.desc)}</p><div class="note"><p>${ctx.esc(p.example)}</p>${p.chips.map(c => `<span class="badge">${ctx.esc(c)}</span>`).join(' ')}</div><div class="actions"><button type="button" class="primary" data-act="${last ? 'finish' : 'next'}">${last ? 'Go to project setup →' : 'Next →'}</button><button type="button" class="quiet" data-act="back">Back</button><button type="button" class="quiet" data-act="finish">Skip tour</button></div></section>`;
+  return `<section class="panel stepper" aria-label="Step ${step + 1} of ${TOUR.length}"><div class="progress">${TOUR.map((_, i) => `<span class="${i <= step ? 'done' : ''}"></span>`).join('')}</div><p class="eyebrow">Guided tour · nothing is sent · Step ${step + 1} of ${TOUR.length} · ${ctx.esc(p.label)}</p><h1>${ctx.esc(p.title)}</h1><p class="muted lead">${ctx.esc(p.desc)}</p><div class="note"><p>${ctx.esc(p.example)}</p>${p.chips.map(c => `<span class="badge">${ctx.esc(c)}</span>`).join(' ')}</div><div class="actions"><button type="button" class="primary" data-act="${last ? 'finish' : 'next'}">${last ? 'Go to project setup →' : 'Next →'}</button><button type="button" class="quiet" data-act="back">Back</button><button type="button" class="quiet" data-act="finish">Skip tour</button></div></section>`;
 }
 function surveyView(ctx) {
   return `<section class="panel narrow"><p class="eyebrow">For participants</p><h1>Your feedback starts with your invitation.</h1><p class="muted">Open the survey link or scan the QR code your facilitator shared, or enter the access code below.</p><form id="code-form"><label class="field">Access code<input name="code" required autocomplete="off" maxlength="64"></label><div class="actions"><button class="primary" type="submit">Open my survey</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form><p class="small muted">Cannot find your invitation? Ask your facilitator to send it again. You do not need a facilitator account to follow a participant link.</p></section>`;
@@ -107,11 +110,16 @@ function exampleView(ctx, model) {
 function signinView(ctx, model) {
   const s = model.signin;
   const codeStep = s.stage === 'code';
-  return `<section class="panel narrow"><p class="eyebrow">Facilitators</p><h1>Sign in</h1><p class="muted">Production sign-in uses an email code: <a href="/v2/auth/access">continue with email code</a>. The form below is the direct link flow.</p><form id="signin-form" data-stage="${codeStep ? 'code' : 'email'}"><label class="field">Email<input name="email" type="email" required autocomplete="email" value="${ctx.esc(s.email)}"${codeStep ? ' readonly' : ''}></label>${codeStep ? `${s.devCode ? `<p class="note small">Sandbox code: <strong>${ctx.esc(s.devCode)}</strong></p>` : '<p class="small muted">Code requested. Enter the code you received.</p>'}<label class="field">Code<input name="code" required autocomplete="one-time-code" inputmode="numeric"></label>` : ''}<div class="actions"><button class="primary" type="submit">${codeStep ? 'Sign in' : 'Send me a code'}</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form></section>`;
+  return `<section class="panel narrow"><p class="eyebrow">Facilitators</p><h1>Sign in</h1><p><a class="button primary" href="/v2/auth/access">Sign in with an email code</a></p><p class="small muted">Cloudflare sends a one-time code to your email; nothing to remember.</p><details class="sandbox-signin" id="sandbox-signin"${codeStep ? ' open' : ''}><summary>Sandbox test identities (dev only) — not a real sign-in</summary><form id="signin-form" data-stage="${codeStep ? 'code' : 'email'}"><label class="field">Email<input name="email" type="email" required autocomplete="email" value="${ctx.esc(s.email)}"${codeStep ? ' readonly' : ''}></label>${codeStep ? `${s.devCode ? `<p class="note small">Sandbox code: <strong>${ctx.esc(s.devCode)}</strong></p>` : '<p class="small muted">Code requested. Enter the code you received.</p>'}<label class="field">Code<input name="code" required autocomplete="one-time-code" inputmode="numeric"></label>` : ''}<div class="actions"><button class="primary" type="submit">${codeStep ? 'Sign in' : 'Send me a code'}</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form></details></section>`;
+}
+async function loadExample(ctx, model) {
+  try { model.example = await ctx.api('/v2/example'); model.exampleStatus = 'loaded'; }
+  catch (e) { model.example = null; model.exampleStatus = 'failed'; model.exampleError = safeMessage(e); }
+  model.mode = 'example';
 }
 const entry = {
   // Legacy public deep links kept: #how → tour, #example → example, #signin → sign-in (the four entry choices stay addressable).
-  async load(ctx, params = {}) { const mode = { how: 'tour', example: 'welcome', signin: 'signin', survey: 'survey' }[params.intent] || 'welcome'; return entryModel({ params, mode }); },
+  async load(ctx, params = {}) { const mode = { how: 'tour', signin: 'signin', survey: 'survey' }[params.intent] || 'welcome'; const model = entryModel({ params, mode }); if (params.intent === 'example') await loadExample(ctx, model); return model; },
   render(ctx, model) {
     const signedIn = !!ctx.state.principal;
     switch (model.mode) {
@@ -124,7 +132,6 @@ const entry = {
   },
   bind(ctx, root, model) {
     const paint = () => { root.innerHTML = entry.render(ctx, model); entry.bind(ctx, root, model); };
-    if (model.params?.intent === 'example' && !model.exampleStatus) { model.params = {}; root.querySelector('[data-act=example]')?.click(); }
     root.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', async () => {
       switch (b.dataset.act) {
         case 'welcome': model.mode = 'welcome'; model.step = 0; return paint();
@@ -134,12 +141,7 @@ const entry = {
         case 'finish': if (ctx.state.principal) return ctx.go(ctx.routes.projects); model.mode = 'signin'; return paint();
         case 'survey': model.mode = 'survey'; return paint();
         case 'signin': model.mode = 'signin'; return paint();
-        case 'example': {
-          b.disabled = true;
-          try { model.example = await ctx.api('/v2/example'); model.exampleStatus = 'loaded'; }
-          catch (e) { model.example = null; model.exampleStatus = 'failed'; model.exampleError = safeMessage(e); }
-          model.mode = 'example'; return paint();
-        }
+        case 'example': { b.disabled = true; await loadExample(ctx, model); return paint(); }
         case 'signout': {
           await write(ctx, b, 'Sign out', () => ctx.api('/v2/auth/session', { method: 'DELETE' }));
           dropSession('facilitatorToken'); if (ctx.setToken) ctx.setToken(null); ctx.state.principal = null;

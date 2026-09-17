@@ -345,7 +345,7 @@ async function render() {
   }
 }
 // ---- scope pages + views (product overhaul): one runner for every { load, render, bind } module ----
-const setToken = t => { token = t || null; try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} state.principal = null; state.projects = []; state.lists.clear(); state.current = null; boot(); };
+const setToken = t => { token = t || null; try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
 function ctxFor(extra = {}) {
   return { api, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, note: (text, alert = false) => { note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
     go: (hash, { reload = false } = {}) => { if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
@@ -405,18 +405,21 @@ function paint(r = route(location.hash), gen = generation) {
 // `#evidence`. `#session=` is the Access return leg (src/index.ts:138, callback unchanged): consumed here exactly as legacy does —
 // same `facilitatorToken` key, stripped from history before any render, never echoed. Nothing else stores a credential.
 const LEGACY_HASHES = new Set(['#participant', '#facilitator', '#workspace', '#reports-card', '#evidence']);
+// Returns 'forwarded' (this page is leaving), 'session' (a session was consumed — identity must be re-observed), or null.
+// Runs on load AND on every hashchange (Auditor S1): fragment-only navigation after load takes the same path as a fresh load.
 function scrubCredentialHash() {
   const h = location.hash || '';
-  if (/^#(invite|survey)=/.test(h) || LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return true; }
+  if (/^#(invite|survey)=/.test(h) || LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
   const m = /^#session=([A-Za-z0-9_]+)$/.exec(h);
-  if (m) { try { history.replaceState(null, '', location.pathname + '#workspaces'); } catch {} token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} return false; }
+  if (m) { try { history.replaceState(null, '', location.pathname + '#workspaces'); } catch {} token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} resetIdentity(); return 'session'; }
   if (/^#session=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} } // malformed: drop, never render
-  return false;
+  return null;
 }
+function resetIdentity() { state.principal = null; state.projects = []; state.lists.clear(); state.workspaces.clear(); state.current = null; state.counts.clear(); state.print = null; }
 let listening = false;
-function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); }); }
+function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
 async function boot() {
-  if (scrubCredentialHash()) return;
+  if (scrubCredentialHash() === 'forwarded') return; // 'session' falls through: identity is observed fresh below
   try { const me = await api('/v2/me'); state.principal = me.principal; }
   catch {
     // Public entry: the welcome/tour/example/survey-code/sign-in page needs no session; every other route asks to sign in.

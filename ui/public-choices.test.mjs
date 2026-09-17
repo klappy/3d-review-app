@@ -4,7 +4,9 @@ import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 
 const read=n=>readFileSync(fileURLToPath(new URL(n,import.meta.url)),'utf8');
-const html=read('./index.html');
+// Root entry switch (PR65 checkpoint 2): the legacy surface this suite specifies now lives byte-identical at ./legacy/index.html;
+// `/` is the product shell (its public-home contract is asserted in assess/scope.test.mjs). Behaviour under test is unchanged.
+const html=read('./legacy/index.html');
 const css=read('./public-choices.css');
 const home=html.slice(html.indexOf('<section id="public-home"'),html.indexOf('<section id="public-how"'));
 

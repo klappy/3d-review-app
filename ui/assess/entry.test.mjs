@@ -30,3 +30,13 @@ test('E1: the shell way back is /legacy/#facilitator, hidden until a session is 
   for (const t of ['assess/entry.test.mjs', 'assess/scope.test.mjs', 'assess/views.test.mjs']) assert.ok(ignored.includes(t), t);
 });
 ;
+
+// Auditor S1 (ac36b30 verdict): credential/legacy hashes are sanitised on the SAME path for load and for fragment-only navigation.
+test('S1: scrubCredentialHash is the first statement of boot() and of the hashchange listener; a consumed #session= re-observes identity', () => {
+  const js = read('./assess.js');
+  assert.match(js, /async function boot\(\) \{\n\s*if \(scrubCredentialHash\(\) === 'forwarded'\) return;/);
+  assert.match(js, /addEventListener\('hashchange', \(\) => \{ const r = scrubCredentialHash\(\); if \(r === 'forwarded'\) return; if \(r === 'session'\) \{ boot\(\); return; \} render\(\);/);
+  assert.match(js, /location\.replace\('\/legacy\/' \+ h\); return 'forwarded';/);
+  assert.match(js, /sessionStorage\.setItem\('facilitatorToken', m\[1\]\); \} catch \{\} resetIdentity\(\); return 'session';/);
+  assert.ok(!/api\([^)]*\)[\s\S]*?scrubCredentialHash\(\) === 'forwarded'\) return;/.test(js.slice(js.indexOf('async function boot()'))), 'no api() call precedes the scrub in boot()');
+});

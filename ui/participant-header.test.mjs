@@ -5,7 +5,9 @@ import {fileURLToPath} from 'node:url';
 
 const read=n=>readFileSync(fileURLToPath(new URL(n,import.meta.url)),'utf8');
 const css=read('./participant-view.css');
-const html=read('./index.html');
+// Root entry switch (PR65 checkpoint 2): the legacy surface this suite specifies now lives byte-identical at ./legacy/index.html;
+// `/` is the product shell (its public-home contract is asserted in assess/scope.test.mjs). Behaviour under test is unchanged.
+const html=read('./legacy/index.html');
 
 // The header block is the section appended for the shared participant route.
 const block=css.slice(css.indexOf('/* Shared participant route'));

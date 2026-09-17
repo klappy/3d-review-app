@@ -137,8 +137,14 @@ test('project: refused assessments list is shown as not visible, page still rend
 // ---------- entry ----------
 test('entry: public welcome with hero, tour stepper and survey/example/sign-in buttons', async () => {
   const ctx = ctxWith(); const m = await pages.entry.load(ctx, {}); const h = pages.entry.render(ctx, m);
-  assert.ok(h.includes('What is 3D Review?')); assert.ok(h.includes('Translation team')); assert.ok(h.includes('data-act="survey"')); assert.ok(h.includes('data-act="example"')); assert.ok(h.includes('data-act="signin"')); assert.ok(!h.includes('Continue'));
-  m.mode = 'tour'; m.step = 0; const t = pages.entry.render(ctx, m); assert.ok(t.includes(TOUR[0].title)); assert.ok(t.includes('data-act="next"')); assert.ok(t.includes('panel stepper'));
+  assert.ok(h.includes('What is 3D Review?')); assert.ok(h.includes('Translation team')); assert.ok(h.includes('href="#participant">Take a survey')); assert.ok(h.includes('href="#example">Browse a sample assessment (invented data) →')); assert.ok(h.includes('href="/v2/auth/access">Sign in</a>')); assert.ok(!h.includes('Continue'));
+  // captain-named public home (ui/public-choices.test.mjs contract, now asserted on the ROOT entry): four choices, in order, above the headline
+  const nav = h.slice(h.indexOf('<nav class="public-choices'), h.indexOf('</nav>')); const links = [...nav.matchAll(/<a class="rv-btn[^"]*" href="([^"]+)">([^<]+)<\/a>/g)].map(m => [m[2], m[1]]);
+  assert.deepEqual(links, [['Read about it', '#public-about'], ['Take the tour', '#how'], ['Take a survey', '#participant'], ['Sign in', '/v2/auth/access']]);
+  assert.ok(nav.includes('aria-label="Choose where to start"')); assert.ok(h.indexOf('<nav class="public-choices') < h.indexOf('<h1>')); assert.ok(h.includes('<p class="eyebrow" id="public-about">What is 3D Review?</p>'));
+  assert.ok(h.includes('The tour: 5 short steps · Go at your own pace · Nothing is sent')); assert.ok(h.includes('href="#reports-card">View a shared report'));
+  for (const retired of ['Here to take the survey?', 'Show me how', 'Manage assessments']) assert.ok(!h.includes(retired), retired);
+  m.mode = 'tour'; m.step = 0; const t = pages.entry.render(ctx, m); assert.ok(t.includes(TOUR[0].title)); assert.ok(t.includes('<p class="eyebrow">Guided tour · nothing is sent · Step 1 of 5 · Prepare</p>')); assert.ok(t.includes('data-act="next"')); assert.ok(t.includes('panel stepper'));
   m.step = 4; assert.ok(pages.entry.render(ctx, m).includes('Go to project setup'));
 });
 test('entry: signed in shows Continue cards + sign-out, hides sign-in', async () => {
@@ -168,8 +174,7 @@ test('entry: sign-in failure stays on the form and never claims success', async 
 });
 test('entry: example renders the fixture, clearly labelled', async () => {
   const ctx = ctxWith({ 'GET /v2/example': { fixture: true, assessment: { id: 'asm_example', name: 'Example assessment (fixture)', stage: 'understand', language: 'Example language', surveys: [{ id: 'srv_example', template: 'translation-team@1', responses: 12 }], summary: { coverage: { translator: 5 }, bands: { clarity: 'mid' } } } } });
-  const m = await pages.entry.load(ctx, {}); const root = mount(pages.entry, ctx, m);
-  await root.querySelector('[data-act="example"]').fire('click');
+  const m = await pages.entry.load(ctx, { intent: 'example' }); const root = mount(pages.entry, ctx, m); // reached by the #example deep link
   const h = pages.entry.render(ctx, m); assert.equal(m.mode, 'example'); assert.ok(h.includes('fixture')); assert.ok(h.includes('translation-team@1')); assert.ok(h.includes('12 responses')); assert.ok(h.includes('Understanding')); assert.ok(h.includes('clarity'));
 });
 test('entry: survey code stores participant token and hands off to legacy /#participant', async () => {
