@@ -1,3 +1,4 @@
+import { renderReportCards } from './report-card.js';
 // Synthetic report rendering. Dependency-free and importable under node --test with an injected doc.
 // Text nodes only: every value comes from the payload as returned (String(), no rounding, no word
 // mapping, no colour), plus the fixed labels in `copy`. Nothing here fetches or authorizes.
@@ -43,15 +44,8 @@ export function renderReport({ doc, root, report }) {
   out.push(el(doc, 'p', `${copy.headerPrefix} · source ${payload.source_commit.slice(0, 7)} · scorer ${val(versions.scorer)} · narrative ${val(versions.narrative)} · policy ${val(versions.policy)}`));
   out.push(el(doc, 'p', `${copy.built} ${val(report.created_at)} ${copy.builtStability}`));
   // Sections follow payload order; an absent or empty one is not announced.
-  const lenses = rows(payload.lenses);
-  if (lenses.length) {
-    out.push(section(doc, copy.lenses, [list(doc, lenses.map(lens => {
-      const li = el(doc, 'li', `${val(lens.lens)} · ${val(lens.score)}`);
-      const subs = rows(lens.sub_dimensions);
-      if (subs.length) li.append(list(doc, subs.map(sub => el(doc, 'li', `${val(sub.sub_dimension)} · ${val(sub.score)} · ${val(sub.n_items_included)}`))));
-      return li;
-    }))]));
-  }
+  const cards = renderReportCards({ doc, report });
+  if (cards) out.push(cards);
   const cross = [...rows(payload.cross_lens_multi), ...rows(payload.cross_lens_single)];
   if (cross.length) {
     out.push(section(doc, copy.crossLens, [list(doc, cross.map(entry => {

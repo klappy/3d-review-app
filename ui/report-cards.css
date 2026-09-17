@@ -1,0 +1,22 @@
+/* Pinned glass composition; identity colors do not encode score or a band. */
+.rv #report-view .report-lens-grid {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:var(--gap-three);
+  list-style:none;
+  padding:0;
+}
+.rv #report-view .report-lens-card {
+  min-width:0;
+  margin:0;
+  overflow-wrap:anywhere;
+  border-top:var(--lens-w) solid var(--line);
+}
+.rv #report-view .report-lens-card[data-lens="team" i], .rv #report-view .report-lens-card[data-lens="Translation Team"] { border-top-color:var(--lens-green); }
+.rv #report-view .report-lens-card[data-lens="community" i] { border-top-color:var(--lens-blue); }
+.rv #report-view .report-lens-card[data-lens="church" i] { border-top-color:var(--lens-yellow); }
+.rv #report-view .report-lens-card > h5 { font-size:16px; margin:0 0 7px; }
+.rv #report-view .report-lens-score { font-size:25px; font-weight:600; }
+@media(max-width:760px) {
+  .rv #report-view .report-lens-grid { grid-template-columns:1fr; }
+}
