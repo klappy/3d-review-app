@@ -278,6 +278,25 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
     stand(projectRoot, el(doc, 'p', [project.name, project.organization, `your role: ${project.role}`].filter(Boolean).join(' · '), 'muted'));
   }
 
+  // Assessment header (views-coordinator.js assessmentShell L59-62). The kit's eyebrow carries the
+  // project and assessment names, the h1 the assessment name, the muted line period · language ·
+  // format. The kit's `· kind` has no field here, and its stageBar is omitted: the phase tabs
+  // already show the stage and two stage readings on one screen is one too many.
+  function renderAssessmentHeadrow(project, assessment, languages) {
+    // A miss (the selected id is not in the list this identity can see) falls back to the project
+    // row. A name is never invented for an assessment the server did not return.
+    if (!assessment) { renderProjectRow(project); return; }
+    const headrow = el(doc, 'div', undefined, 'headrow');
+    const title = el(doc, 'div');
+    title.append(el(doc, 'div', [project.name, assessment.name].filter(Boolean).join(' / '), 'eyebrow'));
+    title.append(el(doc, 'h1', assessment.name));
+    // Only the fields the server actually returned; a null period or format adds no separator.
+    const facts = [assessment.period, languageName(languages, assessment.language_id), assessment.format].filter(Boolean);
+    if (facts.length) title.append(el(doc, 'div', facts.join(' · '), 'muted'));
+    headrow.append(title);
+    stand(projectRoot, headrow);
+  }
+
   // --- C. Crumbs (tree.js crumbs, L98-110) -------------------------------------------------------
   function renderCrumbs(project, assessment) {
     if (!project) { stand(crumbsRoot); return; }
@@ -335,7 +354,7 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
     // The live #assessments value is the composition authority. This GET is only for names;
     // a miss or failed list must not claim `project` (that state hides the workspace cards).
     setState(aid ? 'assessment' : 'project');
-    if (aid) { renderProjectRow(project); return; }
+    if (aid) { renderAssessmentHeadrow(project, assessment, languages); return; }
     // One closure, reused by every repaint: the level menu must survive any number of
     // Assessments/Languages transitions, not just the first.
     const repaint = () => { if (gen === generation) renderProject(project, rows, languages, repaint); };
