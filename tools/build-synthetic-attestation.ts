@@ -2,9 +2,11 @@
 import { readFile, writeFile, rename, unlink } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { canonicalJson, parseBoundedJson, domainHash, sha256Bytes } from '../src/report-canonical-json.ts';
 import type { Json } from '../src/report-canonical-json.ts';
+
+const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
 
 export const SOURCE_PIN = 'f042cde553761a6a7f24132cef7802f956378ee0';
 export const CANONICAL_VERSION = '3d-attestation-jcs-v1';
@@ -34,11 +36,15 @@ export async function readPinnedSources(root = ROOT) {
   for (let i = 0; i < bootstrap.length; i++) if (await sha256Bytes(await readFile(resolve(root, 'migrations', bootstrap[i]))) !== digests[i]) refuse();
   const manifest = object(parseBoundedJson(raws.manifest, 65536));
   if (canonicalJson(manifest.source) !== canonicalJson({ repo: 'klappy/3d-quality-review', pin: SOURCE_PIN, generator: 'survey-pipeline/run_synthetic_pipeline.py', reads_real_exports: false })) refuse();
-  const python = `import sqlite3,json,pathlib,sys\nr=pathlib.Path(sys.argv[1]); db=sqlite3.connect(':memory:'); db.row_factory=sqlite3.Row\nfor n in ['0001_init.sql','0002_code_escrow.sql','0003_language_archive.sql','0004_pinned_instruments.sql']: db.executescript((r/'migrations'/n).read_text())\nprint(json.dumps([dict(x) for x in db.execute('SELECT id,version,name,perspective,source_ref,items_json FROM survey_template WHERE version=2 ORDER BY id')]))\n`;
-  const rawTemplates = execFileSync('python3', ['-c', python, root], { encoding: 'utf8', maxBuffer: 1048576 });
-  // SQLite text fields can contain an entire items JSON >4096 bytes; parse the transport
-  // locally, then strictly validate each actual template preimage below.
-  const templates = JSON.parse(rawTemplates);
+  const db = new DatabaseSync(':memory:');
+  let templates;
+  try {
+    for (const name of [...bootstrap, '0004_pinned_instruments.sql']) {
+      db.exec(await readFile(resolve(root, 'migrations', name), 'utf8'));
+    }
+    // Preserve the original JSON transport's plain objects and SQLite scalar values.
+    templates = JSON.parse(JSON.stringify(db.prepare('SELECT id,version,name,perspective,source_ref,items_json FROM survey_template WHERE version=2 ORDER BY id').all()));
+  } finally { db.close(); }
   const records = parseBoundedJson(raws.answerSets, 4 * 1024 * 1024);
   if (!Array.isArray(records) || records.length !== 425 || !Array.isArray(templates)) refuse();
   return { records, templates };
