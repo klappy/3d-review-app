@@ -6,3 +6,4 @@ visibility.test.mjs
 participant-resume.test.mjs
 participant-dom.test.mjs
 changelog.test.mjs
+stage-screens.test.mjs
