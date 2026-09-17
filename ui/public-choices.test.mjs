@@ -53,7 +53,7 @@ test('real sign-in stays first; sandbox code controls sit in a labelled dev-only
 
 test('the participant card explains shared links first and the code as optional',()=>{
   const p=html.slice(html.indexOf('<section id="participant"'));
-  assert.ok(p.indexOf('<p class="note participant-arrival">')<p.indexOf('<details id="about">'));
+  assert.ok(p.indexOf('<p class="participant-arrival">')<p.indexOf('<details id="about">'));
   assert.ok(p.includes('open that link and you are already in the right place. If you were given an access code instead, enter it below. No account is needed.'));
 });
 
