@@ -27,10 +27,14 @@
   body[data-workspace-route="participant"] #workspace > .introduction,
   body[data-workspace-route="participant"] aside.tree,
   body[data-workspace-route="participant"] #signout { display:none; }
-  /* #identity is a route signal read by public-entry/stage-composition: hidden visually, text intact. */
+  /* Bugbot 4036574263: hiding the aside must also collapse the shell grid (the shared route does it via aside[hidden]). */
+  body[data-workspace-route="participant"] .shell { grid-template-columns:minmax(0,1fr); }
+  /* #identity is a route signal read by public-entry/stage-composition through textContent only, so it stays in the DOM
+     with its text intact. visibility:hidden (not clip-path) removes it from the accessibility tree as well as the screen:
+     a participant must not hear "Not signed in". Absolute positioning keeps it from taking space in the top bar. */
   body[data-workspace-route="participant"] #identity {
     position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;
-    clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;
+    visibility:hidden;white-space:nowrap;
   }
   body[data-workspace-route="participant"] #participant { max-width:640px;width:100%;margin-inline:auto; }
   body:not([data-workspace-route="participant"]) .participant-footer { display:none; }

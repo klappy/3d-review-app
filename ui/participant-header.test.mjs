@@ -26,7 +26,7 @@ test('every new rule is scoped to the participant route or its :not guard',()=>{
 test('new rules target only the listed staff-chrome nodes',()=>{
   const allowed=new Set([
     '#workspace > .headrow','#workspace > .introduction','aside.tree','#signout','#identity',
-    '#participant','.participant-footer',
+    '#participant','.participant-footer','.shell',
   ]);
   for(const sel of selectors){
     const target=sel.replace(/^body(:not)?\[[^\]]*\]|^body:not\([^)]*\)/,'').trim();
@@ -45,10 +45,11 @@ test('the brand and version badge stay visible on the participant route',()=>{
   assert.ok(!block.includes('.badge'));
 });
 
-test('#identity is hidden visually only, its text untouched',()=>{
+test('#identity is hidden from screen and assistive tech, its text untouched',()=>{
   const rule=block.slice(block.indexOf('body[data-workspace-route="participant"] #identity'));
   const body=rule.slice(rule.indexOf('{'),rule.indexOf('}'));
-  assert.ok(body.includes('clip-path:inset(50%)'));
+  assert.ok(body.includes('visibility:hidden'),'removed from the accessibility tree, not just the viewport');
+  assert.ok(!body.includes('clip-path'));
   assert.ok(!/display\s*:\s*none/.test(body));
   assert.ok(html.includes('id="identity" class="me">Checking session…<'));
 });
@@ -62,4 +63,10 @@ test('index.html carries the source footer sentence inside #participant',()=>{
   const end=section.indexOf('</section>');
   const inner=section.slice(0,end);
   assert.ok(inner.includes('<p class="participant-footer">Participants never sign in. Nothing here shows a project, a workspace or other people\'s answers.</p>'));
+});
+
+test('hiding the aside also collapses the shell grid (Bugbot 4036574263) and the test file is asset-ignored',()=>{
+  assert.match(css,/body\[data-workspace-route="participant"\] \.shell\s*\{[^}]*grid-template-columns:minmax\(0,1fr\)/);
+  const ignore=read('./.assetsignore');
+  assert.ok(ignore.split('\n').includes('participant-header.test.mjs'));
 });
