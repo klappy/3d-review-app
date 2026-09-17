@@ -93,18 +93,34 @@ export function saveDraft(store, form, values) {
   store.set('draft', JSON.stringify(draft));
 }
 
-// Server error codes → participant state. Codes assumed; see return notes.
-// AMBIGUITY for the API owner: the base API also raises STAGE_CONFLICT for "already submitted"
-// (a second submit on a submitted context), so mapping STAGE_CONFLICT to 'closed' can show
-// "Collection has closed" to a respondent whose real state is "already submitted". Left as is;
-// a distinct code (or field) from the API disambiguates it.
-const REVOKED = new Set(['LINK_REVOKED', 'LINK_EXPIRED', 'LINK_NOT_FOUND', 'NOT_FOUND_OR_NOT_VISIBLE', 'INVALID_TOKEN']);
-const CLOSED = new Set(['COLLECTION_CLOSED', 'STAGE_CONFLICT', 'SURVEY_CLOSED']);
-export function unavailableState(error) {
-  const code = String(error?.code || error?.message || '').split(':')[0].trim();
-  if (CLOSED.has(code)) return 'closed';
-  if (REVOKED.has(code)) return 'revoked';
+// Codes the handlers actually throw (src/handlers/{shared-link,participant,response}.ts):
+//   NOT_FOUND_OR_NOT_VISIBLE — unknown/revoked/expired link, or a revoked/expired/foreign session;
+//   STAGE_CONFLICT — survey not collecting (closed, archived, wrong stage), link changed during open,
+//                    OR "response already submitted" (another client key after a committed response).
+// STAGE_CONFLICT is therefore ambiguous on its own. Agreed recovery with the API author (no new code):
+// GET /v2/participate/receipt with the same bearer; submitted:true → own receipt; submitted:false →
+// closed; a receipt refusal (NOT_FOUND_OR_NOT_VISIBLE) → link unavailable.
+export function errorKind(error) {
+  const code = String(error?.code || '').trim();
+  if (code === 'STAGE_CONFLICT') return 'conflict';
+  if (code === 'NOT_FOUND_OR_NOT_VISIBLE' || code === 'NOT_AUTHENTICATED') return 'unavailable';
   return null;
+}
+// Resolve a STAGE_CONFLICT (or check state before showing an editable form).
+// Returns { state: 'receipt', receipt } | { state: 'closed' } | { state: 'unavailable' }.
+export async function resolveConflict(client) {
+  if (!client.bearer) return { state: 'closed' }; // a conflict before any session exists cannot be "already submitted"
+  let receipt;
+  try { receipt = await client.receipt(); } catch { return { state: 'unavailable' }; }
+  return receipt.submitted ? { state: 'receipt', receipt } : { state: 'closed' };
+}
+
+// sessionStorage key holding the CURRENT namespace (the digest, never the raw token) so a
+// same-tab reload without the fragment resumes this participant context.
+export const CURRENT_KEY = 'shared:current';
+export function rememberCurrent(storage, namespace) { try { storage.setItem(CURRENT_KEY, namespace); } catch { /* ignore */ } }
+export function currentNamespace(storage) {
+  try { const v = storage.getItem(CURRENT_KEY); return v && /^shared:[0-9a-f]{64}:$/.test(v) ? v : null; } catch { return null; }
 }
 
 export function shareUrl(origin, entryFragment) {
