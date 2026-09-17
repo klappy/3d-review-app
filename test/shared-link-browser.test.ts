@@ -13,6 +13,8 @@ import { mintSession } from "../src/auth";
 // @ts-expect-error plain JS module without types
 import { copy, createSharedLinkClient, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment } from "../ui/shared-link.js";
 // @ts-expect-error plain JS module without types
+import * as sharedModule from "../ui/shared-link.js"; // namespace import: a missing export reads undefined instead of failing the whole file
+// @ts-expect-error plain JS module without types
 import { FORM, memoryStorage } from "./fixtures/shared-link-contract.dev.mjs";
 
 const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "shared-browser", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "shared-browser" } }] }));
@@ -246,13 +248,22 @@ function fakeDocument() {
     e.append = (...c: any[]) => e.children.push(...c); e.prepend = (...c: any[]) => e.children.unshift(...c);
     e.replaceChildren = (...c: any[]) => { e.children = c; }; e.add = (o: any) => e.options.push(o);
     e.querySelector = () => el("p"); e.querySelectorAll = () => []; e.reset = () => {}; e.focus = () => {};
+    e.remove = () => { if (id) { byId.delete(id); removed.add(id); } };
     return e;
   }
-  const document = { getElementById: (id: string) => { if (!byId.has(id)) byId.set(id, el("div", id)); return byId.get(id); }, createElement: (t: string) => el(t), querySelector: () => el("aside"), querySelectorAll: () => [] };
+  const removed = new Set<string>();
+  // Every id-addressed element and its appended children, as document.body.textContent would read them.
+  const allText = (): string => { const walk = (n: any): string => (n.textContent || "") + (n.children || []).map(walk).join(""); return [...byId.values()].map(walk).join("\n"); };
+  const document = {
+    getElementById: (id: string) => { if (removed.has(id)) return null; if (!byId.has(id)) byId.set(id, el("div", id)); return byId.get(id); },
+    createElement: (t: string) => el(t), querySelector: () => el("aside"), querySelectorAll: () => [],
+    body: { get textContent() { return allText(); } },
+  };
   return { document, $: (id: string) => document.getElementById(id) };
 }
+const ATTENTION = "Action needs attention. No completion is assumed.";
 async function settled($: (id: string) => any) { // wait for the startup run() to finish
-  for (let i = 0; i < 200; i++) { const n = $("notice").textContent; if (/complete\.$/.test(n) || !$("error").hidden) return; await new Promise(r => setTimeout(r, 25)); }
+  for (let i = 0; i < 200; i++) { const n = $("notice").textContent; if (/complete\.$/.test(n) || n === ATTENTION || !$("error").hidden) return; await new Promise(r => setTimeout(r, 25)); }
   throw new Error("startup did not settle: " + $("notice").textContent);
 }
 let bootCount = 0;
@@ -390,5 +401,175 @@ describe("[fake-DOM] staff share URL lifetime", () => {
     const $2 = await boot(storage, "");
     expect($2("share-url").textContent).toBe(""); expect($2("issue-link-impact").textContent).toBe("");
     for (const k of storage.keys()) expect(String(storage.getItem(k))).not.toContain("#survey=");
+  });
+});
+
+// ---- [fake-DOM] truthful submit-failure feedback on the shared route (Sprint 2 slice A) ----------
+// Rows F1–F10 of the slice brief. The server replays a committed response for the same idempotency
+// key, so a lost success must read as "uncertain, retry is safe", never "not submitted".
+const SURVEY = "/v2/assessments/assess_tavo_collect/surveys/survey_tavo";
+async function counts() { return ((await (await app.fetch(new Request(ORIGIN + SURVEY, { headers: { authorization: `Bearer ${owner}` } }), env)).json()) as any).result.counts.responses as number; }
+const snapshot = (storage: any) => JSON.stringify(storage.keys().sort().map((k: string) => [k, storage.getItem(k)]));
+const jsonResponse = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+const refuse = (status: number, code: string) => async () => jsonResponse(status, { ok: false, error: { code, message: `${code} synthetic message` }, trace_id: "tr_synthetic0001" });
+const offline = async () => { throw new TypeError("network lost before the request left"); };
+type Route = ((url: string, init: any) => Promise<Response>) | null;
+function router() { // per-route overrides on top of the real worker; null = real
+  const plan: { responses: Route; receipt: Route } = { responses: null, receipt: null };
+  const bodies: any[] = []; // parsed JSON of every real /responses reply (to read duplicate:true/false)
+  const fetcher = async (url: string, init: any) => {
+    if (url.endsWith("/responses") && plan.responses) return plan.responses(url, init);
+    if (url.endsWith("/receipt") && plan.receipt) return plan.receipt(url, init);
+    const r = await fetchImpl(url, init);
+    if (url.endsWith("/responses")) bodies.push(await r.clone().json());
+    return r;
+  };
+  // lost success: the server commits, then the reply never arrives
+  const lost = async (url: string, init: any) => { const r = await fetchImpl(url, init); bodies.push(await r.clone().json()); throw new TypeError("reply lost after the server committed"); };
+  return { plan, fetcher, bodies, lost };
+}
+const LEAK = /STAGE_CONFLICT|INVALID_PARAMS|NOT_FOUND|RATE_LIMITED|trace|tr_[A-Za-z0-9]|\b[45]\d\d\b/;
+function strict($: any) { // F9, after every row
+  expect((globalThis as any).document.body.textContent).not.toMatch(LEAK);
+  expect($("error").textContent).toBe(""); expect($("error").hidden).toBe(true);
+  expect((globalThis as any).document.getElementById("evidence")).toBeNull();
+}
+async function review($: any, values: Record<string, string>) { $("answers").values = values; await $("answers").dispatch("input"); await $("answers").dispatch("submit"); await settled($); expect($("review").hidden).toBe(false); }
+async function edit($: any, values: Record<string, string>) { await $("edit").dispatch("click"); expect($("answers").hidden).toBe(false); await review($, values); }
+async function submit($: any) { await $("submit").dispatch("click"); await settled($); strict($); }
+async function armed(storage: any, ns: string) { // mint the key up front so "byte-identical" covers submitKey too
+  if (!storage.getItem(ns + "submitKey")) storage.setItem(ns + "submitKey", globalThis.crypto.randomUUID());
+  return snapshot(storage);
+}
+async function openForm(link: { link_token: string; entry_fragment: string }, values = { Q1: "3" }) {
+  const storage = memoryStorage(); const r = router();
+  const $ = await boot(storage, link.entry_fragment, r.fetcher); strict($);
+  const ns = await digestNamespace(link.link_token);
+  await review($, values);
+  return { $, storage, ns, ...r };
+}
+function expectUncertain($: any, storage: any, snap: string) {
+  expect($("participant-resume").textContent).toBe(copy.submitUncertain);
+  expect($("receipt").hidden).toBe(true); expect($("participant-error").hidden).toBe(true);
+  expect($("notice").textContent).toBe(ATTENTION);
+  expect(snapshot(storage)).toBe(snap);
+}
+describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
+  const warns: any[][] = []; let originalWarn: any;
+  beforeAll(async () => { owner = await mintSession(env, "person_mara", "user"); /* the staff sign-out test above ended the shared owner session */ originalWarn = console.warn; console.warn = (...args: any[]) => { warns.push(args); }; });
+  afterAll(() => { console.warn = originalWarn; });
+  it("[module] submitFailureKind: 0/5xx/no status → uncertain; STAGE_CONFLICT → conflict; NOT_FOUND/NOT_AUTHENTICATED → unavailable; other 4xx → rejected", () => {
+    const err = (status: number | undefined, code?: string) => Object.assign(new Error("x"), { status, code });
+    const kind = sharedModule.submitFailureKind;
+    for (const e of [err(0), err(500), err(503, "503"), err(undefined), err(502, "STAGE_CONFLICT")]) expect(kind(e)).toBe("uncertain");
+    expect(kind(err(409, "STAGE_CONFLICT"))).toBe("conflict");
+    expect(kind(err(404, "NOT_FOUND_OR_NOT_VISIBLE"))).toBe("unavailable"); expect(kind(err(401, "NOT_AUTHENTICATED"))).toBe("unavailable");
+    for (const e of [err(400, "INVALID_PARAMS"), err(429, "RATE_LIMITED"), err(403, "NOT_AUTHORIZED_AT_SCOPE"), err(400)]) expect(kind(e)).toBe("rejected");
+    expect(copy.submitFailed).toBe("Your answers were not submitted. They are still here; try again.");
+  });
+  it("[module] call() attaches status: JSON failure carries response.status; network and unreadable carry 0 and no code", async () => {
+    const store = scopedStorage(memoryStorage(), "shared:test:");
+    const at = async (fetcher: any) => { try { await createSharedLinkClient({ fetchImpl: fetcher, store }).form(); } catch (e) { return e as any; } };
+    const j = await at(refuse(400, "INVALID_PARAMS")); expect(j.status).toBe(400); expect(j.code).toBe("INVALID_PARAMS"); expect(j.trace_id).toBe("tr_synthetic0001");
+    const n = await at(offline); expect(n.status).toBe(0); expect(n.code).toBeUndefined();
+    const u = await at(async () => new Response("<html>", { status: 502 })); expect(u.status).toBe(0); expect(u.code).toBeUndefined();
+  });
+  it("F1 lost success: uncertain copy, #error hidden, storage byte-identical, counts +1; retry with the same key replays duplicate:true, counts unchanged", async () => {
+    const link = await issue(); const { $, storage, ns, plan, bodies, lost } = await openForm(link);
+    const before = await counts(); const snap = await armed(storage, ns); warns.length = 0;
+    plan.responses = lost; await submit($);
+    expectUncertain($, storage, snap);
+    expect(await counts()).toBe(before + 1); expect(bodies[0].result.duplicate).toBe(false);
+    expect(warns).toEqual([["[3dr] submit", { status: 0, code: undefined, trace_id: undefined }]]);
+    plan.responses = null; await submit($);
+    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toMatch(/^Response saved · resp_/);
+    expect(bodies[1].result).toMatchObject({ response_id: bodies[0].result.response_id, duplicate: true });
+    expect(await counts()).toBe(before + 1);
+    expect(storage.getItem(ns + "submitKey")).toBeNull(); expect(storage.getItem(ns + "draft")).toBeNull();
+  });
+  it("F2 503 JSON reply: uncertain, counts unchanged, storage byte-identical; retry commits duplicate:false", async () => {
+    const link = await issue(); const { $, storage, ns, plan, bodies } = await openForm(link);
+    const before = await counts(); const snap = await armed(storage, ns); warns.length = 0;
+    plan.responses = refuse(503, "INTERNAL"); await submit($);
+    expectUncertain($, storage, snap); expect(await counts()).toBe(before);
+    expect(warns).toEqual([["[3dr] submit", { status: 503, code: "INTERNAL", trace_id: "tr_synthetic0001" }]]);
+    plan.responses = null; await submit($);
+    expect($("receipt").textContent).toMatch(/^Response saved · resp_/); expect(bodies[0].result.duplicate).toBe(false); expect(await counts()).toBe(before + 1);
+  });
+  it("F3 throw before the request left: uncertain, counts unchanged; retry commits duplicate:false", async () => {
+    const link = await issue(); const { $, storage, ns, plan, bodies } = await openForm(link);
+    const before = await counts(); const snap = await armed(storage, ns);
+    plan.responses = offline; await submit($);
+    expectUncertain($, storage, snap); expect(await counts()).toBe(before);
+    plan.responses = null; await submit($);
+    expect($("receipt").textContent).toMatch(/^Response saved · resp_/); expect(bodies[0].result.duplicate).toBe(false); expect(await counts()).toBe(before + 1);
+  });
+  it("F4 400 with no prior commit: the receipt probe says submitted:false → submitFailed; storage byte-identical", async () => {
+    const link = await issue(); const { $, storage, ns, plan } = await openForm(link);
+    const before = await counts(); const snap = await armed(storage, ns);
+    plan.responses = refuse(400, "INVALID_PARAMS"); await submit($);
+    expect($("participant-resume").textContent).toBe(copy.submitFailed);
+    expect($("receipt").hidden).toBe(true); expect($("notice").textContent).toBe(ATTENTION);
+    expect(snapshot(storage)).toBe(snap); expect(await counts()).toBe(before);
+  });
+  it("F6 direct 404 on submit with no earlier uncertainty: linkUnavailable copy; storage byte-identical", async () => {
+    const link = await issue(); const { $, storage, ns, plan } = await openForm(link);
+    const snap = await armed(storage, ns);
+    plan.responses = refuse(404, "NOT_FOUND_OR_NOT_VISIBLE"); await submit($);
+    expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.linkUnavailable);
+    expect($("answers").hidden).toBe(true); expect($("review").hidden).toBe(true);
+    expect(snapshot(storage)).toBe(snap);
+  });
+  const probes: [string, string, Route][] = [
+    ["F7a", "probe 503", refuse(503, "INTERNAL")],
+    ["F7b", "probe throws", offline],
+    ["F7c", "probe 429", refuse(429, "RATE_LIMITED")],
+  ];
+  for (const [row, label, probe] of probes) it(`${row} lost success → edit → 400 with ${label}: uncertain retained, storage byte-identical, no second commit`, async () => {
+    const link = await issue(); const { $, storage, ns, plan, lost } = await openForm(link);
+    const before = await counts();
+    plan.responses = lost; await submit($); expect($("participant-resume").textContent).toBe(copy.submitUncertain); expect(await counts()).toBe(before + 1);
+    plan.responses = null; await edit($, { Q1: "4" });
+    const snap = await armed(storage, ns);
+    plan.responses = refuse(400, "INVALID_PARAMS"); plan.receipt = probe; await submit($);
+    expectUncertain($, storage, snap); expect(await counts()).toBe(before + 1);
+  });
+  it("F7d lost success → edit → 400 with probe 404: cannotResume copy (not linkUnavailable); storage byte-identical", async () => {
+    const link = await issue(); const { $, storage, ns, plan, lost } = await openForm(link);
+    plan.responses = lost; await submit($); expect($("participant-resume").textContent).toBe(copy.submitUncertain);
+    plan.responses = null; await edit($, { Q1: "4" });
+    const snap = await armed(storage, ns);
+    plan.responses = refuse(400, "INVALID_PARAMS"); plan.receipt = refuse(404, "NOT_FOUND_OR_NOT_VISIBLE"); await submit($);
+    expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.cannotResume);
+    expect($("answers").hidden).toBe(true); expect(snapshot(storage)).toBe(snap);
+  });
+  it("F7e lost success → edit → 400 with a live probe: the committed receipt is shown; draft and key cleared; counts unchanged", async () => {
+    const link = await issue(); const { $, storage, ns, plan, lost, bodies } = await openForm(link);
+    const before = await counts();
+    plan.responses = lost; await submit($); expect($("participant-resume").textContent).toBe(copy.submitUncertain);
+    plan.responses = null; await edit($, { Q1: "4" });
+    plan.responses = refuse(400, "INVALID_PARAMS"); await submit($);
+    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toContain(bodies[0].result.response_id);
+    expect($("participant-resume").textContent).toBe(`${copy.receiptThanks} ${copy.sameLinkOthers}`);
+    expect(storage.getItem(ns + "draft")).toBeNull(); expect(storage.getItem(ns + "submitKey")).toBeNull();
+    expect(await counts()).toBe(before + 1);
+  });
+  it("F8 earlier uncertain (nothing committed) → edit → 400 with probe submitted:false: uncertain retained, never submitFailed", async () => {
+    const link = await issue(); const { $, storage, ns, plan } = await openForm(link);
+    const before = await counts();
+    plan.responses = refuse(503, "INTERNAL"); await submit($); expect($("participant-resume").textContent).toBe(copy.submitUncertain);
+    plan.responses = null; await edit($, { Q1: "4" });
+    const snap = await armed(storage, ns);
+    plan.responses = refuse(400, "INVALID_PARAMS"); await submit($); // real probe: submitted:false
+    expectUncertain($, storage, snap); expect(await counts()).toBe(before);
+  });
+  it("F10 fragment entry with GET /receipt → 503: transient copy shown, #error stays empty and hidden", async () => {
+    const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
+    plan.receipt = refuse(503, "INTERNAL");
+    const $ = await boot(storage, link.entry_fragment, fetcher);
+    strict($);
+    expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.transient);
+    expect($("answers").hidden).toBe(true); expect($("notice").textContent).toBe(ATTENTION);
+    expect(storage.getItem((await digestNamespace(link.link_token)) + "bearer")).toMatch(/^pt_/);
   });
 });

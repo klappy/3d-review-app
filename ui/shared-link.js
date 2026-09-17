@@ -15,6 +15,7 @@ export const copy = {
   draftMismatch: 'Your saved answers were for a different version of this survey and were not restored. Please answer again.',
   draftRestored: 'Your unsent answers were restored on this device.',
   submitFailed: 'Your answers were not submitted. They are still here; try again.',
+  submitUncertain: 'We could not confirm whether your answers arrived. Nothing on this device was changed and your answers are still here. Choose Submit once again: if they already arrived you will see your receipt, and nothing is sent twice.',
   receiptThanks: 'Thank you. Your answers stay with the team, grouped with others from the community perspective. Reopening your link shows this receipt again.',
   sameLinkOthers: 'Someone else can answer using the same link on their own device.',
   issuePreview: 'Nothing is sent until you confirm. This is the impact preview the contract requires before every write with an outside effect.',
@@ -117,6 +118,18 @@ export function errorKind(error) {
   if (code === 'NOT_FOUND_OR_NOT_VISIBLE' || code === 'NOT_AUTHENTICATED') return 'unavailable';
   return 'transient';
 }
+// Submit-failure kinds (cookbook #16 c5709809882 + c5709866923). The server replays a committed
+// response for the same idempotency key, so a submit whose outcome is unknown (no status, status 0
+// for network/unreadable, or 5xx) is `uncertain`: the answers may have arrived and a retry with the
+// same key is safe. Any other 4xx is `rejected`: nothing was committed by THIS request, but an
+// earlier uncertain attempt may have been, so the caller probes the receipt before saying "not submitted".
+export function submitFailureKind(error) {
+  const status = Number(error?.status);
+  if (!(status >= 400 && status < 500)) return 'uncertain';
+  const kind = errorKind(error);
+  if (kind === 'conflict' || kind === 'unavailable') return kind;
+  return 'rejected';
+}
 // Cookbook #16 c5708870217: a refused open on the RESUME path (stored resume_token) is a truthful
 // cannot-resume state, not a dead link: scoped bearer/key/draft stay unchanged, no automatic fresh
 // open, no new action. Closed/rate-limit/transient keep their own kinds.
@@ -162,10 +175,10 @@ export function createSharedLinkClient({ fetchImpl = globalThis.fetch, store, on
     if (auth && bearer) headers.authorization = `Bearer ${bearer}`;
     let response;
     try { response = await fetchImpl(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'omit', cache: 'no-store' }); }
-    catch { throw new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); }
+    catch { const error = new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); error.status = 0; throw error; }
     let data;
-    try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
-    if (!response.ok || !data.ok) { const error = new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`); error.code = data.error?.code || String(response.status); throw error; }
+    try { data = await response.json(); } catch { const error = new Error(`Unreadable API response (${response.status}).`); error.status = 0; throw error; }
+    if (!response.ok || !data.ok) { const error = new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`); error.code = data.error?.code || String(response.status); error.status = response.status; error.trace_id = data.trace_id ?? data.error?.trace_id; throw error; }
     onEvent?.({ method, url, capability: data.capability, receipt: data.receipt, trace_id: data.trace_id });
     return data.result;
   }
