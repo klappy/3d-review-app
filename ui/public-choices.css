@@ -1,0 +1,25 @@
+/* Public entry: the four choices (Read about it / Take the tour / Take a survey / Sign in),
+   the labelled sandbox sign-in box, and two route-scoped hides for staff chrome that leaked onto
+   public and participant faces. Layout tokens come from style.css / design-system; nothing here
+   changes routing, authority or the glass stage itself. */
+@media screen {
+  .rv .public-choices { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:0 0 22px; }
+  .rv .public-choices .rv-btn { min-height:44px; white-space:nowrap; }
+  .rv .public-secondary { margin-top:18px; }
+  /* "Read about it" is an in-page anchor: leave breathing room above the eyebrow when the browser scrolls to it. */
+  .rv #public-about { scroll-margin-top:16px; }
+  @media (max-width:760px) {
+    .rv .public-choices { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .rv .public-choices .rv-btn { white-space:normal; }
+  }
+
+  /* Real sign-in is the only control in the primary flow; sandbox code controls open only by explicit choice. */
+  .rv .sandbox-signin { margin-top:14px; padding:12px 14px; border:1px dashed var(--glass-edge); border-radius:var(--r-button); }
+  .rv .sandbox-signin > summary { font-size:13px; font-weight:600; color:var(--secondary); cursor:pointer; }
+
+  /* "Sign out" is meaningless while no staff identity is observed (stage-composition sets data-staff-confirmed). */
+  .rv[data-staff-confirmed="false"] #signout { display:none; }
+  /* The staff run() notice ("Checking session… — complete.") is not part of the public or participant faces. */
+  .rv:not([data-entry-view="workspace"]) #notice,
+  .rv[data-workspace-route="participant"] #notice { display:none; }
+}

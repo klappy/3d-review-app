@@ -26,7 +26,16 @@ export function mountPublicEntry(document,window) {
     // Unauthenticated report entry reaches real sign-in, never a sample report or implied grant.
     if(view==='workspace'&&!shared&&!observedIdentity(identity?.textContent)&&window.location.hash==='#reports-card')document.getElementById('facilitator').scrollIntoView();
   }
-  window.addEventListener('hashchange',render);
+  // "Sign in" from the public choices: land keyboard and viewport on the real sign-in control, not the card heading.
+  // Presentation only — the hash, the view and the auth flow are unchanged.
+  function landOnSignIn(){
+    if(window.location.hash!=='#facilitator'||observedIdentity(identity?.textContent))return;
+    const link=document.querySelector('#facilitator a[href="/v2/auth/access"]');
+    if(!link)return;
+    link.scrollIntoView?.({block:'center'});
+    link.focus?.({preventScroll:true});
+  }
+  window.addEventListener('hashchange',()=>{render();landOnSignIn();});
   new window.MutationObserver(render).observe(identity,{childList:true,subtree:true,characterData:true});
   new window.MutationObserver(render).observe(document.getElementById('facilitator'),{attributes:true,attributeFilter:['hidden']});
   document.querySelectorAll('[data-tour-step]').forEach(button=>button.addEventListener('click',()=>{

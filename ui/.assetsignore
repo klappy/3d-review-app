@@ -16,3 +16,4 @@ workspace-overview.test.mjs
 
 participant-view.test.mjs
 participant-header.test.mjs
+public-choices.test.mjs

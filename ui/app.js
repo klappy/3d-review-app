@@ -591,7 +591,7 @@ function showSharedUnavailable(kind) {
   $('answers').hidden = true; $('review').hidden = true; $('recover').hidden = true; participantView?.showReceipt();
 }
 async function sharedLinkEntry(token, namespace) {
-  $('facilitator').hidden = true; $('evidence').remove(); document.querySelector('aside').hidden = true; $('participant').querySelector('p.note').hidden = true; // evidence is removed, not hidden: no trace/receipt text exists on the shared route
+  $('facilitator').hidden = true; $('evidence').remove(); document.querySelector('aside').hidden = true; $('participant-arrival').hidden = true; $('participant-code-guidance').hidden = true; // arrival and code guidance are for the legacy code path only (explicit targets: Bugbot 4036816500); evidence is removed, not hidden: no trace/receipt text exists on the shared route
   for (const el of $('redeem').querySelectorAll('label,button')) el.hidden = true; // code entry hidden; the alert slot stays
   namespace = namespace || await digestNamespace(token);
   state.sharedStore = scopedStorage(sessionStorage, namespace);
