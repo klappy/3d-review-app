@@ -214,11 +214,11 @@ test('C: crumbs carry project › assessment with aria-current and the deepest r
   assert.equal(nav.children[0].getAttribute('aria-current'), null);
   assert.equal(nav.children[2].getAttribute('aria-current'), 'location');
   assert.equal(nav.children[3].className, 'badge', 'the a2 row role, not the project role');
-  // S4 #13: with an assessment selected the overview collapses to one line and never hides itself.
+  // Assessment context is supplied by its authorized GET; the overview keeps only crumbs.
   assert.equal(w.node('overview').hidden, false);
   assert.equal(w.node('overview-all').hidden, true);
-  assert.equal(w.node('overview-project').children.length, 1);
-  assert.match(text(w.node('overview-project')), /Coast · Partner org · your role: owner/);
+  assert.equal(w.node('overview-project').children.length, 0);
+  assert.doesNotMatch(text(w.node('overview-project')), /your role: owner/);
 });
 
 test('an assessment-only viewer with no project grants gets no overview at all', async () => {
@@ -385,7 +385,7 @@ test('B: a selected assessment keeps assessment state when the overview GET omit
     w.assessments.options = [option(''), option('a1')]; w.assessments.value = 'a1';
     w.mount(); await w.settle();
     assert.equal(w.body.dataset.overviewState, 'assessment', 'the select, not the overview GET, decides composition');
-    assert.equal(w.node('overview-project').children.length, 1, 'collapse to the project line; do not paint a conflicting table');
+    assert.equal(w.node('overview-project').children.length, 0, 'do not paint a parent-role line or conflicting table');
   }
 });
 

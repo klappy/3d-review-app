@@ -3,7 +3,7 @@ import { redactDiagnosticPath } from './diagnostic-path.js';
 import { createCollabHooks } from './collab-mount.js';
 import { mountEntityScreen } from './entity-screen.js';
 import { mountLensSurveys } from './lens-surveys.js';
-import { loadRoleHelp, loadBlankPrint, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
+import { loadRoleHelp, loadBlankPrint, renderAssessmentHeadrow, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
@@ -59,6 +59,7 @@ let stageContext = null;
 function clearStageScreens() {
   stageGeneration++;
   stageContext = null;
+  $('assessment-context').replaceChildren();
   $('stage-workspace').hidden = true;
   for (const id of ['stage-tabs-root', 'stage-help-root', 'stage-tour-root', 'stage-print-root']) $(id).replaceChildren();
   $('stage-print-survey').replaceChildren();
@@ -232,6 +233,7 @@ async function chooseAssessment() {
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   if (!stageCurrent(stageRead)) return;
   state.assessmentRole = result.assessment.role; showReportControls();
+  renderAssessmentHeadrow(document, $('assessment-context'), result.assessment);
   collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
   text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
   const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
@@ -314,6 +316,7 @@ async function chooseGrantedAssessment() {
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   if (!stageCurrent(stageRead)) return;
     state.assessmentRole = result.assessment.role; showReportControls();
+    renderAssessmentHeadrow(document, $('assessment-context'), result.assessment);
     collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
     text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
     for (const survey of result.surveys || []) option($('surveys'), survey.id, survey.template_name || survey.id);

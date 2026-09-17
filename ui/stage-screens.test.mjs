@@ -8,7 +8,7 @@ import {
   shouldShowStageTour, dismissStageTour,
   credentialFields, itemsFromPrintHtml, printTitleFromHtml,
   loadRoleHelp, loadBlankPrint,
-  renderStageTabs, renderRoleHelp, renderStageTour, renderBlankPrint, printBlankForm,
+  renderAssessmentHeadrow, renderStageTabs, renderRoleHelp, renderStageTour, renderBlankPrint, printBlankForm,
 } from './stage-screens.js';
 
 function fakeNode(tag, id) {
@@ -324,4 +324,16 @@ test('role help defaults to a collapsed native disclosure retaining exact role a
   renderRoleHelp(doc,root,{visible:true,role:'member',available:'cap.results.summary'});
   assert.equal(root.children[0].tag,'details');assert.equal(root.children[0].getAttribute('open'),null);
   assert.match(text(root),/Authorized role: member/);assert.match(text(root),/cap.results.summary/);
+});
+
+
+test('assessment heading uses exact returned context without inferred parent, language or role', () => {
+  const doc=fakeDocument(), root=doc.getElementById('heading');
+  renderAssessmentHeadrow(doc,root,{name:'Actual <assessment>',period:'September 2026',format:'Audio',language_id:'private-id',role:'viewer'});
+  assert.equal(root.children[0].tag,'h1');
+  assert.deepEqual(root.children.map(n=>n.textContent),['Actual <assessment>','September 2026 · Audio','viewer']);
+  assert.equal(root.children[2].getAttribute('title'),'Your role at this assessment');
+  renderAssessmentHeadrow(doc,root,{name:'Direct assessment',period:null,format:null,language_id:'unresolved'});
+  assert.deepEqual(root.children.map(n=>n.textContent),['Direct assessment']);
+  renderAssessmentHeadrow(doc,root,null);assert.equal(root.children.length,0);
 });
