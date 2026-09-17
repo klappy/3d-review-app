@@ -2,8 +2,9 @@ import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
 import { resumeTarget, savedSubmitKey } from './participant-resume.js';
+import { copy as sharedCopy, createSharedLinkClient, digestNamespace, parseEntryFragment, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, unavailableState } from './shared-link.js';
 const $ = id => document.getElementById(id);
-const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null };
+const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null };
 state.responseKey = savedSubmitKey(sessionStorage, state.participant);
 const path = (value) => encodeURIComponent(value);
 function note(message) { $('notice').textContent = message; $('error').hidden = true; }
@@ -13,6 +14,7 @@ function option(select, value, label) { select.add(new Option(label, value)); }
 function resetSelect(select, label) { select.replaceChildren(new Option(label, '')); }
 function required(value, message) { if (!value) throw new Error(message); return value; }
 async function api(url, { method = 'GET', body, participant = false } = {}) {
+  if (participant && state.shared) return state.shared.request(url, { method, body }); // shared link: credential-less fetch, link bearer only
   const token = participant ? state.participant : state.session;
   const headers = { accept: 'application/json' };
   if (body !== undefined) headers['content-type'] = 'application/json';
@@ -29,7 +31,7 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
 async function run(label, task) {
   note(label); const buttons = [...document.querySelectorAll('button')]; buttons.forEach(b => b.disabled = true);
   try { await task(); note(`${label} — complete.`); } catch (error) { fail(error.message); }
-  finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : false); }
+  finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : false); }
 }
 function showAuthorizedWork(me) {
   const visible = hasProjectWork(me);
@@ -177,7 +179,7 @@ bindClick('select-survey', 'Selecting survey…', async () => {
   const [template_id, version] = selected.split('@'); const result = await api(`/v2/assessments/${path(aid)}/surveys`, { method: 'POST', body: { template_id, version: Number(version) } });
   const sid = result.survey.id; await chooseAssessment(); state.survey = sid; $('surveys').value = sid; await surveyStatus();
 });
-$('surveys').addEventListener('change', () => { state.survey = $('surveys').value || null; clearCodeBatch(); });
+$('surveys').addEventListener('change', () => { state.survey = $('surveys').value || null; clearCodeBatch(); clearShareLink(); });
 async function surveyStatus() {
   const aid = required(state.assessment, 'Choose an assessment.'), sid = required(state.survey, 'Choose a survey.');
   const result = await api(`/v2/assessments/${path(aid)}/surveys/${path(sid)}`);
@@ -217,6 +219,28 @@ bindClick('release-codes', 'Releasing credential values…', async () => {
   $('codes-output').hidden = false;
   text($('export-impact'), 'Released once. Save/print now; these values cannot be exported again.');
 });
+function linkRoute() {
+  const aid = required(state.assessment, 'Choose an assessment.'), sid = required(state.survey, 'Choose a survey.');
+  return `/v2/assessments/${path(aid)}/surveys/${path(sid)}/links`;
+}
+function clearShareLink() { state.linkConfirm = null; state.shareUrl = null; text($('issue-link-impact'), ''); text($('share-url'), ''); $('share-url').hidden = true; $('copy-link').hidden = true; text($('copy-state'), ''); $('issue-link-confirm').disabled = true; }
+bindClick('issue-link-preview', 'Previewing survey link…', async () => {
+  clearShareLink();
+  const result = await api(linkRoute(), { method: 'POST', body: { params: {}, mode: 'dry_run' } });
+  state.linkConfirm = result.confirm_token;
+  text($('issue-link-impact'), `${sharedCopy.issuePreview} Impact: ${JSON.stringify(result.impact)}. Confirmation expires in ${result.expires_in} seconds.`);
+  $('issue-link-confirm').disabled = false;
+});
+bindClick('issue-link-confirm', 'Creating survey link…', async () => {
+  const confirm_token = required(state.linkConfirm, 'Preview the survey link again.');
+  state.linkConfirm = null; $('issue-link-confirm').disabled = true;
+  const result = await api(linkRoute(), { method: 'POST', body: { params: {}, mode: 'execute', confirm_token } });
+  state.shareUrl = shareUrl(location.origin, result.entry_fragment);
+  text($('share-url'), state.shareUrl); $('share-url').hidden = false; $('copy-link').hidden = false;
+  text($('issue-link-impact'), `${sharedCopy.issueDone}${result.expires_at ? ` Expires ${result.expires_at}.` : ''}`);
+});
+bindClick('copy-link', 'Copying link…', async () => { await navigator.clipboard.writeText(required(state.shareUrl, 'Create a survey link first.')); text($('copy-state'), sharedCopy.linkCopied); });
+bindClick('refresh-counts', 'Refreshing counts…', surveyStatus);
 bindClick('load-results', 'Reading result state…', async () => {
   const aid = required(state.assessment, 'Choose an assessment.'); const result = await api(`/v2/assessments/${path(aid)}/results`);
   text($('results'), result.suppressed ? `Suppressed / ${result.status}: ${result.reason || 'Disclosure policy pending'}` : JSON.stringify(result));
@@ -239,7 +263,21 @@ async function loadForm() {
   const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null;
   text($('form-context'), `${result.assessment} · ${result.language} · ${result.template.id}@${result.template.version}`);
   $('questions').replaceChildren(...result.items.map(drawQuestion)); $('answers').hidden = false; $('review').hidden = true; $('receipt').hidden = true; $('recover').hidden = false;
+  if (state.shared) restoreSharedDraft();
 }
+function draftValues() {
+  const values = new FormData($('answers')); const out = {};
+  for (const item of state.form.items) { const v = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id); if (v !== null) out[item.id] = v; }
+  return out;
+}
+function restoreSharedDraft() {
+  const draft = restoreDraft(state.sharedStore, state.form);
+  if (!draft) return;
+  if (draft.mismatch) { state.sharedStore.remove('draft'); text($('participant-resume'), sharedCopy.draftMismatch); return; }
+  for (const item of state.form.items) { const v = draft.answers[item.id]; if (v == null) continue; for (const input of $('answers').querySelectorAll(`[name="${CSS.escape(item.id)}"]`)) { if (input.type === 'checkbox') input.checked = v.includes(input.value); else if (input.type === 'radio') input.checked = input.value === v; else input.value = v; } }
+  text($('participant-resume'), sharedCopy.draftRestored);
+}
+$('answers').addEventListener('input', () => { if (state.shared && state.form) saveDraft(state.sharedStore, state.form, draftValues()); });
 async function restoreParticipant() {
   try {
     const receipt = await api('/v2/participate/receipt', { participant: true });
@@ -267,6 +305,7 @@ $('edit').addEventListener('click', () => { $('answers').hidden = false; $('revi
 bindClick('submit', 'Submitting response…', async () => {
   required(state.answers, 'Review answers first.');
   if (!state.responseKey) { state.responseKey = crypto.randomUUID(); sessionStorage.setItem('responseKey', state.responseKey); }
+  if (state.shared) { let result; try { result = await state.shared.submit(state.answers); } catch (error) { text($('participant-resume'), sharedCopy.submitFailed); throw error; } showReceipt(result); return; }
   const result = await api('/v2/participate/responses', { method: 'POST', participant: true, body: { answers: state.answers, idempotency_key: state.responseKey } });
   showReceipt(result);
   state.responseKey = null; sessionStorage.removeItem('responseKey');
@@ -275,6 +314,7 @@ function showReceipt(result) {
   text($('receipt'), result.submitted === false ? 'No submission recorded yet.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`);
   $('receipt').hidden = false;
   if (result.submitted !== false) { $('review').hidden = true; $('answers').hidden = true; }
+  if (state.shared && result.submitted !== false) text($('participant-resume'), `${sharedCopy.receiptThanks} ${sharedCopy.sameLinkOthers}`);
 }
 bindClick('recover', 'Recovering receipt…', async () => {
   const receipt = await api('/v2/participate/receipt', { participant: true });
@@ -283,7 +323,31 @@ bindClick('recover', 'Recovering receipt…', async () => {
 });
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
 { const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); } }
-run('Checking session…', async () => {
+async function sharedLinkEntry(token) {
+  $('facilitator').hidden = true; document.querySelector('aside').hidden = true; $('participant').querySelector('p.note').hidden = true;
+  for (const el of $('redeem').querySelectorAll('label,button')) el.hidden = true; // code entry hidden; the alert slot stays
+  state.participant = null; state.responseKey = null; // ignore the global code-path token in this mode
+  state.sharedStore = scopedStorage(sessionStorage, await digestNamespace(token));
+  state.shared = createSharedLinkClient({ store: state.sharedStore, onEvent: e => { const li = document.createElement('li'); li.textContent = `${e.method} ${e.url} · ${e.capability || 'v2'} · ${e.receipt?.id || e.receipt?.receipt_id || 'read'} · ${e.trace_id || 'no trace'}`; $('events').prepend(li); } });
+  try {
+    await state.shared.open(token);
+    const receipt = await state.shared.receipt();
+    $('recover').hidden = false;
+    if (resumeTarget(receipt) === 'receipt') showReceipt(receipt); else await loadForm();
+  } catch (error) {
+    const unavailable = unavailableState(error);
+    if (unavailable === 'closed') {
+      text($('participant-error'), sharedCopy.collectionClosed); $('participant-error').hidden = false;
+      if (state.shared.bearer) { try { const receipt = await state.shared.receipt(); if (receipt.submitted) showReceipt(receipt); } catch { /* no own receipt to replay */ } }
+      return;
+    }
+    text($('participant-error'), unavailable === 'revoked' ? sharedCopy.linkUnavailable : 'Participant session could not be reopened.'); $('participant-error').hidden = false;
+    throw error;
+  }
+}
+const sharedToken = parseEntryFragment(location.hash);
+if (sharedToken !== null) { stripFragment(window); run('Opening survey…', () => sharedLinkEntry(sharedToken)); }
+else run('Checking session…', async () => {
   try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } }
   catch { state.session = null; state.principal = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); }
   if (state.participant) await restoreParticipant();
