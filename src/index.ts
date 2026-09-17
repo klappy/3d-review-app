@@ -120,7 +120,8 @@ app.get("/v2/auth/access", async (c) => {
 // It is labelled "dev.bootstrap.seed_synthetic" so it can never be mistaken for cap.ops.health or counted as parity.
 app.post("/v2/ops/seed/synthetic", async (c) => {
   const env = c.env;
-  if ((env.ENVIRONMENT ?? "dev") !== "dev") return json(fail("NOT_AUTHORIZED_AT_SCOPE", "synthetic seed loads only in the dev sandbox", undefined, "dev.bootstrap.seed_synthetic", newTraceId()), 403);
+  // Fail CLOSED (Astra 5706439170): only an explicit ENVIRONMENT="dev" is dev. A missing variable is not dev.
+  if (env.ENVIRONMENT !== "dev") return json(fail("NOT_AUTHORIZED_AT_SCOPE", "synthetic seed loads only in the dev sandbox", undefined, "dev.bootstrap.seed_synthetic", newTraceId()), 403);
   const ctx = await contextForRequest(c.req.raw, env);
   if (ctx.principal.kind !== "user" && ctx.principal.kind !== "support") return json(fail("NOT_AUTHENTICATED", "sign in first", undefined, "dev.bootstrap.seed_synthetic", ctx.traceId), 401);
   const stmts = [synthResponsesSql, synthOrgResponsesSql].map((f) => f as unknown as string).join("\n").split("\n").filter((l) => !l.startsWith("--")).join("\n").split(";\n").map((s) => s.trim()).filter(Boolean);
