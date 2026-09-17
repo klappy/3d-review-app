@@ -6,6 +6,7 @@ import { mintSession, revokeSessionByHash } from "../auth";
 import { revokeOAuthGrants, type OAuthEnv } from "../oauth";
 import contract from "../../contract/capabilities.json";
 import { capabilities, byId } from "../registry";
+import { APP_VERSION, APP_COMMIT, APP_STAMP, BUILD_UUID, RELEASE_SOURCE } from "../version";
 
 export const entryIntents: Handler = async () => ({ result: { intents: [
   { id: "what", route: "docs" }, { id: "how", route: "docs {topic:'stages'}" }, { id: "example", route: "GET /v2/example" },
@@ -78,7 +79,10 @@ export const authMe: Handler = async (ctx) => {
 export const opsHealth: Handler = async (ctx) => {
   let d1 = "ok";
   try { await ctx.db.prepare("SELECT 1").first(); } catch (e) { d1 = "down"; }
-  return { result: { ok: d1 === "ok", build: "0.0.1-phase0", contract: (contract as any).contract, source_sha: (contract as any).source.sha, deps: { d1 }, capabilities: capabilities.length } };
+  // Release identity (ticket 2026-09-17-3d-release-identity): `build` = <version>+<sha7> from the build-time stamp; `commit` = app code sha;
+  // `release_source` = cookbook release-record commit (release/release-manifest.json). `contract`/`source_sha` remain the contract pin (cookbook 04) — distinct meanings.
+  return { result: { ok: d1 === "ok", version: APP_VERSION, build: APP_STAMP, commit: APP_COMMIT, ...(BUILD_UUID ? { build_uuid: BUILD_UUID } : {}), release_source: RELEASE_SOURCE,
+    contract: (contract as any).contract, source_sha: (contract as any).source.sha, deps: { d1 }, capabilities: capabilities.length } };
 };
 
 /** Literal answers-strip key-set (Auth A5). Dropped before unknown-key reject; never persisted. */
