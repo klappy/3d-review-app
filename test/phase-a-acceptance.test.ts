@@ -1,6 +1,6 @@
-// Phase A — the 33 "accepted when" lines of cookbook 04-ACCEPTANCE, each with its negative, run against the real app +
-// a fresh D1 in the deploy gate. A line the app does not meet is NOT bent to pass: it is listed in DIVERGENCES with the
-// observed behavior, asserted as-observed (so drift is caught), and reported on the board as a finding for its owner.
+// Phase A — partial static assertions against selected proposed 04-ACCEPTANCE observables; not full acceptance.
+// Fresh local D1 fixtures exercise the app. Missing positives, negatives, HTTP/MCP twins and source tensions are
+// recorded in docs/phase-a-coverage.md. DIVERGENCE assertions pin current behavior, not accepted requirements.
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
@@ -46,12 +46,12 @@ describe("04-ACCEPTANCE rows 1–2, 32–33 — public entry", () => {
     expect(a.status).toBe(200); expect(a.result.intents.map((i: any) => i.id)).toEqual(["what", "how", "example", "take survey", "manage", "view results"]);
     expect(b.result.intents).toEqual(a.result.intents);
   });
-  it("2 entry.example: fixture:true with a survey and a summary; cannot be mutated", async () => {
+  it("2 entry.example: fixture, survey and summary; owner mutation attempts return a 4xx status", async () => {
     const a = await call("GET", "/v2/example"); expect(a.ok).toBe(true); expect(a.result.fixture).toBe(true);
     expect(a.result.assessment.surveys.length).toBeGreaterThan(0); expect(a.result.assessment.summary).toBeTruthy();
     for (const m of ["POST", "PATCH", "DELETE"]) expect([404, 405, 400]).toContain((await call(m, "/v2/example", {}, O)).status);
   });
-  it("32 ops.health: build + contract + per-dependency status, no session, no configuration values", async () => {
+  it("32 ops.health: D1-only dependency and truthy contract; selected sensitive strings absent", async () => {
     const h = await call("GET", "/v2/health"); expect(h.status).toBe(200); expect(h.result.deps.d1).toBe("ok"); expect(h.result.contract).toBeTruthy();
     expect(JSON.stringify(h.raw)).not.toMatch(/secret|api_key|workers\.dev|cloudflareaccess/i);
     expect(Object.keys(h.result.deps)).toEqual(["d1"]); // DIVERGENCE as observed: line asks for D1, KV, email sender (Fable's to add after #15/#16)
@@ -110,7 +110,7 @@ describe("rows 5–12 — workspaces, projects, languages", () => {
       const un2 = await call("POST", `/v2/workspaces/${ws}/unarchive`, {}, NEW); note("9", `second unarchive → ${un2.ok ? "ok (idempotent) receipt=" + !!un2.receipt : un2.code}`); expect(un2.ok).toBe(true);
       expect((await call("GET", "/v2/workspaces", undefined, NEW)).result.workspaces.find((w: any) => w.id === ws).archived_at).toBeNull(); }
   });
-  it("10/10a/10b/11/12 project create → language create/list → update → archive/unarchive; negatives", async () => {
+  it("10/10a/10b/11 project create, language create/list and update; row12 archive/unarchive omitted", async () => {
     const ownWs = (await call("POST", "/v2/workspaces", { name: "Acceptance WS for projects" }, NEW)).result.workspace.id; // stands alone (review #17-5)
     const c = await call("POST", "/v2/projects", { name: "Acceptance Project", workspace_id: ownWs }, NEW); expect(c.ok).toBe(true); pid = c.result.project.id;
     // DIVERGENCE (row 10 negative, Lane A handler): `workspace_id` is silently IGNORED — the project is created outside any
@@ -134,7 +134,7 @@ describe("rows 5–12 — workspaces, projects, languages", () => {
 });
 
 describe("rows 13–17 — assessments", () => {
-  it("13/14 list + get: an assessment-scoped viewer sees exactly their one; no session → NOT_AUTHENTICATED; ungranted → hidden", async () => {
+  it("13/14 assessment-scoped project list refused; one grant in auth.me; direct get and refusal assertions", async () => {
     const mine = await call("GET", "/v2/projects/proj_rill/assessments", undefined, VW);
     note("13", `assessment-scoped viewer listing the project → ${mine.ok ? mine.result.assessments.map((a: any) => a.id).join(",") : mine.code}`);
     // DIVERGENCE (row 13, Lane A): no inheritance hides the PROJECT from an assessment-only grantee, and the only list
@@ -147,7 +147,7 @@ describe("rows 13–17 — assessments", () => {
     expect((await call("GET", "/v2/assessments/assess_tavo_prepare", undefined, VW)).code).toBe("NOT_FOUND_OR_NOT_VISIBLE");
     expect((await call("GET", "/v2/assessments/assess_tavo_collect")).code).toBe("NOT_AUTHENTICATED");
   });
-  it("15/16/17 update, set_stage (adjacent only, reversible), notes: viewer refused; bad field refused", async () => {
+  it("15/16/17 purpose and notes updates; stage jump and viewer refused; stage success/undo/counts omitted", async () => {
     const A = "/v2/assessments/assess_tavo_collect";
     expect((await call("PATCH", A, { name: "x" }, VW)).code).toBe("NOT_AUTHORIZED_AT_SCOPE");
     const up = await call("PATCH", A, { purpose: "Acceptance purpose" }, O); expect(up.ok).toBe(true); expect(up.receipt.undo_token).toBeTruthy();
@@ -183,7 +183,7 @@ describe("rows 18–21 — templates", () => {
 });
 
 describe("rows 22–26 — surveys, requests, participation", () => {
-  it("23 survey.get_status: counts, never answers; ungranted hidden", async () => {
+  it("23 survey.get_status: success and answers-string exclusion; outsider hidden; count shape/value omitted", async () => {
     const s = await call("GET", "/v2/assessments/assess_tavo_collect/surveys/survey_tavo", undefined, VW); expect(s.ok).toBe(true);
     expect(JSON.stringify(s.result)).not.toMatch(/answers/); expect((await call("GET", "/v2/assessments/assess_tavo_collect/surveys/survey_tavo", undefined, NEW)).code).toBe("NOT_FOUND_OR_NOT_VISIBLE");
   });
@@ -202,7 +202,7 @@ describe("rows 22–26 — surveys, requests, participation", () => {
 });
 
 describe("rows 27–31 — reserved rows give zero functional credit", () => {
-  it("each answers RESERVED_NOT_BUILT with a docs pointer on both faces", async () => {
+  it("27/29/30/31 reserved refusals on both faces and MCP docs pointer; row28 covered by contract sweep", async () => {
     for (const [cap, method, path] of [["cap.recommendation.propose", "POST", "/v2/assessments/assess_tavo_collect/recommendations"], ["cap.rollup.project", "GET", "/v2/projects/proj_rill/rollup"], ["cap.rollup.workspace", "GET", "/v2/workspaces/ws_cedar/rollup"], ["cap.import.batch", "POST", "/v2/imports"]] as const) {
       const h = await call(method, path, method === "GET" ? undefined : {}, O); const m = await mcp(cap.includes("rollup") ? "read" : "write", cap, {}, O);
       note("27-31", `${cap} http ${h.status} ${h.code} · mcp ${m.code} · docs=${h.error?.docs ?? m.error?.docs}`);
