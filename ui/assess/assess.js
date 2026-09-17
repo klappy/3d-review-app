@@ -4,6 +4,7 @@
 // Anything the showcase draws that this slice does not wire is omitted, never rendered as a working control.
 import { redactDiagnosticPath } from '/diagnostic-path.js';
 import { loadBlankPrint, renderBlankPrint, printAllowed } from '/stage-screens.js';
+import { whatsHere } from '/assess/whats-here.js';
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 const LENSES = ['Translation Team', 'Church', 'Community']; // captain's order; server `perspective` decides membership
 const DOTS = { 'Translation Team': '', Church: 'blue', Community: 'gold', 'Other perspective': '' };
@@ -301,6 +302,9 @@ async function boot() {
     app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this assessment</h1><p class="muted">Sign in with the one-time email code. It brings you back to the workspace home in this tab; then open this address again:</p><p><code>${esc(here)}</code></p><a class="button primary" href="/v2/auth/access">Sign in with an email code</a></div>`;
     return; }
   who.textContent = `${state.principal.kind} · ${state.principal.id}`;
+  // E1: signed-in staff get the real-app way back (same-origin session, no token) and the generated functionality statement.
+  const back = document.getElementById('legacy-link'); if (back) back.hidden = false;
+  const wh = document.getElementById('whats-here'); if (wh) { wh.textContent = whatsHere(); wh.hidden = false; }
   state.projects = (await api('/v2/projects')).projects || [];
   window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
   await render();
