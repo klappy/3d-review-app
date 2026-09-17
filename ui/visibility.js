@@ -13,10 +13,12 @@ export function hasReportWork(me) {
   return hasProjectWork(me) || assessmentGrants(me).length > 0;
 }
 
-// Only an assessment-only grantee gets the granted picker; a project identity would otherwise hold
-// two visible sources for one state.assessment and desync project-scoped writes.
+// Granted picker: exact assessment grants and no project grant. provisioned only unlocks
+// create-project (self-service); it is not project work and must not hide this entry.
+// A project grant still hides the picker so one state.assessment has one visible source.
 export function hasSharedAssessmentEntry(me) {
-  return !hasProjectWork(me) && assessmentGrants(me).length > 0;
+  const hasProjectGrant = (me?.grants || []).some(grant => grant.scope_type === 'project');
+  return !hasProjectGrant && assessmentGrants(me).length > 0;
 }
 
 export const codeEntryFailure = 'Could not open this code. Check it and try again.';

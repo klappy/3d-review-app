@@ -33,16 +33,20 @@ test('report work is reachable for an assessment-only grantee and for every proj
 
 test('the granted picker is the assessment-only entry, never a second source for a project identity', () => {
   const grant = { scope_type: 'assessment', scope_id: 'assess_1', role: 'viewer' };
-  const projectIdentity = { principal: { provisioned: true }, grants: [grant] };
+  const provisionedAssessmentOnly = { principal: { provisioned: true }, grants: [grant] };
   const granteeOfBoth = { principal: { provisioned: false }, grants: [{ scope_type: 'project', scope_id: 'proj_1', role: 'owner' }, grant] };
+  const provisionedProjectOwner = { principal: { provisioned: true }, grants: [{ scope_type: 'project', scope_id: 'proj_1', role: 'owner' }, grant] };
   const assessmentOnly = { principal: { provisioned: false }, grants: [grant] };
-  for (const me of [projectIdentity, granteeOfBoth]) {
+  assert.equal(hasSharedAssessmentEntry(provisionedAssessmentOnly), true, 'provisioned is create-project, not a project grant');
+  assert.equal(hasReportWork(provisionedAssessmentOnly), true);
+  for (const me of [granteeOfBoth, provisionedProjectOwner]) {
     assert.equal(hasSharedAssessmentEntry(me), false, 'a project identity uses the project path');
     assert.equal(hasReportWork(me), true, 'the reports card still shows');
   }
   assert.equal(hasSharedAssessmentEntry(assessmentOnly), true);
   assert.equal(hasReportWork(assessmentOnly), true);
   assert.equal(hasSharedAssessmentEntry({ principal: { provisioned: false }, grants: [] }), false);
+  assert.equal(hasSharedAssessmentEntry({ principal: { provisioned: true }, grants: [] }), false);
   assert.equal(hasSharedAssessmentEntry(null), false);
 });
 

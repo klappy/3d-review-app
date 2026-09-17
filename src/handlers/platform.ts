@@ -34,7 +34,7 @@ export const authRequestLink: Handler = async (ctx, p, o) => {
   if (o?.dryRun) return { result: {}, impact: { affected: [{ email_hash: eh.slice(0, 12) }], irreversible: true, effect: "external", compensating_control: "expire code" } };
   const code = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)); // CSPRNG, not Math.random
   await ctx.db.prepare("INSERT INTO login_code (id, email_hash, code_hash, expires_at, created_at) VALUES (?,?,?,?,?)").bind(id("lc"), eh, await sha256(code), Date.now() + 10 * 60e3, Date.now()).run();
-  await ctx.db.prepare("INSERT OR IGNORE INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id("usr"), eh, 0, 0, new Date().toISOString()).run();
+  await ctx.db.prepare("INSERT OR IGNORE INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id("usr"), eh, 1, 0, new Date().toISOString()).run(); // provisioned = 1: self-service creation of OWN workspaces/projects (captain ruling 2026-09-17); support stays 0
   ctx.log("auth.code_issued", { email_hash_prefix: eh.slice(0, 8) }); // never the code: spans persist to the trace table (CON-PRIV-004)
   return { result: { sent: true, expires_in: 600, ...(ctx.env.ENVIRONMENT === "dev" ? { dev_only_code: code } : {}) }, scope: { type: "platform", id: "auth" } };
 };
