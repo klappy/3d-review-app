@@ -54,13 +54,18 @@ test('real sign-in is the only control in the primary flow; sandbox code control
 
 test('the participant card explains shared links first and the code as optional',()=>{
   const p=html.slice(html.indexOf('<section id="participant"'));
-  assert.ok(p.indexOf('<p class="note participant-arrival">')<p.indexOf('<details id="about">'));
+  const arrivalIndex=p.indexOf('<p class="note participant-arrival" id="participant-arrival">'), aboutIndex=p.indexOf('<details id="about">');
+  assert.ok(arrivalIndex>=0&&aboutIndex>=0,'both participant landmarks must exist');
+  assert.ok(arrivalIndex<aboutIndex);
   assert.ok(p.includes('open that link and you are already in the right place. If you were given an access code instead, enter it below. No account is needed.'));
 });
 
 test('shared-link entry hides both the arrival note and the code guidance by explicit id (Bugbot 4036816500), not by first-note position',()=>{
   assert.ok(html.includes('<p class="note participant-arrival" id="participant-arrival">'));
-  assert.ok(html.includes('<p class="note" id="participant-code-guidance">Use an access code released above.'));
+  const guidance=html.match(/<p class="note" id="participant-code-guidance">([^<]+)<\/p>/)?.[1];
+  assert.equal(guidance,'If you were given an access code, enter it below. Missing your survey link? Ask the person who invited you or shared the survey to send you the link.');
+  assert.ok(!guidance.includes('released above'));
+  assert.ok(html.includes('<form id="redeem">'),'received-code entry remains available');
   const app=read('./app.js');
   assert.ok(app.includes("$('participant-arrival').hidden = true; $('participant-code-guidance').hidden = true;"));
   assert.ok(!app.includes("$('participant').querySelector('p.note')"),'no positional note selector remains');
