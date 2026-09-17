@@ -332,8 +332,10 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
 
     stand(allRoot); // exactly one of A / B occupies the overview
     renderCrumbs(project, assessment);
-    setState(assessment ? 'assessment' : 'project');
-    if (assessment) { renderProjectRow(project); return; }
+    // The live #assessments value is the composition authority. This GET is only for names;
+    // a miss or failed list must not claim `project` (that state hides the workspace cards).
+    setState(aid ? 'assessment' : 'project');
+    if (aid) { renderProjectRow(project); return; }
     // One closure, reused by every repaint: the level menu must survive any number of
     // Assessments/Languages transitions, not just the first.
     const repaint = () => { if (gen === generation) renderProject(project, rows, languages, repaint); };
