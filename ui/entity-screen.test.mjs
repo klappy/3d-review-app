@@ -43,5 +43,7 @@ test('wiring: assets, back link inside #collab, entity screen mounted after coll
   assert.ok(app.includes("collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });"));
   assert.ok(app.includes("lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [], canOpen: !$('survey-card').hidden });"));
   assert.ok(app.includes('async function chooseGrantedAssessment()')&&app.includes('if (!state.templates) await templates();'));
+  assert.ok(app.includes("if (grantedBefore && state.assessment === grantedBefore) $('granted-assessments').value = grantedBefore;"),'identity rebuild keeps the granted assessment selected (Bugbot 4037753258)');
+  assert.ok(app.includes("for (const id of ['project-card', 'assessment-card', 'survey-card', 'results-card']) $(id).hidden = !visible;"),'card visibility policy unchanged: no survey card for grantees without project work; Open is withheld and labelled instead (supersedes autofix a335a54)');
   assert.ok(read('./.assetsignore').split('\n').includes('entity-screen.test.mjs'));
 });
