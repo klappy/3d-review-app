@@ -2,7 +2,7 @@ import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
 import { resumeTarget, savedSubmitKey } from './participant-resume.js';
-import { copy as sharedCopy, createSharedLinkClient, currentNamespace, digestNamespace, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment } from './shared-link.js';
+import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, digestNamespace, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment } from './shared-link.js';
 const $ = id => document.getElementById(id);
 // Shared-link mode is decided first so no global (code-path) key is read or written in that mode.
 const sharedToken = parseEntryFragment(location.hash);
@@ -233,18 +233,18 @@ bindClick('issue-link-preview', sharedCopy.labelPreviewLink, async () => {
   clearShareLink();
   const result = await api(linkRoute(), { method: 'POST', body: { params: {}, mode: 'dry_run' } });
   state.linkConfirm = result.confirm_token;
-  text($('issue-link-impact'), `${sharedCopy.issuePreview} Impact: ${JSON.stringify(result.impact)}. Confirmation expires in ${result.expires_in} seconds.`);
+  text($('issue-link-impact'), `${sharedCopy.issuePreview} ${fill(sharedCopy.issueImpact, { impact: JSON.stringify(result.impact), seconds: result.expires_in })}`);
   $('issue-link-confirm').disabled = false;
 });
 bindClick('issue-link-confirm', sharedCopy.labelCreateLink, async () => {
-  const confirm_token = required(state.linkConfirm, 'Preview the survey link again.');
+  const confirm_token = required(state.linkConfirm, sharedCopy.previewAgain);
   state.linkConfirm = null; $('issue-link-confirm').disabled = true;
   const result = await api(linkRoute(), { method: 'POST', body: { params: {}, mode: 'execute', confirm_token } });
   state.shareUrl = shareUrl(location.origin, result.entry_fragment);
   text($('share-url'), state.shareUrl); $('share-url').hidden = false; $('copy-link').hidden = false;
-  text($('issue-link-impact'), `${sharedCopy.issueDone}${result.expires_at ? ` Expires ${result.expires_at}.` : ''}`);
+  text($('issue-link-impact'), `${sharedCopy.issueDone}${result.expires_at ? ` ${fill(sharedCopy.issueExpires, { expires_at: result.expires_at })}` : ''}`);
 });
-bindClick('copy-link', sharedCopy.labelCopyLink, async () => { await navigator.clipboard.writeText(required(state.shareUrl, 'Create a survey link first.')); text($('copy-state'), sharedCopy.linkCopied); });
+bindClick('copy-link', sharedCopy.labelCopyLink, async () => { await navigator.clipboard.writeText(required(state.shareUrl, sharedCopy.createFirst)); text($('copy-state'), sharedCopy.linkCopied); });
 bindClick('refresh-counts', sharedCopy.labelRefreshCounts, surveyStatus);
 bindClick('load-results', 'Reading result state…', async () => {
   const aid = required(state.assessment, 'Choose an assessment.'); const result = await api(`/v2/assessments/${path(aid)}/results`);
