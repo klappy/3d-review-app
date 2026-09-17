@@ -48,3 +48,25 @@
 @media screen{
   .rv #stage-print-root .paper{max-width:100%}
 }
+
+/* Compact assessment-shell navigation; guidance remains available by disclosure. */
+@media screen {
+  .rv #stage-workspace{padding:14px 18px}
+  .rv #stage-tabs-root{display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap}
+  .rv .stage-tabs{gap:4px;flex-wrap:wrap}
+  .rv .stage-tabs button{min-height:36px;padding:6px 12px;border-radius:var(--r-button);box-shadow:none}
+  .rv .stage-now,.rv .stage-repeat{margin:0;font-size:12px}
+  .rv .stage-now{margin-left:auto}
+  .rv .stage-repeat{color:var(--secondary)}
+  .rv .stage-tour,.rv .role-help{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;padding:8px 0 0;margin:8px 0 0}
+  .rv .stage-tour summary,.rv .role-help summary{cursor:pointer;font-size:13px;font-weight:550}
+  .rv .stage-tour .headrow{margin:4px 0;gap:8px}
+  .rv .stage-tour p,.rv .role-help p{margin:4px 0;font-size:12px}
+  .rv .stage-tour ol{padding-left:20px;margin:4px 0;font-size:13px;line-height:1.4}
+  .rv .stage-tour button{min-height:28px;padding:3px 10px;font-size:12px}
+}
+@media screen and (max-width:700px){
+  .rv .stage-tabs{width:100%}
+  .rv .stage-tabs button{flex:1 1 auto}
+  .rv .stage-now{margin-left:0}
+}

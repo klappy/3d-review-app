@@ -215,24 +215,29 @@ export function renderRoleHelp(doc, root, help) {
   root.className = 'role-help';
   root.setAttribute('role', 'region');
   root.setAttribute('aria-label', 'What you can do here');
-  root.append(el(doc, 'h2', 'What you can do here'));
-  root.append(el(doc, 'p', `Authorized role: ${help.role}`));
-  if (help.available) root.append(el(doc, 'p', `Next here: ${help.available}`));
-  // No denial claim: a missing suggestion may simply be unchecked for the browsed tab.
+  const details = el(doc, 'details');
+  details.append(el(doc, 'summary', 'What you can do here'));
+  details.append(el(doc, 'p', `Authorized role: ${help.role}`));
+  if (help.available) details.append(el(doc, 'p', `Next here: ${help.available}`));
+  // A missing suggestion can mean this phase has not been checked; no denial claim.
+  root.append(details);
 }
 
 export function renderStageTour(doc, root, { storage, assessmentId, stage, role, onDismiss }) {
   root.replaceChildren();
   const show = shouldShowStageTour(storage, assessmentId, stage);
-  root.hidden = !show;
-  if (!show) return;
+  root.hidden = !isStageId(stage) || !assessmentId || !roleHelpVisible(role);
+  if (root.hidden) return;
   const steps = STAGE_TOUR[stage] || [];
   root.className = 'stage-tour';
   root.setAttribute('role', 'region');
   root.setAttribute('aria-label', `First time in ${stageLabel(stage)}`);
+  const disclosure = el(doc, 'details');
+  if (show) disclosure.setAttribute('open', '');
+  disclosure.append(el(doc, 'summary', stageLabel(stage)));
   const head = el(doc, 'div');
   head.className = 'headrow';
-  head.append(el(doc, 'p', `First time in ${stageLabel(stage)}${role ? ` · ${role}` : ''}`));
+  if (show) head.append(el(doc, 'p', `First time in ${stageLabel(stage)}${role ? ` · ${role}` : ''}`));
   const gotIt = el(doc, 'button', 'Got it');
   gotIt.type = 'button';
   gotIt.addEventListener('click', () => {
@@ -240,10 +245,11 @@ export function renderStageTour(doc, root, { storage, assessmentId, stage, role,
     if (onDismiss) onDismiss();
   });
   head.append(gotIt);
-  root.append(head);
+  disclosure.append(head);
   const list = el(doc, 'ol');
   for (const step of steps) list.append(el(doc, 'li', step));
-  root.append(list);
+  disclosure.append(list);
+  root.append(disclosure);
 }
 
 export function renderBlankPrint(doc, root, model, { paper = 'a4', onPrint } = {}) {

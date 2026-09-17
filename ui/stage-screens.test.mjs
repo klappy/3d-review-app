@@ -220,12 +220,13 @@ test('stage tour shows once per stage then dismisses without API calls', async (
   assert.equal(shouldShowStageTour(storage, 'a1', 'collect'), true);
   renderStageTour(doc, root, { storage, assessmentId: 'a1', stage: 'collect', role: 'member' });
   assert.equal(root.hidden, false);
-  assert.equal(root.children[1].children.length, 3);
-  await root.children[0].children[1].fire('click');
+  assert.equal(root.children[0].children[2].children.length, 3);
+  await root.children[0].children[1].children.at(-1).fire('click');
   assert.equal(shouldShowStageTour(storage, 'a1', 'collect'), false);
   assert.equal(shouldShowStageTour(storage, 'a1', 'prepare'), true);
   renderStageTour(doc, root, { storage, assessmentId: 'a1', stage: 'collect', role: 'member' });
-  assert.equal(root.hidden, true);
+  assert.equal(root.hidden, false);
+  assert.equal(root.children[0].getAttribute('open'), null);
   assert.deepEqual(log, []);
 });
 
@@ -303,4 +304,24 @@ test('missing stage suggestion does not falsely deny an authorized role', () => 
   renderRoleHelp(doc,root,{visible:true,role:'member',available:null});
   assert.match(text(root),/Authorized role: member/);
   assert.doesNotMatch(text(root),/not available|not authorized|denied/i);
+});
+
+
+test('dismissed tour remains reopenable, first visit opens, unauthorized tour stays hidden', () => {
+  const doc=fakeDocument(),root=doc.createElement('div'),storage=memory();
+  renderStageTour(doc,root,{storage,assessmentId:'a1',stage:'collect',role:'member'});
+  assert.equal(root.children[0].tag,'details');
+  assert.equal(root.children[0].getAttribute('open'),'');
+  dismissStageTour(storage,'a1','collect');
+  renderStageTour(doc,root,{storage,assessmentId:'a1',stage:'collect',role:'member'});
+  assert.equal(root.hidden,false);assert.equal(root.children[0].getAttribute('open'),null);
+  assert.equal(root.children[0].children[0].tag,'summary');
+  renderStageTour(doc,root,{storage,assessmentId:'a1',stage:'collect',role:'participant'});
+  assert.equal(root.hidden,true);
+});
+test('role help defaults to a collapsed native disclosure retaining exact role and suggestion',()=>{
+  const doc=fakeDocument(),root=doc.createElement('div');
+  renderRoleHelp(doc,root,{visible:true,role:'member',available:'cap.results.summary'});
+  assert.equal(root.children[0].tag,'details');assert.equal(root.children[0].getAttribute('open'),null);
+  assert.match(text(root),/Authorized role: member/);assert.match(text(root),/cap.results.summary/);
 });
