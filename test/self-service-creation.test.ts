@@ -11,11 +11,13 @@
  * and the support row's provisioned value must be untouched by the backfill.
  */
 import { readFileSync } from "node:fs";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { execute } from "../src/dispatch";
 import { resolvePrincipal } from "../src/auth";
 import { sha256 } from "../src/handlers/common";
+import { resetAccessKeyCache } from "../src/access";
+import worker from "../src/worker";
 import type { Ctx, Env, Principal } from "../src/handlers/types";
 
 const MIGRATIONS = ["0001_init.sql", "0002_code_escrow.sql", "0003_language_archive.sql", "0004_pinned_instruments.sql", "0006_oauth_code_redemption.sql"];
@@ -26,9 +28,11 @@ const mf = new Miniflare(convertV4MiniflareOptions({
     modules: true,
     script: "export default { fetch() { return new Response('ok') } }",
     d1Databases: { DB: "self-service-db", DB2: "self-service-backfill-db" },
+    kvNamespaces: { OAUTH_KV: "self-service-kv" },
   }],
 }));
 afterAll(() => mf.dispose());
+afterEach(() => { vi.restoreAllMocks(); resetAccessKeyCache(); });
 
 const sqlOf = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
 const statements = (db: any, path: string) => sqlOf(path).split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s));
@@ -58,12 +62,45 @@ async function signUp(email: string) {
   return { id: consumed.result.principal_id as string, token, principal };
 }
 
+/**
+ * Case (f) only — the REAL sign-in route. Same Access JWT stub helpers as test/access.test.ts and
+ * test/mcp-oauth-hardening.test.ts:~63: one RSA keypair minted in beforeAll, its JWKS served to the
+ * worker by stubbing only the /cdn-cgi/access/certs fetch. No new auth framework, no new stubs.
+ */
+const b64u = (b: ArrayBuffer | Uint8Array | string) => {
+  const bytes = typeof b === "string" ? new TextEncoder().encode(b) : new Uint8Array(b);
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+let kp: CryptoKeyPair;
+let jwks: any;
+async function accessJwt(email: string) {
+  const head = b64u(JSON.stringify({ alg: "RS256", kid: "k1" }));
+  const body = b64u(JSON.stringify({ iss: "https://team.cloudflareaccess.com", aud: ["aud-1"], exp: Math.floor(Date.now() / 1000) + 60, email, sub: "s-" + email }));
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", kp.privateKey, new TextEncoder().encode(`${head}.${body}`));
+  return `${head}.${body}.${b64u(sig)}`;
+}
+const stubJwks = () => {
+  const real = globalThis.fetch;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input: any, init?: any) =>
+    String(input?.url ?? input).includes("/cdn-cgi/access/certs") ? new Response(JSON.stringify(jwks)) : real(input, init));
+};
+const ORIGIN = "https://3dr.test";
+const ectx = () => ({ waitUntil() {}, passThroughOnException() {}, props: undefined }) as any;
+const httpCall = (path: string, init: RequestInit = {}) => worker.fetch(new Request(ORIGIN + path, { redirect: "manual", ...init }), env as any, ectx());
+
 beforeAll(async () => {
   db = await mf.getD1Database("DB");
   for (const m of MIGRATIONS) await db.batch(statements(db, `../migrations/${m}`));
   await db.batch(statements(db, "../migrations/0009_self_service_creation.sql"));
-  env = { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as unknown as Env;
-});
+  env = {
+    DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev",
+    OAUTH_KV: await mf.getKVNamespace("OAUTH_KV"),
+    ACCESS_TEAM_DOMAIN: "team.cloudflareaccess.com", ACCESS_AUD: "aud-1",
+  } as unknown as Env;
+  kp = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
+  const jwk = await crypto.subtle.exportKey("jwk", kp.publicKey);
+  jwks = { keys: [{ kid: "k1", kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256" }] };
+}, 60_000);
 
 describe("self-service creation: provisioned defaults true for every normal user", () => {
   it("(a) a fresh principal is provisioned on sign-in and /v2/me says so", async () => {
@@ -144,5 +181,38 @@ describe("self-service creation: provisioned defaults true for every normal user
     await back.batch(statements(back, "../migrations/0009_self_service_creation.sql"));
     expect(await back.prepare("SELECT provisioned FROM principal WHERE id = ?").bind("usr_legacy").first<{ provisioned: number }>()).toEqual({ provisioned: 1 });
     expect(await back.prepare("SELECT provisioned FROM principal WHERE id = ?").bind("usr_support_legacy").first<{ provisioned: number }>()).toEqual({ provisioned: 0 });
+  });
+
+  /**
+   * Auditor P2 on a770d38: (a)–(e) only exercise the dev link-code path (cap.auth.request_link →
+   * cap.auth.consume_link). This case proves the OTHER INSERT OR IGNORE INTO principal site — the REAL
+   * production sign-in route GET /v2/auth/access in src/index.ts — also binds provisioned = 1, through the
+   * real worker entry with a valid Cloudflare Access assertion. Falsifies: a fresh principal created by
+   * Access landing unprovisioned (or accidentally support) while the link-code path looks correct.
+   */
+  it("(f) a fresh principal created through the REAL sign-in route GET /v2/auth/access is provisioned", async () => {
+    const email = "access-fresh@example.invalid";
+    const eh = await sha256(email);
+    // genuinely fresh: no principal row for this email before the route runs
+    expect(await db.prepare("SELECT id FROM principal WHERE email_hash = ?").bind(eh).first()).toBeNull();
+
+    stubJwks();
+    const res = await httpCall("/v2/auth/access", { headers: { "cf-access-jwt-assertion": await accessJwt(email) } });
+    expect(res.status).toBe(302);
+    const location = res.headers.get("location")!;
+    expect(location).toMatch(/^\/#session=/);
+    const session = location.slice("/#session=".length);
+    expect(session.length).toBeGreaterThan(0);
+
+    // the D1 row the route inserted: provisioned = 1 by the INSERT default, support untouched at 0
+    const row = await db.prepare("SELECT id, provisioned, support FROM principal WHERE email_hash = ?").bind(eh).first<{ id: string; provisioned: number; support: number }>();
+    expect(row).toMatchObject({ provisioned: 1, support: 0 });
+
+    // and the session that route minted reports it on the real /v2/me route
+    const me = await httpCall("/v2/me", { headers: { authorization: `Bearer ${session}` } });
+    expect(me.status).toBe(200);
+    const body: any = await me.json();
+    expect(body.ok).toBe(true);
+    expect(body.result.principal).toMatchObject({ id: row!.id, kind: "user", provisioned: true });
   });
 });
