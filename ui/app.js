@@ -370,7 +370,18 @@ function showReceipt(result) {
   if (state.shared && result.submitted !== false) text($('participant-resume'), `${sharedCopy.receiptThanks} ${sharedCopy.sameLinkOthers}`);
 }
 bindClick('recover', 'Recovering receipt…', async () => {
-  const receipt = await api('/v2/participate/receipt', { participant: true });
+  let receipt;
+  if (state.shared) { // shared route: a refused probe shows participant copy, never raw server text in #error
+    try { receipt = await state.shared.receipt(); }
+    catch (error) {
+      console.warn('[3dr] recover', { status: error?.status, code: error?.code, trace_id: error?.trace_id });
+      const kind = errorKind(error);
+      if (kind === 'unavailable') showSharedUnavailable(submitState === 'uncertain' ? 'cannotResume' : 'unavailable');
+      else if (submitState === 'uncertain') text($('participant-resume'), sharedCopy.submitUncertain); // keep the uncertainty; the form stays
+      else showSharedUnavailable(kind);
+      throw new HandledFailure();
+    }
+  } else receipt = await api('/v2/participate/receipt', { participant: true });
   await recoverParticipant(receipt, !!state.form, loadForm, showReceipt);
   if (!receipt.submitted) return;
   if (state.shared) { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); } // scoped namespace only; globals untouched in shared mode

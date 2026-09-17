@@ -565,6 +565,27 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     plan.responses = refuse(400, "INVALID_PARAMS"); await submit($); // real probe: submitted:false
     expectUncertain($, storage, snap); expect(await counts()).toBe(before);
   });
+  it("F11 recover after a lost submit with GET /receipt → 404: #error empty and hidden, cannotResume copy, #participant-resume cleared, storage byte-identical", async () => {
+    const link = await issue(); const { $, storage, ns, plan, lost } = await openForm(link);
+    plan.responses = lost; await submit($); expect($("participant-resume").textContent).toBe(copy.submitUncertain);
+    const snap = await armed(storage, ns); warns.length = 0;
+    plan.receipt = refuse(404, "NOT_FOUND_OR_NOT_VISIBLE");
+    await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("notice").textContent).toBe(ATTENTION);
+    expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.cannotResume);
+    expect($("participant-resume").textContent).toBe("");
+    expect($("answers").hidden).toBe(true); expect(snapshot(storage)).toBe(snap);
+    expect(warns).toEqual([["[3dr] recover", { status: 404, code: "NOT_FOUND_OR_NOT_VISIBLE", trace_id: "tr_synthetic0001" }]]);
+  });
+  it("F11b recover after a lost submit with GET /receipt → 503: #error empty, uncertainty retained, form still available, storage byte-identical", async () => {
+    const link = await issue(); const { $, storage, ns, plan, lost } = await openForm(link);
+    plan.responses = lost; await submit($);
+    const snap = await armed(storage, ns);
+    plan.receipt = refuse(503, "INTERNAL");
+    await $("recover").dispatch("click"); await settled($); strict($);
+    expectUncertain($, storage, snap);
+    expect($("review").hidden).toBe(false);
+  });
   it("F10 fragment entry with GET /receipt → 503: transient copy shown, #error stays empty and hidden", async () => {
     const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
     plan.receipt = refuse(503, "INTERNAL");
