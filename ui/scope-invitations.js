@@ -26,7 +26,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
   function setStatus(text, error = false) { message = text; failure = error; if (status) { status.textContent = text; status.setAttribute('role', error ? 'alert' : 'status'); } }
   function lock(value) { busy = value; for (const n of controls) n.disabled = value; }
   function clearIntent() {
-    // Pending preview only. The sandbox handoff lives until identity/scope reset or a later execute replaces it.
+    // Pending preview only. The sandbox handoff lives until identity/scope reset, successful invitation revoke, or a later execute replaces it.
     epoch++; pending = null; lock(false);
     confirmation?.replaceChildren();
     if (confirmButton) confirmButton = null;
@@ -116,7 +116,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
         try { await onGrantsChanged(); } catch { if (current(s)) message = 'Role updated, but access could not be refreshed. Refresh before continuing.'; }
       }
       if (current(s)) { failure = false; render(); }
-    } catch (error) { if (current(s)) { credential = null; list = null; render(); setStatus(safeFailure(error, true), true); } }
+    } catch (error) { if (current(s)) { list = null; render(); setStatus(safeFailure(error, true), true); } }
     finally { if (current(s)) lock(false); }
   }
   async function revoke(url, label, target, kind) {
@@ -125,6 +125,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
       const result = baseResult(await request(url, {method:'DELETE'}));
       if (!current(s)) return;
       if (kind === 'grant' ? result.grant !== target || result.revoked !== true : result.id !== target || result.status !== 'revoked') throw new Error('Invalid revocation');
+      if (kind === 'invitation') credential = null;
       list = null; message = `${label} completed. Refresh access to see the current list.`;
       try { await onGrantsChanged(); } catch { if (current(s)) message = `${label} completed, but access could not be refreshed.`; }
       if (current(s)) render();

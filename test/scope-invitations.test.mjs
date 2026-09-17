@@ -58,6 +58,24 @@ test('invite success lists the new row and keeps the handoff across refresh and 
  w.button('Refresh access').click();await flush();assert.ok(w.buttons().includes('Reveal private invitation token'));
  w.button('Reveal private invitation token').click();assert.equal(walk(w.root).find(n=>n.attributes['aria-label']==='Private invitation token').value,'PRIVATE_HANDOFF');
 });
+test('invitation revoke drops the sandbox handoff; grant revoke keeps it',async()=>{
+ const wInvite=world((_u,o)=>o.method==='GET'?list():o.body?.mode==='dry_run'?confirmResult:o.method==='DELETE'?{id:'i1',status:'revoked'}:{invitation_id:'i1',delivered:false,dev_only_link_token:'PRIVATE_HANDOFF'});
+ await wInvite.api.setScope(scope);await emailPreview(wInvite);wInvite.button('Confirm invitation').click();await flush();
+ wInvite.button('Revoke invitation').click();await flush();
+ assert.match(text(wInvite.root),/Invitation revocation completed/);assert.ok(!wInvite.buttons().includes('Reveal private invitation token'));
+ const wGrant=world((_u,o)=>o.method==='GET'?{...list(),grants:[{id:'g1',principal_id:'p2',role:'viewer'}]}:o.body?.mode==='dry_run'?confirmResult:o.method==='DELETE'?{grant:'g1',revoked:true}:{invitation_id:'i1',delivered:false,dev_only_link_token:'PRIVATE_HANDOFF'});
+ await wGrant.api.setScope(scope);await emailPreview(wGrant);wGrant.button('Confirm invitation').click();await flush();
+ wGrant.button('Remove access').click();await flush();
+ assert.match(text(wGrant.root),/Access removal completed/);assert.ok(wGrant.buttons().includes('Reveal private invitation token'));
+});
+test('failed later execute keeps the prior sandbox handoff',async()=>{
+ let executes=0;
+ const w=world((_u,o)=>{if(o.method==='GET')return {...list(),grants:[{id:'g1',principal_id:'p2',role:'member'}]};if(o.body?.mode==='dry_run')return confirmResult;if(o.body?.mode==='execute'){executes++;if(executes>1)throw Error('execute failed');return {invitation_id:'i1',delivered:false,dev_only_link_token:'PRIVATE_HANDOFF'}}});
+ await w.api.setScope(scope);await emailPreview(w);w.button('Confirm invitation').click();await flush();
+ assert.ok(w.buttons().includes('Reveal private invitation token'));
+ w.button('Preview role change').click();await flush();w.button('Confirm role change').click();await flush();
+ assert.match(text(w.root),/outcome could not be confirmed/);assert.ok(w.buttons().includes('Reveal private invitation token'));
+});
 test('missing dev token never invents a handoff or email success',async()=>{
  const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'i1',delivered:false});await w.api.setScope(scope);await emailPreview(w);w.button('Confirm invitation').click();await flush();assert.match(text(w.root),/No invitation credential/);assert.ok(!w.buttons().includes('Reveal private invitation token'));
 });
