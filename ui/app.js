@@ -1,8 +1,10 @@
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
+import { resumeTarget, savedSubmitKey } from './participant-resume.js';
 const $ = id => document.getElementById(id);
 const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null };
+state.responseKey = savedSubmitKey(sessionStorage, state.participant);
 const path = (value) => encodeURIComponent(value);
 function note(message) { $('notice').textContent = message; $('error').hidden = true; }
 function fail(message) { $('error').textContent = message; $('error').hidden = false; $('notice').textContent = 'Action needs attention. No completion is assumed.'; }
@@ -42,6 +44,7 @@ function resetClientIdentity() {
   $('create-project').hidden = true;
   for (const [id, label] of [['projects', 'Choose project'], ['assessments', 'Choose assessment'], ['surveys', 'Choose survey'], ['languages', 'Choose language'], ['templates', 'Choose template']]) resetSelect($(id), label);
   for (const id of ['project-detail', 'assessment-detail', 'survey-detail', 'form-context', 'dev-code']) text($(id), '');
+  text($('participant-resume'), '');
   text($('results'), 'Select an assessment.'); text($('identity'), 'Not signed in');
   text($('access-state'), 'Sign in to see authorized project work.');
   $('questions').replaceChildren(); $('review-answers').replaceChildren(); $('events').replaceChildren();
@@ -223,6 +226,8 @@ bindForm('redeem', 'Redeeming access code…', async fd => {
   try {
     const result = await api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } });
     state.participant = result.participant_token; sessionStorage.setItem('participantToken', state.participant);
+    state.responseKey = null; sessionStorage.removeItem('responseKey');
+    text($('participant-resume'), '');
     await loadForm();
   } catch (error) {
     text($('participant-error'), codeEntryFailure);
@@ -231,9 +236,27 @@ bindForm('redeem', 'Redeeming access code…', async fd => {
   }
 });
 async function loadForm() {
-  const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null; state.responseKey = null;
+  const result = await api('/v2/participate/form', { participant: true }); state.form = result; state.answers = null;
   text($('form-context'), `${result.assessment} · ${result.language} · ${result.template.id}@${result.template.version}`);
   $('questions').replaceChildren(...result.items.map(drawQuestion)); $('answers').hidden = false; $('review').hidden = true; $('receipt').hidden = true; $('recover').hidden = false;
+}
+async function restoreParticipant() {
+  try {
+    const receipt = await api('/v2/participate/receipt', { participant: true });
+    $('recover').hidden = false;
+    if (resumeTarget(receipt) === 'receipt') {
+      showReceipt(receipt);
+      state.responseKey = null; sessionStorage.removeItem('responseKey');
+      text($('participant-resume'), 'Saved submission restored from the server.');
+    } else {
+      await loadForm();
+      text($('participant-resume'), 'Form reopened from your participant session. Answers entered before reload were not saved; please re-enter them.');
+    }
+  } catch (error) {
+    text($('participant-error'), 'Participant session could not be reopened. If the code has already been used, contact the facilitator.');
+    $('participant-error').hidden = false;
+    throw error;
+  }
 }
 bindForm('answers', 'Preparing answer review…', async () => {
   state.answers = answersFromForm(); $('review-answers').replaceChildren();
@@ -246,9 +269,22 @@ bindClick('submit', 'Submitting response…', async () => {
   if (!state.responseKey) { state.responseKey = crypto.randomUUID(); sessionStorage.setItem('responseKey', state.responseKey); }
   const result = await api('/v2/participate/responses', { method: 'POST', participant: true, body: { answers: state.answers, idempotency_key: state.responseKey } });
   showReceipt(result);
+  state.responseKey = null; sessionStorage.removeItem('responseKey');
 });
-function showReceipt(result) { text($('receipt'), result.submitted === false ? 'No submission recorded.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`); $('receipt').hidden = false; $('review').hidden = true; $('answers').hidden = true; }
-bindClick('recover', 'Recovering receipt…', async () => showReceipt(await api('/v2/participate/receipt', { participant: true })));
+function showReceipt(result) {
+  text($('receipt'), result.submitted === false ? 'No submission recorded yet.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`);
+  $('receipt').hidden = false;
+  if (result.submitted !== false) { $('review').hidden = true; $('answers').hidden = true; }
+}
+bindClick('recover', 'Recovering receipt…', async () => {
+  const receipt = await api('/v2/participate/receipt', { participant: true });
+  showReceipt(receipt);
+  if (receipt.submitted) { state.responseKey = null; sessionStorage.removeItem('responseKey'); }
+});
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
 { const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); } }
-run('Checking session…', async () => { try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } if (state.participant) $('recover').hidden = false; } catch { resetClientIdentity(); } });
+run('Checking session…', async () => {
+  try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } }
+  catch { state.session = null; state.principal = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); }
+  if (state.participant) await restoreParticipant();
+});
