@@ -51,6 +51,13 @@ test('invite is two step, honest non-delivery, private reveal cleared on context
  const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'i1',delivered:false,status:'sent',accepted:true,dev_only_link_token:'PRIVATE_HANDOFF'});await w.api.setScope(scope);await emailPreview(w);assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,0);w.button('Confirm invitation').click();await flush();assert.match(text(w.root),/email not delivered/);assert.match(text(w.root),/has not accepted/);assert.ok(!text(w.root).includes('PRIVATE_HANDOFF'));
  w.button('Reveal private invitation token').click();assert.equal(walk(w.root).find(n=>n.attributes['aria-label']==='Private invitation token').value,'PRIVATE_HANDOFF');await w.api.setScope({...scope,id:'other'});assert.ok(!walk(w.root).some(n=>n.value==='PRIVATE_HANDOFF'));
 });
+test('invite success lists the new row and keeps the handoff across refresh and form edit',async()=>{
+ const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'i1',delivered:false,status:'sent',dev_only_link_token:'PRIVATE_HANDOFF'});await w.api.setScope(scope);await emailPreview(w);w.button('Confirm invitation').click();await flush();
+ assert.match(text(w.root),/i1 · viewer · awaiting acceptance/);assert.ok(w.buttons().includes('Reveal private invitation token'));
+ w.input('invite-email').value='other@example.invalid';w.input('invite-email').fire('input');assert.ok(w.buttons().includes('Reveal private invitation token'));assert.match(text(w.root),/email not delivered/);
+ w.button('Refresh access').click();await flush();assert.ok(w.buttons().includes('Reveal private invitation token'));
+ w.button('Reveal private invitation token').click();assert.equal(walk(w.root).find(n=>n.attributes['aria-label']==='Private invitation token').value,'PRIVATE_HANDOFF');
+});
 test('missing dev token never invents a handoff or email success',async()=>{
  const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'i1',delivered:false});await w.api.setScope(scope);await emailPreview(w);w.button('Confirm invitation').click();await flush();assert.match(text(w.root),/No invitation credential/);assert.ok(!w.buttons().includes('Reveal private invitation token'));
 });

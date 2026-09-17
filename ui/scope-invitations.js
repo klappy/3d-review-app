@@ -26,8 +26,9 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
   function setStatus(text, error = false) { message = text; failure = error; if (status) { status.textContent = text; status.setAttribute('role', error ? 'alert' : 'status'); } }
   function lock(value) { busy = value; for (const n of controls) n.disabled = value; }
   function clearIntent() {
-    epoch++; pending = null; credential = null; lock(false);
-    confirmation?.replaceChildren(); credentialBox?.replaceChildren();
+    // Pending preview only. The sandbox handoff lives until identity/scope reset or a later execute replaces it.
+    epoch++; pending = null; lock(false);
+    confirmation?.replaceChildren();
     if (confirmButton) confirmButton = null;
   }
   function safeFailure(error, write) {
@@ -47,8 +48,8 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     return n;
   }
   function field(label, input) { const n = el('label', label); input.setAttribute('aria-label', label); n.append(input); return n; }
-  function input(type, name) { const n = el('input'); n.type = type; n.name = name; n.required = true; n.autocomplete = 'off'; controls.push(n); n.addEventListener('input', () => { clearIntent(); setStatus('Details changed. Preview again before confirming.'); }); return n; }
-  function roleSelect(values, selected) { const n = el('select'); for (const role of values) { const o = el('option', role); o.value = role; n.append(o); } n.value = selected || values[0]; controls.push(n); n.addEventListener('change', () => { clearIntent(); setStatus('Role changed. Preview again before confirming.'); }); return n; }
+  function input(type, name) { const n = el('input'); n.type = type; n.name = name; n.required = true; n.autocomplete = 'off'; controls.push(n); n.addEventListener('input', () => { if (!pending && !busy) return; clearIntent(); setStatus('Details changed. Preview again before confirming.'); }); return n; }
+  function roleSelect(values, selected) { const n = el('select'); for (const role of values) { const o = el('option', role); o.value = role; n.append(o); } n.value = selected || values[0]; controls.push(n); n.addEventListener('change', () => { if (!pending && !busy) return; clearIntent(); setStatus('Role changed. Preview again before confirming.'); }); return n; }
   function path() { return `/v2/${scope.type}/${enc(scope.id)}`; }
   function baseResult(result) { if (!object(result)) throw new Error('Invalid result'); return result; }
   async function refreshList() {
@@ -98,6 +99,9 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
       if (intent.kind === 'invite') {
         if (typeof result.invitation_id !== 'string' || result.delivered !== false) throw new Error('Unexpected delivery result');
         credential = typeof result.dev_only_link_token === 'string' && result.dev_only_link_token ? result.dev_only_link_token : null;
+        if (list && roles.has(intent.body.role)) {
+          list = {grants: list.grants, pending: [...list.pending.filter(i => i.id !== result.invitation_id), {id: result.invitation_id, role: intent.body.role, status: 'sent'}]};
+        }
         message = 'Invitation created; email not delivered. The recipient has not accepted yet.';
       } else if (intent.kind === 'accept') {
         if (result.granted !== true || result.scope?.type !== intent.acceptanceScope.type || result.scope?.id !== intent.acceptanceScope.id || !roles.has(result.role)) throw new Error('Invalid acceptance');
@@ -192,14 +196,14 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     lock(busy);
   }
   function setScope(value) {
-    clearIntent(); scope=value&&scopes.has(value.type)&&typeof value.id==='string'&&value.id&&roles.has(value.role)?{type:value.type,id:value.id,role:value.role}:null;
+    clearIntent(); credential=null; scope=value&&scopes.has(value.type)&&typeof value.id==='string'&&value.id&&roles.has(value.role)?{type:value.type,id:value.id,role:value.role}:null;
     mode='manager';list=null;message='';failure=false;render();return refreshList();
   }
   function openAcceptance() {
     if(!staff(context())||context().kind!=='user')return;
-    clearIntent();mode='accept';list=null;message='';failure=false;render();
+    clearIntent();credential=null;mode='accept';list=null;message='';failure=false;render();
   }
-  function reset() {clearIntent();scope=null;list=null;mode='manager';message='';failure=false;renderId++;root.replaceChildren();root.hidden=true;}
+  function reset() {clearIntent();credential=null;scope=null;list=null;mode='manager';message='';failure=false;renderId++;root.replaceChildren();root.hidden=true;}
   function destroy(){reset();destroyed=true;}
   render();
   return {setScope,openAcceptance,reset,destroy};
