@@ -45,13 +45,22 @@ export async function allow(env: Env, name: LimiterName, key: string): Promise<b
 const limited = (capabilityId: string) => new CapError("RATE_LIMITED", "too many attempts — slow down",
   `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again`, capabilityId);
 
-/** Called by execute() for both faces, before authorization and before any storage access. */
+/** Called by execute() for both faces, before authorization and before the capability's handler runs.
+ *  (Credential resolution — one indexed D1 read — happens earlier when a credential is presented; see INTERFACE.md.) */
 export async function enforceCapabilityLimit(ctx: Ctx, capabilityId: string, params: Record<string, unknown>): Promise<void> {
   const name = CAP_LIMITER[capabilityId];
   if (!name) return;
-  if (!(await allow(ctx.env, name, `ip:${ctx.clientIp ?? "unknown"}`))) throw limited(capabilityId);
+  const ip = ctx.clientIp ?? "unknown";
+  if (name === "RL_AUTH" && params.email !== undefined && typeof params.email !== "string")
+    throw new CapError("INVALID_PARAMS", "email must be a string", undefined, capabilityId); // a non-string must not dodge the email key (review #12-2)
+  if (!(await allow(ctx.env, name, `ip:${ip}`))) throw limited(capabilityId);
   if (name === "RL_AUTH" && typeof params.email === "string" && params.email) {
-    const eh = (await sha256(params.email.toLowerCase())).slice(0, 32);
-    if (!(await allow(ctx.env, name, `em:${eh}`))) throw limited(capabilityId);
+    const eh = (await sha256(params.email.trim().toLowerCase())).slice(0, 32);
+    // request_link: per email (stops code-issuance spam at one mailbox from rotating addresses).
+    // consume_link: per email AND address — a stranger spending the victim's bucket must not lock the victim out of
+    // their own sign-in (review #12-3). Guess-rate from rotating addresses is bounded by the code's 10-minute life and,
+    // in the only environment where this path is live (dev), the code is returned in-band anyway.
+    const key = capabilityId === "cap.auth.consume_link" ? `em:${eh}|ip:${ip}` : `em:${eh}`;
+    if (!(await allow(ctx.env, name, key))) throw limited(capabilityId);
   }
 }
