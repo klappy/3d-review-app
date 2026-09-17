@@ -50,7 +50,7 @@ test('app.js lifecycle: reset first on identity change; identity/projects snapsh
     assert.ok(read('./language.js').includes("if (!pid) {\n      status.textContent = 'Choose a project to list its languages.';"),'languages refresh with no project clears select+status without a fetch'); }
   assert.ok(mount.includes('onGrantsChanged: async () => { await onReload(); if (!selectedWorkspace) await workspaces.refresh(); }'),'accepted workspace invitation reaches the W list (Bugbot 4037957668)');
   assert.ok(!mount.includes("selectedWorkspace ? { type: 'workspace'"),'setScope(null) is a plain reset: no generic workspace fallback during prefetch resets (Bugbot 4038131213)');
-  assert.ok(mount.includes("setScope(scope) { currentScope = scope ? { type: scope.type, id: scope.id, role: scope.role } : null; if (currentScope) invitations.setScope(currentScope); else invitations.reset(); }"));
+  assert.ok(mount.includes("setScope(scope) { if (scope) onAcceptanceEnded(); currentScope = scope ? { type: scope.type, id: scope.id, role: scope.role } : null; if (currentScope) invitations.setScope(currentScope); else invitations.reset(); }"));
   { const a=read('./app.js'); const i=a.indexOf('async function chooseProject'); const body=a.slice(i,a.indexOf('async function assessments'));
     assert.ok(body.includes("if (!state.project) { const ws = collab.selectedWorkspace(); if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role });"),'explicit empty-project restore stays');
     assert.ok(body.indexOf('collab.setScope(null);')<body.indexOf('if (!state.project)'),'prefetch reset precedes the explicit restore');
@@ -59,4 +59,31 @@ test('app.js lifecycle: reset first on identity change; identity/projects snapsh
   const app2=read('./app.js');
   assert.ok(app2.includes("for (const id of ['issue-codes', 'code-count', 'preview-export', 'release-codes', 'issue-link-preview', 'issue-link-confirm', 'select-survey', 'load-templates']) { const n = $(id); if (n) n.hidden = !mayBuild; }"),'viewer write controls gated on assessmentRole (Auditor P2)');
   assert.ok(!/sessionStorage|localStorage|facilitatorToken/.test(mount),'hooks never touch token storage');
+});
+
+test('invitation handoff awaits initial workspace settlement and rejects reset or principal replacement',async()=>{
+ const factory=new Function('mountWorkspaceManager','mountScopeInvitations',read('./collab-mount.js').replace(/^import .*;\n/gm,'').replace('export function createCollabHooks','function createCollabHooks')+'\nreturn createCollabHooks;');
+ for(const ending of ['complete','reset','replace']){
+  let release;const wait=new Promise(r=>release=r),opened=[];const doc={body:{dataset:{invitationIntent:'active'}},getElementById:()=>({addEventListener(){},hidden:false})};
+  const hooks=factory(()=>({refresh:()=>wait,reset(){},destroy(){}}),()=>({setScope(){},reset(){},destroy(){},openAcceptance:t=>opened.push(t)}))({document:doc,api:async()=>({}),sharedMode:false,onReload:async()=>{}});
+  hooks.identity({principal:{id:'first',kind:'user'}});const pending=hooks.openAcceptance('PRIVATE_SENTINEL');await Promise.resolve();assert.deepEqual(opened,[]);
+  if(ending==='reset')hooks.reset();if(ending==='replace')hooks.identity({principal:{id:'second',kind:'user'}});
+  release();assert.equal(await pending,ending==='complete');assert.deepEqual(opened,ending==='complete'?['PRIVATE_SENTINEL']:[]);
+ }
+});
+test('failed initial workspace request blocks invitation handoff despite module catching its own error',async()=>{
+ const factory=new Function('mountWorkspaceManager','mountScopeInvitations',read('./collab-mount.js').replace(/^import .*;\n/gm,'').replace('export function createCollabHooks','function createCollabHooks')+'\nreturn createCollabHooks;');
+ let opens=0;const doc={body:{dataset:{invitationIntent:'active'}},getElementById:()=>({addEventListener(){}})};
+ const hooks=factory(({request})=>({refresh:async()=>{try{await request('/v2/workspaces')}catch{}},reset(){},destroy(){}}),()=>({setScope(){},reset(){},destroy(){},openAcceptance(){opens++}}))({document:doc,api:async()=>{throw Error('refused')},sharedMode:false,onReload:async()=>{}});
+ hooks.identity({principal:{id:'person',kind:'user'}});assert.equal(await hooks.openAcceptance('PRIVATE'),false);assert.equal(opens,0);
+});
+
+test('openAcceptance re-reads the workspace list after a failed first read instead of latching (Bugbot 4039886042)',()=>{
+  const mount=read('./collab-mount.js');
+  assert.ok(mount.includes("if (workspaceReadFailed) { workspaceReadFailed = false; readiness = workspaces.refresh().catch(() => {}); await readiness; if (!current()) return false; }"),'one re-read per attempt');
+  assert.ok(mount.includes('if (workspaceReadFailed) return false;'),'only a failure of THIS read refuses the handoff');
+  const app=read('./app.js');
+  assert.ok(app.includes("document.body.dataset.invitationEntry = 'true'"),'invite entry isolation flag set for the page lifetime');
+  assert.ok(!/delete document\.body\.dataset\.invitationEntry/.test(app),'the isolation flag is never cleared');
+  assert.ok(!/removeItem\('participantToken'\)[^\n]*invit/.test(app),'storage is not deleted by the invite path');
 });
