@@ -249,9 +249,10 @@ async function loadForm() {
   $('questions').replaceChildren(...result.items.map(drawQuestion)); $('answers').hidden = false; $('review').hidden = true; $('receipt').hidden = true; $('recover').hidden = false;
 }
 async function restoreParticipant() {
+  // A failed first receipt request must leave the saved session recoverable.
+  $('recover').hidden = false;
   try {
     const receipt = await api('/v2/participate/receipt', { participant: true });
-    $('recover').hidden = false;
     if (resumeTarget(receipt) === 'receipt') {
       showReceipt(receipt);
       state.responseKey = null; sessionStorage.removeItem('responseKey');

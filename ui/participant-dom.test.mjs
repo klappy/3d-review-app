@@ -30,7 +30,7 @@ function harness(saved = {}) {
   const source = fs.readFileSync(new URL('./app.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
   vm.runInContext(source,context);
   return {node,storage,requests,setResponder(fn){responder=fn},async settle(){for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r))},
-    async event(id,event){node(id).listeners[event]({preventDefault(){},currentTarget:node(id)});await this.settle()}};
+    async event(id,event){if(event==='click'){assert.equal(node(id).hidden,false,'clicked control must be visible');assert.notEqual(node(id).disabled,true,'clicked control must be enabled');}node(id).listeners[event]({preventDefault(){},currentTarget:node(id)});await this.settle()}};
 }
 const ok = result => ({ok:true,status:200,json:async()=>({ok:true,result})});
 
@@ -58,6 +58,8 @@ test('new participant token clears old rendered identity before a failed form fe
 for(const submitted of [false,true])test(`successful ${submitted?'receipt':'form'} Recover clears failed-restore alert`,async()=>{
  const h=harness({participantToken:'saved-token'});await h.settle();
  assert.equal(h.node('participant-error').hidden,false);
+ assert.equal(h.node('recover').hidden,false, 'retry must be reachable after failed restore');
+ assert.notEqual(h.node('recover').disabled,true, 'retry must be enabled');
  h.setResponder(async url=>url.endsWith('/receipt')?ok({submitted,response_id:'synthetic-receipt'}):ok({assessment:'B',language:'test',template:{id:'tpl',version:2},items:[]}));
  await h.event('recover','click');
  assert.equal(h.node('participant-error').hidden,true);assert.equal(h.node('participant-error').textContent,'');
