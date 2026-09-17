@@ -12,6 +12,7 @@ export function targetScope(cap: Capability, params: Record<string, any>): { typ
   if (id === "cap.assessment.create" || id === "cap.assessment.list") return params.pid ? { type: "project", id: params.pid } : null;
   if (id.startsWith("cap.survey.") || id.startsWith("cap.response.list") || id === "cap.response.purge" || id === "cap.results.summary")
     return params.aid ? { type: "assessment", id: params.aid } : null;
+  if ((id === "cap.report.build" || id === "cap.report.list") && params.aid) return { type: "assessment", id: params.aid };
   return null;
 }
 
@@ -30,6 +31,10 @@ export async function authorize(ctx: Ctx, cap: Capability, params: Record<string
   const roles = cap.roles;
   if (roles === "V") return;
   if (p.kind === "anonymous") throw new CapError("NOT_AUTHENTICATED", "sign in first", "POST /v2/auth/link then /v2/auth/session; agents use a delegated bearer", "cap.auth.request_link");
+  if (["cap.report.build", "cap.report.get", "cap.report.list"].includes(cap.id)) {
+    if (p.kind !== "user" && p.kind !== "support") throw notVisible("report");
+    return; // The store's single observation owns exact grant/role/existence; no second SELECT here.
+  }
   if (p.kind === "support") return; // HUMAN-ONLY rows enforce their own step in the handler
   if (roles === "S") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "support only", "ask KCS support", cap.id);
   if (roles === "P" || roles.startsWith("P ")) {
