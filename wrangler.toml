@@ -7,6 +7,11 @@ compatibility_date = "2026-09-01"
 
 [vars]
 ENVIRONMENT = "dev"
+PUBLIC_ORIGIN = "https://3d-review-dev.klappy.workers.dev"   # where links in mail point (src/mail.ts)
+# Outbound mail (src/mail.ts, OF-3). HUMAN-ONLY, set by the captain on the Worker, never in git and never by a seat:
+#   secret RESEND_API_KEY (sending-only key)   var MAIL_FROM (e.g. "3D Review <no-reply@YOUR-DOMAIN>")
+#   var MAIL_ALLOWLIST_SHA256 (DEV ONLY): comma-separated sha256 hex of each allowed recipient address (trim+lowercase).
+# Fail-closed: dev sends only to a listed recipient; a missing or malformed list sends to nobody.
 # Cloudflare Access (one-time PIN) guards GET /v2/auth/access on this hostname — see src/access.ts. AUD is public.
 ACCESS_TEAM_DOMAIN = "klappy.cloudflareaccess.com"
 ACCESS_AUD = "8a1c350783d5c2d075188d66f22b5b8d6bb9ecb31694acf7f4042c1567035998"
@@ -59,6 +64,8 @@ run_worker_first = ["/v2/*", "/mcp", "/mcp/*", "/authorize", "/token", "/registe
 name = "3d-review"
 [env.production.vars]
 ENVIRONMENT = "production"
+PUBLIC_ORIGIN = "https://3d-review.klappy.dev"
+# HUMAN-ONLY on the production Worker (captain): secret RESEND_API_KEY, var MAIL_FROM. No allowlist in production.
 ACCESS_TEAM_DOMAIN = "klappy.cloudflareaccess.com"
 ACCESS_AUD = "584596733c47a7337d5369c2fda819d25c48573c40c4b6ccc78476813f3a20e0"
 [[env.production.routes]]

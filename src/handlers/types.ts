@@ -17,6 +17,9 @@ export interface Principal {
 export interface Env { DB: D1Database; SESSION_SECRET: string; CODE_ESCROW_SECRET?: string; ENVIRONMENT?: string; ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string;
   /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]) — see src/ratelimit.ts. */
   RL_MCP_ANON?: RateLimit; RL_HTTP_ANON?: RateLimit; RL_AUTH?: RateLimit; RL_REDEEM?: RateLimit; RL_MCP_CEILING?: RateLimit;
+  /** Outbound mail (src/mail.ts, OF-3). RESEND_API_KEY is a captain-set secret; MAIL_FROM and MAIL_ALLOWLIST_SHA256 are
+   *  captain-set vars (the allowlist is dev-only and holds sha256 hashes, never addresses). All optional: absent = no send. */
+  RESEND_API_KEY?: string; MAIL_FROM?: string; MAIL_ALLOWLIST_SHA256?: string; PUBLIC_ORIGIN?: string;
   /** OAuth provider storage + helpers (src/worker.ts); absent in unit tests that drive the Hono app directly. */
   OAUTH_KV?: KVNamespace; OAUTH_PROVIDER?: import("@cloudflare/workers-oauth-provider").OAuthHelpers }
 export interface Ctx {

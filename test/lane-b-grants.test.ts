@@ -45,6 +45,13 @@ describe("Lane B: grant / request / support.unlock (D3, no inheritance, existenc
     expect(dry.impact?.effect).toBe("external");
     const sent = await invite(owner, { ...scope, email: "rina@example.invalid", role: "member" });
     const token = sent.result.dev_only_link_token as string; expect(token).toBeTruthy();
+    // OF-3: this env has no PUBLIC_ORIGIN, so no link can be built and nothing may be sent — the result says so instead of pretending
+    expect(sent.result.delivered).toBe(false); expect(sent.result.delivery).toMatchObject({ state: "not_sent", reason: "not_configured" }); expect(sent.result.status).toBe("pending");
+    expect((await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(sent.result.invitation_id).first<{ status: string }>())!.status).toBe("pending"); // never 'sent' when nothing left
+    // intent de-duplication: the same invite again inside the cooldown creates nothing and sends nothing
+    const again = await invite(owner, { ...scope, email: " RINA@example.invalid ", role: "member" });
+    expect(again.result.invitation_id).toBe(sent.result.invitation_id); expect(again.result.delivery).toMatchObject({ reason: "duplicate_recent" });
+    await expect(invite(owner, { ...scope, email: "Rina <rina@example.invalid>", role: "member" })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
     await expect(accept(mk({ kind: "anonymous", id: "anon" }), { token })).rejects.toMatchObject({ code: "NOT_AUTHENTICATED" });
     // wrong identity (usr_x is not rina@) → hidden, no grant
     await expect(accept(stranger, { token })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
