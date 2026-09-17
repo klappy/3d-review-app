@@ -10,8 +10,8 @@
   "counts": {
     "total": 83,
     "read": 29,
-    "write.effect": 6,
-    "write.reversible": 41,
+    "write.effect": 7,
+    "write.reversible": 40,
     "write.dangerous": 7,
     "v2.0-bcs": 75,
     "v2.1-oct": 8,
@@ -279,7 +279,7 @@
         "NOT_AUTHENTICATED",
         "NOT_FOUND_OR_NOT_VISIBLE",
         "STAGE_CONFLICT"
-      ]
+      , "RATE_LIMITED"]
     },
     {
       "id": "cap.workspace.create",
@@ -1262,7 +1262,7 @@
         "CONFIRM_REQUIRED",
         "CONFIRM_EXPIRED",
         "WRONG_TOOL_FOR_CLASS"
-      ]
+      , "RATE_LIMITED"]
     },
     {
       "id": "cap.survey.send_links",
@@ -1709,7 +1709,7 @@
         "NOT_AUTHENTICATED",
         "NOT_FOUND_OR_NOT_VISIBLE",
         "STAGE_CONFLICT"
-      ]
+      , "RATE_LIMITED"]
     },
     {
       "id": "cap.response.submit",
@@ -1787,7 +1787,7 @@
         "NOT_AUTHENTICATED",
         "NOT_FOUND_OR_NOT_VISIBLE",
         "STAGE_CONFLICT"
-      ]
+      , "RATE_LIMITED"]
     },
     {
       "id": "cap.response.receipt",
@@ -1876,7 +1876,7 @@
         "NOT_AUTHENTICATED",
         "NOT_FOUND_OR_NOT_VISIBLE",
         "STAGE_CONFLICT"
-      ]
+      , "RATE_LIMITED"]
     },
     {
       "id": "cap.response.assisted_next",

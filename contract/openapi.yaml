@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: 3D Review API — contract-v0.1 (DRAFT)
   version: 0.1.0-draft
-  description: Projected from cookbook 04 @ 0f4413768c4365054372d917619311d7c2a00e96 by Fable. 79 capabilities; every capability
+  description: Projected from cookbook 04 @ 0f4413768c4365054372d917619311d7c2a00e96 by Fable. 83 capabilities; every capability
     is also reachable via MCP docs/read/write/danger over the same handlers (prd/18-D). Paths marked x-path-inferred were
     elided in 04 and need Lane A confirmation. SUPPRESSED is ok:true. Danger twins are never GET.
 servers:
