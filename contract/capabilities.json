@@ -1,6 +1,6 @@
 {
   "contract": "contract-v0.1",
-  "status": "DRAFT — projected by Fable from cookbook 04 @ 0f4413768c4365054372d917619311d7c2a00e96; Lane A (Astra/Otto) accepts, amends or replaces",
+  "status": "DRAFT \u2014 projected by Fable from cookbook 04 @ 0f4413768c4365054372d917619311d7c2a00e96; Lane A (Astra/Otto) accepts, amends or replaces",
   "generated_at": "2026-09-16T23:13:41Z",
   "source": {
     "repo": "klappy/3d-review-cookbook",
@@ -92,7 +92,7 @@
       "slice": "v2.0-bcs",
       "section": "A. Entry, identity, session",
       "ui_surface": "\"sign in\"",
-      "notes": "**email-code via Cloudflare** (OF-7 ruled) — code **mail sent** → effect; compensate=expire link (not undo); the sign-in submit is the intent-bound confirm",
+      "notes": "**email-code via Cloudflare** (OF-7 ruled) \u2014 code **mail sent** \u2192 effect; compensate=expire link (not undo); the sign-in submit is the intent-bound confirm",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -122,7 +122,7 @@
       "roles": "V",
       "slice": "v2.0-bcs",
       "section": "A. Entry, identity, session",
-      "ui_surface": "—",
+      "ui_surface": "\u2014",
       "notes": "issues session",
       "status": "target",
       "inverse": {
@@ -187,7 +187,7 @@
       "slice": "v2.0-bcs",
       "section": "A. Entry, identity, session",
       "ui_surface": "\"Take a survey / find my invitation\"",
-      "notes": "short access code → participant token (bee:10424888)",
+      "notes": "short access code \u2192 participant token (bee:10424888)",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -209,14 +209,77 @@
       "slice": "v2.0-bcs",
       "section": "A. Entry, identity, session",
       "ui_surface": "invitation URL",
-      "notes": "link token → participant token",
+      "notes": "link token \u2192 participant token",
       "status": "target",
       "inverse": {
         "kind": "none",
         "compensating_control": "token expiry (compensating)"
       },
       "undo_token": false,
-      "public": false
+      "public": false,
+      "params_schema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resume_token": {
+            "type": "string",
+            "pattern": "^pt_[A-Za-z0-9_-]{32}$"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "result_schema": {
+        "type": "object",
+        "properties": {
+          "participant_token": {
+            "type": "string",
+            "pattern": "^pt_[A-Za-z0-9_-]{32}$"
+          },
+          "survey_id": {
+            "type": "string"
+          },
+          "respondent_id": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_in": {
+            "type": "integer"
+          },
+          "resumed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "participant_token",
+          "survey_id",
+          "respondent_id",
+          "expires_at",
+          "expires_in",
+          "resumed"
+        ],
+        "additionalProperties": false
+      },
+      "shared_link_contract": {
+        "status": "A1 accepted semantics; candidate implementation awaiting independent validation",
+        "source": "kitchen/d45bede4391e9a0f48008467e237db208cc4a509",
+        "amendment": "shared-link-context-2026-09-17",
+        "lifetime": "New context requires collecting and unarchived assessment/survey. Resume requires same active link and sole live bound session; closure may resume private receipt. No person uniqueness guarantee."
+      },
+      "error_codes": [
+        "INVALID_PARAMS",
+        "NOT_AUTHENTICATED",
+        "NOT_FOUND_OR_NOT_VISIBLE",
+        "STAGE_CONFLICT"
+      ]
     },
     {
       "id": "cap.workspace.create",
@@ -367,7 +430,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -576,7 +639,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -602,8 +665,8 @@
       "roles": "O, M",
       "slice": "v2.0-bcs",
       "section": "C. Project",
-      "ui_surface": "project → \"Add a language\"",
-      "notes": "**PROPOSED 2026-09-16 18:59 ET (Fable, #14)** — D9 keeps language identity on each assessment but the matrix had no operation that creates one, so a fresh project could never host an assessment (live-observed on `3d-review-dev`; runner J1b bound to seed). Row: `{code, name}` (code = BCP-47 or private-use `qaa–qtz` for invented), unique per project; undo=cap.language.archive (self:restore) — never delete (assessments reference it). No new access scope (D9).",
+      "ui_surface": "project \u2192 \"Add a language\"",
+      "notes": "**PROPOSED 2026-09-16 18:59 ET (Fable, #14)** \u2014 D9 keeps language identity on each assessment but the matrix had no operation that creates one, so a fresh project could never host an assessment (live-observed on `3d-review-dev`; runner J1b bound to seed). Row: `{code, name}` (code = BCP-47 or private-use `qaa\u2013qtz` for invented), unique per project; undo=cap.language.archive (self:restore) \u2014 never delete (assessments reference it). No new access scope (D9).",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -646,7 +709,7 @@
       "slice": "v2.0-bcs",
       "section": "C. Project",
       "ui_surface": "language row menu",
-      "notes": "**PROPOSED** — inverse of create; assessments keep their language_id; archived languages are not offered to assessment.create; undo=cap.language.unarchive",
+      "notes": "**PROPOSED** \u2014 inverse of create; assessments keep their language_id; archived languages are not offered to assessment.create; undo=cap.language.unarchive",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -778,7 +841,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "stage bar",
-      "notes": "prepare↔collect↔understand↔improve; receipt",
+      "notes": "prepare\u2194collect\u2194understand\u2194improve; receipt",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -851,7 +914,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -965,7 +1028,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -1058,7 +1121,7 @@
       "slice": "v2.0-bcs",
       "section": "E. Surveys (templates + assessment surveys)",
       "ui_surface": "\"Print survey\"",
-      "notes": "**blank form** (no credentials, no responses) — HTML print stylesheet + PDF via browser (bee:10424888); served by the API so agents get the same artifact (not browser-only)",
+      "notes": "**blank form** (no credentials, no responses) \u2014 HTML print stylesheet + PDF via browser (bee:10424888); served by the API so agents get the same artifact (not browser-only)",
       "status": "target",
       "inverse": {
         "kind": "n/a"
@@ -1067,8 +1130,8 @@
     },
     {
       "id": "cap.survey.issue_link",
-      "class": "write.reversible",
-      "tool": "write",
+      "class": "write.effect",
+      "tool": "danger",
       "http": {
         "method": "POST",
         "path": "/v2/assessments/{aid}/surveys/{sid}/links",
@@ -1077,16 +1140,129 @@
       "roles": "O, M",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
-      "ui_surface": "Collect: \"Prepare links\"",
-      "notes": "**prepare/create only** (D1 `invitation` row, unsent); undo=cap.survey.revoke_link (true inverse while unsent)",
+      "ui_surface": "Collect: confirmed Copy shared link",
+      "notes": "Confirmed disclosure of reusable link token; no mail. Each open creates an independent anonymous respondent; optional bounded resume.",
       "status": "target",
       "inverse": {
-        "kind": "true",
-        "via": "cap.survey.revoke_link",
-        "provenance": "04 (true inverse while unsent)"
+        "kind": "none",
+        "compensating_control": "cap.survey.revoke_link",
+        "provenance": "A1 shared-link disclosure ACK5708270121; revoke is compensating, not unsending"
       },
-      "undo_token": true,
-      "public": false
+      "undo_token": false,
+      "public": false,
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "disclosure"
+      },
+      "params_schema": {
+        "type": "object",
+        "properties": {
+          "aid": {
+            "type": "string"
+          },
+          "sid": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "aid",
+          "sid"
+        ],
+        "additionalProperties": false
+      },
+      "result_schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "survey_id": {
+                "type": "string"
+              },
+              "expires_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "impact": {
+                "type": "object"
+              },
+              "confirm_token": {
+                "type": "string"
+              },
+              "expires_in": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "survey_id",
+              "expires_at",
+              "impact",
+              "confirm_token",
+              "expires_in"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "link_id": {
+                "type": "string"
+              },
+              "link_token": {
+                "type": "string"
+              },
+              "expires_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "entry_fragment": {
+                "type": "string",
+                "pattern": "^#survey="
+              }
+            },
+            "required": [
+              "link_id",
+              "link_token",
+              "expires_at",
+              "entry_fragment"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "shared_link_contract": {
+        "status": "A1 accepted semantics; candidate implementation awaiting independent validation",
+        "source": "kitchen/d45bede4391e9a0f48008467e237db208cc4a509",
+        "amendment": "shared-link-context-2026-09-17",
+        "lifetime": "Creation discloses a reusable bearer once in execute; not email delivery. Revocation is compensating, not unsending."
+      },
+      "error_codes": [
+        "INVALID_PARAMS",
+        "NOT_AUTHENTICATED",
+        "NOT_FOUND_OR_NOT_VISIBLE",
+        "STAGE_CONFLICT",
+        "NOT_AUTHORIZED_AT_SCOPE",
+        "CONFIRM_REQUIRED",
+        "CONFIRM_EXPIRED",
+        "WRONG_TOOL_FOR_CLASS"
+      ]
     },
     {
       "id": "cap.survey.send_links",
@@ -1100,8 +1276,8 @@
       "roles": "O, M",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
-      "ui_surface": "Collect: \"Send links\" (impact preview → confirm)",
-      "notes": "**split from issue_link** (#13 gap 2; PR #18 example 1): external mail + link disclosure; compensate=cap.survey.revoke_link (access control, not undo); intent bound to recipients/content/expiry/revision; idempotency key; accepted ≠ delivered; delivery/job receipt; no addresses in telemetry",
+      "ui_surface": "Collect: \"Send links\" (impact preview \u2192 confirm)",
+      "notes": "**split from issue_link** (#13 gap 2; PR #18 example 1): external mail + link disclosure; compensate=cap.survey.revoke_link (access control, not undo); intent bound to recipients/content/expiry/revision; idempotency key; accepted \u2260 delivered; delivery/job receipt; no addresses in telemetry",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1132,7 +1308,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "Collect: \"Access codes\"",
-      "notes": "batch short codes; D1 `access_code` (durable for field collect, not KV); undo=cap.survey.revoke_code while unredeemed. POST result is count/ids/receipt only — **omits code values**. **Printing/exporting the codes is credential-bearing output** → `cap.survey.export_codes` (E) below, distinct from a blank-form print",
+      "notes": "batch short codes; D1 `access_code` (durable for field collect, not KV); undo=cap.survey.revoke_code while unredeemed. POST result is count/ids/receipt only \u2014 **omits code values**. **Printing/exporting the codes is credential-bearing output** \u2192 `cap.survey.export_codes` (E) below, distinct from a blank-form print",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -1154,7 +1330,7 @@
       "roles": "O, M",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
-      "ui_surface": "\"Print access codes\" (impact preview → confirm)",
+      "ui_surface": "\"Print access codes\" (impact preview \u2192 confirm)",
       "notes": "credential-bearing disclosure (release); compensate=revoke codes; audit row; no codes in telemetry; danger body: `mode` + `confirm_token` (+ `lang`); **never GET** (not cacheable/prefetchable; confirm token is not a query string)",
       "status": "target",
       "inverse": {
@@ -1226,11 +1402,11 @@
         "path": "/v2/{scope}/{id}/invitations",
         "path_inferred": false
       },
-      "roles": "O, M(≤M)",
+      "roles": "O, M(\u2264M)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
-      "ui_surface": "\"Invite collaborator\" + impact preview → confirm",
-      "notes": "invitation **mail sent** → effect; viewers cannot invite; D3 (proposed); compensate=cap.grant.revoke_invitation",
+      "ui_surface": "\"Invite collaborator\" + impact preview \u2192 confirm",
+      "notes": "invitation **mail sent** \u2192 effect; viewers cannot invite; D3 (proposed); compensate=cap.grant.revoke_invitation",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1257,7 +1433,7 @@
         "path": "/v2/invitations/{id}",
         "path_inferred": false
       },
-      "roles": "O, M(≤M)",
+      "roles": "O, M(\u2264M)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "collaborators panel",
@@ -1283,7 +1459,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "",
-      "notes": "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke",
+      "notes": "**grant released** \u2192 effect (disclosure of scope contents begins); compensate=cap.grant.revoke",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1333,12 +1509,12 @@
       "roles": "O",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
-      "ui_surface": "impact preview → confirm",
+      "ui_surface": "impact preview \u2192 confirm",
       "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed)",
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -1361,11 +1537,11 @@
         "path": "/v2/{scope}/{id}/grants/{gid}",
         "path_inferred": true
       },
-      "roles": "O, M(≤M)",
+      "roles": "O, M(\u2264M)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "",
-      "notes": "cannot remove owner; last-owner protected; undo=null (what was seen stays seen) — re-invite instead",
+      "notes": "cannot remove owner; last-owner protected; undo=null (what was seen stays seen) \u2014 re-invite instead",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1391,7 +1567,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -1422,7 +1598,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED — withdraw route not in 04"
+        "compensating_control": "UNASSESSED \u2014 withdraw route not in 04"
       },
       "undo_token": false,
       "public": false
@@ -1445,7 +1621,95 @@
       "inverse": {
         "kind": "n/a"
       },
-      "public": false
+      "public": false,
+      "params_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "result_schema": {
+        "type": "object",
+        "properties": {
+          "survey_id": {
+            "type": "string"
+          },
+          "assessment": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "period": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "template": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "version": {
+                "type": "integer"
+              },
+              "perspective": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "version",
+              "perspective",
+              "source_ref"
+            ],
+            "additionalProperties": false
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Pinned source renderItems output, stable source item IDs, required/option/exclusion semantics unchanged."
+            }
+          },
+          "participant_labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "survey_id",
+          "assessment",
+          "language",
+          "period",
+          "template",
+          "items",
+          "participant_labels"
+        ],
+        "additionalProperties": false
+      },
+      "shared_link_contract": {
+        "status": "A1 accepted semantics; candidate implementation awaiting independent validation",
+        "source": "kitchen/d45bede4391e9a0f48008467e237db208cc4a509",
+        "amendment": "shared-link-context-2026-09-17",
+        "lifetime": "Shared session and invitation live, selected survey and assessment collecting/unarchived. Source template validation unchanged."
+      },
+      "error_codes": [
+        "INVALID_PARAMS",
+        "NOT_AUTHENTICATED",
+        "NOT_FOUND_OR_NOT_VISIBLE",
+        "STAGE_CONFLICT"
+      ]
     },
     {
       "id": "cap.response.submit",
@@ -1459,15 +1723,71 @@
       "roles": "P",
       "slice": "v2.0-bcs",
       "section": "G. Participation",
-      "ui_surface": "review → submit",
-      "notes": "append-only; idempotency key; receipt (D6); **undo=null** (append-only is not an inverse — amendment/retraction policy held under D6); the review screen is the participant's confirm",
+      "ui_surface": "review \u2192 submit",
+      "notes": "append-only; idempotency key; receipt (D6); **undo=null** (append-only is not an inverse \u2014 amendment/retraction policy held under D6); the review screen is the participant's confirm",
       "status": "target",
       "inverse": {
         "kind": "none",
         "compensating_control": "amendment/retraction policy held under D6 (04)"
       },
       "undo_token": false,
-      "public": false
+      "public": false,
+      "params_schema": {
+        "type": "object",
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "answers": {
+            "type": "object",
+            "description": "Known pinned item IDs only; server validates required, type, option, multi and exclusion rules before canonical hashing."
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "answers"
+        ],
+        "additionalProperties": false
+      },
+      "result_schema": {
+        "type": "object",
+        "properties": {
+          "response_id": {
+            "type": "string"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "duplicate": {
+            "type": "boolean"
+          },
+          "undo": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "response_id",
+          "submitted_at",
+          "duplicate",
+          "undo"
+        ],
+        "additionalProperties": false
+      },
+      "shared_link_contract": {
+        "status": "A1 accepted semantics; candidate implementation awaiting independent validation",
+        "source": "kitchen/d45bede4391e9a0f48008467e237db208cc4a509",
+        "amendment": "shared-link-context-2026-09-17",
+        "lifetime": "New response atomically requires live shared session/link and collecting/unarchived assessment/survey. Exact normalized-payload/key replay returns own response after closure while authority remains valid. Different key conflicts; changed same-key payload invalid."
+      },
+      "error_codes": [
+        "INVALID_PARAMS",
+        "NOT_AUTHENTICATED",
+        "NOT_FOUND_OR_NOT_VISIBLE",
+        "STAGE_CONFLICT"
+      ]
     },
     {
       "id": "cap.response.receipt",
@@ -1487,7 +1807,76 @@
       "inverse": {
         "kind": "n/a"
       },
-      "public": false
+      "public": false,
+      "params_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "result_schema": {
+        "type": "object",
+        "properties": {
+          "submitted": {
+            "type": "boolean"
+          },
+          "response_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "submitted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "template": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "id",
+                  "version"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "submitted",
+          "response_id",
+          "submitted_at",
+          "template"
+        ],
+        "additionalProperties": false
+      },
+      "shared_link_contract": {
+        "status": "A1 accepted semantics; candidate implementation awaiting independent validation",
+        "source": "kitchen/d45bede4391e9a0f48008467e237db208cc4a509",
+        "amendment": "shared-link-context-2026-09-17",
+        "lifetime": "Private to authenticated respondent/survey; shared link/session must remain live. Closure/archive does not delete or expose receipts; revocation/expiry denies access."
+      },
+      "error_codes": [
+        "INVALID_PARAMS",
+        "NOT_AUTHENTICATED",
+        "NOT_FOUND_OR_NOT_VISIBLE",
+        "STAGE_CONFLICT"
+      ]
     },
     {
       "id": "cap.response.assisted_next",
@@ -1506,7 +1895,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "none needed — starts a distinct respondent (D6)"
+        "compensating_control": "none needed \u2014 starts a distinct respondent (D6)"
       },
       "undo_token": false,
       "public": false
@@ -1524,7 +1913,7 @@
       "slice": "v2.0-bcs",
       "section": "G. Participation",
       "ui_surface": "Understand",
-      "notes": "**always-on small-cell suppression** (July D2 ruling) applied server-side before serialization; threshold/role details held → affected disclosure blocked until set; viewers see summary only; `SUPPRESSED` is a typed `ok:true` result (never an `ok:false` error)",
+      "notes": "**always-on small-cell suppression** (July D2 ruling) applied server-side before serialization; threshold/role details held \u2192 affected disclosure blocked until set; viewers see summary only; `SUPPRESSED` is a typed `ok:true` result (never an `ok:false` error)",
       "status": "target",
       "inverse": {
         "kind": "n/a"
@@ -1548,7 +1937,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -1575,7 +1964,7 @@
       "slice": "v2.0-bcs",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "Understand (incl. insufficient-data + suppressed states)",
-      "notes": "counts, coverage, band-level summary (DEC-0001 bands over scores); **suppression integral from first implementation** (July D2): applied before aggregation disclosure/cache/serialization; UI/MCP cannot request unsuppressed mode; threshold/differencing rules held → real private results blocked until set, synthetic fixtures may show states; output carries snapshot/algorithm/policy versions (PR #18 example 2)",
+      "notes": "counts, coverage, band-level summary (DEC-0001 bands over scores); **suppression integral from first implementation** (July D2): applied before aggregation disclosure/cache/serialization; UI/MCP cannot request unsuppressed mode; threshold/differencing rules held \u2192 real private results blocked until set, synthetic fixtures may show states; output carries snapshot/algorithm/policy versions (PR #18 example 2)",
       "status": "target",
       "inverse": {
         "kind": "n/a"
@@ -1595,11 +1984,11 @@
       "slice": "v2.1-oct",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "(Oct)",
-      "notes": "**unimplemented** in v2.0 → documented 501 + docs pointer; counts ❌ whole-product; suppression + human review of generated interpretation required when built (bee:9416233 per PR #18 BEE-HISTORY)",
+      "notes": "**unimplemented** in v2.0 \u2192 documented 501 + docs pointer; counts \u274c whole-product; suppression + human review of generated interpretation required when built (bee:9416233 per PR #18 BEE-HISTORY)",
       "status": "RESERVED_NOT_BUILT",
       "inverse": {
         "kind": "none",
-        "compensating_control": "v2.1-oct — UNASSESSED"
+        "compensating_control": "v2.1-oct \u2014 UNASSESSED"
       },
       "undo_token": false,
       "public": false
@@ -1657,11 +2046,11 @@
       "slice": "v2.1-oct",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "(Oct)",
-      "notes": "AI-assisted with human review (DEC-0002, POL-0001) — reserved",
+      "notes": "AI-assisted with human review (DEC-0002, POL-0001) \u2014 reserved",
       "status": "RESERVED_NOT_BUILT",
       "inverse": {
         "kind": "none",
-        "compensating_control": "v2.1-oct — UNASSESSED"
+        "compensating_control": "v2.1-oct \u2014 UNASSESSED"
       },
       "undo_token": false,
       "public": false
@@ -1679,11 +2068,11 @@
       "slice": "v2.1-oct",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "(Oct)",
-      "notes": "accept/reject with provenance — reserved",
+      "notes": "accept/reject with provenance \u2014 reserved",
       "status": "RESERVED_NOT_BUILT",
       "inverse": {
         "kind": "none",
-        "compensating_control": "v2.1-oct — UNASSESSED"
+        "compensating_control": "v2.1-oct \u2014 UNASSESSED"
       },
       "undo_token": false,
       "public": false
@@ -1745,7 +2134,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -1799,7 +2188,7 @@
       "status": "RESERVED_NOT_BUILT",
       "inverse": {
         "kind": "none",
-        "compensating_control": "v2.1-oct — UNASSESSED"
+        "compensating_control": "v2.1-oct \u2014 UNASSESSED"
       },
       "undo_token": false,
       "public": false
@@ -1817,7 +2206,7 @@
       "slice": "v2.0-bcs",
       "section": "J. Ops, telemetry, xray, docs, feedback",
       "ui_surface": "\"why was this slow?\"",
-      "notes": "**scoped + redacted** projection of the span log (auth, policy, D1 timing, render) — no answers, addresses or bearer material in spans; a trace id is not authorization: substituted id → `NOT_FOUND_OR_NOT_VISIBLE`; test it (05 J7)",
+      "notes": "**scoped + redacted** projection of the span log (auth, policy, D1 timing, render) \u2014 no answers, addresses or bearer material in spans; a trace id is not authorization: substituted id \u2192 `NOT_FOUND_OR_NOT_VISIBLE`; test it (05 J7)",
       "status": "target",
       "inverse": {
         "kind": "n/a"
@@ -1883,7 +2272,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "n/a — this is the undo mechanism"
+        "compensating_control": "n/a \u2014 this is the undo mechanism"
       },
       "undo_token": false,
       "public": false

@@ -2,6 +2,8 @@ import type { Ctx, Handler } from "./types";
 import { CapError, notVisible } from "./errors";
 import { gate, newId, nowIso, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
 
+import { collecting, sharedSession, submitShared } from "./shared-link";
+
 interface ParticipantSurvey { id: string; assessment_id: string; template_id: string; template_version: number; state: string; collection_status: string; name: string; language_name: string; period: string | null; items_json: string; scoring_json: string; perspective: string; source_ref: string | null; published_at: string | null }
 
 async function scopedSurvey(ctx: Ctx, requireOpen = false): Promise<ParticipantSurvey> {
@@ -46,7 +48,12 @@ function validateAnswers(items: TemplateItem[], value: unknown): Record<string, 
   return normalized;
 }
 
-export const form: Handler = async (ctx) => {
+export const form: Handler = async (ctx, params) => {
+  const shared = await sharedSession(ctx);
+  if (shared) {
+    if (Object.keys(params).length) throw new CapError("INVALID_PARAMS", "form takes no parameters");
+    await collecting(ctx, shared.assessment_survey_id);
+  }
   const s = await scopedSurvey(ctx, true);
   const items = parseItems(s as any);
   if (!items.length) throw new CapError("STAGE_CONFLICT", "survey instrument is unavailable");
@@ -56,9 +63,16 @@ export const form: Handler = async (ctx) => {
 };
 
 export const submit: Handler = async (ctx, params) => {
-  const s = await scopedSurvey(ctx, true);
+  const shared = await sharedSession(ctx);
+  const s = await scopedSurvey(ctx, !shared);
   const idempotencyKey = reqStr(params, "idempotency_key");
   if (idempotencyKey.length > 200) throw new CapError("INVALID_PARAMS", "idempotency_key is too long");
+  if (shared) {
+    if (Object.keys(params).some(k => k !== "idempotency_key" && k !== "answers")) throw new CapError("INVALID_PARAMS", "unknown submission parameter");
+    const items = parseItems(s as any);
+    if (!items.length) throw new CapError("STAGE_CONFLICT", "survey instrument is unavailable");
+    return { result: await submitShared(ctx, shared, idempotencyKey, validateAnswers(items, params.answers), s), scope: { type: "survey", id: s.id } };
+  }
   const respondentId = ctx.principal.respondentId!;
   const prior = await ctx.db.prepare("SELECT id, assessment_survey_id, respondent_id, submitted_at FROM response WHERE assessment_survey_id = ? AND idempotency_key = ?")
     .bind(s.id, idempotencyKey).first<{ id: string; assessment_survey_id: string; respondent_id: string; submitted_at: string }>();
@@ -82,7 +96,9 @@ export const submit: Handler = async (ctx, params) => {
   return { result: { response_id: responseId, submitted_at: submittedAt, duplicate: false, undo: null }, scope: { type: "survey", id: s.id } };
 };
 
-export const receipt: Handler = async (ctx) => {
+export const receipt: Handler = async (ctx, params) => {
+  const shared = await sharedSession(ctx);
+  if (shared && Object.keys(params).length) throw new CapError("INVALID_PARAMS", "receipt takes no parameters");
   const s = await scopedSurvey(ctx);
   const row = await ctx.db.prepare("SELECT id, submitted_at, template_id, template_version FROM response WHERE assessment_survey_id = ? AND respondent_id = ? ORDER BY submitted_at DESC LIMIT 1")
     .bind(s.id, ctx.principal.respondentId).first<{ id: string; submitted_at: string; template_id: string; template_version: number }>();

@@ -418,6 +418,7 @@ paths:
       operationId: cap.participant.open_link
       summary: 'cap.participant.open_link — write.reversible — roles: V'
       x-capability: cap.participant.open_link
+      x-shared-link-lifetime: "New context requires collecting and unarchived assessment/survey. Resume requires same active link and sole live bound session; closure may resume private receipt. No person uniqueness guarantee."
       x-class: write.reversible
       x-tool: write
       x-slice: v2.0-bcs
@@ -434,25 +435,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Envelope'
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"participant_token":{"type":"string","pattern":"^pt_[A-Za-z0-9_-]{32}$"},"survey_id":{"type":"string"},"respondent_id":{"type":"string"},"expires_at":{"type":"string","format":"date-time"},"expires_in":{"type":"integer"},"resumed":{"type":"boolean"}},"required":["participant_token","survey_id","respondent_id","expires_at","expires_in","resumed"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
         4XX:
           description: error envelope
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-      security:
-      - session: []
-      - bearer: []
-      - participant: []
+      security: []
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
-            schema:
-              type: object
-              additionalProperties: true
-              description: params — shape owed per capability (A1 open item)
+            schema: {"type":"object","properties":{"token":{"type":"string","minLength":1},"resume_token":{"type":"string","pattern":"^pt_[A-Za-z0-9_-]{32}$"}},"required":["token"],"additionalProperties":false}
   /v2/workspaces:
     post:
       operationId: cap.workspace.create
@@ -2037,15 +2034,13 @@ paths:
   /v2/assessments/{aid}/surveys/{sid}/links:
     post:
       operationId: cap.survey.issue_link
-      summary: 'cap.survey.issue_link — write.reversible — roles: O, M'
+      summary: 'cap.survey.issue_link — write.effect — roles: O, M'
       x-capability: cap.survey.issue_link
-      x-class: write.reversible
-      x-tool: write
+      x-shared-link-lifetime: "Creation discloses a reusable bearer once in execute; not email delivery. Revocation is compensating, not unsending."
+      x-class: write.effect
+      x-tool: danger
       x-slice: v2.0-bcs
-      x-inverse:
-        kind: 'true'
-        via: cap.survey.revoke_link
-        provenance: 04 (true inverse while unsent)
+      x-inverse: {kind: none, compensating_control: cap.survey.revoke_link}
       x-roles: O, M
       x-path-inferred: true
       tags:
@@ -2056,7 +2051,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Envelope'
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - {"type":"object","properties":{"result":{"oneOf":[{"type":"object","properties":{"survey_id":{"type":"string"},"expires_at":{"type":["string","null"],"format":"date-time"},"impact":{"type":"object"},"confirm_token":{"type":"string"},"expires_in":{"type":"integer"}},"required":["survey_id","expires_at","impact","confirm_token","expires_in"],"additionalProperties":false},{"type":"object","properties":{"link_id":{"type":"string"},"link_token":{"type":"string"},"expires_at":{"type":["string","null"],"format":"date-time"},"entry_fragment":{"type":"string","pattern":"^#survey="}},"required":["link_id","link_token","expires_at","entry_fragment"],"additionalProperties":false}]}},"required":["result"],"additionalProperties":true}
         4XX:
           description: error envelope
           content:
@@ -2066,15 +2063,11 @@ paths:
       security:
       - session: []
       - bearer: []
-      - participant: []
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
-            schema:
-              type: object
-              additionalProperties: true
-              description: params — shape owed per capability (A1 open item)
+            schema: {"type":"object","properties":{"params":{"type":"object","properties":{"expires_at":{"type":["string","null"],"format":"date-time"}},"required":[],"additionalProperties":false},"mode":{"enum":["dry_run","execute"]},"confirm_token":{"type":"string"}},"required":["params","mode"],"additionalProperties":false}
       parameters:
       - name: aid
         in: path
@@ -2700,6 +2693,7 @@ paths:
       operationId: cap.response.form
       summary: 'cap.response.form — read — roles: P'
       x-capability: cap.response.form
+      x-shared-link-lifetime: "Shared session and invitation live, selected survey and assessment collecting/unarchived. Source template validation unchanged."
       x-class: read
       x-tool: read
       x-slice: v2.0-bcs
@@ -2715,7 +2709,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Envelope'
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"survey_id":{"type":"string"},"assessment":{"type":"string"},"language":{"type":"string"},"period":{"type":["string","null"]},"template":{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"},"perspective":{"type":"string"},"source_ref":{"type":["string","null"]}},"required":["id","version","perspective","source_ref"],"additionalProperties":false},"items":{"type":"array","items":{"type":"object","description":"Pinned source renderItems output, stable source item IDs, required/option/exclusion semantics unchanged."}},"participant_labels":{"type":"array","items":{"type":"string"}}},"required":["survey_id","assessment","language","period","template","items","participant_labels"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
         4XX:
           description: error envelope
           content:
@@ -2723,14 +2719,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
       security:
-      - session: []
-      - bearer: []
       - participant: []
   /v2/participate/responses:
     post:
       operationId: cap.response.submit
       summary: 'cap.response.submit — write.reversible — roles: P'
       x-capability: cap.response.submit
+      x-shared-link-lifetime: "New response atomically requires live shared session/link and collecting/unarchived assessment/survey. Exact normalized-payload/key replay returns own response after closure while authority remains valid. Different key conflicts; changed same-key payload invalid."
       x-class: write.reversible
       x-tool: write
       x-slice: v2.0-bcs
@@ -2747,7 +2742,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Envelope'
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"response_id":{"type":"string"},"submitted_at":{"type":"string","format":"date-time"},"duplicate":{"type":"boolean"},"undo":{"type":"null"}},"required":["response_id","submitted_at","duplicate","undo"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
         4XX:
           description: error envelope
           content:
@@ -2755,22 +2752,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
       security:
-      - session: []
-      - bearer: []
       - participant: []
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
-            schema:
-              type: object
-              additionalProperties: true
-              description: params — shape owed per capability (A1 open item)
+            schema: {"type":"object","properties":{"idempotency_key":{"type":"string","minLength":1,"maxLength":200},"answers":{"type":"object","description":"Known pinned item IDs only; server validates required, type, option, multi and exclusion rules before canonical hashing."}},"required":["idempotency_key","answers"],"additionalProperties":false}
   /v2/participate/receipt:
     get:
       operationId: cap.response.receipt
       summary: 'cap.response.receipt — read — roles: P'
       x-capability: cap.response.receipt
+      x-shared-link-lifetime: "Private to authenticated respondent/survey; shared link/session must remain live. Closure/archive does not delete or expose receipts; revocation/expiry denies access."
       x-class: read
       x-tool: read
       x-slice: v2.0-bcs
@@ -2786,7 +2779,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Envelope'
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"submitted":{"type":"boolean"},"response_id":{"type":["string","null"]},"submitted_at":{"type":["string","null"],"format":"date-time"},"template":{"oneOf":[{"type":"null"},{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"}},"required":["id","version"],"additionalProperties":false}]}},"required":["submitted","response_id","submitted_at","template"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
         4XX:
           description: error envelope
           content:
@@ -2794,8 +2789,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
       security:
-      - session: []
-      - bearer: []
       - participant: []
   /v2/participate/next:
     post:

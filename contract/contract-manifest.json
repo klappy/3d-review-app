@@ -1,9 +1,9 @@
 {
   "contract": "contract-v0.1",
-  "status": "DRAFT — no bundle frozen",
+  "status": "DRAFT \u2014 no bundle frozen",
   "source_sha": "0f4413768c4365054372d917619311d7c2a00e96",
-  "rule": "a bundle freezes when Lane A marks it frozen_sha; one open bundle does not hold frozen ones (MASTER §per-bundle)",
-  "params_schemas": "OWED — per-capability input/output schemas are the next A1 increment; this draft fixes ids, classes, tools, twins, roles, inverses and the shared envelope",
+  "rule": "a bundle freezes when Lane A marks it frozen_sha; one open bundle does not hold frozen ones (MASTER \u00a7per-bundle)",
+  "params_schemas": "OWED \u2014 per-capability input/output schemas are the next A1 increment; this draft fixes ids, classes, tools, twins, roles, inverses and the shared envelope",
   "bundles": {
     "A": {
       "section": "A. Entry, identity, session",
@@ -213,5 +213,21 @@
       "frozen_sha": null,
       "open_items": []
     }
+  },
+  "shared_link_amendment": {
+    "id": "shared-link-context-2026-09-17",
+    "semantics_source": "kitchen/d45bede4391e9a0f48008467e237db208cc4a509",
+    "app_baseline": "10f5f444d68475d7114ab8fe0bf269fe106476b1",
+    "status": "candidate; independent and integrated review pending",
+    "capabilities": [
+      "cap.survey.issue_link",
+      "cap.participant.open_link",
+      "cap.response.form",
+      "cap.response.submit",
+      "cap.response.receipt"
+    ],
+    "migration": "0007_shared_link_context.sql",
+    "generated_at": "2026-09-17T04:10:21.293Z",
+    "reconstruction": "Full content reconstruction deferred by Chris; essential schemas current; preserve this amendment after baseline generator."
   }
 }
