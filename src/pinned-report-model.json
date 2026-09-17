@@ -1,0 +1,197 @@
+{
+  "algorithm_reference": "survey-pipeline/pipeline/04_aggregate.py",
+  "commit": "f042cde553761a6a7f24132cef7802f956378ee0",
+  "constructs": [
+    {
+      "categorical": false,
+      "code": "translation-brief-alignment",
+      "item_ids": [
+        "TR-Q1",
+        "ML-Q1",
+        "CHIP-Q2",
+        "CHCP-Q2",
+        "CHDL-Q2"
+      ]
+    },
+    {
+      "categorical": true,
+      "code": "translation-type-agreement",
+      "item_ids": [
+        "TR-Q2",
+        "ML-Q2",
+        "CHIP-Q1",
+        "CHCP-Q1",
+        "CHDL-Q1"
+      ]
+    },
+    {
+      "categorical": false,
+      "code": "source-understanding",
+      "item_ids": [
+        "TR-Q9",
+        "CHCC-Q2",
+        "CHIP-Q7",
+        "CHCP-Q7",
+        "CHDL-Q7"
+      ]
+    },
+    {
+      "categorical": false,
+      "code": "consistency",
+      "item_ids": [
+        "TR-Q13",
+        "CHCC-Q3",
+        "ML-Q13"
+      ]
+    },
+    {
+      "categorical": false,
+      "code": "clarity-naturalness",
+      "item_ids": [
+        "CW-Q1",
+        "CW-Q3",
+        "CA-Q1",
+        "CA-Q3",
+        "CV-Q1",
+        "CV-Q3",
+        "CHIP-Q8",
+        "CHCP-Q8",
+        "CHDL-Q8"
+      ]
+    },
+    {
+      "categorical": false,
+      "code": "appeal",
+      "item_ids": [
+        "CW-Q4",
+        "CW-Q5",
+        "CA-Q4",
+        "CA-Q5",
+        "CV-Q4",
+        "CV-Q5",
+        "CHIP-Q9",
+        "CHCP-Q9",
+        "CHDL-Q9"
+      ]
+    },
+    {
+      "categorical": false,
+      "code": "trust-readiness",
+      "item_ids": [
+        "CW-Q11",
+        "CA-Q11",
+        "CV-Q11",
+        "CHCC-Q4",
+        "CHCC-Q5",
+        "CHIP-Q10",
+        "CHCP-Q10",
+        "CHDL-Q10"
+      ]
+    },
+    {
+      "categorical": false,
+      "code": "impact-use",
+      "item_ids": [
+        "CW-Q9",
+        "CW-Q10",
+        "CA-Q9",
+        "CA-Q10",
+        "CV-Q9",
+        "CV-Q10",
+        "CHCP-Q12",
+        "CHCP-Q13"
+      ]
+    }
+  ],
+  "crosslens_csv_sha256": "ac60cfc6565b8385e72b1678de4a71095630e5faba502a1c9449b7201c8b129b",
+  "items_csv_sha256": "488a78c91516888e88ddc4a63d99738dbe8b411483d40aedcdfe64edd2df41c8",
+  "source": "klappy/3d-quality-review",
+  "subdimensions": [
+    {
+      "included_in_lens_score": true,
+      "lens": "Translation Team",
+      "sub_dimension": "Translation Process & Brief"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Translation Team",
+      "sub_dimension": "Understanding the Source"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Translation Team",
+      "sub_dimension": "External Review"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Translation Team",
+      "sub_dimension": "Consistency"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Translation Team",
+      "sub_dimension": "Governance"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Community",
+      "sub_dimension": "Understandable"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Community",
+      "sub_dimension": "Appealing — Written"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Community",
+      "sub_dimension": "Appealing — Audio"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Community",
+      "sub_dimension": "Appealing — Video/Sign"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Community",
+      "sub_dimension": "Impactful"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Community",
+      "sub_dimension": "Trust / Open Feedback"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Church",
+      "sub_dimension": "Confidence in the Translation"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Church",
+      "sub_dimension": "Readiness"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Church",
+      "sub_dimension": "Translation Brief"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Church",
+      "sub_dimension": "Church Involvement"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Church",
+      "sub_dimension": "Affirmation"
+    },
+    {
+      "included_in_lens_score": true,
+      "lens": "Church",
+      "sub_dimension": "Impact Observation"
+    }
+  ],
+  "subdimensions_csv_sha256": "ad3b756b8c85c93461d6b3b90d8b14850bae3b553affae7ed5131cdca523687e"
+}

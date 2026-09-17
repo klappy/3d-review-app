@@ -1,0 +1,88 @@
+{
+  "source_commit": "f042cde553761a6a7f24132cef7802f956378ee0",
+  "source_sha256": {
+    "survey-pipeline/pipeline/07_language_report.py": "08b051cc9ed0b77e94d761cd0a1c59b61c257b5456af4f0f41643eb04fdbd8d0",
+    "rubric_csv/CrossLens.csv": "ac60cfc6565b8385e72b1678de4a71095630e5faba502a1c9449b7201c8b129b"
+  },
+  "constructs": [
+    {
+      "code": "appeal",
+      "name": "Appeal / Beauty"
+    },
+    {
+      "code": "clarity-naturalness",
+      "name": "Clarity / Naturalness"
+    },
+    {
+      "code": "consistency",
+      "name": "Consistency"
+    },
+    {
+      "code": "impact-use",
+      "name": "Impact / Use"
+    },
+    {
+      "code": "source-understanding",
+      "name": "Understanding of the Source"
+    },
+    {
+      "code": "translation-brief-alignment",
+      "name": "Brief Process & Perceived Fidelity"
+    },
+    {
+      "code": "translation-type-agreement",
+      "name": "Translation Type Agreement"
+    },
+    {
+      "code": "trust-readiness",
+      "name": "Trust / Readiness"
+    }
+  ],
+  "forms": [
+    {
+      "template_id": "tpl_audio",
+      "form_type": "CA",
+      "label": "Community — Audio"
+    },
+    {
+      "template_id": "tpl_consultant",
+      "form_type": "CHCC",
+      "label": "Church — Consultant"
+    },
+    {
+      "template_id": "tpl_community_pastor",
+      "form_type": "CHCP",
+      "label": "Church — Community Pastor"
+    },
+    {
+      "template_id": "tpl_denom_leader",
+      "form_type": "CHDL",
+      "label": "Church — Denominational Leader"
+    },
+    {
+      "template_id": "tpl_involved_pastor",
+      "form_type": "CHIP",
+      "label": "Church — Involved Pastor"
+    },
+    {
+      "template_id": "tpl_video_sign",
+      "form_type": "CV",
+      "label": "Community — Video/Sign"
+    },
+    {
+      "template_id": "tpl_written",
+      "form_type": "CW",
+      "label": "Community — Written"
+    },
+    {
+      "template_id": "tpl_mid_level",
+      "form_type": "ML",
+      "label": "Translation Team — Mid-Level Quality Roles"
+    },
+    {
+      "template_id": "tpl_validation",
+      "form_type": "TR",
+      "label": "Translation Team — Translator / Validation"
+    }
+  ]
+}
