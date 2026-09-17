@@ -22,8 +22,8 @@ describe("synthetic answer sets (Steve Watters' persona generator @ f042cde) loa
     await load("../seed/synthetic-responses.sql");
     const n=async(sql:string)=>(await db.prepare(sql).first<{n:number}>())!.n;
     expect(await n("SELECT COUNT(*) AS n FROM response WHERE source='synthetic' AND id NOT IN (SELECT r.id FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id LIKE 'assess_syn_org%')")).toBe(425);
-    expect(await n("SELECT COUNT(*) AS n FROM assessment WHERE id LIKE 'assess_syn_%'")).toBe(34);
-    expect(await n("SELECT COUNT(*) AS n FROM project WHERE id LIKE 'proj_syn_%'")).toBe(10);
+    expect(await n("SELECT COUNT(*) AS n FROM assessment WHERE id LIKE 'assess_syn_%' AND id NOT LIKE 'assess_syn_org%'")).toBe(34);
+    expect(await n("SELECT COUNT(*) AS n FROM project WHERE id LIKE 'proj_syn_%' AND id NOT LIKE 'proj_syn_org%'")).toBe(10);
     // referential + template integrity: every response's survey exists and points at the same v2 template
     expect(await n("SELECT COUNT(*) AS n FROM response r LEFT JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.id IS NULL OR s.template_id<>r.template_id OR s.template_version<>r.template_version")).toBe(0);
     // answers validate against template items: single → option code, multi → array of codes, text → string; no unknown item ids
