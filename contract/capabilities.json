@@ -295,7 +295,7 @@
       "slice": "v2.0-bcs",
       "section": "B. Workspace",
       "ui_surface": "\"Organize projects in a workspace\"",
-      "notes": "request route for others: cap.request.create",
+      "notes": "provisioning defaults to true for every normal authenticated principal (captain ruling 2026-09-17; migration 0009 backfills existing normal users) — self-service creation of one's OWN workspaces, no manual gate; cap.request.create remains the request route for non-provisioned kinds",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -504,7 +504,7 @@
       "slice": "v2.0-bcs",
       "section": "C. Project",
       "ui_surface": "\"Create or choose a project\"",
-      "notes": "",
+      "notes": "provisioning defaults to true for every normal authenticated principal (captain ruling 2026-09-17; migration 0009 backfills existing normal users) — self-service creation of one's OWN projects, no manual gate; cap.request.create remains the request route for non-provisioned kinds",
       "status": "target",
       "inverse": {
         "kind": "true",
