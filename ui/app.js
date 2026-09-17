@@ -46,7 +46,7 @@ function showAuthorizedWork(me) {
 }
 function resetClientIdentity() {
   clearIdentityData(state, sessionStorage);
-  clearCodeBatch();
+  clearCodeBatch(); clearShareLink(); // sign-out/sign-in: the once-shown link and confirm token never outlive the identity
   for (const id of ['project-card', 'assessment-card', 'survey-card', 'results-card']) $(id).hidden = true;
   $('create-project').hidden = true;
   for (const [id, label] of [['projects', 'Choose project'], ['assessments', 'Choose assessment'], ['surveys', 'Choose survey'], ['languages', 'Choose language'], ['templates', 'Choose template']]) resetSelect($(id), label);
@@ -80,7 +80,7 @@ async function projects() {
 }
 async function chooseProject() {
   state.project = $('projects').value || null; state.projectView = null; state.assessment = null; state.survey = null;
-  clearCodeBatch();
+  clearCodeBatch(); clearShareLink();
   text($('project-detail'), ''); text($('assessment-detail'), ''); text($('survey-detail'), '');
   text($('results'), 'Select an assessment.');
   resetSelect($('assessments'), 'Choose assessment'); resetSelect($('surveys'), 'Choose survey');
@@ -98,7 +98,7 @@ async function assessments() {
 }
 async function chooseAssessment() {
   state.assessment = $('assessments').value || null; state.survey = null; resetSelect($('surveys'), 'Choose survey');
-  clearCodeBatch();
+  clearCodeBatch(); clearShareLink();
   text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
   if (!state.assessment) return;
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
@@ -228,6 +228,7 @@ function linkRoute() {
   const aid = required(state.assessment, 'Choose an assessment.'), sid = required(state.survey, 'Choose a survey.');
   return `/v2/assessments/${path(aid)}/surveys/${path(sid)}/links`;
 }
+// Memory only: the once-shown URL and confirm token are never written to storage; every selection change and sign-out clears them.
 function clearShareLink() { state.linkConfirm = null; state.shareUrl = null; text($('issue-link-impact'), ''); text($('share-url'), ''); $('share-url').hidden = true; $('copy-link').hidden = true; text($('copy-state'), ''); $('issue-link-confirm').disabled = true; }
 bindClick('issue-link-preview', sharedCopy.labelPreviewLink, async () => {
   clearShareLink();
