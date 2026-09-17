@@ -21,3 +21,9 @@ export async function redeemAndOpen(redeem, onRedeemed, openForm, onRedeemFailur
   onRedeemed(result);
   await openForm();
 }
+
+// Retry an unopened form without discarding answers in an already open form.
+export async function recoverParticipant(receipt, hasForm, openForm, showReceipt) {
+  if (receipt.submitted === false && !hasForm) await openForm();
+  else showReceipt(receipt);
+}

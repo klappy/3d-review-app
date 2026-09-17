@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
+import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
 
 test('reload before submit reopens the form, not an empty receipt', () => {
   assert.equal(resumeTarget({ submitted: false, response_id: null }), 'form');
@@ -33,4 +33,21 @@ test('confirmed receipt clears stale re-entry warning but unsubmitted receipt re
   const warning = 'Answers entered before reload were not saved';
   assert.equal(resumeNoticeAfterReceipt({ submitted: true }, warning), '');
   assert.equal(resumeNoticeAfterReceipt({ submitted: false }, warning), warning);
+});
+
+ test('recover retries the form after consumed-code failure without redeeming again', async () => {
+  let redeems = 0, opens = 0, savedToken = null, displayed = 0;
+  const open = async () => { if (++opens === 1) throw new Error('temporary form failure'); };
+  await assert.rejects(redeemAndOpen(async () => { redeems++; return { participant_token: 'synthetic' }; },
+    r => { savedToken = r.participant_token; }, open, () => assert.fail('code succeeded')));
+  await recoverParticipant({ submitted: false }, false, open, () => displayed++);
+  assert.equal(redeems, 1); assert.equal(opens, 2); assert.equal(savedToken, 'synthetic'); assert.equal(displayed, 0);
+});
+
+test('recover preserves loaded answers and routes saved receipts without loading form', async () => {
+  const answers = { answer: 'entered value' }; const shown = [];
+  const open = async () => { answers.answer = ''; assert.fail('must not reload form'); };
+  await recoverParticipant({ submitted: false }, true, open, r => shown.push(r));
+  await recoverParticipant({ submitted: true }, false, open, r => shown.push(r));
+  assert.equal(answers.answer, 'entered value'); assert.deepEqual(shown, [{ submitted: false }, { submitted: true }]);
 });

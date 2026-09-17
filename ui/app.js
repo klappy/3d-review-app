@@ -1,7 +1,7 @@
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
-import { redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
+import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
 const $ = id => document.getElementById(id);
 const state = { session: sessionStorage.getItem('facilitatorToken'), participant: sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null };
 state.responseKey = savedSubmitKey(sessionStorage, state.participant);
@@ -227,6 +227,7 @@ bindForm('redeem', 'Redeeming access code…', async fd => {
     () => api('/v2/participate/code', { method: 'POST', body: { code: String(fd.get('code')).trim() } }),
     result => {
     state.participant = result.participant_token; sessionStorage.setItem('participantToken', state.participant);
+    state.form = null; state.answers = null;
     state.responseKey = null; sessionStorage.removeItem('responseKey');
     text($('participant-resume'), '');
     $('recover').hidden = false;
@@ -279,7 +280,7 @@ function showReceipt(result) {
 }
 bindClick('recover', 'Recovering receipt…', async () => {
   const receipt = await api('/v2/participate/receipt', { participant: true });
-  showReceipt(receipt);
+  await recoverParticipant(receipt, !!state.form, loadForm, showReceipt);
   if (receipt.submitted) { state.responseKey = null; sessionStorage.removeItem('responseKey'); }
 });
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
