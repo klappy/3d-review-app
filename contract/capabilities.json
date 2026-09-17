@@ -8,12 +8,12 @@
     "sha": "0f4413768c4365054372d917619311d7c2a00e96"
   },
   "counts": {
-    "total": 83,
-    "read": 29,
+    "total": 84,
+    "read": 30,
     "write.effect": 7,
     "write.reversible": 40,
     "write.dangerous": 7,
-    "v2.0-bcs": 75,
+    "v2.0-bcs": 76,
     "v2.1-oct": 8,
     "paths_inferred": 37,
     "inverse_unassessed": 0
@@ -2246,14 +2246,74 @@
       "slice": "v2.0-bcs",
       "section": "J. Ops, telemetry, xray, docs, feedback",
       "ui_surface": "\"Was this helpful?\"",
-      "notes": "bee:10447875",
+      "notes": "public write; persist accepted keys under canonical body; strip {answers,responses,response} before unknown reject; result {recorded,stripped,feedback_id} never echoes contents; no public list",
       "status": "target",
       "inverse": {
         "kind": "none",
         "compensating_control": "append-only"
       },
       "undo_token": false,
-      "public": true
+      "public": true,
+      "params_schema": {
+        "type": "object",
+        "properties": {
+          "helpful": { "type": "boolean" },
+          "note": { "type": "string" },
+          "text": { "type": "string", "description": "legacy dual-read alias for note" },
+          "context": {},
+          "scope_type": { "type": "string" },
+          "scope_id": { "type": "string" },
+          "satisfaction": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "confusion": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "frustration": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "sentiment_journey": { "type": "string" },
+          "cast_id": { "type": "string" },
+          "persona": { "type": "string" },
+          "goal_id": { "type": "string" },
+          "answers": { "description": "stripped, never persisted" },
+          "responses": { "description": "stripped, never persisted" },
+          "response": { "description": "stripped, never persisted" }
+        },
+        "additionalProperties": false
+      },
+      "result_schema": {
+        "type": "object",
+        "properties": {
+          "recorded": { "type": "boolean", "const": true },
+          "stripped": { "type": "boolean" },
+          "feedback_id": { "type": "string" }
+        },
+        "required": ["recorded", "stripped", "feedback_id"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "cap.ops.feedback_get",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/ops/feedback/{id}",
+        "path_inferred": false
+      },
+      "roles": "S",
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "ui_surface": "staff per-id readback",
+      "notes": "support-only; N6 role gate then row existence-hiding; opaque scope_type/scope_id; no public list; no aggregate",
+      "status": "target",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "public": false,
+      "params_schema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "minLength": 1 }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      }
     },
     {
       "id": "cap.ops.undo",

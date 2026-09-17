@@ -231,7 +231,7 @@ export async function persistTrace(ctx: Ctx, spans: Span[], meta: { capability: 
   }
 }
 
-const REDACT_KEYS = /param|code|email|address|answer|token|secret|password|body|response/i;
+const REDACT_KEYS = /param|code|email|address|answer|token|secret|password|body|response|note|text|context|sentiment/i;
 export function redact(data: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(data)) {
