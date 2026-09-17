@@ -2,7 +2,7 @@ import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { readFile, mkdtemp, writeFile, readdir, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { resolve, delimiter } from 'node:path';
 import { buildIndex, readPinnedSources, generate } from '../tools/build-synthetic-attestation';
 import { attestCapture, initializeAttestation, type CaptureRow } from '../src/report-attestation';
 import { canonicalJson, domainHash } from '../src/report-canonical-json';
@@ -15,7 +15,7 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 beforeAll(async () => {
   sources = await readPinnedSources(); built = await buildIndex(sources.records, sources.templates);
   // Independent mapping oracle: decode the EXISTING committed SQL literals without
-  // executing seed SQL. The only SQLite execution is pinned template recovery.
+  // executing seed SQL. Pinned template recovery uses Node SQLite independently.
   const python = `import json,pathlib,re,sys
 text=(pathlib.Path(sys.argv[1])/'seed/synthetic-responses.sql').read_text()
 def statements(table):
@@ -49,6 +49,27 @@ print(json.dumps(rows))
   });
 }, 20000);
 describe('pinned source identity and compact generation', () => {
+  it('reads pinned sources when Python SQLite is unavailable', async () => {
+    const shim = await mkdtemp(resolve(tmpdir(), 'attestation-no-python-sqlite-'));
+    const previous = process.env.PYTHONPATH;
+    try {
+      await writeFile(resolve(shim, 'sqlite3.py'), "raise ImportError('PORTABILITY_SQLITE_UNAVAILABLE')\n");
+      process.env.PYTHONPATH = previous === undefined ? shim : shim + delimiter + previous;
+      let controlError: unknown;
+      try { execFileSync('python3', ['-c', 'import sqlite3'], { encoding: 'utf8', stdio: 'pipe' }); }
+      catch (error) { controlError = error; }
+      expect(controlError).toBeDefined();
+      expect(String((controlError as { stderr?: unknown })?.stderr)).toContain('PORTABILITY_SQLITE_UNAVAILABLE');
+      const recovered = await readPinnedSources();
+      expect(recovered.records).toHaveLength(425);
+      expect(recovered.templates).toHaveLength(9);
+      expect(recovered.templates).toEqual(sources.templates);
+    } finally {
+      if (previous === undefined) delete process.env.PYTHONPATH;
+      else process.env.PYTHONPATH = previous;
+      await rm(shim, { recursive: true, force: true });
+    }
+  });
   it('generates exact committed bytes with all historic omissions', async () => {
     expect(built.bytes).toBe(await readFile('src/synthetic-attestation-index.json','utf8'));
     expect(built.evidence).toMatchObject({ count:425, cycles:34, itemCount:111, templateCount:9, requiredOmissions:301, optionalNulls:659 });
