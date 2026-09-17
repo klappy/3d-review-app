@@ -51,4 +51,11 @@ describe("docs topics intro/faq (PACKET 2026-09-17 option A)", () => {
       "glossary", "permissions", "reversibility", "telemetry", "privacy", "stages",
     ]));
   });
+
+  it("no-arg what: equals TOPICS.intro cargo bytes (F4)", async () => {
+    const out = await docs(stubCtx, {});
+    expect(out.result.what).toBe(INTRO);
+    expect(sha256(out.result.what as string)).toBe(INTRO_SHA256);
+    expect(Buffer.byteLength(out.result.what as string, "utf8")).toBe(791);
+  });
 });

@@ -126,7 +126,7 @@ export const docs: Handler = async (ctx, a) => {
   }
   const roles = ctx.principal.kind === "user" ? (await ctx.db.prepare("SELECT scope_type, scope_id, role FROM grant WHERE principal_id = ?").bind(ctx.principal.id).all()).results : [];
   return { result: {
-    what: "3D Review helps Bible translation projects assess their own health from three perspectives — the translation team, the community, and the church — and turn the findings into next steps. Create or choose a project. Review the survey results. Use the findings to identify improvements. Repeat when it helps your project reflect on progress.",
+    what: TOPICS.intro,
     tools: { docs: "explain", read: "class=read", write: "class=write.reversible (+ undo)", danger: "write.effect and write.dangerous, two-step" },
     tool_surface: { count: 4, governed_by: CEILING, reason: "read/write/danger split is the host-level permission boundary; telemetry rides read cap.ops.trace and trace_id on every envelope" },
     auth: "Collaborators sign in by Cloudflare email code → web session. Agents and connectors use OAuth 2.1 on /mcp (discovery at /.well-known/oauth-authorization-server, dynamic client registration, PKCE): the user signs in by email code, approves the named app, and the app acts as that user — auth.me shows delegated_by = oauth:<client_id>; write cap.auth.logout disconnects it. /mcp without a credential answers 401 + WWW-Authenticate. Participants: access code or invitation link → participant token bound to one survey. Agents act as a user, never as a role.",
