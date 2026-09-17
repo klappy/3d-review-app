@@ -15,6 +15,7 @@ stage-composition.test.mjs
 workspace-overview.test.mjs
 
 participant-view.test.mjs
+participant-header.test.mjs
 public-choices.test.mjs
 diagnostic-path.test.mjs
 collab-mount.test.mjs
