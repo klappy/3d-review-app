@@ -2,7 +2,12 @@ import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { clearIdentityData, codeEntryFailure, hasProjectWork } from './visibility.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
-import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment } from './shared-link.js';
+import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
+// Thrown by shared-link paths that already showed the participant copy: run() marks the action as
+// needing attention without painting raw server text into #error.
+class HandledFailure extends Error { constructor() { super('handled'); this.name = 'HandledFailure'; } }
+// In-memory only (per page): whether an earlier submit on this page had an unknown outcome.
+let submitState = 'none'; // 'none' | 'uncertain'
 const $ = id => document.getElementById(id);
 // Shared-link mode is decided first so no global (code-path) key is read or written in that mode.
 const sharedToken = parseEntryFragment(location.hash);
@@ -35,7 +40,8 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
 }
 async function run(label, task) {
   note(label); const buttons = [...document.querySelectorAll('button')].filter(b => b.id !== 'version' && b.id !== 'changelog-close'); buttons.forEach(b => b.disabled = true);
-  try { await task(); note(`${label} — complete.`); } catch (error) { fail(error.message); }
+  try { await task(); note(`${label} — complete.`); }
+  catch (error) { if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; } else fail(error.message); }
   finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : false); }
 }
 function showAuthorizedWork(me) {
@@ -323,10 +329,30 @@ bindClick('submit', 'Submitting response…', async () => {
     let result;
     try { result = await state.shared.submit(state.answers); }
     catch (error) {
-      if (errorKind(error) === 'conflict') { const resolved = await resolveConflict(state.shared); if (resolved.state === 'receipt') { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); showReceipt(resolved.receipt); return; } if (resolved.state === 'rateLimited' || resolved.state === 'transient') text($('participant-resume'), resolved.state === 'rateLimited' ? sharedCopy.rateLimited : sharedCopy.transient); else showSharedUnavailable(resolved.state); }
-      else if (errorKind(error) === 'rateLimited') text($('participant-resume'), sharedCopy.rateLimited);
-      else text($('participant-resume'), sharedCopy.submitFailed);
-      throw error;
+      // Diagnostics stay in the console; nothing raw reaches the page (no #events in shared mode, never fail()).
+      console.warn('[3dr] submit', { status: error?.status, code: error?.code, trace_id: error?.trace_id });
+      const kind = submitFailureKind(error);
+      const uncertain = () => { submitState = 'uncertain'; text($('participant-resume'), sharedCopy.submitUncertain); };
+      if (kind === 'uncertain') uncertain();
+      else if (kind === 'conflict') {
+        const resolved = await resolveConflict(state.shared);
+        if (resolved.state === 'receipt') { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); showReceipt(resolved.receipt); return; }
+        if (resolved.state === 'rateLimited' || resolved.state === 'transient') uncertain(); // the probe's wording is not the answers' outcome: unknown means uncertain (auditor F5)
+        else showSharedUnavailable(resolved.state);
+      }
+      else if (kind === 'unavailable') showSharedUnavailable(submitState === 'uncertain' ? 'cannotResume' : 'unavailable');
+      else { // rejected: this request committed nothing, but an earlier uncertain one may have — ask the receipt before saying "not submitted"
+        let receipt;
+        try { receipt = await state.shared.receipt(); }
+        catch (probeError) {
+          if (errorKind(probeError) === 'unavailable') showSharedUnavailable(submitState === 'uncertain' ? 'cannotResume' : 'unavailable');
+          else uncertain();
+          throw new HandledFailure();
+        }
+        if (receipt.submitted) { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); showReceipt(receipt); return; }
+        if (submitState === 'none') text($('participant-resume'), sharedCopy.submitFailed); else uncertain();
+      }
+      throw new HandledFailure();
     }
     showReceipt(result); return;
   }
@@ -336,6 +362,9 @@ bindClick('submit', 'Submitting response…', async () => {
   state.responseKey = null; sessionStorage.removeItem('responseKey');
 });
 function showReceipt(result) {
+  // Existing uncertainty contract: while a submit outcome is unknown, a submitted:false receipt neither
+  // contradicts the uncertain copy nor clears it (same fact, same outcome on the Submit and Recover paths).
+  if (result.submitted === false && submitState === 'uncertain') return;
   clearParticipantError();
   text($('receipt'), result.submitted === false ? 'No submission recorded yet.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`);
   text($('participant-resume'), resumeNoticeAfterReceipt(result, $('participant-resume').textContent));
@@ -344,8 +373,20 @@ function showReceipt(result) {
   if (state.shared && result.submitted !== false) text($('participant-resume'), `${sharedCopy.receiptThanks} ${sharedCopy.sameLinkOthers}`);
 }
 bindClick('recover', 'Recovering receipt…', async () => {
-  const receipt = await api('/v2/participate/receipt', { participant: true });
+  let receipt;
+  if (state.shared) { // shared route: a refused probe shows participant copy, never raw server text in #error
+    try { receipt = await state.shared.receipt(); }
+    catch (error) {
+      console.warn('[3dr] recover', { status: error?.status, code: error?.code, trace_id: error?.trace_id });
+      const kind = errorKind(error);
+      if (kind === 'unavailable') showSharedUnavailable(submitState === 'uncertain' ? 'cannotResume' : 'unavailable');
+      else if (submitState === 'uncertain') text($('participant-resume'), sharedCopy.submitUncertain); // keep the uncertainty; the form stays
+      else text($('participant-resume'), kind === 'rateLimited' ? sharedCopy.rateLimited : sharedCopy.transient); // live form: a probe blip is not a revoked session
+      throw new HandledFailure();
+    }
+  } else receipt = await api('/v2/participate/receipt', { participant: true });
   await recoverParticipant(receipt, !!state.form, loadForm, showReceipt);
+  if (!receipt.submitted && state.shared && submitState === 'uncertain') throw new HandledFailure(); // no "— complete." beside kept uncertainty
   if (!receipt.submitted) return;
   if (state.shared) { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); } // scoped namespace only; globals untouched in shared mode
   else { state.responseKey = null; sessionStorage.removeItem('responseKey'); }
@@ -355,15 +396,16 @@ bindClick('recover', 'Recovering receipt…', async () => {
 function showSharedUnavailable(kind) {
   const message = { closed: sharedCopy.collectionClosed, cannotResume: sharedCopy.cannotResume, rateLimited: sharedCopy.rateLimited, transient: sharedCopy.transient }[kind] || sharedCopy.linkUnavailable;
   text($('participant-error'), message); $('participant-error').hidden = false;
-  $('answers').hidden = true; $('review').hidden = true;
+  text($('participant-resume'), ''); // terminal copy replaces any sticky retry instruction
+  $('answers').hidden = true; $('review').hidden = true; $('recover').hidden = true;
 }
 async function sharedLinkEntry(token, namespace) {
-  $('facilitator').hidden = true; document.querySelector('aside').hidden = true; $('participant').querySelector('p.note').hidden = true;
+  $('facilitator').hidden = true; $('evidence').remove(); document.querySelector('aside').hidden = true; $('participant').querySelector('p.note').hidden = true; // evidence is removed, not hidden: no trace/receipt text exists on the shared route
   for (const el of $('redeem').querySelectorAll('label,button')) el.hidden = true; // code entry hidden; the alert slot stays
   namespace = namespace || await digestNamespace(token);
   state.sharedStore = scopedStorage(sessionStorage, namespace);
   rememberCurrent(sessionStorage, namespace); // digest only; the raw token is never persisted
-  state.shared = createSharedLinkClient({ store: state.sharedStore, onEvent: e => { const li = document.createElement('li'); li.textContent = `${e.method} ${e.url} · ${e.capability || 'v2'} · ${e.receipt?.id || e.receipt?.receipt_id || 'read'} · ${e.trace_id || 'no trace'}`; $('events').prepend(li); } });
+  state.shared = createSharedLinkClient({ store: state.sharedStore }); // no onEvent: nothing is ever written to #events in shared mode
   try {
     // With a fragment: open (resume_token when this namespace holds a bearer). Without one (reload):
     // the raw token is not persisted, so resume goes straight to the receipt with the stored bearer.
@@ -384,7 +426,7 @@ async function sharedLinkEntry(token, namespace) {
     const kind = errorKind(error);
     if (kind === 'conflict') { const resolved = await resolveConflict(state.shared); if (resolved.state === 'receipt') { $('recover').hidden = false; showReceipt(resolved.receipt); return; } showSharedUnavailable(resolved.state); return; }
     showSharedUnavailable(kind);
-    throw error;
+    throw new HandledFailure(); // participant copy already shown; run() must not paint the raw error
   }
 }
 if (sharedMode) run(sharedCopy.labelOpening, () => sharedLinkEntry(sharedToken, sharedResume));
