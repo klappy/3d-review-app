@@ -85,12 +85,143 @@ export const opsHealth: Handler = async (ctx) => {
     contract: (contract as any).contract, source_sha: (contract as any).source.sha, deps: { d1 }, capabilities: capabilities.length } };
 };
 
+/** Literal answers-strip key-set (Auth A5). Dropped before unknown-key reject; never persisted. */
+const FEEDBACK_STRIP_KEYS = ["answers", "responses", "response"] as const;
+const FEEDBACK_WRITE_KEYS = new Set([
+  "helpful", "note", "text", "context", "scope_type", "scope_id",
+  "satisfaction", "confusion", "frustration", "sentiment_journey",
+  "cast_id", "persona", "goal_id",
+]);
+const FEEDBACK_SCORE_KEYS = ["satisfaction", "confusion", "frustration"] as const;
+const FEEDBACK_CODE_UNIT_128 = ["sentiment_journey", "cast_id", "persona", "goal_id"] as const;
+
+const utf8Bytes = (s: string): number => new TextEncoder().encode(s).length;
+const invalidFeedback = (message: string) => new CapError("INVALID_PARAMS", message);
+
+function jsonUtf8Size(value: unknown): number {
+  try { return utf8Bytes(JSON.stringify(value) ?? "null"); }
+  catch { throw invalidFeedback("params must be JSON-serializable"); }
+}
+
+function asFeedbackString(value: unknown, key: string): string {
+  if (typeof value !== "string") throw invalidFeedback(`${key} must be a string`);
+  return value;
+}
+
+/** Persist accepted write keys under canonical body keys; row scopes stay opaque labels. */
 export const opsFeedback: Handler = async (ctx, p) => {
-  const stripped = "answers" in p;
-  const { answers: _drop, ...rest } = p;
+  const stripped = FEEDBACK_STRIP_KEYS.some((k) => k in p);
+  const rest: Record<string, unknown> = { ...p };
+  for (const k of FEEDBACK_STRIP_KEYS) delete rest[k];
+
+  if (jsonUtf8Size(rest) > 8192) throw invalidFeedback("params exceed 8192 UTF-8 bytes");
+
+  if ("helpful" in rest && typeof rest.helpful !== "boolean") throw invalidFeedback("helpful must be a boolean");
+  if ("note" in rest) {
+    const note = asFeedbackString(rest.note, "note");
+    if (utf8Bytes(note) > 4096) throw invalidFeedback("note exceeds 4096 UTF-8 bytes");
+  }
+  if ("text" in rest) {
+    const text = asFeedbackString(rest.text, "text");
+    if (utf8Bytes(text) > 4096) throw invalidFeedback("text exceeds 4096 UTF-8 bytes");
+  }
+  if ("context" in rest && jsonUtf8Size(rest.context) > 1024) throw invalidFeedback("context exceeds 1024 UTF-8 bytes");
+  for (const key of ["scope_type", "scope_id"] as const) {
+    if (!(key in rest)) continue;
+    const value = asFeedbackString(rest[key], key);
+    if (value.length > 64) throw invalidFeedback(`${key} exceeds 64 code units`);
+  }
+  for (const key of FEEDBACK_SCORE_KEYS) {
+    if (!(key in rest)) continue;
+    const value = rest[key];
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 5)
+      throw invalidFeedback(`${key} must be an integer 1-5`);
+  }
+  for (const key of FEEDBACK_CODE_UNIT_128) {
+    if (!(key in rest)) continue;
+    const value = asFeedbackString(rest[key], key);
+    if (value.length > 128) throw invalidFeedback(`${key} exceeds 128 code units`);
+  }
+
+  const hasNote = "note" in rest;
+  const hasText = "text" in rest;
+  if (hasNote && hasText && rest.note !== rest.text) throw invalidFeedback("note and text conflict");
+
+  for (const key of Object.keys(rest)) {
+    if (!FEEDBACK_WRITE_KEYS.has(key)) throw invalidFeedback(`unknown field ${key}`);
+  }
+
+  const body: Record<string, unknown> = { stripped };
+  if ("helpful" in rest) body.helpful = rest.helpful;
+  if (hasNote) body.note = rest.note;
+  else if (hasText) body.note = rest.text;
+  if ("context" in rest) body.context = rest.context;
+  for (const key of FEEDBACK_SCORE_KEYS) if (key in rest) body[key] = rest[key];
+  for (const key of FEEDBACK_CODE_UNIT_128) if (key in rest) body[key] = rest[key];
+
+  const feedbackId = id("fb");
+  const scopeType = "scope_type" in rest ? asFeedbackString(rest.scope_type, "scope_type") : "platform";
+  const scopeId = "scope_id" in rest ? asFeedbackString(rest.scope_id, "scope_id") : "-";
   await ctx.db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
-    .bind(id("fb"), ctx.principal.id, String(rest.scope_type ?? "platform"), String(rest.scope_id ?? "-"), JSON.stringify({ context: rest.context ?? null, text: rest.text ?? "", stripped }), new Date().toISOString()).run();
-  return { result: { recorded: true, stripped }, scope: { type: "platform", id: "feedback" } };
+    .bind(feedbackId, ctx.principal.id, scopeType, scopeId, JSON.stringify(body), new Date().toISOString()).run();
+  return { result: { recorded: true, stripped, feedback_id: feedbackId }, scope: { type: "platform", id: "feedback" } };
+};
+
+/** Present typed stored fields must match the read projection; otherwise the row is malformed. */
+function projectStoredFeedbackBody(raw: Record<string, unknown>): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if ("helpful" in raw) {
+    if (typeof raw.helpful !== "boolean") throw notVisible("feedback");
+    body.helpful = raw.helpful;
+  }
+  if ("note" in raw) {
+    if (typeof raw.note !== "string") throw notVisible("feedback");
+    body.note = raw.note;
+  } else if ("text" in raw) {
+    if (typeof raw.text !== "string") throw notVisible("feedback");
+    body.note = raw.text;
+  }
+  if ("context" in raw) body.context = raw.context;
+  for (const key of FEEDBACK_SCORE_KEYS) {
+    if (!(key in raw)) continue;
+    const value = raw[key];
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 5) throw notVisible("feedback");
+    body[key] = value;
+  }
+  for (const key of FEEDBACK_CODE_UNIT_128) {
+    if (!(key in raw)) continue;
+    if (typeof raw[key] !== "string") throw notVisible("feedback");
+    body[key] = raw[key];
+  }
+  if ("stripped" in raw) {
+    if (typeof raw.stripped !== "boolean") throw notVisible("feedback");
+    body.stripped = raw.stripped;
+  } else {
+    body.stripped = false;
+  }
+  return body;
+}
+
+/** S-only per-row read. Role gate is policy.ts N6; missing/malformed rows are existence-hidden. */
+export const opsFeedbackGet: Handler = async (ctx, p) => {
+  if (typeof p.id !== "string" || !p.id) throw new CapError("INVALID_PARAMS", "id required");
+  const row = await ctx.db.prepare("SELECT id, actor, scope_type, scope_id, body, created_at FROM feedback WHERE id = ?")
+    .bind(p.id).first<{ id: string; actor: string | null; scope_type: string | null; scope_id: string | null; body: string; created_at: string }>();
+  if (!row) throw notVisible("feedback");
+  let stored: unknown;
+  try { stored = JSON.parse(row.body); } catch { throw notVisible("feedback"); }
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) throw notVisible("feedback");
+  const body = projectStoredFeedbackBody(stored as Record<string, unknown>);
+  return {
+    result: {
+      id: row.id,
+      actor: row.actor ?? "anon",
+      scope_type: row.scope_type ?? "platform",
+      scope_id: row.scope_id ?? "-",
+      created_at: row.created_at,
+      body,
+    },
+  };
 };
 
 export const opsTrace: Handler = async (ctx, p) => {
