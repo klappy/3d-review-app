@@ -4,5 +4,6 @@ import fs from "node:fs";
 export default defineConfig({
   plugins: [{ name: "yaml-as-text", transform(_code, id) { if (id.endsWith(".yaml") || id.endsWith(".sql")) return { code: `export default ${JSON.stringify(fs.readFileSync(id, "utf8"))};`, map: null }; } }],
   resolve: { alias: { "cloudflare:workers": new URL("./test/stubs/cloudflare-workers.ts", import.meta.url).pathname } },
-  test: { include: ["test/**/*.test.ts"], testTimeout: 30000, server: { deps: { inline: ["@cloudflare/workers-oauth-provider"] } } },
+  // Bound concurrent test files for the local Miniflare correctness harnesses.
+  test: { fileParallelism: false, include: ["test/**/*.test.ts"], testTimeout: 30000, server: { deps: { inline: ["@cloudflare/workers-oauth-provider"] } } },
 });

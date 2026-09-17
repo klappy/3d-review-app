@@ -252,6 +252,10 @@ function fakeDocument() {
     e.contains = (n: any): boolean => e === n || e.children.some((c: any) => c.contains?.(n));
     e.querySelector = () => el("p"); e.querySelectorAll = () => []; e.reset = () => {}; e.focus = () => {};
     e.remove = () => { if (id) { byId.delete(id); removed.add(id); } };
+    // Real modules mounted through app.js (workspace-manager, scope-invitations) use classList/childElementCount; the hand-written DOM carries them too.
+    const classes = new Set<string>();
+    e.classList = { add: (...c: string[]) => c.forEach(x => classes.add(x)), remove: (...c: string[]) => c.forEach(x => classes.delete(x)), contains: (c: string) => classes.has(c), toggle: (c: string, f?: boolean) => { (f ?? !classes.has(c)) ? classes.add(c) : classes.delete(c); return classes.has(c); } };
+    Object.defineProperty(e, "childElementCount", { get: () => e.children.length });
     return e;
   }
   const removed = new Set<string>();
@@ -386,6 +390,7 @@ function expectCleared($: any, storage: any) {
   expect($("issue-link-impact").textContent).toBe(""); expect($("copy-state").textContent).toBe("");
   for (const k of storage.keys()) expect(String(storage.getItem(k))).not.toContain("#survey=");
 }
+const allTextOf = (n: any): string => (n?.textContent || "") + (n?.children || []).map(allTextOf).join("");
 describe("[fake-DOM] staff share URL lifetime", () => {
   it("switching assessment clears the once-shown URL and confirm state; nothing is persisted", async () => {
     const storage = memoryStorage(); storage.setItem("facilitatorToken", owner);
@@ -393,9 +398,14 @@ describe("[fake-DOM] staff share URL lifetime", () => {
     for (const k of storage.keys()) expect(String(storage.getItem(k))).not.toContain("#survey=");
     $("assessments").value = "assess_tavo_prepare"; await $("assessments").dispatch("change"); await settled($);
     expectCleared($, storage);
+    // the mounted collaborator manager never keeps the previous assessment's scope after a switch (R2): either the
+    // new scope, or nothing when the new selection was refused — never assess_tavo_collect
+    expect(allTextOf($("scope-invitations-root"))).not.toContain("assess_tavo_collect");
+    if ($("error").hidden) expect(allTextOf($("scope-invitations-root"))).toContain("assess_tavo_prepare");
     // a fresh project selection also starts clean
     $("projects").value = "proj_aster"; await $("projects").dispatch("change"); await settled($);
     expectCleared($, storage);
+    expect(allTextOf($("scope-invitations-root"))).not.toContain("assess_tavo_prepare");
   });
   it("sign-out clears the URL and confirm state, and a reload after it shows no link", async () => {
     const storage = memoryStorage(); storage.setItem("facilitatorToken", owner);
@@ -403,6 +413,8 @@ describe("[fake-DOM] staff share URL lifetime", () => {
     await $("signout").dispatch("click"); await settled($);
     expectCleared($, storage);
     expect(storage.getItem("facilitatorToken")).toBeNull();
+    // both mounted managers are reset on identity change: hidden and empty, no scope text survives
+    for (const id of ["workspace-manager-root", "scope-invitations-root"]) { expect($(id).hidden).toBe(true); expect($(id).children.length).toBe(0); }
     // fresh boot: the fake document has no markup defaults, so check content and storage, not `hidden`
     const $2 = await boot(storage, "");
     expect($2("share-url").textContent).toBe(""); expect($2("issue-link-impact").textContent).toBe("");

@@ -1,0 +1,12 @@
+.workspace-manager { display:grid; gap:1rem; min-width:0; }
+.workspace-manager[hidden] { display:none; }
+.workspace-manager .wm-heading,.workspace-manager .wm-project { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.workspace-manager .wm-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); gap:1rem; }
+.workspace-manager .wm-card,.workspace-manager .wm-detail { padding:1.25rem; min-width:0; overflow-wrap:anywhere; }
+.workspace-manager .wm-detail { display:grid; gap:.75rem; }
+.workspace-manager .wm-form { display:flex; flex-wrap:wrap; align-items:end; gap:.75rem; }
+.workspace-manager label { display:grid; gap:.35rem; min-width:0; }
+.workspace-manager input,.workspace-manager select { max-width:100%; min-width:0; }
+.workspace-manager .wm-confirm { border:1px solid currentColor; border-radius:.75rem; padding:1rem; }
+.workspace-manager .wm-status:empty { display:none; }
+@media screen and (max-width:40rem) { .workspace-manager .wm-form { display:grid; } .workspace-manager .wm-heading { align-items:start; } }

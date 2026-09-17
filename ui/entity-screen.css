@@ -1,0 +1,65 @@
+/* One entity per screen (source: views-coordinator V.projects / V.project). body[data-entity-level] is set by
+   entity-screen.js from actual selection state; without it (signed out, public, participant) nothing here applies.
+   Only display/order is set. No hidden attribute, authority flag or select value is touched, and the one path to
+   the next entity (the existing selects via the overview/tree, the authorized create forms) always stays reachable. */
+@media screen {
+  /* Workspaces / workspace: the W manager and the all-projects overview are the screen. Legacy selector chrome is
+     not stacked beneath them; the authorized "Create a project" form stays (revealed by the overview action). */
+  .rv[data-entity-level="workspaces"] #project-card > #load-projects,
+  .rv[data-entity-level="workspaces"] #project-card > label,
+  .rv[data-entity-level="workspaces"] #project-card > #project-detail,
+  .rv[data-entity-level="workspace"] #project-card > #load-projects,
+  .rv[data-entity-level="workspace"] #project-card > label,
+  .rv[data-entity-level="workspace"] #project-card > #project-detail,
+  .rv[data-entity-level="workspaces"] #assessment-card,
+  .rv[data-entity-level="workspace"] #assessment-card,
+  .rv[data-entity-level="workspaces"] #survey-card,
+  .rv[data-entity-level="workspace"] #survey-card,
+  .rv[data-entity-level="workspaces"] #stage-workspace,
+  .rv[data-entity-level="workspace"] #stage-workspace,
+  .rv[data-entity-level="workspaces"] #results-card,
+  .rv[data-entity-level="workspace"] #results-card,
+  .rv[data-entity-level="workspaces"] #reports-card,
+  .rv[data-entity-level="workspace"] #reports-card { display:none; }
+  /* At the workspaces list no scope is selected: the I manager's "select a scope" placeholder adds nothing —
+     but the acceptance form (R9: reachable with zero grants and no entity) must never be hidden, so only the
+     placeholder state (no form, no acceptance heading) is quieted. */
+  .rv[data-entity-level="workspaces"] #scope-invitations-root:not(:has(form)) > :not(.scope-invitations-actions) { display:none; }
+
+  /* Project: the project overview + assessments table + collaborators. The workspace manager leaves the screen;
+     the assessment card keeps only the authorized "Start an assessment" form (revealed by the overview action). */
+  .rv[data-entity-level="project"] #workspace-manager-root,
+  .rv[data-entity-level="project"] #project-card > #load-projects,
+  .rv[data-entity-level="project"] #project-card > label,
+  .rv[data-entity-level="project"] #assessment-card > #load-assessments,
+  .rv[data-entity-level="project"] #assessment-card > label,
+  .rv[data-entity-level="project"] #assessment-card > #assessment-detail { display:none; }
+
+  /* Assessment: phases, reports and collaborators for this assessment only. Parent selectors and the create form leave the screen. */
+  .rv[data-entity-level="assessment"] #workspace-manager-root,
+  .rv[data-entity-level="assessment"] #project-card,
+  .rv[data-entity-level="assessment"] #assessment-card > #load-assessments,
+  .rv[data-entity-level="assessment"] #assessment-card > label,
+  .rv[data-entity-level="assessment"] #create-assessment,
+  .rv[data-entity-level="assessment"] #overview-all { display:none; }
+  /* #assessment-card itself stays: it holds this assessment's detail line and the stage control (#set-stage). */
+  /* Survey: the selected survey's own screen (survey card); assessment-level chrome and parents leave. */
+  .rv[data-entity-level="survey"] #workspace-manager-root,
+  .rv[data-entity-level="survey"] #project-card,
+  .rv[data-entity-level="survey"] #assessment-card,
+  .rv[data-entity-level="survey"] #overview-all,
+  .rv[data-entity-level="survey"] #scope-invitations-root,
+  .rv[data-entity-level="survey"] #reports-card,
+  .rv[data-entity-level="survey"] #results-card { display:none; }
+  .rv[data-entity-level="survey"] #survey-card > [data-stage-content="prepare"] > #load-templates,
+  .rv[data-entity-level="survey"] #survey-card > [data-stage-content="prepare"] > label,
+  .rv[data-entity-level="survey"] #survey-card > [data-stage-content="prepare"] > #select-survey { display:none; }
+
+  /* Back link: one row above the screen content. */
+  .rv #entity-back { display:inline-flex; align-items:center; min-height:36px; margin:0 0 8px; font-size:14px; }
+  .rv #entity-back[hidden] { display:none; }
+  .rv .collab-accept { margin:0 0 8px; }
+  /* The I module renders its own "Accept an invitation" action for any signed-in user; the common entry is the fallback
+     for when that menu is not on screen (module reset), so the two never show together. */
+  .rv #collab:has(#scope-invitations-root:not([hidden]) .scope-invitations-actions) .collab-accept { display:none; }
+}
