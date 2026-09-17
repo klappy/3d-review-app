@@ -1,3 +1,4 @@
+import { loadRoleHelp, loadBlankPrint, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
@@ -18,6 +19,61 @@ const sharedMode = sharedToken !== null || sharedResume !== null;
 const state = { session: sharedMode ? null : sessionStorage.getItem('facilitatorToken'), participant: sharedMode ? null : sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null, assessmentRole: null, reportConfirm: null, reportCursor: null };
 state.responseKey = sharedMode ? null : savedSubmitKey(sessionStorage, state.participant);
 const path = (value) => encodeURIComponent(value);
+let stageGeneration = 0;
+let stageContext = null;
+function clearStageScreens() {
+  stageGeneration++;
+  stageContext = null;
+  $('stage-workspace').hidden = true;
+  for (const id of ['stage-tabs-root', 'stage-help-root', 'stage-tour-root', 'stage-print-root']) $(id).replaceChildren();
+  $('stage-print-survey').replaceChildren();
+  $('stage-print-load').hidden = true;
+}
+function stageSnapshot() { return { generation: stageGeneration, session: state.session, aid: state.assessment, sid: state.survey }; }
+function stageCurrent(snap, survey = false) {
+  return !sharedMode && !!state.principal && snap.generation === stageGeneration && snap.session === state.session && snap.aid === state.assessment && (!survey || snap.sid === state.survey);
+}
+function stageRequest(snap, survey = false) {
+  return async (url, options) => {
+    if (!stageCurrent(snap, survey)) throw new Error('Context changed');
+    const response = await fetch(url, options);
+    if (!stageCurrent(snap, survey)) throw new Error('Context changed');
+    const data = await response.json();
+    if (!stageCurrent(snap, survey)) throw new Error('Context changed');
+    return { ok: response.ok, status: response.status, json: async () => data };
+  };
+}
+async function refreshStageScreens(assessment, surveys = []) {
+  const snap = stageSnapshot();
+  if (!stageCurrent(snap)) return;
+  const help = await loadRoleHelp({request: stageRequest(snap), token: snap.session, assessmentId: snap.aid, stage: assessment.stage});
+  if (!stageCurrent(snap) || !help.visible) return;
+  stageContext = { assessment, help, surveys };
+  $('stage-workspace').hidden = false;
+  const picker = $('stage-print-survey');
+  resetSelect(picker, 'Choose survey');
+  for (const survey of surveys) option(picker, survey.id, survey.template_name || survey.id);
+  picker.value = state.survey || '';
+  $('stage-print-tools').hidden = !printAllowed(help.role);
+  $('stage-print-load').hidden = !printAllowed(help.role) || !state.survey;
+  paintStageScreens();
+}
+function paintStageScreens(selected) {
+  if (!stageContext || sharedMode) return;
+  const { assessment, help } = stageContext;
+  const tab = selected || recalledTab(sessionStorage, state.assessment, assessment.stage);
+  renderStageTabs(document, $('stage-tabs-root'), {assessmentId:state.assessment, stage:assessment.stage, selected:tab, storage:sessionStorage, onSelect:next=>paintStageScreens(next)});
+  renderStageTour(document, $('stage-tour-root'), {assessmentId:state.assessment, stage:tab, role:help.role, storage:sessionStorage, onDismiss:()=>paintStageScreens(tab)});
+  // The displayed capability suggestion is valid only for the fetched stage.
+  renderRoleHelp(document, $('stage-help-root'), tab === assessment.stage ? help : {...help, available:null});
+}
+function clearStagePrint() {
+  stageGeneration++;
+  $('stage-print-root').replaceChildren();
+  $('stage-print-root').hidden = true;
+  $('stage-print-survey').value = state.survey || '';
+  $('stage-print-load').hidden = !stageContext || !printAllowed(stageContext.help.role) || !state.survey;
+}
 function note(message) { $('notice').textContent = message; $('error').hidden = true; }
 function fail(message) { $('error').textContent = message; $('error').hidden = false; $('notice').textContent = 'Action needs attention. No completion is assumed.'; }
 function text(node, value) { node.textContent = value == null ? '' : String(value); }
@@ -60,6 +116,7 @@ function showAuthorizedWork(me) {
   text($('access-state'), visible ? '' : 'No project access is assigned to this identity. Scoped project work is hidden.');
 }
 function resetClientIdentity() {
+  clearStageScreens();
   clearIdentityData(state, sessionStorage);
   clearCodeBatch(); clearShareLink(); // sign-out/sign-in: the once-shown link and confirm token never outlive the identity
   state.assessmentRole = null; clearReportState(); showReportControls();
@@ -96,6 +153,7 @@ async function projects() {
   if (state.project) $('projects').value = state.project;
 }
 async function chooseProject() {
+  clearStageScreens();
   state.project = $('projects').value || null; state.projectView = null; state.assessment = null; state.survey = null;
   clearCodeBatch(); clearShareLink();
   state.assessmentRole = null; clearReportState(); showReportControls();
@@ -116,19 +174,23 @@ async function assessments() {
   if (state.assessment) $('assessments').value = state.assessment;
 }
 async function chooseAssessment() {
+  clearStageScreens();
   state.assessment = $('assessments').value || null; state.survey = null; resetSelect($('surveys'), 'Choose survey');
   clearCodeBatch(); clearShareLink();
   state.assessmentRole = null; clearReportState(); showReportControls();
   $('granted-assessments').value = ''; text($('granted-detail'), ''); // one state.assessment, exactly one visible source
   text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
   if (!state.assessment) return;
+  const stageRead = stageSnapshot();
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
+  if (!stageCurrent(stageRead)) return;
   state.assessmentRole = result.assessment.role; showReportControls();
   text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
   const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
   if (next) $('stage-target').value = next;
   for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
   if (result.surveys?.length === 1) { $('surveys').value = result.surveys[0].id; state.survey = result.surveys[0].id; }
+  await refreshStageScreens(result.assessment, result.surveys || []);
 }
 async function templates() {
   const result = await api('/v2/templates'); resetSelect($('templates'), 'Choose current pinned template');
@@ -190,15 +252,20 @@ bindClick('load-assessments', 'Loading assessments…', assessments);
 $('assessments').addEventListener('change', () => run('Loading assessment…', chooseAssessment));
 // Assessment-only entry: an exact assessment grant, authorized server-side, with no project navigation.
 async function chooseGrantedAssessment() {
+  clearStageScreens();
   state.assessment = $('granted-assessments').value || null; state.survey = null; state.assessmentRole = null;
   clearCodeBatch(); clearShareLink(); clearReportState(); showReportControls();
   $('assessments').value = ''; text($('assessment-detail'), ''); resetSelect($('surveys'), 'Choose survey');
   text($('survey-detail'), ''); text($('results'), 'Select an assessment.'); text($('granted-detail'), '');
   if (!state.assessment) return;
   try {
-    const result = await api(`/v2/assessments/${path(state.assessment)}`);
+    const stageRead = stageSnapshot();
+  const result = await api(`/v2/assessments/${path(state.assessment)}`);
+  if (!stageCurrent(stageRead)) return;
     state.assessmentRole = result.assessment.role; showReportControls();
     text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
+    for (const survey of result.surveys || []) option($('surveys'), survey.id, survey.template_name || survey.id);
+    await refreshStageScreens(result.assessment, result.surveys || []);
   } catch (error) { state.assessmentRole = null; showReportControls(); clearReportState(); throw error; }
 }
 $('granted-assessments').addEventListener('change', () => run('Loading assessment…', chooseGrantedAssessment));
@@ -220,8 +287,21 @@ bindClick('select-survey', 'Selecting survey…', async () => {
   const [template_id, version] = selected.split('@'); const result = await api(`/v2/assessments/${path(aid)}/surveys`, { method: 'POST', body: { template_id, version: Number(version) } });
   const sid = result.survey.id; await chooseAssessment(); state.survey = sid; $('surveys').value = sid; await surveyStatus();
 });
-$('surveys').addEventListener('change', () => { state.survey = $('surveys').value || null; clearCodeBatch(); clearShareLink(); });
+$('surveys').addEventListener('change', () => { state.survey = $('surveys').value || null; clearCodeBatch(); clearShareLink(); clearStagePrint(); });
+$('stage-print-survey').addEventListener('change', () => {
+  $('surveys').value = $('stage-print-survey').value;
+  $('surveys').dispatchEvent(new Event('change'));
+});
+bindClick('stage-print-load', 'Loading blank form…', async () => {
+  const snap = stageSnapshot();
+  if (!stageContext || !stageCurrent(snap, true) || !snap.sid) return;
+  $('stage-print-root').replaceChildren();
+  const model = await loadBlankPrint({request:stageRequest(snap, true), token:snap.session, aid:snap.aid, sid:snap.sid, role:stageContext.help.role});
+  if (!stageCurrent(snap, true)) return;
+  renderBlankPrint(document, $('stage-print-root'), model);
+});
 async function surveyStatus() {
+  clearStagePrint();
   const aid = required(state.assessment, 'Choose an assessment.'), sid = required(state.survey, 'Choose a survey.');
   const result = await api(`/v2/assessments/${path(aid)}/surveys/${path(sid)}`);
   text($('survey-detail'), `${result.survey.template_name} · ${result.survey.collection_status} · ${result.counts.responses} response(s)`);

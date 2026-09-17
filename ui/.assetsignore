@@ -10,3 +10,5 @@ report-view.test.mjs
 context-tree.test.mjs
 public-entry.test.mjs
 report-card.test.mjs
+
+stage-screens.test.mjs

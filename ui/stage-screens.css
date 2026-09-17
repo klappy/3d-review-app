@@ -42,3 +42,9 @@
   body > .stage-print-only{display:block!important}
   body:has(> .stage-print-only){display:block!important;overflow:visible!important;min-height:0!important}
 }
+
+/* Mounted staff stage area spans the existing facilitator grid. */
+.rv #stage-workspace{grid-column:1 / -1;min-width:0}
+@media screen{
+  .rv #stage-print-root .paper{max-width:100%}
+}
