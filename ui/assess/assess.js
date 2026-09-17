@@ -3,6 +3,7 @@
 // Data: existing /v2 endpoints only, same-origin session (cookie or the legacy facilitatorToken). No fictional model.
 // Anything the showcase draws that this slice does not wire is omitted, never rendered as a working control.
 import { redactDiagnosticPath } from '/diagnostic-path.js';
+import { loadBlankPrint, renderBlankPrint, printAllowed } from '/stage-screens.js';
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 const LENSES = ['Translation Team', 'Church', 'Community']; // captain's order; server `perspective` decides membership
 const DOTS = { 'Translation Team': '', Church: 'blue', Community: 'gold', 'Other perspective': '' };
@@ -32,9 +33,13 @@ const redact = m => redactDiagnosticPath(String(m || 'Request could not be compl
 //                                                  | 'unauthenticated' (session expired/revoked — sign in again or retry; never durable)
 //   inflight     Map<pid, Promise>                 one read per project at a time; overlapping callers share it, and only the
 //                                                  newest issued read may write (seq), so a slower failure cannot clobber a success
+//   counts       Map<sid, {status, responses, respondents}>  per included ACTIVE survey (cut 2A): 'loaded' | 'failed' (transient,
+//                                                  Retry) | 'gone' (refusal-class: no longer visible here → assessment marked dirty,
+//                                                  Refresh) | 'unauthenticated'. Every result is bound to (aid, sid, generation) and a
+//                                                  mismatch never paints (Auditor 2A-3).
 //   generation   counter                           a later render supersedes an earlier one's DOM write (supplier 1114cb1)
 let generation = 0;
-const state = { principal: null, projects: [], lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Set() };
+const state = { principal: null, projects: [], lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Set(), counts: new Map(), print: null };
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']); // visibility/authz codes (supplier 97f7402 + policy.ts)
@@ -56,6 +61,8 @@ export function groupByLens({ surveys = [], templates = [] }) {
 export function route(hash) {
   const parts = hash.replace(/^#/, '').split('/').map(p => { try { return decodeURIComponent(p); } catch { return ''; } });
   if (parts[0] !== 'assessment' || !parts[1]) return { kind: 'projects' };
+  // Auditor 2A-4: the survey child route is explicit; anything else after the assessment id is ignored (no silent fall-through elsewhere).
+  if (parts[2] === 'survey' && parts[3]) return { kind: 'survey', id: parts[1], sid: parts[3] };
   return { kind: 'assessment', id: parts[1] };
 }
 
@@ -79,6 +86,83 @@ async function assessmentsFor(pid, { retry = false } = {}) {
   })();
   state.inflight.set(pid, run);
   return run;
+}
+const activeSurveys = current => current.surveys.filter(s => s.state === 'selected' && !s.archived_at);
+const countFor = sid => state.counts.get(sid) || { status: 'loading' };
+// Cut 2A counts: one cap.survey.get_status read per included active survey, in parallel, each bound to (aid, sid, gen).
+function loadCounts(current, gen, { only = null } = {}) {
+  const aid = current.assessment.id;
+  for (const s of activeSurveys(current)) {
+    if (only && s.id !== only) continue;
+    if (!only && countFor(s.id).status === 'loaded') continue;
+    state.counts.set(s.id, { status: 'loading' });
+    api(`/v2/assessments/${encodeURIComponent(aid)}/surveys/${encodeURIComponent(s.id)}`).then(r => {
+      if (gen !== generation || state.current?.assessment.id !== aid) return; // late effect for another screen: discard
+      state.counts.set(s.id, { status: 'loaded', responses: Number(r.counts?.responses ?? 0), respondents: Number(r.counts?.respondents ?? 0), collection_status: r.survey?.collection_status });
+      paintCounts(current);
+    }).catch(e => {
+      if (gen !== generation || state.current?.assessment.id !== aid) return;
+      const code = String(e.code);
+      // Auditor 2A-2: a refusal is not a transient failure — the survey is no longer visible to this identity here; the assessment
+      // is marked dirty so the next render refetches. Wording claims loss of visibility only, never deletion.
+      if (REFUSED.has(code)) { state.counts.set(s.id, { status: 'gone' }); state.dirty.add(aid); }
+      else if (UNAUTHENTICATED.has(code)) state.counts.set(s.id, { status: 'unauthenticated' });
+      else state.counts.set(s.id, { status: 'failed', error: redact(e.message) });
+      paintCounts(current);
+    });
+  }
+}
+function countCell(s) {
+  const c = countFor(s.id);
+  if (c.status === 'loaded') return `<span data-count="${esc(s.id)}">${c.responses} response${c.responses === 1 ? '' : 's'} · ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}</span>`;
+  if (c.status === 'failed') return `<span data-count="${esc(s.id)}" role="alert">count unavailable · <a href="#" data-retry-count="${esc(s.id)}">Retry</a></span>`;
+  if (c.status === 'gone') return `<span data-count="${esc(s.id)}" role="alert">no longer available to you here · <a href="#" data-refresh="1">Refresh</a></span>`;
+  if (c.status === 'unauthenticated') return `<span data-count="${esc(s.id)}" role="alert">sign-in no longer active · ${SIGNIN} or <a href="#" data-retry-count="${esc(s.id)}">Retry</a></span>`;
+  return `<span data-count="${esc(s.id)}" class="muted">counting…</span>`;
+}
+function totalTile(current) {
+  const act = activeSurveys(current); const loaded = act.filter(s => countFor(s.id).status === 'loaded');
+  const total = loaded.reduce((n, s) => n + countFor(s.id).responses, 0); const partial = loaded.length !== act.length;
+  return `<div data-total><p class="count" style="margin:0">${total}</p><p class="muted" style="margin:4px 0 0">responses across ${loaded.length} of ${act.length} included survey${act.length === 1 ? '' : 's'} counted${partial ? ' <strong>(partial)</strong>' : ''}</p></div>`;
+}
+function paintCounts(current) {
+  for (const s of activeSurveys(current)) { const el = app.querySelector(`[data-count="${CSS.escape(s.id)}"]`); if (el) el.outerHTML = countCell(s); }
+  const t = app.querySelector('[data-total]'); if (t) t.outerHTML = totalTile(current);
+  bindCounts(current);
+}
+function bindCounts(current) {
+  app.querySelectorAll('[data-retry-count]').forEach(el => el.onclick = e => { e.preventDefault(); loadCounts(current, generation, { only: el.dataset.retryCount }); paintCounts(current); });
+  app.querySelectorAll('[data-refresh]').forEach(el => el.onclick = e => { e.preventDefault(); render(); });
+}
+function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'Other perspective'; }
+function collectPanel(current) {
+  const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
+  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted">collection ${esc(s.collection_status)} · ${countCell(s)}</p></div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
+  return `<section class="panel"><p class="eyebrow">${title(a.stage)}</p><h2>${{ prepare: 'Prepare this assessment', collect: 'Collect perspectives', understand: 'Bring the perspectives together', improve: 'What comes next?' }[a.stage]}</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey for its own screen: counts and a printable blank questionnaire. Changing the stage, invitations, links, reports and notes are not on this screen yet.</p></section>`;
+}
+// Cut 2A child screen: ONE survey. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
+function surveyScreen(current, s) {
+  const a = current.assessment, lens = lensFor(s), mayPrint = printAllowed(a.role);
+  const back = `<a class="back" href="#assessment/${encodeURIComponent(a.id)}">← Back to ${esc(a.name)}</a>`;
+  const printBlock = mayPrint ? `<section class="panel" id="print-panel"><p class="eyebrow">Paper</p><h2>Print survey</h2><p class="muted">A blank questionnaire with this survey's actual questions — nothing personal, no codes or links on the page.</p><p><button class="primary" id="print-load" ${state.print?.sid === s.id && state.print.status === 'loading' ? 'disabled' : ''}>Print survey</button></p><div id="print-root"></div><p class="status" role="status" aria-live="polite" id="print-status">${state.print?.sid === s.id && state.print.status === 'error' ? esc(state.print.text) : ''}</p></section>` : `<section class="panel"><p class="eyebrow">Paper</p><h2>Print survey</h2><p class="muted">Printing the blank questionnaire needs a member or owner role on this assessment; your role here is ${esc(a.role)}.</p></section>`;
+  return `${back}<div class="title"><div><p class="eyebrow">Survey · ${esc(lens)}</p><h1>${esc(s.template_name)}</h1><p class="muted" style="margin:0">${esc(a.name)} · v${esc(s.template_version)} · collection ${esc(s.collection_status)}</p></div><span class="badge">${countCell(s)}</span></div><div class="grid">${printBlock}<aside class="panel"><p class="eyebrow">This survey</p><p class="count">${countFor(s.id).status === 'loaded' ? countFor(s.id).responses : '—'}</p><p class="muted">responses received${countFor(s.id).status === 'loaded' ? ` from ${countFor(s.id).respondents} respondent${countFor(s.id).respondents === 1 ? '' : 's'}` : ''}</p>${state.dirty.has(a.id) ? '<p class="note" role="alert">This assessment changed; <a href="#" data-refresh="1">Refresh</a> to see the current survey set.</p>' : ''}</aside></div>`;
+}
+function surveyUnavailable(aid, sid) { return `<div class="narrow panel"><h1>Survey unavailable</h1><p class="muted">No survey with this address is visible to you in this assessment.</p><a class="button" href="#assessment/${encodeURIComponent(aid)}">Back to assessment</a></div>`; }
+function bindPrint(current, s) {
+  const btn = app.querySelector('#print-load'); if (!btn) return;
+  btn.onclick = async () => {
+    const gen = generation, aid = current.assessment.id;
+    state.print = { sid: s.id, status: 'loading' }; btn.disabled = true;
+    const model = await loadBlankPrint({ request: (url, init) => fetch(url, init), token, aid, sid: s.id, role: current.assessment.role });
+    if (gen !== generation) return; // navigated away: nothing paints
+    btn.disabled = false;
+    if (!model.visible) { state.print = { sid: s.id, status: 'error', text: model.reason === 'unsafe-print' ? 'The print payload was refused because it carried credentials.' : `Blank questionnaire unavailable (${redact(model.reason)}).` }; app.querySelector('#print-status').textContent = state.print.text; return; }
+    state.print = { sid: s.id, status: 'ready' };
+    // renderBlankPrint draws the preview + Print button; printing itself mounts a .stage-print-only child DIRECTLY on <body>
+    // (stage-screens.js printBlankForm) so stage-screens.css hides every sibling under @media print (Auditor 2A-1).
+    renderBlankPrint(document, app.querySelector('#print-root'), model, { paper: 'a4' });
+    app.querySelector('#print-status').textContent = `${model.items.length} questions ready. Use Print below.`;
+  };
 }
 function context(current) {
   const projects = state.projects.map(p => {
@@ -109,7 +193,7 @@ function screen(current) {
   const phase = current.assessment.stage;
   const a = current.assessment, project = state.projects.find(p => p.id === a.project_id);
   const surveySet = `<aside class="panel"><p class="eyebrow">Survey set</p><h2>Three lenses</h2><p class="muted">${(current.assessment.role === 'owner' || current.assessment.role === 'member') ? 'Within each lens, choose which surveys this assessment includes.' : 'Your role here is ' + esc(current.assessment.role) + ': you can see the survey set; changing it needs a member or owner role.'} Including a survey while the stage is Collect opens collection at once. Removing a survey that already has responses, codes or invitations archives it and keeps them; including that survey again restores it together with what was collected.${state.templates ? '' : ' Template catalogue not loaded.'}</p>${lensRows(current)}${state.dirty.has(current.assessment.id) ? `<p class="note" role="alert">Your change was saved on the server, but this screen could not be refreshed and may be out of date. <a href="#" data-refresh="${esc(current.assessment.id)}">Refresh now</a></p>` : ''}<p class="status" role="${showMessage(current)?.alert ? 'alert' : 'status'}" aria-live="polite">${esc(showMessage(current)?.text || '')}</p></aside>`;
-  const left = `<section class="panel"><p class="eyebrow">${title(phase)}</p><h2>${{ prepare: 'Prepare this assessment', collect: 'Collect perspectives', understand: 'Bring the perspectives together', improve: 'What comes next?' }[phase]}</h2><p class="muted">Current stage: <strong>${title(a.stage)}</strong>. Changing the stage, invitations, links, reports and notes are not on this screen yet; the current workspace still has them.</p></section>`;
+  const left = collectPanel(current);
   return `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${esc(project?.name || a.project_id)} · your role: ${esc(a.role)}</p></div><span class="badge">${stageLabel(a.stage)}</span></div>${stages(a)}<div class="grid">${left}${surveySet}</div>`;
 }
 function projectsView() {
@@ -122,6 +206,7 @@ function bind(current) {
   if (!current) return;
   const aid = current.assessment.id;
   app.querySelectorAll('[data-refresh]').forEach(el => el.onclick = e => { e.preventDefault(); render(); });
+  bindCounts(current);
   app.querySelectorAll('[data-include]').forEach(b => b.onclick = () => act(aid, 'Including survey…', async () => { const restoring = b.textContent.trim() === 'Include again'; const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/surveys`, { method: 'POST', body: { template_id: b.dataset.include, version: Number(b.dataset.version) } }); return `${restoring ? 'Survey restored with what was collected' : 'Survey included'}; collection ${r.survey?.collection_status || 'status unknown'}.`; }));
   app.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => act(aid, 'Removing survey…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/surveys/${encodeURIComponent(b.dataset.remove)}`, { method: 'DELETE' }); return r.archived ? `Survey archived: ${r.preserved_responses} response(s), ${r.preserved_codes} code(s), ${r.preserved_invitations} invitation(s) kept. Collection is closed for it; including it again restores it.` : 'Survey removed from this assessment; nothing had been collected for it.'; }));
 }
@@ -145,10 +230,10 @@ async function fetchAssessment(aid) {
 }
 async function render() {
   const gen = ++generation, r = route(location.hash);
-  if (r.kind === 'assessment') {
+  if (r.kind === 'assessment' || r.kind === 'survey') {
     const aid = r.id;
     if (state.current?.assessment.id !== aid || state.dirty.has(aid)) {
-      try { const data = await fetchAssessment(aid); if (gen !== generation) return; state.current = data; state.dirty.delete(aid); }
+      try { const data = await fetchAssessment(aid); if (gen !== generation) return; state.current = data; state.dirty.delete(aid); state.counts.clear(); state.print = null; }
       catch (e) {
         if (gen !== generation) return;
         if (state.current?.assessment.id === aid) { /* dirty refresh failed: keep the last screen, keep the dirty banner (retry offered) */ }
@@ -156,8 +241,16 @@ async function render() {
       }
     }
     if (gen !== generation || state.current?.assessment.id !== aid) return;
-    app.className = 'workspace-layout'; app.innerHTML = context(state.current) + screen(state.current) + '</section>'; bind(state.current);
-    document.title = `${state.current.assessment.name} · 3D Review`;
+    app.className = 'workspace-layout';
+    if (r.kind === 'survey') {
+      const s = activeSurveys(state.current).find(x => x.id === r.sid);
+      app.innerHTML = context(state.current) + (s ? surveyScreen(state.current, s) : surveyUnavailable(aid, r.sid)) + '</section>';
+      bind(state.current); if (s) { bindPrint(state.current, s); loadCounts(state.current, gen, { only: s.id }); }
+      document.title = `${s ? s.template_name + ' · ' : ''}${state.current.assessment.name} · 3D Review`;
+    } else {
+      app.innerHTML = context(state.current) + screen(state.current) + '</section>'; bind(state.current); loadCounts(state.current, gen);
+      document.title = `${state.current.assessment.name} · 3D Review`;
+    }
   } else { state.current = null; if (gen !== generation) return; app.className = ''; app.innerHTML = projectsView(); bind(null); document.title = '3D Review · Assessments'; }
 }
 async function boot() {
