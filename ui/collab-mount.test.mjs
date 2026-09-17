@@ -37,6 +37,8 @@ test('app.js lifecycle: reset first on identity change; identity/projects snapsh
   assert.ok(mount.includes('if (!selectedWorkspace) await workspaces.refresh()'),'invitation accept re-reads W when none is selected');
   assert.ok(!/projects\(list\) \{[^}]*workspaces\.refresh/.test(mount),'projects() never refreshes W');
   assert.ok(mount.includes('if (!currentScope) invitations.setScope(null);'),'identity re-observation keeps a current host scope');
+  assert.ok(mount.includes("if (ws) { onWorkspaceOpened(); currentScope = { type: 'workspace', id: ws.id, role: ws.role }; invitations.setScope(currentScope); } else if (currentScope?.type === 'workspace')"),'explicit workspace Open resets downstream before painting; null callback stays passive (Auditor c5716400828)');
+  assert.ok(read('./app.js').includes("onWorkspaceOpened: () => { for (const id of ['surveys', 'assessments', 'granted-assessments', 'projects'])"),'downstream reset goes through the existing selects');
   assert.ok(mount.includes('onGrantsChanged: async () => { await onReload(); if (!selectedWorkspace) await workspaces.refresh(); }'),'accepted workspace invitation reaches the W list (Bugbot 4037957668)');
   assert.ok(!mount.includes("selectedWorkspace ? { type: 'workspace'"),'setScope(null) is a plain reset: no generic workspace fallback during prefetch resets (Bugbot 4038131213)');
   assert.ok(mount.includes("setScope(scope) { currentScope = scope ? { type: scope.type, id: scope.id, role: scope.role } : null; if (currentScope) invitations.setScope(currentScope); else invitations.reset(); }"));

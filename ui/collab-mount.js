@@ -4,7 +4,7 @@
 import { mountWorkspaceManager } from './workspace-manager.js';
 import { mountScopeInvitations } from './scope-invitations.js';
 
-export function createCollabHooks({ document: doc, api, sharedMode, onReload }) {
+export function createCollabHooks({ document: doc, api, sharedMode, onReload, onWorkspaceOpened = () => {} }) {
   const wRoot = doc.getElementById('workspace-manager-root');
   const iRoot = doc.getElementById('scope-invitations-root');
   const acceptButton = doc.getElementById('accept-invitation');
@@ -25,7 +25,11 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload }) 
   workspaces = mountWorkspaceManager({
     document: doc, root: wRoot, request, getContext,
     // A null workspace (deselect/refresh/deletion) only clears a WORKSPACE scope; a project/assessment scope is untouched (Bugbot 4037616741).
-    onWorkspaceSelected: ws => { selectedWorkspace = ws ? { id: ws.id, role: ws.role } : null; if (ws) { currentScope = { type: 'workspace', id: ws.id, role: ws.role }; invitations.setScope(currentScope); } else if (currentScope?.type === 'workspace') { currentScope = null; invitations.reset(); } },
+    // Explicit workspace Open/create (non-null): the workspace becomes the ONE selected entity, so the downstream
+    // project/assessment/survey selections are cleared through the host's own selects BEFORE the workspace scope is
+    // painted (Auditor amend c5716400828). A null callback is passive (list refresh/deselect/deletion): it clears only a
+    // workspace scope and never touches child selections (Bugbot 4037616741 / 4038131213 stay honoured).
+    onWorkspaceSelected: ws => { selectedWorkspace = ws ? { id: ws.id, role: ws.role } : null; if (ws) { onWorkspaceOpened(); currentScope = { type: 'workspace', id: ws.id, role: ws.role }; invitations.setScope(currentScope); } else if (currentScope?.type === 'workspace') { currentScope = null; invitations.reset(); } },
     onMutation: () => onReload(),
   });
   acceptButton?.addEventListener('click', () => invitations.openAcceptance());

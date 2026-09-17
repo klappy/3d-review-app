@@ -24,7 +24,9 @@ const sharedResume = sharedToken === null ? currentNamespace(sessionStorage) : n
 const sharedMode = sharedToken !== null || sharedResume !== null;
 const state = { session: sharedMode ? null : sessionStorage.getItem('facilitatorToken'), participant: sharedMode ? null : sessionStorage.getItem('participantToken'), principal: null, project: null, projectView: null, assessment: null, survey: null, form: null, answers: null, responseKey: null, codeIds: null, confirmToken: null, shared: null, linkConfirm: null, shareUrl: null, assessmentRole: null, reportConfirm: null, reportCursor: null };
 state.responseKey = sharedMode ? null : savedSubmitKey(sessionStorage, state.participant);
-const collab = createCollabHooks({ document, api, sharedMode, onReload: async () => { const me = await identity(); if (me && hasProjectWork(me)) await projects(); } });
+const collab = createCollabHooks({ document, api, sharedMode, onReload: async () => { const me = await identity(); if (me && hasProjectWork(me)) await projects(); },
+  // Opening a workspace makes it the selected entity: clear survey → assessment/granted → project through the existing controls (their change handlers run the usual resets).
+  onWorkspaceOpened: () => { for (const id of ['surveys', 'assessments', 'granted-assessments', 'projects']) { const s = $(id); if (s && s.value) { s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); } } } });
 const entityScreen = sharedMode || typeof window === 'undefined' ? null : mountEntityScreen(document, window, { isStaff: () => collab.isStaff(), selectedWorkspace: () => collab.selectedWorkspace(), backToWorkspaces: () => collab.backToWorkspaces() });
 // Assessment = three lenses; inclusion goes through the existing select/deselect capabilities and re-reads the assessment.
 const lensSurveys = sharedMode || !$('lens-surveys-root') ? null : mountLensSurveys({ document, root: $('lens-surveys-root'), actions: {
