@@ -9,6 +9,8 @@ export interface Principal {
   supportActor?: string;
   participantSurveyId?: string;
   respondentId?: string;
+  /** sha256 of the presented session credential (cookie or bearer) — what logout revokes; never client-supplied. */
+  sessionTokenHash?: string;
 }
 export interface Env { DB: D1Database; SESSION_SECRET: string; CODE_ESCROW_SECRET?: string; ENVIRONMENT?: string; ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string }
 export interface Ctx {

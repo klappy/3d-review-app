@@ -34,3 +34,12 @@ export interface Env { DB: D1Database; SESSION_SECRET: string; ENVIRONMENT?: str
 ## Non-negotiables (cookbook 16-CONSTRAINTS)
 - Danger twins never GET. SUPPRESSED is ok:true. v2.1-oct rows are 501 RESERVED_NOT_BUILT. Existence hidden. No inheritance. Codes never returned by issue_codes (count/ids only). Telemetry never carries params/codes/addresses/answers. Receipt on every write with trace_id. No real participant data anywhere. No Supabase. No offline queue.
 - Do NOT npm-install anything that needs network beyond the npm registry. Do not try to reach GitHub. Do not run `wrangler login`/deploy — local only (`wrangler dev --local` or vitest workers pool).
+
+## Transport routes (not capabilities — never counted in parity)
+
+| route | what | why it is not a capability |
+|---|---|---|
+| `POST /mcp` | JSON-RPC face of the same `execute()` | it *is* the second face |
+| `GET /v2/openapi.yaml` | contract projection | static |
+| `GET /v2/auth/access` | Cloudflare Access email-code return leg (browser redirect) | agents hold a bearer; browsers only |
+| `POST /v2/ops/seed/synthetic` | **dev bootstrap**: loads `seed/synthetic-responses.sql` into dev D1; signed-in, idempotent, refused outside `ENVIRONMENT=dev`; label `dev.bootstrap.seed_synthetic`, no receipt | environment plumbing, not product behavior |

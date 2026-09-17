@@ -1,7 +1,7 @@
 /** entry / auth / ops / docs-file handlers (Lane B). Domain handlers are Lane A's. */
 import type { Handler } from "./types";
 import { CapError, id, sha256, notVisible } from "./types";
-import { mintSession, revokeSession } from "../auth";
+import { mintSession, revokeSessionByHash } from "../auth";
 import contract from "../../contract/capabilities.json";
 import { capabilities, byId } from "../registry";
 
@@ -47,8 +47,13 @@ export const authConsumeLink: Handler = async (ctx, p) => {
   return { result: { session: token, principal_id: pr.id, note: "phase 0: same token works as cookie `session` and as Bearer (delegated identity contract = 18-D open item D-1)" }, scope: { type: "platform", id: "auth" } };
 };
 
-export const authLogout: Handler = async (ctx, p) => {
-  if (p.__token) await revokeSession(ctx.env, p.__token);
+/** Logout revokes the credential the caller actually presented (cookie or bearer, HTTP or MCP) — never a
+ *  client-supplied token. signed_out is true only when a live session row was deleted (Astra 5706310753). */
+export const authLogout: Handler = async (ctx) => {
+  const h = ctx.principal.sessionTokenHash;
+  if (!h) throw new CapError("NOT_AUTHENTICATED", "no session to sign out");
+  const revoked = await revokeSessionByHash(ctx.env, h);
+  if (revoked === 0) throw new CapError("NOT_AUTHENTICATED", "session already revoked");
   return { result: { signed_out: true }, scope: { type: "platform", id: "auth" } };
 };
 

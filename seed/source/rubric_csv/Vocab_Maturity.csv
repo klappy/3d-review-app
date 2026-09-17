@@ -1,0 +1,13 @@
+publication_state (single-select),,
+code,name,description
+pre-publication,Pre-publication,Not yet released for general use
+published,Published,Released for community / church use
+published-revising,"Published, revising","Released, but a revision cycle has reopened"
+,,
+verification_milestones (multi-select; order does not matter),,
+code,name,description
+team-reviewed,Team-reviewed,Internal team has cross-checked the portion under assessment
+community-tested-1,Community-tested (1+ round),Community testing has occurred (at least one round)
+community-tested-multi,Community-tested (multiple rounds),Multiple community testing rounds completed
+external-reviewed,External-reviewed,"External review completed — consultant, denominational leader, peer-language team, or other outside reviewer"
+church-affirmed,Church-affirmed,Church / denominational body has formally affirmed for use

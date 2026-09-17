@@ -93,7 +93,9 @@ describe("one-time code escrow and confirmed release",()=>{
     if(!login.ok) throw new Error("login failed");
     const session=login.result.session as string;
     const arbitrary="generic-param-secret-sentinel";
-    const logout=await execute(context(),"cap.auth.logout",{arbitrary},{tool:"write"});
+    // logout revokes the credential the caller presented (sessionTokenHash from resolvePrincipal), never a param
+    const withSession={...context(),principal:{kind:"user" as const,id:"person_escrow_login",sessionTokenHash:await sha256(session)}};
+    const logout=await execute(withSession,"cap.auth.logout",{arbitrary},{tool:"write"});
     expect(logout.ok).toBe(true);
 
     const firstNotes=await execute(context(),"cap.assessment.notes.update",{id:"assess_tavo_collect",notes_reflection:"Synthetic first reflection"},{tool:"write"});
