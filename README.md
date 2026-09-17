@@ -3,6 +3,8 @@
 Cloudflare Worker (Hono + D1). **Every one of the 79 capabilities answers on both faces — HTTP twin and MCP (`docs` / `read` / `write` / `danger`) — through one `execute()`.** Built rows do the real thing; unbuilt rows answer an honest `501 RESERVED_NOT_BUILT`. Anonymous MCP, sign-in and code redemption are rate limited (`429 RATE_LIMITED`, see `INTERFACE.md` § Rate limits). Blueprints: `klappy/3d-review-cookbook` `planning/2026-09-16-parity-build/` (contract projected from `04-CAPABILITY-MATRIX.md`; MCP layer per `prd/18-D-mcp.md`).
 
 ## Deploy (git hooks only)
+**Read [the release procedure and active promotion hold](docs/release.md) before any merge or deployment action.**
+
 Cloudflare **Workers Builds** watches this repo: a push to `phase-0/walking-skeleton` builds and deploys **3d-review-dev** (https://3d-review-dev.klappy.workers.dev); a merge into `main` (by PR) builds and deploys **3d-review** (production, `--env production`). No seat runs `wrangler deploy`. Secrets (`SESSION_SECRET`) live on the Worker, not in the repo. D1 migrations are applied with `wrangler d1 migrations`/execute against the named database by the build or by a reviewed step — never ad hoc against prod.
 
 ## Run locally
