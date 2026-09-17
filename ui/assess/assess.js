@@ -22,6 +22,7 @@ async function api(url, { method = 'GET', body } = {}) {
   return j.result;
 }
 const redact = m => redactDiagnosticPath(String(m || 'Request could not be completed.'));
+let generation = 0; // supplier 1114cb1: stale async loads are discarded
 const state = { principal: null, projects: [], assessmentsByProject: new Map(), templates: null, current: null, busy: false, message: '' };
 
 export function groupByLens({ surveys = [], templates = [] }) {
@@ -86,24 +87,30 @@ function bind(current) {
   app.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => act('Removing survey…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/surveys/${encodeURIComponent(b.dataset.remove)}`, { method: 'DELETE' }); state.message = r.archived ? `Survey archived: ${r.preserved_responses} response(s), ${r.preserved_codes} code(s), ${r.preserved_invitations} invitation(s) kept. Collection is closed for it.` : 'Survey removed from this assessment; nothing had been collected for it.'; }));
 }
 async function act(label, fn) {
-  if (state.busy) return; state.busy = true; state.message = ''; note.textContent = label; render();
-  try { await fn(); await load(state.current.assessment.id); note.textContent = ''; }
-  catch (e) { state.message = redact(e.message); note.textContent = ''; }
+  if (state.busy) return;
+  const aid = state.current.assessment.id;
+  state.busy = true; state.message = ''; note.textContent = label; render();
+  try { await fn(); await load(aid); note.textContent = ''; }
+  catch (e) { if (route(location.hash).id === aid) state.message = redact(e.message); note.textContent = ''; }
   finally { state.busy = false; render(); }
 }
 async function load(aid) {
+  const gen = generation;
   const r = await api(`/v2/assessments/${encodeURIComponent(aid)}`);
+  if (gen !== generation || route(location.hash).id !== aid) return;
   state.current = { assessment: r.assessment, surveys: r.surveys || [] };
   if (!state.templates) { try { state.templates = (await api('/v2/templates')).templates || []; } catch { state.templates = null; } }
+  if (gen !== generation || route(location.hash).id !== aid) return;
   await assessmentsFor(r.assessment.project_id);
 }
 async function render() {
-  const r = route(location.hash);
+  const gen = ++generation, r = route(location.hash);
   if (r.kind === 'assessment') {
-    if (state.current?.assessment.id !== r.id) { try { await load(r.id); } catch (e) { state.current = null; app.className = ''; app.innerHTML = `<div class="narrow panel"><h1>Assessment unavailable</h1><p class="muted">${esc(redact(e.message))}</p><a href="#">All projects</a></div>`; return; } }
+    if (state.current?.assessment.id !== r.id) { state.message = ''; try { await load(r.id); } catch (e) { if (gen !== generation) return; state.current = null; app.className = ''; app.innerHTML = `<div class="narrow panel"><h1>Assessment unavailable</h1><p class="muted">${esc(redact(e.message))}</p><a href="#">All projects</a></div>`; return; } }
+    if (gen !== generation || state.current?.assessment.id !== r.id) return;
     app.className = 'workspace-layout'; app.innerHTML = context(state.current) + screen(state.current) + '</section>'; bind(state.current);
     document.title = `${state.current.assessment.name} · 3D Review`;
-  } else { state.current = null; app.className = ''; app.innerHTML = projectsView(); bind(null); document.title = '3D Review · Assessments'; }
+  } else { state.message = ''; state.current = null; if (gen !== generation) return; app.className = ''; app.innerHTML = projectsView(); bind(null); document.title = '3D Review · Assessments'; }
 }
 async function boot() {
   try { const me = await api('/v2/me'); state.principal = me.principal; }
