@@ -5,7 +5,7 @@ Cloudflare Worker (Hono + D1). **Every one of the 79 capabilities answers on bot
 ## Deploy (git hooks only)
 **Read [the release procedure and active promotion hold](docs/release.md) before any merge or deployment action.**
 
-Cloudflare **Workers Builds** watches this repo: a push to `phase-0/walking-skeleton` builds and deploys **3d-review-dev** (https://3d-review-dev.klappy.workers.dev); a merge into `main` (by PR) builds and deploys **3d-review** (production, `--env production`). No seat runs `wrangler deploy`. Secrets (`SESSION_SECRET`) live on the Worker, not in the repo. D1 migrations are applied with `wrangler d1 migrations`/execute against the named database by the build or by a reviewed step — never ad hoc against prod.
+The governing target is `main` → existing **3d-review-dev** and `production` → **3d-review** (production), with separately reviewed captain-owned promotion. Provider/Git readbacks must prove the correction before it is called applied. Follow [the deployment entry point](docs/deploy.md). No seat deploy or manual build dispatch; no migration/seed replay. Preserve existing data. Secret values stay on the authorized channel, out of Git.
 
 ## Run locally
 ```
