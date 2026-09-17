@@ -89,31 +89,31 @@ async function assessmentsFor(pid, { retry = false } = {}) {
 }
 const activeSurveys = current => current.surveys.filter(s => s.state === 'selected' && !s.archived_at);
 const countFor = sid => state.counts.get(sid) || { status: 'loading' };
-// Cut 2A counts: one cap.survey.get_status read per included active survey, in parallel. Results are bound to the entity
-// (aid, sid): they are stored and painted only while that entity is current; cells for other entities never exist, so
-// nothing can land elsewhere (Auditor 2A-3). `gen` is kept for the refusal repaint only.
-function loadCounts(current, gen, { only = null } = {}) {
+// Cut 2A counts: one cap.survey.get_status read per included active survey, in parallel. Results are bound to
+// (aid, sid, generation) and a mismatch never paints (Auditor 2A-3). `only` filters to one survey (child screen);
+// `retry` is the explicit Retry that re-issues a settled read. A child repaint therefore does not force a refetch.
+function loadCounts(current, gen, { only = null, retry = false } = {}) {
   const aid = current.assessment.id;
   for (const s of activeSurveys(current)) {
     if (only && s.id !== only) continue;
-    // a repaint never re-issues a settled or in-flight read; only an explicit Retry (only=sid) or a fresh entity load does
-    if (!only && (state.counts.has(s.id) || state.countInflight.has(s.id))) continue;
-    state.counts.set(s.id, { status: 'loading' }); state.countInflight.add(s.id);
+    // a repaint never re-issues a settled or in-flight read for this generation; only Retry or a fresh entity load does
+    if (!retry && state.counts.get(s.id)?.gen === gen) continue;
+    state.counts.set(s.id, { status: 'loading', gen }); state.countInflight.add(s.id);
     api(`/v2/assessments/${encodeURIComponent(aid)}/surveys/${encodeURIComponent(s.id)}`).then(r => {
+      if (gen !== generation || state.current?.assessment.id !== aid || state.counts.get(s.id)?.gen !== gen) return; // late effect for another screen or a newer read of this sid: discard
       state.countInflight.delete(s.id);
-      if (state.current?.assessment.id !== aid) return; // entity-bound: a later paint of the SAME entity still needs this value; a different entity never sees it // late effect for another screen: discard
-      state.counts.set(s.id, { status: 'loaded', responses: Number(r.counts?.responses ?? 0), respondents: Number(r.counts?.respondents ?? 0), collection_status: r.survey?.collection_status });
-      paintCounts(current);
+      state.counts.set(s.id, { status: 'loaded', responses: Number(r.counts?.responses ?? 0), respondents: Number(r.counts?.respondents ?? 0), collection_status: r.survey?.collection_status, gen });
+      paintCounts(state.current);
     }).catch(e => {
+      if (gen !== generation || state.current?.assessment.id !== aid || state.counts.get(s.id)?.gen !== gen) return; // late effect for another screen or a newer read of this sid: discard
       state.countInflight.delete(s.id);
-      if (state.current?.assessment.id !== aid) return; // entity-bound: a later paint of the SAME entity still needs this value; a different entity never sees it
       const code = String(e.code);
       // Auditor 2A-2: a refusal is not a transient failure — the survey is no longer visible to this identity here; the assessment
       // is marked dirty so the next render refetches. Wording claims loss of visibility only, never deletion.
-      if (REFUSED.has(code)) { state.counts.set(s.id, { status: 'gone' }); state.dirty.add(aid); paint(); return; } // whole screen repaints: banner + disabled writes (MED 4040990777)
-      else if (UNAUTHENTICATED.has(code)) state.counts.set(s.id, { status: 'unauthenticated' });
-      else state.counts.set(s.id, { status: 'failed', error: redact(e.message) });
-      paintCounts(current);
+      if (REFUSED.has(code)) { state.counts.set(s.id, { status: 'gone', gen }); state.dirty.add(aid); paint(); return; } // whole screen repaints: banner + disabled writes (MED 4040990777)
+      else if (UNAUTHENTICATED.has(code)) state.counts.set(s.id, { status: 'unauthenticated', gen });
+      else state.counts.set(s.id, { status: 'failed', error: redact(e.message), gen });
+      paintCounts(state.current);
     });
   }
 }
@@ -137,7 +137,7 @@ function paintCounts(current) {
   bindCounts(current);
 }
 function bindCounts(current) {
-  app.querySelectorAll('[data-retry-count]').forEach(el => el.onclick = e => { e.preventDefault(); loadCounts(current, generation, { only: el.dataset.retryCount }); paintCounts(current); });
+  app.querySelectorAll('[data-retry-count]').forEach(el => el.onclick = e => { e.preventDefault(); loadCounts(current, generation, { only: el.dataset.retryCount, retry: true }); paintCounts(current); });
   app.querySelectorAll('[data-refresh]').forEach(el => el.onclick = e => { e.preventDefault(); render(); });
 }
 function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'Other perspective'; }
@@ -205,7 +205,7 @@ function lensRows(current) {
 function screen(current) {
   const phase = current.assessment.stage;
   const a = current.assessment, project = state.projects.find(p => p.id === a.project_id);
-  const surveySet = `<aside class="panel"><p class="eyebrow">Survey set</p><h2>Three lenses</h2><p class="muted">${(current.assessment.role === 'owner' || current.assessment.role === 'member') ? 'Within each lens, choose which surveys this assessment includes.' : 'Your role here is ' + esc(current.assessment.role) + ': you can see the survey set; changing it needs a member or owner role.'} Including a survey while the stage is Collect opens collection at once. Removing a survey that already has responses, codes or invitations archives it and keeps them; including that survey again restores it together with what was collected.${state.templates ? '' : ' Template catalogue not loaded.'}</p>${lensRows(current)}${state.dirty.has(current.assessment.id) ? `<p class="note" role="alert">Your change was saved on the server, but this screen could not be refreshed and may be out of date. <a href="#" data-refresh="${esc(current.assessment.id)}">Refresh now</a></p>` : ''}<p class="status" role="${showMessage(current)?.alert ? 'alert' : 'status'}" aria-live="polite">${esc(showMessage(current)?.text || '')}</p></aside>`;
+  const surveySet = `<aside class="panel"><p class="eyebrow">Survey set</p><h2>Three lenses</h2><p class="muted">${(current.assessment.role === 'owner' || current.assessment.role === 'member') ? 'Within each lens, choose which surveys this assessment includes.' : 'Your role here is ' + esc(current.assessment.role) + ': you can see the survey set; changing it needs a member or owner role.'} Including a survey while the stage is Collect opens collection at once. Removing a survey that already has responses, codes or invitations archives it and keeps them; including that survey again restores it together with what was collected.${state.templates ? '' : ' Template catalogue not loaded.'}</p>${lensRows(current)}${state.dirty.has(current.assessment.id) ? ([...state.counts.values()].some(c => c.status === 'gone') ? `<p class="note" role="alert">This assessment changed on the server; <a href="#" data-refresh="${esc(current.assessment.id)}">Refresh</a> to see the current survey set.</p>` : `<p class="note" role="alert">Your change was saved on the server, but this screen could not be refreshed and may be out of date. <a href="#" data-refresh="${esc(current.assessment.id)}">Refresh now</a></p>`) : ''}<p class="status" role="${showMessage(current)?.alert ? 'alert' : 'status'}" aria-live="polite">${esc(showMessage(current)?.text || '')}</p></aside>`;
   const left = collectPanel(current);
   return `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${esc(project?.name || a.project_id)} · your role: ${esc(a.role)}</p></div><span class="badge">${stageLabel(a.stage)}</span></div>${stages(a)}<div class="grid">${left}${surveySet}</div>`;
 }
