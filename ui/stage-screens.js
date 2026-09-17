@@ -218,7 +218,7 @@ export function renderRoleHelp(doc, root, help) {
   root.append(el(doc, 'h2', 'What you can do here'));
   root.append(el(doc, 'p', `Authorized role: ${help.role}`));
   if (help.available) root.append(el(doc, 'p', `Next here: ${help.available}`));
-  else root.append(el(doc, 'p', 'This stage’s suggested next step is not available at your role.'));
+  // No denial claim: a missing suggestion may simply be unchecked for the browsed tab.
 }
 
 export function renderStageTour(doc, root, { storage, assessmentId, stage, role, onDismiss }) {

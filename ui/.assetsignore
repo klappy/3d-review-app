@@ -12,3 +12,4 @@ public-entry.test.mjs
 report-card.test.mjs
 
 stage-screens.test.mjs
+stage-composition.test.mjs

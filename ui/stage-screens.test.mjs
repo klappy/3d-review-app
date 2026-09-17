@@ -297,3 +297,10 @@ test('print wrapper contains only new blank article and cleans up even on print 
   let calls=0;assert.equal(printBlankForm(doc,{...model,blank:false},{print(){calls++;}}),false);
   assert.equal(calls,0);
 });
+
+test('missing stage suggestion does not falsely deny an authorized role', () => {
+  const doc=fakeDocument(),root=doc.createElement('div');
+  renderRoleHelp(doc,root,{visible:true,role:'member',available:null});
+  assert.match(text(root),/Authorized role: member/);
+  assert.doesNotMatch(text(root),/not available|not authorized|denied/i);
+});
