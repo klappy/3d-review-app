@@ -12,6 +12,7 @@ import { ok } from "./envelope";
 import openapiText from "../contract/openapi.yaml";
 import { verifyAccessJwt } from "./access";
 import synthResponsesSql from "../seed/synthetic-responses.sql";
+import synthOrgResponsesSql from "../seed/synthetic-responses-org.sql";
 import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
 
@@ -114,7 +115,7 @@ app.get("/v2/auth/access", async (c) => {
   }
 });
 // DEV BOOTSTRAP — explicitly OUTSIDE capability parity (Astra 5706308285): loads the committed synthetic answer sets
-// (seed/synthetic-responses.sql, Steve Watters' persona generator @ f042cde) into this environment's D1. Not a
+// (seed/synthetic-responses.sql + seed/synthetic-responses-org.sql, Steve Watters' generators @ f042cde) into this environment's D1. Not a
 // capability, not on MCP, mints no receipt, refused outside dev, requires a signed-in user, INSERT OR IGNORE → idempotent.
 // It is labelled "dev.bootstrap.seed_synthetic" so it can never be mistaken for cap.ops.health or counted as parity.
 app.post("/v2/ops/seed/synthetic", async (c) => {
@@ -123,7 +124,7 @@ app.post("/v2/ops/seed/synthetic", async (c) => {
   if (env.ENVIRONMENT !== "dev") return json(fail("NOT_AUTHORIZED_AT_SCOPE", "synthetic seed loads only in the dev sandbox", undefined, "dev.bootstrap.seed_synthetic", newTraceId()), 403);
   const ctx = await contextForRequest(c.req.raw, env);
   if (ctx.principal.kind !== "user" && ctx.principal.kind !== "support") return json(fail("NOT_AUTHENTICATED", "sign in first", undefined, "dev.bootstrap.seed_synthetic", ctx.traceId), 401);
-  const stmts = (synthResponsesSql as unknown as string).split("\n").filter((l) => !l.startsWith("--")).join("\n").split(";\n").map((s) => s.trim()).filter(Boolean);
+  const stmts = [synthResponsesSql, synthOrgResponsesSql].map((f) => f as unknown as string).join("\n").split("\n").filter((l) => !l.startsWith("--")).join("\n").split(";\n").map((s) => s.trim()).filter(Boolean);
   let applied = 0;
   for (let i = 0; i < stmts.length; i += 50) { await env.DB.batch(stmts.slice(i, i + 50).map((s) => env.DB.prepare(s))); applied += Math.min(50, stmts.length - i); }
   const n = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM response WHERE source='synthetic') AS responses, (SELECT COUNT(*) FROM assessment WHERE id LIKE 'assess_syn_%') AS assessments, (SELECT COUNT(*) FROM project WHERE id LIKE 'proj_syn_%') AS projects").first();
