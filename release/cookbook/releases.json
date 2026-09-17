@@ -1,0 +1,27 @@
+{
+  "schema": "3dr-releases/1",
+  "current": "0.1.0",
+  "versions": [
+    {
+      "version": "0.1.0",
+      "status": "candidate",
+      "notes_path": "releases/0.1.0.md",
+      "sections": {
+        "added": [
+          "Shared survey link: an owner can issue one link per survey that participants open to take the survey without a personal code.",
+          "Release identity: a cookbook-pinned release record, a build-time version+commit stamp, version fields on health and MCP serverInfo, and a generated changelog.json for the version badge."
+        ],
+        "changed": [
+          "Health `build` now reports `<version>+<sha7>` derived from the pinned release record and the build commit instead of a hardcoded literal.",
+          "Rate limiter boundaries and OAuth flows hardened for the first DEV collection increment."
+        ],
+        "fixed": [
+          "Email-code redemption is atomic; a code cannot be redeemed twice under concurrent requests, and conflict-recovery kinds are distinct."
+        ],
+        "security": [
+          "Rate-limited anonymous, code and bearer paths fail closed with RATE_LIMITED; OAuth code redemption is single-use."
+        ]
+      }
+    }
+  ]
+}

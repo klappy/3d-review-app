@@ -1,0 +1,35 @@
+{
+  "version": "0.1.0",
+  "cookbook_repo": "klappy/3d-review-cookbook",
+  "cookbook_commit": "69d9e6dcd71dc2abd3e6999fc5fd0e312d4cca6d",
+  "records": [
+    {
+      "path": "planning/2026-09-16-parity-build/releases/0.1.0.md",
+      "blob_sha": "e525cf63094bf09a4ae46eeb2741e7a68a833ff8",
+      "sha256": "1fe973844d3f04e1356ac0f58d29c2839eae7532fd22c61f834d723e44b98037"
+    },
+    {
+      "path": "planning/2026-09-16-parity-build/releases/releases.json",
+      "blob_sha": "f4c2ded05fd8ddea0f45d0a1b923cd6a995bfd27",
+      "sha256": "b69e400707250dd8bb6af091276d776360bf776f1847a42d471dc7ceba494f3b"
+    }
+  ],
+  "changelog": {
+    "sections": {
+      "added": [
+        "Shared survey link: an owner can issue one link per survey that participants open to take the survey without a personal code.",
+        "Release identity: a cookbook-pinned release record, a build-time version+commit stamp, version fields on health and MCP serverInfo, and a generated changelog.json for the version badge."
+      ],
+      "changed": [
+        "Health `build` now reports `<version>+<sha7>` derived from the pinned release record and the build commit instead of a hardcoded literal.",
+        "Rate limiter boundaries and OAuth flows hardened for the first DEV collection increment."
+      ],
+      "fixed": [
+        "Email-code redemption is atomic; a code cannot be redeemed twice under concurrent requests, and conflict-recovery kinds are distinct."
+      ],
+      "security": [
+        "Rate-limited anonymous, code and bearer paths fail closed with RATE_LIMITED; OAuth code redemption is single-use."
+      ]
+    }
+  }
+}
