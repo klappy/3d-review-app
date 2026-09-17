@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
-import { COPY, facilitatorRoute, languageName, mountWorkspaceOverview, selectAndChange } from './workspace-overview.js';
+import { COPY, facilitatorRoute, focusFirstControl, languageName, mountWorkspaceOverview, selectAndChange } from './workspace-overview.js';
 
 // A minimal DOM, in the same shape as the other ui/ DOM tests: enough of the real contract
 // (select.value refuses an absent option, change listeners, hidden, text nodes) to drive the module
@@ -29,7 +29,9 @@ function fakeNode(tag, id) {
 }
 function fakeWorld({ hash = '', session = { facilitatorToken: 'st_owner' }, identity = 'principal · me' } = {}) {
   const nodes = new Map(), requests = [];
+  const body = fakeNode('body'); body.dataset = {};
   const doc = {
+    body,
     getElementById(id) { return nodes.has(id) ? nodes.get(id) : null; },
     createElement(tag) { return fakeNode(tag); },
   };
@@ -39,7 +41,18 @@ function fakeWorld({ hash = '', session = { facilitatorToken: 'st_owner' }, iden
   const projects = make('projects'), assessments = make('assessments');
   projects.tag = assessments.tag = 'select';
   make('load-projects'); make('load-assessments');
-  make('create-project', { hidden: false }); make('create-assessment', { hidden: false });
+  // Real forms hold their controls inside labels; a <form> itself is not focusable.
+  const form = (id) => {
+    const f = make(id, { hidden: false }); f.tag = 'form';
+    const label = fakeNode('label');
+    const skipped = fakeNode('input'); skipped.tagName = 'INPUT'; skipped.disabled = true;
+    const input = fakeNode('input'); input.tagName = 'INPUT'; input.name = 'name';
+    label.children.push(skipped, input);
+    f.children.push(label);
+    f.firstInput = input; f.disabledInput = skipped;
+    return f;
+  };
+  form('create-project'); form('create-assessment');
   make('assessment-card', { hidden: false });
   const sibling = make('project-card', { hidden: false, textContent: 'existing card' }); // containment spy
   const store = new Map(Object.entries(session));
@@ -57,7 +70,7 @@ function fakeWorld({ hash = '', session = { facilitatorToken: 'st_owner' }, iden
     if (typeof body === 'function') return body();
     return { ok: true, status: 200, json: async () => ({ ok: true, result: body }) };
   };
-  return { doc, win, nodes, node: id => nodes.get(id), requests, sibling, projects, assessments,
+  return { doc, win, body, nodes, node: id => nodes.get(id), requests, sibling, projects, assessments,
     setRoutes(next) { routes = next; },
     mount() { return mountWorkspaceOverview({ doc, win, fetchImpl }); },
     async settle() { for (let i = 0; i < 12; i++) await new Promise(r => setImmediate(r)); } };
@@ -295,13 +308,124 @@ test('containment: nothing outside the four roots is written, hidden or moved', 
     assert.equal(node.className, snapshot.className, `${snapshot.id} class must be untouched`);
   }
   assert.equal(w.sibling.children.length, 0);
-  assert.equal(w.node('create-assessment').focused, 1, 'the existing form is focused, never replaced');
+  assert.equal(w.node('create-assessment').focused, 0, 'a form is not focusable and is never focused');
+  assert.equal(w.node('create-assessment').firstInput.focused, 1, 'its first enabled control is focused, never replaced');
+  assert.equal(w.body.dataset.overviewState, 'assessment', 'the one attribute the amendment allows outside the roots, after Open →');
 });
 
 test('helpers: language names come from the project GET and fall back to the real id', () => {
   assert.equal(languageName([{ id: 'l1', name: 'Coast language' }], 'l1'), 'Coast language');
   assert.equal(languageName([], 'l9'), 'l9');
   assert.equal(languageName(null, null), '');
+});
+
+test('A1: the level menu survives repeated Assessments/Languages transitions', async () => {
+  const w = fakeWorld(); w.setRoutes(ROUTES);
+  w.projects.options = [option(''), option('p1')]; w.projects.value = 'p1';
+  w.mount(); await w.settle();
+  const tableShowing = () => !!walk(w.node('overview-project')).find(n => n.className === 'table');
+  const languagesShowing = () => /Coast language · xyz/.test(text(w.node('overview-project')));
+  const menu = () => walk(w.node('overview-project')).find(n => n.className === 'phases');
+  assert.equal(tableShowing(), true, 'the table is the default section');
+  for (let round = 0; round < 3; round += 1) {
+    menu().children[1].click(); await w.settle();
+    assert.equal(languagesShowing(), true, `round ${round}: Languages must render`);
+    assert.equal(tableShowing(), false, `round ${round}: the table gives way`);
+    menu().children[0].click(); await w.settle();
+    assert.equal(tableShowing(), true, `round ${round}: the assessments table must come back`);
+    assert.equal(languagesShowing(), false, `round ${round}: Languages gives way`);
+    assert.equal(walk(w.node('overview-project')).filter(n => n.className === 'table').length, 1, 'exactly one table');
+  }
+  assert.deepEqual(menu().children.map(c => c.getAttribute('aria-current')), ['true', 'false']);
+});
+
+test('A2: the permitted create forms focus their first enabled control, never the form', async () => {
+  const w = fakeWorld(); w.setRoutes(ROUTES);
+  w.mount(); await w.settle();
+  const createProject = w.node('create-project');
+  walk(w.node('overview-all')).find(n => n.textContent === COPY.createProject).click();
+  assert.equal(createProject.focused, 0, 'a form is not focusable and must not be focused');
+  assert.equal(createProject.disabledInput.focused, 0, 'a disabled control is skipped');
+  assert.equal(createProject.firstInput.focused, 1, 'focus lands on the first enabled input');
+
+  w.projects.options = [option(''), option('p1')]; w.projects.value = 'p1';
+  const mounted2 = fakeWorld(); mounted2.setRoutes(ROUTES);
+  mounted2.projects.options = [option(''), option('p1')]; mounted2.projects.value = 'p1';
+  mounted2.mount(); await mounted2.settle();
+  const createAssessment = mounted2.node('create-assessment');
+  walk(mounted2.node('overview-project')).find(n => n.textContent === COPY.startAssessment).click();
+  assert.equal(createAssessment.focused, 0);
+  assert.equal(createAssessment.firstInput.focused, 1);
+});
+
+test('A2: a hidden form is neither focused nor revealed, and no button is offered', async () => {
+  const w = fakeWorld(); w.setRoutes(ROUTES);
+  w.node('create-project').hidden = true; // not provisioned
+  w.mount(); await w.settle();
+  assert.equal(walk(w.node('overview-all')).some(n => n.textContent === COPY.createProject), false, 'no control is offered');
+  assert.equal(focusFirstControl(w.node('create-project')), null);
+  assert.equal(w.node('create-project').hidden, true, 'the form is never unhidden');
+  assert.equal(w.node('create-project').firstInput.focused, 0);
+  assert.equal(focusFirstControl(null), null);
+});
+
+test('B: the state attribute walks none → all → project → assessment and back', async () => {
+  const w = fakeWorld(); w.setRoutes(ROUTES);
+  w.projects.options = [option(''), option('p1')];
+  w.assessments.options = [option(''), option('a1')];
+  const mounted = w.mount();
+  assert.equal(w.body.dataset.overviewState, undefined, 'nothing is claimed before the first read');
+  await w.settle();
+  assert.equal(w.body.dataset.overviewState, 'all');
+  w.projects.value = 'p1'; mounted.schedule(); await w.settle();
+  assert.equal(w.body.dataset.overviewState, 'project');
+  w.assessments.value = 'a1'; mounted.schedule(); await w.settle();
+  assert.equal(w.body.dataset.overviewState, 'assessment');
+  w.assessments.value = ''; w.projects.value = ''; mounted.schedule(); await w.settle();
+  assert.equal(w.body.dataset.overviewState, 'all');
+  w.node('identity').textContent = 'Not signed in'; mounted.schedule(); await w.settle();
+  assert.equal(w.body.dataset.overviewState, 'none', 'sign-out returns the page to its own composition');
+  assert.equal(w.node('overview').hidden, true);
+});
+
+test('B: the shared route and an identity with no grants both claim state none', async () => {
+  const shared = fakeWorld({ hash: '#survey=tok_abc' });
+  shared.setRoutes(ROUTES); shared.mount(); await shared.settle();
+  assert.equal(shared.body.dataset.overviewState, 'none');
+  assert.deepEqual(shared.requests, []);
+  const viewer = fakeWorld(); viewer.setRoutes({ ...ROUTES, '/v2/projects': { projects: [] } });
+  viewer.mount(); await viewer.settle();
+  assert.equal(viewer.body.dataset.overviewState, 'none');
+});
+
+test('B: the state rules hide only repeated chrome and never the path to the next state', () => {
+  const css = fs.readFileSync(new URL('./workspace-overview.css', import.meta.url), 'utf8');
+  const rules = ruleBlocks(css);
+  const hides = rules.filter(r => /display:\s*none/.test(r.body)).flatMap(r => r.selectors);
+  for (const selector of hides) {
+    assert.match(selector, /^body\[data-overview-state=/, `a display:none rule must be state-scoped: ${selector}`);
+  }
+  // The only path onward is never hidden.
+  for (const state of ['all', 'project']) {
+    assert.equal(hides.some(s => s.includes(`"${state}"`) && /#project-card\s*$/.test(s)), false, `#project-card must stay in ${state}`);
+  }
+  assert.equal(hides.some(s => s.includes('"project"') && /#assessment-card\s*$/.test(s)), false, '#assessment-card must stay in project');
+  // Only the generic chrome and the cards with no role in the state are hidden.
+  for (const selector of hides) {
+    assert.match(selector, /#workspace > \.headrow|#workspace > \.introduction|#facilitator > h2|#(assessment|survey|results|reports)-card/, `unexpected hide: ${selector}`);
+  }
+  // Understand: Reports must sit ahead of the legacy Results block.
+  const order = id => {
+    const rule = rules.find(r => r.selectors.some(s => s.includes('"assessment"') && s.includes(id)) && /order:/.test(r.body));
+    return Number((rule.body.match(/order:\s*(-?\d+)/) || [])[1]);
+  };
+  assert.ok(order('#reports-card') < order('#results-card'), 'reports before results in the assessment state');
+  assert.ok(order('#project-card') > order('#results-card'), 'the selector cards follow the phase content');
+  // State none has no rules: the landing and participant routes are untouched.
+  assert.equal(rules.some(r => r.selectors.some(s => s.includes('"none"'))), false);
+  const declarations = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.equal(/data-overview-state/.test(declarations.replace(/body\[data-overview-state="(all|project|assessment)"\]/g, '')), false,
+    'the attribute is only ever read with one of the three composing values');
 });
 
 test('the module renders text nodes only and ships exactly the two missing classes', () => {
@@ -315,10 +439,15 @@ test('the module renders text nodes only and ships exactly the two missing class
   assert.match(css, /\.rv \.table/);
   // Every rule is either one of the two classes the app lacks, or scoped inside #overview. No
   // existing class is redefined for the rest of the app.
+  // Every rule is one of the two classes the app lacks, scoped inside #overview, or a
+  // body[data-overview-state=…] composition rule limited to the shell ids the amendment names.
+  const STATE = /^body\[data-overview-state="(all|project|assessment)"\]\s/;
+  const SHELL = /^body\[data-overview-state="(all|project|assessment)"\]\s+(#workspace > \.(headrow|introduction)|#facilitator > h2|#(project|assessment|survey|results|reports)-card( > h3)?)$/;
   for (const selector of selectorsOf(css)) {
+    if (STATE.test(selector)) { assert.match(selector, SHELL, `a state rule may only target the named shell nodes: ${selector}`); continue; }
     assert.match(selector, /#overview\b|\.phases\b|\.table\b/, `unscoped rule would leak into the app: ${selector}`);
   }
-  for (const existing of ['.glass', '.panel', '.eyebrow', '.three', '.crumbs', '.badge', '.muted', '.note', '.headrow', '.rv-btn']) {
+  for (const existing of ['.glass', '.panel', '.eyebrow', '.three', '.crumbs', '.badge', '.muted', '.note', '.rv-btn']) {
     for (const selector of selectorsOf(css)) {
       if (!new RegExp(`\\${existing}(\\b|$)`).test(selector)) continue;
       assert.match(selector, /#overview\b/, `${existing} already exists; a rule for it must be scoped under #overview, got: ${selector}`);
@@ -326,6 +455,18 @@ test('the module renders text nodes only and ships exactly the two missing class
   }
   assert.equal(/@import/.test(css), false);
 });
+
+// Selector lists paired with their declaration block.
+function ruleBlocks(css) {
+  const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const out = [];
+  for (const match of clean.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    const prelude = match[1].trim();
+    if (!prelude || prelude.startsWith('@')) continue;
+    out.push({ selectors: prelude.split(',').map(s => s.trim()).filter(Boolean), body: match[2] });
+  }
+  return out;
+}
 
 // Every selector list in the stylesheet, comments stripped and at-rule preludes dropped.
 function selectorsOf(css) {

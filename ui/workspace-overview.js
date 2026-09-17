@@ -100,6 +100,27 @@ function heading(doc, eyebrow, title, lead) {
   return nodes;
 }
 
+// A2: a <form> is not focusable, so focusing it silently does nothing. Navigate to the surface the
+// server already permits and focus its first enabled control. A hidden form is never revealed and
+// no authority flag is touched — the caller checks visibility, and so does this.
+export function focusFirstControl(form) {
+  if (!form || form.hidden) return null;
+  const control = firstControl(form);
+  if (!control) return null;
+  if (typeof control.scrollIntoView === 'function') { try { control.scrollIntoView({ block: 'center' }); } catch { /* not scrollable here */ } }
+  if (typeof control.focus === 'function') control.focus();
+  return control;
+}
+function firstControl(node) {
+  for (const child of node.children || []) {
+    const tag = String(child.tagName || child.tag || '').toLowerCase();
+    if (['input', 'select', 'textarea'].includes(tag) && !child.disabled && !child.hidden && child.type !== 'hidden') return child;
+    const nested = firstControl(child);
+    if (nested) return nested;
+  }
+  return null;
+}
+
 function button(doc, label, className, onClick) {
   const node = el(doc, 'button', label, className);
   node.type = 'button';
@@ -133,6 +154,15 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
     return data.result;
   }
 
+  // S4 #13 as amended: the module may set exactly one attribute outside its roots —
+  // body.dataset.overviewState ∈ none|all|project|assessment — and nothing else. It carries no
+  // authority: the stylesheet uses it only to order and quiet presentation the state has no use for.
+  function setState(value) {
+    const body = doc.body;
+    if (!body || !body.dataset) return;
+    if (body.dataset.overviewState !== value) body.dataset.overviewState = value;
+  }
+
   function clear() {
     for (const root of [crumbsRoot, allRoot, projectRoot]) { root.replaceChildren(); root.hidden = true; }
   }
@@ -148,7 +178,7 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
     // S4 #11: the existing form's own hidden attribute is the permission; no /v2/me call here.
     if (createForm && !createForm.hidden) {
       const row = el(doc, 'div', undefined, 'row');
-      row.append(button(doc, COPY.createProject, 'rv-btn primary', () => { if (!createForm.hidden) createForm.focus(); }));
+      row.append(button(doc, COPY.createProject, 'rv-btn primary', () => { focusFirstControl($('create-project')); }));
       nodes.push(row);
     }
     const grid = el(doc, 'div', undefined, 'three');
@@ -230,8 +260,9 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
     if (card && !card.hidden) {
       const actions = el(doc, 'div', undefined, 'row');
       actions.append(button(doc, COPY.startAssessment, 'rv-btn primary', () => {
-        const form = $('create-assessment');
-        if (form && !form.hidden) form.focus();
+        const card = $('assessment-card');
+        if (!card || card.hidden) return; // the surface itself is gated; never reveal an ancestor
+        focusFirstControl($('create-assessment'));
       }));
       headrow.append(actions);
     }
@@ -277,32 +308,36 @@ export function mountWorkspaceOverview({ doc, win, fetchImpl } = {}) {
 
   async function refresh() {
     const gen = ++generation;
-    if (!facilitatorRoute(win, storage) || signedOut(doc, storage)) { clear(); overview.hidden = true; return; }
+    if (!facilitatorRoute(win, storage) || signedOut(doc, storage)) { clear(); overview.hidden = true; setState('none'); return; }
     const projectsResult = await read('/v2/projects');
     if (gen !== generation) return; // stale: the selection or the identity moved on
-    if (!projectsResult) { clear(); overview.hidden = true; return; }
+    if (!projectsResult) { clear(); overview.hidden = true; setState('none'); return; }
     const projects = projectsResult.projects || [];
     // No project grants at all: this identity's entry is #shared-assessments, not the overview.
     // The module says nothing rather than reporting an absence the viewer cannot act on.
-    if (!projects.length) { clear(); overview.hidden = true; return; }
+    if (!projects.length) { clear(); overview.hidden = true; setState('none'); return; }
     const pid = ($('projects') || {}).value || '';
     const aid = ($('assessments') || {}).value || '';
     overview.hidden = false;
 
-    if (!pid) { stand(projectRoot); renderCrumbs(null, null); renderAll(projects); return; }
+    if (!pid) { stand(projectRoot); renderCrumbs(null, null); setState('all'); renderAll(projects); return; }
 
     const [detail, list] = await Promise.all([read(`/v2/projects/${enc(pid)}`), read(`/v2/projects/${enc(pid)}/assessments`)]);
     if (gen !== generation) return; // stale
     const project = detail && detail.project ? detail.project : projects.find(entry => entry.id === pid);
-    if (!project) { clear(); overview.hidden = true; return; }
+    if (!project) { clear(); overview.hidden = true; setState('none'); return; }
     const languages = (detail && detail.languages) || [];
     const rows = (list && list.assessments) || [];
     const assessment = aid ? rows.find(row => row.id === aid) || null : null;
 
     stand(allRoot); // exactly one of A / B occupies the overview
     renderCrumbs(project, assessment);
-    if (assessment) renderProjectRow(project);
-    else renderProject(project, rows, languages, () => { if (gen === generation) renderProject(project, rows, languages, () => {}); });
+    setState(assessment ? 'assessment' : 'project');
+    if (assessment) { renderProjectRow(project); return; }
+    // One closure, reused by every repaint: the level menu must survive any number of
+    // Assessments/Languages transitions, not just the first.
+    const repaint = () => { if (gen === generation) renderProject(project, rows, languages, repaint); };
+    repaint();
   }
 
   // Coalesce the burst of option mutations app.js produces while repopulating a select.

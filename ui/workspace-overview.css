@@ -61,3 +61,61 @@
 .rv #overview .crumbs button[aria-current] { color: var(--ink); font-weight: 600; }
 .rv #overview .crumbs .sep { opacity: .6; flex: 0 0 auto; }  /* separators stay at every width */
 .rv #overview .crumbs .badge { flex: 0 0 auto; }             /* the role badge stays on the row */
+
+/* ---------------------------------------------------------------------------------------------
+   Composition by state (S4 #13 as amended). The module sets body[data-overview-state] to
+   none | all | project | assessment and nothing else outside its roots. Everything below is
+   presentation: it hides generic chrome that repeats what the overview already says, quiets the
+   cards that have no role in the current state, and orders the ones that do. No node is removed,
+   no hidden attribute is written, no authority flag is touched, and `none` (signed out, shared
+   route, or no project grants) has no rules at all — the landing and participant routes are
+   exactly as they were.
+   Never display:none on the card that holds the only path to the next state: #project-card stays
+   in 'all' and in 'project', #assessment-card stays in 'project'.
+   --------------------------------------------------------------------------------------------- */
+
+/* The overview is the header once it has something to say, so the generic one stops repeating it. */
+body[data-overview-state="all"] #workspace > .headrow,
+body[data-overview-state="project"] #workspace > .headrow,
+body[data-overview-state="assessment"] #workspace > .headrow,
+body[data-overview-state="all"] #workspace > .introduction,
+body[data-overview-state="project"] #workspace > .introduction,
+body[data-overview-state="assessment"] #workspace > .introduction,
+body[data-overview-state="all"] #facilitator > h2,
+body[data-overview-state="project"] #facilitator > h2,
+body[data-overview-state="assessment"] #facilitator > h2 { display: none; }
+
+/* Compact: a selector strip beneath the overview, not a second workspace. Nothing is hidden. */
+body[data-overview-state="all"] #project-card,
+body[data-overview-state="project"] #project-card,
+body[data-overview-state="project"] #assessment-card,
+body[data-overview-state="assessment"] #project-card,
+body[data-overview-state="assessment"] #assessment-card {
+  font-size: 14px; padding: 12px 14px; opacity: .92;
+}
+body[data-overview-state="all"] #project-card > h3,
+body[data-overview-state="project"] #project-card > h3,
+body[data-overview-state="project"] #assessment-card > h3,
+body[data-overview-state="assessment"] #project-card > h3,
+body[data-overview-state="assessment"] #assessment-card > h3 { font-size: 15px; margin: 0 0 6px; }
+
+/* A — All projects. The grid leads with the one card that reaches the next state. */
+body[data-overview-state="all"] #assessment-card,
+body[data-overview-state="all"] #survey-card,
+body[data-overview-state="all"] #results-card,
+body[data-overview-state="all"] #reports-card { display: none; }
+body[data-overview-state="all"] #project-card { order: 1; }
+
+/* B — Project. The overview's table leads; the selects stay reachable beneath it. */
+body[data-overview-state="project"] #survey-card,
+body[data-overview-state="project"] #results-card,
+body[data-overview-state="project"] #reports-card { display: none; }
+body[data-overview-state="project"] #project-card { order: 1; }
+body[data-overview-state="project"] #assessment-card { order: 2; }
+
+/* C — Assessment. Phase visibility belongs to the root composition; only order is set here.
+   Reports come before the legacy Results block, and the selector cards follow the phase content. */
+body[data-overview-state="assessment"] #reports-card { order: 2; }
+body[data-overview-state="assessment"] #results-card { order: 3; }
+body[data-overview-state="assessment"] #project-card { order: 8; }
+body[data-overview-state="assessment"] #assessment-card { order: 9; }
