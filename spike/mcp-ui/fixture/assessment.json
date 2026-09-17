@@ -1,0 +1,503 @@
+{
+  "_note": "Shapes copied verbatim from src/handlers/assessment.ts (cap.assessment.get -> {assessment, surveys}) and src/handlers/survey.ts (cap.survey.get_status -> {survey, counts:{responses,respondents}}). counts is keyed by assessment_survey id; in live wiring it is one call per survey (N+1). templates mirrors the catalogue rows of migrations/0004_pinned_instruments.sql. No live cap.* call is made by this spike. templates[] mirrors the host app's template-list source: the snapshot shape {aid, role, stage, surveys, templates} documented at ui/lens-surveys.js:60, whose templates come from the template catalogue rows of migrations/0004_pinned_instruments.sql. error mirrors src/envelope.ts fail() with the message from src/handlers/errors.ts notVisible(\"assessment\"); notVisible() sets no hint, so the envelope has exactly code and message.",
+  "variants": {
+    "default": {
+      "assessment": {
+        "id": "assess_demo0001",
+        "project_id": "proj_demo0001",
+        "language_id": "lang_demo0001",
+        "name": "Kimeru NT quality review 2026",
+        "purpose": "Whole-Bible checkpoint before publication",
+        "period": "2026 Q3",
+        "format": "written",
+        "stage": "collect",
+        "notes_reflection": null,
+        "notes_next_steps": null,
+        "archived_at": null,
+        "created_at": "2026-09-10T14:22:09.000Z",
+        "role": "owner"
+      },
+      "surveys": [
+        {
+          "id": "asrv_midlevel",
+          "template_id": "tpl_mid_level",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:22:09.000Z",
+          "template_name": "Mid-Level",
+          "perspective": "Translation Team"
+        },
+        {
+          "id": "asrv_validation",
+          "template_id": "tpl_validation",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:23:09.000Z",
+          "template_name": "Validation",
+          "perspective": "Translation Team"
+        },
+        {
+          "id": "asrv_communitypastor",
+          "template_id": "tpl_community_pastor",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:24:09.000Z",
+          "template_name": "Community-Pastor",
+          "perspective": "Church"
+        },
+        {
+          "id": "asrv_consultant",
+          "template_id": "tpl_consultant",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:25:09.000Z",
+          "template_name": "Consultant",
+          "perspective": "Church"
+        },
+        {
+          "id": "asrv_denomleader",
+          "template_id": "tpl_denom_leader",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:26:09.000Z",
+          "template_name": "Denom-Leader",
+          "perspective": "Church"
+        },
+        {
+          "id": "asrv_involvedpastor",
+          "template_id": "tpl_involved_pastor",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:27:09.000Z",
+          "template_name": "Involved-Pastor",
+          "perspective": "Church"
+        },
+        {
+          "id": "asrv_audio",
+          "template_id": "tpl_audio",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:28:09.000Z",
+          "template_name": "Audio",
+          "perspective": "Community"
+        },
+        {
+          "id": "asrv_written",
+          "template_id": "tpl_written",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:29:09.000Z",
+          "template_name": "Written",
+          "perspective": "Community"
+        }
+      ],
+      "templates": [
+        {
+          "id": "tpl_mid_level",
+          "name": "Mid-Level",
+          "version": 2,
+          "perspective": "Translation Team"
+        },
+        {
+          "id": "tpl_validation",
+          "name": "Validation",
+          "version": 2,
+          "perspective": "Translation Team"
+        },
+        {
+          "id": "tpl_community_pastor",
+          "name": "Community-Pastor",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_consultant",
+          "name": "Consultant",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_denom_leader",
+          "name": "Denom-Leader",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_involved_pastor",
+          "name": "Involved-Pastor",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_audio",
+          "name": "Audio",
+          "version": 2,
+          "perspective": "Community"
+        },
+        {
+          "id": "tpl_written",
+          "name": "Written",
+          "version": 2,
+          "perspective": "Community"
+        },
+        {
+          "id": "tpl_video_sign",
+          "name": "Video-Sign",
+          "version": 2,
+          "perspective": "Community"
+        }
+      ],
+      "counts": {
+        "asrv_midlevel": {
+          "responses": 6,
+          "respondents": 4
+        },
+        "asrv_validation": {
+          "responses": 3,
+          "respondents": 3
+        },
+        "asrv_communitypastor": {
+          "responses": 5,
+          "respondents": 5
+        },
+        "asrv_consultant": {
+          "responses": 2,
+          "respondents": 2
+        },
+        "asrv_denomleader": {
+          "responses": 1,
+          "respondents": 1
+        },
+        "asrv_involvedpastor": {
+          "responses": 4,
+          "respondents": 3
+        },
+        "asrv_audio": {
+          "responses": 7,
+          "respondents": 6
+        },
+        "asrv_written": {
+          "responses": 2,
+          "respondents": 2
+        }
+      },
+      "fixture": {
+        "label": "Fixture data — not live",
+        "sources": [
+          "cap.assessment.get",
+          "cap.survey.get_status (per survey; N+1 in live wiring)"
+        ]
+      }
+    },
+    "viewer": {
+      "assessment": {
+        "id": "assess_demo0001",
+        "project_id": "proj_demo0001",
+        "language_id": "lang_demo0001",
+        "name": "Kimeru NT quality review 2026",
+        "purpose": "Whole-Bible checkpoint before publication",
+        "period": "2026 Q3",
+        "format": "written",
+        "stage": "collect",
+        "notes_reflection": null,
+        "notes_next_steps": null,
+        "archived_at": null,
+        "created_at": "2026-09-10T14:22:09.000Z",
+        "role": "viewer"
+      },
+      "surveys": [
+        {
+          "id": "asrv_midlevel",
+          "template_id": "tpl_mid_level",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:22:09.000Z",
+          "template_name": "Mid-Level",
+          "perspective": "Translation Team"
+        },
+        {
+          "id": "asrv_validation",
+          "template_id": "tpl_validation",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:23:09.000Z",
+          "template_name": "Validation",
+          "perspective": "Translation Team"
+        },
+        {
+          "id": "asrv_communitypastor",
+          "template_id": "tpl_community_pastor",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:24:09.000Z",
+          "template_name": "Community-Pastor",
+          "perspective": "Church"
+        },
+        {
+          "id": "asrv_consultant",
+          "template_id": "tpl_consultant",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:25:09.000Z",
+          "template_name": "Consultant",
+          "perspective": "Church"
+        },
+        {
+          "id": "asrv_denomleader",
+          "template_id": "tpl_denom_leader",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:26:09.000Z",
+          "template_name": "Denom-Leader",
+          "perspective": "Church"
+        },
+        {
+          "id": "asrv_involvedpastor",
+          "template_id": "tpl_involved_pastor",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:27:09.000Z",
+          "template_name": "Involved-Pastor",
+          "perspective": "Church"
+        },
+        {
+          "id": "asrv_audio",
+          "template_id": "tpl_audio",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:28:09.000Z",
+          "template_name": "Audio",
+          "perspective": "Community"
+        },
+        {
+          "id": "asrv_written",
+          "template_id": "tpl_written",
+          "template_version": 2,
+          "state": "selected",
+          "collection_status": "open",
+          "archived_at": null,
+          "created_at": "2026-09-10T14:29:09.000Z",
+          "template_name": "Written",
+          "perspective": "Community"
+        }
+      ],
+      "templates": [
+        {
+          "id": "tpl_mid_level",
+          "name": "Mid-Level",
+          "version": 2,
+          "perspective": "Translation Team"
+        },
+        {
+          "id": "tpl_validation",
+          "name": "Validation",
+          "version": 2,
+          "perspective": "Translation Team"
+        },
+        {
+          "id": "tpl_community_pastor",
+          "name": "Community-Pastor",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_consultant",
+          "name": "Consultant",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_denom_leader",
+          "name": "Denom-Leader",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_involved_pastor",
+          "name": "Involved-Pastor",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_audio",
+          "name": "Audio",
+          "version": 2,
+          "perspective": "Community"
+        },
+        {
+          "id": "tpl_written",
+          "name": "Written",
+          "version": 2,
+          "perspective": "Community"
+        },
+        {
+          "id": "tpl_video_sign",
+          "name": "Video-Sign",
+          "version": 2,
+          "perspective": "Community"
+        }
+      ],
+      "counts": {
+        "asrv_midlevel": {
+          "responses": 6,
+          "respondents": 4
+        },
+        "asrv_validation": {
+          "responses": 3,
+          "respondents": 3
+        },
+        "asrv_communitypastor": {
+          "responses": 5,
+          "respondents": 5
+        },
+        "asrv_consultant": {
+          "responses": 2,
+          "respondents": 2
+        },
+        "asrv_denomleader": {
+          "responses": 1,
+          "respondents": 1
+        },
+        "asrv_involvedpastor": {
+          "responses": 4,
+          "respondents": 3
+        },
+        "asrv_audio": {
+          "responses": 7,
+          "respondents": 6
+        },
+        "asrv_written": {
+          "responses": 2,
+          "respondents": 2
+        }
+      },
+      "fixture": {
+        "label": "Fixture data — not live",
+        "sources": [
+          "cap.assessment.get",
+          "cap.survey.get_status (per survey; N+1 in live wiring)"
+        ]
+      }
+    },
+    "empty": {
+      "assessment": {
+        "id": "assess_demo0001",
+        "project_id": "proj_demo0001",
+        "language_id": "lang_demo0001",
+        "name": "Kimeru NT quality review 2026",
+        "purpose": "Whole-Bible checkpoint before publication",
+        "period": "2026 Q3",
+        "format": "written",
+        "stage": "collect",
+        "notes_reflection": null,
+        "notes_next_steps": null,
+        "archived_at": null,
+        "created_at": "2026-09-10T14:22:09.000Z",
+        "role": "owner"
+      },
+      "surveys": [],
+      "templates": [
+        {
+          "id": "tpl_mid_level",
+          "name": "Mid-Level",
+          "version": 2,
+          "perspective": "Translation Team"
+        },
+        {
+          "id": "tpl_validation",
+          "name": "Validation",
+          "version": 2,
+          "perspective": "Translation Team"
+        },
+        {
+          "id": "tpl_community_pastor",
+          "name": "Community-Pastor",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_consultant",
+          "name": "Consultant",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_denom_leader",
+          "name": "Denom-Leader",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_involved_pastor",
+          "name": "Involved-Pastor",
+          "version": 2,
+          "perspective": "Church"
+        },
+        {
+          "id": "tpl_audio",
+          "name": "Audio",
+          "version": 2,
+          "perspective": "Community"
+        },
+        {
+          "id": "tpl_written",
+          "name": "Written",
+          "version": 2,
+          "perspective": "Community"
+        },
+        {
+          "id": "tpl_video_sign",
+          "name": "Video-Sign",
+          "version": 2,
+          "perspective": "Community"
+        }
+      ],
+      "counts": {},
+      "fixture": {
+        "label": "Fixture data — not live",
+        "sources": [
+          "cap.assessment.get",
+          "cap.survey.get_status (per survey; N+1 in live wiring)"
+        ]
+      }
+    }
+  },
+  "error": {
+    "ok": false,
+    "error": {
+      "code": "NOT_FOUND_OR_NOT_VISIBLE",
+      "message": "assessment not found or not visible"
+    },
+    "trace_id": "tr_fixture_error"
+  }
+}

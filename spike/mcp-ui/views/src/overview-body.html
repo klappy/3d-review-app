@@ -1,0 +1,141 @@
+<main class="wrap" id="root">
+  <p class="muted">Waiting for the host to deliver a tool result…</p>
+</main>
+<script>
+/* Inlined app script. The ext-apps App class is inlined above as window.McpApps. */
+(function () {
+  const DEV_ROOT = "https://3d-review-dev.klappy.workers.dev/"; // link target string only; nothing is fetched from it
+  const LENSES = ["Translation Team", "Church", "Community"];
+
+  /* groupByLens copied verbatim from ui/lens-surveys.js (klappy/3d-review-app @ main b0bb9c9) */
+  function groupByLens({ surveys = [], templates = [] }) {
+    const included = surveys.filter(s => s.state === 'selected' && !s.archived_at);
+    const groups = LENSES.map(lens => ({ lens, included: [], available: [] }));
+    const other = { lens: 'Other perspective', included: [], available: [] };
+    const groupFor = p => groups.find(g => g.lens === p) || other;
+    for (const s of included) groupFor(s.perspective).included.push(s);
+    const latest = new Map();
+    for (const t of templates) { const cur = latest.get(t.id); if (!cur || t.version > cur.version) latest.set(t.id, t); }
+    for (const t of latest.values()) { if (!included.some(s => s.template_id === t.id)) groupFor(t.perspective).available.push(t); }
+    return other.included.length || other.available.length ? [...groups, other] : groups;
+  }
+
+  const root = document.getElementById("root");
+  const el = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
+  let caps = undefined;
+
+  function renderError(envelope) {
+    root.replaceChildren();
+    const panel = el("section", undefined, "glass panel");
+    panel.setAttribute("data-state", "error");
+    panel.append(el("p", "Fixture data — not live", "badge fixture-badge"));
+    panel.append(el("h1", "This assessment could not be shown"));
+    const code = (envelope && envelope.error && envelope.error.code) || "UNKNOWN";
+    const message = (envelope && envelope.error && envelope.error.message) || "No message in the tool error envelope.";
+    panel.append(el("p", code, "eyebrow"));
+    panel.append(el("p", message));
+    const trace = (envelope && envelope.trace_id) || "(none in envelope)";
+    const traceLine = el("p", undefined, "muted");
+    traceLine.append(el("span", "trace_id: ", "eyebrow"));
+    traceLine.append(el("code", trace, "trace-id"));
+    panel.append(traceLine);
+    panel.append(el("p", "Tool error envelope, verbatim:", "eyebrow"));
+    const pre = el("pre", JSON.stringify(envelope, null, 2), "envelope");
+    panel.append(pre);
+    root.append(panel);
+    document.body.dataset.viewState = "error";
+  }
+
+  function render(data) {
+    root.replaceChildren();
+    const a = data.assessment || {};
+    const header = el("header", undefined, "view-header");
+    header.append(el("p", (data.fixture && data.fixture.label) || "Fixture data — not live", "badge fixture-badge"));
+    header.append(el("h1", a.name || "(unnamed assessment)"));
+    const meta = el("p", undefined, "muted");
+    meta.append(el("span", "stage: ", "eyebrow"));
+    meta.append(el("strong", String(a.stage || "unknown"), "stage-value"));
+    meta.append(el("span", ` · role: ${a.role || "unknown"} · fixture: ${data.fixture_name || "default"}`));
+    header.append(meta);
+    if (data.fixture && data.fixture.sources) {
+      header.append(el("p", "Sources: " + data.fixture.sources.join(" · "), "note"));
+    }
+    root.append(header);
+
+    const surveys = data.surveys || [];
+    if (!surveys.length) {
+      const panel = el("section", undefined, "glass panel");
+      panel.setAttribute("data-state", "empty");
+      panel.append(el("h2", "No surveys included"));
+      panel.append(el("p", "Nothing is included for any lens in this fixture, so no responses can be counted.", "muted"));
+      root.append(panel);
+      document.body.dataset.viewState = "empty";
+    } else {
+      const counts = data.counts || {};
+      const wrap = el("div", undefined, "three lens-groups");
+      for (const g of groupByLens(data)) {
+        const card = el("section", undefined, "glass panel lens-group");
+        card.setAttribute("aria-label", g.lens);
+        card.setAttribute("data-lens", g.lens);
+        card.append(el("h2", g.lens));
+        const responses = g.included.reduce((n, s) => n + Number((counts[s.id] || {}).responses || 0), 0);
+        const respondents = g.included.reduce((n, s) => n + Number((counts[s.id] || {}).respondents || 0), 0);
+        card.append(el("p", `${g.included.length} included`, "muted included-count"));
+        card.append(el("p", `${responses} response${responses === 1 ? "" : "s"} · ${respondents} respondent${respondents === 1 ? "" : "s"}`, "response-total"));
+        const list = el("ul", undefined, "lens-included");
+        for (const s of g.included) {
+          const c = counts[s.id] || {};
+          const li = el("li");
+          li.append(el("strong", s.template_name));
+          li.append(el("span", ` · v${s.template_version} · ${s.collection_status} · ${Number(c.responses || 0)} response${Number(c.responses || 0) === 1 ? "" : "s"}`, "muted"));
+          list.append(li);
+        }
+        if (!g.included.length) list.append(el("li", "No surveys included", "muted"));
+        card.append(list);
+        wrap.append(card);
+      }
+      root.append(wrap);
+      document.body.dataset.viewState = "default";
+    }
+
+    const footer = el("div", undefined, "row view-footer");
+    if (caps && caps.openLinks) {
+      const b = el("button", "Open in app", "primary");
+      b.type = "button";
+      b.id = "open-in-app";
+      b.addEventListener("click", async () => {
+        const res = await app.openLink({ url: DEV_ROOT });
+        b.nextSibling && b.nextSibling.remove();
+        footer.append(el("span", res && res.isError ? "Host declined the link." : "Link handed to the host.", "muted"));
+      });
+      footer.append(b);
+      footer.append(el("span", "Dev root; no deep link.", "muted"));
+    } else {
+      footer.append(el("span", "Host does not advertise openLinks, so no Open in app button is shown.", "muted"));
+    }
+    root.append(footer);
+  }
+
+  function handle(result) {
+    const sc = result && result.structuredContent;
+    if ((result && result.isError) || (sc && sc.ok === false)) {
+      renderError(sc || { ok: false, error: { code: "UNKNOWN", message: "Tool reported an error with no structured envelope." } });
+      return;
+    }
+    if (!sc) { renderError({ ok: false, error: { code: "NO_CONTENT", message: "Tool result carried no structuredContent." } }); return; }
+    render(sc);
+  }
+
+  const app = new window.McpApps.App({ name: "3d-review overview (spike)", version: "0.0.0" });
+  /* listener registered BEFORE connect */
+  app.addEventListener("toolresult", handle);
+  app.onerror = (e) => console.error("[overview]", e);
+
+  app.connect().then(() => {
+    caps = app.getHostCapabilities();
+    console.info("[overview] host capabilities:", JSON.stringify(caps));
+    const banner = document.getElementById("caps");
+    if (banner) banner.textContent = "host capabilities: " + JSON.stringify(caps);
+  }).catch((e) => console.error("[overview] connect failed", e));
+})();
+</script>
