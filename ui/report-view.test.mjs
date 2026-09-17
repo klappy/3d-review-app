@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { copy, createReportState, renderList, renderReport } from './report-view.js';
+import { copy, createReportState, renderList, renderReport, upsertRow } from './report-view.js';
 
 // Minimal fake DOM: no innerHTML exists on these nodes, so any HTML-string rendering would fail here.
 function fakeNode(tag) {
-  return { tag, textContent: '', children: [], listeners: {},
+  return { tag, textContent: '', children: [], listeners: {}, dataset: {},
     addEventListener(event, fn) { (this.listeners[event] ||= []).push(fn); },
     fire(event) { for (const fn of this.listeners[event] || []) fn({}); },
     append(...nodes) { this.children.push(...nodes); },
@@ -122,6 +122,22 @@ test('R9 renderList renders one button row per report and opens by id', () => {
   assert.deepEqual(opened, ['rep_b']);
   renderList({ doc, list, reports: [], onOpen: () => {} });
   assert.deepEqual(list.children, []);
+});
+
+test('R11 upsertRow: an executed build that converges onto a listed id keeps exactly one row, at the top', () => {
+  const list = fakeNode('ol'), opened = [];
+  const onOpen = id => opened.push(id);
+  renderList({ doc, list, reports: [{ id: 'rep_a', created_at: 't1' }, { id: 'rep_b', created_at: 't2' }], onOpen });
+  upsertRow({ doc, list, report: { id: 'rep_b', created_at: 't2' }, onOpen });
+  assert.deepEqual(list.children.map(li => li.dataset.reportId), ['rep_b', 'rep_a']);
+  assert.deepEqual(list.children.map(li => li.children[0].textContent), ['Built t2 · rep_b', 'Built t1 · rep_a']);
+  list.children[0].children[0].fire('click');
+  assert.deepEqual(opened, ['rep_b']);
+  upsertRow({ doc, list, report: { id: 'rep_c', created_at: 't3' }, onOpen }); // a genuinely new report still leads
+  assert.deepEqual(list.children.map(li => li.dataset.reportId), ['rep_c', 'rep_b', 'rep_a']);
+  const empty = fakeNode('ol');
+  upsertRow({ doc, list: empty, report: { id: 'rep_a', created_at: 't1' }, onOpen });
+  assert.deepEqual(empty.children.map(li => li.dataset.reportId), ['rep_a']);
 });
 
 test('R10 createReportState().clear() drops the pending confirmation, its timer and the cursor', () => {

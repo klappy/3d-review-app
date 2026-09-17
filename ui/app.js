@@ -1,7 +1,7 @@
 import { initLanguageControls } from './language.js';
 import { reviewAnswer, templateChoices } from './present.js';
 import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork } from './visibility.js';
-import { renderList, renderReport } from './report-view.js';
+import { renderList, renderReport, upsertRow } from './report-view.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
 import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
 // Thrown by shared-link paths that already showed the participant copy: run() marks the action as
@@ -330,9 +330,7 @@ reportAction('build-report', 'Building report…', async () => {
   dropReportConfirm(); $('build-report').disabled = true; text($('report-preview'), '');
   const result = await api(reportRoute(), { method: 'POST', body: { mode: 'execute', confirm_token } });
   if (result.suppressed) { text($('report-status'), result.reason); return; }
-  const li = document.createElement('li');
-  renderList({ doc: document, list: li, reports: [{ id: result.report.id, created_at: result.report.created_at }], onOpen: id => run('Opening report…', () => openReport(id)) });
-  $('report-list').prepend(...li.children);
+  upsertRow({ doc: document, list: $('report-list'), report: { id: result.report.id, created_at: result.report.created_at }, onOpen: id => run('Opening report…', () => openReport(id)) });
   await openReport(result.report.id);
 });
 async function listReports() {

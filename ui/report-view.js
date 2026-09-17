@@ -85,15 +85,24 @@ export function renderReport({ doc, root, report }) {
   return true;
 }
 // Rows carry the only two disclosed list fields; opening one is the caller's authorized read.
+function reportRow(doc, report, onOpen) {
+  const li = el(doc, 'li');
+  li.dataset.reportId = val(report.id);
+  const button = el(doc, 'button', `${copy.built} ${val(report.created_at)} · ${val(report.id)}`);
+  button.type = 'button';
+  button.addEventListener('click', () => onOpen(report.id));
+  li.append(button);
+  return li;
+}
 export function renderList({ doc, list: target, reports, onOpen }) {
-  target.replaceChildren(...rows(reports).map(report => {
-    const li = el(doc, 'li');
-    const button = el(doc, 'button', `${copy.built} ${val(report.created_at)} · ${val(report.id)}`);
-    button.type = 'button';
-    button.addEventListener('click', () => onOpen(report.id));
-    li.append(button);
-    return li;
-  }));
+  target.replaceChildren(...rows(reports).map(report => reportRow(doc, report, onOpen)));
+}
+// An executed build can converge onto a row the list already shows (same captured membership and
+// version tuple), so the row is keyed by id: one row per report, most recent build at the top.
+export function upsertRow({ doc, list: target, report, onOpen }) {
+  const id = val(report.id);
+  const kept = [...(target.children || [])].filter(row => !row.dataset || row.dataset.reportId !== id);
+  target.replaceChildren(reportRow(doc, report, onOpen), ...kept);
 }
 // The pending confirmation and the list cursor never outlive an identity, project or assessment change.
 export function createReportState() {
