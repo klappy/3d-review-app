@@ -17,5 +17,5 @@ test('E1: the shell way back is /#facilitator, hidden until a session is observe
   assert.ok(html.includes('<p class="storage-note" id="whats-here" hidden></p>'));
   assert.ok(MOUNTED.length >= 2 && ELSEWHERE.items.includes('stage change') && ELSEWHERE.items.includes('reports and results'));
   assert.ok(!/coming soon/i.test(whatsHere()));
-  assert.ok(read('../.assetsignore').split('\n').includes('assess/entry.test.mjs') || true);
+  assert.ok(read('../.assetsignore').split('\n').includes('assess/entry.test.mjs'));
 });
