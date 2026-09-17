@@ -100,3 +100,11 @@ test('completed invitation requires explicit handoff completion before refresh o
  assert.ok(!walk(w.root).some(n=>n.value==='HANDOFF_SENTINEL'));assert.match(text(w.root),/created-i · viewer · awaiting acceptance/);assert.ok(w.buttons().includes('Preview invitation'));
  assert.equal(w.calls.filter(x=>x.method==='GET').length,2);
 });
+
+test('server-confirmed email delivery is reported without false failure or recipient acceptance',async()=>{
+ const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'mailed-i',delivered:true,dev_only_link_token:'UNNEEDED_SECRET'});
+ await w.api.setScope(scope);await emailPreview(w);w.button('Confirm invitation').click();await flush();
+ assert.match(text(w.root),/server reports email delivery/);assert.match(text(w.root),/recipient has not accepted/);
+ assert.ok(!text(w.root).includes('email not delivered'));assert.ok(!text(w.root).includes('outcome could not be confirmed'));assert.ok(!w.buttons().includes('Reveal private invitation token'));
+ assert.ok(w.buttons().includes('Continue and refresh access'));
+});
