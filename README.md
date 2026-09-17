@@ -14,12 +14,15 @@ npm run migrate:local && npx wrangler d1 execute 3d-review --local --file=migrat
 npm run dev            # http://localhost:8787
 curl localhost:8787/v2/health
 curl localhost:8787/mcp -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-SESS=<token> npm run parity   # 79/79 HTTP vs MCP (2 documented exclusions)
+SESS=<token> npm run parity   # same=S/compared=81 · excluded=2 · contract=83
+npm run journeys              # B2 live table + PASS/FAIL/RESERVED/SKIP; exit 1 on FAIL or unmet floor
 ```
 Sign in (phase 0, no email is sent): `POST /v2/auth/link {"email":…}` → response carries `dev_only_code` in dev → `POST /v2/auth/session {"email","code"}` → `session` token works as cookie `session` and as `Authorization: Bearer` (delegated-identity contract is open item D-1 in 18-D).
 
+**B2/B3 runners.** Cite `journeys PASS=a FAIL=b RESERVED=c SKIP=d` and `parity same=S/compared=C excluded=E`, never a bare table or `83/83`. `npm run journeys` (`scripts/journeys.mjs`) exits `process.exit(FAIL > 0 ? 1 : 0)` **plus** a non-overridable REQUIRE floor — `AUTH, ME, J8, J14a, J7, J6, MCP, OUT` must all PASS (not SKIP/RESERVED) or the process exits 1. `REQUIRE=` may only add ids. `--strict` is on by default (`SKIP>0` → exit 1); `--allow-skip` is the explicit opt-out and cannot drop the floor. Uncaught exception → exit 2 naming the row in flight. `INJECT_FAIL=<rowId>` forces that row FAIL for local negative proof (never against live DEV). `SESS=<token> npm run parity` (`scripts/parity.mjs`) requires a bearer for `/mcp`, does not increment `same` on the two EXCLUDE rows, tags `REFUSAL-PARITY` vs `RESULT-PARITY`, and exits 1 on any differ.
+
 ## Layout
-`contract/` A1 (Lane A owns) · `src/registry.ts` routes from the contract · `src/dispatch.ts` one execute (class→tool, RESERVED_NOT_BUILT, authorize, handler, receipt, danger two-step) · `src/mcp.ts` four tools · `src/policy.ts` no inheritance, unauthorized == nonexistent · `src/handlers/` Lane B: entry/auth/ops/docs/undo; Lane A: domain (workspace is a draft seed; project/assessment/template/survey/participant/response/results/grant/request/support still 501) · `migrations/` 0001 schema (Lane A draft) + 0002 platform ext · `seed/synthetic.sql` invented data only · `scripts/parity.mjs` B3.
+`contract/` A1 (Lane A owns) · `src/registry.ts` routes from the contract · `src/dispatch.ts` one execute (class→tool, RESERVED_NOT_BUILT, authorize, handler, receipt, danger two-step) · `src/mcp.ts` four tools · `src/policy.ts` no inheritance, unauthorized == nonexistent · `src/handlers/` Lane B: entry/auth/ops/docs/undo; Lane A: domain (workspace is a draft seed; project/assessment/template/survey/participant/response/results/grant/request/support still 501) · `migrations/` 0001 schema (Lane A draft) + 0002 platform ext · `seed/synthetic.sql` invented data only · `scripts/journeys.mjs` B2 · `scripts/parity.mjs` B3.
 
 ## Rules carried (cookbook 16-CONSTRAINTS)
 Danger twins never GET · `SUPPRESSED` is `ok:true` · `v2.1-oct` = documented 501 · existence hidden · no inheritance · codes never returned by `issue_codes` · telemetry carries no params/codes/answers · receipt with `trace_id` on every write · no real participant data · no Supabase · no offline queue.
