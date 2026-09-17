@@ -125,11 +125,17 @@ export function entryFailureKind(error, resuming) {
   return kind === 'unavailable' && resuming ? 'cannotResume' : kind;
 }
 // Resolve a STAGE_CONFLICT (or check state before showing an editable form).
-// Returns { state: 'receipt', receipt } | { state: 'closed' } | { state: 'unavailable' }.
+// Returns { state: 'receipt', receipt } | { state: 'closed' } | { state: 'unavailable' }
+// | { state: 'rateLimited' } | { state: 'transient' }.
+// A receipt refusal is unavailable only for NOT_FOUND_OR_NOT_VISIBLE / NOT_AUTHENTICATED;
+// rate-limit and transport failures keep their own kinds so callers do not treat a live session as revoked.
 export async function resolveConflict(client) {
   if (!client.bearer) return { state: 'closed' }; // a conflict before any session exists cannot be "already submitted"
   let receipt;
-  try { receipt = await client.receipt(); } catch { return { state: 'unavailable' }; }
+  try { receipt = await client.receipt(); } catch (error) {
+    const kind = errorKind(error);
+    return { state: kind === 'unavailable' ? 'unavailable' : kind === 'rateLimited' ? 'rateLimited' : 'transient' };
+  }
   return receipt.submitted ? { state: 'receipt', receipt } : { state: 'closed' };
 }
 

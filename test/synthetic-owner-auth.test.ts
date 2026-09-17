@@ -52,4 +52,28 @@ describe("local synthetic owner login", () => {
     const created = await execute(signed, "cap.project.create", { name: "New local synthetic project" }, { tool: "write" });
     expect(created).toMatchObject({ ok: true, result: { project: { role: "owner" } } });
   });
+
+  it("overlapping consume of one email code mints only one session", async () => {
+    const db = await mf.getD1Database("DB");
+    const env: Env = { DB: db, SESSION_SECRET: "synthetic-owner-test-only", ENVIRONMENT: "dev" };
+    const email = "race.owner@example.invalid";
+    const anonymous: Ctx = { env, db, principal: { kind: "anonymous", id: "anon" }, traceId: "tr_race_req",
+      now: () => new Date(), log: () => {} };
+    const requested = await execute(anonymous, "cap.auth.request_link", { email }, { tool: "danger" });
+    expect(requested.ok).toBe(true);
+    if (!requested.ok) throw new Error("code not issued");
+    const code = requested.result.dev_only_code as string;
+    const [a, b] = await Promise.all([
+      execute({ ...anonymous, traceId: "tr_race_a" }, "cap.auth.consume_link", { email, code }, { tool: "write" }),
+      execute({ ...anonymous, traceId: "tr_race_b" }, "cap.auth.consume_link", { email, code }, { tool: "write" }),
+    ]);
+    const won = [a, b].filter(r => r.ok);
+    const lost = [a, b].filter(r => !r.ok);
+    expect(won).toHaveLength(1);
+    expect(lost).toHaveLength(1);
+    expect(lost[0]).toMatchObject({ ok: false, error: { code: "INVALID_PARAMS" } });
+    const sessions = await db.prepare("SELECT COUNT(*) AS n FROM session WHERE principal_id = (SELECT id FROM principal WHERE email_hash = ?)")
+      .bind(await sha256(email)).first<{ n: number }>();
+    expect(Number(sessions?.n)).toBe(1);
+  });
 });

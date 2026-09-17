@@ -185,6 +185,18 @@ describe("[real-API] participant client against the worker", () => {
     expect(await sessions()).toBe(n);
     expect(copy.cannotResume).not.toMatch(/expired|no longer works|not saved|was not sent/i);
   });
+  it("resolveConflict maps a receipt refusal by kind: unavailable only for NOT_FOUND, not rate-limit or transport", async () => {
+    const fail = (code?: string) => ({
+      bearer: "pt_x",
+      receipt: async () => { const e: any = new Error(code || "offline"); if (code) e.code = code; throw e; },
+    });
+    expect(await resolveConflict(fail("NOT_FOUND_OR_NOT_VISIBLE"))).toEqual({ state: "unavailable" });
+    expect(await resolveConflict(fail("RATE_LIMITED"))).toEqual({ state: "rateLimited" });
+    expect(await resolveConflict(fail("429"))).toEqual({ state: "rateLimited" });
+    expect(await resolveConflict(fail())).toEqual({ state: "transient" });
+    expect(await resolveConflict(fail("503"))).toEqual({ state: "transient" });
+    expect(await resolveConflict({ bearer: "pt_x", receipt: async () => ({ submitted: false }) })).toEqual({ state: "closed" });
+  });
   it("error kinds: 429/RATE_LIMITED is rateLimited; network and 5xx are transient; closed stays conflict on the resume path", async () => {
     const link = await issue();
     const limited = async () => new Response(JSON.stringify({ ok: false, error: { code: "RATE_LIMITED", message: "slow down" } }), { status: 429, headers: { "content-type": "application/json" } });

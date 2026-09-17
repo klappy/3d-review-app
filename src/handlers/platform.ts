@@ -45,7 +45,8 @@ export const authConsumeLink: Handler = async (ctx, p) => {
   if (!row) throw new CapError("INVALID_PARAMS", "code invalid", "request a new code", "cap.auth.request_link");
   if (row.used_at) throw new CapError("INVALID_PARAMS", "code_used", "codes are single-use; request a new one");
   if (row.expires_at < Date.now()) throw new CapError("INVALID_PARAMS", "code_expired", "request a new code");
-  await ctx.db.prepare("UPDATE login_code SET redeemed_at = ? WHERE id = ?").bind(Date.now(), row.id).run();
+  const changed = await ctx.db.prepare("UPDATE login_code SET redeemed_at = ? WHERE id = ? AND redeemed_at IS NULL").bind(Date.now(), row.id).run();
+  if (changed.meta.changes !== 1) throw new CapError("INVALID_PARAMS", "code_used", "codes are single-use; request a new one");
   const pr = await ctx.db.prepare("SELECT id, support FROM principal WHERE email_hash = ?").bind(eh).first<any>();
   const token = await mintSession(ctx.env, pr.id, pr.support ? "support" : "user");
   return { result: { session: token, principal_id: pr.id, note: "phase 0: same token works as cookie `session` and as Bearer (delegated identity contract = 18-D open item D-1)" }, scope: { type: "platform", id: "auth" } };

@@ -323,7 +323,7 @@ bindClick('submit', 'Submitting response…', async () => {
     let result;
     try { result = await state.shared.submit(state.answers); }
     catch (error) {
-      if (errorKind(error) === 'conflict') { const resolved = await resolveConflict(state.shared); if (resolved.state === 'receipt') { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); showReceipt(resolved.receipt); return; } showSharedUnavailable(resolved.state); }
+      if (errorKind(error) === 'conflict') { const resolved = await resolveConflict(state.shared); if (resolved.state === 'receipt') { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); showReceipt(resolved.receipt); return; } if (resolved.state === 'rateLimited' || resolved.state === 'transient') text($('participant-resume'), resolved.state === 'rateLimited' ? sharedCopy.rateLimited : sharedCopy.transient); else showSharedUnavailable(resolved.state); }
       else if (errorKind(error) === 'rateLimited') text($('participant-resume'), sharedCopy.rateLimited);
       else text($('participant-resume'), sharedCopy.submitFailed);
       throw error;
