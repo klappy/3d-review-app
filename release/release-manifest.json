@@ -1,17 +1,17 @@
 {
   "version": "0.10.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "41bc68776ab06028486c068c97c3a361a23c7f99",
+  "cookbook_commit": "d2311b1ddc2749fd33f89f4d7afb78d332b02c3e",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.10.0.md",
-      "blob_sha": "7e3b1f32eb4949758caf9e63bbe446d44868e9fb",
-      "sha256": "328f7349a5d3bd13625c66170b9fcac5be6180aec55c0f73449a9b4f3cdeb74c"
+      "blob_sha": "c84d0ad5672700a7bd381b48d8312c75031f7289",
+      "sha256": "2c09f0a2fa85887fae0d96cc087a530a7b508714d12cf173b55517700a546d63"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "17d673d358417fa1a99dae7069631b4315ce8f4c",
-      "sha256": "429c94fd07f4e8cbfe2b43bcb38f8e8ae951836004a19fe725d005bd346b433b"
+      "blob_sha": "9f14062d36d4ac6d677407ccdfadf61b3d810eca",
+      "sha256": "24fde53a1d2b9609f2048d2cf9c4fe5325ad5e2f44ce01eaeab102980f881c82"
     }
   ],
   "changelog": {
@@ -21,7 +21,7 @@
       ],
       "changed": [
         "Docs orientation is text-only. Panel startup waits for the host call and does not automatically fetch identity, workspaces or projects; full exploration requires an explicit action.",
-        "Six bounded official-host scenarios are covered across attributed pre/post-fix sources; the integrated theme/card candidate passes33 targeted automated tests. Human satisfaction, confusion and frustration are NOT MEASURED."
+        "Six bounded official-host scenarios are covered across attributed pre/post-fix sources; the final integrated theme/card host check passed1/1 independently. Human satisfaction, confusion and frustration are NOT MEASURED."
       ],
       "fixed": [
         "Compact confirmations show server-owned impact, affected targets, compensating control and expiry; busy and one-shot execution guards remain enforced."
