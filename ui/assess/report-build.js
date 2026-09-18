@@ -37,7 +37,7 @@ export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}) {
       box.querySelector('[data-confirm-report]').onclick = async () => {
         if (!current() || busy || !pending) return;
         if (Date.now() >= pending.expires) { clear(); say('Preview expired. Preview again before building.'); return; }
-        const confirm_token = pending.token; clear(); busy = true; preview.disabled = true; lockRefresh(true); say('Building report…');
+        const confirm_token = pending.token; clear(); busy = true; preview.disabled = true; lockRefresh(true); onClear(); say('Building report…');
         let built = false;
         try {
           const result = await ctx.api(url, { method: 'POST', body: { mode: 'execute', confirm_token } });
