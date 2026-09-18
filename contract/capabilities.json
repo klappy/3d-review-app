@@ -3355,6 +3355,7 @@
         "additionalProperties": false
       },
       "roadmap_contract": {
+        "workflow_amendment": "https://github.com/klappy/3d-review-cookbook/blob/d3e682e109afda735c3a8155ce808fd1441053cf/planning/2026-09-16-parity-build/AMEND-2026-09-18-roadmap-workflow.md",
         "status": "candidate additive amendment; not release acceptance",
         "source": "https://github.com/klappy/3d-review-cookbook/blob/f5fb9a28ee3ea017859e521ac672f4c58236a9b4/planning/2026-09-18-live-roadmap/capabilities.json",
         "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."

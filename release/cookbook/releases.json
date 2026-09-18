@@ -1,7 +1,26 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.13.1",
+  "current": "0.14.0",
   "versions": [
+    {
+      "version": "0.14.0",
+      "status": "candidate",
+      "notes_path": "releases/0.14.0.md",
+      "sections": {
+        "added": [
+          "Explicit Past, Now and Next workflow windows, reviewed operational context and work-type/release badges through the existing shared HTTP/MCP roadmap contract."
+        ],
+        "changed": [
+          "Reported progress is separate from verifier acceptance; missing placement remains unclassified and transport details are secondary."
+        ],
+        "fixed": [
+          "Human-readable cards expose stages, current work, blockers and next action without opening details."
+        ],
+        "security": [
+          "Existing publication/reviewer permissions, confirmation, public text safety, redaction and source privacy remain enforced."
+        ]
+      }
+    },
     {
       "version": "0.13.1",
       "status": "candidate",

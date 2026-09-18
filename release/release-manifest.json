@@ -1,30 +1,32 @@
 {
-  "version": "0.13.1",
+  "version": "0.14.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "9d6a92c2f18e6f6e9660a825447c01a13405c49d",
+  "cookbook_commit": "0dacbc08319bd8e416739d2f988c484152917f3c",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.13.1.md",
-      "blob_sha": "4f6c6a2870513d68608c89b600f5d3c439f3d446",
-      "sha256": "0bab1c92e06f745a317ebdf63d21c2991acaee237d109e24a1703e86c7484913"
+      "path": "planning/2026-09-16-parity-build/releases/0.14.0.md",
+      "blob_sha": "655edc661b064e7f39edd36c20c1be73476378c8",
+      "sha256": "9988f5412427dc2ee7deffe996e64577097d030d1f91b27d7bf3e20aadf96019"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "96342d84ded9888e6aca5b39e402e9a9fcee9b17",
-      "sha256": "0ec206ba45165bb0778e87cfe045900e2aa9ffd49ac8d3a10feb8442c646ae14"
+      "blob_sha": "56c7e843da94b2cf9e3d3534bcbff3a2460c2d82",
+      "sha256": "9b2f9fc0dc00c15e8c7c2086e5594abe7ce5893885ac8548630224c6ad7f0741"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "Explicit Past, Now and Next workflow windows, reviewed operational context and work-type/release badges through the existing shared HTTP/MCP roadmap contract."
+      ],
       "changed": [
-        "Persona evidence: nine local feedback DOM tests passed; deployed reporter and real-human outcomes not measured."
+        "Reported progress is separate from verifier acceptance; missing placement remains unclassified and transport details are secondary."
       ],
       "fixed": [
-        "Feedback opens with the user\u2019s problem or suggestion; experience ratings remain optional in a secondary disclosure."
+        "Human-readable cards expose stages, current work, blockers and next action without opening details."
       ],
       "security": [
-        "Existing authentication, payload privacy, identity isolation and uncertain-send handling remain unchanged."
+        "Existing publication/reviewer permissions, confirmation, public text safety, redaction and source privacy remain enforced."
       ]
     }
   }
