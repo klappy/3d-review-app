@@ -222,3 +222,24 @@ test('ownership transfer to a signed-up principal with no prior grant attaches r
   assert.match(row, /receipt rcpt_1 · trace tr_1/);
   assert.match(x.root.html, /data-permissions-status>Ownership transfer done\. receipt rcpt_1 · trace tr_1/);
 });
+
+test('confirm sheet Cancel dismisses before execute and is ignored while the write is in flight', async () => {
+  const pre = await mount('owner', { 'POST /v2/assessment/a1/transfer': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300, impact: {} } : { transferred: true } }, { to: 'pat' });
+  await pre.submit('data-transfer-form'); await pre.click('data-confirm-cancel');
+  assert.equal(pre.m.sheet, null); assert.doesNotMatch(pre.root.html, /data-confirm-sheet/);
+  assert.equal(pre.calls.filter(c => c.body?.mode === 'execute').length, 0);
+
+  let finishWrite;
+  const x = await mount('owner', { 'POST /v2/assessment/a1/transfer': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300, impact: { effect: 'destructive' } } : new Promise(resolve => { finishWrite = resolve; }) }, { to: 'pat' });
+  await x.submit('data-transfer-form');
+  const pending = x.click('data-confirm-execute');
+  assert.match(x.root.html, /data-confirm-sheet/);
+  assert.match(x.root.html, /data-confirm-execute disabled/);
+  assert.match(x.root.html, /data-confirm-cancel disabled/);
+  await x.click('data-confirm-cancel');
+  assert.ok(x.m.sheet); assert.match(x.root.html, /data-confirm-sheet/, 'cancel ignored while execute is in flight');
+  await x.click('data-confirm-execute');
+  assert.ok(!x.root.html.includes(PREVIEW_AGAIN), 'second confirm does not flash preview-again');
+  finishWrite({ transferred: true }); await pending;
+  assert.equal(x.m.sheet, null); assert.match(x.root.html, /Ownership transfer done/);
+});

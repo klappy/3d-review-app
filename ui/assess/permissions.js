@@ -51,7 +51,7 @@ export const permissions = {
     const roleOptions = (owner ? ROLES : ROLES.filter(r => r !== 'owner')).map(r => `<option value="${r}">${r}</option>`).join('');
     const invite = member ? `<form class="line" data-invite-form><h3>Invite someone</h3><label class="field">Email<input name="email" type="email" required autocomplete="off" ${busy}></label><label class="field">Role<select name="role" ${busy}>${roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit" ${busy}>Preview invitation</button></div><p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p></form>` : '';
     const transfer = owner ? `<form class="line" data-transfer-form><h3>Transfer ownership</h3><p class="small muted">Ownership moves to another signed-up principal. Destructive: it cannot be undone from here.</p><label class="field">New owner's principal id<input name="to" required autocomplete="off" placeholder="usr_… or person_…" ${busy}></label><label class="small"><input type="checkbox" name="step_down"> Step down to member after the transfer</label><div class="actions"><button type="submit" ${busy}>Preview transfer</button></div></form>` : '';
-    const sheet = m.sheet ? renderSheet(ctx, m.sheet) : '';
+    const sheet = m.sheet ? renderSheet(ctx, m.sheet, m.busy) : '';
     return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}<table class="grants"><thead><tr><th>Principal</th><th>Role</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="muted">No grants listed.</td></tr>'}</tbody></table>${pending}${invite}${transfer}${sheet}${status}<p class="small muted line">Accepting an invitation happens on the legacy surface (a mailed <code>#invite=</code> link opens there); it is never done from this page.</p></section>`;
   },
   bind(ctx, root, m) {
@@ -76,8 +76,9 @@ export const permissions = {
       try { const env = await call(url, { method: extra.method || 'POST', body: { params, mode: 'dry_run' } }); const r = env.result;
         m.sheet = { kind, url, method: extra.method || 'POST', params: Object.freeze(JSON.parse(JSON.stringify(params))), token: r.confirm_token, expiresIn: r.expires_in, impact: r.impact || {}, label, ...extra.display }; m.notice = null; m.alert = false;
       } catch (e) { m.sheet = null; fail(e, label); } finally { m.busy = false; paint(); } };
-    const execute = async () => { const s = m.sheet; if (!s) return; if (!s.token) { say(PREVIEW_AGAIN, true); return; }
-      m.busy = true; paint(); const token = s.token; s.token = null; // single-use, cleared before the call
+    const execute = async () => { const s = m.sheet; if (!s || m.busy) return; if (!s.token) { say(PREVIEW_AGAIN, true); return; }
+      const token = s.token; s.token = null; // single-use, cleared before the call
+      m.busy = true; paint();
       try { const env = await call(s.url, { method: s.method, body: { params: s.params, mode: 'execute', confirm_token: token } }); const r = env.result || {};
         m.sheet = null;
         if (s.kind === 'invite') { if (r.delivered === false && /duplicate/.test(r.delivery?.reason || '')) say(`${DUPLICATE_NOTE}${receiptText(env)}`); else if (r.delivered === false && r.delivery?.state === 'unconfirmed') say(`Invitation recorded — ${UNCONFIRMED_NOTE}${receiptText(env)}`); else if (r.delivered === false) say(`Invitation recorded; not sent (${r.delivery?.reason || 'not sent'}). It can be revoked below.${receiptText(env)}`); else say(`Invitation sent.${receiptText(env)}`); }
@@ -101,13 +102,13 @@ export const permissions = {
     root.querySelectorAll('[data-revoke]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`${base}/grants/${ctx.enc(b.dataset.revoke)}`, { method: 'DELETE' }); say(`Access removed.${receiptText(env)}`); await refresh(); } catch (e) { m.busy = false; fail(e, 'Remove access'); } }));
     root.querySelectorAll('[data-revoke-invitation]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`/v2/invitations/${ctx.enc(b.dataset.revokeInvitation)}`, { method: 'DELETE' }); say(`Invitation revoked.${receiptText(env)}`); await refresh(); } catch (e) { m.busy = false; fail(e, 'Revoke invitation'); } }));
     root.querySelector('[data-confirm-execute]')?.addEventListener('click', execute);
-    root.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => { m.sheet = null; say(null); });
+    root.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => { if (m.busy) return; m.sheet = null; say(null); });
   },
 };
 export default permissions;
 
-function renderSheet(ctx, s) {
+function renderSheet(ctx, s, busy) {
   const esc = ctx.esc, i = s.impact || {};
   const affected = Array.isArray(i.affected) ? i.affected : [];
-  return `<section class="note" data-confirm-sheet data-confirm-kind="${esc(s.kind)}"><p class="eyebrow">Confirm: ${esc(s.label)}${s.who ? ` · ${esc(s.who)}` : ''}</p><p class="small">Nothing has changed yet. Confirmation expires in ${esc(s.expiresIn ?? '')} seconds.</p><dl class="small" data-impact><dt>Effect</dt><dd>${esc(i.effect ?? '')}</dd><dt>Irreversible</dt><dd>${esc(String(i.irreversible ?? ''))}</dd><dt>Compensating control</dt><dd>${esc(i.compensating_control ?? '')}</dd><dt>Affected</dt><dd>${affected.length ? `<ul>${affected.map(a => `<li><code>${esc(JSON.stringify(a))}</code></li>`).join('')}</ul>` : '<span class="muted">none listed</span>'}</dd></dl><div class="actions"><button type="button" class="primary" data-confirm-execute ${s.token ? '' : 'disabled'}>Confirm ${esc(s.label.toLowerCase())}</button><button type="button" class="quiet" data-confirm-cancel>Cancel</button></div></section>`;
+  return `<section class="note" data-confirm-sheet data-confirm-kind="${esc(s.kind)}"><p class="eyebrow">Confirm: ${esc(s.label)}${s.who ? ` · ${esc(s.who)}` : ''}</p><p class="small">Nothing has changed yet. Confirmation expires in ${esc(s.expiresIn ?? '')} seconds.</p><dl class="small" data-impact><dt>Effect</dt><dd>${esc(i.effect ?? '')}</dd><dt>Irreversible</dt><dd>${esc(String(i.irreversible ?? ''))}</dd><dt>Compensating control</dt><dd>${esc(i.compensating_control ?? '')}</dd><dt>Affected</dt><dd>${affected.length ? `<ul>${affected.map(a => `<li><code>${esc(JSON.stringify(a))}</code></li>`).join('')}</ul>` : '<span class="muted">none listed</span>'}</dd></dl><div class="actions"><button type="button" class="primary" data-confirm-execute ${s.token && !busy ? '' : 'disabled'}>Confirm ${esc(s.label.toLowerCase())}</button><button type="button" class="quiet" data-confirm-cancel ${busy ? 'disabled' : ''}>Cancel</button></div></section>`;
 }
