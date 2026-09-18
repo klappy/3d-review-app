@@ -200,3 +200,25 @@ test('late permission refresh cannot repaint a route the user has left', async (
   finishRead(roster('member')); await pending;
   assert.equal(x.root.html, '<h1>Another page</h1>');
 });
+
+
+test('ownership transfer to a signed-up principal with no prior grant attaches receipt to the new owner row', async () => {
+  let transferred = false;
+  const after = roster('member');
+  after.grants.push({ id: 'g_new_owner', principal_id: 'new_principal', role: 'owner' });
+  const x = await mount('owner', {
+    [G]: () => transferred ? after : roster('owner'),
+    'POST /v2/assessment/a1/transfer': ({ body }) => {
+      if (body.mode === 'dry_run') return { confirm_token: 'transfer-token', expires_in: 300, impact: {} };
+      transferred = true; return { transferred: true };
+    },
+  }, { to: 'new_principal', step_down_checked: true });
+  assert.equal(x.m.grants.find(g => g.principal_id === 'new_principal'), undefined);
+  await x.submit('data-transfer-form'); await x.click('data-confirm-execute');
+  assert.equal(x.m.myRole, 'member');
+  assert.deepEqual(x.m.receipts.g_new_owner, { receipt: 'rcpt_1', trace: 'tr_1' });
+  assert.equal(x.m.receipts.new_principal, undefined);
+  const row = x.root.html.match(/<tr data-grant-row="g_new_owner">[\s\S]*?<\/tr>/)?.[0];
+  assert.match(row, /receipt rcpt_1 · trace tr_1/);
+  assert.match(x.root.html, /data-permissions-status>Ownership transfer done\. receipt rcpt_1 · trace tr_1/);
+});

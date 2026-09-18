@@ -81,8 +81,13 @@ export const permissions = {
       try { const env = await call(s.url, { method: s.method, body: { params: s.params, mode: 'execute', confirm_token: token } }); const r = env.result || {};
         m.sheet = null;
         if (s.kind === 'invite') { if (r.delivered === false && /duplicate/.test(r.delivery?.reason || '')) say(`${DUPLICATE_NOTE}${receiptText(env)}`); else if (r.delivered === false && r.delivery?.state === 'unconfirmed') say(`Invitation recorded — ${UNCONFIRMED_NOTE}${receiptText(env)}`); else if (r.delivered === false) say(`Invitation recorded; not sent (${r.delivery?.reason || 'not sent'}). It can be revoked below.${receiptText(env)}`); else say(`Invitation sent.${receiptText(env)}`); }
-        else { const gid = s.gid || m.grants.find(g => g.principal_id === s.params.to)?.id; if (gid && env.receipt) m.receipts[gid] = { receipt: env.receipt.id, trace: env.trace_id }; say(`${s.label} done.${receiptText(env)}`); }
+        else say(`${s.label} done.${receiptText(env)}`);
         await refresh();
+        // Transfer may create the target's first grant; resolve only from the refreshed roster.
+        if (s.kind !== 'invite') {
+          const gid = s.gid || m.grants.find(g => g.principal_id === s.params.to)?.id;
+          if (gid && env.receipt) { m.receipts[gid] = { receipt: env.receipt.id, trace: env.trace_id }; paint(); }
+        }
       } catch (e) { m.busy = false;
         const code = String(e.code || '');
         if (code === 'CONFIRM_REQUIRED' && !s.redone) { s.redone = true; try { const env = await call(s.url, { method: s.method, body: { params: s.params, mode: 'dry_run' } }); s.token = env.result.confirm_token; s.expiresIn = env.result.expires_in; s.impact = env.result.impact || s.impact; say('The confirmation no longer matched; the preview was refreshed. Confirm again.', true); } catch (e2) { m.sheet = null; fail(e2, s.label); } return; }
