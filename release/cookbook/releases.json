@@ -1,7 +1,25 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.11.2",
+  "current": "0.11.3",
   "versions": [
+    {
+      "version": "0.11.3",
+      "status": "candidate",
+      "notes_path": "releases/0.11.3.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Feedback guidance provides a minimal note example, HTTP/MCP equivalents, permission and uncertain-outcome recovery through the existing docs tool and topic.",
+          "Persona evidence: local HTTP and MCP discovery/recovery cases improved from 2/7 to 7/7 per face; human satisfaction, confusion and frustration are NOT MEASURED."
+        ],
+        "fixed": [
+          "Capability documentation now exposes existing canonical parameter/result schemas and derived required/optional fields, including authenticated-feedback precondition provenance."
+        ],
+        "security": [
+          "No new tool, permission, accepted-field or feedback-write behavior; examples were executed only in isolated synthetic fixtures."
+        ]
+      }
+    },
     {
       "version": "0.11.2",
       "status": "candidate",
