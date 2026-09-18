@@ -63,12 +63,12 @@ test('A3 results: the held literal with the server reason; no numbers or bands',
   assert.doesNotMatch(panel, /band/i);
 });
 
-test('A4/A5 reports: list rendered from the server; no Build/Preview control anywhere', async () => {
+test('Reports: server list plus preview control for exact assessment editor', async () => {
   const { api } = fakeApi(understandTable); const ctx = ctxFor(api);
   const html = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
   assert.match(html, /data-open-report="rep_1"/);
-  assert.doesNotMatch(html, /build/i);
-  assert.doesNotMatch(html, /preview/i);
+  assert.match(html, /data-preview-report/);
+  assert.doesNotMatch(html, /data-confirm-report/);
 });
 
 test('A4 open report: GET /v2/reports/{id} rendered by report-view.js; held → reason', async () => {

@@ -32,4 +32,6 @@ mcp/harness/host.html
 mcp/harness/bridge-global.js
 mcp/panel-src.html
 
+assess/report-build.test.mjs
+
 demo.test.mjs
