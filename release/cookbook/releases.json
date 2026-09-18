@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.11.0",
+  "current": "0.11.1",
   "versions": [
+    {
+      "version": "0.11.1",
+      "status": "candidate",
+      "notes_path": "releases/0.11.1.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona evidence: 2/2 automated local connection lifecycle cases passed; human satisfaction, confusion and frustration NOT MEASURED."
+        ],
+        "fixed": [
+          "Open workspaces waits for the MCP bridge connection to settle, then becomes available without a stale host-capability refusal."
+        ],
+        "security": [
+          "No automatic tool calls, capability widening or confirmation changes; failed connections retain explicit refusal."
+        ]
+      }
+    },
     {
       "version": "0.11.0",
       "status": "candidate",

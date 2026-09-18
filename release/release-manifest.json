@@ -1,32 +1,30 @@
 {
-  "version": "0.11.0",
+  "version": "0.11.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "515aed295f14c155a91ca28274a315b7ee9629fa",
+  "cookbook_commit": "2c9dcaab4c68ecb0be5cdbd872487c0d7148d19c",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.11.0.md",
-      "blob_sha": "f14d68299b0cf6520715c179874bb3ea884b9b74",
-      "sha256": "e9dc3365c570c8c4f83aee3275ef6897b2b251350d646bd32ac3fe0b50779a23"
+      "path": "planning/2026-09-16-parity-build/releases/0.11.1.md",
+      "blob_sha": "1f5b3d3a2a3f6dff8a07f52e2d5d25ddef279372",
+      "sha256": "804ca429a93726c6d677ab5d58a3af0865fdebbb151ff9671b98ce9210b600d3"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "ea05e8d80c348e743e46391d595e0e88a46e475b",
-      "sha256": "5eb1490381e2a343b3f644164e04a340a89b61a35e2b8058eecc47c6184efd56"
+      "blob_sha": "aeedfea0ed55f05df4def6028ad89b42612f8546",
+      "sha256": "7a849a60884e3bca7786e4efb1fce9741844fe2b63bd0bb442a0fd3f67e56dad"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Signed-in users can send optional app feedback from the current shell with a separate form and a confirmed feedback reference."
-      ],
+      "added": [],
       "changed": [
-        "Persona evidence includes three historical local-browser form cases and current automated HTTP/MCP expiry and form regressions; human satisfaction, confusion and frustration are NOT MEASURED."
+        "Persona evidence: 2/2 automated local connection lifecycle cases passed; human satisfaction, confusion and frustration NOT MEASURED."
       ],
       "fixed": [
-        "Entered feedback survives refused or uncertain submissions; the form requests authenticated attribution at the actual write boundary instead of relying on cached sign-in."
+        "Open workspaces waits for the MCP bridge connection to settle, then becomes available without a stale host-capability refusal."
       ],
       "security": [
-        "Optional require_authenticated on the existing HTTP/MCP feedback write refuses anonymous callers before persistence when true; omission or false preserves public feedback. No database migration or automatic context capture."
+        "No automatic tool calls, capability widening or confirmation changes; failed connections retain explicit refusal."
       ]
     }
   }
