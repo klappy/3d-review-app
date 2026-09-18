@@ -1,29 +1,31 @@
 {
-  "version": "0.7.1",
+  "version": "0.8.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "0ef5fd5888d44ca966a6fed1361739b16808fd4a",
+  "cookbook_commit": "1448943d0cabee43cea2835b4b045912b416bc23",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.7.1.md",
-      "blob_sha": "fc37a5c091b423ef67eb66ca785fbf18f1f04a88",
-      "sha256": "8cae508dce64ea88ee4480377b02e806f497fe979158bf8ff29a2be395244c73"
+      "path": "planning/2026-09-16-parity-build/releases/0.8.0.md",
+      "blob_sha": "4fef3a89b733691a6e0e51d5c8f1adb09b8ffdb1",
+      "sha256": "ef62be38b41aebac218c3801f6bd1bd1add5b57ccac5eec1ee92eff610f58277"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "bb17ef5b47c43086b6107fe4f3943e1d90f0c406",
-      "sha256": "93115d63b2882505f0dc05be13bd8389c4e2f2b94cff5539953465062d422d39"
+      "blob_sha": "30e43f90614282b394ebcbd9a610c0f02cefa966",
+      "sha256": "aa627d68942c9c97c01e2fa59a6b787e4cc3bf7f0750834dcafe22ed0e1f9838"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "Synthetic report preview and explicit confirmed build in the current assessment Understand view, followed by refreshed report list and reopen."
+      ],
       "changed": [
-        "Release notes include a bounded persona outcome scorecard; human satisfaction remains not measured."
+        "Canonical release notes include the bounded reporting persona outcome scorecard, distinguishing automated local outcomes from unmeasured human and agent journeys."
       ],
-      "fixed": [
-        "Initial host-initiated MCP read refusals appear in the panel without leaking private error details; navigation clears the refusal."
-      ],
-      "security": []
+      "fixed": [],
+      "security": [
+        "Existing synthetic admission and exact assessment grants remain authoritative; held inputs, expired previews, identity/navigation changes and uncertain writes do not enable automatic execution or retry."
+      ]
     }
   }
 }
