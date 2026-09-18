@@ -20,6 +20,23 @@
       }
     },
     {
+      "version": "0.12.1",
+      "status": "candidate",
+      "notes_path": "releases/0.12.1.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona evidence: automated redaction/reconnect regression improved from 0/1 to 1/1; human satisfaction, confusion and frustration NOT MEASURED."
+        ],
+        "fixed": [
+          "Roadmap reconnects use the accepted current cursor and redaction generation, preventing repeated table resets after public redaction."
+        ],
+        "security": [
+          "Immediate redaction clearing and stale in-flight response suppression remain; callbacks from closed streams and older generations cannot clear or restore the accepted view."
+        ]
+      }
+    },
+    {
       "version": "0.12.0",
       "status": "candidate",
       "notes_path": "releases/0.12.0.md",
