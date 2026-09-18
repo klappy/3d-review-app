@@ -8,3 +8,7 @@ Lane A (Astra/Otto) owns this folder; this draft exists so the other lanes can m
 - `tools/gen_contract.py` — regenerates all three from 04; edit the matrix, not these files (cookbook 10-REPROJECTION-AUDIT).
 
 Rules carried: danger twins are never GET; `SUPPRESSED` is `ok:true`; `v2.1-oct` rows are documented 501 `RESERVED_NOT_BUILT`; parity = normalized-receipt equality HTTP vs MCP (cookbook prd/18-D MCP-REQ-013).
+
+## Feedback attributed-write amendment
+
+The optional `cap.ops.feedback` parameter `require_authenticated` is hand-projected from [the canonical additive amendment](https://github.com/klappy/3d-review-cookbook/blob/e9c09cb97ef206abb418de741bb93629bd1c9e23/planning/2026-09-16-parity-build/AMEND-2026-09-18-feedback-attributed-write.md). Its field-level `x-cookbook-source` in capabilities/OpenAPI identifies that exact amendment; the historical base-matrix source and generated timestamp above are not a claim that this later field was generated from that matrix. The old `tools/gen_contract.py` does not project this or all prior amendments and must not be used to overwrite the evolved contract without reconciling them. No whole-contract re-projection or release-manifest repin is claimed.

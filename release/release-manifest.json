@@ -1,34 +1,32 @@
 {
-  "version": "0.10.0",
+  "version": "0.11.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "6a903c5dc6ad150854da6806e3b51d5cefdd98b2",
+  "cookbook_commit": "515aed295f14c155a91ca28274a315b7ee9629fa",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.10.0.md",
-      "blob_sha": "aed231a06aafe769ccf73f4e0324b0325021b6cb",
-      "sha256": "0b2b49cb07be2fe6f75398c7c58177a309070983bb0c97ca3a01f157815da571"
+      "path": "planning/2026-09-16-parity-build/releases/0.11.0.md",
+      "blob_sha": "f14d68299b0cf6520715c179874bb3ea884b9b74",
+      "sha256": "e9dc3365c570c8c4f83aee3275ef6897b2b251350d646bd32ac3fe0b50779a23"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "2a954f87b7d4538c172f96494b8b3acfb8c14b60",
-      "sha256": "071a65d51e270763bdf792f41d9fcc7fa98a3f2021d08905dbe83d0b2666b882"
+      "blob_sha": "ea05e8d80c348e743e46391d595e0e88a46e475b",
+      "sha256": "5eb1490381e2a343b3f644164e04a340a89b61a35e2b8058eecc47c6184efd56"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Compact action-specific MCP cards for metadata, entity reads, feedback acknowledgement, refusal and explicit dangerous-action confirmation.",
-        "Requested survey template results display the returned questionnaire, options, version and perspective read-only, instead of a generic success card."
+        "Signed-in users can send optional app feedback from the current shell with a separate form and a confirmed feedback reference."
       ],
       "changed": [
-        "Docs orientation is text-only. Panel startup waits for the host call and does not automatically fetch identity, workspaces or projects; full exploration requires an explicit action.",
-        "Six bounded official-host scenarios are covered across attributed pre/post-fix sources; the final integrated theme/card host check passed1/1 independently. Human satisfaction, confusion and frustration are NOT MEASURED."
+        "Persona evidence includes three historical local-browser form cases and current automated HTTP/MCP expiry and form regressions; human satisfaction, confusion and frustration are NOT MEASURED."
       ],
       "fixed": [
-        "Compact confirmations show server-owned impact, affected targets, compensating control and expiry; busy and one-shot execution guards remain enforced."
+        "Entered feedback survives refused or uncertain submissions; the form requests authenticated attribution at the actual write boundary instead of relying on cached sign-in."
       ],
       "security": [
-        "The existing four-tool contract and server authorization remain unchanged. Private feedback and authorization details are not echoed in cards; no automatic execute or retry."
+        "Optional require_authenticated on the existing HTTP/MCP feedback write refuses anonymous callers before persistence when true; omission or false preserves public feedback. No database migration or automatic context capture."
       ]
     }
   }

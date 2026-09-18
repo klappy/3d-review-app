@@ -1,7 +1,26 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.10.0",
+  "current": "0.11.0",
   "versions": [
+    {
+      "version": "0.11.0",
+      "status": "candidate",
+      "notes_path": "releases/0.11.0.md",
+      "sections": {
+        "added": [
+          "Signed-in users can send optional app feedback from the current shell with a separate form and a confirmed feedback reference."
+        ],
+        "changed": [
+          "Persona evidence includes three historical local-browser form cases and current automated HTTP/MCP expiry and form regressions; human satisfaction, confusion and frustration are NOT MEASURED."
+        ],
+        "fixed": [
+          "Entered feedback survives refused or uncertain submissions; the form requests authenticated attribution at the actual write boundary instead of relying on cached sign-in."
+        ],
+        "security": [
+          "Optional require_authenticated on the existing HTTP/MCP feedback write refuses anonymous callers before persistence when true; omission or false preserves public feedback. No database migration or automatic context capture."
+        ]
+      }
+    },
     {
       "version": "0.10.0",
       "status": "candidate",
