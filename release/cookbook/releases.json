@@ -21,7 +21,7 @@
     },
     {
       "version": "0.4.2",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.4.2.md",
       "sections": {
         "added": [],
@@ -30,7 +30,9 @@
           "Reloading after a failed first shared-link open asks for the original link without claiming an earlier participant session or possible submission."
         ],
         "security": []
-      }
+      },
+      "tag": "v0.4.2",
+      "date": "2026-09-17"
     },
     {
       "version": "0.4.1",
