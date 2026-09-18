@@ -9,3 +9,7 @@ body.mcp-compact{max-width:640px;padding:0 12px 12px}
 
 .action-impact dd { margin:0 0 8px; overflow-wrap:anywhere; white-space:pre-wrap; }
 .action-impact dt { font-weight:600; }
+
+.survey-questions { padding-left:24px; overflow-wrap:anywhere; }
+.survey-questions > li { padding:8px 0; }
+.survey-questions h3 { font-size:1rem; }

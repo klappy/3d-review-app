@@ -27,11 +27,12 @@
       "notes_path": "releases/0.10.0.md",
       "sections": {
         "added": [
-          "Compact action-specific MCP cards for metadata, entity reads, feedback acknowledgement, refusal and explicit dangerous-action confirmation."
+          "Compact action-specific MCP cards for metadata, entity reads, feedback acknowledgement, refusal and explicit dangerous-action confirmation.",
+          "Requested survey template results display the returned questionnaire, options, version and perspective read-only, instead of a generic success card."
         ],
         "changed": [
           "Docs orientation is text-only. Panel startup waits for the host call and does not automatically fetch identity, workspaces or projects; full exploration requires an explicit action.",
-          "Six bounded official-host scenarios are covered across attributed pre/post-fix sources; the integrated theme/card candidate passes33 targeted automated tests. Human satisfaction, confusion and frustration are NOT MEASURED."
+          "Six bounded official-host scenarios are covered across attributed pre/post-fix sources; the final integrated theme/card host check passed1/1 independently. Human satisfaction, confusion and frustration are NOT MEASURED."
         ],
         "fixed": [
           "Compact confirmations show server-owned impact, affected targets, compensating control and expiry; busy and one-shot execution guards remain enforced."
