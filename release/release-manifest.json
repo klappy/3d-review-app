@@ -1,28 +1,30 @@
 {
-  "version": "0.6.0",
+  "version": "0.7.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "ef5879b1a600b77a9249d1a81be12bb4022e1098",
+  "cookbook_commit": "1ee1cf0f46f61295999bfceba57bddb7ae5f9e06",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.6.0.md",
-      "blob_sha": "7cd2a54414d572088b149669c7496a74cc1639f8",
-      "sha256": "479f7a7e2c9dc2b4978339aa432bad7fe00cfc34cd7aed6f94108deb0438986c"
+      "path": "planning/2026-09-16-parity-build/releases/0.7.0.md",
+      "blob_sha": "2f0a11f26dc2914eac728b8c6243b2f0a0fc4a9a",
+      "sha256": "5088fb2368f7e24d008569f9afff809e5b3eb3d50bf5c80196fbdc03f1cf3a8c"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "6e820cfe54afdb8c30b08f87a12e4b20ae0f6fc2",
-      "sha256": "0fbc08d77ed56800a1bc9dac37ce1c2783e0e2eb779732a8f4fc121d1eaf48de"
+      "blob_sha": "80e074b4abec5d51d58b33bd5106c51144665cbd",
+      "sha256": "cf7093bc561cc9bda3be331e0b5b97c16bd168626c2d4175f73ebcf19cd72350"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "Canonical DEV domain dev.3dreview.app and production domain 3dreview.app on the existing Workers, with previous addresses retained as compatible aliases."
+      ],
       "changed": [
-        "Outbound collaborator invitations use native Cloudflare Email Sending from noreply@3dreview.app instead of the Resend HTTP API."
+        "Invitation emails use the canonical origin for their environment; browser-created participant links remain on the current origin."
       ],
       "fixed": [],
       "security": [
-        "Existing recipient validation, synthetic-address refusal, DEV hash allowlist, invitation intent deduplication and uncertain-send protections remain in force; no inbox or forwarding is configured."
+        "Existing authentication audiences, host-only sessions, OAuth callback validation and participant fragment handling remain unchanged. New sign-in paths require matching Cloudflare Access destinations."
       ]
     }
   }
