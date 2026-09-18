@@ -72,3 +72,15 @@ it('contract projects the same optional input and immutable amendment provenance
  const raw=readFileSync(new URL('../contract/openapi.yaml',import.meta.url),'utf8');const line=raw.split('\n').find(l=>l.startsWith('    FeedbackExperience: '))!;
  expect(JSON.parse(line.slice('    FeedbackExperience: '.length))).toEqual(e);expect(e['x-cookbook-source']).toContain('f5d925f');expect(c.params_schema.required??[]).not.toContain('experience');expect(contract.capabilities.filter(c=>c.id.startsWith('cap.ops.feedback')).map(c=>c.id)).toEqual(['cap.ops.feedback','cap.ops.feedback_get']);
 });
+
+describe('registered feedback page context',()=>{
+ it('accepts only shared page/component enums and rejects URLs, IDs and extra context',async()=>{
+  const {feedbackExperience,feedbackProvenance,projectFeedbackProvenance}=await import('../src/handlers/feedback-provenance');
+  const experience={surface:'web',context:{page:'survey',component:'app_feedback'}};
+  expect(feedbackExperience(experience)).toEqual(experience);
+  expect(projectFeedbackProvenance(feedbackProvenance('dev','2026-09-18T00:00:00.000Z',experience))?.experience).toEqual({source:'client_reported',...experience});
+  for(const context of [{page:'survey',component:'app_feedback',id:'private'},{page:'/assessment/private',component:'app_feedback'},{page:'survey',component:'answer_input'},{page:'survey'}])expect(()=>feedbackExperience({context})).toThrow();
+  const cap=(contract as any).capabilities.find((c:any)=>c.id==='cap.ops.feedback');
+  expect(JSON.stringify(cap)).toContain('app_feedback');
+ });
+});

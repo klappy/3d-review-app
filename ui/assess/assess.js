@@ -11,6 +11,8 @@ import { pages, css as scopeCss } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
+import { createFeedbackModal } from '/assess/feedback-modal.js';
+import { clientRelease } from '/client-release.js';
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 // Product overhaul (cookbook #16 c5721465315): five VIEWS on one assessment page. A view is a tab; a tab never mutates stage.
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
@@ -459,6 +461,7 @@ function scrubCredentialHash() {
   return null;
 }
 function resetIdentity() {
+  feedbackModal?.reset();
   identityGeneration += 1; generation += 1; epoch += 1;
   state.share = null; state.principal = null; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
@@ -500,4 +503,13 @@ async function boot() {
   listen();
   await render();
 }
-if (typeof window !== 'undefined' && document.getElementById('app')) boot();
+
+
+let feedbackModal;
+if (typeof window !== 'undefined' && document.getElementById('app')) {
+feedbackModal = createFeedbackModal({ doc: document, context: () => ctxFor({ identity: identityGeneration }), route: () => route(location.hash), routeKey: () => location.hash, clientRelease });
+document.addEventListener('click', event => { const link = event.target.closest?.('a[href="#feedback"]'); if (!link) return; event.preventDefault(); feedbackModal.open(link); });
+window.addEventListener('hashchange', () => feedbackModal.reset());
+
+boot();
+}

@@ -24,11 +24,12 @@ function release(value: unknown) {
 }
 /** Strict allowlist: metadata evidence only, never arbitrary URLs, hostnames or page content. */
 export function feedbackExperience(value: unknown): Record<string, unknown> {
-  const r = object(value, ['occurred_at','surface','host','client_release','api_release']);
+  const r = object(value, ['occurred_at','surface','host','client_release','api_release','context']);
   if (!Object.keys(r).length || new TextEncoder().encode(JSON.stringify(r)).length > 1536) return invalid();
   if ('occurred_at' in r && !utc(r.occurred_at)) return invalid();
   if ('surface' in r && !['web','mcp_panel','mcp_tool','http','unknown'].includes(r.surface)) return invalid();
   if ('host' in r && !['browser','chatgpt','claude','reference_host','other','unknown'].includes(r.host)) return invalid();
+  if ('context' in r) { const c = object(r.context, ['page','component']); if (!['workspaces','workspace','projects','project','assessment','survey','permissions','feedback','unknown'].includes(c.page) || c.component !== 'app_feedback') return invalid(); }
   return { ...r, ...('client_release' in r ? {client_release:release(r.client_release)} : {}), ...('api_release' in r ? {api_release:release(r.api_release)} : {}) };
 }
 export function feedbackProvenance(environment: string | undefined, submittedAt: string, experience?: Record<string, unknown>) {
@@ -47,7 +48,7 @@ export function projectFeedbackProvenance(value: unknown) {
   if (s.build !== `${s.version}+${s.commit.slice(0,7)}`) return invalid();
   let experience = null;
   if (p.experience !== null) {
-    const {source, ...raw} = object(p.experience, ['source','occurred_at','surface','host','client_release','api_release']);
+    const {source, ...raw} = object(p.experience, ['source','occurred_at','surface','host','client_release','api_release','context']);
     if (source !== 'client_reported') return invalid();
     experience = {source:'client_reported', ...feedbackExperience(raw)};
   }

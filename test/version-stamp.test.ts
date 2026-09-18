@@ -162,6 +162,10 @@ describe("stamp script (subprocess): CI without WORKERS_CI_COMMIT_SHA fails, nev
     expect(gen).toContain(`export const APP_STAMP = "0.14.4+aaaaaaa";`);
     expect(gen).toContain(`export const BUILD_UUID: string | null = "11111111-2222-3333-4444-555555555555";`);
     expect(r.stdout).toContain("0.14.4+aaaaaaa");
+    const loadedClient = readFileSync(join(out, "ui/client-release.js"), "utf8");
+    expect(loadedClient).toContain(`"commit":"${sha}"`);
+    expect(loadedClient).toContain(`"version":"${pkg.version}"`);
+    expect(loadedClient).toContain(`"release_source":"${manifest.cookbook_commit}"`);
     expect(readFileSync(join(out, "ui/changelog.json"), "utf8")).toBe(realChangelog);
   });
   it("canonical build permission projection stays isolated from synthetic subprocess fixtures", () => {
