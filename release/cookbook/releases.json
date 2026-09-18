@@ -8,7 +8,9 @@
       "notes_path": "releases/0.14.1.md",
       "sections": {
         "added": [],
-        "changed": [],
+        "changed": [
+          "Persona evidence: 3/3 automated initial-load cases and 1/1 author local-browser check passed; deployed behavior and human satisfaction, confusion and frustration NOT MEASURED."
+        ],
         "fixed": [
           "Roadmap version resolves from canonical health on initial page load, including tabs retaining participant state."
         ],
