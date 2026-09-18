@@ -46,7 +46,9 @@ test('mobile entity-first: below 760px a selected entity precedes the tree; work
 });
 
 test('wiring: assets, back link before assessment context and task, entity screen mounted after collab and reset on identity change',()=>{
-  const html=read('./index.html'),app=read('./app.js'),server=read('./server.mjs'),src=read('./entity-screen.js');
+  // Root entry switch (PR65 checkpoint 2): the legacy surface this suite specifies now lives byte-identical at ./legacy/index.html;
+// `/` is the product shell (its public-home contract is asserted in assess/scope.test.mjs). Behaviour under test is unchanged.
+const html=read('./legacy/index.html'),app=read('./app.js'),server=read('./server.mjs'),src=read('./entity-screen.js');
   assert.ok(html.includes('<link rel="stylesheet" href="/entity-screen.css">'));
   assert.ok(server.includes("'/entity-screen.js':")&&server.includes("'/entity-screen.css':"));
   assert.ok(html.includes('<button id="entity-back" class="rv-btn quiet" type="button" hidden></button><header id="assessment-context" aria-label="Assessment context"></header>'));
