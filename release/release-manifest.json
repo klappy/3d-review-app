@@ -1,30 +1,30 @@
 {
-  "version": "0.9.3",
+  "version": "0.11.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "80d8111fe7ffe9cb14516120de485c469bbe12d6",
+  "cookbook_commit": "20acad96bc67d9ddfdc8eefb0e99fab36608b4d5",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.9.3.md",
-      "blob_sha": "07195f8984ae536432193fe6b9a199be1135686c",
-      "sha256": "a2929099f3504a5943d5da95bc7e20250194d3115655bc239199b9d5b71feae9"
+      "path": "planning/2026-09-16-parity-build/releases/0.11.2.md",
+      "blob_sha": "d881cb490b2f3b4518b4c3f5424d9521a71b25ca",
+      "sha256": "6a5a9e675802220ee1992c6dbe4be631747337601f881cb35ae42e54d3606968"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "f2603c5fbcd0d97a23f535c45ef2631a1cda7acb",
-      "sha256": "1ae848ab989b7c70fd5c83f550a29b7cf4c9c2c08504dad269655917893f846d"
+      "blob_sha": "ddcd6bd8dca298677646137095194d97f819c687",
+      "sha256": "321545ae615bcac540621026597c7331935cf375eb24b9aef8ae6fca062ccb7c"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
       "changed": [
-        "Theme scorecard: 6/6 automated local scenarios and 4/4 bounded official reference-host visual scenarios passed; human satisfaction, confusion and frustration are NOT MEASURED."
+        "Survey sharing opens the output choices directly: Copy link, QR code or Print invitations explicitly confirms issuance after access and revocation disclosure."
       ],
       "fixed": [
-        "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
+        "Copy and print failures reuse the received in-memory link; uncertain issuance never retries automatically, and stale identity/page responses cannot reveal credentials."
       ],
       "security": [
-        "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
+        "Existing preview/execute/revoke APIs, role checks and one-time link disclosure remain unchanged; no credential persistence or background issuance."
       ]
     }
   }

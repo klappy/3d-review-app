@@ -556,6 +556,10 @@ components:
       additionalProperties: false
       description: cap.ops.feedback write params — AMEND 2c4ee8d CORRECTION. Strip answers/responses/response before unknown reject. Client stripped is rejected.
       properties:
+        require_authenticated:
+          type: boolean
+          x-cookbook-source: https://github.com/klappy/3d-review-cookbook/blob/e9c09cb97ef206abb418de741bb93629bd1c9e23/planning/2026-09-16-parity-build/AMEND-2026-09-18-feedback-attributed-write.md
+          description: Optional write precondition. True returns NOT_AUTHENTICATED for an anonymous resolved principal before feedback persistence; omitted or false preserves public feedback. Never persisted.
         helpful:
           type: boolean
         note:

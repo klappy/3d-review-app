@@ -1,0 +1,17 @@
+# Current-shell app feedback
+
+Issue106 recovers kitchen `rail/1-ordered/2026-09-16-3d-feedback-schema-richer` and the preserved Prefer `PLAN-2026-09-17-feedback-component-fixtures.md`. The existing optional-field contract remains authoritative, extended only by the additive authenticated-write precondition below.
+
+`App feedback` in the current shell opens `#feedback`. Signed-in users can send canonical `note`, helpful, optional satisfaction/confusion/frustration1–5, and optional sentiment_journey through existing POST `/v2/feedback`. Empty fields are omitted. No page content, assessment identifiers, answers, credentials or inferred scores are captured. Feedback is linked by the server to the signed-in actor; the form explains authorized-support access.
+
+The separate component uses the shell's existing authenticated API. It preserves entered values across local validation and server/connection failure. Confirmed `recorded:true`, `stripped:false` and a feedback reference produce the success state. Ambiguous/malformed outcomes show uncertainty and require an explicit second send, warning that a duplicate may result; no automatic retry/idempotency claim. Identity/navigation changes suppress stale completion. Demo and unauthenticated contexts cannot mount a sending form. Drafts live only in the page and are lost on leaving/reload; expired-session copy explains saving text before sign-in.
+
+This delivery adds one optional shared-handler write precondition and its HTTP/MCP parameter schema. It adds no database schema/migration, support readback UI, survey feedback, voice, AI processing or public ticket creation. Future meaning-preserving triage, explicitly authorized ticketing, tested fixes and original-user verification remain deferred under the original ticket. They do not gate the form.
+
+Validation: local DOM/component and shell-entry regressions; no live feedback submission or human sentiment measurement. The canonical compatible MINOR candidate is 0.11.0, stacked after cards 0.10.0 and preserving participant patch 0.9.2 and theme 0.9.3. Final guarded-write browser and DEV/production deployment proof remain separate; no release is claimed.
+
+## Attributed-write precondition
+
+A cached sign-in does not prove that the next write is authenticated. The form sends optional `require_authenticated:true`; the existing shared feedback handler checks the request-resolved principal before persistence and refuses anonymous callers with NOT_AUTHENTICATED. This is an additive parameter on the existing HTTP/MCP capability, not a database change or restriction on public feedback. Omitted/false retains existing anonymous behavior; the flag is never persisted or treated as identity. No preflight-only guarantee is claimed. The field map in capabilities/OpenAPI is amended together; canonical MINOR release notes must include it.
+
+Canonical parameter authority: [additive amendment at e9c09cb](https://github.com/klappy/3d-review-cookbook/blob/e9c09cb97ef206abb418de741bb93629bd1c9e23/planning/2026-09-16-parity-build/AMEND-2026-09-18-feedback-attributed-write.md). Contract projections pin this source separately from the semantic-release manifest. Runtime `cc5778f` passed 41 HTTP/MCP/privacy tests and 7 form tests with independent acceptance; the actual HTTP expiry case proves refusal without insertion. Earlier browser fixture evidence covers three scenarios at `bd368f4`, not the new guarded-write expiry boundary. No live feedback or human sentiment evidence is claimed.
