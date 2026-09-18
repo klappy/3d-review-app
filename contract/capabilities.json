@@ -3317,6 +3317,26 @@
             },
             "minItems": 1,
             "maxItems": 8
+          },
+          "happening_now": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "blocker": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "next_action": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "queue_order": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 500
           }
         },
         "required": [

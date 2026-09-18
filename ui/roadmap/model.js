@@ -17,6 +17,7 @@ export function stagePresentation(item,key){
   report:r?`Reported: ${r.state}${r.version?' · '+r.version:''}${r.blocker?' · '+r.blocker.replaceAll('_',' '):''}`:'No publisher report'};
 }
 export function nextAction(item){
+ if(item.operations?.next_action)return item.operations.next_action;
  const latest=latestReport(item);const blocked=latest?.state==='blocked'?latest.stage:null;
  if(blocked)return `Resolve reported ${LABELS[blocked]} blocker: ${(item.reported[blocked].blocker??'cause not recorded').replaceAll('_',' ')}. Verify the updated evidence.`;
  const claimed=STAGES.filter(k=>item.reported?.[k]&&!item.stages[k].evidence?.length);
@@ -27,5 +28,5 @@ export function nextAction(item){
 }
 
 export function latestReport(item){return Object.entries(item.reported??{}).map(([stage,r])=>({...r,stage})).sort((a,b)=>(b.sequence??0)-(a.sequence??0))[0];}
-export function happeningNow(item){const r=latestReport(item);return r?`Latest report: ${LABELS[r.stage]} ${r.state}${r.version?' · '+r.version:''}`:'Current work not reported';}
-export function currentBlocker(item){const r=latestReport(item);return r?.state==='blocked'?(r.blocker??'Cause not recorded').replaceAll('_',' '):'No current blocker reported';}
+export function happeningNow(item){if(item.operations?.happening_now)return item.operations.happening_now;const r=latestReport(item);return r?`Latest report: ${LABELS[r.stage]} ${r.state}${r.version?' · '+r.version:''}`:'Current work not reported';}
+export function currentBlocker(item){if(item.operations?.blocker)return item.operations.blocker;const r=latestReport(item);return r?.state==='blocked'?(r.blocker??'Cause not recorded').replaceAll('_',' '):'No current blocker reported';}
