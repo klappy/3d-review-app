@@ -40,3 +40,10 @@ it('expired preview and uncertain execution do not retry or reuse confirmation',
  const confirm=f.root.querySelector('[data-card-confirm]');confirm.click();await new Promise(r=>setTimeout(r,0));confirm.click();
  expect(calls).toBe(1);expect(f.root.textContent).toContain('outcome could not be confirmed');expect(f.root.textContent).not.toContain('private transport');expect(f.root.querySelector('[data-card-confirm]')).toBeNull();f.dom.window.close();
 });
+
+it('compact role preview displays server impact without exposing confirmation token',()=>{
+ const f=fixture();f.card.receiveInput({arguments:{capability:'cap.grant.update_role',mode:'dry_run',params:{scope:'assessment',id:'a',gid:'g',role:'member'}}});
+ f.card.receiveResult({structuredContent:{ok:true,capability:'cap.grant.update_role',result:{confirm_token:'secret-confirm',expires_in:300,impact:{effect:'disclosure',irreversible:true,compensating_control:'demotion does not undo disclosure',affected:[{grant:'g',from:'viewer',to:'member'}]}}}});
+ for(const fact of ['disclosure','true','demotion does not undo disclosure','viewer','member','300'])expect(f.root.textContent).toContain(fact);
+ expect(f.root.textContent).not.toContain('secret-confirm');expect(f.root.querySelector('[data-card-confirm]')).not.toBeNull();f.dom.window.close();
+});

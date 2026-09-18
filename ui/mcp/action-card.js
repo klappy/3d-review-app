@@ -4,6 +4,7 @@ export function createActionCard({ root, esc, call, explore, execution }) {
   const decode = event => event?.structuredContent || (() => { try { return JSON.parse(event?.content?.[0]?.text); } catch { return event; } })();
   const label = cap => ({'cap.grant.invite':'Invite collaborator','cap.report.build':'Build report','cap.workspace.delete':'Delete workspace','cap.assessment.get':'Assessment','cap.project.get':'Project','cap.workspace.get':'Workspace'}[cap] || (typeof cap === 'string' ? cap.replace(/^cap\./, '').split('.').join(' ') : '3D Review guidance'));
   const trace = env => env?.trace_id ? `<p class="small muted">trace ${esc(env.trace_id)}</p>` : '';
+  const impactDetails = impact => !impact || typeof impact !== 'object' ? '' : `<dl class="action-impact">${['effect','irreversible','compensating_control','affected'].filter(key => Object.hasOwn(impact,key)).map(key => `<dt>${esc(key.replaceAll('_',' '))}</dt><dd>${esc(typeof impact[key] === 'object' ? JSON.stringify(impact[key]) : String(impact[key]))}</dd>`).join('')}</dl>`;
   function render() {
     const env = envelope, result = env?.result || {}, cap = env?.capability || input?.capability;
     let title = label(cap), body = 'Waiting for this tool result…', state = 'loading', entity = null;
@@ -20,7 +21,7 @@ export function createActionCard({ root, esc, call, explore, execution }) {
         state = pending ? 'preview' : 'complete';
       }
     }
-    root.innerHTML = `<section class="panel action-card" data-state="${state}"><h2>${esc(title)}</h2><p>${esc(message || body)}</p>${pending ? `<p class="small">Action: ${esc(label(pending.capability))} · scope ${esc(pending.params.scope || '')} ${esc(pending.params.id || pending.params.aid || '')}${pending.capability === 'cap.grant.invite' ? ` · recipient ${esc(pending.params.email || '')} · role ${esc(pending.params.role || '')}` : ''}</p><div class="actions"><button data-card-confirm ${busy ? 'disabled' : ''}>Confirm action</button><button data-card-cancel ${busy ? 'disabled' : ''}>Cancel</button></div>` : ''}${trace(env)}<button class="quiet" data-card-explore ${busy ? 'disabled' : ''}>Open workspaces</button></section>`;
+    root.innerHTML = `<section class="panel action-card" data-state="${state}"><h2>${esc(title)}</h2><p>${esc(message || body)}</p>${pending ? `<p class="small">Action: ${esc(label(pending.capability))} · scope ${esc(pending.params.scope || '')} ${esc(pending.params.id || pending.params.aid || '')}${pending.capability === 'cap.grant.invite' ? ` · recipient ${esc(pending.params.email || '')} · role ${esc(pending.params.role || '')}` : ''}</p>${impactDetails(pending.impact)}<p class="small">Confirmation expires in ${esc(pending.expiresIn)} seconds.</p><div class="actions"><button data-card-confirm ${busy ? 'disabled' : ''}>Confirm action</button><button data-card-cancel ${busy ? 'disabled' : ''}>Cancel</button></div>` : ''}${trace(env)}<button class="quiet" data-card-explore ${busy ? 'disabled' : ''}>Open workspaces</button></section>`;
     root.querySelector('[data-card-explore]').onclick = () => { if (!busy) { pending = null; explore(); } };
     root.querySelector('[data-card-cancel]')?.addEventListener('click', () => { if (!busy) { pending=null; message='Cancelled. No action was executed by this card.'; render(); } });
     root.querySelector('[data-card-confirm]')?.addEventListener('click', async () => {
@@ -49,7 +50,7 @@ export function createActionCard({ root, esc, call, explore, execution }) {
     if (event?.isError && envelope) envelope={...envelope,isError:true};
     const r=envelope?.result;
     if (envelope?.ok === true && !envelope.isError && input?.mode === 'dry_run' && input.capability === envelope.capability && r?.suppressed !== true && typeof r?.confirm_token === 'string' && r.confirm_token && Number.isFinite(r.expires_in) && r.expires_in>0) {
-      pending={capability:input.capability,params:input.params || {},token:r.confirm_token,expires:Date.now()+r.expires_in*1000};
+      pending={capability:input.capability,params:input.params || {},token:r.confirm_token,expires:Date.now()+r.expires_in*1000,expiresIn:r.expires_in,impact:r.impact || envelope.impact};
     }
     render();return true;
   }
