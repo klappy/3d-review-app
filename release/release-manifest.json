@@ -1,31 +1,30 @@
 {
-  "version": "0.12.0",
+  "version": "0.13.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "d535767fafea2207fbdfd92502fa3bb76f25e47b",
+  "cookbook_commit": "71f06a861a37a6c750971d1ca18535e6a05eb9df",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.12.0.md",
-      "blob_sha": "60188a7a2ab833d516753dacd3c57323a35b0569",
-      "sha256": "0730416ba620a764e5f6c870cf94c48242cb6e9122738b2a82d4793f5f634d5e"
+      "path": "planning/2026-09-16-parity-build/releases/0.13.0.md",
+      "blob_sha": "02d250aea9cb5d8276a5dbf9ca2c7170352b705f",
+      "sha256": "e6aa2c959578fc12a570f8627e2c21b93adf485e4cd68ed154c2dd04e9b57842"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "1dfdbe6a914a9db9a5eab5ed0f1ef2e8bdad39a8",
-      "sha256": "3a0e9c31681e468e4a9e651a22c88323b352df90e7d71472f65adb6d02444a2b"
+      "blob_sha": "e1aa538283c0c14e9175e196fa399f28eabf9bf9",
+      "sha256": "4d9fd8fa6877ad75ec026125ace6c86c564584fac2c46a4c3de60c7e5beb4613"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Live /roadmap reads durable progress and history through six shared HTTP/MCP capabilities, with SSE updates, cursor replay and explicit polling fallback."
+        "Feedback records capture trusted submission-server identity and optional, explicitly client-reported experience identity for support-only readback."
       ],
       "changed": [
-        "Persona evidence: 3/3 local actual-browser HTTP/MCP write-to-visible cases and 1/1 mobile layout case passed; human satisfaction, confusion and frustration NOT MEASURED."
+        "Persona evidence: 18/18 automated local HTTP/MCP provenance scenarios passed; automatic loaded-client capture and deployed operator journeys untested; human satisfaction, confusion and frustration NOT MEASURED."
       ],
       "fixed": [],
       "security": [
-        "Public events use an allowlisted projection; restricted provenance and authenticated publisher identity remain private. Claims do not self-verify completion; corrections support atomic public redaction.",
-        "Publisher permission uses the existing authenticated identity and a narrow server-only build projection. Reviewed additive schema preparation runs only in the matching canonical Git-connected build."
+        "Strict bounded metadata allowlists, existing authentication/support gates and private trace/receipt projections; legacy provenance remains unknown without backfill."
       ]
     }
   }

@@ -1,6 +1,6 @@
 # Feedback provenance: bounded API storage/readback slice
 
-Issue [116](https://github.com/klappy/3d-review-app/issues/116), current user instruction September18. This candidate implements automatic submission-server attribution and an optional structured experience report on existing feedback HTTP/MCP writes. It does not complete issue116 or assign a release version.
+Issue [116](https://github.com/klappy/3d-review-app/issues/116), current user instruction September18. This candidate implements automatic submission-server attribution and an optional structured experience report on existing feedback HTTP/MCP writes. It does not complete issue116. The release candidate is 0.13.0, following roadmap 0.12.0; deployment remains unverified.
 
 New accepted writes stamp server-generated version, commit/build, build UUID, canonical release pin, environment and submission time. Time matches row created_at. Metadata resides in the existing body storage under a reserved internal key; it is not an accepted caller field or a database migration. Caller context never becomes trusted identity. Support-only feedback_get exposes top-level provenance; the public write receipt remains exactly recorded/stripped/feedback_id, and body projection does not leak internal storage fields.
 
@@ -16,7 +16,7 @@ POST this body to the existing /v2/feedback, or wrap it as params for MCP write 
 
 Legacy rows return provenance:null without mutation, preserving their original time/body. Malformed internal metadata is existence-hidden instead of being replaced by current health. No source/version is backfilled. A current health read cannot reconstruct the UI already loaded in a tab or the user's earlier API response.
 
-Canonical contract amendment: f5d925f9f9d448828f7b7bb7afabc08ba6db933f in 3d-review-cookbook. Capabilities/OpenAPI carry separate field-level source annotations; base-matrix and semantic release pins are not misrepresented as the source of this addition. This is an additive feature awaiting its release slot; package metadata remains inherited, not an assigned version for this increment.
+Canonical contract amendment: f5d925f9f9d448828f7b7bb7afabc08ba6db933f in 3d-review-cookbook. Capabilities/OpenAPI carry separate field-level source annotations; base-matrix and semantic release pins are not misrepresented as the source of this addition. The separate 0.13.0 release record supplies the semantic-version authority; package, lock and manifest are validated projections. The contract amendment pin remains unchanged.
 
 ## Evidence and remaining acceptance
 
