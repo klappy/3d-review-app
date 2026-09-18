@@ -27,3 +27,6 @@ assess/views.test.mjs
 assess/share.test.mjs
 assess/permissions.test.mjs
 assess/identity-reset.test.mjs
+mcp/harness/host.html
+mcp/harness/bridge-global.js
+mcp/panel-src.html

@@ -52,7 +52,7 @@ id = "05b0c783c8d14c2ebce39f3e5073d91f"   # 3d-review-dev-oauth
 
 [[rules]]
 type = "Text"
-globs = ["**/*.yaml", "seed/*.sql"]
+globs = ["**/*.yaml", "seed/*.sql", "src/mcp-panel.html"]
 fallthrough = true
 
 # Serve the provisional functional shell at / while /v2 and MCP stay on the Worker.
