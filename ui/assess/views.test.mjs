@@ -166,27 +166,8 @@ test('A9 RESERVED_NOT_BUILT / 501 is its own state, never the generic retry', as
   assert.equal(p.calls.length, 0);
 });
 
-test('permissions: refusal → "Not visible to you"; no-inheritance line on every scope page', async () => {
-  const { api } = fakeApi({ 'GET /v2/project/p1/grants': err('NOT_AUTHORIZED_AT_SCOPE', 403) }); const ctx = ctxFor(api);
-  const html = views.permissions.render(ctx, await views.permissions.load(ctx, { scope: 'projects', id: 'p1' }));
-  assert.ok(html.includes(NOT_VISIBLE)); assert.match(html, /Permissions apply to this project only; nothing is inherited\./);
-  assert.doesNotMatch(html, /data-invite-form|data-revoke|Retry/);
-});
-
-// F2 (PR65 bf9be9b verdict): the AS1 grants contract is read-only. Grants + pending invitations render; no mutation control
-// (invite, revoke, role change, transfer) exists in the DOM at any role, and no write or danger twin is ever requested.
-test('permissions: read-only — grants and pending invitations listed, zero mutation controls, no writes, danger twins never requested', async () => {
-  const w = fakeApi({ 'GET /v2/workspace/w1/grants': { grants: [{ id: 'g1', principal_id: 'me', role: 'owner' }, { id: 'g2', principal_id: 'u2', role: 'member' }], pending_invitations: [{ id: 'inv1', role: 'viewer', created_at: '2026-09-17T00:00:00Z' }] } });
-  const ctx = ctxFor(w.api); const m = await views.permissions.load(ctx, { scope: 'workspaces', id: 'w1' }); const html = views.permissions.render(ctx, m);
-  assert.equal(m.myRole, 'owner'); assert.match(html, /Permissions apply to this workspace only; nothing is inherited\./);
-  assert.match(html, /<td>me <span class="muted small">\(you\)<\/span><\/td><td>owner<\/td>/); assert.match(html, /<td>u2<\/td><td>member<\/td>/);
-  assert.match(html, /Pending invitations/); assert.match(html, /viewer · invited 2026-09-17T00:00:00Z/);
-  assert.doesNotMatch(html, /data-invite-form|data-revoke|data-transfer-form|data-confirm|<form|<button|<select|Change role|Remove|Transfer ownership|Invite someone/);
-  assert.match(html, /not done here yet/); assert.match(html, /href="\/legacy\/#facilitator"/);
-  const root = makeRoot([]); views.permissions.bind(ctx, root, m);
-  assert.deepEqual(w.calls.map(c => `${c.method || 'GET'} ${c.url}`), ['GET /v2/workspace/w1/grants']);
-  for (const role of ['member', 'viewer']) { const c = ctxFor(w.api, { current: { assessment: { ...assessment, role }, surveys } }); const h = views.permissions.render(c, await views.permissions.load(c, { scope: 'assessments', id: 'a1', role })); assert.doesNotMatch(h, /<form|<button|<select/, role); }
-});
+// G1: the Permissions page and its negative cases are covered in ./permissions.test.mjs (Auth contract 2026-09-18).
+test('permissions view is the G1 module', async () => { const g1 = await import('./permissions.js'); assert.equal(views.permissions, g1.permissions); });
 
 test('css export is a string', () => { assert.equal(typeof css, 'string'); assert.match(css, /\.grants/); });
 

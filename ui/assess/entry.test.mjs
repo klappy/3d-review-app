@@ -23,8 +23,8 @@ test('E1: the shell way back is /legacy/#facilitator, hidden until a session is 
     assert.ok(html.includes('<details class="storage-note" id="whats-here-wrap" hidden>'), file);
     assert.ok(html.includes('<p class="storage-note" id="whats-here"></p>'), file);
   }
-  assert.deepEqual(MOUNTED, ['entry (tour, example, survey code, sign-in)', 'workspaces', 'one workspace (its projects)', 'projects', 'one project (assessments, languages)', 'one assessment: Prepare · Collect · Understand · Improve · Permissions', 'stage move (one step, confirmed)', 'survey screen', 'survey counts', 'print blank survey', 'share survey: participant link (two-step), copy, QR, invitation sheet, revoke']);
-  assert.deepEqual(ELSEWHERE.items, ['access codes', 'participant survey flow', 'shared links', 'invitations, role changes and ownership transfer', 'invitation acceptance']);
+  assert.deepEqual(MOUNTED, ['entry (tour, example, survey code, sign-in)', 'workspaces', 'one workspace (its projects)', 'projects', 'one project (assessments, languages)', 'one assessment: Prepare · Collect · Understand · Improve · Permissions (roster, invite, revoke, role change, ownership transfer at that one scope)', 'stage move (one step, confirmed)', 'survey screen', 'survey counts', 'print blank survey', 'share survey: participant link (two-step), copy, QR, invitation sheet, revoke']);
+  assert.deepEqual(ELSEWHERE.items, ['access codes', 'participant survey flow', 'shared links', 'invitation acceptance']);
   assert.ok(!/coming soon/i.test(whatsHere()));
   const ignored = read('../.assetsignore').split('\n');
   for (const t of ['assess/entry.test.mjs', 'assess/scope.test.mjs', 'assess/views.test.mjs']) assert.ok(ignored.includes(t), t);

@@ -1,23 +1,57 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.2.1",
+  "current": "0.3.2",
   "versions": [
     {
-      "version": "0.2.1",
+      "version": "0.3.2",
       "status": "candidate",
-      "notes_path": "releases/0.2.1.md",
+      "notes_path": "releases/0.3.2.md",
       "sections": {
         "added": [],
         "changed": [
-          "Production promotion candidate for the accepted 0.2.0 web and survey-sharing increment; no additional product behavior changes."
+          "Production promotion of validated DEV 0.3.1: accepted web and sharing, scoped Permissions controls, identity isolation fixes and the restored health-backed version badge; no additional product behavior changes."
         ],
         "fixed": [],
         "security": []
       }
     },
     {
-      "version": "0.2.0",
+      "version": "0.3.1",
       "status": "candidate",
+      "notes_path": "releases/0.3.1.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Restore the existing health-backed version badge and release-details dialog on the homepage and assessment shell."
+        ],
+        "security": []
+      }
+    },
+    {
+      "version": "0.3.0",
+      "status": "released",
+      "notes_path": "releases/0.3.0.md",
+      "sections": {
+        "added": [
+          "Scoped Permissions controls for workspace, project and assessment grants, pending invitations, role changes, revocation and ownership transfer."
+        ],
+        "changed": [
+          "Permission actions refresh server-owned roster and role state in place while keeping their outcome, receipt and trace visible."
+        ],
+        "fixed": [
+          "Successful permission actions no longer erase their confirmation through a blank-model route reload; transfer receipts resolve to grant rows."
+        ],
+        "security": [
+          "Danger actions retain preview/confirm with identical parameters; scopes remain explicit with no permission inheritance. Post-action access refusal hides stale controls while retaining the completed action receipt."
+        ]
+      },
+      "tag": "v0.3.0",
+      "date": "2026-09-17"
+    },
+    {
+      "version": "0.2.0",
+      "status": "released",
       "notes_path": "releases/0.2.0.md",
       "sections": {
         "added": [
@@ -34,7 +68,9 @@
         "security": [
           "Credential-bearing route changes retain the accepted forwarding behavior; no new permission inheritance is introduced."
         ]
-      }
+      },
+      "tag": "v0.2.0",
+      "date": "2026-09-17"
     },
     {
       "version": "0.1.0",
