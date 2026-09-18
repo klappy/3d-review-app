@@ -61,7 +61,7 @@ export const summary:Handler=async(ctx,p,opts)=>{
  for(const k of ['workflow','queue_rank'])if(k in p.summary)operations[k]=p.summary[k];
  return write(ctx,p,opts,'summary',async(store,at)=>{const item=await store.item(p.item_id)??blank(p.item_id,at);item.title=s.title;if(Object.keys(operations).length)item.operations={...item.operations,...operations,reviewed_at:at};item.provenance={feedback:s.feedback,priority:s.priority,scope:s.scope,outcome:s.outcome,recurrence:s.recurrence};
  history(item,at,'decision','Reviewed public summary published; review reference is a publisher attestation.',refs,integer(p.expected_cursor)+1);
- return {item,publicEvent:{kind:'summary',attribution:'publication_reviewer_attestation',review:refs,summary:s}};});
+ return {item,publicEvent:{kind:'summary',attribution:'publication_reviewer_attestation',review:refs,summary:{...s,...operations}}};});
 };
 export const verify:Handler=async(ctx,p,opts)=>{
  exact(p,['expected_cursor','idempotency_key','item_id','event_sequence','evidence','attestation']);const sequence=integer(p.event_sequence),refs=evidence(p.evidence);

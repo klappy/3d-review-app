@@ -28,3 +28,4 @@ it('projects latest reported stages for historical rows without changing verifie
  expect((await store.read()).items.some(x=>x.id==='roadmap-140')).toBe(false);
  expect(JSON.stringify(await store.history('roadmap-140',0,100))).not.toContain('production_verified');
 });
+it('reported projection does not include claims outside the requested current-item page',async()=>{const page=await store.read(0,'roadmap-123',1);expect(page.items).toHaveLength(1);expect(page.items[0].id).toBe('roadmap-124');expect(page.items[0].value.reported).toEqual({});});
