@@ -5,8 +5,8 @@ export const WINDOWS = ['past','now','next'];
 export function windowItems(items, all=false){
  const sorted=[...items].sort((a,b)=>(a.operations?.queue_rank??Infinity)-(b.operations?.queue_rank??Infinity)||a.id.localeCompare(b.id));
  const result={};
- for(const key of [...WINDOWS,'unclassified']){
-  const rows=sorted.filter(x=>(WINDOWS.includes(x.operations?.workflow)?x.operations.workflow:'unclassified')===key);
+ for(const key of WINDOWS){
+  const rows=sorted.filter(x=>(WINDOWS.includes(x.operations?.workflow)?x.operations.workflow:'next')===key);
   result[key]=all?rows:rows.slice(0,20);result[key+'Total']=rows.length;
  }
  return result;
@@ -16,7 +16,8 @@ export function windowItems(items, all=false){
 export function stagePresentation(item,key){
  const s=item.stages[key],r=item.reported?.[key];
  const verified=!!s.evidence?.length;
- return {label:verified?'Verified: '+STATES[s.state]:'Not verified',
+ const state = r?.state ?? (verified ? s.state : null);
+ return {state:STATES[state]?state:'unknown',headline:STATES[state]??'Not reported',label:verified?'Verified: '+STATES[s.state]:'Not verified',
   report:r?`Reported: ${r.state}${r.version?' · '+r.version:''}${r.blocker?' · '+r.blocker.replaceAll('_',' '):''}`:'No publisher report'};
 }
 export function nextAction(item){
