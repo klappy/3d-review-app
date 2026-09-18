@@ -36,7 +36,7 @@
     },
     {
       "version": "0.2.0",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.2.0.md",
       "sections": {
         "added": [
@@ -53,7 +53,9 @@
         "security": [
           "Credential-bearing route changes retain the accepted forwarding behavior; no new permission inheritance is introduced."
         ]
-      }
+      },
+      "tag": "v0.2.0",
+      "date": "2026-09-17"
     },
     {
       "version": "0.1.0",
