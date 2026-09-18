@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.9.1",
+  "current": "0.9.2",
   "versions": [
+    {
+      "version": "0.9.2",
+      "status": "candidate",
+      "notes_path": "releases/0.9.2.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Theme regression scorecard: 6/6 automated local scenarios passed; supported-host visual scenarios remain untested and real-human satisfaction, confusion and frustration are NOT MEASURED."
+        ],
+        "fixed": [
+          "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
+        ],
+        "security": [
+          "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
+        ]
+      }
+    },
     {
       "version": "0.9.1",
       "status": "candidate",
@@ -39,7 +56,7 @@
     },
     {
       "version": "0.8.0",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.8.0.md",
       "sections": {
         "added": [
@@ -52,7 +69,9 @@
         "security": [
           "Existing synthetic admission and exact assessment grants remain authoritative; held inputs, expired previews, identity/navigation changes and uncertain writes do not enable automatic execution or retry."
         ]
-      }
+      },
+      "tag": "v0.8.0",
+      "date": "2026-09-18"
     },
     {
       "version": "0.7.1",
