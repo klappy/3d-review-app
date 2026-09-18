@@ -309,7 +309,7 @@ function bind(current) {
 function bindShare(current, s) {
   const root = app.querySelector('#share-root'); if (!root) return;
   const model = share.shareFor(state, current.assessment.id, s.id, epoch);
-  const ctx = { esc, enc: encodeURIComponent };
+  const ctx = { esc, enc: encodeURIComponent, isCurrent: () => state.share === model };
   const onChange = () => { root.innerHTML = share.render(ctx, { current, survey: s, share: model }); share.bind(ctx, root, { current, survey: s, share: model, api, onChange }); };
   share.bind(ctx, root, { current, survey: s, share: model, api, onChange });
 }
