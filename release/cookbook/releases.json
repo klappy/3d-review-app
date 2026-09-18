@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.12.1",
+  "current": "0.13.0",
   "versions": [
+    {
+      "version": "0.13.0",
+      "status": "candidate",
+      "notes_path": "releases/0.13.0.md",
+      "sections": {
+        "added": [
+          "Feedback records capture trusted submission-server identity and optional, explicitly client-reported experience identity for support-only readback."
+        ],
+        "changed": [
+          "Persona evidence: 18/18 automated local HTTP/MCP provenance scenarios passed; automatic loaded-client capture and deployed operator journeys untested; human satisfaction, confusion and frustration NOT MEASURED."
+        ],
+        "fixed": [],
+        "security": [
+          "Strict bounded metadata allowlists, existing authentication/support gates and private trace/receipt projections; legacy provenance remains unknown without backfill."
+        ]
+      }
+    },
     {
       "version": "0.12.1",
       "status": "candidate",

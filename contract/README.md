@@ -13,6 +13,10 @@ Rules carried: danger twins are never GET; `SUPPRESSED` is `ok:true`; `v2.1-oct`
 
 The optional `cap.ops.feedback` parameter `require_authenticated` is hand-projected from [the canonical additive amendment](https://github.com/klappy/3d-review-cookbook/blob/e9c09cb97ef206abb418de741bb93629bd1c9e23/planning/2026-09-16-parity-build/AMEND-2026-09-18-feedback-attributed-write.md). Its field-level `x-cookbook-source` in capabilities/OpenAPI identifies that exact amendment; the historical base-matrix source and generated timestamp above are not a claim that this later field was generated from that matrix. The old `tools/gen_contract.py` does not project this or all prior amendments and must not be used to overwrite the evolved contract without reconciling them. No whole-contract re-projection or release-manifest repin is claimed.
 
+## Feedback provenance amendment
+
+The optional feedback experience parameter and support readback provenance are hand-projected from the field-level canonical [feedback provenance amendment](https://github.com/klappy/3d-review-cookbook/blob/f5d925f9f9d448828f7b7bb7afabc08ba6db933f/planning/2026-09-16-parity-build/AMEND-2026-09-18-feedback-provenance.md). Capabilities parameter/source annotations and OpenAPI schemas pin that amendment separately from the old base-matrix generator and any release manifest. No full contract regeneration or release assignment is claimed.
+
 ## Live roadmap additive candidate
 
 The six `cap.ops.roadmap_*` rows and HTTP/OpenAPI projections are hand-projected from [canonical amendment rows](https://github.com/klappy/3d-review-cookbook/blob/f5fb9a28ee3ea017859e521ac672f4c58236a9b4/planning/2026-09-18-live-roadmap/capabilities.json) at `f5fb9a28ee3ea017859e521ac672f4c58236a9b4`. Base matrix provenance above remains historical; no whole-contract regeneration or release pin is claimed. The same four tools dispatch reads, history and confirmed writes. Agent reports remain claims, narrow existing-identity permissions fail closed, and public data omits private audit. Canonical contract acceptance and operational publishing proof are pending independently of this source candidate.
