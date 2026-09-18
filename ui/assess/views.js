@@ -2,8 +2,9 @@
 // Module contract: { load(ctx, params) → model, render(ctx, model) → html, bind(ctx, root, model) }.
 // ctx = { api, esc, enc, go, note, state, routes, cards, current, refresh? }; params = { aid, scope?, id? }.
 // Rules carried: per-survey counts only (respondents are NEVER summed across surveys); results render the server's held
-// literal; no Build/Preview report control; recommendations are "not built" statically; RESERVED_NOT_BUILT/501 never hits
+// literal; synthetic-only preview/confirmed build; recommendations are "not built" statically; RESERVED_NOT_BUILT/501 never hits
 // the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
+import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js'; // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
@@ -74,7 +75,7 @@ const understand = {
     ]);
     const countMap = new Map();
     for (const [sid, r] of counts) countMap.set(sid, r.status === 'loaded' ? { status: 'loaded', responses: Number(r.value?.counts?.responses ?? 0), respondents: Number(r.value?.counts?.respondents ?? 0) } : r);
-    return { aid, surveys, counts: countMap, results, reports, openReport: null };
+    return { aid, role: cur?.assessment?.role, surveys, counts: countMap, results, reports, openReport: null };
   },
   render(ctx, m) {
     const esc = ctx.esc;
@@ -96,7 +97,7 @@ const understand = {
     let results;
     if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.reason || '')}</p>`; }
     else results = refusalLine(ctx, m.results.status, 'data-retry="results"', 'Results');
-    // (3) Reports: list from the server; opening one renders it with report-view.js. No build control (A5).
+    // (3) Reports: server-owned eligibility and provenance; preview never writes a report.
     let reports;
     if (m.reports.status === 'loaded') {
       const r = m.reports.value || {};
@@ -106,12 +107,26 @@ const understand = {
     } else if (m.reports.status === 'refused') reports = '<p class="muted" data-reports-unavailable>Reports are unavailable for this assessment.</p>';
     else reports = refusalLine(ctx, m.reports.status, 'data-retry="reports"', 'Reports');
     const open = m.openReport ? (m.openReport.status === 'held' ? `<p class="muted" data-open-report-reason>${esc(m.openReport.reason)}</p>` : m.openReport.status === 'error' ? `<p class="small muted" role="alert">${esc(m.openReport.text)}</p>` : '') : '';
-    return `<div class="grid"><section class="panel"><p class="eyebrow">Understand</p><h2>Bring the perspectives together</h2>${lensBlocks}<p class="small muted line">Counts are per survey. Respondents are counted within each survey and are not added across surveys.</p></section><aside class="stack"><section class="panel" data-results><p class="eyebrow">Results</p>${results}</section><section class="panel" data-reports><p class="eyebrow">Reports</p>${reports}${m.openReport && m.openReport.status !== 'shown' ? `<div>${open}</div>` : ''}<p class="status" role="status" aria-live="polite" data-report-status></p></section></aside></div><section class="panel report-full" data-report-full hidden><div class="report-tools"><p class="eyebrow" style="margin:0">Report · full view</p><button type="button" class="quiet" data-close-report>Close report</button></div><div data-report-view></div></section>`;
+    return `<div class="grid"><section class="panel"><p class="eyebrow">Understand</p><h2>Bring the perspectives together</h2>${lensBlocks}<p class="small muted line">Counts are per survey. Respondents are counted within each survey and are not added across surveys.</p></section><aside class="stack"><section class="panel" data-results><p class="eyebrow">Results</p>${results}</section><section class="panel" data-reports><p class="eyebrow">Reports</p>${reports}<p><button type="button" data-retry="reports">Refresh reports</button></p>${reportBuildMarkup(ctx, m.role)}${m.openReport && m.openReport.status !== 'shown' ? `<div>${open}</div>` : ''}<p class="status" role="status" aria-live="polite" data-report-status></p></section></aside></div><section class="panel report-full" data-report-full hidden><div class="report-tools"><p class="eyebrow" style="margin:0">Report · full view</p><button type="button" class="quiet" data-close-report>Close report</button></div><div data-report-view></div></section>`;
   },
   bind(ctx, root, m) {
+    const clearReport = () => {
+      m.reportReadGeneration = (m.reportReadGeneration || 0) + 1; m.openReport = null;
+      root.querySelector('[data-report-view]')?.replaceChildren();
+      const full = root.querySelector('[data-report-full]'); if (full) full.hidden = true;
+    };
+    bindReportBuild(ctx, root, m, async () => {
+      const reports = await settle(ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/reports`));
+      if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
+      m.reports = reports; m.openReport = null;
+      root.innerHTML = understand.render(ctx, m); understand.bind(ctx, root, m);
+      root.querySelector('[data-report-status]').textContent = reports.status === 'loaded' ? (reports.value?.suppressed ? 'Report built, but current report access is held. See the reporting policy reason above.' : 'Report built. Open it from the current report list.') : 'Report built, but the list could not be refreshed. Refresh reports to reopen it.';
+    }, () => { clearReport(); root.querySelector('[data-report-list]')?.remove(); });
     root.querySelectorAll('[data-retry]').forEach(el => el.onclick = e => { e.preventDefault(); ctx.go(ctx.routes.assessment(m.aid, 'understand'), { reload: true }); });
-    const closeBtn = root.querySelector('[data-close-report]'); if (closeBtn) closeBtn.onclick = () => { const full = root.querySelector('[data-report-full]'); const view = root.querySelector('[data-report-view]'); if (view) view.replaceChildren(); if (full) full.hidden = true; m.openReport = null; };
+    const closeBtn = root.querySelector('[data-close-report]'); if (closeBtn) closeBtn.onclick = clearReport;
     root.querySelectorAll('[data-open-report]').forEach(btn => btn.onclick = async () => {
+      if (ctx.isCurrent && !ctx.isCurrent()) return;
+      const readGeneration = (m.reportReadGeneration || 0) + 1; m.reportReadGeneration = readGeneration;
       const id = btn.dataset.openReport, view = root.querySelector('[data-report-view]'), status = root.querySelector('[data-report-status]');
       const all = root.querySelectorAll('[data-open-report]'); all.forEach(b => b.disabled = true); if (status) status.textContent = 'Opening report…';
       // R-1 (Auditor 04aee96): every NON-success outcome is written to the VISIBLE Reports status; the full-width section stays
@@ -120,6 +135,7 @@ const understand = {
       const showFailure = text => { if (status) status.textContent = text; if (view) view.replaceChildren(); if (full) full.hidden = true; };
       try {
         const r = await ctx.api(`/v2/reports/${ctx.enc(id)}`);
+        if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false || readGeneration !== m.reportReadGeneration) return;
         if (r.suppressed) { m.openReport = { status: 'held', reason: String(r.reason || '') }; showFailure(m.openReport.reason); }
         else {
           const ok = renderReport({ doc: root.ownerDocument || globalThis.document, root: view, report: r.report });
@@ -127,6 +143,7 @@ const understand = {
           else { m.openReport = { status: 'error', text: 'This report could not be displayed.' }; showFailure(m.openReport.text); }
         }
       } catch (e) {
+        if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false || readGeneration !== m.reportReadGeneration) return;
         const k = classify(e); m.openReport = { status: 'error', text: k === 'refused' ? NOT_VISIBLE : k === 'not_built' ? 'Reports are not built yet.' : k === 'unauthenticated' ? 'Your sign-in is no longer active.' : String(e.message || 'Report could not be opened.') };
         showFailure(m.openReport.text);
       } finally { all.forEach(b => b.disabled = false); }
