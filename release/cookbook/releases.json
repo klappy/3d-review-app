@@ -1,10 +1,27 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.7.0",
+  "current": "0.8.0",
   "versions": [
     {
-      "version": "0.7.0",
+      "version": "0.8.0",
       "status": "candidate",
+      "notes_path": "releases/0.8.0.md",
+      "sections": {
+        "added": [
+          "Synthetic report preview and explicit confirmed build in the current assessment Understand view, followed by refreshed report list and reopen."
+        ],
+        "changed": [
+          "Canonical release notes include the bounded reporting persona outcome scorecard, distinguishing automated local outcomes from unmeasured human and agent journeys."
+        ],
+        "fixed": [],
+        "security": [
+          "Existing synthetic admission and exact assessment grants remain authoritative; held inputs, expired previews, identity/navigation changes and uncertain writes do not enable automatic execution or retry."
+        ]
+      }
+    },
+    {
+      "version": "0.7.0",
+      "status": "released",
       "notes_path": "releases/0.7.0.md",
       "sections": {
         "added": [
@@ -17,11 +34,13 @@
         "security": [
           "Existing authentication audiences, host-only sessions, OAuth callback validation and participant fragment handling remain unchanged. New sign-in paths require matching Cloudflare Access destinations."
         ]
-      }
+      },
+      "tag": "v0.7.0",
+      "date": "2026-09-18"
     },
     {
       "version": "0.6.0",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.6.0.md",
       "sections": {
         "added": [],
@@ -32,7 +51,9 @@
         "security": [
           "Existing recipient validation, synthetic-address refusal, DEV hash allowlist, invitation intent deduplication and uncertain-send protections remain in force; no inbox or forwarding is configured."
         ]
-      }
+      },
+      "tag": "v0.6.0",
+      "date": "2026-09-18"
     },
     {
       "version": "0.5.0",

@@ -1,30 +1,30 @@
 {
-  "version": "0.7.0",
+  "version": "0.8.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "1ee1cf0f46f61295999bfceba57bddb7ae5f9e06",
+  "cookbook_commit": "073694460187fabe023a96cf6b24a86d55177973",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.7.0.md",
-      "blob_sha": "2f0a11f26dc2914eac728b8c6243b2f0a0fc4a9a",
-      "sha256": "5088fb2368f7e24d008569f9afff809e5b3eb3d50bf5c80196fbdc03f1cf3a8c"
+      "path": "planning/2026-09-16-parity-build/releases/0.8.0.md",
+      "blob_sha": "d780af710c084ac4640118620165da8d64a5139c",
+      "sha256": "b5188c9d537adecd63212c8b7a6822ee20d8951bd65a8629fa4b6d3fb6ddbeb2"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "80e074b4abec5d51d58b33bd5106c51144665cbd",
-      "sha256": "cf7093bc561cc9bda3be331e0b5b97c16bd168626c2d4175f73ebcf19cd72350"
+      "blob_sha": "4571fa64110ef0918bcc737e79ce5587d44a38de",
+      "sha256": "0a886c95bfddc952c76abed2cd3a0be3544c9a0136e44087dca5cf4060bf50d4"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Canonical DEV domain dev.3dreview.app and production domain 3dreview.app on the existing Workers, with previous addresses retained as compatible aliases."
+        "Synthetic report preview and explicit confirmed build in the current assessment Understand view, followed by refreshed report list and reopen."
       ],
       "changed": [
-        "Invitation emails use the canonical origin for their environment; browser-created participant links remain on the current origin."
+        "Canonical release notes include the bounded reporting persona outcome scorecard, distinguishing automated local outcomes from unmeasured human and agent journeys."
       ],
       "fixed": [],
       "security": [
-        "Existing authentication audiences, host-only sessions, OAuth callback validation and participant fragment handling remain unchanged. New sign-in paths require matching Cloudflare Access destinations."
+        "Existing synthetic admission and exact assessment grants remain authoritative; held inputs, expired previews, identity/navigation changes and uncertain writes do not enable automatic execution or retry."
       ]
     }
   }
