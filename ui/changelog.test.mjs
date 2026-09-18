@@ -247,3 +247,28 @@ test('V6 request log contains only /v2/health and /changelog.json', async () => 
   assert.equal(log.some(r => r.options?.headers?.authorization), false, 'no bearer is attached');
   assert.equal(log.every(r => r.options?.credentials === 'omit'), true, 'credentials omitted on both reads');
 });
+
+
+for (const path of ['index.html', 'assess/index.html']) {
+  test(`homepage badge is mounted and bootstraps the shared health-backed component: ${path}`, async () => {
+    const html = fs.readFileSync(new URL(path, import.meta.url), 'utf8');
+    assert.equal((html.match(/src="\/changelog.js"/g) || []).length, 1);
+    const ids = ['version', 'changelog', 'changelog-title', 'changelog-build', 'changelog-body', 'changelog-close'];
+    for (const id of ids) assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id);
+    assert.match(html, /<button id="version"[^>]*aria-controls="changelog"[^>]*>Version…<\/button>/);
+    assert.ok(html.indexOf('id="version"') < html.indexOf('<main'), 'badge survives route content replacement');
+    assert.ok(html.indexOf('id="changelog"') > html.indexOf('</main>'), 'dialog survives route content replacement');
+    const doc = fakeDocument(ids), log = [];
+    const component = fs.readFileSync(new URL('./changelog.js', import.meta.url), 'utf8').replace(/export /g, '');
+    vm.runInNewContext(component, {
+      document: doc, location: { hash: '' }, sessionStorage: { getItem: () => null },
+      fetch: fetchFor({ '/v2/health': json(HEALTH), '/changelog.json': json(CHANGELOG) }, log),
+    });
+    await settle();
+    assert.equal(doc.getElementById('version').textContent, 'Version 0.1.0', 'runtime health fixture supplies version, not markup');
+    await doc.getElementById('version').fire('click'); await settle();
+    assert.equal(doc.getElementById('changelog').open, true);
+    assert.equal(doc.getElementById('changelog-build').textContent, detailsLine(HEALTH.result));
+    assert.deepEqual(log.map(r => r.url), ['/v2/health', '/changelog.json']);
+  });
+}

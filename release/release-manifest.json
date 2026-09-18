@@ -1,33 +1,27 @@
 {
-  "version": "0.3.0",
+  "version": "0.3.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "d56bd74f8f9d50fe29e6f899c2ab7efa3702102d",
+  "cookbook_commit": "c7a2d1be3fd6a33ba976b8a8596f574938905019",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.3.0.md",
-      "blob_sha": "f3b74ad8425b47be525af5aae3039dcc46717313",
-      "sha256": "e42fb639e658dbffb1dee69d14f42ad3b70ba0cce9c3176c7bfc40e05fece97b"
+      "path": "planning/2026-09-16-parity-build/releases/0.3.1.md",
+      "blob_sha": "392ace950e747962bbcc71bed93b263b8bf6f9e1",
+      "sha256": "95b81209d9d73066a97aff851e37ca7a44b5eb8e412bc45600cb15f735d528ae"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "54257e5f365efd79cfedab55b8f8bc9242339895",
-      "sha256": "75383395dd2ca744c104cebe7208e083b01c1b4b6c9a606c275a33a01c910994"
+      "blob_sha": "86a16d0b98c3c4b826f91499d3455f0c2600b65d",
+      "sha256": "f6bbf811f1b2458030bf2f48d90ac228cbbae870811194b4327ed7ef853a9031"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Scoped Permissions controls for workspace, project and assessment grants, pending invitations, role changes, revocation and ownership transfer."
-      ],
-      "changed": [
-        "Permission actions refresh server-owned roster and role state in place while keeping their outcome, receipt and trace visible."
-      ],
+      "added": [],
+      "changed": [],
       "fixed": [
-        "Successful permission actions no longer erase their confirmation through a blank-model route reload; transfer receipts resolve to grant rows."
+        "Restore the existing health-backed version badge and release-details dialog on the homepage and assessment shell."
       ],
-      "security": [
-        "Danger actions retain preview/confirm with identical parameters; scopes remain explicit with no permission inheritance. Post-action access refusal hides stale controls while retaining the completed action receipt."
-      ]
+      "security": []
     }
   }
 }
