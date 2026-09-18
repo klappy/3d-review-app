@@ -1,12 +1,13 @@
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {beforeAll,beforeEach,afterAll,describe,it,expect} from 'vitest';
+import {beforeAll,beforeEach,afterEach,afterAll,describe,it,expect} from 'vitest';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import * as store from '../src/synthetic-report-store';
 import {captureForBuild} from '../src/report-capture';
 import {renderSyntheticReport,REPORT_VERSIONS,REPORT_SCHEMA} from '../src/synthetic-report-renderer';
 import {canonicalJson} from '../src/report-canonical-json';
 import type {Ctx} from '../src/handlers/types';
+import {SerialOperation} from './helpers/serial-operation';
 import sourceFixture from './fixtures/synthetic-report-renderer-v1.json';
 const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:'c2a-real-integration',modules:true,script:"export default {fetch(){return new Response('local synthetic fixture')}}",d1Databases:{DB:'c2a-fixture'}}]}));
 let db:D1Database;
@@ -35,20 +36,20 @@ beforeAll(async()=>{
   const statements=sql.split(';\n').map(s=>s.trim()).filter(Boolean);for(let i=0;i<statements.length;i+=50)await db.batch(statements.slice(i,i+50).map(s=>db.prepare(s)));
  }
 },60000);
-beforeEach(clearReports);
-afterAll(()=>mf.dispose());
-const corpusDeadlineMs=120000;
+const corpusOperation = new SerialOperation();
+// Await timed-out bodies before any subsequent test can clear or reuse the D1 fixture.
+beforeEach(() => corpusOperation.drain(),15000);
+afterEach(() => corpusOperation.drain(),15000);
+afterAll(async () => { try { await corpusOperation.drain(); } finally { await mf.dispose(); } },30000);
 describe('real compiled renderer with local D1',()=>{
- it('roundtrips all34/425 contexts with exact renderer bytes and independently specified tuple key',async()=>{
-  const corpusStarted=performance.now();
-  console.log('C2A_REAL_CORPUS_START '+JSON.stringify({runtime:process.version,deadlineMs:corpusDeadlineMs,expectedContexts:34,expectedResponses:425}));
-  const measurements:any[]=[];let total=0,max=0;
-  // Bounded diagnostic wall time only: no source IDs, answers, SQL or credentials.
-  let contextIndex=0,phaseStarted=0;
-  const phaseStart=(phase:string)=>{phaseStarted=performance.now();console.log('C2A_PHASE '+JSON.stringify({contextIndex,phase,event:'START',elapsedMs:phaseStarted-corpusStarted}));};
-  const phaseEnd=(phase:string)=>{const now=performance.now();console.log('C2A_PHASE '+JSON.stringify({contextIndex,phase,event:'END',elapsedMs:now-corpusStarted,durationMs:now-phaseStarted}));};
-  for(const id of Object.keys(sourceFixture.contexts)){
-   contextIndex++;
+ describe.sequential('all34/425 corpus with shared coexistence', () => {
+  const measurements:any[]=[]; let total=0,max=0,corpusStarted=0;
+  beforeAll(async () => { await clearReports(); corpusStarted=performance.now(); });
+  Object.keys(sourceFixture.contexts).forEach((id,index) => {
+   it(`roundtrips context ${index+1}/34 with exact renderer bytes and tuple key`, () => corpusOperation.run(async () => {
+    const contextIndex=index+1; let phaseStarted=0;
+    const phaseStart=(phase:string)=>{corpusOperation.assertHealthy();phaseStarted=performance.now();console.log('C2A_PHASE '+JSON.stringify({contextIndex,phase,event:'START',elapsedMs:phaseStarted-corpusStarted}));};
+    const phaseEnd=(phase:string)=>{corpusOperation.assertHealthy();const now=performance.now();console.log('C2A_PHASE '+JSON.stringify({contextIndex,phase,event:'END',elapsedMs:now-corpusStarted,durationMs:now-phaseStarted}));};
    phaseStart('capture');
    const c=await capture(id);total+=c.rows.length;max=Math.max(max,c.rows.length);
    phaseEnd('capture');
@@ -77,14 +78,16 @@ describe('real compiled renderer with local D1',()=>{
    expect([row.source_pin,row.index_root,row.scorer_version,row.narrative_version,row.policy_version,row.output_schema_version]).toEqual([sourceFixture.source_commit,'d964f81639e0929ce5f53156b28e3902732b98d2394c6d8dc31c9d14a22fb7dd',REPORT_VERSIONS.scorer,REPORT_VERSIONS.narrative,REPORT_VERSIONS.policy,REPORT_SCHEMA]);
    if(id===aid)expect(row.report_key).toBe('68b602d11a77162f72320c43827d30d33ed9f95fca9dfe5cb07f18905176a52d');
    measurements.push({assessmentId:id,responses:c.rows.length,captureBytes:Buffer.byteLength(c.packedCapture),payloadBytes:Buffer.byteLength(expected.payloadJson),buildMs,getMs,listMs});
-  }
-  expect(measurements).toHaveLength(34);expect(total).toBe(425);expect(max).toBe(23);
-  expect((await db.prepare('SELECT count(*) n FROM synthetic_report').first<any>()).n).toBe(34);
-  console.log('C2A_REAL_CORPUS '+JSON.stringify({elapsedMs:performance.now()-corpusStarted,deadlineMs:corpusDeadlineMs,measurements,totalResponses:total,maxValidSameAssessmentResponses:max,runtime:process.version,measurementKind:'local Node plus Miniflare wall time; not Worker CPU or peak memory'}));
- // The full 34-context/425-response correctness corpus has passed near 60s on the
- // provider and also exceeded it in isolation. This finite harness allowance is
- // not a product latency budget; preserve every roundtrip and coexistence check.
- },corpusDeadlineMs);
+   }));
+  });
+  it('retains all34 reports and exactly425 responses together', async () => {
+   expect(measurements).toHaveLength(34);expect(total).toBe(425);expect(max).toBe(23);
+   expect((await db.prepare('SELECT count(*) n FROM synthetic_report').first<any>()).n).toBe(34);
+   console.log('C2A_REAL_CORPUS '+JSON.stringify({elapsedMs:performance.now()-corpusStarted,measurements,totalResponses:total,maxValidSameAssessmentResponses:max,runtime:process.version,measurementKind:'local Node plus Miniflare wall time; not Worker CPU or peak memory'}));
+  });
+ });
+ describe('refusal and race regressions', () => {
+ beforeEach(clearReports);
  it('refuses rehashed well-typed semantic forgery, not just malformed schema',async()=>{
   const r=await report(),original=await db.prepare('SELECT payload_json,payload_sha256 FROM synthetic_report WHERE id=?').bind(r.id).first<any>();
   const mutations=[
@@ -189,5 +192,6 @@ describe('real compiled renderer with local D1',()=>{
   const malformed=await db.prepare(store.REPORT_LIST_SQL).bind('user',null,id,'person_mara','viewer',null,6).all<any>();
   const refusalStart=performance.now();expect(await store.listMaterialized(context(),id)).toEqual(held(id));
   console.log('C2A_MALFORMED_PAGE '+JSON.stringify({rows:malformed.results.length,serializedPageBytes:Buffer.byteLength(JSON.stringify(malformed.results)),maxSerializedRowBytes:Math.max(...malformed.results.map(r=>Buffer.byteLength(JSON.stringify(r)))),refusalLocalWallMs:performance.now()-refusalStart,interpretation:'local transport only, actual platform gate open'}));
+ });
  });
 });

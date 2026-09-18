@@ -1,36 +1,27 @@
 {
-  "version": "0.9.0",
+  "version": "0.9.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "92b010ce61baae04d7052342bb837dc9b5801d6e",
+  "cookbook_commit": "3e0985c7cfa940a61034c7d262c92e26f36165da",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.9.0.md",
-      "blob_sha": "66c51dfdfebfd3dc4c596c73e7f7ee571f08fb1c",
-      "sha256": "a32a4cbe636cd064550a86b777e94edf1bcd25abcc1917872a754200d246d501"
+      "path": "planning/2026-09-16-parity-build/releases/0.9.1.md",
+      "blob_sha": "a6ca85d89dc703c203e2ae453a94ac79c3153e64",
+      "sha256": "bd91ad6dcca22e441f5047c23bc60a0914d10a84be70eb54d806ddfa25350526"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "11fb5e2d8df6c9117d928bc870be1f7d8f4bf0d8",
-      "sha256": "021bc3d2e760e9935c947ed2975512920135604531e64431335b1a5cdfc11449"
+      "blob_sha": "75c40bf685dc4c777f1df9c2cb17ce77caeac51e",
+      "sha256": "c89ff4b9ff2fe33dc180aebba4710804e02fc717368bf21d28d9a858f7b8728c"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "A source-pinned synthetic assessment example with three surveys, twelve responses, an inspectable report and sample answers, using the real assessment/report/participant UI.",
-        "An isolated sample survey with the real question, review, edit and receipt flow; practice answers stay in memory and are never submitted to a live API."
-      ],
-      "changed": [
-        "Public tour and sample links, including the direct legacy example URL, use the shared application screens. The legacy homepage's overall visual design is preserved.",
-        "Generic legacy navigation is retired where current screens exist; invitation acceptance and access-code participation remain compatible.",
-        "The eight-check browser plan is closed with separately attributed historical and independent exact-head local evidence; real-human satisfaction, confusion and frustration remain NOT MEASURED."
-      ],
+      "added": [],
+      "changed": [],
       "fixed": [
-        "The legacy sample assessment no longer promises a populated assessment while displaying only narrative stage descriptions."
+        "Release validation runs all 34 synthetic report contexts as sequential bounded cases, preserves the 425-response aggregate and coexistence checks, and drains or quarantines unfinished fixture work before reuse."
       ],
-      "security": [
-        "Demo transport rejects unknown reads and all assessment mutations without network fallback. It does not read or change real staff credentials or participant drafts."
-      ]
+      "security": []
     }
   }
 }
