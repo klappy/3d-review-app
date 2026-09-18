@@ -365,7 +365,7 @@ function createActionCard({ root, esc, call, explore, execution }) {
   }
   function render() {
     const env = envelope, result = env?.result || {}, cap = env?.capability || input?.capability;
-    let title = label(cap), body = 'Waiting for this tool result…', state = 'loading', entity = null, questions = ''; 
+    let title = label(cap), body = 'Waiting for this tool result…', state = 'loading', entity = null, questions = '';
     if (env) {
       if (env.ok === false || env.isError) { title = 'Not available'; body = 'This request could not be completed.'; state = 'refused'; }
       else if (cap === 'cap.ops.feedback') { title = 'Feedback received'; body = 'Your feedback was recorded. Its private contents are not displayed here.'; state = 'complete'; }

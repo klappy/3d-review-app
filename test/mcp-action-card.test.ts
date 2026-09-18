@@ -57,5 +57,6 @@ it('latest Written survey result replaces projects/assessment/selection with act
   for(const phrase of ['Written','Community','version 2','3 questions','How often is this useful?','1 to 5','Which difficulties?','Travel <script>','cannot combine','Explain your choice','unknown'])expect(f.root.textContent).toContain(phrase);
   expect(f.root.textContent).not.toContain('OLD');expect(f.root.innerHTML).not.toContain('<script>');expect(f.root.textContent).not.toContain('99');expect(f.root.querySelector('input,textarea')).toBeNull();
  }
+ f.card.receiveResult({structuredContent:{ok:true,capability:'cap.template.get',result:{suppressed:true,template:{name:'Hidden',items}}}});expect(f.root.textContent).toContain('Result held');expect(f.root.textContent).not.toContain('How often');
  f.card.receiveInput({arguments:{capability:'cap.ops.feedback'}});expect(f.root.textContent).not.toContain('How often');f.dom.window.close();
 });
