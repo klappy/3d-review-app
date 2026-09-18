@@ -1,28 +1,30 @@
 {
-  "version": "0.14.1",
+  "version": "0.14.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "fda32bcddef097f5cf5b70a29ec0918048093ca4",
+  "cookbook_commit": "917dd405f74de3c495476f912146dc0143dee7be",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.14.1.md",
-      "blob_sha": "c8fff59c4adc176bfe29fc040d69cac83c45cde1",
-      "sha256": "e5a027ddc10d71466a3b5257092a5333a90a0a57c21586ffe9b8f2cf2f5f032e"
+      "path": "planning/2026-09-16-parity-build/releases/0.14.2.md",
+      "blob_sha": "e60b24dd8af29b6738021c383924e61f389839ea",
+      "sha256": "277ea7e0041f88bdc56d54080b5b4174f88af045bc8ef09aaa11b86c4bb16e9e"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "4173059bf5aba47cbbbdd44618272dddea0eeae0",
-      "sha256": "8b97c9ef251b69303fb1dadc17d8e3e4dd5a3eba1697c40b0b881af85489dff5"
+      "blob_sha": "6ee7926422140921b3f4b0d40564b7910284d7ee",
+      "sha256": "553cceacc425f89b57f22ac1392a67163457e38ea036dbeccc46abababa71067"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
-      "changed": [],
+      "changed": [
+        "Persona evidence: five local Chrome modal acceptance families and23automated changelog tests passed; human outcomes NOT MEASURED."
+      ],
       "fixed": [
-        "Roadmap version resolves from canonical health on initial page load, including tabs retaining participant state."
+        "Changelog opens at the newest entry, resets on reopen and keeps accessible Close available while scrolling; backdrop dismissal and native Escape restore opener focus."
       ],
       "security": [
-        "Participant routes retain lazy health loading; version reads omit credentials and disable caching."
+        "Canonical version/changelog source and anonymous read privacy are unchanged; no new data collection or live writes."
       ]
     }
   }
