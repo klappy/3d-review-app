@@ -13,6 +13,7 @@ The named example is Earning trust, January 2026:12 synthetic responses in3 surv
 |Current homepage survey choice|Current survey entry with sample-survey option and existing optional access-code entry|
 |Shared participant `#survey=…`|Existing standalone participant controller, unchanged|
 |Invitation `#invite=…`|Preserved targeted legacy acceptance; no demonstrated replacement|
+|Current-shell `#participant` resume|Preserved `/legacy/#participant`; existing token resumes without code re-entry|
 |Code participant after `/v2/participate/code`|Preserved `/legacy/#participant`; no demonstrated replacement|
 |Generic current-header legacy link|Removed; workspaces/projects/assessment/permissions now current UI|
 |Current `#reports-card` and public report links|Current projects entry; no implied shared-report token or permission|
