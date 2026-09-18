@@ -25,7 +25,9 @@
       "notes_path": "releases/0.14.3.md",
       "sections": {
         "added": [],
-        "changed": [],
+        "changed": [
+          "Persona evidence: author local Chrome3/3 and automated22/22 passed; physical pagination, reporter confirmation and human ratings remain unmeasured."
+        ],
         "fixed": [
           "Blank survey preview and print default to US Letter; explicit A4 remains available and controls the generated page size."
         ],
