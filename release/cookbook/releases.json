@@ -1,7 +1,54 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.9.0",
+  "current": "0.9.3",
   "versions": [
+    {
+      "version": "0.9.3",
+      "status": "candidate",
+      "notes_path": "releases/0.9.3.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Theme scorecard: 6/6 automated local scenarios and 4/4 bounded official reference-host visual scenarios passed; human satisfaction, confusion and frustration are NOT MEASURED."
+        ],
+        "fixed": [
+          "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
+        ],
+        "security": [
+          "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
+        ]
+      }
+    },
+    {
+      "version": "0.9.2",
+      "status": "candidate",
+      "notes_path": "releases/0.9.2.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona outcome scorecard records five executed route cases and one independent local-browser participant-resume journey; human sentiment remains NOT MEASURED."
+        ],
+        "fixed": [
+          "Current-shell participant resume opens the preserved legacy survey instead of returning an existing participant session to the public access-code entry."
+        ],
+        "security": [
+          "Route forwarding does not read, modify or expose participant credentials. Existing public survey, shared-link, invitation and synthetic-demo routes retain their behavior."
+        ]
+      }
+    },
+    {
+      "version": "0.9.1",
+      "status": "candidate",
+      "notes_path": "releases/0.9.1.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Release validation runs all 34 synthetic report contexts as sequential bounded cases, preserves the 425-response aggregate and coexistence checks, and drains or quarantines unfinished fixture work before reuse."
+        ],
+        "security": []
+      }
+    },
     {
       "version": "0.9.0",
       "status": "candidate",
@@ -26,7 +73,7 @@
     },
     {
       "version": "0.8.0",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.8.0.md",
       "sections": {
         "added": [
@@ -39,11 +86,13 @@
         "security": [
           "Existing synthetic admission and exact assessment grants remain authoritative; held inputs, expired previews, identity/navigation changes and uncertain writes do not enable automatic execution or retry."
         ]
-      }
+      },
+      "tag": "v0.8.0",
+      "date": "2026-09-18"
     },
     {
       "version": "0.7.1",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.7.1.md",
       "sections": {
         "added": [],
@@ -54,7 +103,9 @@
           "Initial host-initiated MCP read refusals appear in the panel without leaking private error details; navigation clears the refusal."
         ],
         "security": []
-      }
+      },
+      "tag": "v0.7.1",
+      "date": "2026-09-18"
     },
     {
       "version": "0.7.0",

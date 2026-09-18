@@ -1,35 +1,30 @@
 {
-  "version": "0.9.0",
+  "version": "0.9.3",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "92b010ce61baae04d7052342bb837dc9b5801d6e",
+  "cookbook_commit": "80d8111fe7ffe9cb14516120de485c469bbe12d6",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.9.0.md",
-      "blob_sha": "66c51dfdfebfd3dc4c596c73e7f7ee571f08fb1c",
-      "sha256": "a32a4cbe636cd064550a86b777e94edf1bcd25abcc1917872a754200d246d501"
+      "path": "planning/2026-09-16-parity-build/releases/0.9.3.md",
+      "blob_sha": "07195f8984ae536432193fe6b9a199be1135686c",
+      "sha256": "a2929099f3504a5943d5da95bc7e20250194d3115655bc239199b9d5b71feae9"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "11fb5e2d8df6c9117d928bc870be1f7d8f4bf0d8",
-      "sha256": "021bc3d2e760e9935c947ed2975512920135604531e64431335b1a5cdfc11449"
+      "blob_sha": "f2603c5fbcd0d97a23f535c45ef2631a1cda7acb",
+      "sha256": "1ae848ab989b7c70fd5c83f550a29b7cf4c9c2c08504dad269655917893f846d"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "A source-pinned synthetic assessment example with three surveys, twelve responses, an inspectable report and sample answers, using the real assessment/report/participant UI.",
-        "An isolated sample survey with the real question, review, edit and receipt flow; practice answers stay in memory and are never submitted to a live API."
-      ],
+      "added": [],
       "changed": [
-        "Public tour and sample links, including the direct legacy example URL, use the shared application screens. The legacy homepage's overall visual design is preserved.",
-        "Generic legacy navigation is retired where current screens exist; invitation acceptance and access-code participation remain compatible.",
-        "The eight-check browser plan is closed with separately attributed historical and independent exact-head local evidence; real-human satisfaction, confusion and frustration remain NOT MEASURED."
+        "Theme scorecard: 6/6 automated local scenarios and 4/4 bounded official reference-host visual scenarios passed; human satisfaction, confusion and frustration are NOT MEASURED."
       ],
       "fixed": [
-        "The legacy sample assessment no longer promises a populated assessment while displaying only narrative stage descriptions."
+        "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
       ],
       "security": [
-        "Demo transport rejects unknown reads and all assessment mutations without network fallback. It does not read or change real staff credentials or participant drafts."
+        "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
       ]
     }
   }

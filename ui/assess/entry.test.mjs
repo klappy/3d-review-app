@@ -1,4 +1,5 @@
 import test from 'node:test';
+import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -47,4 +48,21 @@ test('N4: ui/server.mjs allowlist covers /, /assess/, /legacy/ and every /assess
   for (const p of ['/', '/assess/', '/legacy/', '/assess/assess.js', '/assess/whats-here.js', '/assess/cards.js', '/assess/scope.js', '/assess/views.js']) assert.ok(server.includes(`'${p}':`), p);
   for (const m of shell.matchAll(/from ["'](\/assess\/[^"']+)["']/g)) assert.ok(server.includes(`'${m[1]}':`), `shell import ${m[1]} must be served`);
   assert.ok(server.includes("'/legacy/': ['legacy/index.html', 'text/html']"));
+});
+
+
+test('participant resume dispatches to legacy without reading or changing stored credentials; public survey stays current', () => {
+  const source = read('./assess.js');
+  const code = source.slice(source.indexOf('const LEGACY_HASHES'), source.indexOf('function resetIdentity()'));
+  for (const hash of ['#participant', '#survey', '#survey=fixture', '#invite=fixture', '#example']) {
+    const replaced = [], historyCalls = [];
+    const box = { demo:false, location:{ hash, pathname:'/', replace:path=>replaced.push(path) }, history:{replaceState: (...args)=>historyCalls.push(args)}, sessionStorage:{getItem(){throw Error('No credential read while forwarding');},setItem(){throw Error('No credential write while forwarding');}} };
+    const run = vm.runInNewContext(code + '\nscrubCredentialHash', box);
+    const result=run();
+    if(hash==='#participant'){assert.equal(result,'forwarded');assert.deepEqual(replaced,['/legacy/#participant']);assert.equal(historyCalls.length,0);}
+    if(hash==='#survey'){assert.equal(result,null);assert.deepEqual(replaced,[]);}
+    if(hash==='#survey=fixture')assert.deepEqual(replaced,['/participate/#survey=fixture']);
+    if(hash==='#invite=fixture')assert.deepEqual(replaced,['/legacy/#invite=fixture']);
+    if(hash==='#example')assert.deepEqual(replaced,['/?demo=1#assessment/demo-assessment/prepare']);
+  }
 });
