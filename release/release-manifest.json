@@ -1,30 +1,30 @@
 {
-  "version": "0.9.3",
+  "version": "0.11.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "80d8111fe7ffe9cb14516120de485c469bbe12d6",
+  "cookbook_commit": "d0cb9a895a6639ff223ffedfdc649fc764c9c13d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.9.3.md",
-      "blob_sha": "07195f8984ae536432193fe6b9a199be1135686c",
-      "sha256": "a2929099f3504a5943d5da95bc7e20250194d3115655bc239199b9d5b71feae9"
+      "path": "planning/2026-09-16-parity-build/releases/0.11.4.md",
+      "blob_sha": "3cde2e352bcfa7fb85c0bddcc7a58d0bafe4db49",
+      "sha256": "de4bddaca9f75a76376eda6fb2cf40c03be1c4a6d5a385fd97ea3261d513cdaf"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "f2603c5fbcd0d97a23f535c45ef2631a1cda7acb",
-      "sha256": "1ae848ab989b7c70fd5c83f550a29b7cf4c9c2c08504dad269655917893f846d"
+      "blob_sha": "8a3919a9875a910d341e197c173a15943cf6a56a",
+      "sha256": "b7c575edc0637303b44620c72ce67137831c3a37a18e8bf2c234189a813b9cfa"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
       "changed": [
-        "Theme scorecard: 6/6 automated local scenarios and 4/4 bounded official reference-host visual scenarios passed; human satisfaction, confusion and frustration are NOT MEASURED."
+        "Persona evidence: 1/1 automated local delayed-connection confirmation case passed; human satisfaction, confusion and frustration NOT MEASURED."
       ],
       "fixed": [
-        "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
+        "MCP danger confirmation waits for host tool capability without consuming the preview; once ready, an explicit click executes once."
       ],
       "security": [
-        "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
+        "Unavailable host tools cannot execute; Cancel stays available and no automatic retry or tool call is introduced."
       ]
     }
   }

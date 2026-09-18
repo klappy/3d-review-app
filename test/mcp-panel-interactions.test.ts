@@ -6,15 +6,18 @@ const { JSDOM } = createRequire(import.meta.url)('jsdom');
 const source = readFileSync(new URL('../ui/mcp/panel-src.html', import.meta.url), 'utf8');
 const cards = readFileSync(new URL('../ui/assess/cards.js', import.meta.url), 'utf8').replace(/^export\s+(const|function)\s/gm, '$1 ');
 const script = source.split('<script>')[2].split('</script>')[0].replace('/*__CARDS__*/', cards)
-  .replace('})();', 'window.review = { state, go, render };})();');
+  .replace('/*__ACTION_CARD__*/', readFileSync(new URL('../ui/mcp/action-card.js', import.meta.url), 'utf8').replace(/^export\s+(const|function)\s/gm, '$1 '))
+  .replace(/\}\)\(\);\s*$/,  'window.review = { state, go, render };})();');
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
-function fixture({ deferGet = false, deferWrite = false } = {}) {
+function fixture({ deferGet = false, deferWrite = false, connect = false, deferredConnect = false } = {}) {
   const dom = new JSDOM(source.split('<script>')[0], { runScripts: 'outside-only', url: 'https://panel.test' });
   const events = new Map<string, Function>();
   const w = dom.window, calls: any[] = [], pending: any[] = [], pendingGets: any[] = [], pendingWrites: any[] = [];
+  let connectResolve: any, connectReject: any;
+  const connection = new Promise((resolve,reject)=>{connectResolve=resolve;connectReject=reject;});
   const assessment = (id: string) => ({ assessment: { id, name: id, role: 'owner', stage: 'permissions', project_id: 'p' }, surveys: [] });
   w.McpApps = { App: class {
-    addEventListener(name: string, fn: Function) { events.set(name, fn); } connect() { return new Promise(() => {}); }
+    addEventListener(name: string, fn: Function) { events.set(name, fn); } connect() { return deferredConnect ? connection : connect ? Promise.resolve() : new Promise(() => {}); } getHostCapabilities() { return {serverTools:{}}; }
     callServerTool(req: any) {
       calls.push(req);
       if (req.name === 'danger') return new Promise(resolve => pending.push(resolve));
@@ -24,7 +27,7 @@ function fixture({ deferGet = false, deferWrite = false } = {}) {
       return Promise.resolve({ structuredContent: { ok: true, result: cap === 'cap.grant.list' ? { grants: [] } : {} } });
     }
   } };
-  w.eval(script); const r = w.review; r.state.caps = { serverTools: {} };
+  w.eval(script); const r = w.review; if(!deferredConnect)r.state.caps = { serverTools: {} };
   async function go(id: string, view = 'permissions') { r.go(`#assessment/${id}/${view}`); await tick(); }
   async function preview() {
     const f = w.document.querySelector('[data-invite-form]');
@@ -35,7 +38,7 @@ function fixture({ deferGet = false, deferWrite = false } = {}) {
   const resolvePreview = () => pending.shift()({ structuredContent: { ok: true, result: { confirm_token: 'fixture-confirm', expires_in: 60, impact: { effect: 'invite' } } } });
   const resolveGet = (id: string) => pendingGets.splice(pendingGets.findIndex(x => x.id === id), 1)[0].resolve({ structuredContent: { ok: true, result: assessment(id) } });
   const resolveWrite = (env: any = { ok: true, result: {} }) => pendingWrites.shift()({ structuredContent: env });
-  return { hostResult: (result: any) => events.get('toolresult')!(result), dom, w, r, calls, pending, go, preview, resolvePreview, resolveGet, resolveWrite };
+  return { hostInput: (input: any) => events.get('toolinput')!(input), connectResolve, connectReject, hostResult: (result: any) => events.get('toolresult')!(result), dom, w, r, calls, pending, go, preview, resolvePreview, resolveGet, resolveWrite };
 }
 
 it.each([false, true])('discards deferred A preview after navigation, including return to A (%s)', async back => {
@@ -178,7 +181,7 @@ it.each(['structured', 'text'])('shows initial failed host result without capabi
   } finally { f.dom.window.close(); }
 });
 
-it('host refusal invalidates an older read; a subsequent successful host result routes normally', async () => {
+it('host refusal invalidates an older read; a subsequent successful result stays compact without fetching', async () => {
   const f = fixture({ deferGet: true });
   try {
     await f.go('A');
@@ -186,8 +189,53 @@ it('host refusal invalidates an older read; a subsequent successful host result 
     f.resolveGet('A'); await tick();
     expect(f.w.document.querySelector('[data-state="refused"]')).not.toBeNull();
     f.hostResult({ structuredContent: { ok: true, capability: 'cap.assessment.get', result: { assessment: { id: 'B' } } } });
-    await tick(); f.resolveGet('B'); await tick();
-    expect(f.w.document.querySelector('h1').textContent).toBe('B');
+    await tick();
+    expect(f.w.document.querySelector('.action-card')).not.toBeNull();
+    expect(f.calls.filter(x => x.arguments?.params?.id === 'B')).toHaveLength(0);
     expect(f.w.document.body.textContent).not.toContain('old-trace');
   } finally { f.dom.window.close(); }
+});
+
+
+it('actual connected panel waits compactly without auth or workspace bootstrap', async () => {
+ const f=fixture({connect:true});try { await tick();expect(f.calls).toHaveLength(0);expect(f.w.document.querySelector('.action-card')).not.toBeNull();expect(f.w.document.body.classList.contains('mcp-compact')).toBe(true);expect(f.w.document.querySelector('#app').textContent).toContain('Waiting'); }finally{f.dom.window.close();}
+});
+
+
+it('keeps Explore inert until delayed bridge connection, then opens normally', async()=>{
+ const f=fixture({deferredConnect:true});
+ try {
+  const button=f.w.document.querySelector('[data-card-explore]');
+  expect(button.disabled).toBe(true); button.click(); await tick();
+  expect(f.calls).toHaveLength(0); expect(f.r.state.mode).toBe('card');
+  f.connectResolve(); await tick();
+  expect(f.w.document.querySelector('[data-card-explore]').disabled).toBe(false);
+  f.w.document.querySelector('[data-card-explore]').click(); await tick();
+  expect(f.calls.some(x=>x.arguments.capability==='cap.workspace.list')).toBe(true);
+  expect(f.w.document.body.textContent).not.toContain('This host does not let');
+ }finally{f.dom.window.close();}
+});
+it('settled connection failure permits explicit host refusal without sending tools', async()=>{
+ const f=fixture({deferredConnect:true});
+ try{ f.connectReject(new Error('fixture unavailable')); await tick();
+  expect(f.w.document.body.textContent).toContain('Connect failed: fixture unavailable');
+  f.w.document.querySelector('[data-card-explore]').click();await tick();
+  expect(f.calls).toHaveLength(0);expect(f.w.document.body.textContent).toContain('This host does not let');
+ }finally{f.dom.window.close();}
+});
+
+
+it('preserves danger preview during pending connection and executes once after readiness', async()=>{
+ const f=fixture({deferredConnect:true});
+ try{
+  f.hostInput({arguments:{capability:'cap.grant.invite',params:{id:'A'},mode:'dry_run'}});
+  f.hostResult({structuredContent:{ok:true,capability:'cap.grant.invite',result:{confirm_token:'fixture-preview',expires_in:60}}});
+  const confirm=f.w.document.querySelector('[data-card-confirm]');
+  expect(confirm.disabled).toBe(true);confirm.click();await tick();
+  expect(f.calls).toHaveLength(0);expect(f.w.document.body.textContent).not.toContain('outcome could not');
+  f.connectResolve();await tick();
+  const ready=f.w.document.querySelector('[data-card-confirm]');expect(ready.disabled).toBe(false);ready.click();ready.click();await tick();
+  expect(f.calls).toHaveLength(1);expect(f.calls[0].arguments.confirm_token).toBe('fixture-preview');
+  expect(f.calls[0].arguments.mode).toBe('execute');
+ }finally{f.dom.window.close();}
 });

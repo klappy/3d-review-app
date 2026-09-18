@@ -300,3 +300,27 @@ describe("ops feedback persist HTTP — Prefer 5732375 F1–F7 / N1–N9", () =>
     }
   });
 });
+
+it('attributed UI write refuses expired cookie at the actual request boundary, while public feedback remains available', async () => {
+  const token = await mintSession(env, 'person_mara', 'user');
+  const cookieHeaders = { 'content-type':'application/json', cookie:`session=${token}` };
+  const me = await app.fetch(new Request('https://t.invalid/v2/me', {headers:cookieHeaders}),env);
+  expect((await me.json() as any).result.principal.id).toBe('person_mara');
+  const post = async (body:unknown) => {
+    const r=await app.fetch(new Request('https://t.invalid/v2/feedback',{method:'POST',headers:cookieHeaders,body:JSON.stringify(body)}),env);
+    return {status:r.status, json:await r.json() as any};
+  };
+  const attributed=await post({note:'local attributed fixture',require_authenticated:true});
+  expect(attributed.status).toBe(200);
+  const saved=await db.prepare('SELECT actor,body FROM feedback WHERE id=?').bind(attributed.json.result.feedback_id).first<any>();
+  expect(saved.actor).toBe('person_mara');expect(JSON.parse(saved.body)).not.toHaveProperty('require_authenticated');
+  const {sha256}=await import('../src/handlers/types');
+  await db.prepare('UPDATE session SET expires_at=1 WHERE token_hash=?').bind(await sha256(token)).run();
+  const countBefore=(await db.prepare('SELECT count(*) n FROM feedback').first<any>()).n;
+  const expired=await post({note:'must not become anonymous',require_authenticated:true});
+  expect(expired.status).toBe(401);expect(expired.json.error.code).toBe('NOT_AUTHENTICATED');
+  expect((await db.prepare('SELECT count(*) n FROM feedback').first<any>()).n).toBe(countBefore);
+  const publicWrite=await post({note:'deliberately public fixture'});expect(publicWrite.status).toBe(200);
+  expect((await db.prepare('SELECT actor FROM feedback WHERE id=?').bind(publicWrite.json.result.feedback_id).first<any>()).actor).toBe('anon');
+  expect((await post({require_authenticated:'true'})).status).toBe(400);
+});
