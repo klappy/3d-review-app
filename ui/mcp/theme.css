@@ -1,7 +1,8 @@
 /* MCP presentation consumes the existing light/dark token palette. */
 :root { --muted:var(--secondary); --edge:var(--glass-edge); color:var(--ink); background:var(--ground); color-scheme:light; }
 :root[data-theme="dark"] { color-scheme:dark; }
-:root[data-theme-pending] body { visibility:hidden; }
+:root[data-theme-pending] body { visibility:hidden; animation:theme-pending-reveal 0s 2s forwards; }
+@keyframes theme-pending-reveal { to { visibility:visible; } }
 body { color:var(--ink); background:radial-gradient(ellipse at 0% 8%,var(--aurora-mint),transparent 55%),radial-gradient(ellipse at 96% 28%,var(--aurora-lilac),transparent 58%),radial-gradient(ellipse at 48% 95%,var(--aurora-sky),transparent 60%),var(--ground); }
 .panel-head { background:var(--glass); }
 button,.button { background:var(--button-fill); box-shadow:var(--shadow-button); }
