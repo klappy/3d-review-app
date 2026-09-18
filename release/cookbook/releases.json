@@ -22,8 +22,21 @@
       }
     },
     {
-      "version": "0.3.0",
+      "version": "0.3.1",
       "status": "candidate",
+      "notes_path": "releases/0.3.1.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Restore the existing health-backed version badge and release-details dialog on the homepage and assessment shell."
+        ],
+        "security": []
+      }
+    },
+    {
+      "version": "0.3.0",
+      "status": "released",
       "notes_path": "releases/0.3.0.md",
       "sections": {
         "added": [
@@ -38,11 +51,13 @@
         "security": [
           "Danger actions retain preview/confirm with identical parameters; scopes remain explicit with no permission inheritance. Post-action access refusal hides stale controls while retaining the completed action receipt."
         ]
-      }
+      },
+      "tag": "v0.3.0",
+      "date": "2026-09-17"
     },
     {
       "version": "0.2.0",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.2.0.md",
       "sections": {
         "added": [
@@ -59,7 +74,9 @@
         "security": [
           "Credential-bearing route changes retain the accepted forwarding behavior; no new permission inheritance is introduced."
         ]
-      }
+      },
+      "tag": "v0.2.0",
+      "date": "2026-09-17"
     },
     {
       "version": "0.1.0",
