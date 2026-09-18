@@ -54,8 +54,8 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
       });
     },
     save(values) { if (form && store) saveDraft(store, form, values); },
-    review(values) { if (busy || state.phase !== 'form') return; answers = values; show('review', { notice: '' }); },
-    edit() { if (busy || state.phase !== 'review') return; show('form', { draft: answers, notice: '' }); },
+    review(values) { if (busy || state.phase !== 'form') return; answers = values; show('review', { notice: uncertain ? copy.submitUncertain : '' }); },
+    edit() { if (busy || state.phase !== 'review') return; show('form', { draft: answers, notice: uncertain ? copy.submitUncertain : '' }); },
     async submit() {
       if (state.phase !== 'review' || !answers) return;
       return action(async () => {

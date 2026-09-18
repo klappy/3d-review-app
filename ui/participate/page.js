@@ -67,6 +67,7 @@ function paint(state) {
   }
   $('recover').hidden = !['form', 'review'].includes(state.phase);
   for (const button of document.querySelectorAll('button')) {
+    if (button.id === 'version' || button.id === 'changelog-close') continue;
     if (state.busy) { if (!disabledBeforeRequest.has(button)) disabledBeforeRequest.set(button, button.disabled); button.disabled = true; }
     else if (disabledBeforeRequest.has(button)) { button.disabled = disabledBeforeRequest.get(button); disabledBeforeRequest.delete(button); }
   }

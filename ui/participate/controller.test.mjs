@@ -49,6 +49,8 @@ test('uncertain submit retains draft and key; safe retry reuses key and returns 
   const h = harness({ handle: (url, options) => { if (url.endsWith('/responses')) { keys.push(JSON.parse(options.body).idempotency_key); if (++count === 1) throw Error('network'); } } });
   await h.journey.start(); h.journey.save({ q: 'answer' }); h.journey.review({ q: 'answer' }); await h.journey.submit();
   assert.equal(h.journey.state.notice, copy.submitUncertain); assert.ok([...h.data.keys()].some(k => k.endsWith(':draft')));
+  h.journey.edit(); assert.equal(h.journey.state.notice, copy.submitUncertain);
+  h.journey.review({ q: 'answer' }); assert.equal(h.journey.state.notice, copy.submitUncertain);
   await h.journey.recover(); assert.equal(h.journey.state.notice, copy.submitUncertain);
   await h.journey.submit(); assert.equal(keys[0], keys[1]); assert.equal(h.journey.state.phase, 'receipt');
 });
@@ -88,5 +90,14 @@ test('dedicated static page dependencies are in the local server and tests are e
   const server = read('../server.mjs');
   for (const path of ['/participate/', '/participate/page.js', '/participate/controller.js', '/participate/page.css']) assert.ok(server.includes(`'${path}':`));
   assert.ok(read('../.assetsignore').split('\n').includes('participate/controller.test.mjs'));
-  assert.ok(!read('./index.html').includes('/app.js'), 'legacy staff app is not mounted');
+  const html = read('./index.html');
+  assert.ok(!html.includes('/app.js'), 'legacy staff app is not mounted');
+  assert.equal((html.match(/src="\/changelog.js"/g) || []).length, 1);
+  for (const id of ['version', 'changelog', 'changelog-title', 'changelog-build', 'changelog-body', 'changelog-close']) {
+    assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id);
+  }
+  assert.ok(html.indexOf('id="version"') < html.indexOf('<main'));
+  assert.ok(html.indexOf('id="changelog"') > html.indexOf('</main>'));
+  assert.ok(html.indexOf('src="/changelog.js"') < html.indexOf('src="/participate/page.js"'));
+  assert.ok(read('./page.css').includes('#participant:has(.participant-intro:not([hidden])) #review-button{display:none}'));
 });
