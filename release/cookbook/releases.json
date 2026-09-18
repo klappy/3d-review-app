@@ -1,10 +1,25 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.5.0",
+  "current": "0.6.0",
   "versions": [
     {
-      "version": "0.5.0",
+      "version": "0.6.0",
       "status": "candidate",
+      "notes_path": "releases/0.6.0.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Outbound collaborator invitations use native Cloudflare Email Sending from noreply@3dreview.app instead of the Resend HTTP API."
+        ],
+        "fixed": [],
+        "security": [
+          "Existing recipient validation, synthetic-address refusal, DEV hash allowlist, invitation intent deduplication and uncertain-send protections remain in force; no inbox or forwarding is configured."
+        ]
+      }
+    },
+    {
+      "version": "0.5.0",
+      "status": "released",
       "notes_path": "releases/0.5.0.md",
       "sections": {
         "added": [
@@ -17,7 +32,9 @@
         "security": [
           "Resource access uses existing MCP authorization. Tool permission checks and dangerous-operation confirmation remain server-owned. No new tool, API endpoint or database migration."
         ]
-      }
+      },
+      "tag": "v0.5.0",
+      "date": "2026-09-17"
     },
     {
       "version": "0.4.2",

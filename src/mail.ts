@@ -1,42 +1,19 @@
-/**
- * Outbound mail (OF-3). 6B: BORROW Resend's HTTP API with one fetch — no SDK (it would add Node-shaped dependencies to a
- * Worker for a single POST), no hand-rolled SMTP. BUILD = this adapter only.
- *
- * Captain gate (HUMAN-ONLY: secret): the captain verifies a sending domain in Resend, creates a SENDING-ONLY key and sets
- *   RESEND_API_KEY  (Worker secret)      MAIL_FROM  e.g. "3D Review <no-reply@…>" (var)
- * on the Worker. No seat ever handles the key. Until both exist every send answers
- *   { delivered:false, state:"not_sent", reason:"not_configured" }  — never a pretend success.
- *
- * Rules that hold regardless of configuration:
- *   - a mailbox is contacted ONLY when (a) ENVIRONMENT === "production", or (b) ENVIRONMENT === "dev" AND the recipient's
- *     sha256(trim+lowercase(address)) is listed in MAIL_ALLOWLIST_SHA256. Fail-closed: any other or missing ENVIRONMENT, a
- *     missing/empty/malformed allowlist, or an unlisted recipient never reaches the provider (accepted plan 14c5715401704).
- *   - reserved synthetic domains (*.invalid, *.test, *.example, example.com/net/org) are never sent to, anywhere, and that
- *     refusal is decided BEFORE any environment or configuration check — a dev allowlist cannot re-enable them.
- *   - the address never reaches a log, a span or a result; callers log a state/reason at most.
- *   - the caller passes an Idempotency-Key; de-duplication of the INTENT (same scope + invitee) is the handler's job —
- *     see grant.invite: one live invitation per scope+invitee per 10 minutes, 30 invitations per inviter per hour.
- *
- * Delivery truth (accepted plan 14c5715401704): `delivered` is true ONLY on a provider 2xx, which means the provider
- * ACCEPTED the message — never that it reached an inbox. `state` says which kind of outcome this was:
- *   "accepted"    provider returned 2xx (delivered:true)
- *   "refused"     provider returned non-2xx (provider_status carries it)
- *   "unconfirmed" the request timed out or the provider was unreachable — it MAY have been accepted remotely. Never retried,
- *                 never replayed; the caller must not send a second invitation on the strength of it. grant.invite records
- *                 this by storing the invitation as 'unconfirmed', a LIVE state that blocks a later re-send (docs/mail.md).
- *   "not_sent"    every pre-fetch refusal (address shape, synthetic recipient, environment, allowlist, configuration)
+/** Outbound mail via Cloudflare Email Sending. No inbox, forwarding, API key or retry.
+ * Synthetic recipients and environment/DEV allowlist checks run before the binding.
+ * Accepted means provider acceptance only. Unknown errors/timeouts remain unconfirmed;
+ * callers preserve their existing intent de-duplication and uncertain-invitation lifecycle.
  */
 import type { Env } from "./handlers/types";
 import { sha256 } from "./handlers/common";
 
-export type MailEnv = Env & { RESEND_API_KEY?: string; MAIL_FROM?: string; PUBLIC_ORIGIN?: string; MAIL_ALLOWLIST_SHA256?: string };
+export type MailEnv = Env;
 export type MailReason =
   | "invalid_address" | "duplicate_recent" | "duplicate_uncertain" | "not_configured"
   | "not_allowed_env" | "not_allowlisted" | "synthetic_recipient"
   | "provider_error" | "provider_unreachable";
 /** What actually happened to the request. "unconfirmed" is NOT "not delivered" — see the header comment. */
 export type DeliveryState = "accepted" | "refused" | "unconfirmed" | "not_sent";
-export interface MailResult { delivered: boolean; state: DeliveryState; provider?: "resend"; provider_message_id?: string; reason?: MailReason; provider_status?: number }
+export interface MailResult { delivered: boolean; state: DeliveryState; provider?: "cloudflare"; provider_message_id?: string; reason?: MailReason; provider_status?: number }
 export interface MailMessage { to: string; subject: string; text: string; html?: string; idempotencyKey: string }
 
 /** One plain ASCII mailbox: letters, digits and . _ % + - in the local part (no leading/trailing/double dots); hostname labels
@@ -53,7 +30,7 @@ export function normalizeAddress(raw: unknown): string | null {
   return a.length <= 254 && ADDRESS.test(a) ? a : null;
 }
 export const isSyntheticAddress = (normalized: string): boolean => { const d = normalized.slice(normalized.lastIndexOf("@") + 1); return RESERVED_TLD.test("." + d) || RESERVED_DOMAIN.test(d); };
-export const mailConfigured = (env: MailEnv) => !!(env.RESEND_API_KEY && env.MAIL_FROM);
+export const mailConfigured = (env: MailEnv) => typeof env.EMAIL?.send === "function" && !!normalizeAddress(env.MAIL_FROM);
 
 const HEX64 = /^[0-9a-f]{64}$/;
 /** The dev allowlist, or null when it is missing, empty or malformed. ONE bad entry invalidates the WHOLE list: a typo must
@@ -77,6 +54,16 @@ async function envRefusal(env: MailEnv, normalizedTo: string): Promise<MailReaso
 
 const notSent = (reason: MailReason): MailResult => ({ delivered: false, state: "not_sent", reason });
 
+// Explicit documented rejections only. Internal/unknown errors are deliberately excluded.
+const REFUSAL_CODES = new Set([
+  "E_VALIDATION_ERROR", "E_FIELD_MISSING", "E_TOO_MANY_RECIPIENTS", "E_TOO_MANY_ATTACHMENTS",
+  "E_SENDER_NOT_VERIFIED", "E_RECIPIENT_NOT_ALLOWED", "E_RECIPIENT_SUPPRESSED",
+  "E_SENDER_DOMAIN_NOT_AVAILABLE", "E_CONTENT_TOO_LARGE", "E_DELIVERY_FAILED",
+  "E_RATE_LIMIT_EXCEEDED", "E_DAILY_LIMIT_EXCEEDED", "E_HEADER_NOT_ALLOWED",
+  "E_HEADER_USE_API_FIELD", "E_HEADER_VALUE_INVALID", "E_HEADER_VALUE_TOO_LONG",
+  "E_HEADER_NAME_INVALID", "E_HEADERS_TOO_LARGE", "E_HEADERS_TOO_MANY",
+]);
+
 export async function sendMail(env: MailEnv, m: MailMessage): Promise<MailResult> {
   const to = normalizeAddress(m.to);
   if (!to) return notSent("invalid_address");
@@ -85,22 +72,30 @@ export async function sendMail(env: MailEnv, m: MailMessage): Promise<MailResult
   const refusal = await envRefusal(env, to);
   if (refusal) return notSent(refusal);
   if (!mailConfigured(env)) return notSent("not_configured");
-  let res: Response;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json", "idempotency-key": m.idempotencyKey },
-      signal: AbortSignal.timeout(8000), // a provider stall must not stall the capability
-      body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject: m.subject, text: m.text, ...(m.html ? { html: m.html } : {}) }),
-    });
-  } catch {
-    // The request may have been accepted on the far side. We do not know, so we do not retry and we do not claim either way.
-    return { delivered: false, state: "unconfirmed", provider: "resend", reason: "provider_unreachable" };
-  }
-  if (!res.ok) return { delivered: false, state: "refused", provider: "resend", reason: "provider_error", provider_status: res.status };
-  const body = (await res.json().catch(() => ({}))) as { id?: string };
-  // "delivered" here means: the provider ACCEPTED the message for delivery. Inbox arrival is the provider's to report.
-  return { delivered: true, state: "accepted", provider: "resend", provider_message_id: body.id };
+    // The binding has no abort or documented idempotency API. This header correlates
+    // an intent only; handler-level de-duplication remains the protection against replay.
+    const result = await Promise.race([
+      env.EMAIL!.send({
+        from: { email: normalizeAddress(env.MAIL_FROM)!, name: "3D Review" },
+        to, subject: m.subject, text: m.text, ...(m.html ? { html: m.html } : {}),
+        headers: { "X-3D-Review-Intent": m.idempotencyKey },
+      }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("mail timeout")), 8000); }),
+    ]);
+    // A malformed result is not evidence of acceptance. Never expose provider error text.
+    if (!result || typeof result.messageId !== "string" || !result.messageId)
+      return { delivered: false, state: "unconfirmed", provider: "cloudflare", reason: "provider_unreachable" };
+    return { delivered: true, state: "accepted", provider: "cloudflare", provider_message_id: result.messageId };
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+    if (typeof code === "string" && REFUSAL_CODES.has(code))
+      return { delivered: false, state: "refused", provider: "cloudflare", reason: "provider_error" };
+    // Unknown/internal failures and timeouts may already have sent. No retry, even
+    // after the deadline: the binding operation cannot be cancelled.
+    return { delivered: false, state: "unconfirmed", provider: "cloudflare", reason: "provider_unreachable" };
+  } finally { if (timer !== undefined) clearTimeout(timer); }
 }
 
 /** Where links in mail point. Set per environment in wrangler.toml; absent → no link can be built → caller must not send. */
