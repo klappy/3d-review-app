@@ -85,7 +85,28 @@ test('A4 open report: GET /v2/reports/{id} rendered by report-view.js; held → 
   assert.match(appended[0].text, /^Synthetic data · source abcdef1/); // report-view.js header constant, untouched
   assert.equal(b1.disabled, false);
   await b2.onclick();
-  assert.equal(m.openReport.status, 'held'); assert.equal(view.textContent, 'held by policy');
+  assert.equal(m.openReport.status, 'held');
+});
+
+// R-1 (Auditor 04aee96 verdict): held / refused / render-failure must be VISIBLE — written to the Reports status, never only into
+// the hidden full-width view; the full section stays hidden and the view is emptied.
+test('R-1: held, refused and render-failure outcomes show in the visible Reports status; full view stays hidden with empty content', async () => {
+  const bad = { id: 'rep_bad', created_at: '2026-09-17', payload: null };
+  const { api } = fakeApi({ ...understandTable, 'GET /v2/reports/rep_held': { suppressed: true, reason: 'held by policy' }, 'GET /v2/reports/rep_refused': err('NOT_FOUND_OR_NOT_VISIBLE', 404), 'GET /v2/reports/rep_bad': { report: bad } });
+  const ctx = ctxFor(api); const m = await views.understand.load(ctx, { aid: 'a1' });
+  const doc = { createElement: tag => ({ tag, children: [], set textContent(t) { this.text = t; }, get textContent() { return this.text; }, append(...n) { this.children.push(...n); }, dataset: {}, addEventListener() {} }) };
+  let viewKids = ['stale']; const full = el({ 'data-report-full': '' }); full.hidden = true;
+  const view = { attrs: { 'data-report-view': '' }, replaceChildren(...n) { viewKids = n; }, textContent: '', parentHidden: () => full.hidden };
+  const status = el({ 'data-report-status': '' }); status.hidden = false; status.ancestorHidden = false; // lives in the always-visible Reports card, not inside [data-report-full]
+  const buttons = ['rep_held', 'rep_refused', 'rep_bad'].map(id => el({ tag: 'button', 'data-open-report': id }));
+  makeRoot([...buttons, view, status, full]); root.ownerDocument = doc; views.understand.bind(ctx, root, m);
+  const html = views.understand.render(ctx, m); const statusIdx = html.indexOf('data-report-status'), fullIdx = html.indexOf('data-report-full');
+  assert.ok(statusIdx > -1 && fullIdx > -1 && statusIdx < fullIdx, 'status markup precedes the hidden full section (not nested in it)');
+  assert.ok(!html.slice(fullIdx).includes('data-report-status'), 'no status element inside the hidden full section');
+  await buttons[0].onclick(); assert.equal(status.textContent, 'held by policy'); assert.equal(full.hidden, true); assert.deepEqual(viewKids, []);
+  await buttons[1].onclick(); assert.equal(status.textContent, NOT_VISIBLE); assert.equal(full.hidden, true); assert.deepEqual(viewKids, []);
+  await buttons[2].onclick(); assert.equal(m.openReport.status, 'error'); assert.equal(status.textContent, 'This report could not be displayed.'); assert.equal(full.hidden, true);
+  for (const b of buttons) assert.equal(b.disabled, false);
 });
 
 test('A6 reports 404 → unavailable; results/counts failures are per-part, never a page failure', async () => {
@@ -168,3 +189,24 @@ test('permissions: read-only — grants and pending invitations listed, zero mut
 });
 
 test('css export is a string', () => { assert.equal(typeof css, 'string'); assert.match(css, /\.grants/); });
+
+// Checkpoint 5: readable report display — rounded text, exact value retained on the element; human dates; IDs in <details>.
+test('readableNumbers rounds long decimals to one place and keeps the exact value; skips code/details; humanDate is human', async () => {
+  const { readableNumbers, humanDate } = await import('./views.js');
+  const doc = { createTreeWalker(root) { const list = []; (function walk(n) { for (const c of n.childNodes || []) { if (c.nodeType === 3) list.push(c); else walk(c); } })(root); let i = -1; return { nextNode: () => list[++i] || null }; }, createDocumentFragment() { return { kids: [], append(...x) { this.kids.push(...x); } }; }, createElement(t) { return { tag: t, dataset: {}, set textContent(v) { this._t = v; }, get textContent() { return this._t; } }; } };
+  const mk = (text, parent) => ({ nodeType: 3, nodeValue: text, parentElement: parent, replaced: null, replaceWith(f) { this.replaced = f; } });
+  const plain = mk('Church 91.35416666666667 · Affirmation · 86.16666666666667 · 3 · built 2026-09-17T22:15:39.634Z', { closest: () => null });
+  const inCode = mk('sreport_928bb601 91.35416666666667', { closest: sel => sel.includes('code') ? {} : null });
+  const root = { ownerDocument: doc, childNodes: [plain, inCode] };
+  assert.equal(readableNumbers(root), 2);
+  const spans = plain.replaced.kids.filter(k => k && k.tag === 'span'); assert.deepEqual(spans.map(s => s.textContent), ['91.4', '86.2']); assert.deepEqual(spans.map(s => s.dataset.exact), ['91.35416666666667', '86.16666666666667']); assert.equal(spans[0].title, 'exact: 91.35416666666667');
+  assert.equal(inCode.replaced, null, 'text inside code/details is left exact');
+  assert.match(humanDate('2026-09-17T22:15:39.634Z'), /2026/); assert.equal(humanDate('not a date'), 'not a date');
+});
+test('report list shows a human title/date with the raw id inside <details>, not in the button', async () => {
+  const { api } = fakeApi({ 'GET /v2/assessments/a1/results': { ok: true, suppressed: true, status: 'held', reason: 'D7 held', summary: null }, 'GET /v2/assessments/a1/reports': { suppressed: false, reports: [{ id: 'sreport_928bb601-f318-4cca-b48c-e4683371c6c8', created_at: '2026-09-17T22:15:39.634Z' }] } });
+  const ctx = ctxFor(api, { current: { assessment, surveys: [] } }); const m = await views.understand.load(ctx, { aid: 'a1' }); const html = views.understand.render(ctx, m);
+  const btn = html.match(/<button type="button" data-open-report="[^"]+">([^<]+)<\/button>/)[1];
+  assert.match(btn, /^Report 1 · built /); assert.doesNotMatch(btn, /sreport_|T22:15/);
+  assert.match(html, /<details class="small muted report-ids"><summary>Report id<\/summary><code>sreport_928bb601-f318-4cca-b48c-e4683371c6c8<\/code>/);
+});

@@ -40,3 +40,11 @@ test('S1: scrubCredentialHash is the first statement of boot() and of the hashch
   assert.match(js, /sessionStorage\.setItem\('facilitatorToken', m\[1\]\); \} catch \{\} resetIdentity\(\); return 'session';/);
   assert.ok(!/api\([^)]*\)[\s\S]*?scrubCredentialHash\(\) === 'forwarded'\) return;/.test(js.slice(js.indexOf('async function boot()'))), 'no api() call precedes the scrub in boot()');
 });
+
+// Auditor N4: the local harness allowlist serves every file the product shell and the legacy surface reference.
+test('N4: ui/server.mjs allowlist covers /, /assess/, /legacy/ and every /assess/*.js module the shell imports', () => {
+  const server = read('../server.mjs'), shell = read('./assess.js') + read('./index.html');
+  for (const p of ['/', '/assess/', '/legacy/', '/assess/assess.js', '/assess/whats-here.js', '/assess/cards.js', '/assess/scope.js', '/assess/views.js']) assert.ok(server.includes(`'${p}':`), p);
+  for (const m of shell.matchAll(/from ["'](\/assess\/[^"']+)["']/g)) assert.ok(server.includes(`'${m[1]}':`), `shell import ${m[1]} must be served`);
+  assert.ok(server.includes("'/legacy/': ['legacy/index.html', 'text/html']"));
+});

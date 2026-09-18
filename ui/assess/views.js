@@ -30,6 +30,20 @@ export const css = `
 `;
 
 // Classify an api() failure into the four honest states the contract names. Never a generic retry for NOT_BUILT.
+// Display helpers (readable, not new data): the payload and provenance are untouched — only the rendered text is rounded, with the
+// exact value kept on the element (title + data-exact). IDs/timestamps stay available inside <details>.
+export function humanDate(iso) { const d = new Date(iso); return isNaN(d) ? String(iso || '') : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
+export function readableNumbers(rootEl) {
+  if (!rootEl || !rootEl.ownerDocument) return 0;
+  const doc = rootEl.ownerDocument, walker = doc.createTreeWalker(rootEl, 4 /* NodeFilter.SHOW_TEXT */); const nodes = []; let n; let count = 0;
+  while ((n = walker.nextNode())) if (/(?<![:\d])\d+\.\d{3,}(?![\dZ])/.test(n.nodeValue) && !(n.parentElement && n.parentElement.closest('details, code, .report-exact'))) nodes.push(n);
+  for (const t of nodes) {
+    const frag = doc.createDocumentFragment(); let last = 0; const text = t.nodeValue; const re = /(?<![:\d])(\d+\.\d{3,})(?![\dZ])/g; let m; // never a clock/timestamp fraction (…:39.634Z)
+    while ((m = re.exec(text))) { frag.append(text.slice(last, m.index)); const span = doc.createElement('span'); span.className = 'report-exact'; span.title = `exact: ${m[1]}`; span.dataset.exact = m[1]; span.textContent = (Math.round(Number(m[1]) * 10) / 10).toFixed(1); frag.append(span); last = m.index + m[1].length; count++; }
+    frag.append(text.slice(last)); t.replaceWith(frag);
+  }
+  return count;
+}
 export function classify(e) {
   const code = String(e?.code ?? '');
   if (UNAUTHENTICATED.has(code)) return 'unauthenticated';
@@ -88,7 +102,7 @@ const understand = {
       const r = m.reports.value || {};
       if (r.suppressed || r.status === 'held') reports = `<p class="muted" data-reports-held>${esc(r.reason || 'Reports are held.')}</p>`;
       else { const list = Array.isArray(r.reports) ? r.reports : [];
-        reports = list.length ? `<ul class="links" data-report-list>${list.map(x => `<li data-report-id="${esc(x.id)}"><button type="button" data-open-report="${esc(x.id)}">Built ${esc(x.created_at)} · ${esc(x.id)}</button></li>`).join('')}</ul>` : '<p class="muted">No reports have been built for this assessment.</p>'; }
+        reports = list.length ? `<ul class="links" data-report-list>${list.map((x, i) => `<li data-report-id="${esc(x.id)}"><button type="button" data-open-report="${esc(x.id)}">Report ${list.length - i} · built ${esc(humanDate(x.created_at))}</button><details class="small muted report-ids"><summary>Report id</summary><code>${esc(x.id)}</code> · <code>${esc(x.created_at)}</code></details></li>`).join('')}</ul>` : '<p class="muted">No reports have been built for this assessment.</p>'; }
     } else if (m.reports.status === 'refused') reports = '<p class="muted" data-reports-unavailable>Reports are unavailable for this assessment.</p>';
     else reports = refusalLine(ctx, m.reports.status, 'data-retry="reports"', 'Reports');
     const open = m.openReport ? (m.openReport.status === 'held' ? `<p class="muted" data-open-report-reason>${esc(m.openReport.reason)}</p>` : m.openReport.status === 'error' ? `<p class="small muted" role="alert">${esc(m.openReport.text)}</p>` : '') : '';
@@ -100,14 +114,21 @@ const understand = {
     root.querySelectorAll('[data-open-report]').forEach(btn => btn.onclick = async () => {
       const id = btn.dataset.openReport, view = root.querySelector('[data-report-view]'), status = root.querySelector('[data-report-status]');
       const all = root.querySelectorAll('[data-open-report]'); all.forEach(b => b.disabled = true); if (status) status.textContent = 'Opening report…';
+      // R-1 (Auditor 04aee96): every NON-success outcome is written to the VISIBLE Reports status; the full-width section stays
+      // hidden and its view is emptied. Only a rendered report opens the full section.
+      const full = root.querySelector('[data-report-full]');
+      const showFailure = text => { if (status) status.textContent = text; if (view) view.replaceChildren(); if (full) full.hidden = true; };
       try {
         const r = await ctx.api(`/v2/reports/${ctx.enc(id)}`);
-        if (r.suppressed) { m.openReport = { status: 'held', reason: String(r.reason || '') }; if (view) view.textContent = m.openReport.reason; }
-        else { const ok = renderReport({ doc: root.ownerDocument || globalThis.document, root: view, report: r.report }); m.openReport = ok ? { status: 'shown', id } : { status: 'error', text: 'This report could not be displayed.' }; if (!ok && view) view.textContent = m.openReport.text; const full = root.querySelector('[data-report-full]'); if (full) { full.hidden = !ok; if (ok && full.scrollIntoView) full.scrollIntoView({ block: 'start' }); } }
-        if (status) status.textContent = '';
+        if (r.suppressed) { m.openReport = { status: 'held', reason: String(r.reason || '') }; showFailure(m.openReport.reason); }
+        else {
+          const ok = renderReport({ doc: root.ownerDocument || globalThis.document, root: view, report: r.report });
+          if (ok) { m.openReport = { status: 'shown', id }; if (view) readableNumbers(view); if (status) status.textContent = ''; if (full) { full.hidden = false; if (full.scrollIntoView) full.scrollIntoView({ block: 'start' }); } }
+          else { m.openReport = { status: 'error', text: 'This report could not be displayed.' }; showFailure(m.openReport.text); }
+        }
       } catch (e) {
         const k = classify(e); m.openReport = { status: 'error', text: k === 'refused' ? NOT_VISIBLE : k === 'not_built' ? 'Reports are not built yet.' : k === 'unauthenticated' ? 'Your sign-in is no longer active.' : String(e.message || 'Report could not be opened.') };
-        if (view) view.textContent = m.openReport.text; if (status) status.textContent = '';
+        showFailure(m.openReport.text);
       } finally { all.forEach(b => b.disabled = false); }
     });
   },
