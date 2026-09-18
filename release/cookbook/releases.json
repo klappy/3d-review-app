@@ -1,10 +1,25 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.7.0",
+  "current": "0.7.1",
   "versions": [
     {
-      "version": "0.7.0",
+      "version": "0.7.1",
       "status": "candidate",
+      "notes_path": "releases/0.7.1.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Release notes include a bounded persona outcome scorecard; human satisfaction remains not measured."
+        ],
+        "fixed": [
+          "Initial host-initiated MCP read refusals appear in the panel without leaking private error details; navigation clears the refusal."
+        ],
+        "security": []
+      }
+    },
+    {
+      "version": "0.7.0",
+      "status": "released",
       "notes_path": "releases/0.7.0.md",
       "sections": {
         "added": [
@@ -17,11 +32,13 @@
         "security": [
           "Existing authentication audiences, host-only sessions, OAuth callback validation and participant fragment handling remain unchanged. New sign-in paths require matching Cloudflare Access destinations."
         ]
-      }
+      },
+      "tag": "v0.7.0",
+      "date": "2026-09-18"
     },
     {
       "version": "0.6.0",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.6.0.md",
       "sections": {
         "added": [],
@@ -32,7 +49,9 @@
         "security": [
           "Existing recipient validation, synthetic-address refusal, DEV hash allowlist, invitation intent deduplication and uncertain-send protections remain in force; no inbox or forwarding is configured."
         ]
-      }
+      },
+      "tag": "v0.6.0",
+      "date": "2026-09-18"
     },
     {
       "version": "0.5.0",

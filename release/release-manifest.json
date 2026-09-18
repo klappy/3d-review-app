@@ -1,31 +1,29 @@
 {
-  "version": "0.7.0",
+  "version": "0.7.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "1ee1cf0f46f61295999bfceba57bddb7ae5f9e06",
+  "cookbook_commit": "2be855520a311d269622771fefee5fd07cf75f2c",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.7.0.md",
-      "blob_sha": "2f0a11f26dc2914eac728b8c6243b2f0a0fc4a9a",
-      "sha256": "5088fb2368f7e24d008569f9afff809e5b3eb3d50bf5c80196fbdc03f1cf3a8c"
+      "path": "planning/2026-09-16-parity-build/releases/0.7.1.md",
+      "blob_sha": "fc37a5c091b423ef67eb66ca785fbf18f1f04a88",
+      "sha256": "8cae508dce64ea88ee4480377b02e806f497fe979158bf8ff29a2be395244c73"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "80e074b4abec5d51d58b33bd5106c51144665cbd",
-      "sha256": "cf7093bc561cc9bda3be331e0b5b97c16bd168626c2d4175f73ebcf19cd72350"
+      "blob_sha": "71c7511a59a2beba816f8a8a3cdfe7d4a229623f",
+      "sha256": "c279eca0667b2916929e2c65180e34e200065c2d34f3eb59281d9841e8509fd7"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Canonical DEV domain dev.3dreview.app and production domain 3dreview.app on the existing Workers, with previous addresses retained as compatible aliases."
-      ],
+      "added": [],
       "changed": [
-        "Invitation emails use the canonical origin for their environment; browser-created participant links remain on the current origin."
+        "Release notes include a bounded persona outcome scorecard; human satisfaction remains not measured."
       ],
-      "fixed": [],
-      "security": [
-        "Existing authentication audiences, host-only sessions, OAuth callback validation and participant fragment handling remain unchanged. New sign-in paths require matching Cloudflare Access destinations."
-      ]
+      "fixed": [
+        "Initial host-initiated MCP read refusals appear in the panel without leaking private error details; navigation clears the refusal."
+      ],
+      "security": []
     }
   }
 }
