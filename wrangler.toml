@@ -1,13 +1,18 @@
 # Deploys ONLY via Cloudflare Workers Builds (git push → build → deploy). Never `wrangler deploy` from a seat.
-#   dev : branch phase-0/walking-skeleton → worker 3d-review-dev  (D1 3d-review-dev)   https://3d-review-dev.klappy.workers.dev
-#   prod: branch main                     → worker 3d-review      (D1 3d-review)       promoted by PR merge into main
+#   main → DEV 3d-review-dev at https://dev.3dreview.app (workers.dev alias retained)
+#   production → production 3d-review at https://3dreview.app (legacy custom domain retained)
 name = "3d-review-dev"
 main = "src/worker.ts"
 compatibility_date = "2026-09-01"
+workers_dev = true # preserve existing DEV alias when adding the custom domain
+
+[[routes]]
+pattern = "dev.3dreview.app"
+custom_domain = true
 
 [vars]
 ENVIRONMENT = "dev"
-PUBLIC_ORIGIN = "https://3d-review-dev.klappy.workers.dev"   # where links in mail point (src/mail.ts)
+PUBLIC_ORIGIN = "https://dev.3dreview.app"   # where links in mail point (src/mail.ts)
 MAIL_FROM = "noreply@3dreview.app"
 # DEV sends only to explicitly authorized normalized-recipient hashes. Empty closes sending.
 MAIL_ALLOWLIST_SHA256 = ""
@@ -66,9 +71,10 @@ run_worker_first = ["/v2/*", "/mcp", "/mcp/*", "/authorize", "/token", "/registe
 
 [env.production]
 name = "3d-review"
+workers_dev = false # preserve prior custom-domain-only production configuration
 [env.production.vars]
 ENVIRONMENT = "production"
-PUBLIC_ORIGIN = "https://3d-review.klappy.dev"
+PUBLIC_ORIGIN = "https://3dreview.app"
 MAIL_FROM = "noreply@3dreview.app"
 # Production uses the same native sender; no inbound routing or API key.
 ACCESS_TEAM_DOMAIN = "klappy.cloudflareaccess.com"
@@ -76,6 +82,9 @@ ACCESS_AUD = "584596733c47a7337d5369c2fda819d25c48573c40c4b6ccc78476813f3a20e0"
 [[env.production.send_email]]
 name = "EMAIL"
 allowed_sender_addresses = ["noreply@3dreview.app"]
+[[env.production.routes]]
+pattern = "3dreview.app"
+custom_domain = true
 [[env.production.routes]]
 pattern = "3d-review.klappy.dev"
 custom_domain = true
