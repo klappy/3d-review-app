@@ -1,0 +1,163 @@
+<!-- 3D Review — MCP Apps panel (source). Built by scripts/build-mcp-panel.mjs into src/mcp-panel.html, which src/mcp.ts serves as
+     resource ui://3d-review/panel.html (text/html;profile=mcp-app). Everything is inlined: SDK bundle, design tokens, shared cards.
+     The panel calls ONLY the existing four tools (docs / read / write / danger) through the host bridge; the host supplies the bearer.
+     A card's placement never implies authorization: every action maps to a capability and the server's refusal is rendered as-is. -->
+<header class="panel-head"><span class="brand">3D <span>Review</span></span><span class="small muted" id="who">Connecting…</span><span class="small muted" id="host-note"></span></header>
+<nav class="crumbs" id="crumbs" aria-label="Scope"></nav>
+<main id="app"><p class="muted">Loading…</p></main>
+<p class="small" role="status" aria-live="polite" id="status"></p>
+<script>
+/*__APP_SDK_BUNDLE__*/
+</script>
+<script>
+(() => {
+/*__CARDS__*/
+const $ = id => document.getElementById(id);
+const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
+const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
+const state = { me: null, route: { kind: 'workspaces' }, caps: null, busy: false, executing: false, sheet: null, notice: null, alert: false, cache: new Map() };
+const app = new window.McpApps.App({ name: '3d-review panel', version: '0.1.0' });
+
+// ---- transport: the four tools only, via the host bridge. Returns the server ENVELOPE; throws Error{code,message,hint} on ok:false.
+async function call(tool, args) {
+  if (!state.caps?.serverTools) { const e = new Error('This host does not let the panel call tools; ask the assistant to run the action.'); e.code = 'HOST_NO_SERVER_TOOLS'; throw e; }
+  const r = await app.callServerTool({ name: tool, arguments: args });
+  const env = r.structuredContent || (r.content?.[0]?.text ? safeJson(r.content[0].text) : null);
+  if (!env) { const e = new Error('Tool result carried no envelope.'); e.code = 'NO_CONTENT'; throw e; }
+  if (env.ok === false) { const e = new Error(env.error?.message || 'Request failed'); e.code = env.error?.code || 'ERROR'; e.hint = env.error?.hint; e.trace_id = env.trace_id; throw e; }
+  return env;
+}
+const read = (capability, params = {}) => call('read', { capability, params }).then(e => e.result);
+const write = (capability, params = {}) => call('write', { capability, params });
+const danger = (capability, params, mode, confirm_token) => call('danger', { capability, params, mode, ...(confirm_token ? { confirm_token } : {}) });
+function safeJson(t) { try { return JSON.parse(t); } catch { return null; } }
+const kindOf = e => { const c = String(e.code || ''); return c === 'NOT_AUTHENTICATED' || c === '401' ? 'unauthenticated' : REFUSED.has(c) ? 'refused' : c === 'RESERVED_NOT_BUILT' || c === '501' ? 'not_built' : c === 'HOST_NO_SERVER_TOOLS' ? 'host' : 'failed'; };
+function refusal(e, what) { const k = kindOf(e); return `<section class="panel narrow" data-state="${k}"><h2>${k === 'unauthenticated' ? 'Sign in through the host' : k === 'refused' ? 'Not available' : k === 'not_built' ? `${esc(what)} is not built yet` : k === 'host' ? 'Host limitation' : `Could not load ${esc(what)}`}</h2><p class="muted">${k === 'refused' ? 'Nothing to show here.' : esc(e.message)}${e.hint ? ` — ${esc(e.hint)}` : ''}</p>${e.trace_id ? `<p class="small muted">trace ${esc(e.trace_id)}</p>` : ''}${k === 'failed' ? '<p><a href="#retry" data-retry>Retry</a></p>' : ''}</section>`; }
+// Exact assessment grants remain reachable independently of workspace/project grants.
+const assessmentGrants = me => (me?.grants || []).filter(g => g.scope_type === 'assessment');
+const hasSharedAssessmentEntry = me => assessmentGrants(me).length > 0;
+const canOpenProject = (me, id) => (me?.grants || []).some(g => g.scope_type === 'project' && g.scope_id === id);
+function sharedAssessmentsHtml(me, asPage) {
+  const grid = cardGrid(assessmentGrants(me).map(g => card({ eyebrow: 'Assessment', title: g.scope_id, href: routes.assessment(g.scope_id), meta: [g.role ? `Your role: ${g.role}` : ''], id: g.scope_id })), 'No assessments.');
+  return asPage ? `<div class="title"><div><p class="eyebrow">Shared assessments</p><h1>Choose an assessment</h1></div></div>${grid}` : `<h2 style="margin-top:22px">Shared assessments</h2>${grid}`;
+}
+
+// ---- routing (internal; the iframe URL never changes, so no scope or credential lands in a host history)
+function parse(hash) { const p = hash.replace(/^#/, '').split('/').map(decodeURIComponent); if (!p[0] || p[0] === 'workspaces') return { kind: 'workspaces' }; if (p[0] === 'workspace') return { kind: 'workspace', id: p[1] }; if (p[0] === 'projects') return { kind: 'projects' }; if (p[0] === 'project') return { kind: 'project', id: p[1] }; if (p[0] === 'shared-assessments') return { kind: 'shared-assessments' }; if (p[0] === 'assessment' && p[1]) return { kind: 'assessment', id: p[1], view: VIEWS.includes(p[2]) ? p[2] : null }; return { kind: 'workspaces' }; }
+let routeGeneration = 0;
+function go(hash) { if (state.executing) return; routeGeneration++; state.route = parse(hash); state.sheet = null; state.notice = null; state.busy = false; render(); }
+document.addEventListener('click', e => { const a = e.target.closest('a[href^="#"]'); if (!a) return; e.preventDefault(); const h = a.getAttribute('href'); if (h === '#retry') return render(); go(h); });
+
+// ---- render
+let gen = 0;
+async function render() {
+  const g = ++gen, r = state.route, root = $('app'); root.innerHTML = '<p class="muted">Loading…</p>'; $('status').textContent = state.notice || ''; $('status').className = 'small ' + (state.alert ? 'alert' : 'muted');
+  try {
+    let html = '', trail = '', current = null;
+    if (r.kind === 'workspaces') { const [w, p] = await Promise.all([read('cap.workspace.list'), read('cap.project.list').catch(() => ({ projects: [] }))]); const workspaces = w.workspaces || [], projects = p.projects || [], shared = hasSharedAssessmentEntry(state.me); trail = crumbs([]); html = shared && !workspaces.length && !projects.length ? sharedAssessmentsHtml(state.me, true) : `<div class="title"><div><p class="eyebrow">Your workspaces</p><h1>Choose a workspace</h1></div></div>${cardGrid(workspaces.map(workspaceCard), 'No workspaces yet.')}${projects.length ? `<h2 style="margin-top:22px">Projects</h2>${cardGrid(projects.map(projectCard))}` : ''}${shared ? sharedAssessmentsHtml(state.me, false) : ''}`; }
+    else if (r.kind === 'shared-assessments') { trail = crumbs([['Workspaces', '#workspaces'], ['Shared assessments']]); html = sharedAssessmentsHtml(state.me, true); }
+    else if (r.kind === 'workspace') { const w = await read('cap.workspace.get', { id: r.id }); trail = crumbs([['Workspaces', '#workspaces'], [w.workspace.name]]); html = `<div class="title"><div><p class="eyebrow">Workspace</p><h1>${esc(w.workspace.name)}</h1><p class="muted small">Your role: ${esc(w.workspace.role)}</p></div></div><h2>Projects</h2>${cardGrid((w.projects || []).map(projectCard), 'No projects grouped yet.')}`; }
+    else if (r.kind === 'projects') { const p = await read('cap.project.list'); trail = crumbs([['Workspaces', '#workspaces'], ['Projects']]); html = `<div class="title"><div><p class="eyebrow">Projects</p><h1>Choose a project</h1></div></div>${cardGrid((p.projects || []).map(projectCard), 'No projects.')}`; }
+    else if (r.kind === 'project') { const [p, a] = await Promise.all([read('cap.project.get', { id: r.id }), read('cap.assessment.list', { pid: r.id })]); trail = crumbs([['Workspaces', '#workspaces'], p.project.workspace_id ? ['Workspace', routes.workspace(p.project.workspace_id)] : ['Projects', '#projects'], [p.project.name]]); html = `<div class="title"><div><p class="eyebrow">Project</p><h1>${esc(p.project.name)}</h1><p class="muted small">Your role: ${esc(p.project.role)}</p></div></div><h2>Assessments</h2>${cardGrid((a.assessments || []).map(assessmentCard), 'No assessments yet.')}`; }
+    else if (r.kind === 'assessment') ({ html, trail, current } = await assessmentPage(r));
+    if (g !== gen) return; if (current) state.current = current; $('crumbs').innerHTML = trail; root.innerHTML = html; bind(root);
+  } catch (e) { if (g !== gen) return; root.innerHTML = refusal(e, r.kind); }
+}
+function crumbs(items) { return items.map(([t, h]) => h ? `<a href="${esc(h)}">${esc(t)}</a>` : `<span>${esc(t)}</span>`).join('<span>›</span>'); }
+
+async function assessmentPage(r) {
+  const d = await read('cap.assessment.get', { id: r.id }); const a = d.assessment, surveys = d.surveys || [];
+  const tab = r.view || (VIEWS.includes(a.stage) ? a.stage : 'prepare'); const mayEdit = a.role === 'owner' || a.role === 'member';
+  const trail = crumbs(!canOpenProject(state.me, a.project_id) ? [['Shared assessments', '#shared-assessments'], [a.name]] : [['Workspaces', '#workspaces'], ['Project', routes.project(a.project_id)], [a.name]]);
+  const tabs = (mayEdit ? VIEWS : VIEWS.filter(v => v !== 'permissions')).map(v => `<a href="${routes.assessment(a.id, v)}" ${v === tab ? 'aria-current="page"' : ''}>${v[0].toUpperCase() + v.slice(1)}</a>`).join('');
+  const head = `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted small">your role: ${esc(a.role)}${a.role === 'viewer' ? ' — read only here' : ''}</p></div><span class="badge">${stageLabel(a.stage)}</span></div><nav class="tabs view-tabs" aria-label="Assessment views">${tabs}</nav>`;
+  let body = '';
+  if (tab === 'prepare') body = `<section class="panel"><h2>Prepare this assessment</h2><p><strong>Name</strong> ${esc(a.name)}</p><p><strong>Purpose</strong> ${esc(a.purpose || '—')}</p><p><strong>Stage</strong> ${stageLabel(a.stage)} <span class="small muted">(browsing views never changes it)</span></p>${a.language_id ? `<p class="small muted">Language: ${esc(a.language_id)}</p>` : ''}</section>`;
+  else if (tab === 'collect') {
+    const included = surveys.filter(s => s.state === 'selected' && !s.archived_at);
+    const counts = await Promise.all(included.map(s => read('cap.survey.get_status', { aid: a.id, sid: s.id }).then(x => x.counts).catch(e => ({ error: e }))));
+    const rows = included.map((s, i) => `<div class="survey" data-survey="${esc(s.id)}"><span class="dot"></span><div><h3>${esc(s.template_name)}</h3><p class="small muted">${esc(s.perspective)} · v${esc(s.template_version)} · collection ${esc(s.collection_status)} · ${counts[i].error ? `counts: ${esc(counts[i].error.message)}` : `${counts[i].responses} responses · ${counts[i].respondents} respondents`}</p></div>${mayEdit ? `<button type="button" class="quiet" data-remove="${esc(s.id)}" ${state.busy ? 'disabled' : ''}>Remove</button>` : ''}</div>`).join('');
+    let available = '';
+    if (mayEdit) { try { const t = (await read('cap.template.list')).templates || []; const latest = new Map(); for (const x of t) { const c = latest.get(x.id); if (!c || x.version > c.version) latest.set(x.id, x); } available = [...latest.values()].filter(x => !included.some(s => s.template_id === x.id && s.template_version === x.version)).map(x => `<div class="survey"><span class="dot" style="opacity:.35"></span><div><h3 class="muted" style="font-weight:500">${esc(x.name)}</h3><p class="small muted">${esc(x.perspective)} · v${esc(x.version)} · not included</p></div><button type="button" data-include="${esc(x.id)}" data-version="${esc(x.version)}" ${state.busy ? 'disabled' : ''}>Include</button></div>`).join(''); } catch (e) { available = `<p class="small muted">Templates: ${esc(e.message)}</p>`; } }
+    body = `<section class="panel"><p class="eyebrow">Collect</p><h2>Collect perspectives</h2><p class="small muted">Counts are per survey; respondents are never added across surveys.</p>${rows || '<p class="muted">No survey is included yet.</p>'}${available ? `<h3 style="margin-top:18px">Available to include</h3>${available}` : ''}</section>`;
+  }
+  else if (tab === 'understand') {
+    const [res, rep] = await Promise.all([read('cap.results.summary', { aid: a.id }).catch(e => ({ error: e })), read('cap.report.list', { aid: a.id }).catch(e => ({ error: e }))]);
+    const results = res.error ? refusal(res.error, 'results') : res.suppressed || res.status === 'held' ? `<span class="badge">held</span><p class="muted">${esc(res.reason || '')}</p>` : `<pre class="small">${esc(JSON.stringify(res.summary, null, 1))}</pre>`;
+    const reports = rep.error ? (kindOf(rep.error) === 'refused' ? '<p class="muted">Reports are unavailable for this assessment.</p>' : refusal(rep.error, 'reports')) : rep.suppressed || rep.status === 'held' ? `<p class="muted">${esc(rep.reason || '')}</p>` : (rep.reports || []).length ? `<ul class="links">${rep.reports.map((x, i) => `<li><button type="button" data-open-report="${esc(x.id)}">Report ${rep.reports.length - i} · built ${esc(x.created_at)}</button></li>`).join('')}</ul>` : '<p class="muted">No reports have been built for this assessment.</p>';
+    body = `<div class="grid start"><section class="panel"><p class="eyebrow">Results</p>${results}</section><section class="panel"><p class="eyebrow">Reports</p>${reports}<div data-report-view></div></section></div>`;
+  }
+  else if (tab === 'improve') body = `<section class="panel"><p class="eyebrow">Improve</p><h2>Reflection and next steps</h2><p class="small muted">Everyone with access to this assessment can read these notes.</p>${mayEdit ? `<form data-notes-form><label class="field">Reflection<textarea name="notes_reflection">${esc(a.notes_reflection || '')}</textarea></label><label class="field">Next steps<textarea name="notes_next_steps">${esc(a.notes_next_steps || '')}</textarea></label><div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save notes</button></div></form>` : `<p><strong>Reflection</strong> ${esc(a.notes_reflection || '—')}</p><p><strong>Next steps</strong> ${esc(a.notes_next_steps || '—')}</p>`}<p class="small muted">Recommendations are not built yet.</p></section>`;
+  else if (tab === 'permissions') {
+    let g; try { g = await read('cap.grant.list', { scope: 'assessment', id: a.id }); } catch (e) { return { html: head + (kindOf(e) === 'refused' && String(e.code) === 'NOT_AUTHORIZED_AT_SCOPE' ? '<section class="panel narrow"><p class="eyebrow">Permissions</p><p class="muted">Permissions are managed by members and owners.</p></section>' : refusal(e, 'permissions')), trail, current: null }; }
+    const owner = a.role === 'owner';
+    body = `<section class="panel"><p class="eyebrow">Permissions</p><h2>Who can open this assessment</h2><p class="note small">Permissions apply to this assessment only; nothing is inherited.</p><table class="grants"><thead><tr><th>Principal</th><th>Role</th></tr></thead><tbody>${(g.grants || []).map(x => `<tr><td>${esc(x.principal_id)}${x.principal_id === state.me?.principal?.id ? ' <span class="small muted">(you)</span>' : ''}</td><td>${esc(x.role)}</td></tr>`).join('')}</tbody></table>${(g.pending_invitations || []).length ? `<p class="small muted">${g.pending_invitations.length} pending invitation(s)</p>` : ''}${mayEdit ? `<form class="line" data-invite-form><h3>Invite someone</h3><label class="field">Email<input name="email" type="email" required></label><label class="field">Role<select name="role"><option value="viewer">viewer</option><option value="member">member</option>${owner ? '<option value="owner">owner</option>' : ''}</select></label><div class="actions"><button type="button" data-invite-preview ${state.busy ? 'disabled' : ''}>Preview invitation</button></div><p class="small muted">Nothing is sent until you confirm the preview.</p></form>` : ''}${state.sheet ? sheet(state.sheet) : ''}</section>`;
+  }
+  return { html: head + body, trail, current: { a, surveys } };
+}
+function sheet(s) { const i = s.impact || {}; return `<section class="note" data-confirm-sheet><p class="eyebrow">Confirm: ${esc(s.label)}</p><p class="small">Nothing has changed yet. Confirmation expires in ${esc(s.expiresIn ?? '')} seconds.</p><dl class="small"><dt>Effect</dt><dd>${esc(i.effect ?? '')}</dd><dt>Irreversible</dt><dd>${esc(String(i.irreversible ?? ''))}</dd><dt>Compensating control</dt><dd>${esc(i.compensating_control ?? '')}</dd><dt>Affected</dt><dd>${(i.affected || []).map(x => `<code>${esc(JSON.stringify(x))}</code>`).join('<br>') || '<span class="muted">none listed</span>'}</dd></dl><div class="actions"><button type="button" class="primary" data-confirm-execute ${s.token && !state.busy ? '' : 'disabled'}>Confirm</button><button type="button" class="quiet" data-confirm-cancel ${state.busy ? 'disabled' : ''}>Cancel</button></div></section>`; }
+const say = (t, alert = false) => { state.notice = t; state.alert = alert; render(); };
+async function act(label, fn) {
+  if (state.busy) return;
+  const generation = routeGeneration;
+  state.busy = true; state.notice = label; render();
+  try {
+    const env = await fn();
+    if (generation !== routeGeneration) return;
+    state.busy = false; say(`${label} — done.${env?.receipt?.id ? ` receipt ${env.receipt.id}` : ''}${env?.trace_id ? ` · trace ${env.trace_id}` : ''}`);
+  } catch (e) {
+    if (generation !== routeGeneration) return;
+    state.busy = false; say(`${label} — ${e.message}${e.hint ? ` (${e.hint})` : ''}${e.trace_id ? ` · trace ${e.trace_id}` : ''}`, true);
+  }
+}
+function bind(root) {
+  const aid = state.route.kind === 'assessment' ? state.route.id : null;
+  root.querySelectorAll('[data-include]').forEach(b => b.onclick = () => act('Including survey', () => write('cap.survey.select', { aid, template_id: b.dataset.include, version: Number(b.dataset.version) })));
+  root.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => act('Removing survey', () => write('cap.survey.deselect', { aid, sid: b.dataset.remove })));
+  root.querySelector('[data-notes-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; act('Saving notes', () => write('cap.assessment.notes.update', { id: aid, notes_reflection: f.notes_reflection.value, notes_next_steps: f.notes_next_steps.value })); });
+  root.querySelectorAll('[data-open-report]').forEach(b => b.onclick = async () => { const v = root.querySelector('[data-report-view]'); v.textContent = 'Opening report…'; try { const r = await read('cap.report.get', { id: b.dataset.openReport }); if (r.suppressed) { v.textContent = r.reason; return; } const p = r.report?.payload || {}; v.innerHTML = `<p class="small muted">Synthetic data · source ${esc(String(p.source_commit || '').slice(0, 7))} · report ${esc(r.report.id)}</p>${Array.isArray(p.narrative) ? p.narrative.map(x => `<p>${esc(x)}</p>`).join('') : ''}`; } catch (e) { v.textContent = kindOf(e) === 'refused' ? 'Not available.' : e.message; } });
+  root.querySelector('[data-invite-preview]')?.addEventListener('click', async () => {
+    const f = root.querySelector('[data-invite-form]');
+    if (state.busy || !f.reportValidity()) return;
+    const generation = routeGeneration;
+    const params = { scope: 'assessment', id: aid, email: f.email.value.trim(), role: f.role.value };
+    state.busy = true; render();
+    try {
+      const env = await danger('cap.grant.invite', params, 'dry_run');
+      if (generation !== routeGeneration) return;
+      state.sheet = { generation, label: 'Invitation', params: Object.freeze(params), token: env.result.confirm_token, expiresIn: env.result.expires_in, impact: env.result.impact };
+      state.notice = null;
+    } catch (err) {
+      if (generation !== routeGeneration) return;
+      state.notice = `Invitation — ${err.message}${err.hint ? ` (${err.hint})` : ''}`; state.alert = true;
+    } finally { if (generation === routeGeneration) { state.busy = false; render(); } }
+  });
+  root.querySelector('[data-confirm-execute]')?.addEventListener('click', async () => {
+    if (state.busy) return;
+    const s = state.sheet;
+    if (!s?.token || s.generation !== routeGeneration || s.params.id !== state.route.id) return say('Preview again.', true);
+    const token = s.token; s.token = null; state.executing = true;
+    try {
+      await act('Invitation', async () => {
+        try { const env = await danger('cap.grant.invite', s.params, 'execute', token); state.sheet = null; return env; }
+        catch (err) {
+          if (String(err.code) === 'CONFIRM_EXPIRED' || String(err.code) === 'CONFIRM_REQUIRED') err.message = 'The confirmation expired or no longer matched. Preview again.';
+          state.sheet = null; throw err;
+        }
+      });
+    } finally { state.executing = false; }
+  });
+  root.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => { if (state.busy) return; state.sheet = null; say(null); });
+}
+
+// ---- host wiring: a tool result pushed by the host (the assistant called read/docs) steers the panel to that entity
+app.addEventListener('toolresult', ev => { const env = ev?.structuredContent || ev; const cap = env?.capability, res = env?.result; if (!cap) return; if (env.ok === false) { say(`${cap}: ${env.error?.message || 'refused'}`, true); return; } if (cap === 'cap.assessment.get' && res?.assessment?.id) return go(routes.assessment(res.assessment.id)); if (cap === 'cap.project.get' && res?.project?.id) return go(routes.project(res.project.id)); if (cap === 'cap.workspace.get' && res?.workspace?.id) return go(routes.workspace(res.workspace.id)); if (cap === 'cap.workspace.list') return go('#workspaces'); if (cap === 'cap.project.list') return go('#projects'); });
+app.onerror = e => { $('status').textContent = 'Bridge error: ' + (e?.message || e); };
+app.connect().then(async () => {
+  state.caps = app.getHostCapabilities() || {}; $('host-note').textContent = state.caps.serverTools ? '' : 'host: no app-initiated tool calls';
+  try { state.me = await read('cap.auth.me'); $('who').textContent = `${state.me.principal.kind} · ${state.me.principal.id}`; }
+  catch (e) { $('who').textContent = kindOf(e) === 'unauthenticated' ? 'Not signed in (host bearer missing or expired)' : e.message; }
+  render();
+}).catch(e => { $('who').textContent = 'Connect failed: ' + (e?.message || e); });
+})();
+</script>

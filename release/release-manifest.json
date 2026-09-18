@@ -1,27 +1,31 @@
 {
-  "version": "0.4.2",
+  "version": "0.5.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "ef52bc0a09e37bded59e7f23b2517d5e0b52679f",
+  "cookbook_commit": "f74b0b2f9e1cbb5232c4f865368e97db060d47fc",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.4.2.md",
-      "blob_sha": "fb6b6d1ad6f7bb4ac9fc9c951694364fa3842076",
-      "sha256": "a5fc5c08adc083b080b2ee395da925ac3e5bdf4533c01ef593c96173a03253df"
+      "path": "planning/2026-09-16-parity-build/releases/0.5.0.md",
+      "blob_sha": "9b253ceaaf20a7abb85ba85b042ed99b9a89a571",
+      "sha256": "834a70be96f6482dca2efd6d0bf452fac9b401a7563dc77d06d51db7bb132d42"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "27c066ceb7119d83d920143f03f7f8b81f53bd3e",
-      "sha256": "db3ed4562333f97983366a2ddc809b89e3340b98084d58e9cabad5b875d8c745"
+      "blob_sha": "7c2dce1e44a49466b1b647c56f8d9ef411fc3183",
+      "sha256": "cfcd218db215ccfb13afc7e7a5fd53368a1fe2f84d2dcc843d0f5c7284595fb9"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
-      "changed": [],
-      "fixed": [
-        "Reloading after a failed first shared-link open asks for the original link without claiming an earlier participant session or possible submission."
+      "added": [
+        "One self-contained MCP Apps resource, attached to the existing four tools, with SDK host bridge.",
+        "Workspace and project navigation, assessment views, survey inclusion, reflection notes, report reads and assessment invitation confirmation UI.",
+        "Loading, refusal, error and host-capability states. Local AppBridge harness is excluded from deployed assets."
       ],
-      "security": []
+      "changed": [],
+      "fixed": [],
+      "security": [
+        "Resource access uses existing MCP authorization. Tool permission checks and dangerous-operation confirmation remain server-owned. No new tool, API endpoint or database migration."
+      ]
     }
   }
 }

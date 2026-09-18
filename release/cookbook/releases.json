@@ -1,10 +1,27 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.4.2",
+  "current": "0.5.0",
   "versions": [
     {
-      "version": "0.4.2",
+      "version": "0.5.0",
       "status": "candidate",
+      "notes_path": "releases/0.5.0.md",
+      "sections": {
+        "added": [
+          "One self-contained MCP Apps resource, attached to the existing four tools, with SDK host bridge.",
+          "Workspace and project navigation, assessment views, survey inclusion, reflection notes, report reads and assessment invitation confirmation UI.",
+          "Loading, refusal, error and host-capability states. Local AppBridge harness is excluded from deployed assets."
+        ],
+        "changed": [],
+        "fixed": [],
+        "security": [
+          "Resource access uses existing MCP authorization. Tool permission checks and dangerous-operation confirmation remain server-owned. No new tool, API endpoint or database migration."
+        ]
+      }
+    },
+    {
+      "version": "0.4.2",
+      "status": "released",
       "notes_path": "releases/0.4.2.md",
       "sections": {
         "added": [],
@@ -13,7 +30,9 @@
           "Reloading after a failed first shared-link open asks for the original link without claiming an earlier participant session or possible submission."
         ],
         "security": []
-      }
+      },
+      "tag": "v0.4.2",
+      "date": "2026-09-17"
     },
     {
       "version": "0.4.1",
@@ -30,7 +49,7 @@
     },
     {
       "version": "0.4.0",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.4.0.md",
       "sections": {
         "added": [
@@ -45,7 +64,9 @@
         "security": [
           "Shared-link requests omit cookies and staff credentials, strip the link fragment before transport, and retain per-link draft isolation and idempotent submission retries."
         ]
-      }
+      },
+      "tag": "v0.4.0",
+      "date": "2026-09-17"
     },
     {
       "version": "0.3.2",
