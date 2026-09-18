@@ -25,7 +25,7 @@ const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex
 
 describe("version authority chain: package == lock == manifest == generated", () => {
   it("package.json, both package-lock.json version fields and the manifest agree with the generated APP_VERSION", () => {
-    expect(manifest.version).toBe("0.5.0");
+    expect(manifest.version).toBe("0.6.0");
     expect(pkg.version).toBe(manifest.version);
     expect(lock.version).toBe(manifest.version);
     expect(lock.packages[""].version).toBe(manifest.version);
@@ -46,7 +46,7 @@ describe("version authority chain: package == lock == manifest == generated", ()
 });
 
 describe("manifest records pin the cookbook byte copies (git blob id + sha256)", () => {
-  const expectedPaths = ["planning/2026-09-16-parity-build/releases/0.5.0.md", "planning/2026-09-16-parity-build/releases/releases.json"];
+  const expectedPaths = ["planning/2026-09-16-parity-build/releases/0.6.0.md", "planning/2026-09-16-parity-build/releases/releases.json"];
   it("has exactly the two records", () => {
     expect(manifest.records.map((r: any) => r.path)).toEqual(expectedPaths);
   });
@@ -58,32 +58,32 @@ describe("manifest records pin the cookbook byte copies (git blob id + sha256)",
       expect(sha256(bytes)).toBe(rec.sha256);
     });
   }
-  it("manifest.changelog.sections deep-equal the pinned releases.json 0.5.0 sections; markdown bullets equal the json verbatim", () => {
-    const entry = releases.versions.find((v: any) => v.version === "0.5.0");
+  it("manifest.changelog.sections deep-equal the pinned releases.json 0.6.0 sections; markdown bullets equal the json verbatim", () => {
+    const entry = releases.versions.find((v: any) => v.version === "0.6.0");
     expect(entry.status).toBe("candidate");
     expect(entry.tag).toBeUndefined(); expect(entry.date).toBeUndefined();
     expect(manifest.changelog).toEqual({ sections: entry.sections });
     expect(Object.keys(entry.sections)).toEqual(["added", "changed", "fixed", "security"]);
-    const md = read("release/cookbook/0.5.0.md").toString("utf8");
+    const md = read("release/cookbook/0.6.0.md").toString("utf8");
     for (const [key, heading] of [["added", "Added"], ["changed", "Changed"], ["fixed", "Fixed"], ["security", "Security"]]) {
       const m = md.match(new RegExp(`### ${heading}\\n([\\s\\S]*?)(?=\\n### |\\n## )`));
       expect(m, `### ${heading} section present`).toBeTruthy();
       const bullets = m![1].trim().split("\n").filter((l) => l.startsWith("- ")).map((l) => l.slice(2).trim());
       expect(bullets).toEqual(entry.sections[key]);
     }
-    expect(md).toContain("## [0.5.0] — candidate");
+    expect(md).toContain("## [0.6.0] — candidate");
   });
 });
 
 describe("generated ui/changelog.json", () => {
-  it("deep-equals the derived shape: current, newest-first, 0.5.0 candidate with no tag/date, four section keys, no HTML", () => {
+  it("deep-equals the derived shape: current, newest-first, 0.6.0 candidate with no tag/date, four section keys, no HTML", () => {
     const gen = readJson("ui/changelog.json");
     const derived = { current: releases.current, versions: [...releases.versions]
       .sort((a: any, b: any) => { const pa = a.version.split(".").map(Number), pb = b.version.split(".").map(Number); for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pb[i] - pa[i]; return 0; })
       .map((v: any) => ({ version: v.version, status: v.status, sections: { added: v.sections.added ?? [], changed: v.sections.changed ?? [], fixed: v.sections.fixed ?? [], security: v.sections.security ?? [] }, ...(v.date ? { date: v.date } : {}), ...(v.tag ? { tag: v.tag } : {}) })) };
     expect(gen).toEqual(derived);
     expect(gen.current).toBe(APP_VERSION);
-    expect(gen.versions[0].version).toBe("0.5.0");
+    expect(gen.versions[0].version).toBe("0.6.0");
     expect(gen.versions[0].status).toBe("candidate");
     expect(gen.versions[0]).not.toHaveProperty("tag"); expect(gen.versions[0]).not.toHaveProperty("date");
     for (const v of gen.versions) for (const k of Object.keys(v.sections)) for (const line of v.sections[k]) expect(line).not.toMatch(/<\/?(script|a|img|div|span|p|b|i)[\s>/]/i);
@@ -111,7 +111,7 @@ describe("runtime surfaces: health and MCP serverInfo", () => {
     expect(h.ok).toBe(true);
     expect(h.version).toBe(APP_VERSION);
     expect(h.build).toBe(APP_STAMP);
-    expect(h.build).toBe(`0.5.0+${APP_COMMIT.slice(0, 7)}`);
+    expect(h.build).toBe(`0.6.0+${APP_COMMIT.slice(0, 7)}`);
     expect(h.commit).toBe(APP_COMMIT);
     expect(h.release_source).toBe(manifest.cookbook_commit);
     if (BUILD_UUID === null) expect(h).not.toHaveProperty("build_uuid"); else expect(h.build_uuid).toBe(BUILD_UUID);
@@ -127,7 +127,7 @@ describe("runtime surfaces: health and MCP serverInfo", () => {
     expect(r.status).toBe(200);
     const body: any = await r.json();
     expect(body.result.serverInfo).toEqual({ name: "3d-review", version: APP_VERSION });
-    expect(body.result.serverInfo.version).toBe("0.5.0");
+    expect(body.result.serverInfo.version).toBe("0.6.0");
   });
 });
 
@@ -158,9 +158,9 @@ describe("stamp script (subprocess): CI without WORKERS_CI_COMMIT_SHA fails, nev
     expect(r.status, r.stderr).toBe(0);
     const gen = readFileSync(join(out, "src/version.generated.ts"), "utf8");
     expect(gen).toContain(`export const APP_COMMIT = "${sha}";`);
-    expect(gen).toContain(`export const APP_STAMP = "0.5.0+aaaaaaa";`);
+    expect(gen).toContain(`export const APP_STAMP = "0.6.0+aaaaaaa";`);
     expect(gen).toContain(`export const BUILD_UUID: string | null = "11111111-2222-3333-4444-555555555555";`);
-    expect(r.stdout).toContain("0.5.0+aaaaaaa");
+    expect(r.stdout).toContain("0.6.0+aaaaaaa");
     expect(readFileSync(join(out, "ui/changelog.json"), "utf8")).toBe(realChangelog);
   });
   it("--out <dir> works like STAMP_OUT_DIR; local run is idempotent and fast (second run unchanged, under 1s)", () => {

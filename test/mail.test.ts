@@ -1,29 +1,30 @@
-// OF-3 sender adapter: honest by construction. The provider is stubbed at fetch; no network, no real address.
+// OF-3 sender adapter: honest by construction. The provider is stubbed at its native binding; no network, no real address.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { invitationMessage, parseMailAllowlist, sendMail } from "../src/mail";
 import { sha256 } from "../src/handlers/common";
 
-afterEach(() => vi.restoreAllMocks());
-const prod: any = { ENVIRONMENT: "production", RESEND_API_KEY: "re_test_only", MAIL_FROM: "3D Review <no-reply@mail.test-sender.dev>", PUBLIC_ORIGIN: "https://3d-review.klappy.dev" };
+afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+const prod: any = { ENVIRONMENT: "production", EMAIL: { send: async (_message: any): Promise<any> => { throw new Error("unstubbed provider"); } }, MAIL_FROM: "noreply@3dreview.app", PUBLIC_ORIGIN: "https://3d-review.klappy.dev" };
 const msg = { to: "person@real-domain.dev", subject: "s", text: "t", idempotencyKey: "invite/inv_1" };
-const ok = () => new Response(JSON.stringify({ id: "re_x" }), { status: 200 });
-const resendCalls = (f: any) => f.mock.calls.filter(([u]: any[]) => String(u).includes("resend")).length;
+const ok = () => ({ messageId: "cf_x" });
+const rejected = (code = "E_SENDER_NOT_VERIFIED") => Object.assign(new Error("provider message must not escape"), { code });
+const providerCalls = (f: any) => f.mock.calls.length;
 
 describe("mail adapter", () => {
   it("never pretends: unconfigured and synthetic recipients are delivered:false / state not_sent with a reason and no network call", async () => {
-    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(ok());
-    expect(await sendMail({ ...prod, RESEND_API_KEY: undefined }, msg)).toEqual({ delivered: false, state: "not_sent", reason: "not_configured" });
+    const f = vi.spyOn(prod.EMAIL, "send").mockResolvedValue(ok());
+    expect(await sendMail({ ...prod, EMAIL: undefined }, msg)).toEqual({ delivered: false, state: "not_sent", reason: "not_configured" });
     expect(await sendMail({ ...prod, MAIL_FROM: undefined }, msg)).toEqual({ delivered: false, state: "not_sent", reason: "not_configured" });
     for (const to of ["rina@example.invalid", "a@b.test", "x@example.com", "y@thing.example", " X@Example.COM ", "x@sub.example.com", "x@bar.example.org", "x@host.localhost"]) expect(await sendMail(prod, { ...msg, to }), to).toEqual({ delivered: false, state: "not_sent", reason: "synthetic_recipient" });
     // exactly one plain mailbox or nothing leaves (review #16-3)
     for (const to of ["Rina <rina@real-domain.dev>", "x@real-domain.dev.", "x@localhost", "a@x.dev, b@y.dev", "x@real-domain.dev\r\nBcc: y@evil.dev", "x y@real-domain.dev", "@real-domain.dev", "x@", "", ".lead@real-domain.dev", "a..b@real-domain.dev", "a@-bad-.dev", "o'brien@real-domain.dev"]) expect(await sendMail(prod, { ...msg, to }), JSON.stringify(to)).toEqual({ delivered: false, state: "not_sent", reason: "invalid_address" });
-    for (const to of ["first.last+tag@sub.real-domain.dev", "USER@Real-Domain.DEV", "user@xn--e1afmkfd.xn--p1ai", "u_s-e%r@a-b.museum"]) expect((await sendMail({ ...prod, RESEND_API_KEY: undefined }, { ...msg, to })).reason, to).toBe("not_configured"); // accepted shapes
+    for (const to of ["first.last+tag@sub.real-domain.dev", "USER@Real-Domain.DEV", "user@xn--e1afmkfd.xn--p1ai", "u_s-e%r@a-b.museum"]) expect((await sendMail({ ...prod, EMAIL: undefined }, { ...msg, to })).reason, to).toBe("not_configured"); // accepted shapes
     expect((await sendMail(prod, { ...msg, to: "person@foo.contest" })).reason).toBeUndefined(); // no false positive on a real TLD
-    expect(resendCalls(f)).toBe(1); // only the .contest probe reached the provider stub
+    expect(providerCalls(f)).toBe(1); // only the .contest probe reached the provider stub
   });
 
   it("environment policy is fail-closed: anything that is not production, and not an allowlisted dev recipient, never reaches the provider", async () => {
-    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(ok());
+    const f = vi.spyOn(prod.EMAIL, "send").mockResolvedValue(ok());
     const hash = await sha256("person@real-domain.dev");
     // unknown / missing environments
     for (const ENVIRONMENT of [undefined, "staging", "preview", "DEV", "production ", ""]) expect(await sendMail({ ...prod, ENVIRONMENT }, msg), String(ENVIRONMENT)).toEqual({ delivered: false, state: "not_sent", reason: "not_allowed_env" });
@@ -33,46 +34,80 @@ describe("mail adapter", () => {
       expect(await sendMail(dev(list), msg), JSON.stringify(list)).toEqual({ delivered: false, state: "not_sent", reason: "not_allowlisted" });
     // a well-formed list that does not contain this recipient
     expect(await sendMail(dev(`${await sha256("someone.else@real-domain.dev")}, ${await sha256("third@real-domain.dev")}`), msg)).toEqual({ delivered: false, state: "not_sent", reason: "not_allowlisted" });
-    // dev + allowlisted, but unconfigured → still no fetch
-    expect(await sendMail({ ...dev(hash), RESEND_API_KEY: undefined }, msg)).toEqual({ delivered: false, state: "not_sent", reason: "not_configured" });
+    // dev + allowlisted, but unconfigured → still no binding call
+    expect(await sendMail({ ...dev(hash), EMAIL: undefined }, msg)).toEqual({ delivered: false, state: "not_sent", reason: "not_configured" });
     expect(await sendMail({ ...dev(hash), MAIL_FROM: undefined }, msg)).toEqual({ delivered: false, state: "not_sent", reason: "not_configured" });
     // a synthetic recipient is refused BEFORE the environment/allowlist check — an allowlist cannot re-enable it
     const syn = "rina@example.invalid";
     expect(await sendMail(dev(await sha256(syn)), { ...msg, to: syn })).toEqual({ delivered: false, state: "not_sent", reason: "synthetic_recipient" });
-    expect(resendCalls(f)).toBe(0); // nothing above may touch the provider
+    expect(providerCalls(f)).toBe(0); // nothing above may touch the provider
   });
 
-  it("dev + allowlisted + configured: exactly one POST with the normalised recipient (mixed case and whitespace in, one address out)", async () => {
-    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "re_msg_dev" }), { status: 200 }));
+  it("dev + allowlisted + configured: exactly one binding call with the normalised recipient (mixed case and whitespace in, one address out)", async () => {
+    const f = vi.spyOn(prod.EMAIL, "send").mockResolvedValue({ messageId: "re_msg_dev" });
     const env: any = { ...prod, ENVIRONMENT: "dev", MAIL_ALLOWLIST_SHA256: `${await sha256("someone.else@real-domain.dev")},${await sha256("person@real-domain.dev")}` };
-    expect(await sendMail(env, { ...msg, to: "  PeRsOn@Real-Domain.DEV  " })).toEqual({ delivered: true, state: "accepted", provider: "resend", provider_message_id: "re_msg_dev" });
-    expect(resendCalls(f)).toBe(1);
-    const [url, init] = f.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.resend.com/emails");
-    expect(JSON.parse(init.body as string).to).toEqual(["person@real-domain.dev"]);
+    expect(await sendMail(env, { ...msg, to: "  PeRsOn@Real-Domain.DEV  " })).toEqual({ delivered: true, state: "accepted", provider: "cloudflare", provider_message_id: "re_msg_dev" });
+    expect(providerCalls(f)).toBe(1);
+    expect(f.mock.calls[0][0].to).toBe("person@real-domain.dev");
   });
 
-  it("production + configured: one POST to Resend with the idempotency key; delivered only on provider acceptance", async () => {
-    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "re_msg_1" }), { status: 200 }));
-    expect(await sendMail(prod, msg)).toEqual({ delivered: true, state: "accepted", provider: "resend", provider_message_id: "re_msg_1" });
-    const [url, init] = f.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.resend.com/emails");
-    expect((init.headers as any)["idempotency-key"]).toBe("invite/inv_1");
-    expect(JSON.parse(init.body as string)).toMatchObject({ from: prod.MAIL_FROM, to: ["person@real-domain.dev"] });
+  it("production + configured: one binding call with an intent correlation header; delivered only on provider acceptance", async () => {
+    const f = vi.spyOn(prod.EMAIL, "send").mockResolvedValue({ messageId: "re_msg_1" });
+    expect(await sendMail(prod, msg)).toEqual({ delivered: true, state: "accepted", provider: "cloudflare", provider_message_id: "re_msg_1" });
+    expect(f.mock.calls[0][0]).toEqual({ from: { email: prod.MAIL_FROM, name: "3D Review" }, to: "person@real-domain.dev", subject: "s", text: "t", headers: { "X-3D-Review-Intent": "invite/inv_1" } });
   });
 
-  it("a provider refusal is 'refused' with its status; a timeout or outage is 'unconfirmed', never a second attempt", async () => {
-    const f = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("{}", { status: 422 }));
-    expect(await sendMail(prod, msg)).toEqual({ delivered: false, state: "refused", provider: "resend", reason: "provider_error", provider_status: 422 });
-    f.mockResolvedValueOnce(new Response("{}", { status: 500 }));
-    expect(await sendMail(prod, msg)).toEqual({ delivered: false, state: "refused", provider: "resend", reason: "provider_error", provider_status: 500 });
+  it("a provider refusal is 'refused' without invented HTTP status; a timeout or outage is 'unconfirmed', never a second attempt", async () => {
+    const f = vi.spyOn(prod.EMAIL, "send").mockRejectedValueOnce(rejected());
+    expect(await sendMail(prod, msg)).toEqual({ delivered: false, state: "refused", provider: "cloudflare", reason: "provider_error" });
+    f.mockRejectedValueOnce(rejected("E_RATE_LIMIT_EXCEEDED"));
+    expect(await sendMail(prod, msg)).toEqual({ delivered: false, state: "refused", provider: "cloudflare", reason: "provider_error" });
     // AbortSignal.timeout / network failure: the request MAY have been accepted remotely, so nothing is claimed and nothing retried
     f.mockRejectedValueOnce(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
     const before = f.mock.calls.length;
-    expect(await sendMail(prod, msg)).toEqual({ delivered: false, state: "unconfirmed", provider: "resend", reason: "provider_unreachable" });
+    expect(await sendMail(prod, msg)).toEqual({ delivered: false, state: "unconfirmed", provider: "cloudflare", reason: "provider_unreachable" });
     expect(f.mock.calls.length - before).toBe(1);
     f.mockRejectedValueOnce(new TypeError("fetch failed"));
-    expect(await sendMail(prod, msg)).toEqual({ delivered: false, state: "unconfirmed", provider: "resend", reason: "provider_unreachable" });
+    expect(await sendMail(prod, msg)).toEqual({ delivered: false, state: "unconfirmed", provider: "cloudflare", reason: "provider_unreachable" });
+  });
+
+  it("bounds a stalled binding to eight seconds and never retries or changes its uncertain result after late acceptance", async () => {
+    vi.useFakeTimers();
+    let resolve!: (r: any) => void;
+    const f = vi.spyOn(prod.EMAIL, "send").mockImplementation(() => new Promise((r) => { resolve = r; }));
+    const call = sendMail(prod, msg);
+    await vi.advanceTimersByTimeAsync(8000);
+    const result = await call;
+    expect(result).toMatchObject({ state: "unconfirmed", reason: "provider_unreachable", delivered: false });
+    resolve({ messageId: "late" }); await Promise.resolve();
+    expect(f).toHaveBeenCalledTimes(1); expect(result.state).toBe("unconfirmed");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("keeps internal/unknown failures and malformed success uncertain; error text and recipients never escape", async () => {
+    const secret = "person@real-domain.dev token-secret";
+    const f = vi.spyOn(prod.EMAIL, "send");
+    for (const code of ["E_INTERNAL_SERVER_ERROR", "E_NEW_UNKNOWN_CODE", undefined]) {
+      f.mockRejectedValueOnce(Object.assign(new Error(secret), { code }));
+      const r = await sendMail(prod, msg);
+      expect(r.state).toBe("unconfirmed"); expect(JSON.stringify(r)).not.toContain(secret);
+    }
+    for (const result of [undefined, {}, { messageId: "" }]) {
+      f.mockResolvedValueOnce(result); expect((await sendMail(prod, msg)).state).toBe("unconfirmed");
+    }
+  });
+
+  it("uses only the binding, retains both message bodies, rejects invalid sender config and emits no invented HTTP status", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("HTTP must not be used"));
+    const f = vi.spyOn(prod.EMAIL, "send").mockResolvedValue(ok());
+    for (const MAIL_FROM of ["", "bad", "Name <noreply@3dreview.app>", "x@a.dev\r\nBcc: z@a.dev"])
+      expect((await sendMail({ ...prod, MAIL_FROM }, msg)).reason).toBe("not_configured");
+    expect(f).not.toHaveBeenCalled();
+    await sendMail(prod, { ...msg, html: "<p>t</p>" });
+    expect(f.mock.calls[0][0]).toMatchObject({ html: "<p>t</p>", text: "t" });
+    f.mockRejectedValueOnce(rejected("E_RECIPIENT_NOT_ALLOWED"));
+    expect(await sendMail(prod, msg)).toEqual({ delivered: false, state: "refused", provider: "cloudflare", reason: "provider_error" });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("the allowlist parser closes on anything it does not fully understand", () => {
@@ -82,7 +117,7 @@ describe("mail adapter", () => {
   });
 
   it("an EMPTY comma-separated entry is malformed too: a trailing comma, a doubled comma or a whitespace-only entry closes the whole list", async () => {
-    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(ok());
+    const f = vi.spyOn(prod.EMAIL, "send").mockResolvedValue(ok());
     const h = await sha256("person@real-domain.dev");
     // the parser: a valid hash plus an empty entry is NOT a one-entry list, it is an unreadable list
     for (const bad of [`${h},`, `,${h}`, `${h},,${h}`, `${h}, ,${h}`, `${h},\t,${h}`, `${h},`.repeat(2)])
@@ -91,7 +126,7 @@ describe("mail adapter", () => {
     for (const list of [`${h},`, `${h},,${h}`, `${h}, ,${h}`])
       expect(await sendMail({ ...prod, ENVIRONMENT: "dev", MAIL_ALLOWLIST_SHA256: list } as any, msg), JSON.stringify(list))
         .toEqual({ delivered: false, state: "not_sent", reason: "not_allowlisted" });
-    expect(resendCalls(f)).toBe(0);
+    expect(providerCalls(f)).toBe(0);
   });
 
   it("invitation text carries the link, the expiry, the no-password instruction — and no project contents", () => {
@@ -102,7 +137,7 @@ describe("mail adapter", () => {
   });
 });
 
-// Handler-level production path (review #16-1, #16-2, #16-7): through execute(), provider stubbed at fetch.
+// Handler-level production path (review #16-1, #16-2, #16-7): through execute(), provider stubbed at its native binding.
 import { readFileSync } from "node:fs";
 import { afterAll } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
@@ -122,13 +157,13 @@ describe("cap.grant.invite in production, provider stubbed", () => {
     const db = await freshDb("DB");
     const env: any = { DB: db, SESSION_SECRET: "synthetic-mail", ...prod };
     let n = 0; const ctx = () => ({ env, db, principal: { kind: "user", id: "person_mara", provisioned: true }, traceId: `tr_mail_${++n}`, now: () => new Date(), log: () => {} }) as any;
-    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "re_msg_9" }), { status: 200 }));
+    const f = vi.spyOn(prod.EMAIL, "send").mockResolvedValue({ messageId: "re_msg_9" });
     const params = { scope: "assessment", id: "assess_tavo_collect", email: "Victim.Person@Real-Domain.dev", role: "viewer" };
     const dry: any = await execute(ctx(), "cap.grant.invite", params, { tool: "danger", mode: "dry_run" });
     const runs: any[] = []; for (let i = 0; i < 3; i++) runs.push(await execute(ctx(), "cap.grant.invite", params, { tool: "danger", mode: "execute", confirm_token: dry.result.confirm_token }));
     expect(f).toHaveBeenCalledTimes(1);
     expect(runs.map((r) => r.result.delivered)).toEqual([true, false, false]);
-    expect(runs[0].result.delivery).toMatchObject({ provider: "resend", state: "accepted", reason: null });
+    expect(runs[0].result.delivery).toMatchObject({ provider: "cloudflare", state: "accepted", reason: null });
     expect(runs[1].result.delivery).toMatchObject({ state: "not_sent", reason: "duplicate_recent" }); expect(runs[1].result.invitation_id).toBe(runs[0].result.invitation_id);
     expect((await db.prepare("SELECT COUNT(*) AS n FROM invitation WHERE scope_id = 'assess_tavo_collect' AND role = 'viewer'").first<{ n: number }>())!.n).toBe(1);
     expect((await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(runs[0].result.invitation_id).first<{ status: string }>())!.status).toBe("sent");
@@ -146,11 +181,11 @@ describe("cap.grant.invite in production, provider stubbed", () => {
     const rr: any = await execute(ctx(), "cap.grant.invite", { ...pc, role: "member" }, { tool: "danger", mode: "execute", confirm_token: dr.result.confirm_token });
     expect(rr.error.code).toBe("INVALID_PARAMS"); expect(rr.error.docs).toBe("cap.grant.revoke_invitation");
     // provider refusal → row stays pending, state 'refused' with the status
-    f.mockResolvedValueOnce(new Response("{}", { status: 500 }));
+    f.mockRejectedValueOnce(rejected("E_RATE_LIMIT_EXCEEDED"));
     const p2 = { ...params, email: "other.person@real-domain.dev" };
     const d2: any = await execute(ctx(), "cap.grant.invite", p2, { tool: "danger", mode: "dry_run" });
     const r2: any = await execute(ctx(), "cap.grant.invite", p2, { tool: "danger", mode: "execute", confirm_token: d2.result.confirm_token });
-    expect(r2.result.status).toBe("pending"); expect(r2.result.delivery).toMatchObject({ state: "refused", reason: "provider_error", provider_status: 500 });
+    expect(r2.result.status).toBe("pending"); expect(r2.result.delivery).toMatchObject({ state: "refused", reason: "provider_error" });
     // …and a never-mailed 'pending' row stops blocking a retry after 30 s (it could never be accepted: the token was never delivered)
     let clock = Date.now() + 31_000; const later = () => ({ ...ctx(), now: () => new Date(clock) });
     const d2b: any = await execute(later(), "cap.grant.invite", p2, { tool: "danger", mode: "dry_run" });
@@ -174,13 +209,13 @@ describe("cap.grant.invite in production, provider stubbed", () => {
     const db = await freshDb("DB2");
     const env: any = { DB: db, SESSION_SECRET: "synthetic-mail", ...prod };
     const ctx = () => ({ env, db, principal: { kind: "user", id: "person_mara", provisioned: true }, traceId: `tr_unconf_${Math.random()}`, now: () => new Date(), log: () => {} }) as any;
-    const f = vi.spyOn(globalThis, "fetch").mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
+    const f = vi.spyOn(prod.EMAIL, "send").mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
     const params = { scope: "assessment", id: "assess_tavo_collect", email: "timeout.person@real-domain.dev", role: "viewer" };
     const dry: any = await execute(ctx(), "cap.grant.invite", params, { tool: "danger", mode: "dry_run" });
     const r: any = await execute(ctx(), "cap.grant.invite", params, { tool: "danger", mode: "execute", confirm_token: dry.result.confirm_token });
     expect(f).toHaveBeenCalledTimes(1); // one attempt, no retry and no replay
     expect(r.result.delivered).toBe(false);
-    expect(r.result.delivery).toMatchObject({ provider: "resend", state: "unconfirmed", reason: "provider_unreachable" });
+    expect(r.result.delivery).toMatchObject({ provider: "cloudflare", state: "unconfirmed", reason: "provider_unreachable" });
     expect(r.result.status).toBe("unconfirmed"); // AMEND P2: the row records the uncertainty instead of looking never-mailed
     expect(String(r.result.note)).toMatch(/has not accepted/);
     expect((await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(r.result.invitation_id).first<{ status: string }>())!.status).toBe("unconfirmed");
@@ -188,7 +223,7 @@ describe("cap.grant.invite in production, provider stubbed", () => {
 });
 
 // ── Independent review AMEND: P1 (no terminal state is ever resurrected) and P2 (no replay of an uncertain attempt) ──────────
-// The provider is a fetch stub whose promise this file resolves BY HAND, so a revoke or an accept can be made to land while the
+// The provider is a binding stub whose promise this file resolves BY HAND, so a revoke or an accept can be made to land while the
 // send is still in flight. Fake time is ctx.now() — the handlers read the clock from there and nowhere else.
 import { invite, revoke_invitation, accept, list as listGrants } from "../src/handlers/grant";
 import { del as deleteWorkspace } from "../src/handlers/workspace";
@@ -196,15 +231,17 @@ import { del as deleteWorkspace } from "../src/handlers/workspace";
 const devMail = async (...addresses: string[]): Promise<any> => ({
   ...prod, ENVIRONMENT: "dev", MAIL_ALLOWLIST_SHA256: (await Promise.all(addresses.map((a) => sha256(a)))).join(","),
 });
-/** A fetch stub that parks: `entered` resolves with the request init as soon as the handler calls it, `release` finishes it. */
+/** A binding stub that parks: `entered` resolves with the message as soon as the handler calls it, `release` finishes it. */
 function parkedFetch() {
-  let release!: (r: Response) => void; const gate = new Promise<Response>((r) => { release = r; });
-  let saw!: (init: any) => void; const entered = new Promise<any>((r) => { saw = r; });
-  const f = vi.spyOn(globalThis, "fetch").mockImplementation(((_u: any, init: any) => { saw(init); return gate; }) as any);
+  let resolve!: (r: any) => void, reject!: (r: any) => void;
+  const gate = new Promise<any>((yes, no) => { resolve = yes; reject = no; });
+  let saw!: (message: any) => void; const entered = new Promise<any>((r) => { saw = r; });
+  const f = vi.spyOn(prod.EMAIL, "send").mockImplementation((message: any) => { saw(message); return gate; });
+  const release = (value: any) => value instanceof Error ? reject(value) : resolve(value);
   return { f, entered, release };
 }
-const tokenOf = (init: any) => decodeURIComponent(String(JSON.parse(init.body as string).text).match(/#invite=(\S+)/)![1]);
-const idOf = (init: any) => String((init.headers as any)["idempotency-key"]).replace(/^invite\//, "");
+const tokenOf = (init: any) => decodeURIComponent(String(init.text).match(/#invite=(\S+)/)![1]);
+const idOf = (init: any) => String((init.headers as any)["X-3D-Review-Intent"]).replace(/^invite\//, "");
 const statusOf = async (db: any, id: string) => (await db.prepare("SELECT status, accepted_at FROM invitation WHERE id = ?").bind(id).first<{ status: string; accepted_at: string | null }>())!;
 const rowCount = async (db: any, hash: string) => (await db.prepare("SELECT COUNT(*) AS n FROM invitation WHERE invitee_hash = ?").bind(hash).first<{ n: number }>())!.n;
 const SCOPE = { scope: "assessment", id: "assess_tavo_collect" };
@@ -235,12 +272,12 @@ describe("cap.grant.invite — the post-network status write never resurrects a 
     expect((await statusOf(db, id)).status).toBe("pending");
     const rv = await revoke_invitation(ctx(), { id }); // the human revokes DURING the send
     expect(rv.result).toMatchObject({ id, status: "revoked" });
-    release(new Response(JSON.stringify({ id: "re_race_1" }), { status: 200 })); // …and only now the provider says 2xx
+    release({ messageId: "re_race_1" }); // …and only now the provider accepts
     const r: any = await call;
     expect((await statusOf(db, id)).status).toBe("revoked");            // the conditional UPDATE did not fire
     expect(r.result.status).toBe("revoked");                            // the result reports what is STORED
     expect(r.result.delivered).toBe(true);                              // …separately from what the provider said
-    expect(r.result.delivery).toMatchObject({ state: "accepted", provider: "resend" });
+    expect(r.result.delivery).toMatchObject({ state: "accepted", provider: "cloudflare" });
     expect(String(r.result.note)).toMatch(/revoked/);
     await expect(accept(await asRecipient(), { token })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
   }, 30_000);
@@ -257,7 +294,7 @@ describe("cap.grant.invite — the post-network status write never resurrects a 
     expect(acc.result).toMatchObject({ granted: true, role: "viewer" });
     const afterAccept = await statusOf(db, id);
     expect(afterAccept.status).toBe("accepted"); expect(afterAccept.accepted_at).toBeTruthy();
-    release(new Response(JSON.stringify({ id: "re_race_2" }), { status: 200 }));
+    release({ messageId: "re_race_2" });
     const r: any = await call;
     const afterSend = await statusOf(db, id);
     expect(afterSend.status).toBe("accepted");                          // no downgrade to 'sent'
@@ -269,7 +306,7 @@ describe("cap.grant.invite — the post-network status write never resurrects a 
 
   // A provider REFUSAL transitions nothing, so before the AMEND it reported the default 'pending' regardless of what the row
   // actually said. The no-transition branches now re-read the stored status through the same helper.
-  it("a delayed provider REFUSAL after a concurrent revoke reports the STORED 'revoked', not the default 'pending': delivery.state is 'refused' with its provider_status and the token is dead", async () => {
+  it("a delayed provider REFUSAL after a concurrent revoke reports the STORED 'revoked', not the default 'pending': delivery.state is 'refused' without an invented HTTP status and the token is dead", async () => {
     const email = "race.refuse.revoke@real-domain.dev";
     const { db, ctx, asRecipient } = await bed("DB9", email);
     const { entered, release } = parkedFetch();
@@ -279,12 +316,12 @@ describe("cap.grant.invite — the post-network status write never resurrects a 
     expect((await statusOf(db, id)).status).toBe("pending");
     const rv = await revoke_invitation(ctx(), { id });   // the human revokes DURING the send
     expect(rv.result).toMatchObject({ id, status: "revoked" });
-    release(new Response(JSON.stringify({ message: "domain not verified" }), { status: 422 })); // …and the provider then REFUSES
+    release(rejected("E_SENDER_NOT_VERIFIED")); // …and the provider then REFUSES
     const r: any = await call;
     expect((await statusOf(db, id)).status).toBe("revoked");
     expect(r.result.status).toBe("revoked");                         // the stored status, re-read on a no-transition outcome
     expect(r.result.delivered).toBe(false);
-    expect(r.result.delivery).toMatchObject({ state: "refused", provider: "resend", provider_status: 422 });
+    expect(r.result.delivery).toMatchObject({ state: "refused", provider: "cloudflare" });
     await expect(accept(await asRecipient(), { token })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
   }, 30_000);
 
@@ -300,14 +337,14 @@ describe("cap.grant.invite — the post-network status write never resurrects a 
     expect(acc.result).toMatchObject({ granted: true, role: "viewer" });
     const afterAccept = await statusOf(db, id);
     expect(afterAccept.status).toBe("accepted"); expect(afterAccept.accepted_at).toBeTruthy();
-    release(new Response(JSON.stringify({ message: "rate limited" }), { status: 429 }));
+    release(rejected("E_RATE_LIMIT_EXCEEDED"));
     const r: any = await call;
     const afterSend = await statusOf(db, id);
     expect(afterSend.status).toBe("accepted");
     expect(afterSend.accepted_at).toBe(afterAccept.accepted_at);     // the refusal rewrote nothing
     expect(r.result.status).toBe("accepted");
     expect(r.result.delivered).toBe(false);
-    expect(r.result.delivery).toMatchObject({ state: "refused", provider_status: 429 });
+    expect(r.result.delivery).toMatchObject({ state: "refused" });
     expect(await db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_id = ?').bind("person_invitee", SCOPE.id).first()).toBeTruthy();
   }, 30_000);
 
@@ -318,20 +355,20 @@ describe("cap.grant.invite — the post-network status write never resurrects a 
     const call = invite(ctx(), { ...SCOPE, email, role: "viewer" });
     const init = await entered;
     const id = idOf(init);
-    release(new Response(JSON.stringify({ message: "invalid from address" }), { status: 400 }));
+    release(rejected("E_VALIDATION_ERROR"));
     const r: any = await call;
     expect((await statusOf(db, id)).status).toBe("pending");
     expect(r.result.status).toBe("pending");
     expect(r.result.delivered).toBe(false);
-    expect(r.result.delivery).toMatchObject({ state: "refused", provider_status: 400 });
+    expect(r.result.delivery).toMatchObject({ state: "refused" });
   }, 30_000);
 });
 
 describe("cap.grant.invite — an uncertain attempt is never replayed, across calls, without a schema change (AMEND P2)", () => {
-  it("a timeout stores the invitation as 'unconfirmed', and a later invite at +31 s and at +11 min returns the SAME invitation with duplicate_uncertain, no new row and no second fetch", async () => {
+  it("a timeout stores the invitation as 'unconfirmed', and a later invite at +31 s and at +11 min returns the SAME invitation with duplicate_uncertain, no new row and no second binding call", async () => {
     const email = "uncertain.person@real-domain.dev";
     const { db, ctx, advance, hash } = await bed("DB5", email);
-    const f = vi.spyOn(globalThis, "fetch").mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
+    const f = vi.spyOn(prod.EMAIL, "send").mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
     const first: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
     expect(f).toHaveBeenCalledTimes(1);
     expect(first.result.status).toBe("unconfirmed");
@@ -360,7 +397,7 @@ describe("cap.grant.invite — an uncertain attempt is never replayed, across ca
   it("two concurrent invites inside the uncertain window produce one row and one invitation id", async () => {
     const email = "uncertain.concurrent@real-domain.dev";
     const { db, ctx, advance, hash } = await bed("DB6", email);
-    const f = vi.spyOn(globalThis, "fetch").mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
+    const f = vi.spyOn(prod.EMAIL, "send").mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
     const first: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
     expect(first.result.status).toBe("unconfirmed");
     advance(31_000);
@@ -374,26 +411,26 @@ describe("cap.grant.invite — an uncertain attempt is never replayed, across ca
   it("revoke is the way out: revoking the uncertain invitation lets a fresh one be created with exactly one new provider attempt", async () => {
     const email = "uncertain.retry@real-domain.dev";
     const { db, ctx, advance, hash } = await bed("DB7", email);
-    const f = vi.spyOn(globalThis, "fetch").mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
+    const f = vi.spyOn(prod.EMAIL, "send").mockRejectedValue(Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }));
     const first: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
     expect(first.result.status).toBe("unconfirmed");
     await revoke_invitation(ctx(), { id: first.result.invitation_id });  // explicit human decision
     expect((await statusOf(db, first.result.invitation_id)).status).toBe("revoked");
     advance(31_000);
-    f.mockReset(); f.mockResolvedValue(new Response(JSON.stringify({ id: "re_retry" }), { status: 200 }) as any);
+    f.mockReset(); f.mockResolvedValue({ messageId: "re_retry" } as any);
     const second: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
     expect(second.result.invitation_id).not.toBe(first.result.invitation_id);
     expect(second.result.status).toBe("sent");
     expect(second.result.delivery).toMatchObject({ state: "accepted" });
-    expect(f).toHaveBeenCalledTimes(1);                                  // one fresh attempt with a fresh idempotency key
-    expect(String((f.mock.calls[0] as any)[1].headers["idempotency-key"])).toBe(`invite/${second.result.invitation_id}`);
+    expect(f).toHaveBeenCalledTimes(1);                                  // one fresh attempt with a fresh intent correlation key
+    expect(String((f.mock.calls[0] as any)[0].headers["X-3D-Review-Intent"])).toBe(`invite/${second.result.invitation_id}`);
     expect(await rowCount(db, hash)).toBe(2);
   }, 30_000);
 
   it("accept works on an 'unconfirmed' invitation: token possession plus a matching authenticated recipient email permits acceptance (possession does not establish delivery)", async () => {
     const email = "uncertain.accepted@real-domain.dev";
     const { db, ctx, asRecipient } = await bed("DB8", email);
-    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
+    vi.spyOn(prod.EMAIL, "send").mockRejectedValue(new TypeError("fetch failed"));
     const r: any = await invite(ctx(), { ...SCOPE, email, role: "viewer" });
     expect(r.result.status).toBe("unconfirmed");
     const acc = await accept(await asRecipient(), { token: r.result.dev_only_link_token });
@@ -429,17 +466,17 @@ describe("cap.grant.invite — a scope deleted during the send is reported as 'd
     expect((await statusOf(db, id)).status).toBe("pending");
     const dl: any = await deleteWorkspace(ctx(), { id: WS.id });  // the owner deletes the SCOPE during the send
     expect(dl.result).toMatchObject({ deleted: true, id: WS.id });
-    release(new Response(JSON.stringify({ id: "re_race_del_1" }), { status: 200 })); // …and only now the provider says 2xx
+    release({ messageId: "re_race_del_1" }); // …and only now the provider accepts
     const r: any = await call;
     expect(await db.prepare("SELECT id FROM invitation WHERE id = ?").bind(id).first()).toBeNull(); // hard-deleted with the scope
     expect(r.result.status).toBe("deleted");                       // NOT the old literal 'pending'
     expect(r.result.delivered).toBe(true);                         // the provider outcome is reported unchanged
-    expect(r.result.delivery).toMatchObject({ state: "accepted", provider: "resend" });
+    expect(r.result.delivery).toMatchObject({ state: "accepted", provider: "cloudflare" });
     expect(String(r.result.note)).toMatch(/scope was removed while the message was being sent/);
     await expect(accept(await asRecipient(), { token })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
   }, 30_000);
 
-  it("a provider REFUSAL after the same concurrent cap.workspace.delete also reports 'deleted', with delivery.state 'refused' and its provider_status", async () => {
+  it("a provider REFUSAL after the same concurrent cap.workspace.delete also reports 'deleted', with delivery.state 'refused' without an invented HTTP status", async () => {
     const email = "race.wsdelete.refuse@real-domain.dev";
     const { db, ctx } = await wsBed("DB13", email);
     const { entered, release } = parkedFetch();
@@ -448,12 +485,12 @@ describe("cap.grant.invite — a scope deleted during the send is reported as 'd
     const id = idOf(init);
     const dl: any = await deleteWorkspace(ctx(), { id: WS.id });
     expect(dl.result).toMatchObject({ deleted: true, id: WS.id });
-    release(new Response(JSON.stringify({ message: "domain not verified" }), { status: 422 }));
+    release(rejected("E_SENDER_NOT_VERIFIED"));
     const r: any = await call;
     expect(await db.prepare("SELECT id FROM invitation WHERE id = ?").bind(id).first()).toBeNull();
     expect(r.result.status).toBe("deleted");                       // a no-transition outcome maps a missing row the same way
     expect(r.result.delivered).toBe(false);
-    expect(r.result.delivery).toMatchObject({ state: "refused", provider: "resend", provider_status: 422 });
+    expect(r.result.delivery).toMatchObject({ state: "refused", provider: "cloudflare" });
     expect(String(r.result.note)).toMatch(/no longer exists/);
   }, 30_000);
 });
