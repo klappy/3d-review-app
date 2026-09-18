@@ -1,7 +1,25 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.11.4",
+  "current": "0.12.0",
   "versions": [
+    {
+      "version": "0.12.0",
+      "status": "candidate",
+      "notes_path": "releases/0.12.0.md",
+      "sections": {
+        "added": [
+          "Live /roadmap reads durable progress and history through six shared HTTP/MCP capabilities, with SSE updates, cursor replay and explicit polling fallback."
+        ],
+        "changed": [
+          "Persona evidence: 3/3 local actual-browser HTTP/MCP write-to-visible cases and 1/1 mobile layout case passed; human satisfaction, confusion and frustration NOT MEASURED."
+        ],
+        "fixed": [],
+        "security": [
+          "Public events use an allowlisted projection; restricted provenance and authenticated publisher identity remain private. Claims do not self-verify completion; corrections support atomic public redaction.",
+          "Publisher permission uses the existing authenticated identity and a narrow server-only build projection. Reviewed additive schema preparation runs only in the matching canonical Git-connected build."
+        ]
+      }
+    },
     {
       "version": "0.11.4",
       "status": "candidate",

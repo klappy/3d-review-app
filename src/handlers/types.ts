@@ -14,7 +14,7 @@ export interface Principal {
   /** set when the caller presented a provider-issued OAuth token (src/oauth.ts); logout revokes that client's grants. */
   oauthClientId?: string;
 }
-export interface Env { DB: D1Database; SESSION_SECRET: string; CODE_ESCROW_SECRET?: string; ENVIRONMENT?: string; ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string;
+export interface Env { ROADMAP_PUBLISHER_IDS?: string; ROADMAP_VERIFIER_IDS?: string; ROADMAP_SUMMARY_REVIEWER_IDS?: string; DB: D1Database; SESSION_SECRET: string; CODE_ESCROW_SECRET?: string; ENVIRONMENT?: string; ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string;
   /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]) — see src/ratelimit.ts. */
   RL_MCP_ANON?: RateLimit; RL_HTTP_ANON?: RateLimit; RL_AUTH?: RateLimit; RL_REDEEM?: RateLimit; RL_MCP_CEILING?: RateLimit;
   /** Native Cloudflare Email Sending; no API secret or inbound routing required. */
@@ -28,6 +28,7 @@ export interface Ctx {
   principal: Principal;
   /** cf-connecting-ip of the caller; rate-limit key only, never persisted. */
   clientIp?: string;
+  cookieAuthenticated?: boolean; requestOrigin?: string; requestUrlOrigin?: string;
   traceId: string;
   now: () => Date;
   log: (span: string, data?: Record<string, unknown>) => void;

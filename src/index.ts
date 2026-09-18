@@ -17,6 +17,8 @@ import { sha256 } from "./handlers/common";
 import { allow, clientIp, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { handleAuthorize, handleConsent, oauthPrincipals, renderConsentIfParked, type OAuthEnv } from "./oauth";
 
+import { installRoadmapStream } from "./roadmap/stream";
+
 const app = new Hono<{ Bindings: Env }>();
 const json = (value: unknown, status: number) => new Response(JSON.stringify(value), {
   status, headers: { "content-type": "application/json; charset=utf-8" },
@@ -25,9 +27,12 @@ const json = (value: unknown, status: number) => new Response(JSON.stringify(val
 export async function contextForRequest(req: Request, env: Env): Promise<Ctx> {
   return {
     env, db: env.DB, principal: oauthPrincipals.get(req) ?? await resolvePrincipal(req, env), clientIp: clientIp(req),
+    cookieAuthenticated: !req.headers.has("authorization") && !!req.headers.get("cookie"), requestOrigin:req.headers.get("origin")??undefined, requestUrlOrigin:new URL(req.url).origin,
     traceId: newTraceId(), now: () => new Date(), log: () => {},
   };
 }
+
+installRoadmapStream(app, contextForRequest);
 
 for (const cap of capabilities) {
   if (cap.tool === "danger" && cap.http.method.toUpperCase() === "GET")
@@ -83,6 +88,7 @@ for (const cap of capabilities) {
         transport: "http",
       });
       const res = json(result, result.ok ? 200 : statusFor(result.error.code));
+      if (cap.id.startsWith("cap.ops.roadmap_")) res.headers.set("cache-control", "no-store");
       if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
       if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Path=/; SameSite=Lax`);
       if (cap.id === "cap.auth.logout") res.headers.append("set-cookie", "session=; Max-Age=0; Path=/");

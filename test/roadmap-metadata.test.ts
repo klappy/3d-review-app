@@ -1,0 +1,11 @@
+import {describe,it,expect} from 'vitest';
+import {metadataEvent,publicReferenceUrl} from '../src/roadmap/validation';
+const event=()=>({idempotency_key:'d0ba4251-1358-4ab8-b62f-23192c2b67df',item_id:'roadmap-123',kind:'review_requested',stage:'reviewed',state:'pending',evidence:[{repo:'3d-review-app',kind:'pull',number:123}]});
+describe('proposed safe automatic roadmap metadata boundary',()=>{
+ it('accepts safe enums and public structured references without arbitrary prose',()=>{const e=metadataEvent(event());expect(e).toEqual(event());expect(publicReferenceUrl(e.evidence[0])).toBe('https://github.com/klappy/3d-review-app/pull/123');});
+ it.each(['actor','actor_id','tenant_id','email','raw_feedback','quote','note','token','trace_id','private_source','url','recorded_at'])('rejects seeded sensitive/undeclared field %s before storage',(field)=>{expect(()=>metadataEvent({...event(),[field]:'seeded-private-value'})).toThrow('Invalid roadmap metadata.');});
+ it.each(['Bearer secret','person@example.test','client-secret','private-feedback-1','<script>bad</script>'])('cannot smuggle text through item or lifecycle fields %s',(value)=>{expect(()=>metadataEvent({...event(),item_id:value})).toThrow();expect(()=>metadataEvent({...event(),kind:value})).toThrow();});
+ it('rejects arbitrary/private reference paths and nested undeclared data',()=>{for(const ref of [{repo:'private-repo',kind:'issue',number:1},{repo:'3d-review-app',kind:'issue',number:1,url:'https://private.test'},{repo:'3d-review-app',kind:'commit',sha:'invalid'},{repo:'3d-review-app',kind:'issue',number:1,sha:'a'.repeat(40)}])expect(()=>metadataEvent({...event(),evidence:[ref]})).toThrow();});
+ it('requires evidence for done and keeps reviewed-text/redaction outside automatic producer',()=>{expect(()=>metadataEvent({...event(),state:'done',evidence:[]})).toThrow();for(const kind of ['redaction','correction','outcome_recorded'])expect(()=>metadataEvent({...event(),kind})).toThrow();});
+ it('rejects arbitrary version and blocker prose; copies safe input',()=>{expect(()=>metadataEvent({...event(),version:'person@example.test'})).toThrow();expect(()=>metadataEvent({...event(),blocker:'private diagnosis'})).toThrow();const input=event(),safe=metadataEvent(input);input.evidence[0].number=999;expect(safe.evidence[0].number).toBe(123);});
+});

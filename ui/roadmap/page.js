@@ -1,0 +1,30 @@
+import {STAGES,LABELS,STATES,windowItems} from './model.js';
+import {createLiveFeed} from './live.js';
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const stamp=v=>new Date(v).toLocaleString(undefined,{timeZone:'UTC'})+' UTC';
+const links=xs=>xs.map(x=>`<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.label)}</a>`).join(' · ');
+export function renderTable(items,label){
+ if(!items.length)return `<p class="muted">No ${label.toLowerCase()} in the current public view.</p>`;
+ return `<div class="table-scroll" tabindex="0" role="region" aria-label="${esc(label)}"><table><caption class="visually-hidden">${esc(label)}</caption><thead><tr><th scope="col">Work</th>${STAGES.map(k=>`<th scope="col">${LABELS[k]}</th>`).join('')}<th scope="col">Remaining</th></tr></thead><tbody>${items.map(item=>`<tr><th scope="row"><strong>${esc(item.title)}</strong><p class="small">${item.version?'Release '+esc(item.version):'Release slot not assigned'}</p><p class="small">${links(item.links)}</p><p class="small muted">Updated ${esc(stamp(item.updated_at))}</p><details class="history" data-detail="${esc(item.id)}-history"><summary>Why this work · history</summary><dl>${Object.entries(item.provenance).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl><ol>${item.history.map(e=>`<li><strong>${esc(e.kind)} · ${esc(stamp(e.at))}</strong><p>${esc(e.summary)}</p>${e.corrects?`<p>Corrects event ${esc(e.corrects)}</p>`:''}<p>${links(e.links)}</p></li>`).join('')}</ol><p class="small">Recent ${item.history.length} of ${item.history_count??item.history.length} events</p><button type="button" data-history="${esc(item.id)}">Read full history</button><div data-history-output="${esc(item.id)}"></div></details></th>${STAGES.map(k=>{const s=item.stages[k];return `<td><span class="state">${STATES[s.state]}</span><details data-detail="${esc(item.id)}-${k}"><summary>Evidence</summary><p>${esc(s.reason)}</p><p>${links(s.evidence)}</p></details></td>`;}).join('')}<td>${esc(item.remaining)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+export function mountRoadmap(doc=globalThis.document){
+ const output=doc.querySelector('#roadmap'),status=doc.querySelector('#roadmap-status'),refresh=doc.querySelector('#refresh'),all=doc.querySelector('#show-all');let latest=null;
+ const render=()=>{if(!latest)return;status.textContent=latest.error||latest.connection;
+  if(!latest.snapshot){output.innerHTML='';return;}
+  const opened=new Set([...output.querySelectorAll('details[open]')].map(x=>x.dataset.detail));
+  const focused=doc.activeElement?.closest('details')?.dataset.detail;
+  const s=latest.snapshot,w=windowItems(s.items,all.checked);
+  output.innerHTML=`<section class="glass panel"><p class="eyebrow">${s.source_mode==='production_canonical'?'Production canonical feed':'DEV provisional feed'}</p><p><strong>${esc(latest.connection)}</strong></p><p>Last recorded event ${latest.lastEventAt?esc(stamp(latest.lastEventAt)):'none yet'}</p><p class="small muted">Last successful read ${esc(stamp(latest.fetchedAt))}. Event sequence ${s.cursor}. A connected feed is not proof that work is complete.</p><p class="small">Live delivery observes committed events about every 2 seconds. During a disconnect, labeled polling retries every 15 seconds. No activity is inferred from elapsed time.</p></section><section class="glass panel"><h2>Active work <span class="small">${w.active.length} of ${w.activeTotal}</span></h2>${renderTable(w.active,'Active work')}</section><section class="glass panel"><h2>Completed history <span class="small">${w.completed.length} of ${w.completedTotal}</span></h2>${renderTable(w.completed,'Completed items')}</section>`;
+  for(const d of output.querySelectorAll('details')){if(opened.has(d.dataset.detail))d.open=true;if(focused===d.dataset.detail)d.querySelector('summary')?.focus();}
+ };
+ const historyClick=async(e)=>{const button=e.target.closest('[data-history]');if(!button)return;const id=button.dataset.history,target=output.querySelector(`[data-history-output="${id}"]`);if(!target)return;button.disabled=true;const captured=latest?.snapshot?.generation;let after=Number(button.dataset.after??0);
+  try{const response=await fetch(`/v2/roadmap/items/${encodeURIComponent(id)}/history?after=${after}&limit=25`,{credentials:'omit',cache:'no-store'});const body=await response.json();if(!response.ok||!body.ok)throw Error();const r=body.result;if(captured!==latest?.snapshot?.generation||r.generation!==captured){feed.refresh();return;}
+   const rows=r.events.map(x=>`<li><strong>${esc(stamp(x.recorded_at))}</strong><p>${esc(x.value.kind==='claim'?'Publisher claim: '+x.value.claim.kind.replaceAll('_',' '):x.value.kind.replaceAll('_',' '))}</p>${x.value.summary?`<dl>${Object.entries(x.value.summary).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`:''}</li>`).join('');target.insertAdjacentHTML('beforeend',`<ol>${rows}</ol>`);if(r.next!==null){button.dataset.after=r.next;button.textContent='Read next history page';}else{button.textContent='History loaded';button.hidden=true;}
+  }catch{target.textContent='History could not be loaded. Try again.';}finally{button.disabled=false;}
+ };
+ output.addEventListener('click',historyClick);
+ const feed=createLiveFeed({onChange:s=>{latest=s;render();}}),onRefresh=()=>feed.refresh();refresh.addEventListener('click',onRefresh);all.addEventListener('change',render);
+ const visibility=()=>{if(doc.hidden)feed.pause();else feed.resume();};doc.addEventListener('visibilitychange',visibility);feed.start();
+ return()=>{doc.removeEventListener('visibilitychange',visibility);refresh.removeEventListener('click',onRefresh);all.removeEventListener('change',render);output.removeEventListener('click',historyClick);feed.dispose();};
+}
+if(typeof document!=='undefined' && document.querySelector('#roadmap')){let dispose=mountRoadmap();globalThis.addEventListener('pagehide',()=>dispose());globalThis.addEventListener('pageshow',e=>{if(e.persisted)dispose=mountRoadmap();});}
