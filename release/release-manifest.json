@@ -1,30 +1,30 @@
 {
-  "version": "0.12.1",
+  "version": "0.13.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "b3e7685695403d1e757b8a3160a3d74c38aa7a31",
+  "cookbook_commit": "d52a7c700751ae4725e46b06446acfe440f3aa9f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.12.1.md",
-      "blob_sha": "fe881e8bb1c587ffeea93ec356a452e62b079675",
-      "sha256": "e03f327896ae1943f655ffde0ccd64025540664131bd62c9287383250c6c6c2d"
+      "path": "planning/2026-09-16-parity-build/releases/0.13.0.md",
+      "blob_sha": "02d250aea9cb5d8276a5dbf9ca2c7170352b705f",
+      "sha256": "e6aa2c959578fc12a570f8627e2c21b93adf485e4cd68ed154c2dd04e9b57842"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "90c6653c9d8fbd5a1b583fcb83c5a2e1e91bdfdc",
-      "sha256": "fd92ae8a86b5b1e6e190b66cbc3b6946a5f5ab31857ece6b17034301a0fed590"
+      "blob_sha": "4f008db367d3c09f5ef802a489ff9921b2a5744a",
+      "sha256": "ddaa2d95524c0526cd4feb41a623c291dbabb17303681ea7929bfa80e5d0f577"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "Feedback records capture trusted submission-server identity and optional, explicitly client-reported experience identity for support-only readback."
+      ],
       "changed": [
-        "Persona evidence: automated redaction/reconnect regression improved from 0/1 to 1/1; human satisfaction, confusion and frustration NOT MEASURED."
+        "Persona evidence: 18/18 automated local HTTP/MCP provenance scenarios passed; automatic loaded-client capture and deployed operator journeys untested; human satisfaction, confusion and frustration NOT MEASURED."
       ],
-      "fixed": [
-        "Roadmap reconnects use the accepted current cursor and redaction generation, preventing repeated table resets after public redaction."
-      ],
+      "fixed": [],
       "security": [
-        "Immediate redaction clearing and stale in-flight response suppression remain; callbacks from closed streams and older generations cannot clear or restore the accepted view."
+        "Strict bounded metadata allowlists, existing authentication/support gates and private trace/receipt projections; legacy provenance remains unknown without backfill."
       ]
     }
   }
