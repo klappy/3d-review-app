@@ -47,3 +47,16 @@ it('public SSE ignores signed-in cookies and bearer credentials in every read au
   const after=await db.prepare('SELECT trace_id,actor,spans_json FROM trace').all<{trace_id:string;actor:string;spans_json:string}>();const added=after.results.filter(x=>!ids.has(x.trace_id));expect(added.length).toBeGreaterThanOrEqual(2);expect(added.every(x=>x.actor==='anon'&&!x.spans_json.includes('publisher'))).toBe(true);
  }
 });
+it('reviewed operational context is optional, permissioned, safe, shared with MCP and explicitly clearable',async()=>{
+ const current=await call('read',{});const summary={title:'Roadmap recovery',feedback:'Delivery clarity requested.',priority:'Explain current action.',scope:'Safe public operational context.',outcome:'Unmeasured.',recurrence:'Unknown.',happening_now:'Production deployment retry in progress.',blocker:'Provider build failed.',next_action:'Retry the corrected canonical build.',queue_order:'After report-first feedback.',workflow:'now',queue_rank:2,work_type:'feature',release_impact:'minor',release_reference:'0.14.0',breaking:false};
+ const p={expected_cursor:current.result.cursor,idempotency_key:crypto.randomUUID(),item_id:'roadmap-140',summary,publication_review:[{repo:'3d-review-app',kind:'issue',number:140}]};
+ expect((await call('summary',p,'publisher','dry_run')).ok).toBe(false);
+ expect((await call('summary',{...p,summary:{...summary,next_action:'person@example.test'}},'verifier','dry_run')).ok).toBe(false);
+ expect((await call('summary',{...p,summary:{...summary,workflow:'pending'}},'verifier','dry_run')).ok).toBe(false);
+ expect((await call('summary',{...p,summary:{...summary,queue_rank:0}},'verifier','dry_run')).ok).toBe(false);
+ for(const bad of [{work_type:'urgent'},{release_impact:'urgent'},{release_reference:'https://private.invalid'},{breaking:'yes'}])expect((await call('summary',{...p,summary:{...summary,...bad}},'verifier','dry_run')).ok).toBe(false);
+ expect((await commit('summary',p,'verifier',true)).ok).toBe(true);
+ const read=await call('read',{});expect(read.result.items.find((x:any)=>x.id==='roadmap-140').value.operations.next_action).toBe(summary.next_action);expect(read.result.items.find((x:any)=>x.id==='roadmap-140').value.operations.workflow).toBe('now');
+ expect((await commit('summary',{...p,idempotency_key:crypto.randomUUID(),expected_cursor:read.result.cursor,summary:{...summary,blocker:null}},'verifier')).ok).toBe(true);
+ const mcp=await call('read',{},undefined,undefined,undefined,true);expect(mcp.result.items.find((x:any)=>x.id==='roadmap-140').value.operations.blocker).toBeNull();
+});

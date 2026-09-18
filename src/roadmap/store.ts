@@ -43,11 +43,24 @@ export class RoadmapStore {
    this.db.prepare('SELECT id,public_json,updated_seq FROM roadmap_item WHERE public_json IS NOT NULL AND id>? ORDER BY id LIMIT ?').bind(itemAfter,limit+1),
    this.db.prepare('SELECT seq,item_id,recorded_at,public_json FROM roadmap_event WHERE seq>? AND public_json IS NOT NULL ORDER BY seq LIMIT ?').bind(after,limit+1),
    this.db.prepare('SELECT recorded_at FROM roadmap_event ORDER BY seq DESC LIMIT 1'),
+   // Latest public claim per stage for this bounded item page, including historical imports.
+   // Never read audit columns or resurrect redacted public_json.
+   this.db.prepare(`SELECT e.seq,e.item_id,e.recorded_at,e.public_json FROM roadmap_event e
+    WHERE e.seq IN (SELECT MAX(seq) FROM roadmap_event
+     WHERE public_json IS NOT NULL AND json_extract(public_json,'$.kind')='claim'
+      AND item_id IN (SELECT id FROM roadmap_item WHERE public_json IS NOT NULL AND id>? ORDER BY id LIMIT ?)
+     GROUP BY item_id,json_extract(public_json,'$.claim.stage'))`).bind(itemAfter,limit),
   ]);
   const clock=r[0].results[0] as unknown as Clock;
+  const reports=new Map<string,Record<string,unknown>>();
+  for(const row of r[4].results as unknown as StoredEvent[]){
+   const event=JSON.parse(row.public_json!);const byStage=reports.get(row.item_id)??{};
+   byStage[event.claim.stage]={...event.claim,sequence:row.seq,recorded_at:row.recorded_at,attribution:event.attribution};
+   reports.set(row.item_id,byStage);
+  }
   const items=r[1].results as unknown as PublicItem[],events=r[2].results as unknown as StoredEvent[];
   return {cursor:clock.revision,generation:clock.generation,last_event_at:(r[3].results[0] as {recorded_at?:string}|undefined)?.recorded_at??null,
-   items:items.slice(0,limit).map(x=>({id:x.id,updated_seq:x.updated_seq,value:JSON.parse(x.public_json!)})),
+   items:items.slice(0,limit).map(x=>({id:x.id,updated_seq:x.updated_seq,value:{...JSON.parse(x.public_json!),reported:reports.get(x.id)??{}}})),
    item_next:items.length>limit?items[limit-1].id:null,
    events:events.slice(0,limit).map(x=>({sequence:x.seq,item_id:x.item_id,recorded_at:x.recorded_at,value:JSON.parse(x.public_json!)})),
    event_next:events.length>limit?events[limit-1].seq:null,reset:after>clock.revision};
