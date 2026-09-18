@@ -20,6 +20,21 @@
       }
     },
     {
+      "version": "0.7.1",
+      "status": "candidate",
+      "notes_path": "releases/0.7.1.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Release notes include a bounded persona outcome scorecard; human satisfaction remains not measured."
+        ],
+        "fixed": [
+          "Initial host-initiated MCP read refusals appear in the panel without leaking private error details; navigation clears the refusal."
+        ],
+        "security": []
+      }
+    },
+    {
       "version": "0.7.0",
       "status": "released",
       "notes_path": "releases/0.7.0.md",
@@ -28,7 +43,8 @@
           "Canonical DEV domain dev.3dreview.app and production domain 3dreview.app on the existing Workers, with previous addresses retained as compatible aliases."
         ],
         "changed": [
-          "Invitation emails use the canonical origin for their environment; browser-created participant links remain on the current origin."
+          "Invitation emails use the canonical origin for their environment; browser-created participant links remain on the current origin.",
+          "Persona evidence backfill: operator browser sign-in reached the workspace page on 2/2 canonical environments (DEV and production); full persona workflows and real-user satisfaction, confusion and frustration NOT MEASURED. See the Persona outcome scorecard in releases/0.7.0.md."
         ],
         "fixed": [],
         "security": [
