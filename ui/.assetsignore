@@ -26,3 +26,4 @@ assess/scope.test.mjs
 assess/views.test.mjs
 assess/share.test.mjs
 participate/controller.test.mjs
+assess/identity-reset.test.mjs
