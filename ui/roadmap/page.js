@@ -6,7 +6,7 @@ const stamp=v=>new Date(v).toLocaleString(undefined,{timeZone:'UTC'})+' UTC';
 const links=xs=>xs.map(x=>`<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.label)}</a>`).join(' · ');
 export function renderCards(items,label){
  if(!items.length)return `<p class="muted">No ${label.toLowerCase()} currently published.</p>`;
- return items.map(item=>`<article class="work-card"><h3>${esc(item.title)}</h3><p>${esc(item.provenance.scope??'Scope not yet reviewed.')}</p><p class="small">${item.version?'Verified release '+esc(item.version):'Verified release not recorded'} · ${links(item.links)}</p>
+ return items.map(item=>`<article class="work-card"><h3>${esc(item.title)}</h3><p>${esc(item.provenance.scope??'Scope not yet reviewed.')}</p><p class="small">${item.version?'Release reference '+esc(item.version):'Release reference not recorded'} · ${links(item.links)}</p>
  <div class="stage-matrix" aria-label="Delivery stages">${STAGES.map(k=>{const p=stagePresentation(item,k);return `<div><strong>${LABELS[k]}</strong><span>${esc(p.report)}</span><small>${esc(p.label)}</small></div>`;}).join('')}</div>
  <dl class="actions"><dt>Now</dt><dd>${esc(happeningNow(item))}</dd><dt>Blocker</dt><dd>${esc(currentBlocker(item))}</dd><dt>Next</dt><dd>${esc(nextAction(item))}</dd><dt>Queue</dt><dd>${esc(item.operations?.queue_order??(item.operations?.queue_rank?'Position '+item.operations.queue_rank:'Not ranked'))}</dd></dl>
  ${item.operations?.reviewed_at?`<p class="small muted">Context reviewed ${esc(stamp(item.operations.reviewed_at))}</p>`:''}
