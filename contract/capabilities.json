@@ -3339,7 +3339,11 @@
             "maxLength": 500
           },
           "workflow": {"enum": ["past", "now", "next", null], "description": "Explicit reviewed workflow position; independent of reported or verified stages."},
-          "queue_rank": {"type": ["integer", "null"], "minimum": 1, "description": "Explicit owner queue rank only; null clears rank."}
+          "queue_rank": {"type": ["integer", "null"], "minimum": 1, "description": "Explicit owner queue rank only; null clears rank."},
+          "work_type": {"enum": ["bugfix", "feature", "improvement", "docs", "research", "maintenance", null]},
+          "release_impact": {"enum": ["patch", "minor", "major", null]},
+          "release_reference": {"type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$", "maxLength": 64},
+          "breaking": {"type": ["boolean", "null"]}
         },
         "required": [
           "expected_cursor",
