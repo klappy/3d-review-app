@@ -1,30 +1,28 @@
 {
-  "version": "0.14.2",
+  "version": "0.14.3",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "917dd405f74de3c495476f912146dc0143dee7be",
+  "cookbook_commit": "30c1a00df5ea30693766485c546c9aab0b16e502",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.14.2.md",
-      "blob_sha": "e60b24dd8af29b6738021c383924e61f389839ea",
-      "sha256": "277ea7e0041f88bdc56d54080b5b4174f88af045bc8ef09aaa11b86c4bb16e9e"
+      "path": "planning/2026-09-16-parity-build/releases/0.14.3.md",
+      "blob_sha": "8d628e14eea4a16a73f023fcb4d510fd84e61f35",
+      "sha256": "7a17577acc572b534e3565de7ad20a35af9b92c591868ed8a975dcd4f4b4148f"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "6ee7926422140921b3f4b0d40564b7910284d7ee",
-      "sha256": "553cceacc425f89b57f22ac1392a67163457e38ea036dbeccc46abababa71067"
+      "blob_sha": "61ed15a4fb60bb5cdf9384dabe210c76c995b927",
+      "sha256": "dc2ac7547c2f49c4f823c1021f49c07181dcf7473209ff059331913592444e88"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
-      "changed": [
-        "Persona evidence: five local Chrome modal acceptance families and23automated changelog tests passed; human outcomes NOT MEASURED."
-      ],
+      "changed": [],
       "fixed": [
-        "Changelog opens at the newest entry, resets on reopen and keeps accessible Close available while scrolling; backdrop dismissal and native Escape restore opener focus."
+        "Blank survey preview and print default to US Letter; explicit A4 remains available and controls the generated page size."
       ],
       "security": [
-        "Canonical version/changelog source and anonymous read privacy are unchanged; no new data collection or live writes."
+        "Isolated blank-only printing, authorization and credential exclusions are unchanged."
       ]
     }
   }

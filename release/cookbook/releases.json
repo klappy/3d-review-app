@@ -1,7 +1,22 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.14.2",
+  "current": "0.14.3",
   "versions": [
+    {
+      "version": "0.14.3",
+      "status": "candidate",
+      "notes_path": "releases/0.14.3.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Blank survey preview and print default to US Letter; explicit A4 remains available and controls the generated page size."
+        ],
+        "security": [
+          "Isolated blank-only printing, authorization and credential exclusions are unchanged."
+        ]
+      }
+    },
     {
       "version": "0.14.2",
       "status": "candidate",
