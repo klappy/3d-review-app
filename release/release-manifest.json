@@ -1,34 +1,34 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "69d9e6dcd71dc2abd3e6999fc5fd0e312d4cca6d",
+  "cookbook_commit": "11671805a5eb0b7b5b32f490eec4669ed7f096b2",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.1.0.md",
-      "blob_sha": "e525cf63094bf09a4ae46eeb2741e7a68a833ff8",
-      "sha256": "1fe973844d3f04e1356ac0f58d29c2839eae7532fd22c61f834d723e44b98037"
+      "path": "planning/2026-09-16-parity-build/releases/0.2.0.md",
+      "blob_sha": "8857c752e8c7f952b3f1bc4aab8a39e89c555b5c",
+      "sha256": "64d70191fb75892870eb8b39e67ab9afc1f6dbb5aa04fb84ce469cccf3bd0ffe"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "f4c2ded05fd8ddea0f45d0a1b923cd6a995bfd27",
-      "sha256": "b69e400707250dd8bb6af091276d776360bf776f1847a42d471dc7ceba494f3b"
+      "blob_sha": "19c70bf491a64c6d467d03468dbf0ea5f868d9f1",
+      "sha256": "eb0a6c94672edd9a2b481cf85094578649d7a2fcb99a266f08d956dacd802f02"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Shared survey link: an owner can issue one link per survey that participants open to take the survey without a personal code.",
-        "Release identity: a cookbook-pinned release record, a build-time version+commit stamp, version fields on health and MCP serverInfo, and a generated changelog.json for the version badge."
+        "Showcase-based public entry, workspace and project navigation, and assessment views.",
+        "Survey Share controls create participant links and display locally generated QR codes."
       ],
       "changed": [
-        "Health `build` now reports `<version>+<sha7>` derived from the pinned release record and the build commit instead of a hardcoded literal.",
-        "Rate limiter boundaries and OAuth flows hardened for the first DEV collection increment."
+        "The primary web entry uses the new assessment shell; existing participant, invitation and legacy routes remain available.",
+        "Assessment views separate navigation from stage changes and preserve explicit permission scopes."
       ],
       "fixed": [
-        "Email-code redemption is atomic; a code cannot be redeemed twice under concurrent requests, and conflict-recovery kinds are distinct."
+        "Held or refused reports remain visible as honest states, with mobile layout and report-number readability improvements."
       ],
       "security": [
-        "Rate-limited anonymous, code and bearer paths fail closed with RATE_LIMITED; OAuth code redemption is single-use."
+        "Credential-bearing route changes retain the accepted forwarding behavior; no new permission inheritance is introduced."
       ]
     }
   }

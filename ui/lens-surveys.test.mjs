@@ -37,7 +37,9 @@ test('an unknown perspective is shown as a fourth "Other perspective" group, nev
   assert.equal(g.length,4); assert.equal(g[3].lens,'Other perspective'); assert.equal(g[3].available[0].name,'X');
 });
 test('wiring: root inside the stage workspace, assets, app.js actions use the existing capabilities and the existing #surveys control',()=>{
-  const html=read('./index.html'),app=read('./app.js'),server=read('./server.mjs'),css=read('./lens-surveys.css');
+  // Root entry switch (PR65 checkpoint 2): the legacy surface this suite specifies now lives byte-identical at ./legacy/index.html;
+// `/` is the product shell (its public-home contract is asserted in assess/scope.test.mjs). Behaviour under test is unchanged.
+const html=read('./legacy/index.html'),app=read('./app.js'),server=read('./server.mjs'),css=read('./lens-surveys.css');
   assert.ok(html.includes('<section id="lens-surveys-root" class="lens-surveys" aria-label="Surveys by lens" hidden></section><div data-stage-content="collect">'));
   assert.ok(html.includes('<link rel="stylesheet" href="/lens-surveys.css">')&&server.includes("'/lens-surveys.js':")&&server.includes("'/lens-surveys.css':"));
   assert.ok(app.includes("await api(`/v2/assessments/${path(aid)}/surveys`, { method: 'POST', body: { template_id, version: Number(version) } }); await chooseAssessment();"));

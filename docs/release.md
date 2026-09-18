@@ -67,3 +67,11 @@ Ticket `2026-09-17-3d-release-identity` (kitchen). The app does not author its o
 - **Badge cost (rev 3b I-6):** one anonymous GET /v2/health per page load spends 1/60 of the per-address RL_HTTP_ANON bucket and never touches the participant's authenticated submit; a 429/503 on health renders 'Version unavailable', never an error.
 - **Bumps:** classified by compatibility impact (PATCH: no contract row/schema/accepted-behaviour change; MINOR under 0.y: additive row/migration/capability or changed accepted behaviour; `1.0.0`: captain's call), recorded in the cookbook first, then pinned here. See the policy paragraph in `release/cookbook/0.1.0.md`.
 - **B2/B3 script exit codes** are meaningful as of [klappy/3d-review-app#38](https://github.com/klappy/3d-review-app/pull/38); earlier green tables are inventory, not acceptance. Cite `PASS=a FAIL=b RESERVED=c SKIP=d` and `same=S/compared=C excluded=E`, never a bare table.
+
+## Scoped 0.2.0 release order — 2026-09-17
+
+Chris authorized shipping the accepted cumulative web and sharing baseline through `4a27830c56c4ef05d2ea8656e07de68311eef942` to DEV and then production in separate PRs. This supersedes the earlier blanket no-production instruction only for the candidate tracked in [app issue 66](https://github.com/klappy/3d-review-app/issues/66). CP7 G1, MCP work, and retrospective acceptance remain separate and do not block the accepted increment. PR65 and subsequent work remain preserved.
+
+Version 0.2.0 is MINOR under the established major-zero policy. The canonical cookbook candidate record is authored first and pinned by immutable commit, blob IDs and SHA-256 in the app manifest. Both package version fields and generated identity follow that record. A production promotion must carry a manifest bump and changelog under the existing policy; its exact version is prepared separately after DEV acceptance.
+
+No check or protection is waived: independent exact-head acceptance, literal Cursor Bugbot SUCCESS, terminal attached checks and root prospective disposition precede ordinary merge. DEV and production deployment happen only from their connected Git triggers, followed by canonical build/health/assets verification. No manual deployment or seed/migration replay.

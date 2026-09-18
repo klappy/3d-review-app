@@ -1,0 +1,199 @@
+// ui/assess/views.js — understand / improve / permissions page modules for the assessment shell (UI overhaul, R1/I1).
+// Module contract: { load(ctx, params) → model, render(ctx, model) → html, bind(ctx, root, model) }.
+// ctx = { api, esc, enc, go, note, state, routes, cards, current, refresh? }; params = { aid, scope?, id? }.
+// Rules carried: per-survey counts only (respondents are NEVER summed across surveys); results render the server's held
+// literal; no Build/Preview report control; recommendations are "not built" statically; RESERVED_NOT_BUILT/501 never hits
+// the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
+import { renderReport } from '../report-view.js'; // relative: resolves at /report-view.js in the browser and under node --test
+
+export const LENSES = ['Translation Team', 'Church', 'Community'];
+const OTHER = 'Other perspective';
+const DOTS = { 'Translation Team': '', Church: 'blue', Community: 'gold', [OTHER]: '' };
+const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
+const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
+const NOT_BUILT = new Set(['RESERVED_NOT_BUILT', '501']);
+const SIGNIN = '<a href="/v2/auth/access">Sign in again</a>';
+export const NOTES_VISIBILITY = 'Everyone with access to this assessment can read these notes.';
+export const RECOMMENDATIONS_NOT_BUILT = 'Recommendations are not built yet.';
+export const NOT_VISIBLE = 'Not visible to you';
+// Live API path segment is the SINGULAR scope noun (observed DEV 2026-09-17: /v2/assessment/{id}/grants ok; plural → NOT_FOUND_OR_NOT_VISIBLE).
+const SCOPE_SEG = { workspaces: 'workspace', projects: 'project', assessments: 'assessment' };
+const SCOPE_NOUN = { workspaces: 'workspace', projects: 'project', assessments: 'assessment' };
+const ROLES = ['viewer', 'member', 'owner'];
+const RANK = { viewer: 1, member: 2, owner: 3 };
+
+export const css = `
+.lens-block{margin:18px 0 6px}.lens-block h3{margin-bottom:4px}.lens-sum{font-size:14px}
+.grants{width:100%;border-collapse:collapse;margin-top:12px}.grants th,.grants td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle;font-size:14px}.grants th{color:var(--muted);font-weight:600}
+.grants select{margin-top:0;min-height:38px;padding:6px 10px;width:auto;display:inline-block}.grants button{min-height:38px;padding:6px 12px}
+.inline-form{display:grid;gap:12px;margin-top:14px}.inline-form .actions{margin-top:0}
+`;
+
+// Classify an api() failure into the four honest states the contract names. Never a generic retry for NOT_BUILT.
+// Display helpers (readable, not new data): the payload and provenance are untouched — only the rendered text is rounded, with the
+// exact value kept on the element (title + data-exact). IDs/timestamps stay available inside <details>.
+export function humanDate(iso) { const d = new Date(iso); return isNaN(d) ? String(iso || '') : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
+export function readableNumbers(rootEl) {
+  if (!rootEl || !rootEl.ownerDocument) return 0;
+  const doc = rootEl.ownerDocument, walker = doc.createTreeWalker(rootEl, 4 /* NodeFilter.SHOW_TEXT */); const nodes = []; let n; let count = 0;
+  while ((n = walker.nextNode())) if (/(?<![:\d])\d+\.\d{3,}(?![\dZ])/.test(n.nodeValue) && !(n.parentElement && n.parentElement.closest('details, code, .report-exact'))) nodes.push(n);
+  for (const t of nodes) {
+    const frag = doc.createDocumentFragment(); let last = 0; const text = t.nodeValue; const re = /(?<![:\d])(\d+\.\d{3,})(?![\dZ])/g; let m; // never a clock/timestamp fraction (…:39.634Z)
+    while ((m = re.exec(text))) { frag.append(text.slice(last, m.index)); const span = doc.createElement('span'); span.className = 'report-exact'; span.title = `exact: ${m[1]}`; span.dataset.exact = m[1]; span.textContent = (Math.round(Number(m[1]) * 10) / 10).toFixed(1); frag.append(span); last = m.index + m[1].length; count++; }
+    frag.append(text.slice(last)); t.replaceWith(frag);
+  }
+  return count;
+}
+export function classify(e) {
+  const code = String(e?.code ?? '');
+  if (UNAUTHENTICATED.has(code)) return 'unauthenticated';
+  if (REFUSED.has(code)) return 'refused';
+  if (NOT_BUILT.has(code)) return 'not_built';
+  return 'failed';
+}
+const settle = p => p.then(value => ({ status: 'loaded', value }), e => ({ status: classify(e), error: String(e?.message || 'Request could not be completed.') }));
+const isEditor = role => role === 'owner' || role === 'member';
+const activeSurveys = surveys => (surveys || []).filter(s => s.state === 'selected' && !s.archived_at);
+const lensFor = s => LENSES.includes(s.perspective) ? s.perspective : OTHER;
+function refusalLine(ctx, status, retryAttr, what) {
+  const esc = ctx.esc;
+  if (status === 'unauthenticated') return `<p class="small muted" role="alert">Your sign-in is no longer active. ${SIGNIN} or <a href="#" ${retryAttr}>Retry</a>.</p>`;
+  if (status === 'refused') return `<p class="small muted" role="alert">${esc(NOT_VISIBLE)}.</p>`;
+  if (status === 'not_built') return `<p class="small muted">${esc(what)} is not built yet.</p>`;
+  return `<p class="small muted" role="alert">${esc(what)} could not be loaded. <a href="#" ${retryAttr}>Retry</a></p>`;
+}
+
+// ───────────────────────────────── understand ─────────────────────────────────
+const understand = {
+  async load(ctx, { aid }) {
+    const cur = ctx.current, surveys = activeSurveys(cur?.surveys);
+    const [counts, results, reports] = await Promise.all([
+      Promise.all(surveys.map(s => settle(ctx.api(`/v2/assessments/${ctx.enc(aid)}/surveys/${ctx.enc(s.id)}`)).then(r => [s.id, r]))),
+      settle(ctx.api(`/v2/assessments/${ctx.enc(aid)}/results`)),
+      settle(ctx.api(`/v2/assessments/${ctx.enc(aid)}/reports`)),
+    ]);
+    const countMap = new Map();
+    for (const [sid, r] of counts) countMap.set(sid, r.status === 'loaded' ? { status: 'loaded', responses: Number(r.value?.counts?.responses ?? 0), respondents: Number(r.value?.counts?.respondents ?? 0) } : r);
+    return { aid, surveys, counts: countMap, results, reports, openReport: null };
+  },
+  render(ctx, m) {
+    const esc = ctx.esc;
+    // (1) Counts per lens: each survey row shows its OWN responses/respondents; the lens line sums responses only (A1/A2).
+    const groups = [...LENSES, OTHER].map(lens => ({ lens, surveys: m.surveys.filter(s => lensFor(s) === lens) })).filter(g => g.lens !== OTHER || g.surveys.length);
+    const countCell = s => { const c = m.counts.get(s.id) || { status: 'failed' };
+      if (c.status === 'loaded') return `<span data-count="${esc(s.id)}">${c.responses} response${c.responses === 1 ? '' : 's'} · ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}</span>`;
+      if (c.status === 'refused') return `<span data-count="${esc(s.id)}" role="alert">no longer available to you here</span>`;
+      if (c.status === 'unauthenticated') return `<span data-count="${esc(s.id)}" role="alert">sign-in no longer active · ${SIGNIN}</span>`;
+      return `<span data-count="${esc(s.id)}" role="alert">count unavailable · <a href="#" data-retry="counts">Retry</a></span>`; };
+    const lensBlocks = groups.map(g => {
+      const loaded = g.surveys.filter(s => m.counts.get(s.id)?.status === 'loaded');
+      const sum = loaded.reduce((n, s) => n + m.counts.get(s.id).responses, 0);
+      const sumLine = g.surveys.length ? `<p class="muted lens-sum" data-lens-sum="${esc(g.lens)}">${sum} response${sum === 1 ? '' : 's'} across ${loaded.length} of ${g.surveys.length} survey${g.surveys.length === 1 ? '' : 's'}${loaded.length !== g.surveys.length ? ' <strong>(partial)</strong>' : ''}</p>` : '<p class="small muted">No survey included for this lens.</p>';
+      const rows = g.surveys.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="${esc(ctx.routes.survey(m.aid, s.id))}">${esc(s.template_name || s.template_id)}</a></h3><p class="small muted">${countCell(s)}</p></div></div>`).join('');
+      return `<section class="lens-block" aria-label="${esc(g.lens)}"><h3>${esc(g.lens)}</h3>${sumLine}${rows}</section>`;
+    }).join('');
+    // (2) Results: the held literal with the server's reason. No numbers, no bands.
+    let results;
+    if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.reason || '')}</p>`; }
+    else results = refusalLine(ctx, m.results.status, 'data-retry="results"', 'Results');
+    // (3) Reports: list from the server; opening one renders it with report-view.js. No build control (A5).
+    let reports;
+    if (m.reports.status === 'loaded') {
+      const r = m.reports.value || {};
+      if (r.suppressed || r.status === 'held') reports = `<p class="muted" data-reports-held>${esc(r.reason || 'Reports are held.')}</p>`;
+      else { const list = Array.isArray(r.reports) ? r.reports : [];
+        reports = list.length ? `<ul class="links" data-report-list>${list.map((x, i) => `<li data-report-id="${esc(x.id)}"><button type="button" data-open-report="${esc(x.id)}">Report ${list.length - i} · built ${esc(humanDate(x.created_at))}</button><details class="small muted report-ids"><summary>Report id</summary><code>${esc(x.id)}</code> · <code>${esc(x.created_at)}</code></details></li>`).join('')}</ul>` : '<p class="muted">No reports have been built for this assessment.</p>'; }
+    } else if (m.reports.status === 'refused') reports = '<p class="muted" data-reports-unavailable>Reports are unavailable for this assessment.</p>';
+    else reports = refusalLine(ctx, m.reports.status, 'data-retry="reports"', 'Reports');
+    const open = m.openReport ? (m.openReport.status === 'held' ? `<p class="muted" data-open-report-reason>${esc(m.openReport.reason)}</p>` : m.openReport.status === 'error' ? `<p class="small muted" role="alert">${esc(m.openReport.text)}</p>` : '') : '';
+    return `<div class="grid"><section class="panel"><p class="eyebrow">Understand</p><h2>Bring the perspectives together</h2>${lensBlocks}<p class="small muted line">Counts are per survey. Respondents are counted within each survey and are not added across surveys.</p></section><aside class="stack"><section class="panel" data-results><p class="eyebrow">Results</p>${results}</section><section class="panel" data-reports><p class="eyebrow">Reports</p>${reports}${m.openReport && m.openReport.status !== 'shown' ? `<div>${open}</div>` : ''}<p class="status" role="status" aria-live="polite" data-report-status></p></section></aside></div><section class="panel report-full" data-report-full hidden><div class="report-tools"><p class="eyebrow" style="margin:0">Report · full view</p><button type="button" class="quiet" data-close-report>Close report</button></div><div data-report-view></div></section>`;
+  },
+  bind(ctx, root, m) {
+    root.querySelectorAll('[data-retry]').forEach(el => el.onclick = e => { e.preventDefault(); ctx.go(ctx.routes.assessment(m.aid, 'understand'), { reload: true }); });
+    const closeBtn = root.querySelector('[data-close-report]'); if (closeBtn) closeBtn.onclick = () => { const full = root.querySelector('[data-report-full]'); const view = root.querySelector('[data-report-view]'); if (view) view.replaceChildren(); if (full) full.hidden = true; m.openReport = null; };
+    root.querySelectorAll('[data-open-report]').forEach(btn => btn.onclick = async () => {
+      const id = btn.dataset.openReport, view = root.querySelector('[data-report-view]'), status = root.querySelector('[data-report-status]');
+      const all = root.querySelectorAll('[data-open-report]'); all.forEach(b => b.disabled = true); if (status) status.textContent = 'Opening report…';
+      // R-1 (Auditor 04aee96): every NON-success outcome is written to the VISIBLE Reports status; the full-width section stays
+      // hidden and its view is emptied. Only a rendered report opens the full section.
+      const full = root.querySelector('[data-report-full]');
+      const showFailure = text => { if (status) status.textContent = text; if (view) view.replaceChildren(); if (full) full.hidden = true; };
+      try {
+        const r = await ctx.api(`/v2/reports/${ctx.enc(id)}`);
+        if (r.suppressed) { m.openReport = { status: 'held', reason: String(r.reason || '') }; showFailure(m.openReport.reason); }
+        else {
+          const ok = renderReport({ doc: root.ownerDocument || globalThis.document, root: view, report: r.report });
+          if (ok) { m.openReport = { status: 'shown', id }; if (view) readableNumbers(view); if (status) status.textContent = ''; if (full) { full.hidden = false; if (full.scrollIntoView) full.scrollIntoView({ block: 'start' }); } }
+          else { m.openReport = { status: 'error', text: 'This report could not be displayed.' }; showFailure(m.openReport.text); }
+        }
+      } catch (e) {
+        const k = classify(e); m.openReport = { status: 'error', text: k === 'refused' ? NOT_VISIBLE : k === 'not_built' ? 'Reports are not built yet.' : k === 'unauthenticated' ? 'Your sign-in is no longer active.' : String(e.message || 'Report could not be opened.') };
+        showFailure(m.openReport.text);
+      } finally { all.forEach(b => b.disabled = false); }
+    });
+  },
+};
+
+// ───────────────────────────────── improve ─────────────────────────────────
+const improve = {
+  async load(ctx, { aid }) {
+    const a = ctx.current?.assessment || {};
+    return { aid, role: a.role, notes_reflection: a.notes_reflection ?? '', notes_next_steps: a.notes_next_steps ?? '', editable: isEditor(a.role) };
+  },
+  render(ctx, m) {
+    const esc = ctx.esc;
+    const notes = m.editable
+      ? `<form data-notes-form><label class="field">Reflection<textarea name="notes_reflection" maxlength="4000">${esc(m.notes_reflection)}</textarea></label><label class="field">Next steps<textarea name="notes_next_steps" maxlength="4000">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>Save notes</button></div><p class="status" role="status" aria-live="polite" data-notes-status></p></form>`
+      : `<h3>Reflection</h3><p data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">No reflection recorded.</span>'}</p><h3>Next steps</h3><p data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next steps recorded.</span>'}</p><p class="small muted">${esc(NOTES_VISIBILITY)} Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`;
+    return `<div class="grid"><section class="panel"><p class="eyebrow">Improve</p><h2>What comes next?</h2>${notes}</section><aside class="panel" data-recommendations><p class="eyebrow">Recommendations</p><p class="muted">${esc(RECOMMENDATIONS_NOT_BUILT)}</p></aside></div>`;
+  },
+  bind(ctx, root, m) {
+    const form = root.querySelector('[data-notes-form]'); if (!form) return;
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const btn = form.querySelector('[data-save-notes]'), status = form.querySelector('[data-notes-status]');
+      const body = { notes_reflection: form.querySelector('[name=notes_reflection]').value, notes_next_steps: form.querySelector('[name=notes_next_steps]').value };
+      btn.disabled = true; if (status) { status.textContent = 'Saving…'; status.setAttribute('role', 'status'); }
+      try {
+        const r = await ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/notes`, { method: 'PATCH', body });
+        const a = r?.assessment || {}; m.notes_reflection = a.notes_reflection ?? body.notes_reflection; m.notes_next_steps = a.notes_next_steps ?? body.notes_next_steps;
+        if (status) status.textContent = 'Notes saved.';
+        if (typeof ctx.refresh === 'function') await ctx.refresh();
+      } catch (err) {
+        const k = classify(err);
+        if (status) { status.setAttribute('role', 'alert'); status.textContent = k === 'refused' ? `${NOT_VISIBLE}: the notes were not saved.` : k === 'unauthenticated' ? 'Your sign-in is no longer active. Sign in again; the notes were not saved.' : k === 'not_built' ? 'Notes are not built yet.' : `Notes could not be saved: ${String(err.message || 'request failed')}`; }
+      } finally { btn.disabled = false; }
+    };
+  },
+};
+
+// ───────────────────────────────── permissions ─────────────────────────────────
+// One page per scope. Reads: GET /v2/{scope}/{id}/grants → { scope, grants:[{id, principal_id, role, created_at}], pending_invitations }.
+// Writes: invite (danger two-step: dry_run → execute with confirm_token), revoke (DELETE), update_role (danger two-step),
+// transfer_owner (danger two-step). Request-body shape follows the legacy client's danger calls: { params, mode, confirm_token }.
+const permissions = {
+  async load(ctx, { scope, id, role }) {
+    if (!SCOPE_NOUN[scope]) return { scope, id, status: 'refused', grants: [], pending: [], myRole: null };
+    const r = await settle(ctx.api(`/v2/${SCOPE_SEG[scope]}/${ctx.enc(id)}/grants`));
+    const grants = r.status === 'loaded' ? (r.value?.grants || []) : [], pending = r.status === 'loaded' ? (r.value?.pending_invitations || []) : [];
+    const me = ctx.state?.principal?.id;
+    const myRole = role || (scope === 'assessments' && ctx.current?.assessment?.id === id ? ctx.current.assessment.role : null) || grants.find(g => g.principal_id === me)?.role || null;
+    return { scope, id, status: r.status, error: r.error, grants, pending, myRole, me, confirm: null };
+  },
+  // F2 (PR65 verdict): the AS1 grants contract is READ-ONLY — grants + pending invitations. Invite / revoke / role change /
+  // ownership transfer are deferred behind G1 with a separate security review; the legacy surface keeps them meanwhile.
+  render(ctx, m) {
+    const esc = ctx.esc, noun = SCOPE_NOUN[m.scope] || m.scope;
+    const head = `<p class="eyebrow">Permissions</p><h2>Who can open this ${esc(noun)}</h2><p class="note small">Permissions apply to this ${esc(noun)} only; nothing is inherited.</p>`;
+    if (m.status !== 'loaded') return `<section class="panel narrow" data-permissions>${head}${refusalLine(ctx, m.status, 'data-retry="grants"', 'Permissions')}</section>`;
+    const rows = m.grants.map(g => `<tr><td>${esc(g.principal_id)}${g.principal_id === m.me ? ' <span class="muted small">(you)</span>' : ''}</td><td>${esc(g.role)}</td></tr>`).join('');
+    const pending = m.pending.length ? `<h3 style="margin-top:18px">Pending invitations</h3><ul class="small">${m.pending.map(i => `<li>${esc(i.role)} · invited ${esc(i.created_at || '')}${i.id ? ` · <span class="muted">${esc(i.id)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="small muted" style="margin-top:14px">No pending invitations.</p>';
+    return `<section class="panel" data-permissions>${head}<table class="grants"><thead><tr><th>Principal</th><th>Role</th></tr></thead><tbody>${rows || '<tr><td colspan="2" class="muted">No grants listed.</td></tr>'}</tbody></table>${pending}<p class="small muted line">Inviting people, changing roles, revoking access and transferring ownership are not done here yet; use the legacy <a href="/legacy/#facilitator">Links, codes &amp; people</a> surface.</p></section>`;
+  },
+  bind(ctx, root, m) {
+    root.querySelector('[data-retry="grants"]')?.addEventListener('click', e => { e.preventDefault(); ctx.go(location.hash, { reload: true }); });
+  },
+};
+
+export const views = { understand, improve, permissions };
+export default views;
