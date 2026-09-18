@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.13.0",
+  "current": "0.13.1",
   "versions": [
+    {
+      "version": "0.13.1",
+      "status": "candidate",
+      "notes_path": "releases/0.13.1.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona evidence: nine local feedback DOM tests passed; deployed reporter and real-human outcomes not measured."
+        ],
+        "fixed": [
+          "Feedback opens with the user\u2019s problem or suggestion; experience ratings remain optional in a secondary disclosure."
+        ],
+        "security": [
+          "Existing authentication, payload privacy, identity isolation and uncertain-send handling remain unchanged."
+        ]
+      }
+    },
     {
       "version": "0.13.0",
       "status": "candidate",
