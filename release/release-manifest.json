@@ -1,30 +1,34 @@
 {
-  "version": "0.9.3",
+  "version": "0.10.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "80d8111fe7ffe9cb14516120de485c469bbe12d6",
+  "cookbook_commit": "6a903c5dc6ad150854da6806e3b51d5cefdd98b2",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.9.3.md",
-      "blob_sha": "07195f8984ae536432193fe6b9a199be1135686c",
-      "sha256": "a2929099f3504a5943d5da95bc7e20250194d3115655bc239199b9d5b71feae9"
+      "path": "planning/2026-09-16-parity-build/releases/0.10.0.md",
+      "blob_sha": "aed231a06aafe769ccf73f4e0324b0325021b6cb",
+      "sha256": "0b2b49cb07be2fe6f75398c7c58177a309070983bb0c97ca3a01f157815da571"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "f2603c5fbcd0d97a23f535c45ef2631a1cda7acb",
-      "sha256": "1ae848ab989b7c70fd5c83f550a29b7cf4c9c2c08504dad269655917893f846d"
+      "blob_sha": "2a954f87b7d4538c172f96494b8b3acfb8c14b60",
+      "sha256": "071a65d51e270763bdf792f41d9fcc7fa98a3f2021d08905dbe83d0b2666b882"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "Compact action-specific MCP cards for metadata, entity reads, feedback acknowledgement, refusal and explicit dangerous-action confirmation.",
+        "Requested survey template results display the returned questionnaire, options, version and perspective read-only, instead of a generic success card."
+      ],
       "changed": [
-        "Theme scorecard: 6/6 automated local scenarios and 4/4 bounded official reference-host visual scenarios passed; human satisfaction, confusion and frustration are NOT MEASURED."
+        "Docs orientation is text-only. Panel startup waits for the host call and does not automatically fetch identity, workspaces or projects; full exploration requires an explicit action.",
+        "Six bounded official-host scenarios are covered across attributed pre/post-fix sources; the final integrated theme/card host check passed1/1 independently. Human satisfaction, confusion and frustration are NOT MEASURED."
       ],
       "fixed": [
-        "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
+        "Compact confirmations show server-owned impact, affected targets, compensating control and expiry; busy and one-shot execution guards remain enforced."
       ],
       "security": [
-        "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
+        "The existing four-tool contract and server authorization remain unchanged. Private feedback and authorization details are not echoed in cards; no automatic execute or retry."
       ]
     }
   }

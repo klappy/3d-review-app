@@ -35,3 +35,6 @@ mcp/panel-src.html
 assess/report-build.test.mjs
 
 demo.test.mjs
+
+mcp/action-card.js
+mcp/action-card.css
