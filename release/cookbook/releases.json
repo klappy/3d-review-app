@@ -1,7 +1,28 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.1.0",
+  "current": "0.2.0",
   "versions": [
+    {
+      "version": "0.2.0",
+      "status": "candidate",
+      "notes_path": "releases/0.2.0.md",
+      "sections": {
+        "added": [
+          "Showcase-based public entry, workspace and project navigation, and assessment views.",
+          "Survey Share controls create participant links and display locally generated QR codes."
+        ],
+        "changed": [
+          "The primary web entry uses the new assessment shell; existing participant, invitation and legacy routes remain available.",
+          "Assessment views separate navigation from stage changes and preserve explicit permission scopes."
+        ],
+        "fixed": [
+          "Held or refused reports remain visible as honest states, with mobile layout and report-number readability improvements."
+        ],
+        "security": [
+          "Credential-bearing route changes retain the accepted forwarding behavior; no new permission inheritance is introduced."
+        ]
+      }
+    },
     {
       "version": "0.1.0",
       "status": "candidate",
