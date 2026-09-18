@@ -76,7 +76,7 @@ test('root route forwards shared credentials to dedicated page, invitations rema
   const fn = source.slice(source.indexOf('function scrubCredentialHash()'), source.indexOf('function resetIdentity()'));
   for (const [hash, destination] of [['#survey=link-secret', '/participate/#survey=link-secret'], ['#invite=invite-secret', '/legacy/#invite=invite-secret']]) {
     const events = [];
-    runInNewContext(fn + '\nscrubCredentialHash();', { location: { hash, pathname: '/', replace: value => events.push(value) }, history: { replaceState: () => events.push('scrub') }, LEGACY_HASHES: new Set() });
+    runInNewContext(fn + '\nscrubCredentialHash();', { demo: false, location: { hash, pathname: '/', replace: value => events.push(value) }, history: { replaceState: () => events.push('scrub') }, LEGACY_HASHES: new Set() });
     assert.deepEqual(events, ['scrub', destination]);
   }
 });
