@@ -308,11 +308,16 @@ function bind(current) {
   app.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => act(aid, 'Removing survey…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/surveys/${encodeURIComponent(b.dataset.remove)}`, { method: 'DELETE' }); return r.archived ? `Survey archived: ${r.preserved_responses} response(s), ${r.preserved_codes} code(s), ${r.preserved_invitations} invitation(s) kept. Collection is closed for it; including it again restores it.` : 'Survey removed from this assessment; nothing had been collected for it.'; }));
 }
 // Share card binding: model keyed to (aid, sid, epoch) and cleared with identity; repaint of the card only (no network in paint).
+function currentShareRoute() {
+  const r = route(location.hash), model = state.share;
+  if (model && (r.kind !== 'survey' || r.id !== model.aid || r.sid !== model.sid || epoch !== model.epoch)) state.share = null;
+  return state.share;
+}
 function bindShare(current, s) {
   const root = app.querySelector('#share-root'); if (!root) return;
   const model = share.shareFor(state, current.assessment.id, s.id, epoch);
-  const ctx = { esc, enc: encodeURIComponent };
-  const onChange = () => { root.innerHTML = share.render(ctx, { current, survey: s, share: model }); share.bind(ctx, root, { current, survey: s, share: model, api, onChange }); };
+  const ctx = { esc, enc: encodeURIComponent, isCurrent: () => currentShareRoute() === model };
+  const onChange = () => { const el = app.querySelector('#share-root'); if (!el) return; el.innerHTML = share.render(ctx, { current, survey: s, share: model }); share.bind(ctx, el, { current, survey: s, share: model, api, onChange }); };
   share.bind(ctx, root, { current, survey: s, share: model, api, onChange });
 }
 function bindPrepare(current) {
@@ -354,6 +359,7 @@ async function fetchAssessment(aid) {
 }
 async function render() {
   const gen = ++generation, r = route(location.hash);
+  currentShareRoute();
   if (r.kind === 'assessment' || r.kind === 'survey') {
     const aid = r.id;
     if (state.current?.assessment.id !== aid || state.dirty.has(aid)) {

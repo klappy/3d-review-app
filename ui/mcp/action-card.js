@@ -1,5 +1,5 @@
 // Host-call presentation only. No automatic tool calls or persisted arguments/tokens.
-export function createActionCard({ root, esc, call, explore, execution, canExplore = () => true }) {
+export function createActionCard({ root, esc, call, explore, execution, canExplore = () => true, canConfirm = canExplore }) {
   let input = null, envelope = null, pending = null, busy = false, message = '';
   const decode = event => event?.structuredContent || (() => { try { return JSON.parse(event?.content?.[0]?.text); } catch { return event; } })();
   const label = cap => ({'cap.grant.invite':'Invite collaborator','cap.report.build':'Build report','cap.workspace.delete':'Delete workspace','cap.assessment.get':'Assessment','cap.project.get':'Project','cap.workspace.get':'Workspace'}[cap] || (typeof cap === 'string' ? cap.replace(/^cap\./, '').split('.').join(' ') : '3D Review guidance'));
@@ -27,11 +27,11 @@ export function createActionCard({ root, esc, call, explore, execution, canExplo
         state = pending ? 'preview' : 'complete';
       }
     }
-    root.innerHTML = `<section class="panel action-card" data-state="${state}"><h2>${esc(title)}</h2><p>${esc(message || body)}</p>${questions}${pending ? `<p class="small">Action: ${esc(label(pending.capability))} · scope ${esc(pending.params.scope || '')} ${esc(pending.params.id || pending.params.aid || '')}${pending.capability === 'cap.grant.invite' ? ` · recipient ${esc(pending.params.email || '')} · role ${esc(pending.params.role || '')}` : ''}</p>${impactDetails(pending.impact)}<p class="small">Confirmation expires in ${esc(pending.expiresIn)} seconds.</p><div class="actions"><button data-card-confirm ${busy ? 'disabled' : ''}>Confirm action</button><button data-card-cancel ${busy ? 'disabled' : ''}>Cancel</button></div>` : ''}${trace(env)}<button class="quiet" data-card-explore ${busy || !canExplore() ? 'disabled' : ''}>Open workspaces</button></section>`;
+    root.innerHTML = `<section class="panel action-card" data-state="${state}"><h2>${esc(title)}</h2><p>${esc(message || body)}</p>${questions}${pending ? `<p class="small">Action: ${esc(label(pending.capability))} · scope ${esc(pending.params.scope || '')} ${esc(pending.params.id || pending.params.aid || '')}${pending.capability === 'cap.grant.invite' ? ` · recipient ${esc(pending.params.email || '')} · role ${esc(pending.params.role || '')}` : ''}</p>${impactDetails(pending.impact)}<p class="small">Confirmation expires in ${esc(pending.expiresIn)} seconds.</p><div class="actions"><button data-card-confirm ${busy || !canConfirm() ? 'disabled' : ''}>Confirm action</button><button data-card-cancel ${busy ? 'disabled' : ''}>Cancel</button></div>` : ''}${trace(env)}<button class="quiet" data-card-explore ${busy || !canExplore() ? 'disabled' : ''}>Open workspaces</button></section>`;
     root.querySelector('[data-card-explore]').onclick = () => { if (!busy && canExplore()) { pending = null; explore(); } };
     root.querySelector('[data-card-cancel]')?.addEventListener('click', () => { if (!busy) { pending=null; message='Cancelled. No action was executed by this card.'; render(); } });
     root.querySelector('[data-card-confirm]')?.addEventListener('click', async () => {
-      if (busy || !pending) return;
+      if (busy || !pending || !canConfirm()) return;
       const action=pending; pending=null;
       if (Date.now() >= action.expires) { message='Preview expired. Ask the assistant to preview again.'; render(); return; }
       busy=true; execution(true); message='Executing confirmed action…'; render();

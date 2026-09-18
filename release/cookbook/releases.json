@@ -1,7 +1,77 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.11.1",
+  "current": "0.12.0",
   "versions": [
+    {
+      "version": "0.12.0",
+      "status": "candidate",
+      "notes_path": "releases/0.12.0.md",
+      "sections": {
+        "added": [
+          "Live /roadmap reads durable progress and history through six shared HTTP/MCP capabilities, with SSE updates, cursor replay and explicit polling fallback."
+        ],
+        "changed": [
+          "Persona evidence: 3/3 local actual-browser HTTP/MCP write-to-visible cases and 1/1 mobile layout case passed; human satisfaction, confusion and frustration NOT MEASURED."
+        ],
+        "fixed": [],
+        "security": [
+          "Public events use an allowlisted projection; restricted provenance and authenticated publisher identity remain private. Claims do not self-verify completion; corrections support atomic public redaction.",
+          "Publisher permission uses the existing authenticated identity and a narrow server-only build projection. Reviewed additive schema preparation runs only in the matching canonical Git-connected build."
+        ]
+      }
+    },
+    {
+      "version": "0.11.4",
+      "status": "candidate",
+      "notes_path": "releases/0.11.4.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona evidence: 1/1 automated local delayed-connection confirmation case passed; human satisfaction, confusion and frustration NOT MEASURED."
+        ],
+        "fixed": [
+          "MCP danger confirmation waits for host tool capability without consuming the preview; once ready, an explicit click executes once."
+        ],
+        "security": [
+          "Unavailable host tools cannot execute; Cancel stays available and no automatic retry or tool call is introduced."
+        ]
+      }
+    },
+    {
+      "version": "0.11.3",
+      "status": "candidate",
+      "notes_path": "releases/0.11.3.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Feedback guidance provides a minimal note example, HTTP/MCP equivalents, permission and uncertain-outcome recovery through the existing docs tool and topic.",
+          "Persona evidence: local HTTP and MCP discovery/recovery cases improved from 2/7 to 7/7 per face; human satisfaction, confusion and frustration are NOT MEASURED."
+        ],
+        "fixed": [
+          "Capability documentation now exposes existing canonical parameter/result schemas and derived required/optional fields, including authenticated-feedback precondition provenance."
+        ],
+        "security": [
+          "No new tool, permission, accepted-field or feedback-write behavior; examples were executed only in isolated synthetic fixtures."
+        ]
+      }
+    },
+    {
+      "version": "0.11.2",
+      "status": "candidate",
+      "notes_path": "releases/0.11.2.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Survey sharing opens the output choices directly: Copy link, QR code or Print invitations explicitly confirms issuance after access and revocation disclosure."
+        ],
+        "fixed": [
+          "Copy and print failures reuse the received in-memory link; uncertain issuance never retries automatically, and stale identity/page responses cannot reveal credentials."
+        ],
+        "security": [
+          "Existing preview/execute/revoke APIs, role checks and one-time link disclosure remain unchanged; no credential persistence or background issuance."
+        ]
+      }
+    },
     {
       "version": "0.11.1",
       "status": "candidate",

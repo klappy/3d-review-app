@@ -1,30 +1,31 @@
 {
-  "version": "0.11.1",
+  "version": "0.12.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "71d60fb3a76248565b2f266da6c7fcc28850b496",
+  "cookbook_commit": "d535767fafea2207fbdfd92502fa3bb76f25e47b",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.11.1.md",
-      "blob_sha": "6a1e4460b283b119403ab78341d7f9e1517b664a",
-      "sha256": "53a23d975341b171a3f5297672d4842fe09a4a6715c25c45258c121d5f9285ee"
+      "path": "planning/2026-09-16-parity-build/releases/0.12.0.md",
+      "blob_sha": "60188a7a2ab833d516753dacd3c57323a35b0569",
+      "sha256": "0730416ba620a764e5f6c870cf94c48242cb6e9122738b2a82d4793f5f634d5e"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "aeedfea0ed55f05df4def6028ad89b42612f8546",
-      "sha256": "7a849a60884e3bca7786e4efb1fce9741844fe2b63bd0bb442a0fd3f67e56dad"
+      "blob_sha": "1dfdbe6a914a9db9a5eab5ed0f1ef2e8bdad39a8",
+      "sha256": "3a0e9c31681e468e4a9e651a22c88323b352df90e7d71472f65adb6d02444a2b"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "Live /roadmap reads durable progress and history through six shared HTTP/MCP capabilities, with SSE updates, cursor replay and explicit polling fallback."
+      ],
       "changed": [
-        "Persona evidence: 2/2 automated local connection lifecycle cases passed; human satisfaction, confusion and frustration NOT MEASURED."
+        "Persona evidence: 3/3 local actual-browser HTTP/MCP write-to-visible cases and 1/1 mobile layout case passed; human satisfaction, confusion and frustration NOT MEASURED."
       ],
-      "fixed": [
-        "Open workspaces waits for the MCP bridge connection to settle, then becomes available without a stale host-capability refusal."
-      ],
+      "fixed": [],
       "security": [
-        "No automatic tool calls, capability widening or confirmation changes; failed connections retain explicit refusal."
+        "Public events use an allowlisted projection; restricted provenance and authenticated publisher identity remain private. Claims do not self-verify completion; corrections support atomic public redaction.",
+        "Publisher permission uses the existing authenticated identity and a narrow server-only build projection. Reviewed additive schema preparation runs only in the matching canonical Git-connected build."
       ]
     }
   }

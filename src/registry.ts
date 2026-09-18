@@ -17,6 +17,8 @@ export interface Capability {
   undo_token?: boolean;
   danger?: { two_step: boolean; modes: string[]; twin_never_get: boolean; effect: string };
   public: boolean;
+  params_schema?: { type?: string; properties?: Record<string, unknown>; required?: string[]; [key: string]: unknown };
+  result_schema?: Record<string, unknown>;
 }
 export const capabilities = (contract as any).capabilities as Capability[];
 export const byId = new Map(capabilities.map((c) => [c.id, c]));

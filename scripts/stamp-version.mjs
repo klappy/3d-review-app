@@ -15,12 +15,15 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { stampRoadmapPermissions } from "./stamp-roadmap-permissions.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const outArg = process.argv.indexOf("--out");
 const outDir = outArg >= 0 && process.argv[outArg + 1] ? process.argv[outArg + 1] : (process.env.STAMP_OUT_DIR || root);
 const readJson = (p) => JSON.parse(readFileSync(join(root, p), "utf8"));
 const fail = (msg) => { console.error(`stamp-version: ${msg}`); process.exit(1); };
+
+stampRoadmapPermissions(outDir,process.env);
 
 const manifest = readJson("release/release-manifest.json");
 const pkg = readJson("package.json");
