@@ -10,7 +10,11 @@ export function installRoadmapStream(app:Hono<{Bindings:Env}>,context:(req:Reque
   if(!await allow(c.env,'RL_HTTP_ANON',`roadmap:${clientIp(c.req.raw)}`))return c.text('Temporarily unavailable.',429);
   const raw=c.req.header('last-event-id')??c.req.query('after')??'0';if(!/^\d{1,16}$/.test(raw)||!Number.isSafeInteger(Number(raw)))return c.text('Invalid cursor.',400);
   const generation=c.req.query('generation');if(generation!==undefined&&!/^\d{1,16}$/.test(generation))return c.text('Invalid generation.',400);
-  const ctx=await context(c.req.raw,c.env);let after=Number(raw),seenGeneration=generation===undefined?null:Number(generation);
+  // EventSource includes same-origin cookies even with withCredentials:false.
+  // This public projection never resolves or audits a viewer's signed-in identity.
+  const publicHeaders=new Headers(c.req.raw.headers);publicHeaders.delete('cookie');publicHeaders.delete('authorization');
+  const publicRequest=new Request(c.req.url,{headers:publicHeaders});
+  const ctx=await context(publicRequest,c.env);let after=Number(raw),seenGeneration=generation===undefined?null:Number(generation);
   c.header('Cache-Control','no-store');c.header('X-Content-Type-Options','nosniff');
   const response=streamSSE(c,async stream=>{
    let closed=false;stream.onAbort(()=>{closed=true;});const end=Date.now()+30000;

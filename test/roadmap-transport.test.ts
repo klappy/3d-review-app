@@ -39,3 +39,11 @@ it('trusted serving verifier needs no second account, but rejects fabricated ide
  const outbound=vi.fn().mockResolvedValue(new Response(JSON.stringify({ok:true,result:{version:'0.12.0',commit:'b'.repeat(40)}}),{headers:{'content-type':'application/json'}}));vi.stubGlobal('fetch',outbound);
  try{expect((await call('verify',p,'publisher','dry_run')).ok).toBe(false);outbound.mockImplementation(async()=>new Response(JSON.stringify({ok:true,result:{version:'0.12.0',commit:'a'.repeat(40)}}),{headers:{'content-type':'application/json'}}));const v=await commit('verify',p,'publisher');expect(v.ok).toBe(true);expect(outbound.mock.calls.every(c=>c[0]==='https://dev.3dreview.app/v2/health')).toBe(true);const r=await call('read',{});expect(r.result.items[0].value.stages.dev.reason).toContain('does not prove browser');expect((await call('verify',{...p,environment:'production'},'publisher','dry_run')).ok).toBe(false);}finally{vi.unstubAllGlobals();}
 });
+
+it('public SSE ignores signed-in cookies and bearer credentials in every read audit',async()=>{
+ for(const headers of [{cookie:'session='+tokens.publisher},{authorization:'Bearer '+tokens.publisher}]){
+  const before=await db.prepare('SELECT trace_id FROM trace').all<{trace_id:string}>();const ids=new Set(before.results.map(x=>x.trace_id));
+  const r=await app.fetch(new Request('https://app.test/v2/roadmap/stream',{headers}),env);expect(r.status).toBe(200);const reader=r.body!.getReader();await reader.read();await reader.read();await reader.cancel();
+  const after=await db.prepare('SELECT trace_id,actor,spans_json FROM trace').all<{trace_id:string;actor:string;spans_json:string}>();const added=after.results.filter(x=>!ids.has(x.trace_id));expect(added.length).toBeGreaterThanOrEqual(2);expect(added.every(x=>x.actor==='anon'&&!x.spans_json.includes('publisher'))).toBe(true);
+ }
+});
