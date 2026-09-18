@@ -406,7 +406,7 @@ function mountView(current, tab, gen) {
 // Pure replay from the cached model: renderBlankPrint draws the preview + Print button (printing mounts a .stage-print-only
 // child DIRECTLY on <body>, Auditor 2A-1); the status line is derived from the model, never from the previous DOM.
 function replayPrint(model) {
-  renderBlankPrint(document, app.querySelector('#print-root'), model, { paper: 'a4' });
+  renderBlankPrint(document, app.querySelector('#print-root'), model);
   app.querySelector('#print-status').textContent = `${model.items.length} questions ready. Use Print below.`;
 }
 // P2 keep test: the cached paper survives a repaint only for the same survey route, the same assessment, the same survey-set
