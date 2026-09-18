@@ -1,30 +1,30 @@
 {
-  "version": "0.11.2",
+  "version": "0.11.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "20acad96bc67d9ddfdc8eefb0e99fab36608b4d5",
+  "cookbook_commit": "d0cb9a895a6639ff223ffedfdc649fc764c9c13d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.11.2.md",
-      "blob_sha": "d881cb490b2f3b4518b4c3f5424d9521a71b25ca",
-      "sha256": "6a5a9e675802220ee1992c6dbe4be631747337601f881cb35ae42e54d3606968"
+      "path": "planning/2026-09-16-parity-build/releases/0.11.4.md",
+      "blob_sha": "3cde2e352bcfa7fb85c0bddcc7a58d0bafe4db49",
+      "sha256": "de4bddaca9f75a76376eda6fb2cf40c03be1c4a6d5a385fd97ea3261d513cdaf"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "ddcd6bd8dca298677646137095194d97f819c687",
-      "sha256": "321545ae615bcac540621026597c7331935cf375eb24b9aef8ae6fca062ccb7c"
+      "blob_sha": "8a3919a9875a910d341e197c173a15943cf6a56a",
+      "sha256": "b7c575edc0637303b44620c72ce67137831c3a37a18e8bf2c234189a813b9cfa"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
       "changed": [
-        "Survey sharing opens the output choices directly: Copy link, QR code or Print invitations explicitly confirms issuance after access and revocation disclosure."
+        "Persona evidence: 1/1 automated local delayed-connection confirmation case passed; human satisfaction, confusion and frustration NOT MEASURED."
       ],
       "fixed": [
-        "Copy and print failures reuse the received in-memory link; uncertain issuance never retries automatically, and stale identity/page responses cannot reveal credentials."
+        "MCP danger confirmation waits for host tool capability without consuming the preview; once ready, an explicit click executes once."
       ],
       "security": [
-        "Existing preview/execute/revoke APIs, role checks and one-time link disclosure remain unchanged; no credential persistence or background issuance."
+        "Unavailable host tools cannot execute; Cancel stays available and no automatic retry or tool call is introduced."
       ]
     }
   }
