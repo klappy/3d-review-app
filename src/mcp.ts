@@ -11,8 +11,8 @@ import { newTraceId } from "./receipt";
 import { APP_VERSION } from "./version";
 import panelHtml from "./mcp-panel.html";
 
-// MCP Apps (ext-apps) panel: ONE resource, served with the app profile MIME; every tool carries its uri in _meta so a UI-capable host
-// renders the panel for any tools/call and the panel then drives the SAME four tools through the host bridge. No fifth tool.
+// MCP Apps (ext-apps) panel: ONE resource, served with the app profile MIME; read/write/danger carry its uri in _meta so a UI-capable host
+// renders a compact result card. Docs stays text-only; explicit exploration drives the SAME four tools. No fifth tool.
 export const PANEL_URI = "ui://3d-review/panel.html";
 export const PANEL_MIME = "text/html;profile=mcp-app";
 const UI_META = { ui: { resourceUri: PANEL_URI }, "ui/resourceUri": PANEL_URI };
@@ -21,7 +21,7 @@ export type Execute = (ctx: Ctx, capability: string, params: Record<string, any>
 export type Docs = (ctx: Ctx, args: Record<string, any>) => Promise<any>;
 
 const TOOL_DEFS = [
-  { name: "docs", _meta: UI_META, description: "Front door. No args → orientation (what 3D Review is, the four tools, auth, capability index, your roles). {capability} → that capability's page. {topic} → glossary | permissions | reversibility | telemetry | privacy | stages. {role, scope} → what you can do here. {q} → search. Role-aware, never role-leaking.",
+  { name: "docs", description: "Front door. No args → orientation (what 3D Review is, the four tools, auth, capability index, your roles). {capability} → that capability's page. {topic} → glossary | permissions | reversibility | telemetry | privacy | stages. {role, scope} → what you can do here. {q} → search. Role-aware, never role-leaking.",
     inputSchema: { type: "object", properties: { capability: { type: "string" }, topic: { type: "string" }, role: { type: "string" }, scope: { type: "object", properties: { type: { type: "string" }, id: { type: "string" } } }, q: { type: "string" } } } },
   { name: "read", _meta: UI_META, description: "Execute any class=read capability by id. Same handler, receipt and errors as the HTTP twin.",
     inputSchema: { type: "object", required: ["capability"], properties: { capability: { type: "string" }, params: { type: "object" } } } },
