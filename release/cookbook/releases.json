@@ -1,7 +1,22 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.14.0",
+  "current": "0.14.1",
   "versions": [
+    {
+      "version": "0.14.1",
+      "status": "candidate",
+      "notes_path": "releases/0.14.1.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Roadmap version resolves from canonical health on initial page load, including tabs retaining participant state."
+        ],
+        "security": [
+          "Participant routes retain lazy health loading; version reads omit credentials and disable caching."
+        ]
+      }
+    },
     {
       "version": "0.14.0",
       "status": "candidate",

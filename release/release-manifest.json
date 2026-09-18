@@ -1,32 +1,28 @@
 {
-  "version": "0.14.0",
+  "version": "0.14.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "0dacbc08319bd8e416739d2f988c484152917f3c",
+  "cookbook_commit": "fda32bcddef097f5cf5b70a29ec0918048093ca4",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.14.0.md",
-      "blob_sha": "655edc661b064e7f39edd36c20c1be73476378c8",
-      "sha256": "9988f5412427dc2ee7deffe996e64577097d030d1f91b27d7bf3e20aadf96019"
+      "path": "planning/2026-09-16-parity-build/releases/0.14.1.md",
+      "blob_sha": "c8fff59c4adc176bfe29fc040d69cac83c45cde1",
+      "sha256": "e5a027ddc10d71466a3b5257092a5333a90a0a57c21586ffe9b8f2cf2f5f032e"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "56c7e843da94b2cf9e3d3534bcbff3a2460c2d82",
-      "sha256": "9b2f9fc0dc00c15e8c7c2086e5594abe7ce5893885ac8548630224c6ad7f0741"
+      "blob_sha": "4173059bf5aba47cbbbdd44618272dddea0eeae0",
+      "sha256": "8b97c9ef251b69303fb1dadc17d8e3e4dd5a3eba1697c40b0b881af85489dff5"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Explicit Past, Now and Next workflow windows, reviewed operational context and work-type/release badges through the existing shared HTTP/MCP roadmap contract."
-      ],
-      "changed": [
-        "Reported progress is separate from verifier acceptance; missing placement remains unclassified and transport details are secondary."
-      ],
+      "added": [],
+      "changed": [],
       "fixed": [
-        "Human-readable cards expose stages, current work, blockers and next action without opening details."
+        "Roadmap version resolves from canonical health on initial page load, including tabs retaining participant state."
       ],
       "security": [
-        "Existing publication/reviewer permissions, confirmation, public text safety, redaction and source privacy remain enforced."
+        "Participant routes retain lazy health loading; version reads omit credentials and disable caching."
       ]
     }
   }
