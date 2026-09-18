@@ -1,0 +1,23 @@
+/* MCP presentation consumes the existing light/dark token palette. */
+:root { --muted:var(--secondary); --edge:var(--glass-edge); color:var(--ink); background:var(--ground); color-scheme:light; }
+:root[data-theme="dark"] { color-scheme:dark; }
+:root[data-theme-pending] body { visibility:hidden; }
+body { color:var(--ink); background:radial-gradient(ellipse at 0% 8%,var(--aurora-mint),transparent 55%),radial-gradient(ellipse at 96% 28%,var(--aurora-lilac),transparent 58%),radial-gradient(ellipse at 48% 95%,var(--aurora-sky),transparent 60%),var(--ground); }
+.panel-head { background:var(--glass); }
+button,.button { background:var(--button-fill); box-shadow:var(--shadow-button); }
+button:hover,.button:hover { background:var(--paper); box-shadow:var(--shadow-button-hover); }
+button.primary,.button.primary { background:var(--green); color:white; }
+button.primary:hover,.button.primary:hover { background:var(--green); }
+.quiet { background:transparent; }
+input:not([type=checkbox]):not([type=radio]),select,textarea,dialog,.report-lens { background:var(--paper); color:var(--ink); }
+.panel { box-shadow:var(--shadow-panel); }
+.badge { background:var(--badge-fill); color:var(--badge-ink); }
+.note { background:var(--note-fill); }
+.tabs { background:var(--glass); border-color:var(--edge); }
+.tabs a[aria-current=page],.tabs span[aria-current=step],.view-tabs a[aria-current=page] { background:var(--nav-active); }
+:focus-visible { outline-color:var(--focus); }
+[data-theme="dark"] a:not(.button):not(.entity-card),[data-theme="dark"] .brand span { color:var(--receipt); }
+[data-theme="dark"] #status.alert { color:var(--warning-ink); }
+.theme-control { display:flex; align-items:center; gap:8px; font-size:13px; }
+.theme-control select { width:auto; min-height:36px; margin:0; padding:5px 8px; }
+@media(prefers-reduced-transparency:reduce) { .panel,header,dialog { background:var(--paper); } }
