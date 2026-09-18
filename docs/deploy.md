@@ -2,6 +2,9 @@
 
 **Target:** `main` delivers the existing `3d-review-dev` Worker; `production` delivers the existing `3d-review` Worker through separately reviewed captain-owned main-to-production promotion. Staging is optional future scope only if needed.
 
+
+Canonical web domains are `dev.3dreview.app` (DEV) and `3dreview.app` (production). See [project domains](domains.md) for retained aliases, Access prerequisites and verification limits.
+
 ## Status and authority
 
 This is a proposed correction, not evidence of applied provider settings. Before cutover, the historical listeners are phase0→DEV and main→production; refresh actual state before use. After cutover, require recorded readbacks of main→DEV and production→production. The [release hold and gates](release.md) remain binding. The [control-plane request artifact](release/a8-control-plane-plan.json) is review-only and cannot execute anything. Order A authoring grants no Order B cutover, merge or production authority.

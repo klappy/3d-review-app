@@ -1,7 +1,7 @@
 // MCP authorization end to end through the real worker entry (src/worker.ts): discovery → DCR → PKCE code flow with the
 // Cloudflare Access identity stubbed at the JWKS fetch → delegated MCP call → revoke. Borrowed provider is NOT mocked.
 import { readFileSync } from "node:fs";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import worker from "../src/worker";
 import { mintSession } from "../src/auth";
@@ -16,7 +16,7 @@ function statements(db: D1Database, path: string) {
 }
 const b64u = (b: ArrayBuffer | Uint8Array | string) => { const bytes = typeof b === "string" ? new TextEncoder().encode(b) : new Uint8Array(b); return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
 let env: any; let kp: CryptoKeyPair; let jwks: any;
-const ORIGIN = "https://3dr.test";
+let ORIGIN = "https://3dr.test";
 const ectx = () => ({ waitUntil() {}, passThroughOnException() {}, props: undefined }) as any;
 const call = (path: string, init: RequestInit = {}) => worker.fetch(new Request(ORIGIN + path, { redirect: "manual", ...init }), env, ectx());
 async function accessJwt(email: string) {
@@ -55,12 +55,14 @@ async function toConsent(clientId: string, challenge: string, email: string) {
 }
 const consent = (cookie: string, ticket: string, decision: string) => call("/oauth/consent", { method: "POST", headers: { cookie, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ ticket, decision }).toString() });
 
-describe("MCP authorization (borrowed provider + Access email-code + consent)", () => {
+describe.each(["https://3dr.test", "https://dev.3dreview.app", "https://3dreview.app"])("MCP authorization at %s (borrowed provider + Access email-code + consent)", (origin) => {
+  beforeEach(() => { ORIGIN = origin; });
   it("unauthenticated /mcp is refused with a discovery pointer; metadata advertises DCR + PKCE", async () => {
     const r = await mcpCall(undefined, "read", "cap.auth.me");
     expect(r.status).toBe(401); expect(r.headers.get("www-authenticate") ?? "").toMatch(/Bearer/i);
     const meta: any = await (await call("/.well-known/oauth-authorization-server")).json();
     expect(meta.authorization_endpoint).toBe(ORIGIN + "/authorize"); expect(meta.token_endpoint).toBe(ORIGIN + "/token");
+    expect(meta.issuer).toBe(ORIGIN);
     expect(meta.registration_endpoint).toBe(ORIGIN + "/register"); expect(meta.code_challenge_methods_supported).toContain("S256");
   });
 
@@ -131,6 +133,9 @@ describe("MCP authorization (borrowed provider + Access email-code + consent)", 
     stubJwks();
     const r = await call("/v2/auth/access", { headers: { "cf-access-jwt-assertion": await accessJwt("demo.owner@example.invalid") } });
     expect(r.status).toBe(302); expect(r.headers.get("location")).toMatch(/^\/#session=/);
+    expect(new URL(r.headers.get("location")!, ORIGIN).origin).toBe(ORIGIN);
+    expect(r.headers.get("set-cookie")).toContain("Secure");
+    expect(r.headers.get("set-cookie")).not.toMatch(/Domain=/i);
   }, 60_000);
   it("pre-auth metering: a junk bearer cannot dodge the dampener or buy storage reads (review #15-1)", async () => {
     const limiter = (limit: number) => { const seen = new Map<string, number>(); return { seen, limit: async ({ key }: { key: string }) => { const n = (seen.get(key) ?? 0) + 1; seen.set(key, n); return { success: n <= limit }; } }; };

@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.6.0",
+  "current": "0.7.0",
   "versions": [
+    {
+      "version": "0.7.0",
+      "status": "candidate",
+      "notes_path": "releases/0.7.0.md",
+      "sections": {
+        "added": [
+          "Canonical DEV domain dev.3dreview.app and production domain 3dreview.app on the existing Workers, with previous addresses retained as compatible aliases."
+        ],
+        "changed": [
+          "Invitation emails use the canonical origin for their environment; browser-created participant links remain on the current origin."
+        ],
+        "fixed": [],
+        "security": [
+          "Existing authentication audiences, host-only sessions, OAuth callback validation and participant fragment handling remain unchanged. New sign-in paths require matching Cloudflare Access destinations."
+        ]
+      }
+    },
     {
       "version": "0.6.0",
       "status": "candidate",
