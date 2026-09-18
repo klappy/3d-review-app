@@ -1,30 +1,30 @@
 {
-  "version": "0.13.0",
+  "version": "0.13.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "d52a7c700751ae4725e46b06446acfe440f3aa9f",
+  "cookbook_commit": "9d6a92c2f18e6f6e9660a825447c01a13405c49d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.13.0.md",
-      "blob_sha": "02d250aea9cb5d8276a5dbf9ca2c7170352b705f",
-      "sha256": "e6aa2c959578fc12a570f8627e2c21b93adf485e4cd68ed154c2dd04e9b57842"
+      "path": "planning/2026-09-16-parity-build/releases/0.13.1.md",
+      "blob_sha": "4f6c6a2870513d68608c89b600f5d3c439f3d446",
+      "sha256": "0bab1c92e06f745a317ebdf63d21c2991acaee237d109e24a1703e86c7484913"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "4f008db367d3c09f5ef802a489ff9921b2a5744a",
-      "sha256": "ddaa2d95524c0526cd4feb41a623c291dbabb17303681ea7929bfa80e5d0f577"
+      "blob_sha": "96342d84ded9888e6aca5b39e402e9a9fcee9b17",
+      "sha256": "0ec206ba45165bb0778e87cfe045900e2aa9ffd49ac8d3a10feb8442c646ae14"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Feedback records capture trusted submission-server identity and optional, explicitly client-reported experience identity for support-only readback."
-      ],
+      "added": [],
       "changed": [
-        "Persona evidence: 18/18 automated local HTTP/MCP provenance scenarios passed; automatic loaded-client capture and deployed operator journeys untested; human satisfaction, confusion and frustration NOT MEASURED."
+        "Persona evidence: nine local feedback DOM tests passed; deployed reporter and real-human outcomes not measured."
       ],
-      "fixed": [],
+      "fixed": [
+        "Feedback opens with the user\u2019s problem or suggestion; experience ratings remain optional in a secondary disclosure."
+      ],
       "security": [
-        "Strict bounded metadata allowlists, existing authentication/support gates and private trace/receipt projections; legacy provenance remains unknown without backfill."
+        "Existing authentication, payload privacy, identity isolation and uncertain-send handling remain unchanged."
       ]
     }
   }
