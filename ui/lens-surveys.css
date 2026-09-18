@@ -1,0 +1,18 @@
+/* Surveys by lens (source: views-coordinator V._collect survey cards per perspective, grouped by the three lenses).
+   Uses the existing glass/panel/three/row/eyebrow/note tokens; visible on the Prepare and Collect phases only. */
+@media screen {
+  .rv #lens-surveys-root { margin-top:12px; }
+  .rv .lens-groups .lens-group { margin:0; padding:14px; }
+  .rv .lens-group h4 { margin:0 0 2px; font-size:16px; }
+  .rv .lens-included { list-style:none; margin:8px 0 0; padding:0; }
+  .rv .lens-included li { padding:8px 0; border-top:1px solid var(--line); }
+  .rv .lens-included li .row { margin-top:6px; gap:8px; }
+  .rv .lens-available { margin-top:10px; border-top:1px dashed var(--glass-edge); padding-top:8px; }
+  .rv .lens-available .row { justify-content:space-between; margin:6px 0; gap:8px; }
+  .rv .lens-surveys button { min-height:32px; }
+  body[data-workspace-phase="understand"] #lens-surveys-root,
+  body[data-workspace-phase="improve"] #lens-surveys-root { display:none; }
+  /* Survey screen: the lens list leaves; the survey card (links, codes, print, status) is the screen. */
+  .rv[data-entity-level="survey"] #lens-surveys-root { display:none; }
+  .rv[data-entity-level="assessment"] #survey-card { display:none; }
+}

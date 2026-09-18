@@ -1,0 +1,29 @@
+{
+  "version": "0.6.0",
+  "cookbook_repo": "klappy/3d-review-cookbook",
+  "cookbook_commit": "ef5879b1a600b77a9249d1a81be12bb4022e1098",
+  "records": [
+    {
+      "path": "planning/2026-09-16-parity-build/releases/0.6.0.md",
+      "blob_sha": "7cd2a54414d572088b149669c7496a74cc1639f8",
+      "sha256": "479f7a7e2c9dc2b4978339aa432bad7fe00cfc34cd7aed6f94108deb0438986c"
+    },
+    {
+      "path": "planning/2026-09-16-parity-build/releases/releases.json",
+      "blob_sha": "6e820cfe54afdb8c30b08f87a12e4b20ae0f6fc2",
+      "sha256": "0fbc08d77ed56800a1bc9dac37ce1c2783e0e2eb779732a8f4fc121d1eaf48de"
+    }
+  ],
+  "changelog": {
+    "sections": {
+      "added": [],
+      "changed": [
+        "Outbound collaborator invitations use native Cloudflare Email Sending from noreply@3dreview.app instead of the Resend HTTP API."
+      ],
+      "fixed": [],
+      "security": [
+        "Existing recipient validation, synthetic-address refusal, DEV hash allowlist, invitation intent deduplication and uncertain-send protections remain in force; no inbox or forwarding is configured."
+      ]
+    }
+  }
+}

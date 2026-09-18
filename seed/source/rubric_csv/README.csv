@@ -1,0 +1,37 @@
+3D Quality Review — Scoring Rubric
+"Working draft, version 0.1 — 2026-05-11"
+""
+Purpose
+This workbook is the scoring rubric for the 3D Quality Review questionnaire instrument. Each row in the Items sheet is one survey question; each row in the Options sheet is one answer choice with its score value. Together they define how raw responses convert to numeric measures used in team self-assessment and strategic comparison reports.
+""
+Three lenses
+• Translators / Validation — process-heavy; one form (Validation).
+"• Community / Reception — reader/listener experience; three medium variants (Written, Audio, Video/Sign)."
+"• Church / Affirmation — ecclesial judgment; four role variants (Consultant, Involved Pastor, Community Pastor, Denominational Leader)."
+""
+Item types and scoring rules
+"• ordinal-scored: Single-select with a best-to-worst continuum. Best = 100, worst = 0, intermediate options linearly spaced (4-option: 100/67/33/0; 3-option: 100/50/0; 5-option: 100/75/50/25/0)."
+"• multi-capability-scored: Multi-select where checked options indicate practice or capability coverage. Score = (sum of weights of checked options) / (sum of all weighted options, excluding 'Other') × 100. Options flagged 'exclusion' force the item score to 0 when checked. If 'Other' is the only option checked, the item is excluded from scoring entirely (null), not scored near-zero."
+• multi-problem-scored: Multi-select where checked options indicate problems. Score = 100 − (problems checked / total problem options) × 100.
+"• descriptive: Profile information (translation type, denominational landscape, age range). Not scored — used as filters and context."
+"• open-text: Free-text questions. Theme-coded, not scored."
+""
+Missing data
+"Options flagged 'missing' (e.g., 'I don't have enough information to say', 'We did not have a prior agreement', 'Other') are excluded from sub-dimension means rather than scored as 0. The proportion of 'missing' responses per lens is tracked as evidence quality (see EvidenceQuality sheet)."
+""
+Aggregation
+"Item scores → sub-dimension scores (mean of non-missing items, optionally weighted) → lens score (mean of sub-dimensions, NOT mean of items). No single composite quality score is computed — the profile is the headline. An item flagged 'standalone_indicator' (e.g. ML-Q10) is excluded from its sub-dimension's mean and reported on its own instead."
+""
+Triangulation
+Constructs measured by multiple lenses are reported as both a triangulated mean and an agreement metric (max − min across contributing lenses). See CrossLens sheet.
+""
+Sheets in this workbook
+"• Items — one row per survey question (lens, form, sub-dimension, type, notes)."
+"• Options — one row per answer choice (score, weight, missing/exclusion flags)."
+• SubDimensions — definitions and lens membership.
+• CrossLens — triangulation construct map.
+• EvidenceQuality — metadata fields tracked per lens.
+"• Vocab_Region, Vocab_Methodology, Vocab_Maturity, Vocab_Organization — controlled vocabularies for strategist filters."
+""
+Pair with
+"scoring_rubric_draft.md — narrative spec covering design principles, aggregation math, and decisions log. This workbook is the structured, machine-readable companion."

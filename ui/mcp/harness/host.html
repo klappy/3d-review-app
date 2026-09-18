@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Local bridge harness — NOT a supported host</title>
+<style>body{font:14px sans-serif;margin:0}#bar{padding:8px 12px;background:#fde68a;border-bottom:1px solid #d97706}iframe{width:100%;height:calc(100vh - 40px);border:0}</style></head>
+<body><div id="bar">LOCAL BRIDGE HARNESS — official ext-apps AppBridge + PostMessageTransport, forwarding tools/call to this worker's /mcp with a bearer. This is not a supported assistant host and proves the bridge contract only.</div>
+<iframe id="app" sandbox="allow-scripts allow-same-origin"></iframe>
+<script src="/mcp/harness/bridge-global.js"></script>
+<script>
+(async () => {
+  const bearer = sessionStorage.getItem('harnessBearer') || '';
+  const log = []; window.__rpc = log;
+  const res = await fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + bearer }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'resources/read', params: { uri: 'ui://3d-review/panel.html' } }) });
+  const j = await res.json(); log.push({ method: 'resources/read', status: res.status, mime: j.result?.contents?.[0]?.mimeType });
+  const html = j.result?.contents?.[0]?.text; if (!html) { document.getElementById('bar').textContent += ' — resources/read failed: ' + JSON.stringify(j).slice(0, 200); return; }
+  const iframe = document.getElementById('app'); iframe.srcdoc = html;
+  const bridge = new window.McpHost.AppBridge(null, { name: 'local-bridge-harness', version: '0.0.0' }, { serverTools: {}, openLinks: {} });
+  bridge.oncalltool = async (params) => { const r = await fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + bearer }, body: JSON.stringify({ jsonrpc: '2.0', id: log.length + 2, method: 'tools/call', params }) }); const jj = await r.json(); log.push({ method: 'tools/call', tool: params.name, capability: params.arguments?.capability, mode: params.arguments?.mode, status: r.status, ok: jj.result?.structuredContent?.ok, code: jj.result?.structuredContent?.error?.code }); return jj.result; };
+  bridge.onopenlink = async ({ url }) => { log.push({ method: 'openLink', url }); return {}; };
+  bridge.oninitialized = () => log.push({ method: 'initialized' });
+  window.__push = env => bridge.sendToolResult({ content: [{ type: 'text', text: JSON.stringify(env) }], structuredContent: env });
+  await new Promise(r => iframe.addEventListener('load', r, { once: true }));
+  await bridge.connect(new window.McpHost.PostMessageTransport(iframe.contentWindow, iframe.contentWindow));
+})();
+</script></body></html>

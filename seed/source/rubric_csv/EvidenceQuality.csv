@@ -1,0 +1,23 @@
+lens,field_code,description,value_type
+Translation Team — TR,team-size,Total team members present,Numeric count
+Translation Team — TR,role-coverage,"Roles represented (lead translator, translator, drafter, reviewer, consultant)",Multi-select / list
+Translation Team — TR,education-distribution,Counts at primary / secondary / tertiary education levels,Three numeric counts
+Translation Team — TR,dont-know-rate,% of items answered 'Other (please describe)' or skipped,Computed
+Community,groups-count,Number of respondent groups across media variants,Numeric
+Community,total-participants,Sum of participants across groups,Numeric
+Community,selection-method-mix,Mix of random / purposive / church-based / community-nominated,Multi-select
+Community,setting-coverage,Mix of city / town / village settings represented,Multi-select
+Community,age-range-coverage,Age range represented across groups,Text / range
+Community,gender-mix,Distribution of all-male / all-female / mixed groups,Computed
+Community,media-coverage,Which media variants completed (written / audio / video-sign),Multi-select
+Church,role-types-count,Number of distinct role types represented (consultant / involved pastor / community pastor / denom leader),Numeric (max 4)
+Church,consultant-accreditation,UBS / SIL / Other / None for consultant respondent,Categorical
+Church,consultant-mother-tongue,Mother-tongue speaker of target language (yes/no),Boolean
+Church,prior-familiarity-distribution,Distribution across None / Aware / Has reviewed portions / Has reviewed fully,Computed
+Church,denominational-diversity,Number of distinct denominations among pastor respondents,Numeric
+Church,dont-know-rate,% of items answered 'I don't have enough information to say',Computed
+Translation Team — ML,ml-respondent-count,Number of Mid-Level respondents,Numeric count
+Translation Team — ML,ml-role-types,Role types represented (Facilitator / Team Leader / CiT / Translation Advisor / Other),Multi-select / list
+Translation Team — ML,ml-tenure,How long each ML respondent has been working with this translation team,Multi-select (< 6 months / 6-12 months / 1-3 years / 3+ years)
+Translation Team — ML,ml-mother-tongue,Mother-tongue status relative to the receptor language,Categorical (yes / closely-related / no)
+Translation Team — ML,dont-know-rate,% of items answered 'Other (please describe)' or skipped,Computed

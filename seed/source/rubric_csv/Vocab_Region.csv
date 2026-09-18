@@ -1,0 +1,23 @@
+code,name,parent_code,notes
+AFR,Africa,,Continent top-level
+AFR-W,West Africa,AFR,
+AFR-C,Central Africa,AFR,
+AFR-E,East Africa,AFR,
+AFR-S,Southern Africa,AFR,
+AFR-N,North Africa,AFR,Overlaps with MENA — resolve by convention
+AME,Americas,,
+AME-N,North America,AME,
+AME-C,Central America & Caribbean,AME,
+AME-S,South America,AME,
+ASI,Asia,,
+ASI-S,South Asia,ASI,
+ASI-SE,Southeast Asia,ASI,
+ASI-E,East Asia,ASI,
+ASI-C,Central Asia,ASI,
+EUR,Europe,,No sub-regions proposed
+MENA,Middle East & North Africa,,Overlaps with AFR-N — pick one convention
+PAC,Pacific / Oceania,,
+PAC-MEL,Melanesia,PAC,
+PAC-POL,Polynesia,PAC,
+PAC-MIC,Micronesia,PAC,
+PAC-ANZ,Australia & New Zealand,PAC,

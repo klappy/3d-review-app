@@ -1,0 +1,182 @@
+{
+  "schema": "3dr-releases/1",
+  "current": "0.6.0",
+  "versions": [
+    {
+      "version": "0.6.0",
+      "status": "candidate",
+      "notes_path": "releases/0.6.0.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Outbound collaborator invitations use native Cloudflare Email Sending from noreply@3dreview.app instead of the Resend HTTP API."
+        ],
+        "fixed": [],
+        "security": [
+          "Existing recipient validation, synthetic-address refusal, DEV hash allowlist, invitation intent deduplication and uncertain-send protections remain in force; no inbox or forwarding is configured."
+        ]
+      }
+    },
+    {
+      "version": "0.5.0",
+      "status": "released",
+      "notes_path": "releases/0.5.0.md",
+      "sections": {
+        "added": [
+          "One self-contained MCP Apps resource, attached to the existing four tools, with SDK host bridge.",
+          "Workspace and project navigation, assessment views, survey inclusion, reflection notes, report reads and assessment invitation confirmation UI.",
+          "Loading, refusal, error and host-capability states. Local AppBridge harness is excluded from deployed assets."
+        ],
+        "changed": [],
+        "fixed": [],
+        "security": [
+          "Resource access uses existing MCP authorization. Tool permission checks and dangerous-operation confirmation remain server-owned. No new tool, API endpoint or database migration."
+        ]
+      },
+      "tag": "v0.5.0",
+      "date": "2026-09-17"
+    },
+    {
+      "version": "0.4.2",
+      "status": "released",
+      "notes_path": "releases/0.4.2.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Reloading after a failed first shared-link open asks for the original link without claiming an earlier participant session or possible submission."
+        ],
+        "security": []
+      },
+      "tag": "v0.4.2",
+      "date": "2026-09-17"
+    },
+    {
+      "version": "0.4.1",
+      "status": "candidate",
+      "notes_path": "releases/0.4.1.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Production promotion of DEV 0.4.0: the dedicated shared-link participant journey together with accepted web, sharing, Permissions and version-badge behavior; no additional product behavior changes."
+        ],
+        "fixed": [],
+        "security": []
+      }
+    },
+    {
+      "version": "0.4.0",
+      "status": "released",
+      "notes_path": "releases/0.4.0.md",
+      "sections": {
+        "added": [
+          "Dedicated shared-link participant page with survey questions, answer review and editing, submission receipt, and same-tab resume."
+        ],
+        "changed": [
+          "Shared survey links open the participant page directly instead of the combined legacy staff surface; access-code and invitation routes remain available."
+        ],
+        "fixed": [
+          "Participant drafts and uncertain-submit recovery remain available throughout the dedicated page journey."
+        ],
+        "security": [
+          "Shared-link requests omit cookies and staff credentials, strip the link fragment before transport, and retain per-link draft isolation and idempotent submission retries."
+        ]
+      },
+      "tag": "v0.4.0",
+      "date": "2026-09-17"
+    },
+    {
+      "version": "0.3.2",
+      "status": "candidate",
+      "notes_path": "releases/0.3.2.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Production promotion of validated DEV 0.3.1: accepted web and sharing, scoped Permissions controls, identity isolation fixes and the restored health-backed version badge; no additional product behavior changes."
+        ],
+        "fixed": [],
+        "security": []
+      }
+    },
+    {
+      "version": "0.3.1",
+      "status": "released",
+      "notes_path": "releases/0.3.1.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Restore the existing health-backed version badge and release-details dialog on the homepage and assessment shell."
+        ],
+        "security": []
+      },
+      "tag": "v0.3.1",
+      "date": "2026-09-17"
+    },
+    {
+      "version": "0.3.0",
+      "status": "released",
+      "notes_path": "releases/0.3.0.md",
+      "sections": {
+        "added": [
+          "Scoped Permissions controls for workspace, project and assessment grants, pending invitations, role changes, revocation and ownership transfer."
+        ],
+        "changed": [
+          "Permission actions refresh server-owned roster and role state in place while keeping their outcome, receipt and trace visible."
+        ],
+        "fixed": [
+          "Successful permission actions no longer erase their confirmation through a blank-model route reload; transfer receipts resolve to grant rows."
+        ],
+        "security": [
+          "Danger actions retain preview/confirm with identical parameters; scopes remain explicit with no permission inheritance. Post-action access refusal hides stale controls while retaining the completed action receipt."
+        ]
+      },
+      "tag": "v0.3.0",
+      "date": "2026-09-17"
+    },
+    {
+      "version": "0.2.0",
+      "status": "released",
+      "notes_path": "releases/0.2.0.md",
+      "sections": {
+        "added": [
+          "Showcase-based public entry, workspace and project navigation, and assessment views.",
+          "Survey Share controls create participant links and display locally generated QR codes."
+        ],
+        "changed": [
+          "The primary web entry uses the new assessment shell; existing participant, invitation and legacy routes remain available.",
+          "Assessment views separate navigation from stage changes and preserve explicit permission scopes."
+        ],
+        "fixed": [
+          "Held or refused reports remain visible as honest states, with mobile layout and report-number readability improvements."
+        ],
+        "security": [
+          "Credential-bearing route changes retain the accepted forwarding behavior; no new permission inheritance is introduced."
+        ]
+      },
+      "tag": "v0.2.0",
+      "date": "2026-09-17"
+    },
+    {
+      "version": "0.1.0",
+      "status": "candidate",
+      "notes_path": "releases/0.1.0.md",
+      "sections": {
+        "added": [
+          "Shared survey link: an owner can issue one link per survey that participants open to take the survey without a personal code.",
+          "Release identity: a cookbook-pinned release record, a build-time version+commit stamp, version fields on health and MCP serverInfo, and a generated changelog.json for the version badge."
+        ],
+        "changed": [
+          "Health `build` now reports `<version>+<sha7>` derived from the pinned release record and the build commit instead of a hardcoded literal.",
+          "Rate limiter boundaries and OAuth flows hardened for the first DEV collection increment."
+        ],
+        "fixed": [
+          "Email-code redemption is atomic; a code cannot be redeemed twice under concurrent requests, and conflict-recovery kinds are distinct."
+        ],
+        "security": [
+          "Rate-limited anonymous, code and bearer paths fail closed with RATE_LIMITED; OAuth code redemption is single-use."
+        ]
+      }
+    }
+  ]
+}
