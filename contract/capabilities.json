@@ -1,6 +1,6 @@
 {
   "contract": "contract-v0.1",
-  "status": "DRAFT \u2014 projected by Fable from cookbook 04 @ 0f4413768c4365054372d917619311d7c2a00e96; Lane A (Astra/Otto) accepts, amends or replaces",
+  "status": "DRAFT — projected by Fable from cookbook 04 @ 0f4413768c4365054372d917619311d7c2a00e96; Lane A (Astra/Otto) accepts, amends or replaces",
   "generated_at": "2026-09-16T23:13:41Z",
   "source": {
     "repo": "klappy/3d-review-cookbook",
@@ -8,12 +8,12 @@
     "sha": "0f4413768c4365054372d917619311d7c2a00e96"
   },
   "counts": {
-    "total": 84,
-    "read": 30,
-    "write.effect": 8,
+    "total": 90,
+    "read": 32,
+    "write.effect": 12,
     "write.reversible": 39,
     "write.dangerous": 7,
-    "v2.0-bcs": 79,
+    "v2.0-bcs": 85,
     "v2.1-oct": 5,
     "paths_inferred": 37,
     "inverse_unassessed": 0
@@ -92,7 +92,7 @@
       "slice": "v2.0-bcs",
       "section": "A. Entry, identity, session",
       "ui_surface": "\"sign in\"",
-      "notes": "**email-code via Cloudflare** (OF-7 ruled) \u2014 code **mail sent** \u2192 effect; compensate=expire link (not undo); the sign-in submit is the intent-bound confirm",
+      "notes": "**email-code via Cloudflare** (OF-7 ruled) — code **mail sent** → effect; compensate=expire link (not undo); the sign-in submit is the intent-bound confirm",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -122,7 +122,7 @@
       "roles": "V",
       "slice": "v2.0-bcs",
       "section": "A. Entry, identity, session",
-      "ui_surface": "\u2014",
+      "ui_surface": "—",
       "notes": "issues session",
       "status": "target",
       "inverse": {
@@ -187,7 +187,7 @@
       "slice": "v2.0-bcs",
       "section": "A. Entry, identity, session",
       "ui_surface": "\"Take a survey / find my invitation\"",
-      "notes": "short access code \u2192 participant token (bee:10424888)",
+      "notes": "short access code → participant token (bee:10424888)",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -209,7 +209,7 @@
       "slice": "v2.0-bcs",
       "section": "A. Entry, identity, session",
       "ui_surface": "invitation URL",
-      "notes": "link token \u2192 participant token",
+      "notes": "link token → participant token",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -431,7 +431,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -640,7 +640,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -666,8 +666,8 @@
       "roles": "O, M",
       "slice": "v2.0-bcs",
       "section": "C. Project",
-      "ui_surface": "project \u2192 \"Add a language\"",
-      "notes": "**PROPOSED 2026-09-16 18:59 ET (Fable, #14)** \u2014 D9 keeps language identity on each assessment but the matrix had no operation that creates one, so a fresh project could never host an assessment (live-observed on `3d-review-dev`; runner J1b bound to seed). Row: `{code, name}` (code = BCP-47 or private-use `qaa\u2013qtz` for invented), unique per project; undo=cap.language.archive (self:restore) \u2014 never delete (assessments reference it). No new access scope (D9).",
+      "ui_surface": "project → \"Add a language\"",
+      "notes": "**PROPOSED 2026-09-16 18:59 ET (Fable, #14)** — D9 keeps language identity on each assessment but the matrix had no operation that creates one, so a fresh project could never host an assessment (live-observed on `3d-review-dev`; runner J1b bound to seed). Row: `{code, name}` (code = BCP-47 or private-use `qaa–qtz` for invented), unique per project; undo=cap.language.archive (self:restore) — never delete (assessments reference it). No new access scope (D9).",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -710,7 +710,7 @@
       "slice": "v2.0-bcs",
       "section": "C. Project",
       "ui_surface": "language row menu",
-      "notes": "**PROPOSED** \u2014 inverse of create; assessments keep their language_id; archived languages are not offered to assessment.create; undo=cap.language.unarchive",
+      "notes": "**PROPOSED** — inverse of create; assessments keep their language_id; archived languages are not offered to assessment.create; undo=cap.language.unarchive",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -842,7 +842,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "stage bar",
-      "notes": "prepare\u2194collect\u2194understand\u2194improve; receipt",
+      "notes": "prepare↔collect↔understand↔improve; receipt",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -915,7 +915,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -1029,7 +1029,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -1122,7 +1122,7 @@
       "slice": "v2.0-bcs",
       "section": "E. Surveys (templates + assessment surveys)",
       "ui_surface": "\"Print survey\"",
-      "notes": "**blank form** (no credentials, no responses) \u2014 HTML print stylesheet + PDF via browser (bee:10424888); served by the API so agents get the same artifact (not browser-only)",
+      "notes": "**blank form** (no credentials, no responses) — HTML print stylesheet + PDF via browser (bee:10424888); served by the API so agents get the same artifact (not browser-only)",
       "status": "target",
       "inverse": {
         "kind": "n/a"
@@ -1278,8 +1278,8 @@
       "roles": "O, M",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
-      "ui_surface": "Collect: \"Send links\" (impact preview \u2192 confirm)",
-      "notes": "**split from issue_link** (#13 gap 2; PR #18 example 1): external mail + link disclosure; compensate=cap.survey.revoke_link (access control, not undo); intent bound to recipients/content/expiry/revision; idempotency key; accepted \u2260 delivered; delivery/job receipt; no addresses in telemetry",
+      "ui_surface": "Collect: \"Send links\" (impact preview → confirm)",
+      "notes": "**split from issue_link** (#13 gap 2; PR #18 example 1): external mail + link disclosure; compensate=cap.survey.revoke_link (access control, not undo); intent bound to recipients/content/expiry/revision; idempotency key; accepted ≠ delivered; delivery/job receipt; no addresses in telemetry",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1310,7 +1310,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "Collect: \"Access codes\"",
-      "notes": "batch short codes; D1 `access_code` (durable for field collect, not KV); undo=cap.survey.revoke_code while unredeemed. POST result is count/ids/receipt only \u2014 **omits code values**. **Printing/exporting the codes is credential-bearing output** \u2192 `cap.survey.export_codes` (E) below, distinct from a blank-form print",
+      "notes": "batch short codes; D1 `access_code` (durable for field collect, not KV); undo=cap.survey.revoke_code while unredeemed. POST result is count/ids/receipt only — **omits code values**. **Printing/exporting the codes is credential-bearing output** → `cap.survey.export_codes` (E) below, distinct from a blank-form print",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -1332,7 +1332,7 @@
       "roles": "O, M",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
-      "ui_surface": "\"Print access codes\" (impact preview \u2192 confirm)",
+      "ui_surface": "\"Print access codes\" (impact preview → confirm)",
       "notes": "credential-bearing disclosure (release); compensate=revoke codes; audit row; no codes in telemetry; danger body: `mode` + `confirm_token` (+ `lang`); **never GET** (not cacheable/prefetchable; confirm token is not a query string)",
       "status": "target",
       "inverse": {
@@ -1404,11 +1404,11 @@
         "path": "/v2/{scope}/{id}/invitations",
         "path_inferred": false
       },
-      "roles": "O, M(\u2264M)",
+      "roles": "O, M(≤M)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
-      "ui_surface": "\"Invite collaborator\" + impact preview \u2192 confirm",
-      "notes": "invitation **mail sent** \u2192 effect; viewers cannot invite; D3 (proposed); compensate=cap.grant.revoke_invitation",
+      "ui_surface": "\"Invite collaborator\" + impact preview → confirm",
+      "notes": "invitation **mail sent** → effect; viewers cannot invite; D3 (proposed); compensate=cap.grant.revoke_invitation",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1435,7 +1435,7 @@
         "path": "/v2/invitations/{id}",
         "path_inferred": false
       },
-      "roles": "O, M(\u2264M)",
+      "roles": "O, M(≤M)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "collaborators panel",
@@ -1461,7 +1461,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "",
-      "notes": "**grant released** \u2192 effect (disclosure of scope contents begins); compensate=cap.grant.revoke",
+      "notes": "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1511,12 +1511,12 @@
       "roles": "O",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
-      "ui_surface": "impact preview \u2192 confirm",
+      "ui_surface": "impact preview → confirm",
       "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed)",
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -1539,11 +1539,11 @@
         "path": "/v2/{scope}/{id}/grants/{gid}",
         "path_inferred": true
       },
-      "roles": "O, M(\u2264M)",
+      "roles": "O, M(≤M)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "",
-      "notes": "cannot remove owner; last-owner protected; undo=null (what was seen stays seen) \u2014 re-invite instead",
+      "notes": "cannot remove owner; last-owner protected; undo=null (what was seen stays seen) — re-invite instead",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1569,7 +1569,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -1600,7 +1600,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED \u2014 withdraw route not in 04"
+        "compensating_control": "UNASSESSED — withdraw route not in 04"
       },
       "undo_token": false,
       "public": false
@@ -1726,8 +1726,8 @@
       "roles": "P",
       "slice": "v2.0-bcs",
       "section": "G. Participation",
-      "ui_surface": "review \u2192 submit",
-      "notes": "append-only; idempotency key; receipt (D6); **undo=null** (append-only is not an inverse \u2014 amendment/retraction policy held under D6); the review screen is the participant's confirm",
+      "ui_surface": "review → submit",
+      "notes": "append-only; idempotency key; receipt (D6); **undo=null** (append-only is not an inverse — amendment/retraction policy held under D6); the review screen is the participant's confirm",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1900,7 +1900,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "none needed \u2014 starts a distinct respondent (D6)"
+        "compensating_control": "none needed — starts a distinct respondent (D6)"
       },
       "undo_token": false,
       "public": false
@@ -1918,7 +1918,7 @@
       "slice": "v2.0-bcs",
       "section": "G. Participation",
       "ui_surface": "Understand",
-      "notes": "**always-on small-cell suppression** (July D2 ruling) applied server-side before serialization; threshold/role details held \u2192 affected disclosure blocked until set; viewers see summary only; `SUPPRESSED` is a typed `ok:true` result (never an `ok:false` error)",
+      "notes": "**always-on small-cell suppression** (July D2 ruling) applied server-side before serialization; threshold/role details held → affected disclosure blocked until set; viewers see summary only; `SUPPRESSED` is a typed `ok:true` result (never an `ok:false` error)",
       "status": "target",
       "inverse": {
         "kind": "n/a"
@@ -1942,7 +1942,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -1969,7 +1969,7 @@
       "slice": "v2.0-bcs",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "Understand (incl. insufficient-data + suppressed states)",
-      "notes": "counts, coverage, band-level summary (DEC-0001 bands over scores); **suppression integral from first implementation** (July D2): applied before aggregation disclosure/cache/serialization; UI/MCP cannot request unsuppressed mode; threshold/differencing rules held \u2192 real private results blocked until set, synthetic fixtures may show states; output carries snapshot/algorithm/policy versions (PR #18 example 2)",
+      "notes": "counts, coverage, band-level summary (DEC-0001 bands over scores); **suppression integral from first implementation** (July D2): applied before aggregation disclosure/cache/serialization; UI/MCP cannot request unsuppressed mode; threshold/differencing rules held → real private results blocked until set, synthetic fixtures may show states; output carries snapshot/algorithm/policy versions (PR #18 example 2)",
       "status": "target",
       "inverse": {
         "kind": "n/a"
@@ -2527,11 +2527,11 @@
       "slice": "v2.1-oct",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "(Oct)",
-      "notes": "AI-assisted with human review (DEC-0002, POL-0001) \u2014 reserved",
+      "notes": "AI-assisted with human review (DEC-0002, POL-0001) — reserved",
       "status": "RESERVED_NOT_BUILT",
       "inverse": {
         "kind": "none",
-        "compensating_control": "v2.1-oct \u2014 UNASSESSED"
+        "compensating_control": "v2.1-oct — UNASSESSED"
       },
       "undo_token": false,
       "public": false
@@ -2549,11 +2549,11 @@
       "slice": "v2.1-oct",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "(Oct)",
-      "notes": "accept/reject with provenance \u2014 reserved",
+      "notes": "accept/reject with provenance — reserved",
       "status": "RESERVED_NOT_BUILT",
       "inverse": {
         "kind": "none",
-        "compensating_control": "v2.1-oct \u2014 UNASSESSED"
+        "compensating_control": "v2.1-oct — UNASSESSED"
       },
       "undo_token": false,
       "public": false
@@ -2615,7 +2615,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "UNASSESSED \u2014 see 17-IRREVERSIBILITY"
+        "compensating_control": "UNASSESSED — see 17-IRREVERSIBILITY"
       },
       "undo_token": false,
       "danger": {
@@ -2669,7 +2669,7 @@
       "status": "RESERVED_NOT_BUILT",
       "inverse": {
         "kind": "none",
-        "compensating_control": "v2.1-oct \u2014 UNASSESSED"
+        "compensating_control": "v2.1-oct — UNASSESSED"
       },
       "undo_token": false,
       "public": false
@@ -2687,7 +2687,7 @@
       "slice": "v2.0-bcs",
       "section": "J. Ops, telemetry, xray, docs, feedback",
       "ui_surface": "\"why was this slow?\"",
-      "notes": "**scoped + redacted** projection of the span log (auth, policy, D1 timing, render) \u2014 no answers, addresses or bearer material in spans; a trace id is not authorization: substituted id \u2192 `NOT_FOUND_OR_NOT_VISIBLE`; test it (05 J7)",
+      "notes": "**scoped + redacted** projection of the span log (auth, policy, D1 timing, render) — no answers, addresses or bearer material in spans; a trace id is not authorization: substituted id → `NOT_FOUND_OR_NOT_VISIBLE`; test it (05 J7)",
       "status": "target",
       "inverse": {
         "kind": "n/a"
@@ -2738,34 +2738,86 @@
       "params_schema": {
         "type": "object",
         "properties": {
-          "require_authenticated": { "type": "boolean", "description": "Optional write precondition: true refuses anonymous callers; omitted or false preserves public feedback. Never persisted.", "x-cookbook-source": "https://github.com/klappy/3d-review-cookbook/blob/e9c09cb97ef206abb418de741bb93629bd1c9e23/planning/2026-09-16-parity-build/AMEND-2026-09-18-feedback-attributed-write.md" },
-          "helpful": { "type": "boolean" },
-          "note": { "type": "string" },
-          "text": { "type": "string", "description": "legacy dual-read alias for note" },
+          "require_authenticated": {
+            "type": "boolean",
+            "description": "Optional write precondition: true refuses anonymous callers; omitted or false preserves public feedback. Never persisted.",
+            "x-cookbook-source": "https://github.com/klappy/3d-review-cookbook/blob/e9c09cb97ef206abb418de741bb93629bd1c9e23/planning/2026-09-16-parity-build/AMEND-2026-09-18-feedback-attributed-write.md"
+          },
+          "helpful": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "description": "legacy dual-read alias for note"
+          },
           "context": {},
-          "scope_type": { "type": "string" },
-          "scope_id": { "type": "string" },
-          "satisfaction": { "type": "integer", "minimum": 1, "maximum": 5 },
-          "confusion": { "type": "integer", "minimum": 1, "maximum": 5 },
-          "frustration": { "type": "integer", "minimum": 1, "maximum": 5 },
-          "sentiment_journey": { "type": "string" },
-          "cast_id": { "type": "string" },
-          "persona": { "type": "string" },
-          "goal_id": { "type": "string" },
-          "answers": { "description": "stripped, never persisted" },
-          "responses": { "description": "stripped, never persisted" },
-          "response": { "description": "stripped, never persisted" }
+          "scope_type": {
+            "type": "string"
+          },
+          "scope_id": {
+            "type": "string"
+          },
+          "satisfaction": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "confusion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "frustration": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "sentiment_journey": {
+            "type": "string"
+          },
+          "cast_id": {
+            "type": "string"
+          },
+          "persona": {
+            "type": "string"
+          },
+          "goal_id": {
+            "type": "string"
+          },
+          "answers": {
+            "description": "stripped, never persisted"
+          },
+          "responses": {
+            "description": "stripped, never persisted"
+          },
+          "response": {
+            "description": "stripped, never persisted"
+          }
         },
         "additionalProperties": false
       },
       "result_schema": {
         "type": "object",
         "properties": {
-          "recorded": { "type": "boolean", "const": true },
-          "stripped": { "type": "boolean" },
-          "feedback_id": { "type": "string" }
+          "recorded": {
+            "type": "boolean",
+            "const": true
+          },
+          "stripped": {
+            "type": "boolean"
+          },
+          "feedback_id": {
+            "type": "string"
+          }
         },
-        "required": ["recorded", "stripped", "feedback_id"],
+        "required": [
+          "recorded",
+          "stripped",
+          "feedback_id"
+        ],
         "additionalProperties": false
       }
     },
@@ -2791,9 +2843,14 @@
       "params_schema": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "minLength": 1 }
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "required": ["id"],
+        "required": [
+          "id"
+        ],
         "additionalProperties": false
       }
     },
@@ -2814,7 +2871,7 @@
       "status": "target",
       "inverse": {
         "kind": "none",
-        "compensating_control": "n/a \u2014 this is the undo mechanism"
+        "compensating_control": "n/a — this is the undo mechanism"
       },
       "undo_token": false,
       "public": false
@@ -2878,6 +2935,668 @@
         "kind": "n/a"
       },
       "public": true
+    },
+    {
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "status": "candidate",
+      "ui_surface": "Live public roadmap",
+      "undo_token": false,
+      "id": "cap.ops.roadmap_read",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/roadmap",
+        "path_inferred": false
+      },
+      "roles": "any",
+      "public": true,
+      "notes": "Public sanitized cursor read; private audit omitted.",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "params_schema": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "item_after": {
+            "type": "string",
+            "pattern": "^roadmap-[1-9][0-9]{0,7}$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "roadmap_contract": {
+        "status": "candidate additive amendment; not release acceptance",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
+      },
+      "result_schema": {
+        "type": "object",
+        "description": "Sanitized public projection with cursor/generation for reads, or minimal sequence/replayed receipt for execute; dry_run uses normal impact/confirm-token envelope."
+      }
+    },
+    {
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "status": "candidate",
+      "ui_surface": "Live public roadmap",
+      "undo_token": false,
+      "id": "cap.ops.roadmap_publish",
+      "class": "write.effect",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/roadmap/events",
+        "path_inferred": false
+      },
+      "roles": "any signed-in",
+      "public": false,
+      "notes": "Existing identity plus narrow server-configured roadmap permission; claims never auto-verify. Same common HTTP/MCP dispatch.",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "Authorized redaction removes public replay, not external copies."
+      },
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "disclosure"
+      },
+      "params_schema": {
+        "type": "object",
+        "properties": {
+          "expected_cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "event": {
+            "type": "object",
+            "properties": {
+              "idempotency_key": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "item_id": {
+                "type": "string",
+                "pattern": "^roadmap-[1-9][0-9]{0,7}$"
+              },
+              "kind": {
+                "enum": [
+                  "work_started",
+                  "review_requested",
+                  "review_findings",
+                  "checks_passed",
+                  "checks_failed",
+                  "dev_verified",
+                  "production_verified",
+                  "blocked",
+                  "resumed"
+                ]
+              },
+              "stage": {
+                "enum": [
+                  "planned",
+                  "built",
+                  "reviewed",
+                  "dev",
+                  "production"
+                ]
+              },
+              "state": {
+                "enum": [
+                  "pending",
+                  "done",
+                  "blocked"
+                ]
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "repo": {
+                          "enum": [
+                            "3d-review-app",
+                            "3d-review-cookbook",
+                            "kitchen"
+                          ]
+                        },
+                        "kind": {
+                          "enum": [
+                            "issue",
+                            "pull"
+                          ]
+                        },
+                        "number": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 99999999
+                        }
+                      },
+                      "required": [
+                        "repo",
+                        "kind",
+                        "number"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "repo": {
+                          "enum": [
+                            "3d-review-app",
+                            "3d-review-cookbook",
+                            "kitchen"
+                          ]
+                        },
+                        "kind": {
+                          "const": "commit"
+                        },
+                        "sha": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{40}$"
+                        }
+                      },
+                      "required": [
+                        "repo",
+                        "kind",
+                        "sha"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "minItems": 0,
+                "maxItems": 8
+              },
+              "version": {
+                "type": "string",
+                "pattern": "^[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,4}$"
+              },
+              "source_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "blocker": {
+                "enum": [
+                  "awaiting_implementation",
+                  "awaiting_review",
+                  "review_findings",
+                  "checks_failed",
+                  "awaiting_deployment",
+                  "awaiting_verification",
+                  "awaiting_user_confirmation",
+                  "dependency",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "idempotency_key",
+              "item_id",
+              "kind",
+              "stage",
+              "state",
+              "evidence"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "expected_cursor",
+          "event"
+        ],
+        "additionalProperties": false
+      },
+      "roadmap_contract": {
+        "status": "candidate additive amendment; not release acceptance",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
+      },
+      "result_schema": {
+        "type": "object",
+        "description": "Sanitized public projection with cursor/generation for reads, or minimal sequence/replayed receipt for execute; dry_run uses normal impact/confirm-token envelope."
+      }
+    },
+    {
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "status": "candidate",
+      "ui_surface": "Live public roadmap",
+      "undo_token": false,
+      "id": "cap.ops.roadmap_summary",
+      "class": "write.effect",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/roadmap/summaries",
+        "path_inferred": false
+      },
+      "roles": "any signed-in",
+      "public": false,
+      "notes": "Existing identity plus narrow server-configured roadmap permission; claims never auto-verify. Same common HTTP/MCP dispatch.",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "Authorized redaction removes public replay, not external copies."
+      },
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "disclosure"
+      },
+      "params_schema": {
+        "type": "object",
+        "properties": {
+          "expected_cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item_id": {
+            "type": "string",
+            "pattern": "^roadmap-[1-9][0-9]{0,7}$"
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 150
+              },
+              "feedback": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "priority": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "scope": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "outcome": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "recurrence": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "title",
+              "feedback",
+              "priority",
+              "scope",
+              "outcome",
+              "recurrence"
+            ],
+            "additionalProperties": false
+          },
+          "publication_review": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "repo": {
+                      "enum": [
+                        "3d-review-app",
+                        "3d-review-cookbook",
+                        "kitchen"
+                      ]
+                    },
+                    "kind": {
+                      "enum": [
+                        "issue",
+                        "pull"
+                      ]
+                    },
+                    "number": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99999999
+                    }
+                  },
+                  "required": [
+                    "repo",
+                    "kind",
+                    "number"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "repo": {
+                      "enum": [
+                        "3d-review-app",
+                        "3d-review-cookbook",
+                        "kitchen"
+                      ]
+                    },
+                    "kind": {
+                      "const": "commit"
+                    },
+                    "sha": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{40}$"
+                    }
+                  },
+                  "required": [
+                    "repo",
+                    "kind",
+                    "sha"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 8
+          }
+        },
+        "required": [
+          "expected_cursor",
+          "idempotency_key",
+          "item_id",
+          "summary",
+          "publication_review"
+        ],
+        "additionalProperties": false
+      },
+      "roadmap_contract": {
+        "status": "candidate additive amendment; not release acceptance",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
+      },
+      "result_schema": {
+        "type": "object",
+        "description": "Sanitized public projection with cursor/generation for reads, or minimal sequence/replayed receipt for execute; dry_run uses normal impact/confirm-token envelope."
+      }
+    },
+    {
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "status": "candidate",
+      "ui_surface": "Live public roadmap",
+      "undo_token": false,
+      "id": "cap.ops.roadmap_verify",
+      "class": "write.effect",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/roadmap/verifications",
+        "path_inferred": false
+      },
+      "roles": "any signed-in",
+      "public": false,
+      "notes": "Existing identity plus narrow server-configured roadmap permission; claims never auto-verify. Same common HTTP/MCP dispatch.",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "Authorized redaction removes public replay, not external copies."
+      },
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "disclosure"
+      },
+      "params_schema": {
+        "type": "object",
+        "properties": {
+          "expected_cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item_id": {
+            "type": "string",
+            "pattern": "^roadmap-[1-9][0-9]{0,7}$"
+          },
+          "event_sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "repo": {
+                      "enum": [
+                        "3d-review-app",
+                        "3d-review-cookbook",
+                        "kitchen"
+                      ]
+                    },
+                    "kind": {
+                      "enum": [
+                        "issue",
+                        "pull"
+                      ]
+                    },
+                    "number": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99999999
+                    }
+                  },
+                  "required": [
+                    "repo",
+                    "kind",
+                    "number"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "repo": {
+                      "enum": [
+                        "3d-review-app",
+                        "3d-review-cookbook",
+                        "kitchen"
+                      ]
+                    },
+                    "kind": {
+                      "const": "commit"
+                    },
+                    "sha": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{40}$"
+                    }
+                  },
+                  "required": [
+                    "repo",
+                    "kind",
+                    "sha"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 8
+          },
+          "attestation": {
+            "const": "independently_checked"
+          }
+        },
+        "required": [
+          "expected_cursor",
+          "idempotency_key",
+          "item_id",
+          "event_sequence",
+          "evidence",
+          "attestation"
+        ],
+        "additionalProperties": false
+      },
+      "roadmap_contract": {
+        "status": "candidate additive amendment; not release acceptance",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
+      },
+      "result_schema": {
+        "type": "object",
+        "description": "Sanitized public projection with cursor/generation for reads, or minimal sequence/replayed receipt for execute; dry_run uses normal impact/confirm-token envelope."
+      }
+    },
+    {
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "status": "candidate",
+      "ui_surface": "Live public roadmap",
+      "undo_token": false,
+      "id": "cap.ops.roadmap_redact",
+      "class": "write.effect",
+      "tool": "danger",
+      "http": {
+        "method": "POST",
+        "path": "/v2/roadmap/redactions",
+        "path_inferred": false
+      },
+      "roles": "any signed-in",
+      "public": false,
+      "notes": "Existing identity plus narrow server-configured roadmap permission; claims never auto-verify. Same common HTTP/MCP dispatch.",
+      "inverse": {
+        "kind": "none",
+        "compensating_control": "Authorized redaction removes public replay, not external copies."
+      },
+      "danger": {
+        "two_step": true,
+        "modes": [
+          "dry_run",
+          "execute"
+        ],
+        "twin_never_get": true,
+        "effect": "disclosure"
+      },
+      "params_schema": {
+        "type": "object",
+        "properties": {
+          "expected_cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item_id": {
+            "type": "string",
+            "pattern": "^roadmap-[1-9][0-9]{0,7}$"
+          }
+        },
+        "required": [
+          "expected_cursor",
+          "idempotency_key",
+          "item_id"
+        ],
+        "additionalProperties": false
+      },
+      "roadmap_contract": {
+        "status": "candidate additive amendment; not release acceptance",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
+      },
+      "result_schema": {
+        "type": "object",
+        "description": "Sanitized public projection with cursor/generation for reads, or minimal sequence/replayed receipt for execute; dry_run uses normal impact/confirm-token envelope."
+      }
+    },
+    {
+      "slice": "v2.0-bcs",
+      "section": "J. Ops, telemetry, xray, docs, feedback",
+      "status": "candidate",
+      "ui_surface": "Live public roadmap",
+      "undo_token": false,
+      "id": "cap.ops.roadmap_history",
+      "class": "read",
+      "tool": "read",
+      "http": {
+        "method": "GET",
+        "path": "/v2/roadmap/items/{id}/history",
+        "path_inferred": false
+      },
+      "roles": "any",
+      "public": true,
+      "notes": "Public bounded durable item event history; redacted payloads omitted and generation returned.",
+      "inverse": {
+        "kind": "n/a"
+      },
+      "params_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^roadmap-[1-9][0-9]{0,7}$"
+          },
+          "after": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "roadmap_contract": {
+        "status": "candidate additive amendment; not release acceptance",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
+      },
+      "result_schema": {
+        "type": "object",
+        "description": "Sanitized public projection with cursor/generation for reads, or minimal sequence/replayed receipt for execute; dry_run uses normal impact/confirm-token envelope."
+      }
     }
   ]
 }

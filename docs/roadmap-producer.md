@@ -1,0 +1,31 @@
+# Publish progress through the existing MCP connection
+
+This is the operational producer hook for issue123, not a token setup procedure. Authenticate through the existing 3D Review connection. Start with `read` → `cap.auth.me` and confirm that the server grants the specific roadmap permission when performing the dry run. Being connected, a project owner or support is not sufficient by itself. If refused, use the existing sign-in/consent or have the authorized operator provision the narrow server permission; never paste a token into chat or embed credentials in a client.
+
+At work start, review request/findings, check result, DEV/production verification candidate and blocker/resume:
+
+1. `read` → `cap.ops.roadmap_read` with `{}` obtains the current `cursor`.
+2. Prepare one stable UUID for this logical publication, a public item ID `roadmap-<issue-number>`, the predefined lifecycle kind, stage/state and structured public evidence references. No narrative, actor, role, environment, tenant ID or private source pointer belongs in an automatic status event.
+3. `danger` → `cap.ops.roadmap_publish`, `mode: dry_run`, with the params below. Inspect the actual disclosure impact. The user-authorized coordination workflow permits these narrow public metadata reports; a private-content publication is not implied.
+4. `danger` → same capability, `mode: execute`, identical params and returned `confirm_token`. Record the minimal sequence receipt privately with the work checkpoint. An uncertain response retries the same idempotency key and same params; do not blindly create another event. A stale cursor refusal requires rereading and a new explicit intent/dry run.
+5. An authorized, different verifier independently checks the evidence and calls `cap.ops.roadmap_verify` through the same confirmation flow. Until then it remains a publisher claim. Do not publish a verified transition as the report author.
+
+Example params (illustrative IDs, not an instruction to publish this example):
+
+```json
+{
+  "expected_cursor": 0,
+  "event": {
+    "idempotency_key": "d0ba4251-1358-4ab8-b62f-23192c2b67df",
+    "item_id": "roadmap-123",
+    "kind": "work_started",
+    "stage": "built",
+    "state": "pending",
+    "evidence": [{"repo":"3d-review-app","kind":"issue","number":123}]
+  }
+}
+```
+
+The metadata schema accepts only public structured issue/PR/commit references. `dev_verified` and `production_verified` are report kinds, not bypasses of verifier authority. Publish a reviewed title/feedback summary/priority/scope/outcome/recurrence separately using `cap.ops.roadmap_summary` after independent public-suitability review, citing its public review reference. Never auto-copy private feedback. Use `cap.ops.roadmap_redact` for exposed public content; append normal corrections through summary/history without erasing ordinary provenance.
+
+Deployment acceptance: apply the D1 migration through the existing approved migration path; configure narrow principal permissions without changing credentials; validate both HTTP and installed MCP writes and an open browser on the same running build. DEV is provisional. After normal production promotion, production is canonical. This candidate has local proof but has not completed those operational/deployment checks. Record this as pending, not as an active producer already running in production.

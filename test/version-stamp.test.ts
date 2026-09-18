@@ -103,7 +103,7 @@ describe("runtime surfaces: health and MCP serverInfo", () => {
   }, 60_000);
   const req = (method: string, path: string, body?: unknown) => app.fetch(new Request("https://t.invalid" + path, { method, headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.77" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }), env);
 
-  it("GET /v2/health carries version/build/commit/release_source and keeps contract/source_sha/deps/capabilities(84)/ok", async () => {
+  it("GET /v2/health carries version/build/commit/release_source and keeps contract/source_sha/deps/capabilities(90)/ok", async () => {
     const r = await req("GET", "/v2/health");
     expect(r.status).toBe(200);
     const body: any = await r.json();
@@ -120,7 +120,7 @@ describe("runtime surfaces: health and MCP serverInfo", () => {
     expect(h.contract).toEqual(contract.contract);
     expect(h.source_sha).toBe(contract.source.sha);
     expect(h.deps).toEqual({ d1: "ok" });
-    expect(h.capabilities).toBe(84);
+    expect(h.capabilities).toBe(90);
   });
   it("MCP initialize → serverInfo.version === APP_VERSION", async () => {
     const r = await req("POST", "/mcp", { jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
