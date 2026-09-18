@@ -1,7 +1,29 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.8.0",
+  "current": "0.9.0",
   "versions": [
+    {
+      "version": "0.9.0",
+      "status": "candidate",
+      "notes_path": "releases/0.9.0.md",
+      "sections": {
+        "added": [
+          "A source-pinned synthetic assessment example with three surveys, twelve responses, an inspectable report and sample answers, using the real assessment/report/participant UI.",
+          "An isolated sample survey with the real question, review, edit and receipt flow; practice answers stay in memory and are never submitted to a live API."
+        ],
+        "changed": [
+          "Public tour and sample links, including the direct legacy example URL, use the shared application screens. The legacy homepage's overall visual design is preserved.",
+          "Generic legacy navigation is retired where current screens exist; invitation acceptance and access-code participation remain compatible.",
+          "The eight-check browser plan is closed with separately attributed historical and independent exact-head local evidence; real-human satisfaction, confusion and frustration remain NOT MEASURED."
+        ],
+        "fixed": [
+          "The legacy sample assessment no longer promises a populated assessment while displaying only narrative stage descriptions."
+        ],
+        "security": [
+          "Demo transport rejects unknown reads and all assessment mutations without network fallback. It does not read or change real staff credentials or participant drafts."
+        ]
+      }
+    },
     {
       "version": "0.8.0",
       "status": "candidate",
