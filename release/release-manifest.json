@@ -1,23 +1,25 @@
 {
   "version": "0.9.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "6a5b00379802f256ca9ab0d76b5949b55ed7d7a8",
+  "cookbook_commit": "256eb7572152a9a1c9091a6ae3255f265ba39971",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.9.2.md",
-      "blob_sha": "eaf2b926965364b972c7e58e182e66339262aed9",
-      "sha256": "45e841381a9b6be4221fd5de31e6776435340f5f688c70425f747dba85b9b976"
+      "blob_sha": "90125e13f5331d32bfc989496dc7052877b61836",
+      "sha256": "37ac49a372fcd84cb2b4cf3a88e8e3e58d839336a4fcbc38219cd3870c1e3a34"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "c3545b967f70edbdcb3651c35e3917b1f94342fc",
-      "sha256": "753ef194f795b7542b734173103fe408b7e0520a10a24f0bd01bd7919826145c"
+      "blob_sha": "0576b30eeb68b7706d8eedb0ca5a1efedca2e8a1",
+      "sha256": "b2f6d571cbb2821af6eb2350dc1c1e9221362ffdd0586b27104c3ae955c22816"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
-      "changed": [],
+      "changed": [
+        "Persona outcome scorecard records five executed route cases and one independent local-browser participant-resume journey; human sentiment remains NOT MEASURED."
+      ],
       "fixed": [
         "Current-shell participant resume opens the preserved legacy survey instead of returning an existing participant session to the public access-code entry."
       ],

@@ -8,7 +8,9 @@
       "notes_path": "releases/0.9.2.md",
       "sections": {
         "added": [],
-        "changed": [],
+        "changed": [
+          "Persona outcome scorecard records five executed route cases and one independent local-browser participant-resume journey; human sentiment remains NOT MEASURED."
+        ],
         "fixed": [
           "Current-shell participant resume opens the preserved legacy survey instead of returning an existing participant session to the public access-code entry."
         ],
