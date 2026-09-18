@@ -2738,6 +2738,7 @@
       "params_schema": {
         "type": "object",
         "properties": {
+          "require_authenticated": { "type": "boolean", "description": "Optional write precondition: true refuses anonymous callers; omitted or false preserves public feedback. Never persisted." },
           "helpful": { "type": "boolean" },
           "note": { "type": "string" },
           "text": { "type": "string", "description": "legacy dual-read alias for note" },

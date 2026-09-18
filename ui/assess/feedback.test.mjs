@@ -26,7 +26,7 @@ test('anonymous and demo visitors cannot mount a sending form or call API', asyn
 });
 test('normal signed-in form sends only explicit contract values and shows recorded reference once', async () => {
   const h=await setup(success);h.fill('note','Keep my exact words  ');h.fill('helpful','false');h.fill('satisfaction','4');h.fill('sentiment_journey','confused → clear');await h.submit();await h.submit();
-  assert.deepEqual(h.calls,[['/v2/feedback',{method:'POST',body:{helpful:false,note:'Keep my exact words  ',satisfaction:4,sentiment_journey:'confused → clear'}}]]);
+  assert.deepEqual(h.calls,[['/v2/feedback',{method:'POST',body:{require_authenticated:true,helpful:false,note:'Keep my exact words  ',satisfaction:4,sentiment_journey:'confused → clear'}}]]);
   assert.match(h.text(),/was recorded/);assert.match(h.text(),/fb_fixture/);assert.equal(h.root.querySelector('button').disabled,true);
   assert.equal(h.dom.window.localStorage.length,0);assert.equal(h.dom.window.sessionStorage.length,0);
 });

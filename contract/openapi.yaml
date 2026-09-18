@@ -556,6 +556,9 @@ components:
       additionalProperties: false
       description: cap.ops.feedback write params — AMEND 2c4ee8d CORRECTION. Strip answers/responses/response before unknown reject. Client stripped is rejected.
       properties:
+        require_authenticated:
+          type: boolean
+          description: Optional write precondition. True returns NOT_AUTHENTICATED for an anonymous resolved principal before feedback persistence; omitted or false preserves public feedback. Never persisted.
         helpful:
           type: boolean
         note:

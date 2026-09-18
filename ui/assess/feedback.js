@@ -26,7 +26,7 @@ export const feedback = {
       busy = true; status.textContent = uncertain ? 'Sending again. This may create a duplicate if the earlier request arrived.' : 'Sending feedback…';
       const controls = [...form.querySelectorAll('input,textarea,select,button')]; controls.forEach(c => { c.disabled = true; });
       try {
-        const result = await ctx.api('/v2/feedback', { method: 'POST', body });
+        const result = await ctx.api('/v2/feedback', { method: 'POST', body: { ...body, require_authenticated: true } });
         if (!current()) return;
         if (result?.recorded !== true || typeof result.feedback_id !== 'string' || !result.feedback_id || result.stripped !== false) throw new Error('Unconfirmed receipt');
         recorded = true; status.textContent = 'Thank you. Your feedback was recorded.';
