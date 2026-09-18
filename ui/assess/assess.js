@@ -129,13 +129,13 @@ function loadCounts(current, { retry = null, only = null } = {}) {
     state.counts.set(s.id, { status: 'loading' }); state.countInflight.add(s.id);
     const fresh = () => ep === epoch && state.current?.assessment.id === aid; // same entity AND same survey-set data (Bugbot 4041134428)
     api(`/v2/assessments/${encodeURIComponent(aid)}/surveys/${encodeURIComponent(s.id)}`).then(r => {
-      state.countInflight.delete(s.id);
       if (!fresh()) return; // stale survey set or another entity: never stored, never painted
+      state.countInflight.delete(s.id);
       state.counts.set(s.id, { status: 'loaded', responses: Number(r.counts?.responses ?? 0), respondents: Number(r.counts?.respondents ?? 0), collection_status: r.survey?.collection_status });
       paintCounts(state.current);
     }).catch(e => {
-      state.countInflight.delete(s.id);
       if (!fresh()) return;
+      state.countInflight.delete(s.id);
       const code = String(e.code);
       // Auditor 2A-2: a refusal is not a transient failure — the survey is no longer visible to this identity here. The assessment
       // is marked dirty for VISIBILITY (not a saved write) so the next render refetches; the whole screen repaints once, and the
