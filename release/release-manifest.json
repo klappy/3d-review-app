@@ -1,34 +1,32 @@
 {
-  "version": "0.2.0",
+  "version": "0.4.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "11671805a5eb0b7b5b32f490eec4669ed7f096b2",
+  "cookbook_commit": "fd5ad2b325f0ea547eb5b3c43f519b7b969c4ab4",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.2.0.md",
-      "blob_sha": "8857c752e8c7f952b3f1bc4aab8a39e89c555b5c",
-      "sha256": "64d70191fb75892870eb8b39e67ab9afc1f6dbb5aa04fb84ce469cccf3bd0ffe"
+      "path": "planning/2026-09-16-parity-build/releases/0.4.0.md",
+      "blob_sha": "a8573737858f656c8dfc9f6f248689dbe225ebb7",
+      "sha256": "e1ca770d594d03270339689241eb81cb5294006639156fb87d756150f726181c"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "19c70bf491a64c6d467d03468dbf0ea5f868d9f1",
-      "sha256": "eb0a6c94672edd9a2b481cf85094578649d7a2fcb99a266f08d956dacd802f02"
+      "blob_sha": "1740032d8f05499c68ec192da820dfdfa3863b35",
+      "sha256": "3f7e9048ad25a62cf2267257bf757218896b00cd3a3ac6823d9aa03a2f13d246"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Showcase-based public entry, workspace and project navigation, and assessment views.",
-        "Survey Share controls create participant links and display locally generated QR codes."
+        "Dedicated shared-link participant page with survey questions, answer review and editing, submission receipt, and same-tab resume."
       ],
       "changed": [
-        "The primary web entry uses the new assessment shell; existing participant, invitation and legacy routes remain available.",
-        "Assessment views separate navigation from stage changes and preserve explicit permission scopes."
+        "Shared survey links open the participant page directly instead of the combined legacy staff surface; access-code and invitation routes remain available."
       ],
       "fixed": [
-        "Held or refused reports remain visible as honest states, with mobile layout and report-number readability improvements."
+        "Participant drafts and uncertain-submit recovery remain available throughout the dedicated page journey."
       ],
       "security": [
-        "Credential-bearing route changes retain the accepted forwarding behavior; no new permission inheritance is introduced."
+        "Shared-link requests omit cookies and staff credentials, strip the link fragment before transport, and retain per-link draft isolation and idempotent submission retries."
       ]
     }
   }

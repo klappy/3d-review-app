@@ -1,7 +1,45 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.2.0",
+  "current": "0.4.0",
   "versions": [
+    {
+      "version": "0.4.0",
+      "status": "candidate",
+      "notes_path": "releases/0.4.0.md",
+      "sections": {
+        "added": [
+          "Dedicated shared-link participant page with survey questions, answer review and editing, submission receipt, and same-tab resume."
+        ],
+        "changed": [
+          "Shared survey links open the participant page directly instead of the combined legacy staff surface; access-code and invitation routes remain available."
+        ],
+        "fixed": [
+          "Participant drafts and uncertain-submit recovery remain available throughout the dedicated page journey."
+        ],
+        "security": [
+          "Shared-link requests omit cookies and staff credentials, strip the link fragment before transport, and retain per-link draft isolation and idempotent submission retries."
+        ]
+      }
+    },
+    {
+      "version": "0.3.0",
+      "status": "candidate",
+      "notes_path": "releases/0.3.0.md",
+      "sections": {
+        "added": [
+          "Scoped Permissions controls for workspace, project and assessment grants, pending invitations, role changes, revocation and ownership transfer."
+        ],
+        "changed": [
+          "Permission actions refresh server-owned roster and role state in place while keeping their outcome, receipt and trace visible."
+        ],
+        "fixed": [
+          "Successful permission actions no longer erase their confirmation through a blank-model route reload; transfer receipts resolve to grant rows."
+        ],
+        "security": [
+          "Danger actions retain preview/confirm with identical parameters; scopes remain explicit with no permission inheritance. Post-action access refusal hides stale controls while retaining the completed action receipt."
+        ]
+      }
+    },
     {
       "version": "0.2.0",
       "status": "candidate",
