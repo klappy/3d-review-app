@@ -2738,6 +2738,7 @@
       "params_schema": {
         "type": "object",
         "properties": {
+          "require_authenticated": { "type": "boolean", "description": "Optional write precondition: true refuses anonymous callers; omitted or false preserves public feedback. Never persisted.", "x-cookbook-source": "https://github.com/klappy/3d-review-cookbook/blob/e9c09cb97ef206abb418de741bb93629bd1c9e23/planning/2026-09-16-parity-build/AMEND-2026-09-18-feedback-attributed-write.md" },
           "helpful": { "type": "boolean" },
           "note": { "type": "string" },
           "text": { "type": "string", "description": "legacy dual-read alias for note" },
