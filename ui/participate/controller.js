@@ -39,11 +39,13 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
         if (!namespace) return unavailable('unavailable');
         store = scopedStorage(storage, namespace);
         client = createSharedLinkClient({ store, fetchImpl });
+        // Select this link even if opening fails, so reload cannot fall back to another link.
+        // A namespace alone is not evidence that a participant session exists.
         rememberCurrent(storage, namespace);
         if (token !== null) {
           try { await client.open(token); }
           catch (e) { const kind = entryFailureKind(e, !!client.bearer); return kind === 'conflict' ? conflict() : unavailable(kind); }
-        } else if (!client.bearer) return unavailable('cannotResume');
+        } else if (!client.bearer) return show('unavailable', { notice: 'Open your original survey link to continue. No participant session is available in this tab.' });
         try {
           const result = await client.receipt();
           return result.submitted ? receipt(result) : await loadForm();
