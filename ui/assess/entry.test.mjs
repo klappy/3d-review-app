@@ -39,6 +39,10 @@ test('S1: scrubCredentialHash is the first statement of boot() and of the hashch
   assert.match(js, /location\.replace\('\/legacy\/' \+ h\); return 'forwarded';/);
   assert.match(js, /sessionStorage\.setItem\('facilitatorToken', m\[1\]\); \} catch \{\} resetIdentity\(\); return 'session';/);
   assert.ok(!/api\([^)]*\)[\s\S]*?scrubCredentialHash\(\) === 'forwarded'\) return;/.test(js.slice(js.indexOf('async function boot()'))), 'no api() call precedes the scrub in boot()');
+  const reset = js.slice(js.indexOf('function resetIdentity()'), js.indexOf('let listening'));
+  for (const piece of ['state.openProjects.clear()', 'state.inflight.clear()', 'state.seq.clear()', 'state.message = null', 'state.dirty.clear()', 'state.countInflight.clear()']) assert.ok(reset.includes(piece), piece);
+  assert.match(js, /catch \{ \/\* transient or refusal: do not cache null; the next read retries \*\/ \}/);
+  assert.match(js, /function watchContextViewport\(\)/);
 });
 
 // Auditor N4: the local harness allowlist serves every file the product shell and the legacy surface reference.

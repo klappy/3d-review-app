@@ -51,7 +51,7 @@ const redact = m => redactDiagnosticPath(String(m || 'Request could not be compl
 //                                                  settled or in-flight read; only an explicit user Retry or fresh entity data does
 //                                                  (Bugbot 4041134416). Results are bound to (aid, epoch) (Auditor 2A-3).
 //   generation   counter                           a later render supersedes an earlier one's DOM write (supplier 1114cb1)
-let generation = 0, epoch = 0;
+let generation = 0, epoch = 0, identity = 0;
 const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null };
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
@@ -100,12 +100,13 @@ async function assessmentsFor(pid, { retry = false } = {}) {
   // newest seq may write state, so an older, slower response (success or failure) is discarded.
   if (state.inflight.has(pid)) return state.inflight.get(pid);
   const seq = (state.seq.get(pid) || 0) + 1; state.seq.set(pid, seq);
+  const mine = identity;
   const run = (async () => {
     let next;
     try { const r = await api(`/v2/projects/${encodeURIComponent(pid)}/assessments`); next = { status: 'loaded', list: r.assessments || [] }; }
     catch (e) { const code = String(e.code); next = { status: UNAUTHENTICATED.has(code) ? 'unauthenticated' : REFUSED.has(code) ? 'refused' : 'failed', list: null, error: redact(e.message) }; }
-    finally { state.inflight.delete(pid); }
-    if (state.seq.get(pid) === seq) state.lists.set(pid, next);
+    finally { if (identity === mine) state.inflight.delete(pid); }
+    if (identity === mine && state.seq.get(pid) === seq) state.lists.set(pid, next);
     return listFor(pid);
   })();
   state.inflight.set(pid, run);
@@ -241,6 +242,21 @@ function context(current) {
   // ≤650px: the whole context collapses into one disclosure (summary = where you are); wider: summary hidden, always open. Links unchanged.
   return `<aside class="context-panel"><details class="context-disclosure" ${narrowOpen}><summary><span class="eyebrow" style="margin:0">Context</span><span class="small">${where}</span></summary>${chain}${wsHead}<p class="eyebrow">${ws ? 'Projects in this workspace' : 'Projects'}</p><nav aria-label="Project and assessment navigation">${direct}${projects || (direct ? '' : '<p class="small muted">No project on this account.</p>')}</nav><div class="line links">${state.projects.length ? `<a href="${cards.routes.projects}">All projects</a>` : ''}<a href="${cards.routes.workspaces}">Workspaces</a></div></details></aside><section class="assessment-body">`;
 }
+function syncContextDisclosure() {
+  const el = app.querySelector('.context-disclosure');
+  if (!el) return;
+  // Wide layout hides the summary; keep the tree open so a narrow-first paint cannot stay collapsed after resize.
+  if (typeof matchMedia !== 'function' || !matchMedia('(max-width:650px)').matches) el.open = true;
+}
+let contextViewportWatch = false;
+function watchContextViewport() {
+  if (contextViewportWatch || typeof matchMedia !== 'function') return;
+  contextViewportWatch = true;
+  const mq = matchMedia('(max-width:650px)');
+  const onChange = () => { if (!mq.matches) syncContextDisclosure(); };
+  if (mq.addEventListener) mq.addEventListener('change', onChange);
+  else mq.addListener(onChange);
+}
 // AMEND 2 (Auditor c5719472446): stage change is not wired, so the phase strip is a non-interactive indicator — no links, no buttons.
 function stages(a) { return `<div class="tabs" role="list" aria-label="Assessment stages">${PHASES.map(p => `<span role="listitem" ${p === a.stage ? 'aria-current="step"' : ''}>${title(p)}</span>`).join('')}</div>`; }
 function lensRows(current) {
@@ -282,6 +298,8 @@ function projectsView() {
   return `<div class="title"><div><p class="eyebrow">Your projects</p><h1>Choose an assessment</h1></div></div><div class="project-grid">${state.projects.map(p => { const l = listFor(p.id); return `<div class="panel project-card"><p class="eyebrow">Project</p><h2>${esc(p.name)}</h2>${l.status === 'loaded' ? (l.list.length ? `<div class="links">${l.list.map(x => `<a href="#assessment/${encodeURIComponent(x.id)}">${esc(x.name)} <span class="small muted">· ${stageLabel(x.stage)}</span></a>`).join('')}</div>` : '<p class="small muted">No assessments yet.</p>') : l.status === 'failed' ? `<p class="small muted" role="alert">Could not load assessments. <a href="#" data-retry-list="${esc(p.id)}">Retry</a></p>` : l.status === 'unauthenticated' ? `<p class="small muted" role="alert">Your sign-in is no longer active. ${SIGNIN} or <a href="#" data-retry-list="${esc(p.id)}">Retry</a></p>` : l.status === 'refused' ? '<p class="small muted">Not listed: you have no role on this project.</p>' : `<a href="#" class="small" data-project="${esc(p.id)}">Show assessments</a>`}</div>`; }).join('')}</div>`;
 }
 function bind(current) {
+  watchContextViewport();
+  syncContextDisclosure();
   app.querySelectorAll('[data-project]').forEach(el => el.onclick = async e => { e.preventDefault(); const pid = el.dataset.project; if (state.openProjects.has(pid)) { state.openProjects.delete(pid); if (state.current) paint(); else render(); return; } state.openProjects.add(pid); await assessmentsFor(pid, { retry: listFor(pid).status !== 'refused' }); render(); });
   app.querySelectorAll('[data-retry-list]').forEach(el => el.onclick = async e => { e.preventDefault(); await assessmentsFor(el.dataset.retryList, { retry: true }); render(); });
   if (!current) return;
@@ -322,11 +340,14 @@ async function act(aid, label, fn) {
 }
 // The entity read. Returns the data; the caller decides whether it is still wanted. On success for `aid` the dirty
 // mark is cleared because the screen now reflects the committed server state.
-// Workspace tree read for the sidebar: one call per workspace id, cached; refusal/failure → tree unavailable (project-only fallback).
+// Workspace tree read for the sidebar: one successful call per workspace id, cached. Refusal/failure is not cached — Refresh and later fetchAssessment retry. Missing/invisible workspace still falls back to that project alone.
 async function workspaceFor(pid) {
   const p = state.projects.find(x => x.id === pid); const wid = p?.workspace_id; if (!wid) return null;
-  if (!state.workspaces.has(wid)) { try { const r = await api(`/v2/workspaces/${encodeURIComponent(wid)}`); state.workspaces.set(wid, { id: wid, name: r.workspace.name, projects: (r.projects || []).map(x => x.id) }); } catch { state.workspaces.set(wid, null); } }
-  return state.workspaces.get(wid);
+  if (state.workspaces.has(wid)) return state.workspaces.get(wid);
+  const mine = identity;
+  try { const r = await api(`/v2/workspaces/${encodeURIComponent(wid)}`); if (identity === mine) state.workspaces.set(wid, { id: wid, name: r.workspace.name, projects: (r.projects || []).map(x => x.id) }); }
+  catch { /* transient or refusal: do not cache null; the next read retries */ }
+  return identity === mine ? (state.workspaces.get(wid) ?? null) : null;
 }
 async function fetchAssessment(aid) {
   const r = await api(`/v2/assessments/${encodeURIComponent(aid)}`);
@@ -429,7 +450,7 @@ function scrubCredentialHash() {
   if (/^#session=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} } // malformed: drop, never render
   return null;
 }
-function resetIdentity() { state.share = null; state.principal = null; state.projects = []; state.lists.clear(); state.workspaces.clear(); state.current = null; state.counts.clear(); state.print = null; }
+function resetIdentity() { state.share = null; identity += 1; epoch += 1; state.principal = null; state.projects = []; state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear(); state.current = null; state.message = null; state.dirty.clear(); state.counts.clear(); state.countInflight.clear(); state.print = null; }
 let listening = false;
 function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
 async function boot() {

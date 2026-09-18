@@ -51,7 +51,7 @@ test('classify maps contract codes', () => {
   for (const c of ['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']) assert.equal(classify(err(c)), 'refused');
   assert.equal(classify(err('RESERVED_NOT_BUILT')), 'not_built'); assert.equal(classify(err('500')), 'failed');
 });
-test('css exports the three blocks', () => { for (const k of ['.entity-card', '.hero', '.stepper']) assert.ok(css.includes(k)); });
+test('css exports the three blocks', () => { for (const k of ['.entity-card', '.hero', '.stepper', '.rv-btn', '.public-choices']) assert.ok(css.includes(k)); });
 
 // ---------- empty states ----------
 test('workspaces: empty state and create form', async () => {
@@ -176,6 +176,14 @@ test('entry: example renders the fixture, clearly labelled', async () => {
   const ctx = ctxWith({ 'GET /v2/example': { fixture: true, assessment: { id: 'asm_example', name: 'Example assessment (fixture)', stage: 'understand', language: 'Example language', surveys: [{ id: 'srv_example', template: 'translation-team@1', responses: 12 }], summary: { coverage: { translator: 5 }, bands: { clarity: 'mid' } } } } });
   const m = await pages.entry.load(ctx, { intent: 'example' }); const root = mount(pages.entry, ctx, m); // reached by the #example deep link
   const h = pages.entry.render(ctx, m); assert.equal(m.mode, 'example'); assert.ok(h.includes('fixture')); assert.ok(h.includes('translation-team@1')); assert.ok(h.includes('12 responses')); assert.ok(h.includes('Understanding')); assert.ok(h.includes('clarity'));
+});
+test('entry: survey guidance treats the code as optional and never implies a resend', async () => {
+  const ctx = ctxWith(); const h = pages.entry.render(ctx, await pages.entry.load(ctx, { intent: 'survey' }));
+  const guidance = 'If you were given an access code, enter it below.';
+  assert.ok(h.includes(guidance));
+  assert.ok(h.includes('Missing your survey link? Ask the person who invited you or shared the survey to send you the link.'));
+  assert.ok(!h.includes('released above'));
+  assert.ok(!h.includes('send it again'));
 });
 test('entry: survey code stores participant token and hands off to legacy /#participant', async () => {
   const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, removeItem: k => { delete stored[k]; } };
