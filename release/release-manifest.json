@@ -1,32 +1,30 @@
 {
-  "version": "0.11.0",
+  "version": "0.11.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "515aed295f14c155a91ca28274a315b7ee9629fa",
+  "cookbook_commit": "e17bc90537316d5f338bec353a71dc8214ee42a2",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.11.0.md",
-      "blob_sha": "f14d68299b0cf6520715c179874bb3ea884b9b74",
-      "sha256": "e9dc3365c570c8c4f83aee3275ef6897b2b251350d646bd32ac3fe0b50779a23"
+      "path": "planning/2026-09-16-parity-build/releases/0.11.1.md",
+      "blob_sha": "c4913ec1bdf7d5c45277752206392fdb9b18b931",
+      "sha256": "9bab9346b062822a60a02495468245d342005e1651116ea2c05cab97141d79a9"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "ea05e8d80c348e743e46391d595e0e88a46e475b",
-      "sha256": "5eb1490381e2a343b3f644164e04a340a89b61a35e2b8058eecc47c6184efd56"
+      "blob_sha": "146bafc903825de44b92072ddd0622dad3539c07",
+      "sha256": "c1f60fb8d2085505b86ec0393207cf69f4c8880ee79c0898794d0198efdfed40"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Signed-in users can send optional app feedback from the current shell with a separate form and a confirmed feedback reference."
-      ],
+      "added": [],
       "changed": [
-        "Persona evidence includes three historical local-browser form cases and current automated HTTP/MCP expiry and form regressions; human satisfaction, confusion and frustration are NOT MEASURED."
+        "Survey sharing opens the output choices directly: Copy link, QR code or Print invitations explicitly confirms issuance after access and revocation disclosure."
       ],
       "fixed": [
-        "Entered feedback survives refused or uncertain submissions; the form requests authenticated attribution at the actual write boundary instead of relying on cached sign-in."
+        "Copy and print failures reuse the received in-memory link; uncertain issuance never retries automatically, and stale identity/page responses cannot reveal credentials."
       ],
       "security": [
-        "Optional require_authenticated on the existing HTTP/MCP feedback write refuses anonymous callers before persistence when true; omission or false preserves public feedback. No database migration or automatic context capture."
+        "Existing preview/execute/revoke APIs, role checks and one-time link disclosure remain unchanged; no credential persistence or background issuance."
       ]
     }
   }
