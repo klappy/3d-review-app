@@ -1,12 +1,15 @@
 export const STAGES = ['planned','built','reviewed','dev','production'];
 export const LABELS = {planned:'Planned',built:'Built',reviewed:'Reviewed',dev:'DEV',production:'Production'};
 export const STATES = {done:'✅ Done',pending:'🟡 Pending',blocked:'🔴 Blocked'};
+export const WINDOWS = ['past','now','next'];
 export function windowItems(items, all=false){
-  const sorted=[...items].sort((a,b)=>Date.parse(b.updated_at)-Date.parse(a.updated_at)||a.id.localeCompare(b.id));
-  const delivered=x=>STAGES.every(k=>x.stages[k].state==='done')||latestReport(x)?.stage==='production'&&latestReport(x)?.state==='done';
-  const completed=sorted.filter(delivered);
-  const active=sorted.filter(x=>!delivered(x));
-  return {active:all?active:active.slice(0,20),completed:all?completed:completed.slice(0,10),activeTotal:active.length,completedTotal:completed.length};
+ const sorted=[...items].sort((a,b)=>(a.operations?.queue_rank??Infinity)-(b.operations?.queue_rank??Infinity)||a.id.localeCompare(b.id));
+ const result={};
+ for(const key of [...WINDOWS,'unclassified']){
+  const rows=sorted.filter(x=>(WINDOWS.includes(x.operations?.workflow)?x.operations.workflow:'unclassified')===key);
+  result[key]=all?rows:rows.slice(0,20);result[key+'Total']=rows.length;
+ }
+ return result;
 }
 
 // Existing stages remain verifier materializations; reported is an explicitly separate claim.

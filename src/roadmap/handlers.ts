@@ -54,8 +54,11 @@ export const summary:Handler=async(ctx,p,opts)=>{
  exact(p,['expected_cursor','idempotency_key','item_id','summary','publication_review']);
  if(!p.summary||typeof p.summary!=='object'||Array.isArray(p.summary))throw new CapError('INVALID_PARAMS','Reviewed summary required.');
  const operational=['happening_now','blocker','next_action','queue_order'];
- exact(p.summary,['title','feedback','priority','scope','outcome','recurrence',...operational]);const s=Object.fromEntries(['title','feedback','priority','scope','outcome','recurrence'].map(k=>[k,text(p.summary[k],k==='title'?150:500)]));const refs=evidence(p.publication_review);
+ exact(p.summary,['title','feedback','priority','scope','outcome','recurrence',...operational,'workflow','queue_rank']);const s=Object.fromEntries(['title','feedback','priority','scope','outcome','recurrence'].map(k=>[k,text(p.summary[k],k==='title'?150:500)]));const refs=evidence(p.publication_review);
+ if(p.summary.workflow!==undefined&&p.summary.workflow!==null&&!['past','now','next'].includes(p.summary.workflow))throw new CapError('INVALID_PARAMS','Explicit workflow position required.');
+ if(p.summary.queue_rank!==undefined&&p.summary.queue_rank!==null&&(!Number.isSafeInteger(p.summary.queue_rank)||p.summary.queue_rank<1))throw new CapError('INVALID_PARAMS','Positive explicit queue rank required.');
  const operations=Object.fromEntries(operational.filter(k=>k in p.summary).map(k=>[k,p.summary[k]===null?null:text(p.summary[k])]));
+ for(const k of ['workflow','queue_rank'])if(k in p.summary)operations[k]=p.summary[k];
  return write(ctx,p,opts,'summary',async(store,at)=>{const item=await store.item(p.item_id)??blank(p.item_id,at);item.title=s.title;if(Object.keys(operations).length)item.operations={...item.operations,...operations,reviewed_at:at};item.provenance={feedback:s.feedback,priority:s.priority,scope:s.scope,outcome:s.outcome,recurrence:s.recurrence};
  history(item,at,'decision','Reviewed public summary published; review reference is a publisher attestation.',refs,integer(p.expected_cursor)+1);
  return {item,publicEvent:{kind:'summary',attribution:'publication_reviewer_attestation',review:refs,summary:s}};});
