@@ -1,17 +1,17 @@
 {
-  "version": "0.9.1",
+  "version": "0.9.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "3e0985c7cfa940a61034c7d262c92e26f36165da",
+  "cookbook_commit": "6a5b00379802f256ca9ab0d76b5949b55ed7d7a8",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.9.1.md",
-      "blob_sha": "a6ca85d89dc703c203e2ae453a94ac79c3153e64",
-      "sha256": "bd91ad6dcca22e441f5047c23bc60a0914d10a84be70eb54d806ddfa25350526"
+      "path": "planning/2026-09-16-parity-build/releases/0.9.2.md",
+      "blob_sha": "eaf2b926965364b972c7e58e182e66339262aed9",
+      "sha256": "45e841381a9b6be4221fd5de31e6776435340f5f688c70425f747dba85b9b976"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "75c40bf685dc4c777f1df9c2cb17ce77caeac51e",
-      "sha256": "c89ff4b9ff2fe33dc180aebba4710804e02fc717368bf21d28d9a858f7b8728c"
+      "blob_sha": "c3545b967f70edbdcb3651c35e3917b1f94342fc",
+      "sha256": "753ef194f795b7542b734173103fe408b7e0520a10a24f0bd01bd7919826145c"
     }
   ],
   "changelog": {
@@ -19,9 +19,11 @@
       "added": [],
       "changed": [],
       "fixed": [
-        "Release validation runs all 34 synthetic report contexts as sequential bounded cases, preserves the 425-response aggregate and coexistence checks, and drains or quarantines unfinished fixture work before reuse."
+        "Current-shell participant resume opens the preserved legacy survey instead of returning an existing participant session to the public access-code entry."
       ],
-      "security": []
+      "security": [
+        "Route forwarding does not read, modify or expose participant credentials. Existing public survey, shared-link, invitation and synthetic-demo routes retain their behavior."
+      ]
     }
   }
 }
