@@ -1,11 +1,11 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.11.1",
+  "current": "0.11.2",
   "versions": [
     {
-      "version": "0.11.1",
+      "version": "0.11.2",
       "status": "candidate",
-      "notes_path": "releases/0.11.1.md",
+      "notes_path": "releases/0.11.2.md",
       "sections": {
         "added": [],
         "changed": [
@@ -16,6 +16,23 @@
         ],
         "security": [
           "Existing preview/execute/revoke APIs, role checks and one-time link disclosure remain unchanged; no credential persistence or background issuance."
+        ]
+      }
+    },
+    {
+      "version": "0.11.1",
+      "status": "candidate",
+      "notes_path": "releases/0.11.1.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona evidence: 2/2 automated local connection lifecycle cases passed; human satisfaction, confusion and frustration NOT MEASURED."
+        ],
+        "fixed": [
+          "Open workspaces waits for the MCP bridge connection to settle, then becomes available without a stale host-capability refusal."
+        ],
+        "security": [
+          "No automatic tool calls, capability widening or confirmation changes; failed connections retain explicit refusal."
         ]
       }
     },
