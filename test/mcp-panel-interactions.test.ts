@@ -6,15 +6,16 @@ const { JSDOM } = createRequire(import.meta.url)('jsdom');
 const source = readFileSync(new URL('../ui/mcp/panel-src.html', import.meta.url), 'utf8');
 const cards = readFileSync(new URL('../ui/assess/cards.js', import.meta.url), 'utf8').replace(/^export\s+(const|function)\s/gm, '$1 ');
 const script = source.split('<script>')[2].split('</script>')[0].replace('/*__CARDS__*/', cards)
-  .replace('})();', 'window.review = { state, go, render };})();');
+  .replace('/*__ACTION_CARD__*/', readFileSync(new URL('../ui/mcp/action-card.js', import.meta.url), 'utf8').replace(/^export\s+(const|function)\s/gm, '$1 '))
+  .replace(/\}\)\(\);\s*$/,  'window.review = { state, go, render };})();');
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
-function fixture({ deferGet = false, deferWrite = false } = {}) {
+function fixture({ deferGet = false, deferWrite = false, connect = false } = {}) {
   const dom = new JSDOM(source.split('<script>')[0], { runScripts: 'outside-only', url: 'https://panel.test' });
   const events = new Map<string, Function>();
   const w = dom.window, calls: any[] = [], pending: any[] = [], pendingGets: any[] = [], pendingWrites: any[] = [];
   const assessment = (id: string) => ({ assessment: { id, name: id, role: 'owner', stage: 'permissions', project_id: 'p' }, surveys: [] });
   w.McpApps = { App: class {
-    addEventListener(name: string, fn: Function) { events.set(name, fn); } connect() { return new Promise(() => {}); }
+    addEventListener(name: string, fn: Function) { events.set(name, fn); } connect() { return connect ? Promise.resolve() : new Promise(() => {}); } getHostCapabilities() { return {serverTools:{}}; }
     callServerTool(req: any) {
       calls.push(req);
       if (req.name === 'danger') return new Promise(resolve => pending.push(resolve));
@@ -178,7 +179,7 @@ it.each(['structured', 'text'])('shows initial failed host result without capabi
   } finally { f.dom.window.close(); }
 });
 
-it('host refusal invalidates an older read; a subsequent successful host result routes normally', async () => {
+it('host refusal invalidates an older read; a subsequent successful result stays compact without fetching', async () => {
   const f = fixture({ deferGet: true });
   try {
     await f.go('A');
@@ -186,8 +187,14 @@ it('host refusal invalidates an older read; a subsequent successful host result 
     f.resolveGet('A'); await tick();
     expect(f.w.document.querySelector('[data-state="refused"]')).not.toBeNull();
     f.hostResult({ structuredContent: { ok: true, capability: 'cap.assessment.get', result: { assessment: { id: 'B' } } } });
-    await tick(); f.resolveGet('B'); await tick();
-    expect(f.w.document.querySelector('h1').textContent).toBe('B');
+    await tick();
+    expect(f.w.document.querySelector('.action-card')).not.toBeNull();
+    expect(f.calls.filter(x => x.arguments?.params?.id === 'B')).toHaveLength(0);
     expect(f.w.document.body.textContent).not.toContain('old-trace');
   } finally { f.dom.window.close(); }
+});
+
+
+it('actual connected panel waits compactly without auth or workspace bootstrap', async () => {
+ const f=fixture({connect:true});try { await tick();expect(f.calls).toHaveLength(0);expect(f.w.document.querySelector('.action-card')).not.toBeNull();expect(f.w.document.body.classList.contains('mcp-compact')).toBe(true);expect(f.w.document.querySelector('#app').textContent).toContain('Waiting'); }finally{f.dom.window.close();}
 });
