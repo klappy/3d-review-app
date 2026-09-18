@@ -14,7 +14,7 @@ export function renderCards(items,label){
 }
 export function mountRoadmap(doc=globalThis.document,createFeed=createLiveFeed){
  const output=doc.querySelector('#roadmap'),status=doc.querySelector('#roadmap-status'),refresh=doc.querySelector('#refresh'),all=doc.querySelector('#show-all');let latest=null,selected="now";
- const render=()=>{if(!latest)return;status.textContent=latest.error||'';
+ const render=()=>{if(!latest)return;status.textContent=latest.error||(!latest.snapshot?'Loading roadmap…':'');
   if(!latest.snapshot){output.innerHTML='';return;}
   const opened=new Set([...output.querySelectorAll('details[open]')].map(x=>x.dataset.detail));
   const focused=doc.activeElement?.closest('details')?.dataset.detail;
