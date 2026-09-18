@@ -21,9 +21,18 @@ function makeRoot(html, fields = {}) {
 globalThis.location = { hash: '#assessment/a1/permissions' }; globalThis.CSS = { escape: s => s };
 async function mount(mine, table, fields = {}) {
   const { api, apiFull, calls } = fakeApi({ [G]: roster(mine), ...table }); let reloads = 0;
-  const ctx = { api, apiFull, esc, enc: encodeURIComponent, state: { principal: { id: 'me' } }, go: (h, o) => { if (o?.reload) reloads++; } };
-  const m = await permissions.load(ctx, { scope: 'assessments', id: 'a1' }); const root = makeRoot(permissions.render(ctx, m), fields); permissions.bind(ctx, root, m);
-  return { ctx, m, root, calls, reloads: () => reloads, click: async (k) => root.querySelector(`[${k}]`).fire('click'), submit: async (k) => root.querySelector(`[${k}]`).fire('submit') };
+  let m, root, navigation;
+  const ctx = { api, apiFull, esc, enc: encodeURIComponent, state: { principal: { id: 'me' } }, go: (h, o) => {
+    if (!o?.reload) return;
+    reloads++;
+    // Match the shell's real lifecycle: route reload replaces the model, then renders/binds again.
+    navigation = permissions.load(ctx, { scope: 'assessments', id: 'a1' }).then(fresh => {
+      m = fresh; root.innerHTML = permissions.render(ctx, m); permissions.bind(ctx, root, m);
+    });
+    return navigation;
+  } };
+  m = await permissions.load(ctx, { scope: 'assessments', id: 'a1' }); root = makeRoot(permissions.render(ctx, m), fields); permissions.bind(ctx, root, m);
+  return { ctx, get m() { return m; }, root, calls, settle: () => navigation, reloads: () => reloads, click: async (k) => root.querySelector(`[${k}]`).fire('click'), submit: async (k) => root.querySelector(`[${k}]`).fire('submit') };
 }
 
 test('N1 viewer: grant.list 403 → placeholder note, no roster in DOM; N2 no role: 404 → "Not available", no permission wording, no name', async () => {
@@ -48,7 +57,7 @@ test('invite two-step: dry_run params → sheet renders impact VERBATIM (effect,
   await x.submit('data-invite-form'); assert.deepEqual(seen[0], { params: { email: 'new@example.test', role: 'viewer' }, mode: 'dry_run' });
   const h = x.root.html; assert.match(h, /data-confirm-kind="invite"/); assert.match(h, /expires in 300 seconds/); assert.match(h, /<dd>external<\/dd>/); assert.match(h, /<dd>true<\/dd>/); assert.match(h, /cap.grant.revoke_invitation/); assert.match(h, /629f4df892ca/); assert.match(h, /new@example.test/);
   await x.click('data-confirm-execute'); assert.deepEqual(seen[1], { params: { email: 'new@example.test', role: 'viewer' }, mode: 'execute', confirm_token: 'cfm_1' });
-  assert.equal(x.m.sheet, null); assert.match(x.root.html, /Invitation sent\. receipt rcpt_1 · trace tr_1/); assert.equal(x.reloads(), 1);
+  assert.equal(x.m.sheet, null); assert.match(x.root.html, /Invitation sent\. receipt rcpt_1 · trace tr_1/); assert.equal(x.reloads(), 0); assert.equal(x.calls.filter(c => c.url === '/v2/assessment/a1/grants').length, 2);
 });
 
 test('N3 member invites owner → picker never offers owner; forced 403 renders server message; N12 malformed → server 400 verbatim; N18 429 with hint', async () => {
@@ -108,4 +117,71 @@ test('N16/N17 credential + scope discipline (static): tokens only in the page mo
   assert.doesNotMatch(src, /invitations\/[^`]*\/accept/, 'no accept call');
   assert.match(src, /grants`\)/); assert.doesNotMatch(src, /effective|inherit(ed)? role/i.source ? /effectiveRole|inheritedRole/ : /x/);
   assert.ok(read('../server.mjs').includes("'/assess/permissions.js':")); assert.ok(read('../.assetsignore').split('\n').includes('assess/permissions.test.mjs'));
+});
+
+
+test('F-G1-1: mutation completion refreshes real roster and role while keeping outcome/receipt/trace visible', async () => {
+  for (const action of ['invite', 'update_role', 'transfer', 'revoke', 'revoke_invitation']) {
+    let changed = false;
+    const after = roster(action === 'transfer' ? 'member' : 'owner');
+    if (action === 'invite') after.pending_invitations.push({ id: 'inv_new', role: 'viewer', status: 'sent' });
+    if (action === 'update_role') after.grants.find(g => g.id === 'g_mem').role = 'viewer';
+    if (action === 'transfer') after.grants.find(g => g.id === 'g_mem').role = 'owner';
+    if (action === 'revoke') after.grants = after.grants.filter(g => g.id !== 'g_view');
+    if (action === 'revoke_invitation') after.pending_invitations = after.pending_invitations.filter(i => i.id !== 'inv_p');
+    const mutate = ({ body }) => {
+      if (body?.mode === 'dry_run') return { confirm_token: 'secret-confirm', expires_in: 300, impact: {} };
+      changed = true; return { delivered: true };
+    };
+    const x = await mount('owner', {
+      [G]: () => changed ? after : roster('owner'),
+      'POST /v2/assessment/a1/invitations': mutate,
+      'PATCH /v2/assessment/a1/grants/g_mem': mutate,
+      'POST /v2/assessment/a1/transfer': mutate,
+      'DELETE /v2/assessment/a1/grants/g_view': mutate,
+      'DELETE /v2/invitations/inv_p': mutate,
+    }, { email: 'new@example.test', role: 'viewer', to: 'pat', step_down_checked: true });
+    if (action === 'invite') await x.submit('data-invite-form');
+    if (action === 'update_role') { x.root.els['data-role-for=g_mem'] = { value: 'viewer' }; await x.click('data-change-role="g_mem"'); }
+    if (action === 'transfer') await x.submit('data-transfer-form');
+    if (action === 'revoke') await x.click('data-revoke="g_view"');
+    else if (action === 'revoke_invitation') await x.click('data-revoke-invitation="inv_p"');
+    else await x.click('data-confirm-execute');
+    await x.settle();
+    assert.match(x.root.html, /data-permissions-status>[^<]*receipt rcpt_1 · trace tr_1/, action);
+    assert.equal(x.calls.filter(c => c.url === '/v2/assessment/a1/grants').length, 2, action);
+    assert.equal(x.m.sheet, null);
+    assert.doesNotMatch(x.root.html, /secret-confirm|new@example.test/);
+    if (action === 'invite') assert.match(x.root.html, /data-invitation="inv_new"/);
+    if (action === 'update_role') assert.equal(x.m.grants.find(g => g.id === 'g_mem').role, 'viewer');
+    if (action === 'transfer') {
+      assert.equal(x.m.myRole, 'member'); assert.doesNotMatch(x.root.html, /data-transfer-form|data-change-role/);
+      assert.deepEqual(x.m.receipts.g_mem, { receipt: 'rcpt_1', trace: 'tr_1' });
+      assert.equal(x.m.receipts.pat, undefined, 'principal id is not a grant id');
+    }
+    if (action === 'revoke') assert.doesNotMatch(x.root.html, /data-grant-row="g_view"/);
+    if (action === 'revoke_invitation') assert.doesNotMatch(x.root.html, /data-invitation="inv_p"/);
+  }
+});
+
+test('post-success refresh refusal/failure hides stale access controls, preserves success evidence, and retries read only', async () => {
+  for (const code of ['NOT_AUTHENTICATED', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_FOUND_OR_NOT_VISIBLE', 'INTERNAL_ERROR']) {
+    let changed = false, recovered = false;
+    const x = await mount('member', {
+      [G]: () => changed && !recovered ? err(code, 500) : roster('member'),
+      'DELETE /v2/assessment/a1/grants/g_me': () => { changed = true; return { status: 'revoked' }; },
+    });
+    await x.click('data-revoke="g_me"'); await x.settle();
+    assert.match(x.root.html, /Access removed\. receipt rcpt_1 · trace tr_1/);
+    assert.doesNotMatch(x.root.html, /data-grant-row|data-invite-form|data-transfer-form|data-revoke=/);
+    if (code === 'INTERNAL_ERROR') {
+      recovered = true;
+      await x.click('data-retry="grants"');
+      // Retry handler returns no promise; allow its read/render lifecycle to settle.
+      await new Promise(resolve => setImmediate(resolve));
+      assert.match(x.root.html, /data-permissions-state="loaded"/);
+      assert.match(x.root.html, /Access removed\. receipt rcpt_1 · trace tr_1/);
+    }
+    assert.equal(x.calls.filter(c => c.method === 'DELETE').length, 1, 'refresh never repeats a mutation');
+  }
 });

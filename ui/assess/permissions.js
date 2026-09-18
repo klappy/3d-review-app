@@ -38,11 +38,12 @@ export const permissions = {
   },
   render(ctx, m) {
     const esc = ctx.esc, noun = SCOPE_NOUN[m.scope] || m.scope;
+    const status = `<p class="small ${m.alert ? 'alert' : 'muted'}" role="status" data-permissions-status>${esc(m.notice || '')}</p>`;
     const head = `<p class="eyebrow">Permissions</p><h2>Who can open this ${esc(noun)}</h2><p class="note small">Permissions apply to this ${esc(noun)} only; nothing is inherited.</p>`;
-    if (m.status === 'forbidden') return `<section class="panel narrow" data-permissions data-permissions-state="viewer">${head}<p class="muted">${esc(VIEWER_NOTE)}</p></section>`;
-    if (m.status === 'not_found') return `<section class="panel narrow" data-permissions data-permissions-state="not-found"><p class="eyebrow">Permissions</p><h2>${esc(NOT_AVAILABLE)}</h2><p class="muted">Nothing to show here.</p></section>`;
-    if (m.status === 'unauthenticated') return `<section class="panel narrow" data-permissions data-permissions-state="unauthenticated">${head}<p class="small muted" role="alert">Your sign-in is no longer active. <a href="/v2/auth/access">Sign in again</a></p></section>`;
-    if (m.status !== 'loaded') return `<section class="panel narrow" data-permissions data-permissions-state="failed">${head}<p class="small muted" role="alert">Could not load permissions. <a href="#" data-retry="grants">Retry</a></p></section>`;
+    if (m.status === 'forbidden') return `<section class="panel narrow" data-permissions data-permissions-state="viewer">${head}<p class="muted">${esc(VIEWER_NOTE)}</p>${status}</section>`;
+    if (m.status === 'not_found') return `<section class="panel narrow" data-permissions data-permissions-state="not-found"><p class="eyebrow">Permissions</p><h2>${esc(NOT_AVAILABLE)}</h2><p class="muted">Nothing to show here.</p>${status}</section>`;
+    if (m.status === 'unauthenticated') return `<section class="panel narrow" data-permissions data-permissions-state="unauthenticated">${head}<p class="small muted" role="alert">Your sign-in is no longer active. <a href="/v2/auth/access">Sign in again</a></p>${status}</section>`;
+    if (m.status !== 'loaded') return `<section class="panel narrow" data-permissions data-permissions-state="failed">${head}<p class="small muted" role="alert">Could not load permissions. <a href="#" data-retry="grants">Retry</a></p>${status}</section>`;
     const owner = m.myRole === 'owner', member = m.myRole === 'member' || owner, busy = m.busy ? 'disabled' : '';
     const canTouch = g => g.role !== 'owner' && (owner || RANK[g.role] <= RANK.member); // D3 ceiling; owners never removed/demoted
     const rows = m.grants.map(g => { const rc = m.receipts[g.id]; return `<tr data-grant-row="${esc(g.id)}"><td>${esc(g.principal_id)}${g.principal_id === m.me ? ' <span class="muted small">(you)</span>' : ''}</td><td>${esc(g.role)}</td><td class="small">${g.role === 'owner' ? '<span class="muted">Owner — only a transfer changes this</span>' : member && canTouch(g) ? `${owner ? `<select data-role-for="${esc(g.id)}" aria-label="New role" ${busy}>${ROLES.filter(r => r !== 'owner' || true).map(r => `<option value="${r}" ${r === g.role ? 'selected' : ''}>${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}" ${busy}>Preview role change</button> ` : ''}<button type="button" class="quiet" data-revoke="${esc(g.id)}" ${busy}>Remove</button>` : `<span class="muted">Members manage viewers and members only</span>`}${rc ? `<div class="small muted">receipt ${esc(rc.receipt)} · trace ${esc(rc.trace)}</div>` : ''}</td></tr>`; }).join('');
@@ -51,16 +52,24 @@ export const permissions = {
     const invite = member ? `<form class="line" data-invite-form><h3>Invite someone</h3><label class="field">Email<input name="email" type="email" required autocomplete="off" ${busy}></label><label class="field">Role<select name="role" ${busy}>${roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit" ${busy}>Preview invitation</button></div><p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p></form>` : '';
     const transfer = owner ? `<form class="line" data-transfer-form><h3>Transfer ownership</h3><p class="small muted">Ownership moves to another signed-up principal. Destructive: it cannot be undone from here.</p><label class="field">New owner's principal id<input name="to" required autocomplete="off" placeholder="usr_… or person_…" ${busy}></label><label class="small"><input type="checkbox" name="step_down"> Step down to member after the transfer</label><div class="actions"><button type="submit" ${busy}>Preview transfer</button></div></form>` : '';
     const sheet = m.sheet ? renderSheet(ctx, m.sheet) : '';
-    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}<table class="grants"><thead><tr><th>Principal</th><th>Role</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="muted">No grants listed.</td></tr>'}</tbody></table>${pending}${invite}${transfer}${sheet}<p class="small ${m.alert ? 'alert' : 'muted'}" role="status" data-permissions-status>${esc(m.notice || '')}</p><p class="small muted line">Accepting an invitation happens on the legacy surface (a mailed <code>#invite=</code> link opens there); it is never done from this page.</p></section>`;
+    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}<table class="grants"><thead><tr><th>Principal</th><th>Role</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="muted">No grants listed.</td></tr>'}</tbody></table>${pending}${invite}${transfer}${sheet}${status}<p class="small muted line">Accepting an invitation happens on the legacy surface (a mailed <code>#invite=</code> link opens there); it is never done from this page.</p></section>`;
   },
   bind(ctx, root, m) {
     const base = `/v2/${SCOPE_SEG[m.scope]}/${ctx.enc(m.id)}`;
     const call = ctx.apiFull || (async (url, o) => ({ result: await ctx.api(url, o) }));
     const paint = () => { root.innerHTML = permissions.render(ctx, m); permissions.bind(ctx, root, m); };
     const say = (notice, alert = false) => { m.notice = notice; m.alert = alert; paint(); };
-    const reload = () => ctx.go(location.hash, { reload: true });
+    // Refresh server-owned roster/role state without replacing the action outcome.
+    // A full route reload constructs a blank model and loses the receipt before it can be read.
+    const refresh = async () => {
+      const fresh = await permissions.load(ctx, { scope: m.scope, id: m.id });
+      Object.assign(m, { status: fresh.status, grants: fresh.grants, pending: fresh.pending,
+        me: fresh.me, myRole: fresh.myRole, error: fresh.error, busy: false });
+      paint();
+    };
+    const receiptText = env => `${env.receipt?.id ? ` receipt ${env.receipt.id}` : ''}${env.trace_id ? ` · trace ${env.trace_id}` : ''}`;
     const fail = (e, what) => { const k = classify(e); say(k === 'not_found' ? `${what}: ${NOT_AVAILABLE.toLowerCase()}.` : k === 'unauthenticated' ? 'Your sign-in is no longer active.' : `${what}: ${e.message || 'request failed'}${e.hint ? ` — ${e.hint}` : ''}`, true); };
-    root.querySelector('[data-retry="grants"]')?.addEventListener('click', e => { e.preventDefault(); reload(); });
+    root.querySelector('[data-retry="grants"]')?.addEventListener('click', e => { e.preventDefault(); refresh(); });
     // Danger twin: dry_run → sheet (impact verbatim) → execute with byte-identical params. CONFIRM_REQUIRED → silent re-dry_run once;
     // CONFIRM_EXPIRED → "Preview again". Never auto-retry execute.
     const preview = async (kind, url, params, label, extra = {}) => { m.busy = true; paint();
@@ -71,9 +80,9 @@ export const permissions = {
       m.busy = true; paint(); const token = s.token; s.token = null; // single-use, cleared before the call
       try { const env = await call(s.url, { method: s.method, body: { params: s.params, mode: 'execute', confirm_token: token } }); const r = env.result || {};
         m.sheet = null;
-        if (s.kind === 'invite') { if (r.delivered === false && /duplicate/.test(r.delivery?.reason || '')) say(DUPLICATE_NOTE); else if (r.delivered === false && r.delivery?.state === 'unconfirmed') say(`Invitation recorded — ${UNCONFIRMED_NOTE}`); else if (r.delivered === false) say(`Invitation recorded; not sent (${r.delivery?.reason || 'not sent'}). It can be revoked below.`); else say(`Invitation sent.${env.receipt?.id ? ` receipt ${env.receipt.id}` : ''}${env.trace_id ? ` · trace ${env.trace_id}` : ''}`); }
-        else { const gid = s.gid || s.params.to; if (gid && env.receipt) m.receipts[gid] = { receipt: env.receipt.id, trace: env.trace_id }; say(`${s.label} done.${env.receipt?.id ? ` receipt ${env.receipt.id}` : ''}${env.trace_id ? ` · trace ${env.trace_id}` : ''}`); }
-        m.busy = false; reload();
+        if (s.kind === 'invite') { if (r.delivered === false && /duplicate/.test(r.delivery?.reason || '')) say(`${DUPLICATE_NOTE}${receiptText(env)}`); else if (r.delivered === false && r.delivery?.state === 'unconfirmed') say(`Invitation recorded — ${UNCONFIRMED_NOTE}${receiptText(env)}`); else if (r.delivered === false) say(`Invitation recorded; not sent (${r.delivery?.reason || 'not sent'}). It can be revoked below.${receiptText(env)}`); else say(`Invitation sent.${receiptText(env)}`); }
+        else { const gid = s.gid || m.grants.find(g => g.principal_id === s.params.to)?.id; if (gid && env.receipt) m.receipts[gid] = { receipt: env.receipt.id, trace: env.trace_id }; say(`${s.label} done.${receiptText(env)}`); }
+        await refresh();
       } catch (e) { m.busy = false;
         const code = String(e.code || '');
         if (code === 'CONFIRM_REQUIRED' && !s.redone) { s.redone = true; try { const env = await call(s.url, { method: s.method, body: { params: s.params, mode: 'dry_run' } }); s.token = env.result.confirm_token; s.expiresIn = env.result.expires_in; s.impact = env.result.impact || s.impact; say('The confirmation no longer matched; the preview was refreshed. Confirm again.', true); } catch (e2) { m.sheet = null; fail(e2, s.label); } return; }
@@ -84,8 +93,8 @@ export const permissions = {
     root.querySelectorAll('[data-change-role]').forEach(b => b.addEventListener('click', () => { const gid = b.dataset.changeRole; const role = root.querySelector(`[data-role-for="${CSS.escape(gid)}"]`)?.value; const g = m.grants.find(x => x.id === gid); if (!g || !role || role === g.role) { say('That is already the role.'); return; } preview('update_role', `${base}/grants/${ctx.enc(gid)}`, { role }, 'Role change', { method: 'PATCH', display: { who: g.principal_id, gid } }); }));
     root.querySelector('[data-transfer-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const to = f.querySelector('[name=to]').value.trim(); const step_down = !!f.querySelector('[name=step_down]').checked; preview('transfer_owner', `${base}/transfer`, step_down ? { to, step_down: true } : { to }, 'Ownership transfer', { display: { who: to } }); });
     // single-call writes: mode is never sent (contract §3.5)
-    root.querySelectorAll('[data-revoke]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`${base}/grants/${ctx.enc(b.dataset.revoke)}`, { method: 'DELETE' }); m.busy = false; say(`Access removed.${env.receipt?.id ? ` receipt ${env.receipt.id}` : ''}`); reload(); } catch (e) { m.busy = false; fail(e, 'Remove access'); } }));
-    root.querySelectorAll('[data-revoke-invitation]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { await call(`/v2/invitations/${ctx.enc(b.dataset.revokeInvitation)}`, { method: 'DELETE' }); m.busy = false; say('Invitation revoked.'); reload(); } catch (e) { m.busy = false; fail(e, 'Revoke invitation'); } }));
+    root.querySelectorAll('[data-revoke]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`${base}/grants/${ctx.enc(b.dataset.revoke)}`, { method: 'DELETE' }); m.busy = false; say(`Access removed.${receiptText(env)}`); await refresh(); } catch (e) { m.busy = false; fail(e, 'Remove access'); } }));
+    root.querySelectorAll('[data-revoke-invitation]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`/v2/invitations/${ctx.enc(b.dataset.revokeInvitation)}`, { method: 'DELETE' }); m.busy = false; say(`Invitation revoked.${receiptText(env)}`); await refresh(); } catch (e) { m.busy = false; fail(e, 'Revoke invitation'); } }));
     root.querySelector('[data-confirm-execute]')?.addEventListener('click', execute);
     root.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => { m.sheet = null; say(null); });
   },
