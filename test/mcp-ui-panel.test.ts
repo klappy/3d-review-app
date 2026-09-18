@@ -1,6 +1,8 @@
 // MCP Apps panel wiring (checkpoint 8): the four-tool surface is unchanged; every tool carries the panel resource in _meta;
 // resources/list + resources/read serve ONE self-contained HTML resource with the app profile MIME; nothing off-origin.
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import worker from "../src/worker";
@@ -37,7 +39,12 @@ describe("MCP Apps panel resource", () => {
     const c = read.result.contents[0]; expect(c.mimeType).toBe("text/html;profile=mcp-app"); expect(c.text).toContain("window.McpApps = { App:"); expect(c.text).toContain("function card(");
     expect(c.text).not.toMatch(/\bsrc=["']https?:/); expect(c.text).not.toMatch(/\bhref=["']https?:/); expect(c.text).not.toMatch(/@import\s+url\(\s*["']?https?:/);
     for (const s of ["call('read'", "call('write'", "call('danger'"]) expect(c.text).toContain(s); // the panel drives the same tools; no fifth path
+    for (const s of ["routeGeneration", "state.executing", "if (g !== gen) return", "if (generation !== routeGeneration) return", "shared-assessments"]) expect(c.text).toContain(s);
     const bad = await rpc({ jsonrpc: "2.0", id: 5, method: "resources/read", params: { uri: "ui://3d-review/other.html" } }); expect(bad.error.code).toBe(-32602);
+  });
+  it("the committed panel is a fresh build of panel-src (byte lock against source-only drift)", () => {
+    const check = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/build-mcp-panel.mjs", import.meta.url)), "--check"], { encoding: "utf8" });
+    expect(check.status, check.stderr + check.stdout).toBe(0);
   });
   it("resources need the same authorization as tools (no anonymous MCP)", async () => {
     const r = await worker.fetch(new Request(ORIGIN + "/mcp", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 6, method: "resources/read", params: { uri: PANEL_URI } }) }), env, ectx());

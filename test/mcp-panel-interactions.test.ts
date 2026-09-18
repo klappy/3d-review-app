@@ -110,6 +110,32 @@ it('discards stale notes status instead of disabling or painting it on another a
   } finally { f.dom.window.close(); }
 });
 
+it('surfaces assessment-only grants as reachable cards and crumbs', async () => {
+  const f = fixture();
+  try {
+    f.r.state.me = { principal: { id: 'person_viewer', kind: 'user', provisioned: true }, grants: [{ scope_type: 'assessment', scope_id: 'assess_shared', role: 'viewer' }] };
+    f.r.go('#workspaces'); await tick();
+    expect(f.w.document.querySelector('a[href="#assessment/assess_shared"]')).not.toBeNull();
+    expect(f.w.document.querySelector('h1').textContent).toBe('Choose an assessment');
+    await f.go('assess_shared');
+    expect(f.w.document.querySelector('h1').textContent).toBe('assess_shared');
+    expect(f.w.document.querySelector('#crumbs a[href="#shared-assessments"]')).not.toBeNull();
+    expect(f.w.document.querySelector('#crumbs').textContent).not.toContain('Project');
+    f.r.go('#shared-assessments'); await tick();
+    expect(f.w.document.querySelector('a[href="#assessment/assess_shared"]')).not.toBeNull();
+  } finally { f.dom.window.close(); }
+});
+
+it('does not use the shared-assessment entry when a project grant exists', async () => {
+  const f = fixture();
+  try {
+    f.r.state.me = { principal: { id: 'person_owner', kind: 'user' }, grants: [{ scope_type: 'project', scope_id: 'proj_1', role: 'owner' }, { scope_type: 'assessment', scope_id: 'assess_shared', role: 'viewer' }] };
+    f.r.go('#workspaces'); await tick();
+    expect(f.w.document.querySelector('a[href="#assessment/assess_shared"]')).toBeNull();
+    expect(f.w.document.querySelector('h1').textContent).toBe('Choose a workspace');
+  } finally { f.dom.window.close(); }
+});
+
 it('blocks cancel, repeat confirm and navigation during execute; retains its receipt', async () => {
   const f = fixture();
   try {
