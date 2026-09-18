@@ -39,3 +39,6 @@ demo.test.mjs
 assess/feedback.test.mjs
 mcp/action-card.js
 mcp/action-card.css
+
+roadmap/model.test.mjs
+roadmap/live.test.mjs
