@@ -41,7 +41,19 @@ Only after whole-baseline independent acceptance, literal exact-head Cursor Bugb
 3. Open review-only correction PRs targeting the affected branch. Before any promotion, verify Bugbot is comment-only on a shared promotion head. `.cursor/BUGBOT.md` expresses the policy but does not prove service configuration. An Autofix already running is not permission to discard its branch or accept its output.
 4. Require the **real** `Cursor Bugbot` check from GitHub App `1210556` to be `completed` with `conclusion: success` on the exact current PR head SHA. Enumerate all paginated check runs and status contexts, not just the combined status or UI badge. Missing, unreadable, queued, in-progress, neutral, skipped, cancelled, timed-out or failed required checks block promotion. Every attached check must finish; every adverse conclusion and review finding needs a recorded disposition. Re-read head and checks immediately before the decision; any new commit invalidates the old receipt.
 5. Record independent corrective review, terminal check receipts and remaining findings beside the existing cargo and in issue 14. The responsible authority explicitly records whether the hold is satisfied for a particular promotion; a named, logged override is the only bypass. A worker, green test suite, this document or a GitHub mergeable flag cannot silently lift it.
-6. Only after current authority and gates permit it, merge through the ordinary PR path. Observe the resulting Git SHA, connected build success and deployed version. Independently test the actual deployed API/MCP and human browser journey after merge. A deploy receipt is not full-app acceptance.
+6. Only after current authority and gates permit it, merge through the ordinary PR path. Observe the resulting Git SHA, connected build success and deployed version. Independently test the actual deployed API/MCP and human browser journey after merge. A deploy receipt is not full-app acceptance. Complete the production follow-through receipt below after verified DEV delivery.
+
+## Production follow-through receipt
+
+Apply [cookbook HYGIENE §10](https://github.com/klappy/3d-review-cookbook/blob/main/HYGIENE.md) through the same release receipt used in step 6. Immediately after DEV is verified live, record this chain:
+
+| Receipt field | Evidence |
+| --- | --- |
+| Validated DEV | Merge SHA, canonical push-event build and active deployed version, plus live verification receipt. |
+| Current production candidate | Separate production PR URL and current head SHA; compare its complete source tree against that validated DEV SHA. Verify identical semantic version, canonical release pin and validated product source. List any environment/build metadata differences and their scoped review disposition; those differences alone do not justify a version bump. Product fixes must land on main and be validated in DEV first. Refresh this PR with the validated functionality before reporting follow-through complete. |
+| External prerequisite | The concrete unmet prerequisite, responsible owner and next action, or none. Keep this separate from source equivalence and exact-head review/check results. |
+
+An external prerequisite can hold production merge or deployment while its PR stays current. A pending production comparison does not reverse DEV's verified live status or block unrelated accepted increments. Read the fixed status columns defined in cookbook HYGIENE §10 from this receipt; do not infer production readiness from DEV's deployment or test count. Existing review, check and deployment controls still apply; this receipt adds no approval step.
 
 ## Applied scoped branch enforcement
 
@@ -53,7 +65,7 @@ Only after whole-baseline independent acceptance, literal exact-head Cursor Bugb
 
 Apply only explicitly reviewed additive migrations to the named environment with a current schema/data preflight and readback. Never replay initial migrations or synthetic seeding against existing DEV or production data as a release shortcut. Fable owns auth/contract coordination; remote schema/data work needs its actual claim and authority.
 
-Before production, satisfy live HYGIENE 19: a `package.json` semver bump and CHANGELOG entry in the promotion, manifest-derived `<version>+<sha7>` build/client stamp, and a test proving they agree. This documentation adds no stamp implementation and does not claim that requirement already passes. Full acceptance separately includes reports/results, authentication/security, all persona workflows, source parity, API/MCP and browser evidence. One successful slice or health response cannot close it.
+Before production, preserve the same `package.json` semantic version, canonical release pin and product source already validated in DEV. The current user standing rule in cookbook HYGIENE §10 supersedes the earlier HYGIENE 19 requirement for a promotion-only semver bump. Every version surface derives from the existing authority chain; environment, deployment time, Git merge/build identity and receipt status alone do not bump it. Actual fixes pass through main and DEV validation before production. Verify the manifest-derived `<version>+<sha7>` build/client stamp and its agreement tests. This documentation adds no stamp implementation and does not claim that requirement already passes. Full acceptance separately includes reports/results, authentication/security, all persona workflows, source parity, API/MCP and browser evidence. One successful slice or health response cannot close it.
 
 ## Versioning (release identity)
 
@@ -72,6 +84,6 @@ Ticket `2026-09-17-3d-release-identity` (kitchen). The app does not author its o
 
 Chris authorized shipping the accepted cumulative web and sharing baseline through `4a27830c56c4ef05d2ea8656e07de68311eef942` to DEV and then production in separate PRs. This supersedes the earlier blanket no-production instruction only for the candidate tracked in [app issue 66](https://github.com/klappy/3d-review-app/issues/66). CP7 G1, MCP work, and retrospective acceptance remain separate and do not block the accepted increment. PR65 and subsequent work remain preserved.
 
-Version 0.2.0 is MINOR under the established major-zero policy. The canonical cookbook candidate record is authored first and pinned by immutable commit, blob IDs and SHA-256 in the app manifest. Both package version fields and generated identity follow that record. A production promotion must carry a manifest bump and changelog under the existing policy; its exact version is prepared separately after DEV acceptance.
+Version 0.2.0 is MINOR under the established major-zero policy. The canonical cookbook candidate record is authored first and pinned by immutable commit, blob IDs and SHA-256 in the app manifest. Both package version fields and generated identity follow that record. The earlier order required a separate production manifest bump; that part is superseded by the current same-version standing rule above. Preserve this historical order as provenance, not an instruction to create a promotion-only version.
 
 No check or protection is waived: independent exact-head acceptance, literal Cursor Bugbot SUCCESS, terminal attached checks and root prospective disposition precede ordinary merge. DEV and production deployment happen only from their connected Git triggers, followed by canonical build/health/assets verification. No manual deployment or seed/migration replay.
