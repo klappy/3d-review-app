@@ -48,6 +48,20 @@ it.each([false, true])('discards deferred A preview after navigation, including 
   } finally { f.dom.window.close(); }
 });
 
+it('does not unlock a destination preview when a stale preview settles', async () => {
+  const f = fixture();
+  try {
+    await f.go('A'); await f.preview(); await f.go('B'); await f.preview();
+    expect(f.r.state.busy).toBe(true); expect(f.calls.filter(x => x.name === 'danger')).toHaveLength(2);
+    f.resolvePreview(); await tick();
+    expect(f.r.state.busy).toBe(true); expect(f.r.state.sheet).toBeNull();
+    expect(f.w.document.querySelector('h1').textContent).toBe('B');
+    expect(f.w.document.querySelector('[data-invite-preview]').disabled).toBe(true);
+    f.resolvePreview(); await tick();
+    expect(f.r.state.busy).toBe(false); expect(f.r.state.sheet.params.id).toBe('B');
+  } finally { f.dom.window.close(); }
+});
+
 it('discards stale preview refusal instead of painting it on another assessment', async () => {
   const f = fixture();
   try {

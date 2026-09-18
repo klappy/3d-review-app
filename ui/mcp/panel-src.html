@@ -121,7 +121,7 @@ function bind(root) {
     } catch (err) {
       if (generation !== routeGeneration) return;
       state.notice = `Invitation — ${err.message}${err.hint ? ` (${err.hint})` : ''}`; state.alert = true;
-    } finally { state.busy = false; render(); }
+    } finally { if (generation === routeGeneration) { state.busy = false; render(); } }
   });
   root.querySelector('[data-confirm-execute]')?.addEventListener('click', async () => {
     if (state.busy) return;
