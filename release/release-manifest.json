@@ -1,31 +1,30 @@
 {
-  "version": "0.12.0",
+  "version": "0.12.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "d535767fafea2207fbdfd92502fa3bb76f25e47b",
+  "cookbook_commit": "b3e7685695403d1e757b8a3160a3d74c38aa7a31",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.12.0.md",
-      "blob_sha": "60188a7a2ab833d516753dacd3c57323a35b0569",
-      "sha256": "0730416ba620a764e5f6c870cf94c48242cb6e9122738b2a82d4793f5f634d5e"
+      "path": "planning/2026-09-16-parity-build/releases/0.12.1.md",
+      "blob_sha": "fe881e8bb1c587ffeea93ec356a452e62b079675",
+      "sha256": "e03f327896ae1943f655ffde0ccd64025540664131bd62c9287383250c6c6c2d"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "1dfdbe6a914a9db9a5eab5ed0f1ef2e8bdad39a8",
-      "sha256": "3a0e9c31681e468e4a9e651a22c88323b352df90e7d71472f65adb6d02444a2b"
+      "blob_sha": "90c6653c9d8fbd5a1b583fcb83c5a2e1e91bdfdc",
+      "sha256": "fd92ae8a86b5b1e6e190b66cbc3b6946a5f5ab31857ece6b17034301a0fed590"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Live /roadmap reads durable progress and history through six shared HTTP/MCP capabilities, with SSE updates, cursor replay and explicit polling fallback."
-      ],
+      "added": [],
       "changed": [
-        "Persona evidence: 3/3 local actual-browser HTTP/MCP write-to-visible cases and 1/1 mobile layout case passed; human satisfaction, confusion and frustration NOT MEASURED."
+        "Persona evidence: automated redaction/reconnect regression improved from 0/1 to 1/1; human satisfaction, confusion and frustration NOT MEASURED."
       ],
-      "fixed": [],
+      "fixed": [
+        "Roadmap reconnects use the accepted current cursor and redaction generation, preventing repeated table resets after public redaction."
+      ],
       "security": [
-        "Public events use an allowlisted projection; restricted provenance and authenticated publisher identity remain private. Claims do not self-verify completion; corrections support atomic public redaction.",
-        "Publisher permission uses the existing authenticated identity and a narrow server-only build projection. Reviewed additive schema preparation runs only in the matching canonical Git-connected build."
+        "Immediate redaction clearing and stale in-flight response suppression remain; callbacks from closed streams and older generations cannot clear or restore the accepted view."
       ]
     }
   }
