@@ -177,6 +177,14 @@ test('entry: example renders the fixture, clearly labelled', async () => {
   const m = await pages.entry.load(ctx, { intent: 'example' }); const root = mount(pages.entry, ctx, m); // reached by the #example deep link
   const h = pages.entry.render(ctx, m); assert.equal(m.mode, 'example'); assert.ok(h.includes('fixture')); assert.ok(h.includes('translation-team@1')); assert.ok(h.includes('12 responses')); assert.ok(h.includes('Understanding')); assert.ok(h.includes('clarity'));
 });
+test('entry: survey guidance treats the code as optional and never implies a resend', async () => {
+  const ctx = ctxWith(); const h = pages.entry.render(ctx, await pages.entry.load(ctx, { intent: 'survey' }));
+  const guidance = 'If you were given an access code, enter it below.';
+  assert.ok(h.includes(guidance));
+  assert.ok(h.includes('Missing your survey link? Ask the person who invited you or shared the survey to send you the link.'));
+  assert.ok(!h.includes('released above'));
+  assert.ok(!h.includes('send it again'));
+});
 test('entry: survey code stores participant token and hands off to legacy /#participant', async () => {
   const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, removeItem: k => { delete stored[k]; } };
   const assigned = []; globalThis.window = { location: { assign: u => assigned.push(u) } };
