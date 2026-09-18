@@ -1,7 +1,33 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.4.1",
+  "current": "0.4.3",
   "versions": [
+    {
+      "version": "0.4.3",
+      "status": "candidate",
+      "notes_path": "releases/0.4.3.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Production promotion of DEV 0.4.2, including the corrected failed-first-open participant recovery and previously accepted participant, web, sharing, Permissions and version-badge behavior; no additional product behavior changes."
+        ],
+        "fixed": [],
+        "security": []
+      }
+    },
+    {
+      "version": "0.4.2",
+      "status": "candidate",
+      "notes_path": "releases/0.4.2.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Reloading after a failed first shared-link open asks for the original link without claiming an earlier participant session or possible submission."
+        ],
+        "security": []
+      }
+    },
     {
       "version": "0.4.1",
       "status": "candidate",
@@ -17,7 +43,7 @@
     },
     {
       "version": "0.4.0",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.4.0.md",
       "sections": {
         "added": [
@@ -32,7 +58,9 @@
         "security": [
           "Shared-link requests omit cookies and staff credentials, strip the link fragment before transport, and retain per-link draft isolation and idempotent submission retries."
         ]
-      }
+      },
+      "tag": "v0.4.0",
+      "date": "2026-09-17"
     },
     {
       "version": "0.3.2",

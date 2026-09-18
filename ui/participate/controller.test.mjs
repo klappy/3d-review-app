@@ -101,3 +101,18 @@ test('dedicated static page dependencies are in the local server and tests are e
   assert.ok(html.indexOf('src="/changelog.js"') < html.indexOf('src="/participate/page.js"'));
   assert.ok(read('./page.css').includes('#participant:has(.participant-intro:not([hidden])) #review-button{display:none}'));
 });
+
+test('failed first open then clean reload asks for original link without claiming a previous send or resuming another link', async () => {
+  const old = await digestNamespace('other-link');
+  for (const fail of [() => refused('RATE_LIMITED', 429), () => { throw Error('offline'); }]) {
+    const first = harness({ saved: { 'shared:current': old, [old + 'bearer']: 'other-participant', [old + 'draft']: 'untouched' }, handle: fail });
+    await first.journey.start();
+    const reload = harness({ hash: '', saved: Object.fromEntries(first.data) });
+    await reload.journey.start();
+    assert.equal(reload.journey.state.notice, 'Open your original survey link to continue. No participant session is available in this tab.');
+    assert.equal(reload.requests.length, 0, 'never probes unrelated old session or creates a fresh respondent');
+    assert.equal(reload.data.get(old + 'bearer'), 'other-participant');
+    assert.equal(reload.data.get(old + 'draft'), 'untouched');
+    assert.ok(![...reload.data.values()].includes('link-secret'), 'raw link token is never retained');
+  }
+});
