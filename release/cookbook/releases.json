@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.9.2",
+  "current": "0.9.3",
   "versions": [
+    {
+      "version": "0.9.3",
+      "status": "candidate",
+      "notes_path": "releases/0.9.3.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Theme scorecard: 6/6 automated local scenarios and 4/4 bounded official reference-host visual scenarios passed; human satisfaction, confusion and frustration are NOT MEASURED."
+        ],
+        "fixed": [
+          "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
+        ],
+        "security": [
+          "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
+        ]
+      }
+    },
     {
       "version": "0.9.2",
       "status": "candidate",
@@ -9,13 +26,13 @@
       "sections": {
         "added": [],
         "changed": [
-          "Theme regression scorecard: 6/6 automated local scenarios passed; supported-host visual scenarios remain untested and real-human satisfaction, confusion and frustration are NOT MEASURED."
+          "Persona outcome scorecard records five executed route cases and one independent local-browser participant-resume journey; human sentiment remains NOT MEASURED."
         ],
         "fixed": [
-          "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
+          "Current-shell participant resume opens the preserved legacy survey instead of returning an existing participant session to the public access-code entry."
         ],
         "security": [
-          "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
+          "Route forwarding does not read, modify or expose participant credentials. Existing public survey, shared-link, invitation and synthetic-demo routes retain their behavior."
         ]
       }
     },
