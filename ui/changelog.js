@@ -125,5 +125,6 @@ async function readJsonAllowingNotOk(fetchImpl, url) {
 if (typeof globalThis.document !== 'undefined' && typeof globalThis.location !== 'undefined' && globalThis.document.getElementById('version')) {
   let shared = typeof globalThis.location.hash === 'string' && globalThis.location.hash.startsWith('#survey=');
   try { shared = shared || globalThis.sessionStorage.getItem('shared:current') !== null; } catch { /* storage unavailable: treat as staff route */ }
+  shared = shared || (typeof globalThis.location.pathname === 'string' && globalThis.location.pathname.startsWith('/participate'));
   initVersionBadge({ shared });
 }
