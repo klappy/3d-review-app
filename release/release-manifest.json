@@ -1,32 +1,30 @@
 {
-  "version": "0.14.0",
+  "version": "0.14.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "0dacbc08319bd8e416739d2f988c484152917f3c",
+  "cookbook_commit": "d7596dcf2f7285f60540d2fd49e859dd3f209846",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.14.0.md",
-      "blob_sha": "655edc661b064e7f39edd36c20c1be73476378c8",
-      "sha256": "9988f5412427dc2ee7deffe996e64577097d030d1f91b27d7bf3e20aadf96019"
+      "path": "planning/2026-09-16-parity-build/releases/0.14.1.md",
+      "blob_sha": "07bd4c1a5096f548d3ef262c7284e1026d8a67fd",
+      "sha256": "d0200e1e4cbfeac2341b2ef37956f95dec13166788d68511a941fd1c21ee01bb"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "56c7e843da94b2cf9e3d3534bcbff3a2460c2d82",
-      "sha256": "9b2f9fc0dc00c15e8c7c2086e5594abe7ce5893885ac8548630224c6ad7f0741"
+      "blob_sha": "a05570ba560d84544583ec4a4e7728a2c3ba6aaf",
+      "sha256": "93a8e52d43b4952ba2ee09633ebc828b0ec41f3e81e5fbbdf05bad01414244da"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Explicit Past, Now and Next workflow windows, reviewed operational context and work-type/release badges through the existing shared HTTP/MCP roadmap contract."
-      ],
+      "added": [],
       "changed": [
-        "Reported progress is separate from verifier acceptance; missing placement remains unclassified and transport details are secondary."
+        "Persona evidence: 3/3 automated initial-load cases and 1/1 author local-browser check passed; deployed behavior and human satisfaction, confusion and frustration NOT MEASURED."
       ],
       "fixed": [
-        "Human-readable cards expose stages, current work, blockers and next action without opening details."
+        "Roadmap version resolves from canonical health on initial page load, including tabs retaining participant state."
       ],
       "security": [
-        "Existing publication/reviewer permissions, confirmation, public text safety, redaction and source privacy remain enforced."
+        "Participant routes retain lazy health loading; version reads omit credentials and disable caching."
       ]
     }
   }

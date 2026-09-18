@@ -249,7 +249,7 @@ test('V6 request log contains only /v2/health and /changelog.json', async () => 
 });
 
 
-test('dedicated roadmap shell mounts the shared badge and reads health lazily', async () => {
+test('dedicated roadmap actual bootstrap reads health before interaction despite retained shared state', async () => {
   const html = fs.readFileSync(new URL('./roadmap/index.html', import.meta.url), 'utf8');
   assert.equal((html.match(/src="\/changelog.js"/g) || []).length, 1);
   const ids = ['version', 'changelog', 'changelog-title', 'changelog-build', 'changelog-body', 'changelog-close'];
@@ -261,12 +261,13 @@ test('dedicated roadmap shell mounts the shared badge and reads health lazily', 
   const doc = fakeDocument(ids), log = [];
   const component = fs.readFileSync(new URL('./changelog.js', import.meta.url), 'utf8').replace(/export /g, '');
   vm.runInNewContext(component, {
-    document: doc, location: { hash: '', pathname: '/roadmap/' }, sessionStorage: { getItem: () => null },
+    document: doc, location: { hash: '', pathname: '/roadmap/' }, sessionStorage: { getItem: () => 'retained-participant-state' },
     fetch: fetchFor({ '/v2/health': json(HEALTH), '/changelog.json': json(CHANGELOG) }, log),
   });
   await settle();
-  assert.equal(doc.getElementById('version').textContent, copy.shared, 'dedicated page is lazy, not a staff health read');
-  assert.deepEqual(log, []);
+  assert.equal(doc.getElementById('version').textContent, 'Version 0.1.0', 'canonical health resolves before a click');
+  assert.deepEqual(log.map(r => r.url), ['/v2/health']);
+  assert.ok(log.every(r => r.options.credentials === 'omit' && r.options.cache === 'no-store'));
   await doc.getElementById('version').fire('click'); await settle();
   assert.equal(doc.getElementById('changelog').open, true);
   assert.equal(doc.getElementById('version').textContent, 'Version 0.1.0', 'runtime health fixture supplies version, not markup');
@@ -322,3 +323,11 @@ for (const path of ['index.html', 'assess/index.html']) {
     assert.deepEqual(log.map(r => r.url), ['/v2/health', '/changelog.json']);
   });
 }
+
+for (const retained of [null, 'retained-participant-state']) test(`roadmap auto-bootstrap health failure is honest before interaction (${retained === null ? 'fresh' : 'retained'})`, async()=>{
+ const doc=fakeDocument(['version','changelog','changelog-build','changelog-body','changelog-close']),log=[];
+ const component=fs.readFileSync(new URL('./changelog.js',import.meta.url),'utf8').replace(/export /g,'');
+ vm.runInNewContext(component,{document:doc,location:{hash:'',pathname:'/roadmap'},sessionStorage:{getItem:()=>retained},fetch:fetchFor({'/v2/health':json({ok:true,result:{}})},log)});
+ await settle();assert.equal(doc.getElementById('version').textContent,copy.unavailable);assert.deepEqual(log.map(r=>r.url),['/v2/health']);assert.ok(log.every(r=>r.options.credentials==='omit'&&r.options.cache==='no-store'));
+ await doc.getElementById('version').fire('click');assert.equal(doc.getElementById('changelog').open,false);assert.equal(log.length,1);
+});
