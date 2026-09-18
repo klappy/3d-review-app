@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.9.1",
+  "current": "0.9.2",
   "versions": [
+    {
+      "version": "0.9.2",
+      "status": "candidate",
+      "notes_path": "releases/0.9.2.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona outcome scorecard records five executed route cases and one independent local-browser participant-resume journey; human sentiment remains NOT MEASURED."
+        ],
+        "fixed": [
+          "Current-shell participant resume opens the preserved legacy survey instead of returning an existing participant session to the public access-code entry."
+        ],
+        "security": [
+          "Route forwarding does not read, modify or expose participant credentials. Existing public survey, shared-link, invitation and synthetic-demo routes retain their behavior."
+        ]
+      }
+    },
     {
       "version": "0.9.1",
       "status": "candidate",
@@ -39,7 +56,7 @@
     },
     {
       "version": "0.8.0",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.8.0.md",
       "sections": {
         "added": [
@@ -52,7 +69,9 @@
         "security": [
           "Existing synthetic admission and exact assessment grants remain authoritative; held inputs, expired previews, identity/navigation changes and uncertain writes do not enable automatic execution or retry."
         ]
-      }
+      },
+      "tag": "v0.8.0",
+      "date": "2026-09-18"
     },
     {
       "version": "0.7.1",
