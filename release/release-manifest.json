@@ -1,34 +1,32 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "11671805a5eb0b7b5b32f490eec4669ed7f096b2",
+  "cookbook_commit": "d56bd74f8f9d50fe29e6f899c2ab7efa3702102d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.2.0.md",
-      "blob_sha": "8857c752e8c7f952b3f1bc4aab8a39e89c555b5c",
-      "sha256": "64d70191fb75892870eb8b39e67ab9afc1f6dbb5aa04fb84ce469cccf3bd0ffe"
+      "path": "planning/2026-09-16-parity-build/releases/0.3.0.md",
+      "blob_sha": "f3b74ad8425b47be525af5aae3039dcc46717313",
+      "sha256": "e42fb639e658dbffb1dee69d14f42ad3b70ba0cce9c3176c7bfc40e05fece97b"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "19c70bf491a64c6d467d03468dbf0ea5f868d9f1",
-      "sha256": "eb0a6c94672edd9a2b481cf85094578649d7a2fcb99a266f08d956dacd802f02"
+      "blob_sha": "54257e5f365efd79cfedab55b8f8bc9242339895",
+      "sha256": "75383395dd2ca744c104cebe7208e083b01c1b4b6c9a606c275a33a01c910994"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Showcase-based public entry, workspace and project navigation, and assessment views.",
-        "Survey Share controls create participant links and display locally generated QR codes."
+        "Scoped Permissions controls for workspace, project and assessment grants, pending invitations, role changes, revocation and ownership transfer."
       ],
       "changed": [
-        "The primary web entry uses the new assessment shell; existing participant, invitation and legacy routes remain available.",
-        "Assessment views separate navigation from stage changes and preserve explicit permission scopes."
+        "Permission actions refresh server-owned roster and role state in place while keeping their outcome, receipt and trace visible."
       ],
       "fixed": [
-        "Held or refused reports remain visible as honest states, with mobile layout and report-number readability improvements."
+        "Successful permission actions no longer erase their confirmation through a blank-model route reload; transfer receipts resolve to grant rows."
       ],
       "security": [
-        "Credential-bearing route changes retain the accepted forwarding behavior; no new permission inheritance is introduced."
+        "Danger actions retain preview/confirm with identical parameters; scopes remain explicit with no permission inheritance. Post-action access refusal hides stale controls while retaining the completed action receipt."
       ]
     }
   }
