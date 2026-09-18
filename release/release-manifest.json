@@ -1,30 +1,30 @@
 {
-  "version": "0.9.3",
+  "version": "0.11.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "80d8111fe7ffe9cb14516120de485c469bbe12d6",
+  "cookbook_commit": "71d60fb3a76248565b2f266da6c7fcc28850b496",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.9.3.md",
-      "blob_sha": "07195f8984ae536432193fe6b9a199be1135686c",
-      "sha256": "a2929099f3504a5943d5da95bc7e20250194d3115655bc239199b9d5b71feae9"
+      "path": "planning/2026-09-16-parity-build/releases/0.11.1.md",
+      "blob_sha": "6a1e4460b283b119403ab78341d7f9e1517b664a",
+      "sha256": "53a23d975341b171a3f5297672d4842fe09a4a6715c25c45258c121d5f9285ee"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "f2603c5fbcd0d97a23f535c45ef2631a1cda7acb",
-      "sha256": "1ae848ab989b7c70fd5c83f550a29b7cf4c9c2c08504dad269655917893f846d"
+      "blob_sha": "aeedfea0ed55f05df4def6028ad89b42612f8546",
+      "sha256": "7a849a60884e3bca7786e4efb1fce9741844fe2b63bd0bb442a0fd3f67e56dad"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
       "changed": [
-        "Theme scorecard: 6/6 automated local scenarios and 4/4 bounded official reference-host visual scenarios passed; human satisfaction, confusion and frustration are NOT MEASURED."
+        "Persona evidence: 2/2 automated local connection lifecycle cases passed; human satisfaction, confusion and frustration NOT MEASURED."
       ],
       "fixed": [
-        "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
+        "Open workspaces waits for the MCP bridge connection to settle, then becomes available without a stale host-capability refusal."
       ],
       "security": [
-        "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
+        "No automatic tool calls, capability widening or confirmation changes; failed connections retain explicit refusal."
       ]
     }
   }
