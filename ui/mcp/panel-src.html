@@ -15,7 +15,7 @@
 const $ = id => document.getElementById(id);
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
-const state = { me: null, route: { kind: 'workspaces' }, caps: null, busy: false, sheet: null, notice: null, alert: false, cache: new Map() };
+const state = { me: null, route: { kind: 'workspaces' }, caps: null, busy: false, executing: false, sheet: null, notice: null, alert: false, cache: new Map() };
 const app = new window.McpApps.App({ name: '3d-review panel', version: '0.1.0' });
 
 // ---- transport: the four tools only, via the host bridge. Returns the server ENVELOPE; throws Error{code,message,hint} on ok:false.
@@ -36,7 +36,8 @@ function refusal(e, what) { const k = kindOf(e); return `<section class="panel n
 
 // ---- routing (internal; the iframe URL never changes, so no scope or credential lands in a host history)
 function parse(hash) { const p = hash.replace(/^#/, '').split('/').map(decodeURIComponent); if (!p[0] || p[0] === 'workspaces') return { kind: 'workspaces' }; if (p[0] === 'workspace') return { kind: 'workspace', id: p[1] }; if (p[0] === 'projects') return { kind: 'projects' }; if (p[0] === 'project') return { kind: 'project', id: p[1] }; if (p[0] === 'assessment' && p[1]) return { kind: 'assessment', id: p[1], view: VIEWS.includes(p[2]) ? p[2] : null }; return { kind: 'workspaces' }; }
-function go(hash) { state.route = parse(hash); state.sheet = null; state.notice = null; render(); }
+let routeGeneration = 0;
+function go(hash) { if (state.executing) return; routeGeneration++; state.route = parse(hash); state.sheet = null; state.notice = null; render(); }
 document.addEventListener('click', e => { const a = e.target.closest('a[href^="#"]'); if (!a) return; e.preventDefault(); const h = a.getAttribute('href'); if (h === '#retry') return render(); go(h); });
 
 // ---- render
@@ -86,18 +87,47 @@ async function assessmentPage(r) {
   state.current = { a, surveys };
   return head + body;
 }
-function sheet(s) { const i = s.impact || {}; return `<section class="note" data-confirm-sheet><p class="eyebrow">Confirm: ${esc(s.label)}</p><p class="small">Nothing has changed yet. Confirmation expires in ${esc(s.expiresIn ?? '')} seconds.</p><dl class="small"><dt>Effect</dt><dd>${esc(i.effect ?? '')}</dd><dt>Irreversible</dt><dd>${esc(String(i.irreversible ?? ''))}</dd><dt>Compensating control</dt><dd>${esc(i.compensating_control ?? '')}</dd><dt>Affected</dt><dd>${(i.affected || []).map(x => `<code>${esc(JSON.stringify(x))}</code>`).join('<br>') || '<span class="muted">none listed</span>'}</dd></dl><div class="actions"><button type="button" class="primary" data-confirm-execute ${s.token ? '' : 'disabled'}>Confirm</button><button type="button" class="quiet" data-confirm-cancel>Cancel</button></div></section>`; }
+function sheet(s) { const i = s.impact || {}; return `<section class="note" data-confirm-sheet><p class="eyebrow">Confirm: ${esc(s.label)}</p><p class="small">Nothing has changed yet. Confirmation expires in ${esc(s.expiresIn ?? '')} seconds.</p><dl class="small"><dt>Effect</dt><dd>${esc(i.effect ?? '')}</dd><dt>Irreversible</dt><dd>${esc(String(i.irreversible ?? ''))}</dd><dt>Compensating control</dt><dd>${esc(i.compensating_control ?? '')}</dd><dt>Affected</dt><dd>${(i.affected || []).map(x => `<code>${esc(JSON.stringify(x))}</code>`).join('<br>') || '<span class="muted">none listed</span>'}</dd></dl><div class="actions"><button type="button" class="primary" data-confirm-execute ${s.token && !state.busy ? '' : 'disabled'}>Confirm</button><button type="button" class="quiet" data-confirm-cancel ${state.busy ? 'disabled' : ''}>Cancel</button></div></section>`; }
 const say = (t, alert = false) => { state.notice = t; state.alert = alert; render(); };
 async function act(label, fn) { if (state.busy) return; state.busy = true; state.notice = label; render(); try { const env = await fn(); state.busy = false; say(`${label} — done.${env?.receipt?.id ? ` receipt ${env.receipt.id}` : ''}${env?.trace_id ? ` · trace ${env.trace_id}` : ''}`); } catch (e) { state.busy = false; say(`${label} — ${e.message}${e.hint ? ` (${e.hint})` : ''}${e.trace_id ? ` · trace ${e.trace_id}` : ''}`, true); } }
 function bind(root) {
-  const cur = state.current; const aid = cur?.a?.id;
+  const aid = state.route.kind === 'assessment' ? state.route.id : null;
   root.querySelectorAll('[data-include]').forEach(b => b.onclick = () => act('Including survey', () => write('cap.survey.select', { aid, template_id: b.dataset.include, version: Number(b.dataset.version) })));
   root.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => act('Removing survey', () => write('cap.survey.deselect', { aid, sid: b.dataset.remove })));
   root.querySelector('[data-notes-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; act('Saving notes', () => write('cap.assessment.notes.update', { id: aid, notes_reflection: f.notes_reflection.value, notes_next_steps: f.notes_next_steps.value })); });
   root.querySelectorAll('[data-open-report]').forEach(b => b.onclick = async () => { const v = root.querySelector('[data-report-view]'); v.textContent = 'Opening report…'; try { const r = await read('cap.report.get', { id: b.dataset.openReport }); if (r.suppressed) { v.textContent = r.reason; return; } const p = r.report?.payload || {}; v.innerHTML = `<p class="small muted">Synthetic data · source ${esc(String(p.source_commit || '').slice(0, 7))} · report ${esc(r.report.id)}</p>${Array.isArray(p.narrative) ? p.narrative.map(x => `<p>${esc(x)}</p>`).join('') : ''}`; } catch (e) { v.textContent = kindOf(e) === 'refused' ? 'Not available.' : e.message; } });
-  root.querySelector('[data-invite-preview]')?.addEventListener('click', async () => { const f = root.querySelector('[data-invite-form]'); if (!f.reportValidity()) return; const params = { scope: 'assessment', id: aid, email: f.email.value.trim(), role: f.role.value }; if (state.busy) return; state.busy = true; render(); try { const env = await danger('cap.grant.invite', params, 'dry_run'); state.sheet = { label: 'Invitation', params: Object.freeze(params), token: env.result.confirm_token, expiresIn: env.result.expires_in, impact: env.result.impact }; state.busy = false; state.notice = null; render(); } catch (err) { state.busy = false; say(`Invitation — ${err.message}${err.hint ? ` (${err.hint})` : ''}`, true); } });
-  root.querySelector('[data-confirm-execute]')?.addEventListener('click', async () => { const s = state.sheet; if (!s?.token) return say('Preview again.', true); const token = s.token; s.token = null; await act('Invitation', async () => { try { const env = await danger('cap.grant.invite', s.params, 'execute', token); state.sheet = null; if (env.result?.delivered === false) { env.receipt = env.receipt; state.notice = 'Already invited — nothing sent again.'; } return env; } catch (err) { if (String(err.code) === 'CONFIRM_EXPIRED' || String(err.code) === 'CONFIRM_REQUIRED') { err.message = 'The confirmation expired or no longer matched. Preview again.'; } state.sheet = null; throw err; } }); });
-  root.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => { state.sheet = null; say(null); });
+  root.querySelector('[data-invite-preview]')?.addEventListener('click', async () => {
+    const f = root.querySelector('[data-invite-form]');
+    if (state.busy || !f.reportValidity()) return;
+    const generation = routeGeneration;
+    const params = { scope: 'assessment', id: aid, email: f.email.value.trim(), role: f.role.value };
+    state.busy = true; render();
+    try {
+      const env = await danger('cap.grant.invite', params, 'dry_run');
+      if (generation !== routeGeneration) return;
+      state.sheet = { generation, label: 'Invitation', params: Object.freeze(params), token: env.result.confirm_token, expiresIn: env.result.expires_in, impact: env.result.impact };
+      state.notice = null;
+    } catch (err) {
+      if (generation !== routeGeneration) return;
+      state.notice = `Invitation — ${err.message}${err.hint ? ` (${err.hint})` : ''}`; state.alert = true;
+    } finally { state.busy = false; render(); }
+  });
+  root.querySelector('[data-confirm-execute]')?.addEventListener('click', async () => {
+    if (state.busy) return;
+    const s = state.sheet;
+    if (!s?.token || s.generation !== routeGeneration || s.params.id !== state.route.id) return say('Preview again.', true);
+    const token = s.token; s.token = null; state.executing = true;
+    try {
+      await act('Invitation', async () => {
+        try { const env = await danger('cap.grant.invite', s.params, 'execute', token); state.sheet = null; return env; }
+        catch (err) {
+          if (String(err.code) === 'CONFIRM_EXPIRED' || String(err.code) === 'CONFIRM_REQUIRED') err.message = 'The confirmation expired or no longer matched. Preview again.';
+          state.sheet = null; throw err;
+        }
+      });
+    } finally { state.executing = false; }
+  });
+  root.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => { if (state.busy) return; state.sheet = null; say(null); });
 }
 
 // ---- host wiring: a tool result pushed by the host (the assistant called read/docs) steers the panel to that entity
