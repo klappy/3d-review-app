@@ -123,8 +123,14 @@ async function readJsonAllowingNotOk(fetchImpl, url) {
 }
 
 if (typeof globalThis.document !== 'undefined' && typeof globalThis.location !== 'undefined' && globalThis.document.getElementById('version')) {
-  let shared = typeof globalThis.location.hash === 'string' && globalThis.location.hash.startsWith('#survey=');
-  try { shared = shared || globalThis.sessionStorage.getItem('shared:current') !== null; } catch { /* storage unavailable: treat as staff route */ }
-  shared = shared || (typeof globalThis.location.pathname === 'string' && (globalThis.location.pathname.startsWith('/participate') || globalThis.location.pathname.startsWith('/roadmap')));
+  // Roadmap is a public release surface even when participant state remains in this tab.
+  const pathname = globalThis.location.pathname;
+  const roadmap = pathname === '/roadmap' || (typeof pathname === 'string' && pathname.startsWith('/roadmap/'));
+  let shared = false;
+  if (!roadmap) {
+    shared = typeof globalThis.location.hash === 'string' && globalThis.location.hash.startsWith('#survey=');
+    try { shared = shared || globalThis.sessionStorage.getItem('shared:current') !== null; } catch { /* storage unavailable: treat as staff route */ }
+    shared = shared || (typeof pathname === 'string' && pathname.startsWith('/participate'));
+  }
   initVersionBadge({ shared });
 }
