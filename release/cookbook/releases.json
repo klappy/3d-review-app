@@ -1,7 +1,39 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.2.0",
+  "current": "0.3.1",
   "versions": [
+    {
+      "version": "0.3.1",
+      "status": "candidate",
+      "notes_path": "releases/0.3.1.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Restore the existing health-backed version badge and release-details dialog on the homepage and assessment shell."
+        ],
+        "security": []
+      }
+    },
+    {
+      "version": "0.3.0",
+      "status": "candidate",
+      "notes_path": "releases/0.3.0.md",
+      "sections": {
+        "added": [
+          "Scoped Permissions controls for workspace, project and assessment grants, pending invitations, role changes, revocation and ownership transfer."
+        ],
+        "changed": [
+          "Permission actions refresh server-owned roster and role state in place while keeping their outcome, receipt and trace visible."
+        ],
+        "fixed": [
+          "Successful permission actions no longer erase their confirmation through a blank-model route reload; transfer receipts resolve to grant rows."
+        ],
+        "security": [
+          "Danger actions retain preview/confirm with identical parameters; scopes remain explicit with no permission inheritance. Post-action access refusal hides stale controls while retaining the completed action receipt."
+        ]
+      }
+    },
     {
       "version": "0.2.0",
       "status": "candidate",

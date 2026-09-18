@@ -1,35 +1,27 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "11671805a5eb0b7b5b32f490eec4669ed7f096b2",
+  "cookbook_commit": "30ff9ada3f7e49b7475329e2ba68dd04bf6fc86c",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.2.0.md",
-      "blob_sha": "8857c752e8c7f952b3f1bc4aab8a39e89c555b5c",
-      "sha256": "64d70191fb75892870eb8b39e67ab9afc1f6dbb5aa04fb84ce469cccf3bd0ffe"
+      "path": "planning/2026-09-16-parity-build/releases/0.3.1.md",
+      "blob_sha": "392ace950e747962bbcc71bed93b263b8bf6f9e1",
+      "sha256": "95b81209d9d73066a97aff851e37ca7a44b5eb8e412bc45600cb15f735d528ae"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "19c70bf491a64c6d467d03468dbf0ea5f868d9f1",
-      "sha256": "eb0a6c94672edd9a2b481cf85094578649d7a2fcb99a266f08d956dacd802f02"
+      "blob_sha": "4fa0f14126d72d8f31e676029653f4fb0197e5d1",
+      "sha256": "abd5d7f0c9f5f7f155d4ffa325ff89f0fa78371437a0fd5ce88b82164bbfe16a"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Showcase-based public entry, workspace and project navigation, and assessment views.",
-        "Survey Share controls create participant links and display locally generated QR codes."
-      ],
-      "changed": [
-        "The primary web entry uses the new assessment shell; existing participant, invitation and legacy routes remain available.",
-        "Assessment views separate navigation from stage changes and preserve explicit permission scopes."
-      ],
+      "added": [],
+      "changed": [],
       "fixed": [
-        "Held or refused reports remain visible as honest states, with mobile layout and report-number readability improvements."
+        "Restore the existing health-backed version badge and release-details dialog on the homepage and assessment shell."
       ],
-      "security": [
-        "Credential-bearing route changes retain the accepted forwarding behavior; no new permission inheritance is introduced."
-      ]
+      "security": []
     }
   }
 }
