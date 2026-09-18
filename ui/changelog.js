@@ -72,6 +72,21 @@ export function initVersionBadge({ fetchImpl = globalThis.fetch, doc = globalThi
   const close = doc.getElementById('changelog-close');
   const api = { health: null, ready: Promise.resolve() };
   let healthPromise = null, opening = false;
+  // Reuse the existing control on every shell; focus must not scroll to a footer.
+  dialog.prepend(close);
+  close.textContent = '×';
+  close.setAttribute('aria-label', 'Close changelog');
+  close.setAttribute('title', 'Close changelog');
+  close.setAttribute('style', 'position:sticky;top:0;float:right;z-index:2;min-width:44px;min-height:44px;background:var(--ground,#fff)');
+  let backdropDown = false;
+  const outside = event => {
+    if (event.target !== dialog) return false;
+    const r = dialog.getBoundingClientRect();
+    return event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom;
+  };
+  dialog.addEventListener('pointerdown', event => { backdropDown = outside(event); });
+  dialog.addEventListener('click', event => { if (backdropDown && outside(event)) dialog.close(); backdropDown = false; });
+
 
   function markUnavailable() { badge.textContent = copy.unavailable; badge.setAttribute('aria-disabled', 'true'); }
 
@@ -103,7 +118,9 @@ export function initVersionBadge({ fetchImpl = globalThis.fetch, doc = globalThi
       renderChangelog({ doc, body, data, health: api.health });
       dialog.showModal();
       badge.setAttribute('aria-expanded', 'true');
-      close.focus();
+      dialog.scrollTop = 0;
+      body.scrollTop = 0;
+      close.focus({ preventScroll: true });
     } finally { opening = false; }
   }
 
@@ -123,8 +140,14 @@ async function readJsonAllowingNotOk(fetchImpl, url) {
 }
 
 if (typeof globalThis.document !== 'undefined' && typeof globalThis.location !== 'undefined' && globalThis.document.getElementById('version')) {
-  let shared = typeof globalThis.location.hash === 'string' && globalThis.location.hash.startsWith('#survey=');
-  try { shared = shared || globalThis.sessionStorage.getItem('shared:current') !== null; } catch { /* storage unavailable: treat as staff route */ }
-  shared = shared || (typeof globalThis.location.pathname === 'string' && (globalThis.location.pathname.startsWith('/participate') || globalThis.location.pathname.startsWith('/roadmap')));
+  // Roadmap is a public release surface even when participant state remains in this tab.
+  const pathname = globalThis.location.pathname;
+  const roadmap = pathname === '/roadmap' || (typeof pathname === 'string' && pathname.startsWith('/roadmap/'));
+  let shared = false;
+  if (!roadmap) {
+    shared = typeof globalThis.location.hash === 'string' && globalThis.location.hash.startsWith('#survey=');
+    try { shared = shared || globalThis.sessionStorage.getItem('shared:current') !== null; } catch { /* storage unavailable: treat as staff route */ }
+    shared = shared || (typeof pathname === 'string' && pathname.startsWith('/participate'));
+  }
   initVersionBadge({ shared });
 }

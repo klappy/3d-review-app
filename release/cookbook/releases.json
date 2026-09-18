@@ -1,7 +1,54 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.14.0",
+  "current": "0.14.3",
   "versions": [
+    {
+      "version": "0.14.3",
+      "status": "candidate",
+      "notes_path": "releases/0.14.3.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Blank survey preview and print default to US Letter; explicit A4 remains available and controls the generated page size."
+        ],
+        "security": [
+          "Isolated blank-only printing, authorization and credential exclusions are unchanged."
+        ]
+      }
+    },
+    {
+      "version": "0.14.2",
+      "status": "candidate",
+      "notes_path": "releases/0.14.2.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona evidence: five local Chrome modal acceptance families and23automated changelog tests passed; human outcomes NOT MEASURED."
+        ],
+        "fixed": [
+          "Changelog opens at the newest entry, resets on reopen and keeps accessible Close available while scrolling; backdrop dismissal and native Escape restore opener focus."
+        ],
+        "security": [
+          "Canonical version/changelog source and anonymous read privacy are unchanged; no new data collection or live writes."
+        ]
+      }
+    },
+    {
+      "version": "0.14.1",
+      "status": "candidate",
+      "notes_path": "releases/0.14.1.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Roadmap version resolves from canonical health on initial page load, including tabs retaining participant state."
+        ],
+        "security": [
+          "Participant routes retain lazy health loading; version reads omit credentials and disable caching."
+        ]
+      }
+    },
     {
       "version": "0.14.0",
       "status": "candidate",

@@ -16,6 +16,7 @@ function fakeNode(tag, id) {
     setAttribute(k, v) { attrs.set(k, String(v)); }, getAttribute(k) { return attrs.has(k) ? attrs.get(k) : null; }, removeAttribute(k) { attrs.delete(k); },
     addEventListener(event, fn) { (this.listeners[event] ||= []).push(fn); },
     async fire(event) { for (const fn of this.listeners[event] || []) await fn({ preventDefault() {}, currentTarget: this }); },
+    prepend(...nodes) { this.children = [...nodes, ...this.children.filter(x => !nodes.includes(x))]; },
     append(...nodes) { this.children.push(...nodes); }, replaceChildren(...nodes) { this.children = nodes; },
     focus() { this.focused = true; this.doc.active = this; },
     showModal() { if (this.open) throw new Error('InvalidStateError: dialog already open'); this.open = true; this.showModalCalls = (this.showModalCalls || 0) + 1; }, close() { this.open = false; return this.fire('close'); } };
@@ -249,7 +250,7 @@ test('V6 request log contains only /v2/health and /changelog.json', async () => 
 });
 
 
-test('dedicated roadmap shell mounts the shared badge and reads health lazily', async () => {
+test('dedicated roadmap actual bootstrap reads health before interaction despite retained shared state', async () => {
   const html = fs.readFileSync(new URL('./roadmap/index.html', import.meta.url), 'utf8');
   assert.equal((html.match(/src="\/changelog.js"/g) || []).length, 1);
   const ids = ['version', 'changelog', 'changelog-title', 'changelog-build', 'changelog-body', 'changelog-close'];
@@ -261,12 +262,13 @@ test('dedicated roadmap shell mounts the shared badge and reads health lazily', 
   const doc = fakeDocument(ids), log = [];
   const component = fs.readFileSync(new URL('./changelog.js', import.meta.url), 'utf8').replace(/export /g, '');
   vm.runInNewContext(component, {
-    document: doc, location: { hash: '', pathname: '/roadmap/' }, sessionStorage: { getItem: () => null },
+    document: doc, location: { hash: '', pathname: '/roadmap/' }, sessionStorage: { getItem: () => 'retained-participant-state' },
     fetch: fetchFor({ '/v2/health': json(HEALTH), '/changelog.json': json(CHANGELOG) }, log),
   });
   await settle();
-  assert.equal(doc.getElementById('version').textContent, copy.shared, 'dedicated page is lazy, not a staff health read');
-  assert.deepEqual(log, []);
+  assert.equal(doc.getElementById('version').textContent, 'Version 0.1.0', 'canonical health resolves before a click');
+  assert.deepEqual(log.map(r => r.url), ['/v2/health']);
+  assert.ok(log.every(r => r.options.credentials === 'omit' && r.options.cache === 'no-store'));
   await doc.getElementById('version').fire('click'); await settle();
   assert.equal(doc.getElementById('changelog').open, true);
   assert.equal(doc.getElementById('version').textContent, 'Version 0.1.0', 'runtime health fixture supplies version, not markup');
@@ -322,3 +324,32 @@ for (const path of ['index.html', 'assess/index.html']) {
     assert.deepEqual(log.map(r => r.url), ['/v2/health', '/changelog.json']);
   });
 }
+
+for (const retained of [null, 'retained-participant-state']) test(`roadmap auto-bootstrap health failure is honest before interaction (${retained === null ? 'fresh' : 'retained'})`, async()=>{
+ const doc=fakeDocument(['version','changelog','changelog-build','changelog-body','changelog-close']),log=[];
+ const component=fs.readFileSync(new URL('./changelog.js',import.meta.url),'utf8').replace(/export /g,'');
+ vm.runInNewContext(component,{document:doc,location:{hash:'',pathname:'/roadmap'},sessionStorage:{getItem:()=>retained},fetch:fetchFor({'/v2/health':json({ok:true,result:{}})},log)});
+ await settle();assert.equal(doc.getElementById('version').textContent,copy.unavailable);assert.deepEqual(log.map(r=>r.url),['/v2/health']);assert.ok(log.every(r=>r.options.credentials==='omit'&&r.options.cache==='no-store'));
+ await doc.getElementById('version').fire('click');assert.equal(doc.getElementById('changelog').open,false);assert.equal(log.length,1);
+});
+
+test('long changelog uses a persistent first close control and resets scroll after deferred load and reopen',async()=>{
+ const {JSDOM}=await import('jsdom');const doc=new JSDOM('<button id="version"></button><dialog id="changelog"><h2 id="changelog-title">Changes</h2><p id="changelog-build"></p><div id="changelog-body"></div><button id="changelog-close">Close</button></dialog>').window.document;
+ const dialog=doc.getElementById('changelog'),body=doc.getElementById('changelog-body'),close=doc.getElementById('changelog-close'),badge=doc.getElementById('version');let resolveRead;let focusOptions;
+ dialog.showModal=()=>{dialog.setAttribute('open','');dialog.scrollTop=900;};dialog.close=()=>{dialog.removeAttribute('open');dialog.dispatchEvent(new doc.defaultView.Event('close'));};const focus=close.focus.bind(close);close.focus=opts=>{focusOptions=opts;focus(opts);};
+ const api=initVersionBadge({doc,fetchImpl:async url=>url==='/v2/health'?json(HEALTH):new Promise(resolve=>{resolveRead=()=>resolve(json(CHANGELOG));})});await api.ready;
+ badge.click();await settle();assert.equal(dialog.open,false);resolveRead();await api.ready;
+ assert.equal(dialog.firstElementChild,close);assert.equal(close.getAttribute('aria-label'),'Close changelog');assert.equal(close.style.position,'sticky');assert.equal(dialog.scrollTop,0);assert.deepEqual(focusOptions,{preventScroll:true});assert.match(body.querySelector('h3').textContent,/0.1.0/);
+ dialog.scrollTop=1000;body.scrollTop=700;close.click();assert.equal(dialog.open,false);assert.equal(doc.activeElement,badge);
+ badge.click();await settle();resolveRead();await api.ready;assert.equal(dialog.scrollTop,0);assert.equal(body.scrollTop,0);assert.equal(dialog.open,true);
+});
+
+test('only a pointer gesture wholly on the backdrop closes; content and cross-boundary gestures do not',async()=>{
+ const {JSDOM}=await import('jsdom');const dom=new JSDOM('<button id="version"></button><dialog id="changelog"><h2 id="changelog-title">Changes</h2><p id="changelog-build"></p><div id="changelog-body"></div><button id="changelog-close">Close</button></dialog>'),doc=dom.window.document;
+ const dialog=doc.getElementById('changelog'),badge=doc.getElementById('version');dialog.showModal=()=>dialog.setAttribute('open','');dialog.close=()=>{dialog.removeAttribute('open');dialog.dispatchEvent(new dom.window.Event('close'));};dialog.getBoundingClientRect=()=>({left:100,top:100,right:600,bottom:700});const api=initVersionBadge({doc,fetchImpl:async url=>json(url==='/v2/health'?HEALTH:CHANGELOG)});await api.ready;badge.click();await api.ready;
+ const fire=(target,type,x,y)=>target.dispatchEvent(new dom.window.MouseEvent(type,{clientX:x,clientY:y,bubbles:true}));
+ fire(dialog,'pointerdown',200,200);fire(dialog,'click',200,200);assert.equal(dialog.open,true);
+ fire(doc.getElementById('changelog-body'),'pointerdown',200,200);fire(dialog,'click',10,10);assert.equal(dialog.open,true);
+ fire(dialog,'pointerdown',10,10);fire(dialog,'click',200,200);assert.equal(dialog.open,true);
+ fire(dialog,'pointerdown',10,10);fire(dialog,'click',10,10);assert.equal(dialog.open,false);assert.equal(doc.activeElement,badge);assert.equal(badge.getAttribute('aria-expanded'),'false');
+});

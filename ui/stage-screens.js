@@ -267,7 +267,7 @@ export function renderStageTour(doc, root, { storage, assessmentId, stage, role,
   root.append(disclosure);
 }
 
-export function renderBlankPrint(doc, root, model, { paper = 'a4', onPrint } = {}) {
+export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint } = {}) {
   root.replaceChildren();
   root.hidden = !model || !model.visible;
   if (!model || !model.visible) return;
@@ -276,7 +276,7 @@ export function renderBlankPrint(doc, root, model, { paper = 'a4', onPrint } = {
   tools.className = 'print-tools no-print';
   const paperLabel = el(doc, 'label', 'Paper');
   const paperSelect = el(doc, 'select');
-  for (const size of ['a4', 'letter']) {
+  for (const size of ['letter', 'a4']) {
     const option = el(doc, 'option', size.toUpperCase());
     option.value = size;
     if (size === paper) option.selected = true;
@@ -363,14 +363,15 @@ export function renderBlankPrint(doc, root, model, { paper = 'a4', onPrint } = {
 
 // Print only a newly rendered blank form in a direct body child. Never clone the workspace.
 // C must call this wrapper (the rendered Print button already does), not window.print alone.
-export function printBlankForm(doc, model, { paper = 'a4', print } = {}) {
+export function printBlankForm(doc, model, { paper = 'letter', print } = {}) {
   if (!model || model.visible !== true || model.blank !== true) return false;
   const preview = el(doc, 'div');
   renderBlankPrint(doc, preview, model, { paper });
   const article = preview.children[preview.children.length - 1];
   const isolated = el(doc, 'div');
   isolated.className = 'stage-print-only';
-  isolated.append(article);
+  const pageStyle = el(doc, 'style', `@page { size: ${paper === 'a4' ? 'A4' : 'letter'}; margin: 12mm; }`);
+  isolated.append(article, pageStyle);
   doc.body.append(isolated);
   try {
     (print || (() => doc.defaultView.print()))();
