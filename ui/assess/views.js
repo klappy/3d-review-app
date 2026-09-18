@@ -171,29 +171,7 @@ const improve = {
 // One page per scope. Reads: GET /v2/{scope}/{id}/grants → { scope, grants:[{id, principal_id, role, created_at}], pending_invitations }.
 // Writes: invite (danger two-step: dry_run → execute with confirm_token), revoke (DELETE), update_role (danger two-step),
 // transfer_owner (danger two-step). Request-body shape follows the legacy client's danger calls: { params, mode, confirm_token }.
-const permissions = {
-  async load(ctx, { scope, id, role }) {
-    if (!SCOPE_NOUN[scope]) return { scope, id, status: 'refused', grants: [], pending: [], myRole: null };
-    const r = await settle(ctx.api(`/v2/${SCOPE_SEG[scope]}/${ctx.enc(id)}/grants`));
-    const grants = r.status === 'loaded' ? (r.value?.grants || []) : [], pending = r.status === 'loaded' ? (r.value?.pending_invitations || []) : [];
-    const me = ctx.state?.principal?.id;
-    const myRole = role || (scope === 'assessments' && ctx.current?.assessment?.id === id ? ctx.current.assessment.role : null) || grants.find(g => g.principal_id === me)?.role || null;
-    return { scope, id, status: r.status, error: r.error, grants, pending, myRole, me, confirm: null };
-  },
-  // F2 (PR65 verdict): the AS1 grants contract is READ-ONLY — grants + pending invitations. Invite / revoke / role change /
-  // ownership transfer are deferred behind G1 with a separate security review; the legacy surface keeps them meanwhile.
-  render(ctx, m) {
-    const esc = ctx.esc, noun = SCOPE_NOUN[m.scope] || m.scope;
-    const head = `<p class="eyebrow">Permissions</p><h2>Who can open this ${esc(noun)}</h2><p class="note small">Permissions apply to this ${esc(noun)} only; nothing is inherited.</p>`;
-    if (m.status !== 'loaded') return `<section class="panel narrow" data-permissions>${head}${refusalLine(ctx, m.status, 'data-retry="grants"', 'Permissions')}</section>`;
-    const rows = m.grants.map(g => `<tr><td>${esc(g.principal_id)}${g.principal_id === m.me ? ' <span class="muted small">(you)</span>' : ''}</td><td>${esc(g.role)}</td></tr>`).join('');
-    const pending = m.pending.length ? `<h3 style="margin-top:18px">Pending invitations</h3><ul class="small">${m.pending.map(i => `<li>${esc(i.role)} · invited ${esc(i.created_at || '')}${i.id ? ` · <span class="muted">${esc(i.id)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="small muted" style="margin-top:14px">No pending invitations.</p>';
-    return `<section class="panel" data-permissions>${head}<table class="grants"><thead><tr><th>Principal</th><th>Role</th></tr></thead><tbody>${rows || '<tr><td colspan="2" class="muted">No grants listed.</td></tr>'}</tbody></table>${pending}<p class="small muted line">Inviting people, changing roles, revoking access and transferring ownership are not done here yet; use the legacy <a href="/legacy/#facilitator">Links, codes &amp; people</a> surface.</p></section>`;
-  },
-  bind(ctx, root, m) {
-    root.querySelector('[data-retry="grants"]')?.addEventListener('click', e => { e.preventDefault(); ctx.go(location.hash, { reload: true }); });
-  },
-};
-
+// G1: the Permissions page lives in ./permissions.js (Auth contract 2026-09-18); re-exported here so the shell's view table is unchanged.
+import { permissions } from './permissions.js';
 export const views = { understand, improve, permissions };
 export default views;
