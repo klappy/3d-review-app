@@ -1,4 +1,5 @@
 import test from 'node:test';
+import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -15,11 +16,11 @@ test('E1: legacy header (now at /legacy/) carries exactly one Assessments link t
   assert.equal(links.length, 1); assert.ok(links[0].includes('href="/assess/#"')); assert.ok(!/session=|st_/.test(links[0]));
   assert.match(css, /\.rv:not\(\[data-staff-confirmed="true"\]\) #assess-link,\s*\.rv:not\(\[data-entry-view="workspace"\]\) #assess-link,\s*\.rv\[data-workspace-route="participant"\] #assess-link \{ display:none; \}/);
 });
-test('E1: the shell way back is /legacy/#facilitator, hidden until a session is observed; the statement is generated, hidden until signed in, and names where the rest lives', () => {
+test('E1: generic legacy backlink is retired; the statement is generated, hidden until signed in, and names where the rest lives', () => {
   for (const file of ['./index.html', '../index.html']) { // /assess/ alias and the root shell carry the same header
     const html = read(file);
     const back = html.match(/<a id="legacy-link"[^>]*>[^<]*<\/a>/g) || [];
-    assert.equal(back.length, 1, file); assert.ok(back[0].includes('href="/legacy/#facilitator"') && back[0].includes(' hidden'), file); assert.ok(!/session=|st_|invite=/.test(back[0]), file);
+    assert.equal(back.length, 0, file);
     assert.ok(html.includes('<details class="storage-note" id="whats-here-wrap" hidden>'), file);
     assert.ok(html.includes('<p class="storage-note" id="whats-here"></p>'), file);
   }
@@ -47,4 +48,21 @@ test('N4: ui/server.mjs allowlist covers /, /assess/, /legacy/ and every /assess
   for (const p of ['/', '/assess/', '/legacy/', '/assess/assess.js', '/assess/whats-here.js', '/assess/cards.js', '/assess/scope.js', '/assess/views.js']) assert.ok(server.includes(`'${p}':`), p);
   for (const m of shell.matchAll(/from ["'](\/assess\/[^"']+)["']/g)) assert.ok(server.includes(`'${m[1]}':`), `shell import ${m[1]} must be served`);
   assert.ok(server.includes("'/legacy/': ['legacy/index.html', 'text/html']"));
+});
+
+
+test('participant resume dispatches to legacy without reading or changing stored credentials; public survey stays current', () => {
+  const source = read('./assess.js');
+  const code = source.slice(source.indexOf('const LEGACY_HASHES'), source.indexOf('function resetIdentity()'));
+  for (const hash of ['#participant', '#survey', '#survey=fixture', '#invite=fixture', '#example']) {
+    const replaced = [], historyCalls = [];
+    const box = { demo:false, location:{ hash, pathname:'/', replace:path=>replaced.push(path) }, history:{replaceState: (...args)=>historyCalls.push(args)}, sessionStorage:{getItem(){throw Error('No credential read while forwarding');},setItem(){throw Error('No credential write while forwarding');}} };
+    const run = vm.runInNewContext(code + '\nscrubCredentialHash', box);
+    const result=run();
+    if(hash==='#participant'){assert.equal(result,'forwarded');assert.deepEqual(replaced,['/legacy/#participant']);assert.equal(historyCalls.length,0);}
+    if(hash==='#survey'){assert.equal(result,null);assert.deepEqual(replaced,[]);}
+    if(hash==='#survey=fixture')assert.deepEqual(replaced,['/participate/#survey=fixture']);
+    if(hash==='#invite=fixture')assert.deepEqual(replaced,['/legacy/#invite=fixture']);
+    if(hash==='#example')assert.deepEqual(replaced,['/?demo=1#assessment/demo-assessment/prepare']);
+  }
 });

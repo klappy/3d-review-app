@@ -1,30 +1,30 @@
 {
-  "version": "0.8.0",
+  "version": "0.9.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "1448943d0cabee43cea2835b4b045912b416bc23",
+  "cookbook_commit": "256eb7572152a9a1c9091a6ae3255f265ba39971",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.8.0.md",
-      "blob_sha": "4fef3a89b733691a6e0e51d5c8f1adb09b8ffdb1",
-      "sha256": "ef62be38b41aebac218c3801f6bd1bd1add5b57ccac5eec1ee92eff610f58277"
+      "path": "planning/2026-09-16-parity-build/releases/0.9.2.md",
+      "blob_sha": "90125e13f5331d32bfc989496dc7052877b61836",
+      "sha256": "37ac49a372fcd84cb2b4cf3a88e8e3e58d839336a4fcbc38219cd3870c1e3a34"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "30e43f90614282b394ebcbd9a610c0f02cefa966",
-      "sha256": "aa627d68942c9c97c01e2fa59a6b787e4cc3bf7f0750834dcafe22ed0e1f9838"
+      "blob_sha": "0576b30eeb68b7706d8eedb0ca5a1efedca2e8a1",
+      "sha256": "b2f6d571cbb2821af6eb2350dc1c1e9221362ffdd0586b27104c3ae955c22816"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Synthetic report preview and explicit confirmed build in the current assessment Understand view, followed by refreshed report list and reopen."
-      ],
+      "added": [],
       "changed": [
-        "Canonical release notes include the bounded reporting persona outcome scorecard, distinguishing automated local outcomes from unmeasured human and agent journeys."
+        "Persona outcome scorecard records five executed route cases and one independent local-browser participant-resume journey; human sentiment remains NOT MEASURED."
       ],
-      "fixed": [],
+      "fixed": [
+        "Current-shell participant resume opens the preserved legacy survey instead of returning an existing participant session to the public access-code entry."
+      ],
       "security": [
-        "Existing synthetic admission and exact assessment grants remain authoritative; held inputs, expired previews, identity/navigation changes and uncertain writes do not enable automatic execution or retry."
+        "Route forwarding does not read, modify or expose participant credentials. Existing public survey, shared-link, invitation and synthetic-demo routes retain their behavior."
       ]
     }
   }

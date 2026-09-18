@@ -1,10 +1,62 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.8.0",
+  "current": "0.9.2",
   "versions": [
     {
-      "version": "0.8.0",
+      "version": "0.9.2",
       "status": "candidate",
+      "notes_path": "releases/0.9.2.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona outcome scorecard records five executed route cases and one independent local-browser participant-resume journey; human sentiment remains NOT MEASURED."
+        ],
+        "fixed": [
+          "Current-shell participant resume opens the preserved legacy survey instead of returning an existing participant session to the public access-code entry."
+        ],
+        "security": [
+          "Route forwarding does not read, modify or expose participant credentials. Existing public survey, shared-link, invitation and synthetic-demo routes retain their behavior."
+        ]
+      }
+    },
+    {
+      "version": "0.9.1",
+      "status": "candidate",
+      "notes_path": "releases/0.9.1.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Release validation runs all 34 synthetic report contexts as sequential bounded cases, preserves the 425-response aggregate and coexistence checks, and drains or quarantines unfinished fixture work before reuse."
+        ],
+        "security": []
+      }
+    },
+    {
+      "version": "0.9.0",
+      "status": "candidate",
+      "notes_path": "releases/0.9.0.md",
+      "sections": {
+        "added": [
+          "A source-pinned synthetic assessment example with three surveys, twelve responses, an inspectable report and sample answers, using the real assessment/report/participant UI.",
+          "An isolated sample survey with the real question, review, edit and receipt flow; practice answers stay in memory and are never submitted to a live API."
+        ],
+        "changed": [
+          "Public tour and sample links, including the direct legacy example URL, use the shared application screens. The legacy homepage's overall visual design is preserved.",
+          "Generic legacy navigation is retired where current screens exist; invitation acceptance and access-code participation remain compatible.",
+          "The eight-check browser plan is closed with separately attributed historical and independent exact-head local evidence; real-human satisfaction, confusion and frustration remain NOT MEASURED."
+        ],
+        "fixed": [
+          "The legacy sample assessment no longer promises a populated assessment while displaying only narrative stage descriptions."
+        ],
+        "security": [
+          "Demo transport rejects unknown reads and all assessment mutations without network fallback. It does not read or change real staff credentials or participant drafts."
+        ]
+      }
+    },
+    {
+      "version": "0.8.0",
+      "status": "released",
       "notes_path": "releases/0.8.0.md",
       "sections": {
         "added": [
@@ -17,11 +69,13 @@
         "security": [
           "Existing synthetic admission and exact assessment grants remain authoritative; held inputs, expired previews, identity/navigation changes and uncertain writes do not enable automatic execution or retry."
         ]
-      }
+      },
+      "tag": "v0.8.0",
+      "date": "2026-09-18"
     },
     {
       "version": "0.7.1",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.7.1.md",
       "sections": {
         "added": [],
@@ -32,7 +86,9 @@
           "Initial host-initiated MCP read refusals appear in the panel without leaking private error details; navigation clears the refusal."
         ],
         "security": []
-      }
+      },
+      "tag": "v0.7.1",
+      "date": "2026-09-18"
     },
     {
       "version": "0.7.0",

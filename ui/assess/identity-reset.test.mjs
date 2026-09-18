@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { isDemo, memoryStorage } from '../demo.js';
 
 // Execute the actual shell functions with deferred API replies, without starting its browser boot.
 function harness() {
   const disclosure = { open: false };
   const nodes = new Map(['app', 'who', 'note', 'legacy-link', 'whats-here-wrap'].map(id => [id, { innerHTML: 'old', textContent: 'old', hidden: false, querySelector: () => disclosure }]));
   const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace(/export function /g, 'function ');
-  const box = { document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/' }, redactDiagnosticPath: x => x };
+  const box = { isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/' }, redactDiagnosticPath: x => x };
   const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,setApi:fn=>api=fn,setRender:fn=>render=fn})', box);
   return { ...api, nodes, disclosure };
 }
