@@ -139,6 +139,7 @@ describe("stamp script (subprocess): CI without WORKERS_CI_COMMIT_SHA fails, nev
   const out = mkdtempSync(join(tmpdir(), "stamp-out-"));
   afterAll(() => rmSync(out, { recursive: true, force: true }));
   const clean = { ...process.env } as Record<string, string | undefined>;
+  for (const key of ["ROADMAP_PUBLISHER_IDS", "ROADMAP_VERIFIER_IDS", "ROADMAP_SUMMARY_REVIEWER_IDS", "WORKERS_CI_BRANCH"]) delete clean[key];
   delete clean.CI; delete clean.WORKERS_CI; delete clean.WORKERS_CI_COMMIT_SHA; delete clean.WORKERS_CI_BUILD_UUID; delete clean.STAMP_OUT_DIR;
   const realGen = readFileSync(new URL("src/version.generated.ts", root), "utf8");
   const realChangelog = readFileSync(new URL("ui/changelog.json", root), "utf8");
@@ -162,6 +163,15 @@ describe("stamp script (subprocess): CI without WORKERS_CI_COMMIT_SHA fails, nev
     expect(gen).toContain(`export const BUILD_UUID: string | null = "11111111-2222-3333-4444-555555555555";`);
     expect(r.stdout).toContain("0.13.0+aaaaaaa");
     expect(readFileSync(join(out, "ui/changelog.json"), "utf8")).toBe(realChangelog);
+  });
+  it("canonical build permission projection stays isolated from synthetic subprocess fixtures", () => {
+    const id = "usr_" + "1".repeat(20);
+    const r = run({ CI: "true", WORKERS_CI: "1", WORKERS_CI_BRANCH: "main", WORKERS_CI_COMMIT_SHA: "a".repeat(40), ROADMAP_PUBLISHER_IDS: id });
+    expect(r.status, r.stderr).toBe(0);
+    const projected = readFileSync(join(out, "src/roadmap/permissions.generated.ts"), "utf8");
+    expect(projected).not.toContain(id); expect(projected).toContain('"verify":[]');
+    const local = run({}); expect(local.status, local.stderr).toBe(0);
+    expect(readFileSync(join(out, "src/roadmap/permissions.generated.ts"), "utf8")).toContain('"publish":[]');
   });
   it("--out <dir> works like STAMP_OUT_DIR; local run is idempotent and fast (second run unchanged, under 1s)", () => {
     const out2 = mkdtempSync(join(tmpdir(), "stamp-out2-"));
