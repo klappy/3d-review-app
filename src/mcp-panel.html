@@ -224,6 +224,10 @@ body.mcp-compact{max-width:640px;padding:0 12px 12px}
 
 .action-impact dd { margin:0 0 8px; overflow-wrap:anywhere; white-space:pre-wrap; }
 .action-impact dt { font-weight:600; }
+
+.survey-questions { padding-left:24px; overflow-wrap:anywhere; }
+.survey-questions > li { padding:8px 0; }
+.survey-questions h3 { font-size:1rem; }
 </style></head><body class="mcp-compact"><!-- 3D Review — MCP Apps panel (source). Built by scripts/build-mcp-panel.mjs into src/mcp-panel.html, which src/mcp.ts serves as
      resource ui://3d-review/panel.html (text/html;profile=mcp-app). Everything is inlined: SDK bundle, design tokens, shared cards.
      The panel calls ONLY the existing four tools (docs / read / write / danger) through the host bridge; the host supplies the bearer.
@@ -354,15 +358,21 @@ function createActionCard({ root, esc, call, explore, execution }) {
   const label = cap => ({'cap.grant.invite':'Invite collaborator','cap.report.build':'Build report','cap.workspace.delete':'Delete workspace','cap.assessment.get':'Assessment','cap.project.get':'Project','cap.workspace.get':'Workspace'}[cap] || (typeof cap === 'string' ? cap.replace(/^cap\./, '').split('.').join(' ') : '3D Review guidance'));
   const trace = env => env?.trace_id ? `<p class="small muted">trace ${esc(env.trace_id)}</p>` : '';
   const impactDetails = impact => !impact || typeof impact !== 'object' ? '' : `<dl class="action-impact">${['effect','irreversible','compensating_control','affected'].filter(key => Object.hasOwn(impact,key)).map(key => `<dt>${esc(key.replaceAll('_',' '))}</dt><dd>${esc(typeof impact[key] === 'object' ? JSON.stringify(impact[key]) : String(impact[key]))}</dd>`).join('')}</dl>`;
+  function templateQuestions(result) {
+    const items = Array.isArray(result.items) ? result.items : Array.isArray(result.template?.items) ? result.template.items : [];
+    const text = value => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+    return `<p class="small">Read-only questionnaire · ${esc(items.length)} questions · ${esc(text(result.template?.perspective))} · version ${esc(text(result.template?.version) || 'unavailable')}</p>${items.length ? `<ol class="survey-questions">${items.map(item => `<li><h3>${esc(text(item?.text) || text(item?.id) || 'Question text unavailable')}</h3>${item?.requiredness === 'unresolved' ? '<p>May leave unanswered; requirement policy is unresolved.</p>' : ''}${item?.answer_semantics === 'unresolved_no_problems_vs_skipped' ? '<p>Leaving this blank is unknown, not “no problems.”</p>' : ''}${item?.type === 'scale' ? `<p>Scale: ${esc(text(item.scale?.min))} to ${esc(text(item.scale?.max))}</p>` : item?.type === 'text' ? '<p>Written response</p>' : ['single','multi'].includes(item?.type) ? `<p>${item.type === 'single' ? 'Choose one' : 'Choose all that apply'}</p><ul>${(Array.isArray(item.options) ? item.options : []).map(option => `<li>${esc(text(option?.label) || text(option?.text) || text(option?.code))}${option?.exclusive || option?.flag === 'exclusion' ? ' (cannot combine with other choices)' : ''}</li>`).join('')}</ul>` : '<p>Question format unavailable.</p>'}</li>`).join('')}</ol>` : '<p>No questions were included in this result.</p>'}`;
+  }
   function render() {
     const env = envelope, result = env?.result || {}, cap = env?.capability || input?.capability;
-    let title = label(cap), body = 'Waiting for this tool result…', state = 'loading', entity = null;
+    let title = label(cap), body = 'Waiting for this tool result…', state = 'loading', entity = null, questions = '';
     if (env) {
       if (env.ok === false || env.isError) { title = 'Not available'; body = 'This request could not be completed.'; state = 'refused'; }
       else if (cap === 'cap.ops.feedback') { title = 'Feedback received'; body = 'Your feedback was recorded. Its private contents are not displayed here.'; state = 'complete'; }
       else if (cap === 'cap.auth.me') { title = 'Sign-in checked'; body = 'The assistant received the current authorization details.'; state = 'complete'; }
       else if (cap === 'cap.ops.health') { title = 'Service status'; body = `Version ${typeof result.version === 'string' ? result.version : 'unavailable'}`; state = 'complete'; }
       else if (result.suppressed === true || result.status === 'held') { title = 'Result held'; body = 'This result remains unavailable under the current policy.'; state = 'held'; }
+      else if (['cap.template.get','cap.template.render'].includes(cap)) { title = result.template?.name || 'Survey questionnaire'; body = 'Questions returned by this request. This view does not submit answers.'; state = 'complete'; questions = templateQuestions(result); }
       else {
         entity = result.assessment || result.project || result.workspace;
         title = entity?.name || title;
@@ -370,7 +380,7 @@ function createActionCard({ root, esc, call, explore, execution }) {
         state = pending ? 'preview' : 'complete';
       }
     }
-    root.innerHTML = `<section class="panel action-card" data-state="${state}"><h2>${esc(title)}</h2><p>${esc(message || body)}</p>${pending ? `<p class="small">Action: ${esc(label(pending.capability))} · scope ${esc(pending.params.scope || '')} ${esc(pending.params.id || pending.params.aid || '')}${pending.capability === 'cap.grant.invite' ? ` · recipient ${esc(pending.params.email || '')} · role ${esc(pending.params.role || '')}` : ''}</p>${impactDetails(pending.impact)}<p class="small">Confirmation expires in ${esc(pending.expiresIn)} seconds.</p><div class="actions"><button data-card-confirm ${busy ? 'disabled' : ''}>Confirm action</button><button data-card-cancel ${busy ? 'disabled' : ''}>Cancel</button></div>` : ''}${trace(env)}<button class="quiet" data-card-explore ${busy ? 'disabled' : ''}>Open workspaces</button></section>`;
+    root.innerHTML = `<section class="panel action-card" data-state="${state}"><h2>${esc(title)}</h2><p>${esc(message || body)}</p>${questions}${pending ? `<p class="small">Action: ${esc(label(pending.capability))} · scope ${esc(pending.params.scope || '')} ${esc(pending.params.id || pending.params.aid || '')}${pending.capability === 'cap.grant.invite' ? ` · recipient ${esc(pending.params.email || '')} · role ${esc(pending.params.role || '')}` : ''}</p>${impactDetails(pending.impact)}<p class="small">Confirmation expires in ${esc(pending.expiresIn)} seconds.</p><div class="actions"><button data-card-confirm ${busy ? 'disabled' : ''}>Confirm action</button><button data-card-cancel ${busy ? 'disabled' : ''}>Cancel</button></div>` : ''}${trace(env)}<button class="quiet" data-card-explore ${busy ? 'disabled' : ''}>Open workspaces</button></section>`;
     root.querySelector('[data-card-explore]').onclick = () => { if (!busy) { pending = null; explore(); } };
     root.querySelector('[data-card-cancel]')?.addEventListener('click', () => { if (!busy) { pending=null; message='Cancelled. No action was executed by this card.'; render(); } });
     root.querySelector('[data-card-confirm]')?.addEventListener('click', async () => {

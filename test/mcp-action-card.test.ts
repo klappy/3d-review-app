@@ -47,3 +47,16 @@ it('compact role preview displays server impact without exposing confirmation to
  for(const fact of ['disclosure','true','demotion does not undo disclosure','viewer','member','300'])expect(f.root.textContent).toContain(fact);
  expect(f.root.textContent).not.toContain('secret-confirm');expect(f.root.querySelector('[data-card-confirm]')).not.toBeNull();f.dom.window.close();
 });
+
+it('latest Written survey result replaces projects/assessment/selection with actual read-only questions',()=>{
+ const f=fixture(()=>{throw Error('no automatic calls');});
+ for(const [cap,result] of [['cap.project.list',{projects:[{name:'OLD PROJECT'}]}],['cap.assessment.get',{assessment:{name:'OLD ASSESSMENT'}}],['cap.template.list',{templates:[{name:'Community Written'}]}]]){f.card.receiveInput({arguments:{capability:cap}});f.card.receiveResult({structuredContent:{ok:true,capability:cap,result}});}
+ const items=[{id:'q1',text:'How often is this useful?',type:'scale',scale:{min:1,max:5}},{id:'q2',text:'Which difficulties?',type:'multi',requiredness:'unresolved',answer_semantics:'unresolved_no_problems_vs_skipped',options:[{code:'a',text:'Travel <script>',weight:99},{code:'none',text:'None',flag:'exclusion'}]},{id:'q3',text:'Explain your choice',type:'text'}];
+ for(const cap of ['cap.template.get','cap.template.render']){
+  f.card.receiveInput({arguments:{capability:cap,params:{id:'written'}}});f.card.receiveResult({structuredContent:{ok:true,capability:cap,result:cap.endsWith('.get')?{template:{name:'Written',perspective:'Community',version:2,items}}:{template:{name:'Written',perspective:'Community',version:2},items}}});
+  for(const phrase of ['Written','Community','version 2','3 questions','How often is this useful?','1 to 5','Which difficulties?','Travel <script>','cannot combine','Explain your choice','unknown'])expect(f.root.textContent).toContain(phrase);
+  expect(f.root.textContent).not.toContain('OLD');expect(f.root.innerHTML).not.toContain('<script>');expect(f.root.textContent).not.toContain('99');expect(f.root.querySelector('input,textarea')).toBeNull();
+ }
+ f.card.receiveResult({structuredContent:{ok:true,capability:'cap.template.get',result:{suppressed:true,template:{name:'Hidden',items}}}});expect(f.root.textContent).toContain('Result held');expect(f.root.textContent).not.toContain('How often');
+ f.card.receiveInput({arguments:{capability:'cap.ops.feedback'}});expect(f.root.textContent).not.toContain('How often');f.dom.window.close();
+});
