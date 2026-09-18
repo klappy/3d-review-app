@@ -1,7 +1,20 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.9.0",
+  "current": "0.9.1",
   "versions": [
+    {
+      "version": "0.9.1",
+      "status": "candidate",
+      "notes_path": "releases/0.9.1.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Release validation runs all 34 synthetic report contexts as sequential bounded cases, preserves the 425-response aggregate and coexistence checks, and drains or quarantines unfinished fixture work before reuse."
+        ],
+        "security": []
+      }
+    },
     {
       "version": "0.9.0",
       "status": "candidate",
@@ -43,7 +56,7 @@
     },
     {
       "version": "0.7.1",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.7.1.md",
       "sections": {
         "added": [],
@@ -54,7 +67,9 @@
           "Initial host-initiated MCP read refusals appear in the panel without leaking private error details; navigation clears the refusal."
         ],
         "security": []
-      }
+      },
+      "tag": "v0.7.1",
+      "date": "2026-09-18"
     },
     {
       "version": "0.7.0",
