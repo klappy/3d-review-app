@@ -1,30 +1,28 @@
 {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "f74b0b2f9e1cbb5232c4f865368e97db060d47fc",
+  "cookbook_commit": "ef5879b1a600b77a9249d1a81be12bb4022e1098",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.5.0.md",
-      "blob_sha": "9b253ceaaf20a7abb85ba85b042ed99b9a89a571",
-      "sha256": "834a70be96f6482dca2efd6d0bf452fac9b401a7563dc77d06d51db7bb132d42"
+      "path": "planning/2026-09-16-parity-build/releases/0.6.0.md",
+      "blob_sha": "7cd2a54414d572088b149669c7496a74cc1639f8",
+      "sha256": "479f7a7e2c9dc2b4978339aa432bad7fe00cfc34cd7aed6f94108deb0438986c"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "7c2dce1e44a49466b1b647c56f8d9ef411fc3183",
-      "sha256": "cfcd218db215ccfb13afc7e7a5fd53368a1fe2f84d2dcc843d0f5c7284595fb9"
+      "blob_sha": "6e820cfe54afdb8c30b08f87a12e4b20ae0f6fc2",
+      "sha256": "0fbc08d77ed56800a1bc9dac37ce1c2783e0e2eb779732a8f4fc121d1eaf48de"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "One self-contained MCP Apps resource, attached to the existing four tools, with SDK host bridge.",
-        "Workspace and project navigation, assessment views, survey inclusion, reflection notes, report reads and assessment invitation confirmation UI.",
-        "Loading, refusal, error and host-capability states. Local AppBridge harness is excluded from deployed assets."
+      "added": [],
+      "changed": [
+        "Outbound collaborator invitations use native Cloudflare Email Sending from noreply@3dreview.app instead of the Resend HTTP API."
       ],
-      "changed": [],
       "fixed": [],
       "security": [
-        "Resource access uses existing MCP authorization. Tool permission checks and dangerous-operation confirmation remain server-owned. No new tool, API endpoint or database migration."
+        "Existing recipient validation, synthetic-address refusal, DEV hash allowlist, invitation intent deduplication and uncertain-send protections remain in force; no inbox or forwarding is configured."
       ]
     }
   }
