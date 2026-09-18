@@ -2,6 +2,7 @@ import type {Hono} from 'hono';
 import {streamSSE} from 'hono/streaming';
 import type {Env,Ctx} from '../handlers/types';
 import {execute} from '../dispatch';
+import {newTraceId} from '../receipt';
 import {allow,clientIp} from '../ratelimit';
 /** Read-only event notifications. Payload and actor data are never copied into the stream. */
 export function installRoadmapStream(app:Hono<{Bindings:Env}>,context:(req:Request,env:Env)=>Promise<Ctx>){
@@ -15,7 +16,7 @@ export function installRoadmapStream(app:Hono<{Bindings:Env}>,context:(req:Reque
    let closed=false;stream.onAbort(()=>{closed=true;});const end=Date.now()+30000;
    try{while(!closed&&Date.now()<end){
     // Exact same capability/handler as HTTP and MCP reads; no alternate auth or data projection.
-    const envelope=await execute(ctx,'cap.ops.roadmap_read',{after,limit:100},{tool:'read',transport:'http'});
+    const envelope=await execute({...ctx,traceId:newTraceId()},'cap.ops.roadmap_read',{after,limit:100},{tool:'read',transport:'http'});
     if(!envelope.ok)throw new Error('unavailable');
     const r=envelope.result as any;
     const reset=r.reset||(seenGeneration!==null&&seenGeneration!==r.generation);

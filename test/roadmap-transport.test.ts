@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
-import {beforeAll,afterAll,it,expect} from 'vitest';
+import {beforeAll,afterAll,it,expect,vi} from 'vitest';
 import app from '../src/index';
 import {mintSession} from '../src/auth';
 const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:'roadmap-http',modules:true,script:"export default {fetch(){return new Response('ok')}}",d1Databases:{DB:'roadmap-http-db'}}]}));
@@ -28,3 +28,5 @@ it('reviewed summary rejects seeded contact data and default publisher lacks nar
 it('redaction through MCP clears live public current/history and changes generation',async()=>{const p={expected_cursor:4,idempotency_key:crypto.randomUUID(),item_id:'roadmap-123'};expect((await commit('redact',p,'verifier',true)).ok).toBe(true);const read=await call('read',{});expect(read.result.generation).toBe(1);expect(read.result.items).toEqual([]);expect(read.result.events).toHaveLength(1);expect(JSON.stringify(read.result)).not.toContain('Live roadmap');});
 it('SSE reconnect honors cursor/generation and sends reset without removed payload or actor data',async()=>{const response=await app.fetch(new Request('https://app.test/v2/roadmap/stream?after=0&generation=0',{headers:{'last-event-id':'2'}}),env);expect(response.status).toBe(200);expect(response.headers.get('cache-control')).toBe('no-store');const reader=response.body!.getReader(),first=await reader.read(),wire=new TextDecoder().decode(first.value);expect(wire).toContain('event: reset');expect(wire).toContain('"generation":1');expect(wire).not.toContain('Live roadmap');expect(wire).not.toContain('publisher');await reader.cancel();});
 it('SSE malformed cursor rejected; public history shares redaction generation',async()=>{const response=await app.fetch(new Request('https://app.test/v2/roadmap/stream?after=NaN'),env);expect(response.status).toBe(400);const r=await app.fetch(new Request('https://app.test/v2/roadmap/items/roadmap-123/history'),env);const body:any=await r.json();expect(body.result.generation).toBe(1);expect(body.result.events).toHaveLength(1);expect(body.result.events[0].value.kind).toBe('redaction');});
+
+it('successive SSE reads use distinct audit traces and stop on cancellation',async()=>{const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});try{const r=await app.fetch(new Request('https://app.test/v2/roadmap/stream?after=5&generation=1'),env);const reader=r.body!.getReader();await reader.read();await reader.read();await reader.cancel();expect(warning.mock.calls.some(c=>String(c[0]).includes('trace.persist.failed'))).toBe(false);}finally{warning.mockRestore();}});
