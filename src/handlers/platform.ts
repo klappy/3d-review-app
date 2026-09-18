@@ -1,4 +1,5 @@
 /** entry / auth / ops / docs-file handlers (Lane B). Domain handlers are Lane A's. */
+import { feedbackExperience, feedbackProvenance, projectFeedbackProvenance } from './feedback-provenance';
 import type { Handler } from "./types";
 import { CapError, id, sha256, notVisible } from "./types";
 import { normalizeEmail } from "./common";
@@ -90,7 +91,7 @@ const FEEDBACK_STRIP_KEYS = ["answers", "responses", "response"] as const;
 const FEEDBACK_WRITE_KEYS = new Set([
   "helpful", "note", "text", "context", "scope_type", "scope_id",
   "satisfaction", "confusion", "frustration", "sentiment_journey",
-  "cast_id", "persona", "goal_id", "require_authenticated",
+  "cast_id", "persona", "goal_id", "require_authenticated", "experience",
 ]);
 const FEEDBACK_SCORE_KEYS = ["satisfaction", "confusion", "frustration"] as const;
 const FEEDBACK_CODE_UNIT_128 = ["sentiment_journey", "cast_id", "persona", "goal_id"] as const;
@@ -113,6 +114,7 @@ export const opsFeedback: Handler = async (ctx, p) => {
   // Optional caller precondition, shared by HTTP and MCP. Never degrade an attributed UI write to anonymous.
   if ("require_authenticated" in p && typeof p.require_authenticated !== "boolean") throw invalidFeedback("require_authenticated must be a boolean");
   if (p.require_authenticated === true && ctx.principal.kind === "anonymous") throw new CapError("NOT_AUTHENTICATED", "Sign in before sending this feedback");
+  const experience = "experience" in p ? feedbackExperience(p.experience) : undefined;
   const stripped = FEEDBACK_STRIP_KEYS.some((k) => k in p);
   const rest: Record<string, unknown> = { ...p };
   for (const k of FEEDBACK_STRIP_KEYS) delete rest[k];
@@ -162,11 +164,13 @@ export const opsFeedback: Handler = async (ctx, p) => {
   for (const key of FEEDBACK_SCORE_KEYS) if (key in rest) body[key] = rest[key];
   for (const key of FEEDBACK_CODE_UNIT_128) if (key in rest) body[key] = rest[key];
 
+  const submittedAt = new Date().toISOString();
+  body._feedback_provenance = feedbackProvenance(ctx.env.ENVIRONMENT, submittedAt, experience);
   const feedbackId = id("fb");
   const scopeType = "scope_type" in rest ? asFeedbackString(rest.scope_type, "scope_type") : "platform";
   const scopeId = "scope_id" in rest ? asFeedbackString(rest.scope_id, "scope_id") : "-";
   await ctx.db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
-    .bind(feedbackId, ctx.principal.id, scopeType, scopeId, JSON.stringify(body), new Date().toISOString()).run();
+    .bind(feedbackId, ctx.principal.id, scopeType, scopeId, JSON.stringify(body), submittedAt).run();
   return { result: { recorded: true, stripped, feedback_id: feedbackId }, scope: { type: "platform", id: "feedback" } };
 };
 
@@ -215,6 +219,12 @@ export const opsFeedbackGet: Handler = async (ctx, p) => {
   try { stored = JSON.parse(row.body); } catch { throw notVisible("feedback"); }
   if (!stored || typeof stored !== "object" || Array.isArray(stored)) throw notVisible("feedback");
   const body = projectStoredFeedbackBody(stored as Record<string, unknown>);
+  let provenance;
+  try {
+    provenance = projectFeedbackProvenance((stored as Record<string, unknown>)._feedback_provenance);
+    if (provenance && provenance.submission.submitted_at !== row.created_at) throw notVisible("feedback");
+  }
+  catch { throw notVisible("feedback"); }
   return {
     result: {
       id: row.id,
@@ -223,6 +233,7 @@ export const opsFeedbackGet: Handler = async (ctx, p) => {
       scope_id: row.scope_id ?? "-",
       created_at: row.created_at,
       body,
+      provenance,
     },
   };
 };
