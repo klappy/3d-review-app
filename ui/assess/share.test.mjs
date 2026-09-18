@@ -17,12 +17,13 @@ function makeRoot(html) {
   const els = Object.fromEntries(attrs.map(a => [a, { handlers: {}, addEventListener(ev, fn) { this.handlers[ev] = fn; }, click() { return this.handlers.click?.(); } }]));
   return { html, els, querySelector(sel) { const m = /\[(data-share-[a-z-]+)\]/.exec(sel); return m ? this.els[m[1]] || null : null; }, set innerHTML(v) { this.html = v; const r = makeRoot(v); this.els = r.els; }, get innerHTML() { return this.html; } };
 }
-function mount(role, table) {
+function mount(role, table, extras = {}) {
   const { api, calls } = fakeApi(table); const state = {}; const cur = current(role); const share = shareFor(state, 'a1', 's1', 1);
+  const bindCtx = { ...ctx, ...extras };
   const root = makeRoot(render(ctx, { current: cur, survey, share })); const clipboard = { text: null, async writeText(t) { this.text = t; } };
   const prints = []; const sheets = []; const doc = { createElement: () => ({ set innerHTML(v) { this.html = v; }, className: '', remove() { sheets.push('removed'); } }), body: { append: el => sheets.push(el) } };
-  const onChange = () => { root.innerHTML = render(ctx, { current: cur, survey, share }); bind(ctx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test' }); };
-  bind(ctx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test' });
+  const onChange = () => { root.innerHTML = render(ctx, { current: cur, survey, share }); bind(bindCtx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test' }); };
+  bind(bindCtx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test' });
   return { api, calls, state, share, root, clipboard, prints, sheets, click: async attr => { await root.querySelector(`[${attr}]`).click(); } };
 }
 const LINKS = 'POST /v2/assessments/a1/surveys/s1/links';
@@ -72,6 +73,7 @@ test('credential discipline: the model is keyed to (aid, sid, epoch) and dropped
   shareFor(state, 'a1', 's1', 2).link = { id: 'y', url: 'u' }; assert.equal(shareFor(state, 'a1', 's2', 2).link, null, 'other survey → fresh model');
   const src = read('./share.js'); assert.doesNotMatch(src, /localStorage|sessionStorage|document\.cookie|console\.log/); assert.doesNotMatch(src, /location\.hash\s*=/);
   const shell = read('./assess.js'); assert.match(shell, /function resetIdentity\(\) \{[^}]*state\.share = null;/, 'identity change drops the share model');
+  assert.match(shell, /onChange = \(\) => \{[^}]*querySelector\('#share-root'\)/, 'share onChange retargets the live card after paint');
 });
 
 test('QR and invitation sheet carry the URL only; sheet is print-only markup', () => {
@@ -119,12 +121,35 @@ test('expired preparation never executes and closing before confirmation has no 
   assert.equal(m.calls.length,1); assert.match(m.root.html,/expired/);
   await m.click('data-share-open'); await m.click('data-share-close'); assert.equal(m.calls.length,2); assert.equal(m.share.confirm,null);
 });
-test('inflight duplicate click and stale page response cannot duplicate issuance or deliver token', async () => {
-  let finish; const m=mount('owner', {[LINKS]:({body})=>body.mode==='dry_run'?prepared:new Promise(r=>finish=r)});
+test('inflight duplicate click and replaced-identity response cannot duplicate issuance or deliver token', async () => {
+  let finish; let current = true;
+  const m=mount('owner', {[LINKS]:({body})=>body.mode==='dry_run'?prepared:new Promise(r=>finish=r)}, { isCurrent: () => current });
   await m.click('data-share-open'); const pending=m.click('data-share-copy');
   await m.click('data-share-copy'); assert.equal(m.calls.length,2);
-  m.root.isConnected=false; finish(receipt); await pending;
+  m.root.isConnected=false; current=false; finish(receipt); await pending;
   assert.equal(m.share.link,null); assert.equal(m.clipboard.text,null); assert.equal(m.prints.length,0);
+});
+test('same-page paint keeps an in-flight share and refreshes the replacement card', async () => {
+  let finishPrep; let finishExec; let finishRevoke;
+  const m = mount('owner', {
+    [LINKS]: ({ body }) => body.mode === 'dry_run' ? new Promise(r => finishPrep = r) : new Promise(r => finishExec = r),
+    'DELETE /v2/assessments/a1/surveys/s1/links/inv_1': () => new Promise(r => finishRevoke = r),
+  });
+  const pendingPrep = m.click('data-share-open');
+  m.root.isConnected = false; finishPrep(prepared); await pendingPrep;
+  assert.equal(m.share.stage, 'ready'); assert.equal(m.share.confirm, 'ct1');
+  assert.match(m.root.html, /data-share-copy/);
+  m.root.isConnected = true;
+  const pendingExec = m.click('data-share-copy');
+  m.root.isConnected = false; finishExec(receipt); await pendingExec;
+  assert.equal(m.share.link.url, 'https://example.test/#survey=SECRET'); assert.equal(m.share.stage, 'linked');
+  assert.equal(m.clipboard.text, null, 'detached root must not copy');
+  assert.match(m.root.html, /Keep a copy of this link/); assert.doesNotMatch(m.root.html, / disabled/);
+  m.root.isConnected = true;
+  const pendingRevoke = m.click('data-share-revoke');
+  m.root.isConnected = false; finishRevoke({ id: 'inv_1', status: 'revoked' }); await pendingRevoke;
+  assert.equal(m.share.link, null); assert.equal(m.share.stage, 'idle');
+  assert.match(m.root.html, /Link revoked/);
 });
 test('incomplete execute receipt is uncertain and never becomes an output', async () => {
   const m=mount('owner', {[LINKS]:({body})=>body.mode==='dry_run'?prepared:{link_id:'x'}});

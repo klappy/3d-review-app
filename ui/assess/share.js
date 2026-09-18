@@ -58,9 +58,11 @@ export function invitationSheetHtml(ctx, { current, survey, url }) {
 
 export function bind(ctx, root, { current, survey, share, api, onChange, print = () => globalThis.print?.(), clipboard = globalThis.navigator?.clipboard, doc = globalThis.document, origin = globalThis.location?.origin, now = Date.now }) {
   const aid = current.assessment.id, sid = survey.id, base = `/v2/assessments/${ctx.enc(aid)}/surveys/${ctx.enc(sid)}/links`;
-  // Responses from a page/identity that has gone away must never reveal a credential or trigger an output.
-  const live = () => root.isConnected !== false && (!ctx.isCurrent || ctx.isCurrent());
-  const update = () => { if (live()) onChange(); };
+  // The model stays current until identity, survey or epoch changes. A same-page paint disconnects this root; that must
+  // not blank the model or skip onChange. Copy/print still require the bound node so a gone page cannot receive a credential.
+  const same = () => !ctx.isCurrent || ctx.isCurrent();
+  const live = () => root.isConnected !== false && same();
+  const update = () => { if (same()) onChange(); };
   const say = (message, alert = false) => { share.message = message; share.alert = alert; update(); };
   const fail = (message) => { share.stage = share.link ? 'linked' : 'idle'; say(message, true); };
   root.querySelector('[data-share-open]')?.addEventListener('click', async () => {
@@ -70,10 +72,10 @@ export function bind(ctx, root, { current, survey, share, api, onChange, print =
     share.stage = 'busy'; share.confirm = null; say('Getting sharing options ready…');
     try {
       const r = await api(base, { method: 'POST', body: { params: {}, mode: 'dry_run' } });
-      if (!live()) { Object.assign(share, blankShare()); return; }
+      if (!same()) { Object.assign(share, blankShare()); return; }
       if (!r.confirm_token || !(r.expires_in > 0)) throw new Error('Invalid preparation');
       share.confirm = r.confirm_token; share.deadline = now() + r.expires_in * 1000; share.stage = 'ready'; say('');
-    } catch { if (!live()) { Object.assign(share, blankShare()); return; } fail('Sharing options could not be prepared. Try again, or sign in if your session has ended.'); }
+    } catch { if (!same()) { Object.assign(share, blankShare()); return; } fail('Sharing options could not be prepared. Try again, or sign in if your session has ended.'); }
   });
   root.querySelector('[data-share-close]')?.addEventListener('click', () => {
     if (share.stage === 'busy') return;
@@ -87,27 +89,28 @@ export function bind(ctx, root, { current, survey, share, api, onChange, print =
       share.confirm = null; share.stage = 'busy'; say('Preparing your link…');
       try {
         const r = await api(base, { method: 'POST', body: { params: {}, mode: 'execute', confirm_token } });
-        if (!live()) { Object.assign(share, blankShare(), { message: copy.uncertain, alert: true }); return; }
+        if (!same()) { Object.assign(share, blankShare(), { message: copy.uncertain, alert: true }); return; }
         if (!r.link_id || typeof r.entry_fragment !== 'string' || !/^#survey=[A-Za-z0-9_-]+$/.test(r.entry_fragment)) throw new Error('Incomplete result');
         share.link = { id: r.link_id, url: shareUrl(origin, r.entry_fragment), expires_at: r.expires_at || null };
       } catch (e) {
-        if (!live()) { Object.assign(share, blankShare(), { message: copy.uncertain, alert: true }); return; }
+        if (!same()) { Object.assign(share, blankShare(), { message: copy.uncertain, alert: true }); return; }
         fail(['CONFIRM_EXPIRED', 'CONFIRM_REQUIRED'].includes(e.code) ? 'Sharing options expired. Try sharing again.' : e.status === 401 || e.status === 403 ? 'You no longer have permission to share. Sign in and check your access.' : copy.uncertain);
         return;
       }
     }
-    if (!live()) return;
+    if (!same()) return;
     share.stage = 'linked'; say('');
+    if (!live()) return;
     if (action === 'qr') { share.qr = !share.qr; update(); return; }
     if (action === 'copy') {
-      try { await clipboard.writeText(share.link.url); if (live()) say(copy.copied); }
-      catch { if (live()) say('Your link is ready. Press Copy link again, or select the link text and copy it.', true); }
+      try { await clipboard.writeText(share.link.url); if (same()) say(copy.copied); }
+      catch { if (same()) say('Your link is ready. Press Copy link again, or select the link text and copy it.', true); }
       return;
     }
     try {
       const sheet = doc.createElement('div'); sheet.className = 'stage-print-only share-sheet'; sheet.innerHTML = invitationSheetHtml(ctx, { current, survey, url: share.link.url });
       doc.body.append(sheet); try { print(); } finally { sheet.remove(); }
-    } catch { if (live()) say('Your link is ready, but printing did not open. Press Print invitations again.', true); }
+    } catch { if (same()) say('Your link is ready, but printing did not open. Press Print invitations again.', true); }
   };
   root.querySelector('[data-share-copy]')?.addEventListener('click', () => deliver('copy'));
   root.querySelector('[data-share-qr]')?.addEventListener('click', () => deliver('qr'));
@@ -117,9 +120,9 @@ export function bind(ctx, root, { current, survey, share, api, onChange, print =
     share.stage = 'busy'; update();
     try {
       await api(`${base}/${ctx.enc(share.link.id)}`, { method: 'DELETE' });
-      if (!live()) return;
+      if (!same()) return;
       Object.assign(share, blankShare()); say(copy.revoked);
-    } catch { if (live()) fail('Revocation could not be confirmed. The link may still work. Try revoking it again.'); }
+    } catch { if (same()) fail('Revocation could not be confirmed. The link may still work. Try revoking it again.'); }
   });
 }
 
