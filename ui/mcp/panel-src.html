@@ -37,7 +37,7 @@ function refusal(e, what) { const k = kindOf(e); return `<section class="panel n
 // ---- routing (internal; the iframe URL never changes, so no scope or credential lands in a host history)
 function parse(hash) { const p = hash.replace(/^#/, '').split('/').map(decodeURIComponent); if (!p[0] || p[0] === 'workspaces') return { kind: 'workspaces' }; if (p[0] === 'workspace') return { kind: 'workspace', id: p[1] }; if (p[0] === 'projects') return { kind: 'projects' }; if (p[0] === 'project') return { kind: 'project', id: p[1] }; if (p[0] === 'assessment' && p[1]) return { kind: 'assessment', id: p[1], view: VIEWS.includes(p[2]) ? p[2] : null }; return { kind: 'workspaces' }; }
 let routeGeneration = 0;
-function go(hash) { if (state.executing) return; routeGeneration++; state.route = parse(hash); state.sheet = null; state.notice = null; render(); }
+function go(hash) { if (state.executing) return; routeGeneration++; state.route = parse(hash); state.sheet = null; state.notice = null; state.busy = false; render(); }
 document.addEventListener('click', e => { const a = e.target.closest('a[href^="#"]'); if (!a) return; e.preventDefault(); const h = a.getAttribute('href'); if (h === '#retry') return render(); go(h); });
 
 // ---- render
@@ -45,21 +45,21 @@ let gen = 0;
 async function render() {
   const g = ++gen, r = state.route, root = $('app'); root.innerHTML = '<p class="muted">Loading…</p>'; $('status').textContent = state.notice || ''; $('status').className = 'small ' + (state.alert ? 'alert' : 'muted');
   try {
-    let html = '';
-    if (r.kind === 'workspaces') { const [w, p] = await Promise.all([read('cap.workspace.list'), read('cap.project.list').catch(() => ({ projects: [] }))]); crumbs([]); html = `<div class="title"><div><p class="eyebrow">Your workspaces</p><h1>Choose a workspace</h1></div></div>${cardGrid((w.workspaces || []).map(workspaceCard), 'No workspaces yet.')}${(p.projects || []).length ? `<h2 style="margin-top:22px">Projects</h2>${cardGrid(p.projects.map(projectCard))}` : ''}`; }
-    else if (r.kind === 'workspace') { const w = await read('cap.workspace.get', { id: r.id }); crumbs([['Workspaces', '#workspaces'], [w.workspace.name]]); html = `<div class="title"><div><p class="eyebrow">Workspace</p><h1>${esc(w.workspace.name)}</h1><p class="muted small">Your role: ${esc(w.workspace.role)}</p></div></div><h2>Projects</h2>${cardGrid((w.projects || []).map(projectCard), 'No projects grouped yet.')}`; }
-    else if (r.kind === 'projects') { const p = await read('cap.project.list'); crumbs([['Workspaces', '#workspaces'], ['Projects']]); html = `<div class="title"><div><p class="eyebrow">Projects</p><h1>Choose a project</h1></div></div>${cardGrid((p.projects || []).map(projectCard), 'No projects.')}`; }
-    else if (r.kind === 'project') { const [p, a] = await Promise.all([read('cap.project.get', { id: r.id }), read('cap.assessment.list', { pid: r.id })]); crumbs([['Workspaces', '#workspaces'], p.project.workspace_id ? ['Workspace', routes.workspace(p.project.workspace_id)] : ['Projects', '#projects'], [p.project.name]]); html = `<div class="title"><div><p class="eyebrow">Project</p><h1>${esc(p.project.name)}</h1><p class="muted small">Your role: ${esc(p.project.role)}</p></div></div><h2>Assessments</h2>${cardGrid((a.assessments || []).map(assessmentCard), 'No assessments yet.')}`; }
-    else if (r.kind === 'assessment') html = await assessmentPage(r);
-    if (g !== gen) return; root.innerHTML = html; bind(root);
+    let html = '', trail = '', current = null;
+    if (r.kind === 'workspaces') { const [w, p] = await Promise.all([read('cap.workspace.list'), read('cap.project.list').catch(() => ({ projects: [] }))]); trail = crumbs([]); html = `<div class="title"><div><p class="eyebrow">Your workspaces</p><h1>Choose a workspace</h1></div></div>${cardGrid((w.workspaces || []).map(workspaceCard), 'No workspaces yet.')}${(p.projects || []).length ? `<h2 style="margin-top:22px">Projects</h2>${cardGrid(p.projects.map(projectCard))}` : ''}`; }
+    else if (r.kind === 'workspace') { const w = await read('cap.workspace.get', { id: r.id }); trail = crumbs([['Workspaces', '#workspaces'], [w.workspace.name]]); html = `<div class="title"><div><p class="eyebrow">Workspace</p><h1>${esc(w.workspace.name)}</h1><p class="muted small">Your role: ${esc(w.workspace.role)}</p></div></div><h2>Projects</h2>${cardGrid((w.projects || []).map(projectCard), 'No projects grouped yet.')}`; }
+    else if (r.kind === 'projects') { const p = await read('cap.project.list'); trail = crumbs([['Workspaces', '#workspaces'], ['Projects']]); html = `<div class="title"><div><p class="eyebrow">Projects</p><h1>Choose a project</h1></div></div>${cardGrid((p.projects || []).map(projectCard), 'No projects.')}`; }
+    else if (r.kind === 'project') { const [p, a] = await Promise.all([read('cap.project.get', { id: r.id }), read('cap.assessment.list', { pid: r.id })]); trail = crumbs([['Workspaces', '#workspaces'], p.project.workspace_id ? ['Workspace', routes.workspace(p.project.workspace_id)] : ['Projects', '#projects'], [p.project.name]]); html = `<div class="title"><div><p class="eyebrow">Project</p><h1>${esc(p.project.name)}</h1><p class="muted small">Your role: ${esc(p.project.role)}</p></div></div><h2>Assessments</h2>${cardGrid((a.assessments || []).map(assessmentCard), 'No assessments yet.')}`; }
+    else if (r.kind === 'assessment') ({ html, trail, current } = await assessmentPage(r));
+    if (g !== gen) return; if (current) state.current = current; $('crumbs').innerHTML = trail; root.innerHTML = html; bind(root);
   } catch (e) { if (g !== gen) return; root.innerHTML = refusal(e, r.kind); }
 }
-function crumbs(items) { $('crumbs').innerHTML = items.map(([t, h]) => h ? `<a href="${esc(h)}">${esc(t)}</a>` : `<span>${esc(t)}</span>`).join('<span>›</span>'); }
+function crumbs(items) { return items.map(([t, h]) => h ? `<a href="${esc(h)}">${esc(t)}</a>` : `<span>${esc(t)}</span>`).join('<span>›</span>'); }
 
 async function assessmentPage(r) {
   const d = await read('cap.assessment.get', { id: r.id }); const a = d.assessment, surveys = d.surveys || [];
   const tab = r.view || (VIEWS.includes(a.stage) ? a.stage : 'prepare'); const mayEdit = a.role === 'owner' || a.role === 'member';
-  crumbs([['Workspaces', '#workspaces'], ['Project', routes.project(a.project_id)], [a.name]]);
+  const trail = crumbs([['Workspaces', '#workspaces'], ['Project', routes.project(a.project_id)], [a.name]]);
   const tabs = (mayEdit ? VIEWS : VIEWS.filter(v => v !== 'permissions')).map(v => `<a href="${routes.assessment(a.id, v)}" ${v === tab ? 'aria-current="page"' : ''}>${v[0].toUpperCase() + v.slice(1)}</a>`).join('');
   const head = `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted small">your role: ${esc(a.role)}${a.role === 'viewer' ? ' — read only here' : ''}</p></div><span class="badge">${stageLabel(a.stage)}</span></div><nav class="tabs view-tabs" aria-label="Assessment views">${tabs}</nav>`;
   let body = '';
@@ -80,16 +80,27 @@ async function assessmentPage(r) {
   }
   else if (tab === 'improve') body = `<section class="panel"><p class="eyebrow">Improve</p><h2>Reflection and next steps</h2><p class="small muted">Everyone with access to this assessment can read these notes.</p>${mayEdit ? `<form data-notes-form><label class="field">Reflection<textarea name="notes_reflection">${esc(a.notes_reflection || '')}</textarea></label><label class="field">Next steps<textarea name="notes_next_steps">${esc(a.notes_next_steps || '')}</textarea></label><div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save notes</button></div></form>` : `<p><strong>Reflection</strong> ${esc(a.notes_reflection || '—')}</p><p><strong>Next steps</strong> ${esc(a.notes_next_steps || '—')}</p>`}<p class="small muted">Recommendations are not built yet.</p></section>`;
   else if (tab === 'permissions') {
-    let g; try { g = await read('cap.grant.list', { scope: 'assessment', id: a.id }); } catch (e) { return head + (kindOf(e) === 'refused' && String(e.code) === 'NOT_AUTHORIZED_AT_SCOPE' ? '<section class="panel narrow"><p class="eyebrow">Permissions</p><p class="muted">Permissions are managed by members and owners.</p></section>' : refusal(e, 'permissions')); }
+    let g; try { g = await read('cap.grant.list', { scope: 'assessment', id: a.id }); } catch (e) { return { html: head + (kindOf(e) === 'refused' && String(e.code) === 'NOT_AUTHORIZED_AT_SCOPE' ? '<section class="panel narrow"><p class="eyebrow">Permissions</p><p class="muted">Permissions are managed by members and owners.</p></section>' : refusal(e, 'permissions')), trail, current: null }; }
     const owner = a.role === 'owner';
     body = `<section class="panel"><p class="eyebrow">Permissions</p><h2>Who can open this assessment</h2><p class="note small">Permissions apply to this assessment only; nothing is inherited.</p><table class="grants"><thead><tr><th>Principal</th><th>Role</th></tr></thead><tbody>${(g.grants || []).map(x => `<tr><td>${esc(x.principal_id)}${x.principal_id === state.me?.principal?.id ? ' <span class="small muted">(you)</span>' : ''}</td><td>${esc(x.role)}</td></tr>`).join('')}</tbody></table>${(g.pending_invitations || []).length ? `<p class="small muted">${g.pending_invitations.length} pending invitation(s)</p>` : ''}${mayEdit ? `<form class="line" data-invite-form><h3>Invite someone</h3><label class="field">Email<input name="email" type="email" required></label><label class="field">Role<select name="role"><option value="viewer">viewer</option><option value="member">member</option>${owner ? '<option value="owner">owner</option>' : ''}</select></label><div class="actions"><button type="button" data-invite-preview ${state.busy ? 'disabled' : ''}>Preview invitation</button></div><p class="small muted">Nothing is sent until you confirm the preview.</p></form>` : ''}${state.sheet ? sheet(state.sheet) : ''}</section>`;
   }
-  state.current = { a, surveys };
-  return head + body;
+  return { html: head + body, trail, current: { a, surveys } };
 }
 function sheet(s) { const i = s.impact || {}; return `<section class="note" data-confirm-sheet><p class="eyebrow">Confirm: ${esc(s.label)}</p><p class="small">Nothing has changed yet. Confirmation expires in ${esc(s.expiresIn ?? '')} seconds.</p><dl class="small"><dt>Effect</dt><dd>${esc(i.effect ?? '')}</dd><dt>Irreversible</dt><dd>${esc(String(i.irreversible ?? ''))}</dd><dt>Compensating control</dt><dd>${esc(i.compensating_control ?? '')}</dd><dt>Affected</dt><dd>${(i.affected || []).map(x => `<code>${esc(JSON.stringify(x))}</code>`).join('<br>') || '<span class="muted">none listed</span>'}</dd></dl><div class="actions"><button type="button" class="primary" data-confirm-execute ${s.token && !state.busy ? '' : 'disabled'}>Confirm</button><button type="button" class="quiet" data-confirm-cancel ${state.busy ? 'disabled' : ''}>Cancel</button></div></section>`; }
 const say = (t, alert = false) => { state.notice = t; state.alert = alert; render(); };
-async function act(label, fn) { if (state.busy) return; state.busy = true; state.notice = label; render(); try { const env = await fn(); state.busy = false; say(`${label} — done.${env?.receipt?.id ? ` receipt ${env.receipt.id}` : ''}${env?.trace_id ? ` · trace ${env.trace_id}` : ''}`); } catch (e) { state.busy = false; say(`${label} — ${e.message}${e.hint ? ` (${e.hint})` : ''}${e.trace_id ? ` · trace ${e.trace_id}` : ''}`, true); } }
+async function act(label, fn) {
+  if (state.busy) return;
+  const generation = routeGeneration;
+  state.busy = true; state.notice = label; render();
+  try {
+    const env = await fn();
+    if (generation !== routeGeneration) return;
+    state.busy = false; say(`${label} — done.${env?.receipt?.id ? ` receipt ${env.receipt.id}` : ''}${env?.trace_id ? ` · trace ${env.trace_id}` : ''}`);
+  } catch (e) {
+    if (generation !== routeGeneration) return;
+    state.busy = false; say(`${label} — ${e.message}${e.hint ? ` (${e.hint})` : ''}${e.trace_id ? ` · trace ${e.trace_id}` : ''}`, true);
+  }
+}
 function bind(root) {
   const aid = state.route.kind === 'assessment' ? state.route.id : null;
   root.querySelectorAll('[data-include]').forEach(b => b.onclick = () => act('Including survey', () => write('cap.survey.select', { aid, template_id: b.dataset.include, version: Number(b.dataset.version) })));
