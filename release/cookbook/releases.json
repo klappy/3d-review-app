@@ -1,7 +1,39 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.3.2",
+  "current": "0.4.1",
   "versions": [
+    {
+      "version": "0.4.1",
+      "status": "candidate",
+      "notes_path": "releases/0.4.1.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Production promotion of DEV 0.4.0: the dedicated shared-link participant journey together with accepted web, sharing, Permissions and version-badge behavior; no additional product behavior changes."
+        ],
+        "fixed": [],
+        "security": []
+      }
+    },
+    {
+      "version": "0.4.0",
+      "status": "candidate",
+      "notes_path": "releases/0.4.0.md",
+      "sections": {
+        "added": [
+          "Dedicated shared-link participant page with survey questions, answer review and editing, submission receipt, and same-tab resume."
+        ],
+        "changed": [
+          "Shared survey links open the participant page directly instead of the combined legacy staff surface; access-code and invitation routes remain available."
+        ],
+        "fixed": [
+          "Participant drafts and uncertain-submit recovery remain available throughout the dedicated page journey."
+        ],
+        "security": [
+          "Shared-link requests omit cookies and staff credentials, strip the link fragment before transport, and retain per-link draft isolation and idempotent submission retries."
+        ]
+      }
+    },
     {
       "version": "0.3.2",
       "status": "candidate",
@@ -17,7 +49,7 @@
     },
     {
       "version": "0.3.1",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.3.1.md",
       "sections": {
         "added": [],
@@ -26,7 +58,9 @@
           "Restore the existing health-backed version badge and release-details dialog on the homepage and assessment shell."
         ],
         "security": []
-      }
+      },
+      "tag": "v0.3.1",
+      "date": "2026-09-17"
     },
     {
       "version": "0.3.0",

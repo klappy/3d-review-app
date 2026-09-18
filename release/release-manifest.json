@@ -1,24 +1,24 @@
 {
-  "version": "0.3.2",
+  "version": "0.4.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "b9f2459972ff9d3c5fd3d840c6f4c79e505bb6df",
+  "cookbook_commit": "8ae36f3db907c7aca383cfe54e60185e6bb95a42",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.3.2.md",
-      "blob_sha": "83704c1f9bf7f8d2e18b0c408f0ee9c79427bb7b",
-      "sha256": "628e3b156fa150e3d38a4b11b0e7085fc2501b3cfcfd4101a6ee535f3d700567"
+      "path": "planning/2026-09-16-parity-build/releases/0.4.1.md",
+      "blob_sha": "51baf414c2b804b32800c1d60a8cd93e42cad6bf",
+      "sha256": "8eb547cfed6ce03a80ce2235a8a32ee3d88779f3627c73927b5b9cdc12234fe9"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "d16b6b086f66970adf8873a058d951fdf777055e",
-      "sha256": "c35d3e473b2a07d91a31a6b020dca06e223080539d7a7eb9dbf5f27c347a4d21"
+      "blob_sha": "0a6ea9e3812263603e9b2a877f0c5f5635abc332",
+      "sha256": "1b7c1dc354fba774778de2b4b2e423450077ef0c83e7a04a160a55940d56814f"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
       "changed": [
-        "Production promotion of validated DEV 0.3.1: accepted web and sharing, scoped Permissions controls, identity isolation fixes and the restored health-backed version badge; no additional product behavior changes."
+        "Production promotion of DEV 0.4.0: the dedicated shared-link participant journey together with accepted web, sharing, Permissions and version-badge behavior; no additional product behavior changes."
       ],
       "fixed": [],
       "security": []
