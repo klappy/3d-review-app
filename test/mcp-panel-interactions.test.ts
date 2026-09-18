@@ -6,14 +6,15 @@ const { JSDOM } = createRequire(import.meta.url)('jsdom');
 const source = readFileSync(new URL('../ui/mcp/panel-src.html', import.meta.url), 'utf8');
 const cards = readFileSync(new URL('../ui/assess/cards.js', import.meta.url), 'utf8').replace(/^export\s+(const|function)\s/gm, '$1 ');
 const script = source.split('<script>')[2].split('</script>')[0].replace('/*__CARDS__*/', cards)
-  .replace('})();', 'window.review = { state, go };})();');
+  .replace('})();', 'window.review = { state, go, render };})();');
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 function fixture({ deferGet = false, deferWrite = false } = {}) {
   const dom = new JSDOM(source.split('<script>')[0], { runScripts: 'outside-only', url: 'https://panel.test' });
+  const events = new Map<string, Function>();
   const w = dom.window, calls: any[] = [], pending: any[] = [], pendingGets: any[] = [], pendingWrites: any[] = [];
   const assessment = (id: string) => ({ assessment: { id, name: id, role: 'owner', stage: 'permissions', project_id: 'p' }, surveys: [] });
   w.McpApps = { App: class {
-    addEventListener() {} connect() { return new Promise(() => {}); }
+    addEventListener(name: string, fn: Function) { events.set(name, fn); } connect() { return new Promise(() => {}); }
     callServerTool(req: any) {
       calls.push(req);
       if (req.name === 'danger') return new Promise(resolve => pending.push(resolve));
@@ -34,7 +35,7 @@ function fixture({ deferGet = false, deferWrite = false } = {}) {
   const resolvePreview = () => pending.shift()({ structuredContent: { ok: true, result: { confirm_token: 'fixture-confirm', expires_in: 60, impact: { effect: 'invite' } } } });
   const resolveGet = (id: string) => pendingGets.splice(pendingGets.findIndex(x => x.id === id), 1)[0].resolve({ structuredContent: { ok: true, result: assessment(id) } });
   const resolveWrite = (env: any = { ok: true, result: {} }) => pendingWrites.shift()({ structuredContent: env });
-  return { dom, w, r, calls, pending, go, preview, resolvePreview, resolveGet, resolveWrite };
+  return { hostResult: (result: any) => events.get('toolresult')!(result), dom, w, r, calls, pending, go, preview, resolvePreview, resolveGet, resolveWrite };
 }
 
 it.each([false, true])('discards deferred A preview after navigation, including return to A (%s)', async back => {
@@ -158,5 +159,35 @@ it('blocks cancel, repeat confirm and navigation during execute; retains its rec
     expect(f.w.document.querySelector('#status').textContent).toContain('fixture-receipt');
     expect(f.r.state.busy).toBe(false); expect(f.r.state.executing).toBe(false);
     await f.go('B'); expect(f.w.document.querySelector('h1').textContent).toBe('B');
+  } finally { f.dom.window.close(); }
+});
+
+
+it.each(['structured', 'text'])('shows initial failed host result without capability through %s envelope', async encoding => {
+  const f = fixture();
+  try {
+    const env = { ok: false, error: { code: 'NOT_FOUND_OR_NOT_VISIBLE', message: 'private assessment secret', hint: 'private hint' }, trace_id: 'trace-safe' };
+    f.hostResult(encoding === 'structured' ? { structuredContent: env, isError: true } : { content: [{ type: 'text', text: JSON.stringify(env) }], isError: true });
+    await tick(); await f.r.render(); // Later boot render must not overwrite the initial refusal.
+    expect(f.w.document.querySelector('[data-state="refused"]')).not.toBeNull();
+    expect(f.w.document.querySelector('#app').textContent).toContain('trace-safe');
+    expect(f.w.document.body.textContent).not.toContain('private');
+    expect(f.calls).toHaveLength(0);
+    f.r.go('#workspaces'); await tick();
+    expect(f.w.document.querySelector('[data-state="refused"]')).toBeNull();
+  } finally { f.dom.window.close(); }
+});
+
+it('host refusal invalidates an older read; a subsequent successful host result routes normally', async () => {
+  const f = fixture({ deferGet: true });
+  try {
+    await f.go('A');
+    f.hostResult({ structuredContent: { ok: false, error: { code: 'NOT_FOUND_OR_NOT_VISIBLE' }, trace_id: 'old-trace' } });
+    f.resolveGet('A'); await tick();
+    expect(f.w.document.querySelector('[data-state="refused"]')).not.toBeNull();
+    f.hostResult({ structuredContent: { ok: true, capability: 'cap.assessment.get', result: { assessment: { id: 'B' } } } });
+    await tick(); f.resolveGet('B'); await tick();
+    expect(f.w.document.querySelector('h1').textContent).toBe('B');
+    expect(f.w.document.body.textContent).not.toContain('old-trace');
   } finally { f.dom.window.close(); }
 });
