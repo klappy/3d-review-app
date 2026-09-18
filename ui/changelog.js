@@ -72,6 +72,21 @@ export function initVersionBadge({ fetchImpl = globalThis.fetch, doc = globalThi
   const close = doc.getElementById('changelog-close');
   const api = { health: null, ready: Promise.resolve() };
   let healthPromise = null, opening = false;
+  // Reuse the existing control on every shell; focus must not scroll to a footer.
+  dialog.prepend(close);
+  close.textContent = '×';
+  close.setAttribute('aria-label', 'Close changelog');
+  close.setAttribute('title', 'Close changelog');
+  close.setAttribute('style', 'position:sticky;top:0;float:right;z-index:2;min-width:44px;min-height:44px;background:var(--ground,#fff)');
+  let backdropDown = false;
+  const outside = event => {
+    if (event.target !== dialog) return false;
+    const r = dialog.getBoundingClientRect();
+    return event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom;
+  };
+  dialog.addEventListener('pointerdown', event => { backdropDown = outside(event); });
+  dialog.addEventListener('click', event => { if (backdropDown && outside(event)) dialog.close(); backdropDown = false; });
+
 
   function markUnavailable() { badge.textContent = copy.unavailable; badge.setAttribute('aria-disabled', 'true'); }
 
@@ -103,7 +118,9 @@ export function initVersionBadge({ fetchImpl = globalThis.fetch, doc = globalThi
       renderChangelog({ doc, body, data, health: api.health });
       dialog.showModal();
       badge.setAttribute('aria-expanded', 'true');
-      close.focus();
+      dialog.scrollTop = 0;
+      body.scrollTop = 0;
+      close.focus({ preventScroll: true });
     } finally { opening = false; }
   }
 
