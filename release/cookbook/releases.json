@@ -8,7 +8,8 @@
       "notes_path": "releases/0.10.0.md",
       "sections": {
         "added": [
-          "Compact action-specific MCP cards for metadata, entity reads, feedback acknowledgement, refusal and explicit dangerous-action confirmation."
+          "Compact action-specific MCP cards for metadata, entity reads, feedback acknowledgement, refusal and explicit dangerous-action confirmation.",
+          "Requested survey template results display the returned questionnaire, options, version and perspective read-only, instead of a generic success card."
         ],
         "changed": [
           "Docs orientation is text-only. Panel startup waits for the host call and does not automatically fetch identity, workspaces or projects; full exploration requires an explicit action.",
