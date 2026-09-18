@@ -2978,7 +2978,7 @@
       },
       "roadmap_contract": {
         "status": "candidate additive amendment; not release acceptance",
-        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/f5fb9a28ee3ea017859e521ac672f4c58236a9b4/planning/2026-09-18-live-roadmap/capabilities.json",
         "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
       },
       "result_schema": {
@@ -3167,7 +3167,7 @@
       },
       "roadmap_contract": {
         "status": "candidate additive amendment; not release acceptance",
-        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/f5fb9a28ee3ea017859e521ac672f4c58236a9b4/planning/2026-09-18-live-roadmap/capabilities.json",
         "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
       },
       "result_schema": {
@@ -3339,7 +3339,7 @@
       },
       "roadmap_contract": {
         "status": "candidate additive amendment; not release acceptance",
-        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/f5fb9a28ee3ea017859e521ac672f4c58236a9b4/planning/2026-09-18-live-roadmap/capabilities.json",
         "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
       },
       "result_schema": {
@@ -3460,7 +3460,10 @@
             "maxItems": 8
           },
           "attestation": {
-            "const": "independently_checked"
+            "enum": [
+              "independently_checked",
+              "serving_release_checked"
+            ]
           }
         },
         "required": [
@@ -3475,7 +3478,7 @@
       },
       "roadmap_contract": {
         "status": "candidate additive amendment; not release acceptance",
-        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/f5fb9a28ee3ea017859e521ac672f4c58236a9b4/planning/2026-09-18-live-roadmap/capabilities.json",
         "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
       },
       "result_schema": {
@@ -3538,7 +3541,7 @@
       },
       "roadmap_contract": {
         "status": "candidate additive amendment; not release acceptance",
-        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/f5fb9a28ee3ea017859e521ac672f4c58236a9b4/planning/2026-09-18-live-roadmap/capabilities.json",
         "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
       },
       "result_schema": {
@@ -3590,7 +3593,7 @@
       },
       "roadmap_contract": {
         "status": "candidate additive amendment; not release acceptance",
-        "source": "https://github.com/klappy/3d-review-cookbook/blob/221aac36f587e2fc943296450193adbbc09dc1cb/planning/2026-09-18-live-roadmap/capabilities.json",
+        "source": "https://github.com/klappy/3d-review-cookbook/blob/f5fb9a28ee3ea017859e521ac672f4c58236a9b4/planning/2026-09-18-live-roadmap/capabilities.json",
         "attribution": "Publisher claims never automatically verify a stage. Distinct authorized verifier attestation is explicitly labeled."
       },
       "result_schema": {

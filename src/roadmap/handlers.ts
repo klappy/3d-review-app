@@ -58,15 +58,23 @@ export const summary:Handler=async(ctx,p,opts)=>{
 };
 export const verify:Handler=async(ctx,p,opts)=>{
  exact(p,['expected_cursor','idempotency_key','item_id','event_sequence','evidence','attestation']);const sequence=integer(p.event_sequence),refs=evidence(p.evidence);
- if(p.attestation!=='independently_checked')throw new CapError('INVALID_PARAMS','Explicit independent verification attestation required.');
+ if(!['independently_checked','serving_release_checked'].includes(p.attestation))throw new CapError('INVALID_PARAMS','Explicit independent verification attestation required.');
  return write(ctx,p,opts,'verify',async(store,at)=>{const event=await store.event(sequence),actor=await store.actor(sequence);if(!event||event.item_id!==p.item_id||event.value.kind!=='claim')throw new CapError('NOT_FOUND_OR_NOT_VISIBLE','Claim is not available.');
- if(actor===ctx.principal.id)throw new CapError('NOT_AUTHORIZED_AT_SCOPE','A publisher cannot verify their own claim.');
+ if(p.attestation==='independently_checked'&&actor===ctx.principal.id)throw new CapError('NOT_AUTHORIZED_AT_SCOPE','A publisher cannot verify their own claim without a trusted integration.');
  const claim=event.value.claim,item=await store.item(p.item_id);if(!item)throw new CapError('NOT_FOUND_OR_NOT_VISIBLE','Item is not available.');
  const index=stages.indexOf(claim.stage);if(claim.state==='done'&&stages.slice(0,index).some(k=>item.stages[k].state!=='done'))throw new CapError('STAGE_CONFLICT','Earlier stages need verifier acceptance first.');
- item.stages[claim.stage]={state:claim.state,reason:'Authorized independent verifier attestation; not automatic provider verification.',evidence:links(refs)};if(claim.version)item.version=claim.version;
+ let reason='Authorized independent verifier attestation; not automatic provider verification.';
+ if(p.attestation==='serving_release_checked'){
+  if(!['dev','production'].includes(claim.stage)||claim.state!=='done'||!claim.version||!claim.source_sha)throw new CapError('INVALID_PARAMS','Trusted serving check requires a DEV/production release identity claim.');
+  const origin=claim.stage==='dev'?'https://dev.3dreview.app':'https://3dreview.app';
+  try{const r=await fetch(origin+'/v2/health',{redirect:'error',signal:AbortSignal.timeout(5000)});const body:any=await r.json();if(!r.ok||body.ok!==true||body.result?.version!==claim.version||body.result?.commit!==claim.source_sha)throw Error();}
+  catch{throw new CapError('STAGE_CONFLICT','Trusted serving identity did not verify.');}
+  reason='Trusted serving health confirms the claimed version and source. This does not prove browser behavior or human acceptance.';
+ }
+ item.stages[claim.stage]={state:claim.state,reason,evidence:links(refs)};if(claim.version)item.version=claim.version;
  item.remaining=claim.state==='blocked'?`Blocked: ${String(claim.blocker??'unknown').replaceAll('_',' ')}.`:'See pending stages and evidence. User outcome remains separately recorded.';
- history(item,at,'review','Independent verifier attested to the referenced claim and evidence.',refs,integer(p.expected_cursor)+1);
- return {item,publicEvent:{kind:'verification_attestation',claim_sequence:sequence,stage:claim.stage,state:claim.state,evidence:refs}};});
+ history(item,at,'review',p.attestation==='serving_release_checked'?'Trusted serving identity checked; browser and human outcomes remain separate.':'Independent verifier attested to the referenced claim and evidence.',refs,integer(p.expected_cursor)+1);
+ return {item,publicEvent:{kind:p.attestation==='serving_release_checked'?'serving_identity_verification':'verification_attestation',claim_sequence:sequence,stage:claim.stage,state:claim.state,evidence:refs}};});
 };
 export const redact:Handler=async(ctx,p,opts)=>{
  exact(p,['expected_cursor','idempotency_key','item_id']);
