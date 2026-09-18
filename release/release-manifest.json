@@ -1,30 +1,33 @@
 {
-  "version": "0.9.3",
+  "version": "0.10.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "80d8111fe7ffe9cb14516120de485c469bbe12d6",
+  "cookbook_commit": "41bc68776ab06028486c068c97c3a361a23c7f99",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.9.3.md",
-      "blob_sha": "07195f8984ae536432193fe6b9a199be1135686c",
-      "sha256": "a2929099f3504a5943d5da95bc7e20250194d3115655bc239199b9d5b71feae9"
+      "path": "planning/2026-09-16-parity-build/releases/0.10.0.md",
+      "blob_sha": "7e3b1f32eb4949758caf9e63bbe446d44868e9fb",
+      "sha256": "328f7349a5d3bd13625c66170b9fcac5be6180aec55c0f73449a9b4f3cdeb74c"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "f2603c5fbcd0d97a23f535c45ef2631a1cda7acb",
-      "sha256": "1ae848ab989b7c70fd5c83f550a29b7cf4c9c2c08504dad269655917893f846d"
+      "blob_sha": "17d673d358417fa1a99dae7069631b4315ce8f4c",
+      "sha256": "429c94fd07f4e8cbfe2b43bcb38f8e8ae951836004a19fe725d005bd346b433b"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "Compact action-specific MCP cards for metadata, entity reads, feedback acknowledgement, refusal and explicit dangerous-action confirmation."
+      ],
       "changed": [
-        "Theme scorecard: 6/6 automated local scenarios and 4/4 bounded official reference-host visual scenarios passed; human satisfaction, confusion and frustration are NOT MEASURED."
+        "Docs orientation is text-only. Panel startup waits for the host call and does not automatically fetch identity, workspaces or projects; full exploration requires an explicit action.",
+        "Six bounded official-host scenarios are covered across attributed pre/post-fix sources; the integrated theme/card candidate passes33 targeted automated tests. Human satisfaction, confusion and frustration are NOT MEASURED."
       ],
       "fixed": [
-        "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
+        "Compact confirmations show server-owned impact, affected targets, compensating control and expiry; busy and one-shot execution guards remain enforced."
       ],
       "security": [
-        "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
+        "The existing four-tool contract and server authorization remain unchanged. Private feedback and authorization details are not echoed in cards; no automatic execute or retry."
       ]
     }
   }
