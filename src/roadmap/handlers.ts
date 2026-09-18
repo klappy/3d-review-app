@@ -1,14 +1,16 @@
+import {roadmapPermissionHashes} from './permissions.generated';
 import type {Handler,Ctx} from '../handlers/types';
 import {CapError,sha256} from '../handlers/types';
 import {RoadmapStore,RoadmapConflict} from './store';
 import {metadataEvent,publicReferenceUrl,stages,type PublicReference} from './validation';
 const exact=(p:Record<string,unknown>,keys:string[])=>{if(Object.keys(p).some(k=>!keys.includes(k)))throw new CapError('INVALID_PARAMS','Unknown roadmap field.');};
 const integer=(v:unknown,defaultValue?:number)=>{if(v===undefined&&defaultValue!==undefined)return defaultValue;const n=typeof v==='string'&&/^\d+$/.test(v)?Number(v):v;if(!Number.isSafeInteger(n)||Number(n)<0)throw new CapError('INVALID_PARAMS','Non-negative cursor required.');return Number(n);};
-const gate=(ctx:Ctx,permission:'publish'|'verify'|'summary')=>{
+const gate=async(ctx:Ctx,permission:'publish'|'verify'|'summary')=>{
  if(!['user','support'].includes(ctx.principal.kind))throw new CapError('NOT_AUTHENTICATED','Sign in through the existing authentication flow.');
  if(ctx.cookieAuthenticated && ctx.requestOrigin!==(ctx.env.PUBLIC_ORIGIN??ctx.requestUrlOrigin))throw new CapError('NOT_AUTHORIZED_AT_SCOPE','Same-origin publication required.');
  const raw=permission==='publish'?ctx.env.ROADMAP_PUBLISHER_IDS:permission==='verify'?ctx.env.ROADMAP_VERIFIER_IDS:ctx.env.ROADMAP_SUMMARY_REVIEWER_IDS;
- if(!raw?.split(',').map(s=>s.trim()).filter(Boolean).includes(ctx.principal.id))throw new CapError('NOT_AUTHORIZED_AT_SCOPE','Roadmap permission is required.');
+ const configured=raw!==undefined?raw.split(',').map(s=>s.trim()).filter(Boolean).includes(ctx.principal.id):(roadmapPermissionHashes[permission] as readonly string[]).includes(await sha256(ctx.principal.id));
+ if(!configured)throw new CapError('NOT_AUTHORIZED_AT_SCOPE','Roadmap permission is required.');
 };
 const base=(p:Record<string,any>)=>{
  if(typeof p.item_id!=='string'||!/^roadmap-[1-9][0-9]{0,7}$/.test(p.item_id)||typeof p.idempotency_key!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(p.idempotency_key))throw new CapError('INVALID_PARAMS','Roadmap item and idempotency key required.');
@@ -25,11 +27,11 @@ const history=(item:any,at:string,kind:string,summary:string,refs:PublicReferenc
  item.updated_at=at;item.history_count=(item.history_count??0)+1;item.history=[...(item.history??[]),{id:'event-'+seq,at,kind,summary,links:links(refs),corrects:null}].slice(-20);
 };
 async function write(ctx:Ctx,p:Record<string,any>,opts:any,permission:'publish'|'verify'|'summary',build:(store:RoadmapStore,at:string)=>Promise<{publicEvent:Record<string,unknown>;item?:Record<string,unknown>;redact?:boolean}>){
- gate(ctx,permission);const b=base(p),store=new RoadmapStore(ctx.db),hash=await sha256(JSON.stringify(p));
+ await gate(ctx,permission);const b=base(p),store=new RoadmapStore(ctx.db),hash=await sha256(JSON.stringify(p));
  const prior=await store.receipt(b.key,ctx.principal.id,hash);if(prior&&!opts?.dryRun)return {result:prior};
  const at=ctx.now().toISOString(),change=await build(store,at);
  if(opts?.dryRun)return {result:{item_id:b.itemId,publication:'Public roadmap change; narrative requires independent review.'},impact:{affected:[{item_id:b.itemId}],irreversible:true,effect:'disclosure' as const,compensating_control:'Authorized redaction removes public replay; external copies cannot be recalled.'}};
- gate(ctx,permission);
+ await gate(ctx,permission);
  try{return {result:await store.append({...b,at,actor:ctx.principal.id,requestHash:hash,restrictedProvenance:{delegated:!!ctx.principal.delegatedBy,permission},...change})};}
  catch(e){if(e instanceof RoadmapConflict)throw new CapError('STAGE_CONFLICT',e.message);throw e;}
 }

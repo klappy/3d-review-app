@@ -29,3 +29,7 @@ The table has Planned/Built/Reviewed/DEV/Production and Remaining, with exact le
 ## Evidence boundary
 
 Local proof used actual shared Hono HTTP/MCP dispatch, Miniflare D1 and synthetic sessions: HTTP claim appeared, MCP summary appeared, and MCP redaction removed it on the same open Chrome page without reload/rebuild/handler restart. The inherited build stamp identifies the local base, not a release of this candidate. Tests separately cover forged identity/scope, permission/expiry/CSRF, idempotency, concurrency, public/private separation, redaction/replay and cursor consistency. No live user writes or real-user ratings. Final candidate receipt carries exact source and counts. Independent review, checks, canonical acceptance, release assignment, DEV/production validation and operational producer permission remain outstanding gates.
+
+## 0.12.0 deployment reconciliation
+
+Normal main0.11.4 ancestry is incorporated. Narrow publisher identities can be provided as secret canonical-build variables and projected as server-only hashes by the existing stamp hook; no raw identity enters public source or Assets. A CI-only additive migration helper preflights/reads back the exact roadmap schema before the existing deploy command. Both are reviewed release integration changes, not seat deployment or an implicit grant of verifier/narrative permissions. See the producer document for boundaries and pending operational proof.
