@@ -71,7 +71,7 @@ test('credential discipline: the model is keyed to (aid, sid, epoch) and dropped
   assert.equal(shareFor(state, 'a1', 's1', 2).link, null, 'new epoch → fresh model');
   shareFor(state, 'a1', 's1', 2).link = { id: 'y', url: 'u' }; assert.equal(shareFor(state, 'a1', 's2', 2).link, null, 'other survey → fresh model');
   const src = read('./share.js'); assert.doesNotMatch(src, /localStorage|sessionStorage|document\.cookie|console\.log/); assert.doesNotMatch(src, /location\.hash\s*=/);
-  const shell = read('./assess.js'); assert.match(shell, /function resetIdentity\(\) \{ state\.share = null;/, 'identity change drops the share model');
+  const shell = read('./assess.js'); assert.match(shell, /function resetIdentity\(\) \{[^}]*state\.share = null;/, 'identity change drops the share model');
 });
 
 test('QR and invitation sheet carry the URL only; sheet is print-only markup', () => {

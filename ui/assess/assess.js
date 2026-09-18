@@ -59,7 +59,7 @@ const redact = m => redactDiagnosticPath(String(m || 'Request could not be compl
 //                                                  settled or in-flight read; only an explicit user Retry or fresh entity data does
 //                                                  (Bugbot 4041134416). Results are bound to (aid, epoch) (Auditor 2A-3).
 //   generation   counter                           a later render supersedes an earlier one's DOM write (supplier 1114cb1)
-let generation = 0, epoch = 0;
+let generation = 0, epoch = 0, identityGeneration = 0;
 const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null };
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
@@ -107,13 +107,14 @@ async function assessmentsFor(pid, { retry = false } = {}) {
   // Bugbot 4040745888: dedupe — an overlapping caller joins the read in flight; a fresh read gets a new seq and only the
   // newest seq may write state, so an older, slower response (success or failure) is discarded.
   if (state.inflight.has(pid)) return state.inflight.get(pid);
+  const identity = identityGeneration;
   const seq = (state.seq.get(pid) || 0) + 1; state.seq.set(pid, seq);
   const run = (async () => {
     let next;
     try { const r = await api(`/v2/projects/${encodeURIComponent(pid)}/assessments`); next = { status: 'loaded', list: r.assessments || [] }; }
     catch (e) { const code = String(e.code); next = { status: UNAUTHENTICATED.has(code) ? 'unauthenticated' : REFUSED.has(code) ? 'refused' : 'failed', list: null, error: redact(e.message) }; }
-    finally { state.inflight.delete(pid); }
-    if (state.seq.get(pid) === seq) state.lists.set(pid, next);
+    finally { if (identity === identityGeneration && state.seq.get(pid) === seq) state.inflight.delete(pid); }
+    if (identity === identityGeneration && state.seq.get(pid) === seq) state.lists.set(pid, next);
     return listFor(pid);
   })();
   state.inflight.set(pid, run);
@@ -136,13 +137,13 @@ function loadCounts(current, { retry = null, only = null } = {}) {
     state.counts.set(s.id, { status: 'loading' }); state.countInflight.add(s.id);
     const fresh = () => ep === epoch && state.current?.assessment.id === aid; // same entity AND same survey-set data (Bugbot 4041134428)
     api(`/v2/assessments/${encodeURIComponent(aid)}/surveys/${encodeURIComponent(s.id)}`).then(r => {
-      state.countInflight.delete(s.id);
       if (!fresh()) return; // stale survey set or another entity: never stored, never painted
+      state.countInflight.delete(s.id);
       state.counts.set(s.id, { status: 'loaded', responses: Number(r.counts?.responses ?? 0), respondents: Number(r.counts?.respondents ?? 0), collection_status: r.survey?.collection_status });
       paintCounts(state.current);
     }).catch(e => {
-      state.countInflight.delete(s.id);
       if (!fresh()) return;
+      state.countInflight.delete(s.id);
       const code = String(e.code);
       // Auditor 2A-2: a refusal is not a transient failure — the survey is no longer visible to this identity here. The assessment
       // is marked dirty for VISIBILITY (not a saved write) so the next render refetches; the whole screen repaints once, and the
@@ -322,18 +323,20 @@ function bindPrepare(current) {
 async function act(aid, label, fn) {
   if (state.busy) return;
   if (state.dirty.has(aid)) { state.message = { aid, text: state.dirty.get(aid) === 'write' ? 'Your last change is saved but this screen is not refreshed yet. Refresh before making more changes.' : 'This assessment changed on the server. Refresh before making changes.', alert: true }; paint(); return; } // never silent (MED 4040990777)
+  const identity = identityGeneration;
   state.busy = true; state.message = null; note.textContent = label; render();
   let text = null;
-  try { text = await fn(); state.dirty.set(aid, 'write'); state.message = { aid, text, alert: false }; }
-  catch (e) { state.message = { aid, text: redact(e.message), alert: true }; }
-  finally { note.textContent = ''; state.busy = false; render(); }
+  try { text = await fn(); if (identity !== identityGeneration) return; state.dirty.set(aid, 'write'); state.message = { aid, text, alert: false }; }
+  catch (e) { if (identity === identityGeneration) state.message = { aid, text: redact(e.message), alert: true }; }
+  finally { if (identity === identityGeneration) { note.textContent = ''; state.busy = false; render(); } }
 }
 // The entity read. Returns the data; the caller decides whether it is still wanted. On success for `aid` the dirty
 // mark is cleared because the screen now reflects the committed server state.
 // Workspace tree read for the sidebar: one call per workspace id, cached; refusal/failure → tree unavailable (project-only fallback).
 async function workspaceFor(pid) {
   const p = state.projects.find(x => x.id === pid); const wid = p?.workspace_id; if (!wid) return null;
-  if (!state.workspaces.has(wid)) { try { const r = await api(`/v2/workspaces/${encodeURIComponent(wid)}`); state.workspaces.set(wid, { id: wid, name: r.workspace.name, projects: (r.projects || []).map(x => x.id) }); } catch { state.workspaces.set(wid, null); } }
+  const identity = identityGeneration;
+  if (!state.workspaces.has(wid)) { try { const r = await api(`/v2/workspaces/${encodeURIComponent(wid)}`); if (identity !== identityGeneration) return null; state.workspaces.set(wid, { id: wid, name: r.workspace.name, projects: (r.projects || []).map(x => x.id) }); } catch { return null; } }
   return state.workspaces.get(wid);
 }
 async function fetchAssessment(aid) {
@@ -437,13 +440,26 @@ function scrubCredentialHash() {
   if (/^#session=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} } // malformed: drop, never render
   return null;
 }
-function resetIdentity() { state.share = null; state.principal = null; state.projects = []; state.lists.clear(); state.workspaces.clear(); state.current = null; state.counts.clear(); state.print = null; }
+function resetIdentity() {
+  identityGeneration += 1; generation += 1; epoch += 1;
+  state.share = null; state.principal = null; state.projects = []; state.current = null; state.templates = null;
+  state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
+  state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false;
+  if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
+  for (const id of ['legacy-link', 'whats-here-wrap']) { const el = document.getElementById(id); if (el) el.hidden = true; }
+}
+function syncContextDisclosure(event) {
+  if (!event.matches) { const disclosure = app?.querySelector('.context-disclosure'); if (disclosure) disclosure.open = true; }
+}
+if (typeof matchMedia === 'function') matchMedia('(max-width:650px)').addEventListener('change', syncContextDisclosure);
 let listening = false;
 function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
 async function boot() {
   if (scrubCredentialHash() === 'forwarded') return; // 'session' falls through: identity is observed fresh below
-  try { const me = await api('/v2/me'); state.principal = me.principal; }
+  const identity = identityGeneration;
+  try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; }
   catch {
+    if (identity !== identityGeneration) return;
     // Public entry: the welcome/tour/example/survey-code/sign-in page needs no session; every other route asks to sign in.
     listen();
     if (route(location.hash).kind === 'entry') { who.textContent = 'Not signed in'; app.className = ''; await render(); return; }
@@ -458,8 +474,8 @@ async function boot() {
   const back = document.getElementById('legacy-link'); if (back) back.hidden = false;
   const wh = document.getElementById('whats-here'); if (wh) { wh.textContent = whatsHere(); const wrap = document.getElementById('whats-here-wrap'); if (wrap) wrap.hidden = false; else wh.hidden = false; }
   // A12 (R1/I1): a transient failure here renders a retryable message, never a blank page.
-  try { state.projects = (await api('/v2/projects')).projects || []; }
-  catch (e) { // Auth A14: a direct #assessment/<id> still renders under "Granted to you"; the project list failure is a retryable notice, not a dead end.
+  try { const result = await api('/v2/projects'); if (identity !== identityGeneration) return; state.projects = result.projects || []; }
+  catch (e) { if (identity !== identityGeneration) return; // Auth A14: a direct #assessment/<id> still renders under "Granted to you"; the project list failure is a retryable notice, not a dead end.
     state.projects = []; note.innerHTML = `Could not load your project list (${esc(redact(e.message))}). <a href="#" data-retry-boot>Retry</a>`; note.querySelector('[data-retry-boot]').onclick = ev => { ev.preventDefault(); note.textContent = ''; boot(); };
     if (route(location.hash).kind !== 'assessment' && route(location.hash).kind !== 'survey') { app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
   listen();
