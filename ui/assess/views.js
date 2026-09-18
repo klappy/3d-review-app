@@ -114,6 +114,7 @@ const understand = {
       m.reportReadGeneration = (m.reportReadGeneration || 0) + 1; m.openReport = null;
       root.querySelector('[data-report-view]')?.replaceChildren();
       const full = root.querySelector('[data-report-full]'); if (full) full.hidden = true;
+      const status = root.querySelector('[data-report-status]'); if (status) status.textContent = '';
     };
     bindReportBuild(ctx, root, m, async () => {
       const reports = await settle(ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/reports`));
@@ -121,8 +122,8 @@ const understand = {
       m.reports = reports; m.openReport = null;
       root.innerHTML = understand.render(ctx, m); understand.bind(ctx, root, m);
       root.querySelector('[data-report-status]').textContent = reports.status === 'loaded' ? (reports.value?.suppressed ? 'Report built, but current report access is held. See the reporting policy reason above.' : 'Report built. Open it from the current report list.') : 'Report built, but the list could not be refreshed. Refresh reports to reopen it.';
-    }, () => { clearReport(); root.querySelector('[data-report-list]')?.remove(); });
-    root.querySelectorAll('[data-retry]').forEach(el => el.onclick = e => { e.preventDefault(); ctx.go(ctx.routes.assessment(m.aid, 'understand'), { reload: true }); });
+    }, clearReport);
+    root.querySelectorAll('[data-retry]').forEach(el => el.onclick = e => { e.preventDefault(); if (m.reportBuildBusy) return; ctx.go(ctx.routes.assessment(m.aid, 'understand'), { reload: true }); });
     const closeBtn = root.querySelector('[data-close-report]'); if (closeBtn) closeBtn.onclick = clearReport;
     root.querySelectorAll('[data-open-report]').forEach(btn => btn.onclick = async () => {
       if (ctx.isCurrent && !ctx.isCurrent()) return;

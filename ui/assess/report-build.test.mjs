@@ -63,5 +63,53 @@ test('normal Understand journey: preview, build, refreshed list, reopen with unc
   await root.querySelector('[data-confirm-report]').onclick(); assert.equal(built, true);
   assert.match(root.querySelector('[data-report-status]').textContent, /Report built/);
   await root.querySelector('[data-open-report]').onclick(); assert.equal(root.querySelector('[data-report-full]').hidden, false); assert.match(root.querySelector('[data-report-view]').textContent, /Synthetic data · source f042cde/);
-  await root.querySelector('[data-preview-report]').onclick(); assert.equal(root.querySelector('[data-report-full]').hidden, true); assert.equal(root.querySelector('[data-report-view]').textContent, ''); assert.equal(root.querySelector('[data-report-list]'), null);
+  await root.querySelector('[data-preview-report]').onclick(); assert.equal(root.querySelector('[data-report-full]').hidden, true); assert.equal(root.querySelector('[data-report-view]').textContent, ''); assert.ok(root.querySelector('[data-report-list]'));
+  await root.querySelector('[data-cancel-report]').onclick();
+  assert.ok(root.querySelector('[data-open-report]'));
+});
+test('cancelled preview keeps existing reports and clears a stale Opening status', async () => {
+  const dom = new JSDOM('<main></main>'); const root = dom.window.document.querySelector('main');
+  let resolveOpen;
+  const report = { id: 'r', created_at: '2026-09-18', payload: { source_commit: 'f042cde', versions: { scorer: 'source', narrative: 1, policy: 'synthetic' } } };
+  const ctx = { enc: encodeURIComponent, esc: s => String(s ?? ''), current: { assessment: { id: 'a', role: 'owner' }, surveys: [] }, isCurrent: () => true, routes: { assessment: () => '#understand' }, go() {}, api: async (url, init) => {
+    if (init?.body?.mode === 'dry_run') return ready;
+    if (url === '/v2/reports/r') return new Promise(r => { resolveOpen = r; });
+    if (url.endsWith('/reports')) return { assessment_id: 'a', suppressed: false, reports: [{ id: 'r', created_at: report.created_at }] };
+    return { status: 'held', reason: 'Results held' };
+  } };
+  const m = await views.understand.load(ctx, { aid: 'a' }); root.innerHTML = views.understand.render(ctx, m); views.understand.bind(ctx, root, m);
+  const openP = root.querySelector('[data-open-report]').onclick();
+  assert.equal(root.querySelector('[data-report-status]').textContent, 'Opening report…');
+  await root.querySelector('[data-preview-report]').onclick();
+  assert.ok(root.querySelector('[data-report-list]'));
+  assert.equal(root.querySelector('[data-report-status]').textContent, '');
+  resolveOpen({ assessment_id: 'a', suppressed: false, report });
+  await openP;
+  assert.equal(root.querySelector('[data-report-full]').hidden, true);
+  assert.equal(root.querySelector('[data-report-status]').textContent, '');
+  await root.querySelector('[data-cancel-report]').onclick();
+  assert.ok(root.querySelector('[data-open-report]'));
+});
+test('refresh cannot remount Understand while a report is being built', async () => {
+  const dom = new JSDOM('<main></main>'); const root = dom.window.document.querySelector('main');
+  let resolveExec, goCalls = 0, built = false;
+  const report = { id: 'r', created_at: '2026-09-18', payload: { source_commit: 'f042cde', versions: { scorer: 'source', narrative: 1, policy: 'synthetic' } } };
+  const ctx = { enc: encodeURIComponent, esc: s => String(s ?? ''), current: { assessment: { id: 'a', role: 'owner' }, surveys: [] }, isCurrent: () => true, routes: { assessment: () => '#understand' }, go() { goCalls++; }, api: async (url, init) => {
+    if (init?.body?.mode === 'dry_run') return ready;
+    if (init?.body?.mode === 'execute') return new Promise(r => { resolveExec = r; });
+    if (url.endsWith('/reports')) return { assessment_id: 'a', suppressed: false, reports: built ? [{ id: 'r', created_at: report.created_at }] : [] };
+    return { status: 'held', reason: 'Results held' };
+  } };
+  const m = await views.understand.load(ctx, { aid: 'a' }); root.innerHTML = views.understand.render(ctx, m); views.understand.bind(ctx, root, m);
+  await root.querySelector('[data-preview-report]').onclick();
+  const confirmP = root.querySelector('[data-confirm-report]').onclick();
+  const refresh = root.querySelector('button[data-retry="reports"]');
+  assert.equal(refresh.disabled, true);
+  refresh.onclick({ preventDefault() {} });
+  assert.equal(goCalls, 0);
+  built = true;
+  resolveExec({ assessment_id: 'a', suppressed: false, report });
+  await confirmP;
+  assert.match(root.querySelector('[data-report-status]').textContent, /Report built/);
+  assert.equal(root.querySelector('button[data-retry="reports"]').disabled, false);
 });

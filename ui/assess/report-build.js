@@ -4,15 +4,18 @@ export function reportBuildMarkup(ctx, role) {
   if (!['owner', 'member'].includes(role)) return '';
   return `<section data-report-build><p class="small muted">Build a report from source-attested synthetic assessment data. Other inputs remain held under the current reporting policy.</p><button type="button" data-preview-report>Preview report build</button><div data-report-preview></div><p class="status" role="status" aria-live="polite" data-build-status></p></section>`;
 }
-export function bindReportBuild(ctx, root, { aid, role }, onBuilt, onClear = () => {}) {
+export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}) {
+  const { aid, role } = model;
   const preview = root.querySelector('[data-preview-report]');
   if (!preview || !['owner', 'member'].includes(role)) return;
   const box = root.querySelector('[data-report-preview]'), status = root.querySelector('[data-build-status]');
+  const refresh = root.querySelector('button[data-retry="reports"]');
   const current = () => (!ctx.isCurrent || ctx.isCurrent()) && root.isConnected !== false;
   const url = `/v2/assessments/${ctx.enc(aid)}/reports`;
   let pending = null, busy = false, uncertain = false;
   const clear = () => { pending = null; box.replaceChildren(); };
   const say = text => { status.textContent = text; };
+  const lockRefresh = on => { model.reportBuildBusy = on; if (refresh) refresh.disabled = on; };
   const failure = (e, executing) => {
     if (['NOT_AUTHENTICATED', '401'].includes(String(e?.code))) return 'Your sign-in is no longer active. Sign in again and preview again.';
     if (['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404'].includes(String(e?.code))) return 'Report is not visible to you at this assessment.';
@@ -34,7 +37,7 @@ export function bindReportBuild(ctx, root, { aid, role }, onBuilt, onClear = () 
       box.querySelector('[data-confirm-report]').onclick = async () => {
         if (!current() || busy || !pending) return;
         if (Date.now() >= pending.expires) { clear(); say('Preview expired. Preview again before building.'); return; }
-        const confirm_token = pending.token; clear(); busy = true; preview.disabled = true; say('Building report…');
+        const confirm_token = pending.token; clear(); busy = true; preview.disabled = true; lockRefresh(true); say('Building report…');
         let built = false;
         try {
           const result = await ctx.api(url, { method: 'POST', body: { mode: 'execute', confirm_token } });
@@ -45,7 +48,7 @@ export function bindReportBuild(ctx, root, { aid, role }, onBuilt, onClear = () 
           built = true; say('Report built. Refreshing the report list…');
           await onBuilt();
         } catch (e) { uncertain = !built; if (current()) say(built ? 'Report built, but the list could not be refreshed. Refresh reports to reopen it.' : failure(e, true)); }
-        finally { if (current()) { busy = false; preview.disabled = uncertain; } }
+        finally { if (current()) { busy = false; preview.disabled = uncertain; lockRefresh(false); } }
       };
     } catch (e) { if (current()) { clear(); say(failure(e, false)); } }
     finally { if (current()) { busy = false; preview.disabled = uncertain; } }
