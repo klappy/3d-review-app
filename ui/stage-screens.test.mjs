@@ -289,7 +289,8 @@ test('print wrapper contains only new blank article and cleans up even on print 
   assert.throws(()=>printBlankForm(doc,model,{print(){
     const isolated=doc.body.children[1];
     assert.equal(isolated.className,'stage-print-only');
-    assert.equal(isolated.children.length,1);
+    assert.equal(isolated.children.length,2);
+    assert.match(isolated.children[1].textContent, /size: letter/);
     assert.equal(isolated.children[0].tag,'article');
     assert.doesNotMatch(text(isolated),/PRIVATE WORKSPACE/);
     throw new Error('cancelled');
@@ -336,4 +337,30 @@ test('assessment heading uses exact returned context without inferred parent, la
   renderAssessmentHeadrow(doc,root,{name:'Direct assessment',period:null,format:null,language_id:'unresolved'});
   assert.deepEqual(root.children.map(n=>n.textContent),['Direct assessment']);
   renderAssessmentHeadrow(doc,root,null);assert.equal(root.children.length,0);
+});
+
+
+test('print defaults to Letter and preserves explicit A4 through isolated output', async () => {
+  const { JSDOM } = await import('jsdom');
+  const dom = new JSDOM('<main id="preview"></main>');
+  const doc = dom.window.document, root = doc.querySelector('main');
+  const model = { visible: true, blank: true, items: Array.from({ length: 30 }, (_, i) => `Question ${i + 1}?`) };
+  const captured = [];
+  renderBlankPrint(doc, root, model, { onPrint() {
+    const output = doc.querySelector('.stage-print-only');
+    captured.push([output.querySelector('article').className, output.querySelector('style').textContent]);
+    assert.equal(output.querySelectorAll('.p-lines').length, 30);
+  } });
+  assert.equal(root.querySelector('select').value, 'letter');
+  root.querySelector('button').click();
+  assert.equal(captured[0][0], 'paper letter');
+  assert.match(captured[0][1], /size: letter/);
+  const select = root.querySelector('select'); select.value = 'a4';
+  select.dispatchEvent(new dom.window.Event('change'));
+  assert.equal(root.querySelector('select').value, 'a4');
+  root.querySelector('button').click();
+  assert.equal(captured[1][0], 'paper a4');
+  assert.match(captured[1][1], /size: A4/);
+  assert.equal(doc.querySelector('.stage-print-only'), null);
+  dom.window.close();
 });
