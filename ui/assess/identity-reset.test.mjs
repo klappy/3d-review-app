@@ -17,10 +17,10 @@ const deferred = () => { let resolve; const promise = new Promise(r => resolve =
 test('identity change clears prior data, UI, busy flags and pending-read registries', () => {
   const h = harness();
   for (const key of ['lists','workspaces','inflight','seq','counts','dirty']) h.state[key].set('old', 'old');
-  h.state.openProjects.add('old'); h.state.countInflight.add('old'); h.state.message = { text: 'old' }; h.state.busy = true;
+  h.state.share = { link: 'old' }; h.state.openProjects.add('old'); h.state.countInflight.add('old'); h.state.message = { text: 'old' }; h.state.busy = true;
   h.resetIdentity();
   for (const key of ['lists','workspaces','inflight','seq','counts','dirty','openProjects','countInflight']) assert.equal(h.state[key].size, 0, key);
-  assert.equal(h.state.message, null); assert.equal(h.state.busy, false);
+  assert.equal(h.state.share, null); assert.equal(h.state.message, null); assert.equal(h.state.busy, false);
   assert.equal(h.nodes.get('app').innerHTML, ''); assert.equal(h.nodes.get('legacy-link').hidden, true);
 });
 
