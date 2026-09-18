@@ -60,3 +60,13 @@ it('reviewed operational context is optional, permissioned, safe, shared with MC
  expect((await commit('summary',{...p,idempotency_key:crypto.randomUUID(),expected_cursor:read.result.cursor,summary:{...summary,blocker:null}},'verifier')).ok).toBe(true);
  const mcp=await call('read',{},undefined,undefined,undefined,true);expect(mcp.result.items.find((x:any)=>x.id==='roadmap-140').value.operations.blocker).toBeNull();
 });
+it('MCP capability schema nests operational fields in the same summary object as HTTP and handler',()=>{
+ const catalog=JSON.parse(readFileSync(new URL('../contract/capabilities.json',import.meta.url),'utf8'));const cap=catalog.capabilities.find((x:any)=>x.id==='cap.ops.roadmap_summary');
+ const line=readFileSync(new URL('../contract/openapi.yaml',import.meta.url),'utf8').split('\n').find(x=>x.includes('"operationId": "cap.ops.roadmap_summary"'))!;const http=JSON.parse(line.split('post: ')[1]).requestBody.content['application/json'].schema.properties.params;
+ for(const key of ['happening_now','blocker','next_action','queue_order','workflow','queue_rank','work_type','release_impact','release_reference','breaking']){
+  expect(cap.params_schema.properties[key]).toBeUndefined();
+  const actual=cap.params_schema.properties.summary.properties[key],expected=http.properties.summary.properties[key];expect(actual).toBeDefined();
+  for(const shape of ['type','enum','pattern','minimum','minLength','maxLength'])expect(actual[shape]).toEqual(expected[shape]);
+ }
+ expect(cap.params_schema.properties.summary.additionalProperties).toBe(false);
+});
