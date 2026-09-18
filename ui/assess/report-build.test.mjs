@@ -113,3 +113,29 @@ test('refresh cannot remount Understand while a report is being built', async ()
   assert.match(root.querySelector('[data-report-status]').textContent, /Report built/);
   assert.equal(root.querySelector('button[data-retry="reports"]').disabled, false);
 });
+test('in-flight open during execute cannot paint or write the model after the built remount', async () => {
+  const dom = new JSDOM('<main></main>'); const root = dom.window.document.querySelector('main');
+  let resolveOpen, resolveExec;
+  const report = { id: 'r', created_at: '2026-09-18', payload: { source_commit: 'f042cde', versions: { scorer: 'source', narrative: 1, policy: 'synthetic' } } };
+  const ctx = { enc: encodeURIComponent, esc: s => String(s ?? ''), current: { assessment: { id: 'a', role: 'owner' }, surveys: [] }, isCurrent: () => true, routes: { assessment: () => '#understand' }, go() {}, api: async (url, init) => {
+    if (init?.body?.mode === 'dry_run') return ready;
+    if (init?.body?.mode === 'execute') return new Promise(r => { resolveExec = r; });
+    if (url === '/v2/reports/r') return new Promise(r => { resolveOpen = r; });
+    if (url.endsWith('/reports')) return { assessment_id: 'a', suppressed: false, reports: [{ id: 'r', created_at: report.created_at }] };
+    return { status: 'held', reason: 'Results held' };
+  } };
+  const m = await views.understand.load(ctx, { aid: 'a' }); root.innerHTML = views.understand.render(ctx, m); views.understand.bind(ctx, root, m);
+  await root.querySelector('[data-preview-report]').onclick();
+  const confirmP = root.querySelector('[data-confirm-report]').onclick();
+  const openP = root.querySelector('[data-open-report]').onclick();
+  resolveExec({ assessment_id: 'a', suppressed: false, report });
+  await confirmP;
+  assert.match(root.querySelector('[data-report-status]').textContent, /Report built/);
+  resolveOpen({ assessment_id: 'a', suppressed: false, report });
+  await openP;
+  assert.equal(m.openReport, null);
+  assert.equal(root.querySelector('[data-report-full]').hidden, true);
+  assert.equal(root.querySelector('[data-report-view]').textContent, '');
+  assert.match(root.querySelector('[data-report-status]').textContent, /Report built/);
+  assert.ok(root.querySelector('[data-report-list]'));
+});

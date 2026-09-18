@@ -119,7 +119,7 @@ const understand = {
     bindReportBuild(ctx, root, m, async () => {
       const reports = await settle(ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/reports`));
       if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
-      m.reports = reports; m.openReport = null;
+      m.reportReadGeneration = (m.reportReadGeneration || 0) + 1; m.reports = reports; m.openReport = null;
       root.innerHTML = understand.render(ctx, m); understand.bind(ctx, root, m);
       root.querySelector('[data-report-status]').textContent = reports.status === 'loaded' ? (reports.value?.suppressed ? 'Report built, but current report access is held. See the reporting policy reason above.' : 'Report built. Open it from the current report list.') : 'Report built, but the list could not be refreshed. Refresh reports to reopen it.';
     }, clearReport);
