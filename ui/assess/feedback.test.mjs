@@ -47,3 +47,21 @@ test('uncertain and malformed receipt preserve text without automatic retry or f
 test('double submit is blocked; late identity/navigation completion cannot publish receipt',async()=>{
   let resolve;const h=await setup(()=>new Promise(r=>{resolve=r;}));h.fill('note','fixture');const pending=h.submit();await h.submit();assert.equal(h.calls.length,1);h.stop();resolve(success());await pending;assert.equal(h.root.querySelector('#feedback-receipt').textContent,'');await h.submit();assert.equal(h.calls.length,1);
 });
+
+
+test('bug report and suggestion lead with note and submit without optional ratings',async()=>{
+ for(const note of ['The report would not open. I expected to read it.','Please make it easier to compare the survey questions.']){
+  const h=await setup(success),form=h.root.querySelector('form'),ratings=form.querySelector('details');
+  assert.equal(form.querySelector('input,textarea,select').name,'note');
+  assert.match(form.querySelector('label').textContent,/What happened, or what would you improve/);
+  assert.equal(ratings.open,false);assert.match(ratings.querySelector('summary').textContent,/optional/);
+  assert.equal(ratings.querySelector('[name=helpful]').name,'helpful');
+  h.fill('note',note);await h.submit();
+  assert.deepEqual(h.calls[0][1].body,{note,require_authenticated:true});
+ }
+});
+test('optional ratings stay compatible and leaving without submission sends nothing',async()=>{
+ const h=await setup(success);h.root.querySelector('details').open=true;h.fill('helpful','true');await h.submit();
+ assert.deepEqual(h.calls[0][1].body,{helpful:true,require_authenticated:true});
+ const cancel=await setup(success);cancel.fill('note','Unsent draft');assert.equal(cancel.root.querySelector('.actions a').getAttribute('href'),'#');cancel.stop();assert.equal(cancel.calls.length,0);
+});
