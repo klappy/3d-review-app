@@ -1,35 +1,27 @@
 {
-  "version": "0.2.0",
+  "version": "0.2.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "11671805a5eb0b7b5b32f490eec4669ed7f096b2",
+  "cookbook_commit": "f8beb7cb6e991547f6a90128bdfcf3decb73168a",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.2.0.md",
-      "blob_sha": "8857c752e8c7f952b3f1bc4aab8a39e89c555b5c",
-      "sha256": "64d70191fb75892870eb8b39e67ab9afc1f6dbb5aa04fb84ce469cccf3bd0ffe"
+      "path": "planning/2026-09-16-parity-build/releases/0.2.1.md",
+      "blob_sha": "686f1ee416e38e52d509d6c30a042ad927a65e89",
+      "sha256": "4ac5e5335f85e1d0ea7760b0c16837888f8972d6cfd63fa456f8ada20ed0c748"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "19c70bf491a64c6d467d03468dbf0ea5f868d9f1",
-      "sha256": "eb0a6c94672edd9a2b481cf85094578649d7a2fcb99a266f08d956dacd802f02"
+      "blob_sha": "fc654d918e7bdb392bd9b302a19b56c95522666c",
+      "sha256": "2c63a70c2864eb463055d8d2580de496358af110bd84f6f2399ed55727fef799"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Showcase-based public entry, workspace and project navigation, and assessment views.",
-        "Survey Share controls create participant links and display locally generated QR codes."
-      ],
+      "added": [],
       "changed": [
-        "The primary web entry uses the new assessment shell; existing participant, invitation and legacy routes remain available.",
-        "Assessment views separate navigation from stage changes and preserve explicit permission scopes."
+        "Production promotion candidate for the accepted 0.2.0 web and survey-sharing increment; no additional product behavior changes."
       ],
-      "fixed": [
-        "Held or refused reports remain visible as honest states, with mobile layout and report-number readability improvements."
-      ],
-      "security": [
-        "Credential-bearing route changes retain the accepted forwarding behavior; no new permission inheritance is introduced."
-      ]
+      "fixed": [],
+      "security": []
     }
   }
 }

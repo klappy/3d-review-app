@@ -1,7 +1,20 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.2.0",
+  "current": "0.2.1",
   "versions": [
+    {
+      "version": "0.2.1",
+      "status": "candidate",
+      "notes_path": "releases/0.2.1.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Production promotion candidate for the accepted 0.2.0 web and survey-sharing increment; no additional product behavior changes."
+        ],
+        "fixed": [],
+        "security": []
+      }
+    },
     {
       "version": "0.2.0",
       "status": "candidate",
