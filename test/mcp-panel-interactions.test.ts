@@ -126,13 +126,17 @@ it('surfaces assessment-only grants as reachable cards and crumbs', async () => 
   } finally { f.dom.window.close(); }
 });
 
-it('does not use the shared-assessment entry when a project grant exists', async () => {
+it.each(['unrelated', 'p'])('keeps exact assessment entries with project grant %s and uses only accessible parent crumbs', async projectId => {
   const f = fixture();
   try {
-    f.r.state.me = { principal: { id: 'person_owner', kind: 'user' }, grants: [{ scope_type: 'project', scope_id: 'proj_1', role: 'owner' }, { scope_type: 'assessment', scope_id: 'assess_shared', role: 'viewer' }] };
+    f.r.state.me = { principal: { id: 'person_owner', kind: 'user' }, grants: [{ scope_type: 'project', scope_id: projectId, role: 'owner' }, { scope_type: 'assessment', scope_id: 'assess_shared', role: 'viewer' }] };
     f.r.go('#workspaces'); await tick();
-    expect(f.w.document.querySelector('a[href="#assessment/assess_shared"]')).toBeNull();
-    expect(f.w.document.querySelector('h1').textContent).toBe('Choose a workspace');
+    const link = f.w.document.querySelector('a[href="#assessment/assess_shared"]');
+    expect(link).not.toBeNull();
+    link.click(); await tick();
+    expect(f.w.document.querySelector('h1').textContent).toBe('assess_shared');
+    expect(!!f.w.document.querySelector('#crumbs a[href="#project/p"]')).toBe(projectId === 'p');
+    expect(!!f.w.document.querySelector('#crumbs a[href="#shared-assessments"]')).toBe(projectId !== 'p');
   } finally { f.dom.window.close(); }
 });
 

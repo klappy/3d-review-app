@@ -148,9 +148,10 @@ const danger = (capability, params, mode, confirm_token) => call('danger', { cap
 function safeJson(t) { try { return JSON.parse(t); } catch { return null; } }
 const kindOf = e => { const c = String(e.code || ''); return c === 'NOT_AUTHENTICATED' || c === '401' ? 'unauthenticated' : REFUSED.has(c) ? 'refused' : c === 'RESERVED_NOT_BUILT' || c === '501' ? 'not_built' : c === 'HOST_NO_SERVER_TOOLS' ? 'host' : 'failed'; };
 function refusal(e, what) { const k = kindOf(e); return `<section class="panel narrow" data-state="${k}"><h2>${k === 'unauthenticated' ? 'Sign in through the host' : k === 'refused' ? 'Not available' : k === 'not_built' ? `${esc(what)} is not built yet` : k === 'host' ? 'Host limitation' : `Could not load ${esc(what)}`}</h2><p class="muted">${k === 'refused' ? 'Nothing to show here.' : esc(e.message)}${e.hint ? ` — ${esc(e.hint)}` : ''}</p>${e.trace_id ? `<p class="small muted">trace ${esc(e.trace_id)}</p>` : ''}${k === 'failed' ? '<p><a href="#retry" data-retry>Retry</a></p>' : ''}</section>`; }
-// Same grant projection as the browser shell: exact assessment rows from cap.auth.me, and only when there is no project grant.
+// Exact assessment grants remain reachable independently of workspace/project grants.
 const assessmentGrants = me => (me?.grants || []).filter(g => g.scope_type === 'assessment');
-const hasSharedAssessmentEntry = me => !(me?.grants || []).some(g => g.scope_type === 'project') && assessmentGrants(me).length > 0;
+const hasSharedAssessmentEntry = me => assessmentGrants(me).length > 0;
+const canOpenProject = (me, id) => (me?.grants || []).some(g => g.scope_type === 'project' && g.scope_id === id);
 function sharedAssessmentsHtml(me, asPage) {
   const grid = cardGrid(assessmentGrants(me).map(g => card({ eyebrow: 'Assessment', title: g.scope_id, href: routes.assessment(g.scope_id), meta: [g.role ? `Your role: ${g.role}` : ''], id: g.scope_id })), 'No assessments.');
   return asPage ? `<div class="title"><div><p class="eyebrow">Shared assessments</p><h1>Choose an assessment</h1></div></div>${grid}` : `<h2 style="margin-top:22px">Shared assessments</h2>${grid}`;
@@ -182,7 +183,7 @@ function crumbs(items) { return items.map(([t, h]) => h ? `<a href="${esc(h)}">$
 async function assessmentPage(r) {
   const d = await read('cap.assessment.get', { id: r.id }); const a = d.assessment, surveys = d.surveys || [];
   const tab = r.view || (VIEWS.includes(a.stage) ? a.stage : 'prepare'); const mayEdit = a.role === 'owner' || a.role === 'member';
-  const trail = crumbs(hasSharedAssessmentEntry(state.me) ? [['Shared assessments', '#shared-assessments'], [a.name]] : [['Workspaces', '#workspaces'], ['Project', routes.project(a.project_id)], [a.name]]);
+  const trail = crumbs(!canOpenProject(state.me, a.project_id) ? [['Shared assessments', '#shared-assessments'], [a.name]] : [['Workspaces', '#workspaces'], ['Project', routes.project(a.project_id)], [a.name]]);
   const tabs = (mayEdit ? VIEWS : VIEWS.filter(v => v !== 'permissions')).map(v => `<a href="${routes.assessment(a.id, v)}" ${v === tab ? 'aria-current="page"' : ''}>${v[0].toUpperCase() + v.slice(1)}</a>`).join('');
   const head = `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted small">your role: ${esc(a.role)}${a.role === 'viewer' ? ' — read only here' : ''}</p></div><span class="badge">${stageLabel(a.stage)}</span></div><nav class="tabs view-tabs" aria-label="Assessment views">${tabs}</nav>`;
   let body = '';
