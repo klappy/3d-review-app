@@ -1,14 +1,234 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>3D Review</title><style>
+<!doctype html><html lang="en" data-theme-pending><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>3D Review</title><style>
 :root{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172e40;background:#edf3f8;font-synthesis:none;--ink:#172e40;--muted:#526779;--green:#14685f;--line:#c9d8e5;--glass:rgba(255,255,255,.7);--edge:rgba(255,255,255,.92)}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 0% 8%,#c3e7e0,transparent 55%),radial-gradient(ellipse at 96% 28%,#d8d5f2,transparent 58%),radial-gradient(ellipse at 48% 95%,#d2e5f6,transparent 60%),#edf3f8;font-size:16px;line-height:1.55}button,input,select,textarea{font:inherit}button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}a{color:var(--green);text-underline-offset:4px}button,.button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 17px;border:1px solid var(--edge);border-radius:12px;background:rgba(255,255,255,.85);color:var(--ink);font-weight:600;cursor:pointer;text-decoration:none;box-shadow:0 2px 6px #2543630d}button:hover,.button:hover{background:#fff;box-shadow:0 4px 12px #25436316}.primary{background:var(--green);color:#fff;border-color:transparent}.primary:hover{background:#10574f}.quiet{box-shadow:none;background:transparent;border-color:transparent;padding:8px 10px;color:var(--muted)}:focus-visible{outline:3px solid #287f97;outline-offset:3px}header{border-bottom:1px solid var(--edge);background:rgba(255,255,255,.52);backdrop-filter:blur(28px);padding:20px max(24px,calc((100vw - 1120px)/2));display:flex;align-items:center;justify-content:space-between;gap:16px}.brand{font-size:22px;font-weight:650;letter-spacing:-.7px;color:var(--ink);text-decoration:none}.brand span{color:var(--green)}.sample{font-size:13px;color:var(--muted);border:1px solid #ffffffd0;border-radius:20px;padding:4px 12px;background:#ffffff70;white-space:nowrap}main{max-width:1120px;margin:auto;padding:28px 24px 64px}.context{display:flex;gap:18px;align-items:end;margin-bottom:28px;flex-wrap:wrap}.context label{flex:1;min-width:210px;max-width:360px}.context .quiet{margin-left:auto}label{display:block;color:var(--muted);font-size:14px;font-weight:600}input:not([type=checkbox]):not([type=radio]),select,textarea{display:block;width:100%;margin-top:6px;border:1px solid var(--line);border-radius:11px;color:var(--ink);padding:11px 12px;background:#f8fbff;min-height:46px}textarea{min-height:105px;resize:vertical}h1,h2,h3,p{margin-top:0}h1{font-size:clamp(28px,4vw,38px);font-weight:600;line-height:1.2;letter-spacing:-1.2px;margin-bottom:10px}h2{font-size:23px;font-weight:600;line-height:1.3;letter-spacing:-.5px;margin-bottom:12px}h3{font-size:18px;font-weight:600;margin-bottom:8px}.eyebrow{text-transform:uppercase;font-size:12px;font-weight:650;letter-spacing:.12em;color:var(--muted);margin-bottom:12px}.muted{color:var(--muted)}.small{font-size:14px}.title{display:flex;align-items:start;justify-content:space-between;gap:20px;margin-bottom:25px}.badge{display:inline-block;border-radius:20px;padding:5px 12px;color:#31584e;background:#e3efeb;font-size:14px;white-space:nowrap}.tabs{display:flex;gap:5px;padding:5px;border:1px solid #ffffffaa;background:#ffffff40;border-radius:15px;margin-bottom:24px;max-width:660px}.tabs a{flex:1;text-align:center;padding:11px 12px;color:var(--muted);text-decoration:none;border-radius:11px;font-weight:600}.tabs a[aria-current=page]{color:var(--ink);background:#ffffffd0;box-shadow:0 4px 14px #2543630d}.panel{padding:28px;background:var(--glass);border:1px solid var(--edge);border-radius:20px;box-shadow:0 12px 35px #2543630d,inset 0 1px 0 var(--edge);backdrop-filter:blur(24px) saturate(115%)}.grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(250px,1fr);gap:22px}.stack{display:grid;gap:20px}.row{display:flex;justify-content:space-between;align-items:center;gap:16px}.actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:22px}.field{margin-bottom:18px}.line{border-top:1px solid var(--line);padding-top:20px;margin-top:20px}.note{background:#e8f1f3;color:var(--ink);border-radius:12px;padding:15px 17px}.survey{display:flex;align-items:center;gap:16px;padding:19px 0;border-bottom:1px solid var(--line)}.survey:last-child{border-bottom:0;padding-bottom:0}.survey:first-of-type{padding-top:8px}.survey>div{flex:1}.survey p{margin:0}.dot{width:9px;height:35px;border-radius:4px;background:#49a076;flex:none}.dot.blue{background:#4885bb}.dot.gold{background:#d8ae3c}.project-card{display:block;color:var(--ink);text-decoration:none}.project-card:hover{border-color:#9dbeb7}.project-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.check{display:flex;align-items:center;gap:10px;padding:11px 0;color:var(--ink);font-size:16px;font-weight:400}.check input{width:20px;height:20px;accent-color:var(--green)}.narrow{max-width:720px;margin:15px auto}.back{display:inline-block;margin-bottom:22px}.report-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:22px}.report-lens{padding:19px;border-radius:14px;background:#f8fbff;border-top:4px solid #49a076}.report-lens:nth-child(2){border-color:#4885bb}.report-lens:nth-child(3){border-color:#d8ae3c}.report-lens p{margin-bottom:0}.links{display:grid;gap:12px}.links a{overflow-wrap:anywhere}.status{min-height:24px;margin-top:16px;color:var(--green);font-size:14px}.choice{display:flex;gap:12px;align-items:center;font-size:16px;font-weight:400;color:var(--ink);padding:14px;background:#f8fbff;border:1px solid var(--line);border-radius:12px;margin:10px 0}.choice input{width:18px;height:18px;accent-color:var(--green)}.storage-note{max-width:1120px;margin:0 auto;padding:0 24px 24px;font-size:13px;color:var(--muted)}.empty{padding:28px 0}.count{font-size:38px;font-weight:600;line-height:1.2;letter-spacing:-1px;margin:0 0 8px}.divider{height:1px;background:var(--line);margin:22px 0}dialog{border:1px solid var(--edge);border-radius:22px;max-width:600px;width:calc(100% - 32px);padding:28px;color:var(--ink);background:#f4f9fb;box-shadow:0 25px 100px #172e4030}dialog::backdrop{background:#172e4050;backdrop-filter:blur(5px)}.dialog-top{display:flex;align-items:start;justify-content:space-between;gap:10px}form p:last-child{margin-bottom:0}[hidden]{display:none!important}@media(max-width:720px){header{padding:18px 20px}main{padding:22px 16px 40px}.context{gap:12px;margin-bottom:22px}.context label{min-width:130px;max-width:none}.context .quiet{margin-left:0}.title{display:block}.title .badge{margin-top:4px}.grid,.project-grid,.report-grid{grid-template-columns:1fr}.panel{padding:22px}.tabs{gap:1px}.tabs a{padding:11px 5px;font-size:14px}.row{flex-wrap:wrap}.survey{gap:10px}.survey .button{padding:9px 11px;font-size:14px}.sample{font-size:12px}.storage-note{padding:0 16px 20px}}@media(prefers-reduced-transparency:reduce){.panel,header,dialog{background:#f8fbff;backdrop-filter:none}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 .workspace-layout{max-width:1280px;display:grid;grid-template-columns:240px minmax(0,1fr);gap:28px}.context-panel{border-right:1px solid #ffffffc0;padding:8px 22px 20px 0}.context-project{margin-bottom:20px}.project-name{display:block;color:var(--ink);font-weight:650;text-decoration:none;padding:8px 10px}.assessment-link{display:block;padding:12px;margin:3px 0 3px 8px;color:var(--muted);text-decoration:none;border:1px solid transparent;border-radius:12px;font-size:14px}.assessment-link small{display:block;margin-top:4px;font-size:12px}.assessment-link[aria-current=page]{background:#ffffffb5;border-color:var(--edge);color:var(--ink);box-shadow:0 4px 14px #2543630d}.assessment-body{min-width:0}.context-panel .links a{font-size:14px}@media(max-width:900px){.workspace-layout{grid-template-columns:190px minmax(0,1fr);gap:20px}.workspace-layout .grid{grid-template-columns:1fr}.context-panel{padding-right:12px}}@media(max-width:650px){.workspace-layout{display:block}.context-panel{border-right:0;border-bottom:1px solid #ffffffc0;padding:0 0 18px;margin-bottom:22px}.context-panel nav{display:flex;gap:18px;flex-wrap:wrap}.context-project{flex:1;min-width:150px;margin-bottom:0}.context-panel .line{margin-top:12px;padding-top:12px;display:flex;flex-wrap:wrap;gap:16px}.assessment-link{margin-left:0}}
 /* stage indicator (AMEND 2): same look as the showcase tabs, but spans — not controls */
 .tabs span{flex:1;text-align:center;padding:11px 12px;color:var(--muted);border-radius:11px;font-weight:600}.tabs span[aria-current=step]{color:var(--ink);background:#ffffffd0;box-shadow:0 4px 14px #2543630d}
 .shell-nav{display:flex;align-items:center;gap:14px;flex-wrap:wrap}@media (max-width:650px){.shell-nav{gap:10px;font-size:14px}}.shell-nav a{font-weight:600}#whats-here{margin:6px auto 0}
-.panel-head{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--edge)}body{padding:0 16px 32px;max-width:1120px;margin:auto}.crumbs{display:flex;flex-wrap:wrap;gap:6px;font-size:13px;margin:10px 0}.view-tabs a{flex:1;text-align:center;padding:9px 8px;color:var(--muted);border-radius:11px;font-weight:600;text-decoration:none}.view-tabs a[aria-current=page]{color:var(--ink);background:#ffffffd0}@media (max-width:650px){.view-tabs{flex-wrap:wrap}.view-tabs a{flex:1 1 30%;padding:8px 6px;font-size:14px;min-width:0}}.grid.start{align-items:start}#status.alert{color:#8a2a1c}.grants{width:100%;border-collapse:collapse}.grants td,.grants th{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}.entity-card{display:block;text-decoration:none;color:inherit}</style></head><body><!-- 3D Review — MCP Apps panel (source). Built by scripts/build-mcp-panel.mjs into src/mcp-panel.html, which src/mcp.ts serves as
+.panel-head{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--edge)}body{padding:0 16px 32px;max-width:1120px;margin:auto}.crumbs{display:flex;flex-wrap:wrap;gap:6px;font-size:13px;margin:10px 0}.view-tabs a{flex:1;text-align:center;padding:9px 8px;color:var(--muted);border-radius:11px;font-weight:600;text-decoration:none}.view-tabs a[aria-current=page]{color:var(--ink);background:#ffffffd0}@media (max-width:650px){.view-tabs{flex-wrap:wrap}.view-tabs a{flex:1 1 30%;padding:8px 6px;font-size:14px;min-width:0}}.grid.start{align-items:start}#status.alert{color:#8a2a1c}.grants{width:100%;border-collapse:collapse}.grants td,.grants th{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}.entity-card{display:block;text-decoration:none;color:inherit}/* GENERATED from tokens.json — do not edit. 3D Review glass 2 */
+:root, [data-theme="light"] {
+  --ink: #172e40;
+  --secondary: #526779;
+  --paper: #f8fbff;
+  --line: #c9d8e5;
+  --green: #14685f;
+  --glass: rgba(255,255,255,.68);
+  --glass-edge: rgba(255,255,255,.9);
+  --depth: rgba(37,67,99,.09);
+  --ground: #edf3f8;
+  --aurora-mint: #c3e7e0;
+  --aurora-lilac: #d8d5f2;
+  --aurora-sky: #d2e5f6;
+  --aside-fill: rgba(247,251,255,.36);
+  --button-fill: rgba(255,255,255,.8);
+  --nav-active: rgba(255,255,255,.78);
+  --focus: #287f97;
+  --note-fill: #e8f1f3;
+  --warning-fill: #f5ecd1;
+  --warning-ink: #65511c;
+  --badge-fill: #e3efeb;
+  --badge-ink: #31584e;
+  --demo-fill: rgba(255,255,255,.75);
+  --lens-green: #49a076;
+  --lens-blue: #4885bb;
+  --lens-yellow: #d8ae3c;
+  --welcome-ink: #193548;
+  --welcome-green: #16675e;
+  --welcome-glass: rgba(255,255,255,.66);
+  --welcome-solid: #f6faff;
+  --welcome-edge: rgba(255,255,255,.9);
+  --welcome-ground: #edf4f9;
+  --perspective-fill: rgba(255,255,255,.55);
+  --perspective-team: #5bbd98;
+  --perspective-community: #78aee0;
+  --perspective-church: #e8c568;
+  --pip: #cfdee5;
+  --pip-done: #367e73;
+  --chip-fill: #e4efee;
+  --door-line: #c8d9df;
+  --band-strong: #6fa2d1;
+  --band-growing: #83b996;
+  --band-needs-support: #dfc065;
+  --band-urgent: #da8b83;
+  --face-team: #86b5df;
+  --face-community: #9bcba9;
+  --face-church: #e6d087;
+  --face-stroke: #23433d;
+  --track: #e9eee7;
+  --track-fill: #3b8270;
+  --choice-selected: #e9f4ec;
+  --choice-selected-edge: #36775e;
+  --receipt: #246951;
+  --toast: #195b47;
+  --primary-ink: #ffffff;
+  --shadow-panel: 0 12px 35px rgba(37,67,99,.09), inset 0 1px 0 rgba(255,255,255,.9);
+  --shadow-button: 0 2px 6px rgba(37,67,99,.09);
+  --shadow-button-hover: 0 4px 12px rgba(37,67,99,.09);
+  --shadow-primary: 0 6px 18px rgba(37,67,99,.09);
+  --shadow-nav-active: 0 4px 14px rgba(37,67,99,.09);
+  --shadow-stage: 0 20px 70px rgba(50,70,105,.1), inset 0 1px 0 rgba(255,255,255,.9);
+  --shadow-welcome-primary: 0 7px 20px rgba(25,99,91,.18);
+  --inset-dot: inset 0 2px 3px rgba(255,255,255,.4);
+}
+[data-theme="dark"] {
+  --ink: #edf5fc;
+  --secondary: #b7c8d8;
+  --paper: #172738;
+  --line: #435368;
+  --green: #26786f;
+  --glass: rgba(22,39,58,.78);
+  --glass-edge: rgba(192,218,244,.18);
+  --depth: rgba(0,0,0,.23);
+  --ground: #101d2c;
+  --aurora-mint: #164746;
+  --aurora-lilac: #352e54;
+  --aurora-sky: #163750;
+  --aside-fill: rgba(16,29,44,.34);
+  --button-fill: rgba(38,55,75,.9);
+  --nav-active: rgba(66,94,109,.68);
+  --focus: #8dd9ee;
+  --note-fill: #253e4a;
+  --warning-fill: #4a4027;
+  --warning-ink: #f5e4ad;
+  --badge-fill: #294b45;
+  --badge-ink: #c6e7dd;
+  --demo-fill: rgba(43,61,80,.9);
+  --welcome-ink: #edf6ff;
+  --welcome-green: #287b70;
+  --welcome-glass: rgba(25,43,64,.78);
+  --welcome-solid: #20354b;
+  --welcome-edge: rgba(207,230,255,.2);
+  --welcome-ground: #111e2e;
+  --perspective-fill: rgba(25,43,61,.55);
+  --perspective-team: #72c9a6;
+  --perspective-community: #8cbdeb;
+  --perspective-church: #e7ca7a;
+  --pip: #476070;
+  --pip-done: #88cbbd;
+  --chip-fill: #304d52;
+  --door-line: #496073;
+  --track: #253e4a;
+  --track-fill: #88cbbd;
+  --choice-selected: #294b45;
+  --choice-selected-edge: #88cbbd;
+  --receipt: #88cbbd;
+  --toast: #c6e7dd;
+  --shadow-panel: 0 12px 35px rgba(0,0,0,.23), inset 0 1px 0 rgba(192,218,244,.18);
+  --shadow-button: 0 2px 6px rgba(0,0,0,.23);
+  --shadow-button-hover: 0 4px 12px rgba(0,0,0,.23);
+  --shadow-primary: 0 6px 18px rgba(0,0,0,.23);
+  --shadow-nav-active: 0 4px 14px rgba(0,0,0,.23);
+  --shadow-stage: 0 20px 70px rgba(0,0,0,.23), inset 0 1px 0 rgba(207,230,255,.2);
+  --shadow-welcome-primary: 0 7px 20px rgba(0,0,0,.2);
+}
+:root {
+  --shell-panel-w: 260px;
+  --top-pad-y: 22px;
+  --top-pad-x: 28px;
+  --aside-pad-y: 27px;
+  --aside-pad-x: 18px;
+  --main-pad: 30px;
+  --panel-pad: 23px;
+  --stage-pad: 40px;
+  --phone-pad: 25px;
+  --phone-max-w: 430px;
+  --stage-max-w: 840px;
+  --h1-max-w: 650px;
+  --gap-grid: 18px;
+  --gap-three: 15px;
+  --gap-perspectives: 14px;
+  --gap-row: 12px;
+  --gap-pip: 7px;
+  --page-min-h: 780px;
+  --button-min-h: 42px;
+  --input-pad: 11px;
+  --note-pad-y: 13px;
+  --note-pad-x: 16px;
+  --badge-pad-y: 5px;
+  --badge-pad-x: 10px;
+  --track-h: 7px;
+  --pip-h: 5px;
+  --dot-perspective: 24px;
+  --dot-legend: 9px;
+  --face: 54px;
+  --mobile-bp: 760px;
+  --focus-w: 3px;
+  --lens-w: 4px;
+  --r-page: 24px;
+  --r-stage: 28px;
+  --r-panel: 20px;
+  --r-perspective: 18px;
+  --r-example: 16px;
+  --r-button: 12px;
+  --r-input: 11px;
+  --r-brand: 10px;
+  --r-choice: 9px;
+  --r-linkbox: 8px;
+  --r-pip: 6px;
+  --r-pill: 20px;
+  --r-round: 50%;
+  --blur-top: 28px;
+  --blur-panel: 24px;
+  --sat-top: 125%;
+  --sat-stage: 120%;
+  --sat-panel: 115%;
+  --dur-button: 150ms;
+  --fw-regular: 400;
+  --fw-label: 550;
+  --fw-semibold: 600;
+  --fw-eyebrow: 650;
+  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-scripture-latin: "Noto Serif", Georgia, serif;
+}
+.fs-h1 { font-family: var(--font-ui); font-size: 31px; line-height: 1.18; font-weight: 600; letter-spacing: -1px; }
+.fs-h2 { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; }
+.fs-brand { font-family: var(--font-ui); font-size: 23px; line-height: 1.2; font-weight: 650; letter-spacing: -1px; }
+.fs-metric { font-family: var(--font-ui); font-size: 25px; line-height: 1.2; font-weight: 600; }
+.fs-h3 { font-family: var(--font-ui); font-size: 16px; line-height: 1.4; font-weight: 600; }
+.fs-body { font-family: var(--font-ui); font-size: 15px; line-height: 1.5; font-weight: 400; }
+.fs-label { font-family: var(--font-ui); font-size: 13px; line-height: 1.4; font-weight: 550; }
+.fs-badge { font-family: var(--font-ui); font-size: 12px; line-height: 1.2; font-weight: 400; letter-spacing: 0.04em; }
+.fs-eyebrow { font-family: var(--font-ui); font-size: 11px; line-height: 1.2; font-weight: 650; letter-spacing: 0.13em; }
+.fs-receipt { font-family: var(--font-ui); font-size: 42px; line-height: 1; font-weight: 400; }
+/* MCP presentation consumes the existing light/dark token palette. */
+:root { --muted:var(--secondary); --edge:var(--glass-edge); color:var(--ink); background:var(--ground); color-scheme:light; }
+:root[data-theme="dark"] { color-scheme:dark; }
+:root[data-theme-pending] body { visibility:hidden; animation:theme-pending-reveal 0s 2s forwards; }
+@keyframes theme-pending-reveal { to { visibility:visible; } }
+body { color:var(--ink); background:radial-gradient(ellipse at 0% 8%,var(--aurora-mint),transparent 55%),radial-gradient(ellipse at 96% 28%,var(--aurora-lilac),transparent 58%),radial-gradient(ellipse at 48% 95%,var(--aurora-sky),transparent 60%),var(--ground); }
+.panel-head { background:var(--glass); }
+button,.button { background:var(--button-fill); box-shadow:var(--shadow-button); }
+button:hover,.button:hover { background:var(--paper); box-shadow:var(--shadow-button-hover); }
+button.primary,.button.primary { background:var(--green); color:white; }
+button.primary:hover,.button.primary:hover { background:var(--green); }
+.quiet { background:transparent; }
+input:not([type=checkbox]):not([type=radio]),select,textarea,dialog,.report-lens { background:var(--paper); color:var(--ink); }
+.panel { box-shadow:var(--shadow-panel); }
+.badge { background:var(--badge-fill); color:var(--badge-ink); }
+.note { background:var(--note-fill); }
+.tabs { background:var(--glass); border-color:var(--edge); }
+.tabs a[aria-current=page],.tabs span[aria-current=step],.view-tabs a[aria-current=page] { background:var(--nav-active); }
+:focus-visible { outline-color:var(--focus); }
+[data-theme="dark"] a:not(.button):not(.entity-card),[data-theme="dark"] .brand span { color:var(--receipt); }
+[data-theme="dark"] #status.alert { color:var(--warning-ink); }
+.theme-control { display:flex; align-items:center; gap:8px; font-size:13px; }
+.theme-control select { width:auto; min-height:36px; margin:0; padding:5px 8px; }
+@media(prefers-reduced-transparency:reduce) { .panel,header,dialog { background:var(--paper); } }
+/* Inline cards size to their content, not the host's viewport. Theme is owned separately. */
+html,body{min-height:0}
+body.mcp-compact{max-width:640px;padding:0 12px 12px}
+.mcp-compact main{padding:0;margin:12px 0 0;max-width:100%}
+.mcp-compact .panel-head{padding:8px 0}
+.mcp-compact .crumbs,.mcp-compact #status:empty{display:none}
+.action-card{padding:16px;overflow-wrap:anywhere}
+.action-card h2{margin-top:0;font-size:18px}
+
+.action-impact dd { margin:0 0 8px; overflow-wrap:anywhere; white-space:pre-wrap; }
+.action-impact dt { font-weight:600; }
+</style></head><body class="mcp-compact"><!-- 3D Review — MCP Apps panel (source). Built by scripts/build-mcp-panel.mjs into src/mcp-panel.html, which src/mcp.ts serves as
      resource ui://3d-review/panel.html (text/html;profile=mcp-app). Everything is inlined: SDK bundle, design tokens, shared cards.
      The panel calls ONLY the existing four tools (docs / read / write / danger) through the host bridge; the host supplies the bearer.
      A card's placement never implies authorization: every action maps to a capability and the server's refusal is rendered as-is. -->
-<header class="panel-head"><span class="brand">3D <span>Review</span></span><span class="small muted" id="who">Connecting…</span><span class="small muted" id="host-note"></span></header>
+<header class="panel-head"><span class="brand">3D <span>Review</span></span><span class="small muted" id="who">Tool result</span><label class="theme-control">Theme<select id="panel-theme" aria-label="Panel theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label><span class="small muted" id="host-note"></span></header>
 <nav class="crumbs" id="crumbs" aria-label="Scope"></nav>
 <main id="app"><p class="muted">Loading…</p></main>
 <p class="small" role="status" aria-live="polite" id="status"></p>
@@ -127,11 +347,94 @@ const projectCard = p => card({ eyebrow: 'Project', title: p.name, href: routes.
 const assessmentCard = a => card({ eyebrow: 'Assessment', title: a.name, href: routes.assessment(a.id), meta: [a.language_name || a.language_id ? `Language: ${a.language_name || a.language_id}` : ''], badge: a.archived_at ? 'Archived' : stageLabel(a.stage), archived: !!a.archived_at, id: a.id });
 const surveyCard = (aid, s) => card({ eyebrow: s.perspective || 'Survey', title: s.template_name || s.template_id || s.id, href: routes.survey(aid, s.id), meta: [s.version ? `Version ${s.version}` : ''], badge: s.archived_at ? 'Archived' : '', archived: !!s.archived_at, id: s.id });
 
+// Host-call presentation only. No automatic tool calls or persisted arguments/tokens.
+function createActionCard({ root, esc, call, explore, execution }) {
+  let input = null, envelope = null, pending = null, busy = false, message = '';
+  const decode = event => event?.structuredContent || (() => { try { return JSON.parse(event?.content?.[0]?.text); } catch { return event; } })();
+  const label = cap => ({'cap.grant.invite':'Invite collaborator','cap.report.build':'Build report','cap.workspace.delete':'Delete workspace','cap.assessment.get':'Assessment','cap.project.get':'Project','cap.workspace.get':'Workspace'}[cap] || (typeof cap === 'string' ? cap.replace(/^cap\./, '').split('.').join(' ') : '3D Review guidance'));
+  const trace = env => env?.trace_id ? `<p class="small muted">trace ${esc(env.trace_id)}</p>` : '';
+  const impactDetails = impact => !impact || typeof impact !== 'object' ? '' : `<dl class="action-impact">${['effect','irreversible','compensating_control','affected'].filter(key => Object.hasOwn(impact,key)).map(key => `<dt>${esc(key.replaceAll('_',' '))}</dt><dd>${esc(typeof impact[key] === 'object' ? JSON.stringify(impact[key]) : String(impact[key]))}</dd>`).join('')}</dl>`;
+  function render() {
+    const env = envelope, result = env?.result || {}, cap = env?.capability || input?.capability;
+    let title = label(cap), body = 'Waiting for this tool result…', state = 'loading', entity = null;
+    if (env) {
+      if (env.ok === false || env.isError) { title = 'Not available'; body = 'This request could not be completed.'; state = 'refused'; }
+      else if (cap === 'cap.ops.feedback') { title = 'Feedback received'; body = 'Your feedback was recorded. Its private contents are not displayed here.'; state = 'complete'; }
+      else if (cap === 'cap.auth.me') { title = 'Sign-in checked'; body = 'The assistant received the current authorization details.'; state = 'complete'; }
+      else if (cap === 'cap.ops.health') { title = 'Service status'; body = `Version ${typeof result.version === 'string' ? result.version : 'unavailable'}`; state = 'complete'; }
+      else if (result.suppressed === true || result.status === 'held') { title = 'Result held'; body = 'This result remains unavailable under the current policy.'; state = 'held'; }
+      else {
+        entity = result.assessment || result.project || result.workspace;
+        title = entity?.name || title;
+        body = pending ? 'Review this action before confirming. It may make an irreversible change.' : entity ? 'This is the entity returned by your request.' : cap ? 'The requested operation returned successfully.' : 'Guidance is available in the assistant’s tool response.';
+        state = pending ? 'preview' : 'complete';
+      }
+    }
+    root.innerHTML = `<section class="panel action-card" data-state="${state}"><h2>${esc(title)}</h2><p>${esc(message || body)}</p>${pending ? `<p class="small">Action: ${esc(label(pending.capability))} · scope ${esc(pending.params.scope || '')} ${esc(pending.params.id || pending.params.aid || '')}${pending.capability === 'cap.grant.invite' ? ` · recipient ${esc(pending.params.email || '')} · role ${esc(pending.params.role || '')}` : ''}</p>${impactDetails(pending.impact)}<p class="small">Confirmation expires in ${esc(pending.expiresIn)} seconds.</p><div class="actions"><button data-card-confirm ${busy ? 'disabled' : ''}>Confirm action</button><button data-card-cancel ${busy ? 'disabled' : ''}>Cancel</button></div>` : ''}${trace(env)}<button class="quiet" data-card-explore ${busy ? 'disabled' : ''}>Open workspaces</button></section>`;
+    root.querySelector('[data-card-explore]').onclick = () => { if (!busy) { pending = null; explore(); } };
+    root.querySelector('[data-card-cancel]')?.addEventListener('click', () => { if (!busy) { pending=null; message='Cancelled. No action was executed by this card.'; render(); } });
+    root.querySelector('[data-card-confirm]')?.addEventListener('click', async () => {
+      if (busy || !pending) return;
+      const action=pending; pending=null;
+      if (Date.now() >= action.expires) { message='Preview expired. Ask the assistant to preview again.'; render(); return; }
+      busy=true; execution(true); message='Executing confirmed action…'; render();
+      try {
+        envelope=await call('danger',{capability:action.capability,params:action.params,mode:'execute',confirm_token:action.token});
+        message='';
+      } catch (error) {
+        envelope={ok:false,trace_id:error?.trace_id};
+        message='The outcome could not be confirmed. Check the action state before requesting another preview; no automatic retry was made.';
+      } finally { busy=false; execution(false); render(); }
+    });
+  }
+  function receiveInput(event) {
+    if (busy) return false;
+    // Clone now so host object mutation cannot change the later confirmed parameters.
+    input=event?.arguments ? JSON.parse(JSON.stringify(event.arguments)) : null;
+    envelope=null;pending=null;message='';render();return true;
+  }
+  function receiveResult(event) {
+    if (busy) return false;
+    envelope=decode(event);pending=null;message='';
+    if (event?.isError && envelope) envelope={...envelope,isError:true};
+    const r=envelope?.result;
+    if (envelope?.ok === true && !envelope.isError && input?.mode === 'dry_run' && input.capability === envelope.capability && r?.suppressed !== true && typeof r?.confirm_token === 'string' && r.confirm_token && Number.isFinite(r.expires_in) && r.expires_in>0) {
+      pending={capability:input.capability,params:input.params || {},token:r.confirm_token,expires:Date.now()+r.expires_in*1000,expiresIn:r.expires_in,impact:r.impact || envelope.impact};
+    }
+    render();return true;
+  }
+  return {render,receiveInput,receiveResult};
+}
+
 const $ = id => document.getElementById(id);
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
-const state = { me: null, route: { kind: 'workspaces' }, caps: null, busy: false, executing: false, sheet: null, hostError: null, notice: null, alert: false, cache: new Map() };
+const state = { mode: 'card', me: null, route: { kind: 'workspaces' }, caps: null, busy: false, executing: false, sheet: null, hostError: null, notice: null, alert: false, cache: new Map() };
 const app = new window.McpApps.App({ name: '3d-review panel', version: '0.1.0' });
+// ---- theme: presentation only; no tools or account settings are touched.
+function mountPanelTheme(app, doc, win) {
+  const root = doc.documentElement, control = doc.getElementById('panel-theme');
+  const key = '3d-review:mcp-theme';
+  const valid = value => value === 'light' || value === 'dark';
+  let choice = 'system', hostTheme = null, disposed = false;
+  let media; try { media = win.matchMedia?.('(prefers-color-scheme: dark)'); } catch {}
+  try { const saved = win.localStorage.getItem(key); if (valid(saved)) choice = saved; } catch {}
+  const paint = () => { if (disposed) return; root.dataset.theme = valid(choice) ? choice : hostTheme || (media?.matches ? 'dark' : 'light'); if (control) control.value = choice; };
+  const change = () => { choice = valid(control.value) ? control.value : 'system'; try { if (choice === 'system') win.localStorage.removeItem(key); else win.localStorage.setItem(key, choice); } catch {} paint(); };
+  const hostChanged = context => { if (context && Object.hasOwn(context, 'theme')) hostTheme = valid(context.theme) ? context.theme : null; paint(); };
+  let revealTimer;
+  const reveal = () => { if (!disposed) delete root.dataset.themePending; };
+  const ready = () => { if (disposed) return; win.clearTimeout(revealTimer); hostChanged(app.getHostContext?.()); reveal(); };
+  const dispose = () => { disposed = true; win.clearTimeout(revealTimer); media?.removeEventListener?.('change', paint); control?.removeEventListener('change', change); win.removeEventListener?.('pagehide', dispose); return {}; };
+  root.dataset.themePending = 'true'; paint();
+  revealTimer = win.setTimeout(reveal, 2000);
+  media?.addEventListener?.('change', paint); control?.addEventListener('change', change); win.addEventListener?.('pagehide', dispose, { once: true });
+  app.onhostcontextchanged = hostChanged;
+  app.onteardown = dispose;
+  return { ready, dispose };
+}
+const panelTheme = mountPanelTheme(app, document, window);
+
 
 // ---- transport: the four tools only, via the host bridge. Returns the server ENVELOPE; throws Error{code,message,hint} on ok:false.
 async function call(tool, args) {
@@ -160,12 +463,13 @@ function sharedAssessmentsHtml(me, asPage) {
 // ---- routing (internal; the iframe URL never changes, so no scope or credential lands in a host history)
 function parse(hash) { const p = hash.replace(/^#/, '').split('/').map(decodeURIComponent); if (!p[0] || p[0] === 'workspaces') return { kind: 'workspaces' }; if (p[0] === 'workspace') return { kind: 'workspace', id: p[1] }; if (p[0] === 'projects') return { kind: 'projects' }; if (p[0] === 'project') return { kind: 'project', id: p[1] }; if (p[0] === 'shared-assessments') return { kind: 'shared-assessments' }; if (p[0] === 'assessment' && p[1]) return { kind: 'assessment', id: p[1], view: VIEWS.includes(p[2]) ? p[2] : null }; return { kind: 'workspaces' }; }
 let routeGeneration = 0;
-function go(hash) { if (state.executing) return; routeGeneration++; state.route = parse(hash); state.sheet = null; state.hostError = null; state.notice = null; state.busy = false; render(); }
+function go(hash) { if (state.executing) return; state.mode = 'app'; document.body.classList.remove('mcp-compact'); routeGeneration++; state.route = parse(hash); state.sheet = null; state.hostError = null; state.notice = null; state.busy = false; render(); }
 document.addEventListener('click', e => { const a = e.target.closest('a[href^="#"]'); if (!a) return; e.preventDefault(); const h = a.getAttribute('href'); if (h === '#retry') return render(); go(h); });
 
 // ---- render
 let gen = 0;
 async function render() {
+  if (state.mode === 'card') { ++gen; actionCard.render(); return; }
   const g = ++gen, r = state.route, root = $('app'); root.innerHTML = '<p class="muted">Loading…</p>'; $('status').textContent = state.notice || ''; $('status').className = 'small ' + (state.alert ? 'alert' : 'muted');
   if (state.hostError) { $('crumbs').innerHTML = ''; root.innerHTML = refusal(state.hostError, 'host request') + '<p><a href="#workspaces">Open workspaces</a></p>'; return; }
   try {
@@ -266,33 +570,24 @@ function bind(root) {
   root.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => { if (state.busy) return; state.sheet = null; say(null); });
 }
 
-// ---- host wiring: a tool result pushed by the host (the assistant called read/docs) steers the panel to that entity
-app.addEventListener('toolresult', ev => {
-  const env = ev?.structuredContent || (ev?.content?.[0]?.text ? safeJson(ev.content[0].text) : ev);
-  if (!env || state.executing) return;
-  // Failed envelopes may omit capability. Keep the refusal through the later boot render,
-  // invalidate older reads/actions, and never display inaccessible entity details or hints.
-  if (env.ok === false || ev?.isError) {
-    routeGeneration++; state.sheet = null; state.busy = false; state.notice = null;
-    state.hostError = { code: env.error?.code || 'ERROR', message: 'The host tool request failed.', trace_id: env.trace_id };
-    render(); return;
-  }
-  const hadError = !!state.hostError; state.hostError = null;
-  const cap = env.capability, res = env.result;
-  if (cap === 'cap.assessment.get' && res?.assessment?.id) return go(routes.assessment(res.assessment.id));
-  if (cap === 'cap.project.get' && res?.project?.id) return go(routes.project(res.project.id));
-  if (cap === 'cap.workspace.get' && res?.workspace?.id) return go(routes.workspace(res.workspace.id));
-  if (cap === 'cap.workspace.list') return go('#workspaces');
-  if (cap === 'cap.project.list') return go('#projects');
-  if (hadError) render();
-});
+// Initial host calls stay compact. Full exploration is an explicit user action.
+const actionCard = createActionCard({root:$('app'),esc,call,execution:on=>{state.executing=on;},explore:async()=>{
+  state.mode='app'; document.body.classList.remove('mcp-compact');
+  const generation=++routeGeneration; ++gen;
+  $('app').innerHTML='<p class="muted">Loading workspaces…</p>';
+  try { const me=await read('cap.auth.me'); if(generation!==routeGeneration)return; state.me=me; }
+  catch(e) { if(generation!==routeGeneration)return; state.me=null; }
+  if(generation===routeGeneration)go('#workspaces');
+}});
+function beginCard() { ++routeGeneration; ++gen; state.mode='card'; state.sheet=null; state.hostError=null; state.notice=null; state.busy=false; $('crumbs').innerHTML=''; $('status').textContent=''; document.body.classList.add('mcp-compact'); }
+app.addEventListener('toolinput', ev => { if(state.executing)return; beginCard(); actionCard.receiveInput(ev); });
+app.addEventListener('toolresult', ev => { if(state.executing)return; beginCard(); actionCard.receiveResult(ev); });
+beginCard();actionCard.render();
 app.onerror = e => { $('status').textContent = 'Bridge error: ' + (e?.message || e); };
 app.connect().then(async () => {
+  panelTheme.ready();
   state.caps = app.getHostCapabilities() || {}; $('host-note').textContent = state.caps.serverTools ? '' : 'host: no app-initiated tool calls';
-  try { state.me = await read('cap.auth.me'); $('who').textContent = `${state.me.principal.kind} · ${state.me.principal.id}`; }
-  catch (e) { $('who').textContent = kindOf(e) === 'unauthenticated' ? 'Not signed in (host bearer missing or expired)' : e.message; }
-  render();
-}).catch(e => { $('who').textContent = 'Connect failed: ' + (e?.message || e); });
+}).catch(e => { panelTheme.ready(); $('who').textContent = 'Connect failed: ' + (e?.message || e); });
 })();
 </script>
 </body></html>

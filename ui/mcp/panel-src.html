@@ -2,7 +2,7 @@
      resource ui://3d-review/panel.html (text/html;profile=mcp-app). Everything is inlined: SDK bundle, design tokens, shared cards.
      The panel calls ONLY the existing four tools (docs / read / write / danger) through the host bridge; the host supplies the bearer.
      A card's placement never implies authorization: every action maps to a capability and the server's refusal is rendered as-is. -->
-<header class="panel-head"><span class="brand">3D <span>Review</span></span><span class="small muted" id="who">Connecting…</span><span class="small muted" id="host-note"></span></header>
+<header class="panel-head"><span class="brand">3D <span>Review</span></span><span class="small muted" id="who">Tool result</span><label class="theme-control">Theme<select id="panel-theme" aria-label="Panel theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label><span class="small muted" id="host-note"></span></header>
 <nav class="crumbs" id="crumbs" aria-label="Scope"></nav>
 <main id="app"><p class="muted">Loading…</p></main>
 <p class="small" role="status" aria-live="polite" id="status"></p>
@@ -12,11 +12,36 @@
 <script>
 (() => {
 /*__CARDS__*/
+/*__ACTION_CARD__*/
 const $ = id => document.getElementById(id);
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
-const state = { me: null, route: { kind: 'workspaces' }, caps: null, busy: false, executing: false, sheet: null, hostError: null, notice: null, alert: false, cache: new Map() };
+const state = { mode: 'card', me: null, route: { kind: 'workspaces' }, caps: null, busy: false, executing: false, sheet: null, hostError: null, notice: null, alert: false, cache: new Map() };
 const app = new window.McpApps.App({ name: '3d-review panel', version: '0.1.0' });
+// ---- theme: presentation only; no tools or account settings are touched.
+function mountPanelTheme(app, doc, win) {
+  const root = doc.documentElement, control = doc.getElementById('panel-theme');
+  const key = '3d-review:mcp-theme';
+  const valid = value => value === 'light' || value === 'dark';
+  let choice = 'system', hostTheme = null, disposed = false;
+  let media; try { media = win.matchMedia?.('(prefers-color-scheme: dark)'); } catch {}
+  try { const saved = win.localStorage.getItem(key); if (valid(saved)) choice = saved; } catch {}
+  const paint = () => { if (disposed) return; root.dataset.theme = valid(choice) ? choice : hostTheme || (media?.matches ? 'dark' : 'light'); if (control) control.value = choice; };
+  const change = () => { choice = valid(control.value) ? control.value : 'system'; try { if (choice === 'system') win.localStorage.removeItem(key); else win.localStorage.setItem(key, choice); } catch {} paint(); };
+  const hostChanged = context => { if (context && Object.hasOwn(context, 'theme')) hostTheme = valid(context.theme) ? context.theme : null; paint(); };
+  let revealTimer;
+  const reveal = () => { if (!disposed) delete root.dataset.themePending; };
+  const ready = () => { if (disposed) return; win.clearTimeout(revealTimer); hostChanged(app.getHostContext?.()); reveal(); };
+  const dispose = () => { disposed = true; win.clearTimeout(revealTimer); media?.removeEventListener?.('change', paint); control?.removeEventListener('change', change); win.removeEventListener?.('pagehide', dispose); return {}; };
+  root.dataset.themePending = 'true'; paint();
+  revealTimer = win.setTimeout(reveal, 2000);
+  media?.addEventListener?.('change', paint); control?.addEventListener('change', change); win.addEventListener?.('pagehide', dispose, { once: true });
+  app.onhostcontextchanged = hostChanged;
+  app.onteardown = dispose;
+  return { ready, dispose };
+}
+const panelTheme = mountPanelTheme(app, document, window);
+
 
 // ---- transport: the four tools only, via the host bridge. Returns the server ENVELOPE; throws Error{code,message,hint} on ok:false.
 async function call(tool, args) {
@@ -45,12 +70,13 @@ function sharedAssessmentsHtml(me, asPage) {
 // ---- routing (internal; the iframe URL never changes, so no scope or credential lands in a host history)
 function parse(hash) { const p = hash.replace(/^#/, '').split('/').map(decodeURIComponent); if (!p[0] || p[0] === 'workspaces') return { kind: 'workspaces' }; if (p[0] === 'workspace') return { kind: 'workspace', id: p[1] }; if (p[0] === 'projects') return { kind: 'projects' }; if (p[0] === 'project') return { kind: 'project', id: p[1] }; if (p[0] === 'shared-assessments') return { kind: 'shared-assessments' }; if (p[0] === 'assessment' && p[1]) return { kind: 'assessment', id: p[1], view: VIEWS.includes(p[2]) ? p[2] : null }; return { kind: 'workspaces' }; }
 let routeGeneration = 0;
-function go(hash) { if (state.executing) return; routeGeneration++; state.route = parse(hash); state.sheet = null; state.hostError = null; state.notice = null; state.busy = false; render(); }
+function go(hash) { if (state.executing) return; state.mode = 'app'; document.body.classList.remove('mcp-compact'); routeGeneration++; state.route = parse(hash); state.sheet = null; state.hostError = null; state.notice = null; state.busy = false; render(); }
 document.addEventListener('click', e => { const a = e.target.closest('a[href^="#"]'); if (!a) return; e.preventDefault(); const h = a.getAttribute('href'); if (h === '#retry') return render(); go(h); });
 
 // ---- render
 let gen = 0;
 async function render() {
+  if (state.mode === 'card') { ++gen; actionCard.render(); return; }
   const g = ++gen, r = state.route, root = $('app'); root.innerHTML = '<p class="muted">Loading…</p>'; $('status').textContent = state.notice || ''; $('status').className = 'small ' + (state.alert ? 'alert' : 'muted');
   if (state.hostError) { $('crumbs').innerHTML = ''; root.innerHTML = refusal(state.hostError, 'host request') + '<p><a href="#workspaces">Open workspaces</a></p>'; return; }
   try {
@@ -151,32 +177,23 @@ function bind(root) {
   root.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => { if (state.busy) return; state.sheet = null; say(null); });
 }
 
-// ---- host wiring: a tool result pushed by the host (the assistant called read/docs) steers the panel to that entity
-app.addEventListener('toolresult', ev => {
-  const env = ev?.structuredContent || (ev?.content?.[0]?.text ? safeJson(ev.content[0].text) : ev);
-  if (!env || state.executing) return;
-  // Failed envelopes may omit capability. Keep the refusal through the later boot render,
-  // invalidate older reads/actions, and never display inaccessible entity details or hints.
-  if (env.ok === false || ev?.isError) {
-    routeGeneration++; state.sheet = null; state.busy = false; state.notice = null;
-    state.hostError = { code: env.error?.code || 'ERROR', message: 'The host tool request failed.', trace_id: env.trace_id };
-    render(); return;
-  }
-  const hadError = !!state.hostError; state.hostError = null;
-  const cap = env.capability, res = env.result;
-  if (cap === 'cap.assessment.get' && res?.assessment?.id) return go(routes.assessment(res.assessment.id));
-  if (cap === 'cap.project.get' && res?.project?.id) return go(routes.project(res.project.id));
-  if (cap === 'cap.workspace.get' && res?.workspace?.id) return go(routes.workspace(res.workspace.id));
-  if (cap === 'cap.workspace.list') return go('#workspaces');
-  if (cap === 'cap.project.list') return go('#projects');
-  if (hadError) render();
-});
+// Initial host calls stay compact. Full exploration is an explicit user action.
+const actionCard = createActionCard({root:$('app'),esc,call,execution:on=>{state.executing=on;},explore:async()=>{
+  state.mode='app'; document.body.classList.remove('mcp-compact');
+  const generation=++routeGeneration; ++gen;
+  $('app').innerHTML='<p class="muted">Loading workspaces…</p>';
+  try { const me=await read('cap.auth.me'); if(generation!==routeGeneration)return; state.me=me; }
+  catch(e) { if(generation!==routeGeneration)return; state.me=null; }
+  if(generation===routeGeneration)go('#workspaces');
+}});
+function beginCard() { ++routeGeneration; ++gen; state.mode='card'; state.sheet=null; state.hostError=null; state.notice=null; state.busy=false; $('crumbs').innerHTML=''; $('status').textContent=''; document.body.classList.add('mcp-compact'); }
+app.addEventListener('toolinput', ev => { if(state.executing)return; beginCard(); actionCard.receiveInput(ev); });
+app.addEventListener('toolresult', ev => { if(state.executing)return; beginCard(); actionCard.receiveResult(ev); });
+beginCard();actionCard.render();
 app.onerror = e => { $('status').textContent = 'Bridge error: ' + (e?.message || e); };
 app.connect().then(async () => {
+  panelTheme.ready();
   state.caps = app.getHostCapabilities() || {}; $('host-note').textContent = state.caps.serverTools ? '' : 'host: no app-initiated tool calls';
-  try { state.me = await read('cap.auth.me'); $('who').textContent = `${state.me.principal.kind} · ${state.me.principal.id}`; }
-  catch (e) { $('who').textContent = kindOf(e) === 'unauthenticated' ? 'Not signed in (host bearer missing or expired)' : e.message; }
-  render();
-}).catch(e => { $('who').textContent = 'Connect failed: ' + (e?.message || e); });
+}).catch(e => { panelTheme.ready(); $('who').textContent = 'Connect failed: ' + (e?.message || e); });
 })();
 </script>

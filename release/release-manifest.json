@@ -1,27 +1,34 @@
 {
-  "version": "0.9.1",
+  "version": "0.10.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "3e0985c7cfa940a61034c7d262c92e26f36165da",
+  "cookbook_commit": "41bc68776ab06028486c068c97c3a361a23c7f99",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.9.1.md",
-      "blob_sha": "a6ca85d89dc703c203e2ae453a94ac79c3153e64",
-      "sha256": "bd91ad6dcca22e441f5047c23bc60a0914d10a84be70eb54d806ddfa25350526"
+      "path": "planning/2026-09-16-parity-build/releases/0.10.0.md",
+      "blob_sha": "7e3b1f32eb4949758caf9e63bbe446d44868e9fb",
+      "sha256": "328f7349a5d3bd13625c66170b9fcac5be6180aec55c0f73449a9b4f3cdeb74c"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "75c40bf685dc4c777f1df9c2cb17ce77caeac51e",
-      "sha256": "c89ff4b9ff2fe33dc180aebba4710804e02fc717368bf21d28d9a858f7b8728c"
+      "blob_sha": "17d673d358417fa1a99dae7069631b4315ce8f4c",
+      "sha256": "429c94fd07f4e8cbfe2b43bcb38f8e8ae951836004a19fe725d005bd346b433b"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
-      "changed": [],
-      "fixed": [
-        "Release validation runs all 34 synthetic report contexts as sequential bounded cases, preserves the 425-response aggregate and coexistence checks, and drains or quarantines unfinished fixture work before reuse."
+      "added": [
+        "Compact action-specific MCP cards for metadata, entity reads, feedback acknowledgement, refusal and explicit dangerous-action confirmation."
       ],
-      "security": []
+      "changed": [
+        "Docs orientation is text-only. Panel startup waits for the host call and does not automatically fetch identity, workspaces or projects; full exploration requires an explicit action.",
+        "Six bounded official-host scenarios are covered across attributed pre/post-fix sources; the integrated theme/card candidate passes33 targeted automated tests. Human satisfaction, confusion and frustration are NOT MEASURED."
+      ],
+      "fixed": [
+        "Compact confirmations show server-owned impact, affected targets, compensating control and expiry; busy and one-shot execution guards remain enforced."
+      ],
+      "security": [
+        "The existing four-tool contract and server authorization remain unchanged. Private feedback and authorization details are not echoed in cards; no automatic execute or retry."
+      ]
     }
   }
 }

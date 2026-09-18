@@ -1,7 +1,61 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.9.1",
+  "current": "0.10.0",
   "versions": [
+    {
+      "version": "0.10.0",
+      "status": "candidate",
+      "notes_path": "releases/0.10.0.md",
+      "sections": {
+        "added": [
+          "Compact action-specific MCP cards for metadata, entity reads, feedback acknowledgement, refusal and explicit dangerous-action confirmation."
+        ],
+        "changed": [
+          "Docs orientation is text-only. Panel startup waits for the host call and does not automatically fetch identity, workspaces or projects; full exploration requires an explicit action.",
+          "Six bounded official-host scenarios are covered across attributed pre/post-fix sources; the integrated theme/card candidate passes33 targeted automated tests. Human satisfaction, confusion and frustration are NOT MEASURED."
+        ],
+        "fixed": [
+          "Compact confirmations show server-owned impact, affected targets, compensating control and expiry; busy and one-shot execution guards remain enforced."
+        ],
+        "security": [
+          "The existing four-tool contract and server authorization remain unchanged. Private feedback and authorization details are not echoed in cards; no automatic execute or retry."
+        ]
+      }
+    },
+    {
+      "version": "0.9.3",
+      "status": "candidate",
+      "notes_path": "releases/0.9.3.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Theme scorecard: 6/6 automated local scenarios and 4/4 bounded official reference-host visual scenarios passed; human satisfaction, confusion and frustration are NOT MEASURED."
+        ],
+        "fixed": [
+          "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
+        ],
+        "security": [
+          "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
+        ]
+      }
+    },
+    {
+      "version": "0.9.2",
+      "status": "candidate",
+      "notes_path": "releases/0.9.2.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona outcome scorecard records five executed route cases and one independent local-browser participant-resume journey; human sentiment remains NOT MEASURED."
+        ],
+        "fixed": [
+          "Current-shell participant resume opens the preserved legacy survey instead of returning an existing participant session to the public access-code entry."
+        ],
+        "security": [
+          "Route forwarding does not read, modify or expose participant credentials. Existing public survey, shared-link, invitation and synthetic-demo routes retain their behavior."
+        ]
+      }
+    },
     {
       "version": "0.9.1",
       "status": "candidate",
@@ -39,7 +93,7 @@
     },
     {
       "version": "0.8.0",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.8.0.md",
       "sections": {
         "added": [
@@ -52,7 +106,9 @@
         "security": [
           "Existing synthetic admission and exact assessment grants remain authoritative; held inputs, expired previews, identity/navigation changes and uncertain writes do not enable automatic execution or retry."
         ]
-      }
+      },
+      "tag": "v0.8.0",
+      "date": "2026-09-18"
     },
     {
       "version": "0.7.1",

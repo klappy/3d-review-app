@@ -1,4 +1,4 @@
-// MCP Apps panel wiring (checkpoint 8): the four-tool surface is unchanged; every tool carries the panel resource in _meta;
+// MCP Apps panel wiring (checkpoint 8): the four-tool surface is unchanged; read/write/danger carry the panel resource; docs stays text-only;
 // resources/list + resources/read serve ONE self-contained HTML resource with the app profile MIME; nothing off-origin.
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -25,12 +25,13 @@ beforeAll(async () => {
 const rpc = (body: unknown, token: string | undefined = bearer) => worker.fetch(new Request(ORIGIN + "/mcp", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: token } : {}) }, body: JSON.stringify(body) }), env, ectx()).then((r) => r.json() as any);
 
 describe("MCP Apps panel resource", () => {
-  it("initialize advertises resources and the ui extension; tools/list is still exactly docs/read/write/danger, each carrying the panel uri in _meta", async () => {
+  it("initialize advertises resources and the ui extension; tools/list is still exactly docs/read/write/danger, with intentional text-only docs and compact result resource for the other tools", async () => {
     const init = await rpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
     expect(init.result.capabilities.resources).toBeDefined(); expect(init.result.capabilities.extensions["io.modelcontextprotocol/ui"]).toBeDefined();
     const list = await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" });
     expect(list.result.tools.map((t: any) => t.name)).toEqual(["docs", "read", "write", "danger"]);
-    for (const t of list.result.tools) { expect(t._meta.ui.resourceUri).toBe(PANEL_URI); expect(t._meta["ui/resourceUri"]).toBe(PANEL_URI); }
+    expect(list.result.tools[0]._meta).toBeUndefined();
+    for (const t of list.result.tools.slice(1)) { expect(t._meta.ui.resourceUri).toBe(PANEL_URI); expect(t._meta["ui/resourceUri"]).toBe(PANEL_URI); }
   });
   it("resources/list names the one panel; resources/read serves self-contained HTML with the app-profile MIME; unknown uri is refused", async () => {
     const list = await rpc({ jsonrpc: "2.0", id: 3, method: "resources/list" });
