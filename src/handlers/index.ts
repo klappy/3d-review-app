@@ -1,6 +1,7 @@
 /** Capability id → handler. Lane B rows here; Lane A adds domain rows (workspace/project/assessment/template/survey/participant/response/results/grant/request/support) — merge, don't replace. Missing v2.0 ids answer 501 RESERVED_NOT_BUILT honestly. */
 import type { Handler } from "./types";
 import * as p from "./platform";
+import { handlers as roadmap } from "../roadmap/handlers";
 import { docs } from "./docs";
 import { opsUndo } from "./undo";
 import { handlers as workspace } from "./workspace";
@@ -33,6 +34,7 @@ export const handlers: Record<string, Handler> = {
   "cap.docs.capabilities": p.docsCapabilities,
   "cap.docs.openapi": p.docsOpenapi,
   // Lane A domain handlers. Unlisted capabilities remain honest 501s.
+  ...roadmap,
   ...workspace,
   ...project,
   ...assessment,

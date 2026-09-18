@@ -249,6 +249,31 @@ test('V6 request log contains only /v2/health and /changelog.json', async () => 
 });
 
 
+test('dedicated roadmap shell mounts the shared badge and reads health lazily', async () => {
+  const html = fs.readFileSync(new URL('./roadmap/index.html', import.meta.url), 'utf8');
+  assert.equal((html.match(/src="\/changelog.js"/g) || []).length, 1);
+  const ids = ['version', 'changelog', 'changelog-title', 'changelog-build', 'changelog-body', 'changelog-close'];
+  for (const id of ids) assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id);
+  assert.match(html, /<button id="version"[^>]*aria-controls="changelog"[^>]*>Version…<\/button>/);
+  assert.ok(html.indexOf('id="version"') < html.indexOf('<main'), 'badge survives route content replacement');
+  assert.ok(html.indexOf('id="changelog"') > html.indexOf('</main>'), 'dialog survives route content replacement');
+  assert.ok(html.indexOf('src="/changelog.js"') < html.indexOf('src="/roadmap/page.js"'), 'changelog loads before page');
+  const doc = fakeDocument(ids), log = [];
+  const component = fs.readFileSync(new URL('./changelog.js', import.meta.url), 'utf8').replace(/export /g, '');
+  vm.runInNewContext(component, {
+    document: doc, location: { hash: '', pathname: '/roadmap/' }, sessionStorage: { getItem: () => null },
+    fetch: fetchFor({ '/v2/health': json(HEALTH), '/changelog.json': json(CHANGELOG) }, log),
+  });
+  await settle();
+  assert.equal(doc.getElementById('version').textContent, copy.shared, 'dedicated page is lazy, not a staff health read');
+  assert.deepEqual(log, []);
+  await doc.getElementById('version').fire('click'); await settle();
+  assert.equal(doc.getElementById('changelog').open, true);
+  assert.equal(doc.getElementById('version').textContent, 'Version 0.1.0', 'runtime health fixture supplies version, not markup');
+  assert.equal(doc.getElementById('changelog-build').textContent, detailsLine(HEALTH.result));
+  assert.deepEqual(log.map(r => r.url), ['/v2/health', '/changelog.json']);
+});
+
 test('dedicated participant shell mounts the shared badge and reads health lazily', async () => {
   const html = fs.readFileSync(new URL('./participate/index.html', import.meta.url), 'utf8');
   assert.equal((html.match(/src="\/changelog.js"/g) || []).length, 1);
