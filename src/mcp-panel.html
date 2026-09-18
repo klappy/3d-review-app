@@ -352,9 +352,12 @@ function mountPanelTheme(app, doc, win) {
   const paint = () => { if (disposed) return; root.dataset.theme = valid(choice) ? choice : hostTheme || (media?.matches ? 'dark' : 'light'); if (control) control.value = choice; };
   const change = () => { choice = valid(control.value) ? control.value : 'system'; try { if (choice === 'system') win.localStorage.removeItem(key); else win.localStorage.setItem(key, choice); } catch {} paint(); };
   const hostChanged = context => { if (context && Object.hasOwn(context, 'theme')) hostTheme = valid(context.theme) ? context.theme : null; paint(); };
-  const ready = () => { hostChanged(app.getHostContext?.()); delete root.dataset.themePending; };
-  const dispose = () => { disposed = true; media?.removeEventListener?.('change', paint); control?.removeEventListener('change', change); win.removeEventListener?.('pagehide', dispose); return {}; };
+  let revealTimer;
+  const reveal = () => { if (!disposed) delete root.dataset.themePending; };
+  const ready = () => { if (disposed) return; win.clearTimeout(revealTimer); hostChanged(app.getHostContext?.()); reveal(); };
+  const dispose = () => { disposed = true; win.clearTimeout(revealTimer); media?.removeEventListener?.('change', paint); control?.removeEventListener('change', change); win.removeEventListener?.('pagehide', dispose); return {}; };
   root.dataset.themePending = 'true'; paint();
+  revealTimer = win.setTimeout(reveal, 2000);
   media?.addEventListener?.('change', paint); control?.addEventListener('change', change); win.addEventListener?.('pagehide', dispose, { once: true });
   app.onhostcontextchanged = hostChanged;
   app.onteardown = dispose;
