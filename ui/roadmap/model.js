@@ -3,7 +3,29 @@ export const LABELS = {planned:'Planned',built:'Built',reviewed:'Reviewed',dev:'
 export const STATES = {done:'✅ Done',pending:'🟡 Pending',blocked:'🔴 Blocked'};
 export function windowItems(items, all=false){
   const sorted=[...items].sort((a,b)=>Date.parse(b.updated_at)-Date.parse(a.updated_at)||a.id.localeCompare(b.id));
-  const completed=sorted.filter(x=>STAGES.every(k=>x.stages[k].state==='done'));
-  const active=sorted.filter(x=>!STAGES.every(k=>x.stages[k].state==='done'));
+  const delivered=x=>STAGES.every(k=>x.stages[k].state==='done')||latestReport(x)?.stage==='production'&&latestReport(x)?.state==='done';
+  const completed=sorted.filter(delivered);
+  const active=sorted.filter(x=>!delivered(x));
   return {active:all?active:active.slice(0,20),completed:all?completed:completed.slice(0,10),activeTotal:active.length,completedTotal:completed.length};
 }
+
+// Existing stages remain verifier materializations; reported is an explicitly separate claim.
+export function stagePresentation(item,key){
+ const s=item.stages[key],r=item.reported?.[key];
+ const verified=!!s.evidence?.length;
+ return {label:verified?'Verified: '+STATES[s.state]:'Not verified',
+  report:r?`Reported: ${r.state}${r.version?' · '+r.version:''}${r.blocker?' · '+r.blocker.replaceAll('_',' '):''}`:'No publisher report'};
+}
+export function nextAction(item){
+ const latest=latestReport(item);const blocked=latest?.state==='blocked'?latest.stage:null;
+ if(blocked)return `Resolve reported ${LABELS[blocked]} blocker: ${(item.reported[blocked].blocker??'cause not recorded').replaceAll('_',' ')}. Verify the updated evidence.`;
+ const claimed=STAGES.filter(k=>item.reported?.[k]&&!item.stages[k].evidence?.length);
+ if(claimed.length)return `Review reported ${claimed.map(k=>LABELS[k]).join(', ')} evidence; independent acceptance is not recorded.`;
+ if(/^Work item #/.test(item.title))return 'Publish a reviewed title and scope; delivery state is not established by a missing summary.';
+ if(STAGES.every(k=>item.stages[k].state==='done'))return 'Evaluate the user outcome; release delivery alone does not establish success.';
+ return 'Next delivery action is not recorded. Request an updated owner report.';
+}
+
+export function latestReport(item){return Object.entries(item.reported??{}).map(([stage,r])=>({...r,stage})).sort((a,b)=>(b.sequence??0)-(a.sequence??0))[0];}
+export function happeningNow(item){const r=latestReport(item);return r?`Latest report: ${LABELS[r.stage]} ${r.state}${r.version?' · '+r.version:''}`:'Current work not reported';}
+export function currentBlocker(item){const r=latestReport(item);return r?.state==='blocked'?(r.blocker??'Cause not recorded').replaceAll('_',' '):'No current blocker reported';}
