@@ -38,7 +38,7 @@ function fixture({ deferGet = false, deferWrite = false, connect = false, deferr
   const resolvePreview = () => pending.shift()({ structuredContent: { ok: true, result: { confirm_token: 'fixture-confirm', expires_in: 60, impact: { effect: 'invite' } } } });
   const resolveGet = (id: string) => pendingGets.splice(pendingGets.findIndex(x => x.id === id), 1)[0].resolve({ structuredContent: { ok: true, result: assessment(id) } });
   const resolveWrite = (env: any = { ok: true, result: {} }) => pendingWrites.shift()({ structuredContent: env });
-  return { connectResolve, connectReject, hostResult: (result: any) => events.get('toolresult')!(result), dom, w, r, calls, pending, go, preview, resolvePreview, resolveGet, resolveWrite };
+  return { hostInput: (input: any) => events.get('toolinput')!(input), connectResolve, connectReject, hostResult: (result: any) => events.get('toolresult')!(result), dom, w, r, calls, pending, go, preview, resolvePreview, resolveGet, resolveWrite };
 }
 
 it.each([false, true])('discards deferred A preview after navigation, including return to A (%s)', async back => {
@@ -221,5 +221,21 @@ it('settled connection failure permits explicit host refusal without sending too
   expect(f.w.document.body.textContent).toContain('Connect failed: fixture unavailable');
   f.w.document.querySelector('[data-card-explore]').click();await tick();
   expect(f.calls).toHaveLength(0);expect(f.w.document.body.textContent).toContain('This host does not let');
+ }finally{f.dom.window.close();}
+});
+
+
+it('preserves danger preview during pending connection and executes once after readiness', async()=>{
+ const f=fixture({deferredConnect:true});
+ try{
+  f.hostInput({arguments:{capability:'cap.grant.invite',params:{id:'A'},mode:'dry_run'}});
+  f.hostResult({structuredContent:{ok:true,capability:'cap.grant.invite',result:{confirm_token:'fixture-preview',expires_in:60}}});
+  const confirm=f.w.document.querySelector('[data-card-confirm]');
+  expect(confirm.disabled).toBe(true);confirm.click();await tick();
+  expect(f.calls).toHaveLength(0);expect(f.w.document.body.textContent).not.toContain('outcome could not');
+  f.connectResolve();await tick();
+  const ready=f.w.document.querySelector('[data-card-confirm]');expect(ready.disabled).toBe(false);ready.click();ready.click();await tick();
+  expect(f.calls).toHaveLength(1);expect(f.calls[0].arguments.confirm_token).toBe('fixture-preview');
+  expect(f.calls[0].arguments.mode).toBe('execute');
  }finally{f.dom.window.close();}
 });

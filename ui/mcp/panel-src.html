@@ -178,7 +178,7 @@ function bind(root) {
 }
 
 // Initial host calls stay compact. Full exploration is an explicit user action.
-const actionCard = createActionCard({root:$('app'),esc,call,canExplore:()=>state.caps!==null,execution:on=>{state.executing=on;},explore:async()=>{
+const actionCard = createActionCard({root:$('app'),esc,call,canExplore:()=>state.caps!==null,canConfirm:()=>!!state.caps?.serverTools,execution:on=>{state.executing=on;},explore:async()=>{
   if(state.caps===null)return;
   state.mode='app'; document.body.classList.remove('mcp-compact');
   const generation=++routeGeneration; ++gen;
