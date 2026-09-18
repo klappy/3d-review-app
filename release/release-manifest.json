@@ -1,30 +1,31 @@
 {
-  "version": "0.11.2",
+  "version": "0.11.3",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "20acad96bc67d9ddfdc8eefb0e99fab36608b4d5",
+  "cookbook_commit": "811205edb75f8f2219ad879c1e732b83bfb9ca23",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.11.2.md",
-      "blob_sha": "d881cb490b2f3b4518b4c3f5424d9521a71b25ca",
-      "sha256": "6a5a9e675802220ee1992c6dbe4be631747337601f881cb35ae42e54d3606968"
+      "path": "planning/2026-09-16-parity-build/releases/0.11.3.md",
+      "blob_sha": "6873a3326aba383d53de7b4a13c6fe39041a885a",
+      "sha256": "70292e6d315219e30e71009923ae054845a884671d19e9f634b990875e31e2e7"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "ddcd6bd8dca298677646137095194d97f819c687",
-      "sha256": "321545ae615bcac540621026597c7331935cf375eb24b9aef8ae6fca062ccb7c"
+      "blob_sha": "b108e113b57354210363363b90280c03adfad6cd",
+      "sha256": "bf7d61d13733dafb939575712519e3333ac6d4892608537ff38d27d7ea253c6b"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
       "changed": [
-        "Survey sharing opens the output choices directly: Copy link, QR code or Print invitations explicitly confirms issuance after access and revocation disclosure."
+        "Feedback guidance provides a minimal note example, HTTP/MCP equivalents, permission and uncertain-outcome recovery through the existing docs tool and topic.",
+        "Persona evidence: local HTTP and MCP discovery/recovery cases improved from 2/7 to 7/7 per face; human satisfaction, confusion and frustration are NOT MEASURED."
       ],
       "fixed": [
-        "Copy and print failures reuse the received in-memory link; uncertain issuance never retries automatically, and stale identity/page responses cannot reveal credentials."
+        "Capability documentation now exposes existing canonical parameter/result schemas and derived required/optional fields, including authenticated-feedback precondition provenance."
       ],
       "security": [
-        "Existing preview/execute/revoke APIs, role checks and one-time link disclosure remain unchanged; no credential persistence or background issuance."
+        "No new tool, permission, accepted-field or feedback-write behavior; examples were executed only in isolated synthetic fixtures."
       ]
     }
   }

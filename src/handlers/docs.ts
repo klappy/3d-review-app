@@ -6,6 +6,7 @@ import { roleAt } from "../policy";
 
 const CEILING = "klappy://canon/constraints/mcp-tool-surface-ceiling";
 const TOPICS: Record<string, string> = {
+  feedback: "Feedback is an append-only write without undo. HTTP accepts anonymous feedback; MCP requires connector authentication. Do not include private answers or credentials. Send feedback with write cap.ops.feedback and params {note: 'The feedback instructions were easy to find.'}. Use note for the message; body, message and comment are not accepted parameter names. No feedback fields are required by the API; note is a useful minimal submission. Read docs {capability:'cap.ops.feedback'} for the canonical accepted fields, types and required/optional lists. text is a legacy alias for note; do not send different values for both. HTTP POST /v2/feedback takes these fields directly as its JSON body, while MCP write wraps them in params. This is an append-only write, without undo or a public feedback list; the result contains recorded, stripped and feedback_id, not your text. Do not include private answers or credentials. answers/responses/response are stripped, not stored. HTTP accepts anonymous feedback; MCP requires connector authentication. Add require_authenticated:true when attribution is required: an anonymous resolved caller is refused before persistence. Omitted/false retains public HTTP behavior; the flag is not stored. On NOT_AUTHENTICATED, sign in before retrying. On INVALID_PARAMS, check the schema instead of guessing names. After an uncertain write result, do not resend automatically: the first submission may have succeeded.",
   glossary: "Workspace (optional grouping) › Project › Language › Assessment. An assessment owns the stage Prepare → Collect → Understand → Improve. Survey templates are platform-managed and versioned; an assessment survey is a template@version selected into an assessment. Participants answer by link or short access code and are pseudonymous. Perspective labels follow the instrument: Translator, community, church; four mid-level roles + Other.",
   permissions: "Grants are (principal, scope, role) with role owner/member/viewer at workspace, project or assessment. No inheritance: a workspace grant lists projects, it does not open them. Members invite ≤ member; owners cannot be removed or demoted; the last owner is protected; transfer is dangerous. Participants are never collaborators. Unauthorized and nonexistent look identical (NOT_FOUND_OR_NOT_VISIBLE).",
   reversibility: "read: no side effect. write.reversible: receipt + undo_token only when a true inverse is declared (archive↔unarchive, rename restores prior). write.effect: sends/grants/releases — dry_run → confirm_token → execute; compensating control (revoke) not undo. write.dangerous: destructive — same two-step; inverse none. Submitting a response is append-only: no undo.",
@@ -18,12 +19,21 @@ const TOPICS: Record<string, string> = {
 const INTENTS = ["what", "how", "example", "take survey", "manage", "view results"];
 
 function page(c: Capability) {
+  const params = c.id === "cap.ops.feedback" ? { note: "The feedback instructions were easy to find." } : {};
   return {
     capability: c.id, class: c.class, tool: c.tool, http: `${c.http.method} ${c.http.path}`, roles: c.roles, slice: c.slice,
     status: c.status, section: c.section, ui_surface: c.ui_surface, rules: c.notes, inverse: c.inverse,
+    ...(c.params_schema ? {
+      params_schema: c.params_schema,
+      required_params: c.params_schema.required ?? [],
+      optional_params: Object.keys(c.params_schema.properties ?? {}).filter(k => !c.params_schema!.required?.includes(k)),
+    } : {}),
+    ...(c.result_schema ? { result_schema: c.result_schema } : {}),
+    ...(c.id === "cap.ops.feedback" ? { guidance: TOPICS.feedback, next: { topic: "feedback" } } : {}),
     how_an_agent_calls_it: c.tool === "danger" ? "danger {capability, params, mode:'dry_run'} → impact + confirm_token → danger {…, mode:'execute', confirm_token}" : `${c.tool} {capability, params}`,
     errors: ["NOT_AUTHENTICATED", "NOT_AUTHORIZED_AT_SCOPE", "WRONG_TOOL_FOR_CLASS", "INVALID_PARAMS", "NOT_FOUND_OR_NOT_VISIBLE", ...(c.tool === "danger" ? ["CONFIRM_REQUIRED", "CONFIRM_EXPIRED"] : []), ...(c.slice === "v2.1-oct" ? ["RESERVED_NOT_BUILT"] : []), "RATE_LIMITED"], // every row: anonymous callers are metered per address on both faces (RL_HTTP_ANON / RL_MCP_ANON), four rows additionally by capability
-    examples: { http: `${c.http.method} ${c.http.path}`, mcp: { tool: c.tool, arguments: { capability: c.id, params: {}, ...(c.tool === "danger" ? { mode: "dry_run" } : {}) } } },
+    examples: { http: `${c.http.method} ${c.http.path}`, mcp: { tool: c.tool, arguments: { capability: c.id, params, ...(c.tool === "danger" ? { mode: "dry_run" } : {}) } } },
+    ...(c.id === "cap.ops.feedback" ? { http_request: { method: c.http.method, path: c.http.path, headers: { "content-type": "application/json" }, body: params } } : {}),
     projected_from: `${contractName} @ cookbook ${sourceSha}`,
   };
 }
@@ -130,6 +140,7 @@ export const docs: Handler = async (ctx, a) => {
     tools: { docs: "explain", read: "class=read", write: "class=write.reversible (+ undo)", danger: "write.effect and write.dangerous, two-step" },
     tool_surface: { count: 4, governed_by: CEILING, reason: "read/write/danger split is the host-level permission boundary; telemetry rides read cap.ops.trace and trace_id on every envelope" },
     auth: "Collaborators sign in by Cloudflare email code → web session. Agents and connectors use OAuth 2.1 on /mcp (discovery at /.well-known/oauth-authorization-server, dynamic client registration, PKCE): the user signs in by email code, approves the named app, and the app acts as that user — auth.me shows delegated_by = oauth:<client_id>; write cap.auth.logout disconnects it. /mcp without a credential answers 401 + WWW-Authenticate. Participants: access code or invitation link → participant token bound to one survey. Agents act as a user, never as a role.",
+    topics: Object.keys(TOPICS),
     intents: INTENTS, index: index(), your_roles: roles, contract: `${contractName} @ ${sourceSha}`,
   } };
 };
