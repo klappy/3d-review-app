@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.11.3",
+  "current": "0.11.4",
   "versions": [
+    {
+      "version": "0.11.4",
+      "status": "candidate",
+      "notes_path": "releases/0.11.4.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona evidence: 1/1 automated local delayed-connection confirmation case passed; human satisfaction, confusion and frustration NOT MEASURED."
+        ],
+        "fixed": [
+          "MCP danger confirmation waits for host tool capability without consuming the preview; once ready, an explicit click executes once."
+        ],
+        "security": [
+          "Unavailable host tools cannot execute; Cancel stays available and no automatic retry or tool call is introduced."
+        ]
+      }
+    },
     {
       "version": "0.11.3",
       "status": "candidate",

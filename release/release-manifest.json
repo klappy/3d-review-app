@@ -1,31 +1,30 @@
 {
-  "version": "0.11.3",
+  "version": "0.11.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "811205edb75f8f2219ad879c1e732b83bfb9ca23",
+  "cookbook_commit": "d0cb9a895a6639ff223ffedfdc649fc764c9c13d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.11.3.md",
-      "blob_sha": "6873a3326aba383d53de7b4a13c6fe39041a885a",
-      "sha256": "70292e6d315219e30e71009923ae054845a884671d19e9f634b990875e31e2e7"
+      "path": "planning/2026-09-16-parity-build/releases/0.11.4.md",
+      "blob_sha": "3cde2e352bcfa7fb85c0bddcc7a58d0bafe4db49",
+      "sha256": "de4bddaca9f75a76376eda6fb2cf40c03be1c4a6d5a385fd97ea3261d513cdaf"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "b108e113b57354210363363b90280c03adfad6cd",
-      "sha256": "bf7d61d13733dafb939575712519e3333ac6d4892608537ff38d27d7ea253c6b"
+      "blob_sha": "8a3919a9875a910d341e197c173a15943cf6a56a",
+      "sha256": "b7c575edc0637303b44620c72ce67137831c3a37a18e8bf2c234189a813b9cfa"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
       "changed": [
-        "Feedback guidance provides a minimal note example, HTTP/MCP equivalents, permission and uncertain-outcome recovery through the existing docs tool and topic.",
-        "Persona evidence: local HTTP and MCP discovery/recovery cases improved from 2/7 to 7/7 per face; human satisfaction, confusion and frustration are NOT MEASURED."
+        "Persona evidence: 1/1 automated local delayed-connection confirmation case passed; human satisfaction, confusion and frustration NOT MEASURED."
       ],
       "fixed": [
-        "Capability documentation now exposes existing canonical parameter/result schemas and derived required/optional fields, including authenticated-feedback precondition provenance."
+        "MCP danger confirmation waits for host tool capability without consuming the preview; once ready, an explicit click executes once."
       ],
       "security": [
-        "No new tool, permission, accepted-field or feedback-write behavior; examples were executed only in isolated synthetic fixtures."
+        "Unavailable host tools cannot execute; Cancel stays available and no automatic retry or tool call is introduced."
       ]
     }
   }
