@@ -1,7 +1,26 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.3.1",
+  "current": "0.4.0",
   "versions": [
+    {
+      "version": "0.4.0",
+      "status": "candidate",
+      "notes_path": "releases/0.4.0.md",
+      "sections": {
+        "added": [
+          "Dedicated shared-link participant page with survey questions, answer review and editing, submission receipt, and same-tab resume."
+        ],
+        "changed": [
+          "Shared survey links open the participant page directly instead of the combined legacy staff surface; access-code and invitation routes remain available."
+        ],
+        "fixed": [
+          "Participant drafts and uncertain-submit recovery remain available throughout the dedicated page journey."
+        ],
+        "security": [
+          "Shared-link requests omit cookies and staff credentials, strip the link fragment before transport, and retain per-link draft isolation and idempotent submission retries."
+        ]
+      }
+    },
     {
       "version": "0.3.1",
       "status": "candidate",
@@ -17,7 +36,7 @@
     },
     {
       "version": "0.3.0",
-      "status": "candidate",
+      "status": "released",
       "notes_path": "releases/0.3.0.md",
       "sections": {
         "added": [
@@ -32,7 +51,9 @@
         "security": [
           "Danger actions retain preview/confirm with identical parameters; scopes remain explicit with no permission inheritance. Post-action access refusal hides stale controls while retaining the completed action receipt."
         ]
-      }
+      },
+      "tag": "v0.3.0",
+      "date": "2026-09-17"
     },
     {
       "version": "0.2.0",
