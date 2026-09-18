@@ -8,8 +8,15 @@ export const normalizeSql=s=>s.replace(/\s+/g,' ').trim().replace(/;$/,'').toLow
 export function expectedSchema(sql){const out=new Map();for(const statement of sql.split('\n').filter(x=>!x.trimStart().startsWith('--')).join('\n').split(';').map(x=>x.trim()).filter(Boolean)){const m=statement.match(/^CREATE (TABLE|INDEX) (roadmap_[a-z_]+)/i);if(m)out.set(m[2],normalizeSql(statement));}if(out.size!==5)throw Error('Unexpected roadmap migration source.');return out;}
 export function preflight(rows,expected){if(!Array.isArray(rows))throw Error('Schema preflight unavailable.');if(rows.length===0)return 'absent';if(rows.length!==expected.size||rows.some(r=>!expected.has(r.name)||normalizeSql(r.sql??'')!==expected.get(r.name)))throw Error('Partial or different roadmap schema; refusing migration.');return 'present';}
 export function guard(env,target,head){if(!['dev','production'].includes(target)||env.WORKERS_CI!=='1'||env.CI!=='true'||env.WORKERS_CI_BRANCH!==(target==='dev'?'main':'production')||!/^[0-9a-f]{40}$/.test(env.WORKERS_CI_COMMIT_SHA??'')||head!==env.WORKERS_CI_COMMIT_SHA)throw Error('Migration is restricted to the matching canonical Workers Build.');}
-function run(args){const r=spawnSync(process.execPath,[join(root,'node_modules/wrangler/bin/wrangler.js'),...args],{cwd:root,env:process.env,encoding:'utf8'});if(r.status!==0)throw Error('Provider migration/preflight command failed; deployment stopped.');let data;try{data=JSON.parse(r.stdout);}catch{throw Error('Provider preflight was not valid JSON.');}return data;}
-export function deployPreparation(target,{env=process.env,head,execute=run,sql=readFileSync(migration,'utf8')}={}){
+// Invoke the pinned CLI directly: Wrangler's bin wrapper maps a signal-killed child to exit 0.
+// Keep raw output private; diagnostics expose only process state and byte counts.
+export function providerCommand(args,{spawn=spawnSync,env=process.env}={}){
+ const r=spawn(process.execPath,[join(root,'node_modules/wrangler/wrangler-dist/cli.js'),...args],{cwd:root,env,encoding:'utf8',timeout:120000,maxBuffer:4*1024*1024});
+ const diagnostic=`status=${r.status??'none'} signal=${r.signal??'none'} stdout_bytes=${Buffer.byteLength(r.stdout??'')} stderr_bytes=${Buffer.byteLength(r.stderr??'')}`;
+ if(r.error||r.signal||r.status!==0)throw Error('Provider migration/preflight process failed; deployment stopped. '+diagnostic);
+ let data;try{data=JSON.parse(r.stdout);}catch{throw Error('Provider preflight was not valid JSON; deployment stopped. '+diagnostic);}return data;
+}
+export function deployPreparation(target,{env=process.env,head,execute=providerCommand,sql=readFileSync(migration,'utf8')}={}){
  guard(env,target,head);const expected=expectedSchema(sql),db=target==='dev'?'3d-review-dev':'3d-review';
  const args=['d1','execute',db,'--remote','--json',...(target==='production'?['--env','production']:[])];
  const names=[...expected.keys()].map(x=>`'${x}'`).join(',');
