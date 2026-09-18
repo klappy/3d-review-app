@@ -1,4 +1,5 @@
 import test from 'node:test';
+import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -155,4 +156,18 @@ test('incomplete execute receipt is uncertain and never becomes an output', asyn
   const m=mount('owner', {[LINKS]:({body})=>body.mode==='dry_run'?prepared:{link_id:'x'}});
   await m.click('data-share-open'); await m.click('data-share-qr');
   assert.equal(m.share.link,null); assert.match(m.root.html,/may have created a link/);
+});
+
+
+test('late issue after actual shell route departure cannot retain credential on return', async()=>{
+ const source=read('./assess.js'), box={state:{share:null},epoch:1,location:{hash:'#assessment/a1/survey/s1'}};
+ const routeCode=source.slice(source.indexOf('export function route('),source.indexOf('async function assessmentsFor')).replace('export function','function');
+ const guardCode=source.slice(source.indexOf('function currentShareRoute('),source.indexOf('function bindShare('));
+ const guard=vm.runInNewContext(routeCode+guardCode+'currentShareRoute',box);
+ let finish;const m=mount('owner',{[LINKS]:({body})=>body.mode==='dry_run'?prepared:new Promise(r=>finish=r)},{isCurrent:()=>guard()===m.share});
+ box.state=m.state;await m.click('data-share-open');const pending=m.click('data-share-copy');
+ box.location.hash='#workspaces';guard();box.location.hash='#assessment/a1/survey/s1';
+ finish(receipt);await pending;
+ assert.equal(m.share.link,null);assert.equal(m.clipboard.text,null);
+ assert.notEqual(shareFor(m.state,'a1','s1',1),m.share);
 });
