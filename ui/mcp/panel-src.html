@@ -178,7 +178,8 @@ function bind(root) {
 }
 
 // Initial host calls stay compact. Full exploration is an explicit user action.
-const actionCard = createActionCard({root:$('app'),esc,call,execution:on=>{state.executing=on;},explore:async()=>{
+const actionCard = createActionCard({root:$('app'),esc,call,canExplore:()=>state.caps!==null,execution:on=>{state.executing=on;},explore:async()=>{
+  if(state.caps===null)return;
   state.mode='app'; document.body.classList.remove('mcp-compact');
   const generation=++routeGeneration; ++gen;
   $('app').innerHTML='<p class="muted">Loading workspaces…</p>';
@@ -194,6 +195,7 @@ app.onerror = e => { $('status').textContent = 'Bridge error: ' + (e?.message ||
 app.connect().then(async () => {
   panelTheme.ready();
   state.caps = app.getHostCapabilities() || {}; $('host-note').textContent = state.caps.serverTools ? '' : 'host: no app-initiated tool calls';
-}).catch(e => { panelTheme.ready(); $('who').textContent = 'Connect failed: ' + (e?.message || e); });
+  if(state.mode==='card')actionCard.render();
+}).catch(e => { panelTheme.ready(); state.caps={}; if(state.mode==='card')actionCard.render(); $('who').textContent = 'Connect failed: ' + (e?.message || e); });
 })();
 </script>
