@@ -1,28 +1,30 @@
 {
-  "version": "0.14.3",
+  "version": "0.14.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "30c1a00df5ea30693766485c546c9aab0b16e502",
+  "cookbook_commit": "6d04a61e0471a6c8b791981353c71e0d62e1e6f3",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.14.3.md",
-      "blob_sha": "8d628e14eea4a16a73f023fcb4d510fd84e61f35",
-      "sha256": "7a17577acc572b534e3565de7ad20a35af9b92c591868ed8a975dcd4f4b4148f"
+      "path": "planning/2026-09-16-parity-build/releases/0.14.4.md",
+      "blob_sha": "8ad4fd66c25f35afe7a1ef6718990e954684505d",
+      "sha256": "ee36ed761395f0cd71ab9d48898208142f6d5e737dc0514107b6ad1604586317"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "61ed15a4fb60bb5cdf9384dabe210c76c995b927",
-      "sha256": "dc2ac7547c2f49c4f823c1021f49c07181dcf7473209ff059331913592444e88"
+      "blob_sha": "c379dd879779bc3c4b3322846db88cadef88a19f",
+      "sha256": "22e9ae7ca1c8732e81dc39e18430353d5fdcb6e451ce1d1006ee2d626d32de1a"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
-      "changed": [],
+      "changed": [
+        "Persona evidence: 19/19 automated UI/live checks and two author viewport checkpoints on the full 28-item public fixture; deployed acceptance and human satisfaction, confusion and frustration NOT MEASURED."
+      ],
       "fixed": [
-        "Blank survey preview and print default to US Letter; explicit A4 remains available and controls the generated page size."
+        "Restore prominent Done, Pending and Blocked stage icons/colors, visible work-type/version badges and Status labels; Now includes only explicit active work, with inactive or unplaced work in Future."
       ],
       "security": [
-        "Isolated blank-only printing, authorization and credential exclusions are unchanged."
+        "Reported progress remains distinct from verifier evidence; missing state is not fabricated and existing public-feed privacy/redaction remains unchanged."
       ]
     }
   }
