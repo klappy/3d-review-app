@@ -14,3 +14,18 @@ it('concurrent same cursor has one winner with consistent cursor/event/item',asy
 it('redaction atomically removes current and replay payloads, increments generation, duplicate old key never recovers content',async()=>{await store.append({...input(2,'redact'),publicEvent:{kind:'redaction',notice:'Public content removed.'},item:undefined,redact:true});const read=await store.read();expect(read.cursor).toBe(3);expect(read.generation).toBe(1);expect(read.items).toEqual([]);expect(read.events).toHaveLength(1);expect(JSON.stringify(read)).not.toContain('Safe public title');expect(await store.append(input(0,'one'))).toEqual({sequence:1,replayed:true});expect(await store.event(1)).toBeNull();expect(await store.item('roadmap-123')).toBeNull();});
 it('pagination returns bounded replay cursors and out-of-range cursor is explicit',async()=>{await store.append(input(3,'four'));await store.append({...input(4,'five'),itemId:'roadmap-124'});const read=await store.read(0,'',1);expect(read.events).toHaveLength(1);expect(read.event_next).toBe(3);expect(read.items).toHaveLength(1);expect(read.item_next).toBe('roadmap-123');expect((await store.read(999)).reset).toBe(true);});
 it('deployment schema preflight accepts actual SQLite metadata without rewriting it',async()=>{const {expectedSchema,preflight}=await import('../scripts/prepare-roadmap-deploy.mjs');const expected=expectedSchema(readFileSync(new URL('../migrations/0010_roadmap.sql',import.meta.url),'utf8'));const names=[...expected.keys()].map(x=>"'"+x+"'").join(',');const actual=await db.prepare('SELECT name,sql FROM sqlite_master WHERE name IN ('+names+') ORDER BY name').all();expect(preflight(actual.results,expected)).toBe('present');});
+it('projects latest reported stages for historical rows without changing verifier state or leaking redacted claims',async()=>{
+ let cursor=(await store.read()).cursor;
+ const claim=(key:string,stage:string,state:string)=>({...input(cursor++,key),itemId:'roadmap-140',item:{title:'Reviewed human title',stages:{production:{state:'pending',evidence:[]}}},publicEvent:{kind:'claim',attribution:'operator_report',claim:{item_id:'roadmap-140',kind:'production_verified',stage,state,version:'0.12.1',evidence:[]}}});
+ await store.append(claim('reported-a','production','pending'));
+ await store.append(claim('reported-b','production','done'));
+ await store.append(claim('reported-c','dev','done'));
+ const read=await store.read(999);const item=read.items.find(x=>x.id==='roadmap-140')!.value;
+ expect(item.reported.production.state).toBe('done');expect(item.reported.dev.state).toBe('done');expect(item.stages.production.state).toBe('pending');
+ expect(JSON.stringify(read)).not.toContain('private-actor');
+ const page=await store.read(0,'roadmap-139',1);expect(page.items[0].value.reported.production.version).toBe('0.12.1');
+ await store.append({...input(cursor,'reported-redact'),itemId:'roadmap-140',item:undefined,redact:true,publicEvent:{kind:'redaction'}});
+ expect((await store.read()).items.some(x=>x.id==='roadmap-140')).toBe(false);
+ expect(JSON.stringify(await store.history('roadmap-140',0,100))).not.toContain('production_verified');
+});
+it('reported projection does not include claims outside the requested current-item page',async()=>{const page=await store.read(0,'roadmap-123',1);expect(page.items).toHaveLength(1);expect(page.items[0].id).toBe('roadmap-124');expect(page.items[0].value.reported).toEqual({});});
