@@ -1,33 +1,27 @@
 {
-  "version": "0.4.0",
+  "version": "0.4.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "45f765c609a9cdd0a9c617e254d62a29a65e1e21",
+  "cookbook_commit": "ef52bc0a09e37bded59e7f23b2517d5e0b52679f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.4.0.md",
-      "blob_sha": "a8573737858f656c8dfc9f6f248689dbe225ebb7",
-      "sha256": "e1ca770d594d03270339689241eb81cb5294006639156fb87d756150f726181c"
+      "path": "planning/2026-09-16-parity-build/releases/0.4.2.md",
+      "blob_sha": "fb6b6d1ad6f7bb4ac9fc9c951694364fa3842076",
+      "sha256": "a5fc5c08adc083b080b2ee395da925ac3e5bdf4533c01ef593c96173a03253df"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "d0c258e961d2cc2deb081592fc5abcb8983c93a3",
-      "sha256": "df0e66401216dd7b09fbb2b9591481aeebdefb32cf5abcc9383c5b5693761e52"
+      "blob_sha": "27c066ceb7119d83d920143f03f7f8b81f53bd3e",
+      "sha256": "db3ed4562333f97983366a2ddc809b89e3340b98084d58e9cabad5b875d8c745"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Dedicated shared-link participant page with survey questions, answer review and editing, submission receipt, and same-tab resume."
-      ],
-      "changed": [
-        "Shared survey links open the participant page directly instead of the combined legacy staff surface; access-code and invitation routes remain available."
-      ],
+      "added": [],
+      "changed": [],
       "fixed": [
-        "Participant drafts and uncertain-submit recovery remain available throughout the dedicated page journey."
+        "Reloading after a failed first shared-link open asks for the original link without claiming an earlier participant session or possible submission."
       ],
-      "security": [
-        "Shared-link requests omit cookies and staff credentials, strip the link fragment before transport, and retain per-link draft isolation and idempotent submission retries."
-      ]
+      "security": []
     }
   }
 }
