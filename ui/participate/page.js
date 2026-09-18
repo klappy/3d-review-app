@@ -1,3 +1,4 @@
+import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError } from '../participant-view.js';
 import { reviewAnswer } from '../present.js';
@@ -38,7 +39,7 @@ function values(validate = false) {
   return out;
 }
 function paint(state) {
-  $('notice').textContent = state.notice || '';
+  $('notice').textContent = demo && state.phase === 'receipt' ? 'Practice only. No response was sent or saved.' : state.notice || '';
   if (state.phase !== renderedPhase || (state.form && state.form !== renderedForm)) {
     for (const id of ['answers', 'review', 'receipt']) $(id).hidden = true;
     if (state.phase === 'form') {
@@ -59,7 +60,7 @@ function paint(state) {
     } else {
       pager?.showReceipt();
       if (state.phase === 'receipt') {
-        $('receipt').replaceChildren(element('h2', 'Response saved'), element('p', `${state.receipt.response_id || 'ID unavailable'} · ${state.receipt.submitted_at || 'time unavailable'}`));
+        $('receipt').replaceChildren(element('h2', demo ? 'Practice complete — nothing sent' : 'Response saved'), element('p', `${state.receipt.response_id || 'ID unavailable'} · ${state.receipt.submitted_at || 'time unavailable'}`));
         $('receipt').hidden = false;
       }
     }
@@ -72,7 +73,11 @@ function paint(state) {
     else if (disabledBeforeRequest.has(button)) { button.disabled = disabledBeforeRequest.get(button); disabledBeforeRequest.delete(button); }
   }
 }
-const journey = createParticipantJourney({ window, storage: sessionStorage, onChange: paint });
+const demo = isDemo(location.search);
+if (demo) { document.querySelector('main > h1').textContent = 'Practice survey · nothing is sent'; document.querySelector('main > p').textContent = 'Use the real survey flow with source-pinned synthetic sample questions. Answers stay in memory and disappear when you leave or reload.'; const back = element('a', 'Back to the tour'); back.href = '/?demo=1#assessment/demo-assessment/collect'; document.querySelector('main').prepend(back); }
+const sample = demo ? sampleParticipantEnvironment(Number(new URLSearchParams(location.search).get('survey') || 0)) : null;
+if (demo) { $('submit').textContent = 'Finish practice — nothing sent'; $('recover').textContent = 'Check practice'; }
+const journey = createParticipantJourney({ ...(demo ? sample : { window, storage: sessionStorage }), onChange: paint });
 $('answers').addEventListener('input', () => journey.save(values()));
 $('answers').addEventListener('submit', event => { event.preventDefault(); try { journey.review(values(true)); } catch (error) { $('notice').textContent = error.message; } });
 $('edit').addEventListener('click', () => journey.edit());
@@ -80,4 +85,4 @@ $('submit').addEventListener('click', () => journey.submit());
 $('recover').addEventListener('click', () => journey.recover());
 // A newly pasted link selects a fresh controller; a participant page never changes into a staff surface.
 window.addEventListener('hashchange', () => location.reload());
-journey.start().catch(() => { $('notice').textContent = 'The survey could not be opened. Open your survey link again in a moment.'; });
+journey.start().then(() => { if (demo && new URLSearchParams(location.search).get('response') === '1' && journey.state.phase === 'form') { journey.save(sample.sampleAnswers); journey.review(sample.sampleAnswers); } }).catch(() => { $('notice').textContent = 'The survey could not be opened. Open your survey link again in a moment.'; });

@@ -15,11 +15,11 @@ test('E1: legacy header (now at /legacy/) carries exactly one Assessments link t
   assert.equal(links.length, 1); assert.ok(links[0].includes('href="/assess/#"')); assert.ok(!/session=|st_/.test(links[0]));
   assert.match(css, /\.rv:not\(\[data-staff-confirmed="true"\]\) #assess-link,\s*\.rv:not\(\[data-entry-view="workspace"\]\) #assess-link,\s*\.rv\[data-workspace-route="participant"\] #assess-link \{ display:none; \}/);
 });
-test('E1: the shell way back is /legacy/#facilitator, hidden until a session is observed; the statement is generated, hidden until signed in, and names where the rest lives', () => {
+test('E1: generic legacy backlink is retired; the statement is generated, hidden until signed in, and names where the rest lives', () => {
   for (const file of ['./index.html', '../index.html']) { // /assess/ alias and the root shell carry the same header
     const html = read(file);
     const back = html.match(/<a id="legacy-link"[^>]*>[^<]*<\/a>/g) || [];
-    assert.equal(back.length, 1, file); assert.ok(back[0].includes('href="/legacy/#facilitator"') && back[0].includes(' hidden'), file); assert.ok(!/session=|st_|invite=/.test(back[0]), file);
+    assert.equal(back.length, 0, file);
     assert.ok(html.includes('<details class="storage-note" id="whats-here-wrap" hidden>'), file);
     assert.ok(html.includes('<p class="storage-note" id="whats-here"></p>'), file);
   }

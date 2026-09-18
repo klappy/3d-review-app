@@ -1,3 +1,4 @@
+import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
 // /assess/ — showcase-based assessment screen (cookbook #16 order c5719384228, slice 1).
 // Starting page: the app-flows composition (sidebar · title · phase tabs · two-column body · lens survey rows).
 // Data: existing /v2 endpoints only, same-origin session (cookie or the legacy facilitatorToken). No fictional model.
@@ -18,8 +19,11 @@ const app = document.getElementById('app'), who = document.getElementById('who')
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const title = v => v.charAt(0).toUpperCase() + v.slice(1);
 const stageLabel = s => ({ prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' })[s] || esc(s);
-let token = null; try { token = sessionStorage.getItem('facilitatorToken'); } catch {}
+const demo = typeof location !== 'undefined' && isDemo(location.search);
+let tabStorage = memoryStorage(); if (!demo) { try { tabStorage = sessionStorage; } catch {} }
+let token = null; if (!demo) { try { token = sessionStorage.getItem('facilitatorToken'); } catch {} }
 async function api(url, { method = 'GET', body } = {}) {
+  if (demo) return demoApi(url, { method, body });
   const headers = { accept: 'application/json' };
   if (body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
@@ -31,6 +35,7 @@ async function api(url, { method = 'GET', body } = {}) {
 }
 // Same call, whole envelope (result + receipt + trace_id) — G1 shows receipt/trace on the row after a write.
 async function apiFull(url, { method = 'GET', body } = {}) {
+  if (demo) return { ok: true, result: await demoApi(url, { method, body }) };
   const headers = { accept: 'application/json' }; if (body !== undefined) headers['content-type'] = 'application/json'; if (token) headers.authorization = `Bearer ${token}`;
   let r; try { r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); } catch { throw new Error('API unavailable. For a write, its outcome is unknown.'); }
   let j = null; try { j = await r.json(); } catch {}
@@ -370,7 +375,7 @@ async function render() {
   }
 }
 // ---- scope pages + views (product overhaul): one runner for every { load, render, bind } module ----
-const setToken = t => { token = t || null; try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
+const setToken = t => { if (demo) return; token = t || null; try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
 function ctxFor(extra = {}) {
   return { api, apiFull, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, note: (text, alert = false) => { note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
     go: (hash, { reload = false } = {}) => { if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
@@ -418,8 +423,8 @@ function paint(r = route(location.hash), gen = generation) {
     // A1 precedence: route hash > recalled tab (`stage-tab:<aid>`, stage ids only) > server stage. Permissions is a peer tab but is never
     // written to the recall key (rememberTab rejects non-stage ids) and never carries data-stage, so compositionState never sees it.
     const a0 = state.current.assessment;
-    const tab = r.view || recalledTab(sessionStorage, a0.id, VIEWS.includes(a0.stage) ? a0.stage : 'prepare');
-    if (r.view) rememberTab(sessionStorage, a0.id, r.view);
+    const tab = r.view || recalledTab(tabStorage, a0.id, VIEWS.includes(a0.stage) ? a0.stage : 'prepare');
+    if (r.view) rememberTab(tabStorage, a0.id, r.view);
     app.innerHTML = context(state.current) + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') loadCounts(state.current);
     bindPrepare(state.current); mountView(state.current, tab, gen);
     document.title = `${title(tab)} · ${state.current.assessment.name} · 3D Review`;
@@ -429,11 +434,15 @@ function paint(r = route(location.hash), gen = generation) {
 // `#survey=` uses the dedicated participant page; `#invite=` (acceptance; Auth A13), `#participant`, `#facilitator`, `#workspace`, `#reports-card`,
 // `#evidence`. `#session=` is the Access return leg (src/index.ts:138, callback unchanged): consumed here exactly as legacy does —
 // same `facilitatorToken` key, stripped from history before any render, never echoed. Nothing else stores a credential.
-const LEGACY_HASHES = new Set(['#participant', '#facilitator', '#workspace', '#reports-card', '#evidence']);
+const LEGACY_HASHES = new Set(['#facilitator', '#workspace', '#evidence']);
 // Returns 'forwarded' (this page is leaving), 'session' (a session was consumed — identity must be re-observed), or null.
 // Runs on load AND on every hashchange (Auditor S1): fragment-only navigation after load takes the same path as a fresh load.
 function scrubCredentialHash() {
   const h = location.hash || '';
+  if (demo) { if (/^#(?:session|invite|survey)=/.test(h) || route(h).kind === 'entry') history.replaceState(null, '', location.pathname + '?demo=1#assessment/demo-assessment/prepare'); return null; }
+  if (h === '#how' || h === '#example') { location.replace('/?demo=1#assessment/demo-assessment/prepare'); return 'forwarded'; }
+  if (h === '#participant') { location.replace('/#survey'); return 'forwarded'; }
+  if (h === '#reports-card') { location.replace('/#projects'); return 'forwarded'; }
   if (/^#survey=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + h); return 'forwarded'; }
   if (/^#invite=/.test(h) || LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
   const m = /^#session=([A-Za-z0-9_]+)$/.exec(h);
@@ -457,6 +466,7 @@ let listening = false;
 function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
 async function boot() {
   if (scrubCredentialHash() === 'forwarded') return; // 'session' falls through: identity is observed fresh below
+  if (demo && !document.getElementById('demo-notice')) { const banner = document.createElement('section'); banner.id = 'demo-notice'; banner.className = 'panel'; banner.innerHTML = '<strong>Explore the real app · demonstration data</strong><p>These are the same screens used for assessments. Viewer access: nothing is sent or saved. Source-pinned synthetic responses and report; no real people.</p><a class="button" href="/participate/?demo=1">Try the sample survey</a> <a class="button" href="/">Close tour</a>'; const samples = document.createElement('p'); samples.append('Inspect a synthetic response in the real survey review: '); for (const sample of sampleResponses) { const link = document.createElement('a'); link.href = `/participate/?demo=1&survey=${sample.survey}&response=1`; link.textContent = `${sample.name} (${sample.count} responses) · `; samples.append(link); } banner.append(samples); app.before(banner); }
   const identity = identityGeneration;
   try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; }
   catch {
@@ -472,7 +482,7 @@ async function boot() {
     return; }
   who.textContent = `${state.principal.kind} · ${state.principal.id}`;
   // E1: signed-in staff get the real-app way back (same-origin session, no token) and the generated functionality statement.
-  const back = document.getElementById('legacy-link'); if (back) back.hidden = false;
+  const back = document.getElementById('legacy-link'); if (back) back.hidden = true;
   const wh = document.getElementById('whats-here'); if (wh) { wh.textContent = whatsHere(); const wrap = document.getElementById('whats-here-wrap'); if (wrap) wrap.hidden = false; else wh.hidden = false; }
   // A12 (R1/I1): a transient failure here renders a retryable message, never a blank page.
   try { const result = await api('/v2/projects'); if (identity !== identityGeneration) return; state.projects = result.projects || []; }

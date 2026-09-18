@@ -15,7 +15,7 @@ test('the public home opens with exactly the four captain-named choices, in orde
   const links=[...nav.matchAll(/<a class="rv-btn[^"]*" href="([^"]+)">([^<]+)<\/a>/g)].map(m=>[m[2],m[1]]);
   assert.deepEqual(links,[
     ['Read about it','#public-about'],
-    ['Take the tour','#how'],
+    ['Take the tour','/?demo=1#assessment/demo-assessment/prepare'],
     ['Take a survey','#participant'],
     ['Sign in','/v2/auth/access'],
   ]);
@@ -29,16 +29,16 @@ test('Read about it lands on the description inside the same page (not the parti
 });
 
 test('the sample and shared-report destinations remain, as labelled secondary links; the old unlabelled entry is gone',()=>{
-  assert.ok(home.includes('href="#example">Browse a sample assessment (invented data) →'));
-  assert.ok(home.includes('href="#reports-card">View a shared report'));
+  assert.ok(home.includes('href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →'));
+  assert.ok(home.includes('href="/#projects">View a shared report'));
   assert.ok(!home.includes('Manage assessments'));
   assert.ok(!home.includes('Here to take the survey?'));
   assert.ok(!home.includes('Show me how'));
 });
 
 test('the tour is labelled as a tour that sends nothing',()=>{
-  assert.ok(html.includes('<p class="eyebrow">Guided tour · nothing is sent · Step 1 of 5 · Prepare</p>'));
-  assert.ok(home.includes('The tour: 5 short steps · Go at your own pace · Nothing is sent'));
+  assert.ok(home.includes('/?demo=1#assessment/demo-assessment/prepare')); assert.ok(!html.includes('River Valley, an illustrative assessment'));
+  assert.ok(home.includes('Explore the real assessment screens · Go at your own pace · Nothing is sent'));
 });
 
 test('real sign-in is the only control in the primary flow; sandbox code controls open only by explicit choice',()=>{
@@ -93,6 +93,6 @@ test('global shell makes no dataset claim while actual sample and sandbox disclo
   assert.ok(header.includes('id="identity"')&&header.includes('id="version"'),'session and build identity controls remain');
   assert.ok(html.includes('Sandbox test identities (dev only) — not a real sign-in'));
   assert.ok(html.includes('Synthetic sandbox only (dev): .invalid test identities'));
-  assert.ok(html.includes('Everything here is invented.'));
-  assert.ok(html.includes('Browse a sample assessment (invented data)'));
+  assert.ok(home.includes('synthetic data'));
+  assert.ok(html.includes('Browse a sample assessment (synthetic data)'));
 });
