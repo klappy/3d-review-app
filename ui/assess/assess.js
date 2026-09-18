@@ -26,8 +26,16 @@ async function api(url, { method = 'GET', body } = {}) {
   let r; try { r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); }
   catch { throw new Error('API unavailable. For a write, its outcome is unknown.'); }
   let j = null; try { j = await r.json(); } catch {}
-  if (!r.ok || !j?.ok) { const e = new Error(j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; throw e; }
+  if (!r.ok || !j?.ok) { const e = new Error(j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
   return j.result;
+}
+// Same call, whole envelope (result + receipt + trace_id) — G1 shows receipt/trace on the row after a write.
+async function apiFull(url, { method = 'GET', body } = {}) {
+  const headers = { accept: 'application/json' }; if (body !== undefined) headers['content-type'] = 'application/json'; if (token) headers.authorization = `Bearer ${token}`;
+  let r; try { r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); } catch { throw new Error('API unavailable. For a write, its outcome is unknown.'); }
+  let j = null; try { j = await r.json(); } catch {}
+  if (!r.ok || !j?.ok) { const e = new Error(j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
+  return j;
 }
 const redact = m => redactDiagnosticPath(String(m || 'Request could not be completed.'));
 // State model (Bugbot 4040525117/137/128/144 — one transition matrix, not per-finding patches):
@@ -361,7 +369,7 @@ async function render() {
 // ---- scope pages + views (product overhaul): one runner for every { load, render, bind } module ----
 const setToken = t => { token = t || null; try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
 function ctxFor(extra = {}) {
-  return { api, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, note: (text, alert = false) => { note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
+  return { api, apiFull, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, note: (text, alert = false) => { note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
     go: (hash, { reload = false } = {}) => { if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
 }
 function pageFor(r) { return r.kind === 'permissions' ? views.permissions : pages[r.kind] || pages.projects; }
