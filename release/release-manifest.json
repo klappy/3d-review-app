@@ -1,34 +1,32 @@
 {
-  "version": "0.1.0",
+  "version": "0.3.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "69d9e6dcd71dc2abd3e6999fc5fd0e312d4cca6d",
+  "cookbook_commit": "d56bd74f8f9d50fe29e6f899c2ab7efa3702102d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.1.0.md",
-      "blob_sha": "e525cf63094bf09a4ae46eeb2741e7a68a833ff8",
-      "sha256": "1fe973844d3f04e1356ac0f58d29c2839eae7532fd22c61f834d723e44b98037"
+      "path": "planning/2026-09-16-parity-build/releases/0.3.0.md",
+      "blob_sha": "f3b74ad8425b47be525af5aae3039dcc46717313",
+      "sha256": "e42fb639e658dbffb1dee69d14f42ad3b70ba0cce9c3176c7bfc40e05fece97b"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "f4c2ded05fd8ddea0f45d0a1b923cd6a995bfd27",
-      "sha256": "b69e400707250dd8bb6af091276d776360bf776f1847a42d471dc7ceba494f3b"
+      "blob_sha": "54257e5f365efd79cfedab55b8f8bc9242339895",
+      "sha256": "75383395dd2ca744c104cebe7208e083b01c1b4b6c9a606c275a33a01c910994"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Shared survey link: an owner can issue one link per survey that participants open to take the survey without a personal code.",
-        "Release identity: a cookbook-pinned release record, a build-time version+commit stamp, version fields on health and MCP serverInfo, and a generated changelog.json for the version badge."
+        "Scoped Permissions controls for workspace, project and assessment grants, pending invitations, role changes, revocation and ownership transfer."
       ],
       "changed": [
-        "Health `build` now reports `<version>+<sha7>` derived from the pinned release record and the build commit instead of a hardcoded literal.",
-        "Rate limiter boundaries and OAuth flows hardened for the first DEV collection increment."
+        "Permission actions refresh server-owned roster and role state in place while keeping their outcome, receipt and trace visible."
       ],
       "fixed": [
-        "Email-code redemption is atomic; a code cannot be redeemed twice under concurrent requests, and conflict-recovery kinds are distinct."
+        "Successful permission actions no longer erase their confirmation through a blank-model route reload; transfer receipts resolve to grant rows."
       ],
       "security": [
-        "Rate-limited anonymous, code and bearer paths fail closed with RATE_LIMITED; OAuth code redemption is single-use."
+        "Danger actions retain preview/confirm with identical parameters; scopes remain explicit with no permission inheritance. Post-action access refusal hides stale controls while retaining the completed action receipt."
       ]
     }
   }

@@ -374,7 +374,7 @@ function ctxFor(extra = {}) {
 }
 function pageFor(r) { return r.kind === 'permissions' ? views.permissions : pages[r.kind] || pages.projects; }
 async function runPage(page, r, gen, root = app, extra = {}) {
-  const ctx = ctxFor(extra), params = { ...r, aid: r.id };
+  const ctx = ctxFor({ ...extra, isCurrent: () => gen === generation }), params = { ...r, aid: r.id };
   let model;
   try { model = await page.load(ctx, params); }
   catch (e) { if (gen !== generation) return; root.innerHTML = `<div class="narrow panel"><h1>${UNAUTHENTICATED.has(String(e.code)) ? 'Your sign-in is no longer active' : REFUSED.has(String(e.code)) ? 'Not visible to you' : 'Could not load this page'}</h1><p class="muted">${esc(redact(e.message))}</p><p>${UNAUTHENTICATED.has(String(e.code)) ? `<a class="button primary" href="#">Sign in</a>` : `<a class="button" href="#" data-retry-page>Retry</a>`}</p></div>`; root.querySelector('[data-retry-page]')?.addEventListener('click', ev => { ev.preventDefault(); render(); }); return; }

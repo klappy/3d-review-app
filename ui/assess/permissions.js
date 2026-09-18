@@ -57,7 +57,7 @@ export const permissions = {
   bind(ctx, root, m) {
     const base = `/v2/${SCOPE_SEG[m.scope]}/${ctx.enc(m.id)}`;
     const call = ctx.apiFull || (async (url, o) => ({ result: await ctx.api(url, o) }));
-    const paint = () => { root.innerHTML = permissions.render(ctx, m); permissions.bind(ctx, root, m); };
+    const paint = () => { if (ctx.isCurrent && !ctx.isCurrent()) return; root.innerHTML = permissions.render(ctx, m); permissions.bind(ctx, root, m); };
     const say = (notice, alert = false) => { m.notice = notice; m.alert = alert; paint(); };
     // Refresh server-owned roster/role state without replacing the action outcome.
     // A full route reload constructs a blank model and loses the receipt before it can be read.
@@ -69,7 +69,7 @@ export const permissions = {
     };
     const receiptText = env => `${env.receipt?.id ? ` receipt ${env.receipt.id}` : ''}${env.trace_id ? ` · trace ${env.trace_id}` : ''}`;
     const fail = (e, what) => { const k = classify(e); say(k === 'not_found' ? `${what}: ${NOT_AVAILABLE.toLowerCase()}.` : k === 'unauthenticated' ? 'Your sign-in is no longer active.' : `${what}: ${e.message || 'request failed'}${e.hint ? ` — ${e.hint}` : ''}`, true); };
-    root.querySelector('[data-retry="grants"]')?.addEventListener('click', e => { e.preventDefault(); refresh(); });
+    root.querySelector('[data-retry="grants"]')?.addEventListener('click', e => { e.preventDefault(); return refresh(); });
     // Danger twin: dry_run → sheet (impact verbatim) → execute with byte-identical params. CONFIRM_REQUIRED → silent re-dry_run once;
     // CONFIRM_EXPIRED → "Preview again". Never auto-retry execute.
     const preview = async (kind, url, params, label, extra = {}) => { m.busy = true; paint();
@@ -89,12 +89,12 @@ export const permissions = {
         if (code === 'CONFIRM_EXPIRED' || code === 'CONFIRM_REQUIRED') { s.token = null; say(`The confirmation expired. ${PREVIEW_AGAIN}`, true); return; }
         m.sheet = null; fail(e, s.label);
       } };
-    root.querySelector('[data-invite-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const email = f.querySelector('[name=email]').value.trim(), role = f.querySelector('[name=role]').value; preview('invite', `${base}/invitations`, { email, role }, 'Invitation', { display: { who: email } }); });
-    root.querySelectorAll('[data-change-role]').forEach(b => b.addEventListener('click', () => { const gid = b.dataset.changeRole; const role = root.querySelector(`[data-role-for="${CSS.escape(gid)}"]`)?.value; const g = m.grants.find(x => x.id === gid); if (!g || !role || role === g.role) { say('That is already the role.'); return; } preview('update_role', `${base}/grants/${ctx.enc(gid)}`, { role }, 'Role change', { method: 'PATCH', display: { who: g.principal_id, gid } }); }));
-    root.querySelector('[data-transfer-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const to = f.querySelector('[name=to]').value.trim(); const step_down = !!f.querySelector('[name=step_down]').checked; preview('transfer_owner', `${base}/transfer`, step_down ? { to, step_down: true } : { to }, 'Ownership transfer', { display: { who: to } }); });
+    root.querySelector('[data-invite-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const email = f.querySelector('[name=email]').value.trim(), role = f.querySelector('[name=role]').value; return preview('invite', `${base}/invitations`, { email, role }, 'Invitation', { display: { who: email } }); });
+    root.querySelectorAll('[data-change-role]').forEach(b => b.addEventListener('click', () => { const gid = b.dataset.changeRole; const role = root.querySelector(`[data-role-for="${CSS.escape(gid)}"]`)?.value; const g = m.grants.find(x => x.id === gid); if (!g || !role || role === g.role) { say('That is already the role.'); return; } return preview('update_role', `${base}/grants/${ctx.enc(gid)}`, { role }, 'Role change', { method: 'PATCH', display: { who: g.principal_id, gid } }); }));
+    root.querySelector('[data-transfer-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const to = f.querySelector('[name=to]').value.trim(); const step_down = !!f.querySelector('[name=step_down]').checked; return preview('transfer_owner', `${base}/transfer`, step_down ? { to, step_down: true } : { to }, 'Ownership transfer', { display: { who: to } }); });
     // single-call writes: mode is never sent (contract §3.5)
-    root.querySelectorAll('[data-revoke]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`${base}/grants/${ctx.enc(b.dataset.revoke)}`, { method: 'DELETE' }); m.busy = false; say(`Access removed.${receiptText(env)}`); await refresh(); } catch (e) { m.busy = false; fail(e, 'Remove access'); } }));
-    root.querySelectorAll('[data-revoke-invitation]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`/v2/invitations/${ctx.enc(b.dataset.revokeInvitation)}`, { method: 'DELETE' }); m.busy = false; say(`Invitation revoked.${receiptText(env)}`); await refresh(); } catch (e) { m.busy = false; fail(e, 'Revoke invitation'); } }));
+    root.querySelectorAll('[data-revoke]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`${base}/grants/${ctx.enc(b.dataset.revoke)}`, { method: 'DELETE' }); say(`Access removed.${receiptText(env)}`); await refresh(); } catch (e) { m.busy = false; fail(e, 'Remove access'); } }));
+    root.querySelectorAll('[data-revoke-invitation]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`/v2/invitations/${ctx.enc(b.dataset.revokeInvitation)}`, { method: 'DELETE' }); say(`Invitation revoked.${receiptText(env)}`); await refresh(); } catch (e) { m.busy = false; fail(e, 'Revoke invitation'); } }));
     root.querySelector('[data-confirm-execute]')?.addEventListener('click', execute);
     root.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => { m.sheet = null; say(null); });
   },

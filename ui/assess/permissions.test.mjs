@@ -9,7 +9,7 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const err = (code, status, message = code, hint) => Object.assign(new Error(message), { code, status, hint });
 const G = 'GET /v2/assessment/a1/grants';
 const roster = (mine) => ({ grants: [{ id: 'g_me', principal_id: 'me', role: mine }, { id: 'g_own', principal_id: 'boss', role: 'owner' }, { id: 'g_mem', principal_id: 'pat', role: 'member' }, { id: 'g_view', principal_id: 'val', role: 'viewer' }], pending_invitations: [{ id: 'inv_p', role: 'viewer', status: 'pending', created_at: '2026-09-17T00:00:00Z' }, { id: 'inv_u', role: 'member', status: 'unconfirmed', created_at: '2026-09-17T00:00:00Z' }, { id: 'inv_acc', role: 'viewer', status: 'accepted' }] });
-function fakeApi(table) { const calls = []; const apiFull = async (url, init = {}) => { calls.push({ url, ...init }); const h = table[`${init.method || 'GET'} ${url}`]; if (!h) throw err('NOT_FOUND_OR_NOT_VISIBLE', 404, 'resource not found or not visible'); const v = typeof h === 'function' ? h(init) : h; if (v instanceof Error) throw v; return v.ok === undefined ? { ok: true, result: v, trace_id: 'tr_1', receipt: { id: 'rcpt_1' } } : v; }; const api = async (u, o) => (await apiFull(u, o)).result; return { api, apiFull, calls }; }
+function fakeApi(table) { const calls = []; const apiFull = async (url, init = {}) => { calls.push({ url, ...init }); const h = table[`${init.method || 'GET'} ${url}`]; if (!h) throw err('NOT_FOUND_OR_NOT_VISIBLE', 404, 'resource not found or not visible'); const v = await (typeof h === 'function' ? h(init) : h); if (v instanceof Error) throw v; return v.ok === undefined ? { ok: true, result: v, trace_id: 'tr_1', receipt: { id: 'rcpt_1' } } : v; }; const api = async (u, o) => (await apiFull(u, o)).result; return { api, apiFull, calls }; }
 // fake DOM: elements by attribute; forms carry field values; querySelectorAll by attribute prefix
 function makeRoot(html, fields = {}) {
   const els = {}; for (const m of html.matchAll(/(data-[a-z-]+)(?:="([^"]*)")?/g)) { const key = m[2] !== undefined ? `${m[1]}=${m[2]}` : m[1]; els[key] = els[key] || { dataset: { [m[1].slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase())]: m[2] }, handlers: {}, addEventListener(ev, fn) { this.handlers[ev] = fn; }, fire(ev, e = { preventDefault() {}, currentTarget: null }) { e.currentTarget = e.currentTarget || this; return this.handlers[ev]?.(e); }, querySelector(sel) { const n = /\[name=(\w+)\]/.exec(sel)?.[1]; return n ? { value: fields[n] ?? '', checked: !!fields[n + '_checked'] } : null; } }; }
@@ -184,4 +184,19 @@ test('post-success refresh refusal/failure hides stale access controls, preserve
     }
     assert.equal(x.calls.filter(c => c.method === 'DELETE').length, 1, 'refresh never repeats a mutation');
   }
+});
+
+
+test('late permission refresh cannot repaint a route the user has left', async () => {
+  let finishRead, reads = 0;
+  const x = await mount('member', {
+    [G]: () => ++reads === 1 ? roster('member') : new Promise(resolve => { finishRead = resolve; }),
+    'DELETE /v2/assessment/a1/grants/g_view': { status: 'revoked' },
+  });
+  let current = true; x.ctx.isCurrent = () => current;
+  const pending = x.click('data-revoke="g_view"');
+  await new Promise(resolve => setImmediate(resolve));
+  current = false; x.root.innerHTML = '<h1>Another page</h1>';
+  finishRead(roster('member')); await pending;
+  assert.equal(x.root.html, '<h1>Another page</h1>');
 });
