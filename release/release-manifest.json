@@ -1,7 +1,7 @@
 {
   "version": "0.5.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "2b5cb0f75bc109b0c42b2bef89996a2953eaf149",
+  "cookbook_commit": "46b554d9615a1bc91df7c7c8dec62e8f7824fc2e",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.5.0.md",
@@ -10,20 +10,21 @@
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "7c525a6a5e19775dfa3028fe6a209464a1673b47",
-      "sha256": "cc4e31785579d0ef611c63fc0cba7cbea6694fe63097b06c464fc498f943e817"
+      "blob_sha": "bf4b556583f5a553aa83b663d553acb71845664d",
+      "sha256": "76c705b1fdb1130fd714c152edab36d1c4915a4a37730c991d419bcadcd9372c"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Interactive MCP Apps panel resource using the existing docs/read/write/danger tool boundary and host bridge.",
-        "Panel workspace, project and assessment navigation with Prepare, Collect, Understand, Improve and Permissions views."
+        "One self-contained MCP Apps resource, attached to the existing four tools, with SDK host bridge.",
+        "Workspace and project navigation, assessment views, survey inclusion, reflection notes, report reads and assessment invitation confirmation UI.",
+        "Loading, refusal, error and host-capability states. Local AppBridge harness is excluded from deployed assets."
       ],
       "changed": [],
       "fixed": [],
       "security": [
-        "Panel resources require the same MCP authorization as tool calls; SDK and shared presentation assets are bundled without off-origin dependencies."
+        "Resource access uses existing MCP authorization. Tool permission checks and dangerous-operation confirmation remain server-owned. No new tool, API endpoint or database migration."
       ]
     }
   }

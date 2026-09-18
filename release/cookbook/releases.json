@@ -8,13 +8,14 @@
       "notes_path": "releases/0.5.0.md",
       "sections": {
         "added": [
-          "Interactive MCP Apps panel resource using the existing docs/read/write/danger tool boundary and host bridge.",
-          "Panel workspace, project and assessment navigation with Prepare, Collect, Understand, Improve and Permissions views."
+          "One self-contained MCP Apps resource, attached to the existing four tools, with SDK host bridge.",
+          "Workspace and project navigation, assessment views, survey inclusion, reflection notes, report reads and assessment invitation confirmation UI.",
+          "Loading, refusal, error and host-capability states. Local AppBridge harness is excluded from deployed assets."
         ],
         "changed": [],
         "fixed": [],
         "security": [
-          "Panel resources require the same MCP authorization as tool calls; SDK and shared presentation assets are bundled without off-origin dependencies."
+          "Resource access uses existing MCP authorization. Tool permission checks and dangerous-operation confirmation remain server-owned. No new tool, API endpoint or database migration."
         ]
       }
     },
