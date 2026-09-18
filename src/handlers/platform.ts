@@ -90,7 +90,7 @@ const FEEDBACK_STRIP_KEYS = ["answers", "responses", "response"] as const;
 const FEEDBACK_WRITE_KEYS = new Set([
   "helpful", "note", "text", "context", "scope_type", "scope_id",
   "satisfaction", "confusion", "frustration", "sentiment_journey",
-  "cast_id", "persona", "goal_id",
+  "cast_id", "persona", "goal_id", "require_authenticated",
 ]);
 const FEEDBACK_SCORE_KEYS = ["satisfaction", "confusion", "frustration"] as const;
 const FEEDBACK_CODE_UNIT_128 = ["sentiment_journey", "cast_id", "persona", "goal_id"] as const;
@@ -110,6 +110,9 @@ function asFeedbackString(value: unknown, key: string): string {
 
 /** Persist accepted write keys under canonical body keys; row scopes stay opaque labels. */
 export const opsFeedback: Handler = async (ctx, p) => {
+  // Optional caller precondition, shared by HTTP and MCP. Never degrade an attributed UI write to anonymous.
+  if ("require_authenticated" in p && typeof p.require_authenticated !== "boolean") throw invalidFeedback("require_authenticated must be a boolean");
+  if (p.require_authenticated === true && ctx.principal.kind === "anonymous") throw new CapError("NOT_AUTHENTICATED", "Sign in before sending this feedback");
   const stripped = FEEDBACK_STRIP_KEYS.some((k) => k in p);
   const rest: Record<string, unknown> = { ...p };
   for (const k of FEEDBACK_STRIP_KEYS) delete rest[k];

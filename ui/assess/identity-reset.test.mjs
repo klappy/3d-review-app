@@ -10,7 +10,7 @@ function harness() {
   const nodes = new Map(['app', 'who', 'note', 'legacy-link', 'whats-here-wrap'].map(id => [id, { innerHTML: 'old', textContent: 'old', hidden: false, querySelector: () => disclosure }]));
   const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace(/export function /g, 'function ');
   const box = { isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/' }, redactDiagnosticPath: x => x };
-  const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,setApi:fn=>api=fn,setRender:fn=>render=fn})', box);
+  const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn})', box);
   return { ...api, nodes, disclosure };
 }
 const deferred = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
@@ -70,4 +70,13 @@ test('old count completion does not release the new identity pending count', asy
   h.state.current = current; h.loadCounts(current); h.resetIdentity(); h.state.current = current; h.loadCounts(current);
   old.resolve({}); await Promise.resolve(); await Promise.resolve();
   assert.equal(h.state.countInflight.has('s'), true); assert.equal(h.state.counts.get('s').status, 'loading');
+});
+
+
+test('same-survey repaint preserves sharing but route departure permanently invalidates its model', () => {
+ const h=harness(),model={aid:'a1',sid:'s1',epoch:0,link:null};
+ h.state.share=model;h.setHash('#assessment/a1/survey/s1');
+ assert.equal(h.currentShareRoute(),model);
+ h.setHash('#workspaces');assert.equal(h.currentShareRoute(),null);
+ h.setHash('#assessment/a1/survey/s1');assert.equal(h.currentShareRoute(),null);
 });

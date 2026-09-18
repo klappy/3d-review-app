@@ -213,11 +213,26 @@ input:not([type=checkbox]):not([type=radio]),select,textarea,dialog,.report-lens
 .theme-control { display:flex; align-items:center; gap:8px; font-size:13px; }
 .theme-control select { width:auto; min-height:36px; margin:0; padding:5px 8px; }
 @media(prefers-reduced-transparency:reduce) { .panel,header,dialog { background:var(--paper); } }
-</style></head><body><!-- 3D Review — MCP Apps panel (source). Built by scripts/build-mcp-panel.mjs into src/mcp-panel.html, which src/mcp.ts serves as
+/* Inline cards size to their content, not the host's viewport. Theme is owned separately. */
+html,body{min-height:0}
+body.mcp-compact{max-width:640px;padding:0 12px 12px}
+.mcp-compact main{padding:0;margin:12px 0 0;max-width:100%}
+.mcp-compact .panel-head{padding:8px 0}
+.mcp-compact .crumbs,.mcp-compact #status:empty{display:none}
+.action-card{padding:16px;overflow-wrap:anywhere}
+.action-card h2{margin-top:0;font-size:18px}
+
+.action-impact dd { margin:0 0 8px; overflow-wrap:anywhere; white-space:pre-wrap; }
+.action-impact dt { font-weight:600; }
+
+.survey-questions { padding-left:24px; overflow-wrap:anywhere; }
+.survey-questions > li { padding:8px 0; }
+.survey-questions h3 { font-size:1rem; }
+</style></head><body class="mcp-compact"><!-- 3D Review — MCP Apps panel (source). Built by scripts/build-mcp-panel.mjs into src/mcp-panel.html, which src/mcp.ts serves as
      resource ui://3d-review/panel.html (text/html;profile=mcp-app). Everything is inlined: SDK bundle, design tokens, shared cards.
      The panel calls ONLY the existing four tools (docs / read / write / danger) through the host bridge; the host supplies the bearer.
      A card's placement never implies authorization: every action maps to a capability and the server's refusal is rendered as-is. -->
-<header class="panel-head"><span class="brand">3D <span>Review</span></span><span class="small muted" id="who">Connecting…</span><label class="theme-control">Theme<select id="panel-theme" aria-label="Panel theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label><span class="small muted" id="host-note"></span></header>
+<header class="panel-head"><span class="brand">3D <span>Review</span></span><span class="small muted" id="who">Tool result</span><label class="theme-control">Theme<select id="panel-theme" aria-label="Panel theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label><span class="small muted" id="host-note"></span></header>
 <nav class="crumbs" id="crumbs" aria-label="Scope"></nav>
 <main id="app"><p class="muted">Loading…</p></main>
 <p class="small" role="status" aria-live="polite" id="status"></p>
@@ -336,10 +351,75 @@ const projectCard = p => card({ eyebrow: 'Project', title: p.name, href: routes.
 const assessmentCard = a => card({ eyebrow: 'Assessment', title: a.name, href: routes.assessment(a.id), meta: [a.language_name || a.language_id ? `Language: ${a.language_name || a.language_id}` : ''], badge: a.archived_at ? 'Archived' : stageLabel(a.stage), archived: !!a.archived_at, id: a.id });
 const surveyCard = (aid, s) => card({ eyebrow: s.perspective || 'Survey', title: s.template_name || s.template_id || s.id, href: routes.survey(aid, s.id), meta: [s.version ? `Version ${s.version}` : ''], badge: s.archived_at ? 'Archived' : '', archived: !!s.archived_at, id: s.id });
 
+// Host-call presentation only. No automatic tool calls or persisted arguments/tokens.
+function createActionCard({ root, esc, call, explore, execution, canExplore = () => true, canConfirm = canExplore }) {
+  let input = null, envelope = null, pending = null, busy = false, message = '';
+  const decode = event => event?.structuredContent || (() => { try { return JSON.parse(event?.content?.[0]?.text); } catch { return event; } })();
+  const label = cap => ({'cap.grant.invite':'Invite collaborator','cap.report.build':'Build report','cap.workspace.delete':'Delete workspace','cap.assessment.get':'Assessment','cap.project.get':'Project','cap.workspace.get':'Workspace'}[cap] || (typeof cap === 'string' ? cap.replace(/^cap\./, '').split('.').join(' ') : '3D Review guidance'));
+  const trace = env => env?.trace_id ? `<p class="small muted">trace ${esc(env.trace_id)}</p>` : '';
+  const impactDetails = impact => !impact || typeof impact !== 'object' ? '' : `<dl class="action-impact">${['effect','irreversible','compensating_control','affected'].filter(key => Object.hasOwn(impact,key)).map(key => `<dt>${esc(key.replaceAll('_',' '))}</dt><dd>${esc(typeof impact[key] === 'object' ? JSON.stringify(impact[key]) : String(impact[key]))}</dd>`).join('')}</dl>`;
+  function templateQuestions(result) {
+    const items = Array.isArray(result.items) ? result.items : Array.isArray(result.template?.items) ? result.template.items : [];
+    const text = value => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+    return `<p class="small">Read-only questionnaire · ${esc(items.length)} questions · ${esc(text(result.template?.perspective))} · version ${esc(text(result.template?.version) || 'unavailable')}</p>${items.length ? `<ol class="survey-questions">${items.map(item => `<li><h3>${esc(text(item?.text) || text(item?.id) || 'Question text unavailable')}</h3>${item?.requiredness === 'unresolved' ? '<p>May leave unanswered; requirement policy is unresolved.</p>' : ''}${item?.answer_semantics === 'unresolved_no_problems_vs_skipped' ? '<p>Leaving this blank is unknown, not “no problems.”</p>' : ''}${item?.type === 'scale' ? `<p>Scale: ${esc(text(item.scale?.min))} to ${esc(text(item.scale?.max))}</p>` : item?.type === 'text' ? '<p>Written response</p>' : ['single','multi'].includes(item?.type) ? `<p>${item.type === 'single' ? 'Choose one' : 'Choose all that apply'}</p><ul>${(Array.isArray(item.options) ? item.options : []).map(option => `<li>${esc(text(option?.label) || text(option?.text) || text(option?.code))}${option?.exclusive || option?.flag === 'exclusion' ? ' (cannot combine with other choices)' : ''}</li>`).join('')}</ul>` : '<p>Question format unavailable.</p>'}</li>`).join('')}</ol>` : '<p>No questions were included in this result.</p>'}`;
+  }
+  function render() {
+    const env = envelope, result = env?.result || {}, cap = env?.capability || input?.capability;
+    let title = label(cap), body = 'Waiting for this tool result…', state = 'loading', entity = null, questions = '';
+    if (env) {
+      if (env.ok === false || env.isError) { title = 'Not available'; body = 'This request could not be completed.'; state = 'refused'; }
+      else if (cap === 'cap.ops.feedback') { title = 'Feedback received'; body = 'Your feedback was recorded. Its private contents are not displayed here.'; state = 'complete'; }
+      else if (cap === 'cap.auth.me') { title = 'Sign-in checked'; body = 'The assistant received the current authorization details.'; state = 'complete'; }
+      else if (cap === 'cap.ops.health') { title = 'Service status'; body = `Version ${typeof result.version === 'string' ? result.version : 'unavailable'}`; state = 'complete'; }
+      else if (result.suppressed === true || result.status === 'held') { title = 'Result held'; body = 'This result remains unavailable under the current policy.'; state = 'held'; }
+      else if (['cap.template.get','cap.template.render'].includes(cap)) { title = result.template?.name || 'Survey questionnaire'; body = 'Questions returned by this request. This view does not submit answers.'; state = 'complete'; questions = templateQuestions(result); }
+      else {
+        entity = result.assessment || result.project || result.workspace;
+        title = entity?.name || title;
+        body = pending ? 'Review this action before confirming. It may make an irreversible change.' : entity ? 'This is the entity returned by your request.' : cap ? 'The requested operation returned successfully.' : 'Guidance is available in the assistant’s tool response.';
+        state = pending ? 'preview' : 'complete';
+      }
+    }
+    root.innerHTML = `<section class="panel action-card" data-state="${state}"><h2>${esc(title)}</h2><p>${esc(message || body)}</p>${questions}${pending ? `<p class="small">Action: ${esc(label(pending.capability))} · scope ${esc(pending.params.scope || '')} ${esc(pending.params.id || pending.params.aid || '')}${pending.capability === 'cap.grant.invite' ? ` · recipient ${esc(pending.params.email || '')} · role ${esc(pending.params.role || '')}` : ''}</p>${impactDetails(pending.impact)}<p class="small">Confirmation expires in ${esc(pending.expiresIn)} seconds.</p><div class="actions"><button data-card-confirm ${busy || !canConfirm() ? 'disabled' : ''}>Confirm action</button><button data-card-cancel ${busy ? 'disabled' : ''}>Cancel</button></div>` : ''}${trace(env)}<button class="quiet" data-card-explore ${busy || !canExplore() ? 'disabled' : ''}>Open workspaces</button></section>`;
+    root.querySelector('[data-card-explore]').onclick = () => { if (!busy && canExplore()) { pending = null; explore(); } };
+    root.querySelector('[data-card-cancel]')?.addEventListener('click', () => { if (!busy) { pending=null; message='Cancelled. No action was executed by this card.'; render(); } });
+    root.querySelector('[data-card-confirm]')?.addEventListener('click', async () => {
+      if (busy || !pending || !canConfirm()) return;
+      const action=pending; pending=null;
+      if (Date.now() >= action.expires) { message='Preview expired. Ask the assistant to preview again.'; render(); return; }
+      busy=true; execution(true); message='Executing confirmed action…'; render();
+      try {
+        envelope=await call('danger',{capability:action.capability,params:action.params,mode:'execute',confirm_token:action.token});
+        message='';
+      } catch (error) {
+        envelope={ok:false,trace_id:error?.trace_id};
+        message='The outcome could not be confirmed. Check the action state before requesting another preview; no automatic retry was made.';
+      } finally { busy=false; execution(false); render(); }
+    });
+  }
+  function receiveInput(event) {
+    if (busy) return false;
+    // Clone now so host object mutation cannot change the later confirmed parameters.
+    input=event?.arguments ? JSON.parse(JSON.stringify(event.arguments)) : null;
+    envelope=null;pending=null;message='';render();return true;
+  }
+  function receiveResult(event) {
+    if (busy) return false;
+    envelope=decode(event);pending=null;message='';
+    if (event?.isError && envelope) envelope={...envelope,isError:true};
+    const r=envelope?.result;
+    if (envelope?.ok === true && !envelope.isError && input?.mode === 'dry_run' && input.capability === envelope.capability && r?.suppressed !== true && typeof r?.confirm_token === 'string' && r.confirm_token && Number.isFinite(r.expires_in) && r.expires_in>0) {
+      pending={capability:input.capability,params:input.params || {},token:r.confirm_token,expires:Date.now()+r.expires_in*1000,expiresIn:r.expires_in,impact:r.impact || envelope.impact};
+    }
+    render();return true;
+  }
+  return {render,receiveInput,receiveResult};
+}
+
 const $ = id => document.getElementById(id);
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
-const state = { me: null, route: { kind: 'workspaces' }, caps: null, busy: false, executing: false, sheet: null, hostError: null, notice: null, alert: false, cache: new Map() };
+const state = { mode: 'card', me: null, route: { kind: 'workspaces' }, caps: null, busy: false, executing: false, sheet: null, hostError: null, notice: null, alert: false, cache: new Map() };
 const app = new window.McpApps.App({ name: '3d-review panel', version: '0.1.0' });
 // ---- theme: presentation only; no tools or account settings are touched.
 function mountPanelTheme(app, doc, win) {
@@ -393,12 +473,13 @@ function sharedAssessmentsHtml(me, asPage) {
 // ---- routing (internal; the iframe URL never changes, so no scope or credential lands in a host history)
 function parse(hash) { const p = hash.replace(/^#/, '').split('/').map(decodeURIComponent); if (!p[0] || p[0] === 'workspaces') return { kind: 'workspaces' }; if (p[0] === 'workspace') return { kind: 'workspace', id: p[1] }; if (p[0] === 'projects') return { kind: 'projects' }; if (p[0] === 'project') return { kind: 'project', id: p[1] }; if (p[0] === 'shared-assessments') return { kind: 'shared-assessments' }; if (p[0] === 'assessment' && p[1]) return { kind: 'assessment', id: p[1], view: VIEWS.includes(p[2]) ? p[2] : null }; return { kind: 'workspaces' }; }
 let routeGeneration = 0;
-function go(hash) { if (state.executing) return; routeGeneration++; state.route = parse(hash); state.sheet = null; state.hostError = null; state.notice = null; state.busy = false; render(); }
+function go(hash) { if (state.executing) return; state.mode = 'app'; document.body.classList.remove('mcp-compact'); routeGeneration++; state.route = parse(hash); state.sheet = null; state.hostError = null; state.notice = null; state.busy = false; render(); }
 document.addEventListener('click', e => { const a = e.target.closest('a[href^="#"]'); if (!a) return; e.preventDefault(); const h = a.getAttribute('href'); if (h === '#retry') return render(); go(h); });
 
 // ---- render
 let gen = 0;
 async function render() {
+  if (state.mode === 'card') { ++gen; actionCard.render(); return; }
   const g = ++gen, r = state.route, root = $('app'); root.innerHTML = '<p class="muted">Loading…</p>'; $('status').textContent = state.notice || ''; $('status').className = 'small ' + (state.alert ? 'alert' : 'muted');
   if (state.hostError) { $('crumbs').innerHTML = ''; root.innerHTML = refusal(state.hostError, 'host request') + '<p><a href="#workspaces">Open workspaces</a></p>'; return; }
   try {
@@ -499,34 +580,26 @@ function bind(root) {
   root.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => { if (state.busy) return; state.sheet = null; say(null); });
 }
 
-// ---- host wiring: a tool result pushed by the host (the assistant called read/docs) steers the panel to that entity
-app.addEventListener('toolresult', ev => {
-  const env = ev?.structuredContent || (ev?.content?.[0]?.text ? safeJson(ev.content[0].text) : ev);
-  if (!env || state.executing) return;
-  // Failed envelopes may omit capability. Keep the refusal through the later boot render,
-  // invalidate older reads/actions, and never display inaccessible entity details or hints.
-  if (env.ok === false || ev?.isError) {
-    routeGeneration++; state.sheet = null; state.busy = false; state.notice = null;
-    state.hostError = { code: env.error?.code || 'ERROR', message: 'The host tool request failed.', trace_id: env.trace_id };
-    render(); return;
-  }
-  const hadError = !!state.hostError; state.hostError = null;
-  const cap = env.capability, res = env.result;
-  if (cap === 'cap.assessment.get' && res?.assessment?.id) return go(routes.assessment(res.assessment.id));
-  if (cap === 'cap.project.get' && res?.project?.id) return go(routes.project(res.project.id));
-  if (cap === 'cap.workspace.get' && res?.workspace?.id) return go(routes.workspace(res.workspace.id));
-  if (cap === 'cap.workspace.list') return go('#workspaces');
-  if (cap === 'cap.project.list') return go('#projects');
-  if (hadError) render();
-});
+// Initial host calls stay compact. Full exploration is an explicit user action.
+const actionCard = createActionCard({root:$('app'),esc,call,canExplore:()=>state.caps!==null,canConfirm:()=>!!state.caps?.serverTools,execution:on=>{state.executing=on;},explore:async()=>{
+  if(state.caps===null)return;
+  state.mode='app'; document.body.classList.remove('mcp-compact');
+  const generation=++routeGeneration; ++gen;
+  $('app').innerHTML='<p class="muted">Loading workspaces…</p>';
+  try { const me=await read('cap.auth.me'); if(generation!==routeGeneration)return; state.me=me; }
+  catch(e) { if(generation!==routeGeneration)return; state.me=null; }
+  if(generation===routeGeneration)go('#workspaces');
+}});
+function beginCard() { ++routeGeneration; ++gen; state.mode='card'; state.sheet=null; state.hostError=null; state.notice=null; state.busy=false; $('crumbs').innerHTML=''; $('status').textContent=''; document.body.classList.add('mcp-compact'); }
+app.addEventListener('toolinput', ev => { if(state.executing)return; beginCard(); actionCard.receiveInput(ev); });
+app.addEventListener('toolresult', ev => { if(state.executing)return; beginCard(); actionCard.receiveResult(ev); });
+beginCard();actionCard.render();
 app.onerror = e => { $('status').textContent = 'Bridge error: ' + (e?.message || e); };
 app.connect().then(async () => {
   panelTheme.ready();
   state.caps = app.getHostCapabilities() || {}; $('host-note').textContent = state.caps.serverTools ? '' : 'host: no app-initiated tool calls';
-  try { state.me = await read('cap.auth.me'); $('who').textContent = `${state.me.principal.kind} · ${state.me.principal.id}`; }
-  catch (e) { $('who').textContent = kindOf(e) === 'unauthenticated' ? 'Not signed in (host bearer missing or expired)' : e.message; }
-  render();
-}).catch(e => { panelTheme.ready(); $('who').textContent = 'Connect failed: ' + (e?.message || e); });
+  if(state.mode==='card')actionCard.render();
+}).catch(e => { panelTheme.ready(); state.caps={}; if(state.mode==='card')actionCard.render(); $('who').textContent = 'Connect failed: ' + (e?.message || e); });
 })();
 </script>
 </body></html>
