@@ -230,3 +230,15 @@ describe("ops feedback persist MCP twins — Prefer 5732375 F1–F7 / N1–N9", 
     }
   });
 });
+
+it('MCP shares the opt-in authenticated feedback precondition without restricting public callers', async () => {
+  const before=(await db.prepare('SELECT count(*) n FROM feedback').first<any>()).n;
+  const refused=await writeFeedback({note:'local refused fixture',require_authenticated:true});
+  expect(refused.env.ok).toBe(false);expect(refused.env.error.code).toBe('NOT_AUTHENTICATED');
+  expect((await db.prepare('SELECT count(*) n FROM feedback').first<any>()).n).toBe(before);
+  const admitted=await writeFeedback({note:'local attributed fixture',require_authenticated:true},userToken);
+  expect(admitted.env.ok).toBe(true);
+  const row=await db.prepare('SELECT actor,body FROM feedback WHERE id=?').bind(admitted.env.result.feedback_id).first<any>();
+  expect(row.actor).toBe('person_mara');expect(JSON.parse(row.body)).not.toHaveProperty('require_authenticated');
+  expect((await writeFeedback({note:'local public fixture',require_authenticated:false})).env.ok).toBe(true);
+});

@@ -1,30 +1,32 @@
 {
-  "version": "0.9.3",
+  "version": "0.11.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "80d8111fe7ffe9cb14516120de485c469bbe12d6",
+  "cookbook_commit": "515aed295f14c155a91ca28274a315b7ee9629fa",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.9.3.md",
-      "blob_sha": "07195f8984ae536432193fe6b9a199be1135686c",
-      "sha256": "a2929099f3504a5943d5da95bc7e20250194d3115655bc239199b9d5b71feae9"
+      "path": "planning/2026-09-16-parity-build/releases/0.11.0.md",
+      "blob_sha": "f14d68299b0cf6520715c179874bb3ea884b9b74",
+      "sha256": "e9dc3365c570c8c4f83aee3275ef6897b2b251350d646bd32ac3fe0b50779a23"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "f2603c5fbcd0d97a23f535c45ef2631a1cda7acb",
-      "sha256": "1ae848ab989b7c70fd5c83f550a29b7cf4c9c2c08504dad269655917893f846d"
+      "blob_sha": "ea05e8d80c348e743e46391d595e0e88a46e475b",
+      "sha256": "5eb1490381e2a343b3f644164e04a340a89b61a35e2b8058eecc47c6184efd56"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "Signed-in users can send optional app feedback from the current shell with a separate form and a confirmed feedback reference."
+      ],
       "changed": [
-        "Theme scorecard: 6/6 automated local scenarios and 4/4 bounded official reference-host visual scenarios passed; human satisfaction, confusion and frustration are NOT MEASURED."
+        "Persona evidence includes three historical local-browser form cases and current automated HTTP/MCP expiry and form regressions; human satisfaction, confusion and frustration are NOT MEASURED."
       ],
       "fixed": [
-        "The MCP panel follows the host light/dark theme with operating-system fallback and live updates; a local System/Light/Dark override takes precedence."
+        "Entered feedback survives refused or uncertain submissions; the form requests authenticated attribution at the actual write boundary instead of relying on cached sign-in."
       ],
       "security": [
-        "Theme changes do not invoke tools or change authentication, permissions, confirmations or persisted product data."
+        "Optional require_authenticated on the existing HTTP/MCP feedback write refuses anonymous callers before persistence when true; omission or false preserves public feedback. No database migration or automatic context capture."
       ]
     }
   }

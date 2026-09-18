@@ -10,6 +10,7 @@ import * as cards from '/assess/cards.js';
 import { pages, css as scopeCss } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
+import { feedback } from '/assess/feedback.js';
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 // Product overhaul (cookbook #16 c5721465315): five VIEWS on one assessment page. A view is a tab; a tab never mutates stage.
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
@@ -91,6 +92,7 @@ export function route(hash) {
   // One page per scope: entry → workspaces → ONE workspace → ONE project → ONE assessment (five views) → survey.
   if (!parts[0]) return { kind: 'entry' };
   if (['how', 'example', 'signin', 'survey'].includes(parts[0]) && !parts[1]) return { kind: 'entry', intent: parts[0] };
+  if (parts[0] === 'feedback' && !parts[1]) return { kind: 'feedback' };
   if (parts[0] === 'workspaces') return { kind: 'workspaces' };
   if (parts[0] === 'workspace' && parts[1]) return { kind: 'workspace', id: parts[1] };
   if (parts[0] === 'projects') return { kind: 'projects' };
@@ -377,10 +379,10 @@ async function render() {
 // ---- scope pages + views (product overhaul): one runner for every { load, render, bind } module ----
 const setToken = t => { if (demo) return; token = t || null; try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
 function ctxFor(extra = {}) {
-  return { api, apiFull, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, note: (text, alert = false) => { note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
+  return { api, apiFull, demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, note: (text, alert = false) => { note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
     go: (hash, { reload = false } = {}) => { if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
 }
-function pageFor(r) { return r.kind === 'permissions' ? views.permissions : pages[r.kind] || pages.projects; }
+function pageFor(r) { if (r.kind === 'feedback') return feedback; return r.kind === 'permissions' ? views.permissions : pages[r.kind] || pages.projects; }
 async function runPage(page, r, gen, root = app, extra = {}) {
   const ctx = ctxFor({ ...extra, isCurrent: () => gen === generation }), params = { ...r, aid: r.id };
   let model;
@@ -488,7 +490,7 @@ async function boot() {
   try { const result = await api('/v2/projects'); if (identity !== identityGeneration) return; state.projects = result.projects || []; }
   catch (e) { if (identity !== identityGeneration) return; // Auth A14: a direct #assessment/<id> still renders under "Granted to you"; the project list failure is a retryable notice, not a dead end.
     state.projects = []; note.innerHTML = `Could not load your project list (${esc(redact(e.message))}). <a href="#" data-retry-boot>Retry</a>`; note.querySelector('[data-retry-boot]').onclick = ev => { ev.preventDefault(); note.textContent = ''; boot(); };
-    if (route(location.hash).kind !== 'assessment' && route(location.hash).kind !== 'survey') { app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
+    if (!['assessment', 'survey', 'feedback'].includes(route(location.hash).kind)) { app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
   listen();
   await render();
 }
