@@ -1,30 +1,30 @@
 {
-  "version": "0.14.3",
+  "version": "0.15.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "c9045c2fb940caa77685225fd432f2714bc3256d",
+  "cookbook_commit": "7c1bd9e40e9f5a0cd94172f9d5d8e3fd5157e65d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.14.3.md",
-      "blob_sha": "8e37f9ae04a8d54bb0f7d2e5eaf52acc593cf48d",
-      "sha256": "6823fe8e49f30451dcb09ec0056a7309102962885b34f463be440bfd092984a5"
+      "path": "planning/2026-09-16-parity-build/releases/0.15.0.md",
+      "blob_sha": "ce0f0fbd985bf3b644d1a81d1555928fa9e3a8b1",
+      "sha256": "5edefca8756950a205e3efa935d13384f993d0b0c5233686099dec47112ca7d8"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "c5489f623500e19a2c9d2af8725d178508556405",
-      "sha256": "ae69abb21bef831902af94e0e7ab2dc3760695d9f331ae74d72278936809a01f"
+      "blob_sha": "d3f8de263e86d7caca9f117ff5098f17141a05c9",
+      "sha256": "491758fc7d0094c7c09348bfd05cc49ec327424469e4f59d0f4ed4b2a7f489f3"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "In-place app feedback preserves current work and reports registered page context with loaded-client release identity through the existing HTTP/MCP contract."
+      ],
       "changed": [
-        "Persona evidence: author local Chrome3/3 and automated22/22 passed; physical pagination, reporter confirmation and human ratings remain unmeasured."
+        "Persona evidence: author local modal component3/3, feedback/identity DOM21/21 and provenance20/20 passed; full-shell browser and human outcomes remain unmeasured."
       ],
-      "fixed": [
-        "Blank survey preview and print default to US Letter; explicit A4 remains available and controls the generated page size."
-      ],
+      "fixed": [],
       "security": [
-        "Isolated blank-only printing, authorization and credential exclusions are unchanged."
+        "Context accepts only registered page/component enums; no answers, tokens, full URLs or private IDs. Submission identity remains separate."
       ]
     }
   }
