@@ -31,7 +31,7 @@ async function call(face:string,op:'write'|'read',params:any,bearer?:string){
  const res=await app.fetch(req,env);const j:any=await res.json();return face==='http'?j:j.result.structuredContent;
 }
 const count=()=>db.prepare('SELECT count(*) n FROM feedback').first();
-const experience={occurred_at:'2026-09-17T10:11:12.000Z',surface:'mcp_panel',host:'chatgpt',client_release:{version:'0.8.0',commit:'a'.repeat(40)},api_release:{version:'0.9.0',commit:'b'.repeat(40),environment:'production',build_uuid:null}};
+const experience={context:{page:'assessment',component:'app_feedback'},occurred_at:'2026-09-17T10:11:12.000Z',surface:'mcp_panel',host:'chatgpt',client_release:{version:'0.8.0',commit:'a'.repeat(40)},api_release:{version:'0.9.0',commit:'b'.repeat(40),environment:'production',build_uuid:null}};
 for(const face of ['http','mcp'])describe(`${face}: provenance local Request+D1 fixture`,()=>{
  it('server metadata cannot be changed by misleading caller context; public omission stays valid',async()=>{
   const w=await call(face,'write',{context:{version:'99.0.0',environment:'production'},note:'synthetic note'});expect(w.ok).toBe(true);expect(Object.keys(w.result).sort()).toEqual(['feedback_id','recorded','stripped']);
