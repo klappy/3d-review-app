@@ -31,7 +31,7 @@ export function mountView(root,initial,onIntent,screenSet,actionSet,body){
   const snapshot=generation,values=JSON.parse(b.dataset.values||'{}');
   if(a.id!=='browse-view'&&!['navigation','tour-next','tour-back','start-signin'].includes(a.id)){
    for(const f of root.querySelectorAll('[data-kit-field][name]')){if(f.closest('[data-slot]'))continue;values[f.name]=f.type==='checkbox'?f.checked:f.value;}
-   dispatched.add(a.id);for(const x of root.querySelectorAll('[data-intent]'))if(x.dataset.intent===a.id)x.disabled=true;
+   dispatched.add(a.id);for(const x of root.querySelectorAll('[data-intent]'))if(x.dataset.intent===a.id&&!x.closest('[data-slot]'))x.disabled=true;
   }
   if(snapshot===generation)callback?.({action:a.id,context:{...model.context},values});
  }
