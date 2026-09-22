@@ -16,7 +16,7 @@ export function mountView(root,initial,onIntent,screenSet,actionSet,body){
  const button=(a,values={},scope=null)=>{
   const key=scope?`item:${scope.index}:${a.id}`:a.id;
   const index=bindings.push({action:a,values:structuredClone(values),context:structuredClone(scope?scope.context:model.context),key,item:!!scope})-1;
-  return `<button type="button" class="${a.primary?'primary':''}" data-intent="${esc(a.id)}" data-binding="${index}" data-values="${esc(JSON.stringify(scope?{}:values))}"${values.view===model.view?' aria-current="page"':''}${blocked(a,key)?' disabled':''}>${esc(a.label)}</button>`;
+  return `<button type="button" class="${a.primary?'primary':''}" data-intent="${esc(a.id)}" data-binding="${index}" data-values="${esc(JSON.stringify(scope?{}:values))}"${a.id==='browse-view'&&typeof values.view==='string'&&values.view===model.view?' aria-current="page"':''}${blocked(a,key)?' disabled':''}>${esc(a.label)}</button>`;
  };
  const itemControls=(item,index)=>{
   if(!item.context||typeof item.context!=='object'||Array.isArray(item.context))return '';
