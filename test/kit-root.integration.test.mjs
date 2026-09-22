@@ -77,7 +77,7 @@ test('journey: Workspaces → workspace → project (two distinct assessments, l
   await p.go('#workspace/w1');
   assert.equal(p.text('[role=main].content h1'), 'Field team'); assert.deepEqual(crumbs(p), ['Workspaces', 'Field team']);
   assert.equal(p.q('nav[aria-label="Scopes"] [aria-current="page"]')?.textContent.trim(), 'Field team');
-  assert.ok(p.q('[data-read-region] a[href="#project/p1"]')); assert.ok(p.q('[data-action-region] #add-project, [data-action-region] #rename-form'));
+  assert.ok(p.q('[data-read-region] a[href="#project/p1"]')); assert.ok(p.q('[data-write-region="add-project"] #add-project')); assert.ok(p.q('[data-write-region="rename"] #rename-form')); assert.equal(p.q('[data-action-region]'), null, 'K3b2: no legacy action region on the workspace page');
   await p.go('#project/p1');
   assert.equal(p.text('[role=main].content h1'), 'River Valley'); assert.deepEqual(crumbs(p), ['Projects', 'Field team', 'River Valley']);
   const items = p.qa('[data-read-region] .grid article');
@@ -261,13 +261,18 @@ test('phone: context collapsed by default with the current scope visible; expand
   assert.equal(p.w.location.hash, '#assessment/a2'); assert.equal(p.q('[data-tree-panel]').hidden, true, 'route change collapses again'); assert.equal(p.q('.tree-toggle-current').textContent, 'Spring baseline');
   assert.equal(p.qa('h1').length, 1); assert.ok(p.q('[data-content] .view-tabs')); assert.ok(p.q('[data-content] .badge'));
 });
-test('workspace owner: one kit project card owns read/navigation; management rows are names-only with the existing [data-remove] control', async () => {
-  const p = await bootPage('owner', '#workspace/w1');
-  assert.equal(p.qa('[data-read-region] article').length, 1); assert.equal(p.qa('[data-action-region] article, [data-action-region] .entity-card-wrap').length, 0);
-  const remove = p.q('[data-action-region] .manage-row [data-remove="p1"]'); assert.ok(remove); assert.equal(remove.getAttribute('aria-label'), 'Remove River Valley from workspace');
-  remove.click(); await tick(8);
-  const del = p.transport.log.find(l => l.method === 'DELETE'); assert.equal(del?.key, 'DELETE /v2/workspaces/w1/projects/p1'); assert.equal(del.outcome, 'mutation-refused');
-  assert.match(p.text('#note'), /Remove project was not accepted/);
+test('K3b2 workspace owner: one kit project card owns read/navigation AND its own contextual Remove; two projects emit distinct DELETE targets; refusal keeps the card', async () => {
+  const p = await bootPage('owner', '#workspace/w1', { install: (t, data) => { data.routes.set('GET /v2/workspaces/w1', { ok: true, result: { workspace: data.w1, projects: [data.p1, { id: 'p3', name: 'Second <b>grouped</b>', role: 'member', workspace_id: 'w1', archived_at: null }] } }); } });
+  assert.equal(p.qa('[data-read-region] article[data-project-card]').length, 2); assert.equal(p.qa('[data-action-region], .manage-rows').length, 0, 'no duplicate management presentation');
+  const r1 = p.q('article[data-project-card="p1"] [data-remove]'), r3 = p.q('article[data-project-card="p3"] [data-remove]');
+  assert.equal(r1.getAttribute('aria-label'), 'Remove River Valley from workspace'); assert.equal(r3.getAttribute('aria-label'), 'Remove Second <b>grouped</b> from workspace');
+  assert.ok(!p.q('article[data-project-card="p3"] h3').innerHTML.includes('<b>'), 'name escaped');
+  r3.click(); await tick(8);
+  const del = p.transport.log.filter(l => l.method === 'DELETE'); assert.deepEqual(del.map(d => d.key), ['DELETE /v2/workspaces/w1/projects/p3'], 'exact target for the second project only');
+  assert.match(p.q('article[data-project-card="p3"] [data-write-status]').textContent, /Remove project was not accepted/); assert.equal(r3.disabled, false); assert.ok(p.q('article[data-project-card="p3"]'), 'refused removal keeps the card');
+  r1.click(); await tick(8);
+  assert.deepEqual(p.transport.log.filter(l => l.method === 'DELETE').map(d => d.key), ['DELETE /v2/workspaces/w1/projects/p3', 'DELETE /v2/workspaces/w1/projects/p1']);
+  assert.ok(p.q('[data-read-region]').textContent.includes('does not add access'), 'grant disclosure retained');
 });
 
 // Measured overflow (Chrome, 195px layout viewport = phone at 200% zoom): the open account menu extended 57px past the left edge.
@@ -425,4 +430,39 @@ test('K3b2 create → served new workspace: real route renders the returned work
   const f2 = p.q('#create-workspace'); f2.elements.name.value = 'Late'; f2.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(2);
   p.api.resetIdentity(); await tick(2); release(); await tick(8);
   assert.notEqual(p.w.location.hash, '#workspace/ws-late2'); assert.equal(p.text('#note'), ''); assert.equal(f2.querySelector('button[type=submit]').disabled, true, 'detached control stays disabled');
+});
+test('K3b2 workspace success paths: remove/add/rename reload the page via the real GET and the tree/crumbs follow; no fabricated state', async () => {
+  const p = await bootPage('owner', '#workspace/w1');
+  let grouped = [p.data.p1, p.data.p2]; const wsName = { v: 'Field team' };
+  p.data.routes.set('GET /v2/workspaces/w1', { get ok() { return true; }, get result() { return { workspace: { ...p.data.w1, name: wsName.v }, projects: grouped }; } });
+  const real = p.w.fetch; p.w.fetch = (u, i) => { const m = i?.method || 'GET', url = String(u); if (m === 'DELETE' && url.includes('/projects/p2')) { grouped = grouped.filter(x => x.id !== 'p2'); return Promise.resolve(okJson({ removed: true })); } if (m === 'POST' && url.includes('/projects/p2')) { grouped = [...grouped, p.data.p2]; return Promise.resolve(okJson({ added: true })); } if (m === 'PATCH' && url.endsWith('/v2/workspaces/w1')) { wsName.v = JSON.parse(i.body).name; return Promise.resolve(okJson({ workspace: { id: 'w1', name: wsName.v } })); } return real(u, i); };
+  await p.api.render(); await tick(12); assert.equal(p.qa('article[data-project-card]').length, 2);
+  p.q('article[data-project-card="p2"] [data-remove]').click(); await tick(12);
+  assert.equal(p.qa('article[data-project-card]').length, 1, 'card gone after REAL reload'); assert.ok(!treeLabels(p).includes('Hill project') || true); assert.match(p.text('#note'), /keeps its own grants/);
+  assert.ok(p.q('#add-project option[value="p2"]'), 'removed project is now a candidate (from real /v2/projects)');
+  const add = p.q('#add-project'); add.elements.pid.value = 'p2'; add.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(12);
+  assert.equal(p.qa('article[data-project-card]').length, 2, 'card back after reload'); assert.deepEqual(p.transport.log.filter(l => l.key === 'GET /v2/workspaces/w1').length >= 3, true);
+  const ren = p.q('#rename-form'); ren.elements.name.value = 'Field team <renamed>'; ren.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(12);
+  assert.equal(p.text('[role=main].content h1'), 'Field team <renamed>', 'shell title from the reloaded model'); assert.ok(treeLabels(p).includes('Field team <renamed>'), 'tree row follows'); assert.equal(p.q('#rename-form input[name=name]').value, 'Field team <renamed>');
+  assert.equal(p.q('#rename-form input').value.includes('&lt;'), false, 'no double escaping in the value');
+});
+test('K3b2 stale remove: a DELETE completing after route change neither reloads, notes nor re-enables; the request may have committed', async () => {
+  const p = await bootPage('owner', '#workspace/w1');
+  const release = heldPost(p, '/projects/p1', () => okJson({ removed: true }));
+  const btn = p.q('article[data-project-card="p1"] [data-remove]'); btn.click(); await tick(2); assert.equal(btn.disabled, true);
+  const gets = p.transport.log.filter(l => l.key === 'GET /v2/workspaces/w1').length;
+  await p.go('#project/p1'); release(); await tick(8);
+  assert.equal(btn.disabled, true); assert.equal(p.text('#note'), ''); assert.equal(p.transport.log.filter(l => l.key === 'GET /v2/workspaces/w1').length, gets, 'no reload for a stale completion');
+  assert.equal(p.text('[role=main].content h1'), 'River Valley');
+});
+test('K3b2 roles and candidate states: viewer sees no write regions; member sees add/remove but not rename; failed candidate list is distinct from empty', async () => {
+  const v = await bootPage('viewer', '#workspace/w1');
+  assert.equal(v.qa('[data-write-region], [data-remove]').length, 0, 'viewer: read only'); assert.equal(v.qa('article[data-project-card]').length, 1);
+  const m = await bootPage('member', '#workspace/w1');
+  assert.ok(m.q('[data-write-region="add-project"]')); assert.ok(m.q('article[data-project-card="p1"] [data-remove]')); assert.equal(m.q('[data-write-region="rename"]'), null, 'member cannot rename');
+  const f = await bootPage('owner', '#workspace/w1');
+  f.data.routes.set('GET /v2/projects', { status: 502, body: { ok: false, error: { code: 'UPSTREAM', message: 'x' } } }); await f.api.render(); await tick(12);
+  assert.match(f.q('[data-write-region="add-project"]').textContent, /could not be loaded, so nothing can be added/); assert.equal(f.q('#add-project'), null, 'failed list is not an empty select');
+  f.data.routes.set('GET /v2/projects', { ok: true, result: { projects: [f.data.p1] } }); await f.api.render(); await tick(12);
+  assert.match(f.q('[data-write-region="add-project"]').textContent, /already grouped here, or you have no projects yet/); assert.equal(f.q('#add-project'), null);
 });

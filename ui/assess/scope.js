@@ -242,16 +242,19 @@ const workspace = {
   render(ctx, model) {
     const g = gate(ctx, model, { href: ctx.routes.workspaces, label: 'All workspaces' }); if (g) return g;
     const w = model.workspace, edit = CAN_EDIT.has(w.role), owner = w.role === 'owner';
-    // Management lives on the card itself (root visual delta, loc-27): one card per project, its own Remove control beneath it.
-    const rows = '';
-    const add = edit ? `<section class="panel" style="margin-top:22px"><h2>Add a project</h2>${model.candidatesStatus === 'loaded' ? (model.candidates.length ? `<form id="add-project"><label class="field">Project<select name="pid" required><option value="">Choose a project…</option>${model.candidates.map(p => `<option value="${ctx.esc(p.id)}">${ctx.esc(p.name)}</option>`).join('')}</select></label><div class="actions"><button class="primary" type="submit">Add to workspace</button></div></form>` : '<p class="muted">Every project you can open is already grouped here, or you have no projects yet.</p>') : '<p class="muted">The project list could not be loaded right now.</p>'}<p class="small muted">Only projects you already hold a role on can be grouped. Grouping never grants access.</p></section>` : '';
-    const rename = owner ? `<section class="panel" style="margin-top:22px"><h2>Rename</h2><form id="rename-form"><label class="field">Workspace name<input name="name" maxlength="100" required value="${ctx.esc(w.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
     const r = readModel('workspace', model);
-    // Read region: kit cards for grouped projects. Action region: the existing per-card Remove controls, Add and Rename forms (same selectors).
-    return readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/workspaces/${ctx.enc(w.id)}">Permissions</a>`)}<h3>Projects</h3>${kitGrid(ctx, r.items, r.empty)}`)
-      // Ruling: one kit card owns read/navigation; management is a names-only row per project carrying the EXISTING [data-remove] control
-      // (same selector/handler/permission). Accessible action name includes the project.
-      + actionRegion(`${edit && model.projects.length ? `<ul class="manage-rows" aria-label="Grouped projects">${model.projects.map(p => `<li class="manage-row"><span>${ctx.esc(p.name)}</span><button type="button" class="quiet small" data-remove="${ctx.esc(p.id)}" aria-label="Remove ${ctx.esc(p.name)} from workspace">Remove from workspace</button></li>`).join('')}</ul>` : ''}${rows}${add}${rename}`);
+    // K3b2: one kit card per grouped project owns read/navigation AND (when permitted) its own contextual Remove action —
+    // no separate management rows. Grouping disclosure stays factual: removal never revokes the project's own grants.
+    const cards = r.items.map(x => `<article class="glass panel${x.archived ? ' archived' : ''}" style="min-width:0;overflow-wrap:anywhere" data-project-card="${ctx.esc(x.id)}"><p class="eyebrow">${ctx.esc(x.eyebrow)}</p><div class="row"><h3><a href="${ctx.esc(x.href)}">${ctx.esc(x.title)}</a></h3>${x.role ? `<span class="badge">${ctx.esc(x.role)}</span>` : ''}${x.archived ? '<span class="badge">Archived</span>' : ''}</div>${edit ? `<div class="row card-actions"><button type="button" class="quiet small" data-remove="${ctx.esc(x.id)}" aria-label="Remove ${ctx.esc(x.title)} from workspace">Remove from workspace</button><span class="status small" role="status" aria-live="polite" data-write-status></span></div>` : ''}</article>`);
+    const grid = cards.length ? `<div class="grid">${cards.join('')}</div>` : `<p class="muted">${ctx.esc(r.empty)}</p>`;
+    const candidates = !edit ? '' : model.candidatesStatus === 'loaded'
+      ? (model.candidates.length ? `<form id="add-project"><label>Project<select name="pid" required><option value="">Choose a project…</option>${model.candidates.map(p => `<option value="${ctx.esc(p.id)}">${ctx.esc(p.name)}</option>`).join('')}</select></label><div class="row"><button class="primary" type="submit">Add to workspace</button><span class="status" role="status" aria-live="polite" data-write-status></span></div></form>` : '<p class="muted">Every project you can open is already grouped here, or you have no projects yet.</p>')
+      : model.candidatesStatus === 'unauthenticated' ? `<p class="muted" role="alert">Your session has ended. <a href="${ctx.routes.entry}">Sign in</a> to add projects.</p>`
+      : model.candidatesStatus === 'refused' ? '<p class="muted">The project list is not visible to you here.</p>'
+      : `<p class="muted" role="alert">The project list could not be loaded, so nothing can be added right now. <button type="button" class="quiet" data-act="retry">Retry</button></p>`;
+    const add = edit ? `<section class="glass panel kit-write" data-write-region="add-project"><h3>Add a project</h3>${candidates}<p class="small muted">Only projects you already hold a role on can be grouped. Grouping never grants access.</p></section>` : '';
+    const rename = owner ? `<section class="glass panel kit-write" data-write-region="rename"><h3>Rename workspace</h3><form id="rename-form"><label>Workspace name<input name="name" type="text" maxlength="100" required autocomplete="off" value="${ctx.esc(w.name)}"></label><div class="row"><button class="primary" type="submit">Save name</button><span class="status" role="status" aria-live="polite" data-write-status></span></div></form></section>` : '';
+    return readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/workspaces/${ctx.enc(w.id)}">Permissions</a>`)}<h3>Projects</h3>${grid}<p class="small muted">A workspace groups projects you can already open; it does not add access to other projects.</p>`) + add + rename;
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, workspace, model);
@@ -259,20 +262,28 @@ const workspace = {
     const reload = async () => { const next = await workspace.load(ctx, model.params); swap(ctx, root, workspace, next); };
     root.querySelector('#add-project')?.addEventListener('submit', async ev => {
       ev.preventDefault();
-      const form = ev.target, pid = val(form, 'pid');
-      if (!pid) return;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Add project', () => ctx.api(`/v2/workspaces/${ctx.enc(id)}/projects/${ctx.enc(pid)}`, { method: 'POST' }));
-      if (r) { ctx.note('Project added.'); await reload(); }
+      const form = ev.target, button = form.querySelector('button[type=submit]'), status = form.querySelector('[data-write-status]'), pid = val(form, 'pid');
+      if (button.disabled) return;
+      if (!pid) { status.textContent = 'Choose a project.'; return; }
+      const r = await write(ctx, button, 'Add project', () => ctx.api(`/v2/workspaces/${ctx.enc(id)}/projects/${ctx.enc(pid)}`, { method: 'POST' }), status);
+      if (r === undefined) return;
+      ctx.note('Project added to the workspace.'); await reload();
     });
     root.querySelectorAll('[data-remove]').forEach(b => b.addEventListener('click', async () => {
-      const r = await write(ctx, b, 'Remove project', () => ctx.api(`/v2/workspaces/${ctx.enc(id)}/projects/${ctx.enc(b.dataset.remove)}`, { method: 'DELETE' }));
-      if (r) { ctx.note('Project removed from the workspace. It keeps its own grants.'); await reload(); }
+      if (b.disabled) return;
+      const status = b.parentElement?.querySelector('[data-write-status]') || null;
+      const r = await write(ctx, b, 'Remove project', () => ctx.api(`/v2/workspaces/${ctx.enc(id)}/projects/${ctx.enc(b.dataset.remove)}`, { method: 'DELETE' }), status);
+      if (r === undefined) return;
+      ctx.note('Project removed from the workspace. It keeps its own grants.'); await reload();
     }));
     root.querySelector('#rename-form')?.addEventListener('submit', async ev => {
       ev.preventDefault();
-      const form = ev.target;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Rename', () => ctx.api(`/v2/workspaces/${ctx.enc(id)}`, { method: 'PATCH', body: { name: val(form, 'name') } }));
-      if (r) { ctx.note('Renamed.'); await reload(); }
+      const form = ev.target, button = form.querySelector('button[type=submit]'), status = form.querySelector('[data-write-status]'), name = val(form, 'name');
+      if (button.disabled) return;
+      if (!name) { status.textContent = 'Enter a workspace name.'; form.elements.name.focus(); return; }
+      const r = await write(ctx, button, 'Rename', () => ctx.api(`/v2/workspaces/${ctx.enc(id)}`, { method: 'PATCH', body: { name } }), status);
+      if (r === undefined) return;
+      ctx.note('Workspace renamed.'); await reload();
     });
   },
 };
