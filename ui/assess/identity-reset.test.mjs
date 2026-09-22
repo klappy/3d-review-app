@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { isDemo, memoryStorage } from '../demo.js';
+import * as cards from './cards.js';
+import { mountKitRoot, shellModel } from '../kit/app-adapter.js';
 
 // Execute the actual shell functions with deferred API replies, without starting its browser boot.
 function harness() {
@@ -10,7 +12,8 @@ function harness() {
   const nodes = new Map(['app', 'who', 'note', 'legacy-link', 'whats-here-wrap', 'account-actions', 'account-status', 'account-signout', 'account-switch', 'account-switch-confirm', 'account-switch-cancel', 'account-switch-dialog'].map(id => [id, { innerHTML: 'old', textContent: 'old', hidden: false, querySelector: () => disclosure, addEventListener() {}, close() {}, showModal() {} }]));
   const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace(/export function /g, 'function ');
   const navigations = [], removed = [], fetches = [];
-  const box = { history: {replaceState() {}}, sessionStorage: {getItem() {return null;},removeItem:k=>removed.push(k)}, isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/', assign: path=>navigations.push(path) }, redactDiagnosticPath: x => x, fetch: (url, options) => { fetches.push({ url, options }); return Promise.resolve({ ok: true }); } };
+  // K3a: the real adapter is supplied; with no #rv node the kit root is absent and the controller falls back to #app unchanged.
+  const box = { cards, mountKitRoot, shellModel, history: {replaceState() {}}, sessionStorage: {getItem() {return null;},removeItem:k=>removed.push(k)}, isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/', assign: path=>navigations.push(path) }, redactDiagnosticPath: x => x, fetch: (url, options) => { fetches.push({ url, options }); return Promise.resolve({ ok: true }); } };
   const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn,loadAccountEmail,signOut,setFetch:fn=>fetch=fn,setCredential:t=>token=t,getCredential:()=>token,setListen:fn=>listen=fn})', box);
   return { ...api, nodes, disclosure, navigations, removed, fetches };
 }
@@ -50,9 +53,9 @@ test('old write completion cannot attach a status or dirty flag to a new identit
 
 test('workspace failure is retryable and old workspace replies are discarded', async () => {
   const h = harness(); h.state.projects = [{ id: 'p', workspace_id: 'w' }]; let calls = 0;
-  h.setApi(async () => { if (++calls === 1) throw Error('transient'); return { workspace: { name: 'Workspace' }, projects: [] }; });
+  h.setApi(async () => { if (++calls === 1) throw Error('transient'); return { workspace: { name: 'Workspace', role: 'member' }, projects: [] }; });
   assert.equal(await h.workspaceFor('p'), null); assert.equal(h.state.workspaces.has('w'), false);
-  assert.equal((await h.workspaceFor('p')).name, 'Workspace'); assert.equal(calls, 2);
+  const loaded = await h.workspaceFor('p'); assert.equal(loaded.name, 'Workspace'); assert.equal(loaded.role, 'member', 'workspace cache keeps the role the GET returned'); assert.equal(calls, 2);
   h.state.workspaces.clear(); const reply = deferred(); h.setApi(() => reply.promise); const pending = h.workspaceFor('p');
   h.resetIdentity(); reply.resolve({ workspace: { name: 'Old private workspace' }, projects: [] }); await pending;
   assert.equal(h.state.workspaces.size, 0);

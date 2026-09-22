@@ -131,7 +131,7 @@ test('RESERVED_NOT_BUILT renders honest not-built, not retry', async () => {
 test('project: refused assessments list is shown as not visible, page still renders', async () => {
   const ctx = ctxWith({ 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'viewer' }, languages: [] }, 'GET /v2/projects/p1/assessments': err('NOT_AUTHORIZED_AT_SCOPE'), 'GET /v2/projects/p1/languages': { languages: [] } });
   const m = await pages.project.load(ctx, { id: 'p1' }); assert.equal(m.status, 'loaded'); assert.equal(m.assessmentsStatus, 'refused');
-  const h = pages.project.render(ctx, m); assert.ok(h.includes('not visible to you')); assert.ok(h.includes('<h1>P</h1>'));
+  const h = pages.project.render(ctx, m); assert.ok(h.includes('not visible to you')); assert.ok(h.includes('data-read-head="P"')); assert.ok(h.includes('data-read-region')); assert.ok(!h.includes('data-action-region'), 'viewer: no retained action forms');
 });
 
 // ---------- entry ----------
@@ -209,4 +209,115 @@ test('signed-in welcome never displays internal identity or invented email and d
   let calls=0;const ctx=ctxWith({}, {state:{principal:{id:'private-opaque',email:'not-verified@example.invalid'}},signOut:async()=>{calls++;}});
   const model=await pages.entry.load(ctx);const html=pages.entry.render(ctx,model);assert.ok(!html.includes('private-opaque'));assert.ok(!html.includes('not-verified@example.invalid'));
   const root={querySelector:()=>null,querySelectorAll:()=>[{dataset:{act:'signout'},addEventListener:(_type,fn)=>root.click=fn}]};pages.entry.bind(ctx,root,model);await root.click();assert.equal(calls,1);assert.equal(ctx.calls.length,0);
+});
+
+// ---------- Bugbot 4073693743: title ownership is an explicit host contract ----------
+const FOUR = {
+  'GET /v2/workspaces': { workspaces: [{ id: 'w1', name: 'Field team', role: 'owner' }] },
+  'GET /v2/workspaces/w1': { workspace: { id: 'w1', name: 'Field team', role: 'owner' }, projects: [{ id: 'p1', name: 'River', archived_at: null }] },
+  'GET /v2/projects': { projects: [{ id: 'p1', name: 'River', role: 'owner' }] },
+  'GET /v2/projects/p1': { project: { id: 'p1', name: 'River', role: 'owner' }, languages: [] },
+  'GET /v2/projects/p1/assessments': { assessments: [] }, 'GET /v2/projects/p1/languages': { languages: [] },
+};
+const FOUR_PAGES = [['workspaces', {}, 'Your workspaces', 'Optional grouping'], ['workspace', { id: 'w1' }, 'Field team', 'Workspace'], ['projects', {}, 'Choose a project', 'Your projects'], ['project', { id: 'p1' }, 'River', 'Project']];
+const h1s = h => (h.match(/<h1[ >]/g) || []).length;
+test('non-kit host (shellOwnsTitle absent or false): all four loaded pages render exactly one eyebrow + h1 with the page title', async () => {
+  for (const over of [{}, { shellOwnsTitle: false }, { shellOwnsTitle: undefined }]) {
+    const ctx = ctxWith(FOUR, over);
+    for (const [kind, params, title, eyebrow] of FOUR_PAGES) {
+      const m = await pages[kind].load(ctx, params); assert.equal(m.status, 'loaded', kind);
+      const h = pages[kind].render(ctx, m);
+      assert.equal(h1s(h), 1, `${kind}: exactly one h1 when the host does not own the title`);
+      assert.ok(h.includes(`<h1>${title}</h1>`), `${kind}: heading is the page title`); assert.ok(h.includes(`<p class="eyebrow">${eyebrow}</p>`), `${kind}: eyebrow`);
+      assert.ok(h.indexOf('<h1>') < h.indexOf('data-read-region') + 200, `${kind}: heading leads the read region`);
+    }
+  }
+});
+test('kit host (shellOwnsTitle === true): the four loaded pages render NO h1 — the shell header owns the single page title', async () => {
+  const ctx = ctxWith(FOUR, { shellOwnsTitle: true });
+  for (const [kind, params, title] of FOUR_PAGES) {
+    const h = pages[kind].render(ctx, await pages[kind].load(ctx, params));
+    assert.equal(h1s(h), 0, `${kind}: no page-owned h1 under the kit shell`);
+    if (kind === 'workspace' || kind === 'project') assert.ok(h.includes(`data-read-head="${title}"`), `${kind}: read head still carries role/permissions`);
+  }
+});
+test('title contract is a boolean host flag, not DOM coincidence: truthy non-boolean values do not suppress the heading', async () => {
+  for (const v of [1, 'kit', {}]) { const ctx = ctxWith(FOUR, { shellOwnsTitle: v }); assert.equal(h1s(pages.projects.render(ctx, await pages.projects.load(ctx, {}))), 1); }
+});
+test('title follows the current model on re-render (route/currentness change): workspace w1 → w2 renders w2’s name', async () => {
+  const ctx = ctxWith({ ...FOUR, 'GET /v2/workspaces/w2': { workspace: { id: 'w2', name: 'Lake team', role: 'member' }, projects: [] } });
+  assert.ok(pages.workspace.render(ctx, await pages.workspace.load(ctx, { id: 'w1' })).includes('<h1>Field team</h1>'));
+  assert.ok(pages.workspace.render(ctx, await pages.workspace.load(ctx, { id: 'w2' })).includes('<h1>Lake team</h1>'));
+});
+test('non-kit host keeps the parent back link; kit crumbs replace it (no duplicate)', async () => {
+  for (const over of [{}, { shellOwnsTitle: false }]) {
+    const ctx = ctxWith(FOUR, over);
+    const ws = pages.workspace.render(ctx, await pages.workspace.load(ctx, { id: 'w1' }));
+    const pr = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
+    assert.ok(ws.startsWith('<a class="back" href="#workspaces">← All workspaces</a>'), 'workspace way up');
+    assert.ok(pr.startsWith('<a class="back" href="#projects">← All projects</a>'), 'project way up');
+    assert.ok(ws.indexOf('class="back"') < ws.indexOf('data-read-region'), 'back link leads the read region');
+  }
+  const kit = ctxWith(FOUR, { shellOwnsTitle: true });
+  for (const [kind, params] of [['workspace', { id: 'w1' }], ['project', { id: 'p1' }]]) {
+    const h = pages[kind].render(kit, await pages[kind].load(kit, params));
+    assert.ok(!h.includes('class="back"'), `${kind}: kit host does not repeat the crumb as a back link`);
+  }
+});
+test('failure states keep their own single heading in both hosts (no double title, no lost title)', async () => {
+  for (const over of [{}, { shellOwnsTitle: true }]) {
+    const ctx = ctxWith({ 'GET /v2/projects': err('500', 'boom') }, over);
+    assert.equal(h1s(pages.projects.render(ctx, await pages.projects.load(ctx, {}))), 1);
+  }
+});
+
+// ---------- Bugbot 4073693771: every rendered Retry control is bound; one shared in-flight guard ----------
+function projectBothFailing() {
+  const map = { 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'owner' }, languages: [] }, 'GET /v2/projects/p1/assessments': err('500', 'assessments down'), 'GET /v2/projects/p1/languages': err('500', 'languages down') };
+  return { map, ctx: ctxWith(map) };
+}
+test('project with assessments AND languages both failing renders two Retry controls, both bound, each reloading independently', async () => {
+  for (const which of [0, 1]) {
+    const { map, ctx } = projectBothFailing();
+    const m = await pages.project.load(ctx, { id: 'p1' });
+    assert.equal(m.assessmentsStatus, 'failed'); assert.ok(pages.project.render(ctx, m).includes('assessments down'));
+    const root = mount(pages.project, ctx, m);
+    const buttons = root.querySelectorAll('[data-act="retry"]'); assert.equal(buttons.length, 2, 'two rendered retry controls');
+    const before = ctx.calls.length;
+    map['GET /v2/projects/p1/assessments'] = { assessments: [] }; map['GET /v2/projects/p1/languages'] = { languages: [{ id: 'l1', name: 'Lake', code: 'qaa', archived_at: null }] };
+    await buttons[which].fire('click');
+    assert.equal(ctx.calls.length - before, 3, `retry #${which} re-ran the project load (project + assessments + languages)`);
+    assert.ok(root.querySelector('#create-assessment'), `retry #${which}: page re-rendered from the fresh model with a language available`);
+    assert.equal(root.querySelectorAll('[data-act="retry"]').length, 0, 'no failure state remains after both reads succeed');
+  }
+});
+test('retry failure remains a truthful failure (never empty success) and rebinds both controls for the next attempt', async () => {
+  const { ctx } = projectBothFailing();
+  const root = mount(pages.project, ctx, await pages.project.load(ctx, { id: 'p1' }));
+  await root.querySelectorAll('[data-act="retry"]')[1].fire('click');
+  const again = root.querySelectorAll('[data-act="retry"]'); assert.equal(again.length, 2, 'still failed: both retry controls rendered again');
+  assert.equal(root.querySelector('#create-assessment'), null, 'no assessment form on a failed read');
+  const before = ctx.calls.length; await again[0].fire('click'); assert.equal(ctx.calls.length - before, 3, 're-rendered controls are bound too');
+});
+test('one in-flight guard across both controls: a second click on EITHER button while a reload is pending issues no second read', async () => {
+  const { map, ctx } = projectBothFailing();
+  const root = mount(pages.project, ctx, await pages.project.load(ctx, { id: 'p1' }));
+  let release; map['GET /v2/projects/p1'] = () => new Promise(r => { release = () => r({ project: { id: 'p1', name: 'P', role: 'owner' }, languages: [] }); });
+  const [a, b] = root.querySelectorAll('[data-act="retry"]');
+  const before = ctx.calls.length;
+  const first = a.fire('click'); await Promise.resolve();
+  assert.ok(a.disabled && b.disabled, 'both controls disabled while the shared reload is pending');
+  await b.fire('click'); await a.fire('click');
+  assert.equal(ctx.calls.length - before, 1, 'only the first click issued a read (project read is pending; assessments/languages not yet issued)');
+  release(); await first;
+  assert.equal(ctx.calls.length - before, 3, 'exactly one reload completed');
+});
+test('a retry completing after the view stopped being current does not paint (ctx.isCurrent honoured for either control)', async () => {
+  const { map, ctx } = projectBothFailing(); let current = true; ctx.isCurrent = () => current;
+  const m = await pages.project.load(ctx, { id: 'p1' }); const root = mount(pages.project, ctx, m); const html = root.children.length;
+  let release; map['GET /v2/projects/p1/languages'] = () => new Promise(r => { release = () => r({ languages: [] }); }); map['GET /v2/projects/p1/assessments'] = { assessments: [] };
+  const click = root.querySelectorAll('[data-act="retry"]')[1].fire('click'); await Promise.resolve(); await Promise.resolve();
+  current = false; release(); await click;
+  assert.equal(root.querySelectorAll('[data-act="retry"]').length, 2, 'stale completion left the old view untouched');
+  assert.equal(root.children.length, html);
 });
