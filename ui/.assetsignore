@@ -45,3 +45,4 @@ roadmap/live.test.mjs
 kit/shell.test.mjs
 kit/coordinator.test.mjs
 kit/app-adapter.test.mjs
+kit/participant-presentation.test.mjs
