@@ -49,9 +49,9 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     };
     const outside = e => {if(!root.contains(e.target)||!e.target.closest('.level-menu'))close();};
     const focusout = e => { if(menu&&!menu.hidden && e.relatedTarget && !e.relatedTarget.closest?.('.level-menu'))close(); };
-    const input = e => { if(e.target.matches('[data-search]')) {query=e.target.value;const pos=e.target.selectionStart;paint('search');root.querySelector('[data-search]').setSelectionRange(pos,pos);} };
-    root.addEventListener('click',click);root.addEventListener('keydown',key);root.addEventListener('input',input);root.addEventListener('focusout',focusout);root.ownerDocument.addEventListener('click',outside);
-    cleanup=()=>{root.removeEventListener('click',click);root.removeEventListener('keydown',key);root.removeEventListener('input',input);root.removeEventListener('focusout',focusout);root.ownerDocument.removeEventListener('click',outside);};
+    const input = e => { if(!e.target.matches('[data-search]')||(e.type!=='compositionend'&&e.isComposing))return;query=e.target.value;const pos=e.target.selectionStart;paint('search');root.querySelector('[data-search]').setSelectionRange(pos,pos); };
+    root.addEventListener('click',click);root.addEventListener('keydown',key);root.addEventListener('input',input);root.addEventListener('compositionend',input);root.addEventListener('focusout',focusout);root.ownerDocument.addEventListener('click',outside);
+    cleanup=()=>{root.removeEventListener('click',click);root.removeEventListener('keydown',key);root.removeEventListener('input',input);root.removeEventListener('compositionend',input);root.removeEventListener('focusout',focusout);root.ownerDocument.removeEventListener('click',outside);};
     if(focusKey==='search')root.querySelector('[data-search]')?.focus();
     else if(focusKey)[...root.querySelectorAll('[data-expand]')].find(x=>x.dataset.expand===focusKey)?.focus();
   }
