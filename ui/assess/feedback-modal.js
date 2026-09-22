@@ -19,6 +19,17 @@ export function createFeedbackModal({ doc, context, route, routeKey, clientRelea
   const isOutside = e => { const r = dialog.getBoundingClientRect(); return e.target === dialog && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom); };
   dialog.addEventListener('pointerdown', e => { outside = isOutside(e); });
   dialog.addEventListener('click', e => { if (outside && isOutside(e)) close(); outside = false; });
+  // Strict containment (K3b1): a native modal makes the page inert, but Tab from the last control (or Shift+Tab from the first)
+  // can still land on the dialog element/BODY in real browsers. Wrap within the dialog's own tabbable controls. Scoped to the
+  // dialog only — no document-level key trap; Escape keeps the native close.
+  const tabbables = () => [...dialog.querySelectorAll('a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(el => !el.disabled && !el.hidden && !el.closest('[hidden]') && el.getClientRects().length > 0);
+  dialog.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || !dialog.open) return;
+    const list = tabbables(); if (!list.length) return;
+    const first = list[0], last = list[list.length - 1], active = doc.activeElement;
+    if (e.shiftKey && (active === first || !dialog.contains(active))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (active === last || !dialog.contains(active))) { e.preventDefault(); first.focus(); }
+  });
   return { reset, async open(from) {
     const ctx = context();
     if (mounted && (identity !== ctx.identity || key !== routeKey())) reset();
@@ -39,6 +50,7 @@ export function createFeedbackModal({ doc, context, route, routeKey, clientRelea
       mounted = true;
     }
     if (!dialog.open) dialog.showModal();
-    dialog.querySelector('textarea,button')?.focus({ preventScroll: true });
+    // Initial focus goes to the problem text first; the Close control is next in order.
+    (dialog.querySelector('textarea') || dialog.querySelector('button'))?.focus({ preventScroll: true });
   } };
 }
