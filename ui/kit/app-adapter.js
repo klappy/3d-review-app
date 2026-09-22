@@ -68,7 +68,8 @@ export function shellModel({ route, routes, principal, known = {}, current = nul
   else if (kind === 'feedback') { title = 'App feedback'; eyebrow = 'Feedback'; currentHref = '#feedback'; }
   else { title = principal ? 'Welcome' : '3D Review'; eyebrow = ''; currentHref = '#'; }
   const seen = new Set(); ancestors = ancestors.filter(x => safeHref(x.href) && !seen.has(x.href) && seen.add(x.href));
-  return { context: { route: kind, id: route?.id ?? null }, identityLabel: identityLabel || (principal ? 'Signed in' : 'Not signed in'), role: role || (principal ? 'Member' : 'Guest'), sample: false, title, eyebrow, currentHref, expanded, sectionLabel: sectionLabel || (nodes.length ? 'Workspaces' : 'Nothing loaded'), nodes, ancestors, actions: [], menuLabel: 'Actions', status };
+  // Review F3: the role label comes ONLY from loaded authority for the current scope; with none it is empty — never a synthesized permission.
+  return { context: { route: kind, id: route?.id ?? null }, identityLabel: identityLabel || (principal ? 'Signed in' : 'Not signed in'), role, sample: false, title, eyebrow, currentHref, expanded, sectionLabel: sectionLabel || (nodes.length ? 'Workspaces' : 'Nothing loaded'), nodes, ancestors, actions: [], menuLabel: 'Actions', status };
 }
 
 // Mount the kit shell once around a stable content element. Returns null when the root is absent (tests without a DOM).

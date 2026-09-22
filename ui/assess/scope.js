@@ -42,6 +42,16 @@ function gate(ctx, model, back) {
     default: return null;
   }
 }
+// Replace a page's DOM with a freshly loaded model ONLY while that page is still the current view (review F1: a late retry or
+// reload completion must never overwrite a newer route's content). The controller may expose ctx.isCurrent (render generation +
+// identity) and ctx.pageModel (shell re-sync from this page's new data); without them the swap is unconditional as before.
+function swap(ctx, root, page, next) {
+  if (typeof ctx.isCurrent === 'function' && !ctx.isCurrent()) return false;
+  ctx.pageModel?.(next);
+  root.innerHTML = page.render(ctx, next);
+  page.bind(ctx, root, next);
+  return true;
+}
 // Retry re-runs load() then re-renders and re-binds in place. Every page's bind() starts here.
 function bindRetry(ctx, root, page, model) {
   const b = root.querySelector('[data-act="retry"]');
@@ -49,8 +59,7 @@ function bindRetry(ctx, root, page, model) {
   b.addEventListener('click', async () => {
     b.disabled = true;
     const next = await page.load(ctx, model.params || {});
-    root.innerHTML = page.render(ctx, next);
-    page.bind(ctx, root, next);
+    swap(ctx, root, page, next);
   });
 }
 // A write: disables the trigger while in flight, reports the server outcome, never claims success without it.
@@ -226,7 +235,7 @@ const workspace = {
   bind(ctx, root, model) {
     bindRetry(ctx, root, workspace, model);
     const id = model.workspace?.id;
-    const reload = async () => { const next = await workspace.load(ctx, model.params); root.innerHTML = workspace.render(ctx, next); workspace.bind(ctx, root, next); };
+    const reload = async () => { const next = await workspace.load(ctx, model.params); swap(ctx, root, workspace, next); };
     root.querySelector('#add-project')?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target, pid = val(form, 'pid');
@@ -310,7 +319,7 @@ const project = {
   bind(ctx, root, model) {
     bindRetry(ctx, root, project, model);
     const id = model.project?.id;
-    const reload = async () => { const next = await project.load(ctx, model.params); root.innerHTML = project.render(ctx, next); project.bind(ctx, root, next); };
+    const reload = async () => { const next = await project.load(ctx, model.params); swap(ctx, root, project, next); };
     root.querySelector('#add-language')?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target, code = val(form, 'code');

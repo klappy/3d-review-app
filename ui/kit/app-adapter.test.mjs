@@ -36,7 +36,13 @@ test('shell model: route/title/crumbs agree, role only from loaded data, no acti
   const pending = shellModel({ route: { kind: 'project', id: 'p2' }, routes, principal: { id: 'x' }, known: k, page: { kind: 'project', model: { status: 'refused' } } });
   assert.equal(pending.title, '', 'no title for a refused page'); assert.equal(pending.status, 'refused');
   const guest = shellModel({ route: { kind: 'entry' }, routes, principal: null });
-  assert.equal(guest.role, 'Guest'); assert.equal(guest.identityLabel, 'Not signed in'); assert.deepEqual(guest.nodes, []);
+  assert.equal(guest.role, ''); assert.equal(guest.identityLabel, 'Not signed in'); assert.deepEqual(guest.nodes, []);
+  // Review F3: signed in with no authoritative role at the current scope → no role label (never 'Member').
+  const noScope = shellModel({ route: { kind: 'workspaces' }, routes, principal: { id: 'x' }, known: k });
+  assert.equal(noScope.role, ''); assert.equal(noScope.identityLabel, 'Signed in');
+  const viewerOnly = shellModel({ route: { kind: 'project', id: 'p2' }, routes, principal: { id: 'x' }, known: k, page: { kind: 'project', model: { status: 'loaded', project: k.projects[1], assessmentsStatus: 'refused', assessments: [] } } });
+  assert.equal(viewerOnly.role, 'Viewer', 'role label equals the loaded scope role');
+  assert.equal(viewerOnly.nodes.find(n => n.id === 'p:p2').role, 'Viewer');
 });
 test('direct assessment grant: reachable, listed under itself, no invented workspace/project links; visible names never become ids', () => {
   const current = { assessment: { id: 'a9', name: '<b>Granted</b>', project_id: 'p9', role: 'viewer', stage: 'understand' } };

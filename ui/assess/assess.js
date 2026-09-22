@@ -466,11 +466,13 @@ function ctxFor(extra = {}) {
   const gen = generation, identity = identityGeneration, live = () => gen === generation && identity === identityGeneration;
   const stale = () => Promise.reject(Object.assign(new Error('This view is no longer current.'), { code: 'STALE_VIEW' }));
   return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
-    go: (hash, { reload = false } = {}) => { if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
+    // Review F2: a completion arriving after the view was replaced must not navigate the newer route (it cannot undo a dispatched write).
+    go: (hash, { reload = false } = {}) => { if (!live()) return; if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
 }
 function pageFor(r) { if (r.kind === 'feedback') return feedback; return r.kind === 'permissions' ? views.permissions : pages[r.kind] || pages.projects; }
 async function runPage(page, r, gen, root = app, extra = {}) {
-  const ctx = ctxFor({ ...extra, isCurrent: () => gen === generation }), params = { ...r, aid: r.id };
+  // pageModel: a page that re-loaded itself in place (retry/reload) hands the controller its new model so the shell stays consistent.
+  const ctx = ctxFor({ ...extra, isCurrent: () => gen === generation, pageModel: model => { if (gen === generation && root === app) syncShell({ kind: r.kind, model }); } }), params = { ...r, aid: r.id };
   let model;
   try { model = await page.load(ctx, params); }
   catch (e) { if (gen !== generation) return; if (root === app) syncShell({ kind: r.kind, model: { status: UNAUTHENTICATED.has(String(e.code)) ? 'unauthenticated' : REFUSED.has(String(e.code)) ? 'refused' : 'failed' } }); root.innerHTML = `<div class="narrow panel"><h1>${UNAUTHENTICATED.has(String(e.code)) ? 'Your sign-in is no longer active' : REFUSED.has(String(e.code)) ? 'Not visible to you' : 'Could not load this page'}</h1><p class="muted">${esc(redact(e.message))}</p><p>${UNAUTHENTICATED.has(String(e.code)) ? `<a class="button primary" href="#">Sign in</a>` : `<a class="button" href="#" data-retry-page>Retry</a>`}</p></div>`; root.querySelector('[data-retry-page]')?.addEventListener('click', ev => { ev.preventDefault(); render(); }); return; }

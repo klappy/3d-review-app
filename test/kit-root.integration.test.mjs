@@ -169,3 +169,45 @@ test('unauthenticated normal root: sign-in panel inside the shell, no data, no t
   assert.equal(treeLabels(q).length, 0); assert.equal(q.text('#who'), 'Not signed in');
   assert.ok(!q.served().some(k => k.startsWith('GET /v2/projects')));
 });
+
+// ---- Independent review b918faa disconfirmers (F1/F2/F3) ----
+test('F1: a retry that completes after navigation never overwrites the newer route; a current retry re-syncs the shell', async () => {
+  let release;
+  const p = await bootPage('owner', '#project/p2', { install: t => { release = t.hold('GET /v2/projects/p2'); } });
+  await tick(2); assert.equal(p.text('[data-content]'), 'Loading…');
+  release(); await tick(12);
+  assert.equal(p.text('[role=main].content h1'), 'Hill project');
+  const retry = p.q('[data-read-region] [data-act="retry"]'); assert.ok(retry, 'languages failed → Retry offered');
+  release = p.transport.hold('GET /v2/projects/p2'); retry.click(); await tick(2);
+  await p.go('#project/p1');
+  assert.equal(p.text('[role=main].content h1'), 'River Valley');
+  release(); await tick(12);
+  assert.equal(p.w.location.hash, '#project/p1'); assert.equal(p.text('[role=main].content h1'), 'River Valley');
+  assert.ok(!p.q('[data-content]').textContent.includes('Hill project'), 'late retry completion painted nothing');
+  assert.ok(p.q('[data-read-region] a[href="#assessment/a1"]'), 'p1 content intact');
+  // Current retry: languages route now succeeds → content and shell both reflect the new model.
+  await p.go('#project/p2'); p.data.routes.set('GET /v2/projects/p2/languages', { ok: true, result: { languages: [{ id: 'l5', name: 'Hill language', code: 'qab', archived_at: null }] } });
+  p.q('[data-read-region] [data-act="retry"]').click(); await tick(12);
+  assert.ok(p.q('[data-read-region]').textContent.includes('Hill language')); assert.equal(p.text('[role=main].content h1'), 'Hill project');
+  assert.equal(p.qa('#who').length, 1);
+});
+test('F2: a create completion arriving after navigation does not redirect the newer route', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  let release; p.transport.hold; // synthetic-only: the transport refuses mutations; simulate a deferred SUCCESS for this one POST
+  const held = new Promise(r => { release = r; });
+  const real = p.w.fetch; p.w.fetch = (u, i) => (i?.method === 'POST' && String(u).endsWith('/v2/workspaces')) ? held.then(() => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ ok: true, result: { workspace: { id: 'synthetic-created' } } }) })) : real(u, i);
+  const form = p.q('#create-workspace'); form.elements.name.value = 'Late'; form.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(2);
+  await p.go('#project/p1'); assert.equal(p.text('[role=main].content h1'), 'River Valley');
+  release(); await tick(12);
+  assert.equal(p.w.location.hash, '#project/p1', 'stale completion did not navigate'); assert.equal(p.text('[role=main].content h1'), 'River Valley');
+  assert.equal(p.text('#note'), '', 'stale completion wrote no status line');
+});
+test('F3: viewer-only identity shows no synthesized role; scope role appears only where loaded', async () => {
+  const p = await bootPage('viewer', '#workspaces');
+  assert.equal(p.text('header.top .me'), 'Signed in'); assert.equal(p.q('header.top nav.crumbs .tree-role'), null);
+  assert.ok(!p.q('header.top').textContent.includes('Member'));
+  await p.go('#project/p2');
+  assert.equal(p.text('header.top .me'), 'Signed in · Viewer'); assert.equal(p.text('header.top nav.crumbs .tree-role'), 'Viewer');
+  await p.go('#project/p1');
+  assert.equal(p.text('header.top .me'), 'Signed in · Viewer');
+});
