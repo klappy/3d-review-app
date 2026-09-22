@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.14.4",
+  "current": "0.15.0",
   "versions": [
+    {
+      "version": "0.15.0",
+      "status": "candidate",
+      "notes_path": "releases/0.15.0.md",
+      "sections": {
+        "added": [
+          "In-place app feedback preserves current work and reports registered page context with loaded-client release identity through the existing HTTP/MCP contract."
+        ],
+        "changed": [
+          "Persona evidence: author local modal component3/3, feedback/identity DOM21/21 and provenance20/20 passed; full-shell browser and human outcomes remain unmeasured."
+        ],
+        "fixed": [],
+        "security": [
+          "Context accepts only registered page/component enums; no answers, tokens, full URLs or private IDs. Submission identity remains separate."
+        ]
+      }
+    },
     {
       "version": "0.14.4",
       "status": "candidate",
