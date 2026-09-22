@@ -1,0 +1,105 @@
+Three key JSON-RPC messages from the run recorded in rpc-log.jsonl, pretty-printed and
+UNTRUNCATED, except that the resources/read response's `contents[0].text` (the whole
+self-contained view, ~500 KB) is replaced by a byte count — its header fields are what
+matters here and the full text is what makes the raw log large.
+Lines are exactly as the spike server saw them ({ts, direction, payload}).
+
+### tools/list response — both tools, _meta verbatim
+{
+  "ts": "2026-09-17T19:32:19.664Z",
+  "direction": "response",
+  "payload": {
+    "result": {
+      "tools": [
+        {
+          "name": "assessment_overview",
+          "title": "Assessment overview (fixture)",
+          "description": "Renders a 3d-review assessment overview from fixture data. No live cap.* call.",
+          "inputSchema": {
+            "type": "object",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "properties": {
+              "fixture": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "empty",
+                  "error"
+                ]
+              }
+            }
+          },
+          "_meta": {
+            "ui": {
+              "resourceUri": "ui://3d-review/overview.html"
+            },
+            "ui/resourceUri": "ui://3d-review/overview.html"
+          }
+        },
+        {
+          "name": "survey_selector",
+          "title": "Survey selector (fixture)",
+          "description": "Renders the three-lens survey selector from fixture data. Preview only; performs no write.",
+          "inputSchema": {
+            "type": "object",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "properties": {
+              "fixture": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "viewer",
+                  "empty"
+                ]
+              }
+            }
+          },
+          "_meta": {
+            "ui": {
+              "resourceUri": "ui://3d-review/selector.html"
+            },
+            "ui/resourceUri": "ui://3d-review/selector.html"
+          }
+        }
+      ]
+    },
+    "jsonrpc": "2.0",
+    "id": 1
+  }
+}
+
+### tools/call request
+{
+  "ts": "2026-09-17T19:32:19.942Z",
+  "direction": "request",
+  "payload": {
+    "method": "tools/call",
+    "params": {
+      "name": "assessment_overview",
+      "arguments": {
+        "fixture": "default"
+      }
+    },
+    "jsonrpc": "2.0",
+    "id": 3
+  }
+}
+
+### resources/read response — header only (view HTML elided)
+{
+  "ts": "2026-09-17T19:32:19.995Z",
+  "direction": "response",
+  "payload": {
+    "result": {
+      "contents": [
+        {
+          "uri": "ui://3d-review/overview.html",
+          "mimeType": "text/html;profile=mcp-app",
+          "text": "<elided: 482980 bytes of self-contained view HTML>"
+        }
+      ]
+    },
+    "jsonrpc": "2.0",
+    "id": 4
+  }
+}
