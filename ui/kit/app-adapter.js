@@ -24,7 +24,7 @@ export function mapStatus(status) {
 
 // Tree nodes from loaded, authorized data only. `known` is what the controller already holds:
 //   projects: [{id,name,role,workspace_id}]   (from /v2/projects at boot)
-//   workspaces: Map<wid,{id,name,projects:[pid]}> (cached by workspaceFor) plus page-level lists
+//   workspaces: Map<wid,{id,name,role,projects:[pid]}> (cached by workspaceFor) plus page-level lists
 //   lists: Map<pid,{status,list}>              (assessmentsFor cache)
 //   page: { kind, model }                      (the current scope page's loaded model, if any)
 // Nothing here issues a request; an ancestor the identity cannot read is simply absent (no invented links).
@@ -32,7 +32,7 @@ export function treeNodes(routes, known = {}) {
   const projects = known.projects || [], lists = known.lists || new Map(), page = known.page || null;
   const wsMap = new Map();
   for (const [id, w] of known.workspaces || []) wsMap.set(id, { id, name: w.name, role: w.role, projects: w.projects || [] });
-  if (page?.kind === 'workspaces' && page.model?.status === 'loaded') for (const w of page.model.workspaces || []) if (!wsMap.has(w.id)) wsMap.set(w.id, { id: w.id, name: w.name, role: w.role, projects: [] });
+  if (page?.kind === 'workspaces' && page.model?.status === 'loaded') for (const w of page.model.workspaces || []) { const have = wsMap.get(w.id); if (!have) wsMap.set(w.id, { id: w.id, name: w.name, role: w.role, projects: [] }); else if (!have.role && w.role) have.role = w.role; }
   if (page?.kind === 'workspace' && page.model?.status === 'loaded') { const w = page.model.workspace || {}; if (w.id) wsMap.set(w.id, { id: w.id, name: w.name, role: w.role, projects: (page.model.projects || []).map(p => p.id) }); }
   const projById = new Map(projects.map(p => [p.id, p]));
   if (page?.kind === 'workspace' && page.model?.status === 'loaded') for (const p of page.model.projects || []) if (!projById.has(p.id)) projById.set(p.id, p);
@@ -56,7 +56,7 @@ export function shellModel({ route, routes, principal, known = {}, current = nul
   const nodes = treeNodes(routes, { ...known, page });
   const projects = known.projects || [];
   const findProject = pid => projects.find(p => p.id === pid) || (page?.kind === 'project' && page.model?.project?.id === pid ? page.model.project : null) || (page?.kind === 'workspace' ? (page.model?.projects || []).find(p => p.id === pid) : null);
-  const findWorkspace = wid => (known.workspaces || new Map()).get(wid) || (page?.kind === 'workspace' && page.model?.workspace?.id === wid ? page.model.workspace : null);
+  const findWorkspace = wid => { const cached = (known.workspaces || new Map()).get(wid); const fromPage = page?.kind === 'workspace' && page.model?.workspace?.id === wid ? page.model.workspace : null; return cached ? (fromPage?.role && !cached.role ? { ...cached, role: fromPage.role } : cached) : fromPage; };
   let ancestors = [], title = '', eyebrow = '', currentHref = '', role = '', expanded = [];
   const anc = (label, href) => ({ label: String(label ?? ''), href, visible: true });
   const status = page ? mapStatus(page.model?.status) : 'ready';

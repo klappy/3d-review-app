@@ -296,6 +296,8 @@ test('non-kit host (real /assess/index.html, no #rv): each of the four loaded pa
     const heads = p.qa('#app h1'); assert.equal(heads.length, 1, `${hash}: one h1 in the non-kit host`); assert.equal(heads[0].textContent.trim(), title, `${hash}: title text`);
     assert.ok(p.qa('#app .eyebrow').length >= 1, `${hash}: eyebrow present`);
     assert.equal(p.text('#who'), 'Account: synthetic-owner@example.invalid', `${hash}: existing account control unchanged`);
+    if (hash === '#workspace/w1') assert.equal(p.q('#page-root a.back')?.getAttribute('href'), '#workspaces', 'non-kit workspace keeps ← All workspaces');
+    if (hash === '#project/p1') assert.equal(p.q('#page-root a.back')?.getAttribute('href'), '#projects', 'non-kit project keeps ← All projects');
   }
   assert.ok(p.q('#app [data-read-region] a[href="#assessment/a1"]'), 'project read region still lists its assessments');
   assert.ok(p.q('#app form#create-assessment'), 'existing business controls remain on the non-kit project page');
@@ -306,6 +308,7 @@ test('kit host (real ui/index.html): each of the four loaded pages keeps exactly
     await p.go(hash);
     const heads = p.qa('[role=main].content h1'); assert.equal(heads.length, 1, `${hash}: exactly one h1 under the kit shell`); assert.equal(heads[0].textContent.trim(), title);
     assert.equal(p.qa('[data-read-region] h1').length, 0, `${hash}: the page renders no second heading inside the read region`);
+    if (hash === '#workspace/w1' || hash === '#project/p1') assert.equal(p.q('[data-content] a.back'), null, `${hash}: kit crumbs are the parent link`);
   }
   assert.deepEqual(crumbs(p), ['Projects', 'Field team', 'River Valley']); assert.ok(p.q('[data-action-region] form#create-assessment'));
 });
