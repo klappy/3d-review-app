@@ -2,28 +2,14 @@ import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError } from '../participant-view.js';
 import { reviewAnswer } from '../present.js';
+import { adoptKit, field as kitField, receipt as kitReceipt, reviewRow as kitReviewRow } from '../kit/views-participant.js';
 
 const $ = id => document.getElementById(id);
 let pager, renderedPhase, renderedForm;
 const disabledBeforeRequest = new WeakMap();
 function element(tag, text) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; return node; }
-function draw(item) {
-  const field = element('fieldset'); field.dataset.item = item.id;
-  field.append(element('legend', `${item.text || item.id}${item.requiredness === 'unresolved' ? ' (may leave unanswered; policy held)' : ''}`));
-  if (item.answer_semantics === 'unresolved_no_problems_vs_skipped') field.append(element('p', 'Leaving this blank records an unknown answer, not “no problems.”'));
-  if (item.type === 'scale' || item.type === 'text') {
-    const input = element(item.type === 'text' ? 'textarea' : 'input'); input.name = item.id; input.required = item.required !== false;
-    if (item.type === 'scale') { input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; }
-    field.append(input);
-  } else if (item.type === 'single' || item.type === 'multi') {
-    for (const option of item.options || []) {
-      const label = element('label'), input = element('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = option.code; input.required = item.type === 'single' && item.required !== false;
-      label.append(input, document.createTextNode(option.label || option.text || option.code)); field.append(label);
-    }
-    if (item.type === 'multi' && item.options?.some(o => o.exclusive)) field.append(element('p', 'An exclusion choice cannot be combined with any other choice.'));
-  } else field.append(element('p', 'This survey contains an unsupported question. Ask the person who shared the survey for help.'));
-  return field;
-}
+// K4: one real fieldset per item, painted by the kit. Field names, types, required flags and native validation are unchanged.
+function draw(item) { return kitField(document, item); }
 function values(validate = false) {
   const fd = new FormData($('answers')), out = {};
   for (const item of journey.state.form.items) {
@@ -55,12 +41,12 @@ function paint(state) {
       } else pager?.showForm();
       $('answers').hidden = false;
     } else if (state.phase === 'review') {
-      $('review-answers').replaceChildren(...state.form.items.map(item => element('p', `${item.text || item.id}: ${reviewAnswer(item, state.answers[item.id])}`)));
+      $('review-answers').replaceChildren(...state.form.items.map(item => kitReviewRow(document, item, reviewAnswer(item, state.answers[item.id]))));
       $('review').hidden = false; pager?.showReview();
     } else {
       pager?.showReceipt();
       if (state.phase === 'receipt') {
-        $('receipt').replaceChildren(element('h2', demo ? 'Practice complete — nothing sent' : 'Response saved'), element('p', `${state.receipt.response_id || 'ID unavailable'} · ${state.receipt.submitted_at || 'time unavailable'}`));
+        $('receipt').replaceChildren(kitReceipt(document, state.receipt, { demo }));
         $('receipt').hidden = false;
       }
     }
@@ -74,9 +60,12 @@ function paint(state) {
   }
 }
 const demo = isDemo(location.search);
+// K4: kit stylesheets + `.rv` scope on the participant main. The participant HTML is not owned by this slice; nothing else in the document changes.
+adoptKit(document, $('participant'));
+if (!demo) $('submit').className = 'primary';
 if (demo) { document.querySelector('main > h1').textContent = 'Practice survey · nothing is sent'; document.querySelector('main > p').textContent = 'Use the real survey flow with source-pinned synthetic sample questions. Answers stay in memory and disappear when you leave or reload.'; const back = element('a', 'Back to the tour'); back.href = '/?demo=1#assessment/demo-assessment/collect'; document.querySelector('main').prepend(back); }
 const sample = demo ? sampleParticipantEnvironment(Number(new URLSearchParams(location.search).get('survey') || 0)) : null;
-if (demo) { $('submit').textContent = 'Finish practice — nothing sent'; $('recover').textContent = 'Check practice'; }
+if (demo) { $('submit').textContent = 'Finish practice — nothing sent'; $('submit').className = 'primary'; $('recover').textContent = 'Check practice'; }
 const journey = createParticipantJourney({ ...(demo ? sample : { window, storage: sessionStorage }), onChange: paint });
 $('answers').addEventListener('input', () => journey.save(values()));
 $('answers').addEventListener('submit', event => { event.preventDefault(); try { journey.review(values(true)); } catch (error) { $('notice').textContent = error.message; } });
