@@ -17,7 +17,7 @@ export function mountView(root,initial,onIntent,screenSet,actionSet,body){
  function render(){
   generation++;dispatched.clear();
   const status=model.status||'error',ready=status==='ready'&&screenSet.includes(model.screen);
-  root.innerHTML=`<section data-kit-view="${esc(model.screen)}" style="min-width:0;overflow-wrap:anywhere">${model.sample?'<p class="badge demo">SAMPLE DATA · SIMULATED</p>':''}${heading(model)}${ready?body(model,{actions,button}):`<p class="note" role="status">${esc(statuses[status]||statuses.error)}</p>`}${ready?warnings(model):''}${ready?interaction():''}</section>`;
+  root.innerHTML=`<section data-kit-view="${esc(model.screen)}" style="min-width:0;overflow-wrap:anywhere">${model.sample?'<p class="badge demo">SAMPLE DATA · SIMULATED</p>':''}${ready&&['welcome','tour'].includes(model.screen)?'':heading(model)}${ready?body(model,{actions,button}):`<p class="note" role="status">${esc(statuses[status]||statuses.error)}</p>`}${ready?warnings(model):''}${ready?interaction():''}</section>`;
  }
  function interaction(){const i=model.interaction||{};const a=actions().find(a=>a.id===i.actionId);let html='';
   if(i.outcome==='uncertain')html='<p class="note warning" role="status">Outcome not confirmed. Check the current state before trying again.</p>';
@@ -35,7 +35,7 @@ export function mountView(root,initial,onIntent,screenSet,actionSet,body){
   }
   if(snapshot===generation)callback?.({action:a.id,context:{...model.context},values});
  }
- function key(e){if(e.key==='Escape'){const d=e.target.closest?.('details[open]');if(d&&root.contains(d)){d.open=false;d.querySelector('summary')?.focus();}}}
+ function key(e){if(e.key==='Escape'){const d=e.target.closest?.('details[open]');if(d&&root.contains(d)&&!d.closest('[data-slot]')){d.open=false;d.querySelector('summary')?.focus();}}}
  root.addEventListener('click',click);root.addEventListener('keydown',key);
  function update(next,fn=callback){if(dead)return;model=structuredClone(next);callback=fn;render();}
  update(initial,onIntent);

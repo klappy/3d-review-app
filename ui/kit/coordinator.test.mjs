@@ -31,3 +31,5 @@ test('owned form intent excludes private values mounted in every authoritative s
 test('mounted authoritative slot action cannot dispatch a K2 action',()=>{const h=setup();const b=h.d.window.document.createElement('button');b.dataset.intent='save';h.root.querySelector('[data-slot]').append(b);b.click();assert.equal(h.events.length,0);});
 
 test('K2 duplicate guard leaves matching foreign slot button enabled',()=>{const h=setup();const own=h.root.querySelector('button'),foreign=h.d.window.document.createElement('button');foreign.dataset.intent='save';h.root.querySelector('[data-slot="feedback"]').append(foreign);own.click();assert.equal(own.disabled,true);assert.equal(foreign.disabled,false);assert.equal(h.events.length,1);});
+
+test('K2 Escape does not control authoritative-slot disclosures',()=>{const h=setup();const d=h.d.window.document.createElement('details');d.innerHTML='<summary>Foreign disclosure</summary>';d.open=true;h.root.querySelector('[data-slot="report"]').append(d);d.querySelector('summary').dispatchEvent(new h.d.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(d.open,true);});
