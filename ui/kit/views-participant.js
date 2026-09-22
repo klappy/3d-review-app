@@ -58,7 +58,7 @@ export function intro(doc, model, onBegin) {
 }
 
 // Pager: kit pips + "Question i of n" + Back/Next. Callers own index/validation; this only paints.
-export function pager(doc, count, { onBack, onNext } = {}) {
+export function pager(doc, count, { onBack, onNext, label } = {}) {
   const nav = el(doc, 'div', 'participant-pager');
   nav.hidden = true;
   const bar = el(doc, 'div', 'progress');
@@ -67,13 +67,15 @@ export function pager(doc, count, { onBack, onNext } = {}) {
   for (let i = 0; i < count; i++) { const pip = el(doc, 'span'); pips.push(pip); bar.append(pip); }
   const progress = el(doc, 'p', 'participant-progress eyebrow');
   progress.setAttribute('aria-live', 'polite');
+  progress.setAttribute('style', 'font-weight:400;text-transform:none;letter-spacing:.06em;font-size:13px;margin-bottom:8px'); // kit form screen
   const controls = el(doc, 'div', 'participant-page-actions row');
+  controls.setAttribute('style', 'justify-content:space-between;margin-top:14px');
   const back = button(doc, copy.back, 'quiet', onBack);
   const next = button(doc, copy.next, 'primary', onNext);
   controls.append(back, next);
   nav.append(bar, progress); // controls are placed by the caller under the visible question (kit order: pips, count, question, answers, Back/Next)
   function paint(index) {
-    progress.textContent = `Question ${index + 1} of ${count}`;
+    progress.textContent = `Question ${index + 1} of ${count}${label ? ` · ${label}` : ''}`;
     pips.forEach((pip, i) => { pip.className = i <= index ? 'done' : ''; });
     back.disabled = index === 0;
     next.hidden = index === count - 1;

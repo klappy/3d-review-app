@@ -25,7 +25,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   const changes=[];
   const button=(label,action)=>kitButton(doc,label,undefined,action);
   const {section:intro}=kitIntro(doc,model,()=>showForm(0));
-  const pager=kitPager(doc,items.length,{onBack:()=>showForm(Math.max(0,index-1)),onNext:()=>{if(validItem(index))showForm(index+1);}});
+  const pager=kitPager(doc,items.length,{label:model.template?.perspective,onBack:()=>showForm(Math.max(0,index-1)),onNext:()=>{if(validItem(index))showForm(index+1);}});
   const {nav,controls}=pager;
   const error=kitPageError(doc);
   root.append(intro,nav,error);questions.append(controls);controls.hidden=true;owned.push(intro,nav,error,controls);

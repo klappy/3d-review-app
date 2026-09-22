@@ -40,8 +40,8 @@ test('intro/pager/receipt/reviewRow paint only what the model or controller carr
   assert.equal(section.className, 'participant-intro'); assert.equal(section.querySelector('.eyebrow').textContent, 'Assessment A · test · Community');
   assert.match(section.textContent, /5 questions/); assert.match(section.textContent, /repo@abc1234/);
   assert.equal(begin.type, 'button'); begin.click(); assert.equal(began, 1);
-  const p = pager(d, 3, {}); p.paint(1); assert.equal(p.controls.parentNode, null, 'caller places Back/Next');
-  assert.equal(p.progress.textContent, 'Question 2 of 3'); assert.deepEqual([...p.bar.children].map(s => s.className), ['done', 'done', '']);
+  const p = pager(d, 3, { label: 'Community' }); p.paint(1); assert.equal(p.progress.textContent, 'Question 2 of 3 · Community'); const p0 = pager(d, 3, {}); p0.paint(1); assert.equal(p.controls.parentNode, null, 'caller places Back/Next');
+  assert.equal(p0.progress.textContent, 'Question 2 of 3'); assert.deepEqual([...p.bar.children].map(s => s.className), ['done', 'done', '']);
   assert.equal(p.back.disabled, false); assert.equal(p.next.hidden, false); p.paint(2); assert.equal(p.next.hidden, true); p.paint(0); assert.equal(p.back.disabled, true);
   const r = receipt(d, { response_id: 'r-1', submitted_at: '2026-09-22T00:00:00Z' }); assert.match(r.textContent, /Thank you\./); assert.match(r.textContent, /r-1 · 2026-09-22T00:00:00Z/);
   const missing = receipt(d, {}); assert.match(missing.textContent, /ID unavailable · time unavailable/);
@@ -93,7 +93,7 @@ test('real participant entry: intro → paged questions → review → Change �
   introEl.querySelector('button').click();
   assert.equal(controls.hidden, false); assert.equal($('review-button').hidden, true, 'Review only on the last question');
   assert.deepEqual(fields.map(f => f.hidden), [false, true, true, true]);
-  const nav = main.querySelector('.participant-pager'); assert.equal(nav.hidden, false); assert.equal(nav.querySelector('.participant-progress').textContent, 'Question 1 of 4');
+  const nav = main.querySelector('.participant-pager'); assert.equal(nav.hidden, false); assert.equal(nav.querySelector('.participant-progress').textContent, 'Question 1 of 4 · Community');
   const [back, next] = $('questions').querySelectorAll('.participant-page-actions button'); assert.equal(back.disabled, true);
   // Required scale left blank: Next stays on the page and says why; no controller call.
   next.click(); assert.deepEqual(fields.map(f => f.hidden), [false, true, true, true]); assert.equal(main.querySelector('.participant-page-error').hidden, false);
@@ -231,7 +231,7 @@ test('same-tab reload resumes this link only: draft restored into the real field
   assert.equal(fields[2].querySelector('input[value=x]').checked, true); assert.equal(fields[3].querySelector('textarea').value, 'hello');
   assert.equal(main.querySelector('.participant-intro').hidden, true, 'a restored draft skips the intro');
   assert.deepEqual(fields.map(f => f.hidden), [false, true, true, true]);
-  assert.equal(main.querySelector('.participant-progress').textContent, 'Question 1 of 4');
+  assert.equal(main.querySelector('.participant-progress').textContent, 'Question 1 of 4 · Community');
 });
 
 test('a mismatched draft is not restored and says so; nothing from another version is shown', async () => {
