@@ -49,9 +49,27 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     };
     const outside = e => {if(!root.contains(e.target)||!e.target.closest('.level-menu'))close();};
     const focusout = e => { if(menu&&!menu.hidden && e.relatedTarget && !e.relatedTarget.closest?.('.level-menu'))close(); };
-    const input = e => { if(e.target.matches('[data-search]')) {query=e.target.value;const pos=e.target.selectionStart;paint('search');root.querySelector('[data-search]').setSelectionRange(pos,pos);} };
-    root.addEventListener('click',click);root.addEventListener('keydown',key);root.addEventListener('input',input);root.addEventListener('focusout',focusout);root.ownerDocument.addEventListener('click',outside);
-    cleanup=()=>{root.removeEventListener('click',click);root.removeEventListener('keydown',key);root.removeEventListener('input',input);root.removeEventListener('focusout',focusout);root.ownerDocument.removeEventListener('click',outside);};
+    const search = root.querySelector('[data-search]');
+    let composing = false;
+    const filterSearch = () => {
+      if (!current() || !search.isConnected) return;
+      query = search.value;
+      const start = search.selectionStart, end = search.selectionEnd, direction = search.selectionDirection;
+      paint('search');
+      root.querySelector('[data-search]').setSelectionRange(start, end, direction);
+    };
+    const compositionstart = e => { if(current() && e.target === search) composing = true; };
+    const compositionend = e => {
+      if(!current() || e.target !== search) return;
+      composing = false;
+      filterSearch();
+    };
+    const input = e => {
+      if(!current() || e.target !== search || composing || e.isComposing) return;
+      filterSearch();
+    };
+    root.addEventListener('click',click);root.addEventListener('keydown',key);root.addEventListener('input',input);root.addEventListener('compositionstart',compositionstart);root.addEventListener('compositionend',compositionend);root.addEventListener('focusout',focusout);root.ownerDocument.addEventListener('click',outside);
+    cleanup=()=>{root.removeEventListener('click',click);root.removeEventListener('keydown',key);root.removeEventListener('input',input);root.removeEventListener('compositionstart',compositionstart);root.removeEventListener('compositionend',compositionend);root.removeEventListener('focusout',focusout);root.ownerDocument.removeEventListener('click',outside);};
     if(focusKey==='search')root.querySelector('[data-search]')?.focus();
     else if(focusKey)[...root.querySelectorAll('[data-expand]')].find(x=>x.dataset.expand===focusKey)?.focus();
   }
