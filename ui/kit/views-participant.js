@@ -17,6 +17,7 @@ export const copy = Object.freeze({
   reviewHelp: 'Change anything before you send. Nothing is submitted until you choose to.',
   receiptTitle: 'Thank you.',
   practiceTitle: 'Practice complete — nothing sent',
+  practiceBadge: 'PRACTICE SURVEY · NOTHING IS SENT',
   optional: 'Optional',
   held: 'May leave unanswered · policy held',
   chooseAll: 'Choose all that apply',
@@ -151,13 +152,30 @@ export function receipt(doc, result, { demo = false } = {}) {
 }
 
 // Link the kit stylesheets once (the participant HTML is not owned by this slice) and scope kit rules to the page's main.
-export function adoptKit(doc, main) {
+// The kit's participant stage (cookbook phoneChrome): one 640px glass card whose content is phase-specific. The legacy
+// permanent h1/help above every phase is retired here (independent review aef4ec AMEND A); each phase brings its own heading.
+export function adoptKit(doc, main, { demo = false } = {}) {
   const head = doc.head;
   if (head) for (const href of STYLESHEETS) {
     if ([...head.querySelectorAll('link[rel="stylesheet"]')].some(link => link.getAttribute('href') === href)) continue;
     const link = doc.createElement('link'); link.rel = 'stylesheet'; link.href = href; head.append(link);
   }
-  if (main && !/(^|\s)rv(\s|$)/.test(main.className || '')) main.className = `${main.className || ''} rv participant-kit`.trim();
+  if (!main) return null;
+  if (!/(^|\s)rv(\s|$)/.test(main.className || '')) main.className = `${main.className || ''} rv participant-kit glass phone`.trim();
+  main.setAttribute('style', 'max-width:640px;width:calc(100% - 24px);margin:24px auto;padding:var(--phone-pad,20px)');
+  for (const legacy of [...main.children].filter(n => (n.tagName === 'H1' || n.tagName === 'P') && !n.id)) legacy.hidden = true;
+  let frame = main.querySelector('.participant-frame');
+  if (!frame) { frame = el(doc, 'div', 'participant-frame'); main.prepend(frame); }
+  frame.replaceChildren();
+  if (demo) { const badge = el(doc, 'span', 'badge demo', copy.practiceBadge); frame.append(badge); }
+  return frame;
+}
+
+// Phase heading inside the card (kit: review screen carries eyebrow "Review" + "Your answers"; the intro and receipt carry
+// their own). Caller passes the phase; nothing here reads controller state.
+export function phaseHeading(doc, phase) {
+  if (phase !== 'review') return null;
+  return { eyebrow: el(doc, 'p', 'participant-phase-heading eyebrow', copy.reviewEyebrow), help: el(doc, 'p', 'participant-phase-help muted', copy.reviewHelp) };
 }
 
 // Notice tone from the controller's own state: the kit colours the existing #notice; wording and phase stay the controller's.

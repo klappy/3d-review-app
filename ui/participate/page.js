@@ -2,7 +2,7 @@ import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError } from '../participant-view.js';
 import { reviewAnswer } from '../present.js';
-import { adoptKit, field as kitField, paintNotice, receipt as kitReceipt, reviewRow as kitReviewRow } from '../kit/views-participant.js';
+import { adoptKit, field as kitField, paintNotice, phaseHeading, receipt as kitReceipt, reviewRow as kitReviewRow } from '../kit/views-participant.js';
 import { copy as sharedCopy } from '../shared-link.js';
 
 const $ = id => document.getElementById(id);
@@ -44,6 +44,8 @@ function paint(state) {
       } else pager?.showForm();
       $('answers').hidden = false;
     } else if (state.phase === 'review') {
+      for (const stale of $('review').querySelectorAll('.participant-phase-heading,.participant-phase-help')) stale.remove();
+      const { eyebrow, help } = phaseHeading(document, 'review'); $('review').prepend(eyebrow); $('review').querySelector('h2')?.after(help); // kit: eyebrow → heading → help
       $('review-answers').replaceChildren(...state.form.items.map(item => kitReviewRow(document, item, reviewAnswer(item, state.answers[item.id]))));
       $('review').hidden = false; pager?.showReview();
     } else {
@@ -64,9 +66,9 @@ function paint(state) {
 }
 const demo = isDemo(location.search);
 // K4: kit stylesheets + `.rv` scope on the participant main. The participant HTML is not owned by this slice; nothing else in the document changes.
-adoptKit(document, $('participant'));
+adoptKit(document, $('participant'), { demo });
 $('review-button').className = 'primary'; $('submit').className = 'primary'; $('edit').className = 'quiet'; $('recover').className = 'quiet';
-if (demo) { document.querySelector('main > h1').textContent = 'Practice survey · nothing is sent'; document.querySelector('main > p').textContent = 'Use the real survey flow with source-pinned synthetic sample questions. Answers stay in memory and disappear when you leave or reload.'; const back = element('a', 'Back to the tour'); back.href = '/?demo=1#assessment/demo-assessment/collect'; document.querySelector('main').prepend(back); }
+if (demo) { const back = element('a', 'Back to the tour'); back.href = '/?demo=1#assessment/demo-assessment/collect'; const frame = $('participant').querySelector('.participant-frame'); frame.append(element('p', 'Use the real survey flow with source-pinned synthetic sample questions. Answers stay in memory and disappear when you leave or reload.'), back); }
 const sample = demo ? sampleParticipantEnvironment(Number(new URLSearchParams(location.search).get('survey') || 0)) : null;
 if (demo) { $('submit').textContent = 'Finish practice — nothing sent'; $('recover').textContent = 'Check practice'; }
 const journey = createParticipantJourney({ ...(demo ? sample : { window, storage: sessionStorage }), onChange: paint });

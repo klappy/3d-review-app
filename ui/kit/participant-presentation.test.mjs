@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
-import { adoptKit, field, intro, itemChips, pager, receipt, reviewRow, STYLESHEETS } from './views-participant.js';
+import { adoptKit, el, field, intro, itemChips, pager, phaseHeading, receipt, reviewRow, STYLESHEETS } from './views-participant.js';
 
 const doc = () => new JSDOM('<!doctype html><html><head></head><body><main id="participant"></main></body></html>').window.document;
 const items = [
@@ -48,9 +48,13 @@ test('intro/pager/receipt/reviewRow paint only what the model or controller carr
   const practice = receipt(d, { response_id: 'x' }, { demo: true }); assert.match(practice.textContent, /nothing sent/);
   assert.equal(reviewRow(d, items[3], '').querySelector('strong').textContent, '(left blank)');
   assert.equal(reviewRow(d, items[0], '4').querySelector('strong').textContent, '4');
-  const main = d.getElementById('participant'); adoptKit(d, main); adoptKit(d, main);
+  const main = d.getElementById('participant'); main.append(el(d, 'h1', undefined, 'legacy'), el(d, 'p', undefined, 'legacy help')); const notice = el(d, 'p'); notice.id = 'notice'; main.append(notice);
+  adoptKit(d, main); adoptKit(d, main, { demo: true });
   assert.deepEqual([...d.head.querySelectorAll('link')].map(l => l.getAttribute('href')), [...STYLESHEETS]);
-  assert.equal(main.className, 'rv participant-kit');
+  assert.equal(main.className, 'rv participant-kit glass phone'); assert.match(main.getAttribute('style'), /max-width:640px/);
+  assert.ok(main.querySelector('h1').hidden && main.querySelector('p:not([id])').hidden, 'permanent legacy heading/help retired'); assert.equal(notice.hidden, false, 'controller notice kept');
+  assert.equal(main.querySelectorAll('.participant-frame').length, 1); assert.equal(main.querySelector('.badge.demo').textContent, 'PRACTICE SURVEY · NOTHING IS SENT');
+  assert.equal(phaseHeading(d, 'form'), null); assert.equal(phaseHeading(d, 'review').eyebrow.textContent, 'Review');
 });
 
 // ── Part 2: the real page, controller and client ─────────────────────────────────────────────────────────────────────────
@@ -112,6 +116,7 @@ test('real participant entry: intro → paged questions → review → Change �
   // Review via the existing submit path: real page handler → journey.review(validated answers).
   $('review-button').click(); await settle();
   assert.equal($('review').hidden, false); assert.equal($('answers').hidden, true); assert.equal(controls.hidden, true);
+  assert.equal($('review').firstElementChild.className, 'participant-phase-heading eyebrow'); assert.equal($('review').querySelector('h2').nextElementSibling.className, 'participant-phase-help muted'); assert.equal(main.querySelector('h1').hidden, true, 'no permanent heading over phases');
   const rows = [...$('review-answers').children]; assert.equal(rows.length, 4); assert.ok(rows.every(r => r.classList.contains('participant-review-row')));
   assert.equal(rows[0].querySelector('strong').textContent, '4'); assert.equal(rows[3].querySelector('strong').textContent, 'Not answered (unknown)', 'existing reviewAnswer wording preserved');
   assert.equal(rows[0].querySelector('button.participant-change').textContent, 'Change');
@@ -248,7 +253,7 @@ test('demo entry never touches transport or sessionStorage and ends in the pract
   const h = await boot({ search: '?demo=1', hash: '#survey=practice', route: async url => { throw new Error(`real transport used in demo: ${url}`); } });
   const { $, main, settle } = h;
   assert.equal(h.requests.length, 0);
-  assert.match(main.querySelector('h1').textContent, /Practice survey/);
+  assert.match(main.querySelector('.badge.demo').textContent, /PRACTICE SURVEY/); assert.equal(main.querySelector('h1').hidden, true);
   assert.equal(main.querySelector('.participant-intro').hidden, false);
   main.querySelector('.participant-intro button').click();
   const fields = [...$('questions').querySelectorAll('fieldset')]; assert.ok(fields.length > 0);
