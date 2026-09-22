@@ -185,6 +185,9 @@ function kitGrid(ctx, items, empty) { return items.length ? `<div class="grid">$
 // ctx.shellOwnsTitle = true (the shell header shows title + eyebrow, so the page renders none). In any other host — the real
 // non-kit /assess/index.html, tests, an absent context — the page owns its heading and renders exactly one eyebrow + h1.
 function pageHead(ctx, r) { return ctx.shellOwnsTitle === true ? '' : `<p class="eyebrow">${ctx.esc(r.eyebrow)}</p><h1>${ctx.esc(r.title)}</h1>`; }
+// Parent link follows the same host contract as the heading. Kit crumbs are that link when the shell is mounted; the non-kit
+// /assess/ host has no crumb chrome, so the page keeps the way up (← All workspaces / ← All projects).
+function pageBack(ctx, href, label) { return ctx.shellOwnsTitle === true ? '' : `<a class="back" href="${ctx.esc(href)}">← ${ctx.esc(label)}</a>`; }
 // The read head carries role/archived state and the permissions link; the heading itself follows the host contract above.
 function kitHead(ctx, r, extra = '') { return `${pageHead(ctx, r)}<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}"><p class="muted small" style="margin:0">${r.role ? `Your role: ${ctx.esc(r.role)}` : ''}</p><div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>`; }
 const readRegion = html => `<div data-read-region class="kit-read">${html}</div>`;
@@ -238,7 +241,7 @@ const workspace = {
     const rename = owner ? `<section class="panel" style="margin-top:22px"><h2>Rename</h2><form id="rename-form"><label class="field">Workspace name<input name="name" maxlength="100" required value="${ctx.esc(w.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
     const r = readModel('workspace', model);
     // Read region: kit cards for grouped projects. Action region: the existing per-card Remove controls, Add and Rename forms (same selectors).
-    return readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/workspaces/${ctx.enc(w.id)}">Permissions</a>`)}<h3>Projects</h3>${kitGrid(ctx, r.items, r.empty)}`)
+    return pageBack(ctx, ctx.routes.workspaces, 'All workspaces') + readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/workspaces/${ctx.enc(w.id)}">Permissions</a>`)}<h3>Projects</h3>${kitGrid(ctx, r.items, r.empty)}`)
       // Ruling: one kit card owns read/navigation; management is a names-only row per project carrying the EXISTING [data-remove] control
       // (same selector/handler/permission). Accessible action name includes the project.
       + actionRegion(`${edit && model.projects.length ? `<ul class="manage-rows" aria-label="Grouped projects">${model.projects.map(p => `<li class="manage-row"><span>${ctx.esc(p.name)}</span><button type="button" class="quiet small" data-remove="${ctx.esc(p.id)}" aria-label="Remove ${ctx.esc(p.name)} from workspace">Remove from workspace</button></li>`).join('')}</ul>` : ''}${rows}${add}${rename}`);
@@ -324,7 +327,7 @@ const project = {
     // Assessments and languages keep their independent settled outcomes; only a 'ready' list renders as cards (never an empty success).
     const assessmentsRead = r.assessments.status === 'ready' ? kitGrid(ctx, r.assessments.items, 'No assessments yet.') : assessmentsBlock;
     const languagesRead = r.languages.status === 'ready' ? langList : r.languages.status === 'refused' ? '<p class="muted">Languages are not visible to you here.</p>' : r.languages.status === 'unauthenticated' ? `<p class="muted">Your session has ended. <a href="${ctx.routes.entry}">Sign in</a></p>` : '<p class="muted" role="alert">Languages could not be loaded. <button type="button" class="quiet" data-act="retry">Retry</button></p>';
-    return readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/projects/${ctx.enc(p.id)}">Permissions</a>`)}${p.organization ? `<p class="muted small">${ctx.esc(p.organization)}</p>` : ''}<h3>Assessments</h3>${assessmentsRead}<aside class="glass panel" style="margin-top:22px"><h3>Languages</h3>${languagesRead}</aside>`)
+    return pageBack(ctx, ctx.routes.projects, 'All projects') + readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/projects/${ctx.enc(p.id)}">Permissions</a>`)}${p.organization ? `<p class="muted small">${ctx.esc(p.organization)}</p>` : ''}<h3>Assessments</h3>${assessmentsRead}<aside class="glass panel" style="margin-top:22px"><h3>Languages</h3>${languagesRead}</aside>`)
       + actionRegion(`${create}${rename}${addLang ? `<section class="panel"><h2>Languages</h2>${addLang}</section>` : ''}`);
   },
   bind(ctx, root, model) {

@@ -53,9 +53,9 @@ test('old write completion cannot attach a status or dirty flag to a new identit
 
 test('workspace failure is retryable and old workspace replies are discarded', async () => {
   const h = harness(); h.state.projects = [{ id: 'p', workspace_id: 'w' }]; let calls = 0;
-  h.setApi(async () => { if (++calls === 1) throw Error('transient'); return { workspace: { name: 'Workspace' }, projects: [] }; });
+  h.setApi(async () => { if (++calls === 1) throw Error('transient'); return { workspace: { name: 'Workspace', role: 'member' }, projects: [] }; });
   assert.equal(await h.workspaceFor('p'), null); assert.equal(h.state.workspaces.has('w'), false);
-  assert.equal((await h.workspaceFor('p')).name, 'Workspace'); assert.equal(calls, 2);
+  const loaded = await h.workspaceFor('p'); assert.equal(loaded.name, 'Workspace'); assert.equal(loaded.role, 'member', 'workspace cache keeps the role the GET returned'); assert.equal(calls, 2);
   h.state.workspaces.clear(); const reply = deferred(); h.setApi(() => reply.promise); const pending = h.workspaceFor('p');
   h.resetIdentity(); reply.resolve({ workspace: { name: 'Old private workspace' }, projects: [] }); await pending;
   assert.equal(h.state.workspaces.size, 0);

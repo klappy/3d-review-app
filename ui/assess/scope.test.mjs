@@ -249,6 +249,21 @@ test('title follows the current model on re-render (route/currentness change): w
   assert.ok(pages.workspace.render(ctx, await pages.workspace.load(ctx, { id: 'w1' })).includes('<h1>Field team</h1>'));
   assert.ok(pages.workspace.render(ctx, await pages.workspace.load(ctx, { id: 'w2' })).includes('<h1>Lake team</h1>'));
 });
+test('non-kit host keeps the parent back link; kit crumbs replace it (no duplicate)', async () => {
+  for (const over of [{}, { shellOwnsTitle: false }]) {
+    const ctx = ctxWith(FOUR, over);
+    const ws = pages.workspace.render(ctx, await pages.workspace.load(ctx, { id: 'w1' }));
+    const pr = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
+    assert.ok(ws.startsWith('<a class="back" href="#workspaces">← All workspaces</a>'), 'workspace way up');
+    assert.ok(pr.startsWith('<a class="back" href="#projects">← All projects</a>'), 'project way up');
+    assert.ok(ws.indexOf('class="back"') < ws.indexOf('data-read-region'), 'back link leads the read region');
+  }
+  const kit = ctxWith(FOUR, { shellOwnsTitle: true });
+  for (const [kind, params] of [['workspace', { id: 'w1' }], ['project', { id: 'p1' }]]) {
+    const h = pages[kind].render(kit, await pages[kind].load(kit, params));
+    assert.ok(!h.includes('class="back"'), `${kind}: kit host does not repeat the crumb as a back link`);
+  }
+});
 test('failure states keep their own single heading in both hosts (no double title, no lost title)', async () => {
   for (const over of [{}, { shellOwnsTitle: true }]) {
     const ctx = ctxWith({ 'GET /v2/projects': err('500', 'boom') }, over);

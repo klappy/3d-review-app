@@ -44,6 +44,16 @@ test('shell model: route/title/crumbs agree, role only from loaded data, no acti
   assert.equal(viewerOnly.role, 'Viewer', 'role label equals the loaded scope role');
   assert.equal(viewerOnly.nodes.find(n => n.id === 'p:p2').role, 'Viewer');
 });
+test('a role-less workspace cache does not hide a role loaded later; a role already cached is kept', () => {
+  const bare = new Map([['w1', { id: 'w1', name: 'Field team', projects: ['p1'] }]]);
+  const listed = treeNodes(routes, { projects: [{ id: 'p1', name: 'River', role: 'owner', workspace_id: 'w1' }], workspaces: bare, page: { kind: 'workspaces', model: { status: 'loaded', workspaces: [{ id: 'w1', name: 'Field team', role: 'member' }] } } });
+  assert.equal(listed.find(n => n.id === 'w:w1').role, 'Member', 'workspaces list fills a missing cache role');
+  const page = { kind: 'workspace', model: { status: 'loaded', workspace: { id: 'w1', name: 'Field team', role: 'viewer' }, projects: [] } };
+  const header = shellModel({ route: { kind: 'workspace', id: 'w1' }, routes, principal: { id: 'x' }, known: { projects: [], workspaces: bare, lists: new Map() }, page });
+  assert.equal(header.role, 'Viewer', 'header uses the page role when the cache dropped it');
+  const kept = treeNodes(routes, { workspaces: new Map([['w1', { id: 'w1', name: 'Field team', role: 'owner', projects: [] }]]), page: { kind: 'workspaces', model: { status: 'loaded', workspaces: [{ id: 'w1', name: 'Field team', role: 'viewer' }] } } });
+  assert.equal(kept[0].role, 'Owner', 'a role already in the cache is not replaced');
+});
 test('direct assessment grant: reachable, listed under itself, no invented workspace/project links; visible names never become ids', () => {
   const current = { assessment: { id: 'a9', name: '<b>Granted</b>', project_id: 'p9', role: 'viewer', stage: 'understand' } };
   const m = shellModel({ route: { kind: 'assessment', id: 'a9' }, routes, principal: { id: 'x' }, known: { projects: [], workspaces: new Map(), lists: new Map() }, current });
