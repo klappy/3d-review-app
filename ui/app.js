@@ -1,4 +1,5 @@
 import { parseInvitationFragment } from './public-entry.js';
+import { paintCodeBatch } from './kit/legacy-adapter.js';
 import { mountParticipantView } from './participant-view.js';
 import { redactDiagnosticPath } from './diagnostic-path.js';
 import { createCollabHooks } from './collab-mount.js';
@@ -129,7 +130,10 @@ function text(node, value) { node.textContent = value == null ? '' : String(valu
 function option(select, value, label) { select.add(new Option(label, value)); }
 function resetSelect(select, label) { select.replaceChildren(new Option(label, '')); }
 function required(value, message) { if (!value) throw new Error(message); return value; }
-async function api(url, { method = 'GET', body, participant = false } = {}) {
+// `evidence` (optional): a predicate consulted right before the diagnostic row is appended. Code-batch operations pass
+// their currentness check so a request that resolved after identity/assessment/survey changed leaves no receipt/trace row
+// in the new context. Every other caller omits it and keeps the unconditional append.
+async function api(url, { method = 'GET', body, participant = false, evidence } = {}) {
   if (participant && state.shared) return state.shared.request(url, { method, body }); // shared link: credential-less fetch, link bearer only
   const token = participant ? state.participant : state.session;
   const headers = { accept: 'application/json' };
@@ -141,7 +145,7 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   let data;
   try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
   if (!response.ok || !data.ok) throw Object.assign(new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
-  const li = document.createElement('li'); li.textContent = `${method} ${redactDiagnosticPath(url)} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
+  if (typeof evidence !== 'function' || evidence() === true) { const li = document.createElement('li'); li.textContent = `${method} ${redactDiagnosticPath(url)} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li); }
   return data.result;
 }
 async function run(label, task) {
@@ -378,38 +382,82 @@ async function surveyStatus() {
   text($('survey-detail'), `${result.survey.template_name} · ${result.survey.collection_status} · ${result.counts.responses} response(s)`);
 }
 bindClick('survey-status', 'Checking survey…', surveyStatus);
+// ---- Survey code batch: issue → preview (dry run) → separate confirmed once-only export ----
+// Guarded operation effect chain (ticket 2026-09-22-k5-code-export amendment): every code action captures an immutable
+// snapshot (identity/session, assessment, survey, batch generation, method/target/ids/token) BEFORE dispatch and checks
+// the same snapshot before every completion/error notification, evidence append, state/output paint and control
+// restoration. A dispatched server write may have committed; a stale result changes nothing in the new context and is
+// never retried automatically. Non-code operations keep run()/api() unchanged.
+let codeGeneration = 0, codePending = false;
+const codeRegion = () => document.querySelector('[data-code-batch]');
+function codeSnapshot(extra = {}) { return Object.freeze({ generation: codeGeneration, session: state.session, assessment: state.assessment, survey: state.survey, ...extra }); }
+function codeCurrent(snap) { return snap.generation === codeGeneration && snap.session === state.session && snap.assessment === state.assessment && snap.survey === state.survey; }
+function paintCode(model) { paintCodeBatch(codeRegion(), { context: state.survey || '', ...model }); }
 function clearCodeBatch() {
+  codeGeneration++; // invalidates every in-flight code operation: its completion, evidence row, output and control effects
   state.codeIds = null; state.confirmToken = null;
-  text($('issued-ids'), 'No code batch issued in this page session.');
-  text($('export-impact'), ''); text($('codes-output'), ''); $('codes-output').hidden = true;
+  paintCode({ phase: 'idle' });
   $('release-codes').disabled = true;
 }
 function codeRoute() {
   const aid = required(state.assessment, 'Choose an assessment.'), sid = required(state.survey, 'Choose a survey.');
   return `/v2/assessments/${path(aid)}/surveys/${path(sid)}/codes`;
 }
-bindClick('issue-codes', 'Issuing code IDs…', async () => {
+// Code-only invocation wrapper. Mirrors run()'s visible contract for the CURRENT context (label notice, buttons held,
+// completion/failure notice) but: refuses a duplicate pending invocation; restores each held control to its ORIGINAL
+// disabled state (never blanket false, never a control that did not exist at dispatch); and, when the snapshot is stale
+// by completion time, emits no notice, no error, no state change — the new context painted by the invalidation path wins.
+async function codeRun(label, task) {
+  if (codePending) return;
+  const snap = codeSnapshot(), live = () => codeCurrent(snap);
+  codePending = true;
+  note(label);
+  const held = [...document.querySelectorAll('button')].filter(b => b.id !== 'version' && b.id !== 'changelog-close').map(b => [b, b.disabled]);
+  held.forEach(([b]) => b.disabled = true);
+  try { await task(snap, live); if (live()) note(`${label} — complete.`); }
+  catch (error) { if (live()) fail(error.message); }
+  finally {
+    codePending = false;
+    for (const [b, wasDisabled] of held) {
+      if (!b.isConnected) continue;
+      if (b.id === 'release-codes') b.disabled = !state.confirmToken;
+      else if (b.id === 'issue-link-confirm') b.disabled = !state.linkConfirm;
+      else if (b.id === 'build-report') b.disabled = !state.reportConfirm;
+      else b.disabled = wasDisabled;
+    }
+  }
+}
+function bindCode(id, label, handler) { $(id).addEventListener('click', () => codeRun(label, handler)); }
+bindCode('issue-codes', 'Issuing code IDs…', async (snap, live) => {
   const count = Number($('code-count').value);
   if (!Number.isInteger(count) || count < 1 || count > 100) throw new Error('Code count must be 1–100.');
-  const result = await api(codeRoute(), { method: 'POST', body: { count } });
-  state.codeIds = result.ids; state.confirmToken = null;
-  text($('issued-ids'), `${result.count} code ID(s) issued: ${result.ids.join(', ')}`);
-  text($('export-impact'), 'Preview and confirm to reveal code values.');
-  text($('codes-output'), ''); $('codes-output').hidden = true;
+  const target = codeRoute(); const captured = codeSnapshot({ method: 'POST', target, count });
+  const result = await api(target, { method: 'POST', body: { count }, evidence: live });
+  if (!live() || !codeCurrent(captured)) return; // issued under a superseded context: keep nothing
+  const ids = Array.isArray(result?.ids) ? result.ids.map(String) : null;
+  if (!ids || !Number.isInteger(result?.count)) throw new Error('Code issue response was incomplete; no batch is recorded.');
+  state.codeIds = ids; state.confirmToken = null;
+  paintCode({ phase: 'issued', ids, count: result.count });
 });
-bindClick('preview-export', 'Previewing credential release…', async () => {
+bindCode('preview-export', 'Previewing credential release…', async (snap, live) => {
   const ids = required(state.codeIds, 'Issue a code batch in this page session first.');
-  const result = await api(`${codeRoute()}/export`, { method: 'POST', body: { params: { ids }, mode: 'dry_run' } });
+  const target = `${codeRoute()}/export`; const captured = codeSnapshot({ method: 'POST', target, ids: [...ids], mode: 'dry_run' });
+  const result = await api(target, { method: 'POST', body: { params: { ids }, mode: 'dry_run' }, evidence: live });
+  if (!live() || !codeCurrent(captured) || state.codeIds !== ids) return;
+  if (typeof result?.confirm_token !== 'string' || !result.confirm_token) throw new Error('Preview returned no confirmation token; nothing to confirm.');
   state.confirmToken = result.confirm_token;
-  text($('export-impact'), `Release ${result.count} code value(s) once; impact: ${JSON.stringify(result.impact)}. Confirmation expires in ${result.expires_in} seconds.`);
+  paintCode({ phase: 'previewed', ids, count: result.count, impact: result.impact, expiresIn: result.expires_in });
 });
-bindClick('release-codes', 'Releasing credential values…', async () => {
+bindCode('release-codes', 'Releasing credential values…', async (snap, live) => {
   const ids = required(state.codeIds, 'Issue a code batch first.'), confirm_token = required(state.confirmToken, 'Preview export again.');
   state.confirmToken = null; // a failed/uncertain release requires a fresh preview
-  const result = await api(`${codeRoute()}/export`, { method: 'POST', body: { params: { ids }, mode: 'execute', confirm_token } });
-  text($('codes-output'), result.codes.map(entry => `${entry.id}: ${entry.code}`).join('\n'));
-  $('codes-output').hidden = false;
-  text($('export-impact'), 'Released once. Save/print now; these values cannot be exported again.');
+  const target = `${codeRoute()}/export`; const captured = codeSnapshot({ method: 'POST', target, ids: [...ids], mode: 'execute', confirm_token });
+  let result;
+  try { result = await api(target, { method: 'POST', body: { params: { ids }, mode: 'execute', confirm_token }, evidence: live }); }
+  catch (error) { if (live() && codeCurrent(captured) && state.codeIds === ids) paintCode({ phase: 'issued', ids, failure: `${error.message} The release may or may not have happened; preview again before retrying.` }); throw error; }
+  if (!live() || !codeCurrent(captured) || state.codeIds !== ids) return; // values released to a superseded context are never shown
+  if (!Array.isArray(result?.codes)) throw new Error('Release response carried no code values; treat the outcome as uncertain and preview again.');
+  paintCode({ phase: 'released', ids, codesText: result.codes.map(entry => `${entry.id}: ${entry.code}`).join('\n') });
 });
 function linkRoute() {
   const aid = required(state.assessment, 'Choose an assessment.'), sid = required(state.survey, 'Choose a survey.');
