@@ -266,3 +266,15 @@ test('workspace owner: one kit project card owns read/navigation; management row
   const del = p.transport.log.find(l => l.method === 'DELETE'); assert.equal(del?.key, 'DELETE /v2/workspaces/w1/projects/p1'); assert.equal(del.outcome, 'mutation-refused');
   assert.ok(p.text('#note').includes('Remove project failed'));
 });
+
+// Measured overflow (Chrome, 195px layout viewport = phone at 200% zoom): the open account menu extended 57px past the left edge.
+// jsdom has no layout, so this guards the clamp rules themselves; the pixel proof lives in the browser probe (frames-probe.html?openmenu=1).
+test('account menu is clamped to the viewport inline-size (rule guard; measured proof in browser probe)', async () => {
+  const p = await bootPage('owner', '#project/p1');
+  const css = [...p.d.querySelectorAll('style')].map(s => s.textContent).join('\n');
+  assert.match(css, /\.rv \.account-menu\{[^}]*max-width:calc\(100vw - 16px\)/, 'menu max-width clamped to viewport');
+  assert.match(css, /\.rv \.account-menu\{[^}]*min-width:min\(240px,calc\(100vw - 16px\)\)/, 'min-width never exceeds viewport');
+  assert.match(css, /@media \(max-width:420px\)\{[^}]*\.rv \.account\{position:static\}/, 'narrow viewports anchor the menu to the viewport edges');
+  const toggle = p.q('#account-menu-toggle'); toggle.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  assert.equal(p.q('#account-menu').hidden, false); assert.equal(p.d.activeElement.id, 'account-signout');
+});
