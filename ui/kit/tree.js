@@ -56,8 +56,9 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     const pointerdown = e => { if(current() && composing && e.target !== search) deferred = true; };
     const focusin = e => { if(current() && e.target === search && deferred) { deferred = false; filterSearch(); } };
     const filterSearch = () => {
-      if (!current() || !search.isConnected || deferred) return;
+      if (!current() || !search.isConnected) return;
       query = search.value;
+      if (deferred) return;
       // Filter only the owned tree list. Search, focus, and mounted content stay put.
       const filtered = query ? matches(model.nodes) : visible(model.nodes);
       root.querySelector('[aria-label="Scopes"]').innerHTML = '<div class="eyebrow">'+esc(model.sectionLabel || 'Workspaces')+'</div>'+filtered.map(n=>node(n,1)).join('');
