@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
-import { adoptKit, el, field, intro, itemChips, pager, phaseHeading, receipt, reviewRow, STYLESHEETS } from './views-participant.js';
+import { adoptKit, el, field, intro, itemChips, pager, phaseHeading, receipt, reflowHeader, reviewRow, STYLESHEETS } from './views-participant.js';
 
 const doc = () => new JSDOM('<!doctype html><html><head></head><body><main id="participant"></main></body></html>').window.document;
 const items = [
@@ -285,3 +285,17 @@ test('destroy on form replacement removes stale pager callbacks and restores hid
   reviewBtn.click(); assert.ok([...questions.children].every(f => !f.hidden));
   view.destroy(); // idempotent
 });
+
+test('reflowHeader: participant header wraps and shrinks; Version node, attributes and listeners untouched', async () => {
+  const dom = new JSDOM(html); const d = dom.window.document;
+  const version = d.getElementById('version'); let clicks = 0; version.addEventListener('click', () => clicks++);
+  const before = version.outerHTML;
+  const header = reflowHeader(d);
+  assert.equal(header.getAttribute('style'), 'flex-wrap:wrap;min-width:0;row-gap:6px');
+  assert.ok([...header.children].every(c => /min-width:0;overflow-wrap:anywhere/.test(c.getAttribute('style'))));
+  assert.equal(version.outerHTML.replace(/ style="[^"]*"/, ''), before, 'Version markup unchanged apart from the scoped style');
+  assert.equal(d.getElementById('version'), version); version.click(); assert.equal(clicks, 1, 'existing listener still fires');
+  reflowHeader(d); assert.equal(header.children[2].getAttribute('style'), 'min-width:0;overflow-wrap:anywhere', 'idempotent');
+  assert.equal(reflowHeader(doc()), null, 'no header → no-op');
+});
+

@@ -160,6 +160,7 @@ export function adoptKit(doc, main, { demo = false } = {}) {
     if ([...head.querySelectorAll('link[rel="stylesheet"]')].some(link => link.getAttribute('href') === href)) continue;
     const link = doc.createElement('link'); link.rel = 'stylesheet'; link.href = href; head.append(link);
   }
+  reflowHeader(doc);
   if (!main) return null;
   if (!/(^|\s)rv(\s|$)/.test(main.className || '')) main.className = `${main.className || ''} rv participant-kit glass phone`.trim();
   main.setAttribute('style', 'max-width:640px;width:calc(100% - 24px);margin:24px auto;padding:var(--phone-pad,20px)');
@@ -187,5 +188,19 @@ export function paintNotice(node, text, { phase, warningNotices = [] } = {}) {
   // The page's own #notice rule outranks the kit's class; the warning fill is asserted inline from the same token.
   if (warning) node.setAttribute('style', 'background:var(--warning-fill);color:var(--warning-ink)'); else node.removeAttribute('style');
   return warning;
+}
+
+// Participant page header reflow (independent 6ab60dc ZOOM-AMEND): the legacy header is a non-wrapping flex row, so at
+// 390px scaled ×2 (195 CSS px) the real Version control was pushed off-screen. Scoped runtime styling only — the header's
+// nodes, the Version button and its changelog listener are untouched; nothing is hidden, clipped or shrunk in text size.
+export function reflowHeader(doc) {
+  const header = doc.querySelector('body > header');
+  if (!header) return null;
+  header.setAttribute('style', 'flex-wrap:wrap;min-width:0;row-gap:6px');
+  for (const child of header.children) {
+    const own = child.getAttribute('style') || '';
+    if (!/min-width/.test(own)) child.setAttribute('style', `${own}${own && !own.endsWith(';') ? ';' : ''}min-width:0;overflow-wrap:anywhere`);
+  }
+  return header;
 }
 
