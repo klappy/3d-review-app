@@ -16,7 +16,7 @@ import { pages, css as scopeCss } from '../ui/assess/scope.js';
 import { views, css as viewsCss } from '../ui/assess/views.js';
 import * as share from '../ui/assess/share.js';
 import { feedback } from '../ui/assess/feedback.js';
-import { mountKitRoot, shellModel } from '../ui/kit/app-adapter.js';
+import { mountKitRoot, shellModel, bindAccountMenu } from '../ui/kit/app-adapter.js';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const HTML = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
@@ -37,7 +37,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install } = 
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, views, viewsCss, share, feedback, mountKitRoot, shellModel });
+  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu });
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -56,10 +56,12 @@ test('normal root: single kit header hosts the REAL account/version/link control
   const p = await bootPage('owner', '#workspaces');
   assert.equal(p.qa('header').length, 1); assert.ok(p.q('header.top'));
   assert.equal(p.qa('#who').length, 1); assert.equal(p.qa('#version').length, 1); assert.equal(p.qa('#account').length, 1);
-  assert.ok(p.q('[data-header-host] #who')); assert.ok(p.q('[data-header-host] #version')); assert.ok(p.q('[data-header-host] #shell-links a[href="#feedback"]'));
+  assert.ok(p.q('[data-header-host] #account-menu-toggle #who'), 'verified email node is the visible account control');
+  assert.ok(p.q('[data-header-host] #account-menu #version')); assert.ok(p.q('[data-header-host] #account-menu #shell-links a[href="#feedback"]')); assert.ok(p.q('[data-header-host] #account-menu #account-signout'));
+  assert.equal(p.q('#account-menu').hidden, true, 'secondary controls disclosed on demand'); assert.equal(p.q('header.top .me'), null, 'no identity pill: email is the identity');
   assert.equal(p.q('#shell-controls'), null, 'adoption wrapper removed');
   assert.equal(p.text('#who'), 'Account: synthetic-owner@example.invalid');
-  assert.ok(!p.q('header.top .me').textContent.includes('@'), 'private email appears only in the existing #who node');
+  assert.deepEqual(p.qa('header.top *').filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.includes('@'))).map(e => e.id), ['who'], 'private email appears exactly once (the #who node)');
   assert.equal(p.q('#account-actions').hidden, false);
   assert.equal(p.q('[role=main].content [data-content]'), p.api.app, 'controller app root IS the stable shell content element');
 });
@@ -86,6 +88,7 @@ test('journey: Workspaces → workspace → project (two distinct assessments, l
   assert.equal(p.text('[role=main].content h1'), 'September assessment'); assert.deepEqual(crumbs(p), ['Field team', 'River Valley', 'September assessment']);
   assert.ok(p.q('nav[aria-label="Scopes"] [aria-current="page"]')?.textContent.startsWith('September assessment'));
   assert.ok(p.q('[data-content] .view-tabs'), 'retained legacy assessment module mounted in stable content');
+  assert.equal(p.q('[data-content] .context-panel'), null, 'no duplicate context panel under the kit tree'); assert.equal(p.qa('h1').length, 1, 'one heading'); assert.ok(p.q('[data-content] .badge'), 'stage badge kept');
   assert.equal(p.api.app, projectContent, 'content element identity stable across route change');
   assert.equal(p.q('[data-content] [data-read-region]'), null, 'old project view destroyed before the assessment mounted');
   await p.go('#project/p1');
@@ -204,21 +207,62 @@ test('F2: a create completion arriving after navigation does not redirect the ne
 });
 test('F3: viewer-only identity shows no synthesized role; scope role appears only where loaded', async () => {
   const p = await bootPage('viewer', '#workspaces');
-  assert.equal(p.text('header.top .me'), 'Signed in'); assert.equal(p.q('header.top nav.crumbs .tree-role'), null);
+  assert.equal(p.q('header.top .me'), null); assert.equal(p.q('header.top nav.crumbs .tree-role'), null);
   assert.ok(!p.q('header.top').textContent.includes('Member'));
   await p.go('#project/p2');
-  assert.equal(p.text('header.top .me'), 'Signed in · Viewer'); assert.equal(p.text('header.top nav.crumbs .tree-role'), 'Viewer');
+  assert.equal(p.text('header.top nav.crumbs .tree-role'), 'Viewer');
   await p.go('#project/p1');
-  assert.equal(p.text('header.top .me'), 'Signed in · Viewer');
+  assert.equal(p.text('header.top nav.crumbs .tree-role'), 'Viewer');
 });
 
 test('role contract end-to-end: Owner/Member/Viewer each display as themselves at project p1; write regions follow the real controller permission', async () => {
   for (const [identity, label, forms] of [['owner', 'Owner', ['create-assessment', 'rename-form', 'add-language']], ['member', 'Member', ['create-assessment', 'add-language']], ['viewer', 'Viewer', []]]) {
     const p = await bootPage(identity, '#project/p1');
-    assert.equal(p.text('header.top .me'), 'Signed in · ' + label, identity);
     assert.equal(p.text('header.top nav.crumbs .tree-role'), label, identity);
+    assert.equal(p.text('#who'), 'Account: synthetic-' + identity + '@example.invalid', identity + ' identity is the email, not a role');
     assert.equal(p.q('nav[aria-label="Scopes"] [aria-current="page"]').closest('.tree-row').querySelector('.tree-role').textContent, label, identity);
     assert.deepEqual(p.qa('[data-action-region] form').map(f => f.id), forms, identity + ' write forms come only from the controller role');
     assert.equal(p.qa('[data-menu-toggle]').length, 0, 'kit level menu never synthesized');
   }
+});
+
+// ---- Compact chrome amendment (COMPACT-CHROME-DISPOSITION-2026-09-22) ----
+test('account menu: verified email is the visible control; disclosure opens/closes by pointer and keyboard with focus return; controls keep identity across routes and reset', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  const toggle = p.q('#account-menu-toggle'), menu = p.q('#account-menu'), who = p.q('#who'), version = p.q('#version'), signout = p.q('#account-signout');
+  assert.equal(p.text('#who'), 'Account: synthetic-owner@example.invalid'); assert.equal(menu.hidden, true);
+  toggle.click(); assert.equal(menu.hidden, false); assert.equal(toggle.getAttribute('aria-expanded'), 'true'); assert.equal(p.d.activeElement, signout, 'first enabled item focused');
+  signout.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); assert.equal(p.d.activeElement, p.q('#account-switch'));
+  p.d.activeElement.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); assert.equal(menu.hidden, true); assert.equal(p.d.activeElement, toggle, 'Escape returns focus to the toggle');
+  toggle.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); assert.equal(menu.hidden, false);
+  p.q('[role=main]').click(); assert.equal(menu.hidden, true, 'outside click closes');
+  await p.go('#project/p1'); await p.go('#assessment/a1');
+  assert.equal(p.q('#who'), who); assert.equal(p.q('#version'), version); assert.equal(p.q('#account-signout'), signout); assert.equal(p.qa('#who').length, 1);
+  p.api.resetIdentity(); await tick(2);
+  assert.equal(p.q('#who'), who); assert.equal(p.text('#who'), 'Checking session…'); assert.equal(p.q('#account-actions').hidden, true); assert.equal(menu.hidden, true);
+});
+test('phone: context collapsed by default with the current scope visible; expands, Escape closes and returns focus; content/host untouched', async () => {
+  const p = await bootPage('owner', '#project/p1', { install: () => {} });
+  // emulate the narrow media query for this page instance (layout itself is a browser-screenshot step)
+  p.w.matchMedia = q => ({ matches: /max-width:\s*760px/.test(q), media: q, addEventListener() {}, removeEventListener() {} });
+  await p.go('#workspace/w1'); await p.go('#project/p1');
+  const toggle = p.q('[data-tree-toggle]'); assert.ok(toggle, 'context toggle rendered'); assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  assert.equal(p.q('[data-tree-panel]').hidden, true); assert.equal(toggle.querySelector('.tree-toggle-current').textContent, 'River Valley', 'current scope visible while collapsed');
+  assert.ok(p.q('[data-read-region] a[href="#assessment/a1"]'), 'work area rendered first');
+  const mount = p.api.app, who = p.q('#who');
+  toggle.click(); assert.equal(p.q('[data-tree-panel]').hidden, false); assert.equal(p.q('[data-tree-toggle]').getAttribute('aria-expanded'), 'true'); assert.equal(p.d.activeElement, p.q('[data-tree-toggle]'));
+  assert.equal(p.api.app, mount); assert.equal(p.q('#who'), who);
+  const search = p.q('[data-search]'); search.focus(); search.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert.equal(p.q('[data-tree-panel]').hidden, true); assert.equal(p.d.activeElement, p.q('[data-tree-toggle]'), 'Escape closes and returns focus');
+  p.q('[data-tree-toggle]').click(); p.qa('nav[aria-label="Scopes"] [data-navigate]').find(a => a.textContent.includes('Spring')).click(); await tick(16);
+  assert.equal(p.w.location.hash, '#assessment/a2'); assert.equal(p.q('[data-tree-panel]').hidden, true, 'route change collapses again'); assert.equal(p.q('.tree-toggle-current').textContent, 'Spring baseline');
+  assert.equal(p.qa('h1').length, 1); assert.ok(p.q('[data-content] .view-tabs')); assert.ok(p.q('[data-content] .badge'));
+});
+test('workspace owner: one kit project card owns read/navigation; management rows are names-only with the existing [data-remove] control', async () => {
+  const p = await bootPage('owner', '#workspace/w1');
+  assert.equal(p.qa('[data-read-region] article').length, 1); assert.equal(p.qa('[data-action-region] article, [data-action-region] .entity-card-wrap').length, 0);
+  const remove = p.q('[data-action-region] .manage-row [data-remove="p1"]'); assert.ok(remove); assert.equal(remove.getAttribute('aria-label'), 'Remove River Valley from workspace');
+  remove.click(); await tick(8);
+  const del = p.transport.log.find(l => l.method === 'DELETE'); assert.equal(del?.key, 'DELETE /v2/workspaces/w1/projects/p1'); assert.equal(del.outcome, 'mutation-refused');
+  assert.ok(p.text('#note').includes('Remove project failed'));
 });

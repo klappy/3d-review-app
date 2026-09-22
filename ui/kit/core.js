@@ -10,7 +10,7 @@ export function link(item, current = false) {
 // [data-header-host] is an empty, caller-owned slot for real app controls (account, version); tree.js keeps the same element across paints.
 export function chrome(model) {
   const ancestors = (model.ancestors || []).filter(x => x.visible === true && safeHref(x.href));
-  return '<header class="top"><a class="brand" href="#" data-navigate="#"><span>3D</span>Review</a><nav class="crumbs" aria-label="Breadcrumb">'+ancestors.map(x=>link(x,x.href===model.currentHref)).join('<span class="sep" aria-hidden="true">›</span>')+badge(model.role)+'</nav><div class="right">'+(model.sample?'<span class="badge demo">SAMPLE DATA · SIMULATED</span>':'')+'<span class="me">'+esc(model.identityLabel)+(model.role?' · '+esc(model.role):'')+'</span><span class="header-host" data-header-host></span></div></header>';
+  return '<header class="top"><a class="brand" href="#" data-navigate="#"><span>3D</span>Review</a><nav class="crumbs" aria-label="Breadcrumb">'+ancestors.map(x=>link(x,x.href===model.currentHref)).join('<span class="sep" aria-hidden="true">›</span>')+badge(model.role)+'</nav><div class="right">'+(model.sample?'<span class="badge demo">SAMPLE DATA · SIMULATED</span>':'')+(model.identityLabel?'<span class="me">'+esc(model.identityLabel)+(model.role?' · '+esc(model.role):'')+'</span>':'')+'<span class="header-host" data-header-host></span></div></header>';
 }
 export function levelMenu(model) {
   const actions = (model.actions || []).filter(x => x.allowed === true && typeof x.id === 'string');

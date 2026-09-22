@@ -11,7 +11,7 @@ import { pages, css as scopeCss } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
-import { mountKitRoot, shellModel } from '/kit/app-adapter.js';
+import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 // Product overhaul (cookbook #16 c5721465315): five VIEWS on one assessment page. A view is a tab; a tab never mutates stage.
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
@@ -22,7 +22,9 @@ const DOTS = { 'Translation Team': '', Church: 'blue', Community: 'gold', 'Other
 // legacy harness) `app` is the plain #app element and nothing else changes.
 const kitRoot = document.getElementById('rv');
 const kit = kitRoot ? mountKitRoot(kitRoot, shellModel({ route: route(location.hash), routes: cards.routes, principal: null }), { onNavigate: href => { if (typeof href === 'string' && href.startsWith('#')) { if (location.hash === href) render(); else location.hash = href; } } }) : null;
-if (kit) { kit.adoptControls(document, ['shell-links', 'version', 'account']); document.getElementById('shell-controls')?.remove(); }
+// Compact chrome: #account (toggle showing #who + menu holding sign-out/switch/version/feedback/roadmap) is the ONLY hosted control.
+if (kit) { kit.adoptControls(document, ['account']); document.getElementById('shell-controls')?.remove(); bindAccountMenu(document); }
+const narrow = () => typeof matchMedia === 'function' && matchMedia('(max-width:760px)').matches;
 const app = kit ? kit.content : document.getElementById('app'), who = document.getElementById('who'), note = document.getElementById('note');
 // Shell sync happens only from render()/boot()/resetIdentity(): the model is derived from loaded, authorized data the controller already holds.
 function syncShell(page = null) {
@@ -31,7 +33,7 @@ function syncShell(page = null) {
   // A workspace page has already loaded its workspace: keep it in the same identity-scoped cache workspaceFor() uses (cleared by
   // resetIdentity) so later crumbs can name it without a discovery read. Data only; never a new request.
   if (page?.kind === 'workspace' && page.model?.status === 'loaded' && page.model.workspace?.id) state.workspaces.set(page.model.workspace.id, { id: page.model.workspace.id, name: page.model.workspace.name, role: page.model.workspace.role, projects: (page.model.projects || []).map(x => x.id) });
-  kit.update(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, identityLabel: state.principal ? 'Signed in' : 'Not signed in' }));
+  kit.update(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() }));
 }
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const title = v => v.charAt(0).toUpperCase() + v.slice(1);
@@ -299,7 +301,10 @@ function prepareView(current) {
 function screen(current, view = null) {
   const a = current.assessment, project = state.projects.find(p => p.id === a.project_id);
   const tab = view || (VIEWS.includes(a.stage) ? a.stage : 'prepare');
-  const head = `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${esc(project?.name || a.project_id)} · your role: ${esc(a.role)}${a.role === 'viewer' ? ' — you can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions' : ''}</p></div><span class="badge">${stageLabel(a.stage)}</span></div>${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
+  const roleLine = `${esc(project?.name || a.project_id)} · your role: ${esc(a.role)}${a.role === 'viewer' ? ' — you can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions' : ''}`;
+  // Under the kit shell the eyebrow/h1 are the shell's (one heading); only the unique role line and stage badge remain here.
+  const head = kit ? `<div class="title assessment-head"><p class="muted" style="margin:0">${roleLine}</p><span class="badge">${stageLabel(a.stage)}</span></div>${viewTabs(a, tab)}`
+    : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${roleLine}</p></div><span class="badge">${stageLabel(a.stage)}</span></div>${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
   if (tab === 'prepare') return head + prepareView(current);
   if (tab !== 'collect') return head + `<div id="view-root" data-view="${tab}"><p class="muted">Loading…</p></div>`;
   return head + collectScreen(current);
@@ -503,10 +508,13 @@ function keepPrint(r) {
 function paint(r = route(location.hash), gen = generation) {
   if (!state.current || (r.kind !== 'assessment' && r.kind !== 'survey') || state.current.assessment.id !== r.id) return;
   if (!keepPrint(r)) state.print = null;
-  app.className = 'workspace-layout';
+  // Compact chrome: under the kit shell the tree, crumbs and title are the shell's; the legacy context panel and the duplicate
+  // assessment heading are not rendered. Stage badge, role line, view tabs and every action/state/error remain.
+  app.className = kit ? '' : 'workspace-layout';
+  const ctxPanel = kit ? '<section class="assessment-body">' : context(state.current);
   if (r.kind === 'survey') {
     const s = activeSurveys(state.current).find(x => x.id === r.sid);
-    app.innerHTML = context(state.current) + (s ? surveyScreen(state.current, s) : surveyUnavailable(r.id, r.sid)) + '</section>';
+    app.innerHTML = ctxPanel + (s ? surveyScreen(state.current, s) : surveyUnavailable(r.id, r.sid)) + '</section>';
     // `only` FILTERS the child paint to its own survey; it never forces (settled/in-flight guard intact; only Retry re-reads).
     bind(state.current); if (s) { bindShare(state.current, s); bindPrint(state.current, s); loadCounts(state.current, { only: s.id }); if (state.print && s.id === state.print.sid) replayPrint(state.print.model); }
     document.title = `${s ? s.template_name + ' · ' : ''}${state.current.assessment.name} · 3D Review`;
@@ -516,7 +524,7 @@ function paint(r = route(location.hash), gen = generation) {
     const a0 = state.current.assessment;
     const tab = r.view || recalledTab(tabStorage, a0.id, VIEWS.includes(a0.stage) ? a0.stage : 'prepare');
     if (r.view) rememberTab(tabStorage, a0.id, r.view);
-    app.innerHTML = context(state.current) + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') loadCounts(state.current);
+    app.innerHTML = ctxPanel + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') loadCounts(state.current);
     bindPrepare(state.current); mountView(state.current, tab, gen);
     document.title = `${title(tab)} · ${state.current.assessment.name} · 3D Review`;
   }

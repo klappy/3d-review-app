@@ -223,14 +223,15 @@ const workspace = {
     const g = gate(ctx, model, { href: ctx.routes.workspaces, label: 'All workspaces' }); if (g) return g;
     const w = model.workspace, edit = CAN_EDIT.has(w.role), owner = w.role === 'owner';
     // Management lives on the card itself (root visual delta, loc-27): one card per project, its own Remove control beneath it.
-    const cards = model.projects.map(p => `<div class="entity-card-wrap">${ctx.cards.projectCard(p)}${edit ? `<div class="card-actions"><button type="button" class="quiet small" data-remove="${ctx.esc(p.id)}">Remove from workspace</button></div>` : ''}</div>`);
     const rows = '';
     const add = edit ? `<section class="panel" style="margin-top:22px"><h2>Add a project</h2>${model.candidatesStatus === 'loaded' ? (model.candidates.length ? `<form id="add-project"><label class="field">Project<select name="pid" required><option value="">Choose a project…</option>${model.candidates.map(p => `<option value="${ctx.esc(p.id)}">${ctx.esc(p.name)}</option>`).join('')}</select></label><div class="actions"><button class="primary" type="submit">Add to workspace</button></div></form>` : '<p class="muted">Every project you can open is already grouped here, or you have no projects yet.</p>') : '<p class="muted">The project list could not be loaded right now.</p>'}<p class="small muted">Only projects you already hold a role on can be grouped. Grouping never grants access.</p></section>` : '';
     const rename = owner ? `<section class="panel" style="margin-top:22px"><h2>Rename</h2><form id="rename-form"><label class="field">Workspace name<input name="name" maxlength="100" required value="${ctx.esc(w.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
     const r = readModel('workspace', model);
     // Read region: kit cards for grouped projects. Action region: the existing per-card Remove controls, Add and Rename forms (same selectors).
     return readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/workspaces/${ctx.enc(w.id)}">Permissions</a>`)}<h3>Projects</h3>${kitGrid(ctx, r.items, r.empty)}`)
-      + actionRegion(`${edit && cards.length ? `<h3>Manage grouped projects</h3>${ctx.cards.cardGrid(cards, '')}` : ''}${rows}${add}${rename}`);
+      // Ruling: one kit card owns read/navigation; management is a names-only row per project carrying the EXISTING [data-remove] control
+      // (same selector/handler/permission). Accessible action name includes the project.
+      + actionRegion(`${edit && model.projects.length ? `<ul class="manage-rows" aria-label="Grouped projects">${model.projects.map(p => `<li class="manage-row"><span>${ctx.esc(p.name)}</span><button type="button" class="quiet small" data-remove="${ctx.esc(p.id)}" aria-label="Remove ${ctx.esc(p.name)} from workspace">Remove from workspace</button></li>`).join('')}</ul>` : ''}${rows}${add}${rename}`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, workspace, model);

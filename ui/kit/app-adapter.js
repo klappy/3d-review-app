@@ -51,7 +51,7 @@ export function treeNodes(routes, known = {}) {
 }
 
 // Ancestry/title/role for the current route from loaded data only. `current` is state.current (assessment) or null.
-export function shellModel({ route, routes, principal, known = {}, current = null, page = null, identityLabel, sectionLabel }) {
+export function shellModel({ route, routes, principal, known = {}, current = null, page = null, identityLabel = '', sectionLabel, contextCollapsible = false }) {
   const kind = route?.kind || 'entry';
   const nodes = treeNodes(routes, { ...known, page });
   const projects = known.projects || [];
@@ -74,9 +74,28 @@ export function shellModel({ route, routes, principal, known = {}, current = nul
   else { title = principal ? 'Welcome' : '3D Review'; eyebrow = ''; currentHref = '#'; }
   const seen = new Set(); ancestors = ancestors.filter(x => safeHref(x.href) && !seen.has(x.href) && seen.add(x.href));
   // Review F3: the role label comes ONLY from loaded authority for the current scope; with none it is empty — never a synthesized permission.
-  return { context: { route: kind, id: route?.id ?? null }, identityLabel: identityLabel || (principal ? 'Signed in' : 'Not signed in'), role, sample: false, title, eyebrow, currentHref, expanded, sectionLabel: sectionLabel || (nodes.length ? 'Workspaces' : 'Nothing loaded'), nodes, ancestors, actions: [], menuLabel: 'Actions', status };
+  // Identity is shown by the real account control in the header host (#who); the shell adds no identity pill unless a label is supplied.
+  return { context: { route: kind, id: route?.id ?? null }, identityLabel, role, sample: false, contextCollapsible, title, eyebrow, currentHref, expanded, sectionLabel: sectionLabel || (nodes.length ? 'Workspaces' : 'Nothing loaded'), nodes, ancestors, actions: [], menuLabel: 'Actions', status };
 }
 
+// Account utility menu (compact chrome): the toggle shows the real verified email node (#who); the disclosure holds the existing
+// sign-out/switch/version/feedback/roadmap controls. Nodes and their listeners are untouched; this only opens/closes the menu.
+export function bindAccountMenu(doc) {
+  const toggle = doc.getElementById('account-menu-toggle'), menu = doc.getElementById('account-menu');
+  if (!toggle || !menu) return null;
+  const items = () => [...menu.querySelectorAll('button:not([disabled]):not([hidden]), a[href]')].filter(el => !el.closest('[hidden]'));
+  const set = (open, focus = false) => { menu.hidden = !open; toggle.setAttribute('aria-expanded', String(open)); if (open) items()[0]?.focus(); else if (focus) toggle.focus(); };
+  toggle.addEventListener('click', () => set(menu.hidden));
+  menu.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); set(false, true); return; }
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) { const list = items(), i = list.indexOf(doc.activeElement); const next = e.key === 'Home' ? 0 : e.key === 'End' ? list.length - 1 : (i + (e.key === 'ArrowUp' ? -1 : 1) + list.length) % list.length; e.preventDefault(); list[next]?.focus(); }
+  });
+  toggle.addEventListener('keydown', e => { if (e.key === 'ArrowDown') { e.preventDefault(); set(true); } if (e.key === 'Escape' && !menu.hidden) { e.preventDefault(); set(false, true); } });
+  doc.addEventListener('click', e => { if (!menu.hidden && !toggle.contains(e.target) && !menu.contains(e.target)) set(false); });
+  menu.addEventListener('focusout', e => { if (!menu.hidden && e.relatedTarget && !menu.contains(e.relatedTarget) && e.relatedTarget !== toggle) set(false); });
+  set(false);
+  return { open: () => set(true), close: (focus = false) => set(false, focus), get isOpen() { return !menu.hidden; } };
+}
 // Mount the kit shell once around a stable content element. Returns null when the root is absent (tests without a DOM).
 export function mountKitRoot(root, model, callbacks = {}) {
   if (!root || typeof root.querySelector !== 'function') return null;

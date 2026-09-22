@@ -4,10 +4,15 @@
 import { esc, safeHref, badge, chrome, levelMenu } from './core.js';
 const icons = {workspace:'▦',project:'▣',assessment:'◔',survey:'▤'};
 export function mountShell(root, initialModel, initialCallbacks = {}) {
-  let model, callbacks, revision = 0, cleanup = () => {}, expanded = new Set(), query = '', filterQuery = '';
+  let model, callbacks, revision = 0, cleanup = () => {}, expanded = new Set(), query = '', filterQuery = '', contextOpen = false;
   function update(next, nextCallbacks = callbacks) {
     cleanup(); revision++; model = structuredClone(next); callbacks = nextCallbacks || {};
-    expanded = new Set(model.expanded || []); query = ''; filterQuery = ''; paint(undefined, false);
+    expanded = new Set(model.expanded || []); query = ''; filterQuery = ''; contextOpen = false; paint(undefined, false);
+  }
+  // Collapsed context (model.contextCollapsible): the current scope stays visible on a toggle; the panel opens on demand.
+  function currentLabel() {
+    const find = nodes => { for (const n of nodes || []) { if (n.visible === true && safeHref(n.href) && n.href === model.currentHref) return n.label; const k = find(n.children); if (k) return k; } return null; };
+    return find(model.nodes) || model.title || '';
   }
   function paint(focusKey, preserveContent = true) {
     cleanup();
@@ -25,7 +30,8 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     }
     function matches(nodes) { return visible(nodes).flatMap(n => [ ...(n.label.toLowerCase().includes(filterQuery.toLowerCase()) ? [{...n,children:[]}] : []), ...matches(n.children)]); }
     const nodes = filterQuery ? matches(model.nodes) : visible(model.nodes);
-    root.innerHTML = chrome(model)+'<div class="shell"><aside class="tree" aria-label="Context"><label class="tree-search"><span aria-hidden="true">⌕</span><input data-search aria-label="Find a workspace, project or assessment" placeholder="Find…" value="'+esc(query)+'"></label><nav class="tree-section" aria-label="Scopes"><div class="eyebrow">'+esc(model.sectionLabel || 'Workspaces')+'</div>'+nodes.map(n=>node(n,1)).join('')+'</nav><div class="tree-tools tree-footer"><span class="tree-me">'+esc(model.identityLabel)+(model.role?' · '+esc(model.role):'')+'</span></div></aside><div class="content" role="main" tabindex="-1"><div class="eyebrow">'+esc(model.eyebrow || '')+'</div><div class="row" style="justify-content:space-between"><h1>'+esc(model.title)+'</h1>'+levelMenu(model)+'</div><div data-content></div></div></div>';
+    const collapsible = model.contextCollapsible === true, collapsed = collapsible && !contextOpen;
+    root.innerHTML = chrome(model)+'<div class="shell'+(collapsed?' context-collapsed':'')+'"><aside class="tree'+(collapsible?' collapsible':'')+'" aria-label="Context">'+(collapsible?'<button type="button" class="tree-toggle" data-tree-toggle aria-expanded="'+(!collapsed)+'" aria-controls="kit-context-panel"><span class="eyebrow">Context</span><span class="tree-toggle-current">'+esc(currentLabel())+'</span><span aria-hidden="true">'+(collapsed?'▾':'▴')+'</span></button>':'')+'<div id="kit-context-panel" class="tree-panel" data-tree-panel'+(collapsed?' hidden':'')+'><label class="tree-search"><span aria-hidden="true">⌕</span><input data-search aria-label="Find a workspace, project or assessment" placeholder="Find…" value="'+esc(query)+'"></label><nav class="tree-section" aria-label="Scopes"><div class="eyebrow">'+esc(model.sectionLabel || 'Workspaces')+'</div>'+nodes.map(n=>node(n,1)).join('')+'</nav>'+(model.identityLabel?'<div class="tree-tools tree-footer"><span class="tree-me">'+esc(model.identityLabel)+(model.role?' · '+esc(model.role):'')+'</span></div>':'')+'</div></aside><div class="content" role="main" tabindex="-1"><div class="eyebrow">'+esc(model.eyebrow || '')+'</div><div class="row" style="justify-content:space-between"><h1>'+esc(model.title)+'</h1>'+levelMenu(model)+'</div><div data-content></div></div></div>';
     // Preserve the caller-owned mount root and its delegated listeners across local changes AND model updates (same element, emptied on update).
     if (content) root.querySelector('[data-content]').replaceWith(content);
     if (host) root.querySelector('[data-header-host]').replaceWith(host);
@@ -34,6 +40,8 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     const close = (focus=false) => { if(menu){menu.hidden=true;toggle.setAttribute('aria-expanded','false');if(focus)toggle.focus();} };
     const click = e => {
       if (!current()) return;
+      const toggleContext=e.target.closest('[data-tree-toggle]');
+      if(toggleContext){ contextOpen=!contextOpen; paint('context-toggle'); return; }
       const expand=e.target.closest('[data-expand]');
       if(expand){ const id=expand.dataset.expand;expanded.has(id)?expanded.delete(id):expanded.add(id);paint(id);return; }
       if(e.target.closest('[data-menu-toggle]')){ menu.hidden=!menu.hidden;toggle.setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)menu.querySelector('button')?.focus();return; }
@@ -44,7 +52,9 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     };
     const key = e => {
       if(!current())return;
-      if(e.key==='Escape'&&menu&&!menu.hidden){e.preventDefault();close(true);}
+      if(e.key==='Escape'&&menu&&!menu.hidden){e.preventDefault();close(true);return;}
+      // Escape inside an opened collapsible context closes it and returns focus to the toggle.
+      if(e.key==='Escape'&&collapsible&&contextOpen&&e.target.closest('[data-tree-panel]')){e.preventDefault();contextOpen=false;paint('context-toggle');return;}
       if(menu&&!menu.hidden&&['ArrowDown','ArrowUp','Home','End'].includes(e.key)){
         const buttons=[...menu.querySelectorAll('button')],i=buttons.indexOf(root.ownerDocument.activeElement);
         const next=e.key==='Home'?0:e.key==='End'?buttons.length-1:(i+(e.key==='ArrowUp'?-1:1)+buttons.length)%buttons.length;
@@ -81,7 +91,8 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     };
     root.ownerDocument.addEventListener('pointerdown',pointerdown,true);root.addEventListener('focusin',focusin);root.addEventListener('click',click);root.addEventListener('keydown',key);root.addEventListener('input',input);root.addEventListener('compositionstart',compositionstart);root.addEventListener('compositionend',compositionend);root.addEventListener('focusout',focusout);root.ownerDocument.addEventListener('click',outside);
     cleanup=()=>{root.ownerDocument.removeEventListener('pointerdown',pointerdown,true);root.removeEventListener('focusin',focusin);root.removeEventListener('click',click);root.removeEventListener('keydown',key);root.removeEventListener('input',input);root.removeEventListener('compositionstart',compositionstart);root.removeEventListener('compositionend',compositionend);root.removeEventListener('focusout',focusout);root.ownerDocument.removeEventListener('click',outside);};
-    if(focusKey==='search')root.querySelector('[data-search]')?.focus();
+    if(focusKey==='context-toggle')root.querySelector('[data-tree-toggle]')?.focus();
+    else if(focusKey==='search')root.querySelector('[data-search]')?.focus();
     else if(focusKey)[...root.querySelectorAll('[data-expand]')].find(x=>x.dataset.expand===focusKey)?.focus();
   }
   update(initialModel,initialCallbacks);
