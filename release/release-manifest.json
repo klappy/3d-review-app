@@ -1,31 +1,32 @@
 {
-  "version": "0.14.5",
+  "version": "0.16.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "97af53e83624d3992884ad1d2520b34bd61b74af",
+  "cookbook_commit": "20d51447e0d923f05a9b83f7e421241eec1ccf40",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.14.5.md",
-      "blob_sha": "91bea67f49a04d7cf59579d014bb3b9cff90f061",
-      "sha256": "c994a98623c2692fd5e81fbeee9c3e0d6b7bee936eb1f2c79cbf27db887367c7"
+      "path": "planning/2026-09-16-parity-build/releases/0.16.0.md",
+      "blob_sha": "a0f0173c9ed6f2492c308e6abb3cce71b099efe5",
+      "sha256": "9627aa8c4eb84333d8f93e52e9bf01d72df3d0ffc77c0440980aa168fd42197e"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "c381466dfc0054473c5bd648809b6294a5531b88",
-      "sha256": "c9831b19f1c1ff53f8741b6e0f533a0be19d16d7b00b7c55f39af1fa8a5f2eb6"
+      "blob_sha": "5e64407771fb8360af4ff1f279d95a9581b1958e",
+      "sha256": "7081441b22a824d399dfe7c65d76fb4459e6d3625d8b04c207f93853ec030e35"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "Kit shell activated on the real signed-in root and scope-reading routes: Workspaces→workspace→project→assessment navigation, search and expansion, language state and account/version controls through a read adapter over the existing controllers."
+      ],
       "changed": [
-        "Persona evidence: 12/12 synthetic root-browser scenario checks passed across desktop and phone. Two real-provider account cases remain untested; satisfaction, confusion and frustration NOT MEASURED."
+        "Persona evidence: 15/15 root integration tests and 71/71 adapter/scope/identity-reset/shell unit tests passed at the exact accepted source; 25/25 synthetic menu hit and click checks across five viewport cases in an independent isolated browser. Real provider account journey untested; satisfaction, confusion and frustration NOT MEASURED."
       ],
       "fixed": [
-        "Show the verified account email and keep Sign out and Use another account available on signed-in root pages.",
-        "Keep failed or uncertain sign-out truthful and prevent delayed account actions from clearing or switching a newer identity."
+        "Account menu stacks above the shell context on phone widths so Sign out and Use another account receive pointer input; header keeps its standard heights and no horizontal overflow at 195px."
       ],
       "security": [
-        "Display email only when verified provider identity matches the selected app session; no new personal-data storage or grant changes. Explain provider-wide sign-out before account switching."
+        "Existing authentication, permissions, account read, sign-out and participant routes are unchanged; no fixture data, global state or role simulation in product. Presentation only."
       ]
     }
   }
