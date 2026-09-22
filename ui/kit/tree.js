@@ -53,7 +53,7 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     let composing = false, deferred = false;
     // A composition committed by leaving search must not replace the pressed row.
     // Keep its committed text; apply the filter when search is entered again.
-    const pointerdown = e => { if(current() && composing && e.target !== search) deferred = true; };
+    const pointerdown = e => { if(current() && composing && !e.target.closest?.('.tree-search')) deferred = true; };
     const focusin = e => { if(current() && e.target === search && (deferred || query !== filterQuery)) { deferred = false; filterSearch(); } };
     const filterSearch = () => {
       if (!current() || !search.isConnected) return;
