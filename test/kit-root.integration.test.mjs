@@ -211,3 +211,14 @@ test('F3: viewer-only identity shows no synthesized role; scope role appears onl
   await p.go('#project/p1');
   assert.equal(p.text('header.top .me'), 'Signed in · Viewer');
 });
+
+test('role contract end-to-end: Owner/Member/Viewer each display as themselves at project p1; write regions follow the real controller permission', async () => {
+  for (const [identity, label, forms] of [['owner', 'Owner', ['create-assessment', 'rename-form', 'add-language']], ['member', 'Member', ['create-assessment', 'add-language']], ['viewer', 'Viewer', []]]) {
+    const p = await bootPage(identity, '#project/p1');
+    assert.equal(p.text('header.top .me'), 'Signed in · ' + label, identity);
+    assert.equal(p.text('header.top nav.crumbs .tree-role'), label, identity);
+    assert.equal(p.q('nav[aria-label="Scopes"] [aria-current="page"]').closest('.tree-row').querySelector('.tree-role').textContent, label, identity);
+    assert.deepEqual(p.qa('[data-action-region] form').map(f => f.id), forms, identity + ' write forms come only from the controller role');
+    assert.equal(p.qa('[data-menu-toggle]').length, 0, 'kit level menu never synthesized');
+  }
+});

@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
-import { mapStatus, treeNodes, shellModel, mountKitRoot } from './app-adapter.js';
+import { mapStatus, treeNodes, shellModel, mountKitRoot, roleLabel } from './app-adapter.js';
 import { routes } from '../assess/cards.js';
 
 const known = () => ({ projects: [{ id: 'p1', name: 'River Valley', role: 'owner', workspace_id: 'w1' }, { id: 'p2', name: 'Hill', role: 'viewer', workspace_id: null }], workspaces: new Map([['w1', { id: 'w1', name: 'Field team', role: 'owner', projects: ['p1'] }]]), lists: new Map([['p1', { status: 'loaded', list: [{ id: 'a1', name: 'Sept', stage: 'collect' }] }], ['p2', { status: 'refused', list: null }]]) });
@@ -65,4 +65,21 @@ test('mount: absent root → null; present root → shell with stable content an
   assert.equal(kit.content, content); assert.equal(content.childNodes.length, 0); assert.equal(doc.querySelector('[data-header-host] #who').textContent, 'Account: x@example.invalid');
   assert.deepEqual(kit.adoptControls(doc, ['version']), [], 'already hosted: nothing moved twice');
   assert.equal(doc.querySelectorAll('header').length, 1);
+});
+
+// Captain's role contract: Owner, Member, Viewer — each displays as itself; missing/unknown shows nothing; no privilege escalation.
+test('role labels: owner/member/viewer display as themselves in shell and tree; missing or unknown role yields no label; no actions ever synthesized', () => {
+  assert.deepEqual(['owner', 'member', 'viewer', 'VIEWER'].map(roleLabel), ['Owner', 'Member', 'Viewer', 'Viewer']);
+  assert.deepEqual([undefined, null, '', 'admin', 'superuser', 'Owner ', 42].map(roleLabel), ['', '', '', '', '', '', '']);
+  for (const [role, label] of [['owner', 'Owner'], ['member', 'Member'], ['viewer', 'Viewer']]) {
+    const k = { projects: [{ id: 'p1', name: 'P', role, workspace_id: 'w1' }], workspaces: new Map([['w1', { id: 'w1', name: 'W', role, projects: ['p1'] }]]), lists: new Map() };
+    const m = shellModel({ route: { kind: 'project', id: 'p1' }, routes, principal: { id: 'x' }, known: k, page: { kind: 'project', model: { status: 'loaded', project: k.projects[0], assessmentsStatus: 'loaded', assessments: [] } } });
+    assert.equal(m.role, label); assert.equal(m.nodes[0].role, label); assert.equal(m.nodes[0].children[0].role, label); assert.deepEqual(m.actions, []);
+    const w = shellModel({ route: { kind: 'workspace', id: 'w1' }, routes, principal: { id: 'x' }, known: k });
+    assert.equal(w.role, label);
+    const a = shellModel({ route: { kind: 'assessment', id: 'a1' }, routes, principal: { id: 'x' }, known: k, current: { assessment: { id: 'a1', name: 'A', project_id: 'p1', role, stage: 'prepare' } } });
+    assert.equal(a.role, label);
+  }
+  const unknown = shellModel({ route: { kind: 'project', id: 'p1' }, routes, principal: { id: 'x' }, known: { projects: [{ id: 'p1', name: 'P', role: 'admin' }], workspaces: new Map(), lists: new Map() } });
+  assert.equal(unknown.role, '', 'unknown role is not promoted to any label'); assert.equal(unknown.nodes[0].role, undefined);
 });

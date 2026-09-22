@@ -5,6 +5,10 @@
 import { mountShell } from './tree.js';
 import { safeHref } from './core.js';
 
+// Role contract (captain, 2026-09-22; src/policy.ts RANK): exactly owner | member | viewer. The label is the actual current-scope
+// role — Viewer displays as Viewer. Anything else (missing, unknown) is a separate condition and yields NO label; nothing is invented.
+export const ROLE_LABEL = Object.freeze({ owner: 'Owner', member: 'Member', viewer: 'Viewer' });
+export const roleLabel = role => ROLE_LABEL[typeof role === 'string' ? role.toLowerCase() : ''] || '';
 const CAP = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 const CONTROL_IDS = Object.freeze(['version', 'account']);
 
@@ -37,10 +41,10 @@ export function treeNodes(routes, known = {}) {
     if (page?.kind === 'project' && page.model?.status === 'loaded' && page.model.project?.id === pid && page.model.assessmentsStatus === 'loaded') return page.model.assessments || [];
     return l?.status === 'loaded' ? (l.list || []) : [];
   };
-  const projectNode = p => ({ id: 'p:' + p.id, kind: 'project', label: String(p.name ?? p.id), href: routes.project(p.id), visible: true, role: p.role ? CAP(p.role) : undefined,
+  const projectNode = p => ({ id: 'p:' + p.id, kind: 'project', label: String(p.name ?? p.id), href: routes.project(p.id), visible: true, role: roleLabel(p.role) || undefined,
     children: assessmentsOf(p.id).map(a => ({ id: 'a:' + a.id, kind: 'assessment', label: String(a.name ?? a.id), detail: a.stage ? CAP(a.stage) : undefined, href: routes.assessment(a.id), visible: true, children: [] })) });
   const grouped = new Set();
-  const wsNodes = [...wsMap.values()].map(w => { const kids = w.projects.map(pid => projById.get(pid)).filter(Boolean); kids.forEach(p => grouped.add(p.id)); return { id: 'w:' + w.id, kind: 'workspace', label: String(w.name ?? w.id), href: routes.workspace(w.id), visible: true, role: w.role ? CAP(w.role) : undefined, children: kids.map(projectNode) }; });
+  const wsNodes = [...wsMap.values()].map(w => { const kids = w.projects.map(pid => projById.get(pid)).filter(Boolean); kids.forEach(p => grouped.add(p.id)); return { id: 'w:' + w.id, kind: 'workspace', label: String(w.name ?? w.id), href: routes.workspace(w.id), visible: true, role: roleLabel(w.role) || undefined, children: kids.map(projectNode) }; });
   const loose = [...projById.values()].filter(p => !grouped.has(p.id)).map(projectNode);
   return [...wsNodes, ...loose];
 }
@@ -57,13 +61,13 @@ export function shellModel({ route, routes, principal, known = {}, current = nul
   const status = page ? mapStatus(page.model?.status) : 'ready';
   if (kind === 'workspaces') { title = 'Workspaces'; eyebrow = 'Optional grouping'; currentHref = routes.workspaces; ancestors = [anc('Workspaces', routes.workspaces)]; }
   else if (kind === 'projects') { title = 'Projects'; eyebrow = 'Your projects'; currentHref = routes.projects; ancestors = [anc('Projects', routes.projects)]; }
-  else if (kind === 'workspace') { const w = findWorkspace(route.id); currentHref = routes.workspace(route.id); title = status === 'ready' ? String(w?.name ?? '') : ''; eyebrow = 'Workspace'; role = CAP(w?.role); ancestors = [anc('Workspaces', routes.workspaces), ...(w ? [anc(w.name, currentHref)] : [])]; expanded = ['w:' + route.id]; }
-  else if (kind === 'project') { const p = findProject(route.id); const w = p?.workspace_id ? findWorkspace(p.workspace_id) : null; currentHref = routes.project(route.id); title = status === 'ready' ? String(p?.name ?? '') : ''; eyebrow = 'Project'; role = CAP(p?.role); ancestors = [anc('Projects', routes.projects), ...(w ? [anc(w.name, routes.workspace(w.id))] : []), ...(p ? [anc(p.name, currentHref)] : [])]; expanded = [...(w ? ['w:' + w.id] : []), 'p:' + route.id]; }
-  else if ((kind === 'assessment' || kind === 'survey') && current) { const a = current.assessment; const p = findProject(a.project_id); const w = p?.workspace_id ? findWorkspace(p.workspace_id) : null; currentHref = routes.assessment(a.id); title = String(a.name ?? ''); eyebrow = 'Assessment'; role = CAP(a.role);
+  else if (kind === 'workspace') { const w = findWorkspace(route.id); currentHref = routes.workspace(route.id); title = status === 'ready' ? String(w?.name ?? '') : ''; eyebrow = 'Workspace'; role = roleLabel(w?.role); ancestors = [anc('Workspaces', routes.workspaces), ...(w ? [anc(w.name, currentHref)] : [])]; expanded = ['w:' + route.id]; }
+  else if (kind === 'project') { const p = findProject(route.id); const w = p?.workspace_id ? findWorkspace(p.workspace_id) : null; currentHref = routes.project(route.id); title = status === 'ready' ? String(p?.name ?? '') : ''; eyebrow = 'Project'; role = roleLabel(p?.role); ancestors = [anc('Projects', routes.projects), ...(w ? [anc(w.name, routes.workspace(w.id))] : []), ...(p ? [anc(p.name, currentHref)] : [])]; expanded = [...(w ? ['w:' + w.id] : []), 'p:' + route.id]; }
+  else if ((kind === 'assessment' || kind === 'survey') && current) { const a = current.assessment; const p = findProject(a.project_id); const w = p?.workspace_id ? findWorkspace(p.workspace_id) : null; currentHref = routes.assessment(a.id); title = String(a.name ?? ''); eyebrow = 'Assessment'; role = roleLabel(a.role);
     ancestors = [...(w ? [anc(w.name, routes.workspace(w.id))] : []), ...(p ? [anc(p.name, routes.project(p.id))] : []), anc(a.name, currentHref)];
     expanded = [...(w ? ['w:' + w.id] : []), ...(p ? ['p:' + p.id] : [])];
     // Direct grant: the assessment is reachable and listed truthfully under its own heading; no workspace/project link is invented.
-    if (!p) nodes.push({ id: 'a:' + a.id, kind: 'assessment', label: String(a.name ?? ''), detail: a.stage ? CAP(a.stage) : undefined, href: currentHref, visible: true, role: CAP(a.role), children: [] }); }
+    if (!p) nodes.push({ id: 'a:' + a.id, kind: 'assessment', label: String(a.name ?? ''), detail: a.stage ? CAP(a.stage) : undefined, href: currentHref, visible: true, role: roleLabel(a.role), children: [] }); }
   else if (kind === 'permissions') { title = 'Permissions'; eyebrow = CAP(route.scope); currentHref = safeHref('#permissions/' + route.scope + '/' + encodeURIComponent(route.id)) || ''; }
   else if (kind === 'feedback') { title = 'App feedback'; eyebrow = 'Feedback'; currentHref = '#feedback'; }
   else { title = principal ? 'Welcome' : '3D Review'; eyebrow = ''; currentHref = '#'; }
