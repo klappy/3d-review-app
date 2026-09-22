@@ -2,9 +2,12 @@ import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError } from '../participant-view.js';
 import { reviewAnswer } from '../present.js';
-import { adoptKit, field as kitField, receipt as kitReceipt, reviewRow as kitReviewRow } from '../kit/views-participant.js';
+import { adoptKit, field as kitField, paintNotice, receipt as kitReceipt, reviewRow as kitReviewRow } from '../kit/views-participant.js';
+import { copy as sharedCopy } from '../shared-link.js';
 
 const $ = id => document.getElementById(id);
+// Controller copy that describes a refusal, failure or uncertainty → kit warning tone. Everything else is informational.
+const WARNING_NOTICES = [sharedCopy.linkUnavailable, sharedCopy.collectionClosed, sharedCopy.cannotResume, sharedCopy.rateLimited, sharedCopy.transient, sharedCopy.draftMismatch, sharedCopy.submitFailed, sharedCopy.submitUncertain, 'No submission recorded yet.'];
 let pager, renderedPhase, renderedForm;
 const disabledBeforeRequest = new WeakMap();
 function element(tag, text) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; return node; }
@@ -25,7 +28,7 @@ function values(validate = false) {
   return out;
 }
 function paint(state) {
-  $('notice').textContent = demo && state.phase === 'receipt' ? 'Practice only. No response was sent or saved.' : state.notice || '';
+  paintNotice($('notice'), demo && state.phase === 'receipt' ? 'Practice only. No response was sent or saved.' : state.notice || '', { phase: state.phase, warningNotices: WARNING_NOTICES });
   if (state.phase !== renderedPhase || (state.form && state.form !== renderedForm)) {
     for (const id of ['answers', 'review', 'receipt']) $(id).hidden = true;
     if (state.phase === 'form') {
@@ -68,10 +71,10 @@ const sample = demo ? sampleParticipantEnvironment(Number(new URLSearchParams(lo
 if (demo) { $('submit').textContent = 'Finish practice — nothing sent'; $('recover').textContent = 'Check practice'; }
 const journey = createParticipantJourney({ ...(demo ? sample : { window, storage: sessionStorage }), onChange: paint });
 $('answers').addEventListener('input', () => journey.save(values()));
-$('answers').addEventListener('submit', event => { event.preventDefault(); try { journey.review(values(true)); } catch (error) { $('notice').textContent = error.message; } });
+$('answers').addEventListener('submit', event => { event.preventDefault(); try { journey.review(values(true)); } catch (error) { paintNotice($('notice'), error.message, { phase: 'form', warningNotices: [error.message] }); } });
 $('edit').addEventListener('click', () => journey.edit());
 $('submit').addEventListener('click', () => journey.submit());
 $('recover').addEventListener('click', () => journey.recover());
 // A newly pasted link selects a fresh controller; a participant page never changes into a staff surface.
 window.addEventListener('hashchange', () => location.reload());
-journey.start().then(() => { if (demo && new URLSearchParams(location.search).get('response') === '1' && journey.state.phase === 'form') { journey.save(sample.sampleAnswers); journey.review(sample.sampleAnswers); } }).catch(() => { $('notice').textContent = 'The survey could not be opened. Open your survey link again in a moment.'; });
+journey.start().then(() => { if (demo && new URLSearchParams(location.search).get('response') === '1' && journey.state.phase === 'form') { journey.save(sample.sampleAnswers); journey.review(sample.sampleAnswers); } }).catch(() => { paintNotice($('notice'), 'The survey could not be opened. Open your survey link again in a moment.', { phase: 'unavailable' }); });

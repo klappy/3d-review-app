@@ -157,3 +157,15 @@ export function adoptKit(doc, main) {
   }
   if (main && !/(^|\s)rv(\s|$)/.test(main.className || '')) main.className = `${main.className || ''} rv participant-kit`.trim();
 }
+
+// Notice tone from the controller's own state: the kit colours the existing #notice; wording and phase stay the controller's.
+// `warningNotices` is the set of controller copy strings that describe a refusal/failure/uncertainty (page.js supplies it).
+export function paintNotice(node, text, { phase, warningNotices = [] } = {}) {
+  node.textContent = text || '';
+  const warning = !!text && (phase === 'unavailable' || warningNotices.includes(text));
+  node.className = text ? `note${warning ? ' warning' : ''}` : '';
+  // The page's own #notice rule outranks the kit's class; the warning fill is asserted inline from the same token.
+  if (warning) node.setAttribute('style', 'background:var(--warning-fill);color:var(--warning-ink)'); else node.removeAttribute('style');
+  return warning;
+}
+
