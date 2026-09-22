@@ -166,7 +166,8 @@ function kitCard(ctx, x) {
   return `<article class="glass panel${x.archived ? ' archived' : ''}" style="min-width:0;overflow-wrap:anywhere"><p class="eyebrow">${ctx.esc(x.eyebrow)}</p><div class="row"><h3><a href="${ctx.esc(x.href)}">${ctx.esc(x.title)}</a></h3>${x.role ? `<span class="badge">${ctx.esc(x.role)}</span>` : ''}${x.archived ? '<span class="badge">Archived</span>' : ''}</div>${(x.facts || []).filter(f => f.value).map(f => `<p class="small muted">${ctx.esc(f.label)} ${ctx.esc(f.value)}</p>`).join('')}</article>`;
 }
 function kitGrid(ctx, items, empty) { return items.length ? `<div class="grid">${items.map(x => kitCard(ctx, x)).join('')}</div>` : `<p class="muted">${ctx.esc(empty)}</p>`; }
-function kitHead(ctx, r, extra = '') { return `<div class="row" style="justify-content:space-between;align-items:flex-start"><div>${r.eyebrow ? `<p class="eyebrow">${ctx.esc(r.eyebrow)}</p>` : ''}<h2>${ctx.esc(r.title)}</h2>${r.role ? `<p class="muted small">Your role: ${ctx.esc(r.role)}</p>` : ''}</div><div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>`; }
+// The kit shell already shows the page title and eyebrow; the read head carries only role/archived state and the permissions link.
+function kitHead(ctx, r, extra = '') { return `<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}"><p class="muted small" style="margin:0">${r.role ? `Your role: ${ctx.esc(r.role)}` : ''}</p><div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>`; }
 const readRegion = html => `<div data-read-region class="kit-read">${html}</div>`;
 const actionRegion = html => html ? `<section data-action-region class="legacy-actions" aria-label="Existing controls (kit conversion pending)">${html}</section>` : '';
 
