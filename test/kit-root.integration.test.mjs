@@ -41,7 +41,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install } = 
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
-  await api.boot(); await tick(12);
+  await tick(12); // the controller's own boot guard fires on the kit root; nothing is started by the test
   const d = w.document;
   const q = s => d.querySelector(s), qa = s => [...d.querySelectorAll(s)];
   const go = async h => { w.location.hash = h; await tick(16); };

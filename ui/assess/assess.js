@@ -584,4 +584,5 @@ async function boot() {
   listen();
   await render();
 }
-if (typeof window !== 'undefined' && document.getElementById('app')) boot();
+// Boot on the kit root (normal root) or the legacy #app root; never in a headless harness without either.
+if (typeof window !== 'undefined' && (kit || document.getElementById('app'))) boot();
