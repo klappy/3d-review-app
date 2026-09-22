@@ -50,26 +50,31 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     const outside = e => {if(!root.contains(e.target)||!e.target.closest('.level-menu'))close();};
     const focusout = e => { if(menu&&!menu.hidden && e.relatedTarget && !e.relatedTarget.closest?.('.level-menu'))close(); };
     const search = root.querySelector('[data-search]');
-    let composing = false;
+    let composing = false, deferred = false;
+    // A composition committed by leaving search must not replace the pressed row.
+    // Keep its committed text; apply the filter when search is entered again.
+    const pointerdown = e => { if(current() && composing && e.target !== search) deferred = true; };
+    const focusin = e => { if(current() && e.target === search && deferred) { deferred = false; filterSearch(); } };
     const filterSearch = () => {
-      if (!current() || !search.isConnected) return;
+      if (!current() || !search.isConnected || deferred) return;
       query = search.value;
-      const start = search.selectionStart, end = search.selectionEnd, direction = search.selectionDirection;
-      paint('search');
-      root.querySelector('[data-search]').setSelectionRange(start, end, direction);
+      // Filter only the owned tree list. Search, focus, and mounted content stay put.
+      const filtered = query ? matches(model.nodes) : visible(model.nodes);
+      root.querySelector('[aria-label="Scopes"]').innerHTML = '<div class="eyebrow">'+esc(model.sectionLabel || 'Workspaces')+'</div>'+filtered.map(n=>node(n,1)).join('');
     };
     const compositionstart = e => { if(current() && e.target === search) composing = true; };
     const compositionend = e => {
       if(!current() || e.target !== search) return;
       composing = false;
+      if(root.ownerDocument.activeElement !== search) deferred = true;
       filterSearch();
     };
     const input = e => {
       if(!current() || e.target !== search || composing || e.isComposing) return;
       filterSearch();
     };
-    root.addEventListener('click',click);root.addEventListener('keydown',key);root.addEventListener('input',input);root.addEventListener('compositionstart',compositionstart);root.addEventListener('compositionend',compositionend);root.addEventListener('focusout',focusout);root.ownerDocument.addEventListener('click',outside);
-    cleanup=()=>{root.removeEventListener('click',click);root.removeEventListener('keydown',key);root.removeEventListener('input',input);root.removeEventListener('compositionstart',compositionstart);root.removeEventListener('compositionend',compositionend);root.removeEventListener('focusout',focusout);root.ownerDocument.removeEventListener('click',outside);};
+    root.ownerDocument.addEventListener('pointerdown',pointerdown,true);root.addEventListener('focusin',focusin);root.addEventListener('click',click);root.addEventListener('keydown',key);root.addEventListener('input',input);root.addEventListener('compositionstart',compositionstart);root.addEventListener('compositionend',compositionend);root.addEventListener('focusout',focusout);root.ownerDocument.addEventListener('click',outside);
+    cleanup=()=>{root.ownerDocument.removeEventListener('pointerdown',pointerdown,true);root.removeEventListener('focusin',focusin);root.removeEventListener('click',click);root.removeEventListener('keydown',key);root.removeEventListener('input',input);root.removeEventListener('compositionstart',compositionstart);root.removeEventListener('compositionend',compositionend);root.removeEventListener('focusout',focusout);root.ownerDocument.removeEventListener('click',outside);};
     if(focusKey==='search')root.querySelector('[data-search]')?.focus();
     else if(focusKey)[...root.querySelectorAll('[data-expand]')].find(x=>x.dataset.expand===focusKey)?.focus();
   }
