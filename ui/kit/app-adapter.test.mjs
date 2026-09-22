@@ -71,6 +71,11 @@ test('mount: absent root → null; present root → shell with stable content an
 test('role labels: owner/member/viewer display as themselves in shell and tree; missing or unknown role yields no label; no actions ever synthesized', () => {
   assert.deepEqual(['owner', 'member', 'viewer', 'VIEWER'].map(roleLabel), ['Owner', 'Member', 'Viewer', 'Viewer']);
   assert.deepEqual([undefined, null, '', 'admin', 'superuser', 'Owner ', 42].map(roleLabel), ['', '', '', '', '', '', '']);
+  // Adversarial (review amend at 46b23d10): inherited object keys are unknown roles, never a function/object label.
+  assert.strictEqual(roleLabel('constructor'), ''); assert.strictEqual(roleLabel('__proto__'), '');
+  for (const k of ['toString', 'hasOwnProperty', 'valueOf', 'prototype', 'CONSTRUCTOR']) assert.strictEqual(roleLabel(k), '', k);
+  const hostile = shellModel({ route: { kind: 'project', id: 'p1' }, routes, principal: { id: 'x' }, known: { projects: [{ id: 'p1', name: 'P', role: '__proto__', workspace_id: 'w1' }], workspaces: new Map([['w1', { id: 'w1', name: 'W', role: 'constructor', projects: ['p1'] }]]), lists: new Map() } });
+  assert.strictEqual(hostile.role, ''); assert.strictEqual(hostile.nodes[0].role, undefined); assert.strictEqual(hostile.nodes[0].children[0].role, undefined);
   for (const [role, label] of [['owner', 'Owner'], ['member', 'Member'], ['viewer', 'Viewer']]) {
     const k = { projects: [{ id: 'p1', name: 'P', role, workspace_id: 'w1' }], workspaces: new Map([['w1', { id: 'w1', name: 'W', role, projects: ['p1'] }]]), lists: new Map() };
     const m = shellModel({ route: { kind: 'project', id: 'p1' }, routes, principal: { id: 'x' }, known: k, page: { kind: 'project', model: { status: 'loaded', project: k.projects[0], assessmentsStatus: 'loaded', assessments: [] } } });

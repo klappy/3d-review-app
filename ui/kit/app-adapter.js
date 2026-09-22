@@ -7,8 +7,9 @@ import { safeHref } from './core.js';
 
 // Role contract (captain, 2026-09-22; src/policy.ts RANK): exactly owner | member | viewer. The label is the actual current-scope
 // role — Viewer displays as Viewer. Anything else (missing, unknown) is a separate condition and yields NO label; nothing is invented.
-export const ROLE_LABEL = Object.freeze({ owner: 'Owner', member: 'Member', viewer: 'Viewer' });
-export const roleLabel = role => ROLE_LABEL[typeof role === 'string' ? role.toLowerCase() : ''] || '';
+// Own-property lookup only (review amend at 46b23d10): inherited keys such as 'constructor' or '__proto__' must map to '' like any unknown.
+export const ROLE_LABEL = Object.freeze(Object.assign(Object.create(null), { owner: 'Owner', member: 'Member', viewer: 'Viewer' }));
+export const roleLabel = role => { const key = typeof role === 'string' ? role.toLowerCase() : ''; return Object.prototype.hasOwnProperty.call(ROLE_LABEL, key) ? ROLE_LABEL[key] : ''; };
 const CAP = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 const CONTROL_IDS = Object.freeze(['version', 'account']);
 
