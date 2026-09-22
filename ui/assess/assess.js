@@ -382,10 +382,58 @@ async function render() {
     else await runPage(pageFor(r), r, gen);
   }
 }
+// Account identity remains transient and belongs to this exact app identity.
+let accountBusy = false;
+function accountStatus(message = '') { const el = document.getElementById('account-status'); if (el) el.textContent = message; }
+function accountControls(visible, busy = false) {
+  const actions = document.getElementById('account-actions'); if (actions) actions.hidden = !visible;
+  for (const id of ['account-signout', 'account-switch', 'account-switch-confirm']) { const el = document.getElementById(id); if (el) el.disabled = busy; }
+}
+async function loadAccountEmail() {
+  if (demo) { who.textContent = 'Sample account'; accountControls(false); return; }
+  const identity = identityGeneration, credential = token;
+  who.textContent = 'Checking account…'; accountControls(true, accountBusy);
+  try {
+    const headers = { accept: 'application/json' }; if (credential) headers.authorization = `Bearer ${credential}`;
+    const response = await fetch('/v2/auth/access?view=account', { headers, credentials: 'same-origin', redirect: 'error', cache: 'no-store' });
+    const value = response.ok ? await response.json() : null;
+    if (identity !== identityGeneration || credential !== token) return;
+    who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Account email unavailable.';
+  } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Account email unavailable.'; }
+}
+async function signOut(switchAccount = false) {
+  if (demo || accountBusy || !state.principal) return;
+  const identity = identityGeneration, credential = token;
+  const current = () => identity === identityGeneration && credential === token;
+  accountBusy = true; accountControls(true, true); accountStatus('Signing out…');
+  try {
+    const result = await api('/v2/auth/session', { method: 'DELETE' });
+    if (!current()) return;
+    if (result?.signed_out !== true) throw new Error('Logout not confirmed');
+    token = null; try { sessionStorage.removeItem('facilitatorToken'); } catch {}
+    resetIdentity();
+    who.textContent = 'Not signed in';
+    if (switchAccount) { location.assign('/cdn-cgi/access/logout'); return; }
+    history.replaceState(null, '', location.pathname + '#');
+    listen(); await render();
+  } catch {
+    if (current()) accountStatus('Sign-out could not be confirmed. Your session may still be active.');
+  } finally {
+    if (current()) { accountBusy = false; accountControls(true); }
+  }
+}
+function bindAccountControls() {
+  document.getElementById('account-signout')?.addEventListener('click', () => signOut());
+  const dialog = document.getElementById('account-switch-dialog');
+  document.getElementById('account-switch')?.addEventListener('click', () => { if (!accountBusy && state.principal) dialog?.showModal(); });
+  document.getElementById('account-switch-cancel')?.addEventListener('click', () => dialog?.close());
+  document.getElementById('account-switch-confirm')?.addEventListener('click', () => { dialog?.close(); signOut(true); });
+}
+bindAccountControls();
 // ---- scope pages + views (product overhaul): one runner for every { load, render, bind } module ----
 const setToken = t => { if (demo) return; token = t || null; try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
 function ctxFor(extra = {}) {
-  return { api, apiFull, demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, note: (text, alert = false) => { note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
+  return { api, apiFull, demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, note: (text, alert = false) => { note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
     go: (hash, { reload = false } = {}) => { if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
 }
 function pageFor(r) { if (r.kind === 'feedback') return feedback; return r.kind === 'permissions' ? views.permissions : pages[r.kind] || pages.projects; }
@@ -460,6 +508,8 @@ function scrubCredentialHash() {
 }
 function resetIdentity() {
   identityGeneration += 1; generation += 1; epoch += 1;
+  accountBusy = false; accountControls(false); accountStatus();
+  document.getElementById('account-switch-dialog')?.close();
   state.share = null; state.principal = null; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
   state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false;
@@ -480,6 +530,7 @@ async function boot() {
   catch {
     if (identity !== identityGeneration) return;
     // Public entry: the welcome/tour/example/survey-code/sign-in page needs no session; every other route asks to sign in.
+    accountControls(false); accountStatus();
     listen();
     if (route(location.hash).kind === 'entry') { who.textContent = 'Not signed in'; app.className = ''; await render(); return; }
     // Real sign-in only (captain: synthetic-only sign-in rejected). /v2/auth/access is the existing Cloudflare email-code
@@ -488,7 +539,7 @@ async function boot() {
     const here = /(invite|session)=/.test(location.hash) ? location.pathname : location.pathname + location.hash;
     app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p><p><a class="button primary" href="#">Go to sign in</a> <a class="button" href="/v2/auth/access">Sign in with an email code</a></p></div>`;
     return; }
-  who.textContent = `${state.principal.kind} · ${state.principal.id}`;
+  void loadAccountEmail();
   // E1: signed-in staff get the real-app way back (same-origin session, no token) and the generated functionality statement.
   const back = document.getElementById('legacy-link'); if (back) back.hidden = true;
   const wh = document.getElementById('whats-here'); if (wh) { wh.textContent = whatsHere(); const wrap = document.getElementById('whats-here-wrap'); if (wrap) wrap.hidden = false; else wh.hidden = false; }
