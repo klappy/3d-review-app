@@ -275,6 +275,9 @@ test('account menu is clamped to the viewport inline-size (rule guard; measured 
   assert.match(css, /\.rv \.account-menu\{[^}]*max-width:calc\(100vw - 16px\)/, 'menu max-width clamped to viewport');
   assert.match(css, /\.rv \.account-menu\{[^}]*min-width:min\(240px,calc\(100vw - 16px\)\)/, 'min-width never exceeds viewport');
   assert.match(css, /@media \(max-width:420px\)\{[^}]*\.rv \.account\{position:static\}/, 'narrow viewports anchor the menu to the viewport edges');
+  // Independent clamp review (185ede97): the collapsed context/aside painted over the open menu. The header must be its own stacking
+  // context above the shell; pointer hit/click proof for all five items at 195/390/720/1440 lives in the browser probe (openmenu=1).
+  assert.match(css, /\.rv header\.top\{position:relative;z-index:40\}/, 'header stacks above the shell'); assert.match(css, /\.rv \.shell\{position:relative;z-index:1\}/);
   const toggle = p.q('#account-menu-toggle'); toggle.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
   assert.equal(p.q('#account-menu').hidden, false); assert.equal(p.d.activeElement.id, 'account-signout');
 });
