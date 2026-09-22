@@ -17,6 +17,9 @@ import { views, css as viewsCss } from '../ui/assess/views.js';
 import * as share from '../ui/assess/share.js';
 import { feedback } from '../ui/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '../ui/kit/app-adapter.js';
+import { createFeedbackModal } from '../ui/assess/feedback-modal.js';
+// Generated loaded-client identity is a build artifact (scripts/stamp-version.mjs → ui/client-release.js); the harness supplies a synthetic one.
+const clientRelease = Object.freeze({ version: '0.0.0-synthetic', commit: 'synthetic', release_source: 'synthetic', build_uuid: null });
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const HTML = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
@@ -40,7 +43,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu });
+  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, createFeedbackModal, clientRelease });
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -350,4 +353,69 @@ test('demo write refusal is unchanged: the existing create form submits into the
   for (const hash of ['#workspace/demo-workspace', '#project/demo-project']) { await p.go(hash); assert.equal(p.q('[data-action-region]'), null, `${hash}: demo viewer role sees no scoped write controls`); assert.equal(disclosure(p).length, 1); }
   await assert.rejects(() => demo.demoApi('/v2/workspaces', { method: 'POST', body: { name: 'Nope' } }), /demonstration/i);
   assert.deepEqual(p.served().filter(k => k !== 'GET /v2/health'), []);
+});
+
+// ---- K3b1: feedback in place inside the real kit root (ticket outcomes 1, 3, 4, 5, 6; native focus containment is a browser-probe step) ----
+const openFeedback = async p => { p.q('#account-menu-toggle').click(); const link = p.q('#account-menu a[href="#feedback"]'); link.click(); await tick(12); return p.d.querySelector('dialog.feedback-modal'); };
+test('1: feedback opens from the account menu in a native dialog outside the root; URL, content, unsaved input and host unchanged; Escape/Close return focus to the toggle', async () => {
+  const p = await bootPage('owner', '#project/p1');
+  const mount = p.api.app, input = p.q('#create-assessment input[name=name]'); input.value = 'unsaved draft';
+  const dialog = await openFeedback(p);
+  assert.ok(dialog && dialog.hasAttribute('open'), 'native dialog opened'); assert.equal(dialog.closest('#rv'), null, 'dialog lives outside the application root');
+  assert.equal(p.w.location.hash, '#project/p1'); assert.equal(p.api.app, mount); assert.equal(input.isConnected, true); assert.equal(input.value, 'unsaved draft');
+  assert.equal(p.q('#account-menu').hidden, true, 'menu closed when the modal opened'); assert.ok(p.q('[data-header-host] #who'));
+  assert.ok(dialog.querySelector('#app-feedback textarea, #app-feedback'), 'real feedback form rendered');
+  assert.equal(p.text('[role=main].content h1'), 'River Valley', 'route content untouched');
+  dialog.querySelector('[aria-label="Close feedback"]').click(); await tick(2);
+  assert.equal(dialog.hasAttribute('open'), false); assert.equal(p.d.activeElement, p.q('#account-menu-toggle'), 'opener return goes to the visible menu toggle, not the hidden link');
+  assert.equal(input.value, 'unsaved draft'); assert.equal(p.w.location.hash, '#project/p1');
+});
+test('3: route change and identity reset clear the draft and invalidate a delayed open', async () => {
+  const p = await bootPage('owner', '#project/p1');
+  let dialog = await openFeedback(p); const ta = dialog.querySelector('#app-feedback textarea'); ta.value = 'draft text';
+  dialog.querySelector('[aria-label="Close feedback"]').click(); await tick(2);
+  dialog = await openFeedback(p); assert.equal(dialog.querySelector('#app-feedback textarea').value, 'draft text', 'same-route reopen keeps the draft');
+  dialog.querySelector('[aria-label="Close feedback"]').click(); await tick(2);
+  await p.go('#workspaces'); dialog = await openFeedback(p);
+  assert.equal(dialog.querySelector('#app-feedback textarea').value, '', 'route change resets the draft');
+  dialog.querySelector('[aria-label="Close feedback"]').click(); await tick(2);
+  p.api.resetIdentity(); await tick(2); assert.equal(p.d.querySelector('dialog.feedback-modal').hasAttribute('open'), false); assert.equal(p.d.querySelector('dialog.feedback-modal').childNodes.length, 0, 'identity reset empties the dialog');
+});
+test('4: intercepted payload carries only form fields, require_authenticated and the allowlisted experience; no email/ids/tokens', async () => {
+  const p = await bootPage('owner', '#assessment/a1');
+  const dialog = await openFeedback(p); dialog.querySelector('#app-feedback textarea').value = 'It works';
+  dialog.querySelector('#app-feedback').dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(8);
+  const post = p.transport.log.find(l => l.key === 'POST /v2/feedback'); assert.ok(post, 'exact command'); assert.equal(post.outcome, 'mutation-refused');
+  const body = JSON.parse(post.body); assert.deepEqual(Object.keys(body).sort(), ['experience', 'note', 'require_authenticated']);
+  assert.equal(body.require_authenticated, true); assert.deepEqual(Object.keys(body.experience).sort(), ['client_release', 'context', 'host', 'occurred_at', 'surface']);
+  assert.deepEqual(body.experience.context, { page: 'assessment', component: 'app_feedback' }); assert.equal(body.experience.client_release.version, '0.0.0-synthetic');
+  const raw = post.body; for (const secret of ['@example.invalid', 'a1', 'p1', 'synthetic-owner', 'Bearer']) assert.ok(!raw.includes(secret), 'payload must not carry ' + secret);
+  assert.equal(post.headers.authorization, undefined, 'no bearer token in the synthetic session');
+});
+test('5: success, rejection and uncertain responses produce truthful receipt/draft/error; no automatic retry', async () => {
+  const p = await bootPage('owner', '#project/p1');
+  const real = p.w.fetch; let mode = 'ok';
+  p.w.fetch = (u, i) => (i?.method === 'POST' && String(u).endsWith('/v2/feedback')) ? Promise.resolve(mode === 'ok' ? { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ ok: true, result: { recorded: true, feedback_id: 'fb_synthetic_1', stripped: false } }) } : mode === 'reject' ? { ok: false, status: 403, headers: { get: () => 'application/json' }, json: async () => ({ ok: false, error: { code: 'NOT_AUTHORIZED', message: 'no' } }) } : { ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({ ok: false, error: { code: '503', message: 'upstream' } }) }) : real(u, i);
+  const submit = async (text) => { const d = await openFeedback(p); d.querySelector('#app-feedback textarea').value = text; d.querySelector('#app-feedback').dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(8); return d; };
+  mode = 'uncertain'; let d = await submit('first');
+  assert.match(d.querySelector('#feedback-status').textContent, /could not confirm/); assert.match(d.querySelector('button[type=submit]').textContent, /Send again \(may duplicate\)/); assert.equal(d.querySelector('#app-feedback textarea').value, 'first', 'draft kept');
+  d.querySelector('[aria-label="Close feedback"]').click(); await tick(2); await p.go('#workspaces');
+  mode = 'reject'; d = await submit('second'); assert.match(d.querySelector('#feedback-status').textContent, /refused for this account/); assert.equal(d.querySelector('#app-feedback textarea').value, 'second');
+  d.querySelector('[aria-label="Close feedback"]').click(); await tick(2); await p.go('#project/p1');
+  mode = 'ok'; d = await submit('third'); assert.match(d.querySelector('#feedback-status').textContent, /recorded/); assert.equal(d.querySelector('#feedback-receipt').textContent, 'Feedback reference: fb_synthetic_1');
+  assert.equal(p.transport.log.filter(l => l.key === 'POST /v2/feedback').length, 0, 'the synthetic transport saw no feedback POST: all three were intercepted, none retried');
+});
+test('5b: a completion arriving after the route changed is suppressed without claiming cancellation', async () => {
+  const p = await bootPage('owner', '#project/p1');
+  const real = p.w.fetch; let release; const held = new Promise(r => { release = r; });
+  p.w.fetch = (u, i) => (i?.method === 'POST' && String(u).endsWith('/v2/feedback')) ? held.then(() => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ ok: true, result: { recorded: true, feedback_id: 'fb_late', stripped: false } }) })) : real(u, i);
+  const d = await openFeedback(p); d.querySelector('#app-feedback textarea').value = 'late'; d.querySelector('#app-feedback').dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(2);
+  await p.go('#workspaces'); release(); await tick(8);
+  assert.ok(!d.textContent.includes('fb_late'), 'late receipt never painted'); assert.equal(d.hasAttribute('open'), false);
+  const again = await openFeedback(p); assert.equal(again.querySelector('#app-feedback textarea').value, '', 'no stale draft or receipt after route change');
+});
+test('6: signed-out root shows the sign-in feedback panel in the dialog fallback route; demo/anonymous never sends', async () => {
+  const q = await bootPage('owner', '#feedback', { install: (t, data) => { data.routes.delete('GET /v2/me'); } });
+  assert.ok(q.q('[data-content]').textContent.includes('Sign in to open this page'));
+  assert.equal(q.transport.log.filter(l => l.method === 'POST').length, 0);
 });
