@@ -413,7 +413,7 @@ async function signOut(switchAccount = false) {
     token = null; try { sessionStorage.removeItem('facilitatorToken'); } catch {}
     resetIdentity();
     who.textContent = 'Not signed in';
-    if (switchAccount) { location.assign('https://klappy.cloudflareaccess.com/cdn-cgi/access/logout'); return; }
+    if (switchAccount) { try { await fetch('/cdn-cgi/access/logout', { credentials: 'same-origin', redirect: 'manual', cache: 'no-store' }); } catch {} location.assign('https://klappy.cloudflareaccess.com/cdn-cgi/access/logout'); return; }
     history.replaceState(null, '', location.pathname + '#');
     listen(); await render();
   } catch {

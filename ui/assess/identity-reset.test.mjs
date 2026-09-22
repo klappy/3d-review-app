@@ -9,10 +9,10 @@ function harness() {
   const disclosure = { open: false };
   const nodes = new Map(['app', 'who', 'note', 'legacy-link', 'whats-here-wrap', 'account-actions', 'account-status', 'account-signout', 'account-switch', 'account-switch-confirm', 'account-switch-cancel', 'account-switch-dialog'].map(id => [id, { innerHTML: 'old', textContent: 'old', hidden: false, querySelector: () => disclosure, addEventListener() {}, close() {}, showModal() {} }]));
   const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace(/export function /g, 'function ');
-  const navigations = [], removed = [];
-  const box = { history: {replaceState() {}}, sessionStorage: {getItem() {return null;},removeItem:k=>removed.push(k)}, isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/', assign: path=>navigations.push(path) }, redactDiagnosticPath: x => x, fetch: undefined };
+  const navigations = [], removed = [], fetches = [];
+  const box = { history: {replaceState() {}}, sessionStorage: {getItem() {return null;},removeItem:k=>removed.push(k)}, isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/', assign: path=>navigations.push(path) }, redactDiagnosticPath: x => x, fetch: (url, options) => { fetches.push({ url, options }); return Promise.resolve({ ok: true }); } };
   const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn,loadAccountEmail,signOut,setFetch:fn=>fetch=fn,setCredential:t=>token=t,getCredential:()=>token,setListen:fn=>listen=fn})', box);
-  return { ...api, nodes, disclosure, navigations, removed };
+  return { ...api, nodes, disclosure, navigations, removed, fetches };
 }
 const deferred = () => { let resolve, reject; const promise = new Promise((r,j) => {resolve=r;reject=j;}); return { promise, resolve, reject }; };
 
@@ -95,7 +95,9 @@ test('unconfirmed logout stays truthful and busy prevents duplicate dispatch',as
 });
 test('confirmed switch clears current app identity then navigates to documented provider logout',async()=>{
   const h=harness();h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));await h.signOut(true);
-  assert.equal(h.getCredential(),null);assert.equal(h.state.principal,null);assert.deepEqual(h.removed,['facilitatorToken']);assert.deepEqual(h.navigations,['https://klappy.cloudflareaccess.com/cdn-cgi/access/logout']);
+  assert.equal(h.getCredential(),null);assert.equal(h.state.principal,null);assert.deepEqual(h.removed,['facilitatorToken']);
+  assert.equal(h.fetches.length,1);assert.equal(h.fetches[0].url,'/cdn-cgi/access/logout');assert.equal(h.fetches[0].options.credentials,'same-origin');assert.equal(h.fetches[0].options.redirect,'manual');assert.equal(h.fetches[0].options.cache,'no-store');
+  assert.deepEqual(h.navigations,['https://klappy.cloudflareaccess.com/cdn-cgi/access/logout']);
 });
 test('confirmed ordinary logout does not navigate to provider',async()=>{
   const h=harness();h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));h.setRender(()=>{});h.setListen(()=>{});await h.signOut();
