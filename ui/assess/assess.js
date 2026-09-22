@@ -12,6 +12,8 @@ import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
+import { createFeedbackModal } from '/assess/feedback-modal.js';
+import { clientRelease } from '/client-release.js';
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 // Product overhaul (cookbook #16 c5721465315): five VIEWS on one assessment page. A view is a tab; a tab never mutates stage.
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
@@ -23,7 +25,7 @@ const DOTS = { 'Translation Team': '', Church: 'blue', Community: 'gold', 'Other
 const kitRoot = document.getElementById('rv');
 const kit = kitRoot ? mountKitRoot(kitRoot, shellModel({ route: route(location.hash), routes: cards.routes, principal: null }), { onNavigate: href => { if (typeof href === 'string' && href.startsWith('#')) { if (location.hash === href) render(); else location.hash = href; } } }) : null;
 // Compact chrome: #account (toggle showing #who + menu holding sign-out/switch/version/feedback/roadmap) is the ONLY hosted control.
-if (kit) { kit.adoptControls(document, ['account']); document.getElementById('shell-controls')?.remove(); bindAccountMenu(document); }
+const accountMenu = kit ? (kit.adoptControls(document, ['account']), document.getElementById('shell-controls')?.remove(), bindAccountMenu(document)) : null;
 const narrow = () => typeof matchMedia === 'function' && matchMedia('(max-width:760px)').matches;
 const app = kit ? kit.content : document.getElementById('app'), who = document.getElementById('who'), note = document.getElementById('note');
 // Shell sync happens only from render()/boot()/resetIdentity(): the model is derived from loaded, authorized data the controller already holds.
@@ -550,6 +552,7 @@ function scrubCredentialHash() {
   return null;
 }
 function resetIdentity() {
+  feedbackModal?.reset();
   identityGeneration += 1; generation += 1; epoch += 1;
   accountBusy = false; accountControls(false); accountStatus();
   document.getElementById('account-switch-dialog')?.close();
@@ -594,5 +597,19 @@ async function boot() {
   listen();
   await render();
 }
+// Feedback in place (#159, K3b1): the existing feedback module opens in a native dialog appended outside the application root, so the
+// current route, the stable content mount and the account/version host are untouched. Direct #feedback navigation remains the fallback.
+let feedbackModal;
+function feedbackOpener(link) {
+  // The link lives inside the account disclosure menu; once the menu closes the link is hidden, so focus returns to the menu toggle.
+  const menu = link.closest('#account-menu');
+  if (menu) { accountMenu?.close(); const toggle = document.getElementById('account-menu-toggle'); if (toggle) return toggle; }
+  return link;
+}
 // Boot on the kit root (normal root) or the legacy #app root; never in a headless harness without either.
-if (typeof window !== 'undefined' && (kit || document.getElementById('app'))) boot();
+if (typeof window !== 'undefined' && (kit || document.getElementById('app'))) {
+  feedbackModal = createFeedbackModal({ doc: document, context: () => ctxFor({ identity: identityGeneration }), route: () => route(location.hash), routeKey: () => location.hash, clientRelease });
+  document.addEventListener('click', event => { const link = event.target.closest?.('a[href="#feedback"]'); if (!link) return; event.preventDefault(); feedbackModal.open(feedbackOpener(link)); });
+  window.addEventListener('hashchange', () => feedbackModal.reset());
+  boot();
+}
