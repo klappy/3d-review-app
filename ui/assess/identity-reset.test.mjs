@@ -95,7 +95,7 @@ test('unconfirmed logout stays truthful and busy prevents duplicate dispatch',as
 });
 test('confirmed switch clears current app identity then navigates to documented provider logout',async()=>{
   const h=harness();h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));await h.signOut(true);
-  assert.equal(h.getCredential(),null);assert.equal(h.state.principal,null);assert.deepEqual(h.removed,['facilitatorToken']);assert.deepEqual(h.navigations,['/cdn-cgi/access/logout']);
+  assert.equal(h.getCredential(),null);assert.equal(h.state.principal,null);assert.deepEqual(h.removed,['facilitatorToken']);assert.deepEqual(h.navigations,['https://klappy.cloudflareaccess.com/cdn-cgi/access/logout']);
 });
 test('confirmed ordinary logout does not navigate to provider',async()=>{
   const h=harness();h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));h.setRender(()=>{});h.setListen(()=>{});await h.signOut();
