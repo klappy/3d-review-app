@@ -62,10 +62,10 @@ function paint(state) {
 const demo = isDemo(location.search);
 // K4: kit stylesheets + `.rv` scope on the participant main. The participant HTML is not owned by this slice; nothing else in the document changes.
 adoptKit(document, $('participant'));
-if (!demo) $('submit').className = 'primary';
+$('review-button').className = 'primary'; $('submit').className = 'primary'; $('edit').className = 'quiet'; $('recover').className = 'quiet';
 if (demo) { document.querySelector('main > h1').textContent = 'Practice survey · nothing is sent'; document.querySelector('main > p').textContent = 'Use the real survey flow with source-pinned synthetic sample questions. Answers stay in memory and disappear when you leave or reload.'; const back = element('a', 'Back to the tour'); back.href = '/?demo=1#assessment/demo-assessment/collect'; document.querySelector('main').prepend(back); }
 const sample = demo ? sampleParticipantEnvironment(Number(new URLSearchParams(location.search).get('survey') || 0)) : null;
-if (demo) { $('submit').textContent = 'Finish practice — nothing sent'; $('submit').className = 'primary'; $('recover').textContent = 'Check practice'; }
+if (demo) { $('submit').textContent = 'Finish practice — nothing sent'; $('recover').textContent = 'Check practice'; }
 const journey = createParticipantJourney({ ...(demo ? sample : { window, storage: sessionStorage }), onChange: paint });
 $('answers').addEventListener('input', () => journey.save(values()));
 $('answers').addEventListener('submit', event => { event.preventDefault(); try { journey.review(values(true)); } catch (error) { $('notice').textContent = error.message; } });

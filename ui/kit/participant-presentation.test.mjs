@@ -40,7 +40,7 @@ test('intro/pager/receipt/reviewRow paint only what the model or controller carr
   assert.equal(section.className, 'participant-intro'); assert.equal(section.querySelector('.eyebrow').textContent, 'Assessment A · test · Community');
   assert.match(section.textContent, /5 questions/); assert.match(section.textContent, /repo@abc1234/);
   assert.equal(begin.type, 'button'); begin.click(); assert.equal(began, 1);
-  const p = pager(d, 3, {}); p.paint(1);
+  const p = pager(d, 3, {}); p.paint(1); assert.equal(p.controls.parentNode, null, 'caller places Back/Next');
   assert.equal(p.progress.textContent, 'Question 2 of 3'); assert.deepEqual([...p.bar.children].map(s => s.className), ['done', 'done', '']);
   assert.equal(p.back.disabled, false); assert.equal(p.next.hidden, false); p.paint(2); assert.equal(p.next.hidden, true); p.paint(0); assert.equal(p.back.disabled, true);
   const r = receipt(d, { response_id: 'r-1', submitted_at: '2026-09-22T00:00:00Z' }); assert.match(r.textContent, /Thank you\./); assert.match(r.textContent, /r-1 · 2026-09-22T00:00:00Z/);
@@ -88,11 +88,13 @@ test('real participant entry: intro → paged questions → review → Change �
   // Intro from the kit, real fields hidden behind it, Review submit hidden by the existing page rule.
   const introEl = main.querySelector('.participant-intro'); assert.equal(introEl.hidden, false);
   assert.equal(introEl.querySelector('.eyebrow').textContent, 'Assessment A · test · 2026-09 · Community');
-  const fields = [...$('questions').children]; assert.equal(fields.length, 4); assert.ok(fields.every(f => f.hidden));
+  const fields = [...$('questions').querySelectorAll('fieldset')]; assert.equal(fields.length, 4); assert.ok(fields.every(f => f.hidden));
+  const controls = $('questions').querySelector('.participant-page-actions'); assert.equal(controls.hidden, true, 'Back/Next hidden on intro');
   introEl.querySelector('button').click();
+  assert.equal(controls.hidden, false); assert.equal($('review-button').hidden, true, 'Review only on the last question');
   assert.deepEqual(fields.map(f => f.hidden), [false, true, true, true]);
   const nav = main.querySelector('.participant-pager'); assert.equal(nav.hidden, false); assert.equal(nav.querySelector('.participant-progress').textContent, 'Question 1 of 4');
-  const [back, next] = nav.querySelectorAll('.participant-page-actions button'); assert.equal(back.disabled, true);
+  const [back, next] = $('questions').querySelectorAll('.participant-page-actions button'); assert.equal(back.disabled, true);
   // Required scale left blank: Next stays on the page and says why; no controller call.
   next.click(); assert.deepEqual(fields.map(f => f.hidden), [false, true, true, true]); assert.equal(main.querySelector('.participant-page-error').hidden, false);
   const q1 = fields[0].querySelector('input'); q1.value = '4'; q1.dispatchEvent(new window.Event('input', { bubbles: true }));
@@ -104,13 +106,13 @@ test('real participant entry: intro → paged questions → review → Change �
   // Exclusive + another choice: Next refuses with the existing message.
   const [x, none] = fields[2].querySelectorAll('input'); x.click(); none.click(); next.click();
   assert.deepEqual(fields.map(f => f.hidden), [true, true, false, true]); assert.match(main.querySelector('.participant-page-error').textContent, /cannot be combined/);
-  x.click(); next.click(); assert.deepEqual(fields.map(f => f.hidden), [true, true, true, false]); assert.equal(next.hidden, true);
+  x.click(); next.click(); assert.deepEqual(fields.map(f => f.hidden), [true, true, true, false]); assert.equal(next.hidden, true); assert.equal($('review-button').hidden, false);
   back.click(); assert.deepEqual(fields.map(f => f.hidden), [true, true, false, true]); assert.equal(fields[2].querySelector('input[value=none]').checked, true, 'Back keeps answers');
   next.click();
   // Review via the existing submit path: real page handler → journey.review(validated answers).
   $('review-button').click(); await settle();
-  assert.equal($('review').hidden, false); assert.equal($('answers').hidden, true);
-  const rows = [...$('review-answers').children]; assert.equal(rows.length, 4); assert.ok(rows.every(r => r.className === 'participant-review-row'));
+  assert.equal($('review').hidden, false); assert.equal($('answers').hidden, true); assert.equal(controls.hidden, true);
+  const rows = [...$('review-answers').children]; assert.equal(rows.length, 4); assert.ok(rows.every(r => r.classList.contains('participant-review-row')));
   assert.equal(rows[0].querySelector('strong').textContent, '4'); assert.equal(rows[3].querySelector('strong').textContent, 'Not answered (unknown)', 'existing reviewAnswer wording preserved');
   assert.equal(rows[0].querySelector('button.participant-change').textContent, 'Change');
   rows[0].querySelector('button.participant-change').click(); await settle();

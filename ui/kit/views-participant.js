@@ -16,9 +16,7 @@ export const copy = Object.freeze({
   reviewEyebrow: 'Review',
   reviewHelp: 'Change anything before you send. Nothing is submitted until you choose to.',
   receiptTitle: 'Thank you.',
-  receiptHelp: 'Your answers stay with the team, grouped with others. Reopening your link shows this receipt again.',
   practiceTitle: 'Practice complete — nothing sent',
-  practiceHelp: 'This was the practice survey. No response was sent or saved.',
   optional: 'Optional',
   held: 'May leave unanswered · policy held',
   chooseAll: 'Choose all that apply',
@@ -73,7 +71,7 @@ export function pager(doc, count, { onBack, onNext } = {}) {
   const back = button(doc, copy.back, 'quiet', onBack);
   const next = button(doc, copy.next, 'primary', onNext);
   controls.append(back, next);
-  nav.append(bar, progress, controls);
+  nav.append(bar, progress); // controls are placed by the caller under the visible question (kit order: pips, count, question, answers, Back/Next)
   function paint(index) {
     progress.textContent = `Question ${index + 1} of ${count}`;
     pips.forEach((pip, i) => { pip.className = i <= index ? 'done' : ''; });
@@ -114,7 +112,7 @@ export function field(doc, item) {
   if (item.type === 'scale' || item.type === 'text') {
     const input = el(doc, item.type === 'text' ? 'textarea' : 'input');
     input.name = item.id; input.required = item.required !== false;
-    if (item.type === 'scale') { input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; }
+    if (item.type === 'scale') { input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; input.inputMode = 'numeric'; fieldset.append(el(doc, 'p', 'muted participant-scale-hint', `${item.scale.min} to ${item.scale.max}`)); }
     fieldset.append(input);
   } else if (item.type === 'single' || item.type === 'multi') {
     for (const option of item.options || []) {
@@ -132,19 +130,21 @@ export function field(doc, item) {
 
 // Review row: question, then the answer as the app already presents it. The Change control is appended by participant-view.
 export function reviewRow(doc, item, answerText) {
-  const row = el(doc, 'div', 'participant-review-row');
-  row.append(el(doc, 'p', 'muted', item.text || item.id));
+  const row = el(doc, 'div', 'participant-review-row row');
+  row.setAttribute('style', 'justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)');
+  const question = el(doc, 'div', 'muted', item.text || item.id); question.setAttribute('style', 'flex:1 1 100%;font-size:13px');
+  row.append(question);
   row.append(el(doc, 'strong', undefined, answerText === '' || answerText === null || answerText === undefined ? copy.blank : answerText));
   return row;
 }
 
 // Receipt from the controller's genuine receipt object only. Missing fields are said to be missing, never invented.
 export function receipt(doc, result, { demo = false } = {}) {
-  const wrap = el(doc, 'div', 'participant-receipt');
-  wrap.append(el(doc, 'div', 'participant-receipt-mark', '✓'));
+  const wrap = el(doc, 'div', 'participant-receipt'); wrap.setAttribute('style', 'text-align:center;padding:10px 0');
+  const mark = el(doc, 'div', 'participant-receipt-mark', '✓'); mark.setAttribute('style', 'font-size:42px;color:var(--receipt)'); mark.setAttribute('aria-hidden', 'true'); wrap.append(mark);
   wrap.append(el(doc, 'h2', undefined, demo ? copy.practiceTitle : copy.receiptTitle));
-  wrap.append(el(doc, 'p', 'muted', demo ? copy.practiceHelp : copy.receiptHelp));
-  wrap.append(el(doc, 'p', 'note', `${result?.response_id || 'ID unavailable'} · ${result?.submitted_at || 'time unavailable'}`));
+  // The controller's own notice (#notice) already carries the thanks/same-link wording; the kit adds no second paragraph.
+  const note = el(doc, 'p', 'note', `${result?.response_id || 'ID unavailable'} · ${result?.submitted_at || 'time unavailable'}`); note.setAttribute('style', 'text-align:left'); wrap.append(note);
   return wrap;
 }
 
