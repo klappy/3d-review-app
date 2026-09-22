@@ -1,30 +1,30 @@
 {
-  "version": "0.14.2",
+  "version": "0.14.3",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "1f748faeaf0952a4d7852fd47b54bd8297d00672",
+  "cookbook_commit": "c9045c2fb940caa77685225fd432f2714bc3256d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.14.2.md",
-      "blob_sha": "e60b24dd8af29b6738021c383924e61f389839ea",
-      "sha256": "277ea7e0041f88bdc56d54080b5b4174f88af045bc8ef09aaa11b86c4bb16e9e"
+      "path": "planning/2026-09-16-parity-build/releases/0.14.3.md",
+      "blob_sha": "8e37f9ae04a8d54bb0f7d2e5eaf52acc593cf48d",
+      "sha256": "6823fe8e49f30451dcb09ec0056a7309102962885b34f463be440bfd092984a5"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "7e3e69b5ebc3765c095bb9dec2a3f136a7383944",
-      "sha256": "2daa2d33842ce903ee1d794345cc567e84e1d03297e5b9b7221ae7f249bd97c5"
+      "blob_sha": "c5489f623500e19a2c9d2af8725d178508556405",
+      "sha256": "ae69abb21bef831902af94e0e7ab2dc3760695d9f331ae74d72278936809a01f"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
       "changed": [
-        "Persona evidence: five local Chrome modal acceptance families and23automated changelog tests passed; human outcomes NOT MEASURED."
+        "Persona evidence: author local Chrome3/3 and automated22/22 passed; physical pagination, reporter confirmation and human ratings remain unmeasured."
       ],
       "fixed": [
-        "Changelog opens at the newest entry, resets on reopen and keeps accessible Close available while scrolling; backdrop dismissal and native Escape restore opener focus."
+        "Blank survey preview and print default to US Letter; explicit A4 remains available and controls the generated page size."
       ],
       "security": [
-        "Canonical version/changelog source and anonymous read privacy are unchanged; no new data collection or live writes."
+        "Isolated blank-only printing, authorization and credential exclusions are unchanged."
       ]
     }
   }
