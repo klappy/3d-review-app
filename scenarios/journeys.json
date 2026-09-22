@@ -1,6 +1,6 @@
 {
   "contract": "contract-v0.1",
-  "source": "cookbook 05-NLX-AGENT-USAGE.md @ 59be64c (J1–J14) + 04-ACCEPTANCE.md",
+  "source": "cookbook 05-NLX-AGENT-USAGE.md @ 59be64c (J1–J14) + 04-ACCEPTANCE.md; J11 re-sourced @ 8e1bcbcf against shipped shared-link code",
   "runner": "B2: each row runs on contract mocks first, then live (S1a/S1); $vars are fixture bindings; every must_observe is an assertion; every negative must also hold",
   "journeys": [
     {
@@ -414,13 +414,18 @@
         }
       ],
       "must_observe": [
+        "no account, sign-in or access code is required to open the link",
+        "each open of the same link mints an independent anonymous respondent (respondent_id differs per open)",
         "form at the version bound at presentation",
         "receipt returned; participant never sees results"
       ],
       "negative": [
-        "same link again → INVALID_PARAMS link_used; expired → link_expired"
+        "same link opened again on another device → new respondent with its own response (many-respondents), not an error",
+        "second submit under the same respondent with a different idempotency_key → STAGE_CONFLICT",
+        "revoked, expired or unknown link → NOT_FOUND_OR_NOT_VISIBLE",
+        "collection closed → STAGE_CONFLICT on fresh open / form / submit (a same-link resume_token open still succeeds, shared-link.ts:49-57); prior receipt still readable"
       ],
-      "source": "cookbook 05 @ 59be64c"
+      "source": "cookbook 05-NLX-AGENT-USAGE.md J11 @ 8e1bcbcf (shared-link ruling #14 c5707567961); app shared-link.ts + test/shared-link-flow.test.ts + test/shared-link-browser.test.ts:181"
     },
     {
       "id": "J12",
