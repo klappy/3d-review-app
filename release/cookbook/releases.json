@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.14.3",
+  "current": "0.14.4",
   "versions": [
+    {
+      "version": "0.14.4",
+      "status": "candidate",
+      "notes_path": "releases/0.14.4.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona evidence: 19/19 automated UI/live checks and two author viewport checkpoints on the full 28-item public fixture; deployed acceptance and human satisfaction, confusion and frustration NOT MEASURED."
+        ],
+        "fixed": [
+          "Restore prominent Done, Pending and Blocked stage icons/colors, visible work-type/version badges and Status labels; Now includes only explicit active work, with inactive or unplaced work in Future."
+        ],
+        "security": [
+          "Reported progress remains distinct from verifier evidence; missing state is not fabricated and existing public-feed privacy/redaction remains unchanged."
+        ]
+      }
+    },
     {
       "version": "0.14.3",
       "status": "candidate",
