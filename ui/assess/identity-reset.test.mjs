@@ -112,3 +112,23 @@ test('account email is text only and failures remove previous email',async()=>{
   const h=harness();h.setFetch(async()=>({ok:true,json:async()=>({email:'<synthetic>@example.invalid'})}));await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Account: <synthetic>@example.invalid');
   h.setFetch(async()=>{throw Error('redirect');});await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Account email unavailable.');
 });
+
+for (const outcome of ['resolve', 'reject']) test(`provider logout ${outcome} cannot navigate or clear a replacement identity`, async () => {
+  const h = harness();
+  h.state.principal = { id: 'old' }; h.setCredential('old-token');
+  h.setApi(async () => ({ signed_out: true }));
+  const provider = deferred(), entered = deferred();
+  h.setFetch(() => { entered.resolve(); return provider.promise; });
+  const pending = h.signOut(true);
+  await entered.promise;
+  h.resetIdentity(); h.state.principal = { id: 'new' }; h.setCredential('new-token');
+  h.nodes.get('who').textContent = 'New account'; h.nodes.get('app').innerHTML = 'New work';
+  h.nodes.get('account-status').textContent = 'New status';
+  if (outcome === 'resolve') provider.resolve({ ok: true }); else provider.reject(new Error('Provider uncertain'));
+  await pending;
+  assert.deepEqual(h.navigations, []);
+  assert.equal(h.getCredential(), 'new-token'); assert.equal(h.state.principal.id, 'new');
+  assert.equal(h.nodes.get('who').textContent, 'New account');
+  assert.equal(h.nodes.get('app').innerHTML, 'New work');
+  assert.equal(h.nodes.get('account-status').textContent, 'New status');
+});
