@@ -131,7 +131,7 @@ test('RESERVED_NOT_BUILT renders honest not-built, not retry', async () => {
 test('project: refused assessments list is shown as not visible, page still renders', async () => {
   const ctx = ctxWith({ 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'viewer' }, languages: [] }, 'GET /v2/projects/p1/assessments': err('NOT_AUTHORIZED_AT_SCOPE'), 'GET /v2/projects/p1/languages': { languages: [] } });
   const m = await pages.project.load(ctx, { id: 'p1' }); assert.equal(m.status, 'loaded'); assert.equal(m.assessmentsStatus, 'refused');
-  const h = pages.project.render(ctx, m); assert.ok(h.includes('not visible to you')); assert.ok(h.includes('<h1>P</h1>'));
+  const h = pages.project.render(ctx, m); assert.ok(h.includes('not visible to you')); assert.ok(h.includes('<h2>P</h2>')); assert.ok(h.includes('data-read-region')); assert.ok(!h.includes('data-action-region'), 'viewer: no retained action forms');
 });
 
 // ---------- entry ----------

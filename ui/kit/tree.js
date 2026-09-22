@@ -1,5 +1,6 @@
 // ContextTree presentation: explicit visibility supplied by authoritative caller.
 // Callback context is a snapshot; update/destroy invalidate every previous binding.
+// K3a: the content region is a div[role=main] so the host page keeps one real <main> landmark (index.html wraps the kit root).
 import { esc, safeHref, badge, chrome, levelMenu } from './core.js';
 const icons = {workspace:'▦',project:'▣',assessment:'◔',survey:'▤'};
 export function mountShell(root, initialModel, initialCallbacks = {}) {
@@ -10,7 +11,8 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
   }
   function paint(focusKey, preserveContent = true) {
     cleanup();
-    const content = root.querySelector('[data-content]');
+    // Caller-owned elements survive every paint: the content mount (cleared on model update) and the header host (never cleared here).
+    const content = root.querySelector('[data-content]'), host = root.querySelector('[data-header-host]');
     if (!preserveContent) content?.replaceChildren();
     const generation = revision, context = Object.freeze({...model.context});
     const current = () => revision === generation && root.isConnected;
@@ -23,9 +25,10 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     }
     function matches(nodes) { return visible(nodes).flatMap(n => [ ...(n.label.toLowerCase().includes(filterQuery.toLowerCase()) ? [{...n,children:[]}] : []), ...matches(n.children)]); }
     const nodes = filterQuery ? matches(model.nodes) : visible(model.nodes);
-    root.innerHTML = chrome(model)+'<div class="shell"><aside class="tree" aria-label="Context"><label class="tree-search"><span aria-hidden="true">⌕</span><input data-search aria-label="Find a workspace, project or assessment" placeholder="Find…" value="'+esc(query)+'"></label><nav class="tree-section" aria-label="Scopes"><div class="eyebrow">'+esc(model.sectionLabel || 'Workspaces')+'</div>'+nodes.map(n=>node(n,1)).join('')+'</nav><div class="tree-tools tree-footer"><span class="tree-me">'+esc(model.identityLabel)+' · '+esc(model.role)+'</span></div></aside><main class="content" tabindex="-1"><div class="eyebrow">'+esc(model.eyebrow || '')+'</div><div class="row" style="justify-content:space-between"><h1>'+esc(model.title)+'</h1>'+levelMenu(model)+'</div><div data-content></div></main></div>';
-    // Preserve the caller-owned mount root and its delegated listeners on local changes.
-    if (preserveContent && content) root.querySelector('[data-content]').replaceWith(content);
+    root.innerHTML = chrome(model)+'<div class="shell"><aside class="tree" aria-label="Context"><label class="tree-search"><span aria-hidden="true">⌕</span><input data-search aria-label="Find a workspace, project or assessment" placeholder="Find…" value="'+esc(query)+'"></label><nav class="tree-section" aria-label="Scopes"><div class="eyebrow">'+esc(model.sectionLabel || 'Workspaces')+'</div>'+nodes.map(n=>node(n,1)).join('')+'</nav><div class="tree-tools tree-footer"><span class="tree-me">'+esc(model.identityLabel)+' · '+esc(model.role)+'</span></div></aside><div class="content" role="main" tabindex="-1"><div class="eyebrow">'+esc(model.eyebrow || '')+'</div><div class="row" style="justify-content:space-between"><h1>'+esc(model.title)+'</h1>'+levelMenu(model)+'</div><div data-content></div></div></div>';
+    // Preserve the caller-owned mount root and its delegated listeners across local changes AND model updates (same element, emptied on update).
+    if (content) root.querySelector('[data-content]').replaceWith(content);
+    if (host) root.querySelector('[data-header-host]').replaceWith(host);
     // Caller can mount trusted DOM in this empty slot; no arbitrary model HTML is interpreted.
     const menu = root.querySelector('[data-menu]'), toggle = root.querySelector('[data-menu-toggle]');
     const close = (focus=false) => { if(menu){menu.hidden=true;toggle.setAttribute('aria-expanded','false');if(focus)toggle.focus();} };
@@ -82,5 +85,5 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     else if(focusKey)[...root.querySelectorAll('[data-expand]')].find(x=>x.dataset.expand===focusKey)?.focus();
   }
   update(initialModel,initialCallbacks);
-  return {update, get content(){return root.querySelector('[data-content]');},destroy(){cleanup();revision++;root.querySelector('[data-content]')?.replaceChildren();root.replaceChildren();}};
+  return {update, get content(){return root.querySelector('[data-content]');},get headerHost(){return root.querySelector('[data-header-host]');},destroy(){cleanup();revision++;root.querySelector('[data-content]')?.replaceChildren();root.replaceChildren();}};
 }
