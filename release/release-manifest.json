@@ -1,30 +1,31 @@
 {
-  "version": "0.14.4",
+  "version": "0.14.5",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "791b86cbcdfb4a8cbc492a2914dc6de9790d2b46",
+  "cookbook_commit": "97af53e83624d3992884ad1d2520b34bd61b74af",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.14.4.md",
-      "blob_sha": "8ad4fd66c25f35afe7a1ef6718990e954684505d",
-      "sha256": "ee36ed761395f0cd71ab9d48898208142f6d5e737dc0514107b6ad1604586317"
+      "path": "planning/2026-09-16-parity-build/releases/0.14.5.md",
+      "blob_sha": "91bea67f49a04d7cf59579d014bb3b9cff90f061",
+      "sha256": "c994a98623c2692fd5e81fbeee9c3e0d6b7bee936eb1f2c79cbf27db887367c7"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "5c999103b919975654d1f646a662c083d0414bba",
-      "sha256": "45ca34ce920a6b4b7a09ca2fac07cfe78e422e1f3256da7061a77d0647020993"
+      "blob_sha": "c381466dfc0054473c5bd648809b6294a5531b88",
+      "sha256": "c9831b19f1c1ff53f8741b6e0f533a0be19d16d7b00b7c55f39af1fa8a5f2eb6"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
       "changed": [
-        "Persona evidence: 19/19 automated UI/live checks and two author viewport checkpoints on the full 28-item public fixture; deployed acceptance and human satisfaction, confusion and frustration NOT MEASURED."
+        "Persona evidence: 12/12 synthetic root-browser scenario checks passed across desktop and phone. Two real-provider account cases remain untested; satisfaction, confusion and frustration NOT MEASURED."
       ],
       "fixed": [
-        "Restore prominent Done, Pending and Blocked stage icons/colors, visible work-type/version badges and Status labels; Now includes only explicit active work, with inactive or unplaced work in Future."
+        "Show the verified account email and keep Sign out and Use another account available on signed-in root pages.",
+        "Keep failed or uncertain sign-out truthful and prevent delayed account actions from clearing or switching a newer identity."
       ],
       "security": [
-        "Reported progress remains distinct from verifier evidence; missing state is not fabricated and existing public-feed privacy/redaction remains unchanged."
+        "Display email only when verified provider identity matches the selected app session; no new personal-data storage or grant changes. Explain provider-wide sign-out before account switching."
       ]
     }
   }

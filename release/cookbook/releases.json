@@ -1,7 +1,25 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.14.4",
+  "current": "0.14.5",
   "versions": [
+    {
+      "version": "0.14.5",
+      "status": "candidate",
+      "notes_path": "releases/0.14.5.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "Persona evidence: 12/12 synthetic root-browser scenario checks passed across desktop and phone. Two real-provider account cases remain untested; satisfaction, confusion and frustration NOT MEASURED."
+        ],
+        "fixed": [
+          "Show the verified account email and keep Sign out and Use another account available on signed-in root pages.",
+          "Keep failed or uncertain sign-out truthful and prevent delayed account actions from clearing or switching a newer identity."
+        ],
+        "security": [
+          "Display email only when verified provider identity matches the selected app session; no new personal-data storage or grant changes. Explain provider-wide sign-out before account switching."
+        ]
+      }
+    },
     {
       "version": "0.14.4",
       "status": "candidate",
@@ -99,7 +117,7 @@
           "Persona evidence: nine local feedback DOM tests passed; deployed reporter and real-human outcomes not measured."
         ],
         "fixed": [
-          "Feedback opens with the user\u2019s problem or suggestion; experience ratings remain optional in a secondary disclosure."
+          "Feedback opens with the user’s problem or suggestion; experience ratings remain optional in a secondary disclosure."
         ],
         "security": [
           "Existing authentication, payload privacy, identity isolation and uncertain-send handling remain unchanged."
