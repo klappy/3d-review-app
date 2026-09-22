@@ -75,8 +75,16 @@ async function write(ctx, control, label, fn, status = null) {
   try { const r = await fn(); if (!live()) return undefined; if (status) status.textContent = ''; return r; }
   catch (e) {
     if (!live()) return undefined;
-    const kind = classify(e);
-    say(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? 'Not allowed here.' : kind === 'not_built' ? `${label} is not available yet.` : `${label} failed: ${safeMessage(e)}. Your entry is still here; nothing was retried.`, true);
+    const kind = classify(e), code = String(e?.code ?? '');
+    // Definitive outcomes (the server answered) are reported as such. Anything else — transport failure, timeout, 5xx — is
+    // UNCONFIRMED: the request may have committed, so say so, keep what was entered, and point to checking before retrying.
+    // The server answered (any 4xx or a named 4xx-class code) → definitive; no answer / 5xx / timeout → unconfirmed.
+    const definitive = kind !== 'failed' || (Number(e?.status) >= 400 && Number(e?.status) < 500) || ['INVALID_PARAMS', 'RATE_LIMITED'].includes(code);
+    if (kind === 'unauthenticated') say('Your session has ended. Sign in again.', true);
+    else if (kind === 'refused') say('Not allowed here.', true);
+    else if (kind === 'not_built') say(`${label} is not available yet.`, true);
+    else if (definitive) say(`${label} was not accepted: ${safeMessage(e)}${status ? ' Your entries are unchanged.' : ''}`, true);
+    else say(`${label} could not be confirmed. It may already have completed — check the current list before trying again.${status ? ' Your entries are unchanged;' : ''} nothing was retried.`, true);
     return undefined;
   }
   finally { if (live()) for (const c of controls) c.disabled = false; }
@@ -198,7 +206,7 @@ const workspaces = {
     const r = readModel('workspaces', model);
     // K3b2: kit presentation — read cards plus the real create form as a kit panel (same form id, native required/maxlength).
     return readRegion(`<p class="muted">Group projects you can already open. A workspace does not add access to other projects. <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
-      + `<section class="glass panel kit-write" data-write-region><h3>Create a workspace</h3><form id="create-workspace" novalidate="false"><label>Workspace name<input name="name" type="text" maxlength="100" required autocomplete="off" placeholder="For example, Lake region"></label><div class="row"><button class="primary" type="submit">Create workspace</button><span class="status" role="status" aria-live="polite" data-write-status></span></div></form></section>`;
+      + `<section class="glass panel kit-write" data-write-region><h3>Create a workspace</h3><form id="create-workspace"><label>Workspace name<input name="name" type="text" maxlength="100" required autocomplete="off" placeholder="For example, Lake region"></label><div class="row"><button class="primary" type="submit">Create workspace</button><span class="status" role="status" aria-live="polite" data-write-status></span></div></form></section>`;
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, workspaces, model);

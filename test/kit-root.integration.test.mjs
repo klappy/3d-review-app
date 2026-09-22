@@ -159,7 +159,7 @@ test('retained forms invoke the exact existing commands and fail closed; version
   form.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(8);
   const post = p.transport.log.find(l => l.method === 'POST');
   assert.equal(post?.key, 'POST /v2/workspaces'); assert.equal(post.outcome, 'mutation-refused'); assert.equal(JSON.parse(post.body).name, 'New group');
-  assert.ok(p.text('#note').includes('Create workspace failed'), p.text('#note'));
+  assert.match(p.text('#note'), /Create workspace was not accepted/, p.text('#note'));
   assert.equal(p.w.location.hash, '#workspaces');
   const dialog = p.q('#changelog');
   p.q('#version').click(); await tick(4);
@@ -267,7 +267,7 @@ test('workspace owner: one kit project card owns read/navigation; management row
   const remove = p.q('[data-action-region] .manage-row [data-remove="p1"]'); assert.ok(remove); assert.equal(remove.getAttribute('aria-label'), 'Remove River Valley from workspace');
   remove.click(); await tick(8);
   const del = p.transport.log.find(l => l.method === 'DELETE'); assert.equal(del?.key, 'DELETE /v2/workspaces/w1/projects/p1'); assert.equal(del.outcome, 'mutation-refused');
-  assert.ok(p.text('#note').includes('Remove project failed'));
+  assert.match(p.text('#note'), /Remove project was not accepted/);
 });
 
 // Measured overflow (Chrome, 195px layout viewport = phone at 200% zoom): the open account menu extended 57px past the left edge.
@@ -381,7 +381,9 @@ test('K3b2 create: success routes only to the returned id; missing id is explici
   mode = 'refuse'; let form = await submit('<b>Lake</b> & co');
   assert.equal(form.elements.name.value, '<b>Lake</b> & co', 'entry retained on refusal'); assert.match(form.querySelector('[data-write-status]').textContent, /Not allowed here/); assert.equal(form.querySelector('button[type=submit]').disabled, false); assert.equal(p.w.location.hash, '#workspaces');
   mode = 'uncertain'; form = await submit('<b>Lake</b> & co');
-  assert.match(form.querySelector('[data-write-status]').textContent, /failed.*still here.*nothing was retried/); assert.equal(posts, 2, 'no automatic resend');
+  const unc = form.querySelector('[data-write-status]').textContent;
+  assert.match(unc, /could not be confirmed/); assert.match(unc, /check the current list before trying again/); assert.match(unc, /nothing was retried/); assert.doesNotMatch(unc, /failed|not accepted/, 'an unconfirmed write is never labelled a failure'); assert.equal(form.elements.name.value, '<b>Lake</b> & co'); assert.equal(posts, 2, 'no automatic resend');
+  assert.equal(p.text('#note').includes('failed'), false, 'global note does not contradict the unconfirmed outcome');
   mode = 'noid'; form = await submit('Nameless'); assert.match(form.querySelector('[data-write-status]').textContent, /no workspace id/); assert.equal(p.w.location.hash, '#workspaces');
   // double submit while pending
   let release; const held = new Promise(r => { release = r; }); const prev = p.w.fetch; p.w.fetch = (u, i) => (i?.method === 'POST' && String(u).endsWith('/v2/workspaces')) ? (posts++, held.then(() => okJson({ workspace: { id: 'ws-new' } }))) : prev(u, i);
@@ -390,10 +392,37 @@ test('K3b2 create: success routes only to the returned id; missing id is explici
   release(); await tick(12); assert.equal(p.w.location.hash, '#workspace/ws-new', 'routes only to the returned id');
   assert.ok(p.q('[data-content]').textContent.includes('Not visible to you'), 'unmapped new id renders the refusal panel, nothing invented');
 });
-test('K3b2 roles: viewer sees no create form; owner and member do; kit write region replaces the legacy action region', async () => {
+test('K3b2 roles: creating a workspace is self-service for every signed-in identity (owner/member/viewer/direct); kit write region replaces the legacy action region', async () => {
   for (const [identity, expectForm] of [['owner', true], ['member', true], ['viewer', true], ['direct', true]]) {
     const p = await bootPage(identity, '#workspaces');
     assert.equal(!!p.q('[data-write-region] #create-workspace'), expectForm, identity + ': creating a workspace is a self-service action available to any signed-in account per existing controller');
     assert.equal(p.q('[data-action-region]'), null, identity + ': no legacy action region on workspaces');
   }
+});
+
+test('K3b2 native validation stays enabled: form.noValidate is false, an empty field blocks dispatch via requestSubmit and button click; whitespace-only is caught by the trimmed guard', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  const form = p.q('#create-workspace'); assert.equal(form.noValidate, false, 'no novalidate attribute');
+  assert.equal(form.hasAttribute('novalidate'), false); assert.equal(form.elements.name.required, true); assert.equal(form.elements.name.maxLength, 100);
+  const before = p.transport.log.length;
+  form.elements.name.value = ''; assert.equal(form.checkValidity(), false, 'empty required field is invalid');
+  form.requestSubmit(); await tick(4); // requestSubmit honours constraint validation (jsdom implements it)
+  form.querySelector('button[type=submit]').click(); await tick(4);
+  assert.equal(p.transport.log.slice(before).filter(l => l.method === 'POST').length, 0, 'no dispatch while invalid');
+  form.elements.name.value = '   '; form.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(4);
+  assert.equal(p.transport.log.slice(before).filter(l => l.method === 'POST').length, 0, 'whitespace-only caught by the trimmed guard'); assert.match(form.querySelector('[data-write-status]').textContent, /Enter a workspace name/);
+});
+test('K3b2 create → served new workspace: real route renders the returned workspace and the tree/crumbs update from loaded data; identity reset invalidates a late completion', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  p.data.routes.set('GET /v2/workspaces/ws-new', { ok: true, result: { workspace: { id: 'ws-new', name: 'Lake region', role: 'owner', archived_at: null }, projects: [] } });
+  const real = p.w.fetch; p.w.fetch = (u, i) => (i?.method === 'POST' && String(u).endsWith('/v2/workspaces')) ? Promise.resolve(okJson({ workspace: { id: 'ws-new', name: 'Lake region' } })) : real(u, i);
+  const form = p.q('#create-workspace'); form.elements.name.value = 'Lake region'; form.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(16);
+  assert.equal(p.w.location.hash, '#workspace/ws-new'); assert.equal(p.text('[role=main].content h1'), 'Lake region');
+  assert.deepEqual(crumbs(p), ['Workspaces', 'Lake region']); assert.equal(p.text('header.top nav.crumbs .tree-role'), 'Owner'); assert.ok(treeLabels(p).includes('Lake region'), 'tree shows the created workspace from the loaded page model');
+  assert.ok(p.served().includes('GET /v2/workspaces/ws-new'), 'real GET of the returned id');
+  // identity change while a create is pending: late success must not navigate or note
+  await p.go('#workspaces'); let release; const held = new Promise(r => { release = r; }); p.w.fetch = (u, i) => (i?.method === 'POST' && String(u).endsWith('/v2/workspaces')) ? held.then(() => okJson({ workspace: { id: 'ws-late2' } })) : real(u, i);
+  const f2 = p.q('#create-workspace'); f2.elements.name.value = 'Late'; f2.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(2);
+  p.api.resetIdentity(); await tick(2); release(); await tick(8);
+  assert.notEqual(p.w.location.hash, '#workspace/ws-late2'); assert.equal(p.text('#note'), ''); assert.equal(f2.querySelector('button[type=submit]').disabled, true, 'detached control stays disabled');
 });
