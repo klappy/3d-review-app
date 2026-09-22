@@ -53,13 +53,19 @@ function swap(ctx, root, page, next) {
   return true;
 }
 // Retry re-runs load() then re-renders and re-binds in place. Every page's bind() starts here.
+// Bugbot 4073693771: a page may render more than one Retry (project: assessments AND languages). EVERY rendered control is bound;
+// they share ONE in-flight guard so a second click (either button) while a reload is pending neither issues a second read nor
+// re-enters swap(). Currentness stays with swap()/ctx.isCurrent: a reload completing after navigation never paints.
 function bindRetry(ctx, root, page, model) {
-  const b = root.querySelector('[data-act="retry"]');
-  if (!b) return;
-  b.addEventListener('click', async () => {
-    b.disabled = true;
-    const next = await page.load(ctx, model.params || {});
-    swap(ctx, root, page, next);
+  const buttons = Array.from(root.querySelectorAll('[data-act="retry"]'));
+  if (!buttons.length) return;
+  let pending = false;
+  for (const b of buttons) b.addEventListener('click', async () => {
+    if (pending) return;
+    pending = true;
+    for (const c of buttons) c.disabled = true;
+    try { const next = await page.load(ctx, model.params || {}); swap(ctx, root, page, next); }
+    finally { pending = false; }
   });
 }
 // A write: disables the trigger while in flight, reports the server outcome, never claims success without it.
@@ -175,8 +181,12 @@ function kitCard(ctx, x) {
   return `<article class="glass panel${x.archived ? ' archived' : ''}" style="min-width:0;overflow-wrap:anywhere"><p class="eyebrow">${ctx.esc(x.eyebrow)}</p><div class="row"><h3><a href="${ctx.esc(x.href)}">${ctx.esc(x.title)}</a></h3>${x.role ? `<span class="badge">${ctx.esc(x.role)}</span>` : ''}${x.archived ? '<span class="badge">Archived</span>' : ''}</div>${(x.facts || []).filter(f => f.value).map(f => `<p class="small muted">${ctx.esc(f.label)} ${ctx.esc(f.value)}</p>`).join('')}</article>`;
 }
 function kitGrid(ctx, items, empty) { return items.length ? `<div class="grid">${items.map(x => kitCard(ctx, x)).join('')}</div>` : `<p class="muted">${ctx.esc(empty)}</p>`; }
-// The kit shell already shows the page title and eyebrow; the read head carries only role/archived state and the permissions link.
-function kitHead(ctx, r, extra = '') { return `<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}"><p class="muted small" style="margin:0">${r.role ? `Your role: ${ctx.esc(r.role)}` : ''}</p><div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>`; }
+// Bugbot 4073693743: title ownership is an explicit host contract, never inferred from the DOM. Only the kit-root controller sets
+// ctx.shellOwnsTitle = true (the shell header shows title + eyebrow, so the page renders none). In any other host — the real
+// non-kit /assess/index.html, tests, an absent context — the page owns its heading and renders exactly one eyebrow + h1.
+function pageHead(ctx, r) { return ctx.shellOwnsTitle === true ? '' : `<p class="eyebrow">${ctx.esc(r.eyebrow)}</p><h1>${ctx.esc(r.title)}</h1>`; }
+// The read head carries role/archived state and the permissions link; the heading itself follows the host contract above.
+function kitHead(ctx, r, extra = '') { return `${pageHead(ctx, r)}<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}"><p class="muted small" style="margin:0">${r.role ? `Your role: ${ctx.esc(r.role)}` : ''}</p><div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>`; }
 const readRegion = html => `<div data-read-region class="kit-read">${html}</div>`;
 const actionRegion = html => html ? `<section data-action-region class="legacy-actions" aria-label="Existing controls (kit conversion pending)">${html}</section>` : '';
 
@@ -189,7 +199,7 @@ const workspaces = {
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('workspaces', model);
-    return readRegion(`<p class="muted">Group projects you can already open. A workspace does not add access to other projects. <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
+    return readRegion(`${pageHead(ctx, r)}<p class="muted">Group projects you can already open. A workspace does not add access to other projects. <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
       + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a workspace</h2><form id="create-workspace"><label class="field">Workspace name<input name="name" maxlength="100" required placeholder="For example, Lake region"></label><div class="actions"><button class="primary" type="submit">Create workspace</button></div></form></section>`);
   },
   bind(ctx, root, model) {
@@ -266,7 +276,7 @@ const projects = {
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('projects', model);
-    return readRegion(`${kitGrid(ctx, r.items, r.empty)}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`)
+    return readRegion(`${pageHead(ctx, r)}${kitGrid(ctx, r.items, r.empty)}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`)
       + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a project</h2><form id="create-project"><label class="field">Project name<input name="name" maxlength="100" required placeholder="For example, Lake project"></label><div class="actions"><button class="primary" type="submit">Create project</button></div></form></section>`);
   },
   bind(ctx, root, model) {

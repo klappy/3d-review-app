@@ -34,7 +34,24 @@ function syncShell(page = null) {
   // resetIdentity) so later crumbs can name it without a discovery read. Data only; never a new request.
   if (page?.kind === 'workspace' && page.model?.status === 'loaded' && page.model.workspace?.id) state.workspaces.set(page.model.workspace.id, { id: page.model.workspace.id, name: page.model.workspace.name, role: page.model.workspace.role, projects: (page.model.projects || []).map(x => x.id) });
   kit.update(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() }));
+  placeDemoNotice(); // Bugbot 4073693755: the shell repaint preserves only its content/header hosts; the disclosure is restored by the controller
 }
+// Demo disclosure (Bugbot 4073693755): ONE controller-owned node, built once, placed before the content element and re-placed by the
+// controller's own lifecycle (boot + every syncShell) whenever a shell repaint has detached it. The content element and the mounted
+// view inside it are never touched, so form values and listeners survive; the kit gains no new lifecycle authority.
+let demoNotice = null;
+function placeDemoNotice() {
+  if (!demo || !app) return;
+  if (!demoNotice) {
+    const existing = document.getElementById('demo-notice'); if (existing) demoNotice = existing;
+    else { const banner = document.createElement('section'); banner.id = 'demo-notice'; banner.className = 'panel'; banner.innerHTML = '<strong>Explore the real app · demonstration data</strong><p>These are the same screens used for assessments. Viewer access: nothing is sent or saved. Source-pinned synthetic responses and report; no real people.</p><a class="button" href="/participate/?demo=1">Try the sample survey</a> <a class="button" href="/">Close tour</a>'; const samples = document.createElement('p'); samples.append('Inspect a synthetic response in the real survey review: '); for (const sample of sampleResponses) { const link = document.createElement('a'); link.href = `/participate/?demo=1&survey=${sample.survey}&response=1`; link.textContent = `${sample.name} (${sample.count} responses) · `; samples.append(link); } banner.append(samples); demoNotice = banner; }
+  }
+  if (!demoNotice.isConnected || demoNotice.nextElementSibling !== app) app.before(demoNotice);
+  // Kit-internal paints (tree expansion, search, context toggle) never call the controller; they rebuild the shell chrome and keep
+  // only the content/header hosts. The controller watches its own kit root and re-places the same node the moment it is detached.
+  if (kitRoot && !demoObserver && typeof MutationObserver === 'function') { demoObserver = new MutationObserver(() => { if (demoNotice && !demoNotice.isConnected && app.isConnected) app.before(demoNotice); }); demoObserver.observe(kitRoot, { childList: true, subtree: true }); }
+}
+let demoObserver = null;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const title = v => v.charAt(0).toUpperCase() + v.slice(1);
 const stageLabel = s => ({ prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' })[s] || esc(s);
@@ -470,7 +487,9 @@ function ctxFor(extra = {}) {
   // view (route change, identity reset) can neither issue a request nor write a status line into the current view.
   const gen = generation, identity = identityGeneration, live = () => gen === generation && identity === identityGeneration;
   const stale = () => Promise.reject(Object.assign(new Error('This view is no longer current.'), { code: 'STALE_VIEW' }));
-  return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
+  // shellOwnsTitle (Bugbot 4073693743): explicit host contract — only a mounted kit root shows the page title in its header, so only
+  // then do scope pages omit their own heading. The non-kit /assess/index.html host keeps page-owned headings.
+  return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, shellOwnsTitle: !!kit, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
     // Review F2: a completion arriving after the view was replaced must not navigate the newer route (it cannot undo a dispatched write).
     go: (hash, { reload = false } = {}) => { if (!live()) return; if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
 }
@@ -567,7 +586,7 @@ let listening = false;
 function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
 async function boot() {
   if (scrubCredentialHash() === 'forwarded') return; // 'session' falls through: identity is observed fresh below
-  if (demo && !document.getElementById('demo-notice')) { const banner = document.createElement('section'); banner.id = 'demo-notice'; banner.className = 'panel'; banner.innerHTML = '<strong>Explore the real app · demonstration data</strong><p>These are the same screens used for assessments. Viewer access: nothing is sent or saved. Source-pinned synthetic responses and report; no real people.</p><a class="button" href="/participate/?demo=1">Try the sample survey</a> <a class="button" href="/">Close tour</a>'; const samples = document.createElement('p'); samples.append('Inspect a synthetic response in the real survey review: '); for (const sample of sampleResponses) { const link = document.createElement('a'); link.href = `/participate/?demo=1&survey=${sample.survey}&response=1`; link.textContent = `${sample.name} (${sample.count} responses) · `; samples.append(link); } banner.append(samples); app.before(banner); }
+  placeDemoNotice();
   const identity = identityGeneration;
   try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; }
   catch {

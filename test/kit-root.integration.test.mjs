@@ -26,10 +26,13 @@ const CHANGELOG = strip(readFileSync(new URL('../ui/changelog.js', import.meta.u
 const tick = (n = 6) => new Promise(r => { let i = 0; (function step() { if (++i > n) return r(); setTimeout(step, 0); })(); });
 
 // Boot the real page at `hash` as `identity`. Everything the controller imports is the real module; only fetch is synthetic.
-async function bootPage(identity = 'owner', hash = '#workspaces', { install } = {}) {
+// host: 'kit' boots the REAL ui/index.html (kit root); 'legacy' boots the REAL non-kit ui/assess/index.html (plain #app, no #rv).
+// search: query string for the entry (e.g. '?demo=1' — the controller's own demo path; demoApi answers, fetch stays fail-closed).
+const LEGACY_HTML = readFileSync(new URL('../ui/assess/index.html', import.meta.url), 'utf8');
+async function bootPage(identity = 'owner', hash = '#workspaces', { install, host = 'kit', search = '' } = {}) {
   const data = dataset(identity), transport = createTransport({ routes: data.routes, origin: ORIGIN });
   if (install) install(transport, data);
-  const dom = new JSDOM(HTML, { url: ORIGIN + '/' + hash, pretendToBeVisual: true, runScripts: 'outside-only' });
+  const dom = new JSDOM(host === 'legacy' ? LEGACY_HTML : HTML, { url: ORIGIN + (host === 'legacy' ? '/assess/' : '/') + search + hash, pretendToBeVisual: true, runScripts: 'outside-only' });
   const w = dom.window;
   w.matchMedia = q => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} });
   w.CSS = { escape: s => String(s).replace(/[^a-zA-Z0-9_-]/g, c => '\\' + c) };
@@ -280,4 +283,68 @@ test('account menu is clamped to the viewport inline-size (rule guard; measured 
   assert.match(css, /\.rv header\.top\{position:relative;z-index:40\}/, 'header stacks above the shell'); assert.match(css, /\.rv \.shell\{position:relative;z-index:1\}/);
   const toggle = p.q('#account-menu-toggle'); toggle.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
   assert.equal(p.q('#account-menu').hidden, false); assert.equal(p.d.activeElement.id, 'account-signout');
+});
+
+// ---------- Bugbot 4073693743: page titles are owned by exactly one host ----------
+// Kit shell titles are the route names; page-owned titles are the pages' own (readModel) titles. Both must exist in their host, never both at once.
+const FOUR_ROUTES = [['#workspaces', 'Workspaces', 'Your workspaces'], ['#workspace/w1', 'Field team', 'Field team'], ['#projects', 'Projects', 'Choose a project'], ['#project/p1', 'River Valley', 'River Valley']];
+test('non-kit host (real /assess/index.html, no #rv): each of the four loaded pages shows exactly one visible heading with its title', async () => {
+  const p = await bootPage('owner', '#workspaces', { host: 'legacy' });
+  assert.equal(p.q('#rv'), null, 'legacy host has no kit root'); assert.equal(p.api.kit, null, 'controller mounted no kit');
+  for (const [hash, , title] of FOUR_ROUTES) {
+    await p.go(hash);
+    const heads = p.qa('#app h1'); assert.equal(heads.length, 1, `${hash}: one h1 in the non-kit host`); assert.equal(heads[0].textContent.trim(), title, `${hash}: title text`);
+    assert.ok(p.qa('#app .eyebrow').length >= 1, `${hash}: eyebrow present`);
+    assert.equal(p.text('#who'), 'Account: synthetic-owner@example.invalid', `${hash}: existing account control unchanged`);
+  }
+  assert.ok(p.q('#app [data-read-region] a[href="#assessment/a1"]'), 'project read region still lists its assessments');
+  assert.ok(p.q('#app form#create-assessment'), 'existing business controls remain on the non-kit project page');
+});
+test('kit host (real ui/index.html): each of the four loaded pages keeps exactly ONE page heading (the shell’s), current context and controls', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  for (const [hash, title] of FOUR_ROUTES) {
+    await p.go(hash);
+    const heads = p.qa('[role=main].content h1'); assert.equal(heads.length, 1, `${hash}: exactly one h1 under the kit shell`); assert.equal(heads[0].textContent.trim(), title);
+    assert.equal(p.qa('[data-read-region] h1').length, 0, `${hash}: the page renders no second heading inside the read region`);
+  }
+  assert.deepEqual(crumbs(p), ['Projects', 'Field team', 'River Valley']); assert.ok(p.q('[data-action-region] form#create-assessment'));
+});
+
+// ---------- Bugbot 4073693755: the demo disclosure survives every repaint path ----------
+const disclosure = p => p.qa('#demo-notice');
+const sampleLinks = d => [...d.querySelectorAll('a')].filter(a => a.getAttribute('href').includes('survey=') && a.getAttribute('href').includes('response=1'));
+test('demo boot (real controller, ?demo=1): one visible disclosure before the content element, with working sample links', async () => {
+  const p = await bootPage('owner', '#workspaces', { search: '?demo=1' });
+  assert.equal(disclosure(p).length, 1, 'exactly one disclosure at boot');
+  const d = disclosure(p)[0]; assert.equal(d.nextElementSibling, p.api.app, 'placed immediately before the content element');
+  assert.equal(sampleLinks(d).length, demo.sampleResponses.length, 'one sample-response link per synthetic form'); assert.ok(demo.sampleResponses.length > 0);
+  assert.ok(d.querySelector('a[href="/participate/?demo=1"]')); assert.ok(d.querySelector('a[href="/"]'));
+  assert.equal(p.text('[role=main].content h1'), 'Workspaces');
+  assert.deepEqual(p.served().filter(k => k !== 'GET /v2/health'), [], 'demo issues no data reads (demoApi answers; only the existing version/health probe reaches the transport)');
+});
+test('demo disclosure persists across route changes, tree search, expansion and the assessment repaint; the mounted view and its input survive', async () => {
+  const p = await bootPage('owner', '#projects', { search: '?demo=1' });
+  const d = disclosure(p)[0]; assert.ok(d); const mount = p.api.app;
+  await p.go('#project/demo-project'); assert.equal(disclosure(p).length, 1, 'after route change'); assert.equal(disclosure(p)[0], d, 'same node, not a rebuilt banner');
+  const region = p.q('[data-read-region]'); assert.ok(region, 'demo project read region mounted');
+  const search = p.q('[data-search]'); search.value = 'Earning'; search.dispatchEvent(new p.w.InputEvent('input', { bubbles: true }));
+  await tick(2); assert.equal(disclosure(p).length, 1, 'after tree search'); assert.equal(p.api.app, mount); assert.equal(region.isConnected, true, 'mounted view untouched by the tree search'); assert.equal(search.value, 'Earning', 'shell input value kept');
+  search.value = ''; search.dispatchEvent(new p.w.InputEvent('input', { bubbles: true }));
+  const caret = p.q('[data-expand]'); assert.ok(caret, 'demo tree has an expandable node'); caret.click(); await tick(2); assert.equal(disclosure(p).length, 1, 'after expansion toggle (kit-internal paint, controller not called)'); assert.equal(region.isConnected, true); assert.equal(disclosure(p)[0], d);
+  caret.click(); await tick(2); assert.equal(disclosure(p).length, 1, 'after collapsing again');
+  await p.go('#workspace/demo-workspace'); await p.go('#project/demo-project'); assert.equal(disclosure(p).length, 1, 'after a second route round-trip');
+  await p.go('#assessment/demo-assessment'); assert.equal(disclosure(p).length, 1, 'after the assessment view repaint'); assert.equal(disclosure(p)[0], d);
+  assert.equal(p.qa('[role=main].content h1').length, 1, 'still exactly one page heading');
+  assert.equal(sampleLinks(disclosure(p)[0]).length, demo.sampleResponses.length, 'sample links intact');
+  assert.deepEqual(p.served().filter(k => k !== 'GET /v2/health'), [], 'still no data reads in demo');
+});
+test('demo write refusal is unchanged: the existing create form submits into the demo api, which refuses; nothing leaves the page', async () => {
+  const p = await bootPage('owner', '#workspaces', { search: '?demo=1' });
+  const form = p.q('[data-action-region] form#create-workspace'); assert.ok(form, 'existing create-workspace form is still rendered (not gated by demo)');
+  form.querySelector('input[name=name]').value = 'Nope'; form.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(8);
+  assert.equal(p.text('#note'), 'Not allowed here.', 'demo write refused through the existing write() path (NOT_AUTHORIZED_AT_SCOPE → refused)');
+  assert.equal(p.w.location.hash, '#workspaces', 'no navigation claimed success'); assert.equal(disclosure(p).length, 1);
+  for (const hash of ['#workspace/demo-workspace', '#project/demo-project']) { await p.go(hash); assert.equal(p.q('[data-action-region]'), null, `${hash}: demo viewer role sees no scoped write controls`); assert.equal(disclosure(p).length, 1); }
+  await assert.rejects(() => demo.demoApi('/v2/workspaces', { method: 'POST', body: { name: 'Nope' } }), /demonstration/i);
+  assert.deepEqual(p.served().filter(k => k !== 'GET /v2/health'), []);
 });
