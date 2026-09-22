@@ -10,7 +10,8 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
   }
   function paint(focusKey, preserveContent = true) {
     cleanup();
-    const content = preserveContent ? [...(root.querySelector('[data-content]')?.childNodes || [])] : [];
+    const content = root.querySelector('[data-content]');
+    if (!preserveContent) content?.replaceChildren();
     const generation = revision, context = Object.freeze({...model.context});
     const current = () => revision === generation && root.isConnected;
     const actions = (model.actions || []).filter(x=>x.allowed === true && typeof x.id === 'string');
@@ -23,8 +24,8 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     function matches(nodes) { return visible(nodes).flatMap(n => [ ...(n.label.toLowerCase().includes(filterQuery.toLowerCase()) ? [{...n,children:[]}] : []), ...matches(n.children)]); }
     const nodes = filterQuery ? matches(model.nodes) : visible(model.nodes);
     root.innerHTML = chrome(model)+'<div class="shell"><aside class="tree" aria-label="Context"><label class="tree-search"><span aria-hidden="true">⌕</span><input data-search aria-label="Find a workspace, project or assessment" placeholder="Find…" value="'+esc(query)+'"></label><nav class="tree-section" aria-label="Scopes"><div class="eyebrow">'+esc(model.sectionLabel || 'Workspaces')+'</div>'+nodes.map(n=>node(n,1)).join('')+'</nav><div class="tree-tools tree-footer"><span class="tree-me">'+esc(model.identityLabel)+' · '+esc(model.role)+'</span></div></aside><main class="content" tabindex="-1"><div class="eyebrow">'+esc(model.eyebrow || '')+'</div><div class="row" style="justify-content:space-between"><h1>'+esc(model.title)+'</h1>'+levelMenu(model)+'</div><div data-content></div></main></div>';
-    // Preserve caller-owned DOM across local shell changes, clear it on model update.
-    root.querySelector('[data-content]').append(...content);
+    // Preserve the caller-owned mount root and its delegated listeners on local changes.
+    if (preserveContent && content) root.querySelector('[data-content]').replaceWith(content);
     // Caller can mount trusted DOM in this empty slot; no arbitrary model HTML is interpreted.
     const menu = root.querySelector('[data-menu]'), toggle = root.querySelector('[data-menu-toggle]');
     const close = (focus=false) => { if(menu){menu.hidden=true;toggle.setAttribute('aria-expanded','false');if(focus)toggle.focus();} };
@@ -53,7 +54,7 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     let composing = false, deferred = false;
     // A composition committed by leaving search must not replace the pressed row.
     // Keep its committed text; apply the filter when search is entered again.
-    const pointerdown = e => { if(current() && composing && e.target !== search) deferred = true; };
+    const pointerdown = e => { if(current() && composing && !search.closest('.tree-search').contains(e.target)) deferred = true; };
     const focusin = e => { if(current() && e.target === search && (deferred || query !== filterQuery)) { deferred = false; filterSearch(); } };
     const filterSearch = () => {
       if (!current() || !search.isConnected) return;
@@ -81,5 +82,5 @@ export function mountShell(root, initialModel, initialCallbacks = {}) {
     else if(focusKey)[...root.querySelectorAll('[data-expand]')].find(x=>x.dataset.expand===focusKey)?.focus();
   }
   update(initialModel,initialCallbacks);
-  return {update, get content(){return root.querySelector('[data-content]');},destroy(){cleanup();revision++;root.replaceChildren();}};
+  return {update, get content(){return root.querySelector('[data-content]');},destroy(){cleanup();revision++;root.querySelector('[data-content]')?.replaceChildren();root.replaceChildren();}};
 }
