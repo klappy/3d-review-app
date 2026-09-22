@@ -348,3 +348,68 @@ test('demo write refusal is unchanged: the existing create form submits into the
   await assert.rejects(() => demo.demoApi('/v2/workspaces', { method: 'POST', body: { name: 'Nope' } }), /demonstration/i);
   assert.deepEqual(p.served().filter(k => k !== 'GET /v2/health'), []);
 });
+
+// ---------- Bugbot 4074674575: contextual parent links — non-kit host has them and they navigate; kit host uses crumbs ----------
+test('non-kit host: workspace and project pages each carry exactly one parent link that navigates back to the correct list', async () => {
+  const p = await bootPage('owner', '#workspace/w1', { host: 'legacy' });
+  let back = p.qa('#app a.back[data-page-back]'); assert.equal(back.length, 1); assert.equal(back[0].getAttribute('href'), '#workspaces'); assert.equal(back[0].getAttribute('data-page-back'), 'workspace');
+  back[0].click(); await tick(16);
+  assert.equal(p.w.location.hash, '#workspaces'); assert.equal(p.text('#app h1'), 'Your workspaces'); assert.equal(p.qa('#app a.back').length, 0, 'list page has no parent link');
+  await p.go('#project/p1');
+  back = p.qa('#app a.back[data-page-back]'); assert.equal(back.length, 1); assert.equal(back[0].getAttribute('href'), '#projects');
+  assert.ok(p.q('#app form#create-assessment') && p.q('#app a[href="#permissions/projects/p1"]'), 'controls preserved next to the link');
+  back[0].click(); await tick(16);
+  assert.equal(p.w.location.hash, '#projects'); assert.equal(p.text('#app h1'), 'Choose a project');
+  await p.go('#project/p2');
+  assert.equal(p.qa('#app a.back[data-page-back]').length, 1, 'project with refused assessments still renders (loaded) with its parent link');
+  assert.equal(p.text('#who'), 'Account: synthetic-owner@example.invalid');
+});
+test('kit host: no duplicated page-back link; existing crumbs still navigate workspace → Workspaces and project → Projects', async () => {
+  const p = await bootPage('owner', '#workspace/w1');
+  assert.equal(p.qa('[data-read-region] a.back, [data-content] a[data-page-back]').length, 0, 'no page-back link under the shell');
+  assert.deepEqual(crumbs(p), ['Workspaces', 'Field team']);
+  p.qa('header.top nav.crumbs a').find(a => a.textContent.trim() === 'Workspaces').click(); await tick(16);
+  assert.equal(p.w.location.hash, '#workspaces'); assert.equal(p.text('[role=main].content h1'), 'Workspaces');
+  await p.go('#project/p1'); assert.equal(p.qa('[data-content] a[data-page-back]').length, 0);
+  p.qa('header.top nav.crumbs a').find(a => a.textContent.trim() === 'Projects').click(); await tick(16);
+  assert.equal(p.w.location.hash, '#projects'); assert.equal(p.text('[role=main].content h1'), 'Projects');
+});
+
+// ---------- Bugbot 4074674592: the discovery cache keeps the ACTUAL workspace role ----------
+const wsBadge = (p, id = 'w1') => { const row = p.q(`nav[aria-label="Scopes"] [data-expand="w:${id}"], nav[aria-label="Scopes"] a[href="#workspace/${id}"]`)?.closest('.tree-row'); return row ? (row.querySelector('.tree-role')?.textContent.trim() ?? '') : null; };
+test('cold assessment-first path: Owner/Member/Viewer workspace role badge is present immediately on the Workspaces list, no extra discovery read', async () => {
+  for (const [identity, label] of [['owner', 'Owner'], ['member', 'Member'], ['viewer', 'Viewer']]) {
+    const p = await bootPage(identity, '#assessment/a1');
+    assert.equal(p.text('[role=main].content h1'), 'September assessment', identity);
+    assert.equal(p.served().filter(k => k === 'GET /v2/workspaces/w1').length, 1, `${identity}: one discovery read of w1`);
+    assert.equal(wsBadge(p), label, `${identity}: workspace badge from the assessment-first discovery cache`);
+    await p.go('#workspaces');
+    assert.equal(wsBadge(p), label, `${identity}: badge on the Workspaces list`); assert.equal(p.q('header.top nav.crumbs .tree-role'), null, 'list page: no current-scope role synthesized');
+    assert.equal(p.served().filter(k => k === 'GET /v2/workspaces/w1').length, 1, `${identity}: cache reused, no second discovery read`);
+    await p.go('#workspace/w1'); assert.equal(p.text('header.top nav.crumbs .tree-role'), label, `${identity}: workspace page role`); assert.equal(wsBadge(p), label);
+  }
+});
+test('mixed scope: unknown/missing workspace role stays absent despite an owner project inside it (never derived from project/assessment privilege)', async () => {
+  const p = await bootPage('owner', '#assessment/a1', { install: (t, d) => { const w = { ...d.w1 }; delete w.role; d.routes.set('GET /v2/workspaces/w1', { status: 200, body: { ok: true, result: { workspace: w, projects: [d.p1] } } }); d.routes.set('GET /v2/workspaces', { status: 200, body: { ok: true, result: { workspaces: [w] } } }); } });
+  assert.equal(p.text('[role=main].content h1'), 'September assessment');
+  assert.equal(wsBadge(p), '', 'no workspace badge when the read returned no role'); await p.go('#workspaces'); assert.equal(wsBadge(p), '');
+  assert.equal(p.text('header.top nav.crumbs .tree-role'), '', 'no synthesized current role on the list'); await p.go('#project/p1'); assert.equal(p.text('header.top nav.crumbs .tree-role'), 'Owner', 'the project keeps its own real role');
+});
+test('workspace-first path unchanged: Workspaces → workspace → assessment keeps the loaded role; cache written once with the real role', async () => {
+  const p = await bootPage('member', '#workspaces');
+  assert.equal(wsBadge(p), 'Member'); await p.go('#workspace/w1'); assert.equal(p.text('header.top nav.crumbs .tree-role'), 'Member');
+  await p.go('#assessment/a1'); assert.equal(wsBadge(p), 'Member'); assert.equal(p.served().filter(k => k === 'GET /v2/workspaces/w1').length, 1);
+  assert.deepEqual([...p.api.state.workspaces.get('w1') ? Object.keys(p.api.state.workspaces.get('w1')) : []].sort(), ['id', 'name', 'projects', 'role']);
+});
+test('held stale workspace discovery resolving after an identity reset never repopulates the new identity’s cache or badge', async () => {
+  let release;
+  const p = await bootPage('owner', '#assessment/a1', { install: t => { release = t.hold('GET /v2/workspaces/w1'); } });
+  await tick(4); assert.equal(p.api.state.workspaces.has('w1'), false, 'discovery held');
+  p.api.resetIdentity(); await tick(2);
+  release(); await tick(12);
+  assert.equal(p.api.state.workspaces.has('w1'), false, 'held old-identity reply wrote nothing'); assert.equal(wsBadge(p), null, 'no workspace node for the reset identity');
+});
+test('refused workspace discovery invents no ancestor and no role (direct grant path preserved)', async () => {
+  const p = await bootPage('direct', '#assessment/a9');
+  assert.equal(p.api.state.workspaces.size, 0); assert.deepEqual(treeLabels(p), ['Granted assessment']); assert.equal(p.q('nav[aria-label="Scopes"] a[href^="#workspace"]'), null);
+});

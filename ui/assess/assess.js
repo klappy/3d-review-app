@@ -386,7 +386,9 @@ async function act(aid, label, fn) {
 async function workspaceFor(pid) {
   const p = state.projects.find(x => x.id === pid); const wid = p?.workspace_id; if (!wid) return null;
   const identity = identityGeneration;
-  if (!state.workspaces.has(wid)) { try { const r = await api(`/v2/workspaces/${encodeURIComponent(wid)}`); if (identity !== identityGeneration) return null; state.workspaces.set(wid, { id: wid, name: r.workspace.name, projects: (r.projects || []).map(x => x.id) }); } catch { return null; } }
+  if (!state.workspaces.has(wid)) { try { const r = await api(`/v2/workspaces/${encodeURIComponent(wid)}`); if (identity !== identityGeneration) return null; // Bugbot 4074674592: keep ONLY the role the authorized workspace read actually returned (same shape syncShell caches for a
+      // workspace page). A missing/unknown role stays absent — never derived from project or assessment privilege.
+      state.workspaces.set(wid, { id: wid, name: r.workspace.name, role: r.workspace.role, projects: (r.projects || []).map(x => x.id) }); } catch { return null; } }
   return state.workspaces.get(wid);
 }
 async function fetchAssessment(aid) {

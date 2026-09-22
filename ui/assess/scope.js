@@ -184,7 +184,11 @@ function kitGrid(ctx, items, empty) { return items.length ? `<div class="grid">$
 // Bugbot 4073693743: title ownership is an explicit host contract, never inferred from the DOM. Only the kit-root controller sets
 // ctx.shellOwnsTitle = true (the shell header shows title + eyebrow, so the page renders none). In any other host — the real
 // non-kit /assess/index.html, tests, an absent context — the page owns its heading and renders exactly one eyebrow + h1.
-function pageHead(ctx, r) { return ctx.shellOwnsTitle === true ? '' : `<p class="eyebrow">${ctx.esc(r.eyebrow)}</p><h1>${ctx.esc(r.title)}</h1>`; }
+function pageHead(ctx, r) { return ctx.shellOwnsTitle === true ? '' : `${pageBack(ctx, r)}<p class="eyebrow">${ctx.esc(r.eyebrow)}</p><h1>${ctx.esc(r.title)}</h1>`; }
+// Bugbot 4074674575: the same host contract governs the contextual parent link. The kit shell supplies crumbs; every other host gets
+// exactly one page-back link — workspace → Workspaces list, project → Projects list — from the existing route table, escaped.
+const PARENT = { workspace: ['workspaces', 'Workspaces'], project: ['projects', 'All projects'] };
+function pageBack(ctx, r) { const back = PARENT[r.kind]; return back && ctx.shellOwnsTitle !== true ? `<a class="back" data-page-back="${ctx.esc(r.kind)}" href="${ctx.esc(ctx.routes[back[0]])}">← ${ctx.esc(back[1])}</a>` : ''; }
 // The read head carries role/archived state and the permissions link; the heading itself follows the host contract above.
 function kitHead(ctx, r, extra = '') { return `${pageHead(ctx, r)}<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}"><p class="muted small" style="margin:0">${r.role ? `Your role: ${ctx.esc(r.role)}` : ''}</p><div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>`; }
 const readRegion = html => `<div data-read-region class="kit-read">${html}</div>`;

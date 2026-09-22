@@ -306,3 +306,36 @@ test('a retry completing after the view stopped being current does not paint (ct
   assert.equal(root.querySelectorAll('[data-act="retry"]').length, 2, 'stale completion left the old view untouched');
   assert.equal(root.children.length, html);
 });
+
+// ---------- Bugbot 4074674575: contextual parent link follows the same host contract ----------
+const backLinks = h => (h.match(/<a class="back" data-page-back="[^"]*" href="[^"]*">/g) || []);
+test('non-kit host: loaded workspace renders exactly one parent link to routes.workspaces; loaded project to routes.projects (escaped)', async () => {
+  for (const over of [{}, { shellOwnsTitle: false }]) {
+    const ctx = ctxWith(FOUR, over);
+    const w = pages.workspace.render(ctx, await pages.workspace.load(ctx, { id: 'w1' }));
+    assert.deepEqual(backLinks(w), [`<a class="back" data-page-back="workspace" href="${cards.esc(cards.routes.workspaces)}">`]);
+    assert.ok(w.indexOf('data-page-back') < w.indexOf('<h1>'), 'parent link precedes the heading');
+    const p = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
+    assert.deepEqual(backLinks(p), [`<a class="back" data-page-back="project" href="${cards.esc(cards.routes.projects)}">`]);
+    assert.ok(p.includes('href="#permissions/projects/p1"') && p.includes('id="rename-form"') && p.includes('data-read-head="River"'), 'role/permissions and business controls preserved');
+    for (const kind of ['workspaces', 'projects']) assert.equal(backLinks(pages[kind].render(ctx, await pages[kind].load(ctx, {}))).length, 0, `${kind}: list pages have no parent link`);
+  }
+});
+test('kit host (shellOwnsTitle === true): no page-back link — the shell crumbs own navigation; read head intact', async () => {
+  const ctx = ctxWith(FOUR, { shellOwnsTitle: true });
+  const w = pages.workspace.render(ctx, await pages.workspace.load(ctx, { id: 'w1' })), p = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
+  assert.equal(backLinks(w).length, 0); assert.equal(backLinks(p).length, 0); assert.ok(w.includes('data-read-head="Field team"') && p.includes('data-read-head="River"'));
+});
+test('parent link uses the route table, not a literal: an overridden routes.projects value is what the project page links to (escaped)', async () => {
+  const ctx = ctxWith(FOUR, { routes: { ...cards.routes, projects: '#projects?x=1&y="2"' } });
+  const p = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
+  assert.ok(p.includes('data-page-back="project" href="#projects?x=1&amp;y=&quot;2&quot;"'), p.match(/data-page-back[^>]*/)?.[0]);
+});
+test('failure/refused states keep their existing parent behaviour in both hosts (gate() back link, never a second one)', async () => {
+  for (const over of [{}, { shellOwnsTitle: true }]) {
+    const ctx = ctxWith({ 'GET /v2/projects/p1': err('NOT_AUTHORIZED_AT_SCOPE', 'no'), 'GET /v2/workspaces/w1': err('500', 'boom') }, over);
+    const p = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' })), w = pages.workspace.render(ctx, await pages.workspace.load(ctx, { id: 'w1' }));
+    assert.equal((p.match(/class="back"/g) || []).length, 1, 'refused project: exactly the existing gate() back link'); assert.equal(backLinks(p).length, 0);
+    assert.equal((w.match(/class="back"/g) || []).length, 1, 'failed workspace: exactly the existing gate() back link'); assert.ok(w.includes('data-act="retry"'));
+  }
+});
