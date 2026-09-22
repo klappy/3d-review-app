@@ -63,16 +63,23 @@ function bindRetry(ctx, root, page, model) {
   });
 }
 // A write: disables the trigger while in flight, reports the server outcome, never claims success without it.
-async function write(ctx, control, label, fn) {
+// Currentness (K3b2): a completion that lands after the view was replaced (route/identity change) must neither re-enable
+// controls that now belong to a destroyed view nor report into the new one; the dispatched request may still have committed,
+// so nothing here claims cancellation. `status` (optional element) receives the outcome text for in-place forms.
+async function write(ctx, control, label, fn, status = null) {
   const controls = control ? [control, ...(control.form ? Array.from(control.form.querySelectorAll('button')) : [])] : [];
+  const live = () => (typeof ctx.isCurrent !== 'function' || ctx.isCurrent()) && (!control || control.isConnected !== false);
   for (const c of controls) c.disabled = true;
-  try { const r = await fn(); return r; }
+  const say = (text, alert) => { if (!live()) return; if (status) { status.textContent = text; status.classList?.toggle('alert', !!alert); } ctx.note(text, alert); };
+  if (status) { status.textContent = `${label}…`; status.classList?.remove('alert'); }
+  try { const r = await fn(); if (!live()) return undefined; if (status) status.textContent = ''; return r; }
   catch (e) {
+    if (!live()) return undefined;
     const kind = classify(e);
-    ctx.note(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? 'Not allowed here.' : `${label} failed: ${safeMessage(e)}`, true);
+    say(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? 'Not allowed here.' : kind === 'not_built' ? `${label} is not available yet.` : `${label} failed: ${safeMessage(e)}. Your entry is still here; nothing was retried.`, true);
     return undefined;
   }
-  finally { for (const c of controls) c.disabled = false; }
+  finally { if (live()) for (const c of controls) c.disabled = false; }
 }
 const val = (form, name) => String(form.elements[name]?.value ?? '').trim();
 const storeSession = (key, v) => { try { sessionStorage.setItem(key, v); } catch {} };
@@ -189,17 +196,22 @@ const workspaces = {
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('workspaces', model);
+    // K3b2: kit presentation — read cards plus the real create form as a kit panel (same form id, native required/maxlength).
     return readRegion(`<p class="muted">Group projects you can already open. A workspace does not add access to other projects. <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
-      + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a workspace</h2><form id="create-workspace"><label class="field">Workspace name<input name="name" maxlength="100" required placeholder="For example, Lake region"></label><div class="actions"><button class="primary" type="submit">Create workspace</button></div></form></section>`);
+      + `<section class="glass panel kit-write" data-write-region><h3>Create a workspace</h3><form id="create-workspace" novalidate="false"><label>Workspace name<input name="name" type="text" maxlength="100" required autocomplete="off" placeholder="For example, Lake region"></label><div class="row"><button class="primary" type="submit">Create workspace</button><span class="status" role="status" aria-live="polite" data-write-status></span></div></form></section>`;
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, workspaces, model);
     root.querySelector('#create-workspace')?.addEventListener('submit', async ev => {
       ev.preventDefault();
-      const form = ev.target;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Create workspace', () => ctx.api('/v2/workspaces', { method: 'POST', body: { name: val(form, 'name') } }));
-      if (r?.workspace?.id) ctx.go(ctx.routes.workspace(r.workspace.id));
-      else if (r) ctx.note('Created, but the server returned no workspace id.', true);
+      const form = ev.target, button = form.querySelector('button[type=submit]'), status = form.querySelector('[data-write-status]');
+      if (button.disabled) return; // pending: never dispatch twice
+      const name = val(form, 'name');
+      if (!name) { status.textContent = 'Enter a workspace name.'; form.elements.name.focus(); return; }
+      const r = await write(ctx, button, 'Create workspace', () => ctx.api('/v2/workspaces', { method: 'POST', body: { name } }), status);
+      if (r === undefined) return; // refused/failed/stale: entry retained, reported by write()
+      if (typeof r?.workspace?.id === 'string' && r.workspace.id) ctx.go(ctx.routes.workspace(r.workspace.id));
+      else { status.textContent = 'Created, but the server returned no workspace id. Reload the list to find it.'; status.classList?.add('alert'); ctx.note('Created, but the server returned no workspace id.', true); }
     });
   },
 };

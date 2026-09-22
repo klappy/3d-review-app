@@ -72,7 +72,7 @@ test('normal root: single kit header hosts the REAL account/version/link control
 test('journey: Workspaces → workspace → project (two distinct assessments, language state) → assessment → back; route/title/crumb agree', async () => {
   const p = await bootPage('owner', '#workspaces');
   assert.equal(p.text('[role=main].content h1'), 'Workspaces'); assert.deepEqual(crumbs(p), ['Workspaces']);
-  assert.ok(p.q('[data-read-region] a[href="#workspace/w1"]')); assert.ok(p.q('[data-action-region] form#create-workspace'));
+  assert.ok(p.q('[data-read-region] a[href="#workspace/w1"]')); assert.ok(p.q('[data-write-region] form#create-workspace'), 'create form is a kit write region (K3b2)');
   assert.ok(treeLabels(p).includes('Field team')); assert.ok(treeLabels(p).includes('Hill project'), 'ungrouped project listed at top level');
   await p.go('#workspace/w1');
   assert.equal(p.text('[role=main].content h1'), 'Field team'); assert.deepEqual(crumbs(p), ['Workspaces', 'Field team']);
@@ -348,4 +348,52 @@ test('6: signed-out root shows the sign-in feedback panel in the dialog fallback
   const q = await bootPage('owner', '#feedback', { install: (t, data) => { data.routes.delete('GET /v2/me'); } });
   assert.ok(q.q('[data-content]').textContent.includes('Sign in to open this page'));
   assert.equal(q.transport.log.filter(l => l.method === 'POST').length, 0);
+});
+
+// ---- K3b2 workspace lifecycle (TICKET f2f81db8) ----
+const heldPost = (p, path, respond) => { const real = p.w.fetch; let release; const held = new Promise(r => { release = r; }); p.w.fetch = (u, i) => (i?.method && i.method !== 'GET' && String(u).endsWith(path)) ? held.then(() => respond()) : real(u, i); return release; };
+const okJson = result => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ ok: true, result }) });
+const errJson = (status, code) => ({ ok: false, status, headers: { get: () => 'application/json' }, json: async () => ({ ok: false, error: { code, message: 'synthetic ' + code } }) });
+test('K3b2 negative: a create that completes after the route changed never re-enables detached controls, navigates or notes', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  const release = heldPost(p, '/v2/workspaces', () => okJson({ workspace: { id: 'w-late' } }));
+  const form = p.q('#create-workspace'), button = form.querySelector('button[type=submit]'); form.elements.name.value = 'Late group';
+  form.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(2);
+  assert.equal(button.disabled, true, 'pending: control disabled');
+  await p.go('#project/p1'); assert.equal(button.isConnected, false, 'old view destroyed');
+  release(); await tick(8);
+  assert.equal(button.disabled, true, 'stale completion must not re-enable the detached control');
+  assert.equal(p.w.location.hash, '#project/p1'); assert.equal(p.text('#note'), '');
+});
+test('K3b2 negative: a create rejection arriving after the route changed does not note into the new view or re-enable controls', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  const release = heldPost(p, '/v2/workspaces', () => errJson(403, 'NOT_AUTHORIZED'));
+  const form = p.q('#create-workspace'), button = form.querySelector('button[type=submit]'); form.elements.name.value = 'Refused later';
+  form.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(2);
+  await p.go('#project/p1'); release(); await tick(8);
+  assert.equal(button.disabled, true); assert.equal(p.text('#note'), ''); assert.equal(p.text('[role=main].content h1'), 'River Valley');
+});
+test('K3b2 create: success routes only to the returned id; missing id is explicit; refusal and uncertainty retain the entry with no automatic resend; pending cannot dispatch twice', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  const real = p.w.fetch; let mode = 'ok', posts = 0;
+  p.w.fetch = (u, i) => (i?.method === 'POST' && String(u).endsWith('/v2/workspaces')) ? (posts++, Promise.resolve(mode === 'ok' ? okJson({ workspace: { id: 'ws-new' } }) : mode === 'noid' ? okJson({ workspace: { name: 'x' } }) : mode === 'refuse' ? errJson(403, 'NOT_AUTHORIZED_AT_SCOPE') : errJson(503, '503'))) : real(u, i);
+  const submit = async name => { const form = p.q('#create-workspace'); form.elements.name.value = name; form.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(8); return form; };
+  mode = 'refuse'; let form = await submit('<b>Lake</b> & co');
+  assert.equal(form.elements.name.value, '<b>Lake</b> & co', 'entry retained on refusal'); assert.match(form.querySelector('[data-write-status]').textContent, /Not allowed here/); assert.equal(form.querySelector('button[type=submit]').disabled, false); assert.equal(p.w.location.hash, '#workspaces');
+  mode = 'uncertain'; form = await submit('<b>Lake</b> & co');
+  assert.match(form.querySelector('[data-write-status]').textContent, /failed.*still here.*nothing was retried/); assert.equal(posts, 2, 'no automatic resend');
+  mode = 'noid'; form = await submit('Nameless'); assert.match(form.querySelector('[data-write-status]').textContent, /no workspace id/); assert.equal(p.w.location.hash, '#workspaces');
+  // double submit while pending
+  let release; const held = new Promise(r => { release = r; }); const prev = p.w.fetch; p.w.fetch = (u, i) => (i?.method === 'POST' && String(u).endsWith('/v2/workspaces')) ? (posts++, held.then(() => okJson({ workspace: { id: 'ws-new' } }))) : prev(u, i);
+  const before = posts; form = p.q('#create-workspace'); form.elements.name.value = 'Twice'; form.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(1); form.dispatchEvent(new p.w.Event('submit', { bubbles: true, cancelable: true })); await tick(1);
+  assert.equal(posts, before + 1, 'pending action cannot dispatch twice'); assert.equal(form.querySelector('button[type=submit]').disabled, true);
+  release(); await tick(12); assert.equal(p.w.location.hash, '#workspace/ws-new', 'routes only to the returned id');
+  assert.ok(p.q('[data-content]').textContent.includes('Not visible to you'), 'unmapped new id renders the refusal panel, nothing invented');
+});
+test('K3b2 roles: viewer sees no create form; owner and member do; kit write region replaces the legacy action region', async () => {
+  for (const [identity, expectForm] of [['owner', true], ['member', true], ['viewer', true], ['direct', true]]) {
+    const p = await bootPage(identity, '#workspaces');
+    assert.equal(!!p.q('[data-write-region] #create-workspace'), expectForm, identity + ': creating a workspace is a self-service action available to any signed-in account per existing controller');
+    assert.equal(p.q('[data-action-region]'), null, identity + ': no legacy action region on workspaces');
+  }
 });
