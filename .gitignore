@@ -16,3 +16,5 @@ ui/changelog.json
 
 # Server-only projection of private CI publisher permissions
 src/roadmap/permissions.generated.ts
+
+ui/client-release.js

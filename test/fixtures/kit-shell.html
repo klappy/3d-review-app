@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'none'; img-src 'self' data:; font-src 'self'; form-action 'none'; base-uri 'none'"><title>Isolated kit shell fixture</title><link rel="stylesheet" href="../../ui/kit/tokens.css"><link rel="stylesheet" href="../../ui/kit/components.css"><link rel="stylesheet" href="../../ui/kit/kit.css"><div id="app" class="rv"></div><script type="module">
+import {mountShell} from '../../ui/kit/tree.js';
+import {fixture} from './kit-shell-data.js';
+const role=new URL(location.href).searchParams.get('role')||'owner';
+const model=fixture(['owner','member','viewer','direct'].includes(role)?role:'owner');
+window.fixtureEvents=[];
+window.shell=mountShell(document.querySelector('#app'),model,{onNavigate:(href,context)=>window.fixtureEvents.push({type:'navigate',href,context}),onAction:(id,context)=>window.fixtureEvents.push({type:'action',id,context})});
+const panel=document.createElement('section');panel.className='glass panel';const h=document.createElement('h2');h.textContent='Understanding';const p=document.createElement('p');p.className='muted';p.textContent='Synthetic shell fixture — no changes are sent.';panel.append(h,p);window.shell.content.append(panel);
+window.replaceFixture=role=>window.shell.update(fixture(role));
+</script></html>
+

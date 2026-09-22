@@ -79,4 +79,5 @@ const changelog = JSON.stringify({ current: releases.current, versions }, null, 
 const writeIfChanged = (p, content) => { const f = join(outDir, p); mkdirSync(dirname(f), { recursive: true }); if (existsSync(f) && readFileSync(f, "utf8") === content) return false; writeFileSync(f, content); return true; };
 const a = writeIfChanged("src/version.generated.ts", ts);
 const b = writeIfChanged("ui/changelog.json", changelog);
+writeIfChanged("ui/client-release.js", `// Generated loaded-client identity; never substitute a later health response.\nexport const clientRelease = Object.freeze(${JSON.stringify({version,commit:sha,release_source:manifest.cookbook_commit,build_uuid:buildUuid})});\n`);
 console.log(`stamp-version: ${stamp} (release_source ${manifest.cookbook_commit.slice(0, 7)}${buildUuid ? `, build ${buildUuid}` : ""})${outDir !== root ? ` → ${outDir}` : ""}${a || b ? "" : " — unchanged"}`);

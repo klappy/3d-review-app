@@ -11,12 +11,32 @@ import { pages, css as scopeCss } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
+import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
+import { createFeedbackModal } from '/assess/feedback-modal.js';
+import { clientRelease } from '/client-release.js';
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 // Product overhaul (cookbook #16 c5721465315): five VIEWS on one assessment page. A view is a tab; a tab never mutates stage.
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
 const LENSES = ['Translation Team', 'Church', 'Community']; // captain's order; server `perspective` decides membership
 const DOTS = { 'Translation Team': '', Church: 'blue', Community: 'gold', 'Other perspective': '' };
-const app = document.getElementById('app'), who = document.getElementById('who'), note = document.getElementById('note');
+// K3a normal root: the kit shell is mounted ONCE around a stable content element (#rv → shell.content); the real account/version/
+// link controls are MOVED into the shell's header host (same nodes, same listeners — never cloned). Without a kit root (tests,
+// legacy harness) `app` is the plain #app element and nothing else changes.
+const kitRoot = document.getElementById('rv');
+const kit = kitRoot ? mountKitRoot(kitRoot, shellModel({ route: route(location.hash), routes: cards.routes, principal: null }), { onNavigate: href => { if (typeof href === 'string' && href.startsWith('#')) { if (location.hash === href) render(); else location.hash = href; } } }) : null;
+// Compact chrome: #account (toggle showing #who + menu holding sign-out/switch/version/feedback/roadmap) is the ONLY hosted control.
+const accountMenu = kit ? (kit.adoptControls(document, ['account']), document.getElementById('shell-controls')?.remove(), bindAccountMenu(document)) : null;
+const narrow = () => typeof matchMedia === 'function' && matchMedia('(max-width:760px)').matches;
+const app = kit ? kit.content : document.getElementById('app'), who = document.getElementById('who'), note = document.getElementById('note');
+// Shell sync happens only from render()/boot()/resetIdentity(): the model is derived from loaded, authorized data the controller already holds.
+function syncShell(page = null) {
+  if (!kit) return;
+  const r = route(location.hash);
+  // A workspace page has already loaded its workspace: keep it in the same identity-scoped cache workspaceFor() uses (cleared by
+  // resetIdentity) so later crumbs can name it without a discovery read. Data only; never a new request.
+  if (page?.kind === 'workspace' && page.model?.status === 'loaded' && page.model.workspace?.id) state.workspaces.set(page.model.workspace.id, { id: page.model.workspace.id, name: page.model.workspace.name, role: page.model.workspace.role, projects: (page.model.projects || []).map(x => x.id) });
+  kit.update(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() }));
+}
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const title = v => v.charAt(0).toUpperCase() + v.slice(1);
 const stageLabel = s => ({ prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' })[s] || esc(s);
@@ -283,7 +303,10 @@ function prepareView(current) {
 function screen(current, view = null) {
   const a = current.assessment, project = state.projects.find(p => p.id === a.project_id);
   const tab = view || (VIEWS.includes(a.stage) ? a.stage : 'prepare');
-  const head = `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${esc(project?.name || a.project_id)} · your role: ${esc(a.role)}${a.role === 'viewer' ? ' — you can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions' : ''}</p></div><span class="badge">${stageLabel(a.stage)}</span></div>${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
+  const roleLine = `${esc(project?.name || a.project_id)} · your role: ${esc(a.role)}${a.role === 'viewer' ? ' — you can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions' : ''}`;
+  // Under the kit shell the eyebrow/h1 are the shell's (one heading); only the unique role line and stage badge remain here.
+  const head = kit ? `<div class="title assessment-head"><p class="muted" style="margin:0">${roleLine}</p><span class="badge">${stageLabel(a.stage)}</span></div>${viewTabs(a, tab)}`
+    : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${roleLine}</p></div><span class="badge">${stageLabel(a.stage)}</span></div>${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
   if (tab === 'prepare') return head + prepareView(current);
   if (tab !== 'collect') return head + `<div id="view-root" data-view="${tab}"><p class="muted">Loading…</p></div>`;
   return head + collectScreen(current);
@@ -360,6 +383,10 @@ async function fetchAssessment(aid) {
 async function render() {
   const gen = ++generation, r = route(location.hash);
   currentShareRoute();
+  // K3a root lifecycle (kit only): the shell reflects the new route from data already held, and the previous view is destroyed
+  // BEFORE any load for the new route; a loading line stands in until the page's own render. Same-entity repaints (dirty refresh,
+  // act() completion) keep their view: only a real route/entity change clears.
+  if (kit && (r.kind !== 'assessment' && r.kind !== 'survey' ? true : state.current?.assessment.id !== r.id)) { syncShell(); app.className = ''; app.innerHTML = '<p class="muted">Loading…</p>'; }
   if (r.kind === 'assessment' || r.kind === 'survey') {
     const aid = r.id;
     if (state.current?.assessment.id !== aid || state.dirty.has(aid)) {
@@ -367,18 +394,20 @@ async function render() {
       catch (e) {
         if (gen !== generation) return;
         if (state.current?.assessment.id === aid) { /* dirty refresh failed: keep the last screen, keep the dirty banner (retry offered) */ }
-        else { state.current = null; app.className = ''; const expired = UNAUTHENTICATED.has(String(e.code)); app.innerHTML = `<div class="narrow panel"><h1>${expired ? 'Your sign-in is no longer active' : 'Assessment unavailable'}</h1><p class="muted">${esc(redact(e.message))}</p><p>${expired ? `<a class="button primary" href="/v2/auth/access">Sign in again</a> ` : ''}<a class="button" href="#assessment/${encodeURIComponent(aid)}" data-refresh="${esc(aid)}">Try again</a> <a href="#">All projects</a></p></div>`; app.querySelector('[data-refresh]').onclick = ev => { ev.preventDefault(); render(); }; return; }
+        else { state.current = null; app.className = ''; syncShell(); const expired = UNAUTHENTICATED.has(String(e.code)); app.innerHTML = `<div class="narrow panel"><h1>${expired ? 'Your sign-in is no longer active' : 'Assessment unavailable'}</h1><p class="muted">${esc(redact(e.message))}</p><p>${expired ? `<a class="button primary" href="/v2/auth/access">Sign in again</a> ` : ''}<a class="button" href="#assessment/${encodeURIComponent(aid)}" data-refresh="${esc(aid)}">Try again</a> <a href="#">All projects</a></p></div>`; app.querySelector('[data-refresh]').onclick = ev => { ev.preventDefault(); render(); }; return; }
       }
     }
     if (gen !== generation || state.current?.assessment.id !== aid) return;
+    syncShell(); // old view destroyed here; the assessment page (retained legacy module) mounts into the stable content element
     paint(r, gen);
   } else {
     state.current = null; if (gen !== generation) return;
     // Scope pages (workspace, project, permissions) carry the same context sidebar as the assessment page; entry and the
     // top-level lists stand alone (showcase SOURCE-MAP: the panel is absent from public routes).
-    const sidebar = state.principal && ['workspace', 'project', 'permissions'].includes(r.kind);
+    // K3a: workspace/project read surfaces are kit-presented (tree in the shell); the legacy context sidebar remains only for permissions.
+    const sidebar = state.principal && (kit ? ['permissions'] : ['workspace', 'project', 'permissions']).includes(r.kind);
     app.className = sidebar ? 'workspace-layout' : '';
-    if (sidebar) { app.innerHTML = context(null) + '<div id="page-root"><p class="muted">Loading…</p></div></section>'; bind(null); await runPage(pageFor(r), r, gen, app.querySelector('#page-root')); }
+    if (sidebar) { syncShell(); app.innerHTML = context(null) + '<div id="page-root"><p class="muted">Loading…</p></div></section>'; bind(null); await runPage(pageFor(r), r, gen, app.querySelector('#page-root')); }
     else await runPage(pageFor(r), r, gen);
   }
 }
@@ -439,16 +468,23 @@ bindAccountControls();
 // ---- scope pages + views (product overhaul): one runner for every { load, render, bind } module ----
 const setToken = t => { if (demo) return; token = t || null; try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
 function ctxFor(extra = {}) {
-  return { api, apiFull, demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, note: (text, alert = false) => { note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
-    go: (hash, { reload = false } = {}) => { if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
+  // Every page context is bound to the render generation and identity that created it: a retained control from a destroyed
+  // view (route change, identity reset) can neither issue a request nor write a status line into the current view.
+  const gen = generation, identity = identityGeneration, live = () => gen === generation && identity === identityGeneration;
+  const stale = () => Promise.reject(Object.assign(new Error('This view is no longer current.'), { code: 'STALE_VIEW' }));
+  return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
+    // Review F2: a completion arriving after the view was replaced must not navigate the newer route (it cannot undo a dispatched write).
+    go: (hash, { reload = false } = {}) => { if (!live()) return; if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
 }
 function pageFor(r) { if (r.kind === 'feedback') return feedback; return r.kind === 'permissions' ? views.permissions : pages[r.kind] || pages.projects; }
 async function runPage(page, r, gen, root = app, extra = {}) {
-  const ctx = ctxFor({ ...extra, isCurrent: () => gen === generation }), params = { ...r, aid: r.id };
+  // pageModel: a page that re-loaded itself in place (retry/reload) hands the controller its new model so the shell stays consistent.
+  const ctx = ctxFor({ ...extra, isCurrent: () => gen === generation, pageModel: model => { if (gen === generation && root === app) syncShell({ kind: r.kind, model }); } }), params = { ...r, aid: r.id };
   let model;
   try { model = await page.load(ctx, params); }
-  catch (e) { if (gen !== generation) return; root.innerHTML = `<div class="narrow panel"><h1>${UNAUTHENTICATED.has(String(e.code)) ? 'Your sign-in is no longer active' : REFUSED.has(String(e.code)) ? 'Not visible to you' : 'Could not load this page'}</h1><p class="muted">${esc(redact(e.message))}</p><p>${UNAUTHENTICATED.has(String(e.code)) ? `<a class="button primary" href="#">Sign in</a>` : `<a class="button" href="#" data-retry-page>Retry</a>`}</p></div>`; root.querySelector('[data-retry-page]')?.addEventListener('click', ev => { ev.preventDefault(); render(); }); return; }
+  catch (e) { if (gen !== generation) return; if (root === app) syncShell({ kind: r.kind, model: { status: UNAUTHENTICATED.has(String(e.code)) ? 'unauthenticated' : REFUSED.has(String(e.code)) ? 'refused' : 'failed' } }); root.innerHTML = `<div class="narrow panel"><h1>${UNAUTHENTICATED.has(String(e.code)) ? 'Your sign-in is no longer active' : REFUSED.has(String(e.code)) ? 'Not visible to you' : 'Could not load this page'}</h1><p class="muted">${esc(redact(e.message))}</p><p>${UNAUTHENTICATED.has(String(e.code)) ? `<a class="button primary" href="#">Sign in</a>` : `<a class="button" href="#" data-retry-page>Retry</a>`}</p></div>`; root.querySelector('[data-retry-page]')?.addEventListener('click', ev => { ev.preventDefault(); render(); }); return; }
   if (gen !== generation) return;
+  if (root === app) syncShell({ kind: r.kind, model }); // kit read model from THIS page's loaded data; clears the previous view first
   root.innerHTML = page.render(ctx, model); page.bind(ctx, root, model);
   document.title = `${r.kind === 'entry' ? 'Welcome' : title(r.kind)} · 3D Review`;
 }
@@ -474,10 +510,13 @@ function keepPrint(r) {
 function paint(r = route(location.hash), gen = generation) {
   if (!state.current || (r.kind !== 'assessment' && r.kind !== 'survey') || state.current.assessment.id !== r.id) return;
   if (!keepPrint(r)) state.print = null;
-  app.className = 'workspace-layout';
+  // Compact chrome: under the kit shell the tree, crumbs and title are the shell's; the legacy context panel and the duplicate
+  // assessment heading are not rendered. Stage badge, role line, view tabs and every action/state/error remain.
+  app.className = kit ? '' : 'workspace-layout';
+  const ctxPanel = kit ? '<section class="assessment-body">' : context(state.current);
   if (r.kind === 'survey') {
     const s = activeSurveys(state.current).find(x => x.id === r.sid);
-    app.innerHTML = context(state.current) + (s ? surveyScreen(state.current, s) : surveyUnavailable(r.id, r.sid)) + '</section>';
+    app.innerHTML = ctxPanel + (s ? surveyScreen(state.current, s) : surveyUnavailable(r.id, r.sid)) + '</section>';
     // `only` FILTERS the child paint to its own survey; it never forces (settled/in-flight guard intact; only Retry re-reads).
     bind(state.current); if (s) { bindShare(state.current, s); bindPrint(state.current, s); loadCounts(state.current, { only: s.id }); if (state.print && s.id === state.print.sid) replayPrint(state.print.model); }
     document.title = `${s ? s.template_name + ' · ' : ''}${state.current.assessment.name} · 3D Review`;
@@ -487,7 +526,7 @@ function paint(r = route(location.hash), gen = generation) {
     const a0 = state.current.assessment;
     const tab = r.view || recalledTab(tabStorage, a0.id, VIEWS.includes(a0.stage) ? a0.stage : 'prepare');
     if (r.view) rememberTab(tabStorage, a0.id, r.view);
-    app.innerHTML = context(state.current) + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') loadCounts(state.current);
+    app.innerHTML = ctxPanel + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') loadCounts(state.current);
     bindPrepare(state.current); mountView(state.current, tab, gen);
     document.title = `${title(tab)} · ${state.current.assessment.name} · 3D Review`;
   }
@@ -513,13 +552,14 @@ function scrubCredentialHash() {
   return null;
 }
 function resetIdentity() {
+  feedbackModal?.reset();
   identityGeneration += 1; generation += 1; epoch += 1;
   accountBusy = false; accountControls(false); accountStatus();
   document.getElementById('account-switch-dialog')?.close();
   state.share = null; state.principal = null; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
   state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false;
-  if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
+  if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
   for (const id of ['legacy-link', 'whats-here-wrap']) { const el = document.getElementById(id); if (el) el.hidden = true; }
 }
 function syncContextDisclosure(event) {
@@ -538,10 +578,10 @@ async function boot() {
     // Public entry: the welcome/tour/example/survey-code/sign-in page needs no session; every other route asks to sign in.
     accountControls(false); accountStatus();
     listen();
-    if (route(location.hash).kind === 'entry') { who.textContent = 'Not signed in'; app.className = ''; await render(); return; }
+    if (route(location.hash).kind === 'entry') { who.textContent = 'Not signed in'; app.className = ''; syncShell(); await render(); return; }
     // Real sign-in only (captain: synthetic-only sign-in rejected). /v2/auth/access is the existing Cloudflare email-code
     // route; it sets the session cookie and returns to the workspace home (/#session=…), not here — stated, not hidden.
-    who.textContent = 'Not signed in'; app.className = '';
+    who.textContent = 'Not signed in'; app.className = ''; syncShell();
     const here = /(invite|session)=/.test(location.hash) ? location.pathname : location.pathname + location.hash;
     app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p><p><a class="button primary" href="#">Go to sign in</a> <a class="button" href="/v2/auth/access">Sign in with an email code</a></p></div>`;
     return; }
@@ -553,8 +593,23 @@ async function boot() {
   try { const result = await api('/v2/projects'); if (identity !== identityGeneration) return; state.projects = result.projects || []; }
   catch (e) { if (identity !== identityGeneration) return; // Auth A14: a direct #assessment/<id> still renders under "Granted to you"; the project list failure is a retryable notice, not a dead end.
     state.projects = []; note.innerHTML = `Could not load your project list (${esc(redact(e.message))}). <a href="#" data-retry-boot>Retry</a>`; note.querySelector('[data-retry-boot]').onclick = ev => { ev.preventDefault(); note.textContent = ''; boot(); };
-    if (!['assessment', 'survey', 'feedback'].includes(route(location.hash).kind)) { app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
+    if (!['assessment', 'survey', 'feedback'].includes(route(location.hash).kind)) { syncShell(); app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
   listen();
   await render();
 }
-if (typeof window !== 'undefined' && document.getElementById('app')) boot();
+// Feedback in place (#159, K3b1): the existing feedback module opens in a native dialog appended outside the application root, so the
+// current route, the stable content mount and the account/version host are untouched. Direct #feedback navigation remains the fallback.
+let feedbackModal;
+function feedbackOpener(link) {
+  // The link lives inside the account disclosure menu; once the menu closes the link is hidden, so focus returns to the menu toggle.
+  const menu = link.closest('#account-menu');
+  if (menu) { accountMenu?.close(); const toggle = document.getElementById('account-menu-toggle'); if (toggle) return toggle; }
+  return link;
+}
+// Boot on the kit root (normal root) or the legacy #app root; never in a headless harness without either.
+if (typeof window !== 'undefined' && (kit || document.getElementById('app'))) {
+  feedbackModal = createFeedbackModal({ doc: document, context: () => ctxFor({ identity: identityGeneration }), route: () => route(location.hash), routeKey: () => location.hash, clientRelease });
+  document.addEventListener('click', event => { const link = event.target.closest?.('a[href="#feedback"]'); if (!link) return; event.preventDefault(); feedbackModal.open(feedbackOpener(link)); });
+  window.addEventListener('hashchange', () => feedbackModal.reset());
+  boot();
+}

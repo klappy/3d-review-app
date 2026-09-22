@@ -42,6 +42,16 @@ function gate(ctx, model, back) {
     default: return null;
   }
 }
+// Replace a page's DOM with a freshly loaded model ONLY while that page is still the current view (review F1: a late retry or
+// reload completion must never overwrite a newer route's content). The controller may expose ctx.isCurrent (render generation +
+// identity) and ctx.pageModel (shell re-sync from this page's new data); without them the swap is unconditional as before.
+function swap(ctx, root, page, next) {
+  if (typeof ctx.isCurrent === 'function' && !ctx.isCurrent()) return false;
+  ctx.pageModel?.(next);
+  root.innerHTML = page.render(ctx, next);
+  page.bind(ctx, root, next);
+  return true;
+}
 // Retry re-runs load() then re-renders and re-binds in place. Every page's bind() starts here.
 function bindRetry(ctx, root, page, model) {
   const b = root.querySelector('[data-act="retry"]');
@@ -49,8 +59,7 @@ function bindRetry(ctx, root, page, model) {
   b.addEventListener('click', async () => {
     b.disabled = true;
     const next = await page.load(ctx, model.params || {});
-    root.innerHTML = page.render(ctx, next);
-    page.bind(ctx, root, next);
+    swap(ctx, root, page, next);
   });
 }
 // A write: disables the trigger while in flight, reports the server outcome, never claims success without it.
@@ -142,6 +151,35 @@ const entry = {
   },
 };
 
+
+// ---------- K3a read model + kit presentation (presentation only; load()/bind() and every form selector are unchanged) ----------
+// A scope page renders as: <div data-read-region> (kit-presented read model) + <section data-action-region> (the existing
+// create/rename/add/remove forms, exact selectors and handlers). The action region is an intermediate integration checkpoint
+// until K3b replaces those presentations; it is never hidden to appear finished.
+const ctxStage = s => ({ prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' })[s] || String(s || '');
+const READ_STATUS = Object.freeze({ loaded: 'ready', unauthenticated: 'unauthenticated', refused: 'refused', not_built: 'not_built', failed: 'failed' });
+export function readModel(kind, model) {
+  const status = READ_STATUS[model?.status] || 'failed';
+  const item = (x, href, eyebrow, facts = []) => ({ id: x.id, title: String(x.name ?? x.id ?? ''), href, eyebrow, role: x.role || '', archived: !!x.archived_at, facts });
+  if (status !== 'ready') return { kind, status, items: [], error: model?.error || '' };
+  if (kind === 'workspaces') return { kind, status, title: 'Your workspaces', eyebrow: 'Optional grouping', items: (model.workspaces || []).map(w => item(w, `#workspace/${encodeURIComponent(w.id)}`, 'Workspace')) , empty: 'You have no workspaces yet.' };
+  if (kind === 'projects') return { kind, status, title: 'Choose a project', eyebrow: 'Your projects', items: (model.projects || []).map(p => item(p, `#project/${encodeURIComponent(p.id)}`, 'Project')), empty: 'You have no projects yet.' };
+  if (kind === 'workspace') { const w = model.workspace || {}; return { kind, status, title: String(w.name ?? ''), eyebrow: 'Workspace', role: w.role || '', archived: !!w.archived_at, id: w.id, items: (model.projects || []).map(p => item(p, `#project/${encodeURIComponent(p.id)}`, 'Project')), empty: 'No projects grouped yet. You can still open them from All projects.' }; }
+  if (kind === 'project') { const p = model.project || {}; const langName = new Map((model.languages || []).map(l => [l.id, l.name]));
+    return { kind, status, title: String(p.name ?? ''), eyebrow: 'Project', role: p.role || '', archived: !!p.archived_at, organization: p.organization || '', id: p.id,
+      assessments: { status: READ_STATUS[model.assessmentsStatus] || 'failed', error: model.assessmentsError || '', items: (model.assessments || []).map(a => item(a, `#assessment/${encodeURIComponent(a.id)}`, 'Assessment', [{ label: 'Stage:', value: a.archived_at ? 'Archived' : ctxStage(a.stage) }, ...(langName.get(a.language_id) || a.language_name ? [{ label: 'Language:', value: langName.get(a.language_id) || a.language_name }] : [])])) },
+      languages: { status: READ_STATUS[model.languagesStatus] || 'failed', items: (model.languages || []).map(l => ({ id: l.id, name: l.name, code: l.code || '', archived: !!l.archived_at })) } }; }
+  return { kind, status, items: [] };
+}
+function kitCard(ctx, x) {
+  return `<article class="glass panel${x.archived ? ' archived' : ''}" style="min-width:0;overflow-wrap:anywhere"><p class="eyebrow">${ctx.esc(x.eyebrow)}</p><div class="row"><h3><a href="${ctx.esc(x.href)}">${ctx.esc(x.title)}</a></h3>${x.role ? `<span class="badge">${ctx.esc(x.role)}</span>` : ''}${x.archived ? '<span class="badge">Archived</span>' : ''}</div>${(x.facts || []).filter(f => f.value).map(f => `<p class="small muted">${ctx.esc(f.label)} ${ctx.esc(f.value)}</p>`).join('')}</article>`;
+}
+function kitGrid(ctx, items, empty) { return items.length ? `<div class="grid">${items.map(x => kitCard(ctx, x)).join('')}</div>` : `<p class="muted">${ctx.esc(empty)}</p>`; }
+// The kit shell already shows the page title and eyebrow; the read head carries only role/archived state and the permissions link.
+function kitHead(ctx, r, extra = '') { return `<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}"><p class="muted small" style="margin:0">${r.role ? `Your role: ${ctx.esc(r.role)}` : ''}</p><div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>`; }
+const readRegion = html => `<div data-read-region class="kit-read">${html}</div>`;
+const actionRegion = html => html ? `<section data-action-region class="legacy-actions" aria-label="Existing controls (kit conversion pending)">${html}</section>` : '';
+
 // ---------- workspaces ----------
 const workspaces = {
   async load(ctx, params = {}) {
@@ -150,7 +188,9 @@ const workspaces = {
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
-    return `<div class="title"><div><p class="eyebrow">Optional grouping</p><h1>Your workspaces</h1><p class="muted">Group projects you can already open. A workspace does not add access to other projects.</p></div><a class="button" href="${ctx.routes.projects}">All projects</a></div>${ctx.cards.cardGrid(model.workspaces.map(ctx.cards.workspaceCard), 'You have no workspaces yet.')}<section class="panel" style="margin-top:22px"><h2>Create a workspace</h2><form id="create-workspace"><label class="field">Workspace name<input name="name" maxlength="100" required placeholder="For example, Lake region"></label><div class="actions"><button class="primary" type="submit">Create workspace</button></div></form></section>`;
+    const r = readModel('workspaces', model);
+    return readRegion(`<p class="muted">Group projects you can already open. A workspace does not add access to other projects. <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
+      + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a workspace</h2><form id="create-workspace"><label class="field">Workspace name<input name="name" maxlength="100" required placeholder="For example, Lake region"></label><div class="actions"><button class="primary" type="submit">Create workspace</button></div></form></section>`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, workspaces, model);
@@ -183,16 +223,20 @@ const workspace = {
     const g = gate(ctx, model, { href: ctx.routes.workspaces, label: 'All workspaces' }); if (g) return g;
     const w = model.workspace, edit = CAN_EDIT.has(w.role), owner = w.role === 'owner';
     // Management lives on the card itself (root visual delta, loc-27): one card per project, its own Remove control beneath it.
-    const cards = model.projects.map(p => `<div class="entity-card-wrap">${ctx.cards.projectCard(p)}${edit ? `<div class="card-actions"><button type="button" class="quiet small" data-remove="${ctx.esc(p.id)}">Remove from workspace</button></div>` : ''}</div>`);
     const rows = '';
     const add = edit ? `<section class="panel" style="margin-top:22px"><h2>Add a project</h2>${model.candidatesStatus === 'loaded' ? (model.candidates.length ? `<form id="add-project"><label class="field">Project<select name="pid" required><option value="">Choose a project…</option>${model.candidates.map(p => `<option value="${ctx.esc(p.id)}">${ctx.esc(p.name)}</option>`).join('')}</select></label><div class="actions"><button class="primary" type="submit">Add to workspace</button></div></form>` : '<p class="muted">Every project you can open is already grouped here, or you have no projects yet.</p>') : '<p class="muted">The project list could not be loaded right now.</p>'}<p class="small muted">Only projects you already hold a role on can be grouped. Grouping never grants access.</p></section>` : '';
     const rename = owner ? `<section class="panel" style="margin-top:22px"><h2>Rename</h2><form id="rename-form"><label class="field">Workspace name<input name="name" maxlength="100" required value="${ctx.esc(w.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
-    return `<a class="back" href="${ctx.routes.workspaces}">← All workspaces</a><div class="title"><div><p class="eyebrow">Workspace</p><h1>${ctx.esc(w.name)}</h1><p class="muted small">${w.role ? `Your role: ${ctx.esc(w.role)}` : ''}</p></div><div>${w.role ? `<span class="badge">${ctx.esc(w.role)}</span> ` : ''}${w.archived_at ? '<span class="badge">Archived</span> ' : ''}<a class="button" href="#permissions/workspaces/${ctx.enc(w.id)}">Permissions</a></div></div><h2>Projects</h2>${ctx.cards.cardGrid(cards, 'No projects grouped yet. You can still open them from All projects.')}${rows}${add}${rename}`;
+    const r = readModel('workspace', model);
+    // Read region: kit cards for grouped projects. Action region: the existing per-card Remove controls, Add and Rename forms (same selectors).
+    return readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/workspaces/${ctx.enc(w.id)}">Permissions</a>`)}<h3>Projects</h3>${kitGrid(ctx, r.items, r.empty)}`)
+      // Ruling: one kit card owns read/navigation; management is a names-only row per project carrying the EXISTING [data-remove] control
+      // (same selector/handler/permission). Accessible action name includes the project.
+      + actionRegion(`${edit && model.projects.length ? `<ul class="manage-rows" aria-label="Grouped projects">${model.projects.map(p => `<li class="manage-row"><span>${ctx.esc(p.name)}</span><button type="button" class="quiet small" data-remove="${ctx.esc(p.id)}" aria-label="Remove ${ctx.esc(p.name)} from workspace">Remove from workspace</button></li>`).join('')}</ul>` : ''}${rows}${add}${rename}`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, workspace, model);
     const id = model.workspace?.id;
-    const reload = async () => { const next = await workspace.load(ctx, model.params); root.innerHTML = workspace.render(ctx, next); workspace.bind(ctx, root, next); };
+    const reload = async () => { const next = await workspace.load(ctx, model.params); swap(ctx, root, workspace, next); };
     root.querySelector('#add-project')?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target, pid = val(form, 'pid');
@@ -221,7 +265,9 @@ const projects = {
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
-    return `<div class="title"><div><p class="eyebrow">Your projects</p><h1>Choose a project</h1></div></div>${ctx.cards.cardGrid(model.projects.map(ctx.cards.projectCard), 'You have no projects yet.')}<div class="actions"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a><span class="small muted">Optional</span></div><section class="panel" style="margin-top:22px"><h2>Create a project</h2><form id="create-project"><label class="field">Project name<input name="name" maxlength="100" required placeholder="For example, Lake project"></label><div class="actions"><button class="primary" type="submit">Create project</button></div></form></section>`;
+    const r = readModel('projects', model);
+    return readRegion(`${kitGrid(ctx, r.items, r.empty)}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`)
+      + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a project</h2><form id="create-project"><label class="field">Project name<input name="name" maxlength="100" required placeholder="For example, Lake project"></label><div class="actions"><button class="primary" type="submit">Create project</button></div></form></section>`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, projects, model);
@@ -264,12 +310,17 @@ const project = {
     const addLang = edit ? `<form id="add-language" class="line"><label class="field">Language name<input name="name" maxlength="100" required placeholder="For example, Lake language"></label><label class="field">Code (optional, BCP-47 shaped; qaa–qtz for an invented language)<input name="code" maxlength="20" pattern="[a-z]{2,3}(-[A-Za-z0-9]{1,8})*"></label><div class="actions"><button class="primary" type="submit">Add language</button></div></form>` : '';
     const create = edit ? `<section class="panel"><p class="eyebrow">Prepare</p><h2>Create an assessment</h2>${active.length ? `<form id="create-assessment"><label class="field">Assessment name<input name="name" maxlength="100" required placeholder="For example, September review"></label><label class="field">Language<select name="language_id" required>${active.map(l => `<option value="${ctx.esc(l.id)}">${ctx.esc(l.name)}${l.code ? ` (${ctx.esc(l.code)})` : ''}</option>`).join('')}</select></label><div class="actions"><button class="primary" type="submit">Create & prepare</button></div></form>` : '<p class="muted">Add a language first; every assessment names its target language.</p>'}</section>` : '';
     const rename = owner ? `<section class="panel"><h2>Rename</h2><form id="rename-form"><label class="field">Project name<input name="name" maxlength="100" required value="${ctx.esc(p.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
-    return `<a class="back" href="${ctx.routes.projects}">← All projects</a><div class="title"><div><p class="eyebrow">Project</p><h1>${ctx.esc(p.name)}</h1><p class="muted small">${p.organization ? `${ctx.esc(p.organization)} · ` : ''}${p.role ? `Your role: ${ctx.esc(p.role)}` : ''}</p></div><div>${p.role ? `<span class="badge">${ctx.esc(p.role)}</span> ` : ''}${p.archived_at ? '<span class="badge">Archived</span> ' : ''}<a class="button" href="#permissions/projects/${ctx.enc(p.id)}">Permissions</a></div></div><h2>Assessments</h2>${assessmentsBlock}<div class="grid" style="margin-top:22px"><div class="stack">${create}${rename}</div><aside class="panel"><h2>Languages</h2>${langList}${addLang}</aside></div>`;
+    const r = readModel('project', model);
+    // Assessments and languages keep their independent settled outcomes; only a 'ready' list renders as cards (never an empty success).
+    const assessmentsRead = r.assessments.status === 'ready' ? kitGrid(ctx, r.assessments.items, 'No assessments yet.') : assessmentsBlock;
+    const languagesRead = r.languages.status === 'ready' ? langList : r.languages.status === 'refused' ? '<p class="muted">Languages are not visible to you here.</p>' : r.languages.status === 'unauthenticated' ? `<p class="muted">Your session has ended. <a href="${ctx.routes.entry}">Sign in</a></p>` : '<p class="muted" role="alert">Languages could not be loaded. <button type="button" class="quiet" data-act="retry">Retry</button></p>';
+    return readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/projects/${ctx.enc(p.id)}">Permissions</a>`)}${p.organization ? `<p class="muted small">${ctx.esc(p.organization)}</p>` : ''}<h3>Assessments</h3>${assessmentsRead}<aside class="glass panel" style="margin-top:22px"><h3>Languages</h3>${languagesRead}</aside>`)
+      + actionRegion(`${create}${rename}${addLang ? `<section class="panel"><h2>Languages</h2>${addLang}</section>` : ''}`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, project, model);
     const id = model.project?.id;
-    const reload = async () => { const next = await project.load(ctx, model.params); root.innerHTML = project.render(ctx, next); project.bind(ctx, root, next); };
+    const reload = async () => { const next = await project.load(ctx, model.params); swap(ctx, root, project, next); };
     root.querySelector('#add-language')?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target, code = val(form, 'code');
