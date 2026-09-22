@@ -6,7 +6,7 @@ export const screens=['projects','projectNew','project','workspaceNew','workspac
 const statuses={loading:'Loading…',empty:'Nothing here yet.',unauthenticated:'Sign in to continue.',refused:'Access unavailable.',notFound:'Not found.',notBuilt:'Not available yet.',error:'Unable to load. Try again.'};
 export const heading=m=>`<div><p class="eyebrow">${esc(m.eyebrow)}</p>${m.title?`<h1>${esc(m.title)}</h1>`:""}${m.help?`<p class="muted">${esc(m.help)}</p>`:''}</div>`;
 export const warnings=m=>(m.warnings||[]).map(x=>`<p class="note warning">${esc(x)}</p>`).join('');
-export function fields(m){return (m.fields||[]).filter(f=>typeof f.name==='string'&&/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(f.name)).map(f=>`<label>${esc(f.label)}${f.type==='textarea'?`<textarea name="${esc(f.name)}">${esc(f.value)}</textarea>`:f.type==='select'?`<select name="${esc(f.name)}">${(f.options||[]).map(o=>`<option value="${esc(o.value)}"${o.value===f.value?' selected':''}>${esc(o.label)}</option>`).join('')}</select>`:`<input name="${esc(f.name)}" type="${f.type==='checkbox'?'checkbox':'text'}"${f.type==='checkbox'?(f.value===true?' checked':''):` value="${esc(f.value)}"`}>`}</label>`).join('');}
+export function fields(m){return (m.fields||[]).filter(f=>typeof f.name==='string'&&/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(f.name)).map(f=>`<label>${esc(f.label)}${f.type==='textarea'?`<textarea data-kit-field name="${esc(f.name)}">${esc(f.value)}</textarea>`:f.type==='select'?`<select data-kit-field name="${esc(f.name)}">${(f.options||[]).map(o=>`<option value="${esc(o.value)}"${o.value===f.value?' selected':''}>${esc(o.label)}</option>`).join('')}</select>`:`<input data-kit-field name="${esc(f.name)}" type="${f.type==='checkbox'?'checkbox':'text'}"${f.type==='checkbox'?(f.value===true?' checked':''):` value="${esc(f.value)}"`}>`}</label>`).join('');}
 export function cards(items=[]){return items.map(x=>`<article class="glass panel" style="min-width:0;overflow-wrap:anywhere"><div class="row"><h3>${esc(x.title||x.label)}</h3>${x.role?`<span class="badge">${esc(x.role)}</span>`:''}</div>${x.description?`<p class="muted">${esc(x.description)}</p>`:''}${(x.facts||[]).map(f=>`<p><span class="muted">${esc(f.label)}</span> ${esc(f.value)}</p>`).join('')}${typeof x.responses==='number'?`<p>Responses: ${esc(x.responses)}${typeof x.denominator==='number'?` / ${esc(x.denominator)}`:''}</p>`:''}${(x.children||[]).map(c=>`<div class="nav">${esc(c.label)}<small>${esc(c.detail)}</small></div>`).join('')}</article>`).join('');}
 export function mountView(root,initial,onIntent,screenSet,actionSet,body){
  let model,callback,generation=0,dead=false,dispatched=new Set();
@@ -27,10 +27,10 @@ export function mountView(root,initial,onIntent,screenSet,actionSet,body){
   if(i.outcome==='confirmed'&&model.receipt?.confirmed===true)html+=`<section class="note" role="status">${esc(model.receipt.label)}${model.receipt.details?`<details><summary>Details</summary><p>${esc(model.receipt.details)}</p></details>`:''}</section>`;
   return html;
  }
- function click(e){const b=e.target.closest?.('[data-intent]');if(!b||!root.contains(b)||dead||model.status!=='ready')return;const a=actions().find(a=>a.id===b.dataset.intent);if(!a||blocked(a))return;
+ function click(e){const b=e.target.closest?.('[data-intent]');if(!b||!root.contains(b)||b.closest('[data-slot]')||dead||model.status!=='ready')return;const a=actions().find(a=>a.id===b.dataset.intent);if(!a||blocked(a))return;
   const snapshot=generation,values=JSON.parse(b.dataset.values||'{}');
   if(a.id!=='browse-view'&&!['navigation','tour-next','tour-back','start-signin'].includes(a.id)){
-   for(const f of root.querySelectorAll('input[name],select[name],textarea[name]'))values[f.name]=f.type==='checkbox'?f.checked:f.value;
+   for(const f of root.querySelectorAll('[data-kit-field][name]')){if(f.closest('[data-slot]'))continue;values[f.name]=f.type==='checkbox'?f.checked:f.value;}
    dispatched.add(a.id);for(const x of root.querySelectorAll('[data-intent]'))if(x.dataset.intent===a.id)x.disabled=true;
   }
   if(snapshot===generation)callback?.({action:a.id,context:{...model.context},values});
