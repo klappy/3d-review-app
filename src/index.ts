@@ -128,6 +128,25 @@ app.post("/oauth/consent", (c) => handleConsent(c.req.raw, c.env as OAuthEnv));
 // Agents never use it (they hold a delegated bearer); the MCP surface is unchanged.
 app.get("/v2/auth/access", async (c) => {
   const env = c.env;
+  // Account display is a read, never a sign-in/consent fallback.
+  if (new URL(c.req.url).searchParams.has("view")) {
+    const headers = { "cache-control": "private, no-store" };
+    const modes = new URL(c.req.url).searchParams.getAll("view");
+    if (modes.length !== 1 || modes[0] !== "account") return c.json({ error: "Account identity unavailable" }, 400, headers);
+    try {
+      const identity = await verifyAccessJwt(env, c.req.header("cf-access-jwt-assertion"));
+      if (typeof identity.email !== "string" || !identity.email.trim() || [...identity.email].length > 254) throw new Error();
+      const principal = await resolvePrincipal(c.req.raw, env);
+      if (!principal.sessionTokenHash || !["user", "support"].includes(principal.kind) || principal.oauthClientId) throw new Error();
+      const selected = await env.DB.prepare("SELECT s.principal_id, s.kind, s.delegated_by, s.expires_at, p.email_hash FROM session s JOIN principal p ON p.id = s.principal_id WHERE s.token_hash = ?")
+        .bind(principal.sessionTokenHash).first<{ principal_id: string; kind: string; delegated_by: string | null; expires_at: number | null; email_hash: string }>();
+      if (!selected || selected.principal_id !== principal.id || !["user", "support"].includes(selected.kind) || selected.delegated_by || (selected.expires_at != null && selected.expires_at < Date.now()) || selected.email_hash !== await sha256(identity.email)) throw new Error();
+      return c.json({ email: identity.email }, 200, headers);
+    } catch {
+      return c.json({ error: "Account identity unavailable" }, 401, headers);
+    }
+  }
+
   try {
     const id = await verifyAccessJwt(env, c.req.header("cf-access-jwt-assertion") ?? undefined);
     const eh = await sha256(id.email);

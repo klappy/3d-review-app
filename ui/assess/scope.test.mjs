@@ -204,3 +204,9 @@ test('project: create assessment posts {name, language_id} and goes to #assessme
   const form = root.querySelector('#create-assessment'); form.elements.name.value = 'Sept'; form.elements.language_id.value = 'l1'; await form.fire('submit');
   assert.deepEqual(ctx.calls.at(-1).body, { name: 'Sept', language_id: 'l1' }); assert.deepEqual(ctx.gone, ['#assessment/a7']);
 });
+
+test('signed-in welcome never displays internal identity or invented email and delegates logout', async()=>{
+  let calls=0;const ctx=ctxWith({}, {state:{principal:{id:'private-opaque',email:'not-verified@example.invalid'}},signOut:async()=>{calls++;}});
+  const model=await pages.entry.load(ctx);const html=pages.entry.render(ctx,model);assert.ok(!html.includes('private-opaque'));assert.ok(!html.includes('not-verified@example.invalid'));
+  const root={querySelector:()=>null,querySelectorAll:()=>[{dataset:{act:'signout'},addEventListener:(_type,fn)=>root.click=fn}]};pages.entry.bind(ctx,root,model);await root.click();assert.equal(calls,1);assert.equal(ctx.calls.length,0);
+});

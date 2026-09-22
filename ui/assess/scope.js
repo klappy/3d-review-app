@@ -75,8 +75,7 @@ function entryModel(over = {}) {
   return { status: 'loaded', mode: 'welcome', step: 0, signin: { email: '', devCode: null, stage: 'email' }, example: null, exampleStatus: null, exampleError: '', params: {}, ...over };
 }
 function hero(ctx, signedIn) {
-  const p = ctx.state.principal;
-  const continueCards = signedIn ? `<section class="panel"><p class="eyebrow">Signed in${p?.id ? ` · ${ctx.esc(p.id)}` : ''}</p><h2>Continue</h2><div class="project-grid">${ctx.cards.card({ eyebrow: 'Continue', title: 'Workspaces', href: ctx.routes.workspaces, meta: ['Optional groupings of projects you can already open'] })}${ctx.cards.card({ eyebrow: 'Continue', title: 'Projects', href: ctx.routes.projects, meta: ['All projects your account holds a role on'] })}</div><div class="actions"><button type="button" class="quiet" data-act="signout">Sign out</button></div></section>` : '';
+  const continueCards = signedIn ? `<section class="panel"><p class="eyebrow">Signed in</p><h2>Continue</h2><div class="project-grid">${ctx.cards.card({ eyebrow: 'Continue', title: 'Workspaces', href: ctx.routes.workspaces, meta: ['Optional groupings of projects you can already open'] })}${ctx.cards.card({ eyebrow: 'Continue', title: 'Projects', href: ctx.routes.projects, meta: ['All projects your account holds a role on'] })}</div><div class="actions"><button type="button" class="quiet" data-act="signout">Sign out</button></div></section>` : '';
   // Public home contract (ui/public-choices.test.mjs, captain-named): exactly these four choices, in this order, above the headline;
   // Sign in goes straight to the real provider; sandbox sign-in only by explicit choice (#signin). Retired labels never return.
   const choices = `<nav class="public-choices actions" aria-label="Choose where to start" style="margin-top:0"><a class="rv-btn" href="#public-about">Read about it</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a><a class="rv-btn primary" href="/v2/auth/access">Sign in</a></nav>`;
@@ -108,11 +107,7 @@ const entry = {
         case 'welcome': model.mode = 'welcome'; model.step = 0; return paint();
         case 'survey': model.mode = 'survey'; return paint();
         case 'signin': model.mode = 'signin'; return paint();
-        case 'signout': {
-          await write(ctx, b, 'Sign out', () => ctx.api('/v2/auth/session', { method: 'DELETE' }));
-          dropSession('facilitatorToken'); if (ctx.setToken) ctx.setToken(null); ctx.state.principal = null;
-          ctx.note('Signed out.'); return paint();
-        }
+        case 'signout': return ctx.signOut?.();
       }
     }));
     root.querySelector('#code-form')?.addEventListener('submit', async ev => {
