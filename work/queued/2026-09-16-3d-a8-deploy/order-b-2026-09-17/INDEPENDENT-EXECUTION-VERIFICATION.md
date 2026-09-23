@@ -1,0 +1,16 @@
+# Independent A8 Order B verification
+
+**ACCEPT — settings-only Order B execution, bounded to the observations below.** Reviewer `/root/queue_resolution/pr17_truthfulness_worker` did not execute Order B. Read-only provider/GitHub calls; local evidence files only. Root retains freeze/disposition authority. No merge, build start/retry/cancel, deployment, migration, provider mutation or shared journal write performed by this review.
+
+Fresh GitHub reads: 2026-09-17T04:43:22.377249Z–04:43:25.360339Z (00:43 EDT). Fresh Cloudflare readback: 04:43:35.560Z–04:43:37.261Z. Compared executor BEFORE.json, AFTER.json, REQUEST-RESULTS.json, intermediate readbacks and EXECUTION-RECEIPT.md against independent reads. All 15 explicit comparisons in COMPARISON.json passed.
+
+- Main and newly created production both remain `895339fb5a289b357148e7050447125791e6a411`. Fresh commit object has no parents and Git empty-tree ID `4b825dc642cb6eb9a060e54bf8d69288fbee4904`; phase-0/walking-skeleton remains `10f5f444d68475d7114ab8fe0bf269fe106476b1`.
+- New production-only ruleset `23578667` is active, no bypass actors, with deletion/non-fast-forward/PR requirements and strict Cursor Bugbot check bound to integration `1210556`. Creation exemption (`do_not_enforce_on_create`) is false. Effective production rules are from this ruleset. Existing ruleset `23571595` is structurally identical across before, after and fresh reads.
+- Production trigger `d067de78-0937-42cc-8f3e-cc001c4af8fc` watches only production; server modified_on `04:41:56.607Z`. DEV trigger `b82be56e-33f0-43d5-bf24-3749dd4dc168` watches only main; server modified_on `04:42:13.870Z`. Executor request receipt and timestamps establish production retarget before DEV request at `04:42:13.084Z`. This temporal sequence is attributed to preserved execution evidence, corroborated by fresh provider timestamps, not a claim that this reviewer observed the mutations live.
+- Trigger differences are exactly branch_includes, trigger_name and expected top-level modified_on. Commands, exclusions/path filters, root directory, cache setting, Worker/token/repository associations, nested metadata and created/deleted timestamps are unchanged. Exactly one trigger returned for each Worker.
+- Complete paginated queues match before/after exactly: 19 DEV builds, all stopped (18 historical successes, one historical failure), zero production builds. Both report next_page false; totals match. No new build is present in this observation window.
+- Active DEV deployment `450369eb-d0ef-41c1-af82-b0f28ded5cac` retains version `038befe0-cf15-4c3d-b48e-021a7704f13e` at 100%. Production deployment `4a4d9869-62e8-46c8-acbd-3ef95db0fb42` retains `864f58cd-835c-4999-bc5d-0c9f987ebe77` at 100%. Full latest deployment objects match before/after; no version movement observed.
+
+Evidence: GITHUB-FRESH.json, CLOUDFLARE-FRESH.json and COMPARISON.json adjacent to this receipt. An initial optional GitHub empty-tree-object endpoint returned 404; fresh commit-object read succeeded and supplies the canonical empty-tree hash/parent evidence. No permission workaround or mutation was attempted.
+
+This acceptance does not lift the freeze, accept A8 as a whole, prove application readiness, approve migration/main population/production promotion, or guarantee future queue inactivity. Those remain separate root dispositions and orders.

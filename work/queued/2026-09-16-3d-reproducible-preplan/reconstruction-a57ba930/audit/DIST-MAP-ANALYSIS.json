@@ -1,0 +1,209 @@
+{
+  "sources": [
+    "../node_modules/hono/dist/compose.js",
+    "../node_modules/hono/dist/request/constants.js",
+    "../node_modules/hono/dist/utils/buffer.js",
+    "../node_modules/hono/dist/utils/body.js",
+    "../node_modules/hono/dist/utils/url.js",
+    "../node_modules/hono/dist/request.js",
+    "../node_modules/hono/dist/utils/html.js",
+    "../node_modules/hono/dist/context.js",
+    "../node_modules/hono/dist/router.js",
+    "../node_modules/hono/dist/utils/constants.js",
+    "../node_modules/hono/dist/hono-base.js",
+    "../node_modules/hono/dist/router/utils.js",
+    "../node_modules/hono/dist/router/reg-exp-router/matcher.js",
+    "../node_modules/hono/dist/router/reg-exp-router/node.js",
+    "../node_modules/hono/dist/router/reg-exp-router/trie.js",
+    "../node_modules/hono/dist/router/reg-exp-router/router.js",
+    "../node_modules/hono/dist/router/smart-router/router.js",
+    "../node_modules/hono/dist/router/trie-router/node.js",
+    "../node_modules/hono/dist/router/trie-router/router.js",
+    "../node_modules/hono/dist/hono.js",
+    "../src/handlers/errors.ts",
+    "../src/handlers/types.ts",
+    "../src/auth.ts",
+    "../src/envelope.ts",
+    "../contract/capabilities.json",
+    "../src/registry.ts",
+    "../src/handlers/platform.ts",
+    "../src/policy.ts",
+    "../src/handlers/docs.ts",
+    "../src/receipt.ts",
+    "../src/handlers/undo.ts",
+    "../src/handlers/common.ts",
+    "../src/handlers/workspace.ts",
+    "../src/handlers/project.ts",
+    "../src/handlers/assessment.ts",
+    "../src/handlers/template.ts",
+    "../src/handlers/survey.ts",
+    "../src/handlers/participant.ts",
+    "../src/handlers/response.ts",
+    "../src/handlers/results.ts",
+    "../src/handlers/grant.ts",
+    "../src/handlers/request.ts",
+    "../src/handlers/support.ts",
+    "../src/handlers/index.ts",
+    "../src/dispatch.ts",
+    "../src/mcp.ts",
+    "../src/index.ts"
+  ],
+  "app_sources": [
+    {
+      "map_source": "../src/handlers/errors.ts",
+      "target_path": "src/handlers/errors.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/types.ts",
+      "target_path": "src/handlers/types.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/auth.ts",
+      "target_path": "src/auth.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/envelope.ts",
+      "target_path": "src/envelope.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/registry.ts",
+      "target_path": "src/registry.ts",
+      "matches_frozen": true,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/platform.ts",
+      "target_path": "src/handlers/platform.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/policy.ts",
+      "target_path": "src/policy.ts",
+      "matches_frozen": true,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/docs.ts",
+      "target_path": "src/handlers/docs.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/receipt.ts",
+      "target_path": "src/receipt.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/undo.ts",
+      "target_path": "src/handlers/undo.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/common.ts",
+      "target_path": "src/handlers/common.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/workspace.ts",
+      "target_path": "src/handlers/workspace.ts",
+      "matches_frozen": true,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/project.ts",
+      "target_path": "src/handlers/project.ts",
+      "matches_frozen": true,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/assessment.ts",
+      "target_path": "src/handlers/assessment.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/template.ts",
+      "target_path": "src/handlers/template.ts",
+      "matches_frozen": true,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/survey.ts",
+      "target_path": "src/handlers/survey.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/participant.ts",
+      "target_path": "src/handlers/participant.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/response.ts",
+      "target_path": "src/handlers/response.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/results.ts",
+      "target_path": "src/handlers/results.ts",
+      "matches_frozen": true,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/grant.ts",
+      "target_path": "src/handlers/grant.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/request.ts",
+      "target_path": "src/handlers/request.ts",
+      "matches_frozen": true,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/support.ts",
+      "target_path": "src/handlers/support.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/handlers/index.ts",
+      "target_path": "src/handlers/index.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/dispatch.ts",
+      "target_path": "src/dispatch.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/mcp.ts",
+      "target_path": "src/mcp.ts",
+      "matches_frozen": false,
+      "exists": true
+    },
+    {
+      "map_source": "../src/index.ts",
+      "target_path": "src/index.ts",
+      "matches_frozen": false,
+      "exists": true
+    }
+  ]
+}

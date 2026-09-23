@@ -1,0 +1,7 @@
+# Independent canonical 0.14.5 record review — 2026-09-22
+
+ACCEPT cookbook PR101 exact head c04e816918cb7d06d79c24cb1b6ed3974ca631a1, tree9bc663660488ca3927ef5492613fdf0130a47f7d; release record blob91bea67f49a04d7cf59579d014bb3b9cff90f061. Reviewer ui_audit did not author orphan_audit's current factual source/provenance update.
+
+Read complete canonical record. Current isolated functional9cf345f8/treee69825d0f44b658e858be011f2fd87c72670f2b7 matches observed source commit. My independent bd00e1f9 receipt confirms48 affected UI tests and meaningful parent-regression17pass/2fail. Prior96a56a57 full613/typecheck/assets and12 synthetic viewport groups remain explicitly historical; later17 and48 suites are overlapping attribution, not added unique cases or new browser proof. Provider read/switch cases remain0attempted/2untested; human outcomes unmeasured. Separate recovery branch, original cloud custody and fresh integration disposition remain explicit.
+
+No false deployed status, current full-suite claim, private incident identity or new source scope introduced. Existing source semantics, version classification and changelog sections are unchanged by this factual update. Historical two-line destination description is correctly contextualized by the subsequent guard section. This canonical content acceptance does not satisfy service checks, authorize cookbook merge/app pin, assert provider journey passed or waive eventual integrated-head review. Refresh actual checks/head before any coordinator disposition.

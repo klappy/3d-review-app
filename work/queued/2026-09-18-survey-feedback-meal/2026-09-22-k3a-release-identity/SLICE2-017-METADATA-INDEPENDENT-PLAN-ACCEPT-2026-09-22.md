@@ -1,0 +1,12 @@
+# Slice2 proposed0.17 metadata order — independent ACCEPT
+Reviewed exact38eef1bbf12300e66afe1099e3717bb311eec271, blob558731cb53e1bc853573d582883fe79dfa291241. Planning only; no source/metadata FIRE or shipment claim.
+
+0.17.0 MINOR is consistent with changed accepted participant interaction plus in-place feedback and loaded-client provenance under the established major-zero policy. Fresh main index blob4b6c03e0867a7a541b4c2de156f7bfc58f3d06d3 remains current0.16.0 with34 entries and no0.17. Current open canonical PR listing has20 entries, including reserved historical0.15 PR99, and no0.17 release title/branch. This is bounded present evidence, not an exclusive reservation or proof about every unpublished branch; the required START collision refresh is retained.
+
+Exact canonical two-path and app six-path boundaries are sufficient. Preserve all old records/index entries, especially0.16 and original0.15 lineage; no source/script/generated edits or inherited old metadata. Real immutable canonical merge precedes manifest/blob/SHA/byte pinning. Version tests only change current literals, preserving historical/negative assertions.
+
+The order correctly waits for the ACTUAL independently accepted integrated successor and browser/assets proof before canonical authorship; predicted tree and scratch158 do not substitute. Evidence attribution separates historical components, exact current suites, browser, DEV/production and unmeasured human outcomes. No false full-kit, workspace/K5/print or live-provider claim. Same0.17 version/pin/product source must passDEV beforeproduction, with slice1 shipped first and existing release gates intact.
+
+Independent Oddkit planning challenge2026-09-22T18:10:54.010Z returnedCHALLENGED/block_until_addressed=false, notPASS. Concrete grounding is the live index/open-PR read, accepted source lineage and exact path order. Confidence high in classification and bounded authority chain, conditional in allocation/owner availability/final source until reobserved. Counterexamples—concurrent0.17 allocation, unaccepted source delta, hash mismatch, changed tests beyond literals or fabricated evidence—stop dependent work. Isolated branch edits are reversible; live release remains separately gated. No new universal policy inferred.
+
+ACCEPT enables existing external metadata Fable readiness/ACK/promise and coordinator gates; does not assert source prerequisite, claim, FIRE or release has occurred. Internal implementation remains prohibited; recurring loop remains paused. No new plan or feature starts authorized.

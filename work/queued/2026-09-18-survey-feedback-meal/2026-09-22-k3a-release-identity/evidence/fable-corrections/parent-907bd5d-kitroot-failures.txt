@@ -1,0 +1,20 @@
+not ok 16 - non-kit host (real /assess/index.html, no \#rv): each of the four loaded pages shows exactly one visible heading with its title
+    #workspaces: one h1 in the non-kit host
+    TestContext.<anonymous> (file:///sessions/exciting-adoring-albattani/mnt/3d-review-fable/worker-release-corrections/app/test/kit-root.integration.test.mjs:296:43)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+not ok 18 - demo boot (real controller, ?demo=1): one visible disclosure before the content element, with working sample links
+    exactly one disclosure at boot
+    TestContext.<anonymous> (file:///sessions/exciting-adoring-albattani/mnt/3d-review-fable/worker-release-corrections/app/test/kit-root.integration.test.mjs:318:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+not ok 19 - demo disclosure persists across route changes, tree search, expansion and the assessment repaint; the mounted view and its input survive
+    The expression evaluated to a falsy value:
+    TestContext.<anonymous> (file:///sessions/exciting-adoring-albattani/mnt/3d-review-fable/worker-release-corrections/app/test/kit-root.integration.test.mjs:327:38)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+not ok 20 - demo write refusal is unchanged: the existing create form submits into the demo api, which refuses; nothing leaves the page
+    Expected values to be strictly equal:
+    TestContext.<anonymous> (file:///sessions/exciting-adoring-albattani/mnt/3d-review-fable/worker-release-corrections/app/test/kit-root.integration.test.mjs:346:91)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)

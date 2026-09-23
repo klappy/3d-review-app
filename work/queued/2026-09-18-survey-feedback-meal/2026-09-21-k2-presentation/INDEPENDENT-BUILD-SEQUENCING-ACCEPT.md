@@ -1,0 +1,7 @@
+# Independent K2 build-only sequencing acceptance
+
+ACCEPT coordinator's bounded build-only relaxation of K1 integration dependency. Basis: accepted K2 ticket3bb1e8ac58be8d3379e353d6dfa44b2cee179a6c and independent plan ACCEPT7ff9f586480660e3b3a2594ef3d0160cd1f98dda; five-path authored scope is isolated pure presentation/callbacks, disjoint from K1's tree IME correction and163 root/auth source.
+
+Freeze starting K1 commit1b0ae83a9c79b17f2154317d29c035422e769fce and exact staging base commit/tree in the worker's normal ACK/FIRE. Inherited K1 files may exist on the isolated branch; authored diff remains limited to the accepted three view modules, coordinator.test.mjs and exact owned test-exclusion line in ui/.assetsignore. The shared exclusion file permits only that line, not overwriting later K1 exclusions. No K1/cloudPR162,163 or protected controller edits. The known K1 IME finding remains AMEND and must be explicitly carried in handoff.
+
+This permits bounded K2 construction and local fixtures before K1 final acceptance; it does not imply K1 acceptance or waive final integration. No K2 merge/integration until accepted K1 exact lineage and refreshed interface/base comparison; then rerun meaningful affected role/interaction/visual/asset checks and independent exact-head review. Any actual dependency change returns for narrow amendment. Existing owner ACK, promise, preflight and FIRE remain required; this receipt is not itself FIRE. No source edits or deployment.

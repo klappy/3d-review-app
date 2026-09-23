@@ -1,0 +1,26 @@
+{
+  "before_observed_at": "2026-09-17T08:28:16.614Z",
+  "after_observed_at": "2026-09-17T08:49:08.040Z",
+  "deltas": {
+    "access_code": 0,
+    "assessment": 0,
+    "assessment_survey": 0,
+    "feedback": 0,
+    "grant": 0,
+    "invitation": 0,
+    "language": 0,
+    "login_code": 0,
+    "oauth_code_redemption": 0,
+    "participant_session": 0,
+    "principal": 0,
+    "project": 0,
+    "receipt": 0,
+    "request": 0,
+    "response": 0,
+    "session": 0,
+    "shared_response_claim": 0,
+    "survey_template": 0,
+    "trace": 0,
+    "workspace": 0
+  }
+}

@@ -1,0 +1,21 @@
+# CHECKLIST-RUN — bounded A8 Order A
+
+Live CHECKLIST1.4.1 blob61263b1192a5da3324825d677b94dc88816044ef read. Applies acceptedv1.2 plus AFTERSHIPamendment, not fullA8/OrderB.
+
+1Header PASS boundedlocalauthoringoutcome/rootmove.
+2Fields PENDING actualauthorack25min/10minexisted; changedscope requiresfreshACKbeforefire. CoordinatorOtto/authornamed.
+3Naming PASS existingSep16A8ticket; no duplicatefolder.
+4Ingredients PASS exactplan/review/recipe/baseline; currentcookbookheadrefreshandselectedpathreconcile requiredandacknowledged.
+5Products PASS exact7app+2cookbookamendedallowlist.
+6Done-means PASS sixobservables:exactdiff,112unchanged,TOMLequal,validJSON+currentrecipe,localpins/validation,independentreviewerrepeatstructuralchecks.
+7Dependencies PASS localOrderAonly; rootlandsnarrowamendment, OrderB/fullA8held.
+8Risk PASSSTANDARDinertlocaldocs/comments/nosecrets/provideractions.
+9Vagueness PASS precisehunks/noprojectionextras/nomutationauthority.
+10References PASS originalplanobservedsourcewrangler/release/README/providerreceipts and independentreview.
+11Priorart PASS existingA8recoveredfivefilecargo/currentrelease/rulesetartifacts read and reused; noreplacementcontrolplanemechanism.
+12Failure-response PASS scope/semanticdelta/missingruntime→stopreturn; provideraction→OrderBnotexecute.
+13Lens PASS ORDER-A-DELTA.md plus supersedingbelow.
+
+Verdict pendingfreshACKandrootamendmentreview/landing; then WELL-FORMED forlocalOrderAonly. No false currentFIRE.
+
+Fresh authorACK: accepts revised7app+2cookbook scope,15minutesfromFIRE, firstcheckpoint7minutes; sourcecomparebdb2b45→e8b79ebdonly18-Ichanged, selectedcookbookpathsunchanged. Field2ACKclosed. Current actualtoolchallengeCHALLENGEDnonblocking promptsdisposition: directpinnedsource/review/runtimeevidence, scopedhighconfidenceplanningnotuniversalprinciple; semanticdiff/runtimecounterexampleinvalidates, rollbackdiscardlocalfiles, noexternalwrites. Originalclock/genericgatefailsretained. Rootamendmentreview/GitlandingstillneededbeforeFIRE.

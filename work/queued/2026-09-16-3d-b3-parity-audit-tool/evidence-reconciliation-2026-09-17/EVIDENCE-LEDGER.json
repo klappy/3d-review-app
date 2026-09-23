@@ -1,0 +1,845 @@
+{
+  "scope": "35 proposed acceptance IDs; historical assertions retained verbatim, additive current overlays; no new test run",
+  "main": "299f8255526e13b17215ea1af44e3600d4b35dc2",
+  "historical_baseline_warning": "phase-a-acceptance.test.ts and phase-a-contract-sweep.test.ts are absent from main299f825 test inventory. Old assertion cells belong only to9f551c03; not silently ported to current main. Source title/static read is not execution.",
+  "rows": [
+    {
+      "id": "A04-1",
+      "capability": "cap.entry.intents",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A44:46 six intent IDs/200",
+        "HTTP_NEG": "ASSERTED A44:47 signed-in equality",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Followable routes and docs six-intent parity absent."
+      },
+      "current_overlays": [
+        {
+          "kind": "Candidate only",
+          "transport": "docs tool/internal handler",
+          "role": "visitor/auth context",
+          "claim": "PR32 TOPICS intro/faq and no-arg what exact bytes; not entry.intents routes parity. Bugbot success root-observed08:08:57.",
+          "source": "https://github.com/klappy/3d-review-app/pull/32"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-2",
+      "capability": "cap.entry.example",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "ASSERTED A49:50\u201351 fixture flag, survey and summary",
+        "HTTP_NEG": "PARTIAL A49:52 owner POST/PATCH/DELETE status in 404/405/400",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Exact proposed error and support mutation refusal absent; status alone is not persistent-state comparison."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-3",
+      "capability": "cap.auth.consume_link",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A73:76\u201377 session succeeds, me principal.kind=user",
+        "HTTP_NEG": "ASSERTED A73:78\u201380 code_used/code_expired; PARTIAL S68:71 malformed-entry INVALID_PARAMS",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:71 malformed-entry INVALID_PARAMS, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Subject identity, no-session issuance on refusal and concurrent use not asserted here. Auth custody; staff login evidence is not participant-login policy."
+      },
+      "current_overlays": [
+        {
+          "kind": "Auth source",
+          "transport": "HTTP/MCP",
+          "role": "staff",
+          "claim": "Separate current Access/OAuth tests exist; no participant login requirement. The old consume_link scenario is not the whole production sign-in contract.",
+          "source": "Source inventory access.test.ts,mcp-oauth*.test.ts; no new execution"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "Existing Auth/participant A14 + B15/B3 \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-4",
+      "capability": "cap.auth.logout",
+      "requirement_status": "Q / PROPOSED (named prerequisite SUPERSEDED)",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "ASSERTED A82:84\u201385 HTTP logout receipt then me refusal; L21:37\u201339 cross-face revocation",
+        "HTTP_NEG": "ASSERTED A82:86 no-session refusal; L21:43\u201345 foreign-token body ignored; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED",
+        "MCP_POS": "PARTIAL L21:29\u201332 ok/signed_out and HTTP/MCP revocation",
+        "MCP_NEG": "ASSERTED L21:34,47 dead-token/anonymous refusal; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Source anonymous idempotent success is SUPERSEDED by ruling5706310753. MCP receipt shape absent."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "HTTP/MCP",
+          "role": "user",
+          "claim": "Current logout-cross-face test exists. Cross-face token revocation is the governing rule; no anonymous-success requirement reinstated.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/logout-cross-face.test.ts#L21"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "Existing Auth/participant A14 + B15/B3 \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-5",
+      "capability": "cap.workspace.create",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A92:93\u201397 create ok/receipt, status200, owner badge in list",
+        "HTTP_NEG": "ASSERTED A92:96 unprovisioned refusal and request hint; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Proposed201 differs from asserted200; workspace.get owner role absent."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-6",
+      "capability": "cap.workspace.list",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "ASSERTED A92:97 exact one workspace ID and owner badge",
+        "HTTP_NEG": "ASSERTED A92:98 ungranted empty list/200; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Successful MCP list missing; generic owner-read aggregate does not credit this cell."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-7",
+      "capability": "cap.workspace.get",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A92:99 owner get ok",
+        "HTTP_NEG": "ASSERTED A92:100 outsider hidden; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Grouped project contents not asserted."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-8",
+      "capability": "cap.workspace.update",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A92:101,103\u2013104 update ok/undo token; MCP undo ok then old name restored",
+        "HTTP_NEG": "ASSERTED A92:102 forbidden owner field INVALID_PARAMS; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "No readback of renamed value before undo; member refusal absent. MCP undo is not MCP workspace.update."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-9",
+      "capability": "cap.workspace.unarchive",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A92:105,108\u2013111 archive flag, unarchive ok, final flag null",
+        "HTTP_NEG": "PARTIAL A92:110 second unarchive ok; receipt only logged; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Prior projects intact, member refusal and no-new-receipt absent. Archived stays listed; source tension to A1. Do not infer receipt semantics from note()."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-10",
+      "capability": "cap.project.create",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A113:115 create ok",
+        "HTTP_NEG": "PARTIAL A113:120\u2013123 foreign workspace ignored/null and request hint for unprovisioned; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Foreign-workspace refusal contradicts asserted success;201/receipt/owner role not asserted."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-10a",
+      "capability": "cap.language.create",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A113:124 create ok/receipt",
+        "HTTP_NEG": "ASSERTED A113:125 duplicate code refusal; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Proposed201, inverse and assessment creation only partly exercised by direct dispatch G15, not twins. Viewer refusal absent."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "internal dispatch",
+          "role": "owner/outsider",
+          "claim": "language.test.ts exercises create/list/assessment creation, duplicate refusal, archive and inverse; this is not external twin proof.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/language.test.ts#L15"
+        },
+        {
+          "kind": "Live attributed",
+          "transport": "MCP",
+          "role": "owner",
+          "claim": "C093 reports language.create; no per-field shape or negative case inferred.",
+          "source": "https://github.com/klappy/3d-review-cookbook/issues/19#issuecomment-5710948108"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-10b",
+      "capability": "cap.language.list",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A113:126 language list length=1",
+        "HTTP_NEG": "ASSERTED A113:127 outsider hidden; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "ASSERTED A113:128 wrong tool; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Per-item id/code/name/archived_at shape and positive MCP list absent."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "internal dispatch",
+          "role": "owner/outsider",
+          "claim": "Successful list within language lifecycle does not prove external MCP shape.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/language.test.ts#L15"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-11",
+      "capability": "cap.project.update",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A113:130\u2013131 name update ok/undo token; assessment-list result serialization unchanged; success/contents not asserted",
+        "HTTP_NEG": "ASSERTED A113:132 assessment field refused; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Member refusal, nonempty descendant preservation and org/language updates absent."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-12",
+      "capability": "cap.project.unarchive",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "MISSING (assertion: \"\")",
+        "HTTP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "No successful owner project archive/unarchive scenario; no live-project idempotency, member refusal, child stage/count preservation. Generic scope/anonymous refusal is narrower."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-13",
+      "capability": "cap.assessment.list",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "MISSING (assertion: \"\")",
+        "HTTP_NEG": "PARTIAL A137:143\u2013144 assessment-only project list hidden; me grant list exact; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Requested positive assessment-scoped list is contradicted by NOT_FOUND. A113:129\u2013131 compares list results without asserting success; no positive credit. Me grants are not assessment.list."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-14",
+      "capability": "cap.assessment.get",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A137:145\u2013146 direct get ok/viewer role and name/purpose/stage/language_id keys",
+        "HTTP_NEG": "ASSERTED A137:147\u2013148 sibling hidden and anonymous refusal; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Period/format and full header values absent."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "mock handler",
+          "role": "viewer/project owner/member",
+          "claim": "Exact assessment viewer read succeeds; write refused; project grant alone cannot authorize assessment. No HTTP/MCP positive header-value claim.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/a3-exact-assessment-grants.test.ts#L28"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-15",
+      "capability": "cap.assessment.update",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A150:153 purpose update ok/undo token",
+        "HTTP_NEG": "ASSERTED A150:152,154 viewer and disallowed field refused; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Readback/new value, all five fields, actual inverse restoration and responses_exist language guard absent."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "mock handler",
+          "role": "viewer/project owner/member",
+          "claim": "Viewer update refused and no writes; project grant alone insufficient.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/a3-exact-assessment-grants.test.ts#L28"
+        },
+        {
+          "kind": "Live attributed",
+          "transport": "MCP",
+          "role": "owner",
+          "claim": "C091 reports assessment.update. Exact five-field/readback/inverse closure not established by summary.",
+          "source": "https://github.com/klappy/3d-review-cookbook/issues/19#issuecomment-5710948108"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-16",
+      "capability": "cap.assessment.set_stage",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "MISSING (assertion: \"\")",
+        "HTTP_NEG": "PARTIAL A150:155\u2013156 invalid jump STAGE_CONFLICT and viewer refused; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Successful adjacent stages, reflected stage, receipt inverse/undo and preserved counts absent on both twins. H15 only handler collection gates; proposed INVALID_PARAMS differs."
+      },
+      "current_overlays": [
+        {
+          "kind": "Live attributed",
+          "transport": "MCP",
+          "role": "owner",
+          "claim": "C087 reports set_stage; no successful stage/undo/count twins inferred.",
+          "source": "https://github.com/klappy/3d-review-cookbook/issues/19#issuecomment-5710851850"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-17",
+      "capability": "cap.assessment.notes.update",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A150:157,161 notes update ok/undo token and viewer readback",
+        "HTTP_NEG": "ASSERTED A150:158\u2013160 viewer refusal; owner results succeeds and excludes reflection; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Prior text restoration only direct-dispatch E22:101\u2013111; external inverse/undo still missing."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "internal dispatch",
+          "role": "owner",
+          "claim": "code-escrow notes update and undo restores previous text; remains internal.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/code-escrow.test.ts#L102"
+        },
+        {
+          "kind": "Live attributed",
+          "transport": "MCP",
+          "role": "owner",
+          "claim": "C092 notes.update plus undo token; token existence is not proof of inverse restoration.",
+          "source": "https://github.com/klappy/3d-review-cookbook/issues/19#issuecomment-5710948108"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-18",
+      "capability": "cap.template.list",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A166:168\u2013169 list ok and nine version2 templates",
+        "HTTP_NEG": "ASSERTED A166:167 anonymous refusal; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Exact IDs/pins and draft absence not asserted on list; direct database instrument test is separate."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current source",
+          "transport": "internal DB/oracle",
+          "role": "synthetic source",
+          "claim": "pinned-instruments and rubric-source-readback tests exist. Source111items/9templates proof does not close external list exact-ID assertion by itself.",
+          "source": "Current test inventory; source gold ruling13c5706246421"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-19",
+      "capability": "cap.template.get",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A166:170\u2013171 one pinned template ok and result byte equality",
+        "HTTP_NEG": "PARTIAL A166:172\u2013173 unknown version hidden; omitted version ok=false; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Stable item-ID set and exact INVALID_PARAMS on omitted version absent."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "HTTP",
+          "role": "participant shared context",
+          "claim": "Pinned v2 response form asserts template id/version; not template.get external parity.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/shared-link-flow.test.ts#L87"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-20",
+      "capability": "cap.template.render",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A166:174\u2013175 public render ok; selected scoring keys absent",
+        "HTTP_NEG": "PARTIAL A166:176\u2013177 unsupported language succeeds (divergence)",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Supported-set refusal, multi-select and null/zero external semantics absent; rendering/submit helper evidence P19 not external twins."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "HTTP",
+          "role": "participant shared context",
+          "claim": "Response form/source-derived required/multi/exclusive validation is asserted; not template.render unsupported-language contract closure.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/shared-link-flow.test.ts#L87"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-21",
+      "capability": "cap.template.publish_version",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "MISSING (assertion: \"\")",
+        "HTTP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "ASSERTED A179:180\u2013181 wrong write tool and owner danger dry_run refused; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Support dry_run/execute success, receipt, version binding, confirmation expiry/required guard absent. Zero support execution credit."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-22",
+      "capability": "cap.survey.deselect",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "MISSING (assertion: \"\")",
+        "HTTP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Empty-survey direct dispatch E22:122\u2013125 only ok/inverse:none/no undo, contradicting proposed inverse. With-response archive/count preservation and viewer refusal absent. No external success."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "internal dispatch",
+          "role": "owner",
+          "claim": "Empty survey deselect executes with inverse none in existing code-escrow test; response-preserving external positive remains unclosed.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/code-escrow.test.ts#L120"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-23",
+      "capability": "cap.survey.get_status",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A186:187 status ok",
+        "HTTP_NEG": "ASSERTED A186:188 answers-string exclusion and outsider hidden; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S82:112\u2013119 stranger real/nonexistent refusal, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "No count field shape, numeric value, perspective totals or below-threshold observables asserted."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "HTTP",
+          "role": "owner",
+          "claim": "Current shared-link-flow45 asserts status.result.counts.responses = before+2 after two independent respondents. Closes the absolute claim that no HTTP numeric count assertion exists; not full perspective shape or MCP parity.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/shared-link-flow.test.ts#L45"
+        },
+        {
+          "kind": "Live attributed",
+          "transport": "UI/HTTP owner count",
+          "role": "staff + two participants",
+          "claim": "First collection/staff proof and closure preserve two responses. Historical accepted collection source, not current integrated release acceptance.",
+          "source": "https://github.com/klappy/3d-review-cookbook/issues/16#issuecomment-5709742129"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-24",
+      "capability": "cap.request.create",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A190:191 receipt and success",
+        "HTTP_NEG": "ASSERTED A190:194\u2013195 duplicate same request_id and anonymous refusal; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "201, support queue/author visibility, no provisioning and open-window boundaries absent."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "internal handler",
+          "role": "stranger signed-in",
+          "claim": "Pending request idempotency and invalid kind asserted; support queue/provisioning/window not proved here.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/lane-b-grants.test.ts#L73"
+        },
+        {
+          "kind": "Live attributed",
+          "transport": "MCP",
+          "role": "owner/viewer",
+          "claim": "C094/C095 report request.create; no201/support-readback inference.",
+          "source": "https://github.com/klappy/3d-review-cookbook/issues/19#issuecomment-5710948108"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-25",
+      "capability": "cap.response.form",
+      "requirement_status": "Q / PROPOSED (named prerequisite SUPERSEDED)",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "MISSING (assertion: \"\")",
+        "HTTP_NEG": "PARTIAL A197:198\u2013199 anonymous refusal and facilitator ok=false; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Mandatory participant-code prerequisite SUPERSEDED. Isolated handler form evidence J13/P19 is not successful HTTP/MCP form acceptance; bound-version stability and closed collection external case absent."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "HTTP",
+          "role": "shared participant",
+          "claim": "Bound v2 form and closed/revoked/expired scopes asserted; old blanket no external form-positive claim is superseded.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/shared-link-flow.test.ts#L62"
+        },
+        {
+          "kind": "Current assertion",
+          "transport": "MCP",
+          "role": "participant bearer, owner denied own receipt",
+          "claim": "MCP response.form succeeds, submit/receipt identity agrees, owner receipt denied. This local adapter test uses minted sessions, not delegated OAuth journey.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/shared-link-flow.test.ts#L107"
+        },
+        {
+          "kind": "Live attributed",
+          "transport": "browser UI",
+          "role": "anonymous shared-link participant",
+          "claim": "First collection browser receipt proves bounded direct completion without participant account; no all-device assertion.",
+          "source": "https://github.com/klappy/3d-review-cookbook/issues/16#issuecomment-5709623832"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "Existing Auth/participant A14 + B15/B3 \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-26",
+      "capability": "cap.response.assisted_next",
+      "requirement_status": "Q / PROPOSED (named prerequisite SUPERSEDED)",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "MISSING (assertion: \"\")",
+        "HTTP_NEG": "PARTIAL A197:200 anonymous refusal; PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S68:72\u201373 anonymous NOT_AUTHENTICATED, S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Fresh respondent after submission, next-without-submit idempotency, counts and successful twins absent. Shared-link independent respondents governs; do not restore mandatory-code batches."
+      },
+      "current_overlays": [
+        {
+          "kind": "Current assertion",
+          "transport": "HTTP",
+          "role": "shared participant",
+          "claim": "assisted_next explicitly expects STAGE_CONFLICT; not implemented positive flow. Multiple independent shared-link respondents do not require assisted_next.",
+          "source": "https://github.com/klappy/3d-review-app/blob/299f8255526e13b17215ea1af44e3600d4b35dc2/test/shared-link-flow.test.ts#L80"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "Existing Auth/participant A14 + B15/B3 \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-27",
+      "capability": "cap.recommendation.propose",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "RESERVED; no functional success assertion",
+        "HTTP_NEG": "RESERVED A205:209 HTTP501/code",
+        "MCP_POS": "RESERVED; no functional success assertion",
+        "MCP_NEG": "RESERVED A205:209 MCP code/docs",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Provenance proposal storage and built validation absent; zero functional credit."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-28",
+      "capability": "cap.recommendation.review",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "RESERVED; no functional success assertion",
+        "HTTP_NEG": "RESERVED S57:61 HTTP501/code",
+        "MCP_POS": "RESERVED; no functional success assertion",
+        "MCP_NEG": "RESERVED S57:62 MCP code",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Review state transition, reviewer timestamp/reason and role/state validation absent; zero functional credit. Row absent from A205 loop but present in S57 reserved list."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-29",
+      "capability": "cap.rollup.project",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "RESERVED; no functional success assertion",
+        "HTTP_NEG": "RESERVED A205:209 HTTP501/code",
+        "MCP_POS": "RESERVED; no functional success assertion",
+        "MCP_NEG": "RESERVED A205:209 MCP code/docs",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Aggregated result/suppression semantics absent; zero functional credit."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-30",
+      "capability": "cap.rollup.workspace",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "RESERVED; no functional success assertion",
+        "HTTP_NEG": "RESERVED A205:209 HTTP501/code",
+        "MCP_POS": "RESERVED; no functional success assertion",
+        "MCP_NEG": "RESERVED A205:209 MCP code/docs",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Workspace aggregation/suppression/scope filtering absent; zero functional credit."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-31",
+      "capability": "cap.import.batch",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "RESERVED; no functional success assertion",
+        "HTTP_NEG": "RESERVED A205:209 HTTP501/code",
+        "MCP_POS": "RESERVED; no functional success assertion",
+        "MCP_NEG": "RESERVED A205:209 MCP code/docs",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Import storage/source/receipts/all-or-nothing and owner refusal when built absent; zero functional credit."
+      },
+      "current_overlays": [],
+      "current_disposition": "Historical gap not closed by the selected current receipt set; absence of complete evidence is not a newly observed product failure",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-32",
+      "capability": "cap.ops.health",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A54:55,57 status200/truthy contract/D1 ok and D1-only dependency keys",
+        "HTTP_NEG": "PARTIAL A54:56 absence of selected sensitive strings",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "Build SHA and dependency-failure503 absent; KV/email not represented. Regex is not universal no-secret proof."
+      },
+      "current_overlays": [
+        {
+          "kind": "Live attributed",
+          "transport": "MCP",
+          "role": "owner",
+          "claim": "C096 health read reported at composite main299f825 identity; health source_sha is old contract pin, not deployment identity.",
+          "source": "https://github.com/klappy/3d-review-cookbook/issues/19#issuecomment-5710948108"
+        },
+        {
+          "kind": "Candidate only",
+          "transport": "HTTP/MCP",
+          "role": "public health/MCP initialize",
+          "claim": "PR31be5534d release identity; older43c9868 review/test receipt historical, exact candidate must retain its own verification. UI badge is separatePR33.",
+          "source": "https://github.com/klappy/3d-review-app/pull/31"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    },
+    {
+      "id": "A04-33",
+      "capability": "cap.ops.feedback",
+      "requirement_status": "Q / PROPOSED",
+      "historical": {
+        "test_pin": "9f551c03ef9494c71c4ba118a2573a78648685d5",
+        "HTTP_POS": "PARTIAL A60:65 receipt and anonymous success",
+        "HTTP_NEG": "PARTIAL A60:66\u201368 stripped flag; DB row excludes Q1",
+        "MCP_POS": "MISSING (assertion: \"\")",
+        "MCP_NEG": "PARTIAL S77:79 wrong tool",
+        "UI": "NE",
+        "claim_kind": "Static ASSERTED only; no new run",
+        "gap": "201, support visibility/context, size/unknown-field refusal and receipt stripped flag absent (assertion is result.stripped)."
+      },
+      "current_overlays": [
+        {
+          "kind": "Live attributed",
+          "transport": "MCP",
+          "role": "owner/viewer",
+          "claim": "Wave N reports recorded:true/stripped:false. Does not prove rich fields persisted or authorized readback; separate feedback AMEND remains own lane.",
+          "source": "https://github.com/klappy/3d-review-cookbook/issues/19#issuecomment-5710948108"
+        }
+      ],
+      "current_disposition": "Partial scoped overlay; no whole-row acceptance",
+      "owner_return": "A14 contracts + B15/B3 evidence \u219217; UNACKNOWLEDGED gaps"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+# FIRE-CHECK-RUN — A8 Order A
+
+Live FIRE-CHECK1.3.0 blob99ab73813c9b7d6632658c6335236d77cf4748f4 read.
+1Ticketed PENDING rootlandingcurrentamendedscope (parentexists983a8c18).
+2Wellformed PENDING amendedACK/checklistclose.
+3Speccurrent PASS localAFTERSHIPamendmentgoverns; durablelandingpending.
+4Railreorient PASS currentTICKETre-read; mainDEV/prodproduction/optionalstaging; noactiveauthoring; cookbookheadadvanced e8b79ebdselectedpathreconcile beforeedit.
+5Preflight PASS actualFOUND thisturn; noUIproofneeded, no logicdeltaallowed, currentdecisionlinked.
+6Challenge PASS actualCHALLENGEDnonblocking; assumptionsgroundedbyreview/sourcehash/runtimeprobes, anycontrarycandidatecheckreturnsAMEND. Freshaftershipchallenge still tobeappended.
+7Borrow N/A no new upstreamsubstrate afterprojectordeferral; existingreleaseartifacts reused.
+8Lens PASS ORDER-A-DELTA plus AFTERSHIPupdate.
+Verdict DO NOT FIRE untilrootlandscurrentacceptedamendmentandactualauthorACK; providerOrderBnevercovered.
+
+Rootreported04:02:07Z OddkitNOT_READY1/4 lexicalmissingdecisionslocked/irreversibility/constraints recordedhonestly. Decisions: exact7inertapp+2cookbook nowchosen, fullprojectiondeferred. Irreversibility: isolatedlocalfilesdiscardable; noprovider/sharedref/publicationauthority. Constraints: exacthunks,112unchanged,TOMLequal,ownerexclusions,rootsolejournal,independentreview,Bugbot allstillbind. Genericclassifiersuccessisnotthiswrittenfire.
+
+Fresh authorACK: accepts revised7app+2cookbook scope,15minutesfromFIRE, firstcheckpoint7minutes; sourcecomparebdb2b45→e8b79ebdonly18-Ichanged, selectedcookbookpathsunchanged. Field2ACKclosed. Current actualtoolchallengeCHALLENGEDnonblocking promptsdisposition: directpinnedsource/review/runtimeevidence, scopedhighconfidenceplanningnotuniversalprinciple; semanticdiff/runtimecounterexampleinvalidates, rollbackdiscardlocalfiles, noexternalwrites. Originalclock/genericgatefailsretained. Rootamendmentreview/GitlandingstillneededbeforeFIRE.

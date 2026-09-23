@@ -1,0 +1,284 @@
+[
+  {
+    "id": "J1",
+    "role": "Member facilitator",
+    "requirement_status": "J1\u2013J10 historical proposed journey; later rulings govern",
+    "ruling_disposition": "Historical code route optional; required modern staff selection/shared distribution supersedes mandatory codes",
+    "source_assertions": {
+      "must_observe": [
+        "issue_codes result has count=20 and ids, no code values",
+        "export dry_run returns impact + confirm_token; execute returns codes once + receipt",
+        "cap.survey.print returns the blank form, never codes"
+      ],
+      "negative": [
+        "issue_codes on an assessment in prepare \u2192 INVALID_PARAMS not_collecting",
+        "export execute without token \u2192 CONFIRM_REQUIRED"
+      ]
+    },
+    "selected_evidence": "Internal code-escrow.test.ts:22 and collection-stage-gate.test.ts:15 assertions; current shared-link-flow.test.ts:33 HTTP issue_link confirmation. First staff UI16c5709677962. WaveM C086/C088 MCP preview/print/export summaries.",
+    "remaining_gap": "No combined member fresh project/language/select-two/print/shared-distribution receipt at current frozen integration; optional legacy20-code count/cold-paper exercise not credited by count3 test.",
+    "retained_owner": "Auth owns contracts; Design staff UI; Auditor/Grok campaign",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J2",
+    "role": "Participant",
+    "requirement_status": "J1\u2013J10 historical proposed journey; later rulings govern",
+    "ruling_disposition": "Code premise superseded as mandatory entry; retain optional legacy history",
+    "source_assertions": {
+      "must_observe": [
+        "form version bound at presentation",
+        "submit returns receipt with inverse none",
+        "retry with same idempotency_key returns same receipt, idempotent:true"
+      ],
+      "negative": [
+        "same code twice \u2192 INVALID_PARAMS code_used"
+      ]
+    },
+    "selected_evidence": "Current HTTP shared-link-flow:45,62,87; MCP:107; concurrency25\u201372; UI shared-link-browser95\u2013228; historical live16c5709623832 and staff/closure16c5709742129.",
+    "remaining_gap": "Preserve implemented shared-context retry/receipt/privacy evidence. Full current merged-device campaign not proved; do not restore accounts/codes or per-person identity provisioning.",
+    "retained_owner": "Auth shared-context; Design recoveryPR29; Auditor",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J3",
+    "role": "Owner invites member; invitee sibling isolation",
+    "requirement_status": "J1\u2013J10 historical proposed journey; later rulings govern",
+    "ruling_disposition": "Proposed journey shape needs current exact parameter contract",
+    "source_assertions": {
+      "must_observe": [
+        "dry_run impact names what she will see",
+        "as rina: cap.assessment.list shows only $aid"
+      ],
+      "negative": [
+        "as rina: cap.assessment.get on a sibling \u2192 NOT_FOUND_OR_NOT_VISIBLE"
+      ]
+    },
+    "selected_evidence": "lane-b-grants.test.ts:20 direct handler invite/accept wrongidentity and role guards; a3-exact-assessment-grants.test.ts:28 noinheritance; WaveM C086 invite dry only.",
+    "remaining_gap": "No selected current full delegated OAuth invite-confirm-accept/read/list-and-sibling-hidden twin receipt. Do not count owner dry-run as invitee acceptance. Old assessment.list positive conflict remains contract reconciliation.",
+    "retained_owner": "Auth grants; Auditor/Grok",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J4",
+    "role": "Member",
+    "requirement_status": "J1\u2013J10 historical proposed journey; later rulings govern",
+    "ruling_disposition": "Negative by design, not missing functionality because no positive action",
+    "source_assertions": {
+      "must_observe": [
+        "NOT_AUTHORIZED_AT_SCOPE with hint naming D3"
+      ],
+      "negative": [
+        "is itself the negative"
+      ]
+    },
+    "selected_evidence": "lane-b-grants.test.ts:54 rejects revoke of owner and elevation above member; direct handlers.",
+    "remaining_gap": "External HTTP+MCP refusal including D3 hint and no state change not fully credited from handler test. Viewer refusal is not member ceiling proof.",
+    "retained_owner": "Auth; Auditor",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J5",
+    "role": "Owner",
+    "requirement_status": "J1\u2013J10 historical proposed journey; later rulings govern",
+    "ruling_disposition": "Danger destructive action requires approved bounded fixture scope",
+    "source_assertions": {
+      "must_observe": [
+        "dry_run impact shows response count",
+        "execute only with token; receipt inverse none"
+      ],
+      "negative": [
+        "execute without token \u2192 CONFIRM_REQUIRED; stale token \u2192 CONFIRM_EXPIRED"
+      ]
+    },
+    "selected_evidence": "WaveM C085 deletes dry-stop only; historical static phaseA baseline different pin.",
+    "remaining_gap": "Actual impact response count, token-required/expired controls and authorized execute result at exact integration unclosed by dry-only receipt. Do not execute real deletion as this planning task.",
+    "retained_owner": "Auth/API; Auditor",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J6",
+    "role": "Viewer",
+    "requirement_status": "J1\u2013J10 historical proposed journey; later rulings govern",
+    "ruling_disposition": "Typed held success remains correct D7 boundary, not a score/report success",
+    "source_assertions": {
+      "must_observe": [
+        "summary returned or ok:true suppressed:true",
+        "response.list \u2192 NOT_AUTHORIZED_AT_SCOPE (no raw responses)"
+      ],
+      "negative": [
+        "invite \u2192 NOT_AUTHORIZED_AT_SCOPE"
+      ]
+    },
+    "selected_evidence": "Current a3-response-results:19 static held/null/noinventednumber; main299f825 WaveM C089 suppressed summary and isolation. PR28 separately supplies synthetic report interfaces only.",
+    "remaining_gap": "No real-private scores claimed. Viewer grant/forbidden invite/raw-disclosure exact twin assertions and report-browser/delegated OAuth integrated proof remain scoped acceptance.",
+    "retained_owner": "Auth/D7; report coordinator; Design/Auditor",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J7",
+    "role": "Own trace actor or support; unrelated actor negative",
+    "requirement_status": "J1\u2013J10 historical proposed journey; later rulings govern",
+    "ruling_disposition": "Trace locator is not authority",
+    "source_assertions": {
+      "must_observe": [
+        "own trace: scoped, redacted spans"
+      ],
+      "negative": [
+        "other actor's trace id \u2192 NOT_FOUND_OR_NOT_VISIBLE"
+      ]
+    },
+    "selected_evidence": "WaveN C096 and WaveM C090 report opaque null; historical C021 claimed own/isolation but deployment unbound.",
+    "remaining_gap": "Trace content/redaction and unauthorized substituted real/nonexistent IDs on both faces require exact bound receipt. Empty opaque result does not prove usable diagnostic journey.",
+    "retained_owner": "Auth/telemetry; Grok/Auditor",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J8",
+    "role": "Agent with exact scoped role; viewer negative",
+    "requirement_status": "J1\u2013J10 historical proposed journey; later rulings govern",
+    "ruling_disposition": "Search ranking is distinct from role-aware index and two-call discoverability",
+    "source_assertions": {
+      "must_observe": [
+        "role-aware index in \u22642 calls",
+        "no write/danger verbs listed for a viewer"
+      ],
+      "negative": [
+        "unknown capability \u2192 the index, not a guess"
+      ]
+    },
+    "selected_evidence": "Main docs-search.test.ts23\u201378 static; independent docs30 executed review14c5710514772; live WaveM expectedrank1 and truthfulmisses. Candidate32 exactintro/faq4tests plus historical independent review; candidate only.",
+    "remaining_gap": "Role-filtered index/no viewer write verbs and unknowncapability guidance within2calls not closed by keyword search. Live howtolist/transfer/multi-intent residual gaps remain17c5710948130.",
+    "retained_owner": "Fable B1; CoS+ bounded docs; Grok",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J9",
+    "role": "Owner/member according to capability",
+    "requirement_status": "J1\u2013J10 historical proposed journey; later rulings govern",
+    "ruling_disposition": "True inverse only; no submit/report undo",
+    "source_assertions": {
+      "must_observe": [
+        "rename undone via self:restore-prior"
+      ],
+      "negative": [
+        "response.submit has no undo token; a fake token \u2192 NOT_FOUND_OR_NOT_VISIBLE; a row with inverse none \u2192 NO_INVERSE naming the compensating control"
+      ]
+    },
+    "selected_evidence": "code-escrow102\u2013111 notes restore; undo-batch18 internal atomic batch refusal; WaveN C092 token only.",
+    "remaining_gap": "Full external rename-before/after undo and NO_INVERSE+compensation semantics not closed by token receipt or internal tests; report build inverse none is its own accepted contract.",
+    "retained_owner": "Auth receipts; Auditor",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J10",
+    "role": "Provisioned support",
+    "requirement_status": "J1\u2013J10 historical proposed journey; later rulings govern",
+    "ruling_disposition": "Human-only provisioning; acts_as remains unimplemented in frozen baseline",
+    "source_assertions": {
+      "must_observe": [
+        "audit receipt attributes the support actor (delegated_by)"
+      ],
+      "negative": [
+        "non-support actor \u2192 NOT_AUTHORIZED_AT_SCOPE"
+      ]
+    },
+    "selected_evidence": "lane-b-grants75\u2013107 support.unlock internal dispatch audit row and code custody, not acts_as; historical Grok C017 RESERVED.",
+    "remaining_gap": "No acts_as positive, delegated actor audit or human provisioning receipt. Unlock success must not be relabeled acts_as. Owner must reconcile exact support authorization before plan/FIRE.",
+    "retained_owner": "Auth support; root authority; human provisioning",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J11",
+    "role": "Shared-link participant",
+    "requirement_status": "J11\u2013J14 source-proposed extensions, not silently accepted",
+    "ruling_disposition": "Proposed extension; one-use link condition superseded by14c5707567961",
+    "source_assertions": {
+      "must_observe": [
+        "form at the version bound at presentation",
+        "receipt returned; participant never sees results"
+      ],
+      "negative": [
+        "same link again \u2192 INVALID_PARAMS link_used; expired \u2192 link_expired"
+      ]
+    },
+    "selected_evidence": "Same current shared-flow HTTP/MCP and collection browser receipts as J2, counted once; anonymous HTTP open and independent same-link respondents.",
+    "remaining_gap": "Native Auth now owns precise scenarios/journeys.json and Prefer correction per coordinator update; this ledger does not edit it. Correct participant refusal/ineligibility, exact expiry/closed/resume semantics from accepted contract, no link_used expectation.",
+    "retained_owner": "Active native Auth corrective pen; Design/Auditor",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J12",
+    "role": "Owner; support+owner slot is not independent privilege",
+    "requirement_status": "J11\u2013J14 source-proposed extensions, not silently accepted",
+    "ruling_disposition": "Proposed extension; owner consent retained pending contrary accepted authority",
+    "source_assertions": {
+      "must_observe": [
+        "impact lists current owners, projects, assessments, Mei's resulting role",
+        "receipt inverse none; last-owner protection (D3)"
+      ],
+      "negative": [
+        "execute without token \u2192 CONFIRM_REQUIRED; via write \u2192 WRONG_TOOL_FOR_CLASS; member \u2192 NOT_AUTHORIZED_AT_SCOPE",
+        "support-without-owner-consent: PROPOSED pending source (Astra 5703469487)"
+      ]
+    },
+    "selected_evidence": "lane-b-grants61\u201372 direct-handler support-withoutconsent denial, owner transfer and ownercount; WaveN C094 transfer dry only.",
+    "remaining_gap": "Workspace-level impact contents/confirm/execute/wrongtool/member refusal and actual human provisioned authority not closed by assessment handler test or owner preview.",
+    "retained_owner": "Auth; Grok/Auditor; root for true human-only fork",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J13",
+    "role": "Member/unprovisioned user",
+    "requirement_status": "J11\u2013J14 source-proposed extensions, not silently accepted",
+    "ruling_disposition": "Proposed extension, negative then request positive",
+    "source_assertions": {
+      "must_observe": [
+        "invite above own level \u2192 NOT_AUTHORIZED_AT_SCOPE, hint names D3 and seeds 'invite as member'",
+        "workspace.create without D1 \u2192 NOT_AUTHORIZED_AT_SCOPE, hint names cap.request.create",
+        "request.create returns a request id \u2014 never a dead end"
+      ],
+      "negative": [
+        "is itself the negative"
+      ]
+    },
+    "selected_evidence": "lane-b-grants member inviteaboveown denial and request idempotency; WaveN C094/C095 request summary but owner/viewer actors.",
+    "remaining_gap": "Member exact scoped D3 teaching hint and request-to-support readback chain not proven by owner/viewer summary.",
+    "retained_owner": "Auth requests/grants; Fable educational docs; Grok",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  },
+  {
+    "id": "J14",
+    "role": "Visitor and agent",
+    "requirement_status": "J11\u2013J14 source-proposed extensions, not silently accepted",
+    "ruling_disposition": "Proposed extension; honest reserved rows count zero functional credit",
+    "source_assertions": {
+      "must_observe": [
+        "v2.1-oct rows \u2192 RESERVED_NOT_BUILT with docs pointer on HTTP and MCP; no fabricated summary",
+        "without a session the seven public rows succeed (entry.intents, entry.example, ops.health, template.render, docs.get, docs.openapi, docs.capabilities)"
+      ],
+      "negative": [
+        "any 200 body on a v2.1-oct row fails the scenario",
+        "assessment.list with no session \u2192 NOT_AUTHENTICATED"
+      ]
+    },
+    "selected_evidence": "Historical35 ledger rows27\u201331 reserved assertions on9f551c03. Main registry still separates reserved rows; docs30 live search/health bounded.",
+    "remaining_gap": "Old seven-public-row statement omits ops.feedback (Auth14c5710531174 observed8). Do not enforce blanket any200 failure on report rows enabled in candidate28; keep rec/rollup/import reserved until implemented. HTTP public row != anonymous MCP transport accessibility.",
+    "retained_owner": "Auth registry; Fable B2/B3; report coordinator for3reportrows",
+    "current_status": "PARTIAL / scoped receipts; no whole-journey acceptance",
+    "pin": "299f8255526e13b17215ea1af44e3600d4b35dc2"
+  }
+]
