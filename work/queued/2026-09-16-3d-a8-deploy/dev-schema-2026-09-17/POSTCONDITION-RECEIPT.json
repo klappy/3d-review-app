@@ -1,0 +1,44 @@
+{
+  "status": "PASS author postconditions; independent review pending",
+  "exact_schema_matches_local_expected_from_observed_DDL_and_exact_SQL": true,
+  "unchanged_existing_counts": [
+    {
+      "table_name": "participant_session",
+      "row_count": 10
+    },
+    {
+      "table_name": "invitation",
+      "row_count": 0
+    },
+    {
+      "table_name": "response",
+      "row_count": 432
+    },
+    {
+      "table_name": "assessment_survey",
+      "row_count": 126
+    },
+    {
+      "table_name": "survey_template",
+      "row_count": 18
+    }
+  ],
+  "empty_new_tables_and_no_existing_nonnull_invitation": [
+    {
+      "table_name": "oauth_code_redemption",
+      "row_count": 0
+    },
+    {
+      "table_name": "shared_response_claim",
+      "row_count": 0
+    },
+    {
+      "table_name": "participant_session_nonnull_invitation",
+      "row_count": 0
+    }
+  ],
+  "foreign_key_check": [],
+  "foreign_key_index_primary_unique_and_nullable_column_checks": "PASS",
+  "ledger_absent": true,
+  "note": "Local in-memory schema comparison only; no runtime product tests or writes beyond two approved migration payloads."
+}

@@ -1,0 +1,5 @@
+# Real MCP panel increment
+
+Owner: existing Claude Design worker (active CP8 work preserved; latest scope handoff unconfirmed because browser connection fails). Issue71: https://github.com/klappy/3d-review-app/issues/71. Deliver actual MCP panel/resource/tool bridge separately from permissions, participant and accepted web release. Own PR and cookbook SemVer at release readiness. Existing four tools preserved. Acceptance requires real host panel/navigation/loading/error/refusal/confirmation evidence, independent exact-head review and normal release checks. Never claim fixture or tool-only coverage as panel completion. Root must deliver ownership split before importing mixed CP8 cargo.
+
+Recipe references: docs/release.md in app; kitchen health-code/HYGIENE.md and health-code/RULINGS.md. Ingredients: accepted CP6, source contracts and existing review receipts. Station: isolated agent branch. Risk: bounded application increment; normal tests and independent review required. Promise: active, no fabricated deadline. Declared product and acceptance scope above.

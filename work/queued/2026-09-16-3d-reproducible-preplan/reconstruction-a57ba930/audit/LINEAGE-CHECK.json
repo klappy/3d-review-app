@@ -1,0 +1,16 @@
+[
+  {
+    "supplier": "2315a82829afe152539dd31fe3da93d57b940c1f",
+    "integration": "699ea5137f536eb601dd79a0abd5f3437ff3f3e5",
+    "equal_tree": true,
+    "supplier_is_ancestor": false,
+    "integration_is_ancestor": true
+  },
+  {
+    "supplier": "fc0bbc36cd79f8f477b170e4d3962d414625d332",
+    "integration": "ad95321e99923666b3dbc9eac163710e6e70ad41",
+    "equal_tree": false,
+    "supplier_is_ancestor": false,
+    "integration_is_ancestor": true
+  }
+]

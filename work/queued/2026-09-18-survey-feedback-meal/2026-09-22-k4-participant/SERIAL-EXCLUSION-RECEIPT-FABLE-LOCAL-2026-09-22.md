@@ -1,0 +1,7 @@
+# Serial exclusion receipt — staff owner (Fable local)
+Order: SERIAL-EXCLUSION-ORDER-2026-09-22 @ kitchen 92286a55. Applied after the stamped K3b1 proof, on the staff lineage only.
+
+- Commit **`57fa453ca20754d1315d6bfbc373151c42bc0d7e`** on `design-batch/fable-k3b1-20260922` (remote readback equal); parent efb53588. Diff: `ui/.assetsignore` +1 line `kit/participant-presentation.test.mjs` appended at line 49; all 48 prior entries retained (incl. `assess/feedback-modal.test.mjs` at line 48). Nothing else changed. Separate from the K3b2 four-path scope.
+- Wrangler `--local` at 57fa453c (client-release restamped to 57fa453c): `/kit/participant-presentation.test.mjs` → 404 (note: the file does not exist on this lineage — the K4 worker creates it; the exclusion line is present, so the assembled candidate must re-prove 404 with the file present), `assess/feedback-modal.test.mjs` 404, `kit/app-adapter.test.mjs` 404; runtime `participant-view.js`, `participant-resume.js`, `client-release.js`, `assess/feedback-modal.js` 200 byte-equal; `/participate/index.html` 307 → `/participate/` (asset canonicalisation). File `evidence/k3b1-wrangler-asset-proof-57fa453.txt`.
+- Reviewed K3b1 bundle remains the efb53588 one (output sha256 faa7520d…); this commit does not touch any bundled module. If the release cook assembles at 57fa453c or later, restamp and identify the tested head.
+- Custody: `ui/.assetsignore` remains staff-only; the participant worker does not edit it.

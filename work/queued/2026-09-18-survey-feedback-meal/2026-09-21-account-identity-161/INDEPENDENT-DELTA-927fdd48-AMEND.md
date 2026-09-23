@@ -1,0 +1,9 @@
+# Independent AMEND — app163 head927fdd48
+
+Exact head927fdd48cfc955c3756bb1f1ed44bd48ccf90b79, Cursor Agent delta from previously accepted b6f0eea3cb4d85555fe663442fbc0909fe3d89e4. Only assess.js and identity-reset.test.mjs changed. Source ACCEPT does not extend to this head.
+
+Blocking finding: after confirmed app logout, signOut resets identity, then awaits a newly added same-origin /cdn-cgi/access/logout fetch, and unconditionally navigates to the team-domain logout. A new identity established while that fetch is pending is therefore navigated into provider-wide logout. Existing pre-reset current() checks do not protect this new async boundary.
+
+Independent reproduction used exact new-head assess.js and test file in /tmp/3d-161-927-review, unchanged demo dependencies, plus one reviewer-only deferred-fetch test. Set old principal/token, confirm app logout, hold provider fetch, replace identity/principal/token, resolve fetch. Expected no navigation; actual team-domain logout navigation. Existing17 tests pass, reviewer disconfirmer fails:17pass/1fail. No product edits or live logout.
+
+Required correction: bind continuation after the intentional reset to that post-reset generation/credential state, checking before any provider navigation after the fetch settles; preserve replacement identity and stale status semantics. Add both resolve/reject deferred-provider tests with identity replacement. Do not claim the already-dispatched provider request was canceled or undone. Coordinator must explicitly disposition the added provider-side fetch against prior destination-only adoption; official docs describe both URLs revoking across apps, so inaccurate single-domain-only rationale is not proof the extra action is needed. Existing checks were IN_PROGRESS at observation; no merge or acceptance while this finding remains.

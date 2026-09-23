@@ -1,0 +1,11 @@
+# Independent documentary review — ACCEPT within scope
+
+Reviewed the frozen manifest 7b985a7b231cc03cbe271aa1d7b7113e94befd10745c1c1da9420f35e4a08cb2, GAP-DISPOSITION, RUNNER-LIMITATIONS and full 35-row rendered evidence ledger. Independently recomputed all 74 manifest entries with zero mismatches; counted 35 unique requirement IDs, 27 scoped overlays, 14 journey records and 83 capability records, including 48 with no supplemental ledger mapping. These are inventory, not completion scores.
+
+Independently fetched scripts/journeys.mjs, scripts/parity.mjs and test/shared-link-flow.test.ts directly from GitHub at 299f8255526e13b17215ea1af44e3600d4b35dc2 and matched all three saved sources. The cited J6 success-or-hidden assertion, hardcoded journey execution/printed-row exit limitation, parity placeholder/exclusion/ID-normalization limitations are supported by exact source. Existing numeric-count and participant MCP assertions are credited only at their actual scope. No runtime test was run in this review; no live authorization defect is inferred.
+
+ACCEPT as a bounded evidence-reconciliation planning supplement, not exhaustive test coverage, whole-goal acceptance, a new implementation order, or permission to execute campaigns. Historical suite pins and proposed J11–14 remain visibly distinct; no 35-row-to-83-capability completion inference. Native Auth retains J11 and classification corrections. Source/policy gaps must be reconciled by their existing owners before any human fork is re-opened.
+
+Freshness overlay: the author inventory is explicitly time-pinned. Since its observation, root merged PR31 as bd2f6b27 at 08:25:02Z; provider observer subsequently proved build192a88ef-a6fb-4ab3-9b79-1fedd5c06023 and active version e40439d4-0ee0-4168-b3d4-d3ec23baf8b7. PR28 Bugbot105126094066 is SUCCESS. These later receipts supersede queue labels only; they do not transfer metadata/browser/report acceptance or change the frozen 299f825 assertion audit. Preserve author artifact rather than rewriting historical pins.
+
+Next useful bounded dish is runner assertion/fixture truthfulness planning in existing B2/B3, separate from Auth's already-owned scenario correction. Do not dispatch all ledger gaps as new tests or add another full campaign. Root owns durable landing and prioritization.

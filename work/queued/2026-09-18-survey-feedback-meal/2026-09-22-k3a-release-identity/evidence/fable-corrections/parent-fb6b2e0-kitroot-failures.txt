@@ -1,0 +1,5 @@
+not ok 21 - non-kit host: workspace and project pages each carry exactly one parent link that navigates back to the correct list
+not ok 23 - cold assessment-first path: Owner/Member/Viewer workspace role badge is present immediately on the Workspaces list, no extra discovery read
+# tests 27
+# pass 25
+# fail 2

@@ -1,0 +1,9 @@
+{
+  "verdict": "EXACT_UNION_VERIFIED",
+  "commit": "1c2423d2a55526cf8cec19d50a21848cf55a9cec",
+  "tree": "27786b7f9d881fba55b4db371538f5820ecf4dda",
+  "paths": 164,
+  "exactC1AddedPaths": 9,
+  "B2TreePreserved": true,
+  "baselineSupersession": "B2 accepted capture/docs revisions supersede older B1 blobs; no false original-B1 byte identity"
+}

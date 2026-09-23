@@ -1,0 +1,797 @@
+{
+  "github": {
+    "main": {
+      "exit_code": 0,
+      "result": {
+        "ref": "refs/heads/main",
+        "node_id": "REF_kwDOUd4jZa9yZWZzL2hlYWRzL21haW4",
+        "url": "https://api.github.com/repos/klappy/3d-review-app/git/refs/heads/main",
+        "object": {
+          "sha": "895339fb5a289b357148e7050447125791e6a411",
+          "type": "commit",
+          "url": "https://api.github.com/repos/klappy/3d-review-app/git/commits/895339fb5a289b357148e7050447125791e6a411"
+        }
+      },
+      "stderr": ""
+    },
+    "phase0": {
+      "exit_code": 0,
+      "result": {
+        "ref": "refs/heads/phase-0/walking-skeleton",
+        "node_id": "REF_kwDOUd4jZdoAI3JlZnMvaGVhZHMvcGhhc2UtMC93YWxraW5nLXNrZWxldG9u",
+        "url": "https://api.github.com/repos/klappy/3d-review-app/git/refs/heads/phase-0/walking-skeleton",
+        "object": {
+          "sha": "10f5f444d68475d7114ab8fe0bf269fe106476b1",
+          "type": "commit",
+          "url": "https://api.github.com/repos/klappy/3d-review-app/git/commits/10f5f444d68475d7114ab8fe0bf269fe106476b1"
+        }
+      },
+      "stderr": ""
+    },
+    "production": {
+      "exit_code": 0,
+      "result": {
+        "ref": "refs/heads/production",
+        "node_id": "REF_kwDOUd4jZbVyZWZzL2hlYWRzL3Byb2R1Y3Rpb24",
+        "url": "https://api.github.com/repos/klappy/3d-review-app/git/refs/heads/production",
+        "object": {
+          "sha": "895339fb5a289b357148e7050447125791e6a411",
+          "type": "commit",
+          "url": "https://api.github.com/repos/klappy/3d-review-app/git/commits/895339fb5a289b357148e7050447125791e6a411"
+        }
+      },
+      "stderr": ""
+    },
+    "rulesets": {
+      "exit_code": 0,
+      "result": [
+        {
+          "id": 23571595,
+          "name": "3d-review-pr-and-bugbot",
+          "target": "branch",
+          "source_type": "Repository",
+          "source": "klappy/3d-review-app",
+          "enforcement": "active",
+          "node_id": "RRS_lACqUmVwb3NpdG9yec5R3iNlzgFnrIs",
+          "_links": {
+            "self": {
+              "href": "https://api.github.com/repos/klappy/3d-review-app/rulesets/23571595"
+            },
+            "html": {
+              "href": "https://github.com/klappy/3d-review-app/rules/23571595"
+            }
+          },
+          "created_at": "2026-09-16T20:33:03.493-04:00",
+          "updated_at": "2026-09-16T20:33:03.589-04:00"
+        },
+        {
+          "id": 23578667,
+          "name": "3d-review-production-pr-and-bugbot",
+          "target": "branch",
+          "source_type": "Repository",
+          "source": "klappy/3d-review-app",
+          "enforcement": "active",
+          "node_id": "RRS_lACqUmVwb3NpdG9yec5R3iNlzgFnyCs",
+          "_links": {
+            "self": {
+              "href": "https://api.github.com/repos/klappy/3d-review-app/rulesets/23578667"
+            },
+            "html": {
+              "href": "https://github.com/klappy/3d-review-app/rules/23578667"
+            }
+          },
+          "created_at": "2026-09-17T00:41:04.726-04:00",
+          "updated_at": "2026-09-17T00:41:36.123-04:00"
+        }
+      ],
+      "stderr": ""
+    },
+    "ruleset23571595": {
+      "exit_code": 0,
+      "result": {
+        "id": 23571595,
+        "name": "3d-review-pr-and-bugbot",
+        "target": "branch",
+        "source_type": "Repository",
+        "source": "klappy/3d-review-app",
+        "enforcement": "active",
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "refs/heads/main",
+              "refs/heads/phase-0/walking-skeleton"
+            ]
+          }
+        },
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "type": "pull_request",
+            "parameters": {
+              "required_approving_review_count": 0,
+              "dismiss_stale_reviews_on_push": true,
+              "required_reviewers": [],
+              "require_code_owner_review": false,
+              "require_last_push_approval": false,
+              "required_review_thread_resolution": true,
+              "require_extra_approval_for_unattributed_changes": true,
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ]
+            }
+          },
+          {
+            "type": "required_status_checks",
+            "parameters": {
+              "strict_required_status_checks_policy": true,
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "Cursor Bugbot",
+                  "integration_id": 1210556
+                }
+              ]
+            }
+          }
+        ],
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5R3iNlzgFnrIs",
+        "created_at": "2026-09-16T20:33:03.493-04:00",
+        "updated_at": "2026-09-16T20:33:03.589-04:00",
+        "bypass_actors": [],
+        "current_user_can_bypass": "never",
+        "_links": {
+          "self": {
+            "href": "https://api.github.com/repos/klappy/3d-review-app/rulesets/23571595"
+          },
+          "html": {
+            "href": "https://github.com/klappy/3d-review-app/rules/23571595"
+          }
+        }
+      },
+      "stderr": ""
+    },
+    "effective_main": {
+      "exit_code": 0,
+      "result": [
+        {
+          "type": "deletion",
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23571595
+        },
+        {
+          "type": "non_fast_forward",
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23571595
+        },
+        {
+          "type": "pull_request",
+          "parameters": {
+            "required_approving_review_count": 0,
+            "dismiss_stale_reviews_on_push": true,
+            "required_reviewers": [],
+            "require_code_owner_review": false,
+            "require_last_push_approval": false,
+            "required_review_thread_resolution": true,
+            "require_extra_approval_for_unattributed_changes": true,
+            "allowed_merge_methods": [
+              "merge",
+              "squash",
+              "rebase"
+            ]
+          },
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23571595
+        },
+        {
+          "type": "required_status_checks",
+          "parameters": {
+            "strict_required_status_checks_policy": true,
+            "do_not_enforce_on_create": false,
+            "required_status_checks": [
+              {
+                "context": "Cursor Bugbot",
+                "integration_id": 1210556
+              }
+            ]
+          },
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23571595
+        }
+      ],
+      "stderr": ""
+    },
+    "effective_phase0": {
+      "exit_code": 0,
+      "result": [
+        {
+          "type": "deletion",
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23571595
+        },
+        {
+          "type": "non_fast_forward",
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23571595
+        },
+        {
+          "type": "pull_request",
+          "parameters": {
+            "required_approving_review_count": 0,
+            "dismiss_stale_reviews_on_push": true,
+            "required_reviewers": [],
+            "require_code_owner_review": false,
+            "require_last_push_approval": false,
+            "required_review_thread_resolution": true,
+            "require_extra_approval_for_unattributed_changes": true,
+            "allowed_merge_methods": [
+              "merge",
+              "squash",
+              "rebase"
+            ]
+          },
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23571595
+        },
+        {
+          "type": "required_status_checks",
+          "parameters": {
+            "strict_required_status_checks_policy": true,
+            "do_not_enforce_on_create": false,
+            "required_status_checks": [
+              {
+                "context": "Cursor Bugbot",
+                "integration_id": 1210556
+              }
+            ]
+          },
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23571595
+        }
+      ],
+      "stderr": ""
+    },
+    "effective_production": {
+      "exit_code": 0,
+      "result": [
+        {
+          "type": "deletion",
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23578667
+        },
+        {
+          "type": "non_fast_forward",
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23578667
+        },
+        {
+          "type": "pull_request",
+          "parameters": {
+            "required_approving_review_count": 0,
+            "dismiss_stale_reviews_on_push": true,
+            "required_reviewers": [],
+            "require_code_owner_review": false,
+            "require_last_push_approval": false,
+            "required_review_thread_resolution": true,
+            "require_extra_approval_for_unattributed_changes": true,
+            "allowed_merge_methods": [
+              "merge",
+              "squash",
+              "rebase"
+            ]
+          },
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23578667
+        },
+        {
+          "type": "required_status_checks",
+          "parameters": {
+            "strict_required_status_checks_policy": true,
+            "do_not_enforce_on_create": false,
+            "required_status_checks": [
+              {
+                "context": "Cursor Bugbot",
+                "integration_id": 1210556
+              }
+            ]
+          },
+          "ruleset_source_type": "Repository",
+          "ruleset_source": "klappy/3d-review-app",
+          "ruleset_id": 23578667
+        }
+      ],
+      "stderr": ""
+    },
+    "main_commit": {
+      "exit_code": 0,
+      "result": {
+        "sha": "895339fb5a289b357148e7050447125791e6a411",
+        "node_id": "C_kwDOUd4jZdoAKDg5NTMzOWZiNWEyODliMzU3MTQ4ZTcwNTA0NDcxMjU3OTFlNmE0MTE",
+        "url": "https://api.github.com/repos/klappy/3d-review-app/git/commits/895339fb5a289b357148e7050447125791e6a411",
+        "html_url": "https://github.com/klappy/3d-review-app/commit/895339fb5a289b357148e7050447125791e6a411",
+        "author": {
+          "name": "Chris Klapp",
+          "email": "klappy@users.noreply.github.com",
+          "date": "2026-09-16T19:48:12Z"
+        },
+        "committer": {
+          "name": "Chris Klapp",
+          "email": "klappy@users.noreply.github.com",
+          "date": "2026-09-16T19:48:12Z"
+        },
+        "tree": {
+          "sha": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "url": "https://api.github.com/repos/klappy/3d-review-app/git/trees/4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+        },
+        "message": "init: empty main (OF-1 home for 3D Review app)\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01ULJfWJxAGRqj53nmkc6rcq",
+        "parents": [],
+        "verification": {
+          "verified": false,
+          "reason": "unsigned",
+          "signature": null,
+          "payload": null,
+          "verified_at": null
+        }
+      },
+      "stderr": ""
+    }
+  },
+  "production_ruleset": {
+    "id": 23578667,
+    "name": "3d-review-production-pr-and-bugbot",
+    "target": "branch",
+    "source_type": "Repository",
+    "source": "klappy/3d-review-app",
+    "enforcement": "active",
+    "conditions": {
+      "ref_name": {
+        "exclude": [],
+        "include": [
+          "refs/heads/production"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "type": "deletion"
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "pull_request",
+        "parameters": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews_on_push": true,
+          "required_reviewers": [],
+          "require_code_owner_review": false,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": true,
+          "require_extra_approval_for_unattributed_changes": true,
+          "allowed_merge_methods": [
+            "merge",
+            "squash",
+            "rebase"
+          ]
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "strict_required_status_checks_policy": true,
+          "do_not_enforce_on_create": false,
+          "required_status_checks": [
+            {
+              "context": "Cursor Bugbot",
+              "integration_id": 1210556
+            }
+          ]
+        }
+      }
+    ],
+    "node_id": "RRS_lACqUmVwb3NpdG9yec5R3iNlzgFnyCs",
+    "created_at": "2026-09-17T00:41:04.726-04:00",
+    "updated_at": "2026-09-17T00:41:36.123-04:00",
+    "bypass_actors": [],
+    "current_user_can_bypass": "never",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/klappy/3d-review-app/rulesets/23578667"
+      },
+      "html": {
+        "href": "https://github.com/klappy/3d-review-app/rules/23578667"
+      }
+    }
+  },
+  "cloudflare": {
+    "dev": {
+      "triggers": {
+        "result": [
+          {
+            "trigger_uuid": "b82be56e-33f0-43d5-bf24-3749dd4dc168",
+            "external_script_id": "b0b4617b8a3f49679e4d54ac876b6c73",
+            "build_token_uuid": "add641f1-6a28-4f31-8cd4-89848f9ffdab",
+            "build_token_name": "appbuilder-mcp build token",
+            "trigger_name": "Dev Deploy (main)",
+            "build_command": "npm ci && npm run typecheck && npm test",
+            "deploy_command": "npx wrangler deploy --config wrangler.toml",
+            "root_directory": "/",
+            "branch_includes": [
+              "main"
+            ],
+            "branch_excludes": [],
+            "path_includes": [
+              "*"
+            ],
+            "path_excludes": [
+              "*.md"
+            ],
+            "build_caching_enabled": true,
+            "created_on": "2026-09-16T22:30:47.695Z",
+            "modified_on": "2026-09-17T04:42:13.870Z",
+            "deleted_on": null,
+            "repo_connection": {
+              "repo_connection_uuid": "4988599d-fefa-4e58-a1c3-2e92746a38b3",
+              "repo_id": "1373512549",
+              "repo_name": "3d-review-app",
+              "provider_type": "github",
+              "provider_account_id": "118073",
+              "provider_account_name": "klappy",
+              "grant_id": null,
+              "created_on": "2026-09-16T22:30:47.158Z",
+              "modified_on": "2026-09-16T22:30:47.158Z",
+              "deleted_on": null
+            }
+          }
+        ],
+        "success": true,
+        "errors": [],
+        "messages": [],
+        "status": 200
+      },
+      "build_pages": [
+        {
+          "result": [
+            {
+              "build_uuid": "2d7d63ba-a2a1-48e2-9587-5cc353dae70e",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-17T00:51:01.976Z",
+              "modified_on": "2026-09-17T00:52:01.693Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "10f5f444d68475d7114ab8fe0bf269fe106476b1"
+            },
+            {
+              "build_uuid": "3039809a-0a35-44e2-906e-6a97858228cd",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-17T00:37:35.077Z",
+              "modified_on": "2026-09-17T00:38:24.632Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "7f454791867d6b1ab83a170045c2a7e48931b529"
+            },
+            {
+              "build_uuid": "4325a610-a966-43f9-8160-86949a4ba603",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-17T00:11:08.489Z",
+              "modified_on": "2026-09-17T00:11:58.276Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "518e083aee6395fef144f8705b888d1d76941ff7"
+            },
+            {
+              "build_uuid": "5a8398c6-110b-4424-a3d9-f61e5adfe646",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-17T00:06:14.564Z",
+              "modified_on": "2026-09-17T00:07:16.163Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "e4c97e3ecf745da45e829ee5d01c26974d9de559"
+            },
+            {
+              "build_uuid": "435b0038-2d10-44ac-a3bb-c423efbce8eb",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-17T00:01:42.774Z",
+              "modified_on": "2026-09-17T00:02:43.860Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "d66e97fe78e17d8a03dc0cd5cccb0506f51b3d52"
+            },
+            {
+              "build_uuid": "c28970f3-f941-48c6-800f-e38cfee8f2e8",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T23:56:48.881Z",
+              "modified_on": "2026-09-16T23:57:31.045Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "1590e374b94177022714b4abaeaec0105e6ce901"
+            },
+            {
+              "build_uuid": "810ae044-1a5f-4a7e-8149-860c5976f2fb",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T23:51:37.685Z",
+              "modified_on": "2026-09-16T23:52:22.777Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "36a1b024fe5e2ebb7ae7ed13ca2e0dd9f2644e8b"
+            },
+            {
+              "build_uuid": "66218021-906b-4146-8981-7ec29b282ff2",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T23:49:37.954Z",
+              "modified_on": "2026-09-16T23:50:17.950Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "59b60423148b3755213e08cfebb718d6346a9d1c"
+            },
+            {
+              "build_uuid": "caae6f2a-7913-46b6-9399-e743df40fa13",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T23:44:06.285Z",
+              "modified_on": "2026-09-16T23:44:53.643Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "16943a4b7929fb15c1124dd178994a8157acc1c5"
+            },
+            {
+              "build_uuid": "b56b8df3-9386-4ea9-88b2-143aba025cb7",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T23:15:19.047Z",
+              "modified_on": "2026-09-16T23:15:49.781Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "3aac673aff3c4a80475694ac7f226ffada063d73"
+            },
+            {
+              "build_uuid": "8480c252-fc5e-4b9b-8cc9-9e64e0eb90a5",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T23:09:07.951Z",
+              "modified_on": "2026-09-16T23:09:39.686Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "9d0125664e6b0474326e612d65eebe8bc482a952"
+            },
+            {
+              "build_uuid": "344a2b88-b3a4-4a6f-8075-c2e238d5d6ea",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T22:54:14.361Z",
+              "modified_on": "2026-09-16T22:54:53.688Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "98bfa63565dc6fbc76876a6019e88d15ea8ee161"
+            },
+            {
+              "build_uuid": "4df56700-1065-41e2-b9c4-01112b622c91",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T22:50:19.641Z",
+              "modified_on": "2026-09-16T22:50:50.162Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "69e70208dd9fef6178d9d5cf40e92d7523073897"
+            },
+            {
+              "build_uuid": "4648f1a1-eccf-4ca0-abc4-61f399f38f9f",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T22:46:49.469Z",
+              "modified_on": "2026-09-16T22:47:35.271Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "0a0ba0f0a2052e67e3966331f7f5546107b7caed"
+            },
+            {
+              "build_uuid": "66e5ed0a-934d-4f68-a43c-3617d9c9a12a",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T22:43:07.276Z",
+              "modified_on": "2026-09-16T22:43:37.884Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "998676824eb2458280c8f7eea8fd3a43b72bd5e1"
+            },
+            {
+              "build_uuid": "34d07da7-4ea9-4ad0-b33f-4c66d724c0a9",
+              "status": "stopped",
+              "build_outcome": "fail",
+              "created_on": "2026-09-16T22:40:10.080Z",
+              "modified_on": "2026-09-16T22:40:29.876Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "a3ad81538268932a141ad312e7142088b57a9bb4"
+            },
+            {
+              "build_uuid": "6dd1a6f4-2de5-4b78-a435-15b2f9045097",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T22:38:26.390Z",
+              "modified_on": "2026-09-16T22:38:54.502Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "0410aaa88e845d320ef2dff5f8c8c13f9591d259"
+            },
+            {
+              "build_uuid": "c467a11b-9348-48ed-9239-7b8ba26a4951",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T22:33:14.189Z",
+              "modified_on": "2026-09-16T22:34:01.988Z",
+              "source": "push_event",
+              "branch": "phase-0/walking-skeleton",
+              "sha": "ffa3111c2a58fefe5c886a354082c3673465773d"
+            },
+            {
+              "build_uuid": "12cf7b17-ccb5-49da-995b-56c842874138",
+              "status": "stopped",
+              "build_outcome": "success",
+              "created_on": "2026-09-16T22:30:59.293Z",
+              "modified_on": "2026-09-16T22:31:28.203Z",
+              "source": "manual",
+              "branch": "phase-0/walking-skeleton",
+              "sha": ""
+            }
+          ],
+          "success": true,
+          "errors": [],
+          "messages": [],
+          "result_info": {
+            "next_page": false,
+            "page": 1,
+            "per_page": 200,
+            "count": 19,
+            "total_count": 19,
+            "total_pages": 1
+          },
+          "status": 200
+        }
+      ],
+      "deployments": {
+        "result": {
+          "deployments": [
+            {
+              "id": "450369eb-d0ef-41c1-af82-b0f28ded5cac",
+              "source": "wrangler",
+              "strategy": "percentage",
+              "author_email": "christopher@klapp.name",
+              "annotations": {
+                "workers/triggered_by": "deployment"
+              },
+              "versions": [
+                {
+                  "version_id": "038befe0-cf15-4c3d-b48e-021a7704f13e",
+                  "percentage": 100
+                }
+              ],
+              "created_on": "2026-09-17T00:51:55.459365Z"
+            }
+          ]
+        },
+        "success": true,
+        "errors": [],
+        "messages": [],
+        "status": 200
+      }
+    },
+    "production": {
+      "triggers": {
+        "result": [
+          {
+            "trigger_uuid": "d067de78-0937-42cc-8f3e-cc001c4af8fc",
+            "external_script_id": "0a74a3aacb60454e90c0fb92fff2c3dd",
+            "build_token_uuid": "add641f1-6a28-4f31-8cd4-89848f9ffdab",
+            "build_token_name": "appbuilder-mcp build token",
+            "trigger_name": "Production Deploy (production, via PR)",
+            "build_command": "npm ci && npm run typecheck && npm test",
+            "deploy_command": "npx wrangler deploy --config wrangler.toml --env production",
+            "root_directory": "/",
+            "branch_includes": [
+              "production"
+            ],
+            "branch_excludes": [],
+            "path_includes": [
+              "*"
+            ],
+            "path_excludes": [
+              "*.md"
+            ],
+            "build_caching_enabled": true,
+            "created_on": "2026-09-16T22:30:48.290Z",
+            "modified_on": "2026-09-17T04:41:56.607Z",
+            "deleted_on": null,
+            "repo_connection": {
+              "repo_connection_uuid": "4988599d-fefa-4e58-a1c3-2e92746a38b3",
+              "repo_id": "1373512549",
+              "repo_name": "3d-review-app",
+              "provider_type": "github",
+              "provider_account_id": "118073",
+              "provider_account_name": "klappy",
+              "grant_id": null,
+              "created_on": "2026-09-16T22:30:47.158Z",
+              "modified_on": "2026-09-16T22:30:47.158Z",
+              "deleted_on": null
+            }
+          }
+        ],
+        "success": true,
+        "errors": [],
+        "messages": [],
+        "status": 200
+      },
+      "build_pages": [
+        {
+          "result": [],
+          "success": true,
+          "errors": [],
+          "messages": [],
+          "result_info": {
+            "next_page": false,
+            "page": 1,
+            "per_page": 200,
+            "count": 0,
+            "total_count": 0,
+            "total_pages": 0
+          },
+          "status": 200
+        }
+      ],
+      "deployments": {
+        "result": {
+          "deployments": [
+            {
+              "id": "4a4d9869-62e8-46c8-acbd-3ef95db0fb42",
+              "source": "api",
+              "strategy": "percentage",
+              "author_email": "christopher@klapp.name",
+              "annotations": {
+                "workers/message": "Automatic deployment on upload.",
+                "workers/triggered_by": "upload"
+              },
+              "versions": [
+                {
+                  "version_id": "864f58cd-835c-4999-bc5d-0c9f987ebe77",
+                  "percentage": 100
+                }
+              ],
+              "created_on": "2026-09-16T22:26:57.727118Z"
+            }
+          ]
+        },
+        "success": true,
+        "errors": [],
+        "messages": [],
+        "status": 200
+      }
+    }
+  },
+  "freeze": "retained pending root independent verification"
+}

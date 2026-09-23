@@ -1,0 +1,343 @@
+{
+  "before_cursor": 129,
+  "after_cursor": 133,
+  "generation": 0,
+  "before": [
+    {
+      "id": "roadmap-150",
+      "seq": 128,
+      "operations": {
+        "happening_now": "Letter-default0.14.3 is verified on DEV; production promotion is in review.",
+        "blocker": null,
+        "next_action": "Complete production checks, promote the same release, and verify delivery.",
+        "queue_order": "After changelog patch0.14.2.",
+        "workflow": "now",
+        "queue_rank": null,
+        "work_type": "bugfix",
+        "release_impact": "patch",
+        "release_reference": "0.14.3",
+        "breaking": false,
+        "reviewed_at": "2026-09-19T00:01:07.896Z"
+      },
+      "outcome": "Candidate built;22 print tests and local browser3/3 passed. Independent review and deployment remain."
+    },
+    {
+      "id": "roadmap-154",
+      "seq": 129,
+      "operations": {
+        "happening_now": "Final review and Bugbot passed; the required build check is still running.",
+        "blocker": "Awaiting the final build check before merge and deployment.",
+        "next_action": "Merge immediately after all checks succeed, then verify the corrected mobile stage display live.",
+        "queue_order": null,
+        "workflow": "now",
+        "queue_rank": null,
+        "work_type": "bugfix",
+        "release_impact": "patch",
+        "release_reference": "0.14.4",
+        "breaking": false,
+        "reviewed_at": "2026-09-19T00:01:09.326Z"
+      },
+      "outcome": "19 focused tests passed; author desktop/mobile checks used 28 actual queue items. Not deployed."
+    }
+  ],
+  "after": [
+    {
+      "id": "roadmap-150",
+      "seq": 133,
+      "operations": {
+        "happening_now": "The Letter-default software change is delivered. Physical printing and reporter acceptance remain follow-up work.",
+        "blocker": "Physical print pagination and reporter confirmation have not been observed.",
+        "next_action": "Confirm the paper-print result and original reported scenario; keep issue 150 open until acceptance is recorded.",
+        "queue_order": null,
+        "workflow": "past",
+        "queue_rank": null,
+        "work_type": "bugfix",
+        "release_impact": "patch",
+        "release_reference": "0.14.3",
+        "breaking": false,
+        "reviewed_at": "2026-09-22T02:02:48.477Z"
+      },
+      "outcome": "Version 0.14.3 was delivered to DEV and production with source and serving-release verification. Physical print pagination and reporter confirmation remain unmeasured.",
+      "reported": {
+        "planned": {
+          "item_id": "roadmap-150",
+          "kind": "work_started",
+          "stage": "planned",
+          "state": "done",
+          "evidence": [
+            {
+              "repo": "3d-review-app",
+              "kind": "issue",
+              "number": 150
+            },
+            {
+              "repo": "3d-review-app",
+              "kind": "pull",
+              "number": 153
+            }
+          ],
+          "sequence": 100,
+          "recorded_at": "2026-09-18T23:31:58.218Z",
+          "attribution": "agent_report"
+        },
+        "built": {
+          "item_id": "roadmap-150",
+          "kind": "checks_passed",
+          "stage": "built",
+          "state": "done",
+          "version": "0.14.3",
+          "evidence": [
+            {
+              "repo": "3d-review-app",
+              "kind": "pull",
+              "number": 153
+            }
+          ],
+          "sequence": 114,
+          "recorded_at": "2026-09-18T23:36:15.485Z",
+          "attribution": "agent_report"
+        },
+        "reviewed": {
+          "item_id": "roadmap-150",
+          "kind": "checks_passed",
+          "stage": "reviewed",
+          "state": "done",
+          "version": "0.14.3",
+          "source_sha": "2e9cb18b80dc60e93631dac56c8f2c2c3bd0ed36",
+          "evidence": [
+            {
+              "repo": "3d-review-app",
+              "kind": "commit",
+              "sha": "2e9cb18b80dc60e93631dac56c8f2c2c3bd0ed36"
+            }
+          ],
+          "sequence": 123,
+          "recorded_at": "2026-09-19T00:00:44.565Z",
+          "attribution": "agent_report"
+        },
+        "dev": {
+          "item_id": "roadmap-150",
+          "kind": "dev_verified",
+          "stage": "dev",
+          "state": "done",
+          "version": "0.14.3",
+          "source_sha": "2e9cb18b80dc60e93631dac56c8f2c2c3bd0ed36",
+          "evidence": [
+            {
+              "repo": "3d-review-app",
+              "kind": "commit",
+              "sha": "2e9cb18b80dc60e93631dac56c8f2c2c3bd0ed36"
+            }
+          ],
+          "sequence": 124,
+          "recorded_at": "2026-09-19T00:00:46.203Z",
+          "attribution": "agent_report"
+        },
+        "production": {
+          "item_id": "roadmap-150",
+          "kind": "production_verified",
+          "stage": "production",
+          "state": "done",
+          "version": "0.14.3",
+          "source_sha": "0b798cede7f5ed4a5ccc82de4e196a5587f8ecef",
+          "evidence": [
+            {
+              "repo": "3d-review-app",
+              "kind": "pull",
+              "number": 160
+            },
+            {
+              "repo": "kitchen",
+              "kind": "commit",
+              "sha": "1dc6e3ffd94a1309233cc026b71f81e5517c97cb"
+            }
+          ],
+          "sequence": 133,
+          "recorded_at": "2026-09-22T02:03:40.098Z",
+          "attribution": "agent_report"
+        }
+      },
+      "stages": {
+        "planned": {
+          "state": "pending",
+          "reason": "No verifier attestation recorded.",
+          "evidence": []
+        },
+        "built": {
+          "state": "pending",
+          "reason": "No verifier attestation recorded.",
+          "evidence": []
+        },
+        "reviewed": {
+          "state": "pending",
+          "reason": "No verifier attestation recorded.",
+          "evidence": []
+        },
+        "dev": {
+          "state": "pending",
+          "reason": "No verifier attestation recorded.",
+          "evidence": []
+        },
+        "production": {
+          "state": "pending",
+          "reason": "No verifier attestation recorded.",
+          "evidence": []
+        }
+      }
+    },
+    {
+      "id": "roadmap-154",
+      "seq": 132,
+      "operations": {
+        "happening_now": "DEV delivery is verified. Production promotion is waiting for the required review-service setting evidence.",
+        "blocker": "Applicable comment-only review-service configuration has not yet been verified for a new production promotion.",
+        "next_action": "Resolve the promotion prerequisite, then complete the normal reviewed production release and live verification.",
+        "queue_order": null,
+        "workflow": "now",
+        "queue_rank": null,
+        "work_type": "bugfix",
+        "release_impact": "patch",
+        "release_reference": "0.14.4",
+        "breaking": false,
+        "reviewed_at": "2026-09-22T02:02:26.289Z"
+      },
+      "outcome": "Version 0.14.4 is deployed and verified on DEV. Three attempted live presentation scenarios passed; two cases absent from the live data retain automated coverage. Production delivery and user confirmation remain pending.",
+      "reported": {
+        "planned": {
+          "item_id": "roadmap-154",
+          "kind": "work_started",
+          "stage": "planned",
+          "state": "done",
+          "evidence": [
+            {
+              "repo": "3d-review-app",
+              "kind": "issue",
+              "number": 154
+            }
+          ],
+          "sequence": 106,
+          "recorded_at": "2026-09-18T23:32:07.933Z",
+          "attribution": "agent_report"
+        },
+        "built": {
+          "item_id": "roadmap-154",
+          "kind": "checks_passed",
+          "stage": "built",
+          "state": "done",
+          "version": "0.14.4",
+          "evidence": [
+            {
+              "repo": "3d-review-app",
+              "kind": "pull",
+              "number": 156
+            }
+          ],
+          "sequence": 115,
+          "recorded_at": "2026-09-18T23:36:16.993Z",
+          "attribution": "agent_report"
+        },
+        "reviewed": {
+          "item_id": "roadmap-154",
+          "kind": "checks_passed",
+          "stage": "reviewed",
+          "state": "done",
+          "version": "0.14.4",
+          "evidence": [
+            {
+              "repo": "3d-review-app",
+              "kind": "pull",
+              "number": 156
+            }
+          ],
+          "sequence": 116,
+          "recorded_at": "2026-09-18T23:36:18.346Z",
+          "attribution": "agent_report"
+        },
+        "dev": {
+          "item_id": "roadmap-154",
+          "kind": "dev_verified",
+          "stage": "dev",
+          "state": "done",
+          "version": "0.14.4",
+          "source_sha": "76fe13823dda23c9c046d2b44cdce94fc0842602",
+          "evidence": [
+            {
+              "repo": "3d-review-app",
+              "kind": "pull",
+              "number": 156
+            },
+            {
+              "repo": "kitchen",
+              "kind": "commit",
+              "sha": "61da3d3e4cbd84731658bc68d5d9bdac4c474b2c"
+            }
+          ],
+          "sequence": 132,
+          "recorded_at": "2026-09-22T02:03:09.655Z",
+          "attribution": "agent_report"
+        }
+      },
+      "stages": {
+        "planned": {
+          "state": "pending",
+          "reason": "No verifier attestation recorded.",
+          "evidence": []
+        },
+        "built": {
+          "state": "pending",
+          "reason": "No verifier attestation recorded.",
+          "evidence": []
+        },
+        "reviewed": {
+          "state": "pending",
+          "reason": "No verifier attestation recorded.",
+          "evidence": []
+        },
+        "dev": {
+          "state": "pending",
+          "reason": "No verifier attestation recorded.",
+          "evidence": []
+        },
+        "production": {
+          "state": "pending",
+          "reason": "No verifier attestation recorded.",
+          "evidence": []
+        }
+      }
+    }
+  ],
+  "receipts": [
+    {
+      "ok": true,
+      "sequence": 130,
+      "replayed": false
+    },
+    {
+      "ok": true,
+      "sequence": 131,
+      "replayed": false
+    },
+    {
+      "ok": true,
+      "sequence": 132,
+      "replayed": false
+    },
+    {
+      "ok": true,
+      "sequence": 133,
+      "replayed": false
+    }
+  ],
+  "preservation_checks": [
+    {
+      "id": 150,
+      "preserved": true,
+      "summaryEqualsApproved": true
+    },
+    {
+      "id": 154,
+      "preserved": true,
+      "summaryEqualsApproved": true
+    }
+  ]
+}

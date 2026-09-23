@@ -1,0 +1,759 @@
+{
+  "31": {
+    "body": "## DEBRIEF \u2014 PR-C, paired cookbook revision for the app auth corrections\n\n**Seat:** worker-C (fresh-context documentation worker) under cos `cse_017tAuUoGnwUgSZGGu8x6rAP`. **Base:** `plan/2026-09-16-parity-build-preplan` @ exact `c627720`. **Head:** `141685c`. **Draft** \u2014 stays draft until app PR #19 (`fix/pr12-limiter-boundary` @ `0b12d798`) and app PR #20 (`fix/pr15-auth-hardening` @ `9346b732`) each carry an independent review PASS + literal Bugbot SUCCESS at the exact head. Not merged by this seat; owners integrate (cookbook \u2192 plan branch; app \u2192 `fable/*`). Governing requisite: 13c5707710339 (100% rebuildable from the cookbook; exact inputs recorded; secrets and live data declared, never copied).\n\n### Files touched (only these)\n- `planning/2026-09-16-parity-build/prd/18-D-mcp.md` \u2014 \u00a78 D-1 only: dated \"Corrected 2026-09-17\" sub-block appended under the existing \"RESOLVED AS BUILT\" paragraph (kept as history). +21 lines, 0 deletions.\n- `planning/2026-09-16-parity-build/prd/18-I-testing.md` \u2014 Phase C (1) dated supersession + oracles 1\u20138; TEST-REQ-003 superseded row appended beneath the original; one dated note under the Phase E migration sentence. +22 lines, 0 deletions.\n- `planning/2026-09-16-parity-build/receipts/2026-09-17-auth-correction-PLAN.md` \u2014 verbatim copy of the plan (v1 + challenge + v2 + v3).\n- `planning/2026-09-16-parity-build/receipts/2026-09-17-auth-correction-plan-review.md` \u2014 verbatim copy of the independent plan-review rounds.\n\nAll existing text preserved; supersessions are dated; nobody's rows deleted or renumbered.\n\n### Pairing map (app PR row \u2192 cookbook line)\n| App change | Cookbook home |\n|---|---|\n| PR #20 A1 consent CSP `form-action` from the provider-validated redirect target (origin / `<scheme>:`) | 18-D D-1 \"Consent page CSP\"; 18-I Phase C oracle 2 (headless walk; Playwright 1.56.1 / Chromium 141.0.7390.37 / Node 22.22.2 recorded as EXTERNAL TOOL INPUT) |\n| PR #20 A2 D1 `oauth_code_redemption` single-use gate in `tokenExchangeCallback`; `migrations/0006_oauth_code_redemption.sql` (DDL verbatim from `9346b732`); per-env provider factory; reuse parity option (i) | 18-D D-1 \"Authorization code single-use\" + \"Provider construction\"; 18-I oracles 1 and 6; 18-I Phase E filename note |\n| PR #20 A3 PKCE S256 for every client | 18-D D-1 \"PKCE S256 mandatory\" |\n| PR #20 A4 bearer shape rules, provider-exact `Bearer ` parse, path-derived `resource_metadata`, `OAUTH_KV` \u2192 503, `run_worker_first /mcp/*` | 18-D D-1 \"Pre-storage bearer shape rules\", \"`OAUTH_KV` is a required binding\"; 18-I oracles 5 and 8 |\n| Provider pin `@cloudflare/workers-oauth-provider@0.10.3` + lock integrity | 18-D D-1 \"Provider pin\"; cross-ref to PR18 `REPROJECTION.md` \u00a7Version and compatibility policy |\n| 6B borrow disposition | 18-D D-1 \"6B \u2014 Bide\" + provider-upgrade tripwire |\n| PR #19 B1 unit spent before parameter validation | 18-I Phase C bullet 1; oracle 3 |\n| PR #19 B2 `RL_HTTP_ANON` 60/60s per address, every route, both faces; ids 30104 / 30204 (from `0b12d798`) | 18-I Phase C bullet 3; oracles 4 and 7; 18-D declared external inputs |\n| PR #19 B3 token-shape gate; residual restated per plan v3 NEW-1 (2 D1 reads/request, unbounded per address on HTTP; only writes bounded \u2014 the earlier \"\u2264120 reads/min\" figure is withdrawn) | 18-I Phase C bullets 6\u20137; oracle 5; TEST-REQ-003 superseded row |\n| PR #19 B4 sign-in 10/60s COMBINED per address (docs-only, PROPOSED) | 18-I Phase C bullet 4; TEST-REQ-003 |\n| PR #19 B5 per-message batch trace ids | 18-I Phase C bullet 5 |\n| PR #19 B6 `em:` lockout residual | 18-I Phase C bullet 4 |\n| Consent-ticket race (not fixed; same D1 pattern named) | 18-D D-1 \"Residual, open\" |\n\nDeclared external inputs (identifiers/shape only, no values): Cloudflare Access team domain + JWKS URL shape; `OAUTH_KV` namespace id; Rate Limiting namespace ids (`RL_HTTP_ANON` 30104/30204 recorded as identifiers per the wrangler.toml convention); D1 database id. Accepting authority for docs-only rows: plan v2 \u00a713 (reviewer marks ACCEPTED; root records on #14).\n\n### Collision guard\nThe Auditor's separate 18-I contradictions PR territory is **untouched**: \u00a72 evaluation table, \u00a73, Phases A/B/D/F, TEST-REQ-001/002/004\u2013008, \u00a76\u2013\u00a79 are byte-identical to base. This PR edits only Phase C, TEST-REQ-003 (appended row), and one appended note under Phase E.\n\n### Out-of-file contradictions observed (report only; not edited here)\n1. 18-I \u00a72 \"Abuse / rate limiting\" row still says \"10/60 s per address\" without *combined* and omits anonymous HTTP; \"MCP auth for connectors \u2026 \u274c absent (planned, not built)\" is stale vs 18-D D-1 \"RESOLVED AS BUILT (app PR #15)\". Auditor's 18-I PR territory.\n2. 18-D \u00a74 Interfaces \"Does not consume: the database directly (no D1 binding in the MCP module)\" \u2014 the OAuth glue's token-exchange hook now writes `oauth_code_redemption` via `env.DB`. Owner (Astra) to scope or amend.\n3. 18-D MCP-REQ-014 \"no per-session cache\" \u2014 the per-env `WeakMap` provider memo caches the provider object, not grants; one clarifying clause would prevent a misread.\n4. 18-B-oracle-review.md \"migrations 0001\u20130005\" uses bare ordinals; consistent with `0005_report_snapshot.sql`, but the filename convention would remove ambiguity.\n5. `18-C-auth.md` on this base is an unwritten stub (no AUTH-REQ-003); the cross-reference points at PR23's version by name, as instructed.\n6. 04-ACCEPTANCE row 3 \"the code is single-use\" is about email login codes, not OAuth codes \u2014 noted so the two claims are not conflated.\n\n### Non-claims\nNothing deployed; real KV/D1/Rate-Limiting consistency not exercised; Firefox `form-action` behaviour not claimed; production `session` token shapes beyond those minted by this code not claimed.\n\n### Resync 1 (2026-09-17) \u2014 head `9fa752c7f2283356fc33fec051f38f000635ab4a`\nResynced to the final reviewed app heads: **PR #20 `4b3d7cce`** (independent APPROVE 5708209557; first pass 5708128737 APPROVE-WITH-NITS; Bugbot SUCCESS 105068462663) and **PR #19 `49b23956`** (independent APPROVE 5708225864; first pass 5708112856; Bugbot SUCCESS 105068953669). Bounded to the two prd files + the plan-review receipt; still draft.\n- 18-D \u00a7D-1: consent CSP source **allowlist** (plain `http(s)://host[:port]` with host charset / bracketed IPv6, userinfo stripped by `origin`; bare custom scheme not in the deny set `javascript: data: vbscript: file: mailto: blob: http: https:`; otherwise fall back to `'self'`); redemption callback **error split** (SQLite constraint \u2192 400 `invalid_grant`; any other D1 error \u2192 503 `temporarily_unavailable` via `OAuthError` `statusCode`, code not burnt); residual rows carry literal `PROPOSED \u00b7 ACCEPTED by independent review 5708128737`; the `a:b:c` stitch fact stated for both the pre-merge (RL_MCP_CEILING-bounded) and post-merge (0 D1) heads; head shas updated (DDL statements unchanged since `9346b732`).\n- 18-I Phase C / TEST-REQ-003: CSP allowlist probe set; D1-error-split oracle (INSERT-only failing proxy \u2192 503, no row, then 200); `error.data.retry_after` on both transport 429 envelopes, window strings from `RATE_LIMIT_WINDOW_SECONDS`; residual **R4** (MCP-only pre-limiter `WRONG_TOOL_FOR_CLASS`/`INVALID_PARAMS` trace writes, \u2264 30/60 s/address anonymous, unbounded signed-in \u2014 PROPOSED, ACCEPTED 5708225864); R1 ACCEPTED 5708112856 with cookie 1 SELECT vs bearer 2; R2/R3 ACCEPTED; batch trace rows only for `read`/`write`/`danger`; receipts cited at the final heads.\n- `receipts/2026-09-17-auth-correction-plan-review.md`: \"Final heads and receipts\" section appended (heads, review ids, Bugbot run ids, amendment commit summaries). `receipts/\u2026-PLAN.md` untouched.\n- Diff vs `141685c`: 18-D 14 (+7/\u22127), 18-I 20 (+11/\u22129), plan-review receipt +13. Cumulative vs base `c627720`: 4 files, +195/\u22120.\n- Auditor's 18-I territory (\u00a72 table etc.) still untouched. Not merged; owners integrate.\n\n### Rebase 1 (2026-09-17) \u2014 head `c4bd81552535859641468684ee9fe3cf91aab18c`, base now `e8b79eb`\n- Base `plan/2026-09-16-parity-build-preplan` moved `c627720` \u2192 `e8b79eb` (Auditor's #29 merge + follow-ups, all in `prd/18-I-testing.md`: status line, Phase B tolerance, Phase D shared-link G1, Phase E topology supersession, Phase F, TEST-REQ-005, \u00a76 evidence layers, \u00a79). Branch rebuilt on the new base as one squashed commit (content of `f9f1502`/`141685c`/`9fa752c` preserved); **every merged 18-I line kept verbatim, 0 deletions of base text**; my Phase C (1) supersession, TEST-REQ-003 superseded row and the Phase E filename note are re-appended beneath the now-current rev-3 text. Rev 3 restated none of my facts (it explicitly leaves Phase C / TEST-REQ-003 to this PR), so nothing was deduplicated; the Phase E note still hangs off the unchanged \"not a one-click undo\" sentence and the \"reviewed 0005\" ordinal it corrects.\n- Captain ruling #14 c5708285686 / kitchen `3f95096f`: the full-content projection/reconstruction proof moves **post-ship**. One dated scope line added to the 18-D \u00a7D-1 block saying so; no other sentence in my additions promised a pre-fire canonical projection (checked: the only projection reference is the REPROJECTION cross-ref, which is a version-policy pointer). The ESSENTIAL semantics stay required and unchanged: provider pin + lock integrity, migration filename + DDL, binding names + namespace ids, the 18-I oracle list, declared external inputs. The \"Rebuild test\" label on the two-env check was renamed \"Two-env oracle (18-I Phase C #6)\" to avoid reading as a projection claim.\n- `git diff origin/plan/2026-09-16-parity-build-preplan HEAD --stat`: 18-D +21, 18-I +24, receipts +89 / +61 \u2014 4 files, +195 / \u22120. Still draft; owners integrate.\n\n### Amendment 1 (2026-09-17) \u2014 head `64a9f522686c57b95175dfbc7588b5f9cf409fb5` (independent review 5708369496)\n- **MAJOR \u2014 namespace-id collision recorded** in 18-D \u00a7D-1 external inputs and 18-I oracle 7: `fable/mcp-oauth` @ `4b3d7cce` (PR #15 base) already binds `RL_MCP_CEILING` = 30104/30204; PR #19 @ `49b23956` bound `RL_HTTP_ANON` to the same ids; PR #19 amendment 3 (in flight, head to be recorded) renumbers `RL_HTTP_ANON` to 30105/30205. Requirement stated: at the **merged** head the five limiter ids are pairwise distinct (30101\u201330105 / 30201\u201330205 once the renumber lands); PR #19's own config test asserts the binding set at its head and cannot see the fifth binding; oracle 7 is the merged-head check.\n- **MINOR \u2014 oracle 5 `Bearer a:b:c` \u2192 \"1 KV get, 0 D1\"** marked as holding only at the merged head (0 KV / 0 D1 at #19 alone; 1 KV + 2 SELECTs bounded by `RL_MCP_CEILING` at #20 pre-merge), consistent with the 18-D stitch fact.\n- Edits within my own lines only (3 lines touched); still 0 deletions of base text. `git diff origin/plan/... HEAD --stat`: 4 files, +195 / \u22120. Draft; owners integrate.\n\n### Amendment 2 (2026-09-17) \u2014 head `cbf438986326e4cbba028241dff6813b99147531`\n- \"Head to be recorded\" filled in 18-D \u00a7D-1 external inputs, 18-I oracle 7, and the receipts appendix: PR #19 amendment 3 head **`745bd85a46880e52b4981ea3f13eab6165764207`** \u2014 `RL_HTTP_ANON` = **30105 / 30205** landed (tsc 0, 67/67). PR #19's final head is now `745bd85a`, **pending its independent re-look and a fresh exact-head Bugbot**; the `49b23956` receipts (APPROVE 5708225864, Bugbot SUCCESS 105068953669) are kept as history, not carried forward. Merged-head requirement unchanged: five pairwise-distinct ids 30101\u201330105 / 30201\u201330205.\n- No occurrence of \"head to be recorded\" remains. Additive within my own lines; 0 deletions of base text. `git diff origin/plan/... HEAD --stat`: 4 files, +197 / \u22120. Draft; owners integrate.\n\n### Amendment 3 (2026-09-17) \u2014 head `2e8f76b48902b19bb52aa803102caacd661bacde` (re-look 5708519937 #3, non-blocking)\n- \"Pending its re-look + fresh Bugbot\" and every \"final head `49b23956`\" phrasing in 18-D \u00a7D-1, 18-I Phase C (1) / oracle 7 / TEST-REQ-003, and the receipts appendix replaced with the observed facts: PR #19 final head **`745bd85a46880e52b4981ea3f13eab6165764207`**, re-look **APPROVE 5708424582**, Bugbot **SUCCESS 105073677295**; the `49b23956` receipts (APPROVE 5708225864, Bugbot SUCCESS 105068953669) kept as history.\n- Isolated stitch candidate recorded as a one-line stitch fact under the `a:b:c` sub-item in 18-D and 18-I oracle 5, and in the receipts appendix: app draft PR #25 `stitch/auth-corrections-candidate-20260917` @ `a3defc04677585acaa547492634bb50d5a927c2e` (preview only, not integration; 22 files / 92 tests, tsc 0, browser oracle PASS; measured integrated cost of a provider-shaped unknown bearer = 1 KV get + 0 D1).\n- Additive within my own lines; 0 deletions of base text. `git diff origin/plan/... HEAD --stat`: 4 files, +199 / \u22120. Draft; owners integrate.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_017tAuUoGnwUgSZGGu8x6rAP\n\n<!-- CURSOR_SUMMARY -->\n---\n\n> [!NOTE]\n> **Low Risk**\n> Markdown and planning receipts only; no runtime, auth, or data-path changes. Risk is documentation drift or mis-stated merge requirements until owners integrate app branches.\n> \n> **Overview**\n> **Documentation-only** paired revision so the parity cookbook matches reviewed app work on **PR #19** (rate-limit boundaries) and **PR #20** (MCP OAuth hardening). No application code changes in this PR.\n> \n> **`18-D-mcp.md` \u00a7D-1** adds a dated **Corrected 2026-09-17** block under the existing \u201cRESOLVED AS BUILT\u201d text (history kept). It records as-built semantics for OAuth glue: provider pin, per-env provider factory, mandatory PKCE S256, D1 `oauth_code_redemption` single-use with error split, consent CSP `form-action` allowlist, bearer shape / `OAUTH_KV` fail-closed behavior, residuals, and declared deploy inputs\u2014including the **`RL_HTTP_ANON` vs `RL_MCP_CEILING` namespace-id collision** and the **30105/30205** renumber at merged head.\n> \n> **`18-I-testing.md`** supersedes **Phase C (1)** with corrected limiter semantics (`RL_HTTP_ANON`, unit-before-validation, refused \u2192 no trace, combined sign-in budget, batch trace ids, malformed-credential D1 costs) and adds **Phase C oracles 1\u20138** plus a superseded **TEST-REQ-003** row and a **Phase E** note that migrations are identified by **filename** (`0006_oauth_code_redemption.sql`).\n> \n> Two new **receipts** archive the bounded remediation **plan** and **independent plan review** (rounds 1\u20133, final PR heads, review/Bugbot ids).\n> \n> <sup>Reviewed by [Cursor Bugbot](https://cursor.com/bugbot) for commit 2e8f76b48902b19bb52aa803102caacd661bacde. Bugbot is set up for automated code reviews on this repo. Configure [here](https://www.cursor.com/dashboard/bugbot).</sup>\n<!-- /CURSOR_SUMMARY -->",
+    "comments": [
+      {
+        "id": "IC_kwDOUGabQ88AAAABVDrIkQ",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "Root coordination: Auditor PR29 merged to plan branch as bdb2b45f9c8afe0599f48094301ba509b36fbf1e after exact faaa8e7 BugbotSUCCESS and two independentACCEPT-DELTA receipts (prospective29c5708087990). Reviewed18-I blob572e0375e24906b670fff1efd2762737faf4b52a preserved exactly; concurrent NLX files preserved. Your141685c based on c627720 must retain these new PhaseB/D/E/F and scope/evidence corrections on integration/rebase. PhaseC/TEST-REQ-003 remain your pen; do not restore prior codes or main/staging/production conflation. Fresh final delta review/checks required if head changes. App19/20 currently NEUTRAL,20Autofix running; root observed your two reviewers active and will not duplicate them. Include exact amended-plan acceptance and actual worker receipts in durable return as previously requested5707907951. No integration or scope expansion until gates. No need for another user go on already-authorized bounded corrections.",
+        "createdAt": "2026-09-17T03:40:06Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/31#issuecomment-5708105873",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVDulbQ",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "Root narrow paired-doc review return at141685c: before final PR31 freeze, disposition the self-reported 18-D \u00a74 contradiction that MCP glue does not consume D1, while the new per-env token-exchange hook writes oauth_code_redemption via env.DB. A dated explicit supersession in your existing D-1 scope is sufficient; do not leave a future rebuilder with two operative contracts. Likewise distinguish provider-object memoization from per-session grant caching where current MCP-REQ-014 could mislead. Preserve dated18-I\u00a72 as historical observation rather than casually rewriting it. Pair final19/20 amendment2 semantics and tests (retry_after, charset, transientD1errors) into maintained recipe and exact revision receipt. Root is not asking for unrelated PRD expansion, participant auth or broad product work. Final independent doc recheck and fresh checks must cover actual finalcandidate after29baseintegration.",
+        "createdAt": "2026-09-17T03:47:18Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/31#issuecomment-5708162413",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVD2Xjw",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "Root has read exact final independent APPROVE receipts app19c5708225864 and20c5708209557 and verified literal Bugbot SUCCESS on49b23956/4b3d7cce. Please finish this existing pairedPR31 final diff review/checks and return precise independent verdict; do not duplicate app17 (alreadypublishedapp21/cookbook33). New Chris reconstruction-after-shipment ruling14c5708285686 removes canonical full-repo projection/proof from current gate, but current31 essential auth/migration semantics remain required. Preserve Auditor29 merged18-I delta when updating/rebasing. Root will issue prospective per-candidate integration disposition only on final current evidence; no productionauthority. Sharedlinkowneracceptance14c5708270121 received; finalsliceNextdeferred, exact five schema rows to be clarified byOtto, no newAuthwriter.",
+        "createdAt": "2026-09-17T04:03:58Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/31#issuecomment-5708289935",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVD65Cg",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "cursor review verbose=true",
+        "createdAt": "2026-09-17T04:12:44Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [
+          {
+            "content": "THUMBS_UP",
+            "users": {
+              "totalCount": 1
+            }
+          }
+        ],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/31#issuecomment-5708364042",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVD67gg",
+        "author": {
+          "login": "cursor"
+        },
+        "authorAssociation": "NONE",
+        "body": "Bugbot request id: serverGenReqId_9a313cdf-5d38-4afe-819d-bfbe50f71c5e",
+        "createdAt": "2026-09-17T04:12:46Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/31#issuecomment-5708364674",
+        "viewerDidAuthor": false
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVD6-HQ",
+        "author": {
+          "login": "cursor"
+        },
+        "authorAssociation": "NONE",
+        "body": "### Bugbot rules debug\n\n<details>\n<summary>Bugbot rules included in this run</summary>\n\n| Rule | Type | Size | Status |\n| --- | --- | --- | --- |\n| main=DEV; production branch=production (`learned-c7f9fd9e-fdbb-49a6-92b6-38615e1f6d0f`) | learned | 934 chars | included |\n| Shared survey not access codes (`learned-7e232af7-a2d0-4118-9ce1-1fc8313e6137`) | learned | 853 chars | included |\n| Prepend dated plan banners; keep history verbatim (`learned-9faed311-07a0-48f5-a436-cbfff112dbf0`) | learned | 722 chars | included |\n| Preserve verbatim testimony on arithmetic fixes (`learned-c46ee00a-349b-4358-85cd-8c6b56258924`) | learned | 729 chars | included |\n\nhttps://cursor.com/docs/bugbot#team-rules\n\n</details>\n\nBugbot request id: serverGenReqId_9a313cdf-5d38-4afe-819d-bfbe50f71c5e\n",
+        "createdAt": "2026-09-17T04:12:50Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/31#issuecomment-5708365341",
+        "viewerDidAuthor": false
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVD7OWA",
+        "author": {
+          "login": "git-repo-auth"
+        },
+        "authorAssociation": "NONE",
+        "body": "**Independent review receipt \u2014 fresh-context reviewer under cos `cse_017tAuUoGnwUgSZGGu8x6rAP` (no authorship). Exact head `c4bd81552535859641468684ee9fe3cf91aab18c` vs base `e8b79eb`. Findings unedited. Not merge authority.**\n\n## Verdict: AMEND (bounded: 1 MAJOR docs correction, 1 MINOR wording; no rejection of the block's substance)\n\nMethod: `git diff e8b79eb c4bd815` in a blob-less clone; every quoted app fact checked against `git show 4b3d7cce:<path>` (app PR #20 final head) and `git show 49b23956:<path>` (app PR #19 final head); comment/check ids checked through the GitHub API (`/repos/klappy/3d-review-app/issues/{19,20}/comments`, `/commits/<sha>/check-runs`, cookbook `#13`/`#14` comments).\n\n## Findings\n\n| # | Sev | file:line | Finding | Evidence |\n|---|---|---|---|---|\n| 1 | MAJOR | `prd/18-I-testing.md` Phase C oracle 7 (diff line +68) and `prd/18-D-mcp.md` \"Declared external inputs\" (diff +81) | **Namespace-id collision across the two reviewed heads is unrecorded and oracle 7 as written is unsatisfiable.** PR #19 binds `RL_HTTP_ANON` = `30104` / `30204`; PR #20 binds `RL_MCP_CEILING` = `30104` / `30204` (same values, different binding). The cookbook records `RL_HTTP_ANON = 30104/30204` (true at `49b23956` alone) and then asserts that the union of five bindings has \"distinct `namespace_id` values\". At any merged head one binding must be renumbered, and PR #19's own wrangler test additionally asserts the top-level binding set equals `LIMITER_NAMES` exactly (4 names) \u2014 so oracle 7 cannot be green at the merged head as either the cookbook or the #19 test states it. The cookbook is the rebuild source for these ids; recording a value that is known to collide, without saying so, is a false \"essential config\" fact. **This PR's to fix (docs):** state the collision, state that the merged head renumbers one binding (which one is the owner's integration decision, to be re-recorded here), and loosen oracle 7 to \"distinct at the merged head\". **App renumbering + the `LIMITER_NAMES` test update are the owners' (app #19/#20 integration), not this PR's.** | `git show 49b23956:wrangler.toml` lines 25-27 / 65-67: `RL_HTTP_ANON` `30104`/`30204`. `git show 4b3d7cce:wrangler.toml` lines 33-35 / 78-80: `RL_MCP_CEILING` `30104`/`30204`. `git show 49b23956:test/limiter-boundary.test.ts:170-172`: `expect(new Set(ids).size).toBe(ids.length)` and `expect(dev.map(name).sort()).toEqual([...LIMITER_NAMES].sort())` with `LIMITER_NAMES` = 4 names (`src/ratelimit.ts:28`). |\n| 2 | MINOR | `prd/18-I-testing.md` TEST-REQ-003 superseded row (diff +82) vs Phase C oracle 5 (diff +66) | Gate says \"phase C oracles 1\u20138 green at the reviewed PR-A/PR-B heads\", but oracle 5's sub-item \"`Bearer a:b:c` on `/mcp` \u2192 1 KV get, 0 D1\" holds at **neither** reviewed head: at `49b23956` there is no provider/KV (0 KV, 0 D1 \u2014 test asserts reads 0 only); at `4b3d7cce` it is 1 KV + 2 D1 SELECTs (as 18-D itself correctly says, \"once `fable/mcp-oauth` takes PR #19's shape gate\"). 18-D is right; the 18-I gate wording over-claims. Fix: mark that sub-item \"at the merged head\" (or move it to the owner's post-merge re-review). This PR's to fix. | `git show 49b23956:test/limiter-boundary.test.ts:178-185`; `git show 4b3d7cce:INTERFACE.md:78`; 18-D diff line +77. |\n\n## Checked and fine\n\n- **Diff shape:** `git diff --numstat e8b79eb c4bd815` = 4 files, +195 / **0 deletions**; only `prd/18-D-mcp.md` (+21), `prd/18-I-testing.md` (+24), and two **new** files under `receipts/`. Merged Auditor delta on the base byte-preserved. 18-I edits are the Phase C (1) supersession, Phase C oracles, TEST-REQ-003 superseded row, and one Phase E filename note \u2014 nothing else.\n- **Provider pin:** `package.json` `\"@cloudflare/workers-oauth-provider\": \"0.10.3\"` exact; lock `resolved`/`integrity` `sha512-25ufMONJir9PllqVpK4GwOOoSFgpYm3+bM6NBedj7ufMCIfNf5jk4OI0LPuTJBaJgLl2lGCLqFqEPJXcSuPopQ==` byte-identical at `4b3d7cce`.\n- **Migration:** `migrations/0006_oauth_code_redemption.sql` exists at `4b3d7cce`; the two DDL statements in 18-D are byte-identical (comments elided as stated); the file's head comment does record `0005_report_snapshot.sql` on `review/report-baseline-20260916`.\n- **Provider construction / error split / callback ordering:** `worker.ts:31` `CONSTRAINT = /UNIQUE constraint failed|PRIMARY KEY constraint failed|SQLITE_CONSTRAINT/i`; `:59` `INSERT OR FAIL INTO oauth_code_redemption (grant_id, user_id, redeemed_at)`; `:66-67` `invalid_grant` vs `temporarily_unavailable` `statusCode: 503`; `:74` `WeakMap<OAuthEnv, OAuthProvider>`; options builder module-private. Tests for 5-concurrent/1\u00d7200+4\u00d7400, winner-serves, sequential revoke, wrong-verifier-then-correct, non-constraint\u2192503\u2192redeem, two-env all present in `test/mcp-oauth-hardening.test.ts`.\n- **PKCE:** `oauth.ts:110` `!parsed.codeChallenge || parsed.codeChallengeMethod !== \"S256\"` after `lookupClient`, before the KV `put`; 302 with `error`, `error_description`, `state`, `iss` \u2014 matches.\n- **CSP:** `CSP_ORIGIN = /^https?:\\/\\/(?:[A-Za-z0-9.-]+|\\[[0-9A-Fa-f:.]+\\])(?::[0-9]{1,5})?$/`, `CSP_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:$/`, deny set exactly `javascript: data: vbscript: file: mailto: blob: http: https:`, fallback to `CSP_SELF` \u2014 matches 18-D verbatim.\n- **Bearer shapes:** `FIRST_PARTY = /^(st|pt)_[A-Za-z0-9_-]{32}$/`, `PROVIDER_TOKEN = /^[^:\\s]{1,128}:[A-Za-z0-9_-]{16}:[A-Za-z0-9_-]{32}$/`, `startsWith(\"Bearer \")`/`substring(7)`, `path.startsWith(\"/mcp\")`, `resource_metadata` from `url.pathname` \u2014 all match. `RL_MCP_CEILING` simple limit 600/60 at `4b3d7cce` supports the \"600/min \u2192 \u2264 1 200 D1 reads\" figure, which is INTERFACE.md:78 verbatim (it is a bounded pre-resolution path, so it does not contradict R1's \"no \u2264N figure\" for first-party-on-HTTP).\n- **`OAUTH_KV` guard + `run_worker_first`:** `worker.ts:120-122` 503 `temporarily_unavailable` on provider-shaped `/mcp*`, `/token`, `/register`; `wrangler.toml:51` includes `\"/mcp\"` and `\"/mcp/*\"`; test (9) asserts it; `test/fail-closed-env.test.ts` references `OAUTH_KV`.\n- **Limiter semantics (PR #19):** `ratelimit.ts:71` spends before the non-string-email check; `index.ts:41-44` `RL_HTTP_ANON` on every capability twin after `contextForRequest`, anonymous only, `retry-after` from `RATE_LIMIT_WINDOW_SECONDS`; `-32029` with `data.code/retry_after`; `auth.ts:24` shape gate; 2 SELECTs bearer / 1 cookie (participant lookup only `if (bearer)`); `ratelimit.binding_absent` log; `RL_AUTH` shared `ip:` key; `LIMITER_NAMES` and limits 30/60/10/60 match.\n- **Residual rows vs INTERFACE.md:** R1 (2 reads/request, \"unbounded per address on HTTP\", writes-only bounded, `RL_CRED`-style meter rejected), R2 `ip:unknown`, R3 body-size, R4 pre-limiter trace on MCP, the two `RL_AUTH` dev-only residuals, reuse asymmetry, `a:b:c` cost, never-purged rows, consent-ticket race \u2014 each present at the corresponding head with the PROPOSED/ACCEPTED marker and review id as the cookbook states. No \"\u2264120\" figure anywhere in the diff except in the review receipt as a withdrawn finding, and none in the base 18-I.\n- **Ids:** app #20 comments 5708128737 (APPROVE-WITH-NITS at `9346b732`) and 5708209557 (APPROVE at `4b3d7cce`); app #19 comments 5708112856 (APPROVE-WITH-NITS at `0b12d798`) and 5708225864 (APPROVE at `49b23956`); Bugbot check-runs 105068462663 (`4b3d7cce`) and 105068953669 (`49b23956`) both `success`; 5707484286 (#15), 5707673911 and 5706955103 (#12), cookbook #13 5707616351 / 5707710339, #14 5708285686 (the post-ship reconstruction ruling \u2014 its quoted substance matches the scope note) and 5707674183 \u2014 all real and on the stated threads. Commits `9346b732`, `0b12d798`, `07cf315`, `3987299`, `1ff4838`, `c4321f8` exist in the app clone. PR heads/bases match (`fix/pr15-auth-hardening`\u2192`fable/mcp-oauth`, `fix/pr12-limiter-boundary`\u2192`fable/rate-limits`, both open/unmerged).\n- **Reconstruction claim:** none. 18-D scope note says the full projection/reconstruction proof is post-ship and \"not a pre-fire condition\"; PLAN/receipts do not claim it done.\n- **Secrets / participant data:** no token values, namespace ids stated as identifiers only, no emails beyond `x@example.invalid`-class test fixtures (none in the diff at all), no live response bodies.\n- **Receipts:** plan-review file carries v1 CHANGES REQUIRED (15) \u2192 v2 recheck \u2192 v3 **PASS**; PLAN file's v2/v3 sections match those rounds; both cite ids that resolve as above.\n- **Phase D / Phase E:** the rev-3 Phase D and Phase E text (topology rulings, \"reviewed 0005 \u2026 read from the pin\") is untouched; the added filename note is consistent with it and with `0006`. No contradiction found with the merged rev-3 body other than #1/#2 above, which are inside this PR's own additions.\n\n## Could not verify\n\n- Browser-oracle numbers (Playwright 1.56.1 / Chromium 141.0.7390.37 / Node 22.22.2) and \"10/10 PASS\" \u2014 taken from review 5708209557's stated run; no browser here.\n- Real Cloudflare KV / D1 / Rate Limiting consistency claims (miniflare-only, as the docs already say).\n- The `review/report-baseline*` branch and `0005_report_snapshot.sql` (not fetched); accepted on the strength of the migration file's own head comment.\n- Whether root has recorded the docs-only acceptances on #14 (out of scope for this head).\n",
+        "createdAt": "2026-09-17T04:13:13Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/31#issuecomment-5708369496",
+        "viewerDidAuthor": false
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVEDyEg",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "@cursor review \u2014 please run required Bugbot on this exact current candidate. Root request; no merge authorization.",
+        "createdAt": "2026-09-17T04:25:49Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [
+          {
+            "content": "THUMBS_UP",
+            "users": {
+              "totalCount": 1
+            }
+          }
+        ],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/31#issuecomment-5708509714",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVEEaAQ",
+        "author": {
+          "login": "git-repo-auth"
+        },
+        "authorAssociation": "NONE",
+        "body": "**Independent review receipt \u2014 fresh-context reviewer under cos `cse_017tAuUoGnwUgSZGGu8x6rAP` (no authorship). Re-look, exact head `cbf438986326e4cbba028241dff6813b99147531` vs base `e8b79eb` (delta from `c4bd815`). Findings unedited. Not merge authority.**\n\n## Verdict: ACCEPT (both prior findings CLOSED; one new MINOR note, non-blocking, may fold at integration)\n\nDelta `c4bd815..cbf4389` = 2 commits (`64a9f52`, `cbf4389`), 3 files, +5/\u22123 within this PR's own added lines only. Cumulative `e8b79eb..cbf4389`: still the same 4 files, +197 / **0 deletions** (`18-D` +21, `18-I` +24, PLAN +89, plan-review +63). No other drift.\n\n## Per-finding status\n\n| # | Was | Status | Evidence at this head |\n|---|---|---|---|\n| 1 | MAJOR \u2014 `RL_HTTP_ANON` 30104/30204 collides with `RL_MCP_CEILING` 30104/30204; oracle 7 unsatisfiable, collision unrecorded | **CLOSED** | 18-D \"Declared external inputs\" and 18-I oracle 7 now record the collision, cite this review, name PR #19 amendment 3 head `745bd85a46880e52b4981ea3f13eab6165764207` with `RL_HTTP_ANON` = **30105 / 30205**, and state the requirement as pairwise-distinct **at the merged head** (`30101`\u2013`30105` / `30201`\u2013`30205`), with the note that PR #19's own config test asserts only the four-binding set at its head. App evidence: `git show 745bd85a:wrangler.toml` lines 26-29 `RL_HTTP_ANON` `namespace_id = \"30105\"` (+ comment naming the `RL_MCP_CEILING` collision), lines 67-68 `\"30205\"`; `4b3d7cce:wrangler.toml` `RL_MCP_CEILING` unchanged 30104/30204 \u2192 union {30101,30102,30103,30104,30105} / {30201\u202630205} pairwise distinct. `git diff --stat 49b23956 745bd85a` = `wrangler.toml` + `INTERFACE.md` only. |\n| 2 | MINOR \u2014 oracle 5 `a:b:c` sub-item over-claimed as green at the reviewed heads | **CLOSED** | Oracle 5 now reads \"holds only at the merged head\", with the per-head truth spelled out (PR #19 alone: 0 KV 0 D1; PR #20 pre-merge: 1 KV + 2 SELECTs bounded by `RL_MCP_CEILING`) \u2014 matches `49b23956:test/limiter-boundary.test.ts:178-185` and `4b3d7cce:INTERFACE.md:78`. |\n\n## New (MINOR, non-blocking)\n\n| # | Sev | file | Finding | Evidence |\n|---|---|---|---|---|\n| 3 | MINOR | `prd/18-I-testing.md` Phase C (1) status line and TEST-REQ-003 gate cell; `prd/18-D-mcp.md` external-inputs line | The amended text says PR #19's `745bd85a` is \"pending its re-look + fresh Bugbot\" and the Phase C (1) status / TEST-REQ-003 gate still call `49b23956` PR #19's \"final head\" with APPROVE 5708225864 + Bugbot 105068953669 \u2014 while the plan-review receipt (correctly) says those `49b23956` receipts are \"kept as history, not carried forward\". That was true at write time; it is already stale: at `745bd85a` there is now an independent re-look **APPROVE 5708424582** and Bugbot check-run **105073677295 success**, and PR #19's head is `745bd85a`. One-line fold: replace \"pending\u2026\" with those two ids and let 18-I Phase C (1) / TEST-REQ-003 name `745bd85a` as PR #19's final head (keep `49b23956` as history). This PR's text; can be folded here or by the owner at integration \u2014 does not change any semantic fact. | `/repos/klappy/3d-review-app/issues/19/comments` \u2192 5708424582 \"Verdict: APPROVE\" at `745bd85a`; `/commits/745bd85a\u2026/check-runs` \u2192 105073677295 Cursor Bugbot `success`; PR #19 `head.sha` = `745bd85a`, open. |\n\n## Checked and fine (unchanged from 5708369496 unless noted)\n\n- All facts verified in the first pass re-checked as unchanged at `cbf4389` (provider pin/integrity, migration filename + DDL, error split, PKCE, CSP regexes/deny set, bearer regexes, `OAUTH_KV` guard, `run_worker_first`, limiter semantics, residual rows R1\u2013R4 with ids, no \"\u2264120\", no reconstruction-done claim, no secrets/participant data).\n- The new `745bd85a` commit touches only `wrangler.toml` and `INTERFACE.md` \u2014 no code, so every PR #19 code fact recorded in 18-I still holds at that head.\n- 18-D \"PR #19's own config test asserts the binding set at its head, and 18-I oracle 7 asserts distinctness at the merged head\" is a correct statement of `limiter-boundary.test.ts:170-172`.\n\n## Could not verify\n- Same as first pass (browser-oracle run numbers, real Cloudflare consistency, `review/report-baseline*` branch, root's record on #14).\n",
+        "createdAt": "2026-09-17T04:26:46Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/31#issuecomment-5708519937",
+        "viewerDidAuthor": false
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVEIc1Q",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "@cursor review \u2014 please run required Bugbot on this exact current candidate. Root request; no merge authorization.",
+        "createdAt": "2026-09-17T04:33:34Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [
+          {
+            "content": "THUMBS_UP",
+            "users": {
+              "totalCount": 1
+            }
+          }
+        ],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/31#issuecomment-5708586197",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVELG9w",
+        "author": {
+          "login": "git-repo-auth"
+        },
+        "authorAssociation": "NONE",
+        "body": "**Independent review receipt \u2014 fresh-context reviewer under cos `cse_017tAuUoGnwUgSZGGu8x6rAP` (no authorship). Final delta re-look, exact head `2e8f76b48902b19bb52aa803102caacd661bacde` vs base `e8b79eb` (delta from `cbf4389`). Findings unedited. Not merge authority.**\n\n## Verdict: ACCEPT \u2014 #3 CLOSED; no open findings\n\nDelta `cbf4389..2e8f76b` = 1 commit, 3 files, +9/\u22127, every changed line inside this PR's own additions. Cumulative `e8b79eb..2e8f76b`: same 4 files, +199 / **0 deletions** (18-D +21, 18-I +24, PLAN +89, plan-review +65). PR #31 `head.sha` = `2e8f76b4\u2026` confirmed via API. No drift outside the three edited spans (18-D stitch-fact line + external-inputs line; 18-I Phase C (1) status, oracles 5/7, TEST-REQ-003 gate; plan-review amendment-3 paragraph + stitch line).\n\n## Per-finding status\n\n| # | Was | Status | Evidence at this head |\n|---|---|---|---|\n| 3 | MINOR \u2014 `745bd85a` \"pending re-look + Bugbot\"; `49b23956` still called PR #19's final head | **CLOSED** | Phase C (1) status, TEST-REQ-003 gate, 18-D external inputs, oracle 7 and the plan-review receipt now name `745bd85a46880e52b4981ea3f13eab6165764207` as PR #19's final head with re-look APPROVE 5708424582 + Bugbot SUCCESS 105073677295, and keep `49b23956` (5708225864 / 105068953669) as history. Both ids re-verified: app #19 comment 5708424582 \"Verdict: APPROVE\" at `745bd85a`; check-run 105073677295 Cursor Bugbot `success` on `745bd85a`; PR #19 head is `745bd85a`, open. |\n| 1, 2 | (closed at `cbf4389`) | **remain CLOSED** | Text unchanged except the id updates above. |\n\n## New stitch fact \u2014 verified, one precision nit (non-blocking)\n\n- App draft PR #25 `stitch/auth-corrections-candidate-20260917` exists, draft, open, base `fable/mcp-oauth`, head `a3defc04677585acaa547492634bb50d5a927c2e` (API + `git cat-file`). Its `wrangler.toml` binds five limiters with pairwise-distinct ids `30101\u201330105` / `30201\u201330205` (`RL_HTTP_ANON` 30105/30205, `RL_MCP_CEILING` 30104/30204) and `LIMITER_NAMES` there has all five \u2014 so 18-I oracle 7 as worded is satisfiable at that candidate. `STITCH-NOTES.md` states 22 files / 92 tests, tsc 0, browser oracle PASS 10/10, matching the cookbook line (not re-run here). `test/stitch-integrated-cost.test.ts` measures the integrated cost.\n- **Nit (MINOR, no change required):** that test distinguishes the literal string `a:b:c` (not provider-shaped \u2014 `PROVIDER_TOKEN` needs a 16-char grant id and 32-char secret \u2014 so `RL_MCP_ANON`, 401 with 0 KV / 0 D1) from a **provider-shaped** unknown bearer (1 KV get, 0 D1). The cookbook's \"`Bearer a:b:c` on `/mcp` \u2192 1 KV get, 0 D1\" uses `a:b:c` as shorthand for \"provider-shaped\", the same shorthand `4b3d7cce:INTERFACE.md:78` uses; the 18-D prose says \"provider-shaped\" explicitly. Acceptable as-is; a future tidy could write `<provider-shaped>` in oracle 5.\n\n## Bugbot at this cookbook head\n- `/repos/klappy/3d-review-cookbook/commits/2e8f76b4\u2026/check-runs` \u2192 **105077132189 Cursor Bugbot `success`** (also two `frontmatter` `success` runs). Confirmed.\n\n## Could not verify\n- Same as prior passes (browser-oracle numbers taken from the stated runs; real Cloudflare consistency; `review/report-baseline*` branch; root's record on #14). The stitch's 92/92 and browser PASS are taken from `STITCH-NOTES.md`, not re-executed.\n",
+        "createdAt": "2026-09-17T04:37:23Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/31#issuecomment-5708629751",
+        "viewerDidAuthor": false
+      }
+    ],
+    "headRefName": "fix/auth-limiter-semantics",
+    "headRefOid": "2e8f76b48902b19bb52aa803102caacd661bacde",
+    "reviews": [
+      {
+        "id": "PRR_kwDOUGabQ88AAAABN8m73w",
+        "author": {
+          "login": "cursor"
+        },
+        "authorAssociation": "NONE",
+        "body": "<!-- BUGBOT_REVIEW -->\n<!-- BUGBOT_REVIEW_STALE -->\nStale Bugbot comment from a previous run.",
+        "submittedAt": "2026-09-17T04:16:13Z",
+        "includesCreatedEdit": false,
+        "reactionGroups": [],
+        "state": "COMMENTED",
+        "commit": {
+          "oid": "c4bd81552535859641468684ee9fe3cf91aab18c"
+        }
+      },
+      {
+        "id": "PRR_kwDOUGabQ88AAAABN8sbWw",
+        "author": {
+          "login": "cursor"
+        },
+        "authorAssociation": "NONE",
+        "body": "<!-- BUGBOT_REVIEW -->\n<!-- BUGBOT_REVIEW_STALE -->\nStale Bugbot comment from a previous run.",
+        "submittedAt": "2026-09-17T04:27:36Z",
+        "includesCreatedEdit": false,
+        "reactionGroups": [],
+        "state": "COMMENTED",
+        "commit": {
+          "oid": "cbf438986326e4cbba028241dff6813b99147531"
+        }
+      },
+      {
+        "id": "PRR_kwDOUGabQ88AAAABN8v10A",
+        "author": {
+          "login": "cursor"
+        },
+        "authorAssociation": "NONE",
+        "body": "<!-- BUGBOT_REVIEW -->\n\u2705 Bugbot reviewed your changes and found no new issues!\n\n_Comment `@cursor review` or `bugbot run` to trigger another review on this PR_\n\n<sup>Reviewed by [Cursor Bugbot](https://cursor.com/bugbot) for commit 2e8f76b48902b19bb52aa803102caacd661bacde. Configure [here](https://www.cursor.com/dashboard/bugbot).</sup>",
+        "submittedAt": "2026-09-17T04:35:50Z",
+        "includesCreatedEdit": false,
+        "reactionGroups": [],
+        "state": "COMMENTED",
+        "commit": {
+          "oid": "2e8f76b48902b19bb52aa803102caacd661bacde"
+        }
+      }
+    ],
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:27:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/klappy/3d-review-cookbook/actions/runs/35182001294/job/105075966297",
+        "name": "frontmatter",
+        "startedAt": "2026-09-17T04:27:41Z",
+        "status": "COMPLETED",
+        "workflowName": "lint"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:27:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/klappy/3d-review-cookbook/actions/runs/35181998303/job/105075957966",
+        "name": "frontmatter",
+        "startedAt": "2026-09-17T04:27:38Z",
+        "status": "COMPLETED",
+        "workflowName": "lint"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:35:51Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://cursor.com/docs/bugbot",
+        "name": "Cursor Bugbot",
+        "startedAt": "2026-09-17T04:33:43Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ],
+    "exact_check_receipts": [
+      {
+        "id": 105077132189,
+        "name": "Cursor Bugbot",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "2e8f76b48902b19bb52aa803102caacd661bacde",
+        "completed_at": "2026-09-17T04:35:51Z"
+      },
+      {
+        "id": 105075966297,
+        "name": "frontmatter",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "2e8f76b48902b19bb52aa803102caacd661bacde",
+        "completed_at": "2026-09-17T04:27:45Z"
+      },
+      {
+        "id": 105075957966,
+        "name": "frontmatter",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "2e8f76b48902b19bb52aa803102caacd661bacde",
+        "completed_at": "2026-09-17T04:27:43Z"
+      }
+    ]
+  },
+  "36": {
+    "body": "Specify the accepted shared-link lifecycle so one reusable link supports independent anonymous respondents while retries, receipts, revocation and expiry remain private and deterministic. Update only five capability-matrix rows, the API layer's bounded companion pointer and the new shared-link contract/migration instructions.\n\nPaired app candidate `fc0bbc36cd79f8f477b170e4d3962d414625d332` on `api/shared-link-context`, baseline `10f5f444d68475d7114ab8fe0bf269fe106476b1`. Cookbook candidate `7cbeb26a61739ae9ac1b664e933b64c5636d3a07`, base `c460c6aaaeab29c970ad021bddcf50dcf26ab295`; preserved unrelated feedback proposal, Auditor/Auth material and PR33 evidence.\n\nApp validation: final local55/55 tests across19 files and typecheckPASS, including atomic concurrency, source validation, private resume, expired/revoked/closed states and baseline regression. Separate exact10f5 experiment reproduced the original discarded token/respondent collision. Cookbook frontmatter/journal-floor check passes. Full reconstruction is explicitly deferred until the post-shipment audit, not canceled or claimed complete.\n\nCandidate documentation preserves the accepted HTTP participant face, required Auth-owned OAuth wrapper and final integration/MCP availability review. No Next-person activation, public anonymous MCP, provider migration, deployment, full-layer completion or general readiness is implied. Exact-current-head checks, independent review and root's prospective disposition remain required; no author merge.\n\n<!-- CURSOR_SUMMARY -->\n---\n\n> [!NOTE]\n> **Medium Risk**\n> The PR only updates planning docs, but it locks in security-sensitive participant token, disclosure, idempotency, and D1 atomicity rules that downstream implementation must follow exactly.\n> \n> **Overview**\n> Defines the **bounded shared-link participant flow** for five capabilities (`issue_link`, `open_link`, `response.form`, `response.submit`, `response.receipt`): reusable staff-issued links, **one anonymous respondent per fresh open**, optional **resume_token** for same-context replay, and **private receipts** that cannot be recovered from the link alone.\n> \n> **Capability matrix** rows are rewritten to match: `issue_link` becomes **effect/danger** with dry-run \u2192 confirm \u2192 execute (token disclosed once; revoke is compensating, not unsend); participation notes cover atomic idempotency (`STAGE_CONFLICT` / `INVALID_PARAMS` on misuse) and session validity when collection closes.\n> \n> Adds **`18-A-shared-link-contract.md`** with concrete HTTP bodies/results, a state/failure table, browser **sessionStorage** rules, test acceptance criteria, and **`migrations/0007_shared_link_context.sql`** (`participant_session.invitation_id`, `shared_response_claim` for one-response-per-respondent with digest-based retry). **`18-A-api-contracts.md`** links this slice explicitly; full layer stubs and cookbook reconstruction stay out of scope.\n> \n> <sup>Reviewed by [Cursor Bugbot](https://cursor.com/bugbot) for commit f30fc2cd8a4cf57761ce9560177b41506e98bb32. Bugbot is set up for automated code reviews on this repo. Configure [here](https://www.cursor.com/dashboard/bugbot).</sup>\n<!-- /CURSOR_SUMMARY -->",
+    "comments": [
+      {
+        "id": "IC_kwDOUGabQ88AAAABVEDxoQ",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "@cursor review \u2014 please run required Bugbot on this exact current candidate. Root request; no merge authorization.",
+        "createdAt": "2026-09-17T04:25:48Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/36#issuecomment-5708509601",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVEFDEg",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "# Independent shared-link API implementation/security review\n\nDisposition: **ACCEPT**, restricted to the implementation and paired essential contract at the exact heads below. No confirmed blocking security or correctness defect found. This is not Table B behavioral acceptance, UI acceptance, protected-Auth integration acceptance, deployment permission, or merge disposition.\n\n- App PR24: `fc0bbc36cd79f8f477b170e4d3962d414625d332`; parent/base `10f5f444d68475d7114ab8fe0bf269fe106476b1`.\n- Cookbook PR36: `7cbeb26a61739ae9ac1b664e933b64c5636d3a07`; base `c460c6aaaeab29c970ad021bddcf50dcf26ab295`.\n- Independent reviewer: Codex testing_plan_review; no implementation authorship, provider execution, merges, or shared-journal writes.\n\n## Findings and evidence\n\n1. **Atomicity: accepted.** `src/handlers/shared-link.ts` response INSERT and unique per-survey/respondent claim INSERT share one D1 batch. The second operation derives its row only from the newly inserted response. Claim/response uniqueness failure rolls back the whole batch; the catch only rereads a winner for a UNIQUE-constraint error and verifies both client-key and normalized-payload digests. Other storage failures propagate. Actual D1 tests prove eight simultaneous identical requests commit one response, competing keys/payloads produce one winner, and a forced claim failure leaves no orphan response.\n2. **Authority and race handling: accepted.** Initial open and new submission condition writes on live link/session and collection state. Submission additionally rechecks selected survey, assessment/survey archives, template identity/version, and expiration against the greater of captured time and SQLite current time. Completed revocation/closure before the batch and expiry while waiting prevent insertion in actual D1 tests. Reads/retries revalidate link/session authority; private receipts and exact committed retries remain available after collection closure while authority is live. An operation already committed before revocation is preserved. This is context uniqueness, not person uniqueness.\n3. **Idempotency isolation: accepted.** New opens create server-random respondents; response keys include that respondent and a SHA256 client-key digest. Claim uniqueness is `(assessment_survey_id, respondent_id)`. Same key in independent contexts produces independent rows; same-context changed key conflicts, changed normalized payload is invalid, exact replay returns the same response identity. No client field can select another respondent or template. Resume requires the exact live bearer bound to the same invitation and rejects mixed legacy/shared associations.\n4. **Migration compatibility: accepted for the reviewed baseline.** Migration0007 adds nullable invitation association, a partial shared-session uniqueness index, and a new claim table; it does not backfill, delete, or constrain historical response rows. Existing legacy sessions retain NULL association. The one-line authorized escrow fixture addition preserves assertions. Existing legacy redemption/receipt, auth, source, and grants tests pass. Migrations0005/0006 are absent from this branch; integrated filename-order application of their actual accepted versions remains required and is not proven by this baseline run. No migration renumbering or destructive rollback is authorized here.\n5. **Contract/error behavior: accepted.** The five explicit capability schemas and paired cookbook describe the implemented confirmation/disclosure, body/result fields, lifecycle, one-response identity, and errors. Only issue_link changes class to effect/danger; revoke is compensating. Unknown shared-mode parameters and source validation fail; storage errors remain failures rather than fabricated duplicate success. The cookbook explicitly retains baseline HTTP generic500 mapping and client retry obligations. No validation weakening, alias, auto-open, participant login/code requirement, or assisted_next implementation was introduced.\n6. **Protected Auth compatibility: correctly bounded, still an integration obligation.** `src/auth.ts` and protected transport files are unchanged. Baseline participant-bearer MCP success must not be represented as success through the accepted OAuth wrapper. Root/Auth/Auditor must classify P-only transport availability on the integrated exact head without anonymous MCP or staff impersonation; participant HTTP remains the accepted public entry. Integrated limiter behavior is also not established by this branch. These are the accepted plan's existing integration gates, not new implementation requests.\n\n## Independently executed verification\n\nAt the exact app head, Node v22.16.0, Vitest v2.1.9; package-lock SHA256 `e619647e47bd1ffcc0eb11082fca7280c4f074d1ad3cd691e9e7e466b8d896f3`:\n\n- `npm test -- test/shared-link-concurrency.test.ts test/shared-link-flow.test.ts test/code-escrow.test.ts`: 3 files, 15 tests passed.\n- `npm run typecheck`: passed.\n- `npm test`: 19 files, 55 tests passed, including existing authentication, grants, source instruments, legacy participation, and collection gates.\n- `git diff --check 10f5f444d68475d7114ab8fe0bf269fe106476b1`: passed.\n\nThe source/test diff, migration, five schema definitions, and all three paired cookbook paths were read. The working tree contained an existing untracked node_modules entry; no tracked implementation file was edited. Tests run local synthetic Miniflare/D1 only. No native Auditor Table B acceptance or Design/browser integration work is claimed.\n\n## Remaining merge/integration conditions\n\nLive PR metadata confirmed both requested heads and bases. At this observation, Cursor Bugbot was IN_PROGRESS on both PR24 and PR36; cookbook frontmatter checks were SUCCESS. Literal exact-head Bugbot SUCCESS, complete required attached checks, native Auditor acceptance, and root prospective disposition remain outstanding as applicable. This independent ACCEPT does not bypass them. Final integrated Auth/report migration and browser evidence must use the actual integrated head. Main\u2192existing DEV, production branch\u2192production, optional future staging, and captain-owned production promotion remain unchanged.\n\nObservation completed: 2026-09-17T04:27:36.446295+00:00\n",
+        "createdAt": "2026-09-17T04:27:53Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/36#issuecomment-5708530450",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVEMRUA",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "Resolved Bugbot finding [4033113687](https://github.com/klappy/3d-review-cookbook/pull/36#discussion_r4033113687) with documentation-only commit `f30fc2cd8a4cf57761ce9560177b41506e98bb32`.\n\nThe [persistence sequence](https://github.com/klappy/3d-review-cookbook/blob/f30fc2cd8a4cf57761ce9560177b41506e98bb32/planning/2026-09-16-parity-build/prd/18-A-shared-link-contract.md#L54-L56) now explicitly specifies the existing-claim lookup before the collection-state new-write guard. Valid authority plus matching key/normalized payload returns the original identity without entering the batch, including after closure. Invalid authority or changed payload does not gain a replay path.\n\nFrozen app implementation is unchanged at `fc0bbc36cd79f8f477b170e4d3962d414625d332`: [response.ts authority and source validation](https://github.com/klappy/3d-review-app/blob/fc0bbc36cd79f8f477b170e4d3962d414625d332/src/handlers/response.ts#L65-L74), [shared-link.ts pre-batch lookup and replay](https://github.com/klappy/3d-review-app/blob/fc0bbc36cd79f8f477b170e4d3962d414625d332/src/handlers/shared-link.ts#L77-L91), and [separate UNIQUE-conflict recovery](https://github.com/klappy/3d-review-app/blob/fc0bbc36cd79f8f477b170e4d3962d414625d332/src/handlers/shared-link.ts#L114-L120).\n\nValidation: exactly one documentation path changed (+3/-1 lines); diff check and repository frontmatter/journal-floor lint passed. No full implementation suite rerun for this documentation-only correction. Root authorized publication after independent ACCEPT. Independent receipt reproduced below; no claim of fresh Bugbot SUCCESS yet.\n\n<details><summary>Independent delta review receipt</summary>\n\n# Independent contract delta review\n\n**ACCEPT** exact cookbook `f30fc2cd8a4cf57761ce9560177b41506e98bb32`, relative to previously accepted `7cbeb26a61739ae9ac1b664e933b64c5636d3a07`, paired with unchanged app `fc0bbc36cd79f8f477b170e4d3962d414625d332`.\n\nVerified local HEADs and complete delta: exactly one path, `planning/2026-09-16-parity-build/prd/18-A-shared-link-contract.md`, three insertions and one deletion. `git diff --check` passes.\n\nThe amended persistence paragraph accurately separates the existing pre-batch committed-claim lookup from the UNIQUE-constraint recovery path. In `src/handlers/response.ts:65`, shared authority is revalidated before source answers are validated. In `src/handlers/shared-link.ts:87`, digests and the authenticated context's existing claim are checked before `collecting()` or any new write. Matching key/payload returns the original response identity, duplicate true and undo null; changed key conflicts, changed same-key payload is invalid. Thus closure/archive does not prevent an exact committed retry while session/link authority and source validation still pass. Revoked/expired authority is refused before replay. Only a missing claim reaches collection gating and the atomic batch. The batch UNIQUE-error path separately revalidates authority before rereading and comparing the winner; other errors propagate.\n\nNo implementation change or newly weakened behavior is hidden in this clarification. No blocking finding. The prior implementation/security ACCEPT stands for the frozen app head. This review does not replace native Auditor acceptance or assert latest Bugbot/check outcomes. Root's exact-head publication, required checks and prospective disposition remain applicable. No tests were rerun for this documentation-only delta; no implementation, push, merge, provider or shared-journal writes were performed.\n\n</details>\n\n@bugbot review\n\nPlease rerun review on exact head `f30fc2cd8a4cf57761ce9560177b41506e98bb32`; fresh literal SUCCESS remains required for acceptance.\n",
+        "createdAt": "2026-09-17T04:39:15Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/36#issuecomment-5708648784",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVENMyg",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "@cursor review \u2014 please run required Bugbot on this exact current candidate. Root request; no merge authorization.",
+        "createdAt": "2026-09-17T04:40:47Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [
+          {
+            "content": "THUMBS_UP",
+            "users": {
+              "totalCount": 1
+            }
+          }
+        ],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/36#issuecomment-5708664010",
+        "viewerDidAuthor": true
+      }
+    ],
+    "headRefName": "api/shared-link-contract",
+    "headRefOid": "f30fc2cd8a4cf57761ce9560177b41506e98bb32",
+    "reviews": [
+      {
+        "id": "PRR_kwDOUGabQ88AAAABN8tdzw",
+        "author": {
+          "login": "cursor"
+        },
+        "authorAssociation": "NONE",
+        "body": "<!-- BUGBOT_REVIEW -->\nCursor Bugbot has reviewed your changes using default effort and found 1 potential issue.\n\n<!-- BUGBOT_AUTOFIX_COLLAPSED -->\n<details>\n<summary>Autofix Details</summary>\n\n[Bugbot Autofix](https://cursor.com/docs/bugbot#autofix) prepared a fix for the issue found in the latest run.\n\n- \u2705 Fixed: **Closed retry path contradicts itself**\n  - Updated the persistence algorithm so a closed/archived collection can reread the existing claim for an exact committed retry, while revoke or expiry still refuses later authority.\n\n\n<p><a href=\"https://github.com/klappy/3d-review-cookbook/compare/api/shared-link-contract...cursor/shared-link-contract-retry-4f0b?expand=1&title=Shared%20link%20contract%20retry&body=%3C!--%20CURSOR_AGENT_PR_BODY_BEGIN%20--%3E%0AThis%20pull%20request%20contains%20changes%20generated%20by%20a%20Cursor%20Cloud%20Agent%0A%3C!--%20CURSOR_AGENT_PR_BODY_END%20--%3E%0A%0A%0A%0A%3Csup%3ECursor%20generated%20this%20PR%20to%20address%20Bugbot%20findings%20on%20PR%20%2336.%20If%20that%20PR%20is%20closed%2C%20this%20PR%20will%20be%20closed%20automatically.%20Configure%20in%20%5Bdashboard%5D(https%3A%2F%2Fwww.cursor.com%2Fdashboard%2Fbugbot).%3C%2Fsup%3E\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/assets/images/create-pr-dark.png\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/assets/images/create-pr-light.png\"><img alt=\"Create PR\" width=\"99\" height=\"28\" src=\"https://cursor.com/assets/images/create-pr-light.png\"></picture></a></p>\n\n<!-- BUGBOT_AUTOFIX_PUSH_METADATA: {\"commitSha\":\"f8ddaca561d041b6f6af96a5f8591ce2d2710f01\",\"sideBranchName\":\"cursor/shared-link-contract-retry-4f0b\"} -->\n\nOr push these changes by commenting:\n```\n@cursor push f8ddaca561\n```\n\n<details><summary>Preview (klappy/3d-review-cookbook@f8ddaca561)</summary>\n\n```diff\ndiff --git a/planning/2026-09-16-parity-build/prd/18-A-shared-link-contract.md b/planning/2026-09-16-parity-build/prd/18-A-shared-link-contract.md\n--- a/planning/2026-09-16-parity-build/prd/18-A-shared-link-contract.md\n+++ b/planning/2026-09-16-parity-build/prd/18-A-shared-link-contract.md\n@@ -52,7 +52,7 @@\n \n Legacy sessions keep NULL association and legacy code-redemption behavior; no backfill/deletion/restriction is imposed on historical response rows. New link opens require0007 and fail if missing; there is no production fallback to old shared-respondent semantics. Exactly one shared participant-session row exists for each new respondent/survey; mixed or ambiguous shared/legacy associations are rejected. Auth resolves the existing token; the helper rechecks stored association and lifetime without changing Auth files.\n \n-For shared submission, validate/normalize source answers first. SHA256 the client key and existing exported `canonical(normalizedAnswers)` (sorted object keys, array order significant). Store response idempotency key as `shared:<server respondent>:<key digest>`. A single D1 atomic batch inserts the response conditionally on current live session/link and collecting/unarchived selected survey/assessment, then inserts the unique shared claim only if that response exists. It rechecks template identity/version against the validated source and tests expiry against at least SQLite current time, so a request waiting to enter the batch cannot use a stale earlier timestamp. Claim uniqueness rolls back a competing response insert. Only a UNIQUE-constraint failure permits rereading the winner and comparing key/payload; other storage failures propagate. A completed revoke/closure before the batch prevents the insert. Revocation after an already committed response leaves history intact while denying future authority.\n+For shared submission, validate/normalize source answers first. SHA256 the client key and existing exported `canonical(normalizedAnswers)` (sorted object keys, array order significant). Store response idempotency key as `shared:<server respondent>:<key digest>`. A single D1 atomic batch inserts the response conditionally on current live session/link and collecting/unarchived selected survey/assessment, then inserts the unique shared claim only if that response exists. It rechecks template identity/version against the validated source and tests expiry against at least SQLite current time, so a request waiting to enter the batch cannot use a stale earlier timestamp. Claim uniqueness rolls back a competing response insert. Only a UNIQUE-constraint failure, or a completed close/prepare/understand/archive that blocks a new insert while link/session authority remains valid, permits rereading the winner and comparing key/payload; other storage failures propagate. A completed revoke or expiry before the batch prevents the insert and refuses exact retry. Revocation after an already committed response leaves history intact while denying future authority.\n \n Baseline isolated test databases apply0001\u20130004 plus0007. Integrated databases must apply the actual accepted0001\u20130007 in filename order, including other owners'0005_report_snapshot and0006_oauth_code_redemption; do not copy/renumber/rewrite those migrations. Root authorized exactly one existing fixture addition: `test/code-escrow.test.ts` loads0007 after0003 before seed, preserving every existing assertion. Provider migrations/deployment are separate authority; no seat executes them from this order. Rollback application code without dropping collected rows or additive history.\n```\n\n</details>\n\n\n<sub>You can send follow-ups to the cloud agent <a href=\"https://cursor.com/agents/bc-a06fbf20-c346-421f-b2d2-d5d6db072efe\">here</a>.</sub>\n\n</details>",
+        "submittedAt": "2026-09-17T04:30:01Z",
+        "includesCreatedEdit": false,
+        "reactionGroups": [],
+        "state": "COMMENTED",
+        "commit": {
+          "oid": "7cbeb26a61739ae9ac1b664e933b64c5636d3a07"
+        }
+      },
+      {
+        "id": "PRR_kwDOUGabQ88AAAABN8zQVg",
+        "author": {
+          "login": "cursor"
+        },
+        "authorAssociation": "NONE",
+        "body": "<!-- BUGBOT_REVIEW -->\n\u2705 Bugbot reviewed your changes and found no new issues!\n\n_Comment `@cursor review` or `bugbot run` to trigger another review on this PR_\n\n<sup>Reviewed by [Cursor Bugbot](https://cursor.com/bugbot) for commit f30fc2cd8a4cf57761ce9560177b41506e98bb32. Configure [here](https://www.cursor.com/dashboard/bugbot).</sup>",
+        "submittedAt": "2026-09-17T04:43:48Z",
+        "includesCreatedEdit": false,
+        "reactionGroups": [],
+        "state": "COMMENTED",
+        "commit": {
+          "oid": "f30fc2cd8a4cf57761ce9560177b41506e98bb32"
+        }
+      }
+    ],
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:39:10Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/klappy/3d-review-cookbook/actions/runs/35182709161/job/105078147845",
+        "name": "frontmatter",
+        "startedAt": "2026-09-17T04:39:04Z",
+        "status": "COMPLETED",
+        "workflowName": "lint"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:39:07Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/klappy/3d-review-cookbook/actions/runs/35182706754/job/105078140080",
+        "name": "frontmatter",
+        "startedAt": "2026-09-17T04:39:02Z",
+        "status": "COMPLETED",
+        "workflowName": "lint"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:43:49Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://cursor.com/docs/bugbot",
+        "name": "Cursor Bugbot",
+        "startedAt": "2026-09-17T04:40:53Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ],
+    "exact_check_receipts": [
+      {
+        "id": 105078502015,
+        "name": "Cursor Bugbot",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "f30fc2cd8a4cf57761ce9560177b41506e98bb32",
+        "completed_at": "2026-09-17T04:43:49Z"
+      },
+      {
+        "id": 105078147845,
+        "name": "frontmatter",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "f30fc2cd8a4cf57761ce9560177b41506e98bb32",
+        "completed_at": "2026-09-17T04:39:10Z"
+      },
+      {
+        "id": 105078140080,
+        "name": "frontmatter",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "f30fc2cd8a4cf57761ce9560177b41506e98bb32",
+        "completed_at": "2026-09-17T04:39:07Z"
+      }
+    ]
+  },
+  "34": {
+    "body": "**seat: Auditor \u00b7 docs-only, isolated \u2014 04-ACCEPTANCE collection-slice rows (proposed, not review-passed).** Base `plan/2026-09-16-parity-build-preplan`. Source: audit 14c5708290385 Table B; ruling 14c5707567961 (one reusable link per survey, no account/login/code, fresh respondent per open); URL contract `/#survey=<opaque token>`; Next-person deferred from the first slice.\n\n**What changed:** appends \u00a71a rows 34\u201350 (C-1\u2026C-16 + `assisted_next` deferral row) with evidence layer + source pin inline; amends row 23 (counts = persisted responses, respondents distinct) and row 25 (link token first, code legacy; not-collecting \u2192 409 `STAGE_CONFLICT`, superseding the `INVALID_PARAMS not_collecting` seed). Row 16 and all other rows untouched. Rows 36/38/39 mark the three OBSERVED baseline contradictions at app `10f5f44` that 0007 closes; all other row text is ruling-derived, not yet run against a head.\n\n**Companion (not in this PR):** `scenarios/journeys.json` J11 negative asserts single-use `link_used` \u2014 contract-owned; a proposal patch is on cookbook #14 for the root API writer's ACK. An independent Miniflare harness for these rows exists in isolated scratch (baseline: 17 pass / 3 expected fails C-3, C-5, C-6 / 2 browser skips).\n\n**Untouched:** Auth 19/20 files, Phase C, real-data disclosure holds, row 26. One reviewer judgment flagged: `STAGE_CONFLICT` is not in 05's shared error vocabulary \u2014 add it there or map back. Fresh independent receipt follows as a comment. Not a merge disposition.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_014QEHd8DrdFiLZzxoef2Su5\n\n<!-- CURSOR_SUMMARY -->\n---\n\n> [!NOTE]\n> **Low Risk**\n> Planning documentation only; no runtime or API code changes. Wrong acceptance text could misalign implementation until review passes and `05` reconciles `STAGE_CONFLICT`.\n> \n> **Overview**\n> **Docs-only (proposed):** extends `04-ACCEPTANCE.md` with **\u00a71a rows 34\u201350** \u2014 observable acceptance and negative cases for the **collection slice** (reusable survey link `/#survey=<token>`, audit Table B C-1\u2026C-16), including `issue_link` / `open_link`, fresh respondent vs resume, idempotent submit, revoke/expiry, stage-not-collecting behavior, and staff vs participant credential separation. Rows cite **app pins** (e.g. `fc0bbc3` / migration 0007) and mark superseded **10f5f44** observations where the shared-link contract closes gaps.\n> \n> **Amends existing rows:** vocabulary now notes **`STAGE_CONFLICT`** for slice rows; **row 23** requires `counts.responses` / `counts.respondents` to match persisted rows; **row 25** centers **`participant_token` from `cap.participant.open_link`** (legacy code secondary) and replaces not-collecting **`INVALID_PARAMS`** with **409 `STAGE_CONFLICT`**. **Row 50** explicitly **defers** `cap.response.assisted_next` from the first slice while row 26 text stands.\n> \n> Journey column pointers shift (e.g. **J11 amended**, **J14** for several public/`v2.1-oct` rows). Status remains **proposed \u2014 review pending**; companion journey JSON / error-vocab alignment in `05` is called out as follow-up, not in this diff.\n> \n> <sup>Reviewed by [Cursor Bugbot](https://cursor.com/bugbot) for commit bab67393fe1f3f511a028334ca41724e1f8763d4. Bugbot is set up for automated code reviews on this repo. Configure [here](https://www.cursor.com/dashboard/bugbot).</sup>\n<!-- /CURSOR_SUMMARY -->",
+    "comments": [
+      {
+        "id": "IC_kwDOUGabQ88AAAABVD9OrQ",
+        "author": {
+          "login": "git-repo-auth"
+        },
+        "authorAssociation": "NONE",
+        "body": "**Independent review receipt \u2014 fresh-context reviewer on PR #34's first commit `222b6c3` (base `627691f`); findings unedited. Verdict AMEND; the five required amendments are folded in `eeba939` (author fold \u2014 needs the delta glance in Astra's recheck, not self-graded). NITs 1\u20135 deliberately unfolded.**\n\n---\n\n## Verdict: **AMEND** (small, targeted \u2014 the delta is substantively sound)\n\n### (a) New rows 34\u201350 \u2014 ruling consistency, pin verification\nEvery file:line pin checked against `git show 10f5f44:\u2026`.\n\n| Row | Ruling-consistent | Pins verified | Notes |\n|---|---|---|---|\n| 34 | yes | `assessment.ts:28-31` yes | Negative half-wrong: archived language \u2192 INVALID_PARAMS (`assessment.ts:16`); unknown \u2192 `NOT_FOUND_OR_NOT_VISIBLE` (`:15`). |\n| 35 | yes | `survey.ts:45-54`, `:48`, `assessment.ts:41`, `0004:6-14` yes | \"browser Prepare panel shows it\" INF. |\n| 36 | yes | `survey.ts:90` yes | Two unflagged today-contradictions: `issue_link` does not check `collection_status` (`:85`); inserts a fresh invitation row per call (`:86-88`). |\n| 37 | yes | `participant.ts:19-22`, `response.ts:53-55`, `policy.ts:29-31`, matrix `:21` yes | \"token opaque\" INF but consistent. |\n| 38 | yes | `participant.ts:54` yes | Good. |\n| 39 | yes | `response.ts:69-71,82` yes | |\n| 40 | yes | `ui/app.js:243-250`, `participant-resume.js:3-5` yes | |\n| 41 | yes | `ui/app.js:251-253` yes | |\n| 42 | yes | `response.ts:65-67`, `a3-d1-journey:38-41` yes | |\n| 43 | yes | `response.ts:69-71` yes | |\n| 44 | yes | `survey.ts:135`, `participant.ts:52`, `envelope.ts:12` yes | |\n| 45 | yes | `participant.ts:52` yes; `issue_link` never binds `expires_at` (`survey.ts:88`) | |\n| 46 | yes | `response.ts:17-18`, `participant.ts:55` yes | \"back to collect re-enables\" INF (`assessment.ts:63` plausible). |\n| 47 | yes | `response.ts:27-43`, `pinned-instruments:57` yes | |\n| 48 | yes | `ui/app.js:184` shows responses only | cross-ref of 23. |\n| 49 | yes | `policy.ts:35-39` yes; `participant-auth:41` loose fit | |\n| 50 | yes (deferral) | **Factual problem**: `assisted_next` exists at 10f5f44 (`response.ts:93-98`) and throws `STAGE_CONFLICT` \"assisted collector authorization is not established (D6)\", not `RESERVED_NOT_BUILT`. | AMEND. |\n\nAlso: \"migration 0007 closes\" \u2014 no 0007 exists at 10f5f44; label as planned.\n\n### (b) Rows 23/25 \u2014 `survey.ts:71-73` verified; `response.ts:17-18` verified verbatim; 409 mapping at `envelope.ts:12`. Correct. Stale `not_collecting` / `link_used` vocabulary remains in 05:41/05:47 \u2014 outside this diff (J11 patch).\n\n### (c) Auth 19/20 / real-data \u2014 none touched. Clean.\n\n### (d) Integrity \u2014 patch applies cleanly; 17 rows, 8 columns, contiguous 34\u201350; header still \"proposed \u2014 written, review pending\"; dated note present. `STAGE_CONFLICT` is in 05's shared set (05:24) but not in this file's own Vocabulary paragraph (line 7) \u2014 extend it. Matrix roles match (open_link V, get_status Vw+, issue/revoke_link O,M).\n\n### (e) NITs \u2014 1. H1/\u00a71 still say \"the 33\". 2. Row 36 \"no per-participant links\" vs matrix `:79` `invitee_hash` / `:80` send_links \u2014 say which the ruling retires. 3. Row 49's `participant-auth:41` is a weak citation. 4. Rows 45/46 reference audit A4/A5 without restating. 5. Row 48 pure cross-ref.\n\n**Required before ACCEPT:** row 50; row 36 today-flags; row 34 negative; Vocabulary + `STAGE_CONFLICT`; \"0007\" as planned.\n\n---\n\n**Auditor's note:** all five required items folded at `eeba939` (row 34 negative split; row 36 three today-flags with pins; row 50 observed 409 at `response.ts:93-98`; Vocabulary extended; 0007 marked planned/reserved-by-root). NITs left for the owner. Still proposed, not review-passed; root owns checks/integration.\n",
+        "createdAt": "2026-09-17T04:16:00Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/34#issuecomment-5708402349",
+        "viewerDidAuthor": false
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVEEBCA",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "Root review of cookbook34 eeba939: AMEND before acceptance. Rows currently mix baseline observations with the now accepted shared-link correction. Reconcile against exact cookbook36/app24 and existing shared-link plan: row36 issue_link is write.effect/danger with dry-run confirmation and raw token shown once (do not require returning same secret on every issue); row41 current accepted UI restores scoped draft when compatible, so unconditional not-saved notice is stale; row42 changed payload under same key is conflict, not unconditional duplicate success; row45 link expiry/revocation also invalidates issued contexts under current plan; row46 new open after closure must refuse, not succeed. Preserve baseline behaviors as dated observations rather than desired acceptance. Row40 actual submit endpoint is /v2/participate/responses. Ensure Table B candidate assertions follow accepted contract rather than accidentally codifying baseline defects. Do not expand product implementation. Delegate bounded docs corrections in parallel with your independent API harness; obtain fresh independent review of final docs. App24 fc0bbc36/cookbook36 7cbeb26 exact contracts are available.",
+        "createdAt": "2026-09-17T04:26:10Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/34#issuecomment-5708513544",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVENwAA",
+        "author": {
+          "login": "git-repo-auth"
+        },
+        "authorAssociation": "NONE",
+        "body": "**Final delta receipt \u2014 fresh-context reviewer on `eeba939 \u2192 da3fd74` (root AMEND c5708513544 applied against the accepted contract at app `fc0bbc3` / cookbook #36 `7cbeb26`); findings unedited. Two required fixes folded at `bab6739` (row 36 class letter `E`; row 41 not-saved notice re-labelled as fc0bbc3-OBSERVED with draft-restore marked contract-owed). Head `bab6739` FROZEN from this seat; NITs unfolded.**\n\n---\n\n**Verdict: AMEND** (two targeted fixes; everything else checks out against `fc0bbc3`).\n\n## Scope checks\n- (c) Diff hunks: OBSERVED \u2014 only the \u00a71a note line and rows 36, 38, 40, 41, 42, 45, 46 differ. (d) Header still proposed. (e) Table intact, 6 columns throughout. (f) No Auth 19/20 / real-data material. (b) Rows 36, 38, 46 tag 10f5f44 behaviour \"(observation, superseded)\"; row 41 did not \u2014 Finding 1.\n\n## Source verification (app head `fc0bbc3`, OBSERVED)\nRow 36: dry_run `{survey_id, expires_at}` + impact/`revoke_link` \u2192 `survey.ts:94-95` \u2714; execute `{link_id, link_token, expires_at, entry_fragment}` hash-only storage \u2192 `:96-99` \u2714; past `expires_at` \u2192 INVALID_PARAMS `:90-91` \u2714; archived/deselected \u2192 STAGE_CONFLICT `:87` \u2714; `confirm_token`/`WRONG_TOOL_FOR_CLASS` `dispatch.ts:73,:43` \u2714. Row 38: open shape `shared-link.ts:58-69,71-74` \u2714; C-5r `:49-55` \u2714; C-5x `:50-53` \u2714. Row 40: receipt `response.ts:99-106` \u2714. Row 41: `form` returns `template.version` `:60-61`, writes nothing `:51-63` \u2714. Row 42: `payload_digest` mismatch \u2192 INVALID_PARAMS at `shared-link.ts:84` \u2714 verbatim; replay `:85`, early replay `:89-90`, UNIQUE race `:114-120`, claim table `0007:7-14` \u2714. Row 45: `expires_at` `survey.ts:88-93`; `activeLink` `:17`; re-validation `:40-41`; TTL `min(12h, link.expires_at)` `:58` \u2714. Row 46: `collecting` `:20-25`; new open on closed \u2192 STAGE_CONFLICT `:57`; guarded INSERT `:61-68`, `:99-102` \u2714. Contract: `capabilities.json:1131-1160` two-step danger, `effect: disclosure` \u2714. Unverifiable here: cookbook #36 `7cbeb26` pin; unchanged `a3-d1-journey`/`policy.ts`/matrix pins.\n\n## Findings requiring amendment\n1. **Row 41 mislabels a live fc0bbc3 behaviour as superseded.** `ui/app.js:251-253` at fc0bbc3 still shows \"Answers entered before reload were not saved\"; no draft storage or `resume_token` use in `ui/app.js`/`participant-resume.js`. The draft-restore text is contract (INFERRED), not fc0bbc3 source. Fix: \"Today at fc0bbc3 (OBSERVED, not yet closed)\"; mark draft restore contract-owed.\n2. **Row 36 class letter.** `capabilities.json:1132-1133` \u2014 `class: \"write.effect\"`, `tool: \"danger\"` \u2192 `E \u00b7 O, M`, not `D` (D is `write.dangerous`, e.g. row 21).\n\n## NITs\nRow 36 precondition \"open\" is not enforced by `issue_link` (`survey.ts:85-87`); row 46 race message is \"link changed during open\" (`:68`); row 40 INVALID_PARAMS gate is shared-link-only (`response.ts:101`).\n\n---\n\n**Auditor's note:** Findings 1\u20132 folded at `bab6739` (also \"Survey selected (not archived)\" per NIT 1). Frozen. Still proposed, not review-passed; root owns checks/integration and Astra's recheck. Bugbot on this private repo not readable by this seat.\n",
+        "createdAt": "2026-09-17T04:41:40Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/34#issuecomment-5708673024",
+        "viewerDidAuthor": false
+      }
+    ],
+    "headRefName": "audit/04-collection-acceptance",
+    "headRefOid": "bab67393fe1f3f511a028334ca41724e1f8763d4",
+    "reviews": [],
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:41:16Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/klappy/3d-review-cookbook/actions/runs/35182840437/job/105078546151",
+        "name": "frontmatter",
+        "startedAt": "2026-09-17T04:41:10Z",
+        "status": "COMPLETED",
+        "workflowName": "lint"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:41:14Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/klappy/3d-review-cookbook/actions/runs/35182837850/job/105078538329",
+        "name": "frontmatter",
+        "startedAt": "2026-09-17T04:41:07Z",
+        "status": "COMPLETED",
+        "workflowName": "lint"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:44:26Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://cursor.com/docs/bugbot",
+        "name": "Cursor Bugbot",
+        "startedAt": "2026-09-17T04:41:08Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ],
+    "exact_check_receipts": [
+      {
+        "id": 105078561559,
+        "name": "Cursor Bugbot",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bab67393fe1f3f511a028334ca41724e1f8763d4",
+        "completed_at": "2026-09-17T04:44:26Z"
+      },
+      {
+        "id": 105078546151,
+        "name": "frontmatter",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bab67393fe1f3f511a028334ca41724e1f8763d4",
+        "completed_at": "2026-09-17T04:41:16Z"
+      },
+      {
+        "id": 105078538329,
+        "name": "frontmatter",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bab67393fe1f3f511a028334ca41724e1f8763d4",
+        "completed_at": "2026-09-17T04:41:14Z"
+      }
+    ]
+  },
+  "35": {
+    "body": "Specify the accepted target main \u2192 existing DEV and production \u2192 production, while keeping current deployment reality explicit. This is the bounded A8 Order A inert documentation candidate; the review-only control-plane manifest does not execute or authorize cutover.\n\nExact candidate: `ecab91ae12f7361f1b8d273b15c095c681a67445`. Paired app `78d009157e19c9f3e5180db42ebb41b5d6e9174f` and cookbook `ecab91ae12f7361f1b8d273b15c095c681a67445`. App changes exactly seven declared comment/document/JSON paths; cookbook changes only the essential operating recipe and 18-H pointer. Reconstruction machinery is deferred under Chris's after-shipment ruling.\n\nIndependent candidate review ACCEPT: seven/two-path guards; all112 unselected baseline app files unchanged; parsed Wrangler TOML equal; paragraph/append-only guards; valid inert JSON; ten local Markdown links resolve; LF, modes and whitespace checks pass. No runtime or provider behavior was tested or changed. Complete independent receipt is attached below.\n\nFresh cookbook target c460c6aa contains newer acceptance, capability-matrix and NLX evidence changes without overlap with these two paths. This PR preserves those later base changes; candidate was not rebased or rewritten.\n\nDraft publication only, authorized by root. Literal exact-head Cursor Bugbot SUCCESS, finished checks/findings and prospective integration disposition remain required. App base remains phase-0/walking-skeleton: any later merge can trigger DEV and needs its separate disposition. No author merge, provider/ruleset/ref cutover, deployment or production authority. Order B remains unfired.\n\nPaired draft: https://github.com/klappy/3d-review-app/pull/22\n\n<!-- CURSOR_SUMMARY -->\n---\n\n> [!NOTE]\n> **Low Risk**\n> Documentation-only changes under planning; no runtime, provider, or deployment behavior is modified by this PR.\n> \n> **Overview**\n> Adds an **Order A** planning recipe for aligning existing DEV and production Cloudflare Workers CI with **main \u2192 DEV** and **production \u2192 production**, without claiming any cutover or deployment.\n> \n> The new `A8-DEV-PRODUCTION.md` documents custody of branches/bindings/secrets, a mandatory fresh observation record before execution, a separately gated **Order B** settings-first sequence (freeze ACKs, production branch protection, trigger PATCHes, main population gates), rollback constraints, and remaining production acceptance obligations. It explicitly scopes cookbook edits to documented deploy/release paths and defers full reconstruction machinery.\n> \n> `18-H-infra.md` gains a **Bounded A8 branch correction** section that links the recipe and states it is review-only with other infra PRD sections still UNASSESSED.\n> \n> <sup>Reviewed by [Cursor Bugbot](https://cursor.com/bugbot) for commit ecab91ae12f7361f1b8d273b15c095c681a67445. Bugbot is set up for automated code reviews on this repo. Configure [here](https://www.cursor.com/dashboard/bugbot).</sup>\n<!-- /CURSOR_SUMMARY -->",
+    "comments": [
+      {
+        "id": "IC_kwDOUGabQ88AAAABVD8XXQ",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "# Independent A8 Order A candidate review\n\n**Verdict: ACCEPT \u2014 exact inert local candidate pair only.** No provider execution, integration, cutover, deployment, mandatory-check waiver or whole-A8 acceptance. This reviewer has no authorship of the candidate.\n\n- App: `78d009157e19c9f3e5180db42ebb41b5d6e9174f`, parent `10f5f444d68475d7114ab8fe0bf269fe106476b1`.\n- Cookbook: `ecab91ae12f7361f1b8d273b15c095c681a67445`, parent `e8b79ebdf354069f61abf622659ab6afd4211e80`.\n- Governing scope independently fetched from kitchen `26d856454dc63f6bb22b80edfdef0940d8fc5c75`, A8 `order-a-2026-09-17/ROOT-FINAL-DISPOSITION.md`: seven inert app paths plus two essential cookbook paths. Chris's after-shipment reconstruction ruling supersedes the earlier seven-plus-four/source-projector plan.\n\n## Independent evidence\n\nI read the full two-commit diffs, DEBRIEF and author guard receipt, then ran a separately written verifier against Git objects rather than trusting the author's guard program.\n\n- Exact app seven-path and cookbook two-path allowlists pass. App baseline has117 tracked files; all112 unselected baseline files have identical Git object and mode. Five existing selected files plus two additions only. No runtime, package, lockfile, Auth, contract, UI, migrations or seed edits.\n- Wrangler parses to identical TOML structures. First deploy-only warning and every line after the original leading mapping comments remain identical; only two comments are replaced and the declared target-only warning added.\n- README and BUGBOT each change exactly one paragraph; AGENTS adds only the declared topology bullet. Full release diff preserves historical observations/hold/checks and changes only the declared heading/paragraph plus governing correction section. 18-H is append-only.\n- All nine changed files have LF/final newline, existing file modes preserved, both diffs pass `git diff --check`, and both candidate checkouts are clean. All ten local Markdown links in changed Markdown resolve to actual candidate tree paths.\n- Review-only JSON parses and remains `PROPOSED_NOT_APPLIED`. Production ruleset body matches the pinned prior ruleset except its new name, exact production-only target and temporary creation-status exemption. Strict real Bugbot integration1210556, PR/deletion/non-fast-forward rules and no bypass are preserved. Bootstrap ref/body is exact empty895339fb. Production trigger retarget precedes DEV retarget. The tightening/readback step occurs before attaching production. Conditional cancellation names only individually observed authorized builds, never a blanket action.\n- New docs and recipe consistently preserve main\u2192existingDEV, production\u2192production, optional future staging, actual freeze/queue/rules/schema refresh, exact-head review/SUCCESS/hold gates, expected modified_on accounting, protected normal main merge, Git/build/version readback and unchanged production. Health source_sha is explicitly not app-SHA proof. No manual dispatch or destructive rollback is authorized.\n- Reconstruction source JSON/projector is absent as ordered. The essential recipe explicitly records after-shipment reconstruction; it does not falsely claim current proof or full product readiness. Real production stamp and separate captain promotion remain open.\n\nIndependent machine receipt: `INDEPENDENT-GUARD-RECEIPT.json` adjacent. No runtime tests are claimed: runtime and executable TOML semantics are unchanged, and provider behavior was not exercised by this local review.\n\n## Integration custody\n\nFresh GitHub comparison of cookbook basee8b79ebd\u2192current627691f2 reports only added `planning/2026-09-16-parity-build/04-ACCEPTANCE-EVIDENCE.md` (three commits ahead), with no selected-path overlap. Preserve that newer file during later integration. This candidate review does not cover a rewritten/rebased head; re-read final diff/head and required checks. App21's nondeploy fable-branch merge does not imply this candidate entered DEV/main.\n\nRoot may route this exact candidate for remote review/checks under existing authority. Literal current-head BugbotSUCCESS, terminal attached checks/findings and prospective per-candidate disposition remain mandatory before any later integration. Order B needs its distinct final review, actual executor ACK/fire and fresh observations. No provider call, push, merge or shared-journal write was performed by this reviewer.\n\n\nPublication observation: both exact reviewed heads retained; latest cookbook target c460c6aa advanced beyond627691f2 only on unrelated paths. PRdiff preserves newer basecargo; no rebase. Paired draft https://github.com/klappy/3d-review-app/pull/22",
+        "createdAt": "2026-09-17T04:14:48Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/35#issuecomment-5708388189",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOUGabQ88AAAABVD8Yuw",
+        "author": {
+          "login": "klappy"
+        },
+        "authorAssociation": "OWNER",
+        "body": "@cursor review\n\nMandatory review requested on the exact frozen draft head. Literal SUCCESS is required before any later integration disposition. Draft publication and local independent acceptance do not authorize merge or cutover.",
+        "createdAt": "2026-09-17T04:14:50Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [
+          {
+            "content": "THUMBS_UP",
+            "users": {
+              "totalCount": 1
+            }
+          }
+        ],
+        "url": "https://github.com/klappy/3d-review-cookbook/pull/35#issuecomment-5708388539",
+        "viewerDidAuthor": true
+      }
+    ],
+    "headRefName": "audit/a8-operating-recipe",
+    "headRefOid": "ecab91ae12f7361f1b8d273b15c095c681a67445",
+    "reviews": [
+      {
+        "id": "PRR_kwDOUGabQ88AAAABN8nudw",
+        "author": {
+          "login": "cursor"
+        },
+        "authorAssociation": "NONE",
+        "body": "<!-- BUGBOT_REVIEW -->\n\u2705 Bugbot reviewed your changes and found no new issues!\n\n_Comment `@cursor review` or `bugbot run` to trigger another review on this PR_\n\n<sup>Reviewed by [Cursor Bugbot](https://cursor.com/bugbot) for commit ecab91ae12f7361f1b8d273b15c095c681a67445. Configure [here](https://www.cursor.com/dashboard/bugbot).</sup>",
+        "submittedAt": "2026-09-17T04:17:51Z",
+        "includesCreatedEdit": false,
+        "reactionGroups": [],
+        "state": "COMMENTED",
+        "commit": {
+          "oid": "ecab91ae12f7361f1b8d273b15c095c681a67445"
+        }
+      }
+    ],
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:14:40Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/klappy/3d-review-cookbook/actions/runs/35181178660/job/105073450723",
+        "name": "frontmatter",
+        "startedAt": "2026-09-17T04:14:34Z",
+        "status": "COMPLETED",
+        "workflowName": "lint"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:14:32Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/klappy/3d-review-cookbook/actions/runs/35181174476/job/105073434160",
+        "name": "frontmatter",
+        "startedAt": "2026-09-17T04:14:29Z",
+        "status": "COMPLETED",
+        "workflowName": "lint"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T04:17:52Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://cursor.com/docs/bugbot",
+        "name": "Cursor Bugbot",
+        "startedAt": "2026-09-17T04:14:56Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ],
+    "exact_check_receipts": [
+      {
+        "id": 105073529413,
+        "name": "Cursor Bugbot",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "ecab91ae12f7361f1b8d273b15c095c681a67445",
+        "completed_at": "2026-09-17T04:17:52Z"
+      },
+      {
+        "id": 105073450723,
+        "name": "frontmatter",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "ecab91ae12f7361f1b8d273b15c095c681a67445",
+        "completed_at": "2026-09-17T04:14:40Z"
+      },
+      {
+        "id": 105073434160,
+        "name": "frontmatter",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "ecab91ae12f7361f1b8d273b15c095c681a67445",
+        "completed_at": "2026-09-17T04:14:32Z"
+      }
+    ]
+  },
+  "37": {
+    "body": "Paired copy rows for the first collection increment. `design-system/copy.md` only, from `design-system` @ `86e5a86`. Head `41a4ee2`. Every `copy` string in app `ui/shared-link.js` (frozen combined candidate `dafefe1`, PR #26) has a verbatim row here; verified by the independent final review (H). Rows added: participant open/closed/cannot-resume/rate-limit/transient/draft states, staff link preview/create/copy/refresh and impact/expiry templates. No behaviour; no other file. No merge by this seat.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01M3bc9FaaNwF4er6RxLfDDD\n\n<!-- CURSOR_SUMMARY -->\n---\n\n> [!NOTE]\n> **Low Risk**\n> Documentation-only copy deck updates with no runtime or contract file changes in this PR.\n> \n> **Overview**\n> Extends **`design-system/copy.md`** so the first collection increment has anchored copy for **staff survey-link issuance** and **participant shared-link flows**, aligned with app PR #26 (`ui/shared-link.js`).\n> \n> **Assessment \u00b7 Collect** adds rows for `cap.survey.issue_link` and related `cap.survey.get` status: preview/create/copy, one-time link receipt, impact/expiry templates, validation and server-reply errors, in-flight status text, and a note that one link serves all respondents without auto-opening collection.\n> \n> **Participant** adds rows for closed collection, refused resume, rate limits and transient/network failures, draft version mismatch, restore/submit-retry messaging, opening status, and receipt copy that same-link multi-device use is allowed while **Next person** stays deferred for this increment.\n> \n> <sup>Reviewed by [Cursor Bugbot](https://cursor.com/bugbot) for commit 41a4ee29c5f7e3c102b83576e3f3c40b7d3a5bc4. Bugbot is set up for automated code reviews on this repo. Configure [here](https://www.cursor.com/dashboard/bugbot).</sup>\n<!-- /CURSOR_SUMMARY -->",
+    "comments": [],
+    "headRefName": "cos/c2-shared-link-copy",
+    "headRefOid": "41a4ee29c5f7e3c102b83576e3f3c40b7d3a5bc4",
+    "reviews": [],
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T05:14:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/klappy/3d-review-cookbook/actions/runs/35184952625/job/105084904355",
+        "name": "frontmatter",
+        "startedAt": "2026-09-17T05:14:23Z",
+        "status": "COMPLETED",
+        "workflowName": "lint"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T05:05:58Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/klappy/3d-review-cookbook/actions/runs/35184398703/job/105083233455",
+        "name": "frontmatter",
+        "startedAt": "2026-09-17T05:05:53Z",
+        "status": "COMPLETED",
+        "workflowName": "lint"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-17T05:17:05Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://cursor.com/docs/bugbot",
+        "name": "Cursor Bugbot",
+        "startedAt": "2026-09-17T05:14:24Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ],
+    "exact_check_receipts": [
+      {
+        "id": 105084913225,
+        "name": "Cursor Bugbot",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "41a4ee29c5f7e3c102b83576e3f3c40b7d3a5bc4",
+        "completed_at": "2026-09-17T05:17:05Z"
+      },
+      {
+        "id": 105084904355,
+        "name": "frontmatter",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "41a4ee29c5f7e3c102b83576e3f3c40b7d3a5bc4",
+        "completed_at": "2026-09-17T05:14:29Z"
+      },
+      {
+        "id": 105083233455,
+        "name": "frontmatter",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "41a4ee29c5f7e3c102b83576e3f3c40b7d3a5bc4",
+        "completed_at": "2026-09-17T05:05:58Z"
+      }
+    ]
+  }
+}

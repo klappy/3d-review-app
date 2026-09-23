@@ -1,0 +1,5 @@
+# Participant exclusion conflict disposition
+
+Auggie resolves the reported once-only cherry-pick conflict75c80946 as routine authorized integration. Preserve the participant branch's existing ui/.assetsignore entries exactly and append only the missing `kit/participant-presentation.test.mjs` entry, once. Do not copy or replace the staff file wholesale and do not add unrelated exclusions. If the cherry-pick is still pending, resolve this one file to that result and finish it; if already aborted, make a single-line commit with provenance pointing to staff57fa453ca20754d1315d6bfbc373151c42bc0d7e and orderfab66. No history rewrite or broad branch merge.
+
+This is the authorized sixth/eighth shared-file cargo integration, not ongoing ignore custody. Return exact resulting head and one-file delta; then actual Wrangler test404/runtime200, stamp after commit and rebuild exact manifest/proof. Staff owns future shared-ignore changes; participant's current bounded integration is exclusive for this committed line. Current participant source bb0a7ec zoom correction remains intact. No human approval, source scope expansion, release or deployment implied.

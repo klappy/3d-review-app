@@ -1,0 +1,23 @@
+{
+  "build": {
+    "success": true,
+    "status": 200,
+    "id": "2d7d63ba-a2a1-48e2-9587-5cc353dae70e",
+    "outcome": "success",
+    "sha": "10f5f444d68475d7114ab8fe0bf269fe106476b1"
+  },
+  "version": {
+    "success": true,
+    "status": 200,
+    "id": "038befe0-cf15-4c3d-b48e-021a7704f13e",
+    "created_on": "2026-09-17T00:51:54.256791Z",
+    "db": [
+      {
+        "database_id": "5d4cc260-a7b1-47cc-b03d-ed4f60d324c3",
+        "id": "5d4cc260-a7b1-47cc-b03d-ed4f60d324c3",
+        "name": "DB",
+        "type": "d1"
+      }
+    ]
+  }
+}

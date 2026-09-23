@@ -1,0 +1,187 @@
+{
+  "health": {
+    "ok": true,
+    "capability": "cap.ops.health",
+    "result": {
+      "ok": true,
+      "version": "0.14.3",
+      "build": "0.14.3+0b798ce",
+      "commit": "0b798cede7f5ed4a5ccc82de4e196a5587f8ecef",
+      "build_uuid": "d16a3609-e25f-4e24-88aa-655907515bc0",
+      "release_source": "c9045c2fb940caa77685225fd432f2714bc3256d",
+      "contract": "contract-v0.1",
+      "source_sha": "0f4413768c4365054372d917619311d7c2a00e96",
+      "deps": {
+        "d1": "ok"
+      },
+      "capabilities": 90
+    },
+    "trace_id": "tr_WyB0-6xe-V5VuCLQ"
+  },
+  "assets": [
+    {
+      "path": "/stage-screens.js",
+      "sha256": "98ba2440fe2777efc45c6192826f517f0961b61d45191d561c403cf178050055",
+      "matches": true
+    },
+    {
+      "path": "/",
+      "sha256": "d449f89732c4930c4583b56a07198e668cb0a9d27f83fbcb96d61a2cc22b67f1",
+      "matches": true
+    },
+    {
+      "path": "/roadmap/",
+      "sha256": "e24a4f38951ca09af249d8ff1578fe7dfef3dcc81ef047ce1c787d205210e2f5",
+      "matches": true
+    },
+    {
+      "path": "/roadmap/live.js",
+      "sha256": "d546d8451b5fa3d60934ce5e153f89016229eabff0a18afafc93b2efd2d62ca9",
+      "matches": true
+    },
+    {
+      "path": "/roadmap/model.js",
+      "sha256": "a3251982bfc32ec6ff7f3b8e95dbb683d096bde3f483833539197294e3c47a99",
+      "matches": true
+    },
+    {
+      "path": "/roadmap/page.js",
+      "sha256": "46b6df28d350b71eb45b4ccc12bb75f34e95cee934365870ceb64088f547985d",
+      "matches": true
+    },
+    {
+      "path": "/roadmap/page.css",
+      "sha256": "5d9e1aaaba878497f58e47fa77fb46477986706c83127e8fa922f3e9a63f99a6",
+      "matches": true
+    },
+    {
+      "path": "/assess/assess.js",
+      "sha256": "41083aecbababb56d169361a8b99e60822da4ecc457fd91f2408a9d6e90ba83f",
+      "matches": true
+    },
+    {
+      "path": "/assess/feedback.js",
+      "sha256": "e3936d9a1f78f2afd5ba34c97cbf42e37721a80b755446206f7472454f95dedf",
+      "matches": true
+    },
+    {
+      "path": "/assess/share.js",
+      "sha256": "cede8516f4c0f266b831799c0b9800e09da9a3142fbd43d689e6758764a0f294",
+      "matches": true
+    },
+    {
+      "path": "/assess/vendor-qrcode.js",
+      "sha256": "afd759594a43eec237a805f2f96467ade87f95c9090ac6a8a26940bb0109febf",
+      "matches": true
+    },
+    {
+      "path": "/legacy/",
+      "sha256": "ac783e10bcfcd88aaf0005492a63c8adc835b4715d1d41cf26f2ca4028df0e36",
+      "matches": true
+    },
+    {
+      "path": "/assess/",
+      "sha256": "d449f89732c4930c4583b56a07198e668cb0a9d27f83fbcb96d61a2cc22b67f1",
+      "matches": true
+    },
+    {
+      "path": "/assess/permissions.js",
+      "sha256": "e57933c172421c1ee0823866cc75e8cf478e077f98e9815bbf3092bc7d09d258",
+      "matches": true
+    },
+    {
+      "path": "/changelog.js",
+      "sha256": "e82cdc03ed57549cdd33756b522e9714202178beb169e76a7518998a9413468b",
+      "matches": true
+    },
+    {
+      "path": "/assess/views.js",
+      "sha256": "81d0858fedfc0febc966fc2cd7ce8d26cee6b040bf0bee30fa25781a50206384",
+      "matches": true
+    },
+    {
+      "path": "/assess/report-build.js",
+      "sha256": "0d4fb8424893d14c6078a64df0ddcd1b5daf801af9328a7e9fe5d39f9586180a",
+      "matches": true
+    },
+    {
+      "path": "/demo.js",
+      "sha256": "c1d74b2762ed9702e0c4cbcb9dbdd9dd5b10b98752fa174465fd294e8b08afef",
+      "matches": true
+    },
+    {
+      "path": "/demo-data.js",
+      "sha256": "fafb76d2cd365588bd80ca34d472a6e4f156416de5699ce4e32d4fde3cba2b8c",
+      "matches": true
+    },
+    {
+      "path": "/public-entry.js",
+      "sha256": "e9506b9b4b20a5310877066a240a9c8e994cc11d54c70e12c77c7d79e08ee6fa",
+      "matches": true
+    },
+    {
+      "path": "/participate/",
+      "sha256": "27d234185c272062135ffced4da2397a319e8b5499b29613a3d25ce4dd734fbe",
+      "matches": true
+    },
+    {
+      "path": "/participate/page.js",
+      "sha256": "bf471dcb7b9ed0489d28294354c76ce1be25be201ca9ece1de23acb3994917db",
+      "matches": true
+    },
+    {
+      "path": "/participate/page.css",
+      "sha256": "901d8724e7ffb066a011e7b40ad1c859c388fb1efb0c391dcfa67c808eeac347",
+      "matches": true
+    },
+    {
+      "path": "/participate/controller.js",
+      "sha256": "8a1887cd967e2cf9ba235b36054e6fe204b9bb8124038ecf1bd6629c8b55d840",
+      "matches": true
+    }
+  ],
+  "changelog_current": "0.14.3",
+  "anonymous_mcp_resource_http_status": 401,
+  "excluded_paths": [
+    {
+      "path": "/mcp/harness/host.html",
+      "http_status": 401,
+      "source_not_served": true
+    },
+    {
+      "path": "/mcp/harness/bridge-global.js",
+      "http_status": 401,
+      "source_not_served": true
+    },
+    {
+      "path": "/mcp/panel-src.html",
+      "http_status": 401,
+      "source_not_served": true
+    },
+    {
+      "path": "/demo.test.mjs",
+      "http_status": 404,
+      "source_not_served": true
+    }
+  ],
+  "limitations": "Read-only release/asset verification only. No report build, report data/grant mutation, email, seed or authenticated live report/MCP journey is claimed.",
+  "merge_commit": "0b798cede7f5ed4a5ccc82de4e196a5587f8ecef",
+  "canonical_build": {
+    "uuid": "d16a3609-e25f-4e24-88aa-655907515bc0",
+    "source": "push_event",
+    "branch": "production",
+    "commit": "0b798cede7f5ed4a5ccc82de4e196a5587f8ecef",
+    "status": "stopped",
+    "outcome": "success",
+    "stopped_on": "2026-09-22T01:07:06.771Z",
+    "test_files_passed": 54,
+    "tests_passed": 591,
+    "schema": "already matches; no data change"
+  },
+  "active_deployment": {
+    "id": "22fa469b-8b8d-4efb-aa95-c52eb74af81d",
+    "created_on": "2026-09-22T01:06:54.923612Z",
+    "version_id": "c23de569-3a58-4f8b-8710-09420acc1a84",
+    "percentage": 100
+  }
+}
