@@ -9,6 +9,7 @@
 // location or the router itself. deps.go(hash) is the shell's navigation.
 
 import { shareUrl } from '../shared-link.js';
+import { stepper as stepperComponent, ensureStepperStyle } from './components/stepper.js';
 
 export const STEPS = ['details', 'participants', 'information', 'review'];
 // Step names follow Bincy's screen inventory 03–06 (cookbook @933eb5f sources/bincy-design-sprint-2026-09-22/01_documents/04_screen_inventory.md).
@@ -178,9 +179,8 @@ export function expectedFor(surveyId, store = safeStore()) {
 }
 
 // ---------- views (pure string renderers) ----------
-export function stepper(n) {
-  return `<ol class="stepper" aria-label="Setup steps">${STEP_TITLES.map((t, i) => `<li class="${i + 1 < n ? 'done' : i + 1 === n ? 'on' : ''}"${i + 1 === n ? ' aria-current="step"' : ''}><i>${i + 1 < n ? '✓' : i + 1}</i><span>${t}</span></li>`).join('')}</ol>`;
-}
+// component: Stepper (ruling 12:34) — the wizard composes the shared component; it keeps no copy of its own.
+export const stepper = n => stepperComponent(STEP_TITLES, n, { label: 'Setup steps' });
 const head = (n, h, sub) => `<div class="eyebrow">Start a 3D Review · step ${n} of 4</div>${stepper(n)}<h1 class="wz-h">${h}</h1>${sub ? `<p class="muted wz-sub">${sub}</p>` : ''}`;
 const errBox = errs => errs?.length ? `<div class="note alert" role="alert">${errs.map(esc).join('<br>')}</div>` : '';
 const actions = (back, primary) => `<div class="actions">${back ? `<button type="button" class="rv-btn quiet" data-wz="back">Back</button>` : `<button type="button" class="rv-btn quiet" data-wz="cancel">Cancel</button>`}<span class="spacer"></span>${primary}</div>`;
@@ -256,6 +256,7 @@ export function renderDone(ctx, origin = '', templates = []) {
 // ---------- mount ----------
 // deps: { api(url, {method, body}) → result, go(hash), assessmentHref(aid), origin, store }
 export function mountWizard(root, deps) {
+  ensureStepperStyle(root?.ownerDocument);
   const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0 };
   let alive = true; const ac = new AbortController(); const on = { signal: ac.signal };
   const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, s.data, s.errs, s.partial || false, deps.origin || '')}</div>`; };

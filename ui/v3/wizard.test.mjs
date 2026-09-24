@@ -247,3 +247,12 @@ test('L2-6: review rows carry the perspective dot and prototype sub-line (V.setu
   assert.match(r, /<dt><span class="pdot wz-kvdot p-team" aria-hidden="true"><\/span>Translation team<\/dt><dd>no number given<\/dd>/);
   assert.match(r, /Check the details\. Launching opens the survey links; nothing is sent to anyone\./);
 });
+
+test('L2-7 wizard composes the shared Stepper component (ruling 12:34): no local copy', async () => {
+  const { stepper } = await import('./wizard.js');
+  const { stepper: shared } = await import('./components/stepper.js');
+  assert.equal(stepper(2), shared(STEP_TITLES, 2, { label: 'Setup steps' }));
+  const html = renderStep('participants', draft(), { projects: [], languages: [], templates: [] }, [], false, '');
+  assert.match(html, /class="v3-stepper stepper" aria-label="Setup steps"/);
+  assert.match(html, /<li class="on" aria-current="step"><i aria-hidden="true">2<\/i><span>Participants<\/span>/);
+});
