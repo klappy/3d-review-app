@@ -142,7 +142,7 @@ export async function reconcile(step, ctx, d, api) {
   }
   if (step.cap === 'cap.assessment.create') {
     const r = await api(`/v2/projects/${enc(ctx.pid)}/assessments`); const name = d.name.trim();
-    const hit = newest((r.assessments || []).filter(a => a.name === name && a.language_id === ctx.lid && !a.archived_at && recent(a, at)));
+    const hit = newest((r.assessments || []).filter(a => a.name === name && a.language_id === ctx.lid && a.role === 'owner' && a.stage === 'prepare' && !a.archived_at && recent(a, at)));
     return hit ? { assessment: hit } : null;
   }
   if (step.cap === 'cap.survey.select') {

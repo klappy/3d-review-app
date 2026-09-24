@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY } from './wizard.js';
+import { countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile } from './wizard.js';
 
 const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
 const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
@@ -129,7 +129,7 @@ const lossyApi = (loseOn) => {
     let r;
     if (method === 'GET' && url === '/v2/projects/p1/assessments') return { assessments: db.assessments };
     if (method === 'GET' && url === '/v2/assessments/a1') return { assessment: { id: 'a1', stage: db.stage }, surveys: db.surveys };
-    if (url.endsWith('/assessments')) { const a = { id: 'a1', name: body.name, language_id: body.language_id, created_at: new Date().toISOString() }; db.assessments.push(a); r = { assessment: a }; }
+    if (url.endsWith('/assessments')) { const a = { id: 'a1', name: body.name, language_id: body.language_id, role: 'owner', stage: 'prepare', created_at: new Date().toISOString() }; db.assessments.push(a); r = { assessment: a }; }
     else if (url.endsWith('/surveys')) { const x = { id: 's' + (++n), template_id: body.template_id, template_version: body.version }; db.surveys.push(x); r = { survey: x }; }
     else if (url.endsWith('/stage')) { db.stage = body.stage; r = { assessment: { id: 'a1', stage: body.stage } }; }
     else if (url.endsWith('/links')) r = body.mode === 'dry_run' ? { confirm_token: 'ct' } : { entry_fragment: '#survey=x' };
@@ -176,4 +176,10 @@ test('#188 a clear 4xx refusal leaves nothing pending, so the draft stays editab
   const api = async (url) => { if (url.endsWith('/assessments')) { const e = new Error('Language archived'); e.status = 400; throw e; } throw new Error('unexpected ' + url); };
   let err; try { await launch(draft(), { api, store: mem() }); } catch (e) { err = e; }
   assert.equal(err.ctx.done.length, 0); assert.equal(err.ctx.pending, null);
+});
+
+test('#188 reconcile never adopts a collaborator\'s same-name assessment', async () => {
+  const theirs = { id: 'x9', name: 'Oct', language_id: 'l1', role: 'member', stage: 'prepare', created_at: new Date().toISOString() };
+  const found = await reconcile({ cap: 'cap.assessment.create' }, { pid: 'p1', lid: 'l1', pending: { at: Date.now() } }, draft(), async () => ({ assessments: [theirs] }));
+  assert.equal(found, null);
 });
