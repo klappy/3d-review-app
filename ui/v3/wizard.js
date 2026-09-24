@@ -20,7 +20,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const enc = encodeURIComponent;
 
 export function freshDraft() {
-  return { name: '', project: '', language: '', newProject: '', newLanguage: '', period: '', format: 'Written', purpose: '', followup: false, context: '', groups: {} };
+  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', period: '', format: 'Written', purpose: '', followup: false, context: '', groups: {} };
 }
 
 // Ruling (a): a denominator appears only when the facilitator entered one.
@@ -58,7 +58,7 @@ export function validateStep(step, d) {
 export function launchPlan(d) {
   const plan = [];
   if (d.project === NEW_PROJECT) {
-    plan.push({ cap: 'cap.project.create', method: 'POST', url: () => '/v2/projects', body: () => ({ name: d.newProject.trim() }), keep: (r, ctx) => { ctx.pid = r.project.id; } });
+    plan.push({ cap: 'cap.project.create', method: 'POST', url: () => '/v2/projects', body: () => ((d.newOrg || '').trim() ? { name: d.newProject.trim(), organization: d.newOrg.trim() } : { name: d.newProject.trim() }), keep: (r, ctx) => { ctx.pid = r.project.id; } });
     plan.push({ cap: 'cap.language.create', method: 'POST', url: ctx => `/v2/projects/${enc(ctx.pid)}/languages`, body: () => ({ name: d.newLanguage.trim() }), keep: (r, ctx) => { ctx.lid = r.language.id; } });
   }
   plan.push({ cap: 'cap.assessment.create', method: 'POST', url: ctx => `/v2/projects/${enc(ctx.pid)}/assessments`, body: ctx => {
@@ -197,6 +197,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
         ${isNew ? `<label>New project name<input name="newProject" value="${esc(d.newProject)}" required></label>`
           : `<label>Language<select name="language"${d.project ? '' : ' disabled'}><option value=""${d.language ? '' : ' selected'} disabled>${d.project ? (languages.length ? 'Choose…' : 'No languages in this project') : 'Choose a project first'}</option>${languages.map(l => `<option value="${esc(l.id)}"${l.id === d.language ? ' selected' : ''}>${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</option>`).join('')}</select></label>`}
       </div>
+      ${isNew ? `<label>Lead organisation<input name="newOrg" value="${esc(d.newOrg || '')}" placeholder="e.g. the organisation leading this translation"></label>` : ''}
       ${isNew ? `<label>Language<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label>` : ''}
       <div class="grid">
         <label>When<input name="period" value="${esc(d.period)}" placeholder="e.g. October 2026"></label>
@@ -227,7 +228,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   // review
   return `${head(n, 'Review & launch', 'Check the setup before collection opens. Launching opens the survey links; nothing is sent to anyone.')}${errBox(errs)}
     <div class="wz-sec"><h3>Details</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="details">Edit</button>'}</div>
-    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
+    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
     <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
     <div class="wz-sec"><h3>Participant information</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="information">Edit</button>'}</div>
@@ -258,7 +259,7 @@ export function mountWizard(root, deps) {
   const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
     const fd = new FormData(form), d = s.d;
-    if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newLanguage', 'period', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
+    if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'period', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
     if (form.dataset.wzForm === 'details') { d.followup = fd.has('followup'); if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
     if (form.dataset.wzForm === 'information') d.context = String(fd.get('context') || '');
