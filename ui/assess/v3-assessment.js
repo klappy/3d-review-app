@@ -57,7 +57,7 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null) {
     const note = held ? `<p class="muted" data-v3-band-held>${esc(r.reason || 'Results are held.')}</p>`
       : suppressed ? '<div class="note">Withheld to protect a small group. This is an evidence gap, not a poor result.</div>'
       : b && b.text ? `<p>${esc(b.text)}</p>` : '';
-    const count = groups ? `<div class="count small muted" data-v3-band-count="${esc(lens)}">${esc(v3GroupCountText(groups[lens]))}</div>` : '';
+    const count = groups ? `<div class="v3-band-count small muted" data-v3-band-count="${esc(lens)}">${esc(v3GroupCountText(groups[lens]))}</div>` : '';
     return `<div class="glass band lens ${LENS_CLASS[lens] || ''}" data-v3-band="${esc(lens)}"><div class="eyebrow">${esc(lens)}</div><div class="word">${esc(word)}</div>${note}${count}</div>`;
   }).join('');
   const legend = '<div class="legend small muted" data-v3-legend>Strong · Growing · Needs support · Needs urgent attention · More input needed</div>';
@@ -95,7 +95,7 @@ export function v3EvidenceMarkup(rows, open, esc = esc0) {
 
 export const v3css = `.v3-bands{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:12px 0}
 .v3-bands .band{padding:16px;border:1px solid var(--line);border-radius:12px}.v3-bands .word{font-size:20px;font-weight:600;margin:4px 0 8px}
-.v3-count{font-weight:600}.v3-evidence table{width:100%;border-collapse:collapse}.v3-evidence td,.v3-evidence th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}.v3-summary .row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}`;
+.v3-count{font-weight:600}.v3-bands .v3-band-count{font-size:13px;margin-top:8px}.v3-evidence table{width:100%;border-collapse:collapse}.v3-evidence td,.v3-evidence th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}.v3-summary .row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}`;
 
 // U4 review gate (PARITY.md U4; prototype V.results frame 10). One primary per state, each a single cap.assessment.set_stage
 // move (the server allows one step at a time): Collecting → "Record my review" (checkbox first) → Reviewing →
