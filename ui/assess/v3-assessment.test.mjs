@@ -84,10 +84,8 @@ test('group count on band cards: partial loads say so; no survey says so', () =>
   assert.doesNotMatch(v3BandsMarkup({ status: 'held' }, L), /data-v3-band-count/);
 });
 
-test('L3-4 next step: finish only for an editor in Reviewing; flag on; copy from frame 11', async () => {
+test('L3-4 next step: flag on; copy from frame 11; the stage move stays on the Understand gate', async () => {
   const m = await import('./v3-assessment.js');
-  assert.equal(m.V3_FLAGS.nextStepPage, true);
-  assert.equal(m.v3NextFinishes('understand', true), true);
-  for (const [st, ed] of [['understand', false], ['improve', true], ['collect', true], ['prepare', true]]) assert.equal(m.v3NextFinishes(st, ed), false);
-  assert.equal(m.V3_NEXT.title, 'What happens next?'); assert.equal(m.V3_SET_STAGE.saveAndFinish, 'improve');
+  assert.equal(m.V3_FLAGS.nextStepPage, true); assert.equal(m.V3_NEXT.title, 'What happens next?'); assert.equal(m.V3_NEXT.save, 'Save notes');
+  assert.equal(m.v3GateAction('understand', 'member').action, 'saveAndFinish'); assert.equal(m.V3_SET_STAGE.saveAndFinish, 'improve');
 });
