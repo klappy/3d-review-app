@@ -142,14 +142,15 @@ export function route(hash) {
   // One page per scope: entry → workspaces → ONE workspace → ONE project → ONE assessment (five views) → survey.
   if ((parts[0] === 'new' || (!parts[0] && parts[1] === 'new')) && !parts[2]) return { kind: 'new' };
   if (!parts[0]) return { kind: 'entry' };
-  if (['how', 'example', 'signin', 'survey'].includes(parts[0]) && !parts[1]) return { kind: 'entry', intent: parts[0] };
+  if (['how', 'example', 'signin', 'survey', 'about'].includes(parts[0]) && !parts[1]) return { kind: 'entry', intent: parts[0] };
   if (parts[0] === 'feedback' && !parts[1]) return { kind: 'feedback' };
   if (parts[0] === 'workspaces') return { kind: 'workspaces' };
   if (parts[0] === 'workspace' && parts[1]) return { kind: 'workspace', id: parts[1] };
   if (parts[0] === 'projects') return { kind: 'projects' };
   if (parts[0] === 'project' && parts[1]) return { kind: 'project', id: parts[1] };
   if (parts[0] === 'permissions' && ['workspaces', 'projects', 'assessments'].includes(parts[1]) && parts[2]) return { kind: 'permissions', scope: parts[1], id: parts[2] };
-  if (parts[0] !== 'assessment' || !parts[1]) return { kind: 'projects' };
+  // Ruling 12:53: an unknown hash falls back to the public home, never to a page that shows sign-in.
+  if (parts[0] !== 'assessment' || !parts[1]) return { kind: 'entry' };
   // Auditor 2A-4: the survey child route is explicit; anything else after the assessment id is ignored (no silent fall-through elsewhere).
   if (parts[2] === 'survey' && parts[3]) return { kind: 'survey', id: parts[1], sid: parts[3] };
   // A view segment selects a tab; an unknown segment falls back to the stage view (never to a different assessment).

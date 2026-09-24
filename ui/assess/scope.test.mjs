@@ -140,7 +140,7 @@ test('entry: public welcome with hero, tour stepper and survey/example/sign-in b
   assert.ok(h.includes('What is 3D Review?')); assert.ok(h.includes('Translation team')); assert.ok(h.includes('href="#survey">Take a survey')); assert.ok(h.includes('href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →')); assert.ok(h.includes('href="/v2/auth/access">Sign in</a>')); assert.ok(!h.includes('Continue'));
   // captain-named public home (ui/public-choices.test.mjs contract, now asserted on the ROOT entry): four choices, in order, above the headline
   const nav = h.slice(h.indexOf('<nav class="public-choices'), h.indexOf('</nav>')); const links = [...nav.matchAll(/<a class="rv-btn[^"]*" href="([^"]+)">([^<]+)<\/a>/g)].map(m => [m[2], m[1]]);
-  assert.deepEqual(links, [['Read about it', '#public-about'], ['Take the tour', '/?demo=1#assessment/demo-assessment/prepare'], ['Take a survey', '#survey'], ['Sign in', '/v2/auth/access']]);
+  assert.deepEqual(links, [['Read about it', '#about'], ['Take the tour', '/?demo=1#assessment/demo-assessment/prepare'], ['Take a survey', '#survey'], ['Sign in', '/v2/auth/access']]);
   assert.ok(nav.includes('aria-label="Choose where to start"')); assert.ok(h.indexOf('<nav class="public-choices') < h.indexOf('<h1>')); assert.ok(h.includes('<p class="eyebrow" id="public-about">What is 3D Review?</p>'));
   assert.ok(h.includes('Explore the real assessment screens · Go at your own pace · Nothing is sent')); assert.ok(h.includes('href="#projects">Open your projects and reports'));
   for (const retired of ['Here to take the survey?', 'Show me how', 'Manage assessments']) assert.ok(!h.includes(retired), retired);
@@ -343,4 +343,21 @@ test('L1-7 #signin matches prototype frame 1: centred card, one primary to the r
   assert.ok(access > -1 && box > access, 'real provider precedes the sandbox');
   assert.ok(!/<details class="sandbox-signin"[^>]*\bopen\b/.test(html), 'sandbox collapsed on the email step');
   assert.ok(html.includes('no sign-in is needed') && html.includes('href="#survey"'));
+});
+
+// Captain ruling 12:53 (L1-16): public About is a real page; public routes never show sign-in.
+test('about: #about intent renders the About page with Back to home, three perspectives, and no sign-in panel', async () => {
+  const ctx = ctxWith(); const m = await pages.entry.load(ctx, { intent: 'about' }); const h = pages.entry.render(ctx, m);
+  assert.ok(h.includes('id="about-page"')); assert.ok(h.includes('About 3D Review')); assert.ok(h.includes('href="#">← Back to home'));
+  for (const t of ['Translation team', 'Community', 'Church', 'Who it is for', 'When to use it', 'How often']) assert.ok(h.includes(t), t);
+  assert.ok(!h.includes('Sign in to continue')); assert.ok(!h.includes('/v2/auth/access'));
+});
+test('router: about is a public entry intent; unknown hashes fall back to home, never to a signed-in page', async () => {
+  const { readFileSync } = await import('node:fs'); const vm = await import('node:vm');
+  const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  const code = src.slice(src.indexOf('export function route('), src.indexOf('async function assessmentsFor')).replace('export function', 'function');
+  const route = vm.runInNewContext(`const VIEWS=[];${code};route`, {});
+  assert.deepEqual({ ...route('#about') }, { kind: 'entry', intent: 'about' });
+  for (const h of ['#public-about', '#nonsense', '#assessment']) assert.equal(route(h).kind, 'entry', h);
+  assert.equal(route('#projects').kind, 'projects');
 });
