@@ -191,3 +191,29 @@ test('report list shows a human title/date with the raw id inside <details>, not
   assert.match(btn, /^Report 1 · built /); assert.doesNotMatch(btn, /sreport_|T22:15/);
   assert.match(html, /<details class="small muted report-ids"><summary>Report id<\/summary><code>sreport_928bb601-f318-4cca-b48c-e4683371c6c8<\/code>/);
 });
+
+test('v3 U4 gate in Understand: checkbox arms Record my review; click posts set_stage understand then reloads', async () => {
+  const collecting = { ...assessment, stage: 'collect' };
+  const table = { ...understandTable, 'POST /v2/assessments/a1/stage': { assessment: { ...collecting, stage: 'understand' } } };
+  const { api, calls } = fakeApi(table); const gone = [];
+  const dirty = new Map();
+  const ctx = ctxFor(api, { current: { assessment: collecting, surveys }, state: { principal: { id: 'me' }, dirty }, go: (to, o) => gone.push([to, o]) });
+  const m = await views.understand.load(ctx, { aid: 'a1' }); const html = views.understand.render(ctx, m);
+  assert.match(html, /data-v3-gate-go="recordReview" disabled>Record my review/);
+  const btn = el({ 'data-v3-gate-go': 'recordReview', tag: 'button' }); btn.disabled = true;
+  const chk = el({ 'data-v3-review-check': '' }); const status = el({ 'data-v3-gate-status': '' });
+  const r = makeRoot([btn, chk, status]); views.understand.bind(ctx, r, m);
+  await btn.onclick(); assert.equal(calls.filter(c => c.method === 'POST').length, 0, 'unchecked: no write');
+  chk.checked = true; chk.onchange(); assert.equal(btn.disabled, false);
+  await btn.onclick();
+  const posts = calls.filter(c => c.method === 'POST'); assert.equal(posts.length, 1);
+  assert.equal(posts[0].url, '/v2/assessments/a1/stage'); assert.deepEqual(posts[0].body, { stage: 'understand' });
+  assert.equal(gone.at(-1)[0], '#assessment/a1/understand'); assert.equal(status.textContent, 'Review recorded.');
+  assert.equal(dirty.get('a1'), 'write', 'committed stage marks the assessment dirty so the shell refetches it (Bugbot 4093922740)');
+});
+test('v3 U4 gate: viewers see the state only, no write control', async () => {
+  const { api } = fakeApi(understandTable);
+  const ctx = ctxFor(api, { current: { assessment: { ...assessment, stage: 'collect', role: 'viewer' }, surveys } });
+  const m = await views.understand.load(ctx, { aid: 'a1' });
+  assert.doesNotMatch(views.understand.render(ctx, m), /data-v3-gate-go/);
+});
