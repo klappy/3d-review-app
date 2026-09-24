@@ -5,7 +5,7 @@
 .v3-wizard label{display:flex;flex-direction:column;gap:6px;margin:0 0 14px;font-weight:600}
 .v3-wizard label.choice{flex-direction:row;align-items:flex-start;gap:10px;font-weight:400}
 .v3-wizard .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.v3-wizard .group{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px;border:1px solid var(--line,#d8dee6);border-radius:var(--r-example,12px);background:var(--paper,#fff);margin:10px 0}
+.v3-wizard .group{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px;border:1px solid var(--glass-edge,rgba(255,255,255,.6));border-radius:var(--r-example,12px);background:var(--glass,rgba(255,255,255,.72));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);margin:10px 0}
 .v3-wizard .group.on{background:var(--choice-selected,#e9f4ec);border-color:var(--choice-selected-edge,#36775e)}
 .v3-wizard .pdot{display:inline-block;width:var(--dot-perspective,24px);height:var(--dot-perspective,24px);border-radius:50%;box-shadow:var(--inset-dot,none);flex:none}
 .v3-wizard .p-team{background:var(--perspective-team,#367e73)}.v3-wizard .p-community{background:var(--perspective-community,#c98a2e)}.v3-wizard .p-church{background:var(--perspective-church,#5b5fa8)}.v3-wizard .p-reviewer{background:var(--pip,#cfdee5)}
@@ -14,7 +14,7 @@
 .v3-wizard .gin{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .v3-wizard .gin label{margin:0;font-size:12px;font-weight:400;color:var(--secondary,#5b6675)}
 .v3-wizard .gin input{width:8ch}
-.v3-wizard .kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:8px 0 20px}
+.v3-wizard .kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:8px 0 20px;padding:14px;border:1px solid var(--glass-edge,rgba(255,255,255,.6));border-radius:var(--r-example,12px);background:var(--glass,rgba(255,255,255,.72));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .v3-wizard .kv dt{color:var(--secondary,#5b6675)}
 .v3-wizard .wz-sec{display:flex;justify-content:space-between;align-items:center}
 .v3-wizard .actions{display:flex;gap:10px;align-items:center;margin-top:20px}
