@@ -15,3 +15,16 @@ test('cards.js STAGE_LABEL and stage-screens.js carry the same v3 state words (n
   for (const k of ['prepare', 'collect', 'understand', 'improve']) assert.equal(CTX_STAGE_WORDS[k], stateWord(k), 'scope.js ' + k);
   for (const k of ['prepare', 'collect', 'understand', 'improve']) { assert.equal(STAGE_LABEL[k], stateWord(k), k); assert.equal(STAGE_STATE_WORDS[k], stateWord(k), k); }
 });
+
+test('L1-6 Bincy restyle: light-theme block gives a solid teal primary, white header and flat white cards', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const css = await readFile(new URL('./v3-shell.css', import.meta.url), 'utf8');
+  const block = css.slice(css.indexOf('/* L1-6 Bincy restyle'));
+  assert.ok(block.length > 100, 'restyle block present');
+  assert.match(block, /--bincy-teal:#1c6b5e/);
+  assert.match(block, /body\{background:#f1f6f4\}/, 'body ground is a literal (custom props on .rv do not reach body)');
+  assert.match(block, /\.rv \.rv-btn\.primary\{background:var\(--bincy-teal\)/);
+  assert.match(block, /\.rv \.top\{background:var\(--bincy-card\)/);
+  assert.match(block, /\.rv \.glass\{background:var\(--bincy-card\);backdrop-filter:none/);
+  for (const rule of block.split('}').filter(r => r.includes('{'))) if (!rule.trim().startsWith('/*')) assert.match(rule.trim(), /^(\/\*[\s\S]*?\*\/\s*)?html:not\(\[data-theme="dark"\]\)/, 'every rule is light-only: ' + rule.slice(0, 60));
+});
