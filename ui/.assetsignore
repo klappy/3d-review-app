@@ -58,3 +58,4 @@ v3/components/demo-exit.test.mjs
 v3/components/components-served.test.mjs
 assess/breadcrumbs-mount.test.mjs
 assess/sidebar-mount.test.mjs
+v3/components/review-gate.test.mjs
