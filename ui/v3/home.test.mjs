@@ -23,3 +23,7 @@ test('no title when the shell owns it; names escaped', () => {
   const h = homeView({ projects: [{ id: 'p', name: '<x>' }], listFor: () => ({ status: 'loaded', list: [] }) });
   assert.doesNotMatch(h, /<h1>/); assert.match(h, /&lt;x&gt;/);
 });
+test('archived project is labelled Archived, no continue action', () => {
+  const h = homeView({ projects: [{ id: 'z', name: 'Old', archived_at: '2026-01-01' }], listFor: () => undefined });
+  assert.match(h, /v3h-pill-done">Archived</); assert.doesNotMatch(h, /Continue|Open project/);
+});

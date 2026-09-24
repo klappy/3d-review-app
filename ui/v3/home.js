@@ -20,6 +20,8 @@ export function homeView({ projects = [], listFor, stageLabel = s => ESC(s), sta
       : l.status === 'refused' ? '<p class="v3h-meta">Not listed: you have no role on this project.</p>'
       : l.status === 'failed' ? `<p class="v3h-meta" role="alert">Could not load assessments. ${open}</p>`
       : `<p class="v3h-meta">${open}</p>`;
+    // Bugbot 4095269668: archived projects are labelled, and their assessments are not read (scope.js load skips them).
+    if (p.archived_at) return `<section class="v3h-card v3h-archived" data-v3h-project="${ESC(p.id)}"><div class="v3h-row-head"><h2><a href="#project/${encodeURIComponent(p.id)}">${ESC(p.name)}</a></h2><span class="v3h-pill v3h-pill-done">Archived</span></div></section>`;
     return `<section class="v3h-card" data-v3h-project="${ESC(p.id)}"><h2><a href="#project/${encodeURIComponent(p.id)}">${ESC(p.name)}</a></h2>${inner}</section>`;
   }).join('');
   return `<div class="v3h">${head}${body}</div>`;

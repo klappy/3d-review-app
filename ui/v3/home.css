@@ -17,3 +17,4 @@
 .v3h-pill-done { background: #eef2f6; color: #334155; border-color: #d5dde6; }
 .v3h-continue { display: inline-block; margin-top: 4px; padding: 6px 12px; border: 1px solid var(--primary, #1f6f6a); border-radius: 6px; color: var(--primary, #1f6f6a); font-weight: 600; text-decoration: none; background: #fff; }
 .v3h-continue:hover, .v3h-continue:focus-visible { background: var(--primary, #1f6f6a); color: #fff; }
+.v3h-archived { opacity: .75; }
