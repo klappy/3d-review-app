@@ -22,6 +22,7 @@ test('L1-6 Bincy restyle: light-theme block gives a solid teal primary, white he
   const block = css.slice(css.indexOf('/* L1-6 Bincy restyle'));
   assert.ok(block.length > 100, 'restyle block present');
   assert.match(block, /--bincy-teal:#1c6b5e/);
+  assert.match(block, /body\{background:#f1f6f4\}/, 'body ground is a literal (custom props on .rv do not reach body)');
   assert.match(block, /\.rv \.rv-btn\.primary\{background:var\(--bincy-teal\)/);
   assert.match(block, /\.rv \.top\{background:var\(--bincy-card\)/);
   assert.match(block, /\.rv \.glass\{background:var\(--bincy-card\);backdrop-filter:none/);

@@ -15,7 +15,7 @@ html:not([data-theme="dark"]) .rv{
   --green:var(--bincy-teal);--ink:var(--bincy-ink);--secondary:var(--bincy-muted);
   --badge-fill:var(--bincy-pill);--badge-ink:var(--bincy-pill-ink);
   background:var(--bincy-ground);color:var(--bincy-ink)}
-html:not([data-theme="dark"]) body{background:var(--bincy-ground)}
+html:not([data-theme="dark"]) body{background:#f1f6f4} /* literal: --bincy-* live on .rv, body cannot inherit them (Bugbot 4095204941) */
 html:not([data-theme="dark"]) .rv .top{background:var(--bincy-card);backdrop-filter:none;-webkit-backdrop-filter:none;border:0;border-bottom:1px solid var(--bincy-edge);box-shadow:none;border-radius:0}
 html:not([data-theme="dark"]) .rv .brand,html:not([data-theme="dark"]) .rv a.brand{color:var(--bincy-teal);font-weight:700}
 html:not([data-theme="dark"]) .rv .glass{background:var(--bincy-card);backdrop-filter:none;-webkit-backdrop-filter:none;border:1px solid var(--bincy-edge);border-radius:var(--bincy-r-card);box-shadow:var(--bincy-shadow)}
