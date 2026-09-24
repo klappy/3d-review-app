@@ -129,7 +129,7 @@ const head = (n, h, sub) => `<div class="eyebrow">Start a 3D Review · step ${n}
 const errBox = errs => errs?.length ? `<div class="note alert" role="alert">${errs.map(esc).join('<br>')}</div>` : '';
 const actions = (back, primary) => `<div class="actions">${back ? `<button type="button" class="rv-btn quiet" data-wz="back">Back</button>` : `<button type="button" class="rv-btn quiet" data-wz="cancel">Cancel</button>`}<span class="spacer"></span>${primary}</div>`;
 
-export function renderStep(step, d, data, errs = []) {
+export function renderStep(step, d, data, errs = [], locked = false) {
   const n = STEPS.indexOf(step) + 1;
   const projects = data.projects || [], languages = data.languages || [], templates = latestTemplates(data.templates);
   const isNew = d.project === NEW_PROJECT;
@@ -150,7 +150,7 @@ export function renderStep(step, d, data, errs = []) {
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
       </div>
       <label>What will participants consider?<input name="purpose" value="${esc(d.purpose)}" placeholder="e.g. The Genesis 1 to 3 draft"></label>
-      <label class="choice"><input type="checkbox" name="followup"${d.followup ? ' checked' : ''}>This is a follow-up to an earlier review of the same project</label>
+      <label class="choice"><input type="checkbox" name="followup"${d.followup ? ' checked' : ''}>This is a follow-up to an earlier review of the same project <span class="sub">(not stored yet: the product has no field for it)</span></label>
       ${actions(false, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Three perspectives, kept separate. Choose the groups you can reach.')}${errBox(errs)}
@@ -173,11 +173,11 @@ export function renderStep(step, d, data, errs = []) {
     </form>`;
   // review
   return `${head(n, 'Ready to launch', 'Check the details. Launching opens the survey links; nothing is sent to anyone.')}${errBox(errs)}
-    <div class="wz-sec"><h3>Details</h3><button type="button" class="rv-btn quiet" data-wz="edit" data-step="details">Edit</button></div>
-    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd>${d.followup ? '<dt>Kind</dt><dd>Follow-up</dd>' : ''}</dl>
-    <div class="wz-sec"><h3>Who will participate</h3><button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button></div>
+    <div class="wz-sec"><h3>Details</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="details">Edit</button>'}</div>
+    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
+    <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
     <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
-    ${actions(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
+    ${locked ? `<div class="actions"><span class="spacer"></span><button type="button" class="primary" data-wz="launch">Continue the launch</button></div>` : actions(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
 }
 
 export function renderDone(ctx, origin = '', templates = []) {
@@ -192,42 +192,44 @@ export function renderDone(ctx, origin = '', templates = []) {
 // ---------- mount ----------
 // deps: { api(url, {method, body}) → result, go(hash), assessmentHref(aid), origin, store }
 export function mountWizard(root, deps) {
-  const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null };
-  const paint = () => { root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, s.data, s.errs)}</div>`; };
+  const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0 };
+  let alive = true; const ac = new AbortController(); const on = { signal: ac.signal };
+  const paint = () => { if (!alive) return; root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, s.data, s.errs, !!s.partial)}</div>`; };
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
-  const loadLanguages = async () => { s.data.languages = []; if (s.d.project && s.d.project !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(s.d.project)}/languages`); s.data.languages = (r.languages || []).filter(l => !l.archived_at); } };
+  const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
     const fd = new FormData(form), d = s.d;
     if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newLanguage', 'period', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
-    if (form.dataset.wzForm === 'details') { d.followup = fd.has('followup'); if (fd.has('language')) d.language = String(fd.get('language')); }
+    if (form.dataset.wzForm === 'details') { d.followup = fd.has('followup'); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
     if (form.dataset.wzForm === 'information') d.context = String(fd.get('context') || '');
   };
   root.addEventListener('change', async e => {
-    if (e.target.name === 'project') { const f = e.target.form; read(f); s.d.project = e.target.value; s.d.language = ''; s.errs = []; try { await loadLanguages(); } catch (err) { return note(err); } paint(); }
-  });
+    if (e.target.name === 'project' && !s.partial) { const f = e.target.form; read(f); s.d.project = e.target.value; s.d.language = ''; s.errs = []; paint(); try { if (!(await loadLanguages())) return; } catch (err) { return note(err); } paint(); }
+  }, on);
   root.addEventListener('submit', e => {
-    e.preventDefault(); read(e.target);
+    e.preventDefault(); if (s.partial) return; read(e.target);
     s.errs = validateStep(s.step, s.d); if (!s.errs.length) s.step = STEPS[STEPS.indexOf(s.step) + 1] || s.step; paint();
-  });
+  }, on);
   root.addEventListener('click', async e => {
     const b = e.target.closest('[data-wz]'); if (!b) return;
     const act = b.dataset.wz; s.errs = [];
+    if (s.partial && act !== 'launch') return; // a launch is part-done: the draft is locked so a retry matches the writes already made
     if (act === 'cancel') return deps.go?.('#/');
     if (act === 'back') { const f = root.querySelector('form'); if (f) read(f); s.step = STEPS[Math.max(0, STEPS.indexOf(s.step) - 1)]; return paint(); }
     if (act === 'edit') { s.step = b.dataset.step; return paint(); }
     if (act === 'open') return deps.go?.(deps.assessmentHref ? deps.assessmentHref(b.dataset.aid) : `#/a/${enc(b.dataset.aid)}`);
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
-      try { s.done = await launch(s.d, { api: deps.api, store: deps.store, resume: s.partial }); s.partial = null; paint(); }
-      catch (err) { s.partial = err.ctx || s.partial; note(new Error(`${err.message || err} ${s.partial?.done.length || 0} of the launch writes were done; Launch again continues from where it stopped.`)); }
+      try { const done = await launch(s.d, { api: deps.api, store: deps.store, resume: s.partial }); if (!alive) return; s.done = done; s.partial = null; paint(); }
+      catch (err) { s.partial = err.ctx || s.partial; note(new Error(`${err.message || err} ${s.partial?.done.length || 0} of the launch writes were done; "Continue the launch" picks up from where it stopped; edits stay locked until then.`)); }
       finally { s.busy = false; }
     }
-  });
+  }, on);
   (async () => {
     paint();
-    try { const [p, t] = await Promise.all([deps.api('/v2/projects'), deps.api('/v2/templates')]); s.data.projects = (p.projects || []).filter(x => !x.archived_at && (x.role === 'owner' || x.role === 'member')); s.data.templates = t.templates || []; paint(); }
+    try { const [p, t] = await Promise.all([deps.api('/v2/projects'), deps.api('/v2/templates')]); if (!alive) return; s.data.projects = (p.projects || []).filter(x => !x.archived_at && (x.role === 'owner' || x.role === 'member')); s.data.templates = t.templates || []; paint(); }
     catch (err) { note(err); }
   })();
-  return { state: s, destroy() { root.innerHTML = ''; } };
+  return { state: s, destroy() { alive = false; ac.abort(); root.innerHTML = ''; } };
 }
