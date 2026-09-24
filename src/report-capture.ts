@@ -112,6 +112,7 @@ export type CapturedAssessment = Readonly<{
   rows: readonly CaptureRow[];
   responseIds: readonly string[];
   captureDigest: string;
+  participant?: boolean;
 }>;
 export type CaptureResult =
   | { eligible: true; capture: CapturedAssessment }
@@ -167,12 +168,12 @@ export function decodePackedCapture(expectedAssessmentId: string, raw: string): 
   return Object.freeze(rows);
 }
 /** Internal adapter, not authorization: callers must obtain the token in one guarded SELECT. */
-export async function attestPackedCapture(expectedAssessmentId: string, raw: string): Promise<CaptureResult> {
+export async function attestPackedCapture(expectedAssessmentId: string, raw: string, participant = false): Promise<CaptureResult> {
   try {
     const rows = decodePackedCapture(expectedAssessmentId, raw);
-    const result = await attestCapture(expectedAssessmentId, rows);
+    const result = await attestCapture(expectedAssessmentId, rows, participant === true);
     if (!result.eligible) return { eligible: false, reason: 'HELD' };
-    return { eligible: true, capture: Object.freeze({ assessmentId: expectedAssessmentId, packedCapture: raw, rows, responseIds: Object.freeze(result.responseIds), captureDigest: result.captureDigest }) };
+    return { eligible: true, capture: Object.freeze({ assessmentId: expectedAssessmentId, packedCapture: raw, rows, responseIds: Object.freeze(result.responseIds), captureDigest: result.captureDigest, participant: participant === true }) };
   } catch { return { eligible: false, reason: 'HELD' }; }
 }
 /** Server-owned member minimum and null report ID; no caller-supplied SQL/role selector.
