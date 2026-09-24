@@ -1,28 +1,26 @@
 {
-  "version": "0.20.0",
+  "version": "0.21.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "df999c92673cb188ec79ca15697a63ef88d03b78",
+  "cookbook_commit": "c312c8a62e7d896427c3f144df1b4c157508a221",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.20.0.md",
-      "blob_sha": "18a23fe8b1cead529d8bac67bdd80836263c1da5",
-      "sha256": "280ed8d03572e397fd7ee7cccc4a465e0056a67bbfd193b80ca9dfffef65381f"
+      "path": "planning/2026-09-16-parity-build/releases/0.21.0.md",
+      "blob_sha": "127e1df936090efa5a74a20f5f8c4af20b40d5c8",
+      "sha256": "5834dab46028009c217c7acb2e0928d3516863d2a642286d45c983a170ef1a46"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "df24964013284b11b300f84f0c4df01a6155c618",
-      "sha256": "1ed36c7d76c2d417a46cdd9d087b5926c02afbf5af75b1f7ffe2eb7bb89959e1"
+      "blob_sha": "27f7aadf02a9e322794481eeb660e7f6b79b6e71",
+      "sha256": "8a32aece1308436b4029eab3a228ab8492b5053eb7d9b2ff62a6443ac28a6519"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
-      "changed": [
-        "component: Card — one v3 import point (ui/v3/components/card.js) for home/workspace/project/assessment cards, re-exporting the shared card (no copy) (#249)",
-        "DEV mail: sends to any address when no allowlist is configured (team testing); an allowlist, when set, is still enforced (#252)",
-        "Stepper: pending steps carry class \"todo\" instead of an empty class attribute (component: Stepper) (#251)",
-        "setup wizard: \"step n of N\" count derives from the step list, not a hard-coded 4 (#253)"
+      "added": [
+        "cards show child counts: assessment → responses; project → assessments · responses; workspace → projects · assessments · responses (component: Card) (#255)",
+        "reports: build from real participant responses on DEV (attested synthetic path unchanged; held outside dev) (#256)"
       ],
+      "changed": [],
       "fixed": []
     }
   }
