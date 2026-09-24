@@ -1,35 +1,30 @@
 {
-  "version": "0.17.0",
+  "version": "0.18.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "129c26631e082de117ead68b62d1e163d7136fba",
+  "cookbook_commit": "078cca68e04f0d185862bb7e0ef5be42b00254ba",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.17.0.md",
-      "blob_sha": "a3bf65e2400c6fe86d0c406f299bb352c72bf25d",
-      "sha256": "165a30ee1e29d3155a5523600ce2e4b8d3695634dce7294c05cb50defaaa4f2a"
+      "path": "planning/2026-09-16-parity-build/releases/0.18.0.md",
+      "blob_sha": "e6702796b29f2e1996fded4a238362d48c6a66aa",
+      "sha256": "cae22d3908bf669eda99bb3531f7e28d5b22b665c736812e052612bc80f95889"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "a155e8a1e2dafab7d6ee8bf61e80489393788c6c",
-      "sha256": "692eda7942146b84d7c6cf9f4a52288516186311ccc723426d7429af6c277155"
+      "blob_sha": "1b47479cf5e5f3f494d64e65b69fa992eaa1afd1",
+      "sha256": "d43f894df7060cfdd799c2d4457e446a1f841fc79c2d4653ec2d8dcc12fc09c6"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Kit shell activated on the real signed-in root and scope-reading routes: Workspaces→workspace→project→assessment navigation, search and expansion, language state and account/version controls through a read adapter over the existing controllers."
+        "component: Stepper — one progress stepper in ui/v3/components/stepper.js (glass dots, done ticks, optional hash links per step); the setup wizard composes it and lane 3 imports it for the assessment page (rulings 12:28, 12:34) (#227)",
+        "results: provisional bands (≥75 Strong · 60–74 Growing · 40–59 Needs support · <40 Needs urgent attention; min 3 responses else More input needed) from the latest report's per-perspective and sub-dimension scores, labelled provisional; numbers behind \"Show evidence and details\" (component: Band card + legend) (#225)",
+        "component: Breadcrumbs — one crumb row in fixed order Home › Workspace › Project › Assessment › Page (ui/v3/components/breadcrumbs.js; mounting via NEED 9→1) (#224)"
       ],
-      "changed": [
-        "Persona evidence: 15/15 root integration tests and 71/71 adapter/scope/identity-reset/shell unit tests passed at the exact accepted source; 25/25 synthetic menu hit and click checks across five viewport cases in an independent isolated browser. At the corrected source, 100 affected/anchor tests passed independently with 10 meaningful failures on the uncorrected parent, and 26 real headless Chrome journeys (16 title/route/host/viewport, 4 Retry, 4 delayed completion, 2 demo disclosure) passed at 390×900 and 1440×900. Real provider account journey untested; satisfaction, confusion and frustration NOT MEASURED."
-      ],
+      "changed": [],
       "fixed": [
-        "Account menu stacks above the shell context on phone widths so Sign out and Use another account receive pointer input; header keeps its standard heights and no horizontal overflow at 195px.",
-        "Workspace, workspaces, projects and project pages keep their own visible heading when the kit shell is not hosting the page (non-kit entry such as /assess/); the kit host owns the title only when it is actually mounted.",
-        "The demonstration-data disclosure stays visible through kit repaints, navigation, search and expansion instead of disappearing on first render.",
-        "Every Retry control on a failed page is bound with one shared pending guard, so the second control (languages) works when assessments and languages both fail; stale retry results after navigation change nothing."
-      ],
-      "security": [
-        "Existing authentication, permissions, account read, sign-out and participant routes are unchanged; no fixture data, global state or role simulation in product. Presentation only."
+        "demo: exit to home and sign in from every demo screen (#222)",
+        "permissions: people shown by name and email, not id (component: Member list, used on workspace, project and assessment permissions) (#226)"
       ]
     }
   }
