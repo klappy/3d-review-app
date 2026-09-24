@@ -7,3 +7,6 @@
 #participant > .intro-lead{display:none}
 #participant > a ~ .intro-title{position:static;width:auto;height:auto;margin:revert;overflow:visible;clip:auto;white-space:normal}
 #participant > a ~ .intro-lead{display:block}
+/* v3 lane 1 L1-11 (TRAINING frames 8/9 #7; prototype v3.css .quiet): "Check submission" is a quiet text link, not an equal-weight second button. */
+#recover{display:block;min-height:44px;margin:16px auto 0;padding:10px 4px;border:0;background:transparent;color:#14685f;text-decoration:underline;text-underline-offset:3px;font-size:15px}
+#recover:hover{color:#0e4f48}
