@@ -201,3 +201,14 @@ test('#188 resume reads back an existing same-name language instead of repeating
   const ctx = await launch(d, { api, store: mem(), resume });
   assert.equal(ctx.lid, 'l7'); assert.ok(!posts.includes('/v2/projects/p9/languages'));
 });
+
+test('lane 12 L12-1: lead organisation rides cap.project.create only when given (contract field `organization`)', () => {
+  const body = d => launchPlan(draft({ project: NEW_PROJECT, newProject: ' Hill ', newLanguage: 'L', ...d }))[0].body({});
+  assert.deepEqual(body({ newOrg: ' Hill Bible Society ' }), { name: 'Hill', organization: 'Hill Bible Society' });
+  assert.deepEqual(body({ newOrg: '  ' }), { name: 'Hill' });
+  assert.deepEqual(body({ newOrg: undefined }), { name: 'Hill' });
+  const html = renderStep('details', draft({ project: NEW_PROJECT, newOrg: 'A & B' }), { projects: [], languages: [], templates: [] }, [], false, '');
+  assert.match(html, /Lead organisation<input name="newOrg" value="A &amp; B"/);
+  assert.doesNotMatch(renderStep('details', draft(), { projects: [], languages: [], templates: [] }, [], false, ''), /newOrg/);
+  assert.match(renderStep('review', draft({ project: NEW_PROJECT, newProject: 'H', newOrg: 'Org' }), { projects: [], languages: [], templates: [] }, [], false, ''), /<dt>Lead organisation<\/dt><dd>Org<\/dd>/);
+});
