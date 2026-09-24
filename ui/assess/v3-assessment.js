@@ -44,6 +44,9 @@ export function v3CountLine({ responses, expected, unconfirmed } = {}, esc = esc
 const BAND_WORDS = new Set(['Strong', 'Growing', 'Needs support', 'Needs urgent attention', 'More input needed']);
 const LENS_CLASS = { 'Translation Team': 'team', Church: 'church', Community: 'community' };
 
+// Prototype frame 10 legend (design-system-v3 V.results): one colour dot per band word, colours from tokens only.
+export const V3_LEGEND = Object.freeze([['Strong', '--band-strong'], ['Growing', '--band-growing'], ['Needs support', '--band-needs-support'], ['Needs urgent attention', '--band-urgent'], ['More input needed', '--pip']]);
+
 /** Band layout (ruling c): one card per perspective, a band word never a score. A held result renders every card as an
  *  evidence gap with the server's reason — no band is invented. */
 export function v3BandsMarkup(results, lenses, esc = esc0, groups = null) {
@@ -60,7 +63,7 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null) {
     const count = groups ? `<div class="v3-band-count small muted" data-v3-band-count="${esc(lens)}">${esc(v3GroupCountText(groups[lens]))}</div>` : '';
     return `<div class="glass band lens ${LENS_CLASS[lens] || ''}" data-v3-band="${esc(lens)}"><div class="eyebrow">${esc(lens)}</div><div class="word">${esc(word)}</div>${note}${count}</div>`;
   }).join('');
-  const legend = '<div class="legend small muted" data-v3-legend>Strong · Growing · Needs support · Needs urgent attention · More input needed</div>';
+  const legend = `<div class="legend small muted" data-v3-legend>${V3_LEGEND.map(([w, v]) => `<span><i class="dot" style="background:var(${v})" aria-hidden="true"></i>${w}</span>`).join('')}</div>`;
   return `<div class="v3-bands three" data-v3-bands="${held ? 'held' : 'shown'}">${cards}</div>${legend}`;
 }
 
