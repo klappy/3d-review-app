@@ -9,7 +9,7 @@ export function assessmentRow(a, stageLabel, projectName = '') {
   const href = `#assessment/${encodeURIComponent(a.id)}`;
   const setup = a.stage === 'prepare';
   const eyebrow = [projectName, a.language_name || ''].filter(Boolean).map(ESC).join(' · ');
-  return `<a class="v3h-card v3h-acard" href="${href}" data-v3h-assessment="${ESC(a.id)}"><div class="v3h-row-head"><span class="v3h-eyebrow">${eyebrow}</span><span class="v3h-pill v3h-pill-${pill(a.stage)}">${stageLabel(a.stage)}</span></div><h3>${ESC(a.name)}</h3><span class="v3h-continue">${setup ? 'Continue setup' : 'Continue assessment'} →</span></a>`;
+  return `<a class="v3h-card v3h-acard" href="${href}" data-v3h-assessment="${ESC(a.id)}"><div class="v3h-row-head"><span class="v3h-eyebrow">${eyebrow}</span><span class="v3h-pill v3h-pill-${pill(a.stage)}">${stageLabel(a.stage)}</span></div><h3>${ESC(a.name)}</h3><span class="v3h-continue">${setup ? 'Continue setup' : 'Continue assessment'} <span aria-hidden="true">→</span></span></a>`;
 }
 export function homeView({ projects = [], listFor, stageLabel = s => ESC(s), start = '', title = '' }) {
   const head = `<link rel="stylesheet" href="${HOME_CSS}"><div class="v3h-head"><div>${title ? `<h1>${ESC(title)}</h1>` : ''}<p class="v3h-sub">Here are your 3D Review projects.</p></div>${start}</div>`;
@@ -28,5 +28,8 @@ export function homeView({ projects = [], listFor, stageLabel = s => ESC(s), sta
       : `<p class="v3h-meta">${open}</p>`;
     return [`<section class="v3h-card" data-v3h-project="${ESC(p.id)}"><span class="v3h-eyebrow">Project</span>${plink}${msg}</section>`];
   }).join('');
-  return `<div class="v3h">${head}<div class="v3h-cards">${body}</div></div>`;
+  // Validator #209 (high): projects shown only through assessment cards stay reachable — one quiet line of project links below the grid.
+  const shown = projects.filter(p => !p.archived_at && (listFor(p.id) || {}).status === 'loaded' && listFor(p.id).list.length);
+  const plinks = shown.length ? `<p class="v3h-meta v3h-projects">Projects: ${shown.map(p => `<a href="#project/${encodeURIComponent(p.id)}">${ESC(p.name)}</a>`).join(' · ')}</p>` : '';
+  return `<div class="v3h">${head}<div class="v3h-cards">${body}</div>${plinks}</div>`;
 }
