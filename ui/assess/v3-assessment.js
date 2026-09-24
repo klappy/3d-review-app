@@ -4,7 +4,7 @@
 // "n not yet confirmed" side by side; (c) results use the band layout. Each is one flag below. API contract unchanged:
 // this module only reads what the API already returns and never invents a number the server did not send.
 
-export const V3_FLAGS = Object.freeze({ expectedCountOptional: true, showUnconfirmed: true, bandResults: true });
+export const V3_FLAGS = Object.freeze({ expectedCountOptional: true, showUnconfirmed: true, bandResults: true, nextStepPage: true });
 
 // App stage ids (prepare/collect/understand/improve) → v3 plain state words and the one primary action per state.
 export const V3_STAGES = Object.freeze({
@@ -121,3 +121,15 @@ export function v3SetStage(api, enc, aid, action) {
   if (!stage) return Promise.reject(new Error(`unknown v3 action ${action}`));
   return api(`/v2/assessments/${enc(aid)}/stage`, { method: 'POST', body: { stage } });
 }
+
+// Screen 11 "Next step" (Bincy 04_screen_inventory #11; prototype V.next frame 11, provisional). Same two stored notes
+// (notes_reflection, notes_next_steps) — no new field: the prototype's "Follow up on" date and Bincy's suggested-areas list
+// are not stored by the contract, so they are not drawn (PARITY A5/I1). "Save and finish this review" = save notes, then the
+// one allowed set_stage step understand → improve; in any other stage the button only saves.
+export const V3_NEXT = Object.freeze({
+  eyebrow: 'Next step', title: 'What happens next?', reflection: 'What you noticed', next: 'The next step',
+  reflectionHint: 'In your words. This stays with this review.', nextHint: 'e.g. A listening session with the church group',
+  footer: 'There is no fixed schedule. Start another review when it is appropriate; this one keeps its history.',
+  finish: 'Save and finish this review', save: 'Save',
+});
+export function v3NextFinishes(stage, editable) { return !!editable && stage === 'understand'; }

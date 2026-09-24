@@ -125,13 +125,14 @@ test('A7 improve viewer: read-only notes, no save control, visibility line; text
   assert.match(html, /data-notes-reflection>r&lt;1&gt;</); assert.match(html, /data-notes-next-steps>n&amp;2</);
   assert.ok(html.includes(NOTES_VISIBILITY));
   assert.doesNotMatch(html, /undo/i);
-  assert.ok(html.includes(esc(RECOMMENDATIONS_NOT_BUILT)));
+  assert.ok(!html.includes(esc(RECOMMENDATIONS_NOT_BUILT))); // v3 L3-4: aside not drawn (PARITY I1)
+  assert.match(html, /What happens next\?/); assert.match(html, /<h3>What you noticed<\/h3>/);
   assert.ok(!(await views.improve.load(ctx, { aid: 'a1' })).editable);
 });
 
 test('A8 improve owner/member: one Save → PATCH /v2/assessments/{aid}/notes with both fields; refresh after server result', async () => {
   const { api, calls } = fakeApi({ 'PATCH /v2/assessments/a1/notes': ({ body }) => ({ assessment: { ...assessment, ...body } }) });
-  let refreshed = 0; const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'member' }, surveys }, refresh: async () => { refreshed++; } });
+  let refreshed = 0; const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'member', stage: 'improve' }, surveys }, refresh: async () => { refreshed++; } });
   const m = await views.improve.load(ctx, { aid: 'a1' }); const html = views.improve.render(ctx, m);
   assert.equal((html.match(/data-save-notes/g) || []).length, 1); assert.match(html, /<textarea name="notes_reflection"[^>]*>r&lt;1&gt;</);
   assert.ok(html.includes(NOTES_VISIBILITY));
@@ -143,6 +144,32 @@ test('A8 improve owner/member: one Save → PATCH /v2/assessments/{aid}/notes wi
   assert.deepEqual(calls[0], { url: '/v2/assessments/a1/notes', method: 'PATCH', body: { notes_reflection: 'new r', notes_next_steps: 'new n' } });
   assert.equal(disabledDuring, true); assert.equal(btn.disabled, false);
   assert.equal(status.textContent, 'Notes saved.'); assert.equal(refreshed, 1); assert.equal(m.notes_reflection, 'new r');
+});
+
+test('A8c v3 next step: member in Reviewing → "Save and finish this review" = PATCH notes, then one set_stage improve', async () => {
+  const { api, calls } = fakeApi({ 'PATCH /v2/assessments/a1/notes': ({ body }) => ({ assessment: { ...assessment, ...body } }), 'POST /v2/assessments/a1/stage': () => ({ assessment: { ...assessment, stage: 'improve' } }) });
+  let refreshed = 0; const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'member', stage: 'understand' }, surveys }, refresh: async () => { refreshed++; } });
+  const m = await views.improve.load(ctx, { aid: 'a1' }); const html = views.improve.render(ctx, m);
+  assert.match(html, /data-v3-finish>Save and finish this review</); assert.doesNotMatch(html, /Recommendations/);
+  const form = el({ 'data-notes-form': '' }), btn = el({ tag: 'button', 'data-save-notes': '' }), status = el({ 'data-notes-status': '' });
+  makeRoot([form, btn, status, el({ name: 'notes_reflection', value: 'r' }), el({ name: 'notes_next_steps', value: 'n' })]); views.improve.bind(ctx, root, m);
+  await form.onsubmit({ preventDefault() {} });
+  assert.deepEqual(calls.map(c => `${c.method} ${c.url}`), ['PATCH /v2/assessments/a1/notes', 'POST /v2/assessments/a1/stage']);
+  assert.deepEqual(calls[1].body, { stage: 'improve' });
+  assert.equal(status.textContent, 'Notes saved. This review is finished.'); assert.equal(refreshed, 1);
+});
+
+test('A8d v3 next step: stage move refused after notes saved → says notes saved, not finished; improve stage only saves', async () => {
+  const { api, calls } = fakeApi({ 'PATCH /v2/assessments/a1/notes': ({ body }) => ({ assessment: { ...assessment, ...body } }), 'POST /v2/assessments/a1/stage': err('NOT_AUTHORIZED_AT_SCOPE', 403) });
+  const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'owner', stage: 'understand' }, surveys }, refresh: async () => {} });
+  const m = await views.improve.load(ctx, { aid: 'a1' });
+  const form = el({ 'data-notes-form': '' }), btn = el({ tag: 'button', 'data-save-notes': '' }), status = el({ 'data-notes-status': '' });
+  makeRoot([form, btn, status, el({ name: 'notes_reflection' }), el({ name: 'notes_next_steps' })]); views.improve.bind(ctx, root, m);
+  await form.onsubmit({ preventDefault() {} });
+  assert.match(status.textContent, /^Notes saved\. The review was not marked finished: Not visible to you/); assert.equal(calls.length, 2);
+  const c2 = ctxFor(fakeApi({}).api, { current: { assessment: { ...assessment, role: 'owner', stage: 'improve' }, surveys } });
+  const h2 = views.improve.render(c2, await views.improve.load(c2, { aid: 'a1' }));
+  assert.match(h2, /data-save-notes>Save</); assert.doesNotMatch(h2, /data-v3-finish/);
 });
 
 test('A8b save failure: no success claim, refusal wording', async () => {
