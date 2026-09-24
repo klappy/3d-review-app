@@ -53,3 +53,22 @@ test('v3 L1-5: participant intro never paints the raw template source ref (375px
   assert.ok(texts.some(t=>t.includes('Church')),'perspective still shown');
   assert.ok(!texts.some(t=>t.includes(ref)),'source ref not painted');
 });
+
+test('v3 L1-8: welcome and pager follow prototype frames 8/9 (eyebrow, title, full-width Start, segmented progress)',async()=>{
+  const {mountParticipantView}=await import('./participant-view.js');
+  class Node{children=[];listeners={};hidden=false;dataset={};type='';textContent='';className='';append(...n){this.children.push(...n);}setAttribute(){}addEventListener(t,f){this.listeners[t]=f;}removeEventListener(){}focus(){}remove(){}querySelector(){return null;}querySelectorAll(s){return s==='button'?[review]:[];}}
+  const root=new Node(),form=new Node(),questions=new Node(),review=new Node();review.type='submit';form.contains=n=>n===review;
+  questions.children=[new Node(),new Node(),new Node()];questions.children.forEach((f,i)=>f.dataset.item='q'+i);
+  const doc={createElement:()=>new Node(),defaultView:{FormData}};
+  const c=mountParticipantView({doc,root,form,questions,reviewAnswers:new Node(),model:{assessment:'Mark review',language:'Tok Pisin',items:[0,1,2].map(i=>({id:'q'+i,type:'text',required:false})),template:{perspective:'Church'}},reviewButton:review});
+  const intro=root.children[0];const texts=intro.children.map(n=>n.textContent);
+  assert.equal(texts[0],'Church · Mark review');
+  assert.ok(texts.includes('We would like your perspective'));
+  assert.ok(texts.some(t=>t.includes('Tok Pisin translation')));
+  const start=intro.children.find(n=>n.textContent==='Start');assert.ok(start);assert.match(start.className,/primary/);
+  assert.ok(!texts.includes('Begin'));
+  start.listeners.click();
+  const nav=root.children[1];assert.equal(nav.children[0].textContent,'Question 1 of 3');
+  const bar=nav.children[2];assert.equal(bar.className,'participant-bar');assert.deepEqual(bar.children.map(s=>s.className),['done','','']);
+  c.showForm(2);assert.deepEqual(bar.children.map(s=>s.className),['done','done','done']);
+});

@@ -214,7 +214,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Three perspectives, kept separate. Choose the groups you can reach.')}${errBox(errs)}
     <form data-wz-form="participants">
       ${templates.length ? templates.map(t => { const g = d.groups[t.id]; return `<div class="group${g ? ' on' : ''}"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span>
-        <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(t.version)}"${g ? ' checked' : ''}><span><b>${esc(t.perspective)}</b><span class="sub">${esc(t.name)}</span></span></label>
+        <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(t.version)}"${g ? ' checked' : ''}><span><h3>${esc(t.perspective)}</h3><span class="sub">${esc(t.name)}</span></span></label>
         <div class="gin"><label for="n-${esc(t.id)}">How many do you expect?</label><input type="number" id="n-${esc(t.id)}" name="n-${esc(t.id)}" min="1" step="1" inputmode="numeric" value="${g && g.expected ? esc(g.expected) : ''}" placeholder="optional"></div></div>`; }).join('')
         : '<p class="muted">No published surveys are available to this account.</p>'}
       <p class="footer muted">The number is optional. Leave it empty if you don't know for sure; counts then show as "n responded". Groups you leave out can be added later.</p>
@@ -226,15 +226,15 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       <dl class="kv"><dt>Project</dt><dd>${esc(proj.name || '')}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd><dt>Format</dt><dd>${esc(d.format)}</dd></dl>
       <label>A note for participants (optional)<textarea name="context" rows="2" placeholder="Not stored yet: the product has no field for this note.">${esc(d.context)}</textarea></label>
       <h3>Asked of each participant</h3>
-      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><b>${esc(t.perspective)}</b><span class="sub">The questions in the ${esc(t.name)} survey, as published. Answers are grouped, never shown alone.</span></div></div>`).join('')}
+      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><h3>${esc(t.perspective)}</h3><span class="sub">The questions in the ${esc(t.name)} survey, as published. Answers are grouped, never shown alone.</span></div></div>`).join('')}
       ${actions(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   // review
-  return `${head(n, 'Ready to launch', 'Check the setup before collection opens. Launching opens the survey links; nothing is sent to anyone.')}${errBox(errs)}
+  return `${head(n, 'Ready to launch', 'Check the details. Launching opens the survey links; nothing is sent to anyone.')}${errBox(errs)}
     <div class="wz-sec"><h3>Details</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="details">Edit</button>'}</div>
     <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}${isNew && (d.newLangCode || '').trim() ? ' · ' + esc(d.newLangCode.trim()) : ''}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
-    <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
+    <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt><span class="pdot wz-kvdot ${pdot(t.perspective)}" aria-hidden="true"></span>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
     <div class="wz-sec"><h3>Participant information</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="information">Edit</button>'}</div>
     <dl class="kv"><dt>Shown to everyone</dt><dd>${esc([proj.name, lang.name, d.purpose.trim(), d.format].filter(Boolean).join(' · '))}</dd><dt>Note</dt><dd>${d.context.trim() ? `${esc(d.context.trim())} <span class="sub">(not stored yet: the product has no field for it)</span>` : 'None'}</dd><dt>Asked of each</dt><dd>The published survey questions for each group</dd></dl>
     ${locked && locked.links?.length ? `<h3>Links already opened — copy them now</h3>${linkList(locked.links, origin, templates)}` : ''}

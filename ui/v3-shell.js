@@ -30,3 +30,18 @@ export function onePrimary(region) {
   for (const el of primaries.slice(1)) { el.classList.remove('primary'); el.classList.add('v3-demoted'); demoted++; }
   return demoted;
 }
+
+// CAPTAIN P0 12:10 (lane 1): the demo must never be a closed loop. In ?demo=1 the v3 header carries a persistent "Exit demo"
+// (bare "/" drops demo mode → home) and "Sign in" (the real sign-in route), and the logo leaves demo instead of routing inside it.
+export const DEMO_EXIT_HREF = '/';
+export const DEMO_SIGN_IN_HREF = '/v2/auth/access';
+export function placeDemoExit(doc) {
+  const top = doc?.querySelector?.('header.top'); if (!top) return false;
+  const brand = top.querySelector('a.brand');
+  if (brand) { brand.setAttribute('href', DEMO_EXIT_HREF); brand.removeAttribute('data-navigate'); brand.setAttribute('data-v3-exit-demo', ''); brand.setAttribute('aria-label', '3D Review home (exit demo)'); }
+  if (top.querySelector('.v3-demo-exit')) return true;
+  const nav = doc.createElement('nav'); nav.className = 'v3-demo-exit'; nav.setAttribute('aria-label', 'Leave the demo');
+  nav.innerHTML = `<a class="rv-btn" href="${DEMO_EXIT_HREF}" data-v3-exit-demo>Exit demo</a><a class="rv-btn primary" href="${DEMO_SIGN_IN_HREF}" data-v3-demo-signin>Sign in</a>`;
+  const right = top.querySelector('.right'); if (right) right.before(nav); else top.append(nav);
+  return true;
+}

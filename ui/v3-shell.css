@@ -4,6 +4,9 @@
 @media (max-width:760px){.rv .shell.no-tree>.content{padding:20px 14px}}
 .rv .v3-state{display:inline-block;font-size:12px;letter-spacing:.04em;border-radius:var(--r-pill);padding:var(--badge-pad-y) var(--badge-pad-x);background:var(--badge-fill);color:var(--badge-ink);white-space:nowrap}
 
+/* CAPTAIN P0 12:10: demo exits in the v3 header (lane 1). */
+.v3-demo-exit{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}.v3-demo-exit .rv-btn{min-height:40px;padding:6px 14px;white-space:nowrap}
+@media (max-width:760px){.v3-demo-exit{gap:6px}.v3-demo-exit .rv-btn{min-height:36px;padding:4px 10px;font-size:13px}}
 /* L1-6 Bincy restyle (captain ruling 11:00, LANES.md): flat white cards on a pale mint ground,
    solid teal primary, white header bar — sampled from cookbook sources/bincy-design-sprint-2026-09-22
    02_assets/brand/brand_panel_crop.png + screens/01_sign_in.png, 02_home_dashboard.png.

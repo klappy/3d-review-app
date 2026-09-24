@@ -1,7 +1,26 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.16.0",
+  "current": "0.17.0",
   "versions": [
+    {
+      "version": "0.17.0",
+      "status": "candidate",
+      "notes_path": "releases/0.17.0.md",
+      "sections": {
+        "added": [
+          "v3 shell and tokens: no context tree, breadcrumbs, one primary action per page, plain state words; global restyle to the v3 prototype; sign-in per prototype frame 1.",
+          "Home dashboard as the prototype card grid (Start a new 3D Review, continue cards).",
+          "Four-step setup wizard following prototype frames 3–6, with safe resume after a dropped connection.",
+          "Assessment page with state-driven primary; Record my review → Choose a next step; Next step page saves notes.",
+          "Results as bands with legend, per-perspective counts, evidence toggle and table.",
+          "Collect: settled + not-yet-confirmed counts, open/closed rows, one-line totals.",
+          "Participant welcome and pager per prototype frames 8/9; phone-width fixes.",
+          "Project form: lead organisation, language name + ISO code, cycle date; access codes and workspaces reachable from project settings."
+        ],
+        "changed": [],
+        "fixed": []
+      }
+    },
     {
       "version": "0.16.0",
       "status": "candidate",

@@ -232,3 +232,18 @@ test('lane 12 L12-2: language ISO code rides cap.language.create only when given
   assert.doesNotMatch(renderStep('details', draft(), empty, [], false, ''), /newLangCode/);
   assert.match(renderStep('review', draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'Hiligaynon', newLangCode: 'hil' }), empty, [], false, ''), /<dt>Language<\/dt><dd>Hiligaynon · hil<\/dd>/);
 });
+
+test('L2-5: group titles are h3 on participants and information (prototype frames 4–5)', () => {
+  const data = { templates: [{ id: 't1', version: 1, perspective: 'Community', name: 'Community survey' }] };
+  const d = { ...freshDraft(), groups: { t1: { version: 1, expected: '' } } };
+  assert.match(renderStep('participants', d, data), /<h3>Community<\/h3>/);
+  assert.match(renderStep('information', d, data), /<h3>Community<\/h3>/);
+  assert.doesNotMatch(renderStep('participants', d, data), /<b>Community<\/b>/);
+});
+
+test('L2-6: review rows carry the perspective dot and prototype sub-line (V.setupReview)', () => {
+  const tpl = { id: 'tpl.team', version: 1, name: 'Team', perspective: 'Translation team' };
+  const r = renderStep('review', { ...freshDraft(), name: 'X', project: 'p1', language: 'l1', groups: { 'tpl.team': { version: 1, expected: '' } } }, { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates: [tpl] });
+  assert.match(r, /<dt><span class="pdot wz-kvdot p-team" aria-hidden="true"><\/span>Translation team<\/dt><dd>no number given<\/dd>/);
+  assert.match(r, /Check the details\. Launching opens the survey links; nothing is sent to anyone\./);
+});

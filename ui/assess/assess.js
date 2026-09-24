@@ -12,7 +12,7 @@ import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
-import { V3_SHELL, onePrimary, stateWord } from '/v3-shell.js';
+import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
 import { v3StagePrimary, v3CountLine } from '/assess/v3-assessment.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
 // if the module is absent; destroyed on any route change.
@@ -57,9 +57,10 @@ function placeDemoNotice() {
     else { const banner = document.createElement('section'); banner.id = 'demo-notice'; banner.className = 'panel'; banner.innerHTML = '<strong>Explore the real app · demonstration data</strong><p>These are the same screens used for assessments. Viewer access: nothing is sent or saved. Source-pinned synthetic responses and report; no real people.</p><a class="button" href="/participate/?demo=1">Try the sample survey</a> <a class="button" href="/">Close tour</a>'; const samples = document.createElement('p'); samples.append('Inspect a synthetic response in the real survey review: '); for (const sample of sampleResponses) { const link = document.createElement('a'); link.href = `/participate/?demo=1&survey=${sample.survey}&response=1`; link.textContent = `${sample.name} (${sample.count} responses) · `; samples.append(link); } banner.append(samples); demoNotice = banner; }
   }
   if (!demoNotice.isConnected || demoNotice.nextElementSibling !== app) app.before(demoNotice);
+  placeDemoExit(document); // CAPTAIN P0 12:10: Exit demo + Sign in on every demo screen; logo leaves demo
   // Kit-internal paints (tree expansion, search, context toggle) never call the controller; they rebuild the shell chrome and keep
   // only the content/header hosts. The controller watches its own kit root and re-places the same node the moment it is detached.
-  if (kitRoot && !demoObserver && typeof MutationObserver === 'function') { demoObserver = new MutationObserver(() => { if (demoNotice && !demoNotice.isConnected && app.isConnected) app.before(demoNotice); }); demoObserver.observe(kitRoot, { childList: true, subtree: true }); }
+  if (kitRoot && !demoObserver && typeof MutationObserver === 'function') { demoObserver = new MutationObserver(() => { if (demoNotice && !demoNotice.isConnected && app.isConnected) app.before(demoNotice); if (!document.querySelector?.('header.top .v3-demo-exit')) placeDemoExit(document); }); demoObserver.observe(kitRoot, { childList: true, subtree: true }); }
 }
 let demoObserver = null;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -68,6 +69,8 @@ const stageLabel = s => (V3_SHELL && stateWord(s)) || ({ prepare: 'In preparatio
 // v3 one primary action per page (lane 1): after any content paint, keep the first primary in the content mount and demote the rest (class only).
 if (V3_SHELL && app && typeof MutationObserver === 'function') { let queued = false; new MutationObserver(() => { if (queued) return; queued = true; queueMicrotask(() => { queued = false; onePrimary(app); }); }).observe(app, { childList: true, subtree: true }); }
 const demo = typeof location !== 'undefined' && isDemo(location.search);
+// P0 12:10: a logo tap in demo always leaves demo, even if a kit repaint raced the header rewrite.
+if (demo && typeof document?.addEventListener === 'function') document.addEventListener('click', e => { const b = e.target?.closest?.('header.top a.brand'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); location.assign(DEMO_EXIT_HREF); }, true);
 let tabStorage = memoryStorage(); if (!demo) { try { tabStorage = sessionStorage; } catch {} }
 let token = null; if (!demo) { try { token = sessionStorage.getItem('facilitatorToken'); } catch {} }
 async function api(url, { method = 'GET', body } = {}) {
