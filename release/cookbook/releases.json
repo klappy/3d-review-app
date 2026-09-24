@@ -1,7 +1,20 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.20.0",
+  "current": "0.21.0",
   "versions": [
+    {
+      "version": "0.21.0",
+      "status": "candidate",
+      "notes_path": "releases/0.21.0.md",
+      "sections": {
+        "added": [
+          "cards show child counts: assessment → responses; project → assessments · responses; workspace → projects · assessments · responses (component: Card) (#255)",
+          "reports: build from real participant responses on DEV (attested synthetic path unchanged; held outside dev) (#256)"
+        ],
+        "changed": [],
+        "fixed": []
+      }
+    },
     {
       "version": "0.20.0",
       "status": "candidate",
