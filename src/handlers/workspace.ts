@@ -27,17 +27,18 @@ export const create: Handler = async (ctx, params) => {
 export const list: Handler = async (ctx) => {
   const actor = requireUser(ctx);
   const { results } = await ctx.db
-    .prepare('SELECT w.*, g.role AS role FROM workspace w JOIN "grant" g ON g.scope_type = ? AND g.scope_id = w.id WHERE g.principal_id = ? ORDER BY w.created_at')
+// L1-23 (captain 14:52): read-only child counts for cards, one correlated aggregate per row — no N+1.
+    .prepare('SELECT w.*, g.role AS role, (SELECT COUNT(*) FROM project p2 WHERE p2.workspace_id = w.id) AS project_count, (SELECT COUNT(*) FROM assessment a2 JOIN project p2 ON p2.id = a2.project_id WHERE p2.workspace_id = w.id) AS assessment_count, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id JOIN assessment a2 ON a2.id = s.assessment_id JOIN project p2 ON p2.id = a2.project_id WHERE p2.workspace_id = w.id) AS response_count FROM workspace w JOIN "grant" g ON g.scope_type = ? AND g.scope_id = w.id WHERE g.principal_id = ? ORDER BY w.created_at')
     .bind("workspace", actor)
-    .all<WorkspaceRow & { role: Role }>();
-  return { result: { workspaces: results.map((w) => view(w, w.role)) } };
+    .all<WorkspaceRow & { role: Role; project_count: number; assessment_count: number; response_count: number }>();
+  return { result: { workspaces: results.map((w) => ({ ...view(w, w.role), project_count: Number(w.project_count) || 0, assessment_count: Number(w.assessment_count) || 0, response_count: Number(w.response_count) || 0 })) } };
 };
 
 export const get: Handler = async (ctx, params) => {
   const id = reqStr(params, "id");
   const { row, role } = await loadWorkspace(ctx, id);
   // listing of grouped projects only (notes) — names, not contents
-  const { results } = await ctx.db.prepare("SELECT id, name, organization, archived_at FROM project WHERE workspace_id = ? ORDER BY created_at").bind(id).all<Pick<ProjectRow, "id" | "name" | "organization" | "archived_at">>();
+  const { results } = await ctx.db.prepare("SELECT p.id, p.name, p.organization, p.archived_at, (SELECT COUNT(*) FROM assessment a2 WHERE a2.project_id = p.id) AS assessment_count, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id JOIN assessment a2 ON a2.id = s.assessment_id WHERE a2.project_id = p.id) AS response_count FROM project p WHERE p.workspace_id = ? ORDER BY p.created_at").bind(id).all<Pick<ProjectRow, "id" | "name" | "organization" | "archived_at"> & { assessment_count: number; response_count: number }>();
   return { result: { workspace: view(row, role), projects: results }, scope: { type: "workspace", id } };
 };
 
