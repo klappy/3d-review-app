@@ -223,7 +223,7 @@ export function mountWizard(root, deps) {
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
       try { const done = await launch(s.d, { api: deps.api, store: deps.store, resume: s.partial }); if (!alive) return; s.done = done; s.partial = null; paint(); }
-      catch (err) { if (!alive) return; s.partial = err.ctx?.done.length ? err.ctx : s.partial; s.step = 'review'; note(new Error(`${err.message || err} ${s.partial?.done.length || 0} of the launch writes were done; "Continue the launch" picks up from where it stopped; edits stay locked until then.`)); }
+      catch (err) { if (!alive) return; s.partial = err.ctx?.done.length ? err.ctx : s.partial; s.step = 'review'; note(new Error(s.partial ? `${err.message || err} ${s.partial.done.length} of the launch writes were done. "Continue the launch" picks up from where it stopped; edits stay locked until then.` : `${err.message || err} Nothing was created. You can edit and launch again.`)); }
       finally { s.busy = false; }
     }
   }, on);
