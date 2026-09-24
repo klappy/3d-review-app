@@ -139,7 +139,11 @@ const understand = {
         await v3SetStage(ctx.api, ctx.enc, m.aid, action);
         if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
         if (status) status.textContent = action === 'recordReview' ? 'Review recorded.' : 'Moved to the next step.';
-        ctx.go(ctx.routes.assessment(m.aid, V3_SET_STAGE[action] === 'improve' ? 'improve' : 'understand'), { reload: true });
+        // Bugbot 4093922740: the stage is committed server-side, so mark this assessment dirty (shell protocol: the next render
+        // refetches it) and go to the target view; same hash → shell re-renders, new hash → hashchange renders.
+        if (ctx.state?.dirty instanceof Map) ctx.state.dirty.set(m.aid, 'write');
+        else if (typeof ctx.refresh === 'function') { await ctx.refresh(); if (action === 'recordReview') return; }
+        ctx.go(ctx.routes.assessment(m.aid, V3_SET_STAGE[action] === 'improve' ? 'improve' : 'understand'));
       } catch (err) {
         const k = classify(err);
         if (status) { status.setAttribute('role', 'alert'); status.textContent = k === 'refused' ? `${NOT_VISIBLE}: nothing changed.` : k === 'unauthenticated' ? 'Your sign-in is no longer active. Sign in again; nothing changed.' : `Nothing changed: ${String(err.message || 'request failed')}`; }

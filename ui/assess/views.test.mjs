@@ -196,7 +196,8 @@ test('v3 U4 gate in Understand: checkbox arms Record my review; click posts set_
   const collecting = { ...assessment, stage: 'collect' };
   const table = { ...understandTable, 'POST /v2/assessments/a1/stage': { assessment: { ...collecting, stage: 'understand' } } };
   const { api, calls } = fakeApi(table); const gone = [];
-  const ctx = ctxFor(api, { current: { assessment: collecting, surveys }, go: (to, o) => gone.push([to, o]) });
+  const dirty = new Map();
+  const ctx = ctxFor(api, { current: { assessment: collecting, surveys }, state: { principal: { id: 'me' }, dirty }, go: (to, o) => gone.push([to, o]) });
   const m = await views.understand.load(ctx, { aid: 'a1' }); const html = views.understand.render(ctx, m);
   assert.match(html, /data-v3-gate-go="recordReview" disabled>Record my review/);
   const btn = el({ 'data-v3-gate-go': 'recordReview', tag: 'button' }); btn.disabled = true;
@@ -208,6 +209,7 @@ test('v3 U4 gate in Understand: checkbox arms Record my review; click posts set_
   const posts = calls.filter(c => c.method === 'POST'); assert.equal(posts.length, 1);
   assert.equal(posts[0].url, '/v2/assessments/a1/stage'); assert.deepEqual(posts[0].body, { stage: 'understand' });
   assert.equal(gone.at(-1)[0], '#assessment/a1/understand'); assert.equal(status.textContent, 'Review recorded.');
+  assert.equal(dirty.get('a1'), 'write', 'committed stage marks the assessment dirty so the shell refetches it (Bugbot 4093922740)');
 });
 test('v3 U4 gate: viewers see the state only, no write control', async () => {
   const { api } = fakeApi(understandTable);
