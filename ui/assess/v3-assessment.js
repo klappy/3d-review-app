@@ -36,7 +36,7 @@ export function v3CountLine({ responses, expected, unconfirmed } = {}, esc = esc
   const got = num(responses) ?? 0, of = flags.expectedCountOptional ? num(expected) : null, unc = num(unconfirmed);
   const settled = of ? `${got} of ${of} responded` : `${got} responded`;
   const pending = !flags.showUnconfirmed ? '' : unc === null
-    ? '<span class="muted" data-v3-unconfirmed="unreported">not yet confirmed: none reported</span>'
+    ? '' // the server did not report one: show nothing rather than a number it never sent
     : `<span class="${unc ? 'badge' : 'muted'}" data-v3-unconfirmed="${unc}">${unc} not yet confirmed</span>`;
   return `<span class="v3-count" data-v3-settled="${got}">${esc(settled)}</span>${pending ? ` <span aria-hidden="true">·</span> ${pending}` : ''}`;
 }

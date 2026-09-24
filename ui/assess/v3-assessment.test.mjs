@@ -24,7 +24,8 @@ test('(a) denominator only when entered', () => {
 test('(b) settled and not-yet-confirmed side by side; never guessed', () => {
   const s = v3CountLine({ responses: 7, unconfirmed: 2 });
   assert.match(s, /data-v3-settled="7"/); assert.match(s, /2 not yet confirmed/);
-  assert.match(v3CountLine({ responses: 7 }), /none reported/);
+  assert.doesNotMatch(v3CountLine({ responses: 7 }), /confirmed/);
+  assert.match(v3CountLine({ responses: 7, unconfirmed: 0 }), /0 not yet confirmed/);
   assert.doesNotMatch(v3CountLine({ responses: 7 }, undefined, { ...V3_FLAGS, showUnconfirmed: false }), /confirmed/);
 });
 test('(c) held results render band cards as evidence gaps, no invented band', () => {
