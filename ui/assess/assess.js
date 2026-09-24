@@ -20,7 +20,8 @@ const WIZARD_JS = '/v3/wizard.js', WIZARD_CSS = '/v3/wizard.css';
 let wizardHandle = null;
 const startReview = () => V3_SHELL ? '<div class="v3-shell-actions actions"><a class="rv-btn primary" data-v3-start href="#new">Start a review</a></div>' : '';
 // v3 shell (lane 1): context tree removed when V3_SHELL; crumbs remain the navigation.
-const v3Model = m => V3_SHELL ? { ...m, contextTree: false } : m;
+// Bugbot 4094071963: the kit adapter has no 'new' kind; the shell header names the wizard page (title + current link) here.
+const v3Model = m => !V3_SHELL ? m : m?.context?.route === 'new' ? { ...m, contextTree: false, title: 'Start a review', eyebrow: 'New review', currentHref: '#new', ancestors: [{ label: 'Projects', href: cards.routes.projects, visible: true }] } : { ...m, contextTree: false };
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 // Product overhaul (cookbook #16 c5721465315): five VIEWS on one assessment page. A view is a tab; a tab never mutates stage.
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
@@ -445,6 +446,8 @@ async function render() {
 }
 async function mountNew(gen) {
   syncShell(); app.className = '';
+  // Bugbot 4094071987: same gate as every signed-in page — no session, no wizard.
+  if (!state.principal) { app.innerHTML = `<div class="narrow panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">Starting a review needs a facilitator session.</p><div class="actions"><a class="rv-btn primary" href="/v2/auth/access">Sign in with email code</a></div></div>`; return; }
   if (!document.querySelector(`link[href="${WIZARD_CSS}"]`)) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = WIZARD_CSS; document.head.appendChild(l); }
   let mod = null; try { mod = await import(WIZARD_JS); } catch { mod = null; }
   if (gen !== generation) return;
