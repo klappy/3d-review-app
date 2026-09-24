@@ -36,18 +36,23 @@ const HEX64 = /^[0-9a-f]{64}$/;
 /** The dev allowlist, or null when it is missing, empty or malformed. ONE bad entry invalidates the WHOLE list: a typo must
  *  close the door, not silently shrink it. Entries are sha256 hex of the normalised address — no address sits in config.
  *  EVERY comma-separated entry, after trimming, must be exactly 64 lowercase hex — an EMPTY entry (a trailing or doubled
- *  comma, or whitespace alone) is malformed too and closes the list, rather than being quietly dropped. */
+ *  comma, or whitespace alone) is malformed too and closes the list, rather than being quietly dropped.
+ *  Note: an absent/blank value is handled by envRefusal (DEV then sends to any address); this parser only judges a non-empty list. */
 export function parseMailAllowlist(raw: unknown): Set<string> | null {
   if (typeof raw !== "string") return null;
   const parts = raw.split(",").map((s) => s.trim());
   if (parts.length === 0 || !parts.every((p) => HEX64.test(p))) return null;
   return new Set(parts);
 }
-/** Fail-closed environment policy. Returns null when sending is permitted, otherwise the refusal reason. */
+/** Fail-closed environment policy. Returns null when sending is permitted, otherwise the refusal reason.
+ *  DEV sends to ANY address when MAIL_ALLOWLIST_SHA256 is absent/empty (team testing); a non-empty list is still enforced
+ *  and a malformed one still closes the door. Production is unchanged; every other environment is refused. */
 async function envRefusal(env: MailEnv, normalizedTo: string): Promise<MailReason | null> {
   if (env.ENVIRONMENT === "production") return null;
   if (env.ENVIRONMENT !== "dev") return "not_allowed_env";
-  const allow = parseMailAllowlist(env.MAIL_ALLOWLIST_SHA256);
+  const raw = env.MAIL_ALLOWLIST_SHA256;
+  if (typeof raw !== "string" || raw.trim() === "") return null;
+  const allow = parseMailAllowlist(raw);
   if (!allow) return "not_allowlisted";
   return allow.has(await sha256(normalizedTo)) ? null : "not_allowlisted";
 }

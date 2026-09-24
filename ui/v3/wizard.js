@@ -181,7 +181,7 @@ export function expectedFor(surveyId, store = safeStore()) {
 // ---------- views (pure string renderers) ----------
 // component: Stepper (ruling 12:34) — the wizard composes the shared component; it keeps no copy of its own.
 export const stepper = n => stepperComponent(STEP_TITLES, n, { label: 'Setup steps' });
-const head = (n, h, sub) => `<div class="eyebrow">Start a 3D Review · step ${n} of 4</div>${stepper(n)}<h1 class="wz-h">${h}</h1>${sub ? `<p class="muted wz-sub">${sub}</p>` : ''}`;
+const head = (n, h, sub) => `<div class="eyebrow">Start a 3D Review · step ${n} of ${STEP_TITLES.length}</div>${stepper(n)}<h1 class="wz-h">${h}</h1>${sub ? `<p class="muted wz-sub">${sub}</p>` : ''}`;
 const errBox = errs => errs?.length ? `<div class="note alert" role="alert">${errs.map(esc).join('<br>')}</div>` : '';
 const actions = (back, primary) => `<div class="actions">${back ? `<button type="button" class="rv-btn quiet" data-wz="back">Back</button>` : `<button type="button" class="rv-btn quiet" data-wz="cancel">Cancel</button>`}<span class="spacer"></span>${primary}</div>`;
 

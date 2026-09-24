@@ -28,9 +28,9 @@ describe("mail adapter", () => {
     const hash = await sha256("person@real-domain.dev");
     // unknown / missing environments
     for (const ENVIRONMENT of [undefined, "staging", "preview", "DEV", "production ", ""]) expect(await sendMail({ ...prod, ENVIRONMENT }, msg), String(ENVIRONMENT)).toEqual({ delivered: false, state: "not_sent", reason: "not_allowed_env" });
-    // dev without a usable allowlist
+    // dev with a MALFORMED allowlist (a blank/absent one is tested separately: it opens dev to any address)
     const dev = (MAIL_ALLOWLIST_SHA256?: string) => ({ ...prod, ENVIRONMENT: "dev", MAIL_ALLOWLIST_SHA256 });
-    for (const list of [undefined, "", "   ", ",,", "not-a-hash", hash.toUpperCase(), hash.slice(0, 63), hash + "a", `${hash},nope`, `${hash},${hash.slice(0, 10)}`])
+    for (const list of [",,", "not-a-hash", hash.toUpperCase(), hash.slice(0, 63), hash + "a", `${hash},nope`, `${hash},${hash.slice(0, 10)}`])
       expect(await sendMail(dev(list), msg), JSON.stringify(list)).toEqual({ delivered: false, state: "not_sent", reason: "not_allowlisted" });
     // a well-formed list that does not contain this recipient
     expect(await sendMail(dev(`${await sha256("someone.else@real-domain.dev")}, ${await sha256("third@real-domain.dev")}`), msg)).toEqual({ delivered: false, state: "not_sent", reason: "not_allowlisted" });
@@ -108,6 +108,17 @@ describe("mail adapter", () => {
     f.mockRejectedValueOnce(rejected("E_RECIPIENT_NOT_ALLOWED"));
     expect(await sendMail(prod, msg)).toEqual({ delivered: false, state: "refused", provider: "cloudflare", reason: "provider_error" });
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("dev with NO allowlist (absent, empty or blank) sends to any real address — captain 2026-09-24 14:08: team members test on dev", async () => {
+    const f = vi.spyOn(prod.EMAIL, "send").mockResolvedValue(ok());
+    for (const MAIL_ALLOWLIST_SHA256 of [undefined, "", "   "])
+      expect(await sendMail({ ...prod, ENVIRONMENT: "dev", MAIL_ALLOWLIST_SHA256 } as any, msg), JSON.stringify(MAIL_ALLOWLIST_SHA256)).toMatchObject({ delivered: true });
+    expect(providerCalls(f)).toBe(3);
+    // a synthetic recipient is still refused, and other environments still closed
+    expect(await sendMail({ ...prod, ENVIRONMENT: "dev", MAIL_ALLOWLIST_SHA256: "" } as any, { ...msg, to: "rina@example.invalid" })).toEqual({ delivered: false, state: "not_sent", reason: "synthetic_recipient" });
+    expect(await sendMail({ ...prod, ENVIRONMENT: "staging", MAIL_ALLOWLIST_SHA256: "" } as any, msg)).toEqual({ delivered: false, state: "not_sent", reason: "not_allowed_env" });
+    expect(providerCalls(f)).toBe(3);
   });
 
   it("the allowlist parser closes on anything it does not fully understand", () => {

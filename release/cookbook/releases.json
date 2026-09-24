@@ -1,7 +1,22 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.19.0",
+  "current": "0.20.0",
   "versions": [
+    {
+      "version": "0.20.0",
+      "status": "candidate",
+      "notes_path": "releases/0.20.0.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "component: Card — one v3 import point (ui/v3/components/card.js) for home/workspace/project/assessment cards, re-exporting the shared card (no copy) (#249)",
+          "DEV mail: sends to any address when no allowlist is configured (team testing); an allowlist, when set, is still enforced (#252)",
+          "Stepper: pending steps carry class \"todo\" instead of an empty class attribute (component: Stepper) (#251)",
+          "setup wizard: \"step n of N\" count derives from the step list, not a hard-coded 4 (#253)"
+        ],
+        "fixed": []
+      }
+    },
     {
       "version": "0.19.0",
       "status": "candidate",
