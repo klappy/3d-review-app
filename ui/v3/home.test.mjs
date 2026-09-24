@@ -27,3 +27,6 @@ test('archived project is labelled Archived, no continue action', () => {
   const h = homeView({ projects: [{ id: 'z', name: 'Old', archived_at: '2026-01-01' }], listFor: () => undefined });
   assert.match(h, /v3h-pill-done">Archived</); assert.doesNotMatch(h, /Continue|Open project/);
 });
+test('never shows a raw language id', () => {
+  assert.doesNotMatch(assessmentRow({ id: 'a', name: 'A', stage: 'collect', language_id: 'lang_123' }, label), /lang_123/);
+});

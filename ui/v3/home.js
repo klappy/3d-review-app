@@ -7,7 +7,7 @@ const pill = stage => stage === 'prepare' ? 'setup' : stage === 'collect' ? 'pro
 export function assessmentRow(a, stageLabel) {
   const href = `#assessment/${encodeURIComponent(a.id)}`;
   const setup = a.stage === 'prepare';
-  const meta = [a.language_name || a.language_id || ''].filter(Boolean).map(ESC).join(' · ');
+  const meta = [a.language_name || ''].filter(Boolean).map(ESC).join(' · ');
   return `<div class="v3h-row" data-v3h-assessment="${ESC(a.id)}"><div class="v3h-row-head"><h3>${ESC(a.name)}</h3><span class="v3h-pill v3h-pill-${pill(a.stage)}">${stageLabel(a.stage)}</span></div>${meta ? `<p class="v3h-meta">${meta}</p>` : ''}<a class="v3h-continue" href="${href}">${setup ? 'Continue setup' : 'Continue assessment'} →</a></div>`;
 }
 export function homeView({ projects = [], listFor, stageLabel = s => ESC(s), start = '', title = '' }) {
