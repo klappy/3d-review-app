@@ -3,6 +3,8 @@
 // ctx = { api, esc, enc, go, note(msg, alert), state, routes, cards, setToken? }.
 // Layout comes from the showcase (projectsView / workspaceView / createView, welcome root). Legacy app.js is behaviour reference only.
 // Pure render: HTML strings, every text value through ctx.esc. No DOM access outside bind().
+// v3 lane 9 L9-1: projects page = home per Bincy screen 02 (relative import so node tests resolve it too).
+import { homeView } from '../v3/home.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -276,13 +278,23 @@ const workspace = {
 // ---------- projects ----------
 const projects = {
   async load(ctx, params = {}) {
-    try { const r = await ctx.api('/v2/projects'); return { status: 'loaded', params, projects: r.projects || [] }; }
+    let list;
+    try { const r = await ctx.api('/v2/projects'); list = r.projects || []; }
     catch (e) { return { ...fail(e, safeMessage), params }; }
+    // v3 lane 9: each project's assessments, read-only, same endpoint the project page uses; first 20 projects, the rest link out.
+    const lists = {};
+    await Promise.allSettled(list.filter(p => !p.archived_at).slice(0, 20).map(async p => {
+      try { const a = await ctx.api(`/v2/projects/${encodeURIComponent(p.id)}/assessments`); lists[p.id] = { status: 'loaded', list: (a.assessments || []).filter(x => !x.archived_at) }; }
+      catch (e) { lists[p.id] = { status: classify(e) }; }
+    }));
+    return { status: 'loaded', params, projects: list, lists };
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('projects', model);
-    return readRegion(`${pageHead(ctx, r)}${kitGrid(ctx, r.items, r.empty)}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`)
+    const start = '<div class="v3-shell-actions actions"><a class="rv-btn primary" data-v3-start href="#new">+ Start a new 3D Review</a></div>';
+    const home = homeView({ projects: model.projects || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start });
+    return readRegion(`${pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`)
       + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a project</h2><form id="create-project"><label class="field">Project name<input name="name" maxlength="100" required placeholder="For example, Lake project"></label><div class="actions"><button class="primary" type="submit">Create project</button></div></form></section>`);
   },
   bind(ctx, root, model) {

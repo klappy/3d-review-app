@@ -14,8 +14,6 @@ import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord } from '/v3-shell.js';
 import { v3StagePrimary, v3CountLine } from '/assess/v3-assessment.js';
-// v3 lane 9 L9-1: home per Bincy screen 02 (ui/v3/home.js); vm-box tests strip this import, so projectsView guards on typeof.
-import { homeView } from '/v3/home.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
 // if the module is absent; destroyed on any route change.
 const WIZARD_JS = '/v3/wizard.js', WIZARD_CSS = '/v3/wizard.css';
@@ -358,7 +356,6 @@ function collectScreen(current) {
   return `<div class="grid start">${left}${surveySet}</div>`; // content-height alignment: an empty Collect panel never stretches to the survey-set height
 }
 function projectsView() {
-  if (V3_SHELL && typeof homeView === 'function') return homeView({ principal: state.principal, projects: state.projects, listFor, stageLabel, start: state.principal ? '<div class="v3-shell-actions actions"><a class="rv-btn primary" data-v3-start href="#new">+ Start a new 3D Review</a></div>' : '' });
   if (!state.projects.length) return `<div class="narrow panel"><p class="eyebrow">Your projects</p><h1>No project on this account</h1><p class="muted">This screen lists projects you hold a role on. An assessment you were granted directly, without a project role, is not listed here yet; the current workspace still opens it.</p></div>`;
   return `<div class="title"><div><p class="eyebrow">Your projects</p><h1>Choose an assessment</h1></div></div><div class="project-grid">${state.projects.map(p => { const l = listFor(p.id); return `<div class="panel project-card"><p class="eyebrow">Project</p><h2>${esc(p.name)}</h2>${l.status === 'loaded' ? (l.list.length ? `<div class="links">${l.list.map(x => `<a href="#assessment/${encodeURIComponent(x.id)}">${esc(x.name)} <span class="small muted">· ${stageLabel(x.stage)}</span></a>`).join('')}</div>` : '<p class="small muted">No assessments yet.</p>') : l.status === 'failed' ? `<p class="small muted" role="alert">Could not load assessments. <a href="#" data-retry-list="${esc(p.id)}">Retry</a></p>` : l.status === 'unauthenticated' ? `<p class="small muted" role="alert">Your sign-in is no longer active. ${SIGNIN} or <a href="#" data-retry-list="${esc(p.id)}">Retry</a></p>` : l.status === 'refused' ? '<p class="small muted">Not listed: you have no role on this project.</p>' : `<a href="#" class="small" data-project="${esc(p.id)}">Show assessments</a>`}</div>`; }).join('')}</div>`;
 }
