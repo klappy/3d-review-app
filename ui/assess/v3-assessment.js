@@ -46,7 +46,7 @@ const LENS_CLASS = { 'Translation Team': 'team', Church: 'church', Community: 'c
 
 /** Band layout (ruling c): one card per perspective, a band word never a score. A held result renders every card as an
  *  evidence gap with the server's reason — no band is invented. */
-export function v3BandsMarkup(results, lenses, esc = esc0) {
+export function v3BandsMarkup(results, lenses, esc = esc0, groups = null) {
   const r = results || {};
   const given = Array.isArray(r.bands) ? r.bands : [];
   const held = !given.length || r.status === 'held';
@@ -57,15 +57,45 @@ export function v3BandsMarkup(results, lenses, esc = esc0) {
     const note = held ? `<p class="muted" data-v3-band-held>${esc(r.reason || 'Results are held.')}</p>`
       : suppressed ? '<div class="note">Withheld to protect a small group. This is an evidence gap, not a poor result.</div>'
       : b && b.text ? `<p>${esc(b.text)}</p>` : '';
-    return `<div class="glass band lens ${LENS_CLASS[lens] || ''}" data-v3-band="${esc(lens)}"><div class="eyebrow">${esc(lens)}</div><div class="word">${esc(word)}</div>${note}</div>`;
+    const count = groups ? `<div class="v3-band-count small muted" data-v3-band-count="${esc(lens)}">${esc(v3GroupCountText(groups[lens]))}</div>` : '';
+    return `<div class="glass band lens ${LENS_CLASS[lens] || ''}" data-v3-band="${esc(lens)}"><div class="eyebrow">${esc(lens)}</div><div class="word">${esc(word)}</div>${note}${count}</div>`;
   }).join('');
   const legend = '<div class="legend small muted" data-v3-legend>Strong · Growing · Needs support · Needs urgent attention · More input needed</div>';
   return `<div class="v3-bands three" data-v3-bands="${held ? 'held' : 'shown'}">${cards}</div>${legend}`;
 }
 
+// U2 evidence toggle + table, U3 folded into one footer line (PARITY.md U2/U3; prototype V.results frame 10:
+// "Show evidence and details" / "Simple view", table Evidence · What we can say · Limit). Bincy screen 10 (group counts)
+// is met by the per-perspective count on each band card. Every number here is a server count; nothing is scored.
+/** Group count text for one perspective: {surveys, loaded, responses} from the per-survey count reads. */
+export function v3GroupCountText(g) {
+  if (!g || !g.surveys) return 'Not asked in this review';
+  if (!g.loaded) return 'Count not loaded yet'; // the server has sent no count: show no number
+  const n = num(g.responses) ?? 0, base = `${n} response${n === 1 ? '' : 's'}`;
+  return g.loaded === g.surveys ? base : `${base} so far (${g.loaded} of ${g.surveys} survey counts loaded)`;
+}
+/** One evidence row per perspective. The result read is held until D7, so "what we can say" is the held state, never a band. */
+export function v3EvidenceRows(results, lenses, groups = {}) {
+  const r = results || {}, held = !(Array.isArray(r.bands) && r.bands.length) || r.status === 'held';
+  return lenses.map(lens => {
+    const g = groups[lens], counted = v3GroupCountText(g);
+    if (!g || !g.surveys) return [lens, 'Not asked in this review', 'Missing data is not a low result'];
+    const b = !held && Array.isArray(r.bands) ? r.bands.find(x => x && x.perspective === lens) : null;
+    const say = b && BAND_WORDS.has(b.band) ? b.band : held ? 'Held · no band yet' : 'More input needed';
+    const limit = held ? (r.reason || 'Results are held') : !g.loaded ? 'Count not loaded yet' : (num(g.responses) ?? 0) === 0 ? 'No responses yet' : 'People who did not answer may see it differently';
+    return [lens, `${say} · ${counted}`, limit];
+  });
+}
+export const V3_EVIDENCE_FOOTER = 'Descriptive items are shown, not scored. Choose-all-that-apply items show overlap, not a number. Missing data is not a low result. Bands come from validated scoring and report templates; no number is invented here.';
+export function v3EvidenceMarkup(rows, open, esc = esc0) {
+  const btn = `<button type="button" class="quiet" data-v3-evidence-toggle aria-expanded="${open ? 'true' : 'false'}">${open ? 'Simple view' : 'Show evidence and details'}</button>`;
+  const table = `<div class="v3-evidence" data-v3-evidence${open ? '' : ' hidden'}><h3>What supports this view?</h3><table class="table"><thead><tr><th>Evidence</th><th>What we can say</th><th>Limit</th></tr></thead><tbody>${rows.map(e => `<tr>${e.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table><p class="small muted footer">${esc(V3_EVIDENCE_FOOTER)}</p></div>`;
+  return { btn, table };
+}
+
 export const v3css = `.v3-bands{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:12px 0}
 .v3-bands .band{padding:16px;border:1px solid var(--line);border-radius:12px}.v3-bands .word{font-size:20px;font-weight:600;margin:4px 0 8px}
-.v3-count{font-weight:600}.v3-summary .row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}`;
+.v3-count{font-weight:600}.v3-bands .v3-band-count{font-size:13px;margin-top:8px}.v3-evidence table{width:100%;border-collapse:collapse}.v3-evidence td,.v3-evidence th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}.v3-summary .row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}`;
 
 // U4 review gate (PARITY.md U4; prototype V.results frame 10). One primary per state, each a single cap.assessment.set_stage
 // move (the server allows one step at a time): Collecting → "Record my review" (checkbox first) → Reviewing →
