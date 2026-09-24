@@ -177,7 +177,7 @@ export function renderStep(step, d, data, errs = [], locked = false) {
     <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
     <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
-    ${locked ? `<div class="actions"><span class="spacer"></span><button type="button" class="primary" data-wz="launch">Continue the launch</button></div>` : actions(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
+    ${locked ? `<div class="actions"><button type="button" class="rv-btn quiet" data-wz="cancel">Leave setup (what was created stays; nothing was sent)</button><span class="spacer"></span><button type="button" class="primary" data-wz="launch">Continue the launch</button></div>` : actions(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
 }
 
 export function renderDone(ctx, origin = '', templates = []) {
@@ -205,16 +205,17 @@ export function mountWizard(root, deps) {
     if (form.dataset.wzForm === 'information') d.context = String(fd.get('context') || '');
   };
   root.addEventListener('change', async e => {
-    if (e.target.name === 'project' && !s.partial) { const f = e.target.form; read(f); s.d.project = e.target.value; s.d.language = ''; s.errs = []; paint(); try { if (!(await loadLanguages())) return; } catch (err) { return note(err); } paint(); }
+    if (e.target.name === 'project' && !s.partial && !s.busy) { const f = e.target.form; read(f); s.d.project = e.target.value; s.d.language = ''; s.errs = []; paint(); try { if (!(await loadLanguages())) return; } catch (err) { return note(err); } paint(); }
   }, on);
   root.addEventListener('submit', e => {
-    e.preventDefault(); if (s.partial) return; read(e.target);
+    e.preventDefault(); if (s.partial || s.busy) return; read(e.target);
     s.errs = validateStep(s.step, s.d); if (!s.errs.length) s.step = STEPS[STEPS.indexOf(s.step) + 1] || s.step; paint();
   }, on);
   root.addEventListener('click', async e => {
     const b = e.target.closest('[data-wz]'); if (!b) return;
     const act = b.dataset.wz; s.errs = [];
-    if (s.partial && act !== 'launch') return; // a launch is part-done: the draft is locked so a retry matches the writes already made
+    if (s.busy) return; // nothing moves while a launch is in flight
+    if (s.partial && act !== 'launch' && act !== 'cancel') return; // a launch is part-done: the draft is locked so a retry matches the writes already made
     if (act === 'cancel') return deps.go?.('#/');
     if (act === 'back') { const f = root.querySelector('form'); if (f) read(f); s.step = STEPS[Math.max(0, STEPS.indexOf(s.step) - 1)]; return paint(); }
     if (act === 'edit') { s.step = b.dataset.step; return paint(); }
@@ -222,7 +223,7 @@ export function mountWizard(root, deps) {
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
       try { const done = await launch(s.d, { api: deps.api, store: deps.store, resume: s.partial }); if (!alive) return; s.done = done; s.partial = null; paint(); }
-      catch (err) { s.partial = err.ctx || s.partial; note(new Error(`${err.message || err} ${s.partial?.done.length || 0} of the launch writes were done; "Continue the launch" picks up from where it stopped; edits stay locked until then.`)); }
+      catch (err) { if (!alive) return; s.partial = err.ctx?.done.length ? err.ctx : s.partial; s.step = 'review'; note(new Error(`${err.message || err} ${s.partial?.done.length || 0} of the launch writes were done; "Continue the launch" picks up from where it stopped; edits stay locked until then.`)); }
       finally { s.busy = false; }
     }
   }, on);

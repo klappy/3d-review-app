@@ -102,7 +102,7 @@ test('retry after a partial failure resumes without duplicate writes', async () 
 test('locked review after a partial launch hides Back/Edit; follow-up not claimed as stored', () => {
   const data = { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates: [{ id: 'tpl.team', version: 3, name: 'Team', perspective: 'Translation team' }] };
   const html = renderStep('review', draft({ followup: true }), data, [], true);
-  assert.ok(!html.includes('data-wz="edit"') && !html.includes('data-wz="back"'));
+  assert.ok(!html.includes('data-wz="edit"') && !html.includes('data-wz="back"') && html.includes('data-wz="cancel"'));
   assert.match(html, /Continue the launch/);
   assert.ok(!/Follow-up<\/dd>/.test(html));
   assert.match(renderStep('details', draft(), data), /not stored yet/);
