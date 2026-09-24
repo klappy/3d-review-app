@@ -217,3 +217,18 @@ test('L2-4 setup look follows the design-system-v3 prototype: short stepper labe
   assert.deepEqual(STEP_TITLES, ['Details', 'Participants', 'Information', 'Review']);
   assert.equal(pdot('Translation team'), 'p-team'); assert.equal(pdot('Community'), 'p-community'); assert.equal(pdot('Church'), 'p-church'); assert.equal(pdot('Other'), 'p-reviewer');
 });
+
+test('lane 12 L12-2: language ISO code rides cap.language.create only when given (contract field `code`)', () => {
+  const plan = d => launchPlan(draft({ project: NEW_PROJECT, newProject: 'Hill', newLanguage: ' Hiligaynon ', ...d }));
+  const body = d => plan(d).find(s => s.cap === 'cap.language.create').body({});
+  assert.deepEqual(body({ newLangCode: ' hil ' }), { name: 'Hiligaynon', code: 'hil' });
+  assert.deepEqual(body({ newLangCode: '  ' }), { name: 'Hiligaynon' });
+  assert.deepEqual(body({ newLangCode: undefined }), { name: 'Hiligaynon' });
+  const base = { name: 'R', project: NEW_PROJECT, newProject: 'H', newLanguage: 'L' };
+  assert.ok(validateStep('details', draft({ ...base, newLangCode: 'Hil!' })).some(e => /Language code/.test(e)));
+  assert.ok(!validateStep('details', draft({ ...base, newLangCode: 'en-US' })).some(e => /Language code/.test(e)));
+  const empty = { projects: [], languages: [], templates: [] };
+  assert.match(renderStep('details', draft({ project: NEW_PROJECT, newLangCode: 'x"y' }), empty, [], false, ''), /Language code \(ISO 639, optional\)<input name="newLangCode" value="x&quot;y"/);
+  assert.doesNotMatch(renderStep('details', draft(), empty, [], false, ''), /newLangCode/);
+  assert.match(renderStep('review', draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'Hiligaynon', newLangCode: 'hil' }), empty, [], false, ''), /<dt>Language<\/dt><dd>Hiligaynon · hil<\/dd>/);
+});
