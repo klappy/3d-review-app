@@ -1,8 +1,8 @@
-// Synthetic-only report creation through the existing danger preview/execute contract.
+// Report creation (synthetic everywhere; participant responses on DEV) through the existing danger preview/execute contract.
 // Confirmation lives only in this view's closure; navigation/identity generation invalidates it.
 export function reportBuildMarkup(ctx, role) {
   if (!['owner', 'member'].includes(role)) return '';
-  return `<section data-report-build><p class="small muted">Build a report from source-attested synthetic assessment data. Other inputs remain held under the current reporting policy.</p><button type="button" data-preview-report>Preview report build</button><div data-report-preview></div><p class="status" role="status" aria-live="polite" data-build-status></p></section>`;
+  return `<section data-report-build><p class="small muted">Build a report from this assessment’s responses.</p><button type="button" data-preview-report>Preview report build</button><div data-report-preview></div><p class="status" role="status" aria-live="polite" data-build-status></p></section>`;
 }
 export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}) {
   const { aid, role } = model;
@@ -28,10 +28,10 @@ export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}) {
       const r = await ctx.api(url, { method: 'POST', body: { mode: 'dry_run' } });
       if (!current()) return;
       if (r?.assessment_id !== aid) throw new Error('Invalid preview scope');
-      if (r.suppressed === true || r.status === 'held') { say(`${r.reason || 'Reports are held under the current synthetic reporting policy.'} Nothing was built.`); return; }
+      if (r.suppressed === true || r.status === 'held') { say(`${r.reason || 'Reports are not available for this assessment yet.'} Nothing was built.`); return; }
       if (r.suppressed !== false || r.status !== 'ready' || typeof r.confirm_token !== 'string' || !r.confirm_token || !Number.isFinite(r.expires_in) || r.expires_in <= 0) throw new Error('Invalid preview');
       pending = { token: r.confirm_token, expires: Date.now() + r.expires_in * 1000 };
-      box.innerHTML = '<p>Build this assessment’s synthetic report? This makes an immutable report available to people with access to this assessment. Current inputs and access are checked again when you confirm.</p><div class="actions"><button type="button" data-confirm-report>Build report</button><button type="button" class="quiet" data-cancel-report>Cancel</button></div>';
+      box.innerHTML = '<p>Build a report from this assessment’s responses? This makes an immutable report available to people with access to this assessment. Current inputs and access are checked again when you confirm.</p><div class="actions"><button type="button" data-confirm-report>Build report</button><button type="button" class="quiet" data-cancel-report>Cancel</button></div>';
       say('Preview ready. Nothing has been built.');
       box.querySelector('[data-cancel-report]').onclick = () => { if (!current() || busy) return; clear(); say('Cancelled. Nothing was built.'); };
       box.querySelector('[data-confirm-report]').onclick = async () => {
@@ -43,7 +43,7 @@ export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}) {
           const result = await ctx.api(url, { method: 'POST', body: { mode: 'execute', confirm_token } });
           if (!current()) return;
           if (result?.assessment_id !== aid) throw new Error('Invalid build scope');
-          if (result.suppressed === true) { say(`${result.reason || 'Report held under the current synthetic reporting policy.'} No report was built.`); return; }
+          if (result.suppressed === true) { say(`${result.reason || 'Report not available for this assessment yet.'} No report was built.`); return; }
           if (result.suppressed !== false || !result.report?.id) throw new Error('Unconfirmed report');
           built = true; say('Report built. Refreshing the report list…');
           await onBuilt();

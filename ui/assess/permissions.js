@@ -10,6 +10,8 @@
 // dropped on sign-out with the shell state, cleared after execute. Nothing here touches storage, URLs or logs.
 // Acceptance (cap.grant.accept) is NOT here: it stays on the legacy surface at /legacy/, reached through the root's #invite= forwarder.
 
+import { memberList, labelMembers, readAccountEmail } from '../v3/components/member-list.js';
+
 export const SCOPE_SEG = { workspaces: 'workspace', projects: 'project', assessments: 'assessment' };
 export const SCOPE_NOUN = { workspaces: 'workspace', projects: 'project', assessments: 'assessment' };
 export const RANK = { viewer: 1, member: 2, owner: 3 };
@@ -23,7 +25,7 @@ export const PREVIEW_AGAIN = 'Preview again.';
 const classify = e => { const c = String(e?.code || e?.status || ''); if (c === 'NOT_AUTHENTICATED' || c === '401') return 'unauthenticated'; if (c === 'NOT_AUTHORIZED_AT_SCOPE' || c === '403') return 'forbidden'; if (c === 'NOT_FOUND_OR_NOT_VISIBLE' || c === '404') return 'not_found'; if (c === 'RESERVED_NOT_BUILT' || c === '501') return 'not_built'; return 'failed'; };
 export { classify };
 
-export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myRole: null, sheet: null, notice: null, alert: false, busy: false, receipts: {} }; }
+export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myEmail: '', myRole: null, sheet: null, notice: null, alert: false, busy: false, receipts: {} }; }
 
 export const permissions = {
   async load(ctx, { scope, id }) {
@@ -33,6 +35,8 @@ export const permissions = {
       const r = await ctx.api(`/v2/${SCOPE_SEG[scope]}/${ctx.enc(id)}/grants`);
       m.status = 'loaded'; m.grants = r.grants || []; m.pending = (r.pending_invitations || []).filter(i => ['sent', 'pending', 'unconfirmed'].includes(i.status));
       m.myRole = m.grants.find(g => g.principal_id === m.me)?.role || null;
+      // P0 12:30: people, not ids — the signed-in account's own email (the only one the service exposes today).
+      m.myEmail = ctx.accountEmail ? await ctx.accountEmail().catch(() => '') || '' : await readAccountEmail({ demo: !!ctx.demo });
     } catch (e) { m.status = classify(e); m.error = e; }
     return m;
   },
@@ -46,13 +50,15 @@ export const permissions = {
     if (m.status !== 'loaded') return `<section class="panel narrow" data-permissions data-permissions-state="failed">${head}<p class="small muted" role="alert">Could not load permissions. <a href="#" data-retry="grants">Retry</a></p>${status}</section>`;
     const owner = m.myRole === 'owner', member = m.myRole === 'member' || owner, busy = m.busy ? 'disabled' : '';
     const canTouch = g => g.role !== 'owner' && (owner || RANK[g.role] <= RANK.member); // D3 ceiling; owners never removed/demoted
-    const rows = m.grants.map(g => { const rc = m.receipts[g.id]; return `<tr data-grant-row="${esc(g.id)}"><td>${esc(g.principal_id)}${g.principal_id === m.me ? ' <span class="muted small">(you)</span>' : ''}</td><td>${esc(g.role)}</td><td class="small">${g.role === 'owner' ? '<span class="muted">Owner — only a transfer changes this</span>' : member && canTouch(g) ? `${owner ? `<select data-role-for="${esc(g.id)}" aria-label="New role" ${busy}>${ROLES.filter(r => r !== 'owner' || true).map(r => `<option value="${r}" ${r === g.role ? 'selected' : ''}>${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}" ${busy}>Preview role change</button> ` : ''}<button type="button" class="quiet" data-revoke="${esc(g.id)}" ${busy}>Remove</button>` : `<span class="muted">Members manage viewers and members only</span>`}${rc ? `<div class="small muted">receipt ${esc(rc.receipt)} · trace ${esc(rc.trace)}</div>` : ''}</td></tr>`; }).join('');
+    // Member list component (ui/v3/components/member-list.js): name + email, "You" for self, never the principal id.
+    const actions = g => { const rc = m.receipts[g.id]; return `${g.role === 'owner' ? '<span class="muted">Owner — only a transfer changes this</span>' : member && canTouch(g) ? `${owner ? `<select data-role-for="${esc(g.id)}" aria-label="New role" ${busy}>${ROLES.map(r => `<option value="${r}" ${r === g.role ? 'selected' : ''}>${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}" ${busy}>Preview role change</button> ` : ''}<button type="button" class="quiet" data-revoke="${esc(g.id)}" ${busy}>Remove</button>` : `<span class="muted">Members manage viewers and members only</span>`}${rc ? `<div class="small muted">receipt ${esc(rc.receipt)} · trace ${esc(rc.trace)}</div>` : ''}`; };
+    const roster = memberList(esc, m.grants, { me: m.me, myEmail: m.myEmail, actions, rowAttr: g => `data-grant-row="${esc(g.id)}"`, empty: 'No grants listed.' });
     const pending = m.pending.length ? `<h3 style="margin-top:18px">Pending invitations</h3><ul class="small" data-pending>${m.pending.map(i => `<li data-invitation="${esc(i.id)}">${esc(i.role)} · ${esc(i.status)}${i.status === 'unconfirmed' ? ` · ${esc(UNCONFIRMED_NOTE)}` : ''} · invited ${esc(i.created_at || '')}${member && (owner || RANK[i.role] <= RANK.member) ? ` <button type="button" class="quiet small" data-revoke-invitation="${esc(i.id)}" ${busy}>Revoke invitation</button>` : ''}</li>`).join('')}</ul>` : '<p class="small muted" style="margin-top:14px">No pending invitations.</p>';
     const roleOptions = (owner ? ROLES : ROLES.filter(r => r !== 'owner')).map(r => `<option value="${r}">${r}</option>`).join('');
     const invite = member ? `<form class="line" data-invite-form><h3>Invite someone</h3><label class="field">Email<input name="email" type="email" required autocomplete="off" ${busy}></label><label class="field">Role<select name="role" ${busy}>${roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit" ${busy}>Preview invitation</button></div><p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p></form>` : '';
     const transfer = owner ? `<form class="line" data-transfer-form><h3>Transfer ownership</h3><p class="small muted">Ownership moves to another signed-up principal. Destructive: it cannot be undone from here.</p><label class="field">New owner's principal id<input name="to" required autocomplete="off" placeholder="usr_… or person_…" ${busy}></label><label class="small"><input type="checkbox" name="step_down"> Step down to member after the transfer</label><div class="actions"><button type="submit" ${busy}>Preview transfer</button></div></form>` : '';
     const sheet = m.sheet ? renderSheet(ctx, m.sheet, m.busy) : '';
-    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}<table class="grants"><thead><tr><th>Principal</th><th>Role</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="muted">No grants listed.</td></tr>'}</tbody></table>${pending}${invite}${transfer}${sheet}${status}<p class="small muted line">Accepting an invitation happens on the legacy surface (a mailed <code>#invite=</code> link opens there); it is never done from this page.</p></section>`;
+    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}${roster}${pending}${invite}${transfer}${sheet}${status}<p class="small muted line">Accepting an invitation happens on the legacy surface (a mailed <code>#invite=</code> link opens there); it is never done from this page.</p></section>`;
   },
   bind(ctx, root, m) {
     const base = `/v2/${SCOPE_SEG[m.scope]}/${ctx.enc(m.id)}`;
@@ -64,7 +70,7 @@ export const permissions = {
     const refresh = async () => {
       const fresh = await permissions.load(ctx, { scope: m.scope, id: m.id });
       Object.assign(m, { status: fresh.status, grants: fresh.grants, pending: fresh.pending,
-        me: fresh.me, myRole: fresh.myRole, error: fresh.error, busy: false });
+        me: fresh.me, myEmail: fresh.myEmail, myRole: fresh.myRole, error: fresh.error, busy: false });
       paint();
     };
     const receiptText = env => `${env.receipt?.id ? ` receipt ${env.receipt.id}` : ''}${env.trace_id ? ` · trace ${env.trace_id}` : ''}`;
@@ -96,7 +102,7 @@ export const permissions = {
         m.sheet = null; fail(e, s.label);
       } };
     root.querySelector('[data-invite-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const email = f.querySelector('[name=email]').value.trim(), role = f.querySelector('[name=role]').value; return preview('invite', `${base}/invitations`, { email, role }, 'Invitation', { display: { who: email } }); });
-    root.querySelectorAll('[data-change-role]').forEach(b => b.addEventListener('click', () => { const gid = b.dataset.changeRole; const role = root.querySelector(`[data-role-for="${CSS.escape(gid)}"]`)?.value; const g = m.grants.find(x => x.id === gid); if (!g || !role || role === g.role) { say('That is already the role.'); return; } return preview('update_role', `${base}/grants/${ctx.enc(gid)}`, { role }, 'Role change', { method: 'PATCH', display: { who: g.principal_id, gid } }); }));
+    root.querySelectorAll('[data-change-role]').forEach(b => b.addEventListener('click', () => { const gid = b.dataset.changeRole; const role = root.querySelector(`[data-role-for="${CSS.escape(gid)}"]`)?.value; const g = m.grants.find(x => x.id === gid); if (!g || !role || role === g.role) { say('That is already the role.'); return; } const who = labelMembers(m.grants, { me: m.me, myEmail: m.myEmail }).find(x => x.row === g)?.person; return preview('update_role', `${base}/grants/${ctx.enc(gid)}`, { role }, 'Role change', { method: 'PATCH', display: { who: who ? [who.name, who.email].filter(Boolean).join(' · ') : '', gid } }); }));
     root.querySelector('[data-transfer-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const to = f.querySelector('[name=to]').value.trim(); const step_down = !!f.querySelector('[name=step_down]').checked; return preview('transfer_owner', `${base}/transfer`, step_down ? { to, step_down: true } : { to }, 'Ownership transfer', { display: { who: to } }); });
     // single-call writes: mode is never sent (contract §3.5)
     root.querySelectorAll('[data-revoke]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`${base}/grants/${ctx.enc(b.dataset.revoke)}`, { method: 'DELETE' }); say(`Access removed.${receiptText(env)}`); await refresh(); } catch (e) { m.busy = false; fail(e, 'Remove access'); } }));

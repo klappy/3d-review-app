@@ -131,6 +131,9 @@ describe("self-service creation: provisioned defaults true for every normal user
     expect((wl.result.workspaces as any[]).map((w) => w.id)).toEqual([ws.result.workspace.id]);
     const pl: any = await call(mila.principal, "cap.project.list", {}, "read");
     expect((pl.result.projects as any[]).map((p) => p.id)).toEqual([pj.result.project.id]);
+    // L1-23: list reads carry read-only child counts for cards (fresh entities → 0).
+    expect(wl.result.workspaces[0]).toMatchObject({ project_count: expect.any(Number), assessment_count: 0, response_count: 0 });
+    expect(pl.result.projects[0]).toMatchObject({ assessment_count: 0, response_count: 0 });
   });
 
   it("(c) a second fresh principal still sees nothing of the first's workspace or project", async () => {

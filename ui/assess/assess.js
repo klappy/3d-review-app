@@ -7,11 +7,25 @@ import { redactDiagnosticPath } from '/diagnostic-path.js';
 import { loadBlankPrint, renderBlankPrint, printAllowed, rememberTab, recalledTab, STAGES } from '/stage-screens.js';
 import { whatsHere } from '/assess/whats-here.js';
 import * as cards from '/assess/cards.js';
+import { breadcrumbs } from '/v3/components/breadcrumbs.js';
+import { sidebarTree } from '/v3/components/sidebar-tree.js';
+// P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
+const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
 import { pages, css as scopeCss } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
+import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle } from '/assess/v3-assessment.js';
+// v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
+// if the module is absent; destroyed on any route change.
+const WIZARD_JS = '/v3/wizard.js', WIZARD_CSS = '/v3/wizard.css';
+let wizardHandle = null;
+const startReview = () => V3_SHELL ? '<div class="v3-shell-actions actions"><a class="rv-btn primary" data-v3-start href="#new">Start a review</a></div>' : '';
+// v3 shell (lane 1): context tree removed when V3_SHELL; crumbs remain the navigation.
+// Bugbot 4094071963: the kit adapter has no 'new' kind; the shell header names the wizard page (title + current link) here.
+const v3Model = m => !V3_SHELL ? m : m?.context?.route === 'new' ? { ...m, contextTree: false, title: 'Start a review', eyebrow: 'New review', currentHref: '#new', ancestors: [{ label: 'Projects', href: cards.routes.projects, visible: true }] } : { ...m, contextTree: false };
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 // Product overhaul (cookbook #16 c5721465315): five VIEWS on one assessment page. A view is a tab; a tab never mutates stage.
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
@@ -21,7 +35,7 @@ const DOTS = { 'Translation Team': '', Church: 'blue', Community: 'gold', 'Other
 // link controls are MOVED into the shell's header host (same nodes, same listeners — never cloned). Without a kit root (tests,
 // legacy harness) `app` is the plain #app element and nothing else changes.
 const kitRoot = document.getElementById('rv');
-const kit = kitRoot ? mountKitRoot(kitRoot, shellModel({ route: route(location.hash), routes: cards.routes, principal: null }), { onNavigate: href => { if (typeof href === 'string' && href.startsWith('#')) { if (location.hash === href) render(); else location.hash = href; } } }) : null;
+const kit = kitRoot ? mountKitRoot(kitRoot, v3Model(shellModel({ route: route(location.hash), routes: cards.routes, principal: null })), { onNavigate: href => { if (typeof href === 'string' && href.startsWith('#')) { if (location.hash === href) render(); else location.hash = href; } } }) : null;
 // Compact chrome: #account (toggle showing #who + menu holding sign-out/switch/version/feedback/roadmap) is the ONLY hosted control.
 if (kit) { kit.adoptControls(document, ['account']); document.getElementById('shell-controls')?.remove(); bindAccountMenu(document); }
 const narrow = () => typeof matchMedia === 'function' && matchMedia('(max-width:760px)').matches;
@@ -33,7 +47,7 @@ function syncShell(page = null) {
   // A workspace page has already loaded its workspace: keep it in the same identity-scoped cache workspaceFor() uses (cleared by
   // resetIdentity) so later crumbs can name it without a discovery read. Data only; never a new request.
   if (page?.kind === 'workspace' && page.model?.status === 'loaded' && page.model.workspace?.id) state.workspaces.set(page.model.workspace.id, { id: page.model.workspace.id, name: page.model.workspace.name, role: page.model.workspace.role, projects: (page.model.projects || []).map(x => x.id) });
-  kit.update(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() }));
+  kit.update(v3Model(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() })));
   placeDemoNotice(); // Bugbot 4073693755: the shell repaint preserves only its content/header hosts; the disclosure is restored by the controller
 }
 // Demo disclosure (Bugbot 4073693755): ONE controller-owned node, built once, placed before the content element and re-placed by the
@@ -47,15 +61,20 @@ function placeDemoNotice() {
     else { const banner = document.createElement('section'); banner.id = 'demo-notice'; banner.className = 'panel'; banner.innerHTML = '<strong>Explore the real app · demonstration data</strong><p>These are the same screens used for assessments. Viewer access: nothing is sent or saved. Source-pinned synthetic responses and report; no real people.</p><a class="button" href="/participate/?demo=1">Try the sample survey</a> <a class="button" href="/">Close tour</a>'; const samples = document.createElement('p'); samples.append('Inspect a synthetic response in the real survey review: '); for (const sample of sampleResponses) { const link = document.createElement('a'); link.href = `/participate/?demo=1&survey=${sample.survey}&response=1`; link.textContent = `${sample.name} (${sample.count} responses) · `; samples.append(link); } banner.append(samples); demoNotice = banner; }
   }
   if (!demoNotice.isConnected || demoNotice.nextElementSibling !== app) app.before(demoNotice);
+  placeDemoExit(document); // CAPTAIN P0 12:10: Exit demo + Sign in on every demo screen; logo leaves demo
   // Kit-internal paints (tree expansion, search, context toggle) never call the controller; they rebuild the shell chrome and keep
   // only the content/header hosts. The controller watches its own kit root and re-places the same node the moment it is detached.
-  if (kitRoot && !demoObserver && typeof MutationObserver === 'function') { demoObserver = new MutationObserver(() => { if (demoNotice && !demoNotice.isConnected && app.isConnected) app.before(demoNotice); }); demoObserver.observe(kitRoot, { childList: true, subtree: true }); }
+  if (kitRoot && !demoObserver && typeof MutationObserver === 'function') { demoObserver = new MutationObserver(() => { if (demoNotice && !demoNotice.isConnected && app.isConnected) app.before(demoNotice); if (!document.querySelector?.('header.top .v3-demo-exit')) placeDemoExit(document); }); demoObserver.observe(kitRoot, { childList: true, subtree: true }); }
 }
 let demoObserver = null;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const title = v => v.charAt(0).toUpperCase() + v.slice(1);
-const stageLabel = s => ({ prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' })[s] || esc(s);
+const stageLabel = s => (V3_SHELL && stateWord(s)) || ({ prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' })[s] || esc(s);
+// v3 one primary action per page (lane 1): after any content paint, keep the first primary in the content mount and demote the rest (class only).
+if (V3_SHELL && app && typeof MutationObserver === 'function') { let queued = false; new MutationObserver(() => { if (queued) return; queued = true; queueMicrotask(() => { queued = false; onePrimary(app); }); }).observe(app, { childList: true, subtree: true }); }
 const demo = typeof location !== 'undefined' && isDemo(location.search);
+// P0 12:10: a logo tap in demo always leaves demo, even if a kit repaint raced the header rewrite.
+if (demo && typeof document?.addEventListener === 'function') document.addEventListener('click', e => { const b = e.target?.closest?.('header.top a.brand'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); location.assign(DEMO_EXIT_HREF); }, true);
 let tabStorage = memoryStorage(); if (!demo) { try { tabStorage = sessionStorage; } catch {} }
 let token = null; if (!demo) { try { token = sessionStorage.getItem('facilitatorToken'); } catch {} }
 async function api(url, { method = 'GET', body } = {}) {
@@ -125,15 +144,17 @@ export function groupByLens({ surveys = [], templates = [] }) {
 export function route(hash) {
   const parts = hash.replace(/^#/, '').split('/').map(p => { try { return decodeURIComponent(p); } catch { return ''; } });
   // One page per scope: entry → workspaces → ONE workspace → ONE project → ONE assessment (five views) → survey.
+  if ((parts[0] === 'new' || (!parts[0] && parts[1] === 'new')) && !parts[2]) return { kind: 'new' };
   if (!parts[0]) return { kind: 'entry' };
-  if (['how', 'example', 'signin', 'survey'].includes(parts[0]) && !parts[1]) return { kind: 'entry', intent: parts[0] };
+  if (['how', 'example', 'signin', 'survey', 'about'].includes(parts[0]) && !parts[1]) return { kind: 'entry', intent: parts[0] };
   if (parts[0] === 'feedback' && !parts[1]) return { kind: 'feedback' };
   if (parts[0] === 'workspaces') return { kind: 'workspaces' };
   if (parts[0] === 'workspace' && parts[1]) return { kind: 'workspace', id: parts[1] };
   if (parts[0] === 'projects') return { kind: 'projects' };
   if (parts[0] === 'project' && parts[1]) return { kind: 'project', id: parts[1] };
   if (parts[0] === 'permissions' && ['workspaces', 'projects', 'assessments'].includes(parts[1]) && parts[2]) return { kind: 'permissions', scope: parts[1], id: parts[2] };
-  if (parts[0] !== 'assessment' || !parts[1]) return { kind: 'projects' };
+  // Ruling 12:53: an unknown hash falls back to the public home, never to a page that shows sign-in.
+  if (parts[0] !== 'assessment' || !parts[1]) return { kind: 'entry' };
   // Auditor 2A-4: the survey child route is explicit; anything else after the assessment id is ignored (no silent fall-through elsewhere).
   if (parts[2] === 'survey' && parts[3]) return { kind: 'survey', id: parts[1], sid: parts[3] };
   // A view segment selects a tab; an unknown segment falls back to the stage view (never to a different assessment).
@@ -205,26 +226,43 @@ function countCell(s) {
   if (c.status === 'unauthenticated') return `<span data-count="${esc(s.id)}" role="alert">sign-in no longer active · ${SIGNIN} or <a href="#" data-retry-count="${esc(s.id)}">Retry</a></span>`;
   return `<span data-count="${esc(s.id)}" class="muted">counting…</span>`;
 }
+// v3 L10-2 (prototype frame 7 `.total`): one inline line — big metric, "responses", then how many included surveys were
+// counted. No denominator (ruling a: none entered here); "not yet confirmed" only if the server ever sends it (ruling b; it does not yet).
 function totalTile(current) {
   const act = activeSurveys(current); const loaded = act.filter(s => countFor(s.id).status === 'loaded');
   const total = loaded.reduce((n, s) => n + countFor(s.id).responses, 0); const partial = loaded.length !== act.length;
-  return `<div data-total><p class="count" style="margin:0">${total}</p><p class="muted" style="margin:4px 0 0">responses across ${loaded.length} of ${act.length} included survey${act.length === 1 ? '' : 's'} counted${partial ? ' <strong>(partial)</strong>' : ''}</p><p class="small muted" style="margin:4px 0 0">Responses only. Respondents are counted per survey and are never added up as people.</p></div>`;
+  return `<div data-total data-collect-total style="margin:6px 0 4px"><div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><span class="count" style="margin:0;font-size:31px;font-weight:600;line-height:1">${total}</span><span>response${total === 1 ? '' : 's'}</span><span class="muted">across ${loaded.length} of ${act.length} included survey${act.length === 1 ? '' : 's'}</span>${partial ? '<span class="badge" title="Not every survey count has loaded yet">partial</span>' : ''}</div><p class="small muted" style="margin:6px 0 0">Responses only. Respondents are counted per survey and are never added up as people.</p></div>`;
 }
 function paintCounts(current) {
   for (const s of activeSurveys(current)) { const el = app.querySelector(`[data-count="${CSS.escape(s.id)}"]`); if (el) el.outerHTML = countCell(s); }
   const t = app.querySelector('[data-total]'); if (t) t.outerHTML = totalTile(current);
   for (const s of activeSurveys(current)) { const tile = app.querySelector(`[data-tile="${CSS.escape(s.id)}"]`); if (tile) tile.outerHTML = asideTile(s); }
+  for (const s of activeSurveys(current)) { const w = app.querySelector(`[data-collect-wrap="${CSS.escape(s.id)}"]`); if (w) w.innerHTML = collectCount(s); }
   bindCounts(current);
 }
 function bindCounts(current) {
   app.querySelectorAll('[data-retry-count]').forEach(el => el.onclick = e => { e.preventDefault(); loadCounts(state.current, { retry: el.dataset.retryCount }); paintCounts(state.current); });
   app.querySelectorAll('[data-refresh]').forEach(el => el.onclick = e => { e.preventDefault(); render(); });
 }
+// v3 L1-5 (NEED 3→1, Bincy 07): per-survey counts on Collect read through lane 3's v3CountLine (ruling a/b): "n responded"
+// (never a denominator the facilitator did not enter; the server sends none here) + respondents. Same data-count hook so
+// paintCounts repaints it via data-collect-wrap; non-loaded states keep countCell's retry/refresh wording.
+function collectCount(s) {
+  const c = countFor(s.id);
+  if (c.status !== 'loaded') return countCell(s);
+  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}${collectState(c.collection_status || s.collection_status)}</span>`;
+}
+// v3 L10-1 (prototype frame 7 rrow): each Collect row ends with its plain state word, open / closed (PARITY C6), from the server's collection_status only.
+function collectState(status) {
+  if (!status) return '';
+  const word = ({ open: 'open', closed: 'closed' })[status] || String(status);
+  return ` <span aria-hidden="true">·</span> <span class="state" data-collect-state>${esc(word)}</span>`;
+}
 function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'Other perspective'; }
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
-  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted">collection ${esc(s.collection_status)} · ${countCell(s)}</p></div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
-  return `<section class="panel"><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey for its own screen: counts and a printable blank questionnaire. Changing the stage, invitations, links, reports and notes are not on this screen yet.</p></section>`;
+  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p></div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
+  return `<section class="panel"><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey to share its link or print a blank questionnaire.</p></section>`;
 }
 // Cut 2A child screen: ONE survey. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
@@ -285,12 +323,17 @@ function context(current) {
   const direct = current && !state.projects.some(p => p.id === current.assessment.project_id) ? `<div class="context-project"><span class="project-name">Granted to you</span><a class="assessment-link" href="#assessment/${encodeURIComponent(current.assessment.id)}" aria-current="page">${esc(current.assessment.name)}<small>${stageLabel(current.assessment.stage)} · ${esc(current.assessment.role)}</small></a><p class="small muted" style="margin:4px 0 0 18px">You hold this assessment directly; its project is not listed because you have no role on it.</p></div>` : '';
   // Notion-style context: the scope chain above (Workspaces › Projects › this project), siblings at this level below.
   const proj = current && state.projects.find(p => p.id === current.assessment.project_id);
-  const chain = `<nav class="crumbs" aria-label="Scope"><a href="${cards.routes.workspaces}">Workspaces</a><span>›</span><a href="${cards.routes.projects}">Projects</a>${proj ? `<span>›</span><a href="${cards.routes.project(proj.id)}">${esc(proj.name)}</a>` : ''}</nav>`;
+  const chain = breadcrumbs(crumbScope(ws, proj, current?.assessment), { label: 'Scope' });
+  // NEED 9→1 / ruling 12:22 (1): with a workspace in scope the sidebar is the shared Sidebar tree (component: Sidebar tree),
+  // fed the SAME scope as the crumb row so the two never disagree; no workspace → the project-only fallback above stays.
+  const tree = ws ? sidebarTree([{ id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id), projects: listed.map(p => { const l = listFor(p.id); return { id: p.id, name: p.name, href: cards.routes.project(p.id), assessments: l.status === 'loaded' ? l.list.map(x => ({ id: x.id, name: x.name, href: cards.routes.assessment(x.id) })) : [] }; }) }], crumbScope(ws, proj, current?.assessment), { label: 'Project and assessment navigation' }) : '';
+  const curList = curProj ? listFor(curProj.id) : null;
+  const treeNote = !curList || curList.status === 'loaded' ? '' : curList.status === 'refused' ? '<p class="small muted">Not listed: you have no role on this project.</p>' : curList.status === 'failed' ? `<p class="small muted" role="alert">Could not load assessments. <a href="#" data-retry-list="${esc(curProj.id)}">Retry</a></p>` : curList.status === 'unauthenticated' ? `<p class="small muted" role="alert">Your sign-in is no longer active. ${SIGNIN} or <a href="#" data-retry-list="${esc(curProj.id)}">Retry</a></p>` : '<p class="small muted">Loading…</p>';
   const wsHead = ws ? `<a class="project-name" href="${cards.routes.workspace(ws.id)}" style="padding-left:0">${esc(ws.name)}</a>` : '';
   const narrowOpen = typeof matchMedia === 'function' && matchMedia('(max-width:650px)').matches ? '' : 'open';
   const where = [ws?.name, proj?.name, current?.assessment.name].filter(Boolean).map(esc).join(' › ') || 'Workspaces';
   // ≤650px: the whole context collapses into one disclosure (summary = where you are); wider: summary hidden, always open. Links unchanged.
-  return `<aside class="context-panel"><details class="context-disclosure" ${narrowOpen}><summary><span class="eyebrow" style="margin:0">Context</span><span class="small">${where}</span></summary>${chain}${wsHead}<p class="eyebrow">${ws ? 'Projects in this workspace' : 'Projects'}</p><nav aria-label="Project and assessment navigation">${direct}${projects || (direct ? '' : '<p class="small muted">No project on this account.</p>')}</nav><div class="line links">${state.projects.length ? `<a href="${cards.routes.projects}">All projects</a>` : ''}<a href="${cards.routes.workspaces}">Workspaces</a></div></details></aside><section class="assessment-body">`;
+  return `<aside class="context-panel"><details class="context-disclosure" ${narrowOpen}><summary><span class="eyebrow" style="margin:0">Context</span><span class="small">${where}</span></summary>${chain}${wsHead}<p class="eyebrow">${ws ? 'Projects in this workspace' : 'Projects'}</p>${tree ? `${tree}${treeNote}` : `<nav aria-label="Project and assessment navigation">${direct}${projects || (direct ? '' : '<p class="small muted">No project on this account.</p>')}</nav>`}<div class="line links">${state.projects.length ? `<a href="${cards.routes.projects}">All projects</a>` : ''}<a href="${cards.routes.workspaces}">Workspaces</a></div></details></aside><section class="assessment-body">`;
 }
 // AMEND 2 (Auditor c5719472446): stage change is not wired, so the phase strip is a non-interactive indicator — no links, no buttons.
 function stages(a) { return `<div class="tabs" role="list" aria-label="Assessment stages">${PHASES.map(p => `<span role="listitem" ${p === a.stage ? 'aria-current="step"' : ''}>${title(p)}</span>`).join('')}</div>`; }
@@ -304,7 +347,7 @@ function lensRows(current) {
   }).join('');
 }
 // View tabs (showcase `tabs()`): links between the five views of ONE assessment. Selecting a tab never calls set_stage.
-function viewTabs(a, current) { const vs = (a.role === 'owner' || a.role === 'member') ? VIEWS : VIEWS.filter(v => v !== 'permissions'); return `<nav class="tabs view-tabs" aria-label="Assessment views">${vs.map(v => `<a href="${cards.routes.assessment(a.id, v)}" ${v === current ? 'aria-current="page"' : ''}>${title(v)}</a>`).join('')}</nav>`; }
+function viewTabs(a, current) { ensureStepperStyle(globalThis.document); const perm = (a.role === 'owner' || a.role === 'member') ? `<nav class="tabs view-tabs" aria-label="Assessment settings"><a href="${cards.routes.assessment(a.id, 'permissions')}" ${current === 'permissions' ? 'aria-current="page"' : ''}>Permissions</a></nav>` : ''; return v3StageStepper(a.stage, v => cards.routes.assessment(a.id, v)) + perm; } // ruling 12:28: stage tabs → shared Stepper (component: Stepper); permissions stays a separate link (lane 11 owns its placement)
 // Prepare view (showcase `prepareView()`): name + purpose, saved through cap.assessment.update (O/M); viewers read.
 function prepareView(current) {
   const a = current.assessment, mayEdit = a.role === 'owner' || a.role === 'member';
@@ -320,8 +363,10 @@ function screen(current, view = null) {
   const tab = view || (VIEWS.includes(a.stage) ? a.stage : 'prepare');
   const roleLine = `${esc(project?.name || a.project_id)} · your role: ${esc(a.role)}${a.role === 'viewer' ? ' — you can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions' : ''}`;
   // Under the kit shell the eyebrow/h1 are the shell's (one heading); only the unique role line and stage badge remain here.
-  const head = kit ? `<div class="title assessment-head"><p class="muted" style="margin:0">${roleLine}</p><span class="badge">${stageLabel(a.stage)}</span></div>${viewTabs(a, tab)}`
-    : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${roleLine}</p></div><span class="badge">${stageLabel(a.stage)}</span></div>${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
+  // v3 (NEED 3→1): one state-driven primary in the headrow; viewers get none for setup/collect (lane 3 module decides).
+  const primary = V3_SHELL ? v3StagePrimary(a.stage, a.role === 'owner' || a.role === 'member', v => `#assessment/${encodeURIComponent(a.id)}/${v}`, esc) : '';
+  const head = kit ? `<div class="title assessment-head"><p class="muted" style="margin:0">${roleLine}</p><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${viewTabs(a, tab)}`
+    : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${roleLine}</p></div><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
   if (tab === 'prepare') return head + prepareView(current);
   if (tab !== 'collect') return head + `<div id="view-root" data-view="${tab}"><p class="muted">Loading…</p></div>`;
   return head + collectScreen(current);
@@ -397,6 +442,7 @@ async function fetchAssessment(aid) {
 }
 async function render() {
   const gen = ++generation, r = route(location.hash);
+  if (wizardHandle) { try { wizardHandle.destroy(); } catch {} wizardHandle = null; }
   currentShareRoute();
   // K3a root lifecycle (kit only): the shell reflects the new route from data already held, and the previous view is destroyed
   // BEFORE any load for the new route; a loading line stands in until the page's own render. Same-entity repaints (dirty refresh,
@@ -420,11 +466,25 @@ async function render() {
     // Scope pages (workspace, project, permissions) carry the same context sidebar as the assessment page; entry and the
     // top-level lists stand alone (showcase SOURCE-MAP: the panel is absent from public routes).
     // K3a: workspace/project read surfaces are kit-presented (tree in the shell); the legacy context sidebar remains only for permissions.
+    if (r.kind === 'new') { await mountNew(gen); return; }
     const sidebar = state.principal && (kit ? ['permissions'] : ['workspace', 'project', 'permissions']).includes(r.kind);
     app.className = sidebar ? 'workspace-layout' : '';
     if (sidebar) { syncShell(); app.innerHTML = context(null) + '<div id="page-root"><p class="muted">Loading…</p></div></section>'; bind(null); await runPage(pageFor(r), r, gen, app.querySelector('#page-root')); }
     else await runPage(pageFor(r), r, gen);
+    if (gen === generation && (r.kind === 'projects' || r.kind === 'workspaces') && state.principal && !app.querySelector('[data-v3-start]')) app.insertAdjacentHTML('afterbegin', startReview());
   }
+}
+async function mountNew(gen) {
+  syncShell(); app.className = '';
+  // Bugbot 4094071987: same gate as every signed-in page — no session, no wizard.
+  if (!state.principal) { app.innerHTML = `<div class="narrow panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">Starting a review needs a facilitator session.</p><div class="actions"><a class="rv-btn primary" href="/v2/auth/access">Sign in with email code</a></div></div>`; return; }
+  if (!document.querySelector(`link[href="${WIZARD_CSS}"]`)) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = WIZARD_CSS; document.head.appendChild(l); }
+  let mod = null; try { mod = await import(WIZARD_JS); } catch { mod = null; }
+  if (gen !== generation) return;
+  if (!mod?.mountWizard) { app.innerHTML = `<div class="narrow panel"><h1>Start a review</h1><p class="muted">The guided setup is not available on this build yet.</p><div class="actions"><a class="rv-btn primary" href="${cards.routes.projects}">Go to your projects</a></div></div>`; return; }
+  const ctx = ctxFor();
+  wizardHandle = mod.mountWizard(app, { api: ctx.api, go: ctx.go, origin: location.origin, assessmentHref: id => `#assessment/${encodeURIComponent(id)}` });
+  document.title = 'Start a review · 3D Review';
 }
 // Account identity remains transient and belongs to this exact app identity.
 let accountBusy = false;

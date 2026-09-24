@@ -1,0 +1,15 @@
+# Superseding authority correction — do not infer approval from README
+
+This corrects the approval wording in REFERENCE-70-CANONICAL-TARGETS.md / REFERENCE-70-GAP-MATRIX.md at kitchen a71b656fcd362b46bb8ba383c21e17ebeaa1a199. Source descriptions and file comparisons remain evidence; blanket approval claims do not.
+
+Fresh Git API read of klappy/3d-review-cookbook PR24 reports merged:false. Its README conditions source-of-truth status on merge. PR comments5706935196 and5706938796 explicitly require changes and narrow visual-reference authority under Steve's source, API/requirements and captain rulings. Auditor comment5707723330 reports needs-fix at its inspected head, not full acceptance. These are historical exact-head reviews; they do not independently establish latest-head approval or prove all earlier findings still open.
+
+The README documents cookbook-versus-Generative-Glass precedence, palette/radius/focus differences and candidate extensions. This worker has NOT verified separate captain approval receipts for each such difference. The earlier audit's labels 'approved reusable system', 'approved focus-ring/radius differences' and blanket cookbook precedence were therefore too strong. Read them as DOCUMENTED REFERENCE CHOICES / APPROVAL UNVERIFIED pending exact decision provenance. PR presence, source pin, normal branch publication, generated artifact or README assertion are not visual acceptance.
+
+Confirmed current user directions remain: four homepage actions Read about it / Take a tour / Take a survey / Sign in; multiple surveys WITHIN EACH of three lenses with individual Open; live app should look and feel like the user-selected hosted design and showcase flows while preserving expressly approved differences. Do not convert three source packages into three interchangeable targets or introduce a new design system.
+
+Recommended unified target: use the user-selected hosted visual/behavior reference and showcase composition/flow as the visible target. Use pinned cookbook artifacts as implementation/source lineage, not independent authority to override that target. Preserve only differences with an actual user/owner decision receipt; label the remainder unresolved. Current security, source catalog, actual questionnaire content and report rules remain constraints regardless of mock appearance.
+
+One unresolved decision for root/user only if source tracing cannot settle it: which concrete cookbook-only value/interaction differences, if any, should remain when they visibly disagree with the chosen hosted target? Present actual matched screens and exact alternatives before asking; do not ask the user to approve an abstract third system. No implementation is authorized by this correction and active Design fixes continue.
+
+Workspace-child fix at70 remains PENDING AMEND for Bugbot4038374305; matched current-live rendered parity remains a separate observation, not proven by these source receipts. No private transcript material or raw meeting quotations included.

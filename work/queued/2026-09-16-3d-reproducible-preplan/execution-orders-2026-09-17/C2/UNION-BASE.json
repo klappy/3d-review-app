@@ -1,0 +1,421 @@
+{
+  "status": "LOCAL_UNION_VERIFIED_NOT_IMPLEMENTATION_FIRE",
+  "observedAtUTC": "2026-09-17T07:37:36.837932+00:00",
+  "checkout": "/tmp/3d-c2a-integration-author",
+  "branch": "report/c2a-store-renderer-20260917",
+  "commit": "1c2423d2a55526cf8cec19d50a21848cf55a9cec",
+  "tree": "27786b7f9d881fba55b4db371538f5820ecf4dda",
+  "parents": [
+    "dc9e6dc4a61056048f86c0ae898a775ca64b471a"
+  ],
+  "operation": "cherry-pick exact accepted C1 onto exact accepted B2, no other edits",
+  "appliedSourceCommit": "3d8dce056154d7c860344c1e7a3d8175f6680381",
+  "trackedPathCount": 164,
+  "clean": true,
+  "fullTreeEqualsB2PlusExactNineC1Paths": true,
+  "ingredientChecks": {
+    "A": {
+      "commit": "3523f20ae5807a0f1d4a047352b62c3aa6d2dd82",
+      "parent": "a57ba930ced3c23616982c7dab291949b75a3b8a",
+      "paths": [
+        {
+          "path": "docs/report-attestation.md",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "96e2549487e9d49b142c53d63b1747ecf21d2216"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "96e2549487e9d49b142c53d63b1747ecf21d2216"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/report-attestation.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "6a70fbcdde4d7ba23f38e9e10ac61ca2206fa765"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "6a70fbcdde4d7ba23f38e9e10ac61ca2206fa765"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/report-canonical-json.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "4df364e2374a1856b3b6ce69bb39f8f784c11d5e"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "4df364e2374a1856b3b6ce69bb39f8f784c11d5e"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/synthetic-attestation-index.json",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2c02be430f9b9a2d6584592ede8aa6da0c172593"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "2c02be430f9b9a2d6584592ede8aa6da0c172593"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/synthetic-attestation-trust.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "5c5a620fa603d1878cd1b8a27c0c1e2923267637"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "5c5a620fa603d1878cd1b8a27c0c1e2923267637"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "test/fixtures/report-canonical-v1.json",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "dbce95c6d98eb1054e2760fb35b15a9d8c03a843"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "dbce95c6d98eb1054e2760fb35b15a9d8c03a843"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "test/report-attestation.test.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "65cb5fcfe79d05517454865629760e60ed18466c"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "65cb5fcfe79d05517454865629760e60ed18466c"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "test/report-canonical-json.test.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "fca4ff336a0037b9def0d764b10877bfb0ab2824"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "fca4ff336a0037b9def0d764b10877bfb0ab2824"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "tools/build-synthetic-attestation.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "33424ae9ec81e7ab721e87a8034f21d2b70a8bfd"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "33424ae9ec81e7ab721e87a8034f21d2b70a8bfd"
+          },
+          "exactMatch": true
+        }
+      ]
+    },
+    "B1": {
+      "commit": "ceeba19635421a70e84903b17fd4e1494eb9b5f7",
+      "parent": "3523f20ae5807a0f1d4a047352b62c3aa6d2dd82",
+      "paths": [
+        {
+          "path": "docs/synthetic-report-boundary.md",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "bd437e1234302fff51d1b0917e9b34f595b07235"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "b534adc924c9d2e9507233b1a29b387e33bd2ad5"
+          },
+          "exactMatch": false,
+          "authorizedSupersession": "B2 accepted blob replaces B1 blob; B1 byte identity is not asserted for this path"
+        },
+        {
+          "path": "src/report-capture.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "4531fe3fe281da4cdef5d78092f32464bdccb37f"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ec922effa9b8d5c667eed3c1cb31be774fdf7194"
+          },
+          "exactMatch": false,
+          "authorizedSupersession": "B2 accepted blob replaces B1 blob; B1 byte identity is not asserted for this path"
+        },
+        {
+          "path": "test/synthetic-report-boundary.test.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "af643c5379791cd5cd87ad5d66920413ff682acb"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "af643c5379791cd5cd87ad5d66920413ff682acb"
+          },
+          "exactMatch": true
+        }
+      ]
+    },
+    "B2": {
+      "commit": "dc9e6dc4a61056048f86c0ae898a775ca64b471a",
+      "parent": "ceeba19635421a70e84903b17fd4e1494eb9b5f7",
+      "paths": [
+        {
+          "path": "docs/synthetic-report-boundary.md",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "b534adc924c9d2e9507233b1a29b387e33bd2ad5"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "b534adc924c9d2e9507233b1a29b387e33bd2ad5"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "migrations/0008_synthetic_report.sql",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "677c208eb465cd32f64b386cb7efb582472f7733"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "677c208eb465cd32f64b386cb7efb582472f7733"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/report-capture.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ec922effa9b8d5c667eed3c1cb31be774fdf7194"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ec922effa9b8d5c667eed3c1cb31be774fdf7194"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/synthetic-report-store.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "39ac18ee6faef51bb7658c7d4324a7296532aff5"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "39ac18ee6faef51bb7658c7d4324a7296532aff5"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "test/synthetic-report-materialization.test.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "d3f426cafd3732e228798166e1a35f25e966af77"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "d3f426cafd3732e228798166e1a35f25e966af77"
+          },
+          "exactMatch": true
+        }
+      ]
+    },
+    "C1": {
+      "commit": "3d8dce056154d7c860344c1e7a3d8175f6680381",
+      "parent": "3523f20ae5807a0f1d4a047352b62c3aa6d2dd82",
+      "paths": [
+        {
+          "path": "docs/synthetic-report-renderer.md",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "98df5412681f83198f10e60a8a02a0f351d59476"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "98df5412681f83198f10e60a8a02a0f351d59476"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/pinned-report-labels.json",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "e1f42c4670ac5f06dfb4e1d448f846280dc46f63"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "e1f42c4670ac5f06dfb4e1d448f846280dc46f63"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/pinned-report-model.json",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "bcaea794cd07159051bd1fd714d0080bffde46b5"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "bcaea794cd07159051bd1fd714d0080bffde46b5"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/reference-narrative.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "5b4b6c99fff9df6142b9194beaf889ee5b1c1db1"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "5b4b6c99fff9df6142b9194beaf889ee5b1c1db1"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/reference-rollup.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "803bdac90160f571a681de3f4186e6c195d06b6f"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "803bdac90160f571a681de3f4186e6c195d06b6f"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/source-item-score.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "3d2b5baf939e577dd2b8ebaee5c4efd601c285bd"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "3d2b5baf939e577dd2b8ebaee5c4efd601c285bd"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "src/synthetic-report-renderer.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ebafdb155db4b8367130cb504bf17fd88193d844"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ebafdb155db4b8367130cb504bf17fd88193d844"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "test/fixtures/synthetic-report-renderer-v1.json",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ef888706d6c59885e57a94fe9f2127b5dd88838b"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "ef888706d6c59885e57a94fe9f2127b5dd88838b"
+          },
+          "exactMatch": true
+        },
+        {
+          "path": "test/synthetic-report-renderer.test.ts",
+          "accepted": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "598d034a21fef868cfc8786880043523d87b9d60"
+          },
+          "union": {
+            "mode": "100644",
+            "type": "blob",
+            "blob": "598d034a21fef868cfc8786880043523d87b9d60"
+          },
+          "exactMatch": true
+        }
+      ]
+    }
+  },
+  "proposedC2aCustody": {
+    "author": "/root/queue_resolution/a8_inert_author",
+    "checkout": "/tmp/3d-c2a-integration-author",
+    "branch": "report/c2a-store-renderer-20260917",
+    "editablePaths": [
+      "src/synthetic-report-store.ts",
+      "test/synthetic-report-materialization.test.ts",
+      "test/synthetic-report-integration.test.ts",
+      "docs/synthetic-report-boundary.md"
+    ]
+  },
+  "remotePush": false,
+  "implementationStarted": false
+}

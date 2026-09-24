@@ -125,7 +125,8 @@ test('A7 improve viewer: read-only notes, no save control, visibility line; text
   assert.match(html, /data-notes-reflection>r&lt;1&gt;</); assert.match(html, /data-notes-next-steps>n&amp;2</);
   assert.ok(html.includes(NOTES_VISIBILITY));
   assert.doesNotMatch(html, /undo/i);
-  assert.ok(html.includes(esc(RECOMMENDATIONS_NOT_BUILT)));
+  assert.ok(!html.includes(esc(RECOMMENDATIONS_NOT_BUILT))); // v3 L3-4: aside not drawn (PARITY I1)
+  assert.match(html, /What happens next\?/); assert.match(html, /<h3>What you noticed<\/h3>/);
   assert.ok(!(await views.improve.load(ctx, { aid: 'a1' })).editable);
 });
 
@@ -143,6 +144,18 @@ test('A8 improve owner/member: one Save → PATCH /v2/assessments/{aid}/notes wi
   assert.deepEqual(calls[0], { url: '/v2/assessments/a1/notes', method: 'PATCH', body: { notes_reflection: 'new r', notes_next_steps: 'new n' } });
   assert.equal(disabledDuring, true); assert.equal(btn.disabled, false);
   assert.equal(status.textContent, 'Notes saved.'); assert.equal(refreshed, 1); assert.equal(m.notes_reflection, 'new r');
+});
+
+test('A8c v3 next step (frame 11): one "Save notes" in any stage, never a stage write from this page', async () => {
+  const { api, calls } = fakeApi({ 'PATCH /v2/assessments/a1/notes': ({ body }) => ({ assessment: { ...assessment, ...body } }) });
+  const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'member', stage: 'understand' }, surveys }, refresh: async () => {} });
+  const m = await views.improve.load(ctx, { aid: 'a1' }); const html = views.improve.render(ctx, m);
+  assert.match(html, /data-v3-next/); assert.match(html, /data-save-notes>Save notes</); assert.doesNotMatch(html, /Recommendations|finish/i);
+  assert.match(html, /What you noticed/); assert.match(html, /The next step/);
+  const form = el({ 'data-notes-form': '' }), btn = el({ tag: 'button', 'data-save-notes': '' }), status = el({ 'data-notes-status': '' });
+  makeRoot([form, btn, status, el({ name: 'notes_reflection', value: 'r' }), el({ name: 'notes_next_steps', value: 'n' })]); views.improve.bind(ctx, root, m);
+  await form.onsubmit({ preventDefault() {} });
+  assert.deepEqual(calls.map(c => `${c.method} ${c.url}`), ['PATCH /v2/assessments/a1/notes']); assert.equal(status.textContent, 'Notes saved.');
 });
 
 test('A8b save failure: no success claim, refusal wording', async () => {
@@ -190,4 +203,30 @@ test('report list shows a human title/date with the raw id inside <details>, not
   const btn = html.match(/<button type="button" data-open-report="[^"]+">([^<]+)<\/button>/)[1];
   assert.match(btn, /^Report 1 · built /); assert.doesNotMatch(btn, /sreport_|T22:15/);
   assert.match(html, /<details class="small muted report-ids"><summary>Report id<\/summary><code>sreport_928bb601-f318-4cca-b48c-e4683371c6c8<\/code>/);
+});
+
+test('v3 U4 gate in Understand: checkbox arms Record my review; click posts set_stage understand then reloads', async () => {
+  const collecting = { ...assessment, stage: 'collect' };
+  const table = { ...understandTable, 'POST /v2/assessments/a1/stage': { assessment: { ...collecting, stage: 'understand' } } };
+  const { api, calls } = fakeApi(table); const gone = [];
+  const dirty = new Map();
+  const ctx = ctxFor(api, { current: { assessment: collecting, surveys }, state: { principal: { id: 'me' }, dirty }, go: (to, o) => gone.push([to, o]) });
+  const m = await views.understand.load(ctx, { aid: 'a1' }); const html = views.understand.render(ctx, m);
+  assert.match(html, /data-v3-gate-go="recordReview" disabled>Record my review/);
+  const btn = el({ 'data-v3-gate-go': 'recordReview', tag: 'button' }); btn.disabled = true;
+  const chk = el({ 'data-v3-review-check': '' }); const status = el({ 'data-v3-gate-status': '' });
+  const r = makeRoot([btn, chk, status]); views.understand.bind(ctx, r, m);
+  await btn.onclick(); assert.equal(calls.filter(c => c.method === 'POST').length, 0, 'unchecked: no write');
+  chk.checked = true; chk.onchange(); assert.equal(btn.disabled, false);
+  await btn.onclick();
+  const posts = calls.filter(c => c.method === 'POST'); assert.equal(posts.length, 1);
+  assert.equal(posts[0].url, '/v2/assessments/a1/stage'); assert.deepEqual(posts[0].body, { stage: 'understand' });
+  assert.equal(gone.at(-1)[0], '#assessment/a1/understand'); assert.equal(status.textContent, 'Review recorded.');
+  assert.equal(dirty.get('a1'), 'write', 'committed stage marks the assessment dirty so the shell refetches it (Bugbot 4093922740)');
+});
+test('v3 U4 gate: viewers see the state only, no write control', async () => {
+  const { api } = fakeApi(understandTable);
+  const ctx = ctxFor(api, { current: { assessment: { ...assessment, stage: 'collect', role: 'viewer' }, surveys } });
+  const m = await views.understand.load(ctx, { aid: 'a1' });
+  assert.doesNotMatch(views.understand.render(ctx, m), /data-v3-gate-go/);
 });

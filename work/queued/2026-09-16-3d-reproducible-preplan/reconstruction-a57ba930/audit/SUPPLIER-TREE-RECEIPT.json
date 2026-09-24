@@ -1,0 +1,52 @@
+{
+  "commit": "f042cde553761a6a7f24132cef7802f956378ee0",
+  "tree_sha": "f042cde553761a6a7f24132cef7802f956378ee0",
+  "truncated": false,
+  "matched": [
+    {
+      "path": "rubric_csv/CrossLens.csv",
+      "blob": "042fccd67cf114c4e09444eb88984ab4601c423f"
+    },
+    {
+      "path": "rubric_csv/EvidenceQuality.csv",
+      "blob": "b7852e782b53cca4110848268319408df6f9fb28"
+    },
+    {
+      "path": "rubric_csv/Items.csv",
+      "blob": "7e9f387d2d35f58ba3fa22a48e2f8fd0d282ba91"
+    },
+    {
+      "path": "rubric_csv/Options.csv",
+      "blob": "1a38ad1906d112471d2d529a75a2c7adbd47ee4a"
+    },
+    {
+      "path": "rubric_csv/README.csv",
+      "blob": "db5c924aac0b790bb6f801adc4ae0bb76a52ff9d"
+    },
+    {
+      "path": "rubric_csv/SubDimensions.csv",
+      "blob": "83a135f5e3148713d97fc812eba656cd34a43926"
+    },
+    {
+      "path": "rubric_csv/Vocab_Maturity.csv",
+      "blob": "462d3da1c2391fcb42962169db4b4e68b92a378f"
+    },
+    {
+      "path": "rubric_csv/Vocab_Methodology.csv",
+      "blob": "7f0cf8db6b79e25fb9766215fb35fd4df1496428"
+    },
+    {
+      "path": "rubric_csv/Vocab_Organization.csv",
+      "blob": "0e4fd74b3957a4fe94308253023a0e159059c88a"
+    },
+    {
+      "path": "rubric_csv/Vocab_Region.csv",
+      "blob": "28db245fb7d18a3e0272b1d7ea7ee1a8a24ba82b"
+    },
+    {
+      "path": "scoring_rubric_draft.md",
+      "blob": "6f2d32265c8931ce8b0876f5bee5c5597e86044f"
+    }
+  ],
+  "synthetic_runner_blob": "825d66030913f45ceb122175e840a23b531d06b5"
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "repo": "3d-review-cookbook",
+    "pr": 33,
+    "head": "3c8bfe1f3e5fde8fb7cfe8b9242f45934ceeaa57",
+    "merge": "627691f2a41e01bf42a2780f9e22e32c09216335",
+    "disposition": 5708354246,
+    "paths": [
+      "planning/2026-09-16-parity-build/04-ACCEPTANCE-EVIDENCE.md"
+    ]
+  },
+  {
+    "repo": "3d-review-app",
+    "pr": 21,
+    "head": "758caeffcf8e4a273d7565cbb3369d6c1b2a43e4",
+    "merge": "cc88f369e3f125cf7cd6c3fdfc0855d5b263fefd",
+    "disposition": 5708355620,
+    "paths": [
+      "docs/phase-a-coverage.md",
+      "test/phase-a-acceptance.test.ts"
+    ]
+  }
+]

@@ -5,7 +5,8 @@
 // literal; synthetic-only preview/confirmed build; recommendations are "not built" statically; RESERVED_NOT_BUILT/501 never hits
 // the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
-import { renderReport } from '../report-view.js'; // relative: resolves at /report-view.js in the browser and under node --test
+import { renderReport } from '../report-view.js';
+import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -74,15 +75,20 @@ const understand = {
       settle(ctx.api(`/v2/assessments/${ctx.enc(aid)}/reports`)),
     ]);
     const countMap = new Map();
-    for (const [sid, r] of counts) countMap.set(sid, r.status === 'loaded' ? { status: 'loaded', responses: Number(r.value?.counts?.responses ?? 0), respondents: Number(r.value?.counts?.respondents ?? 0) } : r);
-    return { aid, role: cur?.assessment?.role, surveys, counts: countMap, results, reports, openReport: null };
+    for (const [sid, r] of counts) countMap.set(sid, r.status === 'loaded' ? { status: 'loaded', responses: Number(r.value?.counts?.responses ?? 0), respondents: Number(r.value?.counts?.respondents ?? 0), unconfirmed: r.value?.counts?.unconfirmed, expected: r.value?.expected_count ?? r.value?.survey?.expected_count } : r);
+    // Ruling 12:22 band input: the newest built report's per-perspective scores (read-only; a failed read leaves bands held).
+    let bandScores = null;
+    const built = reports.status === 'loaded' && !reports.value?.suppressed && reports.value?.status !== 'held' && Array.isArray(reports.value?.reports) ? reports.value.reports : [];
+    const newest = built.filter(x => x && x.id).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
+    if (newest) { const rr = await settle(ctx.api(`/v2/reports/${ctx.enc(newest.id)}`)); if (rr.status === 'loaded' && !rr.value?.suppressed) { const sc = v3ReportScores(rr.value?.report); if (Object.keys(sc).length) bandScores = sc; } }
+    return { aid, role: cur?.assessment?.role, surveys, counts: countMap, results, reports, bandScores, openReport: null };
   },
   render(ctx, m) {
     const esc = ctx.esc;
     // (1) Counts per lens: each survey row shows its OWN responses/respondents; the lens line sums responses only (A1/A2).
     const groups = [...LENSES, OTHER].map(lens => ({ lens, surveys: m.surveys.filter(s => lensFor(s) === lens) })).filter(g => g.lens !== OTHER || g.surveys.length);
     const countCell = s => { const c = m.counts.get(s.id) || { status: 'failed' };
-      if (c.status === 'loaded') return `<span data-count="${esc(s.id)}">${c.responses} response${c.responses === 1 ? '' : 's'} · ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}</span>`;
+      if (c.status === 'loaded') return `<span data-count="${esc(s.id)}">${c.responses} response${c.responses === 1 ? '' : 's'} · ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}</span><br><span data-v3-count="${esc(s.id)}">${v3CountLine({ responses: c.responses, expected: c.expected ?? s.expected_count, unconfirmed: c.unconfirmed }, esc)}</span>`;
       if (c.status === 'refused') return `<span data-count="${esc(s.id)}" role="alert">no longer available to you here</span>`;
       if (c.status === 'unauthenticated') return `<span data-count="${esc(s.id)}" role="alert">sign-in no longer active · ${SIGNIN}</span>`;
       return `<span data-count="${esc(s.id)}" role="alert">count unavailable · <a href="#" data-retry="counts">Retry</a></span>`; };
@@ -97,6 +103,12 @@ const understand = {
     let results;
     if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.reason || '')}</p>`; }
     else results = refusalLine(ctx, m.results.status, 'data-retry="results"', 'Results');
+    // v3 (ruling c): band layout, one card per perspective; a held result shows evidence gaps, never an invented band.
+    // v3 U2: per-perspective server counts on each band card (Bincy screen 10 group counts) + evidence toggle and table.
+    const lensGroups = Object.fromEntries(LENSES.map(lens => { const ss = m.surveys.filter(s => lensFor(s) === lens), ld = ss.filter(s => m.counts.get(s.id)?.status === 'loaded');
+      return [lens, { surveys: ss.length, loaded: ld.length, responses: ld.reduce((n, s) => n + m.counts.get(s.id).responses, 0) }]; }));
+    const ev = v3EvidenceMarkup(v3EvidenceRows(m.results.value, LENSES, lensGroups, m.bandScores), !!m.showEvidence, esc);
+    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores)}${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc)}</section>` : '';
     // (3) Reports: server-owned eligibility and provenance; preview never writes a report.
     let reports;
     if (m.reports.status === 'loaded') {
@@ -107,7 +119,7 @@ const understand = {
     } else if (m.reports.status === 'refused') reports = '<p class="muted" data-reports-unavailable>Reports are unavailable for this assessment.</p>';
     else reports = refusalLine(ctx, m.reports.status, 'data-retry="reports"', 'Reports');
     const open = m.openReport ? (m.openReport.status === 'held' ? `<p class="muted" data-open-report-reason>${esc(m.openReport.reason)}</p>` : m.openReport.status === 'error' ? `<p class="small muted" role="alert">${esc(m.openReport.text)}</p>` : '') : '';
-    return `<div class="grid"><section class="panel"><p class="eyebrow">Understand</p><h2>Bring the perspectives together</h2>${lensBlocks}<p class="small muted line">Counts are per survey. Respondents are counted within each survey and are not added across surveys.</p></section><aside class="stack"><section class="panel" data-results><p class="eyebrow">Results</p>${results}</section><section class="panel" data-reports><p class="eyebrow">Reports</p>${reports}<p><button type="button" data-retry="reports">Refresh reports</button></p>${reportBuildMarkup(ctx, m.role)}${m.openReport && m.openReport.status !== 'shown' ? `<div>${open}</div>` : ''}<p class="status" role="status" aria-live="polite" data-report-status></p></section></aside></div><section class="panel report-full" data-report-full hidden><div class="report-tools"><p class="eyebrow" style="margin:0">Report · full view</p><button type="button" class="quiet" data-close-report>Close report</button></div><div data-report-view></div></section>`;
+    return `${bands}<div class="grid"><section class="panel"><p class="eyebrow">Understand</p><h2>Bring the perspectives together</h2>${lensBlocks}<p class="small muted line">Counts are per survey. Respondents are counted within each survey and are not added across surveys.</p></section><aside class="stack"><section class="panel" data-results><p class="eyebrow">Results</p>${results}</section><section class="panel" data-reports><p class="eyebrow">Reports</p>${reports}<p><button type="button" data-retry="reports">Refresh reports</button></p>${reportBuildMarkup(ctx, m.role)}${m.openReport && m.openReport.status !== 'shown' ? `<div>${open}</div>` : ''}<p class="status" role="status" aria-live="polite" data-report-status></p></section></aside></div><section class="panel report-full" data-report-full hidden><div class="report-tools"><p class="eyebrow" style="margin:0">Report · full view</p><button type="button" class="quiet" data-close-report>Close report</button></div><div data-report-view></div></section>`;
   },
   bind(ctx, root, m) {
     const clearReport = () => {
@@ -124,7 +136,31 @@ const understand = {
       root.querySelector('[data-report-status]').textContent = reports.status === 'loaded' ? (reports.value?.suppressed ? 'Report built, but current report access is held. See the reporting policy reason above.' : 'Report built. Open it from the current report list.') : 'Report built, but the list could not be refreshed. Refresh reports to reopen it.';
     }, clearReport);
     root.querySelectorAll('[data-retry]').forEach(el => el.onclick = e => { e.preventDefault(); if (m.reportBuildBusy) return; ctx.go(ctx.routes.assessment(m.aid, 'understand'), { reload: true }); });
+    const evBtn = root.querySelector('[data-v3-evidence-toggle]'), evBox = root.querySelector('[data-v3-evidence]');
+    if (evBtn && evBox) evBtn.onclick = () => { m.showEvidence = !m.showEvidence; evBox.hidden = !m.showEvidence; evBtn.setAttribute('aria-expanded', String(m.showEvidence)); evBtn.textContent = m.showEvidence ? 'Simple view' : 'Show evidence and details'; };
     const closeBtn = root.querySelector('[data-close-report]'); if (closeBtn) closeBtn.onclick = clearReport;
+    // v3 U4 review gate: checkbox arms "Record my review"; each primary is one set_stage move, then the view reloads.
+    const gateBtn = root.querySelector('[data-v3-gate-go]'), gateCheck = root.querySelector('[data-v3-review-check]');
+    if (gateCheck && gateBtn) gateCheck.onchange = () => { gateBtn.disabled = !gateCheck.checked; };
+    if (gateBtn) gateBtn.onclick = async () => {
+      if (gateCheck && !gateCheck.checked) return;
+      const action = gateBtn.dataset.v3GateGo, status = root.querySelector('[data-v3-gate-status]');
+      gateBtn.disabled = true; if (status) status.textContent = 'Saving…';
+      try {
+        await v3SetStage(ctx.api, ctx.enc, m.aid, action);
+        if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
+        if (status) status.textContent = action === 'recordReview' ? 'Review recorded.' : 'Moved to the next step.';
+        // Bugbot 4093922740: the stage is committed server-side, so mark this assessment dirty (shell protocol: the next render
+        // refetches it) and go to the target view; same hash → shell re-renders, new hash → hashchange renders.
+        if (ctx.state?.dirty instanceof Map) ctx.state.dirty.set(m.aid, 'write');
+        else if (typeof ctx.refresh === 'function') { await ctx.refresh(); if (action === 'recordReview') return; }
+        ctx.go(ctx.routes.assessment(m.aid, V3_SET_STAGE[action] === 'improve' ? 'improve' : 'understand'));
+      } catch (err) {
+        const k = classify(err);
+        if (status) { status.setAttribute('role', 'alert'); status.textContent = k === 'refused' ? `${NOT_VISIBLE}: nothing changed.` : k === 'unauthenticated' ? 'Your sign-in is no longer active. Sign in again; nothing changed.' : `Nothing changed: ${String(err.message || 'request failed')}`; }
+        gateBtn.disabled = !!gateCheck && !gateCheck.checked;
+      }
+    };
     root.querySelectorAll('[data-open-report]').forEach(btn => btn.onclick = async () => {
       if (ctx.isCurrent && !ctx.isCurrent()) return;
       const readGeneration = (m.reportReadGeneration || 0) + 1; m.reportReadGeneration = readGeneration;
@@ -160,6 +196,14 @@ const improve = {
   },
   render(ctx, m) {
     const esc = ctx.esc;
+    if (V3_FLAGS.nextStepPage) {
+      // v3 lane 3 L3-4: Bincy screen 11 / prototype frame 11. Recommendations aside not drawn (PARITY I1).
+      const T = V3_NEXT;
+      const notes = m.editable
+        ? `<form data-notes-form><label class="field">${esc(T.reflection)}<textarea name="notes_reflection" rows="3" maxlength="4000" placeholder="${esc(T.reflectionHint)}">${esc(m.notes_reflection)}</textarea></label><label class="field">${esc(T.next)}<textarea name="notes_next_steps" rows="2" maxlength="4000" placeholder="${esc(T.nextHint)}">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(T.footer)} ${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>${esc(T.save)}</button></div><p class="status" role="status" aria-live="polite" data-notes-status></p></form>`
+        : `<h3>${esc(T.reflection)}</h3><p data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">Nothing recorded yet.</span>'}</p><h3>${esc(T.next)}</h3><p data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next step recorded yet.</span>'}</p><p class="small muted">${esc(NOTES_VISIBILITY)} Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`;
+      return `<section class="panel" data-v3-next><p class="eyebrow">${esc(T.eyebrow)}</p><h2>${esc(T.title)}</h2>${notes}</section>`;
+    }
     const notes = m.editable
       ? `<form data-notes-form><label class="field">Reflection<textarea name="notes_reflection" maxlength="4000">${esc(m.notes_reflection)}</textarea></label><label class="field">Next steps<textarea name="notes_next_steps" maxlength="4000">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>Save notes</button></div><p class="status" role="status" aria-live="polite" data-notes-status></p></form>`
       : `<h3>Reflection</h3><p data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">No reflection recorded.</span>'}</p><h3>Next steps</h3><p data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next steps recorded.</span>'}</p><p class="small muted">${esc(NOTES_VISIBILITY)} Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`;

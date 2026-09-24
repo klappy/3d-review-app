@@ -103,10 +103,10 @@ export type RenderResult={eligible:false;reason:'HELD'}|{eligible:true;payload:S
 /** Own immutable primitive snapshot before await prevents caller mutation after
  * A's snapshot from changing rendered inputs. This still does not authorize or
  * prove DB membership: callers must use the separately reviewed B boundary. */
-export async function renderSyntheticReport(expectedAssessmentId:string,rows:readonly CaptureRow[]):Promise<RenderResult> {
+export async function renderSyntheticReport(expectedAssessmentId:string,rows:readonly CaptureRow[],participant=false):Promise<RenderResult> {
   try {
     const captured=snapshot(rows);
-    const attested=await attestCapture(expectedAssessmentId,captured);if(!attested.eligible)return {eligible:false,reason:'HELD'};
+    const attested=await attestCapture(expectedAssessmentId,captured,participant===true);if(!attested.eligible)return {eligible:false,reason:'HELD'};
     return {eligible:true,...assemble(expectedAssessmentId,[...captured].sort((a,b)=>sourceOrder(a.responseId,b.responseId))),captureDigest:attested.captureDigest};
   }catch{return {eligible:false,reason:'HELD'};}
 }

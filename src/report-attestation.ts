@@ -12,7 +12,7 @@ export type CaptureRow = Readonly<{
 }>;
 export type AttestationResult =
   | { eligible: true; responseIds: string[]; captureDigest: string }
-  | { eligible: false; reason: 'INVALID_INPUT' | 'INDEX_INVALID' | 'IDENTITY_MISMATCH' };
+  | { eligible: false; reason: 'INVALID_INPUT' | 'INDEX_INVALID' | 'IDENTITY_MISMATCH' | 'MIXED_SOURCE' };
 const metadata = ['responseId', 'assessmentId', 'assessmentSurveyId', 'responseTemplateId', 'responseTemplateVersion', 'selectedTemplateId', 'selectedTemplateVersion', 'submittedAt'] as const;
 const fields = [...metadata, 'answersRaw', 'templateRaw'];
 const encoder = new TextEncoder();
@@ -87,11 +87,35 @@ async function construct(): Promise<ReadonlyMap<string, Entry>> {
 function index(): Promise<ReadonlyMap<string, Entry>> { return initialized ??= construct(); }
 /** For local initialization measurement; no trust injection or fixture factory exists. */
 export async function initializeAttestation(): Promise<void> { await index(); }
-export async function attestCapture(expectedAssessmentId: string, capture: readonly CaptureRow[]): Promise<AttestationResult> {
+/** DEV-only participant path (captain 2026-09-24 15:03): rows absent from the pinned
+ * synthetic index are digested over their real answers/templates. Mixed captures refuse.
+ * Callers pass participant=true only when ENVIRONMENT === 'dev'. */
+async function participantCapture(expectedAssessmentId: string, rows: CaptureRow[]): Promise<AttestationResult> {
+  const responses: { responseId: string; responseDigest: string }[] = [];
+  for (const row of rows) {
+    const answersDigest = await domainHash('3d-answer-v1', parseBoundedJson(row.answersRaw, 8192));
+    const templateDigest = await domainHash('3d-template-v1', parseBoundedJson(row.templateRaw, 65536));
+    const preimage: Record<string, string | number> = { kind: 'participant', answersDigest, templateDigest };
+    for (const k of metadata) preimage[k] = row[k];
+    responses.push({ responseId: row.responseId, responseDigest: await domainHash('3d-response-v1', preimage) });
+  }
+  responses.sort((a, b) => a.responseId < b.responseId ? -1 : a.responseId > b.responseId ? 1 : 0);
+  const captureDigest = await domainHash('3d-capture-v1', {
+    schemaVersion: '3d-participant-capture-v1', canonicalVersion: trust.canonicalVersion,
+    assessmentId: expectedAssessmentId, responses,
+  });
+  return { eligible: true, responseIds: responses.map(r => r.responseId), captureDigest };
+}
+export async function attestCapture(expectedAssessmentId: string, capture: readonly CaptureRow[], participant = false): Promise<AttestationResult> {
   let rows: CaptureRow[];
   try { rows = snapshot(expectedAssessmentId, capture); } catch { return { eligible: false, reason: 'INVALID_INPUT' }; }
   let entries: ReadonlyMap<string, Entry>;
   try { entries = await index(); } catch { return { eligible: false, reason: 'INDEX_INVALID' }; }
+  if (participant === true) {
+    const known = rows.filter(row => entries.has(row.responseId)).length;
+    if (known > 0 && known < rows.length) return { eligible: false, reason: 'MIXED_SOURCE' };
+    if (known === 0) { try { return await participantCapture(expectedAssessmentId, rows); } catch { return { eligible: false, reason: 'INVALID_INPUT' }; } }
+  }
   try {
     const responses: { responseId: string; responseDigest: string }[] = [];
     for (const row of rows) {

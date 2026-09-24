@@ -1,0 +1,9 @@
+# Correction source selection — isolated accepted successor
+
+Auggie selects f69ac5c3cadcd848fdf3537d57867df2f81c9a6e as the prospective corrected0.16 release source. Independent source acceptance9afafa33 and actual desktop/phone browser acceptancef63a495c cover all three findings,100tests/10parent failures,27actual source asset hashes and real title/retry/demo/currentness journeys. This selects source for canonical reconciliation; not permission to skip final checks, hold disposition or deployment proof.
+
+Fresh PR174 observation: head remains907bd5d2b8056e669e7e3972db395b704612f748; only provider build comment, no cloud correction receipt. Autofix check106825481088 is NEUTRAL, completed16:30:43, explicitly reports30-minute timeout and that agent may still run. No cloud process-stop claim. No visible cloud delta exists to compare now. Original PR174 and job remain untouched; no cancellation, closure or branch takeover.
+
+Use separate selected-source metadata/integration lineage. Do not cherry-pick both fixes. Any later cloud branch/commit is retained as distinct cargo and compared before incorporation; it has no automatic precedence over this independently accepted source and must not mutate the selected candidate silently. Refresh source heads before final disposition; unique late evidence is triaged under normal review, never discarded by assumption.
+
+Existing release Fable now prepares the corrected canonical0.16 factual record under amendment1cbfbc51 and independent plan acceptance0fb0010f; final accepted source is now namedf69. Preserve historicalc9bf evidence, normal canonical review/check/merge, immutable repin and final source/check gates. No version bump solely for this correction. Production remains separately gated including actual effective comment-only configuration.

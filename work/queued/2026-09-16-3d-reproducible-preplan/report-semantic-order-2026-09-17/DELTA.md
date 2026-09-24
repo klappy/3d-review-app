@@ -1,0 +1,9 @@
+# Driver-seat delta — current report semantics without acceptance inflation
+
+A future implementer reading the existing continuation sees “not fired” and “CHANGES REQUIRED” without knowing which requirements now have bounded local proof. Put a current-reading pointer first and a dated superseding semantic section in the same home; preserve history rather than erase rejected attempts. A reviewer opening an old report must distinguish verifying its original captured output from rescoring current responses into that old identity. State this explicitly.
+
+An operator comparing capacity must see normal writer output1,532,919serialized bytes separately from the2,571,891read-admitted payload-padding fixture. The latter required disposable trigger bypass. Neither is the older malformed refusal case; none proves an effective platform limit. Include all three categories and preserve the runtime/security release hold.
+
+Six-B: Borrow existing18-B homes/source/owner decisions; Bend only current-reading navigation and explicit supersession; Break the implication that historical proposal status remains current or local PASS means shipped; Beget named author and independent coordinator review; Bide only root FIRE/current-base reconciliation while preserving runtime gates; Build exactly three reversible doc deltas, no new framework/code corpus.
+
+Rejected: replacing the entire parent layer, copying app modules, altering Auth/Design pens, making a fresh captain fork, or marking runtime ready. Retract/amend any claim whose source receipt or current owner ruling disagrees. Coordinator actual PREFLIGHT.json returned FOUND at08:07:44.562Z; CHALLENGE.json returned CHALLENGED/nonblocking/knowledge_base at08:07:46.615Z, not PASS. This DELTA explicitly supplies scope, evidence, risk, rejected whole-layer rewrite, reversibility and retraction criteria in response to the generic lexical prerequisites; no new implementation or permission follows.

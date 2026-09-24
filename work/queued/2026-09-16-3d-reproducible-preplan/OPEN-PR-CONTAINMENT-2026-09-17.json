@@ -1,0 +1,1154 @@
+[
+  {
+    "baseRefName": "fable/mcp-oauth",
+    "headRefName": "stitch/auth-corrections-candidate-20260917",
+    "headRefOid": "2315a82829afe152539dd31fe3da93d57b940c1f",
+    "number": 25,
+    "title": "stitch candidate: PR #19 + PR #20 over fable/mcp-oauth (preview only \u2014 not for merge)",
+    "compare": {
+      "status": "diverged",
+      "ahead_by": 14,
+      "behind_by": 1,
+      "total_commits": 14
+    },
+    "merge_base": "a3defc04677585acaa547492634bb50d5a927c2e",
+    "files": [
+      {
+        "filename": "INTERFACE.md",
+        "sha": "0c614699b0f12a6e98f86981d9b790b253f31337",
+        "status": "modified"
+      },
+      {
+        "filename": "README.md",
+        "sha": "42ebb627840ecd0ac49c256248a1d4678d3f0382",
+        "status": "modified"
+      },
+      {
+        "filename": "STITCH-NOTES.md",
+        "sha": "780e7211b5ebd71d780a3682dd14a4bfb751b487",
+        "status": "added"
+      },
+      {
+        "filename": "migrations/0006_oauth_code_redemption.sql",
+        "sha": "201f9dc27ed96547cda0c75ce9c6bf8655663847",
+        "status": "added"
+      },
+      {
+        "filename": "scripts/consent-browser-check.mjs",
+        "sha": "904a58fb3bba5dc2f8f1a2734df2ba875bb1b06a",
+        "status": "added"
+      },
+      {
+        "filename": "src/auth.ts",
+        "sha": "7e4b95775438e151b28fa7cef5938f78f159cd1c",
+        "status": "modified"
+      },
+      {
+        "filename": "src/dispatch.ts",
+        "sha": "38360e3250bbca3c6ef412f4950c058a1ff0a789",
+        "status": "modified"
+      },
+      {
+        "filename": "src/envelope.ts",
+        "sha": "02d1edbf51854a563e0de7d2f47ce052d64905d8",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/common.ts",
+        "sha": "45bd80c0ce99be00bc17daa99d9b8d6023c3d3e3",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/docs.ts",
+        "sha": "bce7d670d47001b17c2647e2911b236f8194c9df",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/platform.ts",
+        "sha": "3f9352a64422f977f9de670bfb64393c2e891bea",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/types.ts",
+        "sha": "5ef4c431ff261fe76bbcf7b7d7450cce9f66fffc",
+        "status": "modified"
+      },
+      {
+        "filename": "src/index.ts",
+        "sha": "126819cad3a95ff77cbb991b96b82cd740265de1",
+        "status": "modified"
+      },
+      {
+        "filename": "src/mcp.ts",
+        "sha": "e72ac58e80a9609c74e29d363e4aa9b3d31374a9",
+        "status": "modified"
+      },
+      {
+        "filename": "src/oauth.ts",
+        "sha": "ac3fe6bba542ef818429a4ee4c14dfb3928624b7",
+        "status": "modified"
+      },
+      {
+        "filename": "src/ratelimit.ts",
+        "sha": "2a265988219d89e088a06fadb2b844b1868184aa",
+        "status": "modified"
+      },
+      {
+        "filename": "src/worker.ts",
+        "sha": "e950c83571308210aa5142f413f3c7c0ef2d7808",
+        "status": "modified"
+      },
+      {
+        "filename": "test/fail-closed-env.test.ts",
+        "sha": "4f2a7976485218d88497248c67a19feca54e86f7",
+        "status": "modified"
+      },
+      {
+        "filename": "test/limiter-boundary.test.ts",
+        "sha": "d7a64c2657b6e519305e9d26764061e2835a9c22",
+        "status": "added"
+      },
+      {
+        "filename": "test/mcp-oauth-hardening.test.ts",
+        "sha": "404b05a2ee60cba2d48eb4a78877a543749f0ad2",
+        "status": "added"
+      },
+      {
+        "filename": "test/mcp-oauth.test.ts",
+        "sha": "1576213272c7d07ccd036bcd3d8bebadfb8f3e8e",
+        "status": "modified"
+      },
+      {
+        "filename": "test/participant-auth.test.ts",
+        "sha": "5107ef5beceda900d5ae7b17b6840abc8c8352aa",
+        "status": "modified"
+      },
+      {
+        "filename": "test/stitch-integrated-cost.test.ts",
+        "sha": "593f787c4456519a6005fe83ccb5287bc124aeab",
+        "status": "added"
+      },
+      {
+        "filename": "wrangler.toml",
+        "sha": "dd604cd33b6a61d6eea8b670f1f4d28b589da66b",
+        "status": "modified"
+      }
+    ],
+    "equal_paths": [
+      "INTERFACE.md",
+      "STITCH-NOTES.md",
+      "migrations/0006_oauth_code_redemption.sql",
+      "scripts/consent-browser-check.mjs",
+      "src/auth.ts",
+      "src/dispatch.ts",
+      "src/envelope.ts",
+      "src/handlers/common.ts",
+      "src/handlers/docs.ts",
+      "src/handlers/types.ts",
+      "src/index.ts",
+      "src/mcp.ts",
+      "src/oauth.ts",
+      "src/ratelimit.ts",
+      "src/worker.ts",
+      "test/fail-closed-env.test.ts",
+      "test/limiter-boundary.test.ts",
+      "test/mcp-oauth-hardening.test.ts",
+      "test/mcp-oauth.test.ts",
+      "test/participant-auth.test.ts",
+      "test/stitch-integrated-cost.test.ts",
+      "wrangler.toml"
+    ],
+    "different_paths": [
+      "README.md",
+      "src/handlers/platform.ts"
+    ],
+    "absent_paths": []
+  },
+  {
+    "baseRefName": "phase-0/walking-skeleton",
+    "headRefName": "api/shared-link-context",
+    "headRefOid": "fc0bbc36cd79f8f477b170e4d3962d414625d332",
+    "number": 24,
+    "title": "Fix shared-link respondent isolation and atomic responses",
+    "compare": {
+      "status": "diverged",
+      "ahead_by": 45,
+      "behind_by": 1,
+      "total_commits": 45
+    },
+    "merge_base": "10f5f444d68475d7114ab8fe0bf269fe106476b1",
+    "files": [
+      {
+        "filename": "contract/capabilities.json",
+        "sha": "30e807fd2fca38d45aee99b13ebe6ff3cd5a8994",
+        "status": "modified"
+      },
+      {
+        "filename": "contract/contract-manifest.json",
+        "sha": "c5842ad14801187962cb85340345e89bdfe9dcfc",
+        "status": "modified"
+      },
+      {
+        "filename": "contract/openapi.yaml",
+        "sha": "5e5e2bd5ae0fa18485e1ca9638f948a3ff8f4d79",
+        "status": "modified"
+      },
+      {
+        "filename": "migrations/0007_shared_link_context.sql",
+        "sha": "eb591cbacc2bb7d8f3c826f83a9d1817d70c863c",
+        "status": "added"
+      },
+      {
+        "filename": "src/handlers/participant.ts",
+        "sha": "b8888d3cef2d686c46723e34091def49982b0bed",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/response.ts",
+        "sha": "119e2a93f779e8dff7c8f9809c50b89998a61e3b",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/shared-link.ts",
+        "sha": "d873e7df8eac73abf245f9d4ffbfb54cc1fda1d8",
+        "status": "added"
+      },
+      {
+        "filename": "src/handlers/survey.ts",
+        "sha": "05565bdf84e628bf3b27555464d90c2aa4ba4cf7",
+        "status": "modified"
+      },
+      {
+        "filename": "test/code-escrow.test.ts",
+        "sha": "d69af3e3685a10b1424b1d7209855c46fde4f09e",
+        "status": "modified"
+      },
+      {
+        "filename": "test/shared-link-concurrency.test.ts",
+        "sha": "3d9311233613fa601f91e0733f1e3b00b4a302b3",
+        "status": "added"
+      },
+      {
+        "filename": "test/shared-link-flow.test.ts",
+        "sha": "68dfc24e1ec3fedfd872a15d99ac63303385f051",
+        "status": "added"
+      }
+    ],
+    "equal_paths": [
+      "contract/contract-manifest.json",
+      "migrations/0007_shared_link_context.sql",
+      "src/handlers/participant.ts",
+      "src/handlers/response.ts",
+      "src/handlers/shared-link.ts",
+      "src/handlers/survey.ts",
+      "test/shared-link-concurrency.test.ts",
+      "test/shared-link-flow.test.ts"
+    ],
+    "different_paths": [
+      "contract/capabilities.json",
+      "contract/openapi.yaml",
+      "test/code-escrow.test.ts"
+    ],
+    "absent_paths": []
+  },
+  {
+    "baseRefName": "api/shared-link-context",
+    "headRefName": "c2/shared-link-ui",
+    "headRefOid": "a5949e76af63f714dd7be9a6a3b6c6529a4b8deb",
+    "number": 23,
+    "title": "[DRAFT] ui: shared survey link entry, scoped storage, staff issue/copy, refresh counts (C2 slice, parallel to API)",
+    "compare": {
+      "status": "diverged",
+      "ahead_by": 45,
+      "behind_by": 7,
+      "total_commits": 45
+    },
+    "merge_base": "10f5f444d68475d7114ab8fe0bf269fe106476b1",
+    "files": [
+      {
+        "filename": "test/fixtures/shared-link-contract.dev.mjs",
+        "sha": "95f8de0744b1b770a59a186ea402287c31b92511",
+        "status": "added"
+      },
+      {
+        "filename": "test/shared-link-browser.test.ts",
+        "sha": "5494b36b2a5219c318add557e9297f25cb76a044",
+        "status": "added"
+      },
+      {
+        "filename": "ui/app.js",
+        "sha": "948f51ac4c9bb3bbd3047bfea7843ca52e19eb42",
+        "status": "modified"
+      },
+      {
+        "filename": "ui/index.html",
+        "sha": "356cf63229f7d7e2815c3bf6f08b2456029d107d",
+        "status": "modified"
+      },
+      {
+        "filename": "ui/shared-link.js",
+        "sha": "c177c3321e6c29171f3a19eb88dd0523061de0a1",
+        "status": "added"
+      }
+    ],
+    "equal_paths": [
+      "test/fixtures/shared-link-contract.dev.mjs",
+      "ui/index.html"
+    ],
+    "different_paths": [
+      "test/shared-link-browser.test.ts",
+      "ui/app.js",
+      "ui/shared-link.js"
+    ],
+    "absent_paths": []
+  },
+  {
+    "baseRefName": "phase-0/walking-skeleton",
+    "headRefName": "audit/a8-main-dev-inert",
+    "headRefOid": "78d009157e19c9f3e5180db42ebb41b5d6e9174f",
+    "number": 22,
+    "title": "Document main DEV and protected production topology",
+    "compare": {
+      "status": "diverged",
+      "ahead_by": 45,
+      "behind_by": 1,
+      "total_commits": 45
+    },
+    "merge_base": "10f5f444d68475d7114ab8fe0bf269fe106476b1",
+    "files": [
+      {
+        "filename": ".cursor/BUGBOT.md",
+        "sha": "cde14e0e25ed65e0a898ad418a578c9a92415737",
+        "status": "modified"
+      },
+      {
+        "filename": "AGENTS.md",
+        "sha": "e0a18aa9e7af76d90ace919b46791edcc1f0529d",
+        "status": "modified"
+      },
+      {
+        "filename": "README.md",
+        "sha": "96baa94b20679e22282f18024a691a6950c9810a",
+        "status": "modified"
+      },
+      {
+        "filename": "docs/deploy.md",
+        "sha": "47966a57cc6387d243bad58c5c377f2af9ba3c6a",
+        "status": "added"
+      },
+      {
+        "filename": "docs/release.md",
+        "sha": "8ef470dac0b3ba58e1122dab67a17dbd1c02f660",
+        "status": "modified"
+      },
+      {
+        "filename": "docs/release/a8-control-plane-plan.json",
+        "sha": "2c635d272b086b3d083478485ed0d420fa192dcf",
+        "status": "added"
+      },
+      {
+        "filename": "wrangler.toml",
+        "sha": "67f3563967039d310210754db9861e0103b0dab5",
+        "status": "modified"
+      }
+    ],
+    "equal_paths": [
+      ".cursor/BUGBOT.md",
+      "AGENTS.md",
+      "docs/deploy.md",
+      "docs/release.md",
+      "docs/release/a8-control-plane-plan.json"
+    ],
+    "different_paths": [
+      "README.md",
+      "wrangler.toml"
+    ],
+    "absent_paths": []
+  },
+  {
+    "baseRefName": "fable/mcp-oauth",
+    "headRefName": "fix/pr15-auth-hardening",
+    "headRefOid": "4b3d7cce34654baba79dea438ecec76ab7bd1dee",
+    "number": 20,
+    "title": "mcp auth hardening: consent CSP per validated destination, D1 single-use code redemption, PKCE S256 for every client, bearer/503/PRM minors (closes review #15 findings 1\u201311 at 1ff4838)",
+    "compare": {
+      "status": "ahead",
+      "ahead_by": 25,
+      "behind_by": 0,
+      "total_commits": 25
+    },
+    "merge_base": "4b3d7cce34654baba79dea438ecec76ab7bd1dee",
+    "files": [
+      {
+        "filename": "INTERFACE.md",
+        "sha": "cb29dfd7bd18b426c6e71548de4013e73f617551",
+        "status": "modified"
+      },
+      {
+        "filename": "migrations/0006_oauth_code_redemption.sql",
+        "sha": "201f9dc27ed96547cda0c75ce9c6bf8655663847",
+        "status": "added"
+      },
+      {
+        "filename": "scripts/consent-browser-check.mjs",
+        "sha": "904a58fb3bba5dc2f8f1a2734df2ba875bb1b06a",
+        "status": "added"
+      },
+      {
+        "filename": "src/oauth.ts",
+        "sha": "ac3fe6bba542ef818429a4ee4c14dfb3928624b7",
+        "status": "modified"
+      },
+      {
+        "filename": "src/worker.ts",
+        "sha": "e950c83571308210aa5142f413f3c7c0ef2d7808",
+        "status": "modified"
+      },
+      {
+        "filename": "test/fail-closed-env.test.ts",
+        "sha": "4f2a7976485218d88497248c67a19feca54e86f7",
+        "status": "modified"
+      },
+      {
+        "filename": "test/mcp-oauth-hardening.test.ts",
+        "sha": "80dcaefe6bea3a8a8c5e5b103878abc162bf187e",
+        "status": "added"
+      },
+      {
+        "filename": "test/mcp-oauth.test.ts",
+        "sha": "1576213272c7d07ccd036bcd3d8bebadfb8f3e8e",
+        "status": "modified"
+      },
+      {
+        "filename": "wrangler.toml",
+        "sha": "d78a669ed60150e10d5342413bff907d6d21e78a",
+        "status": "modified"
+      }
+    ],
+    "equal_paths": [
+      "migrations/0006_oauth_code_redemption.sql",
+      "scripts/consent-browser-check.mjs",
+      "src/oauth.ts",
+      "src/worker.ts",
+      "test/fail-closed-env.test.ts",
+      "test/mcp-oauth.test.ts"
+    ],
+    "different_paths": [
+      "INTERFACE.md",
+      "test/mcp-oauth-hardening.test.ts",
+      "wrangler.toml"
+    ],
+    "absent_paths": []
+  },
+  {
+    "baseRefName": "fable/rate-limits",
+    "headRefName": "fix/pr12-limiter-boundary",
+    "headRefOid": "745bd85a46880e52b4981ea3f13eab6165764207",
+    "number": 19,
+    "title": "rate limits: limiter boundary correction \u2014 spend before validate, anonymous HTTP meter, token-shape gate, per-message trace ids (closes auditor 5707673911 / Bugbot 4032246360)",
+    "compare": {
+      "status": "ahead",
+      "ahead_by": 30,
+      "behind_by": 0,
+      "total_commits": 30
+    },
+    "merge_base": "745bd85a46880e52b4981ea3f13eab6165764207",
+    "files": [
+      {
+        "filename": "INTERFACE.md",
+        "sha": "b7821954bf0f54492d033507f63d623ab8f05d80",
+        "status": "modified"
+      },
+      {
+        "filename": "README.md",
+        "sha": "baea1bccaf49eca1e00ef1f89e0f8eec7c01af1a",
+        "status": "modified"
+      },
+      {
+        "filename": "src/auth.ts",
+        "sha": "7e4b95775438e151b28fa7cef5938f78f159cd1c",
+        "status": "modified"
+      },
+      {
+        "filename": "src/dispatch.ts",
+        "sha": "0646bbfe887e72d6b5884bbc73e464a8eaabcee1",
+        "status": "modified"
+      },
+      {
+        "filename": "src/envelope.ts",
+        "sha": "02d1edbf51854a563e0de7d2f47ce052d64905d8",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/common.ts",
+        "sha": "45bd80c0ce99be00bc17daa99d9b8d6023c3d3e3",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/docs.ts",
+        "sha": "e3f6c3381241b431262da385923b85e84d0a098e",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/platform.ts",
+        "sha": "62800bd81ed2a9b76c1b15012f2fbe9327cc583f",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/types.ts",
+        "sha": "2f70726beee999dda80ce9dcc588df7f513ce487",
+        "status": "modified"
+      },
+      {
+        "filename": "src/index.ts",
+        "sha": "ec63807169f11b4ff957c2f95d03e8f8673b9caa",
+        "status": "modified"
+      },
+      {
+        "filename": "src/mcp.ts",
+        "sha": "f0d6d9cd5a2ba058382a9a57bac04a78c9e33914",
+        "status": "modified"
+      },
+      {
+        "filename": "src/ratelimit.ts",
+        "sha": "a52277f2833526b181ec3fe7784d024ec21d6bf6",
+        "status": "modified"
+      },
+      {
+        "filename": "test/limiter-boundary.test.ts",
+        "sha": "9fd0056403afcf8e73e1734eed61c2590c2e0bbe",
+        "status": "added"
+      },
+      {
+        "filename": "test/participant-auth.test.ts",
+        "sha": "5107ef5beceda900d5ae7b17b6840abc8c8352aa",
+        "status": "modified"
+      },
+      {
+        "filename": "wrangler.toml",
+        "sha": "a884285cb28203ad0a30ef6dd5f48a234e7da712",
+        "status": "modified"
+      }
+    ],
+    "equal_paths": [
+      "src/auth.ts",
+      "src/envelope.ts",
+      "src/handlers/common.ts",
+      "test/participant-auth.test.ts"
+    ],
+    "different_paths": [
+      "INTERFACE.md",
+      "README.md",
+      "src/dispatch.ts",
+      "src/handlers/docs.ts",
+      "src/handlers/platform.ts",
+      "src/handlers/types.ts",
+      "src/index.ts",
+      "src/mcp.ts",
+      "src/ratelimit.ts",
+      "test/limiter-boundary.test.ts",
+      "wrangler.toml"
+    ],
+    "absent_paths": []
+  },
+  {
+    "baseRefName": "phase-0/walking-skeleton",
+    "headRefName": "review/ui-recovery-corrected-20260916",
+    "headRefOid": "cf143f363d2b8466830ee0c139aa5408fe670ae7",
+    "number": 18,
+    "title": "Fix participant recovery state and reachable retry controls",
+    "compare": {
+      "status": "diverged",
+      "ahead_by": 45,
+      "behind_by": 7,
+      "total_commits": 45
+    },
+    "merge_base": "10f5f444d68475d7114ab8fe0bf269fe106476b1",
+    "files": [
+      {
+        "filename": "docs/ui-recovery-correction.md",
+        "sha": "22428b24469c49b22c00a7ec7d8dc68edeff078c",
+        "status": "added"
+      },
+      {
+        "filename": "ui/.assetsignore",
+        "sha": "48fa374e04032a16e31b3dde6432aff5c683088d",
+        "status": "modified"
+      },
+      {
+        "filename": "ui/app.js",
+        "sha": "ef4008ffec1836d30252394bcaa3a99e1e1098a0",
+        "status": "modified"
+      },
+      {
+        "filename": "ui/participant-dom.test.mjs",
+        "sha": "0e0decd506ca29260bcfe9c8f01f9743473ea182",
+        "status": "added"
+      },
+      {
+        "filename": "ui/participant-resume.js",
+        "sha": "d2a5af72fd77879396a612a0010839f808da6f05",
+        "status": "modified"
+      },
+      {
+        "filename": "ui/participant-resume.test.mjs",
+        "sha": "87c170f44c992636bb3f9a620ef76a3a7cb53e42",
+        "status": "modified"
+      }
+    ],
+    "equal_paths": [
+      "docs/ui-recovery-correction.md",
+      "ui/.assetsignore",
+      "ui/participant-resume.js",
+      "ui/participant-resume.test.mjs"
+    ],
+    "different_paths": [
+      "ui/app.js",
+      "ui/participant-dom.test.mjs"
+    ],
+    "absent_paths": []
+  },
+  {
+    "baseRefName": "phase-0/walking-skeleton",
+    "headRefName": "fable/phase-a-sweep",
+    "headRefOid": "cc88f369e3f125cf7cd6c3fdfc0855d5b263fefd",
+    "number": 17,
+    "title": "test: Phase A refusal sweep and partial acceptance coverage \u2014 AMEND",
+    "compare": {
+      "status": "diverged",
+      "ahead_by": 45,
+      "behind_by": 8,
+      "total_commits": 45
+    },
+    "merge_base": "10f5f444d68475d7114ab8fe0bf269fe106476b1",
+    "files": [
+      {
+        "filename": "docs/phase-a-coverage.md",
+        "sha": "3331c8cfdba420b6257fe20276bf87474ea1a766",
+        "status": "added"
+      },
+      {
+        "filename": "test/phase-a-acceptance.test.ts",
+        "sha": "5b79a97459cb7c890187bd7263cae3685bce128f",
+        "status": "added"
+      },
+      {
+        "filename": "test/phase-a-contract-sweep.test.ts",
+        "sha": "e9d737523dbe6ed809bedda9831e59df29daf799",
+        "status": "added"
+      }
+    ],
+    "equal_paths": [],
+    "different_paths": [],
+    "absent_paths": [
+      "docs/phase-a-coverage.md",
+      "test/phase-a-acceptance.test.ts",
+      "test/phase-a-contract-sweep.test.ts"
+    ]
+  },
+  {
+    "baseRefName": "phase-0/walking-skeleton",
+    "headRefName": "fable/mail-sender",
+    "headRefOid": "6150483e9e3001a5ca89653b6ad8f3456a281d1c",
+    "number": 16,
+    "title": "mail: OF-3 sender adapter (Resend) wired into grant.invite \u2014 honest delivered:false until the captain configures it",
+    "compare": {
+      "status": "diverged",
+      "ahead_by": 39,
+      "behind_by": 5,
+      "total_commits": 39
+    },
+    "merge_base": "c4321f8063f8f017180da7d5f065f75cb02c69cd",
+    "files": [
+      {
+        "filename": "INTERFACE.md",
+        "sha": "cf7c48b1fb8c4f47ac4ee039f0af4124600422d5",
+        "status": "modified"
+      },
+      {
+        "filename": "README.md",
+        "sha": "022fb63dc1c114cc1126b58e8ca6b98692659d7b",
+        "status": "modified"
+      },
+      {
+        "filename": "contract/capabilities.json",
+        "sha": "0905552179e76e21d8605a74380594c824eb0e94",
+        "status": "modified"
+      },
+      {
+        "filename": "contract/openapi.yaml",
+        "sha": "7d1d7f6f7f7e2a9d7f28b32519c43f530cfcef08",
+        "status": "modified"
+      },
+      {
+        "filename": "docs/mail.md",
+        "sha": "d644c9798c03763ea30824b3038b2bfccbaddf01",
+        "status": "added"
+      },
+      {
+        "filename": "scripts/parity.mjs",
+        "sha": "1a9f61aa6fc2af6821c2f08d6091c6f972d5a16a",
+        "status": "modified"
+      },
+      {
+        "filename": "src/dispatch.ts",
+        "sha": "2ac996176a8f24a7dbb99736a0058d6f8680de01",
+        "status": "modified"
+      },
+      {
+        "filename": "src/envelope.ts",
+        "sha": "1f7a8ba0c00df1db0e8363691c61b0b7f257d430",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/docs.ts",
+        "sha": "f6df48e4d8dced1dd5913ef7e052ca8414b9ccb7",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/errors.ts",
+        "sha": "66042c6510882bc20fbc71f764a2d9a590320789",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/grant.ts",
+        "sha": "3a89c317caedd4770bfefa6fbec228154ce00b0c",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/platform.ts",
+        "sha": "6a761c819c378ee7cc350a11fe91bed1d1be1da3",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/types.ts",
+        "sha": "85c70a4f750c4ec486b7f1ced9b5eca24874422d",
+        "status": "modified"
+      },
+      {
+        "filename": "src/index.ts",
+        "sha": "788f628dbd96627a7b0d88968b78a2493870fea3",
+        "status": "modified"
+      },
+      {
+        "filename": "src/mail.ts",
+        "sha": "bd4e444955e4dc8d75226ae537f0ba92d66f610c",
+        "status": "added"
+      },
+      {
+        "filename": "src/ratelimit.ts",
+        "sha": "fba6ec3e0cf2acd8a3f1c47ec6778f6d1fff970f",
+        "status": "added"
+      },
+      {
+        "filename": "test/code-escrow.test.ts",
+        "sha": "224df12f08467e230d74eff2594472afb5d62cc0",
+        "status": "modified"
+      },
+      {
+        "filename": "test/dispatch.test.ts",
+        "sha": "b52776e9bbb595d47dbe6136d53bb2585a56f6a1",
+        "status": "modified"
+      },
+      {
+        "filename": "test/lane-b-grants.test.ts",
+        "sha": "05b9efa1683bfadb282ff6303e7ed014ba4f9842",
+        "status": "modified"
+      },
+      {
+        "filename": "test/mail.test.ts",
+        "sha": "ddfb6522ce86d8859b43557535f2bb2813104417",
+        "status": "added"
+      },
+      {
+        "filename": "test/rate-limits.test.ts",
+        "sha": "16cd991f3a334d0737b0d268333014d8d5167415",
+        "status": "added"
+      },
+      {
+        "filename": "tools/gen_contract.py",
+        "sha": "f421ddfa8ca95097f01336da5ac7f9e247012cae",
+        "status": "modified"
+      },
+      {
+        "filename": "wrangler.toml",
+        "sha": "6733bd6132921fb99ae2608b48b92942de6f5327",
+        "status": "modified"
+      }
+    ],
+    "equal_paths": [
+      "src/handlers/errors.ts",
+      "test/dispatch.test.ts",
+      "test/rate-limits.test.ts",
+      "tools/gen_contract.py"
+    ],
+    "different_paths": [
+      "INTERFACE.md",
+      "README.md",
+      "contract/capabilities.json",
+      "contract/openapi.yaml",
+      "scripts/parity.mjs",
+      "src/dispatch.ts",
+      "src/envelope.ts",
+      "src/handlers/docs.ts",
+      "src/handlers/grant.ts",
+      "src/handlers/platform.ts",
+      "src/handlers/types.ts",
+      "src/index.ts",
+      "src/ratelimit.ts",
+      "test/code-escrow.test.ts",
+      "test/lane-b-grants.test.ts",
+      "wrangler.toml"
+    ],
+    "absent_paths": [
+      "docs/mail.md",
+      "src/mail.ts",
+      "test/mail.test.ts"
+    ]
+  },
+  {
+    "baseRefName": "fable/rate-limits",
+    "headRefName": "fable/mcp-oauth",
+    "headRefOid": "1ff48384a7cd9476dd29d0c42f951142068e6320",
+    "number": 15,
+    "title": "MCP authorization: OAuth 2.1 on /mcp (borrowed workers-oauth-provider, Access email-code + consent)",
+    "compare": {
+      "status": "ahead",
+      "ahead_by": 32,
+      "behind_by": 0,
+      "total_commits": 32
+    },
+    "merge_base": "1ff48384a7cd9476dd29d0c42f951142068e6320",
+    "files": [
+      {
+        "filename": "INTERFACE.md",
+        "sha": "4103efa9b4fdd9fd5de0be7ea3b244111a1786bf",
+        "status": "modified"
+      },
+      {
+        "filename": "README.md",
+        "sha": "9de7c2869e737f6e30c590119acb3ec40a8ebd5d",
+        "status": "modified"
+      },
+      {
+        "filename": "package-lock.json",
+        "sha": "3c1fc68dd3f5b569cfe6a1f5f2402d8cad90746f",
+        "status": "modified"
+      },
+      {
+        "filename": "package.json",
+        "sha": "fb718663a1598fa574e53c8b7991cba71c9ac810",
+        "status": "modified"
+      },
+      {
+        "filename": "scripts/parity.mjs",
+        "sha": "1f428037156fcd39af88f14e2c4178558bec50b3",
+        "status": "modified"
+      },
+      {
+        "filename": "src/dispatch.ts",
+        "sha": "2a883a8f7971d02bae34ad41bf661e7927d2b0f3",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/docs.ts",
+        "sha": "4e8b962e9460b9848ca84d2aab99ac44a5b17619",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/platform.ts",
+        "sha": "4cc875c79f8a5f0af00e90f6a5e86580ca719185",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/types.ts",
+        "sha": "900d57bbe8b2c6bb547fe069ff7a73c166479dad",
+        "status": "modified"
+      },
+      {
+        "filename": "src/index.ts",
+        "sha": "31c5624c8a2406f50099007c956e1687a1105dec",
+        "status": "modified"
+      },
+      {
+        "filename": "src/mcp.ts",
+        "sha": "72a88f466d86056e4b35a16e2a9634de0e1def1f",
+        "status": "modified"
+      },
+      {
+        "filename": "src/oauth.ts",
+        "sha": "bc3709f3f4e32154fdac225861c0ba090ae8034b",
+        "status": "added"
+      },
+      {
+        "filename": "src/ratelimit.ts",
+        "sha": "1f789ce01b0a4c2fff6366b20b555ef8433b38db",
+        "status": "modified"
+      },
+      {
+        "filename": "src/receipt.ts",
+        "sha": "f285d9e01f18d40962aa28cbacbc5772efd2631d",
+        "status": "modified"
+      },
+      {
+        "filename": "src/worker.ts",
+        "sha": "473a7e71cd70f3b60b56d54e6b8e1ae482a64abf",
+        "status": "added"
+      },
+      {
+        "filename": "test/mcp-oauth.test.ts",
+        "sha": "40e7aae79cf9e0ae197f4d322fc1bbaee6654092",
+        "status": "added"
+      },
+      {
+        "filename": "test/stubs/cloudflare-workers.ts",
+        "sha": "dee2d3980540725aefb615db5667867a76181da2",
+        "status": "added"
+      },
+      {
+        "filename": "vitest.config.ts",
+        "sha": "b15598d5140e26361e8c5300013ec2c2f2ebe63e",
+        "status": "modified"
+      },
+      {
+        "filename": "wrangler.toml",
+        "sha": "938fc8c69f0da0bc2f027b7593753ebab4e2e4fd",
+        "status": "modified"
+      }
+    ],
+    "equal_paths": [
+      "package-lock.json",
+      "package.json",
+      "scripts/parity.mjs",
+      "src/receipt.ts",
+      "test/stubs/cloudflare-workers.ts",
+      "vitest.config.ts"
+    ],
+    "different_paths": [
+      "INTERFACE.md",
+      "README.md",
+      "src/dispatch.ts",
+      "src/handlers/docs.ts",
+      "src/handlers/platform.ts",
+      "src/handlers/types.ts",
+      "src/index.ts",
+      "src/mcp.ts",
+      "src/oauth.ts",
+      "src/ratelimit.ts",
+      "src/worker.ts",
+      "test/mcp-oauth.test.ts",
+      "wrangler.toml"
+    ],
+    "absent_paths": []
+  },
+  {
+    "baseRefName": "phase-0/walking-skeleton",
+    "headRefName": "fable/seed-coverage",
+    "headRefOid": "436f9456ca3fd29b04d07b7808d91839b3a742cf",
+    "number": 14,
+    "title": "seed: source-backed Audio / Video-Sign / Community-Pastor synthetic coverage; project lookup fix; two forms named as source gaps",
+    "compare": {
+      "status": "diverged",
+      "ahead_by": 45,
+      "behind_by": 4,
+      "total_commits": 45
+    },
+    "merge_base": "10f5f444d68475d7114ab8fe0bf269fe106476b1",
+    "files": [
+      {
+        "filename": "package.json",
+        "sha": "9c438175ea1a9687f5ccd90eb4b2da3026a4f9a4",
+        "status": "modified"
+      },
+      {
+        "filename": "seed/source/README.md",
+        "sha": "6c8834a28aced709a091fdf22c6ee93e0e4f2282",
+        "status": "modified"
+      },
+      {
+        "filename": "seed/synthetic-responses-org.sql",
+        "sha": "93911af200575a6a870b8f5433341578ec6ded70",
+        "status": "added"
+      },
+      {
+        "filename": "seed/synthetic/README.md",
+        "sha": "e02a6bb9e1e3e19e9e19f42b0a91913197311529",
+        "status": "added"
+      },
+      {
+        "filename": "seed/synthetic/answer-sets-org-comparison.json",
+        "sha": "adaf803edb224bd370347cb8f73d9faa4f8f5bca",
+        "status": "added"
+      },
+      {
+        "filename": "seed/synthetic/manifest.json",
+        "sha": "5470f82c439ffc88b1fa01265608e160c74afcf5",
+        "status": "modified"
+      },
+      {
+        "filename": "src/index.ts",
+        "sha": "f9ffbdf2a3403b4ea818bf40b413cfaeddf0455a",
+        "status": "modified"
+      },
+      {
+        "filename": "test/synthetic-seed.test.ts",
+        "sha": "feec1023de7a05f244e279cdd9b66dee283544fd",
+        "status": "modified"
+      },
+      {
+        "filename": "tools/synth_answers.py",
+        "sha": "588e30377d971ab2eb38be3da9bb24bf2d8435f3",
+        "status": "modified"
+      },
+      {
+        "filename": "tools/synth_seed_sql.py",
+        "sha": "a025ab112a53521115c1730edc9a71a5239729fc",
+        "status": "modified"
+      }
+    ],
+    "equal_paths": [],
+    "different_paths": [
+      "package.json",
+      "seed/source/README.md",
+      "seed/synthetic/manifest.json",
+      "src/index.ts",
+      "test/synthetic-seed.test.ts",
+      "tools/synth_answers.py",
+      "tools/synth_seed_sql.py"
+    ],
+    "absent_paths": [
+      "seed/synthetic-responses-org.sql",
+      "seed/synthetic/README.md",
+      "seed/synthetic/answer-sets-org-comparison.json"
+    ]
+  },
+  {
+    "baseRefName": "phase-0/walking-skeleton",
+    "headRefName": "fable/rate-limits",
+    "headRefOid": "c4321f8063f8f017180da7d5f065f75cb02c69cd",
+    "number": 12,
+    "title": "rate limits: anonymous /mcp, sign-in, code redemption (Workers Rate Limiting bindings, RATE_LIMITED 429)",
+    "compare": {
+      "status": "ahead",
+      "ahead_by": 39,
+      "behind_by": 0,
+      "total_commits": 39
+    },
+    "merge_base": "c4321f8063f8f017180da7d5f065f75cb02c69cd",
+    "files": [
+      {
+        "filename": "INTERFACE.md",
+        "sha": "cf7c48b1fb8c4f47ac4ee039f0af4124600422d5",
+        "status": "modified"
+      },
+      {
+        "filename": "README.md",
+        "sha": "022fb63dc1c114cc1126b58e8ca6b98692659d7b",
+        "status": "modified"
+      },
+      {
+        "filename": "contract/capabilities.json",
+        "sha": "0905552179e76e21d8605a74380594c824eb0e94",
+        "status": "modified"
+      },
+      {
+        "filename": "contract/openapi.yaml",
+        "sha": "7d1d7f6f7f7e2a9d7f28b32519c43f530cfcef08",
+        "status": "modified"
+      },
+      {
+        "filename": "scripts/parity.mjs",
+        "sha": "1a9f61aa6fc2af6821c2f08d6091c6f972d5a16a",
+        "status": "modified"
+      },
+      {
+        "filename": "src/dispatch.ts",
+        "sha": "2ac996176a8f24a7dbb99736a0058d6f8680de01",
+        "status": "modified"
+      },
+      {
+        "filename": "src/envelope.ts",
+        "sha": "1f7a8ba0c00df1db0e8363691c61b0b7f257d430",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/docs.ts",
+        "sha": "f6df48e4d8dced1dd5913ef7e052ca8414b9ccb7",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/errors.ts",
+        "sha": "66042c6510882bc20fbc71f764a2d9a590320789",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/platform.ts",
+        "sha": "6a761c819c378ee7cc350a11fe91bed1d1be1da3",
+        "status": "modified"
+      },
+      {
+        "filename": "src/handlers/types.ts",
+        "sha": "85c70a4f750c4ec486b7f1ced9b5eca24874422d",
+        "status": "modified"
+      },
+      {
+        "filename": "src/index.ts",
+        "sha": "788f628dbd96627a7b0d88968b78a2493870fea3",
+        "status": "modified"
+      },
+      {
+        "filename": "src/ratelimit.ts",
+        "sha": "fba6ec3e0cf2acd8a3f1c47ec6778f6d1fff970f",
+        "status": "added"
+      },
+      {
+        "filename": "test/code-escrow.test.ts",
+        "sha": "224df12f08467e230d74eff2594472afb5d62cc0",
+        "status": "modified"
+      },
+      {
+        "filename": "test/dispatch.test.ts",
+        "sha": "b52776e9bbb595d47dbe6136d53bb2585a56f6a1",
+        "status": "modified"
+      },
+      {
+        "filename": "test/rate-limits.test.ts",
+        "sha": "16cd991f3a334d0737b0d268333014d8d5167415",
+        "status": "added"
+      },
+      {
+        "filename": "tools/gen_contract.py",
+        "sha": "f421ddfa8ca95097f01336da5ac7f9e247012cae",
+        "status": "modified"
+      },
+      {
+        "filename": "wrangler.toml",
+        "sha": "aa887e279c83108d94496e829b813fbe888666f0",
+        "status": "modified"
+      }
+    ],
+    "equal_paths": [
+      "src/handlers/errors.ts",
+      "test/dispatch.test.ts",
+      "test/rate-limits.test.ts",
+      "tools/gen_contract.py"
+    ],
+    "different_paths": [
+      "INTERFACE.md",
+      "README.md",
+      "contract/capabilities.json",
+      "contract/openapi.yaml",
+      "scripts/parity.mjs",
+      "src/dispatch.ts",
+      "src/envelope.ts",
+      "src/handlers/docs.ts",
+      "src/handlers/platform.ts",
+      "src/handlers/types.ts",
+      "src/index.ts",
+      "src/ratelimit.ts",
+      "test/code-escrow.test.ts",
+      "wrangler.toml"
+    ],
+    "absent_paths": []
+  }
+]

@@ -140,7 +140,7 @@ test('entry: public welcome with hero, tour stepper and survey/example/sign-in b
   assert.ok(h.includes('What is 3D Review?')); assert.ok(h.includes('Translation team')); assert.ok(h.includes('href="#survey">Take a survey')); assert.ok(h.includes('href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →')); assert.ok(h.includes('href="/v2/auth/access">Sign in</a>')); assert.ok(!h.includes('Continue'));
   // captain-named public home (ui/public-choices.test.mjs contract, now asserted on the ROOT entry): four choices, in order, above the headline
   const nav = h.slice(h.indexOf('<nav class="public-choices'), h.indexOf('</nav>')); const links = [...nav.matchAll(/<a class="rv-btn[^"]*" href="([^"]+)">([^<]+)<\/a>/g)].map(m => [m[2], m[1]]);
-  assert.deepEqual(links, [['Read about it', '#public-about'], ['Take the tour', '/?demo=1#assessment/demo-assessment/prepare'], ['Take a survey', '#survey'], ['Sign in', '/v2/auth/access']]);
+  assert.deepEqual(links, [['Read about it', '#about'], ['Take the tour', '/?demo=1#assessment/demo-assessment/prepare'], ['Take a survey', '#survey'], ['Sign in', '/v2/auth/access']]);
   assert.ok(nav.includes('aria-label="Choose where to start"')); assert.ok(h.indexOf('<nav class="public-choices') < h.indexOf('<h1>')); assert.ok(h.includes('<p class="eyebrow" id="public-about">What is 3D Review?</p>'));
   assert.ok(h.includes('Explore the real assessment screens · Go at your own pace · Nothing is sent')); assert.ok(h.includes('href="#projects">Open your projects and reports'));
   for (const retired of ['Here to take the survey?', 'Show me how', 'Manage assessments']) assert.ok(!h.includes(retired), retired);
@@ -320,4 +320,44 @@ test('a retry completing after the view stopped being current does not paint (ct
   current = false; release(); await click;
   assert.equal(root.querySelectorAll('[data-act="retry"]').length, 2, 'stale completion left the old view untouched');
   assert.equal(root.children.length, html);
+});
+
+test('project settings (lane 11): editors reach access codes on the existing screen; viewers see no settings panel', async () => {
+  const base = { 'GET /v2/projects/p1/assessments': { assessments: [] }, 'GET /v2/projects/p1/languages': { languages: [] } };
+  const own = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'owner' }, languages: [] } });
+  const h = pages.project.render(own, await pages.project.load(own, { id: 'p1' }));
+  assert.ok(h.includes('id="project-settings"') && h.includes('Project settings'));
+  assert.ok(/href="\/legacy\/#facilitator" data-kept="access-codes"/.test(h), 'access codes link to the legacy facilitator screen');
+  assert.ok(!/class="[^"]*primary[^"]*"[^>]*data-kept/.test(h), 'kept links never take the page primary');
+  assert.ok(/href="#workspaces" data-kept="workspaces"/.test(h), 'workspaces link to the existing #workspaces screen');
+  const view = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'viewer' }, languages: [] } });
+  assert.ok(!pages.project.render(view, await pages.project.load(view, { id: 'p1' })).includes('project-settings'));
+});
+
+test('L1-7 #signin matches prototype frame 1: centred card, one primary to the real provider, survey footer, sandbox collapsed after it', async () => {
+  const html = pages.entry.render({ esc: s => String(s ?? ''), state: {} }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.ok(html.includes('class="glass panel narrow v3-signin"'));
+  assert.ok(html.includes('<p class="eyebrow">Sign in</p>'));
+  assert.ok(/<a class="button rv-btn primary" href="\/v2\/auth\/access" style="width:100%/.test(html), 'one full-width primary to the real provider');
+  const access = html.indexOf('href="/v2/auth/access"'), box = html.indexOf('<details class="sandbox-signin"');
+  assert.ok(access > -1 && box > access, 'real provider precedes the sandbox');
+  assert.ok(!/<details class="sandbox-signin"[^>]*\bopen\b/.test(html), 'sandbox collapsed on the email step');
+  assert.ok(html.includes('no sign-in is needed') && html.includes('href="#survey"'));
+});
+
+// Captain ruling 12:53 (L1-16): public About is a real page; public routes never show sign-in.
+test('about: #about intent renders the About page with Back to home, three perspectives, and no sign-in panel', async () => {
+  const ctx = ctxWith(); const m = await pages.entry.load(ctx, { intent: 'about' }); const h = pages.entry.render(ctx, m);
+  assert.ok(h.includes('id="about-page"')); assert.ok(h.includes('About 3D Review')); assert.ok(h.includes('href="#">← Back to home'));
+  for (const t of ['Translation team', 'Community', 'Church', 'Who it is for', 'When to use it', 'How often']) assert.ok(h.includes(t), t);
+  assert.ok(!h.includes('Sign in to continue')); assert.ok(!h.includes('/v2/auth/access'));
+});
+test('router: about is a public entry intent; unknown hashes fall back to home, never to a signed-in page', async () => {
+  const { readFileSync } = await import('node:fs'); const vm = await import('node:vm');
+  const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  const code = src.slice(src.indexOf('export function route('), src.indexOf('async function assessmentsFor')).replace('export function', 'function');
+  const route = vm.runInNewContext(`const VIEWS=[];${code};route`, {});
+  assert.deepEqual({ ...route('#about') }, { kind: 'entry', intent: 'about' });
+  for (const h of ['#public-about', '#nonsense', '#assessment']) assert.equal(route(h).kind, 'entry', h);
+  assert.equal(route('#projects').kind, 'projects');
 });

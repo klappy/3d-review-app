@@ -1,0 +1,9 @@
+# K1 isolated IME source checkpoint
+
+PR165 https://github.com/klappy/3d-review-app/pull/165 head cd3fd21fc581238147620fbf29bc5e559274c76c, tree 0fe8e364a156df914839b8dbfbf1a4fef148bb42, parent1b0ae83a9c79b17f2154317d29c035422e769fce. Exactly tree.js and shell.test.mjs; cloud PR162 untouched. Source FIRE3efaad5b read/ACKed; this source checkpoint is within15 active minutes. Frozen staging target is comparison only, not integration authorization.
+
+Defers search repaint while compositionstart state or InputEvent.isComposing is active; compositionend applies final query and restores start/end/direction. Event handlers target the captured search element only and are removed on repaint/model replacement/destroy. Tests cover retained input/focus/content, final filtering/selection, isComposing-only events, cancellation/normal search and stale identity/destroy events.
+
+Actual commands in /tmp/3d-k1-ime-isolated-20260922: node --test ui/kit/shell.test.mjs13pass; node --test ui/assess/entry.test.mjs ui/assess/identity-reset.test.mjs ui/assess/scope.test.mjs ui/roadmap/model.test.mjs50pass; git diff --check clean. Logs /tmp/k1-ime-tests.txt and /tmp/k1-ime-anchors.txt. Browser /tmp/3d-k1-ime-evidence/browser.cjs uses unchanged isolated shell fixture served localhost8898, empty Chrome contexts/localGET only; desktop1440x900 and phone390x844 retained composing node/focus, final filter/selection, mounted content and identity replacement suppression all pass. browser-results.json and desktop.png/phone.png retained. Synthetic browser composition events are NOT native OS IME evidence. No live API/data/auth/settings/logout.
+
+Independent exact-head review, actual checks and fresh cloud-head reconciliation remain required before separate coordinator integration. Known old cloud timeout does not establish worker termination. Preserve K2 independently accepted b4ca41f. No source/controller or release promotion performed.

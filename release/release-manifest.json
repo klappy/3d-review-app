@@ -1,36 +1,27 @@
 {
-  "version": "0.16.0",
+  "version": "0.21.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "3e31ad2f72c739f2c993906ca7bd25667a980c0f",
+  "cookbook_commit": "c312c8a62e7d896427c3f144df1b4c157508a221",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.16.0.md",
-      "blob_sha": "651e97ac291417bb364b91bc6505d40288712475",
-      "sha256": "d16c0aa5223963572732db7588a9b09ce3a144315fe642de92e8f48e11119bea"
+      "path": "planning/2026-09-16-parity-build/releases/0.21.0.md",
+      "blob_sha": "127e1df936090efa5a74a20f5f8c4af20b40d5c8",
+      "sha256": "5834dab46028009c217c7acb2e0928d3516863d2a642286d45c983a170ef1a46"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "4b6c03e0867a7a541b4c2de156f7bfc58f3d06d3",
-      "sha256": "7d5c98da351eca19c95babb79fb37a1e87961ba36c34fcc2da27670365e3a9bb"
+      "blob_sha": "27f7aadf02a9e322794481eeb660e7f6b79b6e71",
+      "sha256": "8a32aece1308436b4029eab3a228ab8492b5053eb7d9b2ff62a6443ac28a6519"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Kit shell activated on the real signed-in root and scope-reading routes: Workspaces→workspace→project→assessment navigation, search and expansion, language state and account/version controls through a read adapter over the existing controllers."
+        "cards show child counts: assessment → responses; project → assessments · responses; workspace → projects · assessments · responses (component: Card) (#255)",
+        "reports: build from real participant responses on DEV (attested synthetic path unchanged; held outside dev) (#256)"
       ],
-      "changed": [
-        "Persona evidence: 15/15 root integration tests and 71/71 adapter/scope/identity-reset/shell unit tests passed at the exact accepted source; 25/25 synthetic menu hit and click checks across five viewport cases in an independent isolated browser. At the corrected source, 100 affected/anchor tests passed independently with 10 meaningful failures on the uncorrected parent, and 26 real headless Chrome journeys (16 title/route/host/viewport, 4 Retry, 4 delayed completion, 2 demo disclosure) passed at 390×900 and 1440×900. Real provider account journey untested; satisfaction, confusion and frustration NOT MEASURED."
-      ],
-      "fixed": [
-        "Account menu stacks above the shell context on phone widths so Sign out and Use another account receive pointer input; header keeps its standard heights and no horizontal overflow at 195px.",
-        "Workspace, workspaces, projects and project pages keep their own visible heading when the kit shell is not hosting the page (non-kit entry such as /assess/); the kit host owns the title only when it is actually mounted.",
-        "The demonstration-data disclosure stays visible through kit repaints, navigation, search and expansion instead of disappearing on first render.",
-        "Every Retry control on a failed page is bound with one shared pending guard, so the second control (languages) works when assessments and languages both fail; stale retry results after navigation change nothing."
-      ],
-      "security": [
-        "Existing authentication, permissions, account read, sign-out and participant routes are unchanged; no fixture data, global state or role simulation in product. Presentation only."
-      ]
+      "changed": [],
+      "fixed": []
     }
   }
 }

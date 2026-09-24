@@ -1,0 +1,13 @@
+/* v3 shell (lane 1). Layout only; every value is a token from design-system-v3/tokens.css. */
+.rv .shell.no-tree{display:block;min-height:calc(100vh - 88px)}
+.rv .shell.no-tree>.content{margin:0 auto;padding:var(--main-pad)}
+@media (max-width:760px){.rv .shell.no-tree>.content{padding:20px 14px}}
+.rv .v3-state{display:inline-block;font-size:12px;letter-spacing:.04em;border-radius:var(--r-pill);padding:var(--badge-pad-y) var(--badge-pad-x);background:var(--badge-fill);color:var(--badge-ink);white-space:nowrap}
+
+/* CAPTAIN P0 12:10: demo exits in the v3 header (lane 1). */
+.v3-demo-exit{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}.v3-demo-exit .rv-btn{min-height:40px;padding:6px 14px;white-space:nowrap}
+@media (max-width:760px){.v3-demo-exit{gap:6px}.v3-demo-exit .rv-btn{min-height:36px;padding:4px 10px;font-size:13px}}
+
+/* NEED 9→1 (L1-20): Sidebar tree nesting inside the context panel; row look comes from design-system components.css. */
+.sidebar-tree ul{list-style:none;margin:0;padding:0}.sidebar-tree ul[role=group]{flex-basis:100%;padding-left:14px}
+.sidebar-tree li.tree-row{flex-wrap:wrap}

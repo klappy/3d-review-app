@@ -1,4 +1,5 @@
 import test from 'node:test';
+import * as v3 from './v3-shell.js';
 import assert from 'node:assert/strict';
 import { demoApi, sampleParticipantEnvironment, sampleResponses } from './demo.js';
 import { createParticipantJourney } from './participate/controller.js';
@@ -29,7 +30,7 @@ test('actual demo shell strips credential fragments and never reads or changes s
  const { isDemo, memoryStorage } = await import('./demo.js');
  const source=readFileSync(new URL('./assess/assess.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export function /g,'function ');
  let storageTouches=0; const location={search:'?demo=1',hash:'#session=staff-secret',pathname:'/'};
- const box={ isDemo, memoryStorage, demoApi, document:{getElementById:()=>null}, location, history:{replaceState:(_,__,url)=>{location.hash=url.slice(url.indexOf('#'));}}, get sessionStorage(){storageTouches++;throw Error('Demo touched staff storage');} };
+ const box={ ...v3, isDemo, memoryStorage, demoApi, document:{getElementById:()=>null}, location, history:{replaceState:(_,__,url)=>{location.hash=url.slice(url.indexOf('#'));}}, get sessionStorage(){storageTouches++;throw Error('Demo touched staff storage');} };
  const shell=runInNewContext(source+'\n({scrubCredentialHash,setToken,api})',box);
  shell.scrubCredentialHash(); assert.equal(location.hash,'#assessment/demo-assessment/prepare');
  shell.setToken('another-secret'); await shell.api('/v2/me'); await assert.rejects(shell.api('/v2/auth/session',{method:'DELETE'})); assert.equal(storageTouches,0);
