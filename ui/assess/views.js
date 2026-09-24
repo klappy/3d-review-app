@@ -78,7 +78,7 @@ const understand = {
     for (const [sid, r] of counts) countMap.set(sid, r.status === 'loaded' ? { status: 'loaded', responses: Number(r.value?.counts?.responses ?? 0), respondents: Number(r.value?.counts?.respondents ?? 0), unconfirmed: r.value?.counts?.unconfirmed, expected: r.value?.expected_count ?? r.value?.survey?.expected_count } : r);
     // Ruling 12:22 band input: the newest built report's per-perspective scores (read-only; a failed read leaves bands held).
     let bandScores = null;
-    const built = reports.status === 'loaded' && !reports.value?.suppressed && Array.isArray(reports.value?.reports) ? reports.value.reports : [];
+    const built = reports.status === 'loaded' && !reports.value?.suppressed && reports.value?.status !== 'held' && Array.isArray(reports.value?.reports) ? reports.value.reports : [];
     const newest = built.filter(x => x && x.id).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
     if (newest) { const rr = await settle(ctx.api(`/v2/reports/${ctx.enc(newest.id)}`)); if (rr.status === 'loaded' && !rr.value?.suppressed) { const sc = v3ReportScores(rr.value?.report); if (Object.keys(sc).length) bandScores = sc; } }
     return { aid, role: cur?.assessment?.role, surveys, counts: countMap, results, reports, bandScores, openReport: null };
