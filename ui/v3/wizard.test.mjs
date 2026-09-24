@@ -120,3 +120,54 @@ test('locked review shows links already issued so a partial launch never loses t
   const html = renderStep('review', draft(), data, [], { done: ['x'], links: [{ template: 'tpl.team', entry_fragment: '#survey=abc' }] }, 'https://dev');
   assert.match(html, /Links already opened/); assert.match(html, /Translation team/);
 });
+
+// #188: a write that committed but whose response was lost is read back, not repeated.
+const lossyApi = (loseOn) => {
+  const calls = []; const db = { assessments: [], surveys: [], stage: 'prepare' }; let n = 0; let lost = false;
+  const api = async (url, { method = 'GET', body } = {}) => {
+    calls.push(`${method} ${url}`);
+    let r;
+    if (method === 'GET' && url === '/v2/projects/p1/assessments') return { assessments: db.assessments };
+    if (method === 'GET' && url === '/v2/assessments/a1') return { assessment: { id: 'a1', stage: db.stage }, surveys: db.surveys };
+    if (url.endsWith('/assessments')) { const a = { id: 'a1', name: body.name, language_id: body.language_id, created_at: new Date().toISOString() }; db.assessments.push(a); r = { assessment: a }; }
+    else if (url.endsWith('/surveys')) { const x = { id: 's' + (++n), template_id: body.template_id, template_version: body.version }; db.surveys.push(x); r = { survey: x }; }
+    else if (url.endsWith('/stage')) { db.stage = body.stage; r = { assessment: { id: 'a1', stage: body.stage } }; }
+    else if (url.endsWith('/links')) r = body.mode === 'dry_run' ? { confirm_token: 'ct' } : { entry_fragment: '#survey=x' };
+    else throw new Error('unexpected ' + url);
+    if (!lost && loseOn(url, method)) { lost = true; throw new Error('network: response lost'); }
+    return r;
+  };
+  return { api, calls, db };
+};
+for (const [label, loseOn] of [
+  ['assessment.create', u => u.endsWith('/assessments')],
+  ['survey.select', u => u.endsWith('/surveys')],
+  ['set_stage', u => u.endsWith('/stage')],
+]) test(`#188 resume after lost ${label} response creates no duplicate`, async () => {
+  const { api, calls, db } = lossyApi(loseOn);
+  let err; try { await launch(draft(), { api, store: mem() }); } catch (e) { err = e; }
+  assert.ok(err && err.ctx && err.ctx.pending, 'failed launch carries a pending write');
+  const ctx = await launch(draft(), { api, store: mem(), resume: err.ctx });
+  assert.equal(db.assessments.length, 1);
+  assert.equal(db.surveys.length, 2);
+  assert.equal(calls.filter(c => c.endsWith('/stage')).length, 1);
+  assert.equal(ctx.pending, null);
+  assert.equal(ctx.links.length, 2);
+  assert.deepEqual(ctx.surveys.map(s => s.id).sort(), ['s1', 's2']);
+});
+
+test('#188 a failed write that did not commit is retried after reconcile finds nothing', async () => {
+  let fail = true; const made = [];
+  const api = async (url, { method = 'GET', body } = {}) => {
+    if (method === 'GET' && url === '/v2/projects/p1/assessments') return { assessments: made };
+    if (url.endsWith('/assessments')) { if (fail) { fail = false; throw new Error('503'); } const a = { id: 'a1', name: body.name, language_id: body.language_id }; made.push(a); return { assessment: a }; }
+    if (url.endsWith('/surveys')) return { survey: { id: 's' + body.template_id } };
+    if (url.endsWith('/stage')) return {};
+    if (url.endsWith('/links')) return body.mode === 'dry_run' ? { confirm_token: 'ct' } : { entry_fragment: '#survey=x' };
+    throw new Error('unexpected ' + url);
+  };
+  let err; try { await launch(draft(), { api, store: mem() }); } catch (e) { err = e; }
+  assert.equal(err.ctx.done.length, 0); assert.equal(err.ctx.pending.cap, 'cap.assessment.create');
+  const ctx = await launch(draft(), { api, store: mem(), resume: err.ctx });
+  assert.equal(made.length, 1); assert.equal(ctx.aid, 'a1');
+});
