@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {JSDOM} from 'jsdom';
+import {renderVersions} from './versions.js';import {nextVersion,parseChange,forecast} from '../../scripts/roadmap-versions.mjs';
+test('any minor → next minor, else patch',()=>{assert.equal(nextVersion('0.21.0',['patch','patch']),'0.21.1');assert.equal(nextVersion('0.21.3',['patch','minor']),'0.22.0');});
+test('forecast counts only units not already shipped, sorted by section then lane',()=>{const rel={current:'0.21.0',versions:[{version:'0.21.0',sections:{added:['old thing shipped already here (#1)'],changed:[],fixed:[]}}]};
+ const c=[parseChange('9-1.md','bump: patch\nlane: 9 · PR: #2\n- Fixed - b new fix'),parseChange('1-1.md','bump: minor\nlane: 1 · PR: #1\n- Added - old thing shipped already here'),parseChange('3-1.md','bump: patch\nlane: 3\n- Changed - a change')];
+ const f=forecast(rel,c);assert.equal(f.version,'0.21.1');assert.deepEqual(f.units.map(u=>u.file),['3-1.md','9-1.md']);});
+test('renders escaped forecast and shipped list',()=>{const html=renderVersions({current:'0.21.0',shipped:[{version:'0.21.0',added:['<b>x</b>'],changed:[],fixed:[]}],forecast:{version:'0.21.1',bump:'patch',units:[{section:'Fixed',text:'<img src=x>',lane:1}]}});const d=new JSDOM(html).window.document;assert.equal(d.querySelector('img'),null);assert.equal(d.querySelector('b'),null);assert.match(d.body.textContent,/Next: v0\.21\.1/);assert.match(d.body.textContent,/v0\.21\.0 · current/);});
+test('empty queue says so',()=>{assert.match(renderVersions({current:'0.21.0',shipped:[],forecast:{version:null,bump:null,units:[]}}),/Nothing waiting/);});

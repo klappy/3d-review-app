@@ -134,6 +134,38 @@ describe("self-service creation: provisioned defaults true for every normal user
     // L1-23: list reads carry read-only child counts for cards (fresh entities → 0).
     expect(wl.result.workspaces[0]).toMatchObject({ project_count: expect.any(Number), assessment_count: 0, response_count: 0 });
     expect(pl.result.projects[0]).toMatchObject({ assessment_count: 0, response_count: 0 });
+    // L1-30 (Bugbot carry 15:12): counts include only assessments this member can list (grants do not inherit).
+    const pid = pj.result.project.id;
+    await db.prepare("UPDATE project SET workspace_id = ? WHERE id = ?").bind(ws.result.workspace.id, pid).run();
+    await db.prepare("INSERT INTO language (id, project_id, name, created_at) VALUES ('lang_l130', ?, 'L130', '2026-09-24T00:00:00Z')").bind(pid).run();
+    await db.prepare("INSERT INTO assessment (id, project_id, language_id, name, stage, created_at) VALUES ('asm_l130_hidden', ?, 'lang_l130', 'Hidden', 'prepare', '2026-09-24T00:00:00Z')").bind(pid).run();
+    const pl2: any = await call(mila.principal, "cap.project.list", {}, "read");
+    expect(pl2.result.projects[0]).toMatchObject({ assessment_count: 0, response_count: 0 });
+    const wl2: any = await call(mila.principal, "cap.workspace.list", {}, "read");
+    expect(wl2.result.workspaces[0]).toMatchObject({ project_count: 1, assessment_count: 0, response_count: 0 });
+    await db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (\'grant_l130\', ?, \'assessment\', \'asm_l130_hidden\', \'viewer\', \'2026-09-24T00:00:00Z\')').bind(mila.id).run();
+    const pl3: any = await call(mila.principal, "cap.project.list", {}, "read");
+    expect(pl3.result.projects[0]).toMatchObject({ assessment_count: 1 });
+    const wg: any = await call(mila.principal, "cap.workspace.get", { id: ws.result.workspace.id }, "read");
+    expect(wg.result.projects[0]).toMatchObject({ assessment_count: 1 });
+    // L1-45 (captain 17:05): a project in the workspace without a grant is not counted on the workspace card.
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at) VALUES ('prj_l145_hidden', ?, 'Hidden project', '2026-09-24T00:00:00Z')").bind(ws.result.workspace.id).run();
+    const wl3: any = await call(mila.principal, "cap.workspace.list", {}, "read");
+    expect(wl3.result.workspaces[0]).toMatchObject({ project_count: 1, assessment_count: 1 });
+    // L1-46 (captain 17:05, L1-45 validator advisory): responses on an assessment without a grant are not counted; responses on a visible one are.
+    await db.prepare("INSERT INTO assessment (id, project_id, language_id, name, stage, created_at) VALUES ('asm_l146_hidden', ?, 'lang_l130', 'Hidden with responses', 'collect', '2026-09-24T00:00:00Z')").bind(pid).run();
+    for (const [sid, aid] of [["srv_l146_hidden", "asm_l146_hidden"], ["srv_l146_seen", "asm_l130_hidden"]]) {
+      await db.prepare("INSERT INTO assessment_survey (id, assessment_id, template_id, template_version, state, collection_status, created_at) SELECT ?, ?, id, version, 'selected', 'open', '2026-09-24T00:00:00Z' FROM survey_template LIMIT 1").bind(sid, aid).run();
+    }
+    for (const [rid, sid] of [["rsp_l146_h1", "srv_l146_hidden"], ["rsp_l146_h2", "srv_l146_hidden"], ["rsp_l146_s1", "srv_l146_seen"]]) {
+      await db.prepare("INSERT INTO response (id, assessment_survey_id, respondent_id, idempotency_key, answers_json, template_id, template_version, submitted_at) SELECT ?, s.id, ?, ?, '{}', s.template_id, s.template_version, '2026-09-24T00:00:00Z' FROM assessment_survey s WHERE s.id = ?").bind(rid, rid, rid, sid).run();
+    }
+    const pl4: any = await call(mila.principal, "cap.project.list", {}, "read");
+    expect(pl4.result.projects[0]).toMatchObject({ assessment_count: 1, response_count: 1 });
+    const wl4: any = await call(mila.principal, "cap.workspace.list", {}, "read");
+    expect(wl4.result.workspaces[0]).toMatchObject({ project_count: 1, assessment_count: 1, response_count: 1 });
+    const wg4: any = await call(mila.principal, "cap.workspace.get", { id: ws.result.workspace.id }, "read");
+    expect(wg4.result.projects[0]).toMatchObject({ assessment_count: 1, response_count: 1 });
   });
 
   it("(c) a second fresh principal still sees nothing of the first's workspace or project", async () => {
