@@ -107,11 +107,39 @@ export const VERSIONS = {
     "text": "roadmap: Versions section on /roadmap/ lists shipped releases and forecasts the next version from the waiting change files"
    },
    {
+    "file": "13-1805.md",
+    "bump": "patch",
+    "lane": 13,
+    "section": "Changed",
+    "text": "roadmap forecast 0.21.1 refreshed: lane 1 card counts (1-1741, 1-1752) and lane 9 less text (9-1759) join the patch train"
+   },
+   {
     "file": "1-1512.md",
     "bump": "patch",
     "lane": 1,
     "section": "Fixed",
     "text": "cards: child counts only include assessments and projects you can list (Bugbot carry 15:12)"
+   },
+   {
+    "file": "1-1741.md",
+    "bump": "patch",
+    "lane": 1,
+    "section": "Fixed",
+    "text": "card counts only include what you can open (workspace project count covered by a member who sees fewer; captain 17:05)"
+   },
+   {
+    "file": "1-1752.md",
+    "bump": "patch",
+    "lane": 1,
+    "section": "Fixed",
+    "text": "card counts only include what you can open (response count covered: responses on an assessment you cannot open are not counted; captain 17:05)"
+   },
+   {
+    "file": "9-1759.md",
+    "bump": "patch",
+    "lane": 9,
+    "section": "Fixed",
+    "text": "screens trimmed to one line and one primary action (public home: four choices, one heading, one line; the rest behind Learn more; captain 17:05)"
    }
   ]
  }
