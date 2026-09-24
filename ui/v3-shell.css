@@ -1,0 +1,5 @@
+/* v3 shell (lane 1). Layout only; every value is a token from design-system-v3/tokens.css. */
+.rv .shell.no-tree{display:block;min-height:calc(100vh - 88px)}
+.rv .shell.no-tree>.content{margin:0 auto;padding:var(--main-pad)}
+@media (max-width:760px){.rv .shell.no-tree>.content{padding:20px 14px}}
+.rv .v3-state{display:inline-block;font-size:12px;letter-spacing:.04em;border-radius:var(--r-pill);padding:var(--badge-pad-y) var(--badge-pad-x);background:var(--badge-fill);color:var(--badge-ink);white-space:nowrap}

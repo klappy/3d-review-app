@@ -12,6 +12,9 @@ import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
+import { V3_SHELL, onePrimary, stateWord } from '/v3-shell.js';
+// v3 shell (lane 1): context tree removed when V3_SHELL; crumbs remain the navigation.
+const v3Model = m => V3_SHELL ? { ...m, contextTree: false } : m;
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 // Product overhaul (cookbook #16 c5721465315): five VIEWS on one assessment page. A view is a tab; a tab never mutates stage.
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
@@ -21,7 +24,7 @@ const DOTS = { 'Translation Team': '', Church: 'blue', Community: 'gold', 'Other
 // link controls are MOVED into the shell's header host (same nodes, same listeners — never cloned). Without a kit root (tests,
 // legacy harness) `app` is the plain #app element and nothing else changes.
 const kitRoot = document.getElementById('rv');
-const kit = kitRoot ? mountKitRoot(kitRoot, shellModel({ route: route(location.hash), routes: cards.routes, principal: null }), { onNavigate: href => { if (typeof href === 'string' && href.startsWith('#')) { if (location.hash === href) render(); else location.hash = href; } } }) : null;
+const kit = kitRoot ? mountKitRoot(kitRoot, v3Model(shellModel({ route: route(location.hash), routes: cards.routes, principal: null })), { onNavigate: href => { if (typeof href === 'string' && href.startsWith('#')) { if (location.hash === href) render(); else location.hash = href; } } }) : null;
 // Compact chrome: #account (toggle showing #who + menu holding sign-out/switch/version/feedback/roadmap) is the ONLY hosted control.
 if (kit) { kit.adoptControls(document, ['account']); document.getElementById('shell-controls')?.remove(); bindAccountMenu(document); }
 const narrow = () => typeof matchMedia === 'function' && matchMedia('(max-width:760px)').matches;
@@ -33,7 +36,7 @@ function syncShell(page = null) {
   // A workspace page has already loaded its workspace: keep it in the same identity-scoped cache workspaceFor() uses (cleared by
   // resetIdentity) so later crumbs can name it without a discovery read. Data only; never a new request.
   if (page?.kind === 'workspace' && page.model?.status === 'loaded' && page.model.workspace?.id) state.workspaces.set(page.model.workspace.id, { id: page.model.workspace.id, name: page.model.workspace.name, role: page.model.workspace.role, projects: (page.model.projects || []).map(x => x.id) });
-  kit.update(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() }));
+  kit.update(v3Model(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() })));
   placeDemoNotice(); // Bugbot 4073693755: the shell repaint preserves only its content/header hosts; the disclosure is restored by the controller
 }
 // Demo disclosure (Bugbot 4073693755): ONE controller-owned node, built once, placed before the content element and re-placed by the
@@ -54,7 +57,9 @@ function placeDemoNotice() {
 let demoObserver = null;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const title = v => v.charAt(0).toUpperCase() + v.slice(1);
-const stageLabel = s => ({ prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' })[s] || esc(s);
+const stageLabel = s => (V3_SHELL && stateWord(s)) || ({ prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' })[s] || esc(s);
+// v3 one primary action per page (lane 1): after any content paint, keep the first primary in the content mount and demote the rest (class only).
+if (V3_SHELL && app && typeof MutationObserver === 'function') { let queued = false; new MutationObserver(() => { if (queued) return; queued = true; queueMicrotask(() => { queued = false; onePrimary(app); }); }).observe(app, { childList: true, subtree: true }); }
 const demo = typeof location !== 'undefined' && isDemo(location.search);
 let tabStorage = memoryStorage(); if (!demo) { try { tabStorage = sessionStorage; } catch {} }
 let token = null; if (!demo) { try { token = sessionStorage.getItem('facilitatorToken'); } catch {} }
