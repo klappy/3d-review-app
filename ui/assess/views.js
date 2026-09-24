@@ -5,7 +5,8 @@
 // literal; synthetic-only preview/confirmed build; recommendations are "not built" statically; RESERVED_NOT_BUILT/501 never hits
 // the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
-import { renderReport } from '../report-view.js'; // relative: resolves at /report-view.js in the browser and under node --test
+import { renderReport } from '../report-view.js';
+import { v3CountLine, v3BandsMarkup, v3StageWord, V3_FLAGS, v3css } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -74,7 +75,7 @@ const understand = {
       settle(ctx.api(`/v2/assessments/${ctx.enc(aid)}/reports`)),
     ]);
     const countMap = new Map();
-    for (const [sid, r] of counts) countMap.set(sid, r.status === 'loaded' ? { status: 'loaded', responses: Number(r.value?.counts?.responses ?? 0), respondents: Number(r.value?.counts?.respondents ?? 0) } : r);
+    for (const [sid, r] of counts) countMap.set(sid, r.status === 'loaded' ? { status: 'loaded', responses: Number(r.value?.counts?.responses ?? 0), respondents: Number(r.value?.counts?.respondents ?? 0), unconfirmed: r.value?.counts?.unconfirmed, expected: r.value?.expected_count ?? r.value?.survey?.expected_count } : r);
     return { aid, role: cur?.assessment?.role, surveys, counts: countMap, results, reports, openReport: null };
   },
   render(ctx, m) {
@@ -82,7 +83,7 @@ const understand = {
     // (1) Counts per lens: each survey row shows its OWN responses/respondents; the lens line sums responses only (A1/A2).
     const groups = [...LENSES, OTHER].map(lens => ({ lens, surveys: m.surveys.filter(s => lensFor(s) === lens) })).filter(g => g.lens !== OTHER || g.surveys.length);
     const countCell = s => { const c = m.counts.get(s.id) || { status: 'failed' };
-      if (c.status === 'loaded') return `<span data-count="${esc(s.id)}">${c.responses} response${c.responses === 1 ? '' : 's'} · ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}</span>`;
+      if (c.status === 'loaded') return `<span data-count="${esc(s.id)}">${c.responses} response${c.responses === 1 ? '' : 's'} · ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}</span><br><span data-v3-count="${esc(s.id)}">${v3CountLine({ responses: c.responses, expected: c.expected ?? s.expected_count, unconfirmed: c.unconfirmed }, esc)}</span>`;
       if (c.status === 'refused') return `<span data-count="${esc(s.id)}" role="alert">no longer available to you here</span>`;
       if (c.status === 'unauthenticated') return `<span data-count="${esc(s.id)}" role="alert">sign-in no longer active · ${SIGNIN}</span>`;
       return `<span data-count="${esc(s.id)}" role="alert">count unavailable · <a href="#" data-retry="counts">Retry</a></span>`; };
@@ -97,6 +98,8 @@ const understand = {
     let results;
     if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.reason || '')}</p>`; }
     else results = refusalLine(ctx, m.results.status, 'data-retry="results"', 'Results');
+    // v3 (ruling c): band layout, one card per perspective; a held result shows evidence gaps, never an invented band.
+    const bands = V3_FLAGS.bandResults && m.results.status === 'loaded' ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span></div>${v3BandsMarkup(m.results.value, LENSES, esc)}</section>` : '';
     // (3) Reports: server-owned eligibility and provenance; preview never writes a report.
     let reports;
     if (m.reports.status === 'loaded') {
@@ -107,7 +110,7 @@ const understand = {
     } else if (m.reports.status === 'refused') reports = '<p class="muted" data-reports-unavailable>Reports are unavailable for this assessment.</p>';
     else reports = refusalLine(ctx, m.reports.status, 'data-retry="reports"', 'Reports');
     const open = m.openReport ? (m.openReport.status === 'held' ? `<p class="muted" data-open-report-reason>${esc(m.openReport.reason)}</p>` : m.openReport.status === 'error' ? `<p class="small muted" role="alert">${esc(m.openReport.text)}</p>` : '') : '';
-    return `<div class="grid"><section class="panel"><p class="eyebrow">Understand</p><h2>Bring the perspectives together</h2>${lensBlocks}<p class="small muted line">Counts are per survey. Respondents are counted within each survey and are not added across surveys.</p></section><aside class="stack"><section class="panel" data-results><p class="eyebrow">Results</p>${results}</section><section class="panel" data-reports><p class="eyebrow">Reports</p>${reports}<p><button type="button" data-retry="reports">Refresh reports</button></p>${reportBuildMarkup(ctx, m.role)}${m.openReport && m.openReport.status !== 'shown' ? `<div>${open}</div>` : ''}<p class="status" role="status" aria-live="polite" data-report-status></p></section></aside></div><section class="panel report-full" data-report-full hidden><div class="report-tools"><p class="eyebrow" style="margin:0">Report · full view</p><button type="button" class="quiet" data-close-report>Close report</button></div><div data-report-view></div></section>`;
+    return `${bands}<div class="grid"><section class="panel"><p class="eyebrow">Understand</p><h2>Bring the perspectives together</h2>${lensBlocks}<p class="small muted line">Counts are per survey. Respondents are counted within each survey and are not added across surveys.</p></section><aside class="stack"><section class="panel" data-results><p class="eyebrow">Results</p>${results}</section><section class="panel" data-reports><p class="eyebrow">Reports</p>${reports}<p><button type="button" data-retry="reports">Refresh reports</button></p>${reportBuildMarkup(ctx, m.role)}${m.openReport && m.openReport.status !== 'shown' ? `<div>${open}</div>` : ''}<p class="status" role="status" aria-live="polite" data-report-status></p></section></aside></div><section class="panel report-full" data-report-full hidden><div class="report-tools"><p class="eyebrow" style="margin:0">Report · full view</p><button type="button" class="quiet" data-close-report>Close report</button></div><div data-report-view></div></section>`;
   },
   bind(ctx, root, m) {
     const clearReport = () => {

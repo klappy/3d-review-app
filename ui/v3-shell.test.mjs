@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {JSDOM} from 'jsdom';
+import {V3_SHELL, STATE_WORDS, stateWord, onePrimary} from './v3-shell.js';
+import {mountShell} from './kit/tree.js';
+import {fixture} from '../test/fixtures/kit-shell-data.js';
+test('v3 shell flag is on and state words cover every app stage id',()=>{assert.equal(V3_SHELL,true);assert.equal(stateWord('collect'),'Collecting responses');assert.equal(stateWord('prepare'),'Setup not finished');assert.equal(stateWord('understand'),'Ready to look at results');assert.equal(stateWord('improve'),'Reviewed');assert.equal(stateWord('constructor'),'');assert.equal(stateWord(undefined),'');assert.ok(Object.isFrozen(STATE_WORDS));});
+test('onePrimary keeps the first primary and demotes the rest, ignoring dialogs',()=>{const d=new JSDOM('<div id="r"><button class="primary" id="a">A</button><button class="primary" id="b">B</button><dialog><button class="primary" id="c">C</button></dialog></div>');const r=d.window.document.getElementById('r');assert.equal(onePrimary(r),1);assert.ok(r.querySelector('#a').classList.contains('primary'));assert.ok(!r.querySelector('#b').classList.contains('primary'));assert.ok(r.querySelector('#c').classList.contains('primary'));assert.equal(onePrimary(null),0);});
+test('contextTree:false omits the context tree but keeps crumbs, header host and content mount',()=>{const d=new JSDOM('<div id="app"></div>',{url:'https://fixture.invalid/'});const root=d.window.document.querySelector('#app');const shell=mountShell(root,{...fixture(),contextTree:false},{});assert.equal(root.querySelector('aside.tree'),null);assert.equal(root.querySelector('[data-search]'),null);assert.ok(root.querySelector('.shell.no-tree'));assert.ok(root.querySelector('nav.crumbs'));assert.ok(shell.content);assert.ok(shell.headerHost);shell.update(fixture());assert.ok(root.querySelector('aside.tree'));shell.destroy();});
