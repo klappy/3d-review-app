@@ -54,16 +54,17 @@ export const V3_BAND_CUTOFFS = Object.freeze({ provisional: true, strong: 75, gr
 export const V3_BAND_PROVISIONAL = 'Provisional bands: 75 and above Strong · 60–74 Growing · 40–59 Needs support · below 40 Needs urgent attention. At least 3 responses per perspective, otherwise More input needed.';
 /** Score → band word. `responses` null/undefined or below the minimum → "More input needed". */
 export function v3ScoreBand(score, responses, c = V3_BAND_CUTOFFS) {
-  const n = num(responses), s = score === null || score === undefined || score === '' ? NaN : Number(score);
+  const n = num(responses), s = scoreOf(score);
   if (n === null || n < c.minResponses || !Number.isFinite(s)) return 'More input needed';
   return s >= c.strong ? 'Strong' : s >= c.growing ? 'Growing' : s >= c.needsSupport ? 'Needs support' : 'Needs urgent attention';
 }
 /** Per-perspective scores from a built report ({payload:{lenses:[{lens,score,sub_dimensions:[{sub_dimension,score}]}]}}). */
+const scoreOf = v => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN); // null/''/bool → NaN, never 0
 export function v3ReportScores(report) {
   const ls = report && report.payload && Array.isArray(report.payload.lenses) ? report.payload.lenses : [];
   const out = {};
-  for (const l of ls) if (l && typeof l.lens === 'string' && Number.isFinite(Number(l.score)))
-    out[l.lens] = { score: Number(l.score), subs: (Array.isArray(l.sub_dimensions) ? l.sub_dimensions : []).filter(x => x && typeof x.sub_dimension === 'string' && Number.isFinite(Number(x.score))).map(x => ({ name: x.sub_dimension, score: Number(x.score) })) };
+  for (const l of ls) if (l && typeof l.lens === 'string' && Number.isFinite(scoreOf(l.score)))
+    out[l.lens] = { score: scoreOf(l.score), subs: (Array.isArray(l.sub_dimensions) ? l.sub_dimensions : []).filter(x => x && typeof x.sub_dimension === 'string' && Number.isFinite(scoreOf(x.score))).map(x => ({ name: x.sub_dimension, score: scoreOf(x.score) })) };
   return out;
 }
 

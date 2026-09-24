@@ -122,3 +122,9 @@ test('v3BandsMarkup: report scores band each perspective and sub-dimension, labe
   const heldHtml = v3BandsMarkup({ status: 'held', reason: 'D7' }, lenses, undefined, groups, null);
   assert.match(heldHtml, /data-v3-bands="held"/); assert.doesNotMatch(heldHtml, /data-v3-provisional/);
 });
+test('v3ReportScores: a null, empty or boolean score is no score (never banded as 0)', async () => {
+  const { v3ReportScores, v3ScoreBand } = await import('./v3-assessment.js');
+  const sc = v3ReportScores({ payload: { lenses: [{ lens: 'Church', score: null }, { lens: 'Community', score: '' }, { lens: 'Translation Team', score: true, sub_dimensions: [] }, { lens: 'X', score: 50, sub_dimensions: [{ sub_dimension: 'A', score: null }, { sub_dimension: 'B', score: '61' }] }] } });
+  assert.deepEqual(Object.keys(sc), ['X']); assert.deepEqual(sc.X.subs, [{ name: 'B', score: 61 }]);
+  assert.equal(v3ScoreBand(false, 9), 'More input needed'); assert.equal(v3ScoreBand('', 9), 'More input needed');
+});
