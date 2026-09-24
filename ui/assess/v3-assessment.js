@@ -5,6 +5,7 @@
 // this module only reads what the API already returns and never invents a number the server did not send.
 
 import { stepper, ensureStepperStyle } from '../v3/components/stepper.js';
+import { bandCard, bandLegend, BAND_LEGEND } from '../v3/components/band-card.js'; // component: Band card + legend (ruling 12:34)
 
 export const V3_FLAGS = Object.freeze({ expectedCountOptional: true, showUnconfirmed: true, bandResults: true, nextStepPage: true });
 
@@ -44,10 +45,9 @@ export function v3CountLine({ responses, expected, unconfirmed } = {}, esc = esc
 }
 
 const BAND_WORDS = new Set(['Strong', 'Growing', 'Needs support', 'Needs urgent attention', 'More input needed']);
-const LENS_CLASS = { 'Translation Team': 'team', Church: 'church', Community: 'community' };
 
 // Prototype frame 10 legend (design-system-v3 V.results): one colour dot per band word, colours from tokens only.
-export const V3_LEGEND = Object.freeze([['Strong', '--band-strong'], ['Growing', '--band-growing'], ['Needs support', '--band-needs-support'], ['Needs urgent attention', '--band-urgent'], ['More input needed', '--pip']]);
+export const V3_LEGEND = BAND_LEGEND;
 
 // CAPTAIN RULING 12:22 (ASK.md option 1): PROVISIONAL cut-offs, labelled provisional on the page. One flip here.
 // Input (captain 11:42): the latest built report's per-perspective score (payload.lenses[].score, 0–100) and the server's
@@ -90,9 +90,9 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores
       : suppressed ? '<div class="note">Withheld to protect a small group. This is an evidence gap, not a poor result.</div>'
       : b && b.text ? `<p>${esc(b.text)}</p>` : '';
     const count = groups ? `<div class="v3-band-count small muted" data-v3-band-count="${esc(lens)}">${esc(v3GroupCountText(groups[lens]))}</div>` : '';
-    return `<div class="glass band lens ${LENS_CLASS[lens] || ''}" data-v3-band="${esc(lens)}" data-v3-band-word="${esc(word)}"><div class="eyebrow">${esc(lens)}</div><div class="word">${esc(word)}</div>${note}${count}</div>`;
+    return bandCard({ lens, word, bodyHtml: note, countHtml: count }, esc);
   }).join('');
-  const legend = `<div class="legend small muted" data-v3-legend>${V3_LEGEND.map(([w, v]) => `<span><i class="dot" style="background:var(${v})" aria-hidden="true"></i>${w}</span>`).join('')}</div>`;
+  const legend = bandLegend(V3_LEGEND, esc);
   const prov = scored && V3_BAND_CUTOFFS.provisional ? `<p class="small muted" data-v3-provisional>${esc(V3_BAND_PROVISIONAL)}</p>` : '';
   return `<div class="v3-bands three" data-v3-bands="${scored ? 'provisional' : held ? 'held' : 'shown'}">${cards}</div>${legend}${prov}`;
 }
