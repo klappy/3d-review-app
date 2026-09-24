@@ -210,7 +210,7 @@ export function mountWizard(root, deps) {
     if (form.dataset.wzForm === 'information') d.context = String(fd.get('context') || '');
   };
   root.addEventListener('change', async e => {
-    if (e.target.name === 'project' && !s.partial && !s.busy) { const f = e.target.form; read(f); s.d.project = e.target.value; s.d.language = ''; s.errs = []; paint(); try { if (!(await loadLanguages())) return; } catch (err) { return note(err); } paint(); }
+    if (e.target.name === 'project' && !s.partial && !s.busy) { const f = e.target.form; read(f); s.d.project = e.target.value; s.d.language = ''; s.data.languages = []; s.errs = []; paint(); try { if (!(await loadLanguages())) return; } catch (err) { return note(err); } paint(); }
   }, on);
   root.addEventListener('submit', e => {
     e.preventDefault(); if (s.partial || s.busy) return; read(e.target);
