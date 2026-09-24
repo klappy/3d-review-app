@@ -12,7 +12,10 @@ import { shareUrl } from '../shared-link.js';
 
 export const STEPS = ['details', 'participants', 'information', 'review'];
 // Step names follow Bincy's screen inventory 03–06 (cookbook @933eb5f sources/bincy-design-sprint-2026-09-22/01_documents/04_screen_inventory.md).
-export const STEP_TITLES = ['Assessment details', 'Who will participate?', 'Participant information', 'Review & launch'];
+// Stepper labels follow the approved design-system-v3 prototype setup view (captain correction 11:14).
+export const STEP_TITLES = ['Details', 'Participants', 'Information', 'Review'];
+// Perspective colour dot, as the prototype's pdot(); unknown perspectives get the neutral pip.
+export const pdot = p => { const s = String(p || '').toLowerCase(); return /team/.test(s) ? 'p-team' : /community/.test(s) ? 'p-community' : /church/.test(s) ? 'p-church' : 'p-reviewer'; };
 export const EXPECTED_KEY = 'v3:expected'; // { [surveyId]: N } — device-local, never sent to the API
 export const NEW_PROJECT = '__new__';
 
@@ -209,7 +212,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
     </form>`;
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Three perspectives, kept separate. Choose the groups you can reach.')}${errBox(errs)}
     <form data-wz-form="participants">
-      ${templates.length ? templates.map(t => { const g = d.groups[t.id]; return `<div class="group${g ? ' on' : ''}">
+      ${templates.length ? templates.map(t => { const g = d.groups[t.id]; return `<div class="group${g ? ' on' : ''}"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span>
         <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(t.version)}"${g ? ' checked' : ''}><span><b>${esc(t.perspective)}</b><span class="sub">${esc(t.name)}</span></span></label>
         <div class="gin"><label for="n-${esc(t.id)}">How many do you expect?</label><input type="number" id="n-${esc(t.id)}" name="n-${esc(t.id)}" min="1" step="1" inputmode="numeric" value="${g && g.expected ? esc(g.expected) : ''}" placeholder="optional"></div></div>`; }).join('')
         : '<p class="muted">No published surveys are available to this account.</p>'}
@@ -222,11 +225,11 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       <dl class="kv"><dt>Project</dt><dd>${esc(proj.name || '')}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd><dt>Format</dt><dd>${esc(d.format)}</dd></dl>
       <label>A note for participants (optional)<textarea name="context" rows="2" placeholder="Not stored yet: the product has no field for this note.">${esc(d.context)}</textarea></label>
       <h3>Asked of each participant</h3>
-      ${chosen.map(t => `<div class="group"><b>${esc(t.perspective)}</b><span class="sub">The questions in the ${esc(t.name)} survey, as published. Answers are grouped, never shown alone.</span></div>`).join('')}
+      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><b>${esc(t.perspective)}</b><span class="sub">The questions in the ${esc(t.name)} survey, as published. Answers are grouped, never shown alone.</span></div></div>`).join('')}
       ${actions(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   // review
-  return `${head(n, 'Review & launch', 'Check the setup before collection opens. Launching opens the survey links; nothing is sent to anyone.')}${errBox(errs)}
+  return `${head(n, 'Ready to launch', 'Check the setup before collection opens. Launching opens the survey links; nothing is sent to anyone.')}${errBox(errs)}
     <div class="wz-sec"><h3>Details</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="details">Edit</button>'}</div>
     <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>

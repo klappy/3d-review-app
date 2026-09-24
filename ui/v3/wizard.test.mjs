@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile } from './wizard.js';
+import { countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot } from './wizard.js';
 
 const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
 const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
@@ -79,11 +79,11 @@ test('views: four steps, one primary each, optional expected count, escaped', ()
   const r = renderStep('review', draft(), { ...data, templates: [...data.templates, { id: 'tpl.community', version: 2, name: 'Community', perspective: 'Community' }] });
   assert.match(r, /10 expected/); assert.match(r, /no number given/);
   // L2-2 · Bincy 03–06: step names, review summary carries all three sections with an Edit each; locked hides Edit.
-  assert.match(r, /Review &amp; launch|Review & launch/); assert.match(r, /<h3>Participant information<\/h3>/);
+  assert.match(r, /Ready to launch/); assert.match(r, /<h3>Participant information<\/h3>/);
   assert.equal((r.match(/data-wz="edit"/g) || []).length, 3);
   assert.match(r, /data-step="information"/);
   assert.equal((renderStep('review', draft(), data, [], true).match(/data-wz="edit"/g) || []).length, 0);
-  assert.match(renderStep('details', draft(), data), /Who will participate\?/);
+  assert.match(renderStep('details', draft(), data), /<span>Participants<\/span>/);
   assert.match(renderStep('review', draft({ context: '<b>x</b>' }), data), /&lt;b&gt;x&lt;\/b&gt; <span class="sub">\(not stored yet/);
 });
 
@@ -211,4 +211,9 @@ test('lane 12 L12-1: lead organisation rides cap.project.create only when given 
   assert.match(html, /Lead organisation<input name="newOrg" value="A &amp; B"/);
   assert.doesNotMatch(renderStep('details', draft(), { projects: [], languages: [], templates: [] }, [], false, ''), /newOrg/);
   assert.match(renderStep('review', draft({ project: NEW_PROJECT, newProject: 'H', newOrg: 'Org' }), { projects: [], languages: [], templates: [] }, [], false, ''), /<dt>Lead organisation<\/dt><dd>Org<\/dd>/);
+});
+
+test('L2-4 setup look follows the design-system-v3 prototype: short stepper labels, perspective dots', () => {
+  assert.deepEqual(STEP_TITLES, ['Details', 'Participants', 'Information', 'Review']);
+  assert.equal(pdot('Translation team'), 'p-team'); assert.equal(pdot('Community'), 'p-community'); assert.equal(pdot('Church'), 'p-church'); assert.equal(pdot('Other'), 'p-reviewer');
 });
