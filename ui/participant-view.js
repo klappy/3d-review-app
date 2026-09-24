@@ -32,7 +32,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   // v3 L1-5 (NEED 5→1): the instrument's source ref is provenance for facilitators, not participant copy; the raw
   // unbroken path widened the intro to 697px on a 375px phone (TRAINING.md #10). Kept on the model, never painted here.
   const start=button('Start',()=>showForm(0));start.className='rv-btn primary participant-start';intro.append(start);
-  const foot=el('p','No account, no sign-in. Your facilitator can also enter your answers with you on paper.');foot.className='participant-foot';intro.append(foot);
+  const foot=el('p','No account, no sign-in. You can review your answers before you send them.');foot.className='participant-foot';intro.append(foot);
   const nav=el('div');nav.className='participant-pager';nav.hidden=true;
   const progress=el('p');progress.className='participant-progress eyebrow';progress.setAttribute('aria-live','polite');
   const controls=el('div');controls.className='participant-page-actions';
