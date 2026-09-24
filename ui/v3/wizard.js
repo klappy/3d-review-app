@@ -199,13 +199,13 @@ export function renderDone(ctx, origin = '', templates = []) {
 export function mountWizard(root, deps) {
   const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0 };
   let alive = true; const ac = new AbortController(); const on = { signal: ac.signal };
-  const paint = () => { if (!alive) return; root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, s.data, s.errs, s.partial || false, deps.origin || '')}</div>`; };
+  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, s.data, s.errs, s.partial || false, deps.origin || '')}</div>`; };
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
   const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
     const fd = new FormData(form), d = s.d;
     if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newLanguage', 'period', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
-    if (form.dataset.wzForm === 'details') { d.followup = fd.has('followup'); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
+    if (form.dataset.wzForm === 'details') { d.followup = fd.has('followup'); if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
     if (form.dataset.wzForm === 'information') d.context = String(fd.get('context') || '');
   };
