@@ -127,12 +127,11 @@ export function v3SetStage(api, enc, aid, action) {
 
 // Screen 11 "Next step" (Bincy 04_screen_inventory #11; prototype V.next frame 11, provisional). Same two stored notes
 // (notes_reflection, notes_next_steps) — no new field: the prototype's "Follow up on" date and Bincy's suggested-areas list
-// are not stored by the contract, so they are not drawn (PARITY A5/I1). "Save and finish this review" = save notes, then the
-// one allowed set_stage step understand → improve; in any other stage the button only saves.
+// are not stored by the contract, so they are not drawn (PARITY A5/I1). The stage move to Improving stays on the Understand
+// gate ("Choose a next step", U4); this page only saves the two notes (no second write, no race with navigation — Bugbot on #197).
 export const V3_NEXT = Object.freeze({
   eyebrow: 'Next step', title: 'What happens next?', reflection: 'What you noticed', next: 'The next step',
   reflectionHint: 'In your words. This stays with this review.', nextHint: 'e.g. A listening session with the church group',
   footer: 'There is no fixed schedule. Start another review when it is appropriate; this one keeps its history.',
-  finish: 'Save and finish this review', save: 'Save',
+  save: 'Save notes',
 });
-export function v3NextFinishes(stage, editable) { return !!editable && stage === 'understand'; }
