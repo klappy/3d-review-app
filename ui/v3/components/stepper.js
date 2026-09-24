@@ -13,7 +13,7 @@ export function stepper(steps = [], current = 1, { label = 'Steps' } = {}) {
   const n = Number.isInteger(current) ? current : 1;
   const items = (Array.isArray(steps) ? steps : []).map(s => (typeof s === 'string' ? { label: s } : s || {}));
   return `<ol class="v3-stepper stepper" aria-label="${esc(label)}">${items.map((s, i) => {
-    const k = i + 1, state = k < n ? 'done' : k === n ? 'on' : '';
+    const k = i + 1, state = k < n ? 'done' : k === n ? 'on' : 'todo';
     const href = safeHref(s.href);
     const body = `<i aria-hidden="true">${k < n ? '✓' : k}</i><span>${esc(s.label)}</span>${k < n ? '<b class="v3-sr"> (completed)</b>' : ''}`;
     const cur = k === n ? ' aria-current="step"' : '';
