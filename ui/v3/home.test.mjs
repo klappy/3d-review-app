@@ -30,3 +30,10 @@ test('archived project is labelled Archived, no continue action', () => {
 test('never shows a raw language id', () => {
   assert.doesNotMatch(assessmentRow({ id: 'a', name: 'A', stage: 'collect', language_id: 'lang_123' }, label), /lang_123/);
 });
+test('L9-2 frame 2: assessments render as whole-card links in one grid, eyebrow project · language, no nested links', () => {
+  const h = homeView({ projects: [{ id: 'p1', name: 'Lake' }], listFor: () => ({ status: 'loaded', list: [{ id: 'a1', name: 'Oct', stage: 'collect', language_name: 'Hindi' }] }), stageLabel: label });
+  assert.match(h, /class="v3h-cards"/); assert.match(h, /<a class="v3h-card v3h-acard" href="#assessment\/a1"/);
+  assert.match(h, /v3h-eyebrow">Lake · Hindi</);
+  const card = h.slice(h.indexOf('<a class="v3h-card'), h.indexOf('</a>', h.indexOf('<a class="v3h-card')) + 4);
+  assert.equal((card.match(/<a /g) || []).length, 1, 'card holds no inner link');
+});
