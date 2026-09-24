@@ -1,27 +1,32 @@
 {
-  "version": "0.21.0",
+  "version": "0.21.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "c312c8a62e7d896427c3f144df1b4c157508a221",
+  "cookbook_commit": "fd30520cf2f3f63b803a61ae8f4f12adcd93dbbc",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.21.0.md",
-      "blob_sha": "127e1df936090efa5a74a20f5f8c4af20b40d5c8",
-      "sha256": "5834dab46028009c217c7acb2e0928d3516863d2a642286d45c983a170ef1a46"
+      "path": "planning/2026-09-16-parity-build/releases/0.21.1.md",
+      "blob_sha": "eb469b2ece6ecc1dbf9312b49c14dff74a10dc2e",
+      "sha256": "813e90161ddd74281be50aac93e8b299e183925aa100e33ba150962b098ac338"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "27f7aadf02a9e322794481eeb660e7f6b79b6e71",
-      "sha256": "8a32aece1308436b4029eab3a228ab8492b5053eb7d9b2ff62a6443ac28a6519"
+      "blob_sha": "d32156d0e96668fdc1ab9a578e3fdf64626c2b62",
+      "sha256": "51cd0dffe7572b8a14a8b6e7cff7fdef9bd2b3d3f29405dd5754b80fbddfceeb"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "cards show child counts: assessment → responses; project → assessments · responses; workspace → projects · assessments · responses (component: Card) (#255)",
-        "reports: build from real participant responses on DEV (attested synthetic path unchanged; held outside dev) (#256)"
+      "added": [],
+      "changed": [
+        "roadmap: Versions section on /roadmap/ lists shipped releases and forecasts the next version from the waiting change files (#261)",
+        "roadmap forecast 0.21.1 refreshed (lane 1 card counts, lane 9 less text) (#265)"
       ],
-      "changed": [],
-      "fixed": []
+      "fixed": [
+        "cards: child counts only include assessments and projects you can list (#260)",
+        "card counts only include what you can open — workspace project count covered by a member who sees fewer (#262)",
+        "card counts only include what you can open — responses on an assessment you cannot open are not counted (#263)",
+        "public home: less text — four choices, one heading, one line; the rest behind Learn more (#264)"
+      ]
     }
   }
 }
