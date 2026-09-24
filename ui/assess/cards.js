@@ -2,7 +2,9 @@
 // Pure functions: HTML strings only, no fetch, no DOM. Every text value passes through esc().
 export const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const enc = v => encodeURIComponent(String(v ?? ''));
-export const STAGE_LABEL = Object.freeze({ prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' });
+// v3 plain state words (lane 1; must match ui/v3-shell.js STATE_WORDS — cards.js is inlined into the MCP panel, so no import).
+// v2 words, for a one-line revert: { prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' }
+export const STAGE_LABEL = Object.freeze({ prepare: 'Setup not finished', collect: 'Collecting responses', understand: 'Ready to look at results', improve: 'Reviewed' });
 export const stageLabel = s => STAGE_LABEL[s] || esc(s || '');
 
 // card({ eyebrow, title, href, meta: [strings], badge, note, archived }) — a panel that is a link when href is set.
