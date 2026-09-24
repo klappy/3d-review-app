@@ -7,7 +7,7 @@ test('Stepper: done ticked, current active with aria-current, later pending', ()
   assert.match(h, /^<ol class="v3-stepper stepper" aria-label="Setup steps">/);
   assert.match(h, /<li class="done"><i aria-hidden="true">✓<\/i><span>A<\/span><b class="v3-sr"> \(completed\)<\/b><\/li>/);
   assert.match(h, /<li class="on" aria-current="step"><i aria-hidden="true">2<\/i><span>B<\/span><\/li>/);
-  assert.match(h, /<li class=""><i aria-hidden="true">3<\/i><span>C<\/span><\/li>/);
+  assert.match(h, /<li class="todo"><i aria-hidden="true">3<\/i><span>C<\/span><\/li>/);
   assert.equal((h.match(/aria-current/g) || []).length, 1);
 });
 
@@ -20,6 +20,7 @@ test('Stepper: each step can navigate via app-local hash links; unsafe hrefs and
 
 test('Stepper: edge inputs — none current, all done, bad input', () => {
   assert.doesNotMatch(stepper(['A', 'B'], 0), /aria-current|done/);
+  assert.doesNotMatch(stepper(['A', 'B', 'C'], 2), /class=""/);
   assert.equal((stepper(['A', 'B'], 3).match(/class="done"/g) || []).length, 2);
   assert.equal(stepper(null, 1), '<ol class="v3-stepper stepper" aria-label="Steps"></ol>');
   assert.match(stepper(['A'], 'x'), /class="on"/);
