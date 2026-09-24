@@ -77,7 +77,9 @@ test('U2 toggle: closed by default, table hidden; open shows Simple view', () =>
 test('group count on band cards: partial loads say so; no survey says so', () => {
   assert.equal(v3GroupCountText({ surveys: 2, loaded: 2, responses: 1 }), '1 response');
   assert.equal(v3GroupCountText({ surveys: 2, loaded: 1, responses: 4 }), '4 responses so far (1 of 2 survey counts loaded)');
-  assert.equal(v3GroupCountText(undefined), 'No survey for this group');
+  assert.equal(v3GroupCountText(undefined), 'Not asked in this review');
+  assert.equal(v3GroupCountText({ surveys: 2, loaded: 0, responses: 0 }), 'Count not loaded yet');
+  assert.deepEqual(v3EvidenceRows({ bands: [{ perspective: 'Church', band: 'Strong' }] }, ['Church'], { Church: { surveys: 1, loaded: 0, responses: 0 } })[0], ['Church', 'Strong · Count not loaded yet', 'Count not loaded yet']);
   assert.match(v3BandsMarkup({ status: 'held' }, L, undefined, { Church: { surveys: 1, loaded: 1, responses: 2 } }), /data-v3-band-count="Church">2 responses/);
   assert.doesNotMatch(v3BandsMarkup({ status: 'held' }, L), /data-v3-band-count/);
 });

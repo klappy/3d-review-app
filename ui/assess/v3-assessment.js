@@ -69,7 +69,8 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null) {
 // is met by the per-perspective count on each band card. Every number here is a server count; nothing is scored.
 /** Group count text for one perspective: {surveys, loaded, responses} from the per-survey count reads. */
 export function v3GroupCountText(g) {
-  if (!g || !g.surveys) return 'No survey for this group';
+  if (!g || !g.surveys) return 'Not asked in this review';
+  if (!g.loaded) return 'Count not loaded yet'; // the server has sent no count: show no number
   const n = num(g.responses) ?? 0, base = `${n} response${n === 1 ? '' : 's'}`;
   return g.loaded === g.surveys ? base : `${base} so far (${g.loaded} of ${g.surveys} survey counts loaded)`;
 }
@@ -81,7 +82,7 @@ export function v3EvidenceRows(results, lenses, groups = {}) {
     if (!g || !g.surveys) return [lens, 'Not asked in this review', 'Missing data is not a low result'];
     const b = !held && Array.isArray(r.bands) ? r.bands.find(x => x && x.perspective === lens) : null;
     const say = b && BAND_WORDS.has(b.band) ? b.band : held ? 'Held · no band yet' : 'More input needed';
-    const limit = held ? (r.reason || 'Results are held') : (num(g.responses) ?? 0) === 0 ? 'No responses yet' : 'People who did not answer may see it differently';
+    const limit = held ? (r.reason || 'Results are held') : !g.loaded ? 'Count not loaded yet' : (num(g.responses) ?? 0) === 0 ? 'No responses yet' : 'People who did not answer may see it differently';
     return [lens, `${say} · ${counted}`, limit];
   });
 }
