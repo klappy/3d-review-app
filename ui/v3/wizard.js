@@ -101,12 +101,63 @@ async function launchInner(d, opts) {
       continue;
     }
     if (i++ < ctx.done.length) continue;
-    const r = await api(step.url(ctx), { method: step.method, body: step.body(ctx) });
+    // #188: a write whose response was lost may have committed. Read it back by ids already known before retrying.
+    // language.create is also read back on any resume: the project is this launch's own (created or reconciled), so a
+    // same-name language there is ours; a "name already exists" 400 would otherwise block Continue forever (Bugbot 4094916357).
+    if ((ctx.pending && ctx.pending.cap === step.cap) || (resume && step.cap === 'cap.language.create')) {
+      const found = await reconcile(step, ctx, d, api);
+      if (found) { if (step.keep) step.keep(found, ctx); ctx.pending = null; ctx.done.push(step.cap); continue; }
+    }
+    ctx.pending = { cap: step.cap, at: now() };
+    let r;
+    try { r = await api(step.url(ctx), { method: step.method, body: step.body(ctx) }); }
+    catch (e) { if (refused(e)) ctx.pending = null; throw e; } // a clear 4xx refusal committed nothing: stay editable
     if (step.keep) step.keep(r, ctx);
+    ctx.pending = null;
     ctx.done.push(step.cap);
   }
   rememberExpected(store, ctx.surveys);
   return ctx;
+}
+
+const now = () => Date.now();
+const SKEW_MS = 5 * 60 * 1000; // client/server clock tolerance when matching a just-created row by name
+const recent = (row, at) => { const t = Date.parse(row?.created_at || ''); return !Number.isNaN(t) && t >= at - SKEW_MS; };
+// 4xx other than 409 (conflict may mean it already exists) = the server refused; no status or 5xx = outcome unknown.
+export const refused = e => Number.isInteger(e?.status) && e.status >= 400 && e.status < 500 && e.status !== 409;
+const newest = rows => rows.slice().sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0] || null;
+
+// #188 reconcile: returns a response-shaped object when the uncertain write is found committed, else null (safe to retry).
+// Reads only (cap.project.list · cap.language.list · cap.assessment.list · cap.assessment.get); contract unchanged.
+// cap.survey.issue_link cannot be read back (the server keeps only a hash), so it is simply issued again.
+export async function reconcile(step, ctx, d, api) {
+  const at = ctx.pending?.at ?? 0;
+  if (step.cap === 'cap.project.create') {
+    const r = await api('/v2/projects'); const name = d.newProject.trim();
+    const hit = newest((r.projects || []).filter(p => p.name === name && p.role === 'owner' && !p.archived_at && recent(p, at)));
+    return hit ? { project: hit } : null;
+  }
+  if (step.cap === 'cap.language.create') {
+    const r = await api(`/v2/projects/${enc(ctx.pid)}/languages`); const name = d.newLanguage.trim();
+    const hit = newest((r.languages || []).filter(l => l.name === name && !l.archived_at));
+    return hit ? { language: hit } : null;
+  }
+  if (step.cap === 'cap.assessment.create') {
+    const r = await api(`/v2/projects/${enc(ctx.pid)}/assessments`); const name = d.name.trim();
+    const hit = newest((r.assessments || []).filter(a => a.name === name && a.language_id === ctx.lid && a.role === 'owner' && a.stage === 'prepare' && !a.archived_at && recent(a, at)));
+    return hit ? { assessment: hit } : null;
+  }
+  if (step.cap === 'cap.survey.select') {
+    const tid = step.body(ctx).template_id, version = step.body(ctx).version, have = new Set(ctx.surveys.map(x => x.id));
+    const r = await api(`/v2/assessments/${enc(ctx.aid)}`);
+    const hit = (r.surveys || []).find(x => x.template_id === tid && Number(x.template_version) === version && !x.archived_at && !have.has(x.id));
+    return hit ? { survey: hit } : null;
+  }
+  if (step.cap === 'cap.assessment.set_stage') {
+    const r = await api(`/v2/assessments/${enc(ctx.aid)}`);
+    return r.assessment && r.assessment.stage && r.assessment.stage !== 'prepare' ? r : null;
+  }
+  return null;
 }
 
 function safeStore() { try { return globalThis.localStorage || null; } catch { return null; } }
@@ -231,7 +282,7 @@ export function mountWizard(root, deps) {
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
       try { const done = await launch(s.d, { api: deps.api, store: deps.store, resume: s.partial }); if (!alive) return; s.done = done; s.partial = null; paint(); }
-      catch (err) { if (!alive) return; s.partial = err.ctx?.done.length ? err.ctx : s.partial; s.step = 'review'; note(new Error(s.partial ? `${err.message || err} ${s.partial.done.length} of the launch writes were done. "Continue the launch" picks up from where it stopped; edits stay locked until then.` : `${err.message || err} Nothing was created. You can edit and launch again.`)); }
+      catch (err) { if (!alive) return; s.partial = (err.ctx?.done.length || err.ctx?.pending) ? err.ctx : s.partial; s.step = 'review'; note(new Error(s.partial ? `${err.message || err} ${s.partial.done.length} of the launch writes were done${s.partial.pending ? ' and the last one may have gone through' : ''}. "Continue the launch" checks what was saved and picks up from there; edits stay locked until then.` : `${err.message || err} Nothing was created. You can edit and launch again.`)); }
       finally { s.busy = false; }
     }
   }, on);
