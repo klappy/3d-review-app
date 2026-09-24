@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.17.0",
+  "current": "0.18.0",
   "versions": [
+    {
+      "version": "0.18.0",
+      "status": "candidate",
+      "notes_path": "releases/0.18.0.md",
+      "sections": {
+        "added": [
+          "component: Stepper — one progress stepper in ui/v3/components/stepper.js (glass dots, done ticks, optional hash links per step); the setup wizard composes it and lane 3 imports it for the assessment page (rulings 12:28, 12:34) (#227)",
+          "results: provisional bands (≥75 Strong · 60–74 Growing · 40–59 Needs support · <40 Needs urgent attention; min 3 responses else More input needed) from the latest report's per-perspective and sub-dimension scores, labelled provisional; numbers behind \"Show evidence and details\" (component: Band card + legend) (#225)",
+          "component: Breadcrumbs — one crumb row in fixed order Home › Workspace › Project › Assessment › Page (ui/v3/components/breadcrumbs.js; mounting via NEED 9→1) (#224)"
+        ],
+        "changed": [],
+        "fixed": [
+          "demo: exit to home and sign in from every demo screen (#222)",
+          "permissions: people shown by name and email, not id (component: Member list, used on workspace, project and assessment permissions) (#226)"
+        ]
+      }
+    },
     {
       "version": "0.17.0",
       "status": "candidate",
