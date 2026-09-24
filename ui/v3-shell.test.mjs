@@ -11,5 +11,7 @@ test('contextTree:false omits the context tree but keeps crumbs, header host and
 test('cards.js STAGE_LABEL and stage-screens.js carry the same v3 state words (neither may import v3-shell)', async () => {
   const { STAGE_LABEL } = await import('./assess/cards.js');
   const { STAGE_STATE_WORDS } = await import('./stage-screens.js');
+  const { CTX_STAGE_WORDS } = await import('./assess/scope.js');
+  for (const k of ['prepare', 'collect', 'understand', 'improve']) assert.equal(CTX_STAGE_WORDS[k], stateWord(k), 'scope.js ' + k);
   for (const k of ['prepare', 'collect', 'understand', 'improve']) { assert.equal(STAGE_LABEL[k], stateWord(k), k); assert.equal(STAGE_STATE_WORDS[k], stateWord(k), k); }
 });
