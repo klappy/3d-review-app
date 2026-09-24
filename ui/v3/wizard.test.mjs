@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY } from './wizard.js';
+import { countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile } from './wizard.js';
 
 const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
 const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
@@ -119,4 +119,85 @@ test('locked review shows links already issued so a partial launch never loses t
   const data = { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates: [{ id: 'tpl.team', version: 3, name: 'Team', perspective: 'Translation team' }] };
   const html = renderStep('review', draft(), data, [], { done: ['x'], links: [{ template: 'tpl.team', entry_fragment: '#survey=abc' }] }, 'https://dev');
   assert.match(html, /Links already opened/); assert.match(html, /Translation team/);
+});
+
+// #188: a write that committed but whose response was lost is read back, not repeated.
+const lossyApi = (loseOn) => {
+  const calls = []; const db = { assessments: [], surveys: [], stage: 'prepare' }; let n = 0; let lost = false;
+  const api = async (url, { method = 'GET', body } = {}) => {
+    calls.push(`${method} ${url}`);
+    let r;
+    if (method === 'GET' && url === '/v2/projects/p1/assessments') return { assessments: db.assessments };
+    if (method === 'GET' && url === '/v2/assessments/a1') return { assessment: { id: 'a1', stage: db.stage }, surveys: db.surveys };
+    if (url.endsWith('/assessments')) { const a = { id: 'a1', name: body.name, language_id: body.language_id, role: 'owner', stage: 'prepare', created_at: new Date().toISOString() }; db.assessments.push(a); r = { assessment: a }; }
+    else if (url.endsWith('/surveys')) { const x = { id: 's' + (++n), template_id: body.template_id, template_version: body.version }; db.surveys.push(x); r = { survey: x }; }
+    else if (url.endsWith('/stage')) { db.stage = body.stage; r = { assessment: { id: 'a1', stage: body.stage } }; }
+    else if (url.endsWith('/links')) r = body.mode === 'dry_run' ? { confirm_token: 'ct' } : { entry_fragment: '#survey=x' };
+    else throw new Error('unexpected ' + url);
+    if (!lost && loseOn(url, method)) { lost = true; throw new Error('network: response lost'); }
+    return r;
+  };
+  return { api, calls, db };
+};
+for (const [label, loseOn] of [
+  ['assessment.create', u => u.endsWith('/assessments')],
+  ['survey.select', u => u.endsWith('/surveys')],
+  ['set_stage', u => u.endsWith('/stage')],
+]) test(`#188 resume after lost ${label} response creates no duplicate`, async () => {
+  const { api, calls, db } = lossyApi(loseOn);
+  let err; try { await launch(draft(), { api, store: mem() }); } catch (e) { err = e; }
+  assert.ok(err && err.ctx && err.ctx.pending, 'failed launch carries a pending write');
+  const ctx = await launch(draft(), { api, store: mem(), resume: err.ctx });
+  assert.equal(db.assessments.length, 1);
+  assert.equal(db.surveys.length, 2);
+  assert.equal(calls.filter(c => c.endsWith('/stage')).length, 1);
+  assert.equal(ctx.pending, null);
+  assert.equal(ctx.links.length, 2);
+  assert.deepEqual(ctx.surveys.map(s => s.id).sort(), ['s1', 's2']);
+});
+
+test('#188 a failed write that did not commit is retried after reconcile finds nothing', async () => {
+  let fail = true; const made = [];
+  const api = async (url, { method = 'GET', body } = {}) => {
+    if (method === 'GET' && url === '/v2/projects/p1/assessments') return { assessments: made };
+    if (url.endsWith('/assessments')) { if (fail) { fail = false; throw new Error('503'); } const a = { id: 'a1', name: body.name, language_id: body.language_id }; made.push(a); return { assessment: a }; }
+    if (url.endsWith('/surveys')) return { survey: { id: 's' + body.template_id } };
+    if (url.endsWith('/stage')) return {};
+    if (url.endsWith('/links')) return body.mode === 'dry_run' ? { confirm_token: 'ct' } : { entry_fragment: '#survey=x' };
+    throw new Error('unexpected ' + url);
+  };
+  let err; try { await launch(draft(), { api, store: mem() }); } catch (e) { err = e; }
+  assert.equal(err.ctx.done.length, 0); assert.equal(err.ctx.pending.cap, 'cap.assessment.create');
+  const ctx = await launch(draft(), { api, store: mem(), resume: err.ctx });
+  assert.equal(made.length, 1); assert.equal(ctx.aid, 'a1');
+});
+
+test('#188 a clear 4xx refusal leaves nothing pending, so the draft stays editable', async () => {
+  const api = async (url) => { if (url.endsWith('/assessments')) { const e = new Error('Language archived'); e.status = 400; throw e; } throw new Error('unexpected ' + url); };
+  let err; try { await launch(draft(), { api, store: mem() }); } catch (e) { err = e; }
+  assert.equal(err.ctx.done.length, 0); assert.equal(err.ctx.pending, null);
+});
+
+test('#188 reconcile never adopts a collaborator\'s same-name assessment', async () => {
+  const theirs = { id: 'x9', name: 'Oct', language_id: 'l1', role: 'member', stage: 'prepare', created_at: new Date().toISOString() };
+  const found = await reconcile({ cap: 'cap.assessment.create' }, { pid: 'p1', lid: 'l1', pending: { at: Date.now() } }, draft(), async () => ({ assessments: [theirs] }));
+  assert.equal(found, null);
+});
+
+test('#188 resume reads back an existing same-name language instead of repeating a refused create', async () => {
+  const langs = [{ id: 'l7', name: 'Hill' }]; const posts = [];
+  const api = async (url, { method = 'GET', body } = {}) => {
+    if (method === 'GET' && url === '/v2/projects/p9/languages') return { languages: langs };
+    if (method === 'POST') posts.push(url);
+    if (url === '/v2/projects/p9/languages') { const e = new Error('a language with that name already exists'); e.status = 400; throw e; }
+    if (url.endsWith('/assessments')) return { assessment: { id: 'a1' } };
+    if (url.endsWith('/surveys')) return { survey: { id: 's' + body.template_id } };
+    if (url.endsWith('/stage')) return {};
+    if (url.endsWith('/links')) return body.mode === 'dry_run' ? { confirm_token: 'ct' } : { entry_fragment: '#survey=x' };
+    throw new Error('unexpected ' + url);
+  };
+  const d = draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'Hill' });
+  const resume = { pid: 'p9', lid: null, aid: null, surveys: [], links: [], done: ['cap.project.create'], pending: null };
+  const ctx = await launch(d, { api, store: mem(), resume });
+  assert.equal(ctx.lid, 'l7'); assert.ok(!posts.includes('/v2/projects/p9/languages'));
 });
