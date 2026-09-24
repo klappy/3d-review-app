@@ -321,3 +321,14 @@ test('a retry completing after the view stopped being current does not paint (ct
   assert.equal(root.querySelectorAll('[data-act="retry"]').length, 2, 'stale completion left the old view untouched');
   assert.equal(root.children.length, html);
 });
+
+test('project settings (lane 11): editors reach access codes on the existing screen; viewers see no settings panel', async () => {
+  const base = { 'GET /v2/projects/p1/assessments': { assessments: [] }, 'GET /v2/projects/p1/languages': { languages: [] } };
+  const own = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'owner' }, languages: [] } });
+  const h = pages.project.render(own, await pages.project.load(own, { id: 'p1' }));
+  assert.ok(h.includes('id="project-settings"') && h.includes('Project settings'));
+  assert.ok(/href="\/legacy\/#facilitator" data-kept="access-codes"/.test(h), 'access codes link to the legacy facilitator screen');
+  assert.ok(!/class="[^"]*primary[^"]*"[^>]*data-kept/.test(h), 'kept links never take the page primary');
+  const view = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'viewer' }, languages: [] } });
+  assert.ok(!pages.project.render(view, await pages.project.load(view, { id: 'p1' })).includes('project-settings'));
+});
