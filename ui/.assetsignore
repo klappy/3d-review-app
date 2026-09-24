@@ -50,4 +50,6 @@ v3/wizard.test.mjs
 v3/home.test.mjs
 v3/components/breadcrumbs.test.mjs
 v3/components/stepper.test.mjs
+v3/components/band-card.test.mjs
+v3/components/components-served.test.mjs
 assess/breadcrumbs-mount.test.mjs
