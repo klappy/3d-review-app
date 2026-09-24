@@ -41,3 +41,15 @@ test('invalid Next stays paged; independent native form invalid still reveals hi
   controller.showForm(0);next.listeners.click();assert.deepEqual(fields.map(f=>f.hidden),[false,true]);
   controller.destroy();assert.equal(form.listeners.invalid,undefined);
 });
+
+test('v3 L1-5: participant intro never paints the raw template source ref (375px overflow, NEED 5→1)',async()=>{
+  const {mountParticipantView}=await import('./participant-view.js');
+  class Node{children=[];listeners={};hidden=false;dataset={};type='';textContent='';append(...n){this.children.push(...n);}setAttribute(){}addEventListener(t,f){this.listeners[t]=f;}removeEventListener(){}focus(){}remove(){}querySelector(){return null;}querySelectorAll(s){return s==='button'?[review]:[];}}
+  const root=new Node(),form=new Node(),questions=new Node(),review=new Node();review.type='submit';form.contains=n=>n===review;questions.children=[new Node()];questions.children[0].dataset.item='a';
+  const doc={createElement:()=>new Node(),defaultView:{FormData}};
+  const ref='klappy/3d-quality-review@f042cde:rubric_csv/Items.csv+Options.csv';
+  mountParticipantView({doc,root,form,questions,reviewAnswers:new Node(),model:{assessment:'A',items:[{id:'a',type:'text'}],template:{perspective:'Church',source_ref:ref}},reviewButton:review});
+  const texts=[];const walk=n=>{texts.push(String(n.textContent||''));(n.children||[]).forEach(walk);};walk(root);
+  assert.ok(texts.some(t=>t.includes('Church')),'perspective still shown');
+  assert.ok(!texts.some(t=>t.includes(ref)),'source ref not painted');
+});

@@ -13,7 +13,7 @@ import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord } from '/v3-shell.js';
-import { v3StagePrimary } from '/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine } from '/assess/v3-assessment.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
 // if the module is absent; destroyed on any route change.
 const WIZARD_JS = '/v3/wizard.js', WIZARD_CSS = '/v3/wizard.css';
@@ -227,17 +227,26 @@ function paintCounts(current) {
   for (const s of activeSurveys(current)) { const el = app.querySelector(`[data-count="${CSS.escape(s.id)}"]`); if (el) el.outerHTML = countCell(s); }
   const t = app.querySelector('[data-total]'); if (t) t.outerHTML = totalTile(current);
   for (const s of activeSurveys(current)) { const tile = app.querySelector(`[data-tile="${CSS.escape(s.id)}"]`); if (tile) tile.outerHTML = asideTile(s); }
+  for (const s of activeSurveys(current)) { const w = app.querySelector(`[data-collect-wrap="${CSS.escape(s.id)}"]`); if (w) w.innerHTML = collectCount(s); }
   bindCounts(current);
 }
 function bindCounts(current) {
   app.querySelectorAll('[data-retry-count]').forEach(el => el.onclick = e => { e.preventDefault(); loadCounts(state.current, { retry: el.dataset.retryCount }); paintCounts(state.current); });
   app.querySelectorAll('[data-refresh]').forEach(el => el.onclick = e => { e.preventDefault(); render(); });
 }
+// v3 L1-5 (NEED 3→1, Bincy 07): per-survey counts on Collect read through lane 3's v3CountLine (ruling a/b): "n responded"
+// (never a denominator the facilitator did not enter; the server sends none here) + respondents. Same data-count hook so
+// paintCounts repaints it via data-collect-wrap; non-loaded states keep countCell's retry/refresh wording.
+function collectCount(s) {
+  const c = countFor(s.id);
+  if (c.status !== 'loaded') return countCell(s);
+  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}</span>`;
+}
 function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'Other perspective'; }
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
-  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted">collection ${esc(s.collection_status)} · ${countCell(s)}</p></div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
-  return `<section class="panel"><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey for its own screen: counts and a printable blank questionnaire. Changing the stage, invitations, links, reports and notes are not on this screen yet.</p></section>`;
+  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p></div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
+  return `<section class="panel"><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey to share its link or print a blank questionnaire.</p></section>`;
 }
 // Cut 2A child screen: ONE survey. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
