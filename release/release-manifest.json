@@ -1,5 +1,5 @@
 {
-  "version": "0.16.0",
+  "version": "0.17.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
   "cookbook_commit": "3e31ad2f72c739f2c993906ca7bd25667a980c0f",
   "records": [
@@ -17,10 +17,10 @@
   "changelog": {
     "sections": {
       "added": [
-        "Kit shell activated on the real signed-in root and scope-reading routes: Workspaces→workspace→project→assessment navigation, search and expansion, language state and account/version controls through a read adapter over the existing controllers."
+        "Kit shell activated on the real signed-in root and scope-reading routes: Workspaces\u2192workspace\u2192project\u2192assessment navigation, search and expansion, language state and account/version controls through a read adapter over the existing controllers."
       ],
       "changed": [
-        "Persona evidence: 15/15 root integration tests and 71/71 adapter/scope/identity-reset/shell unit tests passed at the exact accepted source; 25/25 synthetic menu hit and click checks across five viewport cases in an independent isolated browser. At the corrected source, 100 affected/anchor tests passed independently with 10 meaningful failures on the uncorrected parent, and 26 real headless Chrome journeys (16 title/route/host/viewport, 4 Retry, 4 delayed completion, 2 demo disclosure) passed at 390×900 and 1440×900. Real provider account journey untested; satisfaction, confusion and frustration NOT MEASURED."
+        "Persona evidence: 15/15 root integration tests and 71/71 adapter/scope/identity-reset/shell unit tests passed at the exact accepted source; 25/25 synthetic menu hit and click checks across five viewport cases in an independent isolated browser. At the corrected source, 100 affected/anchor tests passed independently with 10 meaningful failures on the uncorrected parent, and 26 real headless Chrome journeys (16 title/route/host/viewport, 4 Retry, 4 delayed completion, 2 demo disclosure) passed at 390\u00d7900 and 1440\u00d7900. Real provider account journey untested; satisfaction, confusion and frustration NOT MEASURED."
       ],
       "fixed": [
         "Account menu stacks above the shell context on phone widths so Sign out and Use another account receive pointer input; header keeps its standard heights and no horizontal overflow at 195px.",
