@@ -4,6 +4,11 @@
 // "n not yet confirmed" side by side; (c) results use the band layout. Each is one flag below. API contract unchanged:
 // this module only reads what the API already returns and never invents a number the server did not send.
 
+import { stepper, ensureStepperStyle } from '../v3/components/stepper.js';
+import { responseCount } from '../v3/components/response-count.js'; // component: Response count (ruling 12:34)
+import { bandCard, bandLegend, BAND_LEGEND } from '../v3/components/band-card.js'; // component: Band card + legend (ruling 12:34)
+import { evidenceTable } from '../v3/components/evidence-table.js'; // component: Evidence table (ruling 12:34)
+
 export const V3_FLAGS = Object.freeze({ expectedCountOptional: true, showUnconfirmed: true, bandResults: true, nextStepPage: true });
 
 // App stage ids (prepare/collect/understand/improve) → v3 plain state words and the one primary action per state.
@@ -32,20 +37,14 @@ const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(
 
 /** Settled count, optional denominator (ruling a) and "n not yet confirmed" side by side (ruling b).
  *  `unconfirmed` is shown only when the server reports it; the facilitator side never guesses it. */
-export function v3CountLine({ responses, expected, unconfirmed } = {}, esc = esc0, flags = V3_FLAGS) {
-  const got = num(responses) ?? 0, of = flags.expectedCountOptional ? num(expected) : null, unc = num(unconfirmed);
-  const settled = of ? `${got} of ${of} responded` : `${got} responded`;
-  const pending = !flags.showUnconfirmed ? '' : unc === null
-    ? '' // the server did not report one: show nothing rather than a number it never sent
-    : `<span class="${unc ? 'badge' : 'muted'}" data-v3-unconfirmed="${unc}">${unc} not yet confirmed</span>`;
-  return `<span class="v3-count" data-v3-settled="${got}">${esc(settled)}</span>${pending ? ` <span aria-hidden="true">·</span> ${pending}` : ''}`;
+export function v3CountLine(counts = {}, esc = esc0, flags = V3_FLAGS) {
+  return responseCount(counts, esc, { expectedOptional: !!flags.expectedCountOptional, showUnconfirmed: !!flags.showUnconfirmed }); // component: Response count
 }
 
 const BAND_WORDS = new Set(['Strong', 'Growing', 'Needs support', 'Needs urgent attention', 'More input needed']);
-const LENS_CLASS = { 'Translation Team': 'team', Church: 'church', Community: 'community' };
 
 // Prototype frame 10 legend (design-system-v3 V.results): one colour dot per band word, colours from tokens only.
-export const V3_LEGEND = Object.freeze([['Strong', '--band-strong'], ['Growing', '--band-growing'], ['Needs support', '--band-needs-support'], ['Needs urgent attention', '--band-urgent'], ['More input needed', '--pip']]);
+export const V3_LEGEND = BAND_LEGEND;
 
 // CAPTAIN RULING 12:22 (ASK.md option 1): PROVISIONAL cut-offs, labelled provisional on the page. One flip here.
 // Input (captain 11:42): the latest built report's per-perspective score (payload.lenses[].score, 0–100) and the server's
@@ -88,9 +87,9 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores
       : suppressed ? '<div class="note">Withheld to protect a small group. This is an evidence gap, not a poor result.</div>'
       : b && b.text ? `<p>${esc(b.text)}</p>` : '';
     const count = groups ? `<div class="v3-band-count small muted" data-v3-band-count="${esc(lens)}">${esc(v3GroupCountText(groups[lens]))}</div>` : '';
-    return `<div class="glass band lens ${LENS_CLASS[lens] || ''}" data-v3-band="${esc(lens)}" data-v3-band-word="${esc(word)}"><div class="eyebrow">${esc(lens)}</div><div class="word">${esc(word)}</div>${note}${count}</div>`;
+    return bandCard({ lens, word, bodyHtml: note, countHtml: count }, esc);
   }).join('');
-  const legend = `<div class="legend small muted" data-v3-legend>${V3_LEGEND.map(([w, v]) => `<span><i class="dot" style="background:var(${v})" aria-hidden="true"></i>${w}</span>`).join('')}</div>`;
+  const legend = bandLegend(V3_LEGEND, esc);
   const prov = scored && V3_BAND_CUTOFFS.provisional ? `<p class="small muted" data-v3-provisional>${esc(V3_BAND_PROVISIONAL)}</p>` : '';
   return `<div class="v3-bands three" data-v3-bands="${scored ? 'provisional' : held ? 'held' : 'shown'}">${cards}</div>${legend}${prov}`;
 }
@@ -122,9 +121,7 @@ export function v3EvidenceRows(results, lenses, groups = {}, scores = null) {
 }
 export const V3_EVIDENCE_FOOTER = 'Descriptive items are shown, not scored. Choose-all-that-apply items show overlap, not a number. Missing data is not a low result. Bands come from validated scoring and report templates; no number is invented here.';
 export function v3EvidenceMarkup(rows, open, esc = esc0) {
-  const btn = `<button type="button" class="quiet" data-v3-evidence-toggle aria-expanded="${open ? 'true' : 'false'}">${open ? 'Simple view' : 'Show evidence and details'}</button>`;
-  const table = `<div class="v3-evidence" data-v3-evidence${open ? '' : ' hidden'}><h3>What supports this view?</h3><table class="table"><thead><tr><th>Evidence</th><th>What we can say</th><th>Limit</th></tr></thead><tbody>${rows.map(e => `<tr>${e.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table><p class="small muted footer">${esc(V3_EVIDENCE_FOOTER)}</p></div>`;
-  return { btn, table };
+  return evidenceTable(rows, open, esc, { footer: V3_EVIDENCE_FOOTER }); // component: Evidence table
 }
 
 export const v3css = `.v3-bands{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:12px 0}
@@ -134,21 +131,7 @@ export const v3css = `.v3-bands{display:grid;grid-template-columns:repeat(auto-f
 // U4 review gate (PARITY.md U4; prototype V.results frame 10). One primary per state, each a single cap.assessment.set_stage
 // move (the server allows one step at a time): Collecting → "Record my review" (checkbox first) → Reviewing →
 // "Choose a next step" → Improving. Viewers get the state word only. No new capability, no new stored field.
-export const V3_REVIEW_CHECK = 'I checked the meaning, the missing evidence and any sensitive details';
-const CAN_MOVE = new Set(['member', 'owner']);
-export function v3GateAction(stage, role) {
-  if (!CAN_MOVE.has(String(role || '').toLowerCase())) return null;
-  if (stage === 'collect') return { action: 'recordReview', label: 'Record my review', check: true };
-  if (stage === 'understand') return { action: 'saveAndFinish', label: 'Choose a next step', check: false };
-  return null;
-}
-export function v3ReviewGateMarkup(stage, role, esc = esc0) {
-  const reviewed = stage === 'improve', g = v3GateAction(stage, role);
-  const badge = `<span class="badge${reviewed ? '' : ' warn'}" data-v3-reviewed="${reviewed}">${reviewed ? 'Reviewed' : 'Draft · a person checks this before sharing'}</span>`;
-  if (!g) return `<div class="v3-gate" data-v3-gate="none">${badge}</div>`;
-  const check = g.check ? `<label class="choice"><input type="checkbox" data-v3-review-check> ${esc(V3_REVIEW_CHECK)}</label>` : '';
-  return `<div class="v3-gate" data-v3-gate="${esc(g.action)}">${badge}${check}<button type="button" class="primary" data-v3-gate-go="${esc(g.action)}"${g.check ? ' disabled' : ''}>${esc(g.label)}</button><p class="status small" role="status" aria-live="polite" data-v3-gate-status></p></div>`;
-}
+export { V3_REVIEW_CHECK, v3GateAction, reviewGate as v3ReviewGateMarkup } from '../v3/components/review-gate.js'; // component: Review gate (ruling 12:34)
 /** The only write: POST /v2/assessments/:id/stage { stage } (cap.assessment.set_stage), stage from V3_SET_STAGE. */
 export function v3SetStage(api, enc, aid, action) {
   const stage = V3_SET_STAGE[action];
@@ -166,3 +149,13 @@ export const V3_NEXT = Object.freeze({
   footer: 'There is no fixed schedule. Start another review when it is appropriate; this one keeps its history.',
   save: 'Save notes',
 });
+
+// component: Stepper (captain ruling 12:28 + 12:34). The assessment page's stage strip is the wizard's Stepper, imported
+// not copied: the server stage is the active dot, earlier stages ticked, every step links to its view (href from caller).
+export const V3_STAGE_ORDER = Object.freeze(['prepare', 'collect', 'understand', 'improve']);
+export function v3StageStepper(stage, hrefFor = () => null) {
+  const labels = { prepare: 'Prepare', collect: 'Collect', understand: 'Understand', improve: 'Improve' };
+  const i = V3_STAGE_ORDER.indexOf(stage);
+  return stepper(V3_STAGE_ORDER.map(v => ({ label: labels[v], href: hrefFor(v) })), i < 0 ? 1 : i + 1, { label: 'Assessment stages' });
+}
+export { ensureStepperStyle };

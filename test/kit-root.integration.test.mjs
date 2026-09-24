@@ -81,7 +81,7 @@ test('journey: Workspaces → workspace → project (two distinct assessments, l
   assert.equal(p.q('nav[aria-label="Scopes"] [aria-current="page"]')?.textContent.trim(), 'Field team');
   assert.ok(p.q('[data-read-region] a[href="#project/p1"]')); assert.ok(p.q('[data-action-region] #add-project, [data-action-region] #rename-form'));
   await p.go('#project/p1');
-  assert.equal(p.text('[role=main].content h1'), 'River Valley'); assert.deepEqual(crumbs(p), ['Projects', 'Field team', 'River Valley']);
+  assert.equal(p.text('[role=main].content h1'), 'River Valley'); assert.deepEqual(crumbs(p), ['Home', 'Field team']); assert.equal(p.text('header.top nav.crumbs[data-component="breadcrumbs"] [aria-current="page"]'), 'River Valley');
   const items = p.qa('[data-read-region] .grid article');
   assert.equal(items.length, 2);
   assert.ok(items[0].textContent.includes('September assessment') && items[0].textContent.includes('Collecting') && items[0].textContent.includes('Lake language'));
@@ -97,7 +97,7 @@ test('journey: Workspaces → workspace → project (two distinct assessments, l
   assert.equal(p.api.app, projectContent, 'content element identity stable across route change');
   assert.equal(p.q('[data-content] [data-read-region]'), null, 'old project view destroyed before the assessment mounted');
   await p.go('#project/p1');
-  assert.equal(p.text('[role=main].content h1'), 'River Valley'); assert.deepEqual(crumbs(p), ['Projects', 'Field team', 'River Valley']);
+  assert.equal(p.text('[role=main].content h1'), 'River Valley'); assert.deepEqual(crumbs(p), ['Home', 'Field team']); assert.equal(p.text('header.top nav.crumbs[data-component="breadcrumbs"] [aria-current="page"]'), 'River Valley');
   assert.equal(p.q('[data-content] .view-tabs'), null);
   // exact reads: no discovery calls, no mutation, no non-local request
   assert.ok(p.transport.log.every(l => l.outcome === 'served'), JSON.stringify(p.transport.log.filter(l => l.outcome !== 'served').map(l => l.key)));
@@ -312,7 +312,7 @@ test('kit host (real ui/index.html): each of the four loaded pages keeps exactly
     assert.equal(p.qa('[data-read-region] h1').length, 0, `${hash}: the page renders no second heading inside the read region`);
     if (hash === '#workspace/w1' || hash === '#project/p1') assert.equal(p.q('[data-content] a.back'), null, `${hash}: kit crumbs are the parent link`);
   }
-  assert.deepEqual(crumbs(p), ['Projects', 'Field team', 'River Valley']); assert.ok(p.q('[data-action-region] form#create-assessment'));
+  assert.deepEqual(crumbs(p), ['Home', 'Field team']); assert.equal(p.text('header.top nav.crumbs[data-component="breadcrumbs"] [aria-current="page"]'), 'River Valley'); assert.ok(p.q('[data-action-region] form#create-assessment'));
 });
 
 // ---------- Bugbot 4073693755: the demo disclosure survives every repaint path ----------

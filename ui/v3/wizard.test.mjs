@@ -84,7 +84,8 @@ test('views: four steps, one primary each, optional expected count, escaped', ()
   assert.match(r, /data-step="information"/);
   assert.equal((renderStep('review', draft(), data, [], true).match(/data-wz="edit"/g) || []).length, 0);
   assert.match(renderStep('details', draft(), data), /<span>Participants<\/span>/);
-  assert.match(renderStep('review', draft({ context: '<b>x</b>' }), data), /&lt;b&gt;x&lt;\/b&gt; <span class="sub">\(not stored yet/);
+  assert.match(renderStep('review', draft({ context: '<b>x</b>' }), data), /&lt;b&gt;x&lt;\/b&gt; <span class="sub">\(not sent yet/);
+  assert.doesNotMatch(renderStep('review', draft({ context: 'x' }), data), /not stored yet/);
 });
 
 test('retry after a partial failure resumes without duplicate writes', async () => {
@@ -255,4 +256,11 @@ test('L2-7 wizard composes the shared Stepper component (ruling 12:34): no local
   const html = renderStep('participants', draft(), { projects: [], languages: [], templates: [] }, [], false, '');
   assert.match(html, /class="v3-stepper stepper" aria-label="Setup steps"/);
   assert.match(html, /<li class="on" aria-current="step"><i aria-hidden="true">2<\/i><span>Participants<\/span>/);
+});
+
+test('wizard alert colour comes from the design-system token (dark-mode safe)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('./wizard.css', import.meta.url), 'utf8');
+  assert.match(css, /\.note\.alert\{color:var\(--warning-ink/);
+  assert.doesNotMatch(css, /#8a2a1c/);
 });

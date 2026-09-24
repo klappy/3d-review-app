@@ -5,7 +5,7 @@ import { stepper, ensureStepperStyle, STEPPER_CSS, STEPPER_STYLE_ID } from './st
 test('Stepper: done ticked, current active with aria-current, later pending', () => {
   const h = stepper(['A', 'B', 'C'], 2, { label: 'Setup steps' });
   assert.match(h, /^<ol class="v3-stepper stepper" aria-label="Setup steps">/);
-  assert.match(h, /<li class="done"><i aria-hidden="true">✓<\/i><span>A<\/span><\/li>/);
+  assert.match(h, /<li class="done"><i aria-hidden="true">✓<\/i><span>A<\/span><b class="v3-sr"> \(completed\)<\/b><\/li>/);
   assert.match(h, /<li class="on" aria-current="step"><i aria-hidden="true">2<\/i><span>B<\/span><\/li>/);
   assert.match(h, /<li class=""><i aria-hidden="true">3<\/i><span>C<\/span><\/li>/);
   assert.equal((h.match(/aria-current/g) || []).length, 1);
@@ -33,4 +33,16 @@ test('Stepper: style injects once and is a no-op without a document', () => {
   assert.equal(ensureStepperStyle(doc), false);
   assert.equal(nodes.get(STEPPER_STYLE_ID).textContent, STEPPER_CSS);
   assert.match(STEPPER_CSS, /var\(--glass/);
+});
+
+test('stepper dots blur on the design-system-v3 --blur-panel token, not a hard-coded radius (ruling 12:22 glass)', () => {
+  assert.match(STEPPER_CSS, /backdrop-filter:blur\(var\(--blur-panel,24px\)\)/);
+  assert.doesNotMatch(STEPPER_CSS, /blur\(\d+px\)/);
+});
+
+test('done steps announce "completed" to screen readers (ruling 12:28 polish)', async () => {
+  const { stepper, STEPPER_CSS } = await import('./stepper.js');
+  const html = stepper(['A', 'B', 'C'], 2);
+  assert.equal((html.match(/class="v3-sr"> \(completed\)/g) || []).length, 1);
+  assert.match(STEPPER_CSS, /\.v3-stepper \.v3-sr\{position:absolute/);
 });

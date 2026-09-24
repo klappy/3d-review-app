@@ -1,30 +1,46 @@
 {
-  "version": "0.18.0",
+  "version": "0.19.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "078cca68e04f0d185862bb7e0ef5be42b00254ba",
+  "cookbook_commit": "39a1cc5703b34a8072274e3fc1003571772c36f3",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.18.0.md",
-      "blob_sha": "e6702796b29f2e1996fded4a238362d48c6a66aa",
-      "sha256": "cae22d3908bf669eda99bb3531f7e28d5b22b665c736812e052612bc80f95889"
+      "path": "planning/2026-09-16-parity-build/releases/0.19.0.md",
+      "blob_sha": "ced5d1650fefd9d50c834b56eea9653701b1c82e",
+      "sha256": "4d761b54525c8f474a94ca975fecb2cf2b5f52b1b928a43f4819f6688b5fe9b3"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "1b47479cf5e5f3f494d64e65b69fa992eaa1afd1",
-      "sha256": "d43f894df7060cfdd799c2d4457e446a1f841fc79c2d4653ec2d8dcc12fc09c6"
+      "blob_sha": "5df73a2dc338d90ef69425d720a4443caf9b1ae0",
+      "sha256": "a15ab9524cba31904261608d0ece557449778f7ff954c7ed990c5c1f3cd6b18a"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "component: Stepper — one progress stepper in ui/v3/components/stepper.js (glass dots, done ticks, optional hash links per step); the setup wizard composes it and lane 3 imports it for the assessment page (rulings 12:28, 12:34) (#227)",
-        "results: provisional bands (≥75 Strong · 60–74 Growing · 40–59 Needs support · <40 Needs urgent attention; min 3 responses else More input needed) from the latest report's per-perspective and sub-dimension scores, labelled provisional; numbers behind \"Show evidence and details\" (component: Band card + legend) (#225)",
-        "component: Breadcrumbs — one crumb row in fixed order Home › Workspace › Project › Assessment › Page (ui/v3/components/breadcrumbs.js; mounting via NEED 9→1) (#224)"
+        "public About page (#about) (#228)",
+        "left sidebar on assessment and scope pages is the shared Sidebar tree (workspace → project → assessment), in step with the breadcrumbs (component: Sidebar tree) (#243)",
+        "component: Sidebar tree — 0.16 left navigation Workspaces → Project → Assessment, current row from the same scope as Breadcrumbs (ui/v3/components/sidebar-tree.js; mounting via NEED 9→1) (#241)"
       ],
-      "changed": [],
+      "changed": [
+        "component: Breadcrumbs — assessment context panel crumb row is the shared Breadcrumbs (Home › Workspace › Project › Assessment); v3 components served locally (#232)",
+        "navigation: kit shell header crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment › Page), same as the assessment page (P0 12:32) (#239)",
+        "demo header Exit demo / Sign in is one shared component (component: Header with Exit demo / Sign in) (#246)",
+        "setup wizard: group rows use the glass look (--glass, --glass-edge, blur) instead of flat white cards (ruling 12:22) (#234)",
+        "setup wizard: group rows use the design-system glass blur token (--blur-panel) instead of a hard-coded 8px (ruling 12:22) (#238)",
+        "Stepper dots blur on the --blur-panel glass token (component: Stepper) (#244)",
+        "component: Stepper — assessment page stage tab bar (Prepare · Collect · Understand · Improve) replaced by the wizard's shared Stepper; server stage = active dot, earlier stages ticked, each step links to its view; Permissions stays a separate link (captain ruling 12:28) (#230)",
+        "results: band card and colour legend are one shared component (ui/v3/components/band-card.js) (#233)",
+        "results and collect count line comes from one shared Response count component (#240)",
+        "results \"Show evidence and details\" table comes from one shared Evidence table component (component: Evidence table) (#245)",
+        "results review gate (state badge + Record my review / Choose a next step) comes from one shared Review gate component (component: Review gate) (#247)"
+      ],
       "fixed": [
-        "demo: exit to home and sign in from every demo screen (#222)",
-        "permissions: people shown by name and email, not id (component: Member list, used on workspace, project and assessment permissions) (#226)"
+        "public links never land on sign-in (Read about it → #about, unknown hashes → home) (#228)",
+        "look: flat white/teal restyle (#200) removed; design-system-v3 glass tokens govern header, cards and buttons again (ruling 12:22) (#235)",
+        "setup review: participant note says plainly it is not sent or saved yet (review line + placeholder), replacing developer copy (#231)",
+        "setup wizard: alert note uses the design-system --warning-ink token instead of a hard-coded red, so it stays readable in dark mode (#242)",
+        "Stepper: completed steps are announced as \"completed\" to screen readers (component: Stepper) (#248)",
+        "band card component is served by the local server and its tests stay off DEV assets (#236)"
       ]
     }
   }
