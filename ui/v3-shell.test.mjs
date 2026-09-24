@@ -28,3 +28,18 @@ test('L1-6 Bincy restyle: light-theme block gives a solid teal primary, white he
   assert.match(block, /\.rv \.glass\{background:var\(--bincy-card\);backdrop-filter:none/);
   for (const rule of block.split('}').filter(r => r.includes('{'))) if (!rule.trim().startsWith('/*')) assert.match(rule.trim(), /^(\/\*[\s\S]*?\*\/\s*)?html:not\(\[data-theme="dark"\]\)/, 'every rule is light-only: ' + rule.slice(0, 60));
 });
+
+test('P0 12:10 demo exit: header gets Exit demo + Sign in once, logo leaves demo', async () => {
+  const { placeDemoExit, DEMO_EXIT_HREF, DEMO_SIGN_IN_HREF } = await import('./v3-shell.js');
+  const d = new JSDOM('<div id="app"></div>', { url: 'https://fixture.invalid/?demo=1#assessment/demo-assessment/prepare' });
+  const doc = d.window.document; const root = doc.querySelector('#app');
+  const shell = mountShell(root, fixture(), {});
+  assert.equal(placeDemoExit(doc), true); assert.equal(placeDemoExit(doc), true);
+  const exits = doc.querySelectorAll('header.top .v3-demo-exit'); assert.equal(exits.length, 1);
+  assert.equal(doc.querySelector('[data-v3-demo-signin]').getAttribute('href'), DEMO_SIGN_IN_HREF);
+  assert.equal(doc.querySelector('.v3-demo-exit [data-v3-exit-demo]').textContent, 'Exit demo');
+  const brand = doc.querySelector('header.top a.brand'); assert.equal(brand.getAttribute('href'), DEMO_EXIT_HREF); assert.equal(brand.hasAttribute('data-navigate'), false);
+  assert.ok(!DEMO_EXIT_HREF.includes('demo') && !DEMO_SIGN_IN_HREF.includes('demo'));
+  assert.equal(placeDemoExit(null), false);
+  shell.destroy();
+});
