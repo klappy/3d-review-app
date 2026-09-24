@@ -44,6 +44,10 @@ export const STAGE_TOUR = Object.freeze({
 const TAB_KEY = id => `stage-tab:${id}`;
 const TOUR_KEY = (id, stage) => `stage-tour:${id}:${stage}`;
 
+// v3 plain state words for the "Current stage" line (lane 1). This module stays import-free, so the words are carried here;
+// ui/v3-shell.test.mjs asserts they equal ui/v3-shell.js STATE_WORDS. Empty this object to restore the v2 tab-name line.
+export const STAGE_STATE_WORDS = Object.freeze({ prepare: 'Setup not finished', collect: 'Collecting responses', understand: 'Ready to look at results', improve: 'Reviewed' });
+
 export function isStageId(id) {
   return STAGES.some(stage => stage.id === id);
 }
@@ -214,7 +218,7 @@ export function renderStageTabs(doc, root, { assessmentId, stage, selected, stor
     nav.append(button);
   }
   root.append(nav);
-  const now = el(doc, 'p', `Current stage: ${stageLabel(stage) || 'unknown'}`);
+  const now = el(doc, 'p', `Current stage: ${STAGE_STATE_WORDS[stage] || stageLabel(stage) || 'unknown'}`); // v3 plain state word; tab names unchanged
   now.className = 'stage-now';
   root.append(now);
   const repeat = el(doc, 'p', REPEAT_WHEN_APPROPRIATE);
