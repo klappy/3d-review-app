@@ -86,7 +86,7 @@ test('renderStageTabs paints four tabs, keeps server stage distinct, click does 
   assert.equal(nav.getAttribute('role'), 'tablist');
   assert.deepEqual(nav.children.map(b => b.textContent), ['Prepare', 'Collect', 'Understand', 'Improve']);
   assert.equal(nav.children[0].getAttribute('aria-selected'), 'true');
-  assert.match(root.children[1].textContent, /Current stage: Prepare/);
+  assert.match(root.children[1].textContent, /Current stage: Setup not finished/);
   assert.equal(root.children[2].textContent, REPEAT_WHEN_APPROPRIATE);
   await nav.children[2].fire('click');
   assert.deepEqual(selected, ['understand']);
