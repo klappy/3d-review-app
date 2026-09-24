@@ -7,25 +7,3 @@
 /* CAPTAIN P0 12:10: demo exits in the v3 header (lane 1). */
 .v3-demo-exit{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}.v3-demo-exit .rv-btn{min-height:40px;padding:6px 14px;white-space:nowrap}
 @media (max-width:760px){.v3-demo-exit{gap:6px}.v3-demo-exit .rv-btn{min-height:36px;padding:4px 10px;font-size:13px}}
-/* L1-6 Bincy restyle (captain ruling 11:00, LANES.md): flat white cards on a pale mint ground,
-   solid teal primary, white header bar — sampled from cookbook sources/bincy-design-sprint-2026-09-22
-   02_assets/brand/brand_panel_crop.png + screens/01_sign_in.png, 02_home_dashboard.png.
-   Light theme only; dark keeps design-system-v3. One block: delete it to revert. */
-html:not([data-theme="dark"]) .rv{
-  --bincy-teal:#1c6b5e;--bincy-teal-hover:#165a4f;--bincy-ground:#f1f6f4;--bincy-card:#ffffff;
-  --bincy-edge:#dde6e3;--bincy-ink:#1b2b33;--bincy-muted:#5b6b70;--bincy-pill:#e2f1ea;--bincy-pill-ink:#1c6b5e;
-  --bincy-shadow:0 1px 3px rgba(23,46,64,.06);--bincy-r-card:10px;--bincy-r-btn:8px;
-  --green:var(--bincy-teal);--ink:var(--bincy-ink);--secondary:var(--bincy-muted);
-  --badge-fill:var(--bincy-pill);--badge-ink:var(--bincy-pill-ink);
-  background:var(--bincy-ground);color:var(--bincy-ink)}
-html:not([data-theme="dark"]) body{background:#f1f6f4} /* literal: --bincy-* live on .rv, body cannot inherit them (Bugbot 4095204941) */
-html:not([data-theme="dark"]) .rv .top{background:var(--bincy-card);backdrop-filter:none;-webkit-backdrop-filter:none;border:0;border-bottom:1px solid var(--bincy-edge);box-shadow:none;border-radius:0}
-html:not([data-theme="dark"]) .rv .brand,html:not([data-theme="dark"]) .rv a.brand{color:var(--bincy-teal);font-weight:700}
-html:not([data-theme="dark"]) .rv .glass{background:var(--bincy-card);backdrop-filter:none;-webkit-backdrop-filter:none;border:1px solid var(--bincy-edge);border-radius:var(--bincy-r-card);box-shadow:var(--bincy-shadow)}
-html:not([data-theme="dark"]) .rv h1{font-weight:700;color:var(--bincy-ink)}
-html:not([data-theme="dark"]) .rv .rv-btn{border-radius:var(--bincy-r-btn);background:var(--bincy-card);border:1px solid var(--bincy-edge);color:var(--bincy-ink);box-shadow:none;font-weight:600}
-html:not([data-theme="dark"]) .rv .rv-btn:hover{border-color:var(--bincy-teal)}
-html:not([data-theme="dark"]) .rv .rv-btn.primary{background:var(--bincy-teal);border-color:var(--bincy-teal);color:#fff;box-shadow:var(--bincy-shadow)}
-html:not([data-theme="dark"]) .rv .rv-btn.primary:hover{background:var(--bincy-teal-hover)}
-html:not([data-theme="dark"]) .rv .rv-btn.quiet{background:transparent;border-color:transparent}
-html:not([data-theme="dark"]) .rv .v3-state{background:var(--bincy-pill);color:var(--bincy-pill-ink);font-weight:600}
