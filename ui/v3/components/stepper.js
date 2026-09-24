@@ -30,7 +30,7 @@ export const STEPPER_CSS = `
 .v3-stepper li::before{content:"";position:absolute;top:calc(var(--step-dot,28px) / 2 - 1px);left:-50%;right:50%;height:2px;background:var(--pip,#c9d1db);z-index:0}
 .v3-stepper li:first-child::before{display:none}
 .v3-stepper li.done::before,.v3-stepper li.on::before{background:var(--pip-done,#2f7d5b)}
-.v3-stepper li i{width:var(--step-dot,28px);height:var(--step-dot,28px);border-radius:var(--r-round,50%);display:grid;place-items:center;border:2px solid var(--pip,#c9d1db);background:var(--glass,rgba(255,255,255,.72));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-style:normal;font-weight:600;font-size:12px;color:var(--secondary,#5b6675);position:relative;z-index:1}
+.v3-stepper li i{width:var(--step-dot,28px);height:var(--step-dot,28px);border-radius:var(--r-round,50%);display:grid;place-items:center;border:2px solid var(--pip,#c9d1db);background:var(--glass,rgba(255,255,255,.72));-webkit-backdrop-filter:blur(var(--blur-panel,24px));backdrop-filter:blur(var(--blur-panel,24px));font-style:normal;font-weight:600;font-size:12px;color:var(--secondary,#5b6675);position:relative;z-index:1}
 .v3-stepper li.done i{background:var(--pip-done,#2f7d5b);border-color:var(--pip-done,#2f7d5b);color:var(--primary-ink,#fff)}
 .v3-stepper li.on{color:var(--ink,#1c2430);font-weight:600}
 .v3-stepper li.on i{border-color:var(--green,#2f7d5b);color:var(--green,#2f7d5b);box-shadow:0 0 0 4px color-mix(in srgb,var(--green,#2f7d5b) 16%,transparent)}
