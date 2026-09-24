@@ -1,26 +1,26 @@
 {
   "version": "0.17.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "3e31ad2f72c739f2c993906ca7bd25667a980c0f",
+  "cookbook_commit": "129c26631e082de117ead68b62d1e163d7136fba",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.16.0.md",
-      "blob_sha": "651e97ac291417bb364b91bc6505d40288712475",
-      "sha256": "d16c0aa5223963572732db7588a9b09ce3a144315fe642de92e8f48e11119bea"
+      "path": "planning/2026-09-16-parity-build/releases/0.17.0.md",
+      "blob_sha": "a3bf65e2400c6fe86d0c406f299bb352c72bf25d",
+      "sha256": "165a30ee1e29d3155a5523600ce2e4b8d3695634dce7294c05cb50defaaa4f2a"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "4b6c03e0867a7a541b4c2de156f7bfc58f3d06d3",
-      "sha256": "7d5c98da351eca19c95babb79fb37a1e87961ba36c34fcc2da27670365e3a9bb"
+      "blob_sha": "a155e8a1e2dafab7d6ee8bf61e80489393788c6c",
+      "sha256": "692eda7942146b84d7c6cf9f4a52288516186311ccc723426d7429af6c277155"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Kit shell activated on the real signed-in root and scope-reading routes: Workspaces\u2192workspace\u2192project\u2192assessment navigation, search and expansion, language state and account/version controls through a read adapter over the existing controllers."
+        "Kit shell activated on the real signed-in root and scope-reading routes: Workspaces→workspace→project→assessment navigation, search and expansion, language state and account/version controls through a read adapter over the existing controllers."
       ],
       "changed": [
-        "Persona evidence: 15/15 root integration tests and 71/71 adapter/scope/identity-reset/shell unit tests passed at the exact accepted source; 25/25 synthetic menu hit and click checks across five viewport cases in an independent isolated browser. At the corrected source, 100 affected/anchor tests passed independently with 10 meaningful failures on the uncorrected parent, and 26 real headless Chrome journeys (16 title/route/host/viewport, 4 Retry, 4 delayed completion, 2 demo disclosure) passed at 390\u00d7900 and 1440\u00d7900. Real provider account journey untested; satisfaction, confusion and frustration NOT MEASURED."
+        "Persona evidence: 15/15 root integration tests and 71/71 adapter/scope/identity-reset/shell unit tests passed at the exact accepted source; 25/25 synthetic menu hit and click checks across five viewport cases in an independent isolated browser. At the corrected source, 100 affected/anchor tests passed independently with 10 meaningful failures on the uncorrected parent, and 26 real headless Chrome journeys (16 title/route/host/viewport, 4 Retry, 4 delayed completion, 2 demo disclosure) passed at 390×900 and 1440×900. Real provider account journey untested; satisfaction, confusion and frustration NOT MEASURED."
       ],
       "fixed": [
         "Account menu stacks above the shell context on phone widths so Sign out and Use another account receive pointer input; header keeps its standard heights and no horizontal overflow at 195px.",
