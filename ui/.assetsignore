@@ -47,3 +47,4 @@ kit/coordinator.test.mjs
 kit/app-adapter.test.mjs
 v3-shell.test.mjs
 v3/wizard.test.mjs
+v3/home.test.mjs
