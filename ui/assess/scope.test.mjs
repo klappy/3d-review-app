@@ -329,6 +329,18 @@ test('project settings (lane 11): editors reach access codes on the existing scr
   assert.ok(h.includes('id="project-settings"') && h.includes('Project settings'));
   assert.ok(/href="\/legacy\/#facilitator" data-kept="access-codes"/.test(h), 'access codes link to the legacy facilitator screen');
   assert.ok(!/class="[^"]*primary[^"]*"[^>]*data-kept/.test(h), 'kept links never take the page primary');
+  assert.ok(/href="#workspaces" data-kept="workspaces"/.test(h), 'workspaces link to the existing #workspaces screen');
   const view = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'viewer' }, languages: [] } });
   assert.ok(!pages.project.render(view, await pages.project.load(view, { id: 'p1' })).includes('project-settings'));
+});
+
+test('L1-7 #signin matches prototype frame 1: centred card, one primary to the real provider, survey footer, sandbox collapsed after it', async () => {
+  const html = pages.entry.render({ esc: s => String(s ?? ''), state: {} }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.ok(html.includes('class="glass panel narrow v3-signin"'));
+  assert.ok(html.includes('<p class="eyebrow">Sign in</p>'));
+  assert.ok(/<a class="button rv-btn primary" href="\/v2\/auth\/access" style="width:100%/.test(html), 'one full-width primary to the real provider');
+  const access = html.indexOf('href="/v2/auth/access"'), box = html.indexOf('<details class="sandbox-signin"');
+  assert.ok(access > -1 && box > access, 'real provider precedes the sandbox');
+  assert.ok(!/<details class="sandbox-signin"[^>]*\bopen\b/.test(html), 'sandbox collapsed on the email step');
+  assert.ok(html.includes('no sign-in is needed') && html.includes('href="#survey"'));
 });

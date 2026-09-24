@@ -12,15 +12,19 @@ import { shareUrl } from '../shared-link.js';
 
 export const STEPS = ['details', 'participants', 'information', 'review'];
 // Step names follow Bincy's screen inventory 03–06 (cookbook @933eb5f sources/bincy-design-sprint-2026-09-22/01_documents/04_screen_inventory.md).
-export const STEP_TITLES = ['Assessment details', 'Who will participate?', 'Participant information', 'Review & launch'];
+// Stepper labels follow the approved design-system-v3 prototype setup view (captain correction 11:14).
+export const STEP_TITLES = ['Details', 'Participants', 'Information', 'Review'];
+// Perspective colour dot, as the prototype's pdot(); unknown perspectives get the neutral pip.
+export const pdot = p => { const s = String(p || '').toLowerCase(); return /team/.test(s) ? 'p-team' : /community/.test(s) ? 'p-community' : /church/.test(s) ? 'p-church' : 'p-reviewer'; };
 export const EXPECTED_KEY = 'v3:expected'; // { [surveyId]: N } — device-local, never sent to the API
 export const NEW_PROJECT = '__new__';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const enc = encodeURIComponent;
+const LANG_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{1,8})*$/; // mirrors src/handlers/language.ts CODE (cap.language.create `code`)
 
 export function freshDraft() {
-  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', period: '', format: 'Written', purpose: '', followup: false, context: '', groups: {} };
+  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', period: '', format: 'Written', purpose: '', followup: false, context: '', groups: {} };
 }
 
 // Ruling (a): a denominator appears only when the facilitator entered one.
@@ -47,7 +51,7 @@ export function validateStep(step, d) {
   if (step === 'details') {
     if (!d.name.trim()) errs.push('Give the review a name.');
     if (!d.project) errs.push('Choose a project.');
-    if (d.project === NEW_PROJECT) { if (!d.newProject.trim()) errs.push('Name the new project.'); if (!d.newLanguage.trim()) errs.push('Name the language.'); }
+    if (d.project === NEW_PROJECT) { if (!d.newProject.trim()) errs.push('Name the new project.'); if (!d.newLanguage.trim()) errs.push('Name the language.'); if ((d.newLangCode || '').trim() && !LANG_CODE.test(d.newLangCode.trim())) errs.push('Language code: use an ISO 639 code such as "hil" or "en-US" (qaa–qtz for an unlisted language), or leave it blank.'); }
     else if (d.project && !d.language) errs.push('Choose a language.');
   }
   if (step === 'participants' && !Object.keys(d.groups).length) errs.push('Choose at least one group.');
@@ -59,7 +63,7 @@ export function launchPlan(d) {
   const plan = [];
   if (d.project === NEW_PROJECT) {
     plan.push({ cap: 'cap.project.create', method: 'POST', url: () => '/v2/projects', body: () => ((d.newOrg || '').trim() ? { name: d.newProject.trim(), organization: d.newOrg.trim() } : { name: d.newProject.trim() }), keep: (r, ctx) => { ctx.pid = r.project.id; } });
-    plan.push({ cap: 'cap.language.create', method: 'POST', url: ctx => `/v2/projects/${enc(ctx.pid)}/languages`, body: () => ({ name: d.newLanguage.trim() }), keep: (r, ctx) => { ctx.lid = r.language.id; } });
+    plan.push({ cap: 'cap.language.create', method: 'POST', url: ctx => `/v2/projects/${enc(ctx.pid)}/languages`, body: () => ((d.newLangCode || '').trim() ? { name: d.newLanguage.trim(), code: d.newLangCode.trim() } : { name: d.newLanguage.trim() }), keep: (r, ctx) => { ctx.lid = r.language.id; } });
   }
   plan.push({ cap: 'cap.assessment.create', method: 'POST', url: ctx => `/v2/projects/${enc(ctx.pid)}/assessments`, body: ctx => {
     const b = { name: d.name.trim(), language_id: ctx.lid };
@@ -198,7 +202,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
           : `<label>Language<select name="language"${d.project ? '' : ' disabled'}><option value=""${d.language ? '' : ' selected'} disabled>${d.project ? (languages.length ? 'Choose…' : 'No languages in this project') : 'Choose a project first'}</option>${languages.map(l => `<option value="${esc(l.id)}"${l.id === d.language ? ' selected' : ''}>${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</option>`).join('')}</select></label>`}
       </div>
       ${isNew ? `<label>Lead organisation<input name="newOrg" value="${esc(d.newOrg || '')}" placeholder="e.g. the organisation leading this translation"></label>` : ''}
-      ${isNew ? `<label>Language<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label>` : ''}
+      ${isNew ? `<label>Language<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (ISO 639, optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. hil — qaa–qtz if unlisted" autocapitalize="off" spellcheck="false"></label>` : ''}
       <div class="grid">
         <label>When<input name="period" value="${esc(d.period)}" placeholder="e.g. October 2026"></label>
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
@@ -209,7 +213,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
     </form>`;
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Three perspectives, kept separate. Choose the groups you can reach.')}${errBox(errs)}
     <form data-wz-form="participants">
-      ${templates.length ? templates.map(t => { const g = d.groups[t.id]; return `<div class="group${g ? ' on' : ''}">
+      ${templates.length ? templates.map(t => { const g = d.groups[t.id]; return `<div class="group${g ? ' on' : ''}"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span>
         <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(t.version)}"${g ? ' checked' : ''}><span><b>${esc(t.perspective)}</b><span class="sub">${esc(t.name)}</span></span></label>
         <div class="gin"><label for="n-${esc(t.id)}">How many do you expect?</label><input type="number" id="n-${esc(t.id)}" name="n-${esc(t.id)}" min="1" step="1" inputmode="numeric" value="${g && g.expected ? esc(g.expected) : ''}" placeholder="optional"></div></div>`; }).join('')
         : '<p class="muted">No published surveys are available to this account.</p>'}
@@ -222,13 +226,13 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       <dl class="kv"><dt>Project</dt><dd>${esc(proj.name || '')}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd><dt>Format</dt><dd>${esc(d.format)}</dd></dl>
       <label>A note for participants (optional)<textarea name="context" rows="2" placeholder="Not stored yet: the product has no field for this note.">${esc(d.context)}</textarea></label>
       <h3>Asked of each participant</h3>
-      ${chosen.map(t => `<div class="group"><b>${esc(t.perspective)}</b><span class="sub">The questions in the ${esc(t.name)} survey, as published. Answers are grouped, never shown alone.</span></div>`).join('')}
+      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><b>${esc(t.perspective)}</b><span class="sub">The questions in the ${esc(t.name)} survey, as published. Answers are grouped, never shown alone.</span></div></div>`).join('')}
       ${actions(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   // review
-  return `${head(n, 'Review & launch', 'Check the setup before collection opens. Launching opens the survey links; nothing is sent to anyone.')}${errBox(errs)}
+  return `${head(n, 'Ready to launch', 'Check the setup before collection opens. Launching opens the survey links; nothing is sent to anyone.')}${errBox(errs)}
     <div class="wz-sec"><h3>Details</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="details">Edit</button>'}</div>
-    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
+    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}${isNew && (d.newLangCode || '').trim() ? ' · ' + esc(d.newLangCode.trim()) : ''}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
     <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
     <div class="wz-sec"><h3>Participant information</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="information">Edit</button>'}</div>
@@ -259,7 +263,7 @@ export function mountWizard(root, deps) {
   const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
     const fd = new FormData(form), d = s.d;
-    if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'period', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
+    if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'period', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
     if (form.dataset.wzForm === 'details') { d.followup = fd.has('followup'); if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
     if (form.dataset.wzForm === 'information') d.context = String(fd.get('context') || '');

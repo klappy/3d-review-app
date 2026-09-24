@@ -4,7 +4,7 @@
 // "n not yet confirmed" side by side; (c) results use the band layout. Each is one flag below. API contract unchanged:
 // this module only reads what the API already returns and never invents a number the server did not send.
 
-export const V3_FLAGS = Object.freeze({ expectedCountOptional: true, showUnconfirmed: true, bandResults: true });
+export const V3_FLAGS = Object.freeze({ expectedCountOptional: true, showUnconfirmed: true, bandResults: true, nextStepPage: true });
 
 // App stage ids (prepare/collect/understand/improve) → v3 plain state words and the one primary action per state.
 export const V3_STAGES = Object.freeze({
@@ -44,6 +44,9 @@ export function v3CountLine({ responses, expected, unconfirmed } = {}, esc = esc
 const BAND_WORDS = new Set(['Strong', 'Growing', 'Needs support', 'Needs urgent attention', 'More input needed']);
 const LENS_CLASS = { 'Translation Team': 'team', Church: 'church', Community: 'community' };
 
+// Prototype frame 10 legend (design-system-v3 V.results): one colour dot per band word, colours from tokens only.
+export const V3_LEGEND = Object.freeze([['Strong', '--band-strong'], ['Growing', '--band-growing'], ['Needs support', '--band-needs-support'], ['Needs urgent attention', '--band-urgent'], ['More input needed', '--pip']]);
+
 /** Band layout (ruling c): one card per perspective, a band word never a score. A held result renders every card as an
  *  evidence gap with the server's reason — no band is invented. */
 export function v3BandsMarkup(results, lenses, esc = esc0, groups = null) {
@@ -60,7 +63,7 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null) {
     const count = groups ? `<div class="v3-band-count small muted" data-v3-band-count="${esc(lens)}">${esc(v3GroupCountText(groups[lens]))}</div>` : '';
     return `<div class="glass band lens ${LENS_CLASS[lens] || ''}" data-v3-band="${esc(lens)}"><div class="eyebrow">${esc(lens)}</div><div class="word">${esc(word)}</div>${note}${count}</div>`;
   }).join('');
-  const legend = '<div class="legend small muted" data-v3-legend>Strong · Growing · Needs support · Needs urgent attention · More input needed</div>';
+  const legend = `<div class="legend small muted" data-v3-legend>${V3_LEGEND.map(([w, v]) => `<span><i class="dot" style="background:var(${v})" aria-hidden="true"></i>${w}</span>`).join('')}</div>`;
   return `<div class="v3-bands three" data-v3-bands="${held ? 'held' : 'shown'}">${cards}</div>${legend}`;
 }
 
@@ -121,3 +124,14 @@ export function v3SetStage(api, enc, aid, action) {
   if (!stage) return Promise.reject(new Error(`unknown v3 action ${action}`));
   return api(`/v2/assessments/${enc(aid)}/stage`, { method: 'POST', body: { stage } });
 }
+
+// Screen 11 "Next step" (Bincy 04_screen_inventory #11; prototype V.next frame 11, provisional). Same two stored notes
+// (notes_reflection, notes_next_steps) — no new field: the prototype's "Follow up on" date and Bincy's suggested-areas list
+// are not stored by the contract, so they are not drawn (PARITY A5/I1). The stage move to Improving stays on the Understand
+// gate ("Choose a next step", U4); this page only saves the two notes (no second write, no race with navigation — Bugbot on #197).
+export const V3_NEXT = Object.freeze({
+  eyebrow: 'Next step', title: 'What happens next?', reflection: 'What you noticed', next: 'The next step',
+  reflectionHint: 'In your words. This stays with this review.', nextHint: 'e.g. A listening session with the church group',
+  footer: 'There is no fixed schedule. Start another review when it is appropriate; this one keeps its history.',
+  save: 'Save notes',
+});

@@ -218,10 +218,12 @@ function countCell(s) {
   if (c.status === 'unauthenticated') return `<span data-count="${esc(s.id)}" role="alert">sign-in no longer active · ${SIGNIN} or <a href="#" data-retry-count="${esc(s.id)}">Retry</a></span>`;
   return `<span data-count="${esc(s.id)}" class="muted">counting…</span>`;
 }
+// v3 L10-2 (prototype frame 7 `.total`): one inline line — big metric, "responses", then how many included surveys were
+// counted. No denominator (ruling a: none entered here); "not yet confirmed" only if the server ever sends it (ruling b; it does not yet).
 function totalTile(current) {
   const act = activeSurveys(current); const loaded = act.filter(s => countFor(s.id).status === 'loaded');
   const total = loaded.reduce((n, s) => n + countFor(s.id).responses, 0); const partial = loaded.length !== act.length;
-  return `<div data-total><p class="count" style="margin:0">${total}</p><p class="muted" style="margin:4px 0 0">responses across ${loaded.length} of ${act.length} included survey${act.length === 1 ? '' : 's'} counted${partial ? ' <strong>(partial)</strong>' : ''}</p><p class="small muted" style="margin:4px 0 0">Responses only. Respondents are counted per survey and are never added up as people.</p></div>`;
+  return `<div data-total data-collect-total style="margin:6px 0 4px"><div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><span class="count" style="margin:0;font-size:31px;font-weight:600;line-height:1">${total}</span><span>response${total === 1 ? '' : 's'}</span><span class="muted">across ${loaded.length} of ${act.length} included survey${act.length === 1 ? '' : 's'}</span>${partial ? '<span class="badge" title="Not every survey count has loaded yet">partial</span>' : ''}</div><p class="small muted" style="margin:6px 0 0">Responses only. Respondents are counted per survey and are never added up as people.</p></div>`;
 }
 function paintCounts(current) {
   for (const s of activeSurveys(current)) { const el = app.querySelector(`[data-count="${CSS.escape(s.id)}"]`); if (el) el.outerHTML = countCell(s); }
@@ -240,7 +242,13 @@ function bindCounts(current) {
 function collectCount(s) {
   const c = countFor(s.id);
   if (c.status !== 'loaded') return countCell(s);
-  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}</span>`;
+  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}${collectState(c.collection_status || s.collection_status)}</span>`;
+}
+// v3 L10-1 (prototype frame 7 rrow): each Collect row ends with its plain state word, open / closed (PARITY C6), from the server's collection_status only.
+function collectState(status) {
+  if (!status) return '';
+  const word = ({ open: 'open', closed: 'closed' })[status] || String(status);
+  return ` <span aria-hidden="true">·</span> <span class="state" data-collect-state>${esc(word)}</span>`;
 }
 function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'Other perspective'; }
 function collectPanel(current) {

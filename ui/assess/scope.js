@@ -3,6 +3,8 @@
 // ctx = { api, esc, enc, go, note(msg, alert), state, routes, cards, setToken? }.
 // Layout comes from the showcase (projectsView / workspaceView / createView, welcome root). Legacy app.js is behaviour reference only.
 // Pure render: HTML strings, every text value through ctx.esc. No DOM access outside bind().
+// v3 lane 9 L9-1: projects page = home per Bincy screen 02 (relative import so node tests resolve it too).
+import { homeView } from '../v3/home.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -102,7 +104,8 @@ function surveyView(ctx) {
 function signinView(ctx, model) {
   const s = model.signin;
   const codeStep = s.stage === 'code';
-  return `<section class="panel narrow"><p class="eyebrow">Facilitators</p><h1>Sign in</h1><p><a class="button primary" href="/v2/auth/access">Sign in with an email code</a></p><p class="small muted">Cloudflare sends a one-time code to your email; nothing to remember.</p><details class="sandbox-signin" id="sandbox-signin"${codeStep ? ' open' : ''}><summary>Sandbox test identities (dev only) — not a real sign-in</summary><form id="signin-form" data-stage="${codeStep ? 'code' : 'email'}"><label class="field">Email<input name="email" type="email" required autocomplete="email" value="${ctx.esc(s.email)}"${codeStep ? ' readonly' : ''}></label>${codeStep ? `${s.devCode ? `<p class="note small">Sandbox code: <strong>${ctx.esc(s.devCode)}</strong></p>` : '<p class="small muted">Code requested. Enter the code you received.</p>'}<label class="field">Code<input name="code" required autocomplete="one-time-code" inputmode="numeric"></label>` : ''}<div class="actions"><button class="primary" type="submit">${codeStep ? 'Sign in' : 'Send me a code'}</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form></details></section>`;
+  // v3 prototype frame 1 (design-system-v3 V.signin): centred 420px card, eyebrow, one full-width primary, survey footer (lane 1, L1-7).
+  return `<section class="glass panel narrow v3-signin" style="max-width:420px;margin:48px auto 0"><p class="eyebrow">Sign in</p><h1 style="font-size:27px">Sign in with your email</h1><p class="muted">We email you a one-time code. There is no password.</p><div class="actions"><a class="button rv-btn primary" href="/v2/auth/access" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Sign in with an email code</a></div><p class="small muted" style="text-align:center">Here to take a survey? Open the link you were given; no sign-in is needed. <a href="#survey">Have an access code?</a></p><details class="sandbox-signin" id="sandbox-signin"${codeStep ? ' open' : ''}><summary>Sandbox test identities (dev only) — not a real sign-in</summary><form id="signin-form" data-stage="${codeStep ? 'code' : 'email'}"><label class="field">Email<input name="email" type="email" required autocomplete="email" value="${ctx.esc(s.email)}"${codeStep ? ' readonly' : ''}></label>${codeStep ? `${s.devCode ? `<p class="note small">Sandbox code: <strong>${ctx.esc(s.devCode)}</strong></p>` : '<p class="small muted">Code requested. Enter the code you received.</p>'}<label class="field">Code<input name="code" required autocomplete="one-time-code" inputmode="numeric"></label>` : ''}<div class="actions"><button class="primary" type="submit">${codeStep ? 'Sign in' : 'Send me a code'}</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form></details></section>`;
 }
 const entry = {
   // Tour/example deep links redirect into the shared fixture-backed assessment shell.
@@ -276,13 +279,23 @@ const workspace = {
 // ---------- projects ----------
 const projects = {
   async load(ctx, params = {}) {
-    try { const r = await ctx.api('/v2/projects'); return { status: 'loaded', params, projects: r.projects || [] }; }
+    let list;
+    try { const r = await ctx.api('/v2/projects'); list = r.projects || []; }
     catch (e) { return { ...fail(e, safeMessage), params }; }
+    // v3 lane 9: each project's assessments, read-only, same endpoint the project page uses; first 20 projects, the rest link out.
+    const lists = {};
+    await Promise.allSettled(list.filter(p => !p.archived_at).slice(0, 20).map(async p => {
+      try { const a = await ctx.api(`/v2/projects/${encodeURIComponent(p.id)}/assessments`); lists[p.id] = { status: 'loaded', list: (a.assessments || []).filter(x => !x.archived_at) }; }
+      catch (e) { lists[p.id] = { status: classify(e) }; }
+    }));
+    return { status: 'loaded', params, projects: list, lists };
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('projects', model);
-    return readRegion(`${pageHead(ctx, r)}${kitGrid(ctx, r.items, r.empty)}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`)
+    const start = '<div class="v3-shell-actions actions"><a class="rv-btn primary" data-v3-start href="#new">+ Start a new 3D Review</a></div>';
+    const home = homeView({ projects: model.projects || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start });
+    return readRegion(`${pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`)
       + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a project</h2><form id="create-project"><label class="field">Project name<input name="name" maxlength="100" required placeholder="For example, Lake project"></label><div class="actions"><button class="primary" type="submit">Create project</button></div></form></section>`);
   },
   bind(ctx, root, model) {
@@ -328,7 +341,9 @@ const project = {
     const rename = owner ? `<section class="panel"><h2>Rename</h2><form id="rename-form"><label class="field">Project name<input name="name" maxlength="100" required value="${ctx.esc(p.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
     // Lane 11 (LANES.md claim 11:19): retained surfaces (cookbook design-system-v3 PARITY.md, ADOPTION item 7) reachable from project
     // settings. Links only, to the existing screens; no new capability, contract unchanged. Access codes (C3) live on the legacy facilitator page.
-    const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue paper codes for one survey and release them once to print (choose the assessment and survey there)', href: '/legacy/#facilitator', label: 'Open access codes' }];
+    const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue paper codes for one survey and release them once to print (choose the assessment and survey there)', href: '/legacy/#facilitator', label: 'Open access codes' },
+      // Workspaces (W1): the existing #workspaces screen — create a workspace, add or remove projects, rename.
+      { key: 'workspaces', name: 'Workspaces', what: 'Group projects in a workspace: create one, add or remove projects, rename it', href: ctx.routes.workspaces, label: 'Open workspaces' }];
     const settings = edit ? `<section class="panel" id="project-settings" aria-labelledby="project-settings-title"><h2 id="project-settings-title">Project settings</h2><ul class="manage-rows kept-surfaces" aria-label="Kept tools">${kept.map(k => `<li class="manage-row"><span><strong>${ctx.esc(k.name)}</strong> <span class="small muted">${ctx.esc(k.what)}</span></span><a class="button quiet small" href="${ctx.esc(k.href)}" data-kept="${ctx.esc(k.key)}">${ctx.esc(k.label)}</a></li>`).join('')}</ul></section>` : '';
     const r = readModel('project', model);
     // Assessments and languages keep their independent settled outcomes; only a 'ready' list renders as cards (never an empty success).
