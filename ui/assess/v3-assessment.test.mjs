@@ -128,3 +128,14 @@ test('v3ReportScores: a null, empty or boolean score is no score (never banded a
   assert.deepEqual(Object.keys(sc), ['X']); assert.deepEqual(sc.X.subs, [{ name: 'B', score: 61 }]);
   assert.equal(v3ScoreBand(false, 9), 'More input needed'); assert.equal(v3ScoreBand('', 9), 'More input needed');
 });
+
+import { v3StageStepper } from './v3-assessment.js';
+test('L3-13 assessment stages render the shared Stepper: active stage, earlier ticked, steps navigate', () => {
+  const h = v3StageStepper('understand', v => `#assessment/a1/${v}`);
+  assert.match(h, /class="v3-stepper stepper"/);
+  assert.equal((h.match(/<li class="done"/g) || []).length, 2);
+  assert.match(h, /<li class="on" aria-current="step"><a href="#assessment\/a1\/understand">/);
+  assert.match(h, /href="#assessment\/a1\/improve"/);
+  assert.doesNotMatch(v3StageStepper('prepare'), /<a /);
+  assert.match(v3StageStepper('weird'), /<li class="on" aria-current="step">/);
+});

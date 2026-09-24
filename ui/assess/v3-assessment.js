@@ -4,6 +4,8 @@
 // "n not yet confirmed" side by side; (c) results use the band layout. Each is one flag below. API contract unchanged:
 // this module only reads what the API already returns and never invents a number the server did not send.
 
+import { stepper, ensureStepperStyle } from '../v3/components/stepper.js';
+
 export const V3_FLAGS = Object.freeze({ expectedCountOptional: true, showUnconfirmed: true, bandResults: true, nextStepPage: true });
 
 // App stage ids (prepare/collect/understand/improve) → v3 plain state words and the one primary action per state.
@@ -166,3 +168,13 @@ export const V3_NEXT = Object.freeze({
   footer: 'There is no fixed schedule. Start another review when it is appropriate; this one keeps its history.',
   save: 'Save notes',
 });
+
+// component: Stepper (captain ruling 12:28 + 12:34). The assessment page's stage strip is the wizard's Stepper, imported
+// not copied: the server stage is the active dot, earlier stages ticked, every step links to its view (href from caller).
+export const V3_STAGE_ORDER = Object.freeze(['prepare', 'collect', 'understand', 'improve']);
+export function v3StageStepper(stage, hrefFor = () => null) {
+  const labels = { prepare: 'Prepare', collect: 'Collect', understand: 'Understand', improve: 'Improve' };
+  const i = V3_STAGE_ORDER.indexOf(stage);
+  return stepper(V3_STAGE_ORDER.map(v => ({ label: labels[v], href: hrefFor(v) })), i < 0 ? 1 : i + 1, { label: 'Assessment stages' });
+}
+export { ensureStepperStyle };
