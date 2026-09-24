@@ -5,6 +5,7 @@
 // this module only reads what the API already returns and never invents a number the server did not send.
 
 import { stepper, ensureStepperStyle } from '../v3/components/stepper.js';
+import { responseCount } from '../v3/components/response-count.js'; // component: Response count (ruling 12:34)
 import { bandCard, bandLegend, BAND_LEGEND } from '../v3/components/band-card.js'; // component: Band card + legend (ruling 12:34)
 
 export const V3_FLAGS = Object.freeze({ expectedCountOptional: true, showUnconfirmed: true, bandResults: true, nextStepPage: true });
@@ -35,13 +36,8 @@ const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(
 
 /** Settled count, optional denominator (ruling a) and "n not yet confirmed" side by side (ruling b).
  *  `unconfirmed` is shown only when the server reports it; the facilitator side never guesses it. */
-export function v3CountLine({ responses, expected, unconfirmed } = {}, esc = esc0, flags = V3_FLAGS) {
-  const got = num(responses) ?? 0, of = flags.expectedCountOptional ? num(expected) : null, unc = num(unconfirmed);
-  const settled = of ? `${got} of ${of} responded` : `${got} responded`;
-  const pending = !flags.showUnconfirmed ? '' : unc === null
-    ? '' // the server did not report one: show nothing rather than a number it never sent
-    : `<span class="${unc ? 'badge' : 'muted'}" data-v3-unconfirmed="${unc}">${unc} not yet confirmed</span>`;
-  return `<span class="v3-count" data-v3-settled="${got}">${esc(settled)}</span>${pending ? ` <span aria-hidden="true">·</span> ${pending}` : ''}`;
+export function v3CountLine(counts = {}, esc = esc0, flags = V3_FLAGS) {
+  return responseCount(counts, esc, { expectedOptional: !!flags.expectedCountOptional, showUnconfirmed: !!flags.showUnconfirmed }); // component: Response count
 }
 
 const BAND_WORDS = new Set(['Strong', 'Growing', 'Needs support', 'Needs urgent attention', 'More input needed']);
