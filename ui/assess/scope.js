@@ -162,7 +162,10 @@ const entry = {
 // A scope page renders as: <div data-read-region> (kit-presented read model) + <section data-action-region> (the existing
 // create/rename/add/remove forms, exact selectors and handlers). The action region is an intermediate integration checkpoint
 // until K3b replaces those presentations; it is never hidden to appear finished.
-const ctxStage = s => ({ prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' })[s] || String(s || '');
+// v3 plain state words (lane 1; must equal ui/v3-shell.js STATE_WORDS — parity test in ui/v3-shell.test.mjs).
+// v2 words, for a one-line revert: { prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' }
+export const CTX_STAGE_WORDS = Object.freeze({ prepare: 'Setup not finished', collect: 'Collecting responses', understand: 'Ready to look at results', improve: 'Reviewed' });
+const ctxStage = s => CTX_STAGE_WORDS[s] || String(s || '');
 const READ_STATUS = Object.freeze({ loaded: 'ready', unauthenticated: 'unauthenticated', refused: 'refused', not_built: 'not_built', failed: 'failed' });
 export function readModel(kind, model) {
   const status = READ_STATUS[model?.status] || 'failed';
