@@ -6,7 +6,7 @@
 // the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
-import { v3CountLine, v3BandsMarkup, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
+import { v3CountLine, v3BandsMarkup, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, v3NextFinishes } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -187,10 +187,18 @@ const understand = {
 const improve = {
   async load(ctx, { aid }) {
     const a = ctx.current?.assessment || {};
-    return { aid, role: a.role, notes_reflection: a.notes_reflection ?? '', notes_next_steps: a.notes_next_steps ?? '', editable: isEditor(a.role) };
+    return { aid, role: a.role, stage: a.stage, notes_reflection: a.notes_reflection ?? '', notes_next_steps: a.notes_next_steps ?? '', editable: isEditor(a.role) };
   },
   render(ctx, m) {
     const esc = ctx.esc;
+    if (V3_FLAGS.nextStepPage) {
+      // v3 lane 3 L3-4: Bincy screen 11 / prototype frame 11. Recommendations aside not drawn (PARITY I1).
+      const T = V3_NEXT, fin = v3NextFinishes(m.stage, m.editable);
+      const notes = m.editable
+        ? `<form data-notes-form><label class="field">${esc(T.reflection)}<textarea name="notes_reflection" rows="3" maxlength="4000" placeholder="${esc(T.reflectionHint)}">${esc(m.notes_reflection)}</textarea></label><label class="field">${esc(T.next)}<textarea name="notes_next_steps" rows="2" maxlength="4000" placeholder="${esc(T.nextHint)}">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(T.footer)} ${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes${fin ? ' data-v3-finish' : ''}>${esc(fin ? T.finish : T.save)}</button></div><p class="status" role="status" aria-live="polite" data-notes-status></p></form>`
+        : `<h3>${esc(T.reflection)}</h3><p data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">Nothing recorded yet.</span>'}</p><h3>${esc(T.next)}</h3><p data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next step recorded yet.</span>'}</p><p class="small muted">${esc(NOTES_VISIBILITY)} Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`;
+      return `<section class="panel" data-v3-next><p class="eyebrow">${esc(T.eyebrow)}</p><h2>${esc(T.title)}</h2>${notes}</section>`;
+    }
     const notes = m.editable
       ? `<form data-notes-form><label class="field">Reflection<textarea name="notes_reflection" maxlength="4000">${esc(m.notes_reflection)}</textarea></label><label class="field">Next steps<textarea name="notes_next_steps" maxlength="4000">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>Save notes</button></div><p class="status" role="status" aria-live="polite" data-notes-status></p></form>`
       : `<h3>Reflection</h3><p data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">No reflection recorded.</span>'}</p><h3>Next steps</h3><p data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next steps recorded.</span>'}</p><p class="small muted">${esc(NOTES_VISIBILITY)} Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`;
@@ -206,8 +214,16 @@ const improve = {
       try {
         const r = await ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/notes`, { method: 'PATCH', body });
         const a = r?.assessment || {}; m.notes_reflection = a.notes_reflection ?? body.notes_reflection; m.notes_next_steps = a.notes_next_steps ?? body.notes_next_steps;
-        if (status) status.textContent = 'Notes saved.';
-        if (typeof ctx.refresh === 'function') await ctx.refresh();
+        if (V3_FLAGS.nextStepPage && ctx.current?.assessment) Object.assign(ctx.current.assessment, { notes_reflection: m.notes_reflection, notes_next_steps: m.notes_next_steps }); // Bugbot 4095257240: a failed refetch remounts the saved notes
+        const left = () => (ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false; // Bugbot 4095257215: never repaint a route the user moved to
+        let stayOnFailure = false; // Bugbot 4094907104: a refresh remounts the page and would wipe the partial-landing alert
+        if (V3_FLAGS.nextStepPage && v3NextFinishes(m.stage, m.editable)) {
+          // one allowed step understand → improve (cap.assessment.set_stage); notes are already saved if this fails
+          try { await v3SetStage(ctx.api, ctx.enc, m.aid, 'saveAndFinish'); m.stage = V3_SET_STAGE.saveAndFinish; if (ctx.current?.assessment) ctx.current.assessment.stage = m.stage; /* #199: remount shows the committed stage even if the refetch fails */ if (ctx.state?.dirty instanceof Map) ctx.state.dirty.set(m.aid, 'write'); if (status) status.textContent = 'Notes saved. This review is finished.'; }
+          catch (se) { stayOnFailure = true; if (ctx.state?.dirty instanceof Map) ctx.state.dirty.set(m.aid, 'write'); const k2 = classify(se); if (status) { status.setAttribute('role', 'alert'); status.textContent = `Notes saved. The review was not marked finished: ${k2 === 'refused' ? NOT_VISIBLE : k2 === 'unauthenticated' ? 'your sign-in is no longer active' : String(se.message || 'request failed')}.`; } }
+        } else if (status) status.textContent = 'Notes saved.';
+        if (left()) { if (ctx.state?.dirty instanceof Map) ctx.state.dirty.set(m.aid, 'write'); return; }
+        if (!stayOnFailure && typeof ctx.refresh === 'function') await ctx.refresh();
       } catch (err) {
         const k = classify(err);
         if (status) { status.setAttribute('role', 'alert'); status.textContent = k === 'refused' ? `${NOT_VISIBLE}: the notes were not saved.` : k === 'unauthenticated' ? 'Your sign-in is no longer active. Sign in again; the notes were not saved.' : k === 'not_built' ? 'Notes are not built yet.' : `Notes could not be saved: ${String(err.message || 'request failed')}`; }
