@@ -328,7 +328,7 @@ const project = {
     const rename = owner ? `<section class="panel"><h2>Rename</h2><form id="rename-form"><label class="field">Project name<input name="name" maxlength="100" required value="${ctx.esc(p.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
     // Lane 11 (LANES.md claim 11:19): retained surfaces (cookbook design-system-v3 PARITY.md, ADOPTION item 7) reachable from project
     // settings. Links only, to the existing screens; no new capability, contract unchanged. Access codes (C3) live on the legacy facilitator page.
-    const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue, print or revoke paper codes for one survey', href: '/legacy/#facilitator', label: 'Open access codes' }];
+    const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue paper codes for one survey and release them once to print (choose the assessment and survey there)', href: '/legacy/#facilitator', label: 'Open access codes' }];
     const settings = edit ? `<section class="panel" id="project-settings" aria-labelledby="project-settings-title"><h2 id="project-settings-title">Project settings</h2><ul class="manage-rows kept-surfaces" aria-label="Kept tools">${kept.map(k => `<li class="manage-row"><span><strong>${ctx.esc(k.name)}</strong> <span class="small muted">${ctx.esc(k.what)}</span></span><a class="button quiet small" href="${ctx.esc(k.href)}" data-kept="${ctx.esc(k.key)}">${ctx.esc(k.label)}</a></li>`).join('')}</ul></section>` : '';
     const r = readModel('project', model);
     // Assessments and languages keep their independent settled outcomes; only a 'ready' list renders as cards (never an empty success).
