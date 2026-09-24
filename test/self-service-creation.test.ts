@@ -148,6 +148,10 @@ describe("self-service creation: provisioned defaults true for every normal user
     expect(pl3.result.projects[0]).toMatchObject({ assessment_count: 1 });
     const wg: any = await call(mila.principal, "cap.workspace.get", { id: ws.result.workspace.id }, "read");
     expect(wg.result.projects[0]).toMatchObject({ assessment_count: 1 });
+    // L1-45 (captain 17:05): a project in the workspace without a grant is not counted on the workspace card.
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at) VALUES ('prj_l145_hidden', ?, 'Hidden project', '2026-09-24T00:00:00Z')").bind(ws.result.workspace.id).run();
+    const wl3: any = await call(mila.principal, "cap.workspace.list", {}, "read");
+    expect(wl3.result.workspaces[0]).toMatchObject({ project_count: 1, assessment_count: 1 });
   });
 
   it("(c) a second fresh principal still sees nothing of the first's workspace or project", async () => {
