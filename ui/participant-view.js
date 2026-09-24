@@ -21,19 +21,29 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   function el(tag,text) {const n=doc.createElement(tag);if(text!==undefined)n.textContent=String(text);return n;}
   function button(label,action) {const n=el('button',label);n.type='button';n.addEventListener('click',action);return n;}
   const intro=el('section');intro.className='participant-intro';
-  intro.append(el('h2','Here to take the survey?'));
-  const labels=[model.assessment,model.language,model.period,model.template?.perspective].filter(v=>v!==null&&v!==undefined&&v!=='');
-  if(labels.length)intro.append(el('p',labels.join(' · ')));
-  intro.append(el('p',`${items.length} questions`));
+  // v3 L1-8 (NEED 5→1): welcome = design-system-v3 prototype frame 8 (V.pWelcome): eyebrow "<perspective> · <assessment>",
+  // title, lead, Time line, one full-width primary Start. Presentation only; model fields read, nothing stored.
+  const eyebrowText=[model.template?.perspective,model.assessment].filter(v=>v!==null&&v!==undefined&&v!=='').join(' · ');
+  if(eyebrowText){const eb=el('p',eyebrowText);eb.className='eyebrow';intro.append(eb);}
+  intro.append(el('h2','We would like your perspective'));
+  const lead=el('p',`${model.language?`You were invited to say how the ${model.language} translation is going. `:''}Your answers are grouped with others and never shown on their own.`);lead.className='participant-lead';intro.append(lead);
+  if(model.period){const per=el('p',model.period);per.className='participant-meta';intro.append(per);}
+  const time=el('p',`Time: about ${Math.max(5,Math.round(items.length*0.6))} minutes · ${items.length} questions`);time.className='participant-meta';intro.append(time);
   // v3 L1-5 (NEED 5→1): the instrument's source ref is provenance for facilitators, not participant copy; the raw
   // unbroken path widened the intro to 697px on a 375px phone (TRAINING.md #10). Kept on the model, never painted here.
-  intro.append(button('Begin',()=>showForm(0)));
+  const start=button('Start',()=>showForm(0));start.className='rv-btn primary participant-start';intro.append(start);
+  const foot=el('p','No account, no sign-in. Your facilitator can also enter your answers with you on paper.');foot.className='participant-foot';intro.append(foot);
   const nav=el('div');nav.className='participant-pager';nav.hidden=true;
-  const progress=el('p');progress.className='participant-progress';progress.setAttribute('aria-live','polite');
+  const progress=el('p');progress.className='participant-progress eyebrow';progress.setAttribute('aria-live','polite');
   const controls=el('div');controls.className='participant-page-actions';
   const back=button('Back',()=>showForm(Math.max(0,index-1)));
   const next=button('Next',()=>{if(validItem(index))showForm(index+1);});
-  controls.append(back,next);nav.append(progress,controls);
+  back.className='rv-btn quiet';next.className='rv-btn primary';
+  controls.append(back,next);
+  // v3 L1-8: prototype frame 9 segmented progress (one segment per question); decorative, the eyebrow text is the live label.
+  const bar=el('div');bar.className='participant-bar';bar.setAttribute('aria-hidden','true');
+  const segs=items.map(()=>el('span'));bar.append(...segs);
+  nav.append(progress,controls,bar);
   const error=el('p');error.className='participant-page-error';error.setAttribute('role','alert');error.hidden=true;
   root.append(intro,nav,error);owned.push(intro,nav,error);
   function values(){return new doc.defaultView.FormData(form);}
@@ -44,6 +54,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
     fields.forEach((f,k)=>f.hidden=k!==index);
     intro.hidden=true;nav.hidden=false;error.hidden=true;
     progress.textContent=`Question ${index+1} of ${items.length}`;
+    segs.forEach((seg,k)=>{seg.className=k<=index?'done':'';});
     back.disabled=index===0;next.hidden=index===items.length-1;
     focusField(index);
   }

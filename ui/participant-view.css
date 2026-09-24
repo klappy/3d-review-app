@@ -4,6 +4,17 @@
 .rv #participant .participant-intro h2{font-size:24px;line-height:1.25}
 .rv #participant .participant-intro p{overflow-wrap:anywhere}
 .rv #participant .participant-progress{font-size:13px;color:var(--secondary);margin:8px 0}
+/* v3 L1-8: prototype frames 8/9 (design-system-v3 V.pWelcome / V.pQuestion). */
+.rv #participant .participant-intro{background:var(--bincy-card,var(--surface,#fff));border:1px solid var(--bincy-edge,var(--line,#dde3e8));border-radius:16px;padding:24px}
+.rv #participant .participant-intro .eyebrow{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--secondary);margin:0 0 6px}
+.rv #participant .participant-intro h2{font-size:27px;margin:0 0 10px}
+.rv #participant .participant-meta{font-size:14px;color:var(--secondary);margin:4px 0}
+.rv #participant .participant-start{display:block;width:100%;min-height:48px;margin:18px 0 8px;font-size:16px}
+.rv #participant .participant-foot{text-align:center;font-size:13px;color:var(--secondary)}
+.rv #participant .participant-pager{display:flex;flex-direction:column}
+.rv #participant .participant-bar{order:-1;display:flex;gap:4px;margin:4px 0 6px}
+.rv #participant .participant-bar span{flex:1;height:6px;border-radius:3px;background:var(--bincy-edge,#dde3e8)}
+.rv #participant .participant-bar span.done{background:var(--bincy-teal,var(--primary,#0f766e))}
 .rv #participant .participant-page-actions{display:flex;justify-content:space-between;gap:12px}
 .rv #participant .participant-page-error{color:var(--warning-ink);background:var(--warning-fill);padding:12px;border-radius:var(--r-button)}
 .rv #participant .participant-change{display:block;margin-top:6px;min-height:36px}
