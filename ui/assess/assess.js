@@ -240,7 +240,13 @@ function bindCounts(current) {
 function collectCount(s) {
   const c = countFor(s.id);
   if (c.status !== 'loaded') return countCell(s);
-  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}</span>`;
+  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}${collectState(c.collection_status || s.collection_status)}</span>`;
+}
+// v3 L10-1 (prototype frame 7 rrow): each Collect row ends with its plain state word, open / closed (PARITY C6), from the server's collection_status only.
+function collectState(status) {
+  if (!status) return '';
+  const word = ({ open: 'open', closed: 'closed' })[status] || String(status);
+  return ` <span aria-hidden="true">·</span> <span class="state" data-collect-state>${esc(word)}</span>`;
 }
 function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'Other perspective'; }
 function collectPanel(current) {
