@@ -84,7 +84,7 @@ test('views: four steps, one primary each, optional expected count, escaped', ()
   assert.match(r, /data-step="information"/);
   assert.equal((renderStep('review', draft(), data, [], true).match(/data-wz="edit"/g) || []).length, 0);
   assert.match(renderStep('details', draft(), data), /<span>Participants<\/span>/);
-  assert.match(renderStep('review', draft({ context: '<b>x</b>' }), data), /&lt;b&gt;x&lt;\/b&gt; <span class="sub">\(shown here only/);
+  assert.match(renderStep('review', draft({ context: '<b>x</b>' }), data), /&lt;b&gt;x&lt;\/b&gt; <span class="sub">\(not sent yet/);
   assert.doesNotMatch(renderStep('review', draft({ context: 'x' }), data), /not stored yet/);
 });
 

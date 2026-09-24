@@ -224,7 +224,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
     <form data-wz-form="information">
       <h3>Shown to every participant</h3>
       <dl class="kv"><dt>Project</dt><dd>${esc(proj.name || '')}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd><dt>Format</dt><dd>${esc(d.format)}</dd></dl>
-      <label>A note for participants (optional)<textarea name="context" rows="2" placeholder="Not stored yet: the product has no field for this note.">${esc(d.context)}</textarea></label>
+      <label>A note for participants (optional)<textarea name="context" rows="2" placeholder="Not sent to participants yet: this note is not saved.">${esc(d.context)}</textarea></label>
       <h3>Asked of each participant</h3>
       ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><h3>${esc(t.perspective)}</h3><span class="sub">The questions in the ${esc(t.name)} survey, as published. Answers are grouped, never shown alone.</span></div></div>`).join('')}
       ${actions(true, '<button class="primary" type="submit">Continue</button>')}
@@ -236,7 +236,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
     <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt><span class="pdot wz-kvdot ${pdot(t.perspective)}" aria-hidden="true"></span>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
     <div class="wz-sec"><h3>Participant information</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="information">Edit</button>'}</div>
-    <dl class="kv"><dt>Shown to everyone</dt><dd>${esc([proj.name, lang.name, d.purpose.trim(), d.format].filter(Boolean).join(' · '))}</dd><dt>Your note</dt><dd>${d.context.trim() ? `${esc(d.context.trim())} <span class="sub">(shown here only; not saved with the review)</span>` : 'None'}</dd><dt>Asked of each</dt><dd>The published survey questions for each group</dd></dl>
+    <dl class="kv"><dt>Shown to everyone</dt><dd>${esc([proj.name, lang.name, d.purpose.trim(), d.format].filter(Boolean).join(' · '))}</dd><dt>Note for participants</dt><dd>${d.context.trim() ? `${esc(d.context.trim())} <span class="sub">(not sent yet: this note is not saved with the review)</span>` : 'None'}</dd><dt>Asked of each</dt><dd>The published survey questions for each group</dd></dl>
     ${locked && locked.links?.length ? `<h3>Links already opened — copy them now</h3>${linkList(locked.links, origin, templates)}` : ''}
     ${locked ? `<div class="actions"><button type="button" class="rv-btn quiet" data-wz="cancel">Leave setup (what was created stays; nothing was sent)</button><span class="spacer"></span><button type="button" class="primary" data-wz="launch">Continue the launch</button></div>` : actions(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
 }
