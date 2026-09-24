@@ -257,3 +257,10 @@ test('L2-7 wizard composes the shared Stepper component (ruling 12:34): no local
   assert.match(html, /class="v3-stepper stepper" aria-label="Setup steps"/);
   assert.match(html, /<li class="on" aria-current="step"><i aria-hidden="true">2<\/i><span>Participants<\/span>/);
 });
+
+test('wizard alert colour comes from the design-system token (dark-mode safe)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('./wizard.css', import.meta.url), 'utf8');
+  assert.match(css, /\.note\.alert\{color:var\(--warning-ink/);
+  assert.doesNotMatch(css, /#8a2a1c/);
+});
