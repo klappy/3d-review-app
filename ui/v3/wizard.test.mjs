@@ -107,3 +107,9 @@ test('locked review after a partial launch hides Back/Edit; follow-up not claime
   assert.ok(!/Follow-up<\/dd>/.test(html));
   assert.match(renderStep('details', draft(), data), /not stored yet/);
 });
+
+test('locked review shows links already issued so a partial launch never loses them', () => {
+  const data = { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates: [{ id: 'tpl.team', version: 3, name: 'Team', perspective: 'Translation team' }] };
+  const html = renderStep('review', draft(), data, [], { done: ['x'], links: [{ template: 'tpl.team', entry_fragment: '#survey=abc' }] }, 'https://dev');
+  assert.match(html, /Links already opened/); assert.match(html, /Translation team/);
+});

@@ -129,7 +129,8 @@ const head = (n, h, sub) => `<div class="eyebrow">Start a 3D Review · step ${n}
 const errBox = errs => errs?.length ? `<div class="note alert" role="alert">${errs.map(esc).join('<br>')}</div>` : '';
 const actions = (back, primary) => `<div class="actions">${back ? `<button type="button" class="rv-btn quiet" data-wz="back">Back</button>` : `<button type="button" class="rv-btn quiet" data-wz="cancel">Cancel</button>`}<span class="spacer"></span>${primary}</div>`;
 
-export function renderStep(step, d, data, errs = [], locked = false) {
+// locked: the partial launch ctx (or true). Links already issued are shown so they are never lost (the server keeps only a hash).
+export function renderStep(step, d, data, errs = [], locked = false, origin = '') {
   const n = STEPS.indexOf(step) + 1;
   const projects = data.projects || [], languages = data.languages || [], templates = latestTemplates(data.templates);
   const isNew = d.project === NEW_PROJECT;
@@ -177,15 +178,19 @@ export function renderStep(step, d, data, errs = [], locked = false) {
     <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
     <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
+    ${locked && locked.links?.length ? `<h3>Links already opened — copy them now</h3>${linkList(locked.links, origin, templates)}` : ''}
     ${locked ? `<div class="actions"><button type="button" class="rv-btn quiet" data-wz="cancel">Leave setup (what was created stays; nothing was sent)</button><span class="spacer"></span><button type="button" class="primary" data-wz="launch">Continue the launch</button></div>` : actions(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
 }
 
-export function renderDone(ctx, origin = '', templates = []) {
+function linkList(links, origin, templates) {
   const name = id => (templates.find(t => t.id === id) || {}).perspective || id;
   const url = l => { try { return shareUrl(origin, l.entry_fragment); } catch { return ''; } };
+  return `<ul class="wz-links">${links.map(l => `<li><label>${esc(name(l.template))}<input readonly value="${esc(url(l))}"></label></li>`).join('')}</ul>`;
+}
+export function renderDone(ctx, origin = '', templates = []) {
   return `<div class="eyebrow">Launched</div><h1 class="wz-h">The review is collecting responses</h1>
     <p class="muted">Share each link with its group. Nothing was sent to anyone.</p>
-    <ul class="wz-links">${ctx.links.map(l => `<li><label>${esc(name(l.template))}<input readonly value="${esc(url(l))}"></label></li>`).join('')}</ul>
+    ${linkList(ctx.links, origin, templates)}
     <div class="actions"><span class="spacer"></span><button type="button" class="primary" data-wz="open" data-aid="${esc(ctx.aid)}">Open the review</button></div>`;
 }
 
@@ -194,7 +199,7 @@ export function renderDone(ctx, origin = '', templates = []) {
 export function mountWizard(root, deps) {
   const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0 };
   let alive = true; const ac = new AbortController(); const on = { signal: ac.signal };
-  const paint = () => { if (!alive) return; root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, s.data, s.errs, !!s.partial)}</div>`; };
+  const paint = () => { if (!alive) return; root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, s.data, s.errs, s.partial || false, deps.origin || '')}</div>`; };
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
   const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
