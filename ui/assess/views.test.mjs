@@ -161,12 +161,13 @@ test('A8c v3 next step: member in Reviewing → "Save and finish this review" = 
 
 test('A8d v3 next step: stage move refused after notes saved → says notes saved, not finished; improve stage only saves', async () => {
   const { api, calls } = fakeApi({ 'PATCH /v2/assessments/a1/notes': ({ body }) => ({ assessment: { ...assessment, ...body } }), 'POST /v2/assessments/a1/stage': err('NOT_AUTHORIZED_AT_SCOPE', 403) });
-  const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'owner', stage: 'understand' }, surveys }, refresh: async () => {} });
+  let refreshed = 0; const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'owner', stage: 'understand' }, surveys }, refresh: async () => { refreshed++; } });
   const m = await views.improve.load(ctx, { aid: 'a1' });
   const form = el({ 'data-notes-form': '' }), btn = el({ tag: 'button', 'data-save-notes': '' }), status = el({ 'data-notes-status': '' });
   makeRoot([form, btn, status, el({ name: 'notes_reflection' }), el({ name: 'notes_next_steps' })]); views.improve.bind(ctx, root, m);
   await form.onsubmit({ preventDefault() {} });
   assert.match(status.textContent, /^Notes saved\. The review was not marked finished: Not visible to you/); assert.equal(calls.length, 2);
+  assert.equal(refreshed, 0); // alert stays on screen (Bugbot 4094907104)
   const c2 = ctxFor(fakeApi({}).api, { current: { assessment: { ...assessment, role: 'owner', stage: 'improve' }, surveys } });
   const h2 = views.improve.render(c2, await views.improve.load(c2, { aid: 'a1' }));
   assert.match(h2, /data-save-notes>Save</); assert.doesNotMatch(h2, /data-v3-finish/);

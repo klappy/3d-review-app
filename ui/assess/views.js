@@ -214,12 +214,13 @@ const improve = {
       try {
         const r = await ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/notes`, { method: 'PATCH', body });
         const a = r?.assessment || {}; m.notes_reflection = a.notes_reflection ?? body.notes_reflection; m.notes_next_steps = a.notes_next_steps ?? body.notes_next_steps;
+        let stayOnFailure = false; // Bugbot 4094907104: a refresh remounts the page and would wipe the partial-landing alert
         if (V3_FLAGS.nextStepPage && v3NextFinishes(m.stage, m.editable)) {
           // one allowed step understand → improve (cap.assessment.set_stage); notes are already saved if this fails
           try { await v3SetStage(ctx.api, ctx.enc, m.aid, 'saveAndFinish'); m.stage = V3_SET_STAGE.saveAndFinish; if (ctx.state?.dirty instanceof Map) ctx.state.dirty.set(m.aid, 'write'); if (status) status.textContent = 'Notes saved. This review is finished.'; }
-          catch (se) { const k2 = classify(se); if (status) { status.setAttribute('role', 'alert'); status.textContent = `Notes saved. The review was not marked finished: ${k2 === 'refused' ? NOT_VISIBLE : k2 === 'unauthenticated' ? 'your sign-in is no longer active' : String(se.message || 'request failed')}.`; } }
+          catch (se) { stayOnFailure = true; if (ctx.state?.dirty instanceof Map) ctx.state.dirty.set(m.aid, 'write'); const k2 = classify(se); if (status) { status.setAttribute('role', 'alert'); status.textContent = `Notes saved. The review was not marked finished: ${k2 === 'refused' ? NOT_VISIBLE : k2 === 'unauthenticated' ? 'your sign-in is no longer active' : String(se.message || 'request failed')}.`; } }
         } else if (status) status.textContent = 'Notes saved.';
-        if (typeof ctx.refresh === 'function') await ctx.refresh();
+        if (!stayOnFailure && typeof ctx.refresh === 'function') await ctx.refresh();
       } catch (err) {
         const k = classify(err);
         if (status) { status.setAttribute('role', 'alert'); status.textContent = k === 'refused' ? `${NOT_VISIBLE}: the notes were not saved.` : k === 'unauthenticated' ? 'Your sign-in is no longer active. Sign in again; the notes were not saved.' : k === 'not_built' ? 'Notes are not built yet.' : `Notes could not be saved: ${String(err.message || 'request failed')}`; }
