@@ -183,3 +183,21 @@ test('#188 reconcile never adopts a collaborator\'s same-name assessment', async
   const found = await reconcile({ cap: 'cap.assessment.create' }, { pid: 'p1', lid: 'l1', pending: { at: Date.now() } }, draft(), async () => ({ assessments: [theirs] }));
   assert.equal(found, null);
 });
+
+test('#188 resume reads back an existing same-name language instead of repeating a refused create', async () => {
+  const langs = [{ id: 'l7', name: 'Hill' }]; const posts = [];
+  const api = async (url, { method = 'GET', body } = {}) => {
+    if (method === 'GET' && url === '/v2/projects/p9/languages') return { languages: langs };
+    if (method === 'POST') posts.push(url);
+    if (url === '/v2/projects/p9/languages') { const e = new Error('a language with that name already exists'); e.status = 400; throw e; }
+    if (url.endsWith('/assessments')) return { assessment: { id: 'a1' } };
+    if (url.endsWith('/surveys')) return { survey: { id: 's' + body.template_id } };
+    if (url.endsWith('/stage')) return {};
+    if (url.endsWith('/links')) return body.mode === 'dry_run' ? { confirm_token: 'ct' } : { entry_fragment: '#survey=x' };
+    throw new Error('unexpected ' + url);
+  };
+  const d = draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'Hill' });
+  const resume = { pid: 'p9', lid: null, aid: null, surveys: [], links: [], done: ['cap.project.create'], pending: null };
+  const ctx = await launch(d, { api, store: mem(), resume });
+  assert.equal(ctx.lid, 'l7'); assert.ok(!posts.includes('/v2/projects/p9/languages'));
+});

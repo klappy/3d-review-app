@@ -102,7 +102,9 @@ async function launchInner(d, opts) {
     }
     if (i++ < ctx.done.length) continue;
     // #188: a write whose response was lost may have committed. Read it back by ids already known before retrying.
-    if (ctx.pending && ctx.pending.cap === step.cap) {
+    // language.create is also read back on any resume: the project is this launch's own (created or reconciled), so a
+    // same-name language there is ours; a "name already exists" 400 would otherwise block Continue forever (Bugbot 4094916357).
+    if ((ctx.pending && ctx.pending.cap === step.cap) || (resume && step.cap === 'cap.language.create')) {
       const found = await reconcile(step, ctx, d, api);
       if (found) { if (step.keep) step.keep(found, ctx); ctx.pending = null; ctx.done.push(step.cap); continue; }
     }
