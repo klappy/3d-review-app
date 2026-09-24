@@ -31,7 +31,7 @@ test('(b) settled and not-yet-confirmed side by side; never guessed', () => {
 test('(c) held results render band cards as evidence gaps, no invented band', () => {
   const h = v3BandsMarkup({ status: 'held', reason: 'policy <unresolved>' }, L);
   assert.match(h, /data-v3-bands="held"/); assert.equal((h.match(/data-v3-band=/g) || []).length, 3);
-  assert.match(h, /policy &lt;unresolved&gt;/); assert.doesNotMatch(h, />Strong</);
+  assert.match(h, /policy &lt;unresolved&gt;/); assert.doesNotMatch(h.slice(0, h.indexOf('data-v3-legend')), />Strong</); // cards only; the legend names every band (L3-5)
   const s = v3BandsMarkup({ status: 'ready', bands: [{ perspective: 'Church', band: 'Growing', text: 'ok' }, { perspective: 'Community', band: '87%' }] }, L);
   assert.match(s, /data-v3-bands="shown"/); assert.match(s, />Growing</); assert.doesNotMatch(s, /87%/);
 });
@@ -90,4 +90,12 @@ test('L3-4 next step: finish only for an editor in Reviewing; flag on; copy from
   assert.equal(m.v3NextFinishes('understand', true), true);
   for (const [st, ed] of [['understand', false], ['improve', true], ['collect', true], ['prepare', true]]) assert.equal(m.v3NextFinishes(st, ed), false);
   assert.equal(m.V3_NEXT.title, 'What happens next?'); assert.equal(m.V3_SET_STAGE.saveAndFinish, 'improve');
+});
+
+test('L3-5: results legend carries one token colour dot per band word (prototype frame 10)', async () => {
+  const m = await import('./v3-assessment.js');
+  const html = m.v3BandsMarkup({ status: 'held', reason: 'x' }, ['Translation Team', 'Church', 'Community']);
+  const legend = html.slice(html.indexOf('data-v3-legend'));
+  for (const [w, v] of m.V3_LEGEND) assert.ok(legend.includes(`<i class="dot" style="background:var(${v})" aria-hidden="true"></i>${w}`), w);
+  assert.equal(m.V3_LEGEND.length, 5);
 });
