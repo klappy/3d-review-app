@@ -1,31 +1,29 @@
 {
-  "version": "0.18.0",
+  "version": "0.20.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "078cca68e04f0d185862bb7e0ef5be42b00254ba",
+  "cookbook_commit": "df999c92673cb188ec79ca15697a63ef88d03b78",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.18.0.md",
-      "blob_sha": "e6702796b29f2e1996fded4a238362d48c6a66aa",
-      "sha256": "cae22d3908bf669eda99bb3531f7e28d5b22b665c736812e052612bc80f95889"
+      "path": "planning/2026-09-16-parity-build/releases/0.20.0.md",
+      "blob_sha": "18a23fe8b1cead529d8bac67bdd80836263c1da5",
+      "sha256": "280ed8d03572e397fd7ee7cccc4a465e0056a67bbfd193b80ca9dfffef65381f"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "1b47479cf5e5f3f494d64e65b69fa992eaa1afd1",
-      "sha256": "d43f894df7060cfdd799c2d4457e446a1f841fc79c2d4653ec2d8dcc12fc09c6"
+      "blob_sha": "df24964013284b11b300f84f0c4df01a6155c618",
+      "sha256": "1ed36c7d76c2d417a46cdd9d087b5926c02afbf5af75b1f7ffe2eb7bb89959e1"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "component: Stepper — one progress stepper in ui/v3/components/stepper.js (glass dots, done ticks, optional hash links per step); the setup wizard composes it and lane 3 imports it for the assessment page (rulings 12:28, 12:34) (#227)",
-        "results: provisional bands (≥75 Strong · 60–74 Growing · 40–59 Needs support · <40 Needs urgent attention; min 3 responses else More input needed) from the latest report's per-perspective and sub-dimension scores, labelled provisional; numbers behind \"Show evidence and details\" (component: Band card + legend) (#225)",
-        "component: Breadcrumbs — one crumb row in fixed order Home › Workspace › Project › Assessment › Page (ui/v3/components/breadcrumbs.js; mounting via NEED 9→1) (#224)"
+      "added": [],
+      "changed": [
+        "component: Card — one v3 import point (ui/v3/components/card.js) for home/workspace/project/assessment cards, re-exporting the shared card (no copy) (#249)",
+        "DEV mail: sends to any address when no allowlist is configured (team testing); an allowlist, when set, is still enforced (#252)",
+        "Stepper: pending steps carry class \"todo\" instead of an empty class attribute (component: Stepper) (#251)",
+        "setup wizard: \"step n of N\" count derives from the step list, not a hard-coded 4 (#253)"
       ],
-      "changed": [],
-      "fixed": [
-        "demo: exit to home and sign in from every demo screen (#222)",
-        "permissions: people shown by name and email, not id (component: Member list, used on workspace, project and assessment permissions) (#226)"
-      ]
+      "fixed": []
     }
   }
 }

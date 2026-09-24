@@ -1,7 +1,55 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.18.0",
+  "current": "0.20.0",
   "versions": [
+    {
+      "version": "0.20.0",
+      "status": "candidate",
+      "notes_path": "releases/0.20.0.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "component: Card — one v3 import point (ui/v3/components/card.js) for home/workspace/project/assessment cards, re-exporting the shared card (no copy) (#249)",
+          "DEV mail: sends to any address when no allowlist is configured (team testing); an allowlist, when set, is still enforced (#252)",
+          "Stepper: pending steps carry class \"todo\" instead of an empty class attribute (component: Stepper) (#251)",
+          "setup wizard: \"step n of N\" count derives from the step list, not a hard-coded 4 (#253)"
+        ],
+        "fixed": []
+      }
+    },
+    {
+      "version": "0.19.0",
+      "status": "candidate",
+      "notes_path": "releases/0.19.0.md",
+      "sections": {
+        "added": [
+          "public About page (#about) (#228)",
+          "left sidebar on assessment and scope pages is the shared Sidebar tree (workspace → project → assessment), in step with the breadcrumbs (component: Sidebar tree) (#243)",
+          "component: Sidebar tree — 0.16 left navigation Workspaces → Project → Assessment, current row from the same scope as Breadcrumbs (ui/v3/components/sidebar-tree.js; mounting via NEED 9→1) (#241)"
+        ],
+        "changed": [
+          "component: Breadcrumbs — assessment context panel crumb row is the shared Breadcrumbs (Home › Workspace › Project › Assessment); v3 components served locally (#232)",
+          "navigation: kit shell header crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment › Page), same as the assessment page (P0 12:32) (#239)",
+          "demo header Exit demo / Sign in is one shared component (component: Header with Exit demo / Sign in) (#246)",
+          "setup wizard: group rows use the glass look (--glass, --glass-edge, blur) instead of flat white cards (ruling 12:22) (#234)",
+          "setup wizard: group rows use the design-system glass blur token (--blur-panel) instead of a hard-coded 8px (ruling 12:22) (#238)",
+          "Stepper dots blur on the --blur-panel glass token (component: Stepper) (#244)",
+          "component: Stepper — assessment page stage tab bar (Prepare · Collect · Understand · Improve) replaced by the wizard's shared Stepper; server stage = active dot, earlier stages ticked, each step links to its view; Permissions stays a separate link (captain ruling 12:28) (#230)",
+          "results: band card and colour legend are one shared component (ui/v3/components/band-card.js) (#233)",
+          "results and collect count line comes from one shared Response count component (#240)",
+          "results \"Show evidence and details\" table comes from one shared Evidence table component (component: Evidence table) (#245)",
+          "results review gate (state badge + Record my review / Choose a next step) comes from one shared Review gate component (component: Review gate) (#247)"
+        ],
+        "fixed": [
+          "public links never land on sign-in (Read about it → #about, unknown hashes → home) (#228)",
+          "look: flat white/teal restyle (#200) removed; design-system-v3 glass tokens govern header, cards and buttons again (ruling 12:22) (#235)",
+          "setup review: participant note says plainly it is not sent or saved yet (review line + placeholder), replacing developer copy (#231)",
+          "setup wizard: alert note uses the design-system --warning-ink token instead of a hard-coded red, so it stays readable in dark mode (#242)",
+          "Stepper: completed steps are announced as \"completed\" to screen readers (component: Stepper) (#248)",
+          "band card component is served by the local server and its tests stay off DEV assets (#236)"
+        ]
+      }
+    },
     {
       "version": "0.18.0",
       "status": "candidate",
