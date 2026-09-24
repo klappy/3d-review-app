@@ -144,6 +144,12 @@ test('entry: public welcome with hero, tour stepper and survey/example/sign-in b
   assert.ok(nav.includes('aria-label="Choose where to start"')); assert.ok(h.indexOf('<nav class="public-choices') < h.indexOf('<h1>')); assert.ok(h.includes('<p class="eyebrow" id="public-about">What is 3D Review?</p>'));
   assert.ok(h.includes('Explore the real assessment screens · Go at your own pace · Nothing is sent')); assert.ok(h.includes('href="#projects">Open your projects and reports'));
   for (const retired of ['Here to take the survey?', 'Show me how', 'Manage assessments']) assert.ok(!h.includes(retired), retired);
+  // captain order 17:05 (lane 9, L9-22) less text: outside Learn more, only the choices, eyebrow, one heading and one short line
+  const hero = h.slice(h.indexOf('<section class="hero panel"'), h.indexOf('</section>') + 10); const lm = hero.indexOf('<details class="small learn-more"><summary>Learn more</summary>');
+  assert.ok(lm > -1, 'Learn more disclosure present'); const shown = hero.slice(0, lm) + hero.slice(hero.indexOf('</details>', lm) + 10);
+  assert.equal((shown.match(/<h1>/g) || []).length, 1); assert.equal((shown.match(/<p /g) || []).length, 2, 'eyebrow + one line'); assert.ok(!/<details[^>]*\bopen\b/.test(hero.slice(lm, lm + 60)), 'collapsed by default');
+  const line = shown.match(/<p class="muted lead">([^<]+)<\/p>/)[1]; assert.equal(line.split(/[.!?](\s|$)/).filter(x => x && x.trim()).length, 1, 'one sentence');
+  for (const kept of ['Translation team', 'Explore the real assessment screens', 'Open your projects and reports']) assert.ok(hero.slice(lm).includes(kept), kept + ' lives behind Learn more');
 });
 test('entry: signed in shows Continue cards + sign-out, hides sign-in', async () => {
   const ctx = ctxWith({}, { state: { principal: { id: 'pr_1' } } }); const h = pages.entry.render(ctx, await pages.entry.load(ctx, {}));

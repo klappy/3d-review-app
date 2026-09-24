@@ -1,7 +1,25 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.21.0",
+  "current": "0.21.1",
   "versions": [
+    {
+      "version": "0.21.1",
+      "status": "candidate",
+      "notes_path": "releases/0.21.1.md",
+      "sections": {
+        "added": [],
+        "changed": [
+          "roadmap: Versions section on /roadmap/ lists shipped releases and forecasts the next version from the waiting change files (#261)",
+          "roadmap forecast 0.21.1 refreshed (lane 1 card counts, lane 9 less text) (#265)"
+        ],
+        "fixed": [
+          "cards: child counts only include assessments and projects you can list (#260)",
+          "card counts only include what you can open — workspace project count covered by a member who sees fewer (#262)",
+          "card counts only include what you can open — responses on an assessment you cannot open are not counted (#263)",
+          "public home: less text — four choices, one heading, one line; the rest behind Learn more (#264)"
+        ]
+      }
+    },
     {
       "version": "0.21.0",
       "status": "candidate",
