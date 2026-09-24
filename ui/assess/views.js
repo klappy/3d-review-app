@@ -187,7 +187,7 @@ const understand = {
 const improve = {
   async load(ctx, { aid }) {
     const a = ctx.current?.assessment || {};
-    return { aid, role: a.role, stage: a.stage, notes_reflection: a.notes_reflection ?? '', notes_next_steps: a.notes_next_steps ?? '', editable: isEditor(a.role) };
+    return { aid, role: a.role, notes_reflection: a.notes_reflection ?? '', notes_next_steps: a.notes_next_steps ?? '', editable: isEditor(a.role) };
   },
   render(ctx, m) {
     const esc = ctx.esc;

@@ -132,7 +132,7 @@ test('A7 improve viewer: read-only notes, no save control, visibility line; text
 
 test('A8 improve owner/member: one Save → PATCH /v2/assessments/{aid}/notes with both fields; refresh after server result', async () => {
   const { api, calls } = fakeApi({ 'PATCH /v2/assessments/a1/notes': ({ body }) => ({ assessment: { ...assessment, ...body } }) });
-  let refreshed = 0; const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'member', stage: 'improve' }, surveys }, refresh: async () => { refreshed++; } });
+  let refreshed = 0; const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'member' }, surveys }, refresh: async () => { refreshed++; } });
   const m = await views.improve.load(ctx, { aid: 'a1' }); const html = views.improve.render(ctx, m);
   assert.equal((html.match(/data-save-notes/g) || []).length, 1); assert.match(html, /<textarea name="notes_reflection"[^>]*>r&lt;1&gt;</);
   assert.ok(html.includes(NOTES_VISIBILITY));
