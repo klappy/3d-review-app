@@ -4,9 +4,9 @@ import { homeView, assessmentRow } from './home.js';
 const label = s => ({ prepare: 'Setup not finished', collect: 'Collecting responses' }[s] || s);
 test('prepare → Continue setup; other stages → Continue assessment; pill carries the state word', () => {
   const s = assessmentRow({ id: 'a1', name: 'Kapanawa', stage: 'prepare' }, label);
-  assert.match(s, /Continue setup →/); assert.match(s, /v3h-pill-setup">Setup not finished/); assert.match(s, /href="#assessment\/a1"/);
+  assert.match(s, /Continue setup <span aria-hidden="true">→<\/span>/); assert.match(s, /v3h-pill-setup">Setup not finished/); assert.match(s, /href="#assessment\/a1"/);
   const c = assessmentRow({ id: 'a 2', name: 'Hindi', stage: 'collect', language_name: 'Hindi' }, label);
-  assert.match(c, /Continue assessment →/); assert.match(c, /v3h-pill-progress/); assert.match(c, /#assessment\/a%202/);
+  assert.match(c, /Continue assessment <span aria-hidden="true">→<\/span>/); assert.match(c, /v3h-pill-progress/); assert.match(c, /#assessment\/a%202/);
 });
 test('home keeps list states; every project reachable by link', () => {
   const lists = { p1: { status: 'loaded', list: [{ id: 'a1', name: 'A', stage: 'collect' }] }, p2: { status: 'failed' }, p3: {} };
@@ -29,4 +29,12 @@ test('archived project is labelled Archived, no continue action', () => {
 });
 test('never shows a raw language id', () => {
   assert.doesNotMatch(assessmentRow({ id: 'a', name: 'A', stage: 'collect', language_id: 'lang_123' }, label), /lang_123/);
+});
+test('L9-2 frame 2: assessments render as whole-card links in one grid, eyebrow project · language, no nested links', () => {
+  const h = homeView({ projects: [{ id: 'p1', name: 'Lake' }], listFor: () => ({ status: 'loaded', list: [{ id: 'a1', name: 'Oct', stage: 'collect', language_name: 'Hindi' }] }), stageLabel: label });
+  assert.match(h, /class="v3h-cards"/); assert.match(h, /<a class="v3h-card v3h-acard" href="#assessment\/a1"/);
+  assert.match(h, /v3h-eyebrow">Lake · Hindi</);
+  const card = h.slice(h.indexOf('<a class="v3h-card'), h.indexOf('</a>', h.indexOf('<a class="v3h-card')) + 4);
+  assert.equal((card.match(/<a /g) || []).length, 1, 'card holds no inner link');
+  assert.match(h, /v3h-projects">Projects: <a href="#project\/p1">Lake<\/a>/, 'project still reachable');
 });

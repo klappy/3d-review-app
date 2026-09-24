@@ -18,3 +18,16 @@
 .v3h-continue { display: inline-block; margin-top: 4px; padding: 6px 12px; border: 1px solid var(--primary, #1f6f6a); border-radius: 6px; color: var(--primary, #1f6f6a); font-weight: 600; text-decoration: none; background: #fff; }
 .v3h-continue:hover, .v3h-continue:focus-visible { background: var(--primary, #1f6f6a); color: #fff; }
 .v3h-archived { opacity: .75; }
+/* L9-2: prototype frame 2 (design-system-v3 v3.css .cards / a.card): card grid, whole-card link, eyebrow, green next line. */
+.v3h { max-width: 1040px; }
+.v3h-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.v3h-card { align-content: start; gap: 6px; }
+.v3h-card h3 { margin: 0; font-size: 18px; font-weight: 700; }
+.v3h-card h3 a { color: inherit; }
+.v3h-eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted, #64748b); }
+.v3h-card .v3h-row-head { justify-content: space-between; }
+a.v3h-acard { display: grid; text-decoration: none; color: inherit; transition: box-shadow .15s; }
+a.v3h-acard:hover, a.v3h-acard:focus-visible { box-shadow: 0 4px 14px rgba(15, 23, 42, .10); }
+a.v3h-acard .v3h-continue { border: 0; padding: 0; margin-top: 10px; background: none; color: var(--green, #1f7a45); font-size: 14px; }
+a.v3h-acard:hover .v3h-continue, a.v3h-acard:focus-visible .v3h-continue { background: none; color: var(--green, #1f7a45); text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { a.v3h-acard { transition: none; } }
