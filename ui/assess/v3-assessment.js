@@ -7,6 +7,7 @@
 import { stepper, ensureStepperStyle } from '../v3/components/stepper.js';
 import { responseCount } from '../v3/components/response-count.js'; // component: Response count (ruling 12:34)
 import { bandCard, bandLegend, BAND_LEGEND } from '../v3/components/band-card.js'; // component: Band card + legend (ruling 12:34)
+import { evidenceTable } from '../v3/components/evidence-table.js'; // component: Evidence table (ruling 12:34)
 
 export const V3_FLAGS = Object.freeze({ expectedCountOptional: true, showUnconfirmed: true, bandResults: true, nextStepPage: true });
 
@@ -120,9 +121,7 @@ export function v3EvidenceRows(results, lenses, groups = {}, scores = null) {
 }
 export const V3_EVIDENCE_FOOTER = 'Descriptive items are shown, not scored. Choose-all-that-apply items show overlap, not a number. Missing data is not a low result. Bands come from validated scoring and report templates; no number is invented here.';
 export function v3EvidenceMarkup(rows, open, esc = esc0) {
-  const btn = `<button type="button" class="quiet" data-v3-evidence-toggle aria-expanded="${open ? 'true' : 'false'}">${open ? 'Simple view' : 'Show evidence and details'}</button>`;
-  const table = `<div class="v3-evidence" data-v3-evidence${open ? '' : ' hidden'}><h3>What supports this view?</h3><table class="table"><thead><tr><th>Evidence</th><th>What we can say</th><th>Limit</th></tr></thead><tbody>${rows.map(e => `<tr>${e.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table><p class="small muted footer">${esc(V3_EVIDENCE_FOOTER)}</p></div>`;
-  return { btn, table };
+  return evidenceTable(rows, open, esc, { footer: V3_EVIDENCE_FOOTER }); // component: Evidence table
 }
 
 export const v3css = `.v3-bands{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:12px 0}
