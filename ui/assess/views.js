@@ -217,7 +217,7 @@ const improve = {
         let stayOnFailure = false; // Bugbot 4094907104: a refresh remounts the page and would wipe the partial-landing alert
         if (V3_FLAGS.nextStepPage && v3NextFinishes(m.stage, m.editable)) {
           // one allowed step understand → improve (cap.assessment.set_stage); notes are already saved if this fails
-          try { await v3SetStage(ctx.api, ctx.enc, m.aid, 'saveAndFinish'); m.stage = V3_SET_STAGE.saveAndFinish; if (ctx.state?.dirty instanceof Map) ctx.state.dirty.set(m.aid, 'write'); if (status) status.textContent = 'Notes saved. This review is finished.'; }
+          try { await v3SetStage(ctx.api, ctx.enc, m.aid, 'saveAndFinish'); m.stage = V3_SET_STAGE.saveAndFinish; if (ctx.current?.assessment) ctx.current.assessment.stage = m.stage; /* #199: remount shows the committed stage even if the refetch fails */ if (ctx.state?.dirty instanceof Map) ctx.state.dirty.set(m.aid, 'write'); if (status) status.textContent = 'Notes saved. This review is finished.'; }
           catch (se) { stayOnFailure = true; if (ctx.state?.dirty instanceof Map) ctx.state.dirty.set(m.aid, 'write'); const k2 = classify(se); if (status) { status.setAttribute('role', 'alert'); status.textContent = `Notes saved. The review was not marked finished: ${k2 === 'refused' ? NOT_VISIBLE : k2 === 'unauthenticated' ? 'your sign-in is no longer active' : String(se.message || 'request failed')}.`; } }
         } else if (status) status.textContent = 'Notes saved.';
         if (!stayOnFailure && typeof ctx.refresh === 'function') await ctx.refresh();

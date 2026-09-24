@@ -157,6 +157,8 @@ test('A8c v3 next step: member in Reviewing → "Save and finish this review" = 
   assert.deepEqual(calls.map(c => `${c.method} ${c.url}`), ['PATCH /v2/assessments/a1/notes', 'POST /v2/assessments/a1/stage']);
   assert.deepEqual(calls[1].body, { stage: 'improve' });
   assert.equal(status.textContent, 'Notes saved. This review is finished.'); assert.equal(refreshed, 1);
+  assert.equal(ctx.current.assessment.stage, 'improve'); // #199: committed stage survives a failed refetch
+  const again = views.improve.render(ctx, await views.improve.load(ctx, { aid: 'a1' })); assert.doesNotMatch(again, /data-v3-finish/);
 });
 
 test('A8d v3 next step: stage move refused after notes saved → says notes saved, not finished; improve stage only saves', async () => {
