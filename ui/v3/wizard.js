@@ -1,5 +1,5 @@
 // v3 lane 2 · four-step setup wizard (design-system-v3 CHANGE-MAP "Setup (frames 3 to 6)", PARITY P2/P7/A1/C1).
-// Steps: Details · Who will participate? · Participant information · Ready to launch. One primary action per step.
+// Steps (Bincy 03–06): Assessment details · Who will participate? · Participant information · Review & launch. One primary action per step.
 // Contract unchanged (ADOPTION.md): launch maps onto cap.project.create (only for "New project…"), cap.language.create
 // (only with a new project), cap.assessment.create, cap.survey.select, cap.assessment.set_stage (collect) and
 // cap.survey.issue_link (dry_run → execute). Nothing is sent to anyone; links are opened, not mailed.
@@ -180,7 +180,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
     <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
     <div class="wz-sec"><h3>Participant information</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="information">Edit</button>'}</div>
-    <dl class="kv"><dt>Shown to everyone</dt><dd>${esc([proj.name, lang.name, d.format].filter(Boolean).join(' · '))}</dd><dt>Note</dt><dd>${d.context.trim() ? `${esc(d.context.trim())} <span class="sub">(not stored yet: the product has no field for it)</span>` : 'None'}</dd><dt>Asked of each</dt><dd>The published survey questions for each group</dd></dl>
+    <dl class="kv"><dt>Shown to everyone</dt><dd>${esc([proj.name, lang.name, d.purpose.trim(), d.format].filter(Boolean).join(' · '))}</dd><dt>Note</dt><dd>${d.context.trim() ? `${esc(d.context.trim())} <span class="sub">(not stored yet: the product has no field for it)</span>` : 'None'}</dd><dt>Asked of each</dt><dd>The published survey questions for each group</dd></dl>
     ${locked && locked.links?.length ? `<h3>Links already opened — copy them now</h3>${linkList(locked.links, origin, templates)}` : ''}
     ${locked ? `<div class="actions"><button type="button" class="rv-btn quiet" data-wz="cancel">Leave setup (what was created stays; nothing was sent)</button><span class="spacer"></span><button type="button" class="primary" data-wz="launch">Continue the launch</button></div>` : actions(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
 }
