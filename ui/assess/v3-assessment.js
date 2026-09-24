@@ -47,24 +47,51 @@ const LENS_CLASS = { 'Translation Team': 'team', Church: 'church', Community: 'c
 // Prototype frame 10 legend (design-system-v3 V.results): one colour dot per band word, colours from tokens only.
 export const V3_LEGEND = Object.freeze([['Strong', '--band-strong'], ['Growing', '--band-growing'], ['Needs support', '--band-needs-support'], ['Needs urgent attention', '--band-urgent'], ['More input needed', '--pip']]);
 
-/** Band layout (ruling c): one card per perspective, a band word never a score. A held result renders every card as an
- *  evidence gap with the server's reason — no band is invented. */
-export function v3BandsMarkup(results, lenses, esc = esc0, groups = null) {
+// CAPTAIN RULING 12:22 (ASK.md option 1): PROVISIONAL cut-offs, labelled provisional on the page. One flip here.
+// Input (captain 11:42): the latest built report's per-perspective score (payload.lenses[].score, 0–100) and the server's
+// survey response counts for that perspective. Below the minimum count → "More input needed". Read-only; no contract change.
+export const V3_BAND_CUTOFFS = Object.freeze({ provisional: true, strong: 75, growing: 60, needsSupport: 40, minResponses: 3 });
+export const V3_BAND_PROVISIONAL = 'Provisional bands: 75 and above Strong · 60–74 Growing · 40–59 Needs support · below 40 Needs urgent attention. At least 3 responses per perspective, otherwise More input needed.';
+/** Score → band word. `responses` null/undefined or below the minimum → "More input needed". */
+export function v3ScoreBand(score, responses, c = V3_BAND_CUTOFFS) {
+  const n = num(responses), s = score === null || score === undefined || score === '' ? NaN : Number(score);
+  if (n === null || n < c.minResponses || !Number.isFinite(s)) return 'More input needed';
+  return s >= c.strong ? 'Strong' : s >= c.growing ? 'Growing' : s >= c.needsSupport ? 'Needs support' : 'Needs urgent attention';
+}
+/** Per-perspective scores from a built report ({payload:{lenses:[{lens,score,sub_dimensions:[{sub_dimension,score}]}]}}). */
+export function v3ReportScores(report) {
+  const ls = report && report.payload && Array.isArray(report.payload.lenses) ? report.payload.lenses : [];
+  const out = {};
+  for (const l of ls) if (l && typeof l.lens === 'string' && Number.isFinite(Number(l.score)))
+    out[l.lens] = { score: Number(l.score), subs: (Array.isArray(l.sub_dimensions) ? l.sub_dimensions : []).filter(x => x && typeof x.sub_dimension === 'string' && Number.isFinite(Number(x.score))).map(x => ({ name: x.sub_dimension, score: Number(x.score) })) };
+  return out;
+}
+
+/** Band layout (ruling c): one card per perspective, a band word never a score. With a built report's scores (`scores`,
+ *  from v3ReportScores) each card is banded by the provisional cut-offs, gated on the perspective's server response count
+ *  (`groups`); each sub-dimension gets its own band word under the same gate. Without scores a held result renders every
+ *  card as an evidence gap with the server's reason — no band is invented. */
+export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores = null) {
   const r = results || {};
   const given = Array.isArray(r.bands) ? r.bands : [];
-  const held = !given.length || r.status === 'held';
+  const scored = !!(scores && lenses.some(l => scores[l]));
+  const held = !scored && (!given.length || r.status === 'held');
   const cards = lenses.map(lens => {
+    const sc = scored ? scores[lens] : null, g = groups && groups[lens], n = g && g.loaded ? g.responses : null;
     const b = given.find(x => x && x.perspective === lens);
-    const word = !held && b && BAND_WORDS.has(b.band) ? b.band : 'More input needed';
-    const suppressed = b && b.state === 'suppressed';
-    const note = held ? `<p class="muted" data-v3-band-held>${esc(r.reason || 'Results are held.')}</p>`
+    const word = sc ? v3ScoreBand(sc.score, n) : !held && b && BAND_WORDS.has(b.band) ? b.band : 'More input needed';
+    const suppressed = !sc && b && b.state === 'suppressed';
+    const note = sc ? (sc.subs.length ? `<ul class="v3-band-subs small">${sc.subs.map(x => `<li data-v3-sub="${esc(x.name)}">${esc(x.name)} · <strong>${esc(v3ScoreBand(x.score, n))}</strong></li>`).join('')}</ul>` : '')
+      : scored ? '<p class="muted">Not in the latest report.</p>'
+      : held ? `<p class="muted" data-v3-band-held>${esc(r.reason || 'Results are held.')}</p>`
       : suppressed ? '<div class="note">Withheld to protect a small group. This is an evidence gap, not a poor result.</div>'
       : b && b.text ? `<p>${esc(b.text)}</p>` : '';
     const count = groups ? `<div class="v3-band-count small muted" data-v3-band-count="${esc(lens)}">${esc(v3GroupCountText(groups[lens]))}</div>` : '';
-    return `<div class="glass band lens ${LENS_CLASS[lens] || ''}" data-v3-band="${esc(lens)}"><div class="eyebrow">${esc(lens)}</div><div class="word">${esc(word)}</div>${note}${count}</div>`;
+    return `<div class="glass band lens ${LENS_CLASS[lens] || ''}" data-v3-band="${esc(lens)}" data-v3-band-word="${esc(word)}"><div class="eyebrow">${esc(lens)}</div><div class="word">${esc(word)}</div>${note}${count}</div>`;
   }).join('');
   const legend = `<div class="legend small muted" data-v3-legend>${V3_LEGEND.map(([w, v]) => `<span><i class="dot" style="background:var(${v})" aria-hidden="true"></i>${w}</span>`).join('')}</div>`;
-  return `<div class="v3-bands three" data-v3-bands="${held ? 'held' : 'shown'}">${cards}</div>${legend}`;
+  const prov = scored && V3_BAND_CUTOFFS.provisional ? `<p class="small muted" data-v3-provisional>${esc(V3_BAND_PROVISIONAL)}</p>` : '';
+  return `<div class="v3-bands three" data-v3-bands="${scored ? 'provisional' : held ? 'held' : 'shown'}">${cards}</div>${legend}${prov}`;
 }
 
 // U2 evidence toggle + table, U3 folded into one footer line (PARITY.md U2/U3; prototype V.results frame 10:
@@ -78,11 +105,14 @@ export function v3GroupCountText(g) {
   return g.loaded === g.surveys ? base : `${base} so far (${g.loaded} of ${g.surveys} survey counts loaded)`;
 }
 /** One evidence row per perspective. The result read is held until D7, so "what we can say" is the held state, never a band. */
-export function v3EvidenceRows(results, lenses, groups = {}) {
+export function v3EvidenceRows(results, lenses, groups = {}, scores = null) {
   const r = results || {}, held = !(Array.isArray(r.bands) && r.bands.length) || r.status === 'held';
   return lenses.map(lens => {
     const g = groups[lens], counted = v3GroupCountText(g);
     if (!g || !g.surveys) return [lens, 'Not asked in this review', 'Missing data is not a low result'];
+    const sc = scores && scores[lens];
+    if (sc) { const n = g.loaded ? g.responses : null, w = v3ScoreBand(sc.score, n);
+      return [lens, `${w} (provisional) · score ${sc.score} · ${counted}`, w === 'More input needed' ? `Fewer than ${V3_BAND_CUTOFFS.minResponses} responses` : 'Provisional cut-offs; people who did not answer may see it differently']; }
     const b = !held && Array.isArray(r.bands) ? r.bands.find(x => x && x.perspective === lens) : null;
     const say = b && BAND_WORDS.has(b.band) ? b.band : held ? 'Held · no band yet' : 'More input needed';
     const limit = held ? (r.reason || 'Results are held') : !g.loaded ? 'Count not loaded yet' : (num(g.responses) ?? 0) === 0 ? 'No responses yet' : 'People who did not answer may see it differently';
@@ -98,7 +128,7 @@ export function v3EvidenceMarkup(rows, open, esc = esc0) {
 
 export const v3css = `.v3-bands{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:12px 0}
 .v3-bands .band{padding:16px;border:1px solid var(--line);border-radius:12px}.v3-bands .word{font-size:20px;font-weight:600;margin:4px 0 8px}
-.v3-count{font-weight:600}.v3-bands .v3-band-count{font-size:13px;margin-top:8px}.v3-evidence table{width:100%;border-collapse:collapse}.v3-evidence td,.v3-evidence th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}.v3-summary .row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}`;
+.v3-count{font-weight:600}.v3-bands .v3-band-count{font-size:13px;margin-top:8px}.v3-band-subs{margin:0 0 6px;padding-left:18px}.v3-evidence table{width:100%;border-collapse:collapse}.v3-evidence td,.v3-evidence th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}.v3-summary .row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}`;
 
 // U4 review gate (PARITY.md U4; prototype V.results frame 10). One primary per state, each a single cap.assessment.set_stage
 // move (the server allows one step at a time): Collecting → "Record my review" (checkbox first) → Reviewing →

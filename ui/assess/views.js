@@ -6,7 +6,7 @@
 // the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
-import { v3CountLine, v3BandsMarkup, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
+import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -76,7 +76,12 @@ const understand = {
     ]);
     const countMap = new Map();
     for (const [sid, r] of counts) countMap.set(sid, r.status === 'loaded' ? { status: 'loaded', responses: Number(r.value?.counts?.responses ?? 0), respondents: Number(r.value?.counts?.respondents ?? 0), unconfirmed: r.value?.counts?.unconfirmed, expected: r.value?.expected_count ?? r.value?.survey?.expected_count } : r);
-    return { aid, role: cur?.assessment?.role, surveys, counts: countMap, results, reports, openReport: null };
+    // Ruling 12:22 band input: the newest built report's per-perspective scores (read-only; a failed read leaves bands held).
+    let bandScores = null;
+    const built = reports.status === 'loaded' && !reports.value?.suppressed && Array.isArray(reports.value?.reports) ? reports.value.reports : [];
+    const newest = built.filter(x => x && x.id).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
+    if (newest) { const rr = await settle(ctx.api(`/v2/reports/${ctx.enc(newest.id)}`)); if (rr.status === 'loaded' && !rr.value?.suppressed) { const sc = v3ReportScores(rr.value?.report); if (Object.keys(sc).length) bandScores = sc; } }
+    return { aid, role: cur?.assessment?.role, surveys, counts: countMap, results, reports, bandScores, openReport: null };
   },
   render(ctx, m) {
     const esc = ctx.esc;
@@ -102,8 +107,8 @@ const understand = {
     // v3 U2: per-perspective server counts on each band card (Bincy screen 10 group counts) + evidence toggle and table.
     const lensGroups = Object.fromEntries(LENSES.map(lens => { const ss = m.surveys.filter(s => lensFor(s) === lens), ld = ss.filter(s => m.counts.get(s.id)?.status === 'loaded');
       return [lens, { surveys: ss.length, loaded: ld.length, responses: ld.reduce((n, s) => n + m.counts.get(s.id).responses, 0) }]; }));
-    const ev = v3EvidenceMarkup(v3EvidenceRows(m.results.value, LENSES, lensGroups), !!m.showEvidence, esc);
-    const bands = V3_FLAGS.bandResults && m.results.status === 'loaded' ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups)}${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc)}</section>` : '';
+    const ev = v3EvidenceMarkup(v3EvidenceRows(m.results.value, LENSES, lensGroups, m.bandScores), !!m.showEvidence, esc);
+    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores)}${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc)}</section>` : '';
     // (3) Reports: server-owned eligibility and provenance; preview never writes a report.
     let reports;
     if (m.reports.status === 'loaded') {

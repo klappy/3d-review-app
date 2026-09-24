@@ -97,3 +97,28 @@ test('L3-5: results legend carries one token colour dot per band word (prototype
   for (const [w, v] of m.V3_LEGEND) assert.ok(legend.includes(`<i class="dot" style="background:var(${v})" aria-hidden="true"></i>${w}`), w);
   assert.equal(m.V3_LEGEND.length, 5);
 });
+
+// L3-12 — CAPTAIN RULING 12:22: provisional cut-offs from the report's per-perspective score, min 3 responses.
+test('v3ScoreBand: provisional cut-offs and the minimum response count', async () => {
+  const { v3ScoreBand, V3_BAND_CUTOFFS } = await import('./v3-assessment.js');
+  assert.deepEqual({ ...V3_BAND_CUTOFFS }, { provisional: true, strong: 75, growing: 60, needsSupport: 40, minResponses: 3 });
+  assert.equal(v3ScoreBand(75, 3), 'Strong'); assert.equal(v3ScoreBand(74.9, 3), 'Growing'); assert.equal(v3ScoreBand(60, 10), 'Growing');
+  assert.equal(v3ScoreBand(59.9, 3), 'Needs support'); assert.equal(v3ScoreBand(40, 3), 'Needs support'); assert.equal(v3ScoreBand(39.9, 3), 'Needs urgent attention');
+  assert.equal(v3ScoreBand(90, 2), 'More input needed'); assert.equal(v3ScoreBand(90, null), 'More input needed'); assert.equal(v3ScoreBand(null, 9), 'More input needed');
+});
+test('v3BandsMarkup: report scores band each perspective and sub-dimension, labelled provisional; held without scores', async () => {
+  const { v3BandsMarkup, v3ReportScores, v3EvidenceRows } = await import('./v3-assessment.js');
+  const report = { payload: { lenses: [{ lens: 'Church', score: 45.8, sub_dimensions: [{ sub_dimension: 'Affirmation', score: 41.7 }, { sub_dimension: 'Translation Brief', score: 80 }] }, { lens: 'Community', score: 47.1, sub_dimensions: [] }] } };
+  const scores = v3ReportScores(report), lenses = ['Translation Team', 'Church', 'Community'];
+  const groups = { 'Translation Team': { surveys: 1, loaded: 1, responses: 5 }, Church: { surveys: 1, loaded: 1, responses: 4 }, Community: { surveys: 1, loaded: 1, responses: 2 } };
+  const html = v3BandsMarkup({ status: 'held', reason: 'D7' }, lenses, undefined, groups, scores);
+  assert.match(html, /data-v3-bands="provisional"/); assert.match(html, /data-v3-provisional/);
+  assert.match(html, /data-v3-band="Church" data-v3-band-word="Needs support"/);
+  assert.match(html, /Affirmation · <strong>Needs support/); assert.match(html, /Translation Brief · <strong>Strong/);
+  assert.match(html, /data-v3-band="Community" data-v3-band-word="More input needed"/); // 2 responses < 3
+  assert.match(html, /data-v3-band="Translation Team" data-v3-band-word="More input needed"/); // not in the report
+  assert.doesNotMatch(html, /45\.8/); // bands first; numbers only behind the evidence toggle
+  assert.match(v3EvidenceRows({ status: 'held' }, lenses, groups, scores)[1][1], /Needs support \(provisional\) · score 45\.8/);
+  const heldHtml = v3BandsMarkup({ status: 'held', reason: 'D7' }, lenses, undefined, groups, null);
+  assert.match(heldHtml, /data-v3-bands="held"/); assert.doesNotMatch(heldHtml, /data-v3-provisional/);
+});
