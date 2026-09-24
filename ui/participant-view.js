@@ -25,7 +25,8 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   const labels=[model.assessment,model.language,model.period,model.template?.perspective].filter(v=>v!==null&&v!==undefined&&v!=='');
   if(labels.length)intro.append(el('p',labels.join(' · ')));
   intro.append(el('p',`${items.length} questions`));
-  if(model.template?.source_ref)intro.append(el('p',model.template.source_ref));
+  // v3 L1-5 (NEED 5→1): the instrument's source ref is provenance for facilitators, not participant copy; the raw
+  // unbroken path widened the intro to 697px on a 375px phone (TRAINING.md #10). Kept on the model, never painted here.
   intro.append(button('Begin',()=>showForm(0)));
   const nav=el('div');nav.className='participant-pager';nav.hidden=true;
   const progress=el('p');progress.className='participant-progress';progress.setAttribute('aria-live','polite');
