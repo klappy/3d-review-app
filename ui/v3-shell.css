@@ -7,3 +7,7 @@
 /* CAPTAIN P0 12:10: demo exits in the v3 header (lane 1). */
 .v3-demo-exit{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none}.v3-demo-exit .rv-btn{min-height:40px;padding:6px 14px;white-space:nowrap}
 @media (max-width:760px){.v3-demo-exit{gap:6px}.v3-demo-exit .rv-btn{min-height:36px;padding:4px 10px;font-size:13px}}
+
+/* NEED 9→1 (L1-20): Sidebar tree nesting inside the context panel; row look comes from design-system components.css. */
+.sidebar-tree ul{list-style:none;margin:0;padding:0}.sidebar-tree ul[role=group]{flex-basis:100%;padding-left:14px}
+.sidebar-tree li.tree-row{flex-wrap:wrap}

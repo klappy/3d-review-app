@@ -8,6 +8,7 @@ import { loadBlankPrint, renderBlankPrint, printAllowed, rememberTab, recalledTa
 import { whatsHere } from '/assess/whats-here.js';
 import * as cards from '/assess/cards.js';
 import { breadcrumbs } from '/v3/components/breadcrumbs.js';
+import { sidebarTree } from '/v3/components/sidebar-tree.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
 const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
 import { pages, css as scopeCss } from '/assess/scope.js';
@@ -323,11 +324,16 @@ function context(current) {
   // Notion-style context: the scope chain above (Workspaces › Projects › this project), siblings at this level below.
   const proj = current && state.projects.find(p => p.id === current.assessment.project_id);
   const chain = breadcrumbs(crumbScope(ws, proj, current?.assessment), { label: 'Scope' });
+  // NEED 9→1 / ruling 12:22 (1): with a workspace in scope the sidebar is the shared Sidebar tree (component: Sidebar tree),
+  // fed the SAME scope as the crumb row so the two never disagree; no workspace → the project-only fallback above stays.
+  const tree = ws ? sidebarTree([{ id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id), projects: listed.map(p => { const l = listFor(p.id); return { id: p.id, name: p.name, href: cards.routes.project(p.id), assessments: l.status === 'loaded' ? l.list.map(x => ({ id: x.id, name: x.name, href: cards.routes.assessment(x.id) })) : [] }; }) }], crumbScope(ws, proj, current?.assessment), { label: 'Project and assessment navigation' }) : '';
+  const curList = curProj ? listFor(curProj.id) : null;
+  const treeNote = !curList || curList.status === 'loaded' ? '' : curList.status === 'refused' ? '<p class="small muted">Not listed: you have no role on this project.</p>' : curList.status === 'failed' ? `<p class="small muted" role="alert">Could not load assessments. <a href="#" data-retry-list="${esc(curProj.id)}">Retry</a></p>` : curList.status === 'unauthenticated' ? `<p class="small muted" role="alert">Your sign-in is no longer active. ${SIGNIN} or <a href="#" data-retry-list="${esc(curProj.id)}">Retry</a></p>` : '<p class="small muted">Loading…</p>';
   const wsHead = ws ? `<a class="project-name" href="${cards.routes.workspace(ws.id)}" style="padding-left:0">${esc(ws.name)}</a>` : '';
   const narrowOpen = typeof matchMedia === 'function' && matchMedia('(max-width:650px)').matches ? '' : 'open';
   const where = [ws?.name, proj?.name, current?.assessment.name].filter(Boolean).map(esc).join(' › ') || 'Workspaces';
   // ≤650px: the whole context collapses into one disclosure (summary = where you are); wider: summary hidden, always open. Links unchanged.
-  return `<aside class="context-panel"><details class="context-disclosure" ${narrowOpen}><summary><span class="eyebrow" style="margin:0">Context</span><span class="small">${where}</span></summary>${chain}${wsHead}<p class="eyebrow">${ws ? 'Projects in this workspace' : 'Projects'}</p><nav aria-label="Project and assessment navigation">${direct}${projects || (direct ? '' : '<p class="small muted">No project on this account.</p>')}</nav><div class="line links">${state.projects.length ? `<a href="${cards.routes.projects}">All projects</a>` : ''}<a href="${cards.routes.workspaces}">Workspaces</a></div></details></aside><section class="assessment-body">`;
+  return `<aside class="context-panel"><details class="context-disclosure" ${narrowOpen}><summary><span class="eyebrow" style="margin:0">Context</span><span class="small">${where}</span></summary>${chain}${wsHead}<p class="eyebrow">${ws ? 'Projects in this workspace' : 'Projects'}</p>${tree ? `${tree}${treeNote}` : `<nav aria-label="Project and assessment navigation">${direct}${projects || (direct ? '' : '<p class="small muted">No project on this account.</p>')}</nav>`}<div class="line links">${state.projects.length ? `<a href="${cards.routes.projects}">All projects</a>` : ''}<a href="${cards.routes.workspaces}">Workspaces</a></div></details></aside><section class="assessment-body">`;
 }
 // AMEND 2 (Auditor c5719472446): stage change is not wired, so the phase strip is a non-interactive indicator — no links, no buttons.
 function stages(a) { return `<div class="tabs" role="list" aria-label="Assessment stages">${PHASES.map(p => `<span role="listitem" ${p === a.stage ? 'aria-current="step"' : ''}>${title(p)}</span>`).join('')}</div>`; }
