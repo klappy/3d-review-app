@@ -56,3 +56,28 @@ test('U4 gate write is one set_stage move with the mapped stage id', async () =>
   assert.deepEqual(calls, [['/v2/assessments/a%201/stage', { method: 'POST', body: { stage: 'understand' } }], ['/v2/assessments/a1/stage', { method: 'POST', body: { stage: 'improve' } }]]);
   await assert.rejects(v3SetStage(api, encodeURIComponent, 'a1', 'nope'));
 });
+
+// L3-3: U2 evidence toggle + table, group counts on band cards (Bincy screen 10).
+import { v3EvidenceRows, v3EvidenceMarkup, v3GroupCountText, V3_EVIDENCE_FOOTER } from './v3-assessment.js';
+test('U2 evidence rows: held result → held state + server reason, counts only from server', () => {
+  const held = { status: 'held', reason: 'D7 policy unresolved' };
+  const rows = v3EvidenceRows(held, L, { 'Translation Team': { surveys: 1, loaded: 1, responses: 3 }, Church: { surveys: 0, loaded: 0, responses: 0 } });
+  assert.deepEqual(rows[0], ['Translation Team', 'Held · no band yet · 3 responses', 'D7 policy unresolved']);
+  assert.deepEqual(rows[1], ['Church', 'Not asked in this review', 'Missing data is not a low result']);
+  assert.equal(rows[2][1], 'Not asked in this review');
+  assert.ok(rows.every(r => !/\d+(\.\d+)?%|score/i.test(r.join(' '))));
+});
+test('U2 toggle: closed by default, table hidden; open shows Simple view', () => {
+  const c = v3EvidenceMarkup([['A', 'b', 'c']], false), o = v3EvidenceMarkup([['A', 'b', 'c']], true);
+  assert.match(c.btn, /Show evidence and details/); assert.match(c.btn, /aria-expanded="false"/); assert.match(c.table, /data-v3-evidence hidden/);
+  assert.match(o.btn, /Simple view/); assert.doesNotMatch(o.table, / hidden/);
+  assert.ok(o.table.includes('Missing data is not a low result') && V3_EVIDENCE_FOOTER.length > 0);
+  assert.match(v3EvidenceMarkup([['<x>', '', '']], true).table, /&lt;x&gt;/);
+});
+test('group count on band cards: partial loads say so; no survey says so', () => {
+  assert.equal(v3GroupCountText({ surveys: 2, loaded: 2, responses: 1 }), '1 response');
+  assert.equal(v3GroupCountText({ surveys: 2, loaded: 1, responses: 4 }), '4 responses so far (1 of 2 survey counts loaded)');
+  assert.equal(v3GroupCountText(undefined), 'No survey for this group');
+  assert.match(v3BandsMarkup({ status: 'held' }, L, undefined, { Church: { surveys: 1, loaded: 1, responses: 2 } }), /data-v3-band-count="Church">2 responses/);
+  assert.doesNotMatch(v3BandsMarkup({ status: 'held' }, L), /data-v3-band-count/);
+});
