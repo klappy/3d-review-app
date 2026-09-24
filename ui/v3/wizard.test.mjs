@@ -264,3 +264,9 @@ test('wizard alert colour comes from the design-system token (dark-mode safe)', 
   assert.match(css, /\.note\.alert\{color:var\(--warning-ink/);
   assert.doesNotMatch(css, /#8a2a1c/);
 });
+
+test('L2-15 eyebrow step count follows STEP_TITLES, not a literal', async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('./wizard.js', import.meta.url), 'utf8');
+  assert.match(src, /step \$\{n\} of \$\{STEP_TITLES\.length\}/);
+  assert.doesNotMatch(src, /step \$\{n\} of 4/);
+});
