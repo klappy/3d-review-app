@@ -6,7 +6,7 @@
 // the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
-import { v3CountLine, v3BandsMarkup, v3StageWord, V3_FLAGS, v3css } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
+import { v3CountLine, v3BandsMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -99,7 +99,7 @@ const understand = {
     if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.reason || '')}</p>`; }
     else results = refusalLine(ctx, m.results.status, 'data-retry="results"', 'Results');
     // v3 (ruling c): band layout, one card per perspective; a held result shows evidence gaps, never an invented band.
-    const bands = V3_FLAGS.bandResults && m.results.status === 'loaded' ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span></div>${v3BandsMarkup(m.results.value, LENSES, esc)}</section>` : '';
+    const bands = V3_FLAGS.bandResults && m.results.status === 'loaded' ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span></div>${v3BandsMarkup(m.results.value, LENSES, esc)}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc)}</section>` : '';
     // (3) Reports: server-owned eligibility and provenance; preview never writes a report.
     let reports;
     if (m.reports.status === 'loaded') {
@@ -128,6 +128,24 @@ const understand = {
     }, clearReport);
     root.querySelectorAll('[data-retry]').forEach(el => el.onclick = e => { e.preventDefault(); if (m.reportBuildBusy) return; ctx.go(ctx.routes.assessment(m.aid, 'understand'), { reload: true }); });
     const closeBtn = root.querySelector('[data-close-report]'); if (closeBtn) closeBtn.onclick = clearReport;
+    // v3 U4 review gate: checkbox arms "Record my review"; each primary is one set_stage move, then the view reloads.
+    const gateBtn = root.querySelector('[data-v3-gate-go]'), gateCheck = root.querySelector('[data-v3-review-check]');
+    if (gateCheck && gateBtn) gateCheck.onchange = () => { gateBtn.disabled = !gateCheck.checked; };
+    if (gateBtn) gateBtn.onclick = async () => {
+      if (gateCheck && !gateCheck.checked) return;
+      const action = gateBtn.dataset.v3GateGo, status = root.querySelector('[data-v3-gate-status]');
+      gateBtn.disabled = true; if (status) status.textContent = 'Saving…';
+      try {
+        await v3SetStage(ctx.api, ctx.enc, m.aid, action);
+        if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
+        if (status) status.textContent = action === 'recordReview' ? 'Review recorded.' : 'Moved to the next step.';
+        ctx.go(ctx.routes.assessment(m.aid, V3_SET_STAGE[action] === 'improve' ? 'improve' : 'understand'), { reload: true });
+      } catch (err) {
+        const k = classify(err);
+        if (status) { status.setAttribute('role', 'alert'); status.textContent = k === 'refused' ? `${NOT_VISIBLE}: nothing changed.` : k === 'unauthenticated' ? 'Your sign-in is no longer active. Sign in again; nothing changed.' : `Nothing changed: ${String(err.message || 'request failed')}`; }
+        gateBtn.disabled = !!gateCheck && !gateCheck.checked;
+      }
+    };
     root.querySelectorAll('[data-open-report]').forEach(btn => btn.onclick = async () => {
       if (ctx.isCurrent && !ctx.isCurrent()) return;
       const readGeneration = (m.reportReadGeneration || 0) + 1; m.reportReadGeneration = readGeneration;

@@ -66,3 +66,28 @@ export function v3BandsMarkup(results, lenses, esc = esc0) {
 export const v3css = `.v3-bands{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:12px 0}
 .v3-bands .band{padding:16px;border:1px solid var(--line);border-radius:12px}.v3-bands .word{font-size:20px;font-weight:600;margin:4px 0 8px}
 .v3-count{font-weight:600}.v3-summary .row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}`;
+
+// U4 review gate (PARITY.md U4; prototype V.results frame 10). One primary per state, each a single cap.assessment.set_stage
+// move (the server allows one step at a time): Collecting → "Record my review" (checkbox first) → Reviewing →
+// "Choose a next step" → Improving. Viewers get the state word only. No new capability, no new stored field.
+export const V3_REVIEW_CHECK = 'I checked the meaning, the missing evidence and any sensitive details';
+const CAN_MOVE = new Set(['member', 'owner']);
+export function v3GateAction(stage, role) {
+  if (!CAN_MOVE.has(String(role || '').toLowerCase())) return null;
+  if (stage === 'collect') return { action: 'recordReview', label: 'Record my review', check: true };
+  if (stage === 'understand') return { action: 'saveAndFinish', label: 'Choose a next step', check: false };
+  return null;
+}
+export function v3ReviewGateMarkup(stage, role, esc = esc0) {
+  const reviewed = stage === 'improve', g = v3GateAction(stage, role);
+  const badge = `<span class="badge${reviewed ? '' : ' warn'}" data-v3-reviewed="${reviewed}">${reviewed ? 'Reviewed' : 'Draft · a person checks this before sharing'}</span>`;
+  if (!g) return `<div class="v3-gate" data-v3-gate="none">${badge}</div>`;
+  const check = g.check ? `<label class="choice"><input type="checkbox" data-v3-review-check> ${esc(V3_REVIEW_CHECK)}</label>` : '';
+  return `<div class="v3-gate" data-v3-gate="${esc(g.action)}">${badge}${check}<button type="button" class="primary" data-v3-gate-go="${esc(g.action)}"${g.check ? ' disabled' : ''}>${esc(g.label)}</button><p class="status small" role="status" aria-live="polite" data-v3-gate-status></p></div>`;
+}
+/** The only write: POST /v2/assessments/:id/stage { stage } (cap.assessment.set_stage), stage from V3_SET_STAGE. */
+export function v3SetStage(api, enc, aid, action) {
+  const stage = V3_SET_STAGE[action];
+  if (!stage) return Promise.reject(new Error(`unknown v3 action ${action}`));
+  return api(`/v2/assessments/${enc(aid)}/stage`, { method: 'POST', body: { stage } });
+}
