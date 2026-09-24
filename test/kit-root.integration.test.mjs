@@ -71,7 +71,7 @@ test('normal root: single kit header hosts the REAL account/version/link control
   assert.equal(p.q('[role=main].content [data-content]'), p.api.app, 'controller app root IS the stable shell content element');
 });
 
-test('journey: Workspaces → workspace → project (two distinct assessments, language state) → assessment → back; route/title/crumb agree', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: follow-up issue' }, async () => {
+test('journey: Workspaces → workspace → project (two distinct assessments, language state) → assessment → back; route/title/crumb agree', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: #195' }, async () => {
   const p = await bootPage('owner', '#workspaces');
   assert.equal(p.text('[role=main].content h1'), 'Workspaces'); assert.deepEqual(crumbs(p), ['Workspaces']);
   assert.ok(p.q('[data-read-region] a[href="#workspace/w1"]')); assert.ok(p.q('[data-action-region] form#create-workspace'));
@@ -104,7 +104,7 @@ test('journey: Workspaces → workspace → project (two distinct assessments, l
   assert.ok(!p.served().some(k => k.includes('/v2/projects/p9')));
 });
 
-test('shell search and expansion preserve the mounted view, its input and the header host; delegated navigation works', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: follow-up issue' }, async () => {
+test('shell search and expansion preserve the mounted view, its input and the header host; delegated navigation works', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: #195' }, async () => {
   const p = await bootPage('owner', '#project/p1');
   const mount = p.api.app, who = p.q('#who'), host = p.q('[data-header-host]');
   const input = p.q('#create-assessment input[name=name]'); input.value = 'unsaved draft';
@@ -140,7 +140,7 @@ test('stale identity/route: held read never paints, retained old control is disc
   assert.ok(!p.transport.log.some(l => l.method === 'POST'), 'retained old form cannot emit into the new identity');
 });
 
-test('read states are distinct: refused assessments + failed languages are not empty success; direct grant lists no invented ancestors', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: follow-up issue' }, async () => {
+test('read states are distinct: refused assessments + failed languages are not empty success; direct grant lists no invented ancestors', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: #195' }, async () => {
   const p = await bootPage('member', '#project/p2');
   assert.equal(p.text('[role=main].content h1'), 'Hill project');
   assert.ok(p.q('[data-read-region]').textContent.includes('not visible to you'));
@@ -220,7 +220,7 @@ test('F3: viewer-only identity shows no synthesized role; scope role appears onl
   assert.equal(p.text('header.top nav.crumbs .tree-role'), 'Viewer');
 });
 
-test('role contract end-to-end: Owner/Member/Viewer each display as themselves at project p1; write regions follow the real controller permission', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: follow-up issue' }, async () => {
+test('role contract end-to-end: Owner/Member/Viewer each display as themselves at project p1; write regions follow the real controller permission', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: #195' }, async () => {
   for (const [identity, label, forms] of [['owner', 'Owner', ['create-assessment', 'rename-form', 'add-language']], ['member', 'Member', ['create-assessment', 'add-language']], ['viewer', 'Viewer', []]]) {
     const p = await bootPage(identity, '#project/p1');
     assert.equal(p.text('header.top nav.crumbs .tree-role'), label, identity);
@@ -246,7 +246,7 @@ test('account menu: verified email is the visible control; disclosure opens/clos
   p.api.resetIdentity(); await tick(2);
   assert.equal(p.q('#who'), who); assert.equal(p.text('#who'), 'Checking session…'); assert.equal(p.q('#account-actions').hidden, true); assert.equal(menu.hidden, true);
 });
-test('phone: context collapsed by default with the current scope visible; expands, Escape closes and returns focus; content/host untouched', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: follow-up issue' }, async () => {
+test('phone: context collapsed by default with the current scope visible; expands, Escape closes and returns focus; content/host untouched', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: #195' }, async () => {
   const p = await bootPage('owner', '#project/p1', { install: () => {} });
   // emulate the narrow media query for this page instance (layout itself is a browser-screenshot step)
   p.w.matchMedia = q => ({ matches: /max-width:\s*760px/.test(q), media: q, addEventListener() {}, removeEventListener() {} });
@@ -327,7 +327,7 @@ test('demo boot (real controller, ?demo=1): one visible disclosure before the co
   assert.equal(p.text('[role=main].content h1'), 'Workspaces');
   assert.deepEqual(p.served().filter(k => k !== 'GET /v2/health'), [], 'demo issues no data reads (demoApi answers; only the existing version/health probe reaches the transport)');
 });
-test('demo disclosure persists across route changes, tree search, expansion and the assessment repaint; the mounted view and its input survive', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: follow-up issue' }, async () => {
+test('demo disclosure persists across route changes, tree search, expansion and the assessment repaint; the mounted view and its input survive', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: #195' }, async () => {
   const p = await bootPage('owner', '#projects', { search: '?demo=1' });
   const d = disclosure(p)[0]; assert.ok(d); const mount = p.api.app;
   await p.go('#project/demo-project'); assert.equal(disclosure(p).length, 1, 'after route change'); assert.equal(disclosure(p)[0], d, 'same node, not a rebuilt banner');
