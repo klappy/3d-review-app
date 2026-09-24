@@ -14,7 +14,7 @@ custom_domain = true
 ENVIRONMENT = "dev"
 PUBLIC_ORIGIN = "https://dev.3dreview.app"   # where links in mail point (src/mail.ts)
 MAIL_FROM = "noreply@3dreview.app"
-# DEV sends only to explicitly authorized normalized-recipient hashes. Empty closes sending.
+# DEV sends to ANY address unless an allowlist is set; a non-empty list of normalized-recipient hashes is enforced (malformed closes sending).
 MAIL_ALLOWLIST_SHA256 = ""
 # Native Email Sending only; no inbox, inbound route or forwarding configuration.
 # Cloudflare Access (one-time PIN) guards GET /v2/auth/access on this hostname — see src/access.ts. AUD is public.
