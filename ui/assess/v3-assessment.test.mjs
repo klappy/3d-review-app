@@ -35,3 +35,24 @@ test('(c) held results render band cards as evidence gaps, no invented band', ()
   const s = v3BandsMarkup({ status: 'ready', bands: [{ perspective: 'Church', band: 'Growing', text: 'ok' }, { perspective: 'Community', band: '87%' }] }, L);
   assert.match(s, /data-v3-bands="shown"/); assert.match(s, />Growing</); assert.doesNotMatch(s, /87%/);
 });
+
+import { v3GateAction, v3ReviewGateMarkup, v3SetStage, V3_REVIEW_CHECK } from './v3-assessment.js';
+test('U4 gate: Collecting → Record my review (checkbox first) → Choose a next step → Reviewed', () => {
+  assert.deepEqual(v3GateAction('collect', 'owner'), { action: 'recordReview', label: 'Record my review', check: true });
+  assert.equal(v3GateAction('understand', 'member').action, 'saveAndFinish');
+  assert.equal(v3GateAction('improve', 'owner'), null);
+  assert.equal(v3GateAction('collect', 'viewer'), null);
+  const c = v3ReviewGateMarkup('collect', 'owner');
+  assert.match(c, /data-v3-review-check/); assert.match(c, /data-v3-gate-go="recordReview" disabled>Record my review/);
+  assert.ok(c.includes(V3_REVIEW_CHECK)); assert.match(c, /Draft · a person checks this before sharing/);
+  assert.doesNotMatch(v3ReviewGateMarkup('understand', 'owner'), /data-v3-review-check|disabled/);
+  assert.match(v3ReviewGateMarkup('improve', 'owner'), /data-v3-reviewed="true">Reviewed/);
+  const v = v3ReviewGateMarkup('collect', 'viewer'); assert.doesNotMatch(v, /button/); assert.match(v, /data-v3-gate="none"/);
+});
+test('U4 gate write is one set_stage move with the mapped stage id', async () => {
+  const calls = []; const api = async (url, init) => { calls.push([url, init]); return {}; };
+  await v3SetStage(api, encodeURIComponent, 'a 1', 'recordReview');
+  await v3SetStage(api, encodeURIComponent, 'a1', 'saveAndFinish');
+  assert.deepEqual(calls, [['/v2/assessments/a%201/stage', { method: 'POST', body: { stage: 'understand' } }], ['/v2/assessments/a1/stage', { method: 'POST', body: { stage: 'improve' } }]]);
+  await assert.rejects(v3SetStage(api, encodeURIComponent, 'a1', 'nope'));
+});
