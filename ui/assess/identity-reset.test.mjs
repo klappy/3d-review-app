@@ -1,4 +1,5 @@
 import test from 'node:test';
+import * as v3 from '../v3-shell.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
@@ -13,7 +14,7 @@ function harness() {
   const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace(/export function /g, 'function ');
   const navigations = [], removed = [], fetches = [];
   // K3a: the real adapter is supplied; with no #rv node the kit root is absent and the controller falls back to #app unchanged.
-  const box = { cards, mountKitRoot, shellModel, history: {replaceState() {}}, sessionStorage: {getItem() {return null;},removeItem:k=>removed.push(k)}, isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/', assign: path=>navigations.push(path) }, redactDiagnosticPath: x => x, fetch: (url, options) => { fetches.push({ url, options }); return Promise.resolve({ ok: true }); } };
+  const box = { ...v3, cards, mountKitRoot, shellModel, history: {replaceState() {}}, sessionStorage: {getItem() {return null;},removeItem:k=>removed.push(k)}, isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/', assign: path=>navigations.push(path) }, redactDiagnosticPath: x => x, fetch: (url, options) => { fetches.push({ url, options }); return Promise.resolve({ ok: true }); } };
   const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn,loadAccountEmail,signOut,setFetch:fn=>fetch=fn,setCredential:t=>token=t,getCredential:()=>token,setListen:fn=>listen=fn})', box);
   return { ...api, nodes, disclosure, navigations, removed, fetches };
 }

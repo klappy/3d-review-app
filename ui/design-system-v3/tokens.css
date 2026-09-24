@@ -1,0 +1,190 @@
+/* Copied verbatim from klappy/3d-review-cookbook design-system-v3/tokens.css @66d97f3 (#112). Do not edit here; rebuild from tokens.json upstream. */
+/* GENERATED from tokens.json — do not edit. 3D Review glass 3.0.0-candidate */
+:root, [data-theme="light"] {
+  --ink: #172e40;
+  --secondary: #526779;
+  --paper: #f8fbff;
+  --line: #c9d8e5;
+  --green: #14685f;
+  --glass: rgba(255,255,255,.68);
+  --glass-edge: rgba(255,255,255,.9);
+  --depth: rgba(37,67,99,.09);
+  --ground: #edf3f8;
+  --aurora-mint: #c3e7e0;
+  --aurora-lilac: #d8d5f2;
+  --aurora-sky: #d2e5f6;
+  --aside-fill: rgba(247,251,255,.36);
+  --button-fill: rgba(255,255,255,.8);
+  --nav-active: rgba(255,255,255,.78);
+  --focus: #287f97;
+  --note-fill: #e8f1f3;
+  --warning-fill: #f5ecd1;
+  --warning-ink: #65511c;
+  --badge-fill: #e3efeb;
+  --badge-ink: #31584e;
+  --demo-fill: rgba(255,255,255,.75);
+  --lens-green: #49a076;
+  --lens-blue: #4885bb;
+  --lens-yellow: #d8ae3c;
+  --welcome-ink: #193548;
+  --welcome-green: #16675e;
+  --welcome-glass: rgba(255,255,255,.66);
+  --welcome-solid: #f6faff;
+  --welcome-edge: rgba(255,255,255,.9);
+  --welcome-ground: #edf4f9;
+  --perspective-fill: rgba(255,255,255,.55);
+  --perspective-team: #5bbd98;
+  --perspective-community: #78aee0;
+  --perspective-church: #e8c568;
+  --pip: #cfdee5;
+  --pip-done: #367e73;
+  --chip-fill: #e4efee;
+  --door-line: #c8d9df;
+  --band-strong: #6fa2d1;
+  --band-growing: #83b996;
+  --band-needs-support: #dfc065;
+  --band-urgent: #da8b83;
+  --face-team: #86b5df;
+  --face-community: #9bcba9;
+  --face-church: #e6d087;
+  --face-stroke: #23433d;
+  --track: #e9eee7;
+  --track-fill: #3b8270;
+  --choice-selected: #e9f4ec;
+  --choice-selected-edge: #36775e;
+  --receipt: #246951;
+  --toast: #195b47;
+  --primary-ink: #ffffff;
+  --shadow-panel: 0 12px 35px rgba(37,67,99,.09), inset 0 1px 0 rgba(255,255,255,.9);
+  --shadow-button: 0 2px 6px rgba(37,67,99,.09);
+  --shadow-button-hover: 0 4px 12px rgba(37,67,99,.09);
+  --shadow-primary: 0 6px 18px rgba(37,67,99,.09);
+  --shadow-nav-active: 0 4px 14px rgba(37,67,99,.09);
+  --shadow-stage: 0 20px 70px rgba(50,70,105,.1), inset 0 1px 0 rgba(255,255,255,.9);
+  --shadow-welcome-primary: 0 7px 20px rgba(25,99,91,.18);
+  --inset-dot: inset 0 2px 3px rgba(255,255,255,.4);
+}
+[data-theme="dark"] {
+  --ink: #edf5fc;
+  --secondary: #b7c8d8;
+  --paper: #172738;
+  --line: #435368;
+  --green: #26786f;
+  --glass: rgba(22,39,58,.78);
+  --glass-edge: rgba(192,218,244,.18);
+  --depth: rgba(0,0,0,.23);
+  --ground: #101d2c;
+  --aurora-mint: #164746;
+  --aurora-lilac: #352e54;
+  --aurora-sky: #163750;
+  --aside-fill: rgba(16,29,44,.34);
+  --button-fill: rgba(38,55,75,.9);
+  --nav-active: rgba(66,94,109,.68);
+  --focus: #8dd9ee;
+  --note-fill: #253e4a;
+  --warning-fill: #4a4027;
+  --warning-ink: #f5e4ad;
+  --badge-fill: #294b45;
+  --badge-ink: #c6e7dd;
+  --demo-fill: rgba(43,61,80,.9);
+  --welcome-ink: #edf6ff;
+  --welcome-green: #287b70;
+  --welcome-glass: rgba(25,43,64,.78);
+  --welcome-solid: #20354b;
+  --welcome-edge: rgba(207,230,255,.2);
+  --welcome-ground: #111e2e;
+  --perspective-fill: rgba(25,43,61,.55);
+  --perspective-team: #72c9a6;
+  --perspective-community: #8cbdeb;
+  --perspective-church: #e7ca7a;
+  --pip: #476070;
+  --pip-done: #88cbbd;
+  --chip-fill: #304d52;
+  --door-line: #496073;
+  --track: #253e4a;
+  --track-fill: #88cbbd;
+  --choice-selected: #294b45;
+  --choice-selected-edge: #88cbbd;
+  --receipt: #88cbbd;
+  --toast: #c6e7dd;
+  --shadow-panel: 0 12px 35px rgba(0,0,0,.23), inset 0 1px 0 rgba(192,218,244,.18);
+  --shadow-button: 0 2px 6px rgba(0,0,0,.23);
+  --shadow-button-hover: 0 4px 12px rgba(0,0,0,.23);
+  --shadow-primary: 0 6px 18px rgba(0,0,0,.23);
+  --shadow-nav-active: 0 4px 14px rgba(0,0,0,.23);
+  --shadow-stage: 0 20px 70px rgba(0,0,0,.23), inset 0 1px 0 rgba(207,230,255,.2);
+  --shadow-welcome-primary: 0 7px 20px rgba(0,0,0,.2);
+}
+:root {
+  --shell-panel-w: 260px;
+  --top-pad-y: 22px;
+  --top-pad-x: 28px;
+  --aside-pad-y: 27px;
+  --aside-pad-x: 18px;
+  --main-pad: 30px;
+  --panel-pad: 23px;
+  --stage-pad: 40px;
+  --phone-pad: 25px;
+  --phone-max-w: 430px;
+  --stage-max-w: 840px;
+  --h1-max-w: 650px;
+  --gap-grid: 18px;
+  --gap-three: 15px;
+  --gap-perspectives: 14px;
+  --gap-row: 12px;
+  --gap-pip: 7px;
+  --page-min-h: 780px;
+  --button-min-h: 42px;
+  --input-pad: 11px;
+  --note-pad-y: 13px;
+  --note-pad-x: 16px;
+  --badge-pad-y: 5px;
+  --badge-pad-x: 10px;
+  --track-h: 7px;
+  --pip-h: 5px;
+  --dot-perspective: 24px;
+  --dot-legend: 9px;
+  --face: 54px;
+  --mobile-bp: 760px;
+  --focus-w: 3px;
+  --lens-w: 4px;
+  --step-dot: 28px;
+  --wizard-max-w: 720px;
+  --card-min-w: 300px;
+  --code-slot-w: 44px;
+  --r-page: 24px;
+  --r-stage: 28px;
+  --r-panel: 20px;
+  --r-perspective: 18px;
+  --r-example: 16px;
+  --r-button: 12px;
+  --r-input: 11px;
+  --r-brand: 10px;
+  --r-choice: 9px;
+  --r-linkbox: 8px;
+  --r-pip: 6px;
+  --r-pill: 20px;
+  --r-round: 50%;
+  --blur-top: 28px;
+  --blur-panel: 24px;
+  --sat-top: 125%;
+  --sat-stage: 120%;
+  --sat-panel: 115%;
+  --dur-button: 150ms;
+  --fw-regular: 400;
+  --fw-label: 550;
+  --fw-semibold: 600;
+  --fw-eyebrow: 650;
+  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-scripture-latin: "Noto Serif", Georgia, serif;
+}
+.fs-h1 { font-family: var(--font-ui); font-size: 31px; line-height: 1.18; font-weight: 600; letter-spacing: -1px; }
+.fs-h2 { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; }
+.fs-brand { font-family: var(--font-ui); font-size: 23px; line-height: 1.2; font-weight: 650; letter-spacing: -1px; }
+.fs-metric { font-family: var(--font-ui); font-size: 25px; line-height: 1.2; font-weight: 600; }
+.fs-h3 { font-family: var(--font-ui); font-size: 16px; line-height: 1.4; font-weight: 600; }
+.fs-body { font-family: var(--font-ui); font-size: 15px; line-height: 1.5; font-weight: 400; }
+.fs-label { font-family: var(--font-ui); font-size: 13px; line-height: 1.4; font-weight: 550; }
+.fs-badge { font-family: var(--font-ui); font-size: 12px; line-height: 1.2; font-weight: 400; letter-spacing: 0.04em; }
+.fs-eyebrow { font-family: var(--font-ui); font-size: 11px; line-height: 1.2; font-weight: 650; letter-spacing: 0.13em; }
+.fs-receipt { font-family: var(--font-ui); font-size: 42px; line-height: 1; font-weight: 400; }
