@@ -243,3 +243,28 @@ test('confirm sheet Cancel dismisses before execute and is ignored while the wri
   finishWrite({ transferred: true }); await pending;
   assert.equal(x.m.sheet, null); assert.match(x.root.html, /Ownership transfer done/);
 });
+
+// P0 12:30 (lane 11): Member list component — people by name + email, "You" for self, never principal ids (every scope).
+import { memberList, memberPerson, labelMembers, readAccountEmail, YOU, NO_EMAIL_NOTE } from '../v3/components/member-list.js';
+test('member list: roster shows "You" + own email and "Member N" for others — no principal id anywhere in the roster', async () => {
+  const x = await mount('owner'); x.m.myEmail = 'me@example.test'; x.root.innerHTML = permissions.render(x.ctx, x.m);
+  const table = /<table[\s\S]*?<\/table>/.exec(x.root.html)[0];
+  assert.match(table, /data-member-you><strong>You<\/strong><br><span class="small muted" data-member-email>me@example.test/);
+  assert.match(table, /<strong>Member 1<\/strong>/); assert.match(table, /<strong>Member 3<\/strong>/); assert.match(table, /<th>Person<\/th>/);
+  for (const id of ['>me<', '>boss', '>pat', '>val', '(you)', 'Principal']) assert.ok(!table.includes(id), `roster leaks ${id}`);
+  assert.ok(x.root.html.includes(NO_EMAIL_NOTE)); assert.match(x.root.html, /data-grant-row="g_mem"/); assert.match(x.root.html, /data-change-role="g_mem"/);
+});
+test('member list: same component for workspace / project / assessment; a future name/email on the grant row is shown; account email read is safe', async () => {
+  for (const scope of ['workspaces', 'projects', 'assessments']) {
+    const seg = { workspaces: 'workspace', projects: 'project', assessments: 'assessment' }[scope];
+    const { api, apiFull } = fakeApi({ [`GET /v2/${seg}/s1/grants`]: { grants: [{ id: 'g1', principal_id: 'usr_x', role: 'owner', display_name: 'Ana Ruiz', email: 'ana@example.test' }, { id: 'g2', principal_id: 'me', role: 'member' }] } });
+    const ctx = { api, apiFull, esc, enc: encodeURIComponent, state: { principal: { id: 'me' } }, accountEmail: async () => 'me@example.test' };
+    const m = await permissions.load(ctx, { scope, id: 's1' }); const h = permissions.render(ctx, m);
+    assert.match(h, /data-member-list/); assert.match(h, /<strong>Ana Ruiz<\/strong><br><span class="small muted" data-member-email>ana@example.test/); assert.match(h, /<strong>You<\/strong>.*me@example.test/s);
+    assert.ok(!h.includes('usr_x'), `${scope}: principal id leaked`); assert.ok(!h.includes(NO_EMAIL_NOTE));
+  }
+  assert.equal(memberPerson({ principal_id: 'me' }, { me: 'me' }).name, YOU); assert.equal(memberPerson({ principal_id: 'z' }, { me: 'me', n: 2 }).name, 'Member 2');
+  assert.deepEqual(labelMembers([{ principal_id: 'a' }, { principal_id: 'me' }, { principal_id: 'b' }], { me: 'me' }).map(r => r.person.name), ['Member 1', 'You', 'Member 2']);
+  assert.equal(memberList(esc, [], {}).includes('No one listed.'), true);
+  assert.equal(await readAccountEmail({ demo: true }), ''); assert.equal(await readAccountEmail({ fetchImpl: async () => { throw new Error('x'); } }), '');
+});
