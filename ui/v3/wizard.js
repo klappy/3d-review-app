@@ -8,6 +8,8 @@
 // Lane 1 owns routing and the shell: this module exports pure helpers plus mountWizard(root, deps); it never touches
 // location or the router itself. deps.go(hash) is the shell's navigation.
 
+import { shareUrl } from '../shared-link.js';
+
 export const STEPS = ['details', 'participants', 'information', 'review'];
 export const STEP_TITLES = ['Details', 'Participants', 'Information', 'Review'];
 export const EXPECTED_KEY = 'v3:expected'; // { [surveyId]: N } — device-local, never sent to the API
@@ -74,19 +76,30 @@ export function launchPlan(d) {
   return plan;
 }
 
-export async function launch(d, { api, store = safeStore() }) {
-  const ctx = { pid: d.project === NEW_PROJECT ? null : d.project, lid: d.project === NEW_PROJECT ? null : d.language, aid: null, surveys: [], links: [], done: [] };
+// Resumable: pass the ctx from a failed attempt as `resume` and completed writes are not repeated (no duplicate
+// project/assessment/survey on retry). ctx.done counts completed writes in plan order.
+export async function launch(d, opts) {
+  const ctx0 = opts.resume || null;
+  try { return await launchInner(d, opts); } catch (err) { if (!err.ctx) try { err.ctx = opts._ctx || ctx0; } catch {} throw err; }
+}
+async function launchInner(d, opts) {
+  const { api, store = safeStore(), resume = null } = opts;
+  const ctx = resume || { pid: d.project === NEW_PROJECT ? null : d.project, lid: d.project === NEW_PROJECT ? null : d.language, aid: null, surveys: [], links: [], done: [] };
+  opts._ctx = ctx;
+  let i = 0;
   for (const step of launchPlan(d)) {
     if (step.each === 'surveys') {
       for (const s of ctx.surveys) {
+        if (i++ < ctx.done.length) continue;
         const url = `/v2/assessments/${enc(ctx.aid)}/surveys/${enc(s.id)}/links`;
         const dry = await api(url, { method: 'POST', body: { params: {}, mode: 'dry_run' } });
         const r = await api(url, { method: 'POST', body: { params: {}, mode: 'execute', confirm_token: dry.confirm_token } });
-        ctx.links.push({ survey: s.id, entry_fragment: r.entry_fragment, expires_at: r.expires_at || null });
+        ctx.links.push({ survey: s.id, template: s.template, entry_fragment: r.entry_fragment, expires_at: r.expires_at || null });
         ctx.done.push(step.cap);
       }
       continue;
     }
+    if (i++ < ctx.done.length) continue;
     const r = await api(step.url(ctx), { method: step.method, body: step.body(ctx) });
     if (step.keep) step.keep(r, ctx);
     ctx.done.push(step.cap);
@@ -167,18 +180,20 @@ export function renderStep(step, d, data, errs = []) {
     ${actions(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
 }
 
-export function renderDone(ctx, origin = '') {
+export function renderDone(ctx, origin = '', templates = []) {
+  const name = id => (templates.find(t => t.id === id) || {}).perspective || id;
+  const url = l => { try { return shareUrl(origin, l.entry_fragment); } catch { return ''; } };
   return `<div class="eyebrow">Launched</div><h1 class="wz-h">The review is collecting responses</h1>
     <p class="muted">Share each link with its group. Nothing was sent to anyone.</p>
-    <ul class="wz-links">${ctx.links.map(l => `<li><input readonly value="${esc(origin + '/' + (l.entry_fragment || ''))}" aria-label="Participant link"></li>`).join('')}</ul>
+    <ul class="wz-links">${ctx.links.map(l => `<li><label>${esc(name(l.template))}<input readonly value="${esc(url(l))}"></label></li>`).join('')}</ul>
     <div class="actions"><span class="spacer"></span><button type="button" class="primary" data-wz="open" data-aid="${esc(ctx.aid)}">Open the review</button></div>`;
 }
 
 // ---------- mount ----------
 // deps: { api(url, {method, body}) → result, go(hash), assessmentHref(aid), origin, store }
 export function mountWizard(root, deps) {
-  const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null };
-  const paint = () => { root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '') : renderStep(s.step, s.d, s.data, s.errs)}</div>`; };
+  const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null };
+  const paint = () => { root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, s.data, s.errs)}</div>`; };
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
   const loadLanguages = async () => { s.data.languages = []; if (s.d.project && s.d.project !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(s.d.project)}/languages`); s.data.languages = (r.languages || []).filter(l => !l.archived_at); } };
   const read = (form) => {
@@ -204,8 +219,8 @@ export function mountWizard(root, deps) {
     if (act === 'open') return deps.go?.(deps.assessmentHref ? deps.assessmentHref(b.dataset.aid) : `#/a/${enc(b.dataset.aid)}`);
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
-      try { s.done = await launch(s.d, { api: deps.api, store: deps.store }); paint(); }
-      catch (err) { note(new Error(`${err.message || err} Nothing after this point was done; check the review list before trying again.`)); }
+      try { s.done = await launch(s.d, { api: deps.api, store: deps.store, resume: s.partial }); s.partial = null; paint(); }
+      catch (err) { s.partial = err.ctx || s.partial; note(new Error(`${err.message || err} ${s.partial?.done.length || 0} of the launch writes were done; Launch again continues from where it stopped.`)); }
       finally { s.busy = false; }
     }
   });

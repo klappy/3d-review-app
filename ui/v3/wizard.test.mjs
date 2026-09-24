@@ -79,3 +79,22 @@ test('views: four steps, one primary each, optional expected count, escaped', ()
   const r = renderStep('review', draft(), { ...data, templates: [...data.templates, { id: 'tpl.community', version: 2, name: 'Community', perspective: 'Community' }] });
   assert.match(r, /10 expected/); assert.match(r, /no number given/);
 });
+
+test('retry after a partial failure resumes without duplicate writes', async () => {
+  const urls = []; let failOnce = true;
+  const api = async (url, { body } = {}) => { urls.push(url);
+    if (url.endsWith('/assessments')) return { assessment: { id: 'a1' } };
+    if (url.endsWith('/surveys')) return { survey: { id: 's1' } };
+    if (url.endsWith('/stage')) { if (failOnce) { failOnce = false; throw new Error('boom'); } return {}; }
+    if (url.endsWith('/links')) return body.mode === 'dry_run' ? { confirm_token: 't' } : { entry_fragment: '#survey=z' };
+    return {}; };
+  const d = draft({ groups: { t: { version: '1', expected: '' } } });
+  let partial = null;
+  await assert.rejects(launch(d, { api, store: null }).catch(e => { partial = e.ctx; throw e; }));
+  assert.equal(partial.done.length, 2);
+  const ctx = await launch(d, { api, store: null, resume: partial });
+  assert.equal(urls.filter(u => u.endsWith('/assessments')).length, 1);
+  assert.equal(urls.filter(u => u.endsWith('/surveys')).length, 1);
+  assert.equal(urls.filter(u => u.endsWith('/stage')).length, 2);
+  assert.equal(ctx.links.length, 1);
+});
