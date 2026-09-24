@@ -48,3 +48,6 @@ kit/app-adapter.test.mjs
 v3-shell.test.mjs
 v3/wizard.test.mjs
 v3/home.test.mjs
+v3/components/breadcrumbs.test.mjs
+v3/components/stepper.test.mjs
+assess/breadcrumbs-mount.test.mjs

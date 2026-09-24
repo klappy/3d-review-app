@@ -7,6 +7,9 @@ import { redactDiagnosticPath } from '/diagnostic-path.js';
 import { loadBlankPrint, renderBlankPrint, printAllowed, rememberTab, recalledTab, STAGES } from '/stage-screens.js';
 import { whatsHere } from '/assess/whats-here.js';
 import * as cards from '/assess/cards.js';
+import { breadcrumbs } from '/v3/components/breadcrumbs.js';
+// P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
+const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
 import { pages, css as scopeCss } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
@@ -319,7 +322,7 @@ function context(current) {
   const direct = current && !state.projects.some(p => p.id === current.assessment.project_id) ? `<div class="context-project"><span class="project-name">Granted to you</span><a class="assessment-link" href="#assessment/${encodeURIComponent(current.assessment.id)}" aria-current="page">${esc(current.assessment.name)}<small>${stageLabel(current.assessment.stage)} · ${esc(current.assessment.role)}</small></a><p class="small muted" style="margin:4px 0 0 18px">You hold this assessment directly; its project is not listed because you have no role on it.</p></div>` : '';
   // Notion-style context: the scope chain above (Workspaces › Projects › this project), siblings at this level below.
   const proj = current && state.projects.find(p => p.id === current.assessment.project_id);
-  const chain = `<nav class="crumbs" aria-label="Scope"><a href="${cards.routes.workspaces}">Workspaces</a><span>›</span><a href="${cards.routes.projects}">Projects</a>${proj ? `<span>›</span><a href="${cards.routes.project(proj.id)}">${esc(proj.name)}</a>` : ''}</nav>`;
+  const chain = breadcrumbs(crumbScope(ws, proj, current?.assessment), { label: 'Scope' });
   const wsHead = ws ? `<a class="project-name" href="${cards.routes.workspace(ws.id)}" style="padding-left:0">${esc(ws.name)}</a>` : '';
   const narrowOpen = typeof matchMedia === 'function' && matchMedia('(max-width:650px)').matches ? '' : 'open';
   const where = [ws?.name, proj?.name, current?.assessment.name].filter(Boolean).map(esc).join(' › ') || 'Workspaces';
