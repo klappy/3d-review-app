@@ -230,11 +230,11 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       ${actions(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   // review
-  return `${head(n, 'Ready to launch', 'Check the setup before collection opens. Launching opens the survey links; nothing is sent to anyone.')}${errBox(errs)}
+  return `${head(n, 'Ready to launch', 'Check the details. Launching opens the survey links; nothing is sent to anyone.')}${errBox(errs)}
     <div class="wz-sec"><h3>Details</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="details">Edit</button>'}</div>
     <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}${isNew && (d.newLangCode || '').trim() ? ' · ' + esc(d.newLangCode.trim()) : ''}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
-    <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
+    <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt><span class="pdot wz-kvdot ${pdot(t.perspective)}" aria-hidden="true"></span>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
     <div class="wz-sec"><h3>Participant information</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="information">Edit</button>'}</div>
     <dl class="kv"><dt>Shown to everyone</dt><dd>${esc([proj.name, lang.name, d.purpose.trim(), d.format].filter(Boolean).join(' · '))}</dd><dt>Note</dt><dd>${d.context.trim() ? `${esc(d.context.trim())} <span class="sub">(not stored yet: the product has no field for it)</span>` : 'None'}</dd><dt>Asked of each</dt><dd>The published survey questions for each group</dd></dl>
     ${locked && locked.links?.length ? `<h3>Links already opened — copy them now</h3>${linkList(locked.links, origin, templates)}` : ''}

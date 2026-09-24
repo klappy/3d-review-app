@@ -30,3 +30,4 @@
 .v3-wizard .stepper li.done i{background:var(--pip-done,#2f7d5b);border-color:var(--pip-done,#2f7d5b);color:var(--primary-ink,#fff)}
 .v3-wizard .stepper li.on{color:var(--ink,#1c2430);font-weight:600}.v3-wizard .stepper li.on i{border-color:var(--green,#2f7d5b);color:var(--green,#2f7d5b)}
 @media (max-width:650px){.v3-wizard .grid{grid-template-columns:1fr}.v3-wizard .group{grid-template-columns:auto 1fr}.v3-wizard .gin{grid-column:2;align-items:flex-start}.v3-wizard .stepper li span{display:none}.v3-wizard .stepper li.on span{display:block}}
+.v3-wizard .pdot.wz-kvdot{width:10px;height:10px;margin-right:6px;vertical-align:middle}
