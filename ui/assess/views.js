@@ -6,7 +6,7 @@
 // the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
-import { v3CountLine, v3BandsMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
+import { v3CountLine, v3BandsMarkup, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -99,7 +99,11 @@ const understand = {
     if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.reason || '')}</p>`; }
     else results = refusalLine(ctx, m.results.status, 'data-retry="results"', 'Results');
     // v3 (ruling c): band layout, one card per perspective; a held result shows evidence gaps, never an invented band.
-    const bands = V3_FLAGS.bandResults && m.results.status === 'loaded' ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span></div>${v3BandsMarkup(m.results.value, LENSES, esc)}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc)}</section>` : '';
+    // v3 U2: per-perspective server counts on each band card (Bincy screen 10 group counts) + evidence toggle and table.
+    const lensGroups = Object.fromEntries(LENSES.map(lens => { const ss = m.surveys.filter(s => lensFor(s) === lens), ld = ss.filter(s => m.counts.get(s.id)?.status === 'loaded');
+      return [lens, { surveys: ss.length, loaded: ld.length, responses: ld.reduce((n, s) => n + m.counts.get(s.id).responses, 0) }]; }));
+    const ev = v3EvidenceMarkup(v3EvidenceRows(m.results.value, LENSES, lensGroups), !!m.showEvidence, esc);
+    const bands = V3_FLAGS.bandResults && m.results.status === 'loaded' ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups)}${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc)}</section>` : '';
     // (3) Reports: server-owned eligibility and provenance; preview never writes a report.
     let reports;
     if (m.reports.status === 'loaded') {
@@ -127,6 +131,8 @@ const understand = {
       root.querySelector('[data-report-status]').textContent = reports.status === 'loaded' ? (reports.value?.suppressed ? 'Report built, but current report access is held. See the reporting policy reason above.' : 'Report built. Open it from the current report list.') : 'Report built, but the list could not be refreshed. Refresh reports to reopen it.';
     }, clearReport);
     root.querySelectorAll('[data-retry]').forEach(el => el.onclick = e => { e.preventDefault(); if (m.reportBuildBusy) return; ctx.go(ctx.routes.assessment(m.aid, 'understand'), { reload: true }); });
+    const evBtn = root.querySelector('[data-v3-evidence-toggle]'), evBox = root.querySelector('[data-v3-evidence]');
+    if (evBtn && evBox) evBtn.onclick = () => { m.showEvidence = !m.showEvidence; evBox.hidden = !m.showEvidence; evBtn.setAttribute('aria-expanded', String(m.showEvidence)); evBtn.textContent = m.showEvidence ? 'Simple view' : 'Show evidence and details'; };
     const closeBtn = root.querySelector('[data-close-report]'); if (closeBtn) closeBtn.onclick = clearReport;
     // v3 U4 review gate: checkbox arms "Record my review"; each primary is one set_stage move, then the view reloads.
     const gateBtn = root.querySelector('[data-v3-gate-go]'), gateCheck = root.querySelector('[data-v3-review-check]');
