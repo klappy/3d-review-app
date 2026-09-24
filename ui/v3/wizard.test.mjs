@@ -78,6 +78,13 @@ test('views: four steps, one primary each, optional expected count, escaped', ()
   assert.match(p, /data-version="3"/);
   const r = renderStep('review', draft(), { ...data, templates: [...data.templates, { id: 'tpl.community', version: 2, name: 'Community', perspective: 'Community' }] });
   assert.match(r, /10 expected/); assert.match(r, /no number given/);
+  // L2-2 · Bincy 03–06: step names, review summary carries all three sections with an Edit each; locked hides Edit.
+  assert.match(r, /Review &amp; launch|Review & launch/); assert.match(r, /<h3>Participant information<\/h3>/);
+  assert.equal((r.match(/data-wz="edit"/g) || []).length, 3);
+  assert.match(r, /data-step="information"/);
+  assert.equal((renderStep('review', draft(), data, [], true).match(/data-wz="edit"/g) || []).length, 0);
+  assert.match(renderStep('details', draft(), data), /Who will participate\?/);
+  assert.match(renderStep('review', draft({ context: '<b>x</b>' }), data), /&lt;b&gt;x&lt;\/b&gt; <span class="sub">\(not stored yet/);
 });
 
 test('retry after a partial failure resumes without duplicate writes', async () => {
