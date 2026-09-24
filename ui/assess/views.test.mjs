@@ -175,6 +175,19 @@ test('A8d v3 next step: stage move refused after notes saved → says notes save
   assert.match(h2, /data-save-notes>Save</); assert.doesNotMatch(h2, /data-v3-finish/);
 });
 
+test('A8e v3 next step: saved notes land on the shared model; leaving mid-request never refreshes the new route', async () => {
+  const { api, calls } = fakeApi({ 'PATCH /v2/assessments/a1/notes': ({ body }) => ({ assessment: { ...assessment, ...body } }), 'POST /v2/assessments/a1/stage': () => ({ assessment: { ...assessment, stage: 'improve' } }) });
+  let refreshed = 0, here = true; const dirty = new Map();
+  const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'member', stage: 'understand' }, surveys }, refresh: async () => { refreshed++; }, isCurrent: () => here, state: { dirty } });
+  const m = await views.improve.load(ctx, { aid: 'a1' });
+  const form = el({ 'data-notes-form': '' }), btn = el({ tag: 'button', 'data-save-notes': '' }), status = el({ 'data-notes-status': '' });
+  makeRoot([form, btn, status, el({ name: 'notes_reflection', value: 'R2' }), el({ name: 'notes_next_steps', value: 'N2' })]); views.improve.bind(ctx, root, m);
+  const orig = ctx.api; ctx.api = async (...a) => { const r = await orig(...a); if (a[0].endsWith('/stage')) here = false; return r; };
+  await form.onsubmit({ preventDefault() {} });
+  assert.equal(calls.length, 2); assert.equal(refreshed, 0); assert.equal(dirty.get('a1'), 'write');
+  assert.equal(ctx.current.assessment.notes_reflection, 'R2'); assert.equal(ctx.current.assessment.notes_next_steps, 'N2'); assert.equal(ctx.current.assessment.stage, 'improve');
+});
+
 test('A8b save failure: no success claim, refusal wording', async () => {
   const { api } = fakeApi({ 'PATCH /v2/assessments/a1/notes': err('NOT_AUTHORIZED_AT_SCOPE', 403) });
   let refreshed = 0; const ctx = ctxFor(api, { refresh: async () => { refreshed++; } }); const m = await views.improve.load(ctx, { aid: 'a1' });
