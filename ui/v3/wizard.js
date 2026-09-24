@@ -214,7 +214,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Three perspectives, kept separate. Choose the groups you can reach.')}${errBox(errs)}
     <form data-wz-form="participants">
       ${templates.length ? templates.map(t => { const g = d.groups[t.id]; return `<div class="group${g ? ' on' : ''}"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span>
-        <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(t.version)}"${g ? ' checked' : ''}><span><b>${esc(t.perspective)}</b><span class="sub">${esc(t.name)}</span></span></label>
+        <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(t.version)}"${g ? ' checked' : ''}><span><h3>${esc(t.perspective)}</h3><span class="sub">${esc(t.name)}</span></span></label>
         <div class="gin"><label for="n-${esc(t.id)}">How many do you expect?</label><input type="number" id="n-${esc(t.id)}" name="n-${esc(t.id)}" min="1" step="1" inputmode="numeric" value="${g && g.expected ? esc(g.expected) : ''}" placeholder="optional"></div></div>`; }).join('')
         : '<p class="muted">No published surveys are available to this account.</p>'}
       <p class="footer muted">The number is optional. Leave it empty if you don't know for sure; counts then show as "n responded". Groups you leave out can be added later.</p>
@@ -226,7 +226,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       <dl class="kv"><dt>Project</dt><dd>${esc(proj.name || '')}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd><dt>Format</dt><dd>${esc(d.format)}</dd></dl>
       <label>A note for participants (optional)<textarea name="context" rows="2" placeholder="Not stored yet: the product has no field for this note.">${esc(d.context)}</textarea></label>
       <h3>Asked of each participant</h3>
-      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><b>${esc(t.perspective)}</b><span class="sub">The questions in the ${esc(t.name)} survey, as published. Answers are grouped, never shown alone.</span></div></div>`).join('')}
+      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><h3>${esc(t.perspective)}</h3><span class="sub">The questions in the ${esc(t.name)} survey, as published. Answers are grouped, never shown alone.</span></div></div>`).join('')}
       ${actions(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   // review

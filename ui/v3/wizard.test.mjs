@@ -232,3 +232,11 @@ test('lane 12 L12-2: language ISO code rides cap.language.create only when given
   assert.doesNotMatch(renderStep('details', draft(), empty, [], false, ''), /newLangCode/);
   assert.match(renderStep('review', draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'Hiligaynon', newLangCode: 'hil' }), empty, [], false, ''), /<dt>Language<\/dt><dd>Hiligaynon · hil<\/dd>/);
 });
+
+test('L2-5: group titles are h3 on participants and information (prototype frames 4–5)', () => {
+  const data = { templates: [{ id: 't1', version: 1, perspective: 'Community', name: 'Community survey' }] };
+  const d = { ...freshDraft(), groups: { t1: { version: 1, expected: '' } } };
+  assert.match(renderStep('participants', d, data), /<h3>Community<\/h3>/);
+  assert.match(renderStep('information', d, data), /<h3>Community<\/h3>/);
+  assert.doesNotMatch(renderStep('participants', d, data), /<b>Community<\/b>/);
+});
