@@ -171,3 +171,9 @@ test('#188 a failed write that did not commit is retried after reconcile finds n
   const ctx = await launch(draft(), { api, store: mem(), resume: err.ctx });
   assert.equal(made.length, 1); assert.equal(ctx.aid, 'a1');
 });
+
+test('#188 a clear 4xx refusal leaves nothing pending, so the draft stays editable', async () => {
+  const api = async (url) => { if (url.endsWith('/assessments')) { const e = new Error('Language archived'); e.status = 400; throw e; } throw new Error('unexpected ' + url); };
+  let err; try { await launch(draft(), { api, store: mem() }); } catch (e) { err = e; }
+  assert.equal(err.ctx.done.length, 0); assert.equal(err.ctx.pending, null);
+});

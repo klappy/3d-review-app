@@ -107,7 +107,9 @@ async function launchInner(d, opts) {
       if (found) { if (step.keep) step.keep(found, ctx); ctx.pending = null; ctx.done.push(step.cap); continue; }
     }
     ctx.pending = { cap: step.cap, at: now() };
-    const r = await api(step.url(ctx), { method: step.method, body: step.body(ctx) });
+    let r;
+    try { r = await api(step.url(ctx), { method: step.method, body: step.body(ctx) }); }
+    catch (e) { if (refused(e)) ctx.pending = null; throw e; } // a clear 4xx refusal committed nothing: stay editable
     if (step.keep) step.keep(r, ctx);
     ctx.pending = null;
     ctx.done.push(step.cap);
@@ -118,7 +120,9 @@ async function launchInner(d, opts) {
 
 const now = () => Date.now();
 const SKEW_MS = 5 * 60 * 1000; // client/server clock tolerance when matching a just-created row by name
-const recent = (row, at) => { const t = Date.parse(row?.created_at || ''); return Number.isNaN(t) || t >= at - SKEW_MS; };
+const recent = (row, at) => { const t = Date.parse(row?.created_at || ''); return !Number.isNaN(t) && t >= at - SKEW_MS; };
+// 4xx other than 409 (conflict may mean it already exists) = the server refused; no status or 5xx = outcome unknown.
+export const refused = e => Number.isInteger(e?.status) && e.status >= 400 && e.status < 500 && e.status !== 409;
 const newest = rows => rows.slice().sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0] || null;
 
 // #188 reconcile: returns a response-shaped object when the uncertain write is found committed, else null (safe to retry).
