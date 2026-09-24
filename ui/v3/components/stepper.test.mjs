@@ -34,3 +34,8 @@ test('Stepper: style injects once and is a no-op without a document', () => {
   assert.equal(nodes.get(STEPPER_STYLE_ID).textContent, STEPPER_CSS);
   assert.match(STEPPER_CSS, /var\(--glass/);
 });
+
+test('stepper dots blur on the design-system-v3 --blur-panel token, not a hard-coded radius (ruling 12:22 glass)', () => {
+  assert.match(STEPPER_CSS, /backdrop-filter:blur\(var\(--blur-panel,24px\)\)/);
+  assert.doesNotMatch(STEPPER_CSS, /blur\(\d+px\)/);
+});
