@@ -54,6 +54,7 @@ v3/components/band-card.test.mjs
 v3/components/response-count.test.mjs
 v3/components/evidence-table.test.mjs
 v3/components/sidebar-tree.test.mjs
+v3/components/demo-exit.test.mjs
 v3/components/components-served.test.mjs
 assess/breadcrumbs-mount.test.mjs
 assess/sidebar-mount.test.mjs
