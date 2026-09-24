@@ -131,21 +131,7 @@ export const v3css = `.v3-bands{display:grid;grid-template-columns:repeat(auto-f
 // U4 review gate (PARITY.md U4; prototype V.results frame 10). One primary per state, each a single cap.assessment.set_stage
 // move (the server allows one step at a time): Collecting → "Record my review" (checkbox first) → Reviewing →
 // "Choose a next step" → Improving. Viewers get the state word only. No new capability, no new stored field.
-export const V3_REVIEW_CHECK = 'I checked the meaning, the missing evidence and any sensitive details';
-const CAN_MOVE = new Set(['member', 'owner']);
-export function v3GateAction(stage, role) {
-  if (!CAN_MOVE.has(String(role || '').toLowerCase())) return null;
-  if (stage === 'collect') return { action: 'recordReview', label: 'Record my review', check: true };
-  if (stage === 'understand') return { action: 'saveAndFinish', label: 'Choose a next step', check: false };
-  return null;
-}
-export function v3ReviewGateMarkup(stage, role, esc = esc0) {
-  const reviewed = stage === 'improve', g = v3GateAction(stage, role);
-  const badge = `<span class="badge${reviewed ? '' : ' warn'}" data-v3-reviewed="${reviewed}">${reviewed ? 'Reviewed' : 'Draft · a person checks this before sharing'}</span>`;
-  if (!g) return `<div class="v3-gate" data-v3-gate="none">${badge}</div>`;
-  const check = g.check ? `<label class="choice"><input type="checkbox" data-v3-review-check> ${esc(V3_REVIEW_CHECK)}</label>` : '';
-  return `<div class="v3-gate" data-v3-gate="${esc(g.action)}">${badge}${check}<button type="button" class="primary" data-v3-gate-go="${esc(g.action)}"${g.check ? ' disabled' : ''}>${esc(g.label)}</button><p class="status small" role="status" aria-live="polite" data-v3-gate-status></p></div>`;
-}
+export { V3_REVIEW_CHECK, v3GateAction, reviewGate as v3ReviewGateMarkup } from '../v3/components/review-gate.js'; // component: Review gate (ruling 12:34)
 /** The only write: POST /v2/assessments/:id/stage { stage } (cap.assessment.set_stage), stage from V3_SET_STAGE. */
 export function v3SetStage(api, enc, aid, action) {
   const stage = V3_SET_STAGE[action];
