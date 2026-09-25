@@ -98,3 +98,23 @@ test('B03 (Bugbot): a failed project-list read never blocks the invitation page'
   const js = read('./assess.js');
   assert.match(js, /if \(!\['assessment', 'survey', 'feedback', 'invite'\]\.includes\(route\(location\.hash\)\.kind\)\)/);
 });
+
+// Bincy B04 (captain ruling 2026-09-25): a fresh sign-in lands by Bincy's rule — invitation → accept screen; one project → it; several → Home.
+test('B04: a consumed #session= marks the sign-in; boot() applies signInLanding once, after the project list, before render()', () => {
+  const source = read('./assess.js');
+  const code = source.slice(source.indexOf('const LEGACY_HASHES'), source.indexOf('function resetIdentity()'));
+  const drive = (hash, store = new Map()) => {
+    const historyCalls = [];
+    const box = { demo:false, INVITE_KEY:'pendingInvite', parseInvitationFragment: () => null, resetIdentity(){}, token:null,
+      location:{ hash, pathname:'/', replace(){} }, history:{replaceState:(...args)=>historyCalls.push(args)},
+      sessionStorage:{ getItem:k=>store.get(k) ?? null, setItem:(k,v)=>store.set(k,v), removeItem:k=>store.delete(k) } };
+    const [result, landing] = vm.runInNewContext(code + '\n[scrubCredentialHash(), landAfterSignIn]', box);
+    return { result, landing, historyCalls };
+  };
+  assert.deepEqual([drive('#session=st_abc').result, drive('#session=st_abc').landing], ['session', true]);
+  assert.equal(drive('#projects').landing, false, 'plain navigation is not a sign-in');
+  assert.equal(drive('#session=st_abc', new Map([['pendingInvite', 'tok']])).historyCalls[0][2], '/#invite');
+  const boot = source.slice(source.indexOf('async function boot()'));
+  assert.match(boot, /state\.projects = result\.projects \|\| \[\];[\s\S]*if \(landAfterSignIn\) \{ landAfterSignIn = false; if \(\['projects', 'invite', 'entry'\]\.includes\(route\(location\.hash\)\.kind\)\) \{ try \{ history\.replaceState\(null, '', location\.pathname \+ location\.search \+ signInLanding\(\{ invite: !!\(pendingInvite \|\| storedInvite\(\)\), projects: state\.projects \}\)\); \} catch \{\} \} \}\n\s*listen\(\);\n\s*await render\(\);/);
+  assert.match(source, /const setToken = t => \{ if \(demo\) return; token = t \|\| null; landAfterSignIn = !!t;/, 'the entry form sign-in lands the same way');
+});

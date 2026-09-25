@@ -1,7 +1,7 @@
 // node --test ui/assess/scope.test.mjs — scope pages: render() strings, load() with a fake api, entry sign-in transitions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pages, css, classify, landsOnWork } from './scope.js';
+import { pages, css, classify, landsOnWork, signInLanding } from './scope.js';
 import * as cards from './cards.js';
 
 const err = (code, message = 'nope') => Object.assign(new Error(message), { code, status: Number(code) || 400 });
@@ -391,4 +391,15 @@ test('router: about is a public entry intent; unknown hashes fall back to home, 
   assert.deepEqual({ ...route('#about') }, { kind: 'entry', intent: 'about' });
   for (const h of ['#public-about', '#nonsense', '#assessment']) assert.equal(route(h).kind, 'entry', h);
   assert.equal(route('#projects').kind, 'projects');
+});
+
+test('B04: sign-in landing — pending invitation first; one project → that project; several or none → Home', () => {
+  const one = [{ id: 'prj 1' }], two = [{ id: 'p1' }, { id: 'p2' }];
+  assert.equal(signInLanding({ invite: true, projects: one }), '#invite', 'invitation beats one project');
+  assert.equal(signInLanding({ invite: true, projects: two }), '#invite', 'invitation beats several');
+  assert.equal(signInLanding({ projects: one }), '#project/prj%201');
+  assert.equal(signInLanding({ projects: two }), '#projects');
+  assert.equal(signInLanding({ projects: [] }), '#projects');
+  assert.equal(signInLanding(), '#projects');
+  assert.equal(signInLanding({ projects: [{ id: 'p1' }, { id: 'p2', archived_at: '2026-01-01' }] }), '#project/p1', 'archived projects do not count');
 });
