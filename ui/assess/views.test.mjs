@@ -89,6 +89,7 @@ test('Reports: server list plus preview control for exact assessment editor', as
   const html = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
   assert.match(html, /data-open-report="rep_1"/);
   assert.match(html, /data-preview-report/);
+  assert.match(html, /<details class="small" data-report-build-more><summary>Technical details<\/summary><section data-report-build>/); // U32: closed disclosure, not a second visible build action
   assert.doesNotMatch(html, /data-confirm-report/);
 });
 

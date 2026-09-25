@@ -58,7 +58,7 @@ const settle = p => p.then(value => ({ status: 'loaded', value }), e => ({ statu
 const isEditor = role => role === 'owner' || role === 'member';
 // B35 (lanes-1321): bands come from a built report. While none is built and some perspective already has enough responses
 // (the provisional minimum), the band block itself offers the one next action; it opens the SAME preview → confirm as
-// "Preview report build" below, shown right here in the band block (never builds without the confirm).
+// "Preview report build" (closed behind Technical details, U32), shown right here in the band block (never builds without the confirm).
 export function buildResultsCta(m, lensGroups, esc) {
   if (m.bandScores || m.resultsBuilt || !isEditor(m.role)) return '';
   // Bugbot 4108654385: offered only when the report list is known and empty; an existing report (or an unknown list) never
