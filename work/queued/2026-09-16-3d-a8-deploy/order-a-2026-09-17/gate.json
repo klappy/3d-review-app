@@ -1,9 +1,0 @@
-{
-  "content": [
-    {
-      "type": "text",
-      "text": "{\n  \"action\": \"gate\",\n  \"result\": {\n    \"status\": \"PASS\",\n    \"transition\": {\n      \"from\": \"planning\",\n      \"to\": \"execution\"\n    },\n    \"prerequisites\": {\n      \"met\": [\n        \"decisions_locked\",\n        \"dod_defined\",\n        \"irreversibility_assessed\",\n        \"constraints_satisfied\"\n      ],\n      \"unmet\": [],\n      \"unknown\": [],\n      \"required_met\": 4,\n      \"required_total\": 4\n    },\n    \"governance_source\": \"knowledge_base\",\n    \"governance_uris\": [\n      \"klappy://odd/gate/prerequisites\",\n      \"klappy://odd/gate/transitions\"\n    ]\n  },\n  \"assistant_text\": \"Gate: PASS (planning → execution)\\n\\nPrerequisites: 4/4 required met\\n\\nMet:\\n  + decisions_locked\\n  + dod_defined\\n  + irreversibility_assessed\\n  + constraints_satisfied\\n\\nTip: oddkit tracks tool usage (which tools, how often) but never your prompts, searches, or responses. Add ?consumer=yourname to your oddkit URL to appear on the public transparency leaderboard. See telemetry_policy for details.\",\n  \"debug\": {\n    \"duration_ms\": 0,\n    \"generated_at\": \"2026-09-17T04:04:10.510Z\",\n    \"trace\": {\n      \"spans\": [\n        {\n          \"label\": \"action:gate\",\n          \"duration_ms\": 0\n        }\n      ],\n      \"fetches\": [],\n      \"cacheStats\": {\n        \"hits\": 0,\n        \"misses\": 0,\n        \"total\": 0\n      },\n      \"total_ms\": 0\n    }\n  },\n  \"server_time\": \"2026-09-17T04:04:10.510Z\"\n}"
-    }
-  ],
-  "isError": false
-}
