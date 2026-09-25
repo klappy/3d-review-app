@@ -122,7 +122,7 @@ const redact = m => redactDiagnosticPath(String(m || 'Request could not be compl
 //                                                  (Bugbot 4041134416). Results are bound to (aid, epoch) (Auditor 2A-3).
 //   generation   counter                           a later render supersedes an earlier one's DOM write (supplier 1114cb1)
 let generation = 0, epoch = 0, identityGeneration = 0;
-const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null };
+const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null, collectLinks: new Map() };
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']); // visibility/authz codes (supplier 97f7402 + policy.ts)
@@ -261,10 +261,25 @@ function collectState(status) {
   return ` <span aria-hidden="true">·</span> <span class="state" data-collect-state>${esc(word)}</span>`;
 }
 function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'Other perspective'; }
+// B36: Copy link / Show QR code per group on Collect (owner, member; open surveys). One tap issues the link through the Share
+// card's API pair; the link lives in memory only, keyed to (aid, sid, epoch) and dropped with identity (state.collectLinks).
+function shareable(a, s) { return share.CAN_SHARE.has(a.role) && (s.collection_status === 'open' || a.stage === 'collect'); }
+function bindCollectLinks(current) {
+  const root = app.querySelector('[data-collect-panel]'); if (!root) return;
+  const aid = current.assessment.id, ep = epoch;
+  share.bindGroupLinks(root, { resolve: async sid => {
+    const k = `${aid}|${sid}|${ep}`;
+    for (const key of state.collectLinks.keys()) if (!key.startsWith(`${aid}|`) || !key.endsWith(`|${epoch}`)) state.collectLinks.delete(key);
+    if (!state.collectLinks.has(k)) state.collectLinks.set(k, share.issueLink(api, { aid, sid, origin: location.origin }).catch(e => { state.collectLinks.delete(k); throw e; }));
+    const link = await state.collectLinks.get(k);
+    if (ep !== epoch || state.current?.assessment.id !== aid) return null;
+    return link.url;
+  } });
+}
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
-  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p></div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
-  return `<section class="panel"><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey to share its link or print a blank questionnaire.</p></section>`;
+  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id, group: g.lens, survey: s.template_name }]) : ''}</div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
+  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey to share its link or print a blank questionnaire.</p></section>`;
 }
 // Cut 2A child screen: ONE survey. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
@@ -610,7 +625,7 @@ function paint(r = route(location.hash), gen = generation) {
     const a0 = state.current.assessment;
     const tab = r.view || recalledTab(tabStorage, a0.id, VIEWS.includes(a0.stage) ? a0.stage : 'prepare');
     if (r.view) rememberTab(tabStorage, a0.id, r.view);
-    app.innerHTML = ctxPanel + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') loadCounts(state.current);
+    app.innerHTML = ctxPanel + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') { bindCollectLinks(state.current); loadCounts(state.current); }
     bindPrepare(state.current); mountView(state.current, tab, gen);
     document.title = `${title(tab)} · ${state.current.assessment.name} · 3D Review`;
   }
@@ -639,7 +654,7 @@ function resetIdentity() {
   identityGeneration += 1; generation += 1; epoch += 1;
   accountBusy = false; accountControls(false); accountStatus();
   document.getElementById('account-switch-dialog')?.close();
-  state.share = null; state.principal = null; state.projects = []; state.current = null; state.templates = null;
+  state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
   state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false;
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
