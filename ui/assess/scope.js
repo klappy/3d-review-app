@@ -21,6 +21,7 @@ export function classify(e) {
 }
 const fail = (e, message) => ({ status: classify(e), error: message(e) });
 const safeMessage = e => String(e?.message || 'Request could not be completed.');
+export const CODE_REFUSED = 'This code has been used or is not valid. Check it, or ask the person who gave it to you for a new one.';
 
 function signInPanel(ctx) {
   return `<div class="narrow"><section class="panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">This page needs a facilitator session.</p><div class="actions"><a class="button primary" href="${ctx.routes.entry}">Go to sign in</a><a class="quiet button" href="/v2/auth/access">Sign in with email code</a></div></section></div>`;
@@ -71,13 +72,13 @@ function bindRetry(ctx, root, page, model) {
   });
 }
 // A write: disables the trigger while in flight, reports the server outcome, never claims success without it.
-async function write(ctx, control, label, fn) {
+async function write(ctx, control, label, fn, { refused = 'Not allowed here.', failed = null } = {}) {
   const controls = control ? [control, ...(control.form ? Array.from(control.form.querySelectorAll('button')) : [])] : [];
   for (const c of controls) c.disabled = true;
   try { const r = await fn(); return r; }
   catch (e) {
     const kind = classify(e);
-    ctx.note(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? 'Not allowed here.' : `${label} failed: ${safeMessage(e)}`, true);
+    ctx.note(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? refused : (failed || `${label} failed: ${safeMessage(e)}`), true);
     return undefined;
   }
   finally { for (const c of controls) c.disabled = false; }
@@ -141,7 +142,8 @@ const entry = {
     root.querySelector('#code-form')?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }));
+      // U08 (lanes-1321): a used, unknown or mistyped code gets one plain next step, not "Not allowed here." / a server message.
+      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }), { refused: CODE_REFUSED });
       if (!r) return;
       const token = r.participant_token || r.participant;
       if (!token) return ctx.note('The server accepted the code but returned no participant token.', true);
