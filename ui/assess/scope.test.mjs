@@ -1,7 +1,8 @@
 // node --test ui/assess/scope.test.mjs — scope pages: render() strings, load() with a fake api, entry sign-in transitions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pages, css, classify, landsOnWork } from './scope.js';
+import { pages, css, classify, landsOnWork, whoLine, PERSPECTIVE_WHO } from './scope.js';
+import { readFileSync } from 'node:fs';
 import * as cards from './cards.js';
 
 const err = (code, message = 'nope') => Object.assign(new Error(message), { code, status: Number(code) || 400 });
@@ -391,4 +392,13 @@ test('router: about is a public entry intent; unknown hashes fall back to home, 
   assert.deepEqual({ ...route('#about') }, { kind: 'entry', intent: 'about' });
   for (const h of ['#public-about', '#nonsense', '#assessment']) assert.equal(route(h).kind, 'entry', h);
   assert.equal(route('#projects').kind, 'projects');
+});
+
+test('B08+B20: one shared who-line per group (setup, launch, Collect); headings untouched; unknown groups get none', () => {
+  assert.equal(whoLine('Translation Team'), PERSPECTIVE_WHO.team); assert.equal(whoLine('Translation team'), PERSPECTIVE_WHO.team);
+  assert.equal(whoLine('Community'), PERSPECTIVE_WHO.community); assert.equal(whoLine('Church'), PERSPECTIVE_WHO.church);
+  assert.equal(whoLine('Other perspective'), ''); assert.equal(whoLine(undefined), '');
+  for (const w of Object.values(PERSPECTIVE_WHO)) assert.doesNotMatch(w, /Experience of/, 'who the group is, not what it is asked');
+  const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  assert.match(src, /<h3 style="margin:18px 0 6px">\$\{esc\(g\.lens\)\}<\/h3>\$\{whoLine\(g\.lens\)/, 'Collect group heading carries the shared who-line');
 });

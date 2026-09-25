@@ -84,7 +84,7 @@ async function assessPage() {
   const imp = async p => import(new URL(p, import.meta.url));
   const [demo, dp, ss, wh, cardsNs, bc, st, lm, scope, vw, share, fb, ad, v3s, v3a] = await Promise.all(['../demo.js', '../diagnostic-path.js', '../stage-screens.js', './whats-here.js', './cards.js', '../v3/components/breadcrumbs.js', '../v3/components/sidebar-tree.js', '../v3/components/learn-more.js', './scope.js', './views.js', './share.js', './feedback.js', '../kit/app-adapter.js', '../v3-shell.js', './v3-assessment.js'].map(imp));
   const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace(/export function /g, 'function ');
-  const box = { ...demo, ...dp, ...ss, ...wh, cards: cardsNs, ...bc, ...st, ...lm, pages: scope.pages, scopeCss: scope.css, views: vw.views, viewsCss: vw.css, share, ...fb, ...ad, ...v3s, ...v3a,
+  const box = { ...demo, ...dp, ...ss, ...wh, cards: cardsNs, ...bc, ...st, ...lm, pages: scope.pages, scopeCss: scope.css, whoLine: scope.whoLine, views: vw.views, viewsCss: vw.css, share, ...fb, ...ad, ...v3s, ...v3a,
     document: new JSDOM('<!doctype html><head></head><body></body>').window.document, location: { hash: '', pathname: '/' }, history: { replaceState() {} }, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} }, localStorage: { getItem: () => null, setItem() {} }, matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }), addEventListener() {}, setTimeout, clearTimeout, console, URL, URLSearchParams };
   box.globalThis = box;
   const api = vm.runInNewContext(source + '\n({screen,state})', box);

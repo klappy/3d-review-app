@@ -92,6 +92,10 @@ const dropSession = key => { try { sessionStorage.removeItem(key); } catch {} };
 // ---------- entry (public) ----------
 // B20: also composed by the v3 setup wizard (step 2 "Who will participate?"), one description per perspective.
 export const PERSPECTIVES = [['team', 'Translation team', 'Experience of the work'], ['community', 'Community', 'Experience of the translation'], ['church', 'Church', 'Experience of its use']];
+// B08+B20 (Bincy SI 04 "Translation Team, Community, and Church descriptions"): one plain who-line per group, shared by setup step 2,
+// the launched rows and the Collect heading. Headings and data unchanged. Keyed as the wizard's pdot(): team / community / church.
+export const PERSPECTIVE_WHO = Object.freeze({ team: 'The people doing the translation work.', community: 'People who speak the language.', church: 'Pastors and church leaders in the language area.' });
+export const whoLine = p => { const s = String(p || '').toLowerCase(); return PERSPECTIVE_WHO[/team/.test(s) ? 'team' : /community/.test(s) ? 'community' : /church/.test(s) ? 'church' : ''] || ''; };
 function entryModel(over = {}) {
   return { status: 'loaded', mode: 'welcome', step: 0, signin: { email: '', devCode: null, stage: 'email' }, example: null, exampleStatus: null, exampleError: '', params: {}, ...over };
 }
