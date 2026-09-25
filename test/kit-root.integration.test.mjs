@@ -428,3 +428,18 @@ test('B07: a refused rename that settles after navigating to another assessment 
   assert.equal(p.q('#prepare-form textarea[name="purpose"]').value, 'draft on a1'); assert.equal(p.api.state.message, null, 'no refusal pinned on another assessment');
   assert.equal(p.q('#prepare-form button[type=submit]').disabled, false, 'the other page keeps its write controls enabled'); assert.ok(p.qa('[data-stage]').every(b => !b.disabled));
 });
+test('B07: a Prepare save from a rebuilt view waits for the in-flight rename (no racing cap.assessment.update)', async () => {
+  let release; const held = new Promise(r => { release = r; }); const patches = []; let inflight = 0, maxInflight = 0;
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { patches.push(JSON.parse(init.body || '{}')); inflight++; maxInflight = Math.max(maxInflight, inflight); if (patches.length === 1) await held; inflight--;
+      return { ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => ({ ok: true, result: { assessment: { id: 'a2', name: 'Spring review' } } }), text: async () => '' }; }
+    return base(u, init); }; } });
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  await p.go('#assessment/a2/collect'); await p.go('#assessment/a2/prepare');
+  assert.equal(p.q('#prepare-form button[type=submit]').disabled, false, 'rebuilt view draws its controls normally');
+  p.q('#prepare-form textarea[name="purpose"]').value = 'p'; p.q('#prepare-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(8);
+  assert.equal(patches.length, 1, 'Prepare waits while the rename PATCH is in flight');
+  release(); await tick(24);
+  assert.equal(maxInflight, 1, 'never two assessment updates at once'); assert.ok('name' in patches[0]);
+});
