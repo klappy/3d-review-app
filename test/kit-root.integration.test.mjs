@@ -12,13 +12,17 @@ import { redactDiagnosticPath } from '../ui/diagnostic-path.js';
 import * as stage from '../ui/stage-screens.js';
 import { whatsHere } from '../ui/assess/whats-here.js';
 import * as cards from '../ui/assess/cards.js';
-import { pages, css as scopeCss } from '../ui/assess/scope.js';
+import { pages, css as scopeCss, landsOnWork } from '../ui/assess/scope.js';
 import { views, css as viewsCss } from '../ui/assess/views.js';
 import * as share from '../ui/assess/share.js';
 import { feedback } from '../ui/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '../ui/kit/app-adapter.js';
 import * as v3 from '../ui/v3-shell.js';
-import { v3StagePrimary } from '../ui/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor } from '../ui/assess/v3-assessment.js';
+import { learnMore } from '../ui/v3/components/learn-more.js';
+import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
+import { sidebarTree } from '../ui/v3/components/sidebar-tree.js';
+import { mountEditableHeading } from '../ui/v3/components/editable-heading.js';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const HTML = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
@@ -42,7 +46,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, learnMore, breadcrumbs, sidebarTree, mountEditableHeading }); // v3 shell imports (assess.js lines 15–16); #190
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -86,7 +90,7 @@ test('journey: Workspaces → workspace → project (two distinct assessments, l
   assert.equal(items.length, 2);
   assert.ok(items[0].textContent.includes('September assessment') && items[0].textContent.includes('Collecting') && items[0].textContent.includes('Lake language'));
   assert.ok(items[1].textContent.includes('Spring baseline') && items[1].textContent.includes('In preparation'));
-  assert.ok(p.q('[data-action-region] #create-assessment')); assert.ok(p.q('[data-action-region] #add-language')); assert.ok(p.q('[data-action-region] #rename-form'));
+  assert.ok(p.q('[data-action-region] #create-assessment')); assert.ok(p.q('[data-action-region] #add-language')); assert.ok(p.q('[role=main].content .v3-eh [data-edit-heading]'), 'B07: rename lives on the heading');
   assert.deepEqual(treeLabels(p).filter(l => /September|Spring/.test(l)), ['September assessment', 'Spring baseline'], 'tree shows both assessments under the project from loaded data');
   const projectContent = p.api.app;
   await p.go('#assessment/a1');
@@ -221,7 +225,7 @@ test('F3: viewer-only identity shows no synthesized role; scope role appears onl
 });
 
 test('role contract end-to-end: Owner/Member/Viewer each display as themselves at project p1; write regions follow the real controller permission', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: #195' }, async () => {
-  for (const [identity, label, forms] of [['owner', 'Owner', ['create-assessment', 'rename-form', 'add-language']], ['member', 'Member', ['create-assessment', 'add-language']], ['viewer', 'Viewer', []]]) {
+  for (const [identity, label, forms] of [['owner', 'Owner', ['create-assessment', 'add-language']], ['member', 'Member', ['create-assessment', 'add-language']], ['viewer', 'Viewer', []]]) {
     const p = await bootPage(identity, '#project/p1');
     assert.equal(p.text('header.top nav.crumbs .tree-role'), label, identity);
     assert.equal(p.text('#who'), 'Account: synthetic-' + identity + '@example.invalid', identity + ' identity is the email, not a role');
@@ -352,4 +356,120 @@ test('demo write refusal is unchanged: the existing create form submits into the
   for (const hash of ['#workspace/demo-workspace', '#project/demo-project']) { await p.go(hash); assert.equal(p.q('[data-action-region]'), null, `${hash}: demo viewer role sees no scoped write controls`); assert.equal(disclosure(p).length, 1); }
   await assert.rejects(() => demo.demoApi('/v2/workspaces', { method: 'POST', body: { name: 'Nope' } }), /demonstration/i);
   assert.deepEqual(p.served().filter(k => k !== 'GET /v2/health'), []);
+});
+
+// ---- B07 (Bincy F04): the name is the heading with a modest edit control; no rename card, no name field in Prepare ----
+test('B07: project and assessment names are the heading with an edit control for writers only; the synthetic transport refuses the save and the field stays open', async () => {
+  const p = await bootPage('owner', '#project/p1');
+  assert.equal(p.text('[role=main].content .v3-eh h1'), 'River Valley');
+  assert.equal(p.qa('[role=main].content [data-edit-heading]').length, 1); assert.equal(p.q('#rename-form'), null);
+  assert.ok(!/Save name/.test(p.d.body.textContent));
+  p.q('[data-edit-heading]').click();
+  const form = p.q('.v3-eh-form'); assert.ok(form); assert.equal(form.querySelector('input').value, 'River Valley'); assert.equal(p.q('.v3-eh h1').hidden, true);
+  form.querySelector('[data-cancel]').click(); assert.equal(p.q('.v3-eh-form'), null); assert.equal(p.q('.v3-eh h1').hidden, false);
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'River Valley 2';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(12);
+  assert.ok(p.transport.log.some(l => l.key === 'PATCH /v2/projects/p1' && l.outcome === 'mutation-refused'), 'rename uses the existing project PATCH');
+  assert.ok(p.q('.v3-eh-form'), 'refused save keeps the field open'); assert.equal(p.q('.v3-eh h1').textContent, 'River Valley');
+  assert.ok(p.q('.v3-eh-msg').textContent && p.q('.v3-eh-msg').textContent !== 'The name was not saved.', 'the server refusal reason is shown in the field (Bugbot 4108308764)');
+  await p.go('#assessment/a2/prepare');
+  assert.equal(p.text('[role=main].content .v3-eh h1'), 'Spring baseline'); assert.equal(p.qa('[role=main].content [data-edit-heading]').length, 1);
+  assert.ok(p.q('#prepare-form')); assert.equal(p.q('#prepare-form input[name="name"]'), null, 'no name field in Prepare');
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(12);
+  assert.ok(p.transport.log.some(l => l.key === 'PATCH /v2/assessments/a2' && l.outcome === 'mutation-refused'));
+  assert.match(p.q('.v3-eh-form .v3-eh-msg').textContent, /Synthetic transport refuses/, 'refusal is shown at the field');
+  assert.equal(p.api.state.busy, false, 'busy cleared'); assert.equal(p.q('.v3-eh h1').textContent, 'Spring baseline');
+  assert.ok(p.q('#prepare-form button[type=submit]') && !p.q('#prepare-form button[type=submit]').disabled, 'Prepare save enabled again');
+  for (const [identity, project, assessment] of [['member', 0, 1], ['viewer', 0, 0]]) {
+    const v = await bootPage(identity, '#project/p1');
+    assert.equal(v.text('[role=main].content h1'), 'River Valley', identity); assert.equal(v.qa('[data-edit-heading]').length, project, identity + ' project');
+    await v.go('#assessment/a2/prepare');
+    assert.equal(v.qa('[data-edit-heading]').length, assessment, identity + ' assessment');
+  }
+});
+test('B07: assessment heading rename disables other writes in place, keeps unsaved drafts, and re-syncs only the shell', async () => {
+  let release; const held = new Promise(r => { release = r; });
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { await held; return { ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => ({ ok: true, result: { assessment: { id: 'a2', name: 'Spring review' } } }), text: async () => '' }; }
+    return base(u, init); }; } });
+  p.q('#prepare-form textarea[name="purpose"]').value = 'unsaved draft';
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  assert.equal(p.api.state.busy, false, 'shared busy flag untouched'); assert.equal(p.q('#prepare-form button[type=submit]').disabled, true, 'other writes visibly disabled while saving');
+  release(); await tick(12);
+  assert.equal(p.api.state.busy, false); assert.equal(p.q('#prepare-form button[type=submit]').disabled, false);
+  assert.equal(p.q('#prepare-form textarea[name="purpose"]').value, 'unsaved draft', 'draft survives the rename');
+  assert.equal(p.text('[role=main].content .v3-eh h1'), 'Spring review'); assert.equal(p.qa('[data-edit-heading]').length, 1); assert.equal(p.api.state.current.assessment.name, 'Spring review');
+  assert.equal(p.text('header.top nav.crumbs [aria-current="page"]'), 'Spring review', 'crumb follows the committed name');
+});
+test('B07: a view rebuilt while the rename is in flight settles like act(): refreshed, controls enabled', async () => {
+  let release; const held = new Promise(r => { release = r; });
+  const p = await bootPage('owner', '#assessment/a2/collect', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { await held; return { ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => ({ ok: true, result: { assessment: { id: 'a2', name: 'Spring review' } } }), text: async () => '' }; }
+    return base(u, init); }; } });
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  await p.go('#assessment/a2/prepare');
+  const gets = p.transport.log.filter(l => l.key === 'GET /v2/assessments/a2').length;
+  release(); await tick(16);
+  assert.equal(p.api.state.busy, false); assert.equal(p.q('#prepare-form button[type=submit]').disabled, false, 'remounted controls enabled after settle');
+  assert.ok(p.transport.log.filter(l => l.key === 'GET /v2/assessments/a2').length > gets, 'committed rename refreshes the rebuilt view');
+  assert.equal(p.qa('[data-edit-heading]').length, 1);
+});
+test('B07: a refused rename that settles after navigating to another assessment never repaints that page', async () => {
+  let release; const held = new Promise(r => { release = r; });
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { await held; return base(u, init); } return base(u, init); }; } });
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  await p.go('#assessment/a1/prepare');
+  p.q('#prepare-form textarea[name="purpose"]').value = 'draft on a1';
+  release(); await tick(16);
+  assert.equal(p.api.state.busy, false); assert.equal(p.api.state.current.assessment.id, 'a1');
+  assert.equal(p.q('#prepare-form textarea[name="purpose"]').value, 'draft on a1'); assert.equal(p.api.state.message, null, 'no refusal pinned on another assessment');
+  assert.equal(p.q('#prepare-form button[type=submit]').disabled, false, 'the other page keeps its write controls enabled'); assert.ok(p.qa('[data-stage]').every(b => !b.disabled));
+});
+test('B07: a Prepare save from a rebuilt view waits for the in-flight rename (no racing cap.assessment.update)', async () => {
+  let release; const held = new Promise(r => { release = r; }); const patches = []; let inflight = 0, maxInflight = 0;
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { patches.push(JSON.parse(init.body || '{}')); inflight++; maxInflight = Math.max(maxInflight, inflight); if (patches.length === 1) await held; inflight--;
+      return { ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => ({ ok: true, result: { assessment: { id: 'a2', name: 'Spring review' } } }), text: async () => '' }; }
+    return base(u, init); }; } });
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  await p.go('#assessment/a2/collect'); await p.go('#assessment/a2/prepare');
+  assert.equal(p.q('#prepare-form button[type=submit]').disabled, false, 'rebuilt view draws its controls normally');
+  p.q('#prepare-form textarea[name="purpose"]').value = 'p'; p.q('#prepare-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(8);
+  assert.equal(patches.length, 1, 'Prepare waits while the rename PATCH is in flight');
+  release(); await tick(24);
+  assert.equal(maxInflight, 1, 'never two assessment updates at once'); assert.ok('name' in patches[0]);
+  assert.equal(patches.length, 2, 'the waiting Prepare save runs after the rename, not dropped'); assert.deepEqual(patches[1], { purpose: 'p' });
+  assert.ok(!(p.api.state.message?.alert), 'no stale not-refreshed message');
+});
+test('B07: a write queued behind the rename is dropped when the identity resets meanwhile', async () => {
+  let release; const held = new Promise(r => { release = r; }); const patches = [];
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { patches.push(JSON.parse(init.body || '{}')); if (patches.length === 1) await held;
+      return { ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => ({ ok: true, result: { assessment: { id: 'a2', name: 'Spring review' } } }), text: async () => '' }; }
+    return base(u, init); }; } });
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  await p.go('#assessment/a2/collect'); await p.go('#assessment/a2/prepare');
+  p.q('#prepare-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  p.api.resetIdentity(); release(); await tick(24);
+  assert.equal(patches.length, 1, 'queued write not replayed onto a new identity');
+});
+test('B07: rename updates only the assessment crumb and title, even when another crumb has the same label', async () => {
+  let release; const held = new Promise(r => { release = r; });
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: (t, data) => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { await held; return { ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => ({ ok: true, result: { assessment: { id: 'a2', name: 'Renamed' } } }), text: async () => '' }; }
+    return base(u, init); }; } });
+  const proj = p.q('header.top nav.crumbs [data-crumb="project"]'); assert.ok(proj);
+  proj.textContent = 'Spring baseline'; // a same-label crumb at another level must not be rewritten
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Renamed';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); release(); await tick(12);
+  assert.equal(p.text('header.top nav.crumbs [data-crumb="assessment"]'), 'Renamed');
+  assert.equal(p.q('header.top nav.crumbs [data-crumb="project"]').textContent, 'Spring baseline', 'project crumb untouched');
+  assert.match(p.d.title, / · Renamed · 3D Review$/);
 });

@@ -22,6 +22,7 @@ import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
 import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor } from '/assess/v3-assessment.js';
+import { mountEditableHeading } from '/v3/components/editable-heading.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
 // if the module is absent; destroyed on any route change.
 const WIZARD_JS = '/v3/wizard.js', WIZARD_CSS = '/v3/wizard.css';
@@ -368,10 +369,10 @@ function lensRows(current) {
 }
 // View tabs (showcase `tabs()`): links between the five views of ONE assessment. Selecting a tab never calls set_stage.
 function viewTabs(a, current) { ensureStepperStyle(globalThis.document); const perm = (a.role === 'owner' || a.role === 'member') ? `<nav class="tabs view-tabs" aria-label="Assessment settings"><a href="${cards.routes.assessment(a.id, 'permissions')}" ${current === 'permissions' ? 'aria-current="page"' : ''}>Permissions</a></nav>` : ''; return v3StageStepper(a.stage, v => cards.routes.assessment(a.id, v)) + perm; } // ruling 12:28: stage tabs → shared Stepper (component: Stepper); permissions stays a separate link (lane 11 owns its placement)
-// Prepare view (showcase `prepareView()`): name + purpose, saved through cap.assessment.update (O/M); viewers read.
+// Prepare view (showcase `prepareView()`): purpose, saved through cap.assessment.update (O/M); viewers read. The name is the heading (B07).
 function prepareView(current) {
   const a = current.assessment, mayEdit = a.role === 'owner' || a.role === 'member';
-  const fields = `<label class="field">Assessment name<input name="name" maxlength="100" required value="${esc(a.name)}" ${mayEdit ? '' : 'readonly'}></label><label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>`;
+  const fields = `<label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>`;
   const form = mayEdit ? `<form id="prepare-form">${fields}<div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save preparation</button></div></form>` : `<div>${fields}<p class="small muted">Your role here is ${esc(a.role)}: preparation is read-only.</p></div>`;
   const i = PHASES.indexOf(a.stage), prev = PHASES[i - 1], next = PHASES[i + 1], n = activeSurveys(current).length;
   const move = mayEdit ? `<div class="actions">${prev ? `<button type="button" data-stage="${prev}" ${state.busy ? 'disabled' : ''}>← Back to ${title(prev)}</button>` : ''}${next ? `<button type="button" data-stage="${next}" ${state.busy ? 'disabled' : ''}>Move to ${title(next)} →</button>` : ''}</div>` : ''; // lane 9 L9-24: one primary on this view (Save preparation)
@@ -449,11 +450,51 @@ function bindPrepare(current) {
     act(aid, 'Moving stage…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/stage`, { method: 'POST', body: { stage: to } }); return `Stage is now ${stageLabel(r.assessment.stage)}.`; }); // refusal: act() shows the server error.message verbatim
   });
   const f = app.querySelector('#prepare-form'); if (!f) return;
-  f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f); act(current.assessment.id, 'Saving preparation…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(current.assessment.id)}`, { method: 'PATCH', body: { name: String(fd.get('name')).trim(), purpose: String(fd.get('purpose')).trim() } }); return `Saved: ${r.assessment.name}`; }); };
+  f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f); act(current.assessment.id, 'Saving preparation…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(current.assessment.id)}`, { method: 'PATCH', body: { purpose: String(fd.get('purpose')).trim() } }); return `Saved: ${r.assessment.name}`; }); };
+}
+// B07: the assessment name is the heading (shell's or page's); owners/members rename it in place through cap.assessment.update.
+let pendingRename = null; // { aid, done } while a heading rename PATCH is in flight
+function bindNameHeading(current) {
+  const a = current.assessment;
+  return mountEditableHeading((app.closest('[role=main]') || app).querySelector('h1'), { canEdit: a.role === 'owner' || a.role === 'member', label: 'assessment name',
+    // Write guards without the shared busy flag (Bugbot on #285): never starts during an act() write or over a dirty screen; while the
+    // PATCH runs, this view's other controls are disabled IN PLACE (no repaint, drafts survive) and re-enabled only if still on screen.
+    // act() on this assessment waits for the rename to settle (pendingRename), so two cap.assessment.update writes never race.
+    // A view rebuilt meanwhile draws normally and, if it shows this assessment, settles like act(): refresh on commit, aid-scoped
+    // message on refusal. Other pages are untouched.
+    save: async name => {
+      if (state.busy || pendingRename) return false;
+      if (state.dirty.has(a.id)) throw new Error(state.dirty.get(a.id) === 'write' ? 'Your last change is saved but this screen is not refreshed yet. Refresh before making more changes.' : 'This assessment changed on the server. Refresh before making changes.');
+      const identity = identityGeneration, view = app.firstElementChild, held = [...app.querySelectorAll('button:not([disabled])')].filter(b => !b.closest('.v3-eh'));
+      held.forEach(b => { b.disabled = true; });
+      let settle; const mine = pendingRename = { aid: a.id, done: new Promise(res => { settle = res; }) };
+      let r, failed = null;
+      try { r = await api(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); } catch (e) { failed = redact(e.message); }
+      held.forEach(b => { if (b.isConnected) b.disabled = false; });
+      if (pendingRename === mine) pendingRename = null;
+      try {
+        if (identity !== identityGeneration) return false;
+        const intact = !!view?.isConnected && held.every(b => b.isConnected);
+        const here = route(location.hash), onThis = (here.kind === 'assessment' || here.kind === 'survey') && here.id === a.id && state.current?.assessment.id === a.id;
+        if (failed) { if (!intact && onThis && !state.busy) { state.message = { aid: a.id, text: failed, alert: true }; paint(); } throw new Error(failed); }
+        const next = String(r?.assessment?.name ?? name), old = state.current?.assessment.name;
+        const listed = state.lists.get(a.project_id)?.list?.find?.(x => x.id === a.id); if (listed) listed.name = next;
+        if (state.current?.assessment.id !== a.id) return;
+        state.current.assessment.name = next;
+        if (!intact) { if (onThis) { state.dirty.set(a.id, 'write'); if (!state.busy) await render(); } return; } // refreshed BEFORE settle(): a waiting act() then runs on a clean screen
+        const parts = document.title.split(' · '); if (parts.length === 3 && parts[1] === old) document.title = [parts[0], next, parts[2]].join(' · '); // paint()'s `<tab> · <name> · 3D Review`, by position
+        // No shell re-sync here: a kit update empties the content mount (drafts). The component sets the heading; the assessment crumb and title follow in place.
+        if (kit) document.querySelectorAll('header.top nav.crumbs [data-crumb="assessment"]').forEach(el => { el.textContent = next; }); // by level, never by label text
+      } finally { settle(); }
+    } });
 }
 // Transition: write → (committed ⇒ dirty) → refresh → (landed ⇒ clean). Every outcome is scoped to `aid`, never to
 // whatever is on screen when the promise settles (Bugbot 4040525117 / 4040525128).
 async function act(aid, label, fn) {
+  if (pendingRename?.aid === aid) { // B07: never race the heading rename's PATCH; a queued write survives only the same identity on the same assessment
+    const identity0 = identityGeneration; await pendingRename.done;
+    const here = route(location.hash); if (identity0 !== identityGeneration || !((here.kind === 'assessment' || here.kind === 'survey') && here.id === aid)) return;
+  }
   if (state.busy) return;
   if (state.dirty.has(aid)) { state.message = { aid, text: state.dirty.get(aid) === 'write' ? 'Your last change is saved but this screen is not refreshed yet. Refresh before making more changes.' : 'This assessment changed on the server. Refresh before making changes.', alert: true }; paint(); return; } // never silent (MED 4040990777)
   const identity = identityGeneration;
@@ -657,7 +698,7 @@ function paint(r = route(location.hash), gen = generation) {
     const tab = r.view || recalledTab(tabStorage, a0.id, VIEWS.includes(a0.stage) ? a0.stage : 'prepare');
     if (r.view) rememberTab(tabStorage, a0.id, r.view);
     app.innerHTML = ctxPanel + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') { bindCollectLinks(state.current); loadCounts(state.current); }
-    bindPrepare(state.current); mountView(state.current, tab, gen);
+    bindPrepare(state.current); bindNameHeading(state.current); mountView(state.current, tab, gen);
     document.title = `${title(tab)} · ${state.current.assessment.name} · 3D Review`;
   }
 }
@@ -688,6 +729,7 @@ function scrubCredentialHash() {
 }
 function resetIdentity() {
   identityGeneration += 1; generation += 1; epoch += 1;
+  pendingRename = null; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
   accountBusy = false; accountControls(false); accountStatus();
   document.getElementById('account-switch-dialog')?.close();
   state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
