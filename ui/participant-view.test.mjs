@@ -60,11 +60,14 @@ test('v3 L1-8: welcome and pager follow prototype frames 8/9 (eyebrow, title, fu
   const root=new Node(),form=new Node(),questions=new Node(),review=new Node();review.type='submit';form.contains=n=>n===review;
   questions.children=[new Node(),new Node(),new Node()];questions.children.forEach((f,i)=>f.dataset.item='q'+i);
   const doc={createElement:()=>new Node(),defaultView:{FormData}};
-  const c=mountParticipantView({doc,root,form,questions,reviewAnswers:new Node(),model:{assessment:'Mark review',language:'Tok Pisin',items:[0,1,2].map(i=>({id:'q'+i,type:'text',required:false})),template:{perspective:'Church'}},reviewButton:review});
+  const c=mountParticipantView({doc,root,form,questions,reviewAnswers:new Node(),model:{assessment:'Mark review',language:'Tok Pisin',project:'Hill Project',purpose:'Mark 1–4',format:'Audio',period:null,items:[0,1,2].map(i=>({id:'q'+i,type:'text',required:false})),template:{perspective:'Church'}},reviewButton:review});
   const intro=root.children[0];const texts=intro.children.map(n=>n.textContent);
   assert.equal(texts[0],'Church · Mark review');
   assert.ok(texts.includes('We would like your perspective'));
   assert.ok(texts.some(t=>t.includes('Tok Pisin translation')));
+  // Bincy B10: the shared context step 3 lists, once, in one compact line (empty fields skipped).
+  assert.equal(intro.children.filter(n=>n.className.includes('participant-context')).length,1);
+  assert.ok(texts.includes('Hill Project · Tok Pisin · Mark 1–4 · Audio'));
   const start=intro.children.find(n=>n.textContent==='Start');assert.ok(start);assert.match(start.className,/primary/);
   assert.ok(!texts.includes('Begin'));
   start.listeners.click();
