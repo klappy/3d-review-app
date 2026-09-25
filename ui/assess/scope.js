@@ -6,6 +6,7 @@
 // v3 lane 9 L9-1: projects page = home per Bincy screen 02 (relative import so node tests resolve it too).
 import { homeView } from '../v3/home.js';
 import { learnMore } from '../v3/components/learn-more.js';
+import { mountEditableHeading } from '../v3/components/editable-heading.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -335,7 +336,7 @@ const project = {
   },
   render(ctx, model) {
     const g = gate(ctx, model, { href: ctx.routes.projects, label: 'All projects' }); if (g) return g;
-    const p = model.project, edit = CAN_EDIT.has(p.role), owner = p.role === 'owner';
+    const p = model.project, edit = CAN_EDIT.has(p.role);
     const active = model.languages.filter(l => !l.archived_at);
     const langName = new Map(model.languages.map(l => [l.id, l.name]));
     const cards = model.assessments.map(a => ctx.cards.assessmentCard({ ...a, language_name: langName.get(a.language_id) || a.language_name }));
@@ -346,7 +347,6 @@ const project = {
     const langList = model.languages.length ? `<div class="links">${model.languages.map(l => `<p class="small">${ctx.esc(l.name)}${l.code ? ` <span class="muted">(${ctx.esc(l.code)})</span>` : ''}${l.archived_at ? ' <span class="badge">Archived</span>' : ''}</p>`).join('')}</div>` : '<p class="muted">No languages yet.</p>';
     const addLang = edit ? `<form id="add-language" class="line"><label class="field">Language name<input name="name" maxlength="100" required placeholder="For example, Lake language"></label><label class="field">Code (optional, BCP-47 shaped; qaa–qtz for an invented language)<input name="code" maxlength="20" pattern="[a-z]{2,3}(-[A-Za-z0-9]{1,8})*"></label><div class="actions"><button class="primary" type="submit">Add language</button></div></form>` : '';
     const create = edit ? `<section class="panel"><p class="eyebrow">Prepare</p><h2>Create an assessment</h2>${active.length ? `<form id="create-assessment"><label class="field">Assessment name<input name="name" maxlength="100" required placeholder="For example, September review"></label><label class="field">Language<select name="language_id" required>${active.map(l => `<option value="${ctx.esc(l.id)}">${ctx.esc(l.name)}${l.code ? ` (${ctx.esc(l.code)})` : ''}</option>`).join('')}</select></label><div class="actions"><button class="primary" type="submit">Create & prepare</button></div></form>` : '<p class="muted">Add a language first; every assessment names its target language.</p>'}</section>` : '';
-    const rename = owner ? `<section class="panel"><h2>Rename</h2><form id="rename-form"><label class="field">Project name<input name="name" maxlength="100" required value="${ctx.esc(p.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
     // Lane 11 (LANES.md claim 11:19): retained surfaces (cookbook design-system-v3 PARITY.md, ADOPTION item 7) reachable from project
     // settings. Links only, to the existing screens; no new capability, contract unchanged. Access codes (C3) live on the legacy facilitator page.
     const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue paper codes for one survey and release them once to print (choose the assessment and survey there)', href: '/legacy/#facilitator', label: 'Open access codes' },
@@ -358,7 +358,7 @@ const project = {
     const assessmentsRead = r.assessments.status === 'ready' ? kitGrid(ctx, r.assessments.items, 'No assessments yet.') : assessmentsBlock;
     const languagesRead = r.languages.status === 'ready' ? langList : r.languages.status === 'refused' ? '<p class="muted">Languages are not visible to you here.</p>' : r.languages.status === 'unauthenticated' ? `<p class="muted">Your session has ended. <a href="${ctx.routes.entry}">Sign in</a></p>` : '<p class="muted" role="alert">Languages could not be loaded. <button type="button" class="quiet" data-act="retry">Retry</button></p>';
     return pageBack(ctx, ctx.routes.projects, 'All projects') + readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/projects/${ctx.enc(p.id)}">Permissions</a>`)}${p.organization ? `<p class="muted small">${ctx.esc(p.organization)}</p>` : ''}<h3>Assessments</h3>${assessmentsRead}<aside class="glass panel" style="margin-top:22px"><h3>Languages</h3>${languagesRead}</aside>`)
-      + actionRegion(`${edit ? START_REVIEW : ''}${rename}${settings}${edit ? `<details class="panel more-tools" id="project-more"><summary>More</summary>${create}<section class="panel"><h2>Languages</h2>${addLang}</section></details>` : ''}`);
+      + actionRegion(`${edit ? START_REVIEW : ''}${settings}${edit ? `<details class="panel more-tools" id="project-more"><summary>More</summary>${create}<section class="panel"><h2>Languages</h2>${addLang}</section></details>` : ''}`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, project, model);
@@ -378,12 +378,14 @@ const project = {
       if (r?.assessment?.id) ctx.go(ctx.routes.assessment(r.assessment.id));
       else if (r) ctx.note('Created, but the server returned no assessment id.', true);
     });
-    root.querySelector('#rename-form')?.addEventListener('submit', async ev => {
-      ev.preventDefault();
-      const form = ev.target;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Rename', () => ctx.api(`/v2/projects/${ctx.enc(id)}`, { method: 'PATCH', body: { name: val(form, 'name') } }));
-      if (r) { ctx.note('Renamed.'); await reload(); }
-    });
+    // B07: the project name is the heading (kit shell's or the page's own); owners rename it in place — no rename card.
+    const heading = (root.closest?.('[role=main]') || root).querySelector?.('h1');
+    mountEditableHeading(heading, { canEdit: model.project?.role === 'owner', label: 'project name', save: async name => {
+      const r = await write(ctx, null, 'Rename', () => ctx.api(`/v2/projects/${ctx.enc(id)}`, { method: 'PATCH', body: { name } }));
+      if (!r) return false;
+      const cached = ctx.state?.projects?.find?.(x => x.id === id); if (cached) cached.name = r.project?.name || name; // shell title + crumbs read this cache
+      ctx.note('Renamed.'); await reload();
+    } });
   },
 };
 

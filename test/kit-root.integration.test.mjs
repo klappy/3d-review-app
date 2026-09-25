@@ -18,7 +18,10 @@ import * as share from '../ui/assess/share.js';
 import { feedback } from '../ui/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '../ui/kit/app-adapter.js';
 import * as v3 from '../ui/v3-shell.js';
-import { v3StagePrimary } from '../ui/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle } from '../ui/assess/v3-assessment.js';
+import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
+import { sidebarTree } from '../ui/v3/components/sidebar-tree.js';
+import { mountEditableHeading } from '../ui/v3/components/editable-heading.js';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const HTML = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
@@ -42,7 +45,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, breadcrumbs, sidebarTree, mountEditableHeading }); // v3 shell imports (assess.js lines 15–16); #190
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -86,7 +89,7 @@ test('journey: Workspaces → workspace → project (two distinct assessments, l
   assert.equal(items.length, 2);
   assert.ok(items[0].textContent.includes('September assessment') && items[0].textContent.includes('Collecting') && items[0].textContent.includes('Lake language'));
   assert.ok(items[1].textContent.includes('Spring baseline') && items[1].textContent.includes('In preparation'));
-  assert.ok(p.q('[data-action-region] #create-assessment')); assert.ok(p.q('[data-action-region] #add-language')); assert.ok(p.q('[data-action-region] #rename-form'));
+  assert.ok(p.q('[data-action-region] #create-assessment')); assert.ok(p.q('[data-action-region] #add-language')); assert.ok(p.q('[role=main].content .v3-eh [data-edit-heading]'), 'B07: rename lives on the heading');
   assert.deepEqual(treeLabels(p).filter(l => /September|Spring/.test(l)), ['September assessment', 'Spring baseline'], 'tree shows both assessments under the project from loaded data');
   const projectContent = p.api.app;
   await p.go('#assessment/a1');
@@ -221,7 +224,7 @@ test('F3: viewer-only identity shows no synthesized role; scope role appears onl
 });
 
 test('role contract end-to-end: Owner/Member/Viewer each display as themselves at project p1; write regions follow the real controller permission', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: #195' }, async () => {
-  for (const [identity, label, forms] of [['owner', 'Owner', ['create-assessment', 'rename-form', 'add-language']], ['member', 'Member', ['create-assessment', 'add-language']], ['viewer', 'Viewer', []]]) {
+  for (const [identity, label, forms] of [['owner', 'Owner', ['create-assessment', 'add-language']], ['member', 'Member', ['create-assessment', 'add-language']], ['viewer', 'Viewer', []]]) {
     const p = await bootPage(identity, '#project/p1');
     assert.equal(p.text('header.top nav.crumbs .tree-role'), label, identity);
     assert.equal(p.text('#who'), 'Account: synthetic-' + identity + '@example.invalid', identity + ' identity is the email, not a role');
@@ -352,4 +355,32 @@ test('demo write refusal is unchanged: the existing create form submits into the
   for (const hash of ['#workspace/demo-workspace', '#project/demo-project']) { await p.go(hash); assert.equal(p.q('[data-action-region]'), null, `${hash}: demo viewer role sees no scoped write controls`); assert.equal(disclosure(p).length, 1); }
   await assert.rejects(() => demo.demoApi('/v2/workspaces', { method: 'POST', body: { name: 'Nope' } }), /demonstration/i);
   assert.deepEqual(p.served().filter(k => k !== 'GET /v2/health'), []);
+});
+
+// ---- B07 (Bincy F04): the name is the heading with a modest edit control; no rename card, no name field in Prepare ----
+test('B07: project and assessment names are the heading with an edit control for writers only; the synthetic transport refuses the save and the field stays open', async () => {
+  const p = await bootPage('owner', '#project/p1');
+  assert.equal(p.text('[role=main].content .v3-eh h1'), 'River Valley');
+  assert.equal(p.qa('[role=main].content [data-edit-heading]').length, 1); assert.equal(p.q('#rename-form'), null);
+  assert.ok(!/Save name/.test(p.d.body.textContent));
+  p.q('[data-edit-heading]').click();
+  const form = p.q('.v3-eh-form'); assert.ok(form); assert.equal(form.querySelector('input').value, 'River Valley'); assert.equal(p.q('.v3-eh h1').hidden, true);
+  form.querySelector('[data-cancel]').click(); assert.equal(p.q('.v3-eh-form'), null); assert.equal(p.q('.v3-eh h1').hidden, false);
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'River Valley 2';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(12);
+  assert.ok(p.transport.log.some(l => l.key === 'PATCH /v2/projects/p1' && l.outcome === 'mutation-refused'), 'rename uses the existing project PATCH');
+  assert.ok(p.q('.v3-eh-form'), 'refused save keeps the field open'); assert.equal(p.q('.v3-eh h1').textContent, 'River Valley');
+  await p.go('#assessment/a2/prepare');
+  assert.equal(p.text('[role=main].content .v3-eh h1'), 'Spring baseline'); assert.equal(p.qa('[role=main].content [data-edit-heading]').length, 1);
+  assert.ok(p.q('#prepare-form')); assert.equal(p.q('#prepare-form input[name="name"]'), null, 'no name field in Prepare');
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(12);
+  assert.ok(p.transport.log.some(l => l.key === 'PATCH /v2/assessments/a2' && l.outcome === 'mutation-refused'));
+  assert.ok(p.q('.v3-eh-form .v3-eh-msg').textContent.length > 0, 'refusal is shown at the field');
+  for (const [identity, project, assessment] of [['member', 0, 1], ['viewer', 0, 0]]) {
+    const v = await bootPage(identity, '#project/p1');
+    assert.equal(v.text('[role=main].content h1'), 'River Valley', identity); assert.equal(v.qa('[data-edit-heading]').length, project, identity + ' project');
+    await v.go('#assessment/a2/prepare');
+    assert.equal(v.qa('[data-edit-heading]').length, assessment, identity + ' assessment');
+  }
 });

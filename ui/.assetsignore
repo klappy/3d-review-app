@@ -63,3 +63,4 @@ assess/breadcrumbs-mount.test.mjs
 assess/sidebar-mount.test.mjs
 v3/components/review-gate.test.mjs
 v3/components/card.test.mjs
+v3/components/editable-heading.test.mjs
