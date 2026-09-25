@@ -623,7 +623,9 @@ async function signOut(switchAccount = false) {
       // The provider request may already have taken effect; only its continuation can be suppressed.
       try { await fetch('/cdn-cgi/access/logout', { credentials: 'same-origin', redirect: 'manual', cache: 'no-store' }); } catch {}
       if (signedOutIdentity !== identityGeneration || signedOutCredential !== token) return;
-      location.assign('https://klappy.cloudflareaccess.com/cdn-cgi/access/logout'); return;
+      // B38: with email links on, another account = request a link for another email (the Access cookie is cleared above).
+      // Off (production): the Access team-domain logout, unchanged — otherwise the live Access session signs A back in.
+      location.assign(state.emailLinks === true ? '/v2/auth/email' : 'https://klappy.cloudflareaccess.com/cdn-cgi/access/logout'); return;
     }
     history.replaceState(null, '', location.pathname + '#');
     listen(); await render();
@@ -756,10 +758,31 @@ if (typeof matchMedia === 'function') matchMedia('(max-width:650px)').addEventLi
 function clearPageNote() { if (!note || state.busy) return; note.textContent = ''; note.classList.remove('alert'); }
 let listening = false;
 function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } clearPageNote(); render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
+// B38: does this environment use email sign-in links (DEV) or Cloudflare Access (production)? Asked once; remembered only on
+// an answer (2 s timeout; a timeout or failure leaves it unknown). Unknown or off → the Access sign-in button and the team-domain logout stay exactly as before.
+async function loadEmailLinks() {
+  if (demo || typeof state.emailLinks === 'boolean') return state.emailLinks === true;
+  try { const r = await fetch('/v2/auth/email?probe', { headers: { accept: 'application/json' }, credentials: 'same-origin', redirect: 'error', cache: 'no-store', ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(2000) } : {}) }); if (r.ok) { const v = await r.json(); state.emailLinks = v?.email_links === true; if (state.emailLinks) emailLinksCopy(); } } catch {}
+  return state.emailLinks === true;
+}
+// B38, email links ON only: the markup and every Sign-in href stay byte-identical to production (/v2/auth/access, Access
+// copy); this environment re-points them at run time. Plain left clicks on an Access sign-in link go to the email sign-in
+// page instead, and the account-switch dialog gets the email-link copy. Off → nothing here runs.
+function emailLinksCopy() {
+  const dialog = document.getElementById('account-switch-dialog');
+  const paras = dialog?.querySelectorAll?.('p');
+  if (paras?.length) { paras[0].textContent = 'You will be signed out here, then asked for the email address of the other account. We email it a sign-in link.'; for (const p of [...paras].slice(1)) p.remove(); }
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('click', ev => {
+  if (state.emailLinks !== true || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+  const a = ev.target?.closest?.('a[href="/v2/auth/access"]'); if (!a) return;
+  ev.preventDefault(); location.assign('/v2/auth/email');
+});
 async function boot() {
   if (scrubCredentialHash() === 'forwarded') return; // 'session' falls through: identity is observed fresh below
   placeDemoNotice();
   const identity = identityGeneration;
+  const linksKnown = loadEmailLinks();
   try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; }
   catch {
     if (identity !== identityGeneration) return;
@@ -768,7 +791,7 @@ async function boot() {
     accountControls(false); accountStatus();
     listen();
     if (route(location.hash).kind === 'invite') { who.textContent = 'Not signed in'; app.className = ''; syncShell(); mountInvitePage(generation); return; }
-    if (route(location.hash).kind === 'entry') { who.textContent = 'Not signed in'; app.className = ''; syncShell(); await render(); return; }
+    if (route(location.hash).kind === 'entry') { await linksKnown; if (identity !== identityGeneration) return; who.textContent = 'Not signed in'; app.className = ''; syncShell(); await render(); return; }
     // Real sign-in only (captain: synthetic-only sign-in rejected). /v2/auth/access is the existing Cloudflare email-code
     // route; it sets the session cookie and returns to the workspace home (/#session=…), not here — stated, not hidden.
     who.textContent = 'Not signed in'; app.className = ''; syncShell();

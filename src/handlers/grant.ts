@@ -1,5 +1,6 @@
 // cap.grant.* — invitations and grants at exactly one scope. D3: members invite ≤ member; owners are never removed or demoted;
 // the last owner is protected; transfer is dangerous. No inheritance (D2). Existence never leaks. Lane B (Fable) — owner per #14 c5704577820.
+import { magicLinkEnabled } from "../magic-link";
 import type { Ctx, Handler, Role, ScopeType } from "./types";
 import { CapError, notVisible } from "./errors";
 import { ROLE_RANK, atLeast, countScalar, gate, newId, nowIso, randomToken, reqRole, reqScope, reqStr, roleAt, sha256 } from "./common";
@@ -107,7 +108,7 @@ export const invite: Handler = async (ctx, p, o) => {
   // No PUBLIC_ORIGIN → no link can be built → nothing may be sent. One send attempt per call, never retried.
   let delivery: MailResult = { delivered: false, state: "not_sent", reason: "not_configured" };
   if (origin) {
-    const msg = invitationMessage(origin, token, role, scope.type, INVITE_TTL_S / 86400);
+    const msg = invitationMessage(origin, token, role, scope.type, INVITE_TTL_S / 86400, magicLinkEnabled(ctx.env));
     delivery = await sendMail(env, { to: email, subject: msg.subject, text: msg.text, html: msg.html, idempotencyKey: `invite/${id}` });
   }
   // The row says 'sent' only when the provider accepted, and 'unconfirmed' when we cannot tell (the mail MAY have gone out).
