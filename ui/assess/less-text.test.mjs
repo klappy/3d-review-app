@@ -70,7 +70,12 @@ test('L9-24 admin (permissions): heading + one note; the legacy-acceptance expla
   const h = permissions.render({ esc }, m);
   const body = lessText(h, 'permissions', /<h2\b/g);
   assert.match(body, /Accepting an invitation happens from the mailed link/);
-  assert.match(upFront(h), /Destructive: it cannot be undone from here\./, 'the transfer warning stays up front');
+  assert.match(body, /An invitation sends an email\. Nothing is sent until you confirm\./, 'B30: the invitation note moved, not removed');
+  // B30 (less text 3): transfer is a closed disclosure; opened, its first line is the destructive warning, before the form fields.
+  const tr = h.match(/<details class="line" data-transfer><summary>Transfer ownership<\/summary><form data-transfer-form><p class="small muted">([^<]*)<\/p>/);
+  assert.ok(tr, 'transfer behind its own closed disclosure'); assert.equal(tr[1], 'Destructive: it cannot be undone from here.');
+  assert.doesNotMatch(upFront(h), /Transfer ownership|principal id/, 'no transfer form up front');
+  assert.match(permissions.render({ esc }, { ...m, transferOpen: true }), /<details class="line" data-transfer open>/, 'stays open across repaints');
 });
 
 // Real render of the assessment page (head + Prepare view): assess.js runs in a headless vm with its real imports, as
@@ -83,7 +88,7 @@ async function assessPage() {
     document: new JSDOM('<!doctype html><head></head><body></body>').window.document, location: { hash: '', pathname: '/' }, history: { replaceState() {} }, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} }, localStorage: { getItem: () => null, setItem() {} }, matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }), addEventListener() {}, setTimeout, clearTimeout, console, URL, URLSearchParams };
   box.globalThis = box;
   const api = vm.runInNewContext(source + '\n({screen,state})', box);
-  return (role, stage = 'prepare', view = 'prepare') => { api.state.projects = [{ id: 'p1', name: 'Coast' }];
+  return (role, stage = 'prepare', view = 'prepare', projects = [{ id: 'p1', name: 'Coast' }]) => { api.state.projects = projects;
     return api.screen({ assessment: { id: 'a1', name: 'Oct', project_id: 'p1', role, stage, language_id: 'lang1', period: '2026' }, surveys: [{ id: 's1', state: 'selected' }, { id: 's2', state: 'selected' }] }, view); };
 }
 
@@ -99,7 +104,8 @@ test('L9-24 assessment page, Prepare view (validator #282): one view heading, no
     const lines = count(upFront(view).replace(/<form[\s\S]*?<\/form>/, ''), /<p class="(?:small )?muted"/g);
     assert.ok(lines <= 1, `${name}: at most one line up front (got ${lines})`);
     const more = [...view.matchAll(closed)].map(x => x[0]).join('');
-    for (const moved of ["The stage is the assessment's own state.", 'Language: lang1', 'Period: 2026']) assert.ok(more.includes(moved), `${name}: moved, not removed: ${moved}`);
+    for (const moved of ["The stage is the assessment's own state.", 'Period: 2026']) assert.ok(more.includes(moved), `${name}: moved, not removed: ${moved}`);
+    assert.doesNotMatch(h, /lang1|p1 ·/, `${name}: B31 no raw language or project id`);
     if (role !== 'viewer') assert.match(more, /Moving into Collect opens collection; moving out of Collect closes it — for all 2 included surveys\./);
   }
   const viewerNext = page('viewer', 'improve', 'improve');
@@ -121,4 +127,35 @@ test('L9-24 Understand (validator #282): a results error and its Retry stay up f
   assert.match(v, /data-v3-bands="provisional"/, 'band panel shown');
   assert.match(v, /data-results>[\s\S]*Results could not be loaded\. <a href="#" data-retry="results">Retry<\/a>/, 'error + Retry visible, not behind Learn more');
   assert.ok(h.indexOf(LM) > -1 && h.indexOf('Counts are per survey.') > h.indexOf(LM), 'counts still behind Learn more');
+});
+
+// B30 + B31 (lane 9, less text 3 — lanes-1611): Collect has ONE heading; the survey set sits in a closed "Change surveys"
+// disclosure (open only when nothing is included); the counting note is behind Learn more; no raw ids in the head.
+test('B30 Collect: one heading, one primary at most, survey set + notes behind closed disclosures', async () => {
+  const page = await assessPage();
+  for (const role of ['owner', 'viewer']) {
+    const h = page(role, 'collect', 'collect'), name = `collect ${role}`;
+    const view = h.slice(h.indexOf('<div class="stack">')); assert.ok(view.length > 20, name + ': view rendered');
+    assert.equal(count(upFront(view), /<h[12]\b/g), 1, name + ': one heading');
+    assert.match(upFront(view), /<h2>Collect perspectives<\/h2>/);
+    assert.doesNotMatch(view, /Three lenses|<aside\b/, name + ': no second heading, no aside');
+    assert.ok(count(upFront(view), /class="(?:[^"]* )?primary(?: [^"]*)?"/g) <= 1, name + ': at most one primary in the view');
+    assert.match(view, /<details class="panel survey-set" data-survey-set><summary>/, name + ': survey set closed by default');
+    const more = [...view.matchAll(closed)].map(x => x[0]).join('');
+    for (const moved of ['Respondents are counted per survey and are never added up as people.', 'Including a survey while the stage is Collect opens collection at once.']) assert.ok(more.includes(moved), `${name}: moved, not removed: ${moved}`);
+    assert.match(view, /<p class="status"/, name + ': the outcome line stays outside the disclosure');
+  }
+});
+test('B31 head: the role line shows the project name or nothing — never the raw project id', async () => {
+  const page = await assessPage();
+  assert.match(page('viewer', 'collect', 'prepare'), /Coast · your role: viewer/);
+  const h = page('viewer', 'collect', 'prepare', []);
+  assert.doesNotMatch(h, /p1 ·|proj_/); assert.match(h, />your role: viewer</);
+});
+test('B30 About: one heading, one short line, one primary; the explanation and the three facts behind Learn more', async () => {
+  const h = pages.entry.render({ esc, cards: await import('./cards.js'), state: {} }, { mode: 'about' });
+  const body = lessText(h, 'about', /<h[12]\b/g);
+  assert.equal(count(upFront(h), /<p class="muted lead">/g), 1);
+  const line = upFront(h).match(/<p class="muted lead">([^<]*)<\/p>/)[1]; assert.equal(sentences(line), 1, 'one sentence');
+  for (const moved of ['A facilitator sets up a review.', 'Who it is for', 'When to use it', 'How often']) assert.ok(body.includes(moved), `moved, not removed: ${moved}`);
 });
