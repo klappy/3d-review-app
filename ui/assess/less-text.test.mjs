@@ -150,7 +150,7 @@ test('B31 head: the role line shows the project name or nothing — never the ra
   const page = await assessPage();
   assert.match(page('viewer', 'collect', 'prepare'), /Coast · your role: viewer/);
   const h = page('viewer', 'collect', 'prepare', []);
-  assert.doesNotMatch(h, /p1 ·|proj_/); assert.match(h, />your role: viewer</);
+  assert.doesNotMatch(h, /p1 ·|proj_/); assert.match(h, />Your role: viewer</);
 });
 test('B30 About: one heading, one short line, one primary; the explanation and the three facts behind Learn more', async () => {
   // no card headings, even hidden: one heading per screen
@@ -160,4 +160,29 @@ test('B30 About: one heading, one short line, one primary; the explanation and t
   const line = upFront(h).match(/<p class="muted lead">([^<]*)<\/p>/)[1]; assert.equal(sentences(line), 1, 'one sentence');
   for (const moved of ['A facilitator sets up a review.', 'Who it is for', 'When to use it', 'How often']) assert.ok(body.includes(moved), `moved, not removed: ${moved}`);
   assert.equal(count(h, /<h[1-6]\b/g), 1, 'one heading in the whole page, disclosures included');
+});
+
+// Validator FAIL on #292 @2b81817 (lanes-1611): Permissions kept two lines + three headings; notices showed ids and ISO stamps;
+// About showed the shell h1 next to its own.
+test('B30 Permissions (owner + viewer): one heading, one line up front; the names note + section labels are not headings', () => {
+  const grants = [{ id: 'g1', principal_id: 'me', role: 'owner' }, { id: 'g2', principal_id: 'usr_x', role: 'viewer' }];
+  const pending = [{ id: 'inv_1', role: 'viewer', status: 'pending', created_at: '2026-09-25T20:40:12.345Z' }];
+  const m = { scope: 'assessments', id: 'a1', status: 'loaded', grants, pending, me: 'me', myEmail: '', myRole: 'owner', receipts: { g2: { receipt: 'rcpt_9', trace: 'tr_9' } }, notice: 'Invitation sent.', noticeRef: 'receipt rcpt_1 · trace tr_1' };
+  for (const [name, h] of [['owner', permissions.render({ esc }, m)], ['viewer', permissions.render({ esc }, { ...m, status: 'forbidden', myRole: 'viewer', notice: '' , noticeRef: '' })]]) {
+    const v = upFront(h);
+    assert.equal(count(v, /<h[1-6]\b/g), 1, `${name}: one heading`);
+    assert.equal(count(v.replace(/<form[\s\S]*?<\/form>/g, '').replace(/<ul[\s\S]*?<\/ul>/g, '').replace(/<table[\s\S]*?<\/table>/g, ''), /<p class="(?:note small|muted|small muted)"(?! role="status")/g), 1, `${name}: one line up front (the outcome notice is not counted)`);
+    assert.doesNotMatch(v.replace(/<[^>]+>/g, " "), /Names and emails|rcpt_|tr_\d|inv_|usr_|\d{4}-\d\d-\d\dT/, `${name}: no ids, no ISO stamps, names note behind Learn more`);
+  }
+  const h = permissions.render({ esc }, m);
+  assert.match(h, /<details class="small learn-more"><summary>Learn more<\/summary><p class="small muted" data-member-note>Names and emails/, 'names note moved, not removed');
+  assert.match(h, /data-permissions-ref>receipt rcpt_1 · trace tr_1/, 'receipt kept behind Details');
+  assert.match(h, /viewer · pending · invited [A-Z0-9][^<T]*2026/, 'human date'); assert.doesNotMatch(h, /2026-09-25T/, 'never the ISO stamp');
+  assert.doesNotMatch(h, /<h3\b/, 'section labels, not headings');
+});
+test('B30 shell: a page with its own h1 hides the shell h1 (shared kit rule, not an About patch)', () => {
+  const css = readFileSync(new URL('../kit/kit.css', import.meta.url), 'utf8');
+  assert.match(css, /\.rv \.content:has\(> \[data-content\] h1\) > \.row > h1\{display:none\}/);
+  const tree = readFileSync(new URL('../kit/tree.js', import.meta.url), 'utf8');
+  assert.match(tree, /<div class="content" role="main" tabindex="-1"><div class="eyebrow">'\+esc\(model\.eyebrow \|\| ''\)\+'<\/div><div class="row" style="justify-content:space-between"><h1>/, 'the rule matches the shell markup');
 });

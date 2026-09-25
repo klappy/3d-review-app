@@ -1,6 +1,8 @@
 // Reusable entity cards — same markup for browser pages and MCP-rendered summaries (cookbook #16 mandate: reusable cards).
 // Pure functions: HTML strings only, no fetch, no DOM. Every text value passes through esc().
 export const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Shared human date (was views.js): "Sep 25, 2026, 4:18 PM"; a non-date is shown as given. Never a raw ISO stamp on screen (B31).
+export function humanDate(iso) { const d = new Date(iso); return isNaN(d) ? String(iso || '') : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
 export const enc = v => encodeURIComponent(String(v ?? ''));
 // v3 plain state words (lane 1; must match ui/v3-shell.js STATE_WORDS — cards.js is inlined into the MCP panel, so no import).
 // v2 words, for a one-line revert: { prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' }
