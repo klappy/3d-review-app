@@ -564,8 +564,15 @@ function mountInvitePage(gen) {
   if (!state.principal) { app.innerHTML = inviteView({ status: 'signin' }); return; }
   const ctx = ctxFor();
   mountInvite(app, { api: ctx.api, token: t, isCurrent: () => gen === generation, forget: forgetInvite,
-    // Accepted: Home lists what was shared (projects list is re-read by the page load).
-    onAccepted: () => ctx.go(cards.routes.projects) });
+    // Accepted (Bugbot on #298): re-read the project list the way boot does, so the granted project's name is known to Home and
+    // the assessment header without a page reload; a failed re-read keeps the old list and still goes Home.
+    onAccepted: async () => { await reloadProjects(); if (gen === generation) ctx.go(cards.routes.projects); } });
+}
+// The project list read boot uses. Returns false (state untouched) when the identity changed while it was in flight.
+async function reloadProjects() {
+  const identity = identityGeneration;
+  try { const result = await api('/v2/projects'); if (identity !== identityGeneration) return false; state.projects = result.projects || []; return true; }
+  catch { return false; }
 }
 async function mountNew(gen) {
   syncShell(); app.className = '';

@@ -136,3 +136,47 @@ for (const outcome of ['resolve', 'reject']) test(`provider logout ${outcome} ca
   assert.equal(h.nodes.get('app').innerHTML, 'New work');
   assert.equal(h.nodes.get('account-status').textContent, 'New status');
 });
+
+// B03 follow-up (Bugbot on #298): accepting an invitation re-reads the project list before Home renders, so the granted
+// project's name is known (assessment header, Home) without a page reload. Drives the real mountInvitePage → onAccepted.
+function inviteHarness() {
+  const nodes = new Map(['app', 'who', 'note', 'legacy-link', 'whats-here-wrap'].map(id => [id, { innerHTML: '', textContent: '', hidden: false, className: '', querySelector: () => null, addEventListener() {} }]));
+  const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace(/export function /g, 'function ');
+  const seen = { mounted: null, navigations: [] };
+  const location = { pathname: '/', _h: '#invite', get hash() { return this._h; }, set hash(v) { this._h = v; seen.navigations.push({ hash: v, projects: api.state.projects.map(p => p.name) }); } };
+  const box = { ...v3, cards, mountKitRoot, shellModel, history: { replaceState() {} }, sessionStorage: { getItem: () => 'tok-1', setItem() {}, removeItem() {} }, isDemo, memoryStorage,
+    document: { getElementById: id => nodes.get(id), title: '' }, location, redactDiagnosticPath: x => x, fetch: () => Promise.resolve({ ok: true }),
+    INVITE_KEY: 'k', inviteView: () => '', mountInvite: (root, opts) => { seen.mounted = opts; } };
+  const api = vm.runInNewContext(source + '\n({state,mountInvitePage,resetIdentity,getGen:()=>generation,setApi:fn=>api=fn,setRender:fn=>render=fn})', box);
+  api.setRender(async () => {});
+  return { ...api, seen };
+}
+
+test('B03: after an accepted invitation the project list is re-read before going Home (granted project named, no reload)', async () => {
+  const h = inviteHarness(), calls = [];
+  h.state.principal = { id: 'u1' }; h.state.projects = [{ id: 'p0', name: 'Coast' }];
+  h.setApi(async url => { calls.push(url); if (url === '/v2/projects') return { projects: [{ id: 'p0', name: 'Coast' }, { id: 'p9', name: 'Granted' }] }; throw new Error('unexpected ' + url); });
+  h.mountInvitePage(h.getGen());
+  assert.ok(h.seen.mounted, 'invitation controller mounted');
+  await h.seen.mounted.onAccepted({ kind: 'project', id: 'p9' });
+  assert.deepEqual(calls, ['/v2/projects'], 'the boot project-list read, once');
+  assert.deepEqual(h.state.projects.map(p => p.id), ['p0', 'p9']);
+  assert.deepEqual(h.seen.navigations, [{ hash: '#projects', projects: ['Coast', 'Granted'] }], 'Home is reached with the granted project already in the list');
+});
+
+test('B03: a failed re-read after accept keeps the old list and still goes Home; a stale view does not navigate', async () => {
+  const h = inviteHarness();
+  h.state.principal = { id: 'u1' }; h.state.projects = [{ id: 'p0', name: 'Coast' }];
+  h.setApi(async () => { throw Object.assign(new Error('down'), { code: '503' }); });
+  h.mountInvitePage(h.getGen());
+  await h.seen.mounted.onAccepted({});
+  assert.deepEqual(h.state.projects.map(p => p.id), ['p0']);
+  assert.deepEqual(h.seen.navigations.map(n => n.hash), ['#projects']);
+  const s = inviteHarness(); let release; const gate = new Promise(r => { release = r; });
+  s.state.principal = { id: 'u1' }; s.state.projects = [{ id: 'p0', name: 'Coast' }];
+  s.setApi(async () => { await gate; return { projects: [{ id: 'old-identity', name: 'Private' }] }; });
+  s.mountInvitePage(s.getGen());
+  const done = s.seen.mounted.onAccepted({}); s.resetIdentity(); release(); await done;
+  assert.equal(s.state.projects.some(p => p.id === 'old-identity'), false, 'an old identity\'s list never lands');
+  assert.deepEqual(s.seen.navigations, [], 'no navigation from a replaced view');
+});
