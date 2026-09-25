@@ -186,3 +186,10 @@ test('B30 shell: a page with its own h1 hides the shell h1 (shared kit rule, not
   const tree = readFileSync(new URL('../kit/tree.js', import.meta.url), 'utf8');
   assert.match(tree, /<div class="content" role="main" tabindex="-1"><div class="eyebrow">'\+esc\(model\.eyebrow \|\| ''\)\+'<\/div><div class="row" style="justify-content:space-between"><h1>/, 'the rule matches the shell markup');
 });
+test('B31 Permissions (Bugbot 4108609584/4108609569): a new preview drops the previous receipt; no ref, no Details', () => {
+  const src = readFileSync(new URL('./permissions.js', import.meta.url), 'utf8');
+  assert.match(src, /m\.notice = null; m\.noticeRef = '';/, 'preview clears the old receipt with the old notice');
+  assert.match(src, /if \(e\.currentTarget\.isConnected\) m\.transferOpen = /, 'stale toggle ignored');
+  const h = permissions.render({ esc }, { scope: 'assessments', id: 'a1', status: 'loaded', grants: [], pending: [], me: 'me', myRole: 'owner', receipts: {}, notice: 'x', noticeRef: '' });
+  assert.doesNotMatch(h, /<summary>Details<\/summary>/);
+});

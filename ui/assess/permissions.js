@@ -87,7 +87,7 @@ export const permissions = {
     // CONFIRM_EXPIRED → "Preview again". Never auto-retry execute.
     const preview = async (kind, url, params, label, extra = {}) => { m.busy = true; paint();
       try { const env = await call(url, { method: extra.method || 'POST', body: { params, mode: 'dry_run' } }); const r = env.result;
-        m.sheet = { kind, url, method: extra.method || 'POST', params: Object.freeze(JSON.parse(JSON.stringify(params))), token: r.confirm_token, expiresIn: r.expires_in, impact: r.impact || {}, label, ...extra.display }; m.notice = null; m.alert = false;
+        m.sheet = { kind, url, method: extra.method || 'POST', params: Object.freeze(JSON.parse(JSON.stringify(params))), token: r.confirm_token, expiresIn: r.expires_in, impact: r.impact || {}, label, ...extra.display }; m.notice = null; m.noticeRef = ''; m.alert = false;
       } catch (e) { m.sheet = null; fail(e, label); } finally { m.busy = false; paint(); } };
     const execute = async () => { const s = m.sheet; if (!s || m.busy) return; if (!s.token) { say(PREVIEW_AGAIN, true); return; }
       const token = s.token; s.token = null; // single-use, cleared before the call
@@ -110,7 +110,7 @@ export const permissions = {
       } };
     root.querySelector('[data-invite-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const email = f.querySelector('[name=email]').value.trim(), role = f.querySelector('[name=role]').value; return preview('invite', `${base}/invitations`, { email, role }, 'Invitation', { display: { who: email } }); });
     root.querySelectorAll('[data-change-role]').forEach(b => b.addEventListener('click', () => { const gid = b.dataset.changeRole; const role = root.querySelector(`[data-role-for="${CSS.escape(gid)}"]`)?.value; const g = m.grants.find(x => x.id === gid); if (!g || !role || role === g.role) { say('That is already the role.'); return; } const who = labelMembers(m.grants, { me: m.me, myEmail: m.myEmail }).find(x => x.row === g)?.person; return preview('update_role', `${base}/grants/${ctx.enc(gid)}`, { role }, 'Role change', { method: 'PATCH', display: { who: who ? [who.name, who.email].filter(Boolean).join(' · ') : '', gid } }); }));
-    root.querySelector('[data-transfer]')?.addEventListener('toggle', e => { m.transferOpen = e.currentTarget.open; }); // keep it open across repaints
+    root.querySelector('[data-transfer]')?.addEventListener('toggle', e => { if (e.currentTarget.isConnected) m.transferOpen = e.currentTarget.open; }); // Bugbot 4108609584: a replaced node's stale toggle is ignored // keep it open across repaints
     root.querySelector('[data-transfer-form]')?.addEventListener('submit', e => { e.preventDefault(); m.transferOpen = true; const f = e.currentTarget; const to = f.querySelector('[name=to]').value.trim(); const step_down = !!f.querySelector('[name=step_down]').checked; return preview('transfer_owner', `${base}/transfer`, step_down ? { to, step_down: true } : { to }, 'Ownership transfer', { display: { who: to } }); });
     // single-call writes: mode is never sent (contract §3.5)
     root.querySelectorAll('[data-revoke]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`${base}/grants/${ctx.enc(b.dataset.revoke)}`, { method: 'DELETE' }); say(`Access removed.`, false, receiptText(env)); await refresh(); } catch (e) { m.busy = false; fail(e, 'Remove access'); } }));
