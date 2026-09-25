@@ -2,7 +2,8 @@
 // Confirmation lives only in this view's closure; navigation/identity generation invalidates it.
 export function reportBuildMarkup(ctx, role) {
   if (!['owner', 'member'].includes(role)) return '';
-  return `<section data-report-build><p class="small muted">Build a report from this assessment’s responses.</p><button type="button" data-preview-report>Preview report build</button><div data-report-preview></div><p class="status" role="status" aria-live="polite" data-build-status></p></section>`;
+  // U32 (Bincy B30/B35): "Build the results" is Understand's one build action; this older path stays, closed behind Technical details.
+  return `<details class="small" data-report-build-more><summary>Technical details</summary><section data-report-build><p class="small muted">Build a report from this assessment’s responses.</p><button type="button" data-preview-report>Preview report build</button><div data-report-preview></div><p class="status" role="status" aria-live="polite" data-build-status></p></section></details>`;
 }
 // B35: `extra` adds a second entry point (the band block's "Build the results") that runs the SAME preview → one confirm → execute,
 // with its own box/status/labels; all entry points share one pending token and one busy/uncertain state. onBuilt(source) says which.
