@@ -1,9 +1,0 @@
-# Independent narrow sequencing acceptance — 159
-
-ACCEPT the sequencing amendment in RECONCILIATION-PLAN-2026-09-21.md at 5445105e60df717ae852a3086c99763995d00bac (blob 28a2918ab09add06dc8a7d20219c3c3ce57b3a10), resolving my sequencing-only AMEND cee22d6bca588510ea1431841aab8f8743e20472. Author and reviewer are distinct.
-
-The superseding section requires 161 → coordinator's actual accepted immutable main handoff → history-preserving 159 reconciliation → accepted 159 exact-tree handoff → K3. Protected account/session/privacy behavior and existing 159 commits remain preserved; no parallel shared-path custody is granted. The section's cited 96a56a57 source acceptance is historical evidence, not the final handoff: 161 has since changed to b6f0eea3. Its explicit fresh immutable main requirement governs, so no stale candidate is authorized by this acceptance. At product FIRE the actual accepted main/head/tree and meaningful account regression evidence remain required.
-
-The separately orderable fixture-only prerequisite is bounded to the already specified local harness/evidence, isolated preserved 159 source and fail-closed synthetic normal-shell proof. No commands or fixture success are claimed. Actual owner ACK, promise and applicable preparation gates remain prerequisites to FIRE. Full product reconciliation additionally waits for independently reproduced fixture proof and the accepted 161 main handoff. Preserve the prior review's occupied-port precaution: use a recorded free port rather than interrupt another owner's server.
-
-This is final acceptance of the bounded plan correction, not product/source/browser acceptance, a claim receipt, implementation FIRE, merge or deployment permission. Exact 18 app / 3 cookbook path boundaries and separate 149 custody remain unchanged. No fresh audit or product edits performed.

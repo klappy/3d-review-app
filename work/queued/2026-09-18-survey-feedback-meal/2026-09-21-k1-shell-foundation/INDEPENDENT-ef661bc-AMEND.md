@@ -1,7 +1,0 @@
-# Independent K1 ef661bc delta review — AMEND
-
-Exact PR168 head ef661bca39e88f61d83a381f671ba7a90c7cd648. Read only the two-file delta against4a7715e. Sixteen shell tests pass independently in /tmp/3d-k1-review-ef661bc. Independent real Chrome153 desktop1440×900 and phone390×844, synthetic composition with actual pointer clicks, confirms query-loss correction: caret commit now retains 'September'. Earlier navigation-row callback/focus, retained search/content and deferred-return filter still pass.
-
-Remaining existing focus criterion fails on the same caret path: click expansion caret a1 while composing 'September'; compositionend stores query, then expansion paint applies that query immediately and removes/replaces the target. No matching focusKey caret remains. Actual document.activeElement is BODY, activeInsideTree:false on both viewports. /tmp/3d-followup-independent/ef/caret-results.json and caret.cjs reproduce it. This is not native OS IME evidence.
-
-The new test checks only query/content and does not assert retained actionable focus. Amend this bounded case so the intended local expansion/focus remains usable while committed query is retained—e.g. preserve deferred-list behavior until return, or an independently reviewed intentional accessible fallback. Do not silently accept BODY focus, weaken outside-focus contract or expand global ownership. Existing identity/destroy/selection/privacy cases must remain passing. No source changes by reviewer; no READY transition or integration acceptance.
