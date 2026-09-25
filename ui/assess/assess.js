@@ -13,7 +13,7 @@ import { sidebarTree } from '/v3/components/sidebar-tree.js';
 import { learnMore } from '/v3/components/learn-more.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
 const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
-import { pages, css as scopeCss } from '/assess/scope.js';
+import { pages, css as scopeCss, landsOnWork } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
@@ -272,16 +272,15 @@ function bindCollectLinks(current) {
   share.bindGroupLinks(root, { resolve: async sid => {
     const k = `${aid}|${sid}|${ep}`;
     for (const key of state.collectLinks.keys()) if (!key.startsWith(`${aid}|`) || !key.endsWith(`|${epoch}`)) state.collectLinks.delete(key);
-    if (!state.collectLinks.has(k)) state.collectLinks.set(k, share.issueLink(api, { aid, sid, origin: location.origin }).catch(e => { state.collectLinks.delete(k); throw e; }));
-    const link = await state.collectLinks.get(k);
-    if (ep !== epoch || state.current?.assessment.id !== aid) return null;
+    const link = await share.cachedLink(state.collectLinks, k, () => share.issueLink(api, { aid, sid, origin: location.origin }));
+    if (ep !== epoch || state.current?.assessment.id !== aid) throw share.failure(); // a link may exist but is not shown here
     return link.url;
   } });
 }
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
-  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id, group: g.lens, survey: s.template_name }]) : ''}</div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
-  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey to share its link or print a blank questionnaire.</p></section>`;
+  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id }]) : ''}</div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
+  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}</section>`;
 }
 // Cut 2A child screen: ONE survey. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
@@ -505,6 +504,8 @@ async function fetchAssessment(aid) {
   return { assessment: r.assessment, surveys: r.surveys || [] };
 }
 async function render() {
+  // B02: signed in, "/" is the current work (#projects), never the public welcome with its Sign in choice.
+  if (landsOnWork(route(location.hash), state.principal)) { try { history.replaceState(null, '', location.pathname + location.search + '#projects'); } catch {} }
   const gen = ++generation, r = route(location.hash);
   if (wizardHandle) { try { wizardHandle.destroy(); } catch {} wizardHandle = null; }
   currentShareRoute();
@@ -689,7 +690,7 @@ function scrubCredentialHash() {
   if (/^#survey=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + h); return 'forwarded'; }
   if (/^#invite=/.test(h) || LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
   const m = /^#session=([A-Za-z0-9_]+)$/.exec(h);
-  if (m) { try { history.replaceState(null, '', location.pathname + '#workspaces'); } catch {} token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} resetIdentity(); return 'session'; }
+  if (m) { /* B-F02a: land on the work list */ try { history.replaceState(null, '', location.pathname + '#projects'); } catch {} token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} resetIdentity(); return 'session'; }
   if (/^#session=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} } // malformed: drop, never render
   return null;
 }

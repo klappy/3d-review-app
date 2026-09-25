@@ -31,7 +31,9 @@ test('(b) settled and not-yet-confirmed side by side; never guessed', () => {
 test('(c) held results render band cards as evidence gaps, no invented band', () => {
   const h = v3BandsMarkup({ status: 'held', reason: 'policy <unresolved>' }, L);
   assert.match(h, /data-v3-bands="held"/); assert.equal((h.match(/data-v3-band=/g) || []).length, 3);
-  assert.match(h, /policy &lt;unresolved&gt;/); assert.doesNotMatch(h.slice(0, h.indexOf('data-v3-legend')), />Strong</); // cards only; the legend names every band (L3-5)
+  assert.doesNotMatch(h, /policy &lt;unresolved&gt;/); // U05: never the server's policy code
+  assert.equal((h.match(/Results appear after/g) || []).length, 1); assert.match(h, /data-v3-band-held>Results appear after/); // U05: one plain line under the cards, none per card
+  assert.doesNotMatch(h.slice(0, h.indexOf('data-v3-legend')), />Strong</); // cards only; the legend names every band (L3-5)
   const s = v3BandsMarkup({ status: 'ready', bands: [{ perspective: 'Church', band: 'Growing', text: 'ok' }, { perspective: 'Community', band: '87%' }] }, L);
   assert.match(s, /data-v3-bands="shown"/); assert.match(s, />Growing</); assert.doesNotMatch(s, /87%/);
 });
@@ -59,10 +61,10 @@ test('U4 gate write is one set_stage move with the mapped stage id', async () =>
 
 // L3-3: U2 evidence toggle + table, group counts on band cards (Bincy screen 10).
 import { v3EvidenceRows, v3EvidenceMarkup, v3GroupCountText, V3_EVIDENCE_FOOTER } from './v3-assessment.js';
-test('U2 evidence rows: held result → held state + server reason, counts only from server', () => {
+test('U2 evidence rows: held result → held state + plain limit (never the server reason), counts only from server', () => {
   const held = { status: 'held', reason: 'D7 policy unresolved' };
   const rows = v3EvidenceRows(held, L, { 'Translation Team': { surveys: 1, loaded: 1, responses: 3 }, Church: { surveys: 0, loaded: 0, responses: 0 } });
-  assert.deepEqual(rows[0], ['Translation Team', 'Held · no band yet · 3 responses', 'D7 policy unresolved']);
+  assert.deepEqual(rows[0], ['Translation Team', 'Held · no band yet · 3 responses', 'Held until a report is built']); assert.ok(!rows.flat().join(' ').includes('D7'));
   assert.deepEqual(rows[1], ['Church', 'Not asked in this review', 'Missing data is not a low result']);
   assert.equal(rows[2][1], 'Not asked in this review');
   assert.ok(rows.every(r => !/\d+(\.\d+)?%|score/i.test(r.join(' '))));

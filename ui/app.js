@@ -6,7 +6,7 @@ import { mountEntityScreen } from './entity-screen.js';
 import { mountLensSurveys } from './lens-surveys.js';
 import { loadRoleHelp, loadBlankPrint, renderAssessmentHeadrow, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
 import { initLanguageControls } from './language.js';
-import { reviewAnswer, templateChoices } from './present.js';
+import { reviewAnswer, templateChoices, receiptLine } from './present.js';
 import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
 import { renderList, renderReport, upsertRow } from './report-view.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
@@ -269,8 +269,7 @@ async function templates() {
 }
 function drawQuestion(item) {
   const field = document.createElement('fieldset'); field.dataset.item = item.id;
-  const legend = document.createElement('legend'); legend.textContent = `${item.text || item.id}${item.requiredness === 'unresolved' ? ' (may leave unanswered; policy held)' : ''}`; field.append(legend);
-  if (item.answer_semantics === 'unresolved_no_problems_vs_skipped') { const note = document.createElement('p'); note.textContent = 'Leaving this blank records an unknown answer, not “no problems.”'; field.append(note); }
+  const legend = document.createElement('legend'); legend.textContent = `${item.text || item.id}${item.requiredness === 'unresolved' ? ' (optional)' : ''}`; field.append(legend);
   if (item.type === 'scale') { const input = document.createElement('input'); input.name = item.id; input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'text') { const input = document.createElement('textarea'); input.name = item.id; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'single' || item.type === 'multi') {
@@ -628,7 +627,7 @@ function showReceipt(result) {
   // contradicts the uncertain copy nor clears it (same fact, same outcome on the Submit and Recover paths).
   if (result.submitted === false && submitState === 'uncertain') return;
   clearParticipantError();
-  text($('receipt'), result.submitted === false ? 'No submission recorded yet.' : `Response saved · ${result.response_id || 'ID unavailable'} · ${result.submitted_at || 'time unavailable'}`);
+  text($('receipt'), result.submitted === false ? 'No submission recorded yet.' : `Response saved · ${receiptLine(result)}`);
   text($('participant-resume'), resumeNoticeAfterReceipt(result, $('participant-resume').textContent));
   $('receipt').hidden = false;
   if (result.submitted !== false) { $('review').hidden = true; $('answers').hidden = true; participantView?.showReceipt(); }
