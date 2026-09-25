@@ -308,12 +308,21 @@ const projects = {
       try { const a = await ctx.api(`/v2/projects/${encodeURIComponent(p.id)}/assessments`); lists[p.id] = { status: 'loaded', list: (a.assessments || []).filter(x => !x.archived_at) }; }
       catch (e) { lists[p.id] = { status: classify(e) }; }
     }));
-    return { status: 'loaded', params, projects: list, lists };
+    // B03 (Bincy F01/F02): an assessment shared directly (assessment grant, no project role) is not in /v2/projects. Home lists it
+    // from the caller's own grants (/v2/me) + the assessment read the grant already allows — no new server surface.
+    let shared = [];
+    try {
+      const me = await ctx.api('/v2/me'), here = new Set(list.map(p => p.id));
+      const ids = [...new Set((me?.grants || []).filter(g => g.scope_type === 'assessment').map(g => g.scope_id))].slice(0, 20);
+      const reads = await Promise.allSettled(ids.map(id => ctx.api(`/v2/assessments/${encodeURIComponent(id)}`)));
+      shared = reads.filter(r => r.status === 'fulfilled').map(r => r.value?.assessment).filter(a => a && !a.archived_at && !here.has(a.project_id));
+    } catch { shared = []; }
+    return { status: 'loaded', params, projects: list, lists, shared };
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('projects', model);
-    const home = homeView({ projects: model.projects || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW });
+    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW });
     return readRegion(`${pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`);
   },
   bind(ctx, root, model) {
