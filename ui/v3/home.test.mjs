@@ -38,3 +38,13 @@ test('L9-2 frame 2: assessments render as whole-card links in one grid, eyebrow 
   assert.equal((card.match(/<a /g) || []).length, 1, 'card holds no inner link');
   assert.match(h, /v3h-projects">Projects: <a href="#project\/p1">Lake<\/a>/, 'project still reachable');
 });
+test('B17: cards show the response count the list read sent; project cards show assessments and responses; none invented', () => {
+  const a = assessmentRow({ id: 'a1', name: 'A', stage: 'understand', response_count: 9 }, label);
+  assert.match(a, /data-v3-counts>9 responses</);
+  assert.match(assessmentRow({ id: 'a', name: 'A', stage: 'collect', response_count: 1 }, label), /data-v3-counts>1 response</);
+  assert.match(assessmentRow({ id: 'a', name: 'A', stage: 'collect', response_count: 0 }, label), /data-v3-counts>No responses yet</);
+  assert.doesNotMatch(assessmentRow({ id: 'a', name: 'A', stage: 'collect' }, label), /data-v3-counts/, 'no field → no line');
+  const h = homeView({ projects: [{ id: 'p', name: 'P', assessment_count: 0, response_count: 0 }, { id: 'q', name: 'Q', assessment_count: 2, response_count: 5 }], listFor: id => (id === 'p' ? { status: 'loaded', list: [] } : {}) });
+  assert.doesNotMatch(h.slice(0, h.indexOf('data-v3h-project="q"')), /data-v3-counts/, 'loaded-empty keeps its one "No assessments yet" line');
+  assert.match(h, /data-v3-counts>2 assessments · 5 responses</);
+});

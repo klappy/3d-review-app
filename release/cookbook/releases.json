@@ -1,7 +1,23 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.21.1",
+  "current": "0.21.2",
   "versions": [
+    {
+      "version": "0.21.2",
+      "status": "candidate",
+      "notes_path": "releases/0.21.2.md",
+      "sections": {
+        "added": [
+          "DEV only: \"Mid-Level v1 (legacy)\" survey template carrying the old Lovable ML1–ML12 questions verbatim, so legacy mid-level responses import as answered (#270)"
+        ],
+        "changed": [
+          "work rail moved to the cookbook repo (HYGIENE 35) (#268)"
+        ],
+        "fixed": [
+          "setup screens trimmed to one line and one primary action (assessment details, groups, participant information, review and launch, links); explanations behind a shared Learn more (#269)"
+        ]
+      }
+    },
     {
       "version": "0.21.1",
       "status": "candidate",

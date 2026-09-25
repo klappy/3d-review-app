@@ -8,6 +8,7 @@ import { stepper, ensureStepperStyle } from '../v3/components/stepper.js';
 import { responseCount } from '../v3/components/response-count.js'; // component: Response count (ruling 12:34)
 import { bandCard, bandLegend, BAND_LEGEND } from '../v3/components/band-card.js'; // component: Band card + legend (ruling 12:34)
 import { evidenceTable } from '../v3/components/evidence-table.js'; // component: Evidence table (ruling 12:34)
+import { learnMore } from '../v3/components/learn-more.js'; // component: Learn more (lane 9 L9-24)
 
 export const V3_FLAGS = Object.freeze({ expectedCountOptional: true, showUnconfirmed: true, bandResults: true, nextStepPage: true });
 
@@ -83,15 +84,16 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores
     const suppressed = !sc && b && b.state === 'suppressed';
     const note = sc ? (sc.subs.length ? `<ul class="v3-band-subs small">${sc.subs.map(x => `<li data-v3-sub="${esc(x.name)}">${esc(x.name)} · <strong>${esc(v3ScoreBand(x.score, n))}</strong></li>`).join('')}</ul>` : '')
       : scored ? '<p class="muted">Not in the latest report.</p>'
-      : held ? `<p class="muted" data-v3-band-held>${esc(r.reason || 'Results are held.')}</p>`
+      : held ? '' // lane 9 L9-24: the held reason is said once under the cards, not once per card
       : suppressed ? '<div class="note">Withheld to protect a small group. This is an evidence gap, not a poor result.</div>'
       : b && b.text ? `<p>${esc(b.text)}</p>` : '';
     const count = groups ? `<div class="v3-band-count small muted" data-v3-band-count="${esc(lens)}">${esc(v3GroupCountText(groups[lens]))}</div>` : '';
     return bandCard({ lens, word, bodyHtml: note, countHtml: count }, esc);
   }).join('');
   const legend = bandLegend(V3_LEGEND, esc);
-  const prov = scored && V3_BAND_CUTOFFS.provisional ? `<p class="small muted" data-v3-provisional>${esc(V3_BAND_PROVISIONAL)}</p>` : '';
-  return `<div class="v3-bands three" data-v3-bands="${scored ? 'provisional' : held ? 'held' : 'shown'}">${cards}</div>${legend}${prov}`;
+  const prov = scored && V3_BAND_CUTOFFS.provisional ? learnMore(`<p class="small muted" data-v3-provisional>${esc(V3_BAND_PROVISIONAL)}</p>`) : ''; // lane 9 L9-24: cut-offs behind Learn more
+  const heldLine = held ? `<p class="muted" data-v3-band-held>${esc(r.reason || 'Results are held.')}</p>` : '';
+  return `<div class="v3-bands three" data-v3-bands="${scored ? 'provisional' : held ? 'held' : 'shown'}">${cards}</div>${heldLine}${legend}${prov}`;
 }
 
 // U2 evidence toggle + table, U3 folded into one footer line (PARITY.md U2/U3; prototype V.results frame 10:

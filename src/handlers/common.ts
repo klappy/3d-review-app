@@ -1,3 +1,4 @@
+import { ensureLegacyTemplates, LEGACY_TEMPLATE_IDS } from "../legacy-templates";
 // Shared helpers for data handlers: ids, hashing, params, visibility/role checks.
 // Roles come from `grant` rows at the exact scope (D2: no inheritance). The one
 // grouping-listing exception (03 matrix): a project grant lets its holder see the
@@ -164,6 +165,7 @@ export async function loadSurvey(ctx: Ctx, sid: string, aid: string | undefined,
   return { row, assessment, role };
 }
 export async function loadTemplate(ctx: Ctx, id: string, version?: number): Promise<TemplateRow> {
+  if (LEGACY_TEMPLATE_IDS.has(id)) await ensureLegacyTemplates(ctx);
   const row = version === undefined
     ? await ctx.db.prepare("SELECT * FROM survey_template WHERE id = ? AND published_at IS NOT NULL ORDER BY version DESC LIMIT 1").bind(id).first<TemplateRow>()
     : await ctx.db.prepare("SELECT * FROM survey_template WHERE id = ? AND version = ?").bind(id, version).first<TemplateRow>();
