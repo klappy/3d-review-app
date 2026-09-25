@@ -1,0 +1,402 @@
+[
+ {
+  "id": "ML1",
+  "group": "Source Engagement",
+  "text": "How consistently does the team engage primary source materials (Greek/Hebrew or trusted source text) before drafting?",
+  "type": "single",
+  "required": true,
+  "source_type": "choose-one",
+  "options": [
+   {
+    "code": "o1",
+    "text": "Every passage, with structured study"
+   },
+   {
+    "code": "o2",
+    "text": "Most passages, with informal study"
+   },
+   {
+    "code": "o3",
+    "text": "Occasionally, when difficulty arises"
+   },
+   {
+    "code": "o4",
+    "text": "Rarely — drafting relies on a gateway translation alone"
+   },
+   {
+    "code": "other",
+    "text": "Other (please describe):"
+   }
+  ]
+ },
+ {
+  "id": "ML1_other",
+  "group": "Source Engagement",
+  "text": "Other (please describe):",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ },
+ {
+  "id": "ML2",
+  "group": "Source Engagement",
+  "text": "Which exegetical resources does the team use most reliably?",
+  "type": "multi",
+  "required": true,
+  "source_type": "choose-all",
+  "options": [
+   {
+    "code": "o1",
+    "text": "Translation handbooks (UBS/SIL)"
+   },
+   {
+    "code": "o2",
+    "text": "Commentaries"
+   },
+   {
+    "code": "o3",
+    "text": "Original-language tools (interlinear, lexicons)"
+   },
+   {
+    "code": "o4",
+    "text": "Multiple gateway translations"
+   },
+   {
+    "code": "o5",
+    "text": "Consultant or trainer guidance"
+   },
+   {
+    "code": "other",
+    "text": "Other (please describe):"
+   }
+  ]
+ },
+ {
+  "id": "ML2_other",
+  "group": "Source Engagement",
+  "text": "Other (please describe):",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ },
+ {
+  "id": "ML3",
+  "group": "Drafting Quality",
+  "text": "How would you rate the team's first-draft quality before any internal checking?",
+  "type": "single",
+  "required": true,
+  "source_type": "choose-one",
+  "options": [
+   {
+    "code": "o1",
+    "text": "Strong — usually meaning-accurate and natural"
+   },
+   {
+    "code": "o2",
+    "text": "Adequate — meaning is sound, naturalness needs work"
+   },
+   {
+    "code": "o3",
+    "text": "Mixed — accuracy varies passage to passage"
+   },
+   {
+    "code": "o4",
+    "text": "Weak — significant revision required"
+   },
+   {
+    "code": "other",
+    "text": "Other (please describe):"
+   }
+  ]
+ },
+ {
+  "id": "ML3_other",
+  "group": "Drafting Quality",
+  "text": "Other (please describe):",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ },
+ {
+  "id": "ML4",
+  "group": "Drafting Quality",
+  "text": "How consistently are key biblical terms handled across the draft?",
+  "type": "single",
+  "required": true,
+  "source_type": "choose-one",
+  "options": [
+   {
+    "code": "o1",
+    "text": "A maintained key-terms list is used and respected"
+   },
+   {
+    "code": "o2",
+    "text": "Key terms are tracked informally and usually consistent"
+   },
+   {
+    "code": "o3",
+    "text": "Key terms are inconsistent across drafters"
+   },
+   {
+    "code": "o4",
+    "text": "No key-terms management in place"
+   },
+   {
+    "code": "other",
+    "text": "Other (please describe):"
+   }
+  ]
+ },
+ {
+  "id": "ML4_other",
+  "group": "Drafting Quality",
+  "text": "Other (please describe):",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ },
+ {
+  "id": "ML5",
+  "group": "Review Discipline",
+  "text": "How disciplined is the team about internal cross-checking before external review?",
+  "type": "single",
+  "required": true,
+  "source_type": "choose-one",
+  "options": [
+   {
+    "code": "o1",
+    "text": "Every draft is peer-checked using a documented protocol"
+   },
+   {
+    "code": "o2",
+    "text": "Most drafts are peer-checked, protocol is informal"
+   },
+   {
+    "code": "o3",
+    "text": "Peer-checking happens when issues are flagged"
+   },
+   {
+    "code": "o4",
+    "text": "Little or no internal cross-checking"
+   },
+   {
+    "code": "other",
+    "text": "Other (please describe):"
+   }
+  ]
+ },
+ {
+  "id": "ML5_other",
+  "group": "Review Discipline",
+  "text": "Other (please describe):",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ },
+ {
+  "id": "ML6",
+  "group": "Review Discipline",
+  "text": "How well does the team document and resolve reviewer feedback?",
+  "type": "single",
+  "required": true,
+  "source_type": "choose-one",
+  "options": [
+   {
+    "code": "o1",
+    "text": "All feedback is logged and tracked to resolution"
+   },
+   {
+    "code": "o2",
+    "text": "Feedback is logged; resolution is not always tracked"
+   },
+   {
+    "code": "o3",
+    "text": "Feedback is discussed verbally and applied informally"
+   },
+   {
+    "code": "o4",
+    "text": "Feedback often goes unresolved"
+   },
+   {
+    "code": "other",
+    "text": "Other (please describe):"
+   }
+  ]
+ },
+ {
+  "id": "ML6_other",
+  "group": "Review Discipline",
+  "text": "Other (please describe):",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ },
+ {
+  "id": "ML7",
+  "group": "Community Fit",
+  "text": "How well does the team's drafting style match what the community actually understands?",
+  "type": "single",
+  "required": true,
+  "source_type": "choose-one",
+  "options": [
+   {
+    "code": "o1",
+    "text": "Strong fit — drafts test well in community"
+   },
+   {
+    "code": "o2",
+    "text": "Good fit — minor naturalness adjustments needed"
+   },
+   {
+    "code": "o3",
+    "text": "Mixed — some passages land, others don't"
+   },
+   {
+    "code": "o4",
+    "text": "Poor fit — drafts often need rework after community testing"
+   },
+   {
+    "code": "other",
+    "text": "Other (please describe):"
+   }
+  ]
+ },
+ {
+  "id": "ML7_other",
+  "group": "Community Fit",
+  "text": "Other (please describe):",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ },
+ {
+  "id": "ML8",
+  "group": "Community Fit",
+  "text": "How seriously does the team take community-testing results?",
+  "type": "single",
+  "required": true,
+  "source_type": "choose-one",
+  "options": [
+   {
+    "code": "o1",
+    "text": "Results drive revision systematically"
+   },
+   {
+    "code": "o2",
+    "text": "Results inform revision, with judgment applied"
+   },
+   {
+    "code": "o3",
+    "text": "Results are considered but inconsistently applied"
+   },
+   {
+    "code": "o4",
+    "text": "Results are largely ignored"
+   },
+   {
+    "code": "other",
+    "text": "Other (please describe):"
+   }
+  ]
+ },
+ {
+  "id": "ML8_other",
+  "group": "Community Fit",
+  "text": "Other (please describe):",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ },
+ {
+  "id": "ML9",
+  "group": "Church Alignment",
+  "text": "How well aligned is the team with the receiving church community?",
+  "type": "single",
+  "required": true,
+  "source_type": "choose-one",
+  "options": [
+   {
+    "code": "o1",
+    "text": "Strong — church leaders are active partners"
+   },
+   {
+    "code": "o2",
+    "text": "Good — church leaders are consulted regularly"
+   },
+   {
+    "code": "o3",
+    "text": "Limited — church engagement is occasional"
+   },
+   {
+    "code": "o4",
+    "text": "Weak — little visible church partnership"
+   },
+   {
+    "code": "other",
+    "text": "Other (please describe):"
+   }
+  ]
+ },
+ {
+  "id": "ML9_other",
+  "group": "Church Alignment",
+  "text": "Other (please describe):",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ },
+ {
+  "id": "ML10",
+  "group": "Church Alignment",
+  "text": "From what you have seen, is this translation on track to be trusted by the church for wide use?",
+  "type": "single",
+  "required": true,
+  "source_type": "choose-one",
+  "options": [
+   {
+    "code": "o1",
+    "text": "Yes — strong trajectory"
+   },
+   {
+    "code": "o2",
+    "text": "Likely — with continued discipline"
+   },
+   {
+    "code": "o3",
+    "text": "Uncertain — outcome depends on remaining work"
+   },
+   {
+    "code": "o4",
+    "text": "Unlikely — significant concerns"
+   },
+   {
+    "code": "other",
+    "text": "Other (please describe):"
+   }
+  ]
+ },
+ {
+  "id": "ML10_other",
+  "group": "Church Alignment",
+  "text": "Other (please describe):",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ },
+ {
+  "id": "ML11",
+  "group": "Open Feedback",
+  "text": "What is the single biggest strength of this team's process right now?",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ },
+ {
+  "id": "ML12",
+  "group": "Open Feedback",
+  "text": "What is the single most important thing this team should improve before the next cycle?",
+  "type": "text",
+  "required": false,
+  "source_type": "free-text"
+ }
+]
