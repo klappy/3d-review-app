@@ -228,6 +228,11 @@ const understand = {
 };
 
 // ───────────────────────────────── improve ─────────────────────────────────
+// U24: the post-save refresh repaints the page, so the "Saved" line is carried across that one repaint (per assessment),
+// drawn next to the button, and dropped once that repaint is done — it never outlives the save it reports.
+let notesSaved = null;
+const NOTES_SAVED = 'Saved';
+const savedNote = m => (notesSaved && notesSaved === m.aid ? NOTES_SAVED : '');
 const improve = {
   async load(ctx, { aid }) {
     const a = ctx.current?.assessment || {};
@@ -239,14 +244,14 @@ const improve = {
       // v3 lane 3 L3-4: Bincy screen 11 / prototype frame 11. Recommendations aside not drawn (PARITY I1).
       const T = V3_NEXT;
       const notes = m.editable
-        ? `<form data-notes-form><label class="field">${esc(T.reflection)}<textarea name="notes_reflection" rows="3" maxlength="4000" placeholder="${esc(T.reflectionHint)}">${esc(m.notes_reflection)}</textarea></label><label class="field">${esc(T.next)}<textarea name="notes_next_steps" rows="2" maxlength="4000" placeholder="${esc(T.nextHint)}">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>${esc(T.save)}</button></div><p class="status" role="status" aria-live="polite" data-notes-status></p></form>`
+        ? `<form data-notes-form><label class="field">${esc(T.reflection)}<textarea name="notes_reflection" rows="3" maxlength="4000" placeholder="${esc(T.reflectionHint)}">${esc(m.notes_reflection)}</textarea></label><label class="field">${esc(T.next)}<textarea name="notes_next_steps" rows="2" maxlength="4000" placeholder="${esc(T.nextHint)}">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>${esc(T.save)}</button> <span class="status" role="status" aria-live="polite" data-notes-status>${esc(savedNote(m))}</span></div></form>`
         : `<h3>${esc(T.reflection)}</h3><p data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">Nothing recorded yet.</span>'}</p><h3>${esc(T.next)}</h3><p data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next step recorded yet.</span>'}</p><p class="small muted">${esc(NOTES_VISIBILITY)}</p>`;
       // Lane 9 L9-24: the schedule note and the role explanation move behind the shared Learn more (one line kept: who can read).
       const more = `<p class="muted">${esc(T.footer)}</p>${m.editable ? '' : `<p class="muted">Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`}`;
       return `<section class="panel" data-v3-next><p class="eyebrow">${esc(T.eyebrow)}</p><h2>${esc(T.title)}</h2>${notes}${learnMore(more)}</section>`;
     }
     const notes = m.editable
-      ? `<form data-notes-form><label class="field">Reflection<textarea name="notes_reflection" maxlength="4000">${esc(m.notes_reflection)}</textarea></label><label class="field">Next steps<textarea name="notes_next_steps" maxlength="4000">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>Save notes</button></div><p class="status" role="status" aria-live="polite" data-notes-status></p></form>`
+      ? `<form data-notes-form><label class="field">Reflection<textarea name="notes_reflection" maxlength="4000">${esc(m.notes_reflection)}</textarea></label><label class="field">Next steps<textarea name="notes_next_steps" maxlength="4000">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>Save notes</button> <span class="status" role="status" aria-live="polite" data-notes-status>${esc(savedNote(m))}</span></div></form>`
       : `<h3>Reflection</h3><p data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">No reflection recorded.</span>'}</p><h3>Next steps</h3><p data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next steps recorded.</span>'}</p><p class="small muted">${esc(NOTES_VISIBILITY)} Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`;
     return `<div class="grid"><section class="panel"><p class="eyebrow">Improve</p><h2>What comes next?</h2>${notes}</section><aside class="panel" data-recommendations><p class="eyebrow">Recommendations</p><p class="muted">${esc(RECOMMENDATIONS_NOT_BUILT)}</p></aside></div>`;
   },
@@ -260,8 +265,8 @@ const improve = {
       try {
         const r = await ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/notes`, { method: 'PATCH', body });
         const a = r?.assessment || {}; m.notes_reflection = a.notes_reflection ?? body.notes_reflection; m.notes_next_steps = a.notes_next_steps ?? body.notes_next_steps;
-        if (status) status.textContent = 'Notes saved.';
-        if (typeof ctx.refresh === 'function') await ctx.refresh();
+        if (status) status.textContent = NOTES_SAVED;
+        if (typeof ctx.refresh === 'function') { notesSaved = m.aid; try { await ctx.refresh(); } finally { notesSaved = null; } }
       } catch (err) {
         const k = classify(err);
         if (status) { status.setAttribute('role', 'alert'); status.textContent = k === 'refused' ? `${NOT_VISIBLE}: the notes were not saved.` : k === 'unauthenticated' ? 'Your sign-in is no longer active. Sign in again; the notes were not saved.' : k === 'not_built' ? 'Notes are not built yet.' : `Notes could not be saved: ${String(err.message || 'request failed')}`; }
