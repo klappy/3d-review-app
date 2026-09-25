@@ -10,7 +10,6 @@ function element(tag, text) { const node = document.createElement(tag); if (text
 function draw(item) {
   const field = element('fieldset'); field.dataset.item = item.id;
   field.append(element('legend', `${item.text || item.id}${item.requiredness === 'unresolved' ? ' (optional)' : ''}`)); // B-09: plain words, no policy text
-  if (item.answer_semantics === 'unresolved_no_problems_vs_skipped') field.append(element('p', 'Leaving this blank records an unknown answer, not “no problems.”'));
   if (item.type === 'scale' || item.type === 'text') {
     const input = element(item.type === 'text' ? 'textarea' : 'input'); input.name = item.id; input.required = item.required !== false;
     if (item.type === 'scale') { input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; }

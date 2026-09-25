@@ -270,7 +270,6 @@ async function templates() {
 function drawQuestion(item) {
   const field = document.createElement('fieldset'); field.dataset.item = item.id;
   const legend = document.createElement('legend'); legend.textContent = `${item.text || item.id}${item.requiredness === 'unresolved' ? ' (optional)' : ''}`; field.append(legend);
-  if (item.answer_semantics === 'unresolved_no_problems_vs_skipped') { const note = document.createElement('p'); note.textContent = 'Leaving this blank records an unknown answer, not “no problems.”'; field.append(note); }
   if (item.type === 'scale') { const input = document.createElement('input'); input.name = item.id; input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'text') { const input = document.createElement('textarea'); input.name = item.id; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'single' || item.type === 'multi') {

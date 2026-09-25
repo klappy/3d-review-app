@@ -1,0 +1,7 @@
+/* B24 shared participant pager: "Question n of N" eyebrow, Back/Next, segmented progress bar.
+   Loaded by /participate/ and the legacy workspace (/legacy/); one source, no fork. */
+#participant .participant-pager{display:flex;flex-direction:column}
+#participant .participant-bar{order:-1;display:flex;gap:4px;margin:4px 0 6px}
+#participant .participant-bar span{flex:1;height:6px;border-radius:3px;background:var(--bincy-edge,#dde3e8)}
+#participant .participant-bar span.done{background:var(--bincy-teal,var(--primary,#0f766e))}
+#participant .participant-page-actions{display:flex;justify-content:space-between;gap:12px}
