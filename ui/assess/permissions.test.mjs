@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { permissions, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN } from './permissions.js';
+import { permissions, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, TEST_ADDRESS_NOTE, inviteOutcome } from './permissions.js';
+import { shortDate } from './cards.js';
 
 const read = n => readFileSync(fileURLToPath(new URL(n, import.meta.url)), 'utf8');
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -275,4 +276,28 @@ test('U13: confirm sheet leads with one plain sentence; the impact record sits b
   assert.match(sheetSentence({ kind: 'transfer_owner', params: { to: 'usr_1', step_down: true } }, 'projects'), /^Ownership of this project moves .* and you become a member\. This cannot be undone from here\.$/);
   assert.equal(sheetSentence({ kind: 'update_role', params: { role: 'viewer' } }, 'workspace'), 'Their role on this workspace changes to viewer.');
   assert.equal(sheetSentence({ kind: 'other' }), 'Nothing changes until you confirm.');
+});
+
+test('B31/U26: invite to a test address → one plain sentence (no reason code); pending row reads role · invited <short date> · email', async () => {
+  const t = { 'POST /v2/assessment/a1/invitations': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'c', expires_in: 300, impact: {} } : { invitation_id: 'inv_new', role: 'member', status: 'pending', accepted: true, delivered: false, delivery: { provider: null, state: 'not_sent', reason: 'synthetic_recipient' } } };
+  const x = await mount('owner', t, { email: 'persona-1812-a@training.example.invalid', role: 'member' });
+  await x.submit('data-invite-form'); await x.click('data-confirm-execute');
+  const status = x.root.html.match(/data-permissions-status>([^<]*)</)[1];
+  assert.equal(status, TEST_ADDRESS_NOTE);
+  assert.doesNotMatch(status, /synthetic_recipient|rcpt_|tr_/);
+  assert.equal(x.m.invitees.inv_new, 'persona-1812-a@training.example.invalid');
+  // the refreshed roster lists the new invitation (the service returns no address, only role/status/date)
+  const m = { ...x.m, pending: [{ id: 'inv_new', role: 'member', status: 'pending', created_at: '2026-09-25T20:40:12Z' }] };
+  const h = permissions.render({ esc }, m);
+  const li = h.match(/<li data-invitation="inv_new">([^<]*)/)[1];
+  assert.equal(li.trim(), `member · invited ${shortDate('2026-09-25T20:40:12Z')} · persona-1812-a@training.example.invalid`);
+});
+
+test('B31/U26: inviteOutcome and shortDate are plain words', () => {
+  assert.equal(inviteOutcome({ delivered: false, delivery: { state: 'not_sent', reason: 'synthetic_recipient' } }), 'Invitation recorded; not emailed (test address).');
+  assert.equal(inviteOutcome({ delivered: false, delivery: { state: 'not_sent', reason: 'duplicate_recent' } }), DUPLICATE_NOTE);
+  assert.equal(inviteOutcome({ delivered: true, delivery: { state: 'accepted' } }), 'Invitation sent.');
+  assert.equal(shortDate('2026-09-25T12:00:00Z', new Date('2026-10-01T00:00:00Z')), 'Sep 25');
+  assert.equal(shortDate('2025-09-25T12:00:00Z', new Date('2026-10-01T00:00:00Z')), 'Sep 25, 2025');
+  assert.equal(shortDate('not a date'), 'not a date');
 });

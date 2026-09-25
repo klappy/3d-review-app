@@ -20,6 +20,8 @@ export interface Env { ROADMAP_PUBLISHER_IDS?: string; ROADMAP_VERIFIER_IDS?: st
   /** Native Cloudflare Email Sending; no API secret or inbound routing required. */
   EMAIL?: SendEmail;
   MAIL_FROM?: string; MAIL_ALLOWLIST_SHA256?: string; PUBLIC_ORIGIN?: string;
+  /** B38 email sign-in link (src/magic-link.ts): "on" enables it; TTL in minutes (5–60, default 30). */
+  MAGIC_LINK?: string; MAGIC_LINK_TTL_MINUTES?: string;
   /** OAuth provider storage + helpers (src/worker.ts); absent in unit tests that drive the Hono app directly. */
   OAUTH_KV?: KVNamespace; OAUTH_PROVIDER?: import("@cloudflare/workers-oauth-provider").OAuthHelpers }
 export interface Ctx {

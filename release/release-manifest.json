@@ -1,27 +1,27 @@
 {
-  "version": "0.21.4",
+  "version": "0.21.6",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "3e283c1fddcdeec1dbd428bc16f2486525efa903",
+  "cookbook_commit": "a32c87c6c205e9164a74eb31cbf5769395f21d40",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.21.4.md",
-      "blob_sha": "4ee523f6e8672fa5f99b28a758b286bc1b202e7c",
-      "sha256": "fc92d87a0db6ea05a223449956e9043b8b3cb783d647c6cdbc5fe2dfa8edd38a"
+      "path": "planning/2026-09-16-parity-build/releases/0.21.6.md",
+      "blob_sha": "e36505bb08543dc75f23d54f3e6e8d4f3603c117",
+      "sha256": "ef4f806c73d0a90ce589b8fcde07b87314df43e668f24b5782c12cab65aa7024"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "454347a7887ab7ad3a887c100b4e762665bcfbe0",
-      "sha256": "f7d0817375991031212a3e6c044dbe6464e952f9f202b7fdd3cefa77363e8d2d"
+      "blob_sha": "35476c6625c0749feeb4ac43b3f6b561d59b31eb",
+      "sha256": "c658e56526ef4c22bef8553a002e15c6e058875c3f32326579147bdc4e414eb8"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
-      "changed": [],
-      "fixed": [
-        "An invitation link opens in the app: see what was shared, accept it, and find it on your Home page (Bincy B03) (#291)",
-        "The participant welcome shows the shared context setup step 3 promises (project · language · material · format · when) in one line; step 3 no longer offers a note that was never saved (Bincy B10). (#289)"
-      ]
+      "changed": [
+        "Sign in by email link: enter your email, open the link we send (it works for 30 minutes, on any device) — no more one-time PIN; DEV only, behind MAGIC_LINK — production keeps Cloudflare Access. Signing out clears the session cookie with the same protections it was set with (HttpOnly, Secure, SameSite=Lax), in every environment (Bincy B38) (#305)",
+        "/roadmap shows the versions list only; stale work-item feed removed (captain 18:20) (#307)"
+      ],
+      "fixed": []
     }
   }
 }

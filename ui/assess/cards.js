@@ -3,6 +3,8 @@
 export const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Shared human date (was views.js): "Sep 25, 2026, 4:18 PM"; a non-date is shown as given. Never a raw ISO stamp on screen (B31).
 export function humanDate(iso) { const d = new Date(iso); return isNaN(d) ? String(iso || '') : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
+// Shared short date for lists (B31/U26): "Sep 25" this year, "Sep 25, 2025" otherwise; a non-date is shown as given.
+export function shortDate(iso, now = new Date()) { const d = new Date(iso); if (isNaN(d)) return String(iso || ''); return d.toLocaleDateString('en-US', d.getFullYear() === now.getFullYear() ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' }); }
 export const enc = v => encodeURIComponent(String(v ?? ''));
 // v3 plain state words (lane 1; must match ui/v3-shell.js STATE_WORDS — cards.js is inlined into the MCP panel, so no import).
 // v2 words, for a one-line revert: { prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' }

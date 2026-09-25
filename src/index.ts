@@ -15,7 +15,8 @@ import synthResponsesSql from "../seed/synthetic-responses.sql";
 import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
 import { allow, clientIp, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
-import { handleAuthorize, handleConsent, oauthPrincipals, renderConsentIfParked, type OAuthEnv } from "./oauth";
+import { cookieValue, handleAuthorize, handleConsent, oauthPrincipals, PARK_COOKIE, renderConsentIfParked, type OAuthEnv } from "./oauth";
+import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLinkEnabled, magicSessionCookie, mintMagicSession, newNonce, openPage, principalForEmailHash, requestMagicLink, sameOriginPost, signInPage, verifyMagicToken } from "./magic-link";
 
 import { installRoadmapStream } from "./roadmap/stream";
 
@@ -90,8 +91,8 @@ for (const cap of capabilities) {
       const res = json(result, result.ok ? 200 : statusFor(result.error.code));
       if (cap.id.startsWith("cap.ops.roadmap_")) res.headers.set("cache-control", "no-store");
       if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
-      if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Path=/; SameSite=Lax`);
-      if (cap.id === "cap.auth.logout") res.headers.append("set-cookie", "session=; Max-Age=0; Path=/");
+      if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Secure; Path=/; SameSite=Lax`);
+      if (cap.id === "cap.auth.logout") res.headers.append("set-cookie", "session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
       return res;
     } catch (e) {
       if (e instanceof CapError) return json(fail(e.code, e.message, e.hint, e.docs, ctx.traceId), statusFor(e.code));
@@ -147,6 +148,10 @@ app.get("/v2/auth/access", async (c) => {
     }
   }
 
+  // B38: with the email sign-in link enabled and no Access assertion on the request (Access removed from this path, or
+  // never in front of it), send the browser to the app's own sign-in page — connector sign-in keeps its next=oauth.
+  if (magicLinkEnabled(env) && !c.req.header("cf-access-jwt-assertion"))
+    return new Response(null, { status: 302, headers: { location: new URL(c.req.url).searchParams.get("next") === "oauth" ? "/v2/auth/email?next=oauth" : "/v2/auth/email", "cache-control": "no-store" } });
   try {
     const id = await verifyAccessJwt(env, c.req.header("cf-access-jwt-assertion") ?? undefined);
     const eh = await sha256(id.email);
@@ -167,6 +172,92 @@ app.get("/v2/auth/access", async (c) => {
     const code = e instanceof CapError ? e.code : "NOT_AUTHENTICATED";
     return json(fail(code, e.message ?? "sign-in failed", e.hint, "cap.auth.consume_link", newTraceId()), statusFor(code));
   }
+});
+// B38 email sign-in link (src/magic-link.ts). Transport routes, not capabilities: browsers only; agents hold a bearer.
+// Off unless MAGIC_LINK = "on" for the environment; when off every route hands the browser to the Access route.
+const nextOf = (v: unknown): "oauth" | undefined => (v === "oauth" ? "oauth" : undefined);
+const toAccess = () => new Response(null, { status: 303, headers: { location: "/v2/auth/access", "cache-control": "no-store" } });
+async function formOrJson(req: Request): Promise<{ fields: Record<string, unknown>; json: boolean } | null> {
+  const type = (req.headers.get("content-type") ?? "").toLowerCase();
+  try {
+    if (type.startsWith("application/json")) { const v: unknown = await req.json(); return v && typeof v === "object" && !Array.isArray(v) ? { fields: v as Record<string, unknown>, json: true } : null; }
+    if (type.startsWith("application/x-www-form-urlencoded") || type.startsWith("multipart/form-data")) { const f = await req.formData(); const o: Record<string, unknown> = {}; for (const [k, v] of f) if (typeof v === "string") o[k] = v; return { fields: o, json: false }; }
+  } catch { /* malformed body */ }
+  return null;
+}
+app.get("/v2/auth/email", (c) => {
+  // B38: the UI asks once whether email links are on here; off (production) → it keeps the Access sign-in and team logout.
+  if (new URL(c.req.url).searchParams.has("probe")) return c.json({ email_links: magicLinkEnabled(c.env) }, 200, { "cache-control": "no-store" });
+  if (!magicLinkEnabled(c.env)) return toAccess();
+  return signInPage(nextOf(new URL(c.req.url).searchParams.get("next")));
+});
+app.post("/v2/auth/email", async (c) => {
+  const env = c.env, req = c.req.raw;
+  if (!magicLinkEnabled(env)) return toAccess();
+  if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in request refused", undefined, "auth.email_link", newTraceId()), 403);
+  // Per-IP dampener first: a refusal costs no storage access and sends nothing.
+  if (!(await allow(env, "RL_AUTH", `ip:${clientIp(req)}`))) {
+    const r = json(fail("RATE_LIMITED", "too many sign-in requests — wait a minute and try again", undefined, "auth.email_link", newTraceId()), 429);
+    r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
+  }
+  const body = await formOrJson(req);
+  if (!body) return json(fail("INVALID_PARAMS", "email required", undefined, "auth.email_link", newTraceId()), 400);
+  const next = nextOf(body.fields.next);
+  const out = await requestMagicLink(env, body.fields.email, { next });
+  if (out.state === "invalid") return body.json ? json(fail("INVALID_PARAMS", "enter one email address", undefined, "auth.email_link", newTraceId()), 400) : signInPage(next, "Enter one email address, like name@example.org.");
+  if (out.state === "limited") {
+    const r = body.json ? json(fail("RATE_LIMITED", "too many links requested for this address — use the newest email or wait 15 minutes", undefined, "auth.email_link", newTraceId()), 429)
+      : page429(next);
+    r.headers.set("retry-after", "900"); return r;
+  }
+  if (out.state === "unavailable") return json(fail("RESERVED_NOT_BUILT", "email sign-in is not configured here", undefined, "auth.email_link", newTraceId()), 503);
+  return body.json ? json({ ok: true, result: { sent: true, expires_in_minutes: out.minutes } }, 200) : checkEmailPage(out.minutes);
+});
+const page429 = (next?: "oauth") => { const r = signInPage(next, "Too many links were requested for this address. Use the newest email, or wait 15 minutes."); return new Response(r.body, { status: 429, headers: r.headers }); };
+app.get("/v2/auth/email/open", (c) => {
+  if (!magicLinkEnabled(c.env)) return toAccess();
+  return openPage(newNonce(), nextOf(new URL(c.req.url).searchParams.get("next")));
+});
+// Landing-page check: is this link live, and does the address it carries match it? Mints nothing, writes nothing.
+app.post("/v2/auth/email/check", async (c) => {
+  const env = c.env, req = c.req.raw;
+  const headers = { "cache-control": "no-store" };
+  if (!magicLinkEnabled(env)) return c.json({ valid: false }, 404, headers);
+  if (!sameOriginPost(req)) return c.json({ valid: false }, 403, headers);
+  if (!(await allow(env, "RL_REDEEM", `ip:${clientIp(req)}`))) return c.json({ valid: false }, 429, { ...headers, "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
+  const body = await formOrJson(req);
+  const link = body ? await verifyMagicToken(env, body.fields.t) : null;
+  if (!link) return c.json({ valid: false }, 200, headers);
+  return c.json({ valid: true, email: await verifiedAddress(body!.fields.e, link.emailHash) }, 200, headers);
+});
+app.post("/v2/auth/email/open", async (c) => {
+  const env = c.env, req = c.req.raw;
+  if (!magicLinkEnabled(env)) return toAccess();
+  if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in refused", undefined, "auth.email_link", newTraceId()), 403);
+  if (!(await allow(env, "RL_REDEEM", `ip:${clientIp(req)}`))) {
+    const r = json(fail("RATE_LIMITED", "too many sign-in attempts — wait a minute and try again", undefined, "auth.email_link", newTraceId()), 429);
+    r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
+  }
+  const body = await formOrJson(req);
+  const link = body ? await verifyMagicToken(env, body.fields.t) : null;
+  if (!link) return badLinkPage();
+  // Every open must carry the link's own address, hash-matched to its row (validator 2 #2): a link that does not name its
+  // account never signs anyone in — the landing page showed "Sign in as <address>" before the click.
+  const shown = await verifiedAddress(body!.fields.e, link.emailHash);
+  if (!shown) return unnamedLinkPage();
+  const pr = await principalForEmailHash(env, link.emailHash);
+  if (!pr) return badLinkPage();
+  // A connector is waiting on THIS browser (GET /authorize parked a request): show consent, open no web session.
+  // Opened in another browser (no park cookie) the link is an ordinary sign-in.
+  // Consent names the hash-verified account (checked above for every open).
+  if (new URL(req.url).searchParams.get("next") === "oauth" && cookieValue(req, PARK_COOKIE)) {
+    const consent = await renderConsentIfParked(req, env as OAuthEnv, pr.id, shown);
+    if (consent) return consent;
+  }
+  const token = await mintMagicSession(env, pr);
+  const headers = new Headers({ location: `/#session=${token}`, "cache-control": "no-store", "referrer-policy": "no-referrer" });
+  headers.append("set-cookie", magicSessionCookie(token));
+  return new Response(null, { status: 303, headers });
 });
 // DEV BOOTSTRAP — explicitly OUTSIDE capability parity (Astra 5706308285): loads the committed synthetic answer sets
 // (seed/synthetic-responses.sql, Steve Watters' persona generator @ f042cde) into this environment's D1. Not a

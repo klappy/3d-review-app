@@ -43,7 +43,7 @@ export const authRequestLink: Handler = async (ctx, p, o) => {
 export const authConsumeLink: Handler = async (ctx, p) => {
   if (!p.email || !p.code) throw new CapError("INVALID_PARAMS", "email and code required");
   const eh = await sha256(normalizeEmail(String(p.email)));
-  const row = await ctx.db.prepare("SELECT id, expires_at, redeemed_at AS used_at FROM login_code WHERE email_hash = ? AND code_hash = ? ORDER BY created_at DESC LIMIT 1").bind(eh, await sha256(String(p.code))).first<any>();
+  const row = await ctx.db.prepare("SELECT id, expires_at, redeemed_at AS used_at FROM login_code WHERE email_hash = ? AND code_hash = ? AND id NOT LIKE 'ml\\_%' ESCAPE '\\' ORDER BY created_at DESC LIMIT 1").bind(eh, await sha256(String(p.code))).first<any>();
   if (!row) throw new CapError("INVALID_PARAMS", "code invalid", "request a new code", "cap.auth.request_link");
   if (row.used_at) throw new CapError("INVALID_PARAMS", "code_used", "codes are single-use; request a new one");
   if (row.expires_at < Date.now()) throw new CapError("INVALID_PARAMS", "code_expired", "request a new code");

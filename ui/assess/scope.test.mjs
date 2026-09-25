@@ -360,13 +360,26 @@ test('project settings (lane 11): editors reach access codes on the existing scr
   assert.ok(!pages.project.render(view, await pages.project.load(view, { id: 'p1' })).includes('project-settings'));
 });
 
-test('L1-7 #signin matches prototype frame 1: centred card, one primary to the real provider, survey footer, sandbox collapsed after it', async () => {
+test('L1-7 #signin with email links off (production) keeps prototype frame 1: one primary to the Access provider, survey footer, sandbox collapsed after it', async () => {
   const html = pages.entry.render({ esc: s => String(s ?? ''), state: {} }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
   assert.ok(html.includes('class="glass panel narrow v3-signin"'));
-  assert.ok(html.includes('<p class="eyebrow">Sign in</p>'));
   assert.ok(/<a class="button rv-btn primary" href="\/v2\/auth\/access" style="width:100%/.test(html), 'one full-width primary to the real provider');
+  assert.ok(!html.includes('email-link-form'), 'no email form that production would discard');
   const access = html.indexOf('href="/v2/auth/access"'), box = html.indexOf('<details class="sandbox-signin"');
   assert.ok(access > -1 && box > access, 'real provider precedes the sandbox');
+});
+test('L1-7 #signin matches prototype frame 1 (B38: one email field + one "Email me a sign-in link" button), survey footer, sandbox collapsed after it', async () => {
+  const html = pages.entry.render({ esc: s => String(s ?? ''), state: { emailLinks: true } }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.ok(html.includes('class="glass panel narrow v3-signin"'));
+  assert.ok(html.includes('<p class="eyebrow">Sign in</p>'));
+  const form = html.slice(html.indexOf('<form id="email-link-form"'), html.indexOf('</form>', html.indexOf('<form id="email-link-form"')));
+  assert.ok(form.includes('method="post" action="/v2/auth/email"'), 'posts to the email sign-in link route (works without script)');
+  assert.equal((form.match(/<input /g) || []).length, 1, 'one email field'); assert.ok(form.includes('type="email"'));
+  assert.ok(/<button class="button rv-btn primary" type="submit" style="width:100%[^>]*>Email me a sign-in link<\/button>/.test(form), 'one full-width primary');
+  assert.ok(html.includes('id="email-link-status"') && html.includes('role="status"'), 'room for the one-line confirmation');
+  assert.ok(!html.includes('/v2/auth/access') && !html.includes('cdn-cgi'), 'no Cloudflare Access hop for app sign-in');
+  const real = html.indexOf('id="email-link-form"'), box = html.indexOf('<details class="sandbox-signin"');
+  assert.ok(real > -1 && box > real, 'real sign-in precedes the sandbox');
   assert.ok(!/<details class="sandbox-signin"[^>]*\bopen\b/.test(html), 'sandbox collapsed on the email step');
   assert.ok(html.includes('no sign-in is needed') && html.includes('href="#survey"'));
 });
@@ -411,14 +424,19 @@ test('B08+B20: one shared who-line per group (setup, launch, Collect); headings 
 test('U28 (Bincy B32): both sign-in entry points say a new email creates an account — one shared line, under the Sign in action', async () => {
   assert.equal(SIGNUP_NOTE, 'New here? Signing in with your email creates your account.');
   const ctx = ctxWith(); const home = pages.entry.render(ctx, await pages.entry.load(ctx, {}));
-  const nav = home.slice(home.indexOf('<nav class="public-choices'), home.indexOf('</nav>'));
-  assert.equal(nav.split(SIGNUP_NOTE).length - 1, 1, 'home: once, inside the choices'); assert.ok(nav.indexOf(SIGNUP_NOTE) > nav.indexOf('>Sign in</a>'), 'home: under Sign in');
+  const nav = home.slice(home.indexOf('<nav class="public-choices'), home.indexOf('</nav>') + 6); const after = home.slice(home.indexOf('</nav>') + 6);
+  assert.ok(nav.endsWith('>Sign in</a></nav>'), 'home: B38 nav markup untouched'); assert.ok(after.startsWith('<small class="small muted signup-note" data-signup-note'), 'home: the line right under the choices');
+  assert.ok(after.indexOf(SIGNUP_NOTE) < after.indexOf('<h1>'), 'home: before the heading, not a line under it');
   assert.equal(home.split(SIGNUP_NOTE).length - 1, 1, 'home: never repeated');
-  assert.match(nav, /data-signup-note style="display:block;flex-basis:100%;grid-column:1\/-1;/, 'home: its own full-width line in the flex (product) or grid (legacy) row');
   const si = pages.entry.render(ctx, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
   assert.equal(si.split(SIGNUP_NOTE).length - 1, 1, '#signin: once'); assert.ok(si.indexOf(SIGNUP_NOTE) > si.indexOf('>Sign in with an email code</a>'), '#signin: under the primary');
   const inx = ctxWith({}, { state: { principal: { id: 'pr_1' } } }); const signedIn = pages.entry.render(inx, await pages.entry.load(inx, {}));
   assert.ok(!signedIn.includes(SIGNUP_NOTE), 'signed in: no sign-up line');
   const siIn = pages.entry.render(inx, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  // B38 flag on (DEV MAGIC_LINK="on"): the magic-link path also creates the account on first sign-in, so the same line, once, under its primary.
+  const on = pages.entry.render(ctxWith({}, { state: { emailLinks: true } }), { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.equal(on.split(SIGNUP_NOTE).length - 1, 1, 'flag on: once'); assert.ok(on.indexOf(SIGNUP_NOTE) > on.indexOf('>Email me a sign-in link</button>'), 'flag on: under the primary');
+  const onIn = pages.entry.render(ctxWith({}, { state: { emailLinks: true, principal: { id: 'pr_1' } } }), { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.ok(onIn.includes('Email me a sign-in link') && !onIn.includes(SIGNUP_NOTE), 'flag on, signed in: no sign-up line');
   assert.ok(siIn.includes('Sign in with an email code'), 'signed-in #signin still renders'); assert.ok(!siIn.includes(SIGNUP_NOTE), 'signed-in #signin (typed, bookmark, Back): no sign-up line');
 });
