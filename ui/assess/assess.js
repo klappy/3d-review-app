@@ -753,13 +753,16 @@ function syncContextDisclosure(event) {
   if (!event.matches) { const disclosure = app?.querySelector('.context-disclosure'); if (disclosure) disclosure.open = true; }
 }
 if (typeof matchMedia === 'function') matchMedia('(max-width:650px)').addEventListener('change', syncContextDisclosure);
+// U30 (Bincy B07/B31): a status line belongs to the page and action that set it. A route change clears it so "Renamed." from one
+// page never reads as feedback on the next. An in-flight action keeps its busy label; its own finally clears it.
+function clearPageNote() { if (!note || state.busy) return; note.textContent = ''; note.classList.remove('alert'); }
 let listening = false;
-function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
+function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } clearPageNote(); render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
 // B38: does this environment use email sign-in links (DEV) or Cloudflare Access (production)? Asked once; remembered only on
-// an answer. Unknown or off → the Access sign-in button and the team-domain logout stay exactly as before.
+// an answer (2 s timeout; a timeout or failure leaves it unknown). Unknown or off → the Access sign-in button and the team-domain logout stay exactly as before.
 async function loadEmailLinks() {
   if (demo || typeof state.emailLinks === 'boolean') return state.emailLinks === true;
-  try { const r = await fetch('/v2/auth/email?probe', { headers: { accept: 'application/json' }, credentials: 'same-origin', redirect: 'error', cache: 'no-store' }); if (r.ok) { const v = await r.json(); state.emailLinks = v?.email_links === true; if (state.emailLinks) emailLinksCopy(); } } catch {}
+  try { const r = await fetch('/v2/auth/email?probe', { headers: { accept: 'application/json' }, credentials: 'same-origin', redirect: 'error', cache: 'no-store', ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(2000) } : {}) }); if (r.ok) { const v = await r.json(); state.emailLinks = v?.email_links === true; if (state.emailLinks) emailLinksCopy(); } } catch {}
   return state.emailLinks === true;
 }
 // B38, email links ON only: the markup and every Sign-in href stay byte-identical to production (/v2/auth/access, Access

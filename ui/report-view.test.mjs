@@ -53,8 +53,13 @@ const REPORT = {
 test('R1 full payload renders header, stability line and every section in payload order', () => {
   const root = fakeNode('section');
   assert.equal(renderReport({ doc, root, report: REPORT }), true);
-  assert.equal(root.children[0].textContent, 'Synthetic data · source f042cde · scorer steve-f042cde-single-assessment-v1 · narrative steve-f042cde-rule-narrative-v1 · policy synthetic-current-assessment-asof-query-v1');
-  assert.equal(root.children[1].textContent, 'Built 2026-09-17T10:00:00.000Z from the responses that were captured for it. Its content does not change; it may become unavailable under the current synthetic reporting policy.');
+  const when = new Date('2026-09-17T10:00:00.000Z').toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  assert.equal(root.children[0].textContent, `Built ${when} from the responses that were captured for it. Its content does not change; it may become unavailable under the current synthetic reporting policy.`);
+  assert.doesNotMatch(root.children[0].textContent, /\d{4}-\d{2}-\d{2}T/); // B31: no raw ISO stamp on screen
+  const tech = root.children[1]; // B31: ids only behind one closed "Technical details" disclosure
+  assert.equal(tech.tag, 'details'); assert.equal(tech.open, undefined);
+  assert.equal(tech.children[0].tag, 'summary'); assert.equal(tech.children[0].textContent, 'Technical details');
+  assert.match(tech.children[1].textContent, /^Synthetic data · source f042cde · scorer steve-f042cde-single-assessment-v1 · narrative steve-f042cde-rule-narrative-v1 · policy synthetic-current-assessment-asof-query-v1/);
   assert.deepEqual(root.children.slice(2).map(s => s.children[0].textContent), [copy.lenses, copy.crossLens, copy.standalone, copy.translationAgreement, copy.evidence, copy.narrative]);
   for (const node of root.children) assert.equal('innerHTML' in node, false);
 });

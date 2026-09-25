@@ -133,7 +133,7 @@ export function v3EvidenceRows(results, lenses, groups = {}, scores = null) {
     if (!g || !g.surveys) return [lens, 'Not asked in this review', 'Missing data is not a low result'];
     const sc = scores && scores[lens];
     if (sc) { const n = g.loaded ? g.responses : null, w = v3ScoreBand(sc.score, n);
-      return [lens, `${w} (provisional) · score ${sc.score} · ${counted}`, w === 'More input needed' ? `Fewer than ${V3_BAND_CUTOFFS.minResponses} responses` : 'Provisional cut-offs; people who did not answer may see it differently']; }
+      return [lens, `${w} (provisional) · score ${Number.isFinite(scoreOf(sc.score)) ? Math.floor(scoreOf(sc.score)) : sc.score} · ${counted}`, w === 'More input needed' ? `Fewer than ${V3_BAND_CUTOFFS.minResponses} responses` : 'Provisional cut-offs; people who did not answer may see it differently']; }
     const b = !held && Array.isArray(r.bands) ? r.bands.find(x => x && x.perspective === lens) : null;
     const say = b && BAND_WORDS.has(b.band) ? b.band : held ? 'Held · no band yet' : 'More input needed';
     const limit = held ? V3_HELD_LIMIT : !g.loaded ? 'Count not loaded yet' : (num(g.responses) ?? 0) === 0 ? 'No responses yet' : 'People who did not answer may see it differently';
