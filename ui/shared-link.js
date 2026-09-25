@@ -16,7 +16,9 @@ export const copy = {
   draftRestored: 'Your unsent answers were restored on this device.',
   submitFailed: 'Your answers were not submitted. They are still here; try again.',
   submitUncertain: 'We could not confirm whether your answers arrived. Nothing on this device was changed and your answers are still here. Choose Submit once again: if they already arrived you will see your receipt, and nothing is sent twice.',
-  receiptThanks: 'Thank you. Your answers stay with the team, grouped with others from the community perspective. Reopening your link shows this receipt again.',
+  // Bincy B26: the thank-you names the survey's own group (the same perspective label the welcome eyebrow shows).
+  receiptThanks: 'Thank you. Your answers stay with the team, grouped with others from the {perspective} perspective. Reopening your link shows this receipt again.',
+  receiptThanksNoGroup: 'Thank you. Your answers stay with the team, grouped with others from your group. Reopening your link shows this receipt again.',
   sameLinkOthers: 'Someone else can answer using the same link on their own device.',
   issuePreview: 'Nothing is sent until you confirm. This is the impact preview the contract requires before every write with an outside effect.',
   issueConfirm: 'Create survey link',
@@ -37,6 +39,11 @@ export const copy = {
   createFirst: 'Create a survey link first.',
 };
 export function fill(template, values) { return template.replace(/\{(\w+)\}/g, (_, k) => String(values[k])); }
+// One thank-you for every participant route: names the survey's perspective when the form is known, never another group.
+export function receiptNotice(perspective) {
+  const group = typeof perspective === 'string' ? perspective.trim() : '';
+  return `${group ? fill(copy.receiptThanks, { perspective: group }) : copy.receiptThanksNoGroup} ${copy.sameLinkOthers}`;
+}
 
 const FRAGMENT = /^#survey=([^&]+)$/;
 
