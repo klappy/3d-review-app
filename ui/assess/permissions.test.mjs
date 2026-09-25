@@ -268,3 +268,11 @@ test('member list: same component for workspace / project / assessment; a future
   assert.equal(memberList(esc, [], {}).includes('No one listed.'), true);
   assert.equal(await readAccountEmail({ demo: true }), ''); assert.equal(await readAccountEmail({ fetchImpl: async () => { throw new Error('x'); } }), '');
 });
+
+test('U13: confirm sheet leads with one plain sentence; the impact record sits behind Details', async () => {
+  const { sheetSentence } = await import('./permissions.js');
+  assert.equal(sheetSentence({ kind: 'invite', params: { email: 'rina@x.example.invalid', role: 'member' } }, 'assessment'), 'rina@x.example.invalid will be able to open this assessment as member once they accept. An email is sent when you confirm.');
+  assert.match(sheetSentence({ kind: 'transfer_owner', params: { to: 'usr_1', step_down: true } }, 'projects'), /^Ownership of this project moves .* and you become a member\. This cannot be undone from here\.$/);
+  assert.equal(sheetSentence({ kind: 'update_role', params: { role: 'viewer' } }, 'workspace'), 'Their role on this workspace changes to viewer.');
+  assert.equal(sheetSentence({ kind: 'other' }), 'Nothing changes until you confirm.');
+});
