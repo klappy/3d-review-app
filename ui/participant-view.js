@@ -27,7 +27,9 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   if(eyebrowText){const eb=el('p',eyebrowText);eb.className='eyebrow';intro.append(eb);}
   intro.append(el('h2','We would like your perspective'));
   const lead=el('p',`${model.language?`You were invited to say how the ${model.language} translation is going. `:''}Your answers are grouped with others and never shown on their own.`);lead.className='participant-lead';intro.append(lead);
-  if(model.period){const per=el('p',model.period);per.className='participant-meta';intro.append(per);}
+  // Bincy B10: the shared context setup step 3 lists ("Shown to every participant"), once, in one compact line.
+  const shared=[model.project,model.language,model.purpose,model.format,model.period].map(v=>typeof v==='string'?v.trim():'').filter(Boolean).join(' · ');
+  if(shared){const ctx=el('p',shared);ctx.className='participant-meta participant-context';intro.append(ctx);}
   const time=el('p',`Time: about ${Math.max(5,Math.round(items.length*0.6))} minutes · ${items.length} questions`);time.className='participant-meta';intro.append(time);
   // v3 L1-5 (NEED 5→1): the instrument's source ref is provenance for facilitators, not participant copy; the raw
   // unbroken path widened the intro to 697px on a 375px phone (TRAINING.md #10). Kept on the model, never painted here.

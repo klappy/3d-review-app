@@ -1,7 +1,18 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.21.3",
+  "current": "0.21.4",
   "versions": [
+    {
+      "version": "0.21.4",
+      "status": "candidate",
+      "notes_path": "releases/0.21.4.md",
+      "sections": {
+        "fixed": [
+          "An invitation link opens in the app: see what was shared, accept it, and find it on your Home page (Bincy B03) (#291)",
+          "The participant welcome shows the shared context setup step 3 promises (project · language · material · format · when) in one line; step 3 no longer offers a note that was never saved (Bincy B10). (#289)"
+        ]
+      }
+    },
     {
       "version": "0.21.3",
       "status": "candidate",
