@@ -16,8 +16,7 @@ import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
 import { allow, clientIp, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { cookieValue, handleAuthorize, handleConsent, oauthPrincipals, PARK_COOKIE, renderConsentIfParked, type OAuthEnv } from "./oauth";
-import { badLinkPage, checkEmailPage, magicLinkEnabled, magicSessionCookie, mintMagicSession, newNonce, openPage, principalForEmailHash, requestMagicLink, sameOriginPost, signInPage, verifyMagicToken } from "./magic-link";
-import { normalizeAddress } from "./mail";
+import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLinkEnabled, magicSessionCookie, mintMagicSession, newNonce, openPage, principalForEmailHash, requestMagicLink, sameOriginPost, signInPage, verifyMagicToken } from "./magic-link";
 
 import { installRoadmapStream } from "./roadmap/stream";
 
@@ -92,7 +91,7 @@ for (const cap of capabilities) {
       const res = json(result, result.ok ? 200 : statusFor(result.error.code));
       if (cap.id.startsWith("cap.ops.roadmap_")) res.headers.set("cache-control", "no-store");
       if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
-      if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Path=/; SameSite=Lax`);
+      if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Secure; Path=/; SameSite=Lax`);
       if (cap.id === "cap.auth.logout") res.headers.append("set-cookie", "session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
       return res;
     } catch (e) {
@@ -187,6 +186,8 @@ async function formOrJson(req: Request): Promise<{ fields: Record<string, unknow
   return null;
 }
 app.get("/v2/auth/email", (c) => {
+  // B38: the UI asks once whether email links are on here; off (production) → it keeps the Access sign-in and team logout.
+  if (new URL(c.req.url).searchParams.has("probe")) return c.json({ email_links: magicLinkEnabled(c.env) }, 200, { "cache-control": "no-store" });
   if (!magicLinkEnabled(c.env)) return toAccess();
   return signInPage(nextOf(new URL(c.req.url).searchParams.get("next")));
 });
@@ -217,6 +218,18 @@ app.get("/v2/auth/email/open", (c) => {
   if (!magicLinkEnabled(c.env)) return toAccess();
   return openPage(newNonce(), nextOf(new URL(c.req.url).searchParams.get("next")));
 });
+// Landing-page check: is this link live, and does the address it carries match it? Mints nothing, writes nothing.
+app.post("/v2/auth/email/check", async (c) => {
+  const env = c.env, req = c.req.raw;
+  const headers = { "cache-control": "no-store" };
+  if (!magicLinkEnabled(env)) return c.json({ valid: false }, 404, headers);
+  if (!sameOriginPost(req)) return c.json({ valid: false }, 403, headers);
+  if (!(await allow(env, "RL_REDEEM", `ip:${clientIp(req)}`))) return c.json({ valid: false }, 429, { ...headers, "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
+  const body = await formOrJson(req);
+  const link = body ? await verifyMagicToken(env, body.fields.t) : null;
+  if (!link) return c.json({ valid: false }, 200, headers);
+  return c.json({ valid: true, email: await verifiedAddress(body!.fields.e, link.emailHash) }, 200, headers);
+});
 app.post("/v2/auth/email/open", async (c) => {
   const env = c.env, req = c.req.raw;
   if (!magicLinkEnabled(env)) return toAccess();
@@ -232,10 +245,11 @@ app.post("/v2/auth/email/open", async (c) => {
   if (!pr) return badLinkPage();
   // A connector is waiting on THIS browser (GET /authorize parked a request): show consent, open no web session.
   // Opened in another browser (no park cookie) the link is an ordinary sign-in.
+  // Consent must name the account: without a hash-matched address the connector binding is refused (validator B38 #2).
   if (new URL(req.url).searchParams.get("next") === "oauth" && cookieValue(req, PARK_COOKIE)) {
-    const shown = normalizeAddress(body!.fields.e);
-    const label = shown && (await sha256(shown)) === link.emailHash ? shown : "the email address this link was sent to";
-    const consent = await renderConsentIfParked(req, env as OAuthEnv, pr.id, label);
+    const shown = await verifiedAddress(body!.fields.e, link.emailHash);
+    if (!shown) return unnamedLinkPage();
+    const consent = await renderConsentIfParked(req, env as OAuthEnv, pr.id, shown);
     if (consent) return consent;
   }
   const token = await mintMagicSession(env, pr);

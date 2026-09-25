@@ -12,9 +12,10 @@
  *     device or browser, until it expires (email security scanners that open links first cannot burn it).
  *   - a newer link never cancels an older unexpired one (nothing is deleted on request, only expired rows).
  *   - no same-browser binding (WhatsApp / Gmail in-app / Safari hand-offs work).
- *   - the token travels in the URL FRAGMENT (`/v2/auth/email/open#t=…`), like `/#invite=` and `/#session=`: it never
- *     reaches a server log, an edge log or a Referer. The landing page (tiny, CSP-locked, one nonce'd script) moves it
- *     into a same-origin POST and submits; the visible "Sign in" button is the fallback.
+ *   - the token travels in the URL FRAGMENT (`/v2/auth/email/open#t=…&e=<address>`), like `/#invite=` and `/#session=`:
+ *     it never reaches a server log, an edge log or a Referer. The landing page (tiny, CSP-locked, one nonce'd script)
+ *     checks the link without minting anything and shows ONE button, "Sign in as <address>" (address shown only when its
+ *     hash matches the link's row). Nothing signs in until a person clicks — scanners do not click.
  *
  * Storage: the existing `login_code` table (no migration). Link rows use the `ml_` id prefix; `code_hash` = SHA-256 of
  * the token (UNIQUE → indexed lookup); `email_hash` = SHA-256 of the normalised email. No plaintext email is stored.
@@ -61,12 +62,11 @@ export function timingSafeEqual(a: string, b: string): boolean {
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 /** Mail copy: one short sentence + the link + the expiry. Plain, no tracking, no images. */
-export function magicLinkMessage(origin: string, token: string, minutes: number, next?: "oauth", email?: string) {
-  // Connector links also carry the address (fragment only) so consent can name it; the open route shows it only when its hash
-  // matches the link's row (Bugbot 4109104674).
-  const link = next === "oauth"
-    ? `${origin}/v2/auth/email/open?next=oauth#t=${token}${email ? `&e=${encodeURIComponent(email)}` : ""}`
-    : `${origin}/v2/auth/email/open#t=${token}`;
+export function magicLinkMessage(origin: string, token: string, minutes: number, email: string, next?: "oauth") {
+  // Every link names its address (fragment only): the landing page shows "Sign in as <address>" — only after the server has
+  // matched the address's hash to the link's row — so a link for someone else's account is visible before any click
+  // (login-CSRF, validator B38 #2). Connector consent requires it.
+  const link = `${origin}/v2/auth/email/open${next === "oauth" ? "?next=oauth" : ""}#t=${token}&e=${encodeURIComponent(email)}`;
   const subject = "Your 3D Review sign-in link";
   const text = ["Open this link to sign in to 3D Review:", "", link, "", `The link expires in ${minutes} minutes.`].join("\n");
   const html = `<p>Open this link to sign in to 3D Review:</p><p><a href="${esc(link)}">Sign in to 3D Review</a></p><p style="color:#57606a;font-size:14px">The link expires in ${minutes} minutes.</p>`;
@@ -91,13 +91,14 @@ export async function requestMagicLink(env: Env, rawEmail: unknown, opts: { now?
   const eh = await sha256(email);
   // Housekeeping: only rows that are expired AND older than the counting window go (a newer link never removes an older one).
   await env.DB.prepare("DELETE FROM login_code WHERE id LIKE 'ml\\_%' ESCAPE '\\' AND expires_at < ? AND created_at < ?").bind(now, now - MAGIC_LINK_WINDOW_MS).run();
-  const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM login_code WHERE id LIKE 'ml\\_%' ESCAPE '\\' AND email_hash = ? AND created_at > ?").bind(eh, now - MAGIC_LINK_WINDOW_MS).first<{ n: number }>();
-  if ((recent?.n ?? 0) >= MAGIC_LINK_PER_EMAIL) return { state: "limited" };
   const token = newMagicToken();
   const th = await sha256(token);
-  await env.DB.prepare("INSERT INTO login_code (id, email_hash, code_hash, expires_at, created_at) VALUES (?,?,?,?,?)")
-    .bind(id(ROW_PREFIX.slice(0, -1)), eh, th, now + minutes * 60e3, now).run();
-  const m = magicLinkMessage(origin, token, minutes, opts.next, email);
+  // Atomic per-email cap: the count and the insert are ONE statement, so concurrent requests cannot both pass a stale count.
+  const inserted = await env.DB.prepare(
+    "INSERT INTO login_code (id, email_hash, code_hash, expires_at, created_at) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM login_code WHERE id LIKE 'ml\\_%' ESCAPE '\\' AND email_hash = ? AND created_at > ?) < ?"
+  ).bind(id(ROW_PREFIX.slice(0, -1)), eh, th, now + minutes * 60e3, now, eh, now - MAGIC_LINK_WINDOW_MS, MAGIC_LINK_PER_EMAIL).run();
+  if ((inserted.meta?.changes ?? 0) !== 1) return { state: "limited" };
+  const m = magicLinkMessage(origin, token, minutes, email, opts.next);
   const result = await (opts.send ?? sendMail)(env, { to: email, subject: m.subject, text: m.text, html: m.html, idempotencyKey: `magic-link:${th.slice(0, 16)}` });
   // Never the address or the token: the hash prefix correlates with the row for an operator, nothing more.
   console.log("auth.magic_link.issued", JSON.stringify({ email_hash_prefix: eh.slice(0, 8), state: result.state, reason: result.reason ?? null }));
@@ -113,6 +114,12 @@ export async function verifyMagicToken(env: Env, token: unknown, now = Date.now(
   if (!row || !timingSafeEqual(row.code_hash, th)) return null;
   if (!(Number(row.expires_at) > now)) return null;
   return { emailHash: row.email_hash };
+}
+
+/** The address carried by the link (`e`), only when its normalised hash equals the link row's email_hash; otherwise null. */
+export async function verifiedAddress(raw: unknown, emailHash: string): Promise<string | null> {
+  const a = normalizeAddress(raw);
+  return a && timingSafeEqual(await sha256(a), emailHash) ? a : null;
 }
 
 /** Same principal mapping as the Access route: sha256(normalised email) → principal row, created on first sign-in. */
@@ -137,7 +144,7 @@ export const clearSessionCookie = "session=; HttpOnly; Secure; Path=/; SameSite=
 // ---------------------------------------------------------------------------------------------------------------
 const STYLE = "body{font:16px/1.5 system-ui,sans-serif;max-width:26rem;margin:10vh auto;padding:0 1rem;color:#1b1f23}h1{font-size:1.3rem}label{display:block;margin:1rem 0 .3rem}input[type=email]{font:inherit;width:100%;box-sizing:border-box;padding:.6rem;border:1px solid #8c959f;border-radius:.4rem}button{font:inherit;width:100%;margin-top:1rem;padding:.7rem;border-radius:.4rem;border:1px solid #1b1f23;background:#1b1f23;color:#fff;cursor:pointer}small,.muted{color:#57606a}a{color:#0969da}";
 export function page(title: string, body: string, status = 200, nonce?: string): Response {
-  const csp = `default-src 'none'; style-src 'unsafe-inline'; ${nonce ? `script-src 'nonce-${nonce}'; ` : ""}form-action 'self'; frame-ancestors 'none'; base-uri 'none'`;
+  const csp = `default-src 'none'; style-src 'unsafe-inline'; ${nonce ? `script-src 'nonce-${nonce}'; connect-src 'self'; ` : ""}form-action 'self'; frame-ancestors 'none'; base-uri 'none'`;
   return new Response(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} — 3D Review</title><style>${STYLE}</style>${body}</html>`,
     { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "content-security-policy": csp, "referrer-policy": "same-origin" } });
 }
@@ -146,13 +153,23 @@ export const signInPage = (next?: "oauth", note = "") => page("Sign in",
   `<h1>Sign in to 3D Review</h1>${note ? `<p role="alert">${esc(note)}</p>` : ""}<form method="post" action="/v2/auth/email">${nextField(next)}<label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required maxlength="254"><button type="submit">Email me a sign-in link</button></form><p><small>No password. We email you a link that signs you in.</small></p>`);
 export const checkEmailPage = (minutes: number) => page("Check your email",
   `<h1>Check your email</h1><p role="status">We sent you a sign-in link. It expires in ${minutes} minutes.</p><p><small><a href="/v2/auth/email">Use a different email</a> · <a href="/">Home</a></small></p>`);
-/** Landing page for the emailed link. The script reads `#t=` (and `&e=` on connector links), strips the fragment from
- *  history, fills the form and submits it; without script the token cannot be read, so the page says so. */
+/** Landing page for the emailed link. It NEVER submits by itself (validator B38 #2/#4: login CSRF; script-running mail
+ *  scanners would otherwise mint sessions). The script reads `#t=…&e=…`, strips the fragment from history, asks
+ *  POST /v2/auth/email/check (mints nothing) whether the link is live and whether `e` matches it, then shows one button:
+ *  "Sign in as <verified address>" — or plain "Sign in" when the link names no matching address. A person must click. */
 export function openPage(nonce: string, next?: "oauth"): Response {
   const action = `/v2/auth/email/open${next === "oauth" ? "?next=oauth" : ""}`;
-  return page("Signing in", `<h1>Sign in to 3D Review</h1><form id="f" method="post" action="${action}"><input type="hidden" name="t" id="t"><input type="hidden" name="e" id="e"><button type="submit" id="b">Sign in</button></form><p id="m" class="muted"><noscript>Your browser blocked the script this page needs. Open the link in another browser.</noscript></p>
-<script nonce="${nonce}">(function(){var m=/^#t=([A-Za-z0-9_-]{43})(?:&e=([^&]{1,762}))?$/.exec(location.hash);try{history.replaceState(null,"",location.pathname+location.search)}catch(x){}if(!m){document.getElementById("b").hidden=true;document.getElementById("m").textContent="This sign-in link is incomplete. Request a new one from the sign-in page.";return}document.getElementById("t").value=m[1];if(m[2]){try{document.getElementById("e").value=decodeURIComponent(m[2])}catch(x){}}document.getElementById("f").submit()})();</script>`, 200, nonce);
+  return page("Sign in", `<h1>Sign in to 3D Review</h1><form id="f" method="post" action="${action}"><input type="hidden" name="t" id="t"><input type="hidden" name="e" id="e"><button type="submit" id="b" hidden>Sign in</button></form><p id="m" class="muted">Checking your link…<noscript> Your browser blocked the script this page needs. Open the link in another browser.</noscript></p>
+<script nonce="${nonce}">(function(){var d=document,m=/^#t=([A-Za-z0-9_-]{43})(?:&e=([^&]{1,762}))?$/.exec(location.hash),msg=d.getElementById("m"),b=d.getElementById("b");try{history.replaceState(null,"",location.pathname+location.search)}catch(x){}
+function bad(t){msg.textContent=t;var a=d.createElement("a");a.href="/v2/auth/email";a.textContent=" Request a new link";msg.appendChild(a)}
+if(!m){bad("This sign-in link is incomplete.");return}var e="";if(m[2]){try{e=decodeURIComponent(m[2])}catch(x){}}
+fetch("/v2/auth/email/check",{method:"POST",headers:{"content-type":"application/json",accept:"application/json"},body:JSON.stringify({t:m[1],e:e}),credentials:"same-origin",cache:"no-store"}).then(function(r){return r.ok?r.json():{valid:false}}).then(function(v){
+if(!v||!v.valid){bad("This sign-in link is not valid or has expired.");return}
+if(${next === "oauth" ? "true" : "false"}&&!v.email){bad("This link does not name the account it signs in.");return}
+d.getElementById("t").value=m[1];if(v.email){d.getElementById("e").value=v.email;b.textContent="Sign in as "+v.email}msg.textContent=v.email?"Not you? Close this page.":"";b.hidden=false;b.focus()}).catch(function(){bad("Could not check this link. Check your connection.")})})();</script>`, 200, nonce);
 }
+export const unnamedLinkPage = () => page("Link does not name an account",
+  `<h1>This link does not name the account it signs in</h1><p>Start again from the app you were connecting, and use the newest link we email you.</p>`, 400);
 export const badLinkPage = () => page("Link not valid",
   `<h1>This sign-in link is not valid</h1><p>It may have expired or been copied incompletely.</p><p><a href="/v2/auth/email">Request a new link</a></p>`, 400);
 export const newNonce = (): string => b64u(crypto.getRandomValues(new Uint8Array(16)));

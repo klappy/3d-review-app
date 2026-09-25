@@ -360,8 +360,16 @@ test('project settings (lane 11): editors reach access codes on the existing scr
   assert.ok(!pages.project.render(view, await pages.project.load(view, { id: 'p1' })).includes('project-settings'));
 });
 
-test('L1-7 #signin matches prototype frame 1 (B38: one email field + one "Email me a sign-in link" button), survey footer, sandbox collapsed after it', async () => {
+test('L1-7 #signin with email links off (production) keeps prototype frame 1: one primary to the Access provider, survey footer, sandbox collapsed after it', async () => {
   const html = pages.entry.render({ esc: s => String(s ?? ''), state: {} }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.ok(html.includes('class="glass panel narrow v3-signin"'));
+  assert.ok(/<a class="button rv-btn primary" href="\/v2\/auth\/access" style="width:100%/.test(html), 'one full-width primary to the real provider');
+  assert.ok(!html.includes('email-link-form'), 'no email form that production would discard');
+  const access = html.indexOf('href="/v2/auth/access"'), box = html.indexOf('<details class="sandbox-signin"');
+  assert.ok(access > -1 && box > access, 'real provider precedes the sandbox');
+});
+test('L1-7 #signin matches prototype frame 1 (B38: one email field + one "Email me a sign-in link" button), survey footer, sandbox collapsed after it', async () => {
+  const html = pages.entry.render({ esc: s => String(s ?? ''), state: { emailLinks: true } }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
   assert.ok(html.includes('class="glass panel narrow v3-signin"'));
   assert.ok(html.includes('<p class="eyebrow">Sign in</p>'));
   const form = html.slice(html.indexOf('<form id="email-link-form"'), html.indexOf('</form>', html.indexOf('<form id="email-link-form"')));

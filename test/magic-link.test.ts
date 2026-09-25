@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import app from "../src/index";
+import worker from "../src/worker";
 import { resolvePrincipal } from "../src/auth";
 import { sha256 } from "../src/handlers/common";
 import { execute } from "../src/dispatch";
@@ -15,7 +16,7 @@ import {
 } from "../src/magic-link";
 
 const MIGRATIONS = ["0001_init.sql", "0002_code_escrow.sql", "0003_language_archive.sql", "0004_pinned_instruments.sql", "0006_oauth_code_redemption.sql"];
-const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "magic-link", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "magic-link-db" } }] }));
+const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "magic-link", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "magic-link-db" }, kvNamespaces: { OAUTH_KV: "magic-link-kv" } }] }));
 afterAll(() => mf.dispose());
 const sqlOf = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
 
@@ -61,11 +62,10 @@ describe("link token", () => {
     expect(rows[0].expires_at - rows[0].created_at).toBe(30 * 60e3);
   });
   it("mail copy is one sentence + the link (token in the fragment) + the expiry", () => {
-    const m = magicLinkMessage(ORIGIN, "T".repeat(43), 30);
-    expect(m.link).toBe(`${ORIGIN}/v2/auth/email/open#t=${"T".repeat(43)}`);
+    const m = magicLinkMessage(ORIGIN, "T".repeat(43), 30, "a+b@example.invalid");
+    expect(m.link).toBe(`${ORIGIN}/v2/auth/email/open#t=${"T".repeat(43)}&e=a%2Bb%40example.invalid`); // every link names its address
     expect(m.text).toBe(`Open this link to sign in to 3D Review:\n\n${m.link}\n\nThe link expires in 30 minutes.`);
-    expect(magicLinkMessage(ORIGIN, "T".repeat(43), 30, "oauth", "a+b@example.invalid").link).toBe(`${ORIGIN}/v2/auth/email/open?next=oauth#t=${"T".repeat(43)}&e=a%2Bb%40example.invalid`);
-    expect(magicLinkMessage(ORIGIN, "T".repeat(43), 30, undefined, "a@example.invalid").link).not.toContain("example.invalid"); // ordinary links carry no address
+    expect(magicLinkMessage(ORIGIN, "T".repeat(43), 30, "a+b@example.invalid", "oauth").link).toBe(`${ORIGIN}/v2/auth/email/open?next=oauth#t=${"T".repeat(43)}&e=a%2Bb%40example.invalid`);
   });
   it("is reusable until it expires, then refused", async () => {
     const t0 = Date.now();
@@ -108,6 +108,13 @@ describe("rate limits", () => {
     expect(refused.out.state).toBe("limited"); expect(refused.sent).toHaveLength(0);
     expect((await issue("other@example.invalid", { now: t0 + 10 })).out.state).toBe("sent");
     expect((await issue("limit@example.invalid", { now: t0 + 15 * 60e3 + 20 })).out.state).toBe("sent"); // window passed
+  });
+  it("per email is atomic: 8 concurrent requests for one address issue exactly the cap", async () => {
+    const outs = await Promise.all(Array.from({ length: 8 }, () => issue("race@example.invalid")));
+    expect(outs.filter((o) => o.out.state === "sent")).toHaveLength(MAGIC_LINK_PER_EMAIL);
+    expect(outs.filter((o) => o.out.state === "limited")).toHaveLength(8 - MAGIC_LINK_PER_EMAIL);
+    expect(outs.filter((o) => o.out.state === "limited").every((o) => o.sent.length === 0)).toBe(true);
+    expect(await db.prepare("SELECT COUNT(*) AS n FROM login_code WHERE email_hash = ?").bind(await sha256("race@example.invalid")).first("n")).toBe(MAGIC_LINK_PER_EMAIL);
   });
   it("per IP: the RL_AUTH ip: key refuses before any storage access or mail", async () => {
     const keys: string[] = [];
@@ -207,6 +214,29 @@ describe("routes", () => {
     expect(csp).toContain("default-src 'none'"); expect(csp).toContain("frame-ancestors 'none'");
     expect(res.headers.get("referrer-policy")).toBe("same-origin");
     expect(html).toContain('action="/v2/auth/email/open"');
+    expect(csp).toContain("connect-src 'self'");
+  });
+  it("landing page never signs in by itself: no auto-submit, the button starts hidden and needs a click", async () => {
+    const html = await (await app.fetch(new Request(ORIGIN + "/v2/auth/email/open"), env)).text();
+    expect(html).not.toMatch(/\.submit\(|requestSubmit|autofocus|http-equiv/i);
+    expect(html).toContain('<button type="submit" id="b" hidden>Sign in</button>');
+    expect(html).toContain('"/v2/auth/email/check"'); // the script only checks the link
+    expect(html).toContain('"Sign in as "+v.email');
+  });
+  it("check endpoint: live link + hash-matched address → that address; mismatch → no address; dead link → invalid; mints nothing", async () => {
+    const { token } = await issue("checker@example.invalid");
+    const check = async (body: unknown) => (await postJson("/v2/auth/email/check", body)).json() as Promise<any>;
+    expect(await check({ t: token, e: "Checker@Example.invalid" })).toEqual({ valid: true, email: "checker@example.invalid" });
+    expect(await check({ t: token, e: "attacker@example.invalid" })).toEqual({ valid: true, email: null });
+    expect(await check({ t: token })).toEqual({ valid: true, email: null });
+    expect(await check({ t: newMagicToken(), e: "checker@example.invalid" })).toEqual({ valid: false });
+    expect((await postJson("/v2/auth/email/check", { t: token }, { origin: "https://evil.invalid" })).status).toBe(403);
+    expect(await db.prepare("SELECT COUNT(*) AS n FROM session").first("n")).toBe(0);
+  });
+  it("probe tells the UI whether email links are on (production: off)", async () => {
+    expect(await (await app.fetch(new Request(ORIGIN + "/v2/auth/email?probe"), env)).json()).toEqual({ email_links: true });
+    const off = await app.fetch(new Request(ORIGIN + "/v2/auth/email?probe"), { ...env, MAGIC_LINK: undefined });
+    expect(off.status).toBe(200); expect(await off.json()).toEqual({ email_links: false });
   });
   it("sign-in page: one email field and one 'Email me a sign-in link' button", async () => {
     const html = await (await app.fetch(new Request(ORIGIN + "/v2/auth/email"), env)).text();
@@ -228,14 +258,62 @@ describe("routes", () => {
     const oauthEnv = { ...env, OAUTH_KV: { get: async () => JSON.stringify({ clientId: "c1", redirectUri: "https://client.invalid/cb" }) }, OAUTH_PROVIDER: { lookupClient: async () => ({ clientName: "Test app" }) } };
     const { token, sent } = await issue("connector@example.invalid", { next: "oauth" });
     expect(sent[0].text).toContain("?next=oauth#t=" + token + "&e=connector%40example.invalid");
+    expect((await issue("plain@example.invalid")).sent[0].text).toContain("&e=plain%40example.invalid"); // ordinary links too
     const req = (e: string, cookie?: string) => app.fetch(new Request(ORIGIN + "/v2/auth/email/open?next=oauth", { method: "POST", headers: { origin: ORIGIN, "content-type": "application/x-www-form-urlencoded", ...(cookie ? { cookie } : {}) }, body: new URLSearchParams({ t: token, e }).toString() }), oauthEnv);
     const consent = await req("connector@example.invalid", "__Host-oauth_req=park1");
     expect(consent.status).toBe(200); expect(consent.headers.get("set-cookie")).toBeNull();
     const html = await consent.text();
     expect(html).toContain("Test app"); expect(html).toContain("connector@example.invalid");
-    const spoofed = await (await req("someone.else@example.invalid", "__Host-oauth_req=park1")).text(); // e is display only, and only when its hash matches
-    expect(spoofed).not.toContain("someone.else@example.invalid");
+    const spoofed = await req("someone.else@example.invalid", "__Host-oauth_req=park1"); // e must hash-match the link's row
+    expect(spoofed.status).toBe(400); expect(await spoofed.text()).not.toContain("someone.else@example.invalid");
+    const unnamed = await req("", "__Host-oauth_req=park1"); // no address → connector binding refused, no session either
+    expect(unnamed.status).toBe(400); expect(unnamed.headers.get("set-cookie")).toBeNull();
     const elsewhere = await req("connector@example.invalid"); // opened in another browser: ordinary sign-in
     expect(elsewhere.status).toBe(303); expect(sessionFrom(elsewhere)).toBeTruthy();
+  });
+});
+
+describe("connector end to end through the real worker: register → authorize → email link (e=) → consent → token → MCP", () => {
+  const b64u = (b: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const ectx = () => ({ waitUntil() {}, passThroughOnException() {}, props: undefined }) as any;
+  let wenv: any;
+  const call = (path: string, init: RequestInit = {}) => worker.fetch(new Request(ORIGIN + path, { redirect: "manual", ...init }), wenv, ectx());
+  it("signs a connector in with the verified address and no web session; a mismatched address is refused", async () => {
+    wenv = { ...env, OAUTH_KV: await mf.getKVNamespace("OAUTH_KV") };
+    const reg = await call("/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client_name: "E2E Connector", redirect_uris: ["https://client.invalid/cb"], token_endpoint_auth_method: "none", grant_types: ["authorization_code"], response_types: ["code"] }) });
+    expect(reg.status).toBe(201); const clientId = ((await reg.json()) as any).client_id as string;
+    const verifier = b64u(crypto.getRandomValues(new Uint8Array(32))), challenge = b64u(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+    const authz = await call(`/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent("https://client.invalid/cb")}&code_challenge=${challenge}&code_challenge_method=S256&state=st-e2e&scope=3dreview`);
+    expect(authz.status).toBe(302); expect(authz.headers.get("location")).toBe("/v2/auth/access?next=oauth");
+    const park = authz.headers.get("set-cookie")!.split(";")[0];
+    const bounce = await call("/v2/auth/access?next=oauth", { headers: { cookie: park } }); // Access removed: no assertion
+    expect(bounce.status).toBe(302); expect(bounce.headers.get("location")).toBe("/v2/auth/email?next=oauth");
+    // The mail step (sendMail refuses synthetic addresses, so the link is captured from the injectable sender).
+    const sent: any[] = [];
+    expect((await requestMagicLink(wenv, "E2E.Owner@example.invalid", { next: "oauth", send: async (_e, m) => { sent.push(m); return { delivered: true, state: "accepted" }; } })).state).toBe("sent");
+    const link = new URL(/https:\S+/.exec(sent[0].text)![0]);
+    expect(link.pathname + link.search).toBe("/v2/auth/email/open?next=oauth");
+    const frag = /^#t=([A-Za-z0-9_-]{43})&e=(.+)$/.exec(link.hash)!; const t = frag[1], e = decodeURIComponent(frag[2]);
+    expect(e).toBe("e2e.owner@example.invalid");
+    const landing = await call(link.pathname + link.search, { headers: { cookie: park } });
+    expect(landing.status).toBe(200); expect(landing.headers.get("set-cookie")).toBeNull();
+    const checked: any = await (await call("/v2/auth/email/check", { method: "POST", headers: { origin: ORIGIN, "content-type": "application/json" }, body: JSON.stringify({ t, e }) })).json();
+    expect(checked).toEqual({ valid: true, email: "e2e.owner@example.invalid" });
+    const open = (addr: string) => call("/v2/auth/email/open?next=oauth", { method: "POST", headers: { origin: ORIGIN, cookie: park, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ t, e: addr }).toString() });
+    const refused = await open("other.person@example.invalid");
+    expect(refused.status).toBe(400); expect(refused.headers.get("set-cookie")).toBeNull();
+    const page = await open(e);
+    expect(page.status).toBe(200); expect(page.headers.get("set-cookie") ?? "").not.toMatch(/session=/);
+    const html = await page.text();
+    expect(html).toContain("e2e.owner@example.invalid"); expect(html).toContain("E2E Connector");
+    const ticket = /name="ticket" value="([^"]+)"/.exec(html)![1];
+    const done = await call("/oauth/consent", { method: "POST", headers: { cookie: park, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ ticket, decision: "approve" }).toString() });
+    expect(done.status).toBe(302);
+    const back = new URL(done.headers.get("location")!); expect(back.searchParams.get("state")).toBe("st-e2e");
+    const tok = await call("/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", code: back.searchParams.get("code")!, client_id: clientId, redirect_uri: "https://client.invalid/cb", code_verifier: verifier }).toString() });
+    expect(tok.status).toBe(200); const access = ((await tok.json()) as any).access_token as string;
+    const me: any = await (await call("/mcp", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${access}` }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "read", arguments: { capability: "cap.auth.me", params: {} } } }) })).json();
+    const pr: any = await db.prepare("SELECT id FROM principal WHERE email_hash = ?").bind(await sha256("e2e.owner@example.invalid")).first();
+    expect(me.result.structuredContent.result.principal).toMatchObject({ id: pr.id, kind: "user", delegated_by: `oauth:${clientId}` });
   });
 });
