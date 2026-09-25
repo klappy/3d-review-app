@@ -120,7 +120,7 @@ test('v3BandsMarkup: report scores band each perspective and sub-dimension, labe
   assert.match(html, /data-v3-band="Community" data-v3-band-word="More input needed"/); // 2 responses < 3
   assert.match(html, /data-v3-band="Translation Team" data-v3-band-word="More input needed"/); // not in the report
   assert.doesNotMatch(html, /45\.8/); // bands first; numbers only behind the evidence toggle
-  assert.match(v3EvidenceRows({ status: 'held' }, lenses, groups, scores)[1][1], /Needs support \(provisional\) · score 45\.8/);
+  assert.match(v3EvidenceRows({ status: 'held' }, lenses, groups, scores)[1][1], /Needs support \(provisional\) · score 46 ·/);
   const heldHtml = v3BandsMarkup({ status: 'held', reason: 'D7' }, lenses, undefined, groups, null);
   assert.match(heldHtml, /data-v3-bands="held"/); assert.doesNotMatch(heldHtml, /data-v3-provisional/);
 });

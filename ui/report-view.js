@@ -1,4 +1,5 @@
 import { renderReportCards } from './report-card.js';
+import { humanDate } from './assess/cards.js'; // one shared local-time formatter (B31)
 // Synthetic report rendering. Dependency-free and importable under node --test with an injected doc.
 // Text nodes only: every value comes from the payload as returned (String(), no rounding, no word
 // mapping, no colour), plus the fixed labels in `copy`. Nothing here fetches or authorizes.
@@ -6,6 +7,7 @@ export const copy = Object.freeze({
   headerPrefix: 'Synthetic data',
   builtStability: 'from the responses that were captured for it. Its content does not change; it may become unavailable under the current synthetic reporting policy.',
   built: 'Built',
+  technical: 'Technical details',
   lenses: 'Lenses',
   crossLens: 'Cross-lens comparisons',
   standalone: 'Standalone indicators',
@@ -41,8 +43,11 @@ export function renderReport({ doc, root, report }) {
   const versions = payload.versions;
   if (typeof payload.source_commit !== 'string' || !versions || typeof versions !== 'object') return false;
   const out = [];
-  out.push(el(doc, 'p', `${copy.headerPrefix} · source ${payload.source_commit.slice(0, 7)} · scorer ${val(versions.scorer)} · narrative ${val(versions.narrative)} · policy ${val(versions.policy)}`));
-  out.push(el(doc, 'p', `${copy.built} ${val(report.created_at)} ${copy.builtStability}`));
+  out.push(el(doc, 'p', `${copy.built} ${humanDate(report.created_at)} ${copy.builtStability}`));
+  // B31: provenance ids and the report id stay off the screen by default — one closed disclosure.
+  const tech = el(doc, 'details');
+  tech.append(el(doc, 'summary', copy.technical), el(doc, 'p', `${copy.headerPrefix} · source ${payload.source_commit.slice(0, 7)} · scorer ${val(versions.scorer)} · narrative ${val(versions.narrative)} · policy ${val(versions.policy)}${report.id ? ` · report ${val(report.id)}` : ''} · built ${val(report.created_at)}`));
+  out.push(tech);
   // Sections follow payload order; an absent or empty one is not announced.
   const cards = renderReportCards({ doc, report });
   if (cards) out.push(cards);

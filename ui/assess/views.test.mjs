@@ -103,7 +103,8 @@ test('A4 open report: GET /v2/reports/{id} rendered by report-view.js; held → 
   views.understand.bind(ctx, root, m);
   await b1.onclick();
   assert.ok(calls.some(c => c.url === '/v2/reports/rep_1' && !c.method));
-  assert.match(appended[0].text, /^Synthetic data · source abcdef1/); // report-view.js header constant, untouched
+  assert.match(appended[0].text, /^Built /); // B31: readable built line first
+  assert.equal(appended[1].tag, 'details'); assert.match(appended[1].children[1].text, /^Synthetic data · source abcdef1/); // ids behind Technical details
   assert.equal(b1.disabled, false);
   await b2.onclick();
   assert.equal(m.openReport.status, 'held');
@@ -223,7 +224,7 @@ test('report list shows a human title/date with the raw id inside <details>, not
   const ctx = ctxFor(api, { current: { assessment, surveys: [] } }); const m = await views.understand.load(ctx, { aid: 'a1' }); const html = views.understand.render(ctx, m);
   const btn = html.match(/<button type="button" data-open-report="[^"]+">([^<]+)<\/button>/)[1];
   assert.match(btn, /^Report 1 · built /); assert.doesNotMatch(btn, /sreport_|T22:15/);
-  assert.match(html, /<details class="small muted report-ids"><summary>Report id<\/summary><code>sreport_928bb601-f318-4cca-b48c-e4683371c6c8<\/code>/);
+  assert.match(html, /<details class="small muted report-ids"><summary>Technical details<\/summary><code>sreport_928bb601-f318-4cca-b48c-e4683371c6c8<\/code>/);
 });
 
 test('v3 U4 gate in Understand: checkbox arms Record my review; click posts set_stage understand then reloads', async () => {

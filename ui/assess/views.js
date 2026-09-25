@@ -136,7 +136,7 @@ const understand = {
       const r = m.reports.value || {};
       if (r.suppressed || r.status === 'held') reports = `<p class="muted" data-reports-held>${esc(V3_REPORTS_HELD)}</p>`;
       else { const list = Array.isArray(r.reports) ? r.reports : [];
-        reports = list.length ? `<ul class="links" data-report-list>${list.map((x, i) => `<li data-report-id="${esc(x.id)}"><button type="button" data-open-report="${esc(x.id)}">Report ${list.length - i} · built ${esc(humanDate(x.created_at))}</button><details class="small muted report-ids"><summary>Report id</summary><code>${esc(x.id)}</code> · <code>${esc(x.created_at)}</code></details></li>`).join('')}</ul>` : '<p class="muted">No reports have been built for this assessment.</p>'; }
+        reports = list.length ? `<ul class="links" data-report-list>${list.map((x, i) => `<li data-report-id="${esc(x.id)}"><button type="button" data-open-report="${esc(x.id)}">Report ${list.length - i} · built ${esc(humanDate(x.created_at))}</button><details class="small muted report-ids"><summary>Technical details</summary><code>${esc(x.id)}</code> · <code>${esc(x.created_at)}</code></details></li>`).join('')}</ul>` : '<p class="muted">No reports have been built for this assessment.</p>'; }
     } else if (m.reports.status === 'refused') reports = '<p class="muted" data-reports-unavailable>Reports are unavailable for this assessment.</p>';
     else reports = refusalLine(ctx, m.reports.status, 'data-retry="reports"', 'Reports');
     const open = m.openReport ? (m.openReport.status === 'held' ? `<p class="muted" data-open-report-reason>${esc(V3_REPORT_HELD)}</p>` : m.openReport.status === 'error' ? `<p class="small muted" role="alert">${esc(m.openReport.text)}</p>` : '') : '';
