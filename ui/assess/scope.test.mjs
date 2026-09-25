@@ -1,7 +1,7 @@
 // node --test ui/assess/scope.test.mjs — scope pages: render() strings, load() with a fake api, entry sign-in transitions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pages, css, classify, landsOnWork, signInLanding, whoLine, PERSPECTIVE_WHO } from './scope.js';
+import { pages, css, classify, landsOnWork, signInLanding, whoLine, PERSPECTIVE_WHO, SIGNUP_NOTE } from './scope.js';
 import { readFileSync } from 'node:fs';
 import * as cards from './cards.js';
 
@@ -406,4 +406,16 @@ test('B08+B20: one shared who-line per group (setup, launch, Collect); headings 
   for (const w of Object.values(PERSPECTIVE_WHO)) assert.doesNotMatch(w, /Experience of/, 'who the group is, not what it is asked');
   const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   assert.match(src, /<h3 style="margin:18px 0 6px">\$\{esc\(g\.lens\)\}<\/h3>\$\{whoLine\(g\.lens\)/, 'Collect group heading carries the shared who-line');
+});
+
+test('U28 (Bincy B32): both sign-in entry points say a new email creates an account — one shared line, under the Sign in action', async () => {
+  assert.equal(SIGNUP_NOTE, 'New here? Signing in with your email creates your account.');
+  const ctx = ctxWith(); const home = pages.entry.render(ctx, await pages.entry.load(ctx, {}));
+  const nav = home.slice(home.indexOf('<nav class="public-choices'), home.indexOf('</nav>'));
+  assert.equal(nav.split(SIGNUP_NOTE).length - 1, 1, 'home: once, inside the choices'); assert.ok(nav.indexOf(SIGNUP_NOTE) > nav.indexOf('>Sign in</a>'), 'home: under Sign in');
+  assert.equal(home.split(SIGNUP_NOTE).length - 1, 1, 'home: never repeated');
+  const si = pages.entry.render(ctx, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.equal(si.split(SIGNUP_NOTE).length - 1, 1, '#signin: once'); assert.ok(si.indexOf(SIGNUP_NOTE) > si.indexOf('>Sign in with an email code</a>'), '#signin: under the primary');
+  const inx = ctxWith({}, { state: { principal: { id: 'pr_1' } } }); const signedIn = pages.entry.render(inx, await pages.entry.load(inx, {}));
+  assert.ok(!signedIn.includes(SIGNUP_NOTE), 'signed in: no sign-up line');
 });
