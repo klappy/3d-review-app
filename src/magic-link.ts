@@ -159,14 +159,17 @@ export const checkEmailPage = (minutes: number) => page("Check your email",
  *  "Sign in as <verified address>" — or plain "Sign in" when the link names no matching address. A person must click. */
 export function openPage(nonce: string, next?: "oauth"): Response {
   const action = `/v2/auth/email/open${next === "oauth" ? "?next=oauth" : ""}`;
-  return page("Sign in", `<h1>Sign in to 3D Review</h1><form id="f" method="post" action="${action}"><input type="hidden" name="t" id="t"><input type="hidden" name="e" id="e"><button type="submit" id="b" hidden>Sign in</button></form><p id="m" class="muted">Checking your link…<noscript> Your browser blocked the script this page needs. Open the link in another browser.</noscript></p>
+  return page("Sign in", `<h1>Sign in to 3D Review</h1><form id="f" method="post" action="${action}"><input type="hidden" name="t" id="t"><input type="hidden" name="e" id="e"><button type="submit" id="b" hidden>Sign in</button></form><button type="button" id="r" hidden>Try again</button><p id="m" class="muted">Checking your link…<noscript> Your browser blocked the script this page needs. Open the link in another browser.</noscript></p>
 <script nonce="${nonce}">(function(){var d=document,m=/^#t=([A-Za-z0-9_-]{43})(?:&e=([^&]{1,762}))?$/.exec(location.hash),msg=d.getElementById("m"),b=d.getElementById("b");try{history.replaceState(null,"",location.pathname+location.search)}catch(x){}
 function bad(t){msg.textContent=t;var a=d.createElement("a");a.href="/v2/auth/email";a.textContent=" Request a new link";msg.appendChild(a)}
 if(!m){bad("This sign-in link is incomplete.");return}var e="";if(m[2]){try{e=decodeURIComponent(m[2])}catch(x){}}
-fetch("/v2/auth/email/check",{method:"POST",headers:{"content-type":"application/json",accept:"application/json"},body:JSON.stringify({t:m[1],e:e}),credentials:"same-origin",cache:"no-store"}).then(function(r){return r.ok?r.json():{valid:false}}).then(function(v){
+var r=d.getElementById("r");function retry(t){msg.textContent=t;r.hidden=false;r.focus()}r.onclick=function(){r.hidden=true;check()};
+function check(){msg.textContent="Checking your link…";fetch("/v2/auth/email/check",{method:"POST",headers:{"content-type":"application/json",accept:"application/json"},body:JSON.stringify({t:m[1],e:e}),credentials:"same-origin",cache:"no-store"}).then(function(x){
+if(x.status===429){retry("Too many sign-ins from this network right now. Wait a minute, then try again.");return null}
+if(!x.ok){retry("Could not check this link right now. Try again.");return null}return x.json()}).then(function(v){if(v===null)return;
 if(!v||!v.valid){bad("This sign-in link is not valid or has expired.");return}
 if(${next === "oauth" ? "true" : "false"}&&!v.email){bad("This link does not name the account it signs in.");return}
-d.getElementById("t").value=m[1];if(v.email){d.getElementById("e").value=v.email;b.textContent="Sign in as "+v.email}msg.textContent=v.email?"Not you? Close this page.":"";b.hidden=false;b.focus()}).catch(function(){bad("Could not check this link. Check your connection.")})})();</script>`, 200, nonce);
+d.getElementById("t").value=m[1];if(v.email){d.getElementById("e").value=v.email;b.textContent="Sign in as "+v.email}msg.textContent=v.email?"Not you? Close this page.":"";b.hidden=false;b.focus()}).catch(function(){retry("Could not check this link. Check your connection, then try again.")})}check()})();</script>`, 200, nonce);
 }
 export const unnamedLinkPage = () => page("Link does not name an account",
   `<h1>This link does not name the account it signs in</h1><p>Start again from the app you were connecting, and use the newest link we email you.</p>`, 400);

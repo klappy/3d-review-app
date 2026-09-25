@@ -222,6 +222,9 @@ describe("routes", () => {
     expect(html).toContain('<button type="submit" id="b" hidden>Sign in</button>');
     expect(html).toContain('"/v2/auth/email/check"'); // the script only checks the link
     expect(html).toContain('"Sign in as "+v.email');
+    // Only a definite {valid:false} says "expired"; a 429 or network failure offers a retry (Bugbot 4109240140).
+    expect(html).toContain('<button type="button" id="r" hidden>Try again</button>');
+    expect(html).toContain("x.status===429"); expect(html).toContain("r.onclick=function(){r.hidden=true;check()}");
   });
   it("check endpoint: live link + hash-matched address → that address; mismatch → no address; dead link → invalid; mints nothing", async () => {
     const { token } = await issue("checker@example.invalid");
