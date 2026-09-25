@@ -8,11 +8,13 @@
 //   transfer ownership  POST   /v2/{scope}/{id}/transfer                  danger (destructive): owner only; principal ID; step_down off
 // Confirm tokens and the typed invitee address live only in this page's in-memory model: rebuilt on every load (scope change),
 // dropped on sign-out with the shell state, cleared after execute. Nothing here touches storage, URLs or logs.
+// B31/U26: the address you just invited is kept in memory (m.invitees, by invitation id) only to label its pending row;
+// the service stores a hash, not the address, so an invitation made earlier shows role and date only.
 // Acceptance (cap.grant.accept) is NOT here: the root's #invite= link opens the v3 Invitation page (ui/v3/components/invite.js, B03).
 
 import { memberList, labelMembers, readAccountEmail, membersHidden, NO_EMAIL_NOTE } from '../v3/components/member-list.js';
 import { learnMore } from '../v3/components/learn-more.js';
-import { humanDate as plainDate } from './cards.js'; // lane 9 L9-24: shared closed-by-default disclosure
+import { shortDate } from './cards.js'; // B31/U26: shared short date ("Sep 25"), never an ISO stamp
 
 export const SCOPE_SEG = { workspaces: 'workspace', projects: 'project', assessments: 'assessment' };
 export const SCOPE_NOUN = { workspaces: 'workspace', projects: 'project', assessments: 'assessment' };
@@ -23,11 +25,21 @@ export const VIEWER_NOTE = 'Permissions are managed by members and owners.';
 export const DUPLICATE_NOTE = 'Already invited — nothing sent again.';
 export const UNCONFIRMED_NOTE = 'Could not be confirmed as sent; the invitation stays live and can be revoked.';
 export const PREVIEW_AGAIN = 'Preview again.';
+export const TEST_ADDRESS_NOTE = 'Invitation recorded; not emailed (test address).';
+// B31/U26: one plain sentence for an invite outcome — never a delivery reason code, receipt or trace id.
+export function inviteOutcome(r = {}) {
+  const reason = r.delivery?.reason || '';
+  if (r.delivered === false && /duplicate/.test(reason)) return DUPLICATE_NOTE;
+  if (r.delivered === false && r.delivery?.state === 'unconfirmed') return `Invitation recorded — ${UNCONFIRMED_NOTE}`;
+  if (r.delivered === false && reason === 'synthetic_recipient') return TEST_ADDRESS_NOTE;
+  if (r.delivered === false) return 'Invitation recorded; no email was sent. It can be revoked below.';
+  return 'Invitation sent.';
+}
 
 const classify = e => { const c = String(e?.code || e?.status || ''); if (c === 'NOT_AUTHENTICATED' || c === '401') return 'unauthenticated'; if (c === 'NOT_AUTHORIZED_AT_SCOPE' || c === '403') return 'forbidden'; if (c === 'NOT_FOUND_OR_NOT_VISIBLE' || c === '404') return 'not_found'; if (c === 'RESERVED_NOT_BUILT' || c === '501') return 'not_built'; return 'failed'; };
 export { classify };
 
-export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myEmail: '', myRole: null, sheet: null, notice: null, alert: false, busy: false, receipts: {} }; }
+export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myEmail: '', myRole: null, sheet: null, notice: null, alert: false, busy: false, receipts: {}, invitees: {} }; }
 
 export const permissions = {
   async load(ctx, { scope, id }) {
@@ -59,7 +71,7 @@ export const permissions = {
     const actions = g => { const rc = m.receipts[g.id]; return `${g.role === 'owner' ? '<span class="muted">Owner — only a transfer changes this</span>' : member && canTouch(g) ? `${owner ? `<select data-role-for="${esc(g.id)}" aria-label="New role" ${busy}>${ROLES.map(r => `<option value="${r}" ${r === g.role ? 'selected' : ''}>${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}" ${busy}>Preview role change</button> ` : ''}<button type="button" class="quiet" data-revoke="${esc(g.id)}" ${busy}>Remove</button>` : `<span class="muted">Members manage viewers and members only</span>`}${rc ? learnMore(`<p class="small muted">receipt ${esc(rc.receipt)} · trace ${esc(rc.trace)}</p>`, { summary: 'Details' }) : ''}`; };
     const roster = memberList(esc, m.grants, { me: m.me, myEmail: m.myEmail, actions, rowAttr: g => `data-grant-row="${esc(g.id)}"`, empty: 'No grants listed.', note: false });
     const namesNote = membersHidden(m.grants, { me: m.me, myEmail: m.myEmail }) ? `<p class="small muted" data-member-note>${esc(NO_EMAIL_NOTE)}</p>` : '';
-    const pending = m.pending.length ? `<p class="eyebrow" style="margin-top:18px">Pending invitations</p><ul class="small" data-pending>${m.pending.map(i => `<li data-invitation="${esc(i.id)}">${esc(i.role)} · ${esc(i.status)}${i.status === 'unconfirmed' ? ` · ${esc(UNCONFIRMED_NOTE)}` : ''}${i.created_at ? ` · invited ${esc(plainDate(i.created_at))}` : ''}${member && (owner || RANK[i.role] <= RANK.member) ? ` <button type="button" class="quiet small" data-revoke-invitation="${esc(i.id)}" ${busy}>Revoke invitation</button>` : ''}</li>`).join('')}</ul>` : ''; // B30: no pending → nothing (not another line)
+    const pending = m.pending.length ? `<p class="eyebrow" style="margin-top:18px">Pending invitations</p><ul class="small" data-pending>${m.pending.map(i => `<li data-invitation="${esc(i.id)}">${esc(i.role)}${i.created_at ? ` · invited ${esc(shortDate(i.created_at))}` : ''}${m.invitees?.[i.id] ? ` · ${esc(m.invitees[i.id])}` : ''}${i.status === 'unconfirmed' ? ` · ${esc(UNCONFIRMED_NOTE)}` : ''}${member && (owner || RANK[i.role] <= RANK.member) ? ` <button type="button" class="quiet small" data-revoke-invitation="${esc(i.id)}" ${busy}>Revoke invitation</button>` : ''}</li>`).join('')}</ul>` : ''; // B30: no pending → nothing (not another line)
     const roleOptions = (owner ? ROLES : ROLES.filter(r => r !== 'owner')).map(r => `<option value="${r}">${r}</option>`).join('');
     const invite = member ? `<form class="line" data-invite-form><p class="eyebrow">Invite someone</p><label class="field">Email<input name="email" type="email" required autocomplete="off" ${busy}></label><label class="field">Role<select name="role" ${busy}>${roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit" ${busy}>Preview invitation</button></div></form>` : '';
     // B30 (lane 9, less text 3): transfer is rare and destructive — a closed disclosure whose first line, once opened, is the warning.
@@ -94,7 +106,7 @@ export const permissions = {
       m.busy = true; paint();
       try { const env = await call(s.url, { method: s.method, body: { params: s.params, mode: 'execute', confirm_token: token } }); const r = env.result || {};
         m.sheet = null;
-        if (s.kind === 'invite') { if (r.delivered === false && /duplicate/.test(r.delivery?.reason || '')) say(`${DUPLICATE_NOTE}`, false, receiptText(env)); else if (r.delivered === false && r.delivery?.state === 'unconfirmed') say(`Invitation recorded — ${UNCONFIRMED_NOTE}`, false, receiptText(env)); else if (r.delivered === false) say('Invitation recorded; no email was sent. It can be revoked below.', false, receiptText(env)); else say(`Invitation sent.`, false, receiptText(env)); }
+        if (s.kind === 'invite') { if (r.invitation_id && s.params.email) (m.invitees ||= {})[r.invitation_id] = s.params.email; say(inviteOutcome(r), false, receiptText(env)); }
         else say(`${s.label} done.`, false, receiptText(env));
         await refresh();
         // Transfer may create the target's first grant; resolve only from the refreshed roster.
