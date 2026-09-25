@@ -6,6 +6,7 @@
 // the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
+import { learnMore } from '../v3/components/learn-more.js'; // lane 9 L9-24: shared closed-by-default disclosure
 import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, V3_HELD_TEXT } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
@@ -119,7 +120,18 @@ const understand = {
     } else if (m.reports.status === 'refused') reports = '<p class="muted" data-reports-unavailable>Reports are unavailable for this assessment.</p>';
     else reports = refusalLine(ctx, m.reports.status, 'data-retry="reports"', 'Reports');
     const open = m.openReport ? (m.openReport.status === 'held' ? `<p class="muted" data-open-report-reason>${esc(m.openReport.reason)}</p>` : m.openReport.status === 'error' ? `<p class="small muted" role="alert">${esc(m.openReport.text)}</p>` : '') : '';
-    return `${bands}<div class="grid"><section class="panel"><p class="eyebrow">Understand</p><h2>Bring the perspectives together</h2>${lensBlocks}<p class="small muted line">Counts are per survey. Respondents are counted within each survey and are not added across surveys.</p></section><aside class="stack"><section class="panel" data-results><p class="eyebrow">Results</p>${results}</section><section class="panel" data-reports><p class="eyebrow">Reports</p>${reports}<p><button type="button" data-retry="reports">Refresh reports</button></p>${reportBuildMarkup(ctx, m.role)}${m.openReport && m.openReport.status !== 'shown' ? `<div>${open}</div>` : ''}<p class="status" role="status" aria-live="polite" data-report-status></p></section></aside></div><section class="panel report-full" data-report-full hidden><div class="report-tools"><p class="eyebrow" style="margin:0">Report · full view</p><button type="button" class="quiet" data-close-report>Close report</button></div><div data-report-view></div></section>`;
+    const countsNote = '<p class="small muted line">Counts are per survey. Respondents are counted within each survey and are not added across surveys.</p>';
+    const reportsPanel = `<section class="panel" data-reports><p class="eyebrow">Reports</p>${reports}<p><button type="button" data-retry="reports">Refresh reports</button></p>${reportBuildMarkup(ctx, m.role)}${m.openReport && m.openReport.status !== 'shown' ? `<div>${open}</div>` : ''}<p class="status" role="status" aria-live="polite" data-report-status></p></section>`;
+    const full = '<section class="panel report-full" data-report-full hidden><div class="report-tools"><p class="eyebrow" style="margin:0">Report · full view</p><button type="button" class="quiet" data-close-report>Close report</button></div><div data-report-view></div></section>';
+    // No band panel (results unreadable, no scores): the per-survey counts and the results state stay up front (unchanged layout).
+    if (!bands) return `<div class="grid"><section class="panel"><p class="eyebrow">Understand</p><h2>Bring the perspectives together</h2>${lensBlocks}${countsNote}</section><aside class="stack"><section class="panel" data-results><p class="eyebrow">Results</p>${results}</section>${reportsPanel}</aside></div>${full}`;
+    // Lane 9 L9-24 (captain 17:05 "less text"): the band panel is the screen (one heading, one primary: the review gate).
+    // Per-survey counts and the results state move behind the shared Learn more; reports stay visible (they are actions).
+    // Validator #282: a results error (and its Retry) is never tucked away — only the loaded results state goes behind Learn more.
+    const resultsPanel = `<section${m.results.status === 'loaded' ? '' : ' class="panel"'} data-results><p class="eyebrow">Results</p>${results}</section>`;
+    return m.results.status === 'loaded'
+      ? `${bands}${learnMore(`<section class="lens-detail"><p class="eyebrow">Counts per survey</p>${lensBlocks}${countsNote}</section>${resultsPanel}`)}${reportsPanel}${full}`
+      : `${bands}${resultsPanel}${learnMore(`<section class="lens-detail"><p class="eyebrow">Counts per survey</p>${lensBlocks}${countsNote}</section>`)}${reportsPanel}${full}`;
   },
   bind(ctx, root, m) {
     const clearReport = () => {
@@ -200,9 +212,11 @@ const improve = {
       // v3 lane 3 L3-4: Bincy screen 11 / prototype frame 11. Recommendations aside not drawn (PARITY I1).
       const T = V3_NEXT;
       const notes = m.editable
-        ? `<form data-notes-form><label class="field">${esc(T.reflection)}<textarea name="notes_reflection" rows="3" maxlength="4000" placeholder="${esc(T.reflectionHint)}">${esc(m.notes_reflection)}</textarea></label><label class="field">${esc(T.next)}<textarea name="notes_next_steps" rows="2" maxlength="4000" placeholder="${esc(T.nextHint)}">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(T.footer)} ${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>${esc(T.save)}</button></div><p class="status" role="status" aria-live="polite" data-notes-status></p></form>`
-        : `<h3>${esc(T.reflection)}</h3><p data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">Nothing recorded yet.</span>'}</p><h3>${esc(T.next)}</h3><p data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next step recorded yet.</span>'}</p><p class="small muted">${esc(NOTES_VISIBILITY)} Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`;
-      return `<section class="panel" data-v3-next><p class="eyebrow">${esc(T.eyebrow)}</p><h2>${esc(T.title)}</h2>${notes}</section>`;
+        ? `<form data-notes-form><label class="field">${esc(T.reflection)}<textarea name="notes_reflection" rows="3" maxlength="4000" placeholder="${esc(T.reflectionHint)}">${esc(m.notes_reflection)}</textarea></label><label class="field">${esc(T.next)}<textarea name="notes_next_steps" rows="2" maxlength="4000" placeholder="${esc(T.nextHint)}">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>${esc(T.save)}</button></div><p class="status" role="status" aria-live="polite" data-notes-status></p></form>`
+        : `<h3>${esc(T.reflection)}</h3><p data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">Nothing recorded yet.</span>'}</p><h3>${esc(T.next)}</h3><p data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next step recorded yet.</span>'}</p><p class="small muted">${esc(NOTES_VISIBILITY)}</p>`;
+      // Lane 9 L9-24: the schedule note and the role explanation move behind the shared Learn more (one line kept: who can read).
+      const more = `<p class="muted">${esc(T.footer)}</p>${m.editable ? '' : `<p class="muted">Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`}`;
+      return `<section class="panel" data-v3-next><p class="eyebrow">${esc(T.eyebrow)}</p><h2>${esc(T.title)}</h2>${notes}${learnMore(more)}</section>`;
     }
     const notes = m.editable
       ? `<form data-notes-form><label class="field">Reflection<textarea name="notes_reflection" maxlength="4000">${esc(m.notes_reflection)}</textarea></label><label class="field">Next steps<textarea name="notes_next_steps" maxlength="4000">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>Save notes</button></div><p class="status" role="status" aria-live="polite" data-notes-status></p></form>`
