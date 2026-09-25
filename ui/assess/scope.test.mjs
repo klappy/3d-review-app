@@ -414,6 +414,7 @@ test('U28 (Bincy B32): both sign-in entry points say a new email creates an acco
   const nav = home.slice(home.indexOf('<nav class="public-choices'), home.indexOf('</nav>'));
   assert.equal(nav.split(SIGNUP_NOTE).length - 1, 1, 'home: once, inside the choices'); assert.ok(nav.indexOf(SIGNUP_NOTE) > nav.indexOf('>Sign in</a>'), 'home: under Sign in');
   assert.equal(home.split(SIGNUP_NOTE).length - 1, 1, 'home: never repeated');
+  assert.match(nav, /data-signup-note style="display:block;flex-basis:100%;grid-column:1\/-1;/, 'home: its own full-width line in the flex (product) or grid (legacy) row');
   const si = pages.entry.render(ctx, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
   assert.equal(si.split(SIGNUP_NOTE).length - 1, 1, '#signin: once'); assert.ok(si.indexOf(SIGNUP_NOTE) > si.indexOf('>Sign in with an email code</a>'), '#signin: under the primary');
   const inx = ctxWith({}, { state: { principal: { id: 'pr_1' } } }); const signedIn = pages.entry.render(inx, await pages.entry.load(inx, {}));
