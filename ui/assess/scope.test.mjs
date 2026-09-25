@@ -1,7 +1,7 @@
 // node --test ui/assess/scope.test.mjs — scope pages: render() strings, load() with a fake api, entry sign-in transitions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pages, css, classify } from './scope.js';
+import { pages, css, classify, landsOnWork } from './scope.js';
 import * as cards from './cards.js';
 
 const err = (code, message = 'nope') => Object.assign(new Error(message), { code, status: Number(code) || 400 });
@@ -156,6 +156,18 @@ test('entry: public welcome with hero, tour stepper and survey/example/sign-in b
 test('entry: signed in shows Continue cards + sign-out, hides sign-in', async () => {
   const ctx = ctxWith({}, { state: { principal: { id: 'pr_1' } } }); const h = pages.entry.render(ctx, await pages.entry.load(ctx, {}));
   assert.ok(h.includes('href="#workspaces"')); assert.ok(h.includes('href="#projects"')); assert.ok(h.includes('data-act="signout"')); assert.ok(!h.includes('data-act="signin"'));
+  // B02: a signed-in "/" never shows "Sign in" — not the nav choice, not any link to the provider
+  const nav = h.slice(h.indexOf('<nav class="public-choices'), h.indexOf('</nav>'));
+  assert.ok(!nav.includes('Sign in')); assert.ok(!h.includes('href="/v2/auth/access"')); assert.ok(!/>\s*Sign in\s*</.test(h));
+});
+test('B02: signed in, the welcome route lands on #projects; signed out, and the explicit #signin/#survey/#about pages, stay put', () => {
+  for (const r of [{ kind: 'entry' }, { kind: 'entry', intent: 'how' }, { kind: 'entry', intent: 'example' }]) { assert.equal(landsOnWork(r, { id: 'pr_1' }), true, JSON.stringify(r)); assert.equal(landsOnWork(r, null), false, JSON.stringify(r)); }
+  for (const intent of ['signin', 'survey', 'about']) assert.equal(landsOnWork({ kind: 'entry', intent }, { id: 'pr_1' }), false, intent);
+  for (const kind of ['projects', 'workspaces', 'assessment']) assert.equal(landsOnWork({ kind }, { id: 'pr_1' }), false, kind);
+});
+test('B02: render() applies landsOnWork before routing, replacing (not pushing) the address with #projects', async () => {
+  const { readFileSync } = await import('node:fs'); const js = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  assert.match(js, /async function render\(\) \{\n[^\n]*\n\s*if \(landsOnWork\(route\(location\.hash\), state\.principal\)\) \{ try \{ history\.replaceState\(null, '', location\.pathname \+ location\.search \+ '#projects'\); \} catch \{\} \}\n\s*const gen = \+\+generation, r = route\(location\.hash\);/);
 });
 test('entry: sign-in email → code step (dev code shown) → session stored, go #projects then token set (B-F02a)', async () => {
   const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, removeItem: k => { delete stored[k]; } };
