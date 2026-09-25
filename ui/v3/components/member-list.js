@@ -31,12 +31,16 @@ export function memberCell(esc, person) {
 }
 
 /** Roster table. `actions(row, person)` returns the third cell's HTML (page-specific controls). */
-export function memberList(esc, rows, { me = null, myEmail = '', actions = () => '', rowAttr = () => '', empty = 'No one listed.' } = {}) {
+// `note: false` leaves the "names are not shared" note to the caller (e.g. behind Learn more: one line per screen, B30).
+export function memberList(esc, rows, { me = null, myEmail = '', actions = () => '', rowAttr = () => '', empty = 'No one listed.', note = true } = {}) {
   const labelled = labelMembers(rows, { me, myEmail });
   const body = labelled.map(({ row, person }) => `<tr ${rowAttr(row)}><td>${memberCell(esc, person)}</td><td>${esc(row.role)}</td><td class="small">${actions(row, person)}</td></tr>`).join('');
   const hidden = labelled.some(({ person }) => !person.you && !person.email);
-  return `<table class="grants" data-member-list><thead><tr><th>Person</th><th>Role</th><th></th></tr></thead><tbody>${body || `<tr><td colspan="3" class="muted">${esc(empty)}</td></tr>`}</tbody></table>${hidden ? `<p class="small muted" data-member-note>${esc(NO_EMAIL_NOTE)}</p>` : ''}`;
+  return `<table class="grants" data-member-list><thead><tr><th>Person</th><th>Role</th><th></th></tr></thead><tbody>${body || `<tr><td colspan="3" class="muted">${esc(empty)}</td></tr>`}</tbody></table>${hidden && note ? `<p class="small muted" data-member-note>${esc(NO_EMAIL_NOTE)}</p>` : ''}`;
 }
+
+/** True when some row (not you) has no name or email to show — the case NO_EMAIL_NOTE explains. */
+export const membersHidden = (rows = [], { me = null, myEmail = '' } = {}) => labelMembers(rows, { me, myEmail }).some(({ person }) => !person.you && !person.email);
 
 /** Read the signed-in account's email (same read the shell header uses). Resolves '' on any failure; never throws. */
 export async function readAccountEmail({ demo = false, fetchImpl = globalThis.fetch } = {}) {

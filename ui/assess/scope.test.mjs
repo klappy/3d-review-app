@@ -100,7 +100,7 @@ test('project (owner): assessment cards link to #assessment/<id> with language n
   const h = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
   assert.ok(h.includes('href="#assessment/a1"')); assert.ok(h.includes('Language: Lake')); assert.ok(h.includes('Collecting'));
   assert.ok(h.includes('id="create-assessment"')); assert.ok(h.includes('<option value="l1">Lake (qaa)</option>')); assert.ok(!h.includes('<option value="l2"'), 'archived language not offered');
-  assert.ok(h.includes('id="rename-form"')); assert.ok(h.includes('href="#permissions/projects/p1"')); assert.ok(h.includes('Org'));
+  assert.ok(!h.includes('id="rename-form"') && !h.includes('<h2>Rename</h2>'), 'B07: no rename card; the heading carries the edit control'); assert.ok(h.includes('href="#permissions/projects/p1"')); assert.ok(h.includes('Org'));
   // B34: Start is the one visible create action; the bare assessment / language forms sit behind a closed "More".
   assert.ok(h.includes('data-v3-start href="#new"')); assert.match(h, /<details class="panel more-tools" id="project-more"><summary>More<\/summary>[\s\S]*id="create-assessment"[\s\S]*id="add-language"[\s\S]*<\/details>/);
 });

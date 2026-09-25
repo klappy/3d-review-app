@@ -87,3 +87,6 @@ main.content{padding:var(--main-pad);min-width:0;max-width:1180px}
 .rv .content:focus{outline:none}
 /* An isolated shell may have little content; don't stretch the mobile tree. */
 @media(max-width:760px){.shell{grid-template-rows:auto 1fr}}
+/* B30 (lane 9, less text 3): ONE visible heading per screen. When a page renders its own h1 (About, sign-in, survey, public
+   home, error panels), the shell's generic h1 ("Welcome" / "3D Review" / scope title) steps aside; its eyebrow and level menu stay. */
+.rv .content:has(> [data-content] h1) > .row > h1{display:none}
