@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import app from "../src/index";
+import { invitationMessage } from "../src/mail";
 import worker from "../src/worker";
 import { resolvePrincipal } from "../src/auth";
 import { sha256 } from "../src/handlers/common";
@@ -100,6 +101,22 @@ describe("link token", () => {
   });
 });
 
+describe("invitation copy follows the environment (validator 2 #1)", () => {
+  it("email links off (production): byte-identical to the base copy; on: names the sign-in email", () => {
+    const off = invitationMessage("https://app.invalid", "il_x", "member", "assessment", 7);
+    expect(off.text).toBe([
+      "You have been invited to join a assessment in 3D Review as member.", "",
+      "To accept, open this link and sign in with this email address. You will get a one-time code by email — there is no password.", "",
+      "https://app.invalid/#invite=il_x", "",
+      "The invitation expires in 7 days and only works for this email address. If you were not expecting it, you can ignore this message.",
+    ].join("\n"));
+    expect(off.html).toBe('<p>You have been invited to join a assessment in 3D Review as <b>member</b>.</p><p>To accept, open this link and sign in with this email address. You will get a one-time code by email — there is no password.</p><p><a href="https://app.invalid/#invite=il_x">Accept the invitation</a></p><p style="color:#57606a;font-size:14px">The invitation expires in 7 days and only works for this email address. If you were not expecting it, you can ignore this message.</p>');
+    const on = invitationMessage("https://app.invalid", "il_x", "member", "assessment", 7, true);
+    expect(on.text).toContain("You will get a sign-in email — there is no password."); expect(on.text).not.toContain("one-time code");
+    expect(on.html).toContain("You will get a sign-in email — there is no password.");
+  });
+});
+
 describe("rate limits", () => {
   it(`per email: ${MAGIC_LINK_PER_EMAIL} links per 15 minutes, keyed on the normalised address`, async () => {
     const t0 = Date.now();
@@ -166,7 +183,7 @@ describe("routes", () => {
     const eh = await sha256("owner@example.invalid");
     await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind("usr_owner_b38", eh, 1, 0, new Date().toISOString()).run();
     const { token } = await issue("Owner@Example.invalid");
-    const first = await post("/v2/auth/email/open", { t: token });
+    const first = await post("/v2/auth/email/open", { t: token, e: "owner@example.invalid" });
     expect(first.status).toBe(303);
     const cookie = first.headers.get("set-cookie")!;
     const s1 = sessionFrom(first)!;
@@ -176,12 +193,12 @@ describe("routes", () => {
     const row: any = await db.prepare("SELECT expires_at, created_at FROM session WHERE token_hash = ?").bind(await sha256(s1)).first();
     expect(row.expires_at - row.created_at).toBe(30 * 24 * 3600e3);
     // A second device / browser / scanner opening the same link also works (not single-use).
-    const second = await post("/v2/auth/email/open", { t: token });
+    const second = await post("/v2/auth/email/open", { t: token, e: "owner@example.invalid" });
     expect(second.status).toBe(303); expect(sessionFrom(second)).not.toBe(s1);
   });
   it("a first-time address gets a new self-serve principal (provisioned, not support)", async () => {
     const { token } = await issue("newcomer@example.invalid");
-    const res = await post("/v2/auth/email/open", { t: token });
+    const res = await post("/v2/auth/email/open", { t: token, e: "newcomer@example.invalid" });
     const p: any = await resolvePrincipal(new Request(ORIGIN + "/", { headers: { cookie: `session=${sessionFrom(res)}` } }), env);
     expect(p).toMatchObject({ kind: "user", provisioned: true });
     const pr: any = await db.prepare("SELECT support FROM principal WHERE email_hash = ?").bind(await sha256("newcomer@example.invalid")).first();
@@ -191,14 +208,24 @@ describe("routes", () => {
     const t0 = Date.now() - 31 * 60e3;
     const { token } = await issue("late@example.invalid", { now: t0 });
     for (const t of [token, newMagicToken(), "junk"]) {
-      const res = await post("/v2/auth/email/open", { t });
+      const res = await post("/v2/auth/email/open", { t, e: "late@example.invalid" });
       expect(res.status).toBe(400); expect(res.headers.get("set-cookie")).toBeNull();
     }
     expect(await db.prepare("SELECT COUNT(*) AS n FROM session").first("n")).toBe(0);
   });
+  it("every open requires the link's own address, hash-matched: missing or mismatched → 'incomplete' page, no session (plain sign-in too)", async () => {
+    const { token } = await issue("named@example.invalid");
+    for (const body of [{ t: token }, { t: token, e: "" }, { t: token, e: "someone.else@example.invalid" }, { t: token, e: "not an address" }]) {
+      const res = await post("/v2/auth/email/open", body);
+      expect(res.status).toBe(400); expect(res.headers.get("set-cookie")).toBeNull();
+      expect(await res.text()).toContain("This link is incomplete — request a new one.");
+    }
+    expect(await db.prepare("SELECT COUNT(*) AS n FROM session").first("n")).toBe(0);
+    expect((await post("/v2/auth/email/open", { t: token, e: " Named@Example.invalid " })).status).toBe(303); // normalised match
+  });
   it("sign-out deletes the session row and clears the cookie", async () => {
     const { token } = await issue("leaver@example.invalid");
-    const s = sessionFrom(await post("/v2/auth/email/open", { t: token }))!;
+    const s = sessionFrom(await post("/v2/auth/email/open", { t: token, e: "leaver@example.invalid" }))!;
     const out = await app.fetch(new Request(ORIGIN + "/v2/auth/session", { method: "DELETE", headers: { cookie: `session=${s}`, origin: ORIGIN } }), env);
     expect(out.status).toBe(200);
     expect(out.headers.get("set-cookie")).toBe("session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
@@ -221,7 +248,9 @@ describe("routes", () => {
     expect(html).not.toMatch(/\.submit\(|requestSubmit|autofocus|http-equiv/i);
     expect(html).toContain('<button type="submit" id="b" hidden>Sign in</button>');
     expect(html).toContain('"/v2/auth/email/check"'); // the script only checks the link
-    expect(html).toContain('"Sign in as "+v.email');
+    expect(html).toContain('b.textContent="Sign in as "+v.email');
+    expect(html).toContain('if(!v.email){bad("This link is incomplete — request a new one.");return}'); // never an unnamed sign-in
+    expect(html).not.toMatch(/if\(v\.email\)/);
     // Only a definite {valid:false} says "expired"; a 429 or network failure offers a retry (Bugbot 4109240140).
     expect(html).toContain('<button type="button" id="r" hidden>Try again</button>');
     expect(html).toContain("x.status===429"); expect(html).toContain("r.onclick=function(){r.hidden=true;check()}");

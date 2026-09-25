@@ -14,8 +14,8 @@
  *   - no same-browser binding (WhatsApp / Gmail in-app / Safari hand-offs work).
  *   - the token travels in the URL FRAGMENT (`/v2/auth/email/open#t=…&e=<address>`), like `/#invite=` and `/#session=`:
  *     it never reaches a server log, an edge log or a Referer. The landing page (tiny, CSP-locked, one nonce'd script)
- *     checks the link without minting anything and shows ONE button, "Sign in as <address>" (address shown only when its
- *     hash matches the link's row). Nothing signs in until a person clicks — scanners do not click.
+ *     checks the link without minting anything and shows ONE button, "Sign in as <address>"; the open POST requires that
+ *     address, hash-matched to the link's row, or refuses. Nothing signs in until a person clicks — scanners do not click.
  *
  * Storage: the existing `login_code` table (no migration). Link rows use the `ml_` id prefix; `code_hash` = SHA-256 of
  * the token (UNIQUE → indexed lookup); `email_hash` = SHA-256 of the normalised email. No plaintext email is stored.
@@ -156,7 +156,8 @@ export const checkEmailPage = (minutes: number) => page("Check your email",
 /** Landing page for the emailed link. It NEVER submits by itself (validator B38 #2/#4: login CSRF; script-running mail
  *  scanners would otherwise mint sessions). The script reads `#t=…&e=…`, strips the fragment from history, asks
  *  POST /v2/auth/email/check (mints nothing) whether the link is live and whether `e` matches it, then shows one button:
- *  "Sign in as <verified address>" — or plain "Sign in" when the link names no matching address. A person must click. */
+ *  "Sign in as <verified address>". A link without a hash-matched address is refused ("incomplete") — never an unnamed
+ *  sign-in. A person must click. */
 export function openPage(nonce: string, next?: "oauth"): Response {
   const action = `/v2/auth/email/open${next === "oauth" ? "?next=oauth" : ""}`;
   return page("Sign in", `<h1>Sign in to 3D Review</h1><form id="f" method="post" action="${action}"><input type="hidden" name="t" id="t"><input type="hidden" name="e" id="e"><button type="submit" id="b" hidden>Sign in</button></form><button type="button" id="r" hidden>Try again</button><p id="m" class="muted">Checking your link…<noscript> Your browser blocked the script this page needs. Open the link in another browser.</noscript></p>
@@ -168,11 +169,11 @@ function check(){msg.textContent="Checking your link…";fetch("/v2/auth/email/c
 if(x.status===429){retry("Too many sign-ins from this network right now. Wait a minute, then try again.");return null}
 if(!x.ok){retry("Could not check this link right now. Try again.");return null}return x.json()}).then(function(v){if(v===null)return;
 if(!v||!v.valid){bad("This sign-in link is not valid or has expired.");return}
-if(${next === "oauth" ? "true" : "false"}&&!v.email){bad("This link does not name the account it signs in.");return}
-d.getElementById("t").value=m[1];if(v.email){d.getElementById("e").value=v.email;b.textContent="Sign in as "+v.email}msg.textContent=v.email?"Not you? Close this page.":"";b.hidden=false;b.focus()}).catch(function(){retry("Could not check this link. Check your connection, then try again.")})}check()})();</script>`, 200, nonce);
+if(!v.email){bad("This link is incomplete — request a new one.");return}
+d.getElementById("t").value=m[1];d.getElementById("e").value=v.email;b.textContent="Sign in as "+v.email;msg.textContent="Not you? Close this page.";b.hidden=false;b.focus()}).catch(function(){retry("Could not check this link. Check your connection, then try again.")})}check()})();</script>`, 200, nonce);
 }
-export const unnamedLinkPage = () => page("Link does not name an account",
-  `<h1>This link does not name the account it signs in</h1><p>Start again from the app you were connecting, and use the newest link we email you.</p>`, 400);
+export const unnamedLinkPage = () => page("Link incomplete",
+  `<h1>This link is incomplete — request a new one.</h1><p><a href="/v2/auth/email">Request a new link</a></p>`, 400);
 export const badLinkPage = () => page("Link not valid",
   `<h1>This sign-in link is not valid</h1><p>It may have expired or been copied incompletely.</p><p><a href="/v2/auth/email">Request a new link</a></p>`, 400);
 export const newNonce = (): string => b64u(crypto.getRandomValues(new Uint8Array(16)));

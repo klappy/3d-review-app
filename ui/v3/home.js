@@ -32,7 +32,7 @@ export function homeView({ projects = [], shared = [], listFor, stageLabel = s =
     if (p.archived_at) return [`<section class="v3h-card v3h-archived" data-v3h-project="${ESC(p.id)}"><div class="v3h-row-head"><span class="v3h-eyebrow">Project</span><span class="v3h-pill v3h-pill-done">Archived</span></div>${plink}</section>`];
     if (l.status === 'loaded' && l.list.length) return [];
     const msg = l.status === 'loaded' ? `<p class="v3h-meta">No assessments yet. ${open}</p>`
-      : l.status === 'unauthenticated' ? '<p class="v3h-meta" role="alert">Your sign-in is no longer active. <a href="/v2/auth/email">Sign in again</a></p>'
+      : l.status === 'unauthenticated' ? '<p class="v3h-meta" role="alert">Your sign-in is no longer active. <a href="/v2/auth/access">Sign in again</a></p>'
       : l.status === 'refused' ? '<p class="v3h-meta">Not listed: you have no role on this project.</p>'
       : l.status === 'failed' ? `<p class="v3h-meta" role="alert">Could not load assessments. ${open}</p>`
       : `<p class="v3h-meta">${open}</p>`;

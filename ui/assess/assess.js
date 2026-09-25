@@ -129,7 +129,7 @@ const state = { principal: null, projects: [], workspaces: new Map(), openProjec
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']); // visibility/authz codes (supplier 97f7402 + policy.ts)
-const SIGNIN = '<a href="/v2/auth/email">Sign in again</a>';
+const SIGNIN = '<a href="/v2/auth/access">Sign in again</a>';
 const listFor = pid => state.lists.get(pid) || { status: 'unloaded', list: null };
 const showMessage = current => state.message && current && state.message.aid === current.assessment.id ? state.message : null;
 
@@ -536,7 +536,7 @@ async function render() {
       catch (e) {
         if (gen !== generation) return;
         if (state.current?.assessment.id === aid) { /* dirty refresh failed: keep the last screen, keep the dirty banner (retry offered) */ }
-        else { state.current = null; app.className = ''; syncShell(); const expired = UNAUTHENTICATED.has(String(e.code)); app.innerHTML = `<div class="narrow panel"><h1>${expired ? 'Your sign-in is no longer active' : 'Assessment unavailable'}</h1><p class="muted">${esc(redact(e.message))}</p><p>${expired ? `<a class="button primary" href="/v2/auth/email">Sign in again</a> ` : ''}<a class="button" href="#assessment/${encodeURIComponent(aid)}" data-refresh="${esc(aid)}">Try again</a> <a href="#">All projects</a></p></div>`; app.querySelector('[data-refresh]').onclick = ev => { ev.preventDefault(); render(); }; return; }
+        else { state.current = null; app.className = ''; syncShell(); const expired = UNAUTHENTICATED.has(String(e.code)); app.innerHTML = `<div class="narrow panel"><h1>${expired ? 'Your sign-in is no longer active' : 'Assessment unavailable'}</h1><p class="muted">${esc(redact(e.message))}</p><p>${expired ? `<a class="button primary" href="/v2/auth/access">Sign in again</a> ` : ''}<a class="button" href="#assessment/${encodeURIComponent(aid)}" data-refresh="${esc(aid)}">Try again</a> <a href="#">All projects</a></p></div>`; app.querySelector('[data-refresh]').onclick = ev => { ev.preventDefault(); render(); }; return; }
       }
     }
     if (gen !== generation || state.current?.assessment.id !== aid) return;
@@ -577,7 +577,7 @@ async function reloadProjects() {
 async function mountNew(gen) {
   syncShell(); app.className = '';
   // Bugbot 4094071987: same gate as every signed-in page — no session, no wizard.
-  if (!state.principal) { app.innerHTML = `<div class="narrow panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">Starting a review needs a facilitator session.</p><div class="actions"><a class="rv-btn primary" href="/v2/auth/email">Sign in with email</a></div></div>`; return; }
+  if (!state.principal) { app.innerHTML = `<div class="narrow panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">Starting a review needs a facilitator session.</p><div class="actions"><a class="rv-btn primary" href="/v2/auth/access">Sign in with email code</a></div></div>`; return; }
   if (!document.querySelector(`link[href="${WIZARD_CSS}"]`)) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = WIZARD_CSS; document.head.appendChild(l); }
   let mod = null; try { mod = await import(WIZARD_JS); } catch { mod = null; }
   if (gen !== generation) return;
@@ -759,9 +759,22 @@ function listen() { if (listening) return; listening = true; window.addEventList
 // an answer. Unknown or off → the Access sign-in button and the team-domain logout stay exactly as before.
 async function loadEmailLinks() {
   if (demo || typeof state.emailLinks === 'boolean') return state.emailLinks === true;
-  try { const r = await fetch('/v2/auth/email?probe', { headers: { accept: 'application/json' }, credentials: 'same-origin', redirect: 'error', cache: 'no-store' }); if (r.ok) { const v = await r.json(); state.emailLinks = v?.email_links === true; } } catch {}
+  try { const r = await fetch('/v2/auth/email?probe', { headers: { accept: 'application/json' }, credentials: 'same-origin', redirect: 'error', cache: 'no-store' }); if (r.ok) { const v = await r.json(); state.emailLinks = v?.email_links === true; if (state.emailLinks) emailLinksCopy(); } } catch {}
   return state.emailLinks === true;
 }
+// B38, email links ON only: the markup and every Sign-in href stay byte-identical to production (/v2/auth/access, Access
+// copy); this environment re-points them at run time. Plain left clicks on an Access sign-in link go to the email sign-in
+// page instead, and the account-switch dialog gets the email-link copy. Off → nothing here runs.
+function emailLinksCopy() {
+  const dialog = document.getElementById('account-switch-dialog');
+  const paras = dialog?.querySelectorAll?.('p');
+  if (paras?.length) { paras[0].textContent = 'You will be signed out here, then asked for the email address of the other account. We email it a sign-in link.'; for (const p of [...paras].slice(1)) p.remove(); }
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('click', ev => {
+  if (state.emailLinks !== true || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+  const a = ev.target?.closest?.('a[href="/v2/auth/access"]'); if (!a) return;
+  ev.preventDefault(); location.assign('/v2/auth/email');
+});
 async function boot() {
   if (scrubCredentialHash() === 'forwarded') return; // 'session' falls through: identity is observed fresh below
   placeDemoNotice();
@@ -780,7 +793,7 @@ async function boot() {
     // route; it sets the session cookie and returns to the workspace home (/#session=…), not here — stated, not hidden.
     who.textContent = 'Not signed in'; app.className = ''; syncShell();
     const here = /(invite|session)=/.test(location.hash) ? location.pathname : location.pathname + location.hash;
-    app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p><p><a class="button primary" href="#">Go to sign in</a> <a class="button" href="/v2/auth/email">Sign in with email</a></p></div>`;
+    app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p><p><a class="button primary" href="#">Go to sign in</a> <a class="button" href="/v2/auth/access">Sign in with an email code</a></p></div>`;
     return; }
   void loadAccountEmail();
   // E1: signed-in staff get the real-app way back (same-origin session, no token) and the generated functionality statement.

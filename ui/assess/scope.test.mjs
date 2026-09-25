@@ -116,7 +116,7 @@ test('refusal codes render "Not visible to you" without leaking existence', asyn
 });
 test('NOT_AUTHENTICATED renders a sign-in prompt linking #', async () => {
   const ctx = ctxWith({ 'GET /v2/workspaces': err('NOT_AUTHENTICATED'), 'GET /v2/projects': err('401') });
-  for (const page of [pages.workspaces, pages.projects]) { const h = page.render(ctx, await page.load(ctx, {})); assert.ok(h.includes('Sign in to continue')); assert.ok(h.includes('href="#"')); assert.ok(h.includes('/v2/auth/email')); }
+  for (const page of [pages.workspaces, pages.projects]) { const h = page.render(ctx, await page.load(ctx, {})); assert.ok(h.includes('Sign in to continue')); assert.ok(h.includes('href="#"')); assert.ok(h.includes('/v2/auth/access')); }
 });
 test('transient failure renders message + Retry, and Retry re-runs load', async () => {
   const map = { 'GET /v2/workspaces': err('500', 'boom') }; const ctx = ctxWith(map);
@@ -139,10 +139,10 @@ test('project: refused assessments list is shown as not visible, page still rend
 // ---------- entry ----------
 test('entry: public welcome with hero, tour stepper and survey/example/sign-in buttons', async () => {
   const ctx = ctxWith(); const m = await pages.entry.load(ctx, {}); const h = pages.entry.render(ctx, m);
-  assert.ok(h.includes('What is 3D Review?')); assert.ok(h.includes('Translation team')); assert.ok(h.includes('href="#survey">Take a survey')); assert.ok(h.includes('href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →')); assert.ok(h.includes('href="/v2/auth/email">Sign in</a>')); assert.ok(!h.includes('Continue'));
+  assert.ok(h.includes('What is 3D Review?')); assert.ok(h.includes('Translation team')); assert.ok(h.includes('href="#survey">Take a survey')); assert.ok(h.includes('href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →')); assert.ok(h.includes('href="/v2/auth/access">Sign in</a>')); assert.ok(!h.includes('Continue'));
   // captain-named public home (ui/public-choices.test.mjs contract, now asserted on the ROOT entry): four choices, in order, above the headline
   const nav = h.slice(h.indexOf('<nav class="public-choices'), h.indexOf('</nav>')); const links = [...nav.matchAll(/<a class="rv-btn[^"]*" href="([^"]+)">([^<]+)<\/a>/g)].map(m => [m[2], m[1]]);
-  assert.deepEqual(links, [['Read about it', '#about'], ['Take the tour', '/?demo=1#assessment/demo-assessment/prepare'], ['Take a survey', '#survey'], ['Sign in', '/v2/auth/email']]);
+  assert.deepEqual(links, [['Read about it', '#about'], ['Take the tour', '/?demo=1#assessment/demo-assessment/prepare'], ['Take a survey', '#survey'], ['Sign in', '/v2/auth/access']]);
   assert.ok(nav.includes('aria-label="Choose where to start"')); assert.ok(h.indexOf('<nav class="public-choices') < h.indexOf('<h1>')); assert.ok(h.includes('<p class="eyebrow" id="public-about">What is 3D Review?</p>'));
   assert.ok(h.includes('Explore the real assessment screens · Go at your own pace · Nothing is sent')); assert.ok(h.includes('href="#projects">Open your projects and reports'));
   for (const retired of ['Here to take the survey?', 'Show me how', 'Manage assessments']) assert.ok(!h.includes(retired), retired);
@@ -158,7 +158,7 @@ test('entry: signed in shows Continue cards + sign-out, hides sign-in', async ()
   assert.ok(h.includes('href="#workspaces"')); assert.ok(h.includes('href="#projects"')); assert.ok(h.includes('data-act="signout"')); assert.ok(!h.includes('data-act="signin"'));
   // B02: a signed-in "/" never shows "Sign in" — not the nav choice, not any link to the provider
   const nav = h.slice(h.indexOf('<nav class="public-choices'), h.indexOf('</nav>'));
-  assert.ok(!nav.includes('Sign in')); assert.ok(!h.includes('href="/v2/auth/email"')); assert.ok(!/>\s*Sign in\s*</.test(h));
+  assert.ok(!nav.includes('Sign in')); assert.ok(!h.includes('href="/v2/auth/access"')); assert.ok(!/>\s*Sign in\s*</.test(h));
 });
 test('B02: signed in, the welcome route lands on #projects; signed out, and the explicit #signin/#survey/#about pages, stay put', () => {
   for (const r of [{ kind: 'entry' }, { kind: 'entry', intent: 'how' }, { kind: 'entry', intent: 'example' }]) { assert.equal(landsOnWork(r, { id: 'pr_1' }), true, JSON.stringify(r)); assert.equal(landsOnWork(r, null), false, JSON.stringify(r)); }
@@ -389,7 +389,7 @@ test('about: #about intent renders the About page with Back to home, three persp
   const ctx = ctxWith(); const m = await pages.entry.load(ctx, { intent: 'about' }); const h = pages.entry.render(ctx, m);
   assert.ok(h.includes('id="about-page"')); assert.ok(h.includes('About 3D Review')); assert.ok(h.includes('href="#">← Back to home'));
   for (const t of ['Translation team', 'Community', 'Church', 'Who it is for', 'When to use it', 'How often']) assert.ok(h.includes(t), t);
-  assert.ok(!h.includes('Sign in to continue')); assert.ok(!h.includes('/v2/auth/email'));
+  assert.ok(!h.includes('Sign in to continue')); assert.ok(!h.includes('/v2/auth/access'));
 });
 test('router: about is a public entry intent; unknown hashes fall back to home, never to a signed-in page', async () => {
   const { readFileSync } = await import('node:fs'); const vm = await import('node:vm');

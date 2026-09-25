@@ -241,14 +241,16 @@ app.post("/v2/auth/email/open", async (c) => {
   const body = await formOrJson(req);
   const link = body ? await verifyMagicToken(env, body.fields.t) : null;
   if (!link) return badLinkPage();
+  // Every open must carry the link's own address, hash-matched to its row (validator 2 #2): a link that does not name its
+  // account never signs anyone in — the landing page showed "Sign in as <address>" before the click.
+  const shown = await verifiedAddress(body!.fields.e, link.emailHash);
+  if (!shown) return unnamedLinkPage();
   const pr = await principalForEmailHash(env, link.emailHash);
   if (!pr) return badLinkPage();
   // A connector is waiting on THIS browser (GET /authorize parked a request): show consent, open no web session.
   // Opened in another browser (no park cookie) the link is an ordinary sign-in.
-  // Consent must name the account: without a hash-matched address the connector binding is refused (validator B38 #2).
+  // Consent names the hash-verified account (checked above for every open).
   if (new URL(req.url).searchParams.get("next") === "oauth" && cookieValue(req, PARK_COOKIE)) {
-    const shown = await verifiedAddress(body!.fields.e, link.emailHash);
-    if (!shown) return unnamedLinkPage();
     const consent = await renderConsentIfParked(req, env as OAuthEnv, pr.id, shown);
     if (consent) return consent;
   }
