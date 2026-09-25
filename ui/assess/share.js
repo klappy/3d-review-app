@@ -7,6 +7,7 @@
 //                  DELETE /v2/assessments/{aid}/surveys/{sid}/links/{link_id}
 import { shareUrl } from '../shared-link.js';
 import qrcode from './vendor-qrcode.js';
+import { learnMore } from '../v3/components/learn-more.js'; // B30: the survey screen keeps one heading; the lead sits behind Learn more
 
 export const CAN_SHARE = new Set(['owner', 'member']); // issue_link / revoke_link roles O, M (contract rows)
 export const copy = Object.freeze({
@@ -44,7 +45,7 @@ export function qrSvg(url) { const q = qrcode(0, 'M'); q.addData(url); q.make();
 
 export function render(ctx, { current, survey, share }) {
   const esc = ctx.esc, role = current.assessment.role;
-  if (!CAN_SHARE.has(role)) return `<section class="panel" data-share><p class="eyebrow">Share</p><h2>${esc(copy.title)}</h2><p class="muted">${esc(copy.readOnly)}</p></section>`;
+  if (!CAN_SHARE.has(role)) return `<section class="panel" data-share><p class="eyebrow">Share</p><p class="muted">${esc(copy.readOnly)}</p></section>`;
   const collecting = survey.collection_status === 'open' || current.assessment.stage === 'collect';
   const busy = share.stage === 'busy';
   const link = share.link;
@@ -55,7 +56,7 @@ export function render(ctx, { current, survey, share }) {
       ${link ? `<div class="share-link"><p data-share-url><code>${esc(link.url)}</code></p>${link.expires_at ? `<p class="small muted">Expires ${esc(link.expires_at)}</p>` : ''}</div>` : ''}
       <div class="actions">${ready || busy ? `<button type="button" class="primary" data-share-copy ${busy ? 'disabled' : ''}>${esc(copy.copyLink)}</button><button type="button" data-share-qr ${busy ? 'disabled' : ''}>${esc(share.qr ? copy.hideQr : copy.qr)}</button><button type="button" data-share-sheet ${busy ? 'disabled' : ''}>${esc(copy.sheet)}</button>` : `<button type="button" data-share-open>Try sharing again</button>`}${link ? `<button type="button" class="quiet" data-share-revoke ${busy ? 'disabled' : ''}>${esc(copy.revoke)}</button>` : ''}<button type="button" class="quiet" data-share-close ${busy ? 'disabled' : ''}>Close</button></div>
       ${share.qr && link ? `<figure class="share-qr" data-share-qr-figure>${qrSvg(link.url)}<figcaption class="small muted">Scan to open the survey</figcaption></figure>` : ''}${link ? `<p class="small muted">${esc(copy.onceShown)}</p>` : ''}`;
-  return `<section class="panel" data-share><p class="eyebrow">Share</p><h2>${esc(copy.title)}</h2><p class="muted">${esc(copy.lead)}</p>${collecting ? '' : `<p class="small muted">${esc(copy.notCollecting)}</p>`}${actions}<p class="small ${share.alert ? 'alert' : 'muted'}" role="status" data-share-status>${esc(share.message || '')}</p></section>`;
+  return `<section class="panel" data-share><p class="eyebrow">Share</p>${collecting ? '' : `<p class="small muted">${esc(copy.notCollecting)}</p>`}${actions}${learnMore(`<p class="small muted">${esc(copy.lead)}</p>`)}<p class="small ${share.alert ? 'alert' : 'muted'}" role="status" data-share-status>${esc(share.message || '')}</p></section>`;
 }
 
 // Invitation sheet: a print-only element mounted directly on <body> (same approach as the blank-survey print, Auditor 2A-1),
