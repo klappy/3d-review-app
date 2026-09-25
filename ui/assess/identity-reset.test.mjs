@@ -14,8 +14,8 @@ function harness() {
   const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace(/export function /g, 'function ');
   const navigations = [], removed = [], fetches = [];
   // K3a: the real adapter is supplied; with no #rv node the kit root is absent and the controller falls back to #app unchanged.
-  const box = { ...v3, cards, mountKitRoot, shellModel, history: {replaceState() {}}, sessionStorage: {getItem() {return null;},removeItem:k=>removed.push(k)}, isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/', assign: path=>navigations.push(path) }, redactDiagnosticPath: x => x, fetch: (url, options) => { fetches.push({ url, options }); return Promise.resolve({ ok: true }); } };
-  const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn,loadAccountEmail,signOut,setFetch:fn=>fetch=fn,setCredential:t=>token=t,getCredential:()=>token,setListen:fn=>listen=fn,clearPageNote})', box);
+  const box = { ...v3, cards, mountKitRoot, shellModel, history: {replaceState() {}}, sessionStorage: {getItem() {return null;},removeItem:k=>removed.push(k)}, isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/', assign: path=>navigations.push(path) }, redactDiagnosticPath: x => x, AbortSignal, fetch: (url, options) => { fetches.push({ url, options }); return Promise.resolve({ ok: true }); } };
+  const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn,loadAccountEmail,signOut,setFetch:fn=>fetch=fn,setCredential:t=>token=t,getCredential:()=>token,setListen:fn=>listen=fn,clearPageNote,loadEmailLinks})', box);
   return { ...api, nodes, disclosure, navigations, removed, fetches };
 }
 const deferred = () => { let resolve, reject; const promise = new Promise((r,j) => {resolve=r;reject=j;}); return { promise, resolve, reject }; };
@@ -97,11 +97,18 @@ test('unconfirmed logout stays truthful and busy prevents duplicate dispatch',as
   const pending=h.signOut(true);await h.signOut(true);assert.equal(calls,1);wait.resolve({signed_out:false});await pending;
   assert.equal(h.getCredential(),'one-token');assert.equal(h.state.principal.id,'one');assert.match(h.nodes.get('account-status').textContent,/could not be confirmed/);assert.deepEqual(h.navigations,[]);
 });
-test('confirmed switch clears current app identity then navigates to documented provider logout',async()=>{
+test('confirmed switch clears current app identity then navigates to documented provider logout (email links off: production)',async()=>{
   const h=harness();h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));await h.signOut(true);
   assert.equal(h.getCredential(),null);assert.equal(h.state.principal,null);assert.deepEqual(h.removed,['facilitatorToken']);
   assert.equal(h.fetches.length,1);assert.equal(h.fetches[0].url,'/cdn-cgi/access/logout');assert.equal(h.fetches[0].options.credentials,'same-origin');assert.equal(h.fetches[0].options.redirect,'manual');assert.equal(h.fetches[0].options.cache,'no-store');
   assert.deepEqual(h.navigations,['https://klappy.cloudflareaccess.com/cdn-cgi/access/logout']);
+});
+test('B38: confirmed switch with email links on clears identity and the Access cookie, then opens the email sign-in page',async()=>{
+  const h=harness();h.state.emailLinks=true;h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));await h.signOut(true);
+  assert.equal(h.getCredential(),null);assert.equal(h.state.principal,null);
+  assert.equal(h.fetches.length,1);assert.equal(h.fetches[0].url,'/cdn-cgi/access/logout');
+  assert.deepEqual(h.navigations,['/v2/auth/email']);
+  h.resetIdentity();assert.equal(h.state.emailLinks,true,'an environment fact, not identity: survives sign-out');
 });
 test('confirmed ordinary logout does not navigate to provider',async()=>{
   const h=harness();h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));h.setRender(()=>{});h.setListen(()=>{});await h.signOut();
@@ -191,4 +198,16 @@ test('U30: a route change clears the page status line; an in-flight busy label s
   note.textContent = 'Saving…'; h.state.busy = true;
   h.clearPageNote();
   assert.equal(note.textContent, 'Saving…');
+});
+
+test('B38: the email-links probe carries a 2 s timeout; a timeout leaves the setting unknown (Access copy, as before)', async () => {
+  const h = harness(); let seen;
+  h.setFetch((url, options) => { seen = { url, options }; return new Promise((_, reject) => options.signal.addEventListener('abort', () => reject(options.signal.reason))); });
+  const keepAlive = setTimeout(() => {}, 5000); // AbortSignal.timeout timers are unref'd in Node
+  const t0 = Date.now(); const on = await h.loadEmailLinks(); clearTimeout(keepAlive);
+  assert.equal(seen.url, '/v2/auth/email?probe'); assert.ok(seen.options.signal, 'signal passed');
+  assert.ok(Date.now() - t0 >= 1900 && Date.now() - t0 < 5000, 'aborted by the 2 s timeout');
+  assert.equal(on, false); assert.equal(h.state.emailLinks, undefined, 'unknown, not false: a later call may ask again');
+  h.setFetch(async () => ({ ok: true, json: async () => ({ email_links: true }) }));
+  assert.equal(await h.loadEmailLinks(), true); assert.equal(h.state.emailLinks, true);
 });

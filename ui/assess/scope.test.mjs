@@ -360,13 +360,26 @@ test('project settings (lane 11): editors reach access codes on the existing scr
   assert.ok(!pages.project.render(view, await pages.project.load(view, { id: 'p1' })).includes('project-settings'));
 });
 
-test('L1-7 #signin matches prototype frame 1: centred card, one primary to the real provider, survey footer, sandbox collapsed after it', async () => {
+test('L1-7 #signin with email links off (production) keeps prototype frame 1: one primary to the Access provider, survey footer, sandbox collapsed after it', async () => {
   const html = pages.entry.render({ esc: s => String(s ?? ''), state: {} }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
   assert.ok(html.includes('class="glass panel narrow v3-signin"'));
-  assert.ok(html.includes('<p class="eyebrow">Sign in</p>'));
   assert.ok(/<a class="button rv-btn primary" href="\/v2\/auth\/access" style="width:100%/.test(html), 'one full-width primary to the real provider');
+  assert.ok(!html.includes('email-link-form'), 'no email form that production would discard');
   const access = html.indexOf('href="/v2/auth/access"'), box = html.indexOf('<details class="sandbox-signin"');
   assert.ok(access > -1 && box > access, 'real provider precedes the sandbox');
+});
+test('L1-7 #signin matches prototype frame 1 (B38: one email field + one "Email me a sign-in link" button), survey footer, sandbox collapsed after it', async () => {
+  const html = pages.entry.render({ esc: s => String(s ?? ''), state: { emailLinks: true } }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.ok(html.includes('class="glass panel narrow v3-signin"'));
+  assert.ok(html.includes('<p class="eyebrow">Sign in</p>'));
+  const form = html.slice(html.indexOf('<form id="email-link-form"'), html.indexOf('</form>', html.indexOf('<form id="email-link-form"')));
+  assert.ok(form.includes('method="post" action="/v2/auth/email"'), 'posts to the email sign-in link route (works without script)');
+  assert.equal((form.match(/<input /g) || []).length, 1, 'one email field'); assert.ok(form.includes('type="email"'));
+  assert.ok(/<button class="button rv-btn primary" type="submit" style="width:100%[^>]*>Email me a sign-in link<\/button>/.test(form), 'one full-width primary');
+  assert.ok(html.includes('id="email-link-status"') && html.includes('role="status"'), 'room for the one-line confirmation');
+  assert.ok(!html.includes('/v2/auth/access') && !html.includes('cdn-cgi'), 'no Cloudflare Access hop for app sign-in');
+  const real = html.indexOf('id="email-link-form"'), box = html.indexOf('<details class="sandbox-signin"');
+  assert.ok(real > -1 && box > real, 'real sign-in precedes the sandbox');
   assert.ok(!/<details class="sandbox-signin"[^>]*\bopen\b/.test(html), 'sandbox collapsed on the email step');
   assert.ok(html.includes('no sign-in is needed') && html.includes('href="#survey"'));
 });
