@@ -696,6 +696,7 @@ function scrubCredentialHash() {
 }
 function resetIdentity() {
   identityGeneration += 1; generation += 1; epoch += 1;
+  pendingRename = null; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
   accountBusy = false; accountControls(false); accountStatus();
   document.getElementById('account-switch-dialog')?.close();
   state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;

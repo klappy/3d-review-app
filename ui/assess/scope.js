@@ -384,8 +384,10 @@ const project = {
     // B07: the project name is the heading (kit shell's or the page's own); owners rename it in place — no rename card.
     const heading = (root.closest?.('[role=main]') || root).querySelector?.('h1');
     mountEditableHeading(heading, { canEdit: model.project?.role === 'owner', label: 'project name', save: async name => {
-      const r = await write(ctx, null, 'Rename', () => ctx.api(`/v2/projects/${ctx.enc(id)}`, { method: 'PATCH', body: { name } }));
-      if (!r) return false;
+      let reason = ''; // the refusal is shown in the heading's field (like the assessment rename), not only in the page note
+      const quiet = Object.create(ctx, { note: { value: (text, alert) => { if (alert) reason = text; else ctx.note(text, alert); } } });
+      const r = await write(quiet, null, 'Rename', () => ctx.api(`/v2/projects/${ctx.enc(id)}`, { method: 'PATCH', body: { name } }));
+      if (!r) throw new Error(reason || 'The name was not saved.');
       const cached = ctx.state?.projects?.find?.(x => x.id === id); if (cached) cached.name = r.project?.name || name; // shell title + crumbs read this cache
       ctx.note('Renamed.'); await reload();
     } });

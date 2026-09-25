@@ -371,6 +371,7 @@ test('B07: project and assessment names are the heading with an edit control for
   p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(12);
   assert.ok(p.transport.log.some(l => l.key === 'PATCH /v2/projects/p1' && l.outcome === 'mutation-refused'), 'rename uses the existing project PATCH');
   assert.ok(p.q('.v3-eh-form'), 'refused save keeps the field open'); assert.equal(p.q('.v3-eh h1').textContent, 'River Valley');
+  assert.ok(p.q('.v3-eh-msg').textContent && p.q('.v3-eh-msg').textContent !== 'The name was not saved.', 'the server refusal reason is shown in the field (Bugbot 4108308764)');
   await p.go('#assessment/a2/prepare');
   assert.equal(p.text('[role=main].content .v3-eh h1'), 'Spring baseline'); assert.equal(p.qa('[role=main].content [data-edit-heading]').length, 1);
   assert.ok(p.q('#prepare-form')); assert.equal(p.q('#prepare-form input[name="name"]'), null, 'no name field in Prepare');
