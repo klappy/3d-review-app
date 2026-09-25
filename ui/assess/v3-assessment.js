@@ -37,6 +37,17 @@ const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(
 
 /** Settled count, optional denominator (ruling a) and "n not yet confirmed" side by side (ruling b).
  *  `unconfirmed` is shown only when the server reports it; the facilitator side never guesses it. */
+// Bincy 07 / RULING a (B-07, lanes-1321): the wizard keeps "How many do you expect?" per survey in this browser only
+// (v3/wizard.js EXPECTED_KEY 'v3:expected', never sent to the API). Collect reads it back so "n of N responded" shows
+// where N was given; anything missing, zero or unreadable → null → plain "n responded".
+export const V3_EXPECTED_KEY = 'v3:expected';
+export function v3ExpectedFor(surveyId, store) {
+  try {
+    const n = Number(JSON.parse(store?.getItem(V3_EXPECTED_KEY) || '{}')[surveyId]);
+    return Number.isInteger(n) && n > 0 ? n : null;
+  } catch { return null; }
+}
+
 export function v3CountLine(counts = {}, esc = esc0, flags = V3_FLAGS) {
   return responseCount(counts, esc, { expectedOptional: !!flags.expectedCountOptional, showUnconfirmed: !!flags.showUnconfirmed }); // component: Response count
 }

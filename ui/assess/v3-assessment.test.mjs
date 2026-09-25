@@ -1,7 +1,7 @@
 // node --test ui/assess/v3-assessment.test.mjs — lane 3: rulings a/b/c and the state-driven primary.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { v3StagePrimary, v3StageWord, v3CountLine, v3BandsMarkup, V3_SET_STAGE, V3_FLAGS } from './v3-assessment.js';
+import { v3StagePrimary, v3StageWord, v3CountLine, v3BandsMarkup, V3_SET_STAGE, V3_FLAGS, v3ExpectedFor, V3_EXPECTED_KEY } from './v3-assessment.js';
 
 const L = ['Translation Team', 'Church', 'Community'];
 
@@ -138,4 +138,16 @@ test('L3-13 assessment stages render the shared Stepper: active stage, earlier t
   assert.match(h, /href="#assessment\/a1\/improve"/);
   assert.doesNotMatch(v3StageStepper('prepare'), /<a /);
   assert.match(v3StageStepper('weird'), /<li class="on" aria-current="step">/);
+});
+
+test('B-07: collect reads the expected number the wizard stored on this device', () => {
+  const mem = v => ({ getItem: k => (k === V3_EXPECTED_KEY ? v : null) });
+  assert.equal(v3ExpectedFor('s1', mem(JSON.stringify({ s1: 5 }))), 5);
+  assert.equal(v3ExpectedFor('s1', mem(JSON.stringify({ s1: '5' }))), 5);
+  assert.equal(v3ExpectedFor('s2', mem(JSON.stringify({ s1: 5 }))), null);
+  assert.equal(v3ExpectedFor('s1', mem(JSON.stringify({ s1: 0 }))), null);
+  assert.equal(v3ExpectedFor('s1', mem('not json')), null);
+  assert.equal(v3ExpectedFor('s1', null), null);
+  assert.match(v3CountLine({ responses: 3, expected: v3ExpectedFor('s1', mem(JSON.stringify({ s1: 5 }))) }), />3 of 5 responded</);
+  assert.match(v3CountLine({ responses: 3, expected: v3ExpectedFor('s9', mem('{}')) }), />3 responded</);
 });
