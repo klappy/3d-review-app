@@ -94,3 +94,7 @@ test('B03: an assessment with no known project shows no raw project id in its he
   assert.ok(!js.includes('project?.name || a.project_id'));
   assert.match(js, /const roleLine = project \? `\$\{esc\(project\.name\)\} · your role: \$\{esc\(a\.role\)\}` : `Your role: \$\{esc\(a\.role\)\}`;/);
 });
+test('B03 (Bugbot): a failed project-list read never blocks the invitation page', () => {
+  const js = read('./assess.js');
+  assert.match(js, /if \(!\['assessment', 'survey', 'feedback', 'invite'\]\.includes\(route\(location\.hash\)\.kind\)\)/);
+});
