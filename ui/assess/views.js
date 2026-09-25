@@ -7,7 +7,7 @@
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
 import { learnMore } from '../v3/components/learn-more.js'; // lane 9 L9-24: shared closed-by-default disclosure
-import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, V3_HELD_TEXT } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
+import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, V3_HELD_TEXT, V3_REPORTS_HELD, V3_REPORT_HELD } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -100,9 +100,9 @@ const understand = {
       const rows = g.surveys.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="${esc(ctx.routes.survey(m.aid, s.id))}">${esc(s.template_name || s.template_id)}</a></h3><p class="small muted">${countCell(s)}</p></div></div>`).join('');
       return `<section class="lens-block" aria-label="${esc(g.lens)}"><h3>${esc(g.lens)}</h3>${sumLine}${rows}</section>`;
     }).join('');
-    // (2) Results: the held literal with one plain line (U05; the server reason stays in the evidence table). No numbers, no bands.
+    // (2) Results: the held literal with one plain line (U05; the server reason is never rendered anywhere). No numbers, no bands.
     let results;
-    if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.status === 'held' || r.suppressed ? V3_HELD_TEXT : (r.reason || ''))}</p>`; } // U05: plain line, not the server's policy code
+    if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.status === 'held' || r.suppressed ? V3_HELD_TEXT : '')}</p>`; } // U05: plain line; the server reason is never rendered
     else results = refusalLine(ctx, m.results.status, 'data-retry="results"', 'Results');
     // v3 (ruling c): band layout, one card per perspective; a held result shows evidence gaps, never an invented band.
     // v3 U2: per-perspective server counts on each band card (Bincy screen 10 group counts) + evidence toggle and table.
@@ -114,12 +114,12 @@ const understand = {
     let reports;
     if (m.reports.status === 'loaded') {
       const r = m.reports.value || {};
-      if (r.suppressed || r.status === 'held') reports = `<p class="muted" data-reports-held>${esc(r.reason || 'Reports are held.')}</p>`;
+      if (r.suppressed || r.status === 'held') reports = `<p class="muted" data-reports-held>${esc(V3_REPORTS_HELD)}</p>`;
       else { const list = Array.isArray(r.reports) ? r.reports : [];
         reports = list.length ? `<ul class="links" data-report-list>${list.map((x, i) => `<li data-report-id="${esc(x.id)}"><button type="button" data-open-report="${esc(x.id)}">Report ${list.length - i} · built ${esc(humanDate(x.created_at))}</button><details class="small muted report-ids"><summary>Report id</summary><code>${esc(x.id)}</code> · <code>${esc(x.created_at)}</code></details></li>`).join('')}</ul>` : '<p class="muted">No reports have been built for this assessment.</p>'; }
     } else if (m.reports.status === 'refused') reports = '<p class="muted" data-reports-unavailable>Reports are unavailable for this assessment.</p>';
     else reports = refusalLine(ctx, m.reports.status, 'data-retry="reports"', 'Reports');
-    const open = m.openReport ? (m.openReport.status === 'held' ? `<p class="muted" data-open-report-reason>${esc(m.openReport.reason)}</p>` : m.openReport.status === 'error' ? `<p class="small muted" role="alert">${esc(m.openReport.text)}</p>` : '') : '';
+    const open = m.openReport ? (m.openReport.status === 'held' ? `<p class="muted" data-open-report-reason>${esc(V3_REPORT_HELD)}</p>` : m.openReport.status === 'error' ? `<p class="small muted" role="alert">${esc(m.openReport.text)}</p>` : '') : '';
     const countsNote = '<p class="small muted line">Counts are per survey. Respondents are counted within each survey and are not added across surveys.</p>';
     const reportsPanel = `<section class="panel" data-reports><p class="eyebrow">Reports</p>${reports}<p><button type="button" data-retry="reports">Refresh reports</button></p>${reportBuildMarkup(ctx, m.role)}${m.openReport && m.openReport.status !== 'shown' ? `<div>${open}</div>` : ''}<p class="status" role="status" aria-live="polite" data-report-status></p></section>`;
     const full = '<section class="panel report-full" data-report-full hidden><div class="report-tools"><p class="eyebrow" style="margin:0">Report · full view</p><button type="button" class="quiet" data-close-report>Close report</button></div><div data-report-view></div></section>';
@@ -130,7 +130,7 @@ const understand = {
     // Validator #282: a results error (and its Retry) is never tucked away — only the loaded results state goes behind Learn more.
     const resultsPanel = `<section${m.results.status === 'loaded' ? '' : ' class="panel"'} data-results><p class="eyebrow">Results</p>${results}</section>`;
     return m.results.status === 'loaded'
-      ? `${bands}${learnMore(`<section class="lens-detail"><p class="eyebrow">Counts per survey</p>${lensBlocks}${countsNote}</section>${resultsPanel}`)}${reportsPanel}${full}`
+      ? `${bands}${learnMore(`<section class="lens-detail"><p class="eyebrow">Counts per survey</p>${lensBlocks}${countsNote}</section>`)}${reportsPanel}${full}` // U05: the band panel already says the results state once; no second copy behind Learn more
       : `${bands}${resultsPanel}${learnMore(`<section class="lens-detail"><p class="eyebrow">Counts per survey</p>${lensBlocks}${countsNote}</section>`)}${reportsPanel}${full}`;
   },
   bind(ctx, root, m) {
@@ -145,7 +145,7 @@ const understand = {
       if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
       m.reportReadGeneration = (m.reportReadGeneration || 0) + 1; m.reports = reports; m.openReport = null;
       root.innerHTML = understand.render(ctx, m); understand.bind(ctx, root, m);
-      root.querySelector('[data-report-status]').textContent = reports.status === 'loaded' ? (reports.value?.suppressed ? 'Report built, but current report access is held. See the reporting policy reason above.' : 'Report built. Open it from the current report list.') : 'Report built, but the list could not be refreshed. Refresh reports to reopen it.';
+      root.querySelector('[data-report-status]').textContent = reports.status === 'loaded' ? (reports.value?.suppressed ? 'Report built, but current report access is held. Reports are held for now.' : 'Report built. Open it from the current report list.') : 'Report built, but the list could not be refreshed. Refresh reports to reopen it.';
     }, clearReport);
     root.querySelectorAll('[data-retry]').forEach(el => el.onclick = e => { e.preventDefault(); if (m.reportBuildBusy) return; ctx.go(ctx.routes.assessment(m.aid, 'understand'), { reload: true }); });
     const evBtn = root.querySelector('[data-v3-evidence-toggle]'), evBox = root.querySelector('[data-v3-evidence]');
@@ -185,7 +185,7 @@ const understand = {
       try {
         const r = await ctx.api(`/v2/reports/${ctx.enc(id)}`);
         if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false || readGeneration !== m.reportReadGeneration) return;
-        if (r.suppressed) { m.openReport = { status: 'held', reason: String(r.reason || '') }; showFailure(m.openReport.reason); }
+        if (r.suppressed) { m.openReport = { status: 'held' }; showFailure(V3_REPORT_HELD); }
         else {
           const ok = renderReport({ doc: root.ownerDocument || globalThis.document, root: view, report: r.report });
           if (ok) { m.openReport = { status: 'shown', id }; if (view) readableNumbers(view); if (status) status.textContent = ''; if (full) { full.hidden = false; if (full.scrollIntoView) full.scrollIntoView({ block: 'start' }); } }

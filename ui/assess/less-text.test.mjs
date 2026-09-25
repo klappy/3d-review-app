@@ -34,7 +34,7 @@ test('L9-24 Understand/results: band panel is the screen; per-survey counts and 
   assert.match(upFront(h), /<h2>What the perspectives say<\/h2>/);
   assert.equal(count(upFront(h), /class="primary"/g), 1, 'the review gate is the one primary');
   const all = [...h.matchAll(closed)].map(x => x[0]).join('');
-  for (const moved of ['Counts are per survey.', 'data-lens-sum=', 'data-results>', 'data-v3-provisional']) assert.ok(all.includes(moved), `moved, not removed: ${moved}`);
+  for (const moved of ['Counts are per survey.', 'data-lens-sum=', 'data-v3-provisional']) assert.ok(all.includes(moved), `moved, not removed: ${moved}`);
   assert.doesNotMatch(upFront(h), /Counts are per survey|Bring the perspectives together|Provisional bands/);
   assert.match(upFront(h), /data-reports>/, 'reports (actions) stay visible');
 });
@@ -46,7 +46,7 @@ test('L9-24 + U05 Understand held: one plain line up front, never per card and n
   const h = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
   assert.equal(count(upFront(h), new RegExp(plain, 'g')), 1, 'plain held line once');
   assert.doesNotMatch(h, new RegExp(reason), 'server reason never shown (U05)');
-  assert.match(h.slice(h.indexOf(LM)), /data-results-reason>Results appear after a report is built/, 'results state kept behind Learn more');
+  assert.equal(count(h, new RegExp(plain, 'g')), 1, 'plain held line once even with Learn more opened (U05)');
 });
 
 test('L9-24 next step: one line (who can read the notes) + Learn more holds the schedule note', async () => {

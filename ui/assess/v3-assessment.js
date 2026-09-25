@@ -39,9 +39,13 @@ const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(
 /** Settled count, optional denominator (ruling a) and "n not yet confirmed" side by side (ruling b).
  *  `unconfirmed` is shown only when the server reports it; the facilitator side never guesses it. */
 // U05 / B31 (lanes-1321): facilitators never see the server's internal hold reason (e.g. "D7 scoring, threshold, and
-// differencing policy unresolved"): held cards carry only their band word + count; the Results block says this once. The server reason stays in the evidence table
-// behind "Show evidence and details".
+// differencing policy unresolved"): held cards carry only their band word + count; the Results block says this once. The evidence
+// table behind "Show evidence and details" shows a plain phrase too (V3_HELD_LIMIT), never the server reason.
 export const V3_HELD_TEXT = 'Results appear after a report is built from at least three responses per group.';
+// U05 validator (lanes-1510): every facilitator-visible held reason is a plain phrase; the server's reason string is never rendered.
+export const V3_HELD_LIMIT = 'Held until a report is built';
+export const V3_REPORTS_HELD = 'Reports are held for now.';
+export const V3_REPORT_HELD = 'This report is held for now.';
 // Bincy 07 / RULING a (B-07, lanes-1321): the wizard keeps "How many do you expect?" per survey in this browser only
 // (v3/wizard.js EXPECTED_KEY 'v3:expected', never sent to the API). Collect reads it back so "n of N responded" shows
 // where N was given; anything missing, zero or unreadable → null → plain "n responded".
@@ -132,7 +136,7 @@ export function v3EvidenceRows(results, lenses, groups = {}, scores = null) {
       return [lens, `${w} (provisional) · score ${sc.score} · ${counted}`, w === 'More input needed' ? `Fewer than ${V3_BAND_CUTOFFS.minResponses} responses` : 'Provisional cut-offs; people who did not answer may see it differently']; }
     const b = !held && Array.isArray(r.bands) ? r.bands.find(x => x && x.perspective === lens) : null;
     const say = b && BAND_WORDS.has(b.band) ? b.band : held ? 'Held · no band yet' : 'More input needed';
-    const limit = held ? (r.reason || 'Results are held') : !g.loaded ? 'Count not loaded yet' : (num(g.responses) ?? 0) === 0 ? 'No responses yet' : 'People who did not answer may see it differently';
+    const limit = held ? V3_HELD_LIMIT : !g.loaded ? 'Count not loaded yet' : (num(g.responses) ?? 0) === 0 ? 'No responses yet' : 'People who did not answer may see it differently';
     return [lens, `${say} · ${counted}`, limit];
   });
 }
