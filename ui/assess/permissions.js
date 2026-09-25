@@ -51,7 +51,7 @@ export const permissions = {
     const head = `<p class="eyebrow">Permissions</p><h2>Who can open this ${esc(noun)}</h2>${applies}`;
     if (m.status === 'forbidden') return `<section class="panel narrow" data-permissions data-permissions-state="viewer"><p class="eyebrow">Permissions</p><h2>Who can open this ${esc(noun)}</h2><p class="muted">${esc(VIEWER_NOTE)}</p>${status}${learnMore(applies.replace('note small', 'small muted'))}</section>`;
     if (m.status === 'not_found') return `<section class="panel narrow" data-permissions data-permissions-state="not-found"><p class="eyebrow">Permissions</p><h2>${esc(NOT_AVAILABLE)}</h2><p class="muted">Nothing to show here.</p>${status}</section>`;
-    if (m.status === 'unauthenticated') return `<section class="panel narrow" data-permissions data-permissions-state="unauthenticated">${head}<p class="small muted" role="alert">Your sign-in is no longer active. <a href="/v2/auth/access">Sign in again</a></p>${status}</section>`;
+    if (m.status === 'unauthenticated') return `<section class="panel narrow" data-permissions data-permissions-state="unauthenticated">${head}<p class="small muted" role="alert">Your sign-in is no longer active. <a href="/v2/auth/email">Sign in again</a></p>${status}</section>`;
     if (m.status !== 'loaded') return `<section class="panel narrow" data-permissions data-permissions-state="failed">${head}<p class="small muted" role="alert">Could not load permissions. <a href="#" data-retry="grants">Retry</a></p>${status}</section>`;
     const owner = m.myRole === 'owner', member = m.myRole === 'member' || owner, busy = m.busy ? 'disabled' : '';
     const canTouch = g => g.role !== 'owner' && (owner || RANK[g.role] <= RANK.member); // D3 ceiling; owners never removed/demoted

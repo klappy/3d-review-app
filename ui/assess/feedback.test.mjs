@@ -36,7 +36,7 @@ test('empty form and UTF-8 note overflow refuse locally without losing entered t
 test('permission, invalid input and expired sign-in retain exact draft with no raw server message',async()=>{
   for(const code of ['NOT_AUTHORIZED','INVALID_PARAMS','NOT_AUTHENTICATED','RATE_LIMITED']){
     const h=await setup(()=>{throw Object.assign(new Error('private server detail'),{code});});h.fill('note','Please fix this');await h.submit();assert.equal(h.root.querySelector('textarea').value,'Please fix this');assert.doesNotMatch(h.text(),/private server/);assert.equal(h.calls.length,1);assert.equal(h.root.querySelector('button').disabled,false);
-    if(code==='NOT_AUTHENTICATED')assert.equal(h.root.querySelector('#feedback-status a').getAttribute('href'),'/v2/auth/access');
+    if(code==='NOT_AUTHENTICATED')assert.equal(h.root.querySelector('#feedback-status a').getAttribute('href'),'/v2/auth/email');
   }
 });
 test('uncertain and malformed receipt preserve text without automatic retry or false success',async()=>{

@@ -114,12 +114,12 @@ export function invitationMessage(origin: string, token: string, role: string, s
   const text = [
     `You have been invited to join a ${scopeType} in 3D Review as ${role}.`,
     "",
-    "To accept, open this link and sign in with this email address. You will get a one-time code by email — there is no password.",
+    "To accept, open this link and sign in with this email address. You will get a sign-in email — there is no password.",
     "",
     link,
     "",
     `The invitation expires in ${expiresDays} days and only works for this email address. If you were not expecting it, you can ignore this message.`,
   ].join("\n");
-  const html = `<p>You have been invited to join a ${esc(scopeType)} in 3D Review as <b>${esc(role)}</b>.</p><p>To accept, open this link and sign in with this email address. You will get a one-time code by email — there is no password.</p><p><a href="${esc(link)}">Accept the invitation</a></p><p style="color:#57606a;font-size:14px">The invitation expires in ${expiresDays} days and only works for this email address. If you were not expecting it, you can ignore this message.</p>`;
+  const html = `<p>You have been invited to join a ${esc(scopeType)} in 3D Review as <b>${esc(role)}</b>.</p><p>To accept, open this link and sign in with this email address. You will get a sign-in email — there is no password.</p><p><a href="${esc(link)}">Accept the invitation</a></p><p style="color:#57606a;font-size:14px">The invitation expires in ${expiresDays} days and only works for this email address. If you were not expecting it, you can ignore this message.</p>`;
   return { subject, text, html, link };
 }

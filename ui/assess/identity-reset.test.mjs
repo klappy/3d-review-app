@@ -97,11 +97,11 @@ test('unconfirmed logout stays truthful and busy prevents duplicate dispatch',as
   const pending=h.signOut(true);await h.signOut(true);assert.equal(calls,1);wait.resolve({signed_out:false});await pending;
   assert.equal(h.getCredential(),'one-token');assert.equal(h.state.principal.id,'one');assert.match(h.nodes.get('account-status').textContent,/could not be confirmed/);assert.deepEqual(h.navigations,[]);
 });
-test('confirmed switch clears current app identity then navigates to documented provider logout',async()=>{
+test('confirmed switch clears current app identity, clears the Access cookie, then opens the email sign-in page (B38)',async()=>{
   const h=harness();h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));await h.signOut(true);
   assert.equal(h.getCredential(),null);assert.equal(h.state.principal,null);assert.deepEqual(h.removed,['facilitatorToken']);
   assert.equal(h.fetches.length,1);assert.equal(h.fetches[0].url,'/cdn-cgi/access/logout');assert.equal(h.fetches[0].options.credentials,'same-origin');assert.equal(h.fetches[0].options.redirect,'manual');assert.equal(h.fetches[0].options.cache,'no-store');
-  assert.deepEqual(h.navigations,['https://klappy.cloudflareaccess.com/cdn-cgi/access/logout']);
+  assert.deepEqual(h.navigations,['/v2/auth/email']);
 });
 test('confirmed ordinary logout does not navigate to provider',async()=>{
   const h=harness();h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));h.setRender(()=>{});h.setListen(()=>{});await h.signOut();

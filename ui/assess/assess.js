@@ -129,7 +129,7 @@ const state = { principal: null, projects: [], workspaces: new Map(), openProjec
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']); // visibility/authz codes (supplier 97f7402 + policy.ts)
-const SIGNIN = '<a href="/v2/auth/access">Sign in again</a>';
+const SIGNIN = '<a href="/v2/auth/email">Sign in again</a>';
 const listFor = pid => state.lists.get(pid) || { status: 'unloaded', list: null };
 const showMessage = current => state.message && current && state.message.aid === current.assessment.id ? state.message : null;
 
@@ -536,7 +536,7 @@ async function render() {
       catch (e) {
         if (gen !== generation) return;
         if (state.current?.assessment.id === aid) { /* dirty refresh failed: keep the last screen, keep the dirty banner (retry offered) */ }
-        else { state.current = null; app.className = ''; syncShell(); const expired = UNAUTHENTICATED.has(String(e.code)); app.innerHTML = `<div class="narrow panel"><h1>${expired ? 'Your sign-in is no longer active' : 'Assessment unavailable'}</h1><p class="muted">${esc(redact(e.message))}</p><p>${expired ? `<a class="button primary" href="/v2/auth/access">Sign in again</a> ` : ''}<a class="button" href="#assessment/${encodeURIComponent(aid)}" data-refresh="${esc(aid)}">Try again</a> <a href="#">All projects</a></p></div>`; app.querySelector('[data-refresh]').onclick = ev => { ev.preventDefault(); render(); }; return; }
+        else { state.current = null; app.className = ''; syncShell(); const expired = UNAUTHENTICATED.has(String(e.code)); app.innerHTML = `<div class="narrow panel"><h1>${expired ? 'Your sign-in is no longer active' : 'Assessment unavailable'}</h1><p class="muted">${esc(redact(e.message))}</p><p>${expired ? `<a class="button primary" href="/v2/auth/email">Sign in again</a> ` : ''}<a class="button" href="#assessment/${encodeURIComponent(aid)}" data-refresh="${esc(aid)}">Try again</a> <a href="#">All projects</a></p></div>`; app.querySelector('[data-refresh]').onclick = ev => { ev.preventDefault(); render(); }; return; }
       }
     }
     if (gen !== generation || state.current?.assessment.id !== aid) return;
@@ -577,7 +577,7 @@ async function reloadProjects() {
 async function mountNew(gen) {
   syncShell(); app.className = '';
   // Bugbot 4094071987: same gate as every signed-in page — no session, no wizard.
-  if (!state.principal) { app.innerHTML = `<div class="narrow panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">Starting a review needs a facilitator session.</p><div class="actions"><a class="rv-btn primary" href="/v2/auth/access">Sign in with email code</a></div></div>`; return; }
+  if (!state.principal) { app.innerHTML = `<div class="narrow panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">Starting a review needs a facilitator session.</p><div class="actions"><a class="rv-btn primary" href="/v2/auth/email">Sign in with email</a></div></div>`; return; }
   if (!document.querySelector(`link[href="${WIZARD_CSS}"]`)) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = WIZARD_CSS; document.head.appendChild(l); }
   let mod = null; try { mod = await import(WIZARD_JS); } catch { mod = null; }
   if (gen !== generation) return;
@@ -623,7 +623,8 @@ async function signOut(switchAccount = false) {
       // The provider request may already have taken effect; only its continuation can be suppressed.
       try { await fetch('/cdn-cgi/access/logout', { credentials: 'same-origin', redirect: 'manual', cache: 'no-store' }); } catch {}
       if (signedOutIdentity !== identityGeneration || signedOutCredential !== token) return;
-      location.assign('https://klappy.cloudflareaccess.com/cdn-cgi/access/logout'); return;
+      // B38: another account = request a link for another email. The Access cookie for this app is cleared above.
+      location.assign('/v2/auth/email'); return;
     }
     history.replaceState(null, '', location.pathname + '#');
     listen(); await render();
@@ -770,7 +771,7 @@ async function boot() {
     // route; it sets the session cookie and returns to the workspace home (/#session=…), not here — stated, not hidden.
     who.textContent = 'Not signed in'; app.className = ''; syncShell();
     const here = /(invite|session)=/.test(location.hash) ? location.pathname : location.pathname + location.hash;
-    app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p><p><a class="button primary" href="#">Go to sign in</a> <a class="button" href="/v2/auth/access">Sign in with an email code</a></p></div>`;
+    app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p><p><a class="button primary" href="#">Go to sign in</a> <a class="button" href="/v2/auth/email">Sign in with email</a></p></div>`;
     return; }
   void loadAccountEmail();
   // E1: signed-in staff get the real-app way back (same-origin session, no token) and the generated functionality statement.

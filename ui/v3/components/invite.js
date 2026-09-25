@@ -18,7 +18,7 @@ const home = '<a class="rv-btn" href="#projects">Go to your projects</a>';
 export function inviteView(m = {}) {
   switch (m.status) {
     case 'ready': case 'accepting': return panel('You were invited', `You were invited to ${KIND[m.kind] || 'shared work'} as ${ROLE[m.role] || 'a collaborator'}.`, `<button type="button" class="rv-btn primary" data-invite-accept ${m.status === 'accepting' ? 'disabled' : ''}>${m.status === 'accepting' ? 'Accepting…' : 'Accept invitation'}</button>`);
-    case 'signin': return panel('Sign in to accept', 'Sign in with the email address that was invited; you come back here after signing in.', '<a class="rv-btn primary" href="/v2/auth/access" data-invite-signin>Sign in with an email code</a>');
+    case 'signin': return panel('Sign in to accept', 'Sign in with the email address that was invited; you come back here after signing in.', '<a class="rv-btn primary" href="/v2/auth/email" data-invite-signin>Sign in with email</a>');
     case 'used': return panel('Already accepted', 'This invitation was already accepted.', home);
     case 'expired': return panel('Invitation expired', 'This invitation has expired. Ask the person who invited you for a new one.', home);
     case 'refused': return panel('Invitation not available', 'This invitation is not for the account you are signed in with, or it was withdrawn. Sign in with the invited email address, or ask for a new invitation.', home);

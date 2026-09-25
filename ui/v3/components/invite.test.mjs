@@ -15,7 +15,7 @@ test('ready: what was shared (kind + role) and ONE Accept action; no ids', () =>
 });
 test('signed out: sign in, then back here', () => {
   const h = inviteView({ status: 'signin' });
-  assert.match(h, /href="\/v2\/auth\/access"/); assert.match(h, /you come back here after signing in/);
+  assert.match(h, /href="\/v2\/auth\/email"/); assert.match(h, /you come back here after signing in/);
 });
 test('server codes map to plain screens, never raw text', () => {
   assert.equal(inviteFailure({ code: 'NOT_AUTHENTICATED' }), 'signin');

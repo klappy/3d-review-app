@@ -15,7 +15,7 @@ const DOTS = { 'Translation Team': '', Church: 'blue', Community: 'gold', [OTHER
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
 const NOT_BUILT = new Set(['RESERVED_NOT_BUILT', '501']);
-const SIGNIN = '<a href="/v2/auth/access">Sign in again</a>';
+const SIGNIN = '<a href="/v2/auth/email">Sign in again</a>';
 export const NOTES_VISIBILITY = 'Everyone with access to this assessment can read these notes.';
 export const RECOMMENDATIONS_NOT_BUILT = 'Recommendations are not built yet.';
 export const NOT_VISIBLE = 'Not visible to you';

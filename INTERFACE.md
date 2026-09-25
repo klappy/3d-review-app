@@ -43,6 +43,10 @@ export interface Env { DB: D1Database; SESSION_SECRET: string; ENVIRONMENT?: str
 | `POST /mcp` | JSON-RPC face of the same `execute()` | it *is* the second face |
 | `GET /v2/openapi.yaml` | contract projection | static |
 | `GET /v2/auth/access` | Cloudflare Access email-code return leg (browser redirect) | agents hold a bearer; browsers only |
+| `GET /v2/auth/email` | B38 email sign-in link: sign-in page (one email field) | browsers only; off unless `MAGIC_LINK="on"` (DEV) — then `303 → /v2/auth/access` |
+| `POST /v2/auth/email` | B38: request a link (`email`, optional `next=oauth`; form or JSON). Same answer whether or not the address has signed in before. Same-origin only; per IP `RL_AUTH` `ip:` before storage; per email 5 links / 15 min (D1) | sends mail; browsers only |
+| `GET /v2/auth/email/open` | B38: landing page for the emailed link `…/open#t=<token>` — the token stays in the fragment; one nonce'd script moves it into a same-origin POST | browsers only |
+| `POST /v2/auth/email/open` | B38: open the link. Token 256-bit, stored as SHA-256 in `login_code` (`ml_` rows), reusable until expiry (30 min), any browser/device; `RL_REDEEM` `ip:` before storage. Success → 30-day session, `session` cookie `HttpOnly; Secure; SameSite=Lax`, `303 → /#session=`. With `next=oauth` and this browser's parked connector request → consent page, no web session | browsers only |
 | `POST /v2/ops/seed/synthetic` | **dev bootstrap**: loads `seed/synthetic-responses.sql` into dev D1; signed-in, idempotent, refused unless `ENVIRONMENT` is exactly `dev` (a missing variable fails closed); label `dev.bootstrap.seed_synthetic`, no receipt | environment plumbing, not product behavior |
 
 ## Rate limits (src/ratelimit.ts)
