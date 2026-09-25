@@ -155,7 +155,7 @@ test('entry: signed in shows Continue cards + sign-out, hides sign-in', async ()
   const ctx = ctxWith({}, { state: { principal: { id: 'pr_1' } } }); const h = pages.entry.render(ctx, await pages.entry.load(ctx, {}));
   assert.ok(h.includes('href="#workspaces"')); assert.ok(h.includes('href="#projects"')); assert.ok(h.includes('data-act="signout"')); assert.ok(!h.includes('data-act="signin"'));
 });
-test('entry: sign-in email → code step (dev code shown) → session stored, token set, go #workspaces', async () => {
+test('entry: sign-in email → code step (dev code shown) → session stored, go #projects then token set (B-F02a)', async () => {
   const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, removeItem: k => { delete stored[k]; } };
   const tokens = [];
   const ctx = ctxWith({ 'POST /v2/auth/link': { sent: true, dev_only_code: '123456' }, 'POST /v2/auth/session': { session: 'sess_abc', principal_id: 'pr_1' } }, { setToken: t => tokens.push(t) });
@@ -168,7 +168,8 @@ test('entry: sign-in email → code step (dev code shown) → session stored, to
   assert.ok(pages.entry.render(ctx, m).includes('123456'));
   form.elements.code.value = ' 123456 '; await form.fire('submit');
   assert.deepEqual(ctx.calls[1].body, { email: 'a@x.example.invalid', code: '123456' });
-  assert.equal(stored.facilitatorToken, 'sess_abc'); assert.deepEqual(tokens, ['sess_abc']); assert.deepEqual(ctx.gone, ['#workspaces']);
+  assert.equal(stored.facilitatorToken, 'sess_abc'); assert.deepEqual(tokens, ['sess_abc']); assert.deepEqual(ctx.gone, ['#projects']);
+  assert.ok(!ctx.notes.some(n => n.m === 'Signed in.'), 'no stale note after the re-boot');
 });
 test('entry: sign-in failure stays on the form and never claims success', async () => {
   const ctx = ctxWith({ 'POST /v2/auth/link': err('INVALID_PARAMS', 'synthetic only') });

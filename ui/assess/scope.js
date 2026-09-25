@@ -163,9 +163,10 @@ const entry = {
       if (!r) return;
       if (!r.session) return ctx.note('The server answered without a session token.', true);
       storeSession('facilitatorToken', r.session);
+      // Bincy F02 / B-F02a (lanes-1321): land on the work, not back on this form. Navigate BEFORE setToken: setToken
+      // re-boots the app (new generation), after which ctx.go is a no-op and the page stayed on #signin.
+      ctx.go(ctx.routes.projects);
       if (ctx.setToken) ctx.setToken(r.session);
-      ctx.note('Signed in.');
-      ctx.go(ctx.routes.workspaces);
     });
   },
 };
