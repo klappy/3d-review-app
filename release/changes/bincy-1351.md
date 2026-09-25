@@ -1,0 +1,3 @@
+bump: patch
+lane: bincy · PR: #271
+- Fixed - collect shows "n of N responded" when an expected number was given in setup (Bincy 07)
