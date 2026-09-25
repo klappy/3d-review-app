@@ -1,7 +1,31 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.21.4",
+  "current": "0.21.5",
   "versions": [
+    {
+      "version": "0.21.5",
+      "status": "candidate",
+      "notes_path": "releases/0.21.5.md",
+      "sections": {
+        "changed": [
+          "Home shows one card per review, project as sub-line, newest first (Bincy B28) (#294)",
+          "project page offers only Start a new 3D Review (Bincy B34) (#295)",
+          "each group has a plain who-line on setup, launch and Collect (Bincy B08, B20) (#296)",
+          "reports show a readable time; ids behind Technical details; scores rounded (Bincy B31) (#302)",
+          "project and assessment names are the page heading with a small edit control; the Rename card and the Prepare name field are gone (Bincy B07) (#285)",
+          "Permissions: a pending invitation reads \"member · invited Sep 25 · <email>\"; inviting a test address says \"Invitation recorded; not emailed (test address).\" (B31/U26) (#306)"
+        ],
+        "fixed": [
+          "Signing in opens your invitation first if you have one, your one project if you have just one, or Home if you have several (#297)",
+          "After you accept an invitation, the shared project shows by name right away, without reloading the page (#300)",
+          "A status line like \"Renamed.\" now clears when you move to another page, so it only shows where the action happened. (#308)",
+          "Setup step 1 no longer shows a follow-up checkbox that was never saved. (#303)",
+          "results: Build the results on the results panel asks once, builds, and the bands fill in place with no trip to Reports and no reload (Bincy 10) (#283)",
+          "\"Save notes\" on the next-step page now shows \"Saved\" next to the button after the page refreshes (U24) (#304)",
+          "Collect, Permissions and About trimmed to one heading and one line; the rest behind Learn more; no raw ids on screen (Bincy B30, B31) (#292)"
+        ]
+      }
+    },
     {
       "version": "0.21.4",
       "status": "candidate",

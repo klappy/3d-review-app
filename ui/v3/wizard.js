@@ -12,7 +12,7 @@ import { shareUrl } from '../shared-link.js';
 import { groupLinks, bindGroupLinks } from '../assess/share.js';
 import { stepper as stepperComponent, ensureStepperStyle } from './components/stepper.js';
 import { learnMore } from './components/learn-more.js';
-import { PERSPECTIVES } from '../assess/scope.js';
+import { whoLine } from '../assess/scope.js';
 
 export const STEPS = ['details', 'participants', 'information', 'review'];
 // Step names follow Bincy's screen inventory 03–06 (cookbook @933eb5f sources/bincy-design-sprint-2026-09-22/01_documents/04_screen_inventory.md).
@@ -28,7 +28,7 @@ const enc = encodeURIComponent;
 const LANG_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{1,8})*$/; // mirrors src/handlers/language.ts CODE (cap.language.create `code`)
 
 export function freshDraft() {
-  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', period: '', format: 'Written', purpose: '', followup: false, groups: {} };
+  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', period: '', format: 'Written', purpose: '', groups: {} };
 }
 
 // Ruling (a): a denominator appears only when the facilitator entered one.
@@ -184,8 +184,8 @@ export function expectedFor(surveyId, store = safeStore()) {
 // ---------- views (pure string renderers) ----------
 // component: Stepper (ruling 12:34) — the wizard composes the shared component; it keeps no copy of its own.
 export const stepper = n => stepperComponent(STEP_TITLES, n, { label: 'Setup steps' });
-// B20 (Bincy SI 04): step 2 groups surveys under one heading per perspective, each with the About page's one line (composed, not copied).
-export const perspectiveNote = p => { const k = pdot(p).slice(2); const hit = PERSPECTIVES.find(([key]) => key === k); return hit ? hit[2] : ''; };
+// B08+B20 (Bincy SI 04): step 2 groups surveys under one heading per perspective, each with one plain who-line (scope.js whoLine, shared).
+export const perspectiveNote = p => whoLine(p);
 export function byPerspective(templates = []) {
   const groups = new Map();
   for (const t of templates) { const k = String(t.perspective ?? ''); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t); }
@@ -219,7 +219,6 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
       </div>
       <label>What will participants consider?<input name="purpose" value="${esc(d.purpose)}" placeholder="e.g. The Genesis 1 to 3 draft"></label>
-      <label class="choice"><input type="checkbox" name="followup"${d.followup ? ' checked' : ''}>This is a follow-up to an earlier review of the same project <span class="sub">(not stored yet: the product has no field for it)</span></label>
       ${actions(false, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Choose the groups you can reach.', '<p class="muted">Three perspectives, kept separate.</p><p class="muted">The number is optional. Leave it empty if you don\'t know for sure; counts then show as "n responded". Groups you leave out can be added later.</p>')}${errBox(errs)}
@@ -257,7 +256,12 @@ export function linkRows(links, origin, templates) {
   const url = l => { try { return shareUrl(origin, l.entry_fragment); } catch { return ''; } };
   return links.map(l => ({ key: l.survey || l.template, group: tpl(l.template).perspective || l.template, survey: tpl(l.template).name || 'Survey', url: url(l) }));
 }
-function linkList(links, origin, templates) { return `<div class="wz-links">${groupLinks({ esc }, linkRows(links, origin, templates))}</div>`; }
+// B08+B20: the launched rows sit under their group's who-line (same shared line as step 2 and Collect); rows themselves unchanged.
+function linkList(links, origin, templates) {
+  const rows = linkRows(links, origin, templates), groups = new Map();
+  for (const r of rows) { const w = whoLine(r.group); if (!groups.has(w)) groups.set(w, []); groups.get(w).push(r); }
+  return `<div class="wz-links">${[...groups].map(([w, rs]) => `${w ? `<p class="small muted wz-pnote" data-who>${esc(w)}</p>` : ''}${groupLinks({ esc }, rs)}`).join('')}</div>`;
+}
 export function renderDone(ctx, origin = '', templates = []) {
   return `<div class="eyebrow">Launched</div><h1 class="wz-h">The review is collecting responses</h1>
     <p class="muted">Share each link with its group.</p>${learnMore('<p class="muted">Nothing was sent to anyone.</p>')}
@@ -277,7 +281,7 @@ export function mountWizard(root, deps) {
   const read = (form) => {
     const fd = new FormData(form), d = s.d;
     if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'period', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
-    if (form.dataset.wzForm === 'details') { d.followup = fd.has('followup'); if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
+    if (form.dataset.wzForm === 'details') { if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
   };
   root.addEventListener('change', async e => {

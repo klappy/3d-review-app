@@ -36,7 +36,7 @@ test('E1: generic legacy backlink is retired; the statement is generated, hidden
 test('S1: scrubCredentialHash is the first statement of boot() and of the hashchange listener; a consumed #session= re-observes identity', () => {
   const js = read('./assess.js');
   assert.match(js, /async function boot\(\) \{\n\s*if \(scrubCredentialHash\(\) === 'forwarded'\) return;/);
-  assert.match(js, /addEventListener\('hashchange', \(\) => \{ const r = scrubCredentialHash\(\); if \(r === 'forwarded'\) return; if \(r === 'session'\) \{ boot\(\); return; \} render\(\);/);
+  assert.match(js, /addEventListener\('hashchange', \(\) => \{ const r = scrubCredentialHash\(\); if \(r === 'forwarded'\) return; if \(r === 'session'\) \{ boot\(\); return; \} clearPageNote\(\); render\(\);/);
   assert.match(js, /location\.replace\('\/legacy\/' \+ h\); return 'forwarded';/);
   assert.match(js, /sessionStorage\.setItem\('facilitatorToken', m\[1\]\); \} catch \{\} resetIdentity\(\); return 'session';/);
   assert.ok(!/api\([^)]*\)[\s\S]*?scrubCredentialHash\(\) === 'forwarded'\) return;/.test(js.slice(js.indexOf('async function boot()'))), 'no api() call precedes the scrub in boot()');
@@ -97,4 +97,24 @@ test('B03: an assessment with no known project shows no raw project id in its he
 test('B03 (Bugbot): a failed project-list read never blocks the invitation page', () => {
   const js = read('./assess.js');
   assert.match(js, /if \(!\['assessment', 'survey', 'feedback', 'invite'\]\.includes\(route\(location\.hash\)\.kind\)\)/);
+});
+
+// Bincy B04 (captain ruling 2026-09-25): a fresh sign-in lands by Bincy's rule — invitation → accept screen; one project → it; several → Home.
+test('B04: a consumed #session= marks the sign-in; boot() applies signInLanding once, after the project list, before render()', () => {
+  const source = read('./assess.js');
+  const code = source.slice(source.indexOf('const LEGACY_HASHES'), source.indexOf('function resetIdentity()'));
+  const drive = (hash, store = new Map()) => {
+    const historyCalls = [];
+    const box = { demo:false, INVITE_KEY:'pendingInvite', parseInvitationFragment: () => null, resetIdentity(){}, token:null,
+      location:{ hash, pathname:'/', replace(){} }, history:{replaceState:(...args)=>historyCalls.push(args)},
+      sessionStorage:{ getItem:k=>store.get(k) ?? null, setItem:(k,v)=>store.set(k,v), removeItem:k=>store.delete(k) } };
+    const [result, landing] = vm.runInNewContext(code + '\n[scrubCredentialHash(), landAfterSignIn]', box);
+    return { result, landing, historyCalls };
+  };
+  assert.deepEqual([drive('#session=st_abc').result, drive('#session=st_abc').landing], ['session', true]);
+  assert.equal(drive('#projects').landing, false, 'plain navigation is not a sign-in');
+  assert.equal(drive('#session=st_abc', new Map([['pendingInvite', 'tok']])).historyCalls[0][2], '/#invite');
+  const boot = source.slice(source.indexOf('async function boot()'));
+  assert.match(boot, /state\.projects = result\.projects \|\| \[\];[\s\S]*if \(landAfterSignIn\) \{ landAfterSignIn = false; if \(\['projects', 'invite', 'entry'\]\.includes\(route\(location\.hash\)\.kind\)\) \{ try \{ history\.replaceState\(null, '', location\.pathname \+ location\.search \+ signInLanding\(\{ invite: !!\(pendingInvite \|\| storedInvite\(\)\), projects: state\.projects \}\)\); \} catch \{\} \} \}\n\s*listen\(\);\n\s*await render\(\);/);
+  assert.match(source, /const setToken = t => \{ if \(demo\) return; token = t \|\| null; landAfterSignIn = !!t;/, 'the entry form sign-in lands the same way');
 });
