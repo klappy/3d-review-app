@@ -394,7 +394,7 @@ test('B07: assessment heading rename disables other writes in place, keeps unsav
   p.q('#prepare-form textarea[name="purpose"]').value = 'unsaved draft';
   p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
   p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
-  assert.equal(p.api.state.busy, true); assert.equal(p.q('#prepare-form button[type=submit]').disabled, true, 'other writes visibly disabled while saving');
+  assert.equal(p.api.state.busy, false, 'shared busy flag untouched'); assert.equal(p.q('#prepare-form button[type=submit]').disabled, true, 'other writes visibly disabled while saving');
   release(); await tick(12);
   assert.equal(p.api.state.busy, false); assert.equal(p.q('#prepare-form button[type=submit]').disabled, false);
   assert.equal(p.q('#prepare-form textarea[name="purpose"]').value, 'unsaved draft', 'draft survives the rename');
@@ -409,7 +409,6 @@ test('B07: a view rebuilt while the rename is in flight settles like act(): refr
   p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
   p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
   await p.go('#assessment/a2/prepare');
-  assert.equal(p.q('#prepare-form button[type=submit]').disabled, true, 'drawn disabled while busy');
   const gets = p.transport.log.filter(l => l.key === 'GET /v2/assessments/a2').length;
   release(); await tick(16);
   assert.equal(p.api.state.busy, false); assert.equal(p.q('#prepare-form button[type=submit]').disabled, false, 'remounted controls enabled after settle');
@@ -427,4 +426,5 @@ test('B07: a refused rename that settles after navigating to another assessment 
   release(); await tick(16);
   assert.equal(p.api.state.busy, false); assert.equal(p.api.state.current.assessment.id, 'a1');
   assert.equal(p.q('#prepare-form textarea[name="purpose"]').value, 'draft on a1'); assert.equal(p.api.state.message, null, 'no refusal pinned on another assessment');
+  assert.equal(p.q('#prepare-form button[type=submit]').disabled, false, 'the other page keeps its write controls enabled'); assert.ok(p.qa('[data-stage]').every(b => !b.disabled));
 });

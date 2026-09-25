@@ -441,26 +441,27 @@ function bindPrepare(current) {
 function bindNameHeading(current) {
   const a = current.assessment;
   return mountEditableHeading((app.closest('[role=main]') || app).querySelector('h1'), { canEdit: a.role === 'owner' || a.role === 'member', label: 'assessment name',
-    // act()'s write guards (one write at a time, never over a dirty screen) without repainting the page: other write controls are
-    // disabled in place while the PATCH runs, so unsaved Prepare/Improve drafts survive; the committed name goes to state.current.
+    // Write guards without the shared busy flag (Bugbot on #285): never starts during an act() write or over a dirty screen; while the
+    // PATCH runs, this view's other controls are disabled IN PLACE (no repaint, drafts survive) and re-enabled only if still on screen.
+    // A view rebuilt meanwhile draws its controls normally (the PATCH carries only `name`; Prepare sends only `purpose`, so no field is
+    // overwritten) and, if it shows this assessment, settles like act(): refresh on commit, status line on refusal. Other pages are untouched.
     save: async name => {
       if (state.busy) return false;
       if (state.dirty.has(a.id)) throw new Error(state.dirty.get(a.id) === 'write' ? 'Your last change is saved but this screen is not refreshed yet. Refresh before making more changes.' : 'This assessment changed on the server. Refresh before making changes.');
       const identity = identityGeneration, view = app.firstElementChild, held = [...app.querySelectorAll('button:not([disabled])')].filter(b => !b.closest('.v3-eh'));
-      state.busy = true; held.forEach(b => { b.disabled = true; });
+      held.forEach(b => { b.disabled = true; });
       let r, failed = null;
       try { r = await api(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); } catch (e) { failed = redact(e.message); }
+      held.forEach(b => { if (b.isConnected) b.disabled = false; });
       if (identity !== identityGeneration) return false;
-      // If the view was rebuilt while the PATCH ran (tab/crumb navigation, paint), its controls were drawn disabled from `busy`:
-      // then settle the way act() does — repaint (refusal) or refresh (committed) — instead of re-enabling detached nodes.
-      state.busy = false; const intact = !!view?.isConnected && held.every(b => b.isConnected); if (intact) held.forEach(b => { b.disabled = false; });
+      const intact = !!view?.isConnected && held.every(b => b.isConnected);
       const here = route(location.hash), onThis = (here.kind === 'assessment' || here.kind === 'survey') && here.id === a.id && state.current?.assessment.id === a.id;
-      if (failed) { if (!intact && onThis) { state.message = { aid: a.id, text: failed, alert: true }; paint(); } throw new Error(failed); } // never repaint another page
+      if (failed) { if (!intact && onThis) { note.textContent = failed; note.classList.add('alert'); } throw new Error(failed); }
       const next = String(r?.assessment?.name ?? name), old = state.current?.assessment.name;
       const listed = state.lists.get(a.project_id)?.list?.find?.(x => x.id === a.id); if (listed) listed.name = next;
       if (state.current?.assessment.id !== a.id) return;
       state.current.assessment.name = next;
-      if (!intact) { if (onThis) { state.dirty.set(a.id, 'write'); render(); } return; }
+      if (!intact) { if (onThis) { state.dirty.set(a.id, 'write'); if (!state.busy) render(); } return; } // an act() in flight refreshes on its own settle
       if (document.title.includes(old)) document.title = document.title.replace(old, next);
       // No shell re-sync here: a kit update empties the content mount (drafts). The component sets the heading; crumbs follow in place.
       if (kit) for (const el of document.querySelectorAll('header.top nav.crumbs a, header.top nav.crumbs [aria-current]')) if (el.children.length === 0 && el.textContent.trim() === old) el.textContent = next;
