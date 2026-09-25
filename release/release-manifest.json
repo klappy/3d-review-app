@@ -1,29 +1,40 @@
 {
-  "version": "0.21.2",
+  "version": "0.21.3",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "22591d55d8c583cc1a306d8362b58c39f5c52eba",
+  "cookbook_commit": "8e54b7f1d7e6321804e3e7a08ffb0d7ed7da3713",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.21.2.md",
-      "blob_sha": "75c2826cfe5fbc684889fb058f5470c22efbf027",
-      "sha256": "b340f0f20478ed99f8bc32fc534c6f33136de5536691b8a2eccda5c8c62b5c03"
+      "path": "planning/2026-09-16-parity-build/releases/0.21.3.md",
+      "blob_sha": "2e04ab1240d1b1655553a1b7901bc29ae4a27243",
+      "sha256": "421668a61b87a10af436896321a445b6da9f292080c12caf8b7743f19d7db55e"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "f8ff80281a9d4dd684ac8aa6d225a1f92e4e3cc6",
-      "sha256": "9c120c591b4c05c03333319840dc5d16e070734b0117b9b950105f3cd9ae47db"
+      "blob_sha": "1d219d3de02095a529796382b6d431a4f583da97",
+      "sha256": "0ff1af4b2ed8ce23d7e7f0787303781e28e696517b7353da11320bd17067ff5d"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "DEV only: \"Mid-Level v1 (legacy)\" survey template carrying the old Lovable ML1–ML12 questions verbatim, so legacy mid-level responses import as answered (#270)"
-      ],
+      "added": [],
       "changed": [
-        "work rail moved to the cookbook repo (HYGIENE 35) (#268)"
+        "Copy and QR per group on the launched screen and Collect (Bincy B36) (#287)",
+        "thank-you names the participant's own group (Bincy B26) (#286)"
       ],
       "fixed": [
-        "setup screens trimmed to one line and one primary action (assessment details, groups, participant information, review and launch, links); explanations behind a shared Learn more (#269)"
+        "signing in lands on your projects with Continue, not back on the sign-in form (Bincy F02) (#272)",
+        "header says Signed in instead of Account email unavailable. (#274)",
+        "a used or unknown access code tells the participant what to do next (#277)",
+        "Projects page cards show their counts again: assessment cards say how many responses (\"9 responses\"), project cards how many assessments and responses (#279)",
+        "Projects and a project page offer \"Start a new 3D Review\" as the one create action; add-language and bare-assessment forms move behind a closed \"More\" (Bincy B34 / F03). (#280)",
+        "setup step 2 now explains each perspective (Translation team, Community, Church) in one line above its surveys (#284)",
+        "Collect never silently makes a second link after an uncertain failure (Bincy B36) (#288)",
+        "collect shows \"n of N responded\" when an expected number was given in setup (Bincy 07) (#271)",
+        "results: one plain line while results are held, no internal policy codes (#275)",
+        "survey: optional questions say (optional), skipped answers say Skipped, the receipt shows a short reference and local time (Bincy 09) (#273)",
+        "survey: each question page shows its progress bar again and only the question, without internal notes (Bincy B24) (#273)",
+        "results, next step, sign-in, permissions and the assessment Prepare view show one heading, one line and one primary action (explanations behind Learn more; results errors stay visible; Prepare stage panel no longer squashed on phones) (#282)",
+        "permissions: confirming an invitation or transfer says what will happen in one sentence; the technical record is under Details (#278)"
       ]
     }
   }

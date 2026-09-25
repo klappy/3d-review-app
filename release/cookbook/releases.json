@@ -1,7 +1,33 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.21.2",
+  "current": "0.21.3",
   "versions": [
+    {
+      "version": "0.21.3",
+      "status": "candidate",
+      "notes_path": "releases/0.21.3.md",
+      "sections": {
+        "changed": [
+          "Copy and QR per group on the launched screen and Collect (Bincy B36) (#287)",
+          "thank-you names the participant's own group (Bincy B26) (#286)"
+        ],
+        "fixed": [
+          "signing in lands on your projects with Continue, not back on the sign-in form (Bincy F02) (#272)",
+          "header says Signed in instead of Account email unavailable. (#274)",
+          "a used or unknown access code tells the participant what to do next (#277)",
+          "Projects page cards show their counts again: assessment cards say how many responses (\"9 responses\"), project cards how many assessments and responses (#279)",
+          "Projects and a project page offer \"Start a new 3D Review\" as the one create action; add-language and bare-assessment forms move behind a closed \"More\" (Bincy B34 / F03). (#280)",
+          "setup step 2 now explains each perspective (Translation team, Community, Church) in one line above its surveys (#284)",
+          "Collect never silently makes a second link after an uncertain failure (Bincy B36) (#288)",
+          "collect shows \"n of N responded\" when an expected number was given in setup (Bincy 07) (#271)",
+          "results: one plain line while results are held, no internal policy codes (#275)",
+          "survey: optional questions say (optional), skipped answers say Skipped, the receipt shows a short reference and local time (Bincy 09) (#273)",
+          "survey: each question page shows its progress bar again and only the question, without internal notes (Bincy B24) (#273)",
+          "results, next step, sign-in, permissions and the assessment Prepare view show one heading, one line and one primary action (explanations behind Learn more; results errors stay visible; Prepare stage panel no longer squashed on phones) (#282)",
+          "permissions: confirming an invitation or transfer says what will happen in one sentence; the technical record is under Details (#278)"
+        ]
+      }
+    },
     {
       "version": "0.21.2",
       "status": "candidate",
