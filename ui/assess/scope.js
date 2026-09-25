@@ -114,8 +114,9 @@ function surveyView(ctx) {
 const LEAD = 'Hear from the translation team, the community and the church, then choose what to do next.';
 const WHO = [['Who it is for', 'Translation teams, the communities they serve and the churches using the translation — with a facilitator who runs the review.'], ['When to use it', 'When your project is ready to pause, reflect and learn from feedback.'], ['How often', 'Repeat when a new assessment would be useful — for example, between books or publishing iterations.']];
 export function aboutView(ctx) {
-  const facts = WHO.map(([t, s]) => ctx.cards.card({ title: t, meta: [s] })).join('');
-  return `<section class="glass panel narrow" id="about-page"><a class="back" href="#">← Back to home</a><p class="eyebrow">About 3D Review</p><h1>Three perspectives. One useful next step.</h1><p class="muted lead">${LEAD}</p>${perspectivesRow(ctx)}${learnMore(`<p class="muted">A facilitator sets up a review.</p><p class="muted">Each group answers a short survey.</p><p class="muted">The results show where the project is strong and where it needs support.</p><div class="project-grid">${facts}</div>`)}<div class="actions"><a class="rv-btn primary" href="#">Back to home</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a></div></section>`;
+  // B30: behind Learn more the three facts are plain label + line pairs (no card headings: one heading per screen).
+  const facts = WHO.map(([t, s]) => `<p><strong>${ctx.esc(t)}</strong></p><p class="muted">${ctx.esc(s)}</p>`).join('');
+  return `<section class="glass panel narrow" id="about-page"><a class="back" href="#">← Back to home</a><p class="eyebrow">About 3D Review</p><h1>Three perspectives. One useful next step.</h1><p class="muted lead">${LEAD}</p>${perspectivesRow(ctx)}${learnMore(`<p class="muted">A facilitator sets up a review.</p><p class="muted">Each group answers a short survey.</p><p class="muted">The results show where the project is strong and where it needs support.</p>${facts}`)}<div class="actions"><a class="rv-btn primary" href="#">Back to home</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a></div></section>`;
 }
 function signinView(ctx, model) {
   const s = model.signin;

@@ -153,9 +153,11 @@ test('B31 head: the role line shows the project name or nothing — never the ra
   assert.doesNotMatch(h, /p1 ·|proj_/); assert.match(h, />your role: viewer</);
 });
 test('B30 About: one heading, one short line, one primary; the explanation and the three facts behind Learn more', async () => {
+  // no card headings, even hidden: one heading per screen
   const h = pages.entry.render({ esc, cards: await import('./cards.js'), state: {} }, { mode: 'about' });
   const body = lessText(h, 'about', /<h[12]\b/g);
   assert.equal(count(upFront(h), /<p class="muted lead">/g), 1);
   const line = upFront(h).match(/<p class="muted lead">([^<]*)<\/p>/)[1]; assert.equal(sentences(line), 1, 'one sentence');
   for (const moved of ['A facilitator sets up a review.', 'Who it is for', 'When to use it', 'How often']) assert.ok(body.includes(moved), `moved, not removed: ${moved}`);
+  assert.equal(count(h, /<h[1-6]\b/g), 1, 'one heading in the whole page, disclosures included');
 });
