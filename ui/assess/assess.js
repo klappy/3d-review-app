@@ -9,15 +9,19 @@ import { whatsHere } from '/assess/whats-here.js';
 import * as cards from '/assess/cards.js';
 import { breadcrumbs } from '/v3/components/breadcrumbs.js';
 import { sidebarTree } from '/v3/components/sidebar-tree.js';
+// lane 9 L9-24: shared closed-by-default disclosure
+import { learnMore } from '/v3/components/learn-more.js';
+// Bincy B03: `#invite=<token>` is handled here (v3), not forwarded to /legacy/.
+import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment } from '/v3/components/invite.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
 const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
-import { pages, css as scopeCss } from '/assess/scope.js';
+import { pages, css as scopeCss, landsOnWork } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle } from '/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor } from '/assess/v3-assessment.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
 // if the module is absent; destroyed on any route change.
 const WIZARD_JS = '/v3/wizard.js', WIZARD_CSS = '/v3/wizard.css';
@@ -25,7 +29,7 @@ let wizardHandle = null;
 const startReview = () => V3_SHELL ? '<div class="v3-shell-actions actions"><a class="rv-btn primary" data-v3-start href="#new">Start a review</a></div>' : '';
 // v3 shell (lane 1): context tree removed when V3_SHELL; crumbs remain the navigation.
 // Bugbot 4094071963: the kit adapter has no 'new' kind; the shell header names the wizard page (title + current link) here.
-const v3Model = m => !V3_SHELL ? m : m?.context?.route === 'new' ? { ...m, contextTree: false, title: 'Start a review', eyebrow: 'New review', currentHref: '#new', ancestors: [{ label: 'Projects', href: cards.routes.projects, visible: true }] } : { ...m, contextTree: false };
+const v3Model = m => !V3_SHELL ? m : m?.context?.route === 'invite' ? { ...m, contextTree: false, title: 'Invitation', eyebrow: '', currentHref: '#invite', ancestors: [] } : m?.context?.route === 'new' ? { ...m, contextTree: false, title: 'Start a review', eyebrow: 'New review', currentHref: '#new', ancestors: [{ label: 'Projects', href: cards.routes.projects, visible: true }] } : { ...m, contextTree: false };
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 // Product overhaul (cookbook #16 c5721465315): five VIEWS on one assessment page. A view is a tab; a tab never mutates stage.
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
@@ -120,7 +124,7 @@ const redact = m => redactDiagnosticPath(String(m || 'Request could not be compl
 //                                                  (Bugbot 4041134416). Results are bound to (aid, epoch) (Auditor 2A-3).
 //   generation   counter                           a later render supersedes an earlier one's DOM write (supplier 1114cb1)
 let generation = 0, epoch = 0, identityGeneration = 0;
-const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null };
+const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null, collectLinks: new Map() };
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']); // visibility/authz codes (supplier 97f7402 + policy.ts)
@@ -148,6 +152,7 @@ export function route(hash) {
   if (!parts[0]) return { kind: 'entry' };
   if (['how', 'example', 'signin', 'survey', 'about'].includes(parts[0]) && !parts[1]) return { kind: 'entry', intent: parts[0] };
   if (parts[0] === 'feedback' && !parts[1]) return { kind: 'feedback' };
+  if (parts[0] === 'invite' && !parts[1]) return { kind: 'invite' }; // B03: token already moved out of the address bar
   if (parts[0] === 'workspaces') return { kind: 'workspaces' };
   if (parts[0] === 'workspace' && parts[1]) return { kind: 'workspace', id: parts[1] };
   if (parts[0] === 'projects') return { kind: 'projects' };
@@ -244,13 +249,14 @@ function bindCounts(current) {
   app.querySelectorAll('[data-retry-count]').forEach(el => el.onclick = e => { e.preventDefault(); loadCounts(state.current, { retry: el.dataset.retryCount }); paintCounts(state.current); });
   app.querySelectorAll('[data-refresh]').forEach(el => el.onclick = e => { e.preventDefault(); render(); });
 }
-// v3 L1-5 (NEED 3→1, Bincy 07): per-survey counts on Collect read through lane 3's v3CountLine (ruling a/b): "n responded"
-// (never a denominator the facilitator did not enter; the server sends none here) + respondents. Same data-count hook so
+// v3 L1-5 (NEED 3→1, Bincy 07): per-survey counts on Collect read through lane 3's v3CountLine (ruling a/b): "n of N responded"
+// when the facilitator entered N in setup on this device (B-07), else "n responded" (never a denominator nobody entered) + respondents. Same data-count hook so
 // paintCounts repaints it via data-collect-wrap; non-loaded states keep countCell's retry/refresh wording.
+function localStore() { try { return globalThis.localStorage || null; } catch { return null; } }
 function collectCount(s) {
   const c = countFor(s.id);
   if (c.status !== 'loaded') return countCell(s);
-  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}${collectState(c.collection_status || s.collection_status)}</span>`;
+  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses, expected: demo ? null : v3ExpectedFor(s.id, localStore()) }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}${collectState(c.collection_status || s.collection_status)}</span>`;
 }
 // v3 L10-1 (prototype frame 7 rrow): each Collect row ends with its plain state word, open / closed (PARITY C6), from the server's collection_status only.
 function collectState(status) {
@@ -259,10 +265,24 @@ function collectState(status) {
   return ` <span aria-hidden="true">·</span> <span class="state" data-collect-state>${esc(word)}</span>`;
 }
 function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'Other perspective'; }
+// B36: Copy link / Show QR code per group on Collect (owner, member; open surveys). One tap issues the link through the Share
+// card's API pair; the link lives in memory only, keyed to (aid, sid, epoch) and dropped with identity (state.collectLinks).
+function shareable(a, s) { return share.CAN_SHARE.has(a.role) && (s.collection_status === 'open' || a.stage === 'collect'); }
+function bindCollectLinks(current) {
+  const root = app.querySelector('[data-collect-panel]'); if (!root) return;
+  const aid = current.assessment.id, ep = epoch;
+  share.bindGroupLinks(root, { resolve: async sid => {
+    const k = `${aid}|${sid}|${ep}`;
+    for (const key of state.collectLinks.keys()) if (!key.startsWith(`${aid}|`) || !key.endsWith(`|${epoch}`)) state.collectLinks.delete(key);
+    const link = await share.cachedLink(state.collectLinks, k, () => share.issueLink(api, { aid, sid, origin: location.origin }));
+    if (ep !== epoch || state.current?.assessment.id !== aid) throw share.failure(); // a link may exist but is not shown here
+    return link.url;
+  } });
+}
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
-  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p></div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
-  return `<section class="panel"><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey to share its link or print a blank questionnaire.</p></section>`;
+  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id }]) : ''}</div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
+  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}</section>`;
 }
 // Cut 2A child screen: ONE survey. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
@@ -354,19 +374,25 @@ function prepareView(current) {
   const fields = `<label class="field">Assessment name<input name="name" maxlength="100" required value="${esc(a.name)}" ${mayEdit ? '' : 'readonly'}></label><label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>`;
   const form = mayEdit ? `<form id="prepare-form">${fields}<div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save preparation</button></div></form>` : `<div>${fields}<p class="small muted">Your role here is ${esc(a.role)}: preparation is read-only.</p></div>`;
   const i = PHASES.indexOf(a.stage), prev = PHASES[i - 1], next = PHASES[i + 1], n = activeSurveys(current).length;
-  const move = mayEdit ? `<div class="actions">${prev ? `<button type="button" data-stage="${prev}" ${state.busy ? 'disabled' : ''}>← Back to ${title(prev)}</button>` : ''}${next ? `<button type="button" class="primary" data-stage="${next}" ${state.busy ? 'disabled' : ''}>Move to ${title(next)} →</button>` : ''}</div><p class="small muted">One stage at a time, as the server allows. Moving into Collect opens collection; moving out of Collect closes it — for all ${n} included survey${n === 1 ? '' : 's'}.</p>` : '';
-  const stage = `<aside class="panel"><p class="eyebrow">Stage</p><h2>${stageLabel(a.stage)}</h2><p class="muted">The stage is the assessment's own state. Browsing these views never changes it.</p>${move}${a.language_id ? `<p class="small muted">Language: ${esc(a.language_id)}</p>` : ''}${a.period ? `<p class="small muted">Period: ${esc(a.period)}</p>` : ''}</aside>`;
+  const move = mayEdit ? `<div class="actions">${prev ? `<button type="button" data-stage="${prev}" ${state.busy ? 'disabled' : ''}>← Back to ${title(prev)}</button>` : ''}${next ? `<button type="button" data-stage="${next}" ${state.busy ? 'disabled' : ''}>Move to ${title(next)} →</button>` : ''}</div>` : ''; // lane 9 L9-24: one primary on this view (Save preparation)
+  // Lane 9 L9-24 (validator #282): ONE view heading ("Prepare this assessment"). The stage is an eyebrow + badge, not a second
+  // heading; the collect consequence, stage notes, language and period sit behind the shared Learn more. A <section>, not an
+  // <aside>: kit.css turns every `.rv aside` into a nav flex row at ≤760px (squashed/clipped at 390px).
+  const more = `${mayEdit ? `<p class="muted">Moving into Collect opens collection; moving out of Collect closes it — for all ${n} included survey${n === 1 ? '' : 's'}.</p><p class="muted">One stage at a time, as the server allows.</p>` : ''}<p class="muted">The stage is the assessment's own state. Browsing these views never changes it.</p>${a.language_id ? `<p class="small muted">Language: ${esc(a.language_id)}</p>` : ''}${a.period ? `<p class="small muted">Period: ${esc(a.period)}</p>` : ''}`;
+  const stage = `<section class="panel" data-stage-panel><p class="eyebrow">Stage <span class="badge">${stageLabel(a.stage)}</span></p>${move}${learnMore(more)}</section>`;
   return `<div class="grid"><section class="panel"><h2>Prepare this assessment</h2>${form}</section>${stage}</div>`;
 }
 function screen(current, view = null) {
   const a = current.assessment, project = state.projects.find(p => p.id === a.project_id);
   const tab = view || (VIEWS.includes(a.stage) ? a.stage : 'prepare');
-  const roleLine = `${esc(project?.name || a.project_id)} · your role: ${esc(a.role)}${a.role === 'viewer' ? ' — you can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions' : ''}`;
+  const roleLine = project ? `${esc(project.name)} · your role: ${esc(a.role)}` : `Your role: ${esc(a.role)}`; // B03: never a raw project id (shared assessment, no project role)
+  // lane 9 L9-24: the viewer explanation moves behind Learn more (roleMore)
+  const roleMore = a.role === 'viewer' && tab !== 'improve' ? learnMore( /* Next steps carries its own role note (one, not two) */'<p class="muted">You can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions.</p>') : '';
   // Under the kit shell the eyebrow/h1 are the shell's (one heading); only the unique role line and stage badge remain here.
   // v3 (NEED 3→1): one state-driven primary in the headrow; viewers get none for setup/collect (lane 3 module decides).
   const primary = V3_SHELL ? v3StagePrimary(a.stage, a.role === 'owner' || a.role === 'member', v => `#assessment/${encodeURIComponent(a.id)}/${v}`, esc) : '';
-  const head = kit ? `<div class="title assessment-head"><p class="muted" style="margin:0">${roleLine}</p><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${viewTabs(a, tab)}`
-    : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${roleLine}</p></div><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
+  const head = kit ? `<div class="title assessment-head"><p class="muted" style="margin:0">${roleLine}</p><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`
+    : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${roleLine}</p></div><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
   if (tab === 'prepare') return head + prepareView(current);
   if (tab !== 'collect') return head + `<div id="view-root" data-view="${tab}"><p class="muted">Loading…</p></div>`;
   return head + collectScreen(current);
@@ -441,6 +467,8 @@ async function fetchAssessment(aid) {
   return { assessment: r.assessment, surveys: r.surveys || [] };
 }
 async function render() {
+  // B02: signed in, "/" is the current work (#projects), never the public welcome with its Sign in choice.
+  if (landsOnWork(route(location.hash), state.principal)) { try { history.replaceState(null, '', location.pathname + location.search + '#projects'); } catch {} }
   const gen = ++generation, r = route(location.hash);
   if (wizardHandle) { try { wizardHandle.destroy(); } catch {} wizardHandle = null; }
   currentShareRoute();
@@ -467,12 +495,24 @@ async function render() {
     // top-level lists stand alone (showcase SOURCE-MAP: the panel is absent from public routes).
     // K3a: workspace/project read surfaces are kit-presented (tree in the shell); the legacy context sidebar remains only for permissions.
     if (r.kind === 'new') { await mountNew(gen); return; }
+    if (r.kind === 'invite') { mountInvitePage(gen); return; }
     const sidebar = state.principal && (kit ? ['permissions'] : ['workspace', 'project', 'permissions']).includes(r.kind);
     app.className = sidebar ? 'workspace-layout' : '';
     if (sidebar) { syncShell(); app.innerHTML = context(null) + '<div id="page-root"><p class="muted">Loading…</p></div></section>'; bind(null); await runPage(pageFor(r), r, gen, app.querySelector('#page-root')); }
     else await runPage(pageFor(r), r, gen);
     if (gen === generation && (r.kind === 'projects' || r.kind === 'workspaces') && state.principal && !app.querySelector('[data-v3-start]')) app.insertAdjacentHTML('afterbegin', startReview());
   }
+}
+// B03: the invitation page. Signed out → the sign-in step (the token stays in this tab so the sign-in return comes back here).
+function mountInvitePage(gen) {
+  syncShell(); app.className = ''; document.title = 'Invitation · 3D Review';
+  const t = pendingInvite || storedInvite();
+  if (!t) { app.innerHTML = inviteView({ status: 'missing' }); return; }
+  if (!state.principal) { app.innerHTML = inviteView({ status: 'signin' }); return; }
+  const ctx = ctxFor();
+  mountInvite(app, { api: ctx.api, token: t, isCurrent: () => gen === generation, forget: forgetInvite,
+    // Accepted: Home lists what was shared (projects list is re-read by the page load).
+    onAccepted: () => ctx.go(cards.routes.projects) });
 }
 async function mountNew(gen) {
   syncShell(); app.className = '';
@@ -502,8 +542,9 @@ async function loadAccountEmail() {
     const response = await fetch('/v2/auth/access?view=account', { headers, credentials: 'same-origin', redirect: 'error', cache: 'no-store' });
     const value = response.ok ? await response.json() : null;
     if (identity !== identityGeneration || credential !== token) return;
-    who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Account email unavailable.';
-  } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Account email unavailable.'; }
+    // U03 (lanes-1321): sandbox and cookie sessions have no account view; say "Signed in", never a failure sentence.
+    who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Signed in';
+  } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Signed in'; }
 }
 async function signOut(switchAccount = false) {
   if (demo || accountBusy || !state.principal) return;
@@ -603,7 +644,7 @@ function paint(r = route(location.hash), gen = generation) {
     const a0 = state.current.assessment;
     const tab = r.view || recalledTab(tabStorage, a0.id, VIEWS.includes(a0.stage) ? a0.stage : 'prepare');
     if (r.view) rememberTab(tabStorage, a0.id, r.view);
-    app.innerHTML = ctxPanel + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') loadCounts(state.current);
+    app.innerHTML = ctxPanel + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') { bindCollectLinks(state.current); loadCounts(state.current); }
     bindPrepare(state.current); mountView(state.current, tab, gen);
     document.title = `${title(tab)} · ${state.current.assessment.name} · 3D Review`;
   }
@@ -613,6 +654,10 @@ function paint(r = route(location.hash), gen = generation) {
 // `#evidence`. `#session=` is the Access return leg (src/index.ts:138, callback unchanged): consumed here exactly as legacy does —
 // same `facilitatorToken` key, stripped from history before any render, never echoed. Nothing else stores a credential.
 const LEGACY_HASHES = new Set(['#facilitator', '#workspace', '#evidence']);
+// B03: a pending invitation token — memory + this tab's sessionStorage only (survives the sign-in round trip), cleared once used.
+let pendingInvite = null;
+function storedInvite() { try { return sessionStorage.getItem(INVITE_KEY); } catch { return null; } }
+function forgetInvite() { pendingInvite = null; try { sessionStorage.removeItem(INVITE_KEY); } catch {} }
 // Returns 'forwarded' (this page is leaving), 'session' (a session was consumed — identity must be re-observed), or null.
 // Runs on load AND on every hashchange (Auditor S1): fragment-only navigation after load takes the same path as a fresh load.
 function scrubCredentialHash() {
@@ -622,9 +667,10 @@ function scrubCredentialHash() {
   if (h === '#participant') { location.replace('/legacy/#participant'); return 'forwarded'; }
   if (h === '#reports-card') { location.replace('/#projects'); return 'forwarded'; }
   if (/^#survey=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + h); return 'forwarded'; }
-  if (/^#invite=/.test(h) || LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
+  if (/^#invite=/.test(h)) { const t = parseInvitationFragment(h); if (t) { pendingInvite = t; try { sessionStorage.setItem(INVITE_KEY, t); } catch {} } try { history.replaceState(null, '', location.pathname + '#invite'); } catch {} return null; } // B03: stays in v3; token leaves the address bar
+  if (LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
   const m = /^#session=([A-Za-z0-9_]+)$/.exec(h);
-  if (m) { try { history.replaceState(null, '', location.pathname + '#workspaces'); } catch {} token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} resetIdentity(); return 'session'; }
+  if (m) { /* B-F02a: land on the work list; B03: a pending invitation comes first */ try { history.replaceState(null, '', location.pathname + (pendingInvite || storedInvite() ? '#invite' : '#projects')); } catch {} token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} resetIdentity(); return 'session'; }
   if (/^#session=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} } // malformed: drop, never render
   return null;
 }
@@ -632,7 +678,7 @@ function resetIdentity() {
   identityGeneration += 1; generation += 1; epoch += 1;
   accountBusy = false; accountControls(false); accountStatus();
   document.getElementById('account-switch-dialog')?.close();
-  state.share = null; state.principal = null; state.projects = []; state.current = null; state.templates = null;
+  state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
   state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false;
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
@@ -654,6 +700,7 @@ async function boot() {
     // Public entry: the welcome/tour/example/survey-code/sign-in page needs no session; every other route asks to sign in.
     accountControls(false); accountStatus();
     listen();
+    if (route(location.hash).kind === 'invite') { who.textContent = 'Not signed in'; app.className = ''; syncShell(); mountInvitePage(generation); return; }
     if (route(location.hash).kind === 'entry') { who.textContent = 'Not signed in'; app.className = ''; syncShell(); await render(); return; }
     // Real sign-in only (captain: synthetic-only sign-in rejected). /v2/auth/access is the existing Cloudflare email-code
     // route; it sets the session cookie and returns to the workspace home (/#session=…), not here — stated, not hidden.
@@ -669,7 +716,7 @@ async function boot() {
   try { const result = await api('/v2/projects'); if (identity !== identityGeneration) return; state.projects = result.projects || []; }
   catch (e) { if (identity !== identityGeneration) return; // Auth A14: a direct #assessment/<id> still renders under "Granted to you"; the project list failure is a retryable notice, not a dead end.
     state.projects = []; note.innerHTML = `Could not load your project list (${esc(redact(e.message))}). <a href="#" data-retry-boot>Retry</a>`; note.querySelector('[data-retry-boot]').onclick = ev => { ev.preventDefault(); note.textContent = ''; boot(); };
-    if (!['assessment', 'survey', 'feedback'].includes(route(location.hash).kind)) { syncShell(); app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
+    if (!['assessment', 'survey', 'feedback', 'invite'].includes(route(location.hash).kind)) /* B03: acceptance does not need the list */ { syncShell(); app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
   listen();
   await render();
 }

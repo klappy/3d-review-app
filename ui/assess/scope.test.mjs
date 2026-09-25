@@ -1,7 +1,7 @@
 // node --test ui/assess/scope.test.mjs — scope pages: render() strings, load() with a fake api, entry sign-in transitions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pages, css, classify } from './scope.js';
+import { pages, css, classify, landsOnWork } from './scope.js';
 import * as cards from './cards.js';
 
 const err = (code, message = 'nope') => Object.assign(new Error(message), { code, status: Number(code) || 400 });
@@ -62,7 +62,7 @@ test('workspaces: empty state and create form', async () => {
 test('projects: empty state and create form', async () => {
   const ctx = ctxWith({ 'GET /v2/projects': { projects: [] } });
   const h = pages.projects.render(ctx, await pages.projects.load(ctx, {}));
-  assert.ok(h.includes('You have no projects yet.')); assert.ok(h.includes('id="create-project"')); assert.ok(h.includes('href="#workspaces"'));
+  assert.ok(h.includes('You have no projects yet.')); assert.ok(!h.includes('id="create-project"'), 'B34: no separate create-project form'); assert.ok(h.includes('data-v3-start href="#new"')); assert.ok(h.includes('href="#workspaces"'));
 });
 test('workspace: no projects grouped, viewer sees no add/rename/remove', async () => {
   const ctx = ctxWith({ 'GET /v2/workspaces/ws1': { workspace: { id: 'ws1', name: 'W <1>', role: 'viewer', archived_at: null }, projects: [] } });
@@ -100,6 +100,8 @@ test('project (owner): assessment cards link to #assessment/<id> with language n
   assert.ok(h.includes('href="#assessment/a1"')); assert.ok(h.includes('Language: Lake')); assert.ok(h.includes('Collecting'));
   assert.ok(h.includes('id="create-assessment"')); assert.ok(h.includes('<option value="l1">Lake (qaa)</option>')); assert.ok(!h.includes('<option value="l2"'), 'archived language not offered');
   assert.ok(h.includes('id="rename-form"')); assert.ok(h.includes('href="#permissions/projects/p1"')); assert.ok(h.includes('Org'));
+  // B34: Start is the one visible create action; the bare assessment / language forms sit behind a closed "More".
+  assert.ok(h.includes('data-v3-start href="#new"')); assert.match(h, /<details class="panel more-tools" id="project-more"><summary>More<\/summary>[\s\S]*id="create-assessment"[\s\S]*id="add-language"[\s\S]*<\/details>/);
 });
 
 // ---------- refusal / auth / transient ----------
@@ -154,8 +156,20 @@ test('entry: public welcome with hero, tour stepper and survey/example/sign-in b
 test('entry: signed in shows Continue cards + sign-out, hides sign-in', async () => {
   const ctx = ctxWith({}, { state: { principal: { id: 'pr_1' } } }); const h = pages.entry.render(ctx, await pages.entry.load(ctx, {}));
   assert.ok(h.includes('href="#workspaces"')); assert.ok(h.includes('href="#projects"')); assert.ok(h.includes('data-act="signout"')); assert.ok(!h.includes('data-act="signin"'));
+  // B02: a signed-in "/" never shows "Sign in" — not the nav choice, not any link to the provider
+  const nav = h.slice(h.indexOf('<nav class="public-choices'), h.indexOf('</nav>'));
+  assert.ok(!nav.includes('Sign in')); assert.ok(!h.includes('href="/v2/auth/access"')); assert.ok(!/>\s*Sign in\s*</.test(h));
 });
-test('entry: sign-in email → code step (dev code shown) → session stored, token set, go #workspaces', async () => {
+test('B02: signed in, the welcome route lands on #projects; signed out, and the explicit #signin/#survey/#about pages, stay put', () => {
+  for (const r of [{ kind: 'entry' }, { kind: 'entry', intent: 'how' }, { kind: 'entry', intent: 'example' }]) { assert.equal(landsOnWork(r, { id: 'pr_1' }), true, JSON.stringify(r)); assert.equal(landsOnWork(r, null), false, JSON.stringify(r)); }
+  for (const intent of ['signin', 'survey', 'about']) assert.equal(landsOnWork({ kind: 'entry', intent }, { id: 'pr_1' }), false, intent);
+  for (const kind of ['projects', 'workspaces', 'assessment']) assert.equal(landsOnWork({ kind }, { id: 'pr_1' }), false, kind);
+});
+test('B02: render() applies landsOnWork before routing, replacing (not pushing) the address with #projects', async () => {
+  const { readFileSync } = await import('node:fs'); const js = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  assert.match(js, /async function render\(\) \{\n[^\n]*\n\s*if \(landsOnWork\(route\(location\.hash\), state\.principal\)\) \{ try \{ history\.replaceState\(null, '', location\.pathname \+ location\.search \+ '#projects'\); \} catch \{\} \}\n\s*const gen = \+\+generation, r = route\(location\.hash\);/);
+});
+test('entry: sign-in email → code step (dev code shown) → session stored, go #projects then token set (B-F02a)', async () => {
   const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, removeItem: k => { delete stored[k]; } };
   const tokens = [];
   const ctx = ctxWith({ 'POST /v2/auth/link': { sent: true, dev_only_code: '123456' }, 'POST /v2/auth/session': { session: 'sess_abc', principal_id: 'pr_1' } }, { setToken: t => tokens.push(t) });
@@ -168,7 +182,8 @@ test('entry: sign-in email → code step (dev code shown) → session stored, to
   assert.ok(pages.entry.render(ctx, m).includes('123456'));
   form.elements.code.value = ' 123456 '; await form.fire('submit');
   assert.deepEqual(ctx.calls[1].body, { email: 'a@x.example.invalid', code: '123456' });
-  assert.equal(stored.facilitatorToken, 'sess_abc'); assert.deepEqual(tokens, ['sess_abc']); assert.deepEqual(ctx.gone, ['#workspaces']);
+  assert.equal(stored.facilitatorToken, 'sess_abc'); assert.deepEqual(tokens, ['sess_abc']); assert.deepEqual(ctx.gone, ['#projects']);
+  assert.ok(!ctx.notes.some(n => n.m === 'Signed in.'), 'no stale note after the re-boot');
 });
 test('entry: sign-in failure stays on the form and never claims success', async () => {
   const ctx = ctxWith({ 'POST /v2/auth/link': err('INVALID_PARAMS', 'synthetic only') });
@@ -191,6 +206,16 @@ test('entry: survey code stores participant token and hands off to legacy /#part
   const m = await pages.entry.load(ctx, {}); m.mode = 'survey'; const root = mount(pages.entry, ctx, m);
   const form = root.querySelector('#code-form'); form.elements.code.value = 'ABC'; await form.fire('submit');
   assert.equal(stored.participantToken, 'ptok'); assert.deepEqual(assigned, ['/legacy/#participant']);
+});
+
+test('U08: a used or unknown access code says what to do next, not "Not allowed here."', async () => {
+  const assigned = []; globalThis.window = { location: { assign: u => assigned.push(u) } };
+  const ctx = ctxWith({ 'POST /v2/participate/code': err('NOT_FOUND_OR_NOT_VISIBLE', 'access code not found or not visible') });
+  const m = await pages.entry.load(ctx, {}); m.mode = 'survey'; const root = mount(pages.entry, ctx, m);
+  const form = root.querySelector('#code-form'); form.elements.code.value = 'ZZZ'; await form.fire('submit');
+  assert.deepEqual(assigned, []);
+  assert.equal(ctx.notes.at(-1).m, 'This code has been used or is not valid. Check it, or ask the person who gave it to you for a new one.');
+  assert.equal(ctx.notes.at(-1).a, true);
 });
 
 // ---------- writes ----------

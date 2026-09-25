@@ -1,7 +1,7 @@
 import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError } from '../participant-view.js';
-import { reviewAnswer } from '../present.js';
+import { reviewAnswer, receiptLine } from '../present.js';
 
 const $ = id => document.getElementById(id);
 let pager, renderedPhase, renderedForm;
@@ -9,8 +9,7 @@ const disabledBeforeRequest = new WeakMap();
 function element(tag, text) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; return node; }
 function draw(item) {
   const field = element('fieldset'); field.dataset.item = item.id;
-  field.append(element('legend', `${item.text || item.id}${item.requiredness === 'unresolved' ? ' (may leave unanswered; policy held)' : ''}`));
-  if (item.answer_semantics === 'unresolved_no_problems_vs_skipped') field.append(element('p', 'Leaving this blank records an unknown answer, not “no problems.”'));
+  field.append(element('legend', `${item.text || item.id}${item.requiredness === 'unresolved' ? ' (optional)' : ''}`)); // B-09: plain words, no policy text
   if (item.type === 'scale' || item.type === 'text') {
     const input = element(item.type === 'text' ? 'textarea' : 'input'); input.name = item.id; input.required = item.required !== false;
     if (item.type === 'scale') { input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; }
@@ -60,7 +59,7 @@ function paint(state) {
     } else {
       pager?.showReceipt();
       if (state.phase === 'receipt') {
-        $('receipt').replaceChildren(element('h2', demo ? 'Practice complete — nothing sent' : 'Response saved'), element('p', `${state.receipt.response_id || 'ID unavailable'} · ${state.receipt.submitted_at || 'time unavailable'}`));
+        $('receipt').replaceChildren(element('h2', demo ? 'Practice complete — nothing sent' : 'Response saved'), element('p', receiptLine(state.receipt)));
         $('receipt').hidden = false;
       }
     }

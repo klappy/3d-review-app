@@ -1,4 +1,4 @@
-import { copy, createSharedLinkClient, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, stripFragment, submitFailureKind } from '../shared-link.js';
+import { copy, createSharedLinkClient, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, stripFragment, submitFailureKind } from '../shared-link.js';
 
 // Only the existing participant client owns transport. No staff identity is read.
 export function createParticipantJourney({ window: win, storage, fetchImpl, onChange = () => {} }) {
@@ -8,7 +8,7 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
   const unavailable = kind => show('unavailable', { notice: ({ closed: copy.collectionClosed, cannotResume: copy.cannotResume, rateLimited: copy.rateLimited, transient: copy.transient })[kind] || copy.linkUnavailable });
   function receipt(result) {
     store.remove('draft'); store.remove('submitKey'); uncertain = false;
-    return show('receipt', { receipt: result, notice: `${copy.receiptThanks} ${copy.sameLinkOthers}` });
+    return show('receipt', { receipt: result, notice: receiptNotice(form?.template?.perspective) });
   }
   async function loadForm() {
     form = await client.form();

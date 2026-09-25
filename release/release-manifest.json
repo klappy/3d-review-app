@@ -1,31 +1,40 @@
 {
-  "version": "0.21.1",
+  "version": "0.21.3",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "fd30520cf2f3f63b803a61ae8f4f12adcd93dbbc",
+  "cookbook_commit": "8e54b7f1d7e6321804e3e7a08ffb0d7ed7da3713",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.21.1.md",
-      "blob_sha": "eb469b2ece6ecc1dbf9312b49c14dff74a10dc2e",
-      "sha256": "813e90161ddd74281be50aac93e8b299e183925aa100e33ba150962b098ac338"
+      "path": "planning/2026-09-16-parity-build/releases/0.21.3.md",
+      "blob_sha": "2e04ab1240d1b1655553a1b7901bc29ae4a27243",
+      "sha256": "421668a61b87a10af436896321a445b6da9f292080c12caf8b7743f19d7db55e"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "d32156d0e96668fdc1ab9a578e3fdf64626c2b62",
-      "sha256": "51cd0dffe7572b8a14a8b6e7cff7fdef9bd2b3d3f29405dd5754b80fbddfceeb"
+      "blob_sha": "1d219d3de02095a529796382b6d431a4f583da97",
+      "sha256": "0ff1af4b2ed8ce23d7e7f0787303781e28e696517b7353da11320bd17067ff5d"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
       "changed": [
-        "roadmap: Versions section on /roadmap/ lists shipped releases and forecasts the next version from the waiting change files (#261)",
-        "roadmap forecast 0.21.1 refreshed (lane 1 card counts, lane 9 less text) (#265)"
+        "Copy and QR per group on the launched screen and Collect (Bincy B36) (#287)",
+        "thank-you names the participant's own group (Bincy B26) (#286)"
       ],
       "fixed": [
-        "cards: child counts only include assessments and projects you can list (#260)",
-        "card counts only include what you can open — workspace project count covered by a member who sees fewer (#262)",
-        "card counts only include what you can open — responses on an assessment you cannot open are not counted (#263)",
-        "public home: less text — four choices, one heading, one line; the rest behind Learn more (#264)"
+        "signing in lands on your projects with Continue, not back on the sign-in form (Bincy F02) (#272)",
+        "header says Signed in instead of Account email unavailable. (#274)",
+        "a used or unknown access code tells the participant what to do next (#277)",
+        "Projects page cards show their counts again: assessment cards say how many responses (\"9 responses\"), project cards how many assessments and responses (#279)",
+        "Projects and a project page offer \"Start a new 3D Review\" as the one create action; add-language and bare-assessment forms move behind a closed \"More\" (Bincy B34 / F03). (#280)",
+        "setup step 2 now explains each perspective (Translation team, Community, Church) in one line above its surveys (#284)",
+        "Collect never silently makes a second link after an uncertain failure (Bincy B36) (#288)",
+        "collect shows \"n of N responded\" when an expected number was given in setup (Bincy 07) (#271)",
+        "results: one plain line while results are held, no internal policy codes (#275)",
+        "survey: optional questions say (optional), skipped answers say Skipped, the receipt shows a short reference and local time (Bincy 09) (#273)",
+        "survey: each question page shows its progress bar again and only the question, without internal notes (Bincy B24) (#273)",
+        "results, next step, sign-in, permissions and the assessment Prepare view show one heading, one line and one primary action (explanations behind Learn more; results errors stay visible; Prepare stage panel no longer squashed on phones) (#282)",
+        "permissions: confirming an invitation or transfer says what will happen in one sentence; the technical record is under Details (#278)"
       ]
     }
   }

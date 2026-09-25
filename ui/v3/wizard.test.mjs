@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot } from './wizard.js';
+import { countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot, renderDone } from './wizard.js';
 
 const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
 const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
@@ -84,8 +84,11 @@ test('views: four steps, one primary each, optional expected count, escaped', ()
   assert.match(r, /data-step="information"/);
   assert.equal((renderStep('review', draft(), data, [], true).match(/data-wz="edit"/g) || []).length, 0);
   assert.match(renderStep('details', draft(), data), /<span>Participants<\/span>/);
-  assert.match(renderStep('review', draft({ context: '<b>x</b>' }), data), /&lt;b&gt;x&lt;\/b&gt; <span class="sub">\(not sent yet/);
-  assert.doesNotMatch(renderStep('review', draft({ context: 'x' }), data), /not stored yet/);
+  // Bincy B10: step 3 promises only what the welcome shows (project · language · material · format · when); no unsaved note box.
+  const info = renderStep('information', draft({ purpose: 'Mark 1–4', period: 'March' }), data);
+  for (const k of ['Project', 'Language', 'Material', 'Format', 'When']) assert.match(info, new RegExp(`<dt>${k}</dt>`));
+  assert.doesNotMatch(info, /textarea|not saved|Not sent/);
+  assert.doesNotMatch(renderStep('review', draft(), data), /Note for participants|not saved/);
 });
 
 test('retry after a partial failure resumes without duplicate writes', async () => {
@@ -246,7 +249,7 @@ test('L2-6: review rows carry the perspective dot and prototype sub-line (V.setu
   const tpl = { id: 'tpl.team', version: 1, name: 'Team', perspective: 'Translation team' };
   const r = renderStep('review', { ...freshDraft(), name: 'X', project: 'p1', language: 'l1', groups: { 'tpl.team': { version: 1, expected: '' } } }, { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates: [tpl] });
   assert.match(r, /<dt><span class="pdot wz-kvdot p-team" aria-hidden="true"><\/span>Translation team<\/dt><dd>no number given<\/dd>/);
-  assert.match(r, /Check the details\. Launching opens the survey links; nothing is sent to anyone\./);
+  assert.match(r, /Check the details, then launch\./); assert.match(r, /<summary>Learn more<\/summary><p class="muted">Launching opens the survey links; nothing is sent to anyone\.<\/p>/);
 });
 
 test('L2-7 wizard composes the shared Stepper component (ruling 12:34): no local copy', async () => {
@@ -269,4 +272,48 @@ test('L2-15 eyebrow step count follows STEP_TITLES, not a literal', async () => 
   const src = (await import('node:fs')).readFileSync(new URL('./wizard.js', import.meta.url), 'utf8');
   assert.match(src, /step \$\{n\} of \$\{STEP_TITLES\.length\}/);
   assert.doesNotMatch(src, /step \$\{n\} of 4/);
+});
+
+test('L9-23 less text (captain 17:05): every setup screen = one heading, at most one short line, one primary action; the rest in Learn more', () => {
+  const tpl = { id: 'tpl.team', version: 1, name: 'Team', perspective: 'Translation team' };
+  const d = { ...freshDraft(), name: 'X', project: 'p1', language: 'l1', groups: { 'tpl.team': { version: 1, expected: '' } } };
+  const data = { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates: [tpl] };
+  const screens = { details: renderStep('details', d, data), participants: renderStep('participants', d, data), information: renderStep('information', d, data), review: renderStep('review', d, data), done: renderDone({ aid: 'a1', links: [] }, 'https://x', [tpl]) };
+  for (const [k, h] of Object.entries(screens)) {
+    assert.equal((h.match(/<h1\b/g) || []).length, 1, k + ': one heading');
+    assert.equal((h.match(/class="primary"/g) || []).length, 1, k + ': one primary action');
+    const after = h.slice(h.indexOf('</h1>') + 5).trimStart(); const line = after.match(/^<p class="muted[^"]*">([^<]*)<\/p>/);
+    if (line) assert.equal(line[1].split(/[.!?](\s|$)/).filter(x => x && x.trim()).length, 1, k + ': one sentence under the heading');
+    const lm = h.indexOf('<details class="small learn-more"><summary>Learn more</summary>');
+    if (k !== 'information') assert.ok(lm > -1, k + ': Learn more present'); if (lm > -1) assert.ok(!/<details[^>]*\bopen\b/.test(h.slice(lm, lm + 60)), k + ': collapsed');
+  }
+  // nothing lost: the explanations moved, they did not go
+  assert.match(screens.details, /Learn more<\/summary><p class="muted">Only what the review needs\./);
+  assert.match(screens.participants, /Learn more<\/summary>.*Three perspectives, kept separate\..*The number is optional\./s);
+  assert.ok(screens.participants.indexOf('The number is optional') < screens.participants.indexOf('</details>'), 'optional-number note lives behind Learn more');
+  assert.match(screens.information, /Answers are grouped, never shown alone\./); assert.equal((screens.information.match(/never shown alone/g) || []).length, 1, 'privacy line once, not per group');
+  assert.match(screens.done, /Learn more<\/summary><p class="muted">Nothing was sent to anyone\./);
+});
+
+test('B20 (Bincy SI 04): step 2 groups surveys under one heading per perspective, each with the About page line', async () => {
+  const { PERSPECTIVES } = await import('../assess/scope.js');
+  const templates = [
+    { id: 'c1', version: 1, perspective: 'Church', name: 'Involved-Pastor' }, { id: 'c2', version: 1, perspective: 'Church', name: 'Uninvolved-Pastor' },
+    { id: 'm1', version: 1, perspective: 'Community', name: 'Community' }, { id: 't1', version: 1, perspective: 'Translation Team', name: 'Mid-Level' },
+  ];
+  const html = renderStep('participants', { ...freshDraft(), groups: { c1: { version: 1, expected: '' } } }, { templates });
+  for (const [, , line] of PERSPECTIVES) assert.equal((html.match(new RegExp(`>${line}<`, 'g')) || []).length, 1, line);
+  assert.equal((html.match(/<h3>Church<\/h3>/g) || []).length, 1, 'one heading per perspective, not per survey');
+  assert.ok(html.indexOf('Experience of its use') < html.indexOf('Involved-Pastor'), 'description above its surveys');
+  assert.match(html, /Mid-Level/); assert.equal((html.match(/name="g"/g) || []).length, 4, 'every survey still selectable');
+  assert.doesNotMatch(renderStep('participants', freshDraft(), { templates: [{ id: 'x', version: 1, perspective: 'Reviewer', name: 'R' }] }), /Experience of/);
+});
+
+test('B36 launched screen: one labelled row per group (group · survey) with Copy link and Show QR code; still one primary', () => {
+  const tpls = [{ id: 'tpl.team', version: 1, name: 'Team', perspective: 'Translation team' }, { id: 'tpl.comm', version: 1, name: 'Listening', perspective: 'Community' }];
+  const h = renderDone({ aid: 'a1', links: [{ survey: 's1', template: 'tpl.team', entry_fragment: '#survey=AAA' }, { survey: 's2', template: 'tpl.comm', entry_fragment: '#survey=BBB' }] }, 'https://x', tpls);
+  assert.match(h, /Translation team <span aria-hidden="true">·<\/span> Team/); assert.match(h, /Community <span aria-hidden="true">·<\/span> Listening/);
+  assert.equal((h.match(/data-group-copy="s[12]"/g) || []).length, 2); assert.equal((h.match(/data-group-qr="s[12]"/g) || []).length, 2);
+  assert.match(h, /#survey=AAA/); assert.match(h, /#survey=BBB/);
+  assert.equal((h.match(/class="primary"/g) || []).length, 1);
 });
