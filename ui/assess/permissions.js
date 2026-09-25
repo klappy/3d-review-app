@@ -8,7 +8,7 @@
 //   transfer ownership  POST   /v2/{scope}/{id}/transfer                  danger (destructive): owner only; principal ID; step_down off
 // Confirm tokens and the typed invitee address live only in this page's in-memory model: rebuilt on every load (scope change),
 // dropped on sign-out with the shell state, cleared after execute. Nothing here touches storage, URLs or logs.
-// Acceptance (cap.grant.accept) is NOT here: it stays on the legacy surface at /legacy/, reached through the root's #invite= forwarder.
+// Acceptance (cap.grant.accept) is NOT here: the root's #invite= link opens the v3 Invitation page (ui/v3/components/invite.js, B03).
 
 import { memberList, labelMembers, readAccountEmail } from '../v3/components/member-list.js';
 import { learnMore } from '../v3/components/learn-more.js'; // lane 9 L9-24: shared closed-by-default disclosure
@@ -59,7 +59,7 @@ export const permissions = {
     const invite = member ? `<form class="line" data-invite-form><h3>Invite someone</h3><label class="field">Email<input name="email" type="email" required autocomplete="off" ${busy}></label><label class="field">Role<select name="role" ${busy}>${roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit" ${busy}>Preview invitation</button></div><p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p></form>` : '';
     const transfer = owner ? `<form class="line" data-transfer-form><h3>Transfer ownership</h3><p class="small muted">Ownership moves to another signed-up principal. Destructive: it cannot be undone from here.</p><label class="field">New owner's principal id<input name="to" required autocomplete="off" placeholder="usr_… or person_…" ${busy}></label><label class="small"><input type="checkbox" name="step_down"> Step down to member after the transfer</label><div class="actions"><button type="submit" ${busy}>Preview transfer</button></div></form>` : '';
     const sheet = m.sheet ? renderSheet(ctx, m.sheet, m.busy, m.scope) : '';
-    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}${roster}${pending}${invite}${transfer}${sheet}${status}${learnMore('<p class="small muted">Accepting an invitation happens on the legacy surface (a mailed <code>#invite=</code> link opens there); it is never done from this page.</p>')}</section>`;
+    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}${roster}${pending}${invite}${transfer}${sheet}${status}${learnMore('<p class="small muted">Accepting an invitation happens from the mailed link; it is never done from this page.</p>')}</section>`;
   },
   bind(ctx, root, m) {
     const base = `/v2/${SCOPE_SEG[m.scope]}/${ctx.enc(m.id)}`;

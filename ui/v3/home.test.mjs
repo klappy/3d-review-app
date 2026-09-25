@@ -48,3 +48,9 @@ test('B17: cards show the response count the list read sent; project cards show 
   assert.doesNotMatch(h.slice(0, h.indexOf('data-v3h-project="q"')), /data-v3-counts/, 'loaded-empty keeps its one "No assessments yet" line');
   assert.match(h, /data-v3-counts>2 assessments · 5 responses</);
 });
+test('B03: an assessment shared directly (no project role) is listed with Continue, eyebrow "Shared with you", no raw ids', () => {
+  const h = homeView({ projects: [], shared: [{ id: 'asm_1', project_id: 'proj_9', name: 'Kapanawa review', stage: 'collect' }], listFor: () => undefined, stageLabel: label });
+  assert.doesNotMatch(h, /You have no projects yet/);
+  assert.match(h, /Shared with you/); assert.match(h, /Kapanawa review/); assert.match(h, /Continue assessment/); assert.match(h, /href="#assessment\/asm_1"/);
+  assert.doesNotMatch(h, /proj_9/);
+});

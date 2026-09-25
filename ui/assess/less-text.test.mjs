@@ -69,7 +69,7 @@ test('L9-24 admin (permissions): heading + one note; the legacy-acceptance expla
   const m = { scope: 'assessments', id: 'a1', status: 'loaded', grants: [{ id: 'g1', principal_id: 'me', role: 'owner' }], pending: [], me: 'me', myEmail: '', myRole: 'owner', receipts: {} };
   const h = permissions.render({ esc }, m);
   const body = lessText(h, 'permissions', /<h2\b/g);
-  assert.match(body, /Accepting an invitation happens on the legacy surface/);
+  assert.match(body, /Accepting an invitation happens from the mailed link/);
   assert.match(upFront(h), /Destructive: it cannot be undone from here\./, 'the transfer warning stays up front');
 });
 
