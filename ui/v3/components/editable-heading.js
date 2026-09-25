@@ -27,7 +27,7 @@ export function mountEditableHeading(h1, { canEdit = false, label = 'name', save
     if (form) return;
     form = doc.createElement('form'); form.className = 'v3-eh-form';
     const input = doc.createElement('input'); input.name = 'name'; input.required = true; input.maxLength = maxLength; input.value = h1.textContent.trim(); input.setAttribute('aria-label', label.charAt(0).toUpperCase() + label.slice(1));
-    const ok = doc.createElement('button'); ok.type = 'submit'; ok.className = 'primary'; ok.textContent = 'Save';
+    const ok = doc.createElement('button'); ok.type = 'submit'; ok.textContent = 'Save'; // not 'primary': the page keeps its one primary action
     const cancel = doc.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancel'; cancel.dataset.cancel = '';
     const msg = doc.createElement('p'); msg.className = 'v3-eh-msg small muted'; msg.setAttribute('role', 'status');
     form.append(input, ok, cancel, msg);

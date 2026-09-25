@@ -440,19 +440,24 @@ function bindPrepare(current) {
 // B07: the assessment name is the heading (shell's or page's); owners/members rename it in place through cap.assessment.update.
 function bindNameHeading(current) {
   const a = current.assessment;
-  mountEditableHeading((app.closest('[role=main]') || app).querySelector('h1'), { canEdit: a.role === 'owner' || a.role === 'member', label: 'assessment name',
-    save: async name => { // act()'s write lifecycle: one write at a time, repainted while busy, never over a dirty screen, refresh only this assessment
+  return mountEditableHeading((app.closest('[role=main]') || app).querySelector('h1'), { canEdit: a.role === 'owner' || a.role === 'member', label: 'assessment name',
+    // act()'s write guards (one write at a time, never over a dirty screen) without repainting the page: other write controls are
+    // disabled in place while the PATCH runs, so unsaved Prepare/Improve drafts survive; the committed name goes to state.current.
+    save: async name => {
       if (state.busy) return false;
       if (state.dirty.has(a.id)) throw new Error(state.dirty.get(a.id) === 'write' ? 'Your last change is saved but this screen is not refreshed yet. Refresh before making more changes.' : 'This assessment changed on the server. Refresh before making changes.');
-      const identity = identityGeneration;
-      state.busy = true; state.message = null; note.textContent = 'Renaming…'; note.classList.remove('alert'); paint(); // other write controls render disabled
-      let failed = null;
-      try { await api(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); } catch (e) { failed = redact(e.message); }
-      if (identity !== identityGeneration) return false;
-      state.busy = false; note.textContent = failed || ''; note.classList.toggle('alert', !!failed);
-      if (failed) { paint(); return false; } // the refusal stays in the status line; the heading returns with its control
-      state.dirty.set(a.id, 'write'); // committed: refresh (shell title, crumbs, tabs read the committed name) only while this assessment is on screen
-      const r = route(location.hash); if ((r.kind === 'assessment' || r.kind === 'survey') && r.id === a.id) render();
+      const identity = identityGeneration, held = [...app.querySelectorAll('button:not([disabled])')].filter(b => !b.closest('.v3-eh'));
+      state.busy = true; held.forEach(b => { b.disabled = true; });
+      let r;
+      try { r = await api(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); } catch (e) { throw new Error(redact(e.message)); }
+      finally { if (identity === identityGeneration) { state.busy = false; held.forEach(b => { b.disabled = false; }); } }
+      if (identity !== identityGeneration || state.current?.assessment.id !== a.id) return;
+      const next = String(r?.assessment?.name ?? name), old = state.current.assessment.name;
+      state.current.assessment.name = next;
+      const listed = state.lists.get(a.project_id)?.list?.find?.(x => x.id === a.id); if (listed) listed.name = next;
+      if (document.title.includes(old)) document.title = document.title.replace(old, next);
+      // No shell re-sync here: a kit update empties the content mount (drafts). The component sets the heading; crumbs follow in place.
+      if (kit) for (const el of document.querySelectorAll('header.top nav.crumbs a, header.top nav.crumbs [aria-current]')) if (el.children.length === 0 && el.textContent.trim() === old) el.textContent = next;
     } });
 }
 // Transition: write → (committed ⇒ dirty) → refresh → (landed ⇒ clean). Every outcome is scoped to `aid`, never to

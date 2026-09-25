@@ -376,8 +376,8 @@ test('B07: project and assessment names are the heading with an edit control for
   p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
   p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(12);
   assert.ok(p.transport.log.some(l => l.key === 'PATCH /v2/assessments/a2' && l.outcome === 'mutation-refused'));
-  assert.match(p.text('#note'), /Synthetic transport refuses/, 'refusal is shown in the status line'); assert.equal(p.q('#note').classList.contains('alert'), true);
-  assert.equal(p.api.state.busy, false, 'busy cleared'); assert.equal(p.qa('[data-edit-heading]').length, 1, 'heading control back after the repaint'); assert.equal(p.q('.v3-eh h1').textContent, 'Spring baseline');
+  assert.match(p.q('.v3-eh-form .v3-eh-msg').textContent, /Synthetic transport refuses/, 'refusal is shown at the field');
+  assert.equal(p.api.state.busy, false, 'busy cleared'); assert.equal(p.q('.v3-eh h1').textContent, 'Spring baseline');
   assert.ok(p.q('#prepare-form button[type=submit]') && !p.q('#prepare-form button[type=submit]').disabled, 'Prepare save enabled again');
   for (const [identity, project, assessment] of [['member', 0, 1], ['viewer', 0, 0]]) {
     const v = await bootPage(identity, '#project/p1');
@@ -385,4 +385,19 @@ test('B07: project and assessment names are the heading with an edit control for
     await v.go('#assessment/a2/prepare');
     assert.equal(v.qa('[data-edit-heading]').length, assessment, identity + ' assessment');
   }
+});
+test('B07: assessment heading rename disables other writes in place, keeps unsaved drafts, and re-syncs only the shell', async () => {
+  let release; const held = new Promise(r => { release = r; });
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { await held; return { ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => ({ ok: true, result: { assessment: { id: 'a2', name: 'Spring review' } } }), text: async () => '' }; }
+    return base(u, init); }; } });
+  p.q('#prepare-form textarea[name="purpose"]').value = 'unsaved draft';
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  assert.equal(p.api.state.busy, true); assert.equal(p.q('#prepare-form button[type=submit]').disabled, true, 'other writes visibly disabled while saving');
+  release(); await tick(12);
+  assert.equal(p.api.state.busy, false); assert.equal(p.q('#prepare-form button[type=submit]').disabled, false);
+  assert.equal(p.q('#prepare-form textarea[name="purpose"]').value, 'unsaved draft', 'draft survives the rename');
+  assert.equal(p.text('[role=main].content .v3-eh h1'), 'Spring review'); assert.equal(p.qa('[data-edit-heading]').length, 1); assert.equal(p.api.state.current.assessment.name, 'Spring review');
+  assert.equal(p.text('header.top nav.crumbs [aria-current="page"]'), 'Spring review', 'crumb follows the committed name');
 });
