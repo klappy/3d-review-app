@@ -1,31 +1,29 @@
 {
-  "version": "0.21.1",
+  "version": "0.21.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "fd30520cf2f3f63b803a61ae8f4f12adcd93dbbc",
+  "cookbook_commit": "22591d55d8c583cc1a306d8362b58c39f5c52eba",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.21.1.md",
-      "blob_sha": "eb469b2ece6ecc1dbf9312b49c14dff74a10dc2e",
-      "sha256": "813e90161ddd74281be50aac93e8b299e183925aa100e33ba150962b098ac338"
+      "path": "planning/2026-09-16-parity-build/releases/0.21.2.md",
+      "blob_sha": "75c2826cfe5fbc684889fb058f5470c22efbf027",
+      "sha256": "b340f0f20478ed99f8bc32fc534c6f33136de5536691b8a2eccda5c8c62b5c03"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "d32156d0e96668fdc1ab9a578e3fdf64626c2b62",
-      "sha256": "51cd0dffe7572b8a14a8b6e7cff7fdef9bd2b3d3f29405dd5754b80fbddfceeb"
+      "blob_sha": "f8ff80281a9d4dd684ac8aa6d225a1f92e4e3cc6",
+      "sha256": "9c120c591b4c05c03333319840dc5d16e070734b0117b9b950105f3cd9ae47db"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "DEV only: \"Mid-Level v1 (legacy)\" survey template carrying the old Lovable ML1–ML12 questions verbatim, so legacy mid-level responses import as answered (#270)"
+      ],
       "changed": [
-        "roadmap: Versions section on /roadmap/ lists shipped releases and forecasts the next version from the waiting change files (#261)",
-        "roadmap forecast 0.21.1 refreshed (lane 1 card counts, lane 9 less text) (#265)"
+        "work rail moved to the cookbook repo (HYGIENE 35) (#268)"
       ],
       "fixed": [
-        "cards: child counts only include assessments and projects you can list (#260)",
-        "card counts only include what you can open — workspace project count covered by a member who sees fewer (#262)",
-        "card counts only include what you can open — responses on an assessment you cannot open are not counted (#263)",
-        "public home: less text — four choices, one heading, one line; the rest behind Learn more (#264)"
+        "setup screens trimmed to one line and one primary action (assessment details, groups, participant information, review and launch, links); explanations behind a shared Learn more (#269)"
       ]
     }
   }
