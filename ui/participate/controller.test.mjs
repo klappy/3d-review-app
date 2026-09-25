@@ -100,6 +100,19 @@ test('dedicated static page dependencies are in the local server and tests are e
   assert.ok(html.indexOf('id="changelog"') > html.indexOf('</main>'));
   assert.ok(html.indexOf('src="/changelog.js"') < html.indexOf('src="/participate/page.js"'));
   assert.ok(read('./page.css').includes('#participant:has(.participant-intro:not([hidden])) #review-button{display:none}'));
+
+});
+test('B24: /participate/ loads the shared pager + progress bar styles and shows only the question', async () => {
+  const { readFileSync } = await import('node:fs'); const read = file => readFileSync(new URL(file, import.meta.url), 'utf8');
+  const html = read('./index.html'), bar = read('../participant-bar.css');
+  assert.ok(html.includes('href="/participant-bar.css"'), 'participant page links the shared bar stylesheet');
+  assert.ok(read('../legacy/index.html').includes('href="/participant-bar.css"'), 'legacy page shares the same stylesheet');
+  assert.ok(read('../server.mjs').includes("'/participant-bar.css':"));
+  assert.match(bar, /#participant \.participant-bar\{[^}]*display:flex/);
+  assert.match(bar, /#participant \.participant-bar span\{[^}]*height:6px/);
+  assert.ok(!/\.rv #participant/.test(bar), 'bar rules are not scoped to the staff shell');
+  assert.ok(!/participant-bar/.test(read('../participant-view.css').replace(/\/\*[\s\S]*?\*\//g, '')), 'no forked copy of the bar rules');
+  assert.ok(!read('./page.js').includes('Leaving this blank'), 'no internal answer-semantics note on the question page');
 });
 
 test('failed first open then clean reload asks for original link without claiming a previous send or resuming another link', async () => {
