@@ -42,3 +42,20 @@ test('while saving: a second submit, Escape and Cancel are ignored; the field is
   release(); await flush();
   assert.equal(h1.textContent, 'Next'); assert.equal(d.querySelector('.v3-eh-form'), null); assert.deepEqual(calls, ['Next']);
 });
+test('a field detached by a repaint while saving is left alone and isOpen() reports it gone', async () => {
+  const { d, h1 } = page(); let release;
+  const eh = mountEditableHeading(h1, { canEdit: true, label: 'project name', save: () => new Promise((_, rej) => { release = () => rej(new Error('Refused.')); }) });
+  d.querySelector('[data-edit-heading]').click(); const form = d.querySelector('.v3-eh-form'); form.querySelector('input').value = 'Z'; submit(d, form); await flush();
+  assert.equal(eh.isOpen(), true);
+  h1.parentElement.remove(); // the host navigated / repainted
+  assert.equal(eh.isOpen(), false);
+  release(); await flush();
+  assert.equal(form.querySelector('.v3-eh-msg').textContent, '', 'no message written onto a removed node');
+});
+test('re-mount without edit rights tears down the previous control', () => {
+  const { d, h1 } = page();
+  mountEditableHeading(h1, { canEdit: true, label: 'project name', save: async () => {} });
+  d.querySelector('[data-edit-heading]').click(); assert.ok(d.querySelector('.v3-eh-form'));
+  assert.equal(mountEditableHeading(h1, { canEdit: false, label: 'project name', save: async () => {} }), null);
+  assert.equal(d.querySelector('[data-edit-heading]'), null); assert.equal(d.querySelector('.v3-eh-form'), null); assert.equal(h1.hidden, false);
+});

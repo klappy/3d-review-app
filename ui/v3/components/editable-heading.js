@@ -11,7 +11,12 @@ const CSS = '.v3-eh{display:flex;align-items:center;gap:6px;min-width:0;flex-wra
   + '.v3-eh-msg{flex-basis:100%;margin:0}';
 
 export function mountEditableHeading(h1, { canEdit = false, label = 'name', save, maxLength = 100 } = {}) {
-  if (!h1 || !canEdit || typeof save !== 'function' || !h1.ownerDocument) return null;
+  if (!h1 || !h1.ownerDocument) return null;
+  if (!canEdit || typeof save !== 'function') { // lost edit rights on a re-mount: tear down the previous control and its save (Bugbot 4108644451)
+    const old = h1.parentElement?.classList?.contains('v3-eh') ? h1.parentElement : null;
+    if (old) { for (const n of [...old.children]) if (n !== h1) n.remove(); h1.hidden = false; }
+    return null;
+  }
   const doc = h1.ownerDocument;
   if (!doc.getElementById(STYLE_ID)) { const s = doc.createElement('style'); s.id = STYLE_ID; s.textContent = CSS; (doc.head || doc.documentElement).append(s); }
   let wrap = h1.parentElement?.classList?.contains('v3-eh') ? h1.parentElement : null;
@@ -40,10 +45,10 @@ export function mountEditableHeading(h1, { canEdit = false, label = 'name', save
       if (name === h1.textContent.trim()) { close(true); return; }
       saving = true; ok.disabled = cancel.disabled = input.readOnly = true; form.setAttribute('aria-busy', 'true'); msg.textContent = '';
       let done = false, reason = ''; try { done = (await save(name)) !== false; } catch (err) { reason = String(err?.message || ''); } finally { saving = false; }
-      if (!form) return; // the host repainted (and re-mounted) while saving
+      if (!form || !form.isConnected) return; // the host repainted (re-mounted or navigated) while saving; isOpen() lets it fall back to its own note
       if (done) { h1.textContent = name; close(btn.isConnected); } else { ok.disabled = cancel.disabled = input.readOnly = false; form.removeAttribute('aria-busy'); msg.textContent = reason || 'The name was not saved.'; input.focus(); }
     });
     h1.hidden = true; btn.hidden = true; wrap.append(form); input.focus(); input.select?.();
   });
-  return { button: btn, close: () => close(false) };
+  return { button: btn, close: () => close(false), isOpen: () => !!form?.isConnected };
 }
