@@ -164,7 +164,7 @@ test('A8 improve owner/member: one Save → PATCH /v2/assessments/{aid}/notes wi
   await form.onsubmit({ preventDefault() {} });
   assert.deepEqual(calls[0], { url: '/v2/assessments/a1/notes', method: 'PATCH', body: { notes_reflection: 'new r', notes_next_steps: 'new n' } });
   assert.equal(disabledDuring, true); assert.equal(btn.disabled, false);
-  assert.equal(status.textContent, 'Notes saved.'); assert.equal(refreshed, 1); assert.equal(m.notes_reflection, 'new r');
+  assert.equal(status.textContent, 'Saved'); assert.equal(refreshed, 1); assert.equal(m.notes_reflection, 'new r');
 });
 
 test('A8c v3 next step (frame 11): one "Save notes" in any stage, never a stage write from this page', async () => {
@@ -176,7 +176,20 @@ test('A8c v3 next step (frame 11): one "Save notes" in any stage, never a stage 
   const form = el({ 'data-notes-form': '' }), btn = el({ tag: 'button', 'data-save-notes': '' }), status = el({ 'data-notes-status': '' });
   makeRoot([form, btn, status, el({ name: 'notes_reflection', value: 'r' }), el({ name: 'notes_next_steps', value: 'n' })]); views.improve.bind(ctx, root, m);
   await form.onsubmit({ preventDefault() {} });
-  assert.deepEqual(calls.map(c => `${c.method} ${c.url}`), ['PATCH /v2/assessments/a1/notes']); assert.equal(status.textContent, 'Notes saved.');
+  assert.deepEqual(calls.map(c => `${c.method} ${c.url}`), ['PATCH /v2/assessments/a1/notes']); assert.equal(status.textContent, 'Saved');
+});
+
+test('U24 "Saved" survives the post-save repaint, next to the button, then is dropped', async () => {
+  const { api } = fakeApi({ 'PATCH /v2/assessments/a1/notes': ({ body }) => ({ assessment: { ...assessment, ...body } }) });
+  let repainted = '';
+  const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'member', stage: 'improve' }, surveys }, refresh: async () => { repainted = views.improve.render(ctx, await views.improve.load(ctx, { aid: 'a1' })); } });
+  const m = await views.improve.load(ctx, { aid: 'a1' });
+  assert.doesNotMatch(views.improve.render(ctx, m), /data-notes-status>Saved</);
+  const form = el({ 'data-notes-form': '' }), btn = el({ tag: 'button', 'data-save-notes': '' }), status = el({ 'data-notes-status': '' });
+  makeRoot([form, btn, status, el({ name: 'notes_reflection', value: 'r' }), el({ name: 'notes_next_steps', value: 'n' })]); views.improve.bind(ctx, root, m);
+  await form.onsubmit({ preventDefault() {} });
+  assert.match(repainted, /data-save-notes>Save notes<\/button> <span class="status" role="status" aria-live="polite" data-notes-status>Saved<\/span><\/div>/);
+  assert.doesNotMatch(views.improve.render(ctx, m), /data-notes-status>Saved</);
 });
 
 test('A8b save failure: no success claim, refusal wording', async () => {
