@@ -173,6 +173,25 @@ describe("routes", () => {
     expect(res.status).toBe(429);
     expect(await res.text()).toContain('<input type="hidden" name="next" value="oauth">');
   });
+  it("every way back to the email form keeps next=oauth on a connector sign-in, and only that exact value (Bugbot #311)", async () => {
+    const sent = await post("/v2/auth/email", { email: "swap@example.invalid", next: "oauth" });
+    expect(await sent.text()).toContain('<a href="/v2/auth/email?next=oauth">Use a different email</a>');
+    const plain = await post("/v2/auth/email", { email: "swap@example.invalid" });
+    expect(await plain.text()).toContain('<a href="/v2/auth/email">Use a different email</a>');
+    for (const next of ["https://evil.invalid", "OAUTH", "oauth&x=1"]) {
+      const other = await (await post("/v2/auth/email", { email: "swap@example.invalid", next })).text();
+      expect(other).toContain('<a href="/v2/auth/email">Use a different email</a>'); expect(other).not.toContain("evil.invalid");
+    }
+    const open = await app.fetch(new Request(ORIGIN + "/v2/auth/email/open?next=oauth"), env);
+    expect(await open.text()).toContain('a.href="/v2/auth/email?next=oauth"');
+    const bad = await post("/v2/auth/email/open?next=oauth", { t: newMagicToken(), e: "swap@example.invalid" });
+    expect(bad.status).toBe(400); expect(await bad.text()).toContain('<a href="/v2/auth/email?next=oauth">Request a new link</a>');
+    const { token } = await issue("swap@example.invalid", { next: "oauth" });
+    const unnamed = await post("/v2/auth/email/open?next=oauth", { t: token });
+    expect(unnamed.status).toBe(400); expect(await unnamed.text()).toContain('<a href="/v2/auth/email?next=oauth">Request a new link</a>');
+    const badPlain = await post("/v2/auth/email/open", { t: newMagicToken(), e: "swap@example.invalid" });
+    expect(await badPlain.text()).toContain('<a href="/v2/auth/email">Request a new link</a>');
+  });
   it("refuses cross-site posts to both endpoints", async () => {
     expect((await postJson("/v2/auth/email", { email: "x@example.invalid" }, { origin: "https://evil.invalid" })).status).toBe(403);
     expect((await post("/v2/auth/email/open", { t: newMagicToken() }, { origin: "https://evil.invalid" })).status).toBe(403);
