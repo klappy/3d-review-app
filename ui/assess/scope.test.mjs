@@ -71,10 +71,10 @@ test('workspace: no projects grouped, viewer sees no add/rename/remove', async (
   assert.equal(ctx.calls.length, 1, 'viewer does not fetch candidate projects');
   assert.ok(h.includes('href="#permissions/workspaces/ws1"'));
 });
-test('project: no assessments, no languages → create blocked until a language exists', async () => {
+test('project (member): no assessments, no languages → Start a new 3D Review is the only create action (B34)', async () => {
   const ctx = ctxWith({ 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'member' }, languages: [] }, 'GET /v2/projects/p1/assessments': { assessments: [] }, 'GET /v2/projects/p1/languages': { languages: [] } });
   const h = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
-  assert.ok(h.includes('No assessments yet.')); assert.ok(h.includes('No languages yet')); assert.ok(h.includes('id="add-language"')); assert.ok(!h.includes('id="create-assessment"')); assert.ok(!h.includes('id="rename-form"'), 'member cannot rename');
+  assert.ok(h.includes('No assessments yet.')); assert.ok(h.includes('No languages yet')); assert.ok(h.includes('data-v3-start href="#new"')); assert.ok(!h.includes('id="add-language"')); assert.ok(!h.includes('id="create-assessment"')); assert.ok(!h.includes('Add a language first')); assert.ok(!h.includes('id="rename-form"'), 'member cannot rename');
 });
 
 // ---------- card links per scope ----------
@@ -94,14 +94,13 @@ test('projects: cards link to #project/<id>', async () => {
   const ctx = ctxWith({ 'GET /v2/projects': { projects: [{ id: 'p1', name: 'One', role: 'owner' }] } });
   assert.ok(pages.projects.render(ctx, await pages.projects.load(ctx, {})).includes('href="#project/p1"'));
 });
-test('project (owner): assessment cards link to #assessment/<id> with language name, create form, permissions link', async () => {
+test('project (owner): assessment cards link to #assessment/<id> with language name, Start entry, permissions link', async () => {
   const ctx = ctxWith({ 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'owner', organization: 'Org' }, languages: [] }, 'GET /v2/projects/p1/assessments': { assessments: [{ id: 'a1', name: 'Sept', stage: 'collect', language_id: 'l1' }] }, 'GET /v2/projects/p1/languages': { languages: [{ id: 'l1', name: 'Lake', code: 'qaa', archived_at: null }, { id: 'l2', name: 'Old', code: null, archived_at: '2026-01-01' }] } });
   const h = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
   assert.ok(h.includes('href="#assessment/a1"')); assert.ok(h.includes('Language: Lake')); assert.ok(h.includes('Collecting'));
-  assert.ok(h.includes('id="create-assessment"')); assert.ok(h.includes('<option value="l1">Lake (qaa)</option>')); assert.ok(!h.includes('<option value="l2"'), 'archived language not offered');
   assert.ok(h.includes('id="rename-form"')); assert.ok(h.includes('href="#permissions/projects/p1"')); assert.ok(h.includes('Org'));
-  // B34: Start is the one visible create action; the bare assessment / language forms sit behind a closed "More".
-  assert.ok(h.includes('data-v3-start href="#new"')); assert.match(h, /<details class="panel more-tools" id="project-more"><summary>More<\/summary>[\s\S]*id="create-assessment"[\s\S]*id="add-language"[\s\S]*<\/details>/);
+  // B34 (Bincy F03): Start is the ONLY create action; no create-assessment / add-language forms, not even behind "More".
+  assert.equal(h.match(/data-v3-start href="#new"/g).length, 1); for (const gone of ['id="create-assessment"', 'id="add-language"', 'id="project-more"', 'Create an assessment', 'Create &amp; prepare', 'Create & prepare', '>Add language<']) assert.ok(!h.includes(gone), gone);
 });
 
 // ---------- refusal / auth / transient ----------
@@ -229,12 +228,7 @@ test('workspaces: create goes to the new workspace; NOT_AUTHORIZED shows the ser
   const f2 = root2.querySelector('#create-workspace'); f2.elements.name.value = 'N'; await f2.fire('submit');
   assert.deepEqual(ctx2.gone, []); assert.ok(ctx2.notes.some(n => n.a));
 });
-test('project: create assessment posts {name, language_id} and goes to #assessment/<id>', async () => {
-  const ctx = ctxWith({ 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'member' }, languages: [] }, 'GET /v2/projects/p1/assessments': { assessments: [] }, 'GET /v2/projects/p1/languages': { languages: [{ id: 'l1', name: 'Lake', code: null, archived_at: null }] }, 'POST /v2/projects/p1/assessments': { assessment: { id: 'a7' } } });
-  const m = await pages.project.load(ctx, { id: 'p1' }); const root = mount(pages.project, ctx, m);
-  const form = root.querySelector('#create-assessment'); form.elements.name.value = 'Sept'; form.elements.language_id.value = 'l1'; await form.fire('submit');
-  assert.deepEqual(ctx.calls.at(-1).body, { name: 'Sept', language_id: 'l1' }); assert.deepEqual(ctx.gone, ['#assessment/a7']);
-});
+
 
 test('signed-in welcome never displays internal identity or invented email and delegates logout', async()=>{
   let calls=0;const ctx=ctxWith({}, {state:{principal:{id:'private-opaque',email:'not-verified@example.invalid'}},signOut:async()=>{calls++;}});
@@ -318,7 +312,7 @@ test('project with assessments AND languages both failing renders two Retry cont
     map['GET /v2/projects/p1/assessments'] = { assessments: [] }; map['GET /v2/projects/p1/languages'] = { languages: [{ id: 'l1', name: 'Lake', code: 'qaa', archived_at: null }] };
     await buttons[which].fire('click');
     assert.equal(ctx.calls.length - before, 3, `retry #${which} re-ran the project load (project + assessments + languages)`);
-    assert.ok(root.querySelector('#create-assessment'), `retry #${which}: page re-rendered from the fresh model with a language available`);
+    assert.ok(root.querySelector('#rename-form'), `retry #${which}: page re-rendered from the fresh model`);
     assert.equal(root.querySelectorAll('[data-act="retry"]').length, 0, 'no failure state remains after both reads succeed');
   }
 });
@@ -327,7 +321,7 @@ test('retry failure remains a truthful failure (never empty success) and rebinds
   const root = mount(pages.project, ctx, await pages.project.load(ctx, { id: 'p1' }));
   await root.querySelectorAll('[data-act="retry"]')[1].fire('click');
   const again = root.querySelectorAll('[data-act="retry"]'); assert.equal(again.length, 2, 'still failed: both retry controls rendered again');
-  assert.equal(root.querySelector('#create-assessment'), null, 'no assessment form on a failed read');
+  assert.equal(root.querySelector('#create-assessment'), null, 'no assessment form (B34: never on the project page)');
   const before = ctx.calls.length; await again[0].fire('click'); assert.equal(ctx.calls.length - before, 3, 're-rendered controls are bound too');
 });
 test('one in-flight guard across both controls: a second click on EITHER button while a reload is pending issues no second read', async () => {
