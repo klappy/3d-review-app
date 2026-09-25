@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { views, classify, NOTES_VISIBILITY, RECOMMENDATIONS_NOT_BUILT, NOT_VISIBLE, css } from './views.js';
 import { esc, enc, routes } from './cards.js';
+import { JSDOM } from 'jsdom';
 
 const err = (code, status, message = code) => Object.assign(new Error(message), { code, status });
 function fakeApi(table) {
@@ -249,4 +250,40 @@ test('v3 U4 gate: viewers see the state only, no write control', async () => {
   const ctx = ctxFor(api, { current: { assessment: { ...assessment, stage: 'collect', role: 'viewer' }, surveys } });
   const m = await views.understand.load(ctx, { aid: 'a1' });
   assert.doesNotMatch(views.understand.render(ctx, m), /data-v3-gate-go/);
+});
+
+test('B35: the band block offers "Build the results" only to editors, only before a report, only once a group has 3+', async () => {
+  const { buildResultsCta } = await import('./views.js'); const esc = s => String(s);
+  const ready = { 'Community': { responses: 3 } }, thin = { 'Community': { responses: 2 } }, none = { status: 'loaded', value: { reports: [] } };
+  assert.match(buildResultsCta({ role: 'owner', bandScores: null, reports: none }, ready, esc), /data-results-build/);
+  assert.match(buildResultsCta({ role: 'member', bandScores: null, reports: none }, ready, esc), /Build the results/);
+  assert.equal(buildResultsCta({ role: 'viewer', bandScores: null, reports: none }, ready, esc), '');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: { Community: {} }, reports: none }, ready, esc), '');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: none }, thin, esc), '');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: { status: 'loaded', value: { reports: [{ id: 'r' }] } } }, ready, esc), '', 'a report already exists');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: { status: 'error' } }, ready, esc), '', 'report list unknown');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: none, resultsBuilt: true }, ready, esc), '', 'already built here');
+});
+
+test('B35: "Build the results" on the band block previews, confirms once in place, builds, and the bands fill with no reload', async () => {
+  const dom = new JSDOM('<main></main>'); const root = dom.window.document.querySelector('main'); let built = false, reloads = 0;
+  const report = { id: 'r', created_at: '2026-09-18', payload: { lenses: [{ lens: 'Community', score: 80, sub_dimensions: [] }] } };
+  const ctx = { enc: encodeURIComponent, esc: s => String(s ?? ''), current: { assessment: { id: 'a', role: 'owner', stage: 'understand' }, surveys: [{ id: 's1', template_id: 't', template_name: 'C', perspective: 'Community', state: 'selected', archived_at: null }] }, isCurrent: () => true, routes: { assessment: () => '#x', survey: () => '#s' }, go() { reloads++; }, api: async (url, init) => {
+    if (init?.body?.mode === 'dry_run') return { assessment_id: 'a', suppressed: false, status: 'ready', confirm_token: 'tok', expires_in: 60 };
+    if (init?.body?.mode === 'execute') { built = true; return { assessment_id: 'a', suppressed: false, report }; }
+    if (url === '/v2/reports/r') return { assessment_id: 'a', suppressed: false, report };
+    if (url.endsWith('/reports')) return { assessment_id: 'a', suppressed: false, reports: built ? [{ id: 'r', created_at: report.created_at }] : [] };
+    if (url.includes('/surveys/s1')) return { survey: { id: 's1' }, counts: { responses: 3, respondents: 3 } };
+    return { status: 'held', reason: 'Server policy words' };
+  } };
+  const m = await views.understand.load(ctx, { aid: 'a' }); root.innerHTML = views.understand.render(ctx, m); views.understand.bind(ctx, root, m);
+  const band = () => root.querySelector('[data-v3-results]');
+  await band().querySelector('[data-results-build]').onclick(); assert.equal(built, false);
+  const box = band().querySelector('[data-results-preview]');
+  assert.match(box.textContent, /immutable report/); assert.equal(root.querySelectorAll('[data-confirm-report]').length, 1, 'one confirm, in the band block');
+  assert.deepEqual([...box.querySelectorAll('button')].map(b => b.textContent), ['Build the results', 'Not now']);
+  await box.querySelector('[data-confirm-report]').onclick(); assert.equal(built, true); assert.equal(reloads, 0);
+  assert.ok(m.bandScores?.Community, 'bands filled from the report just built'); assert.equal(band().querySelector('[data-results-build]'), null);
+  assert.equal(band().querySelector('[data-results-status]').textContent, 'Results built.');
+  assert.doesNotMatch(root.textContent, /Server policy words|Open it from the current report list/);
 });

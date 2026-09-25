@@ -37,7 +37,7 @@ test('held execute stays held, uncertain execute never retries or refreshes as s
   for (const error of [false, true]) {
     const s = setup(body => { if (body.mode === 'dry_run') return ready; if (error) throw Error('network'); return { assessment_id: 'a', suppressed: true, reason: 'Changed inputs held' }; });
     await s.click('preview-report'); await s.click('confirm-report'); assert.equal(s.calls.length, 2); assert.equal(s.builds(), 0);
-    assert.match(s.text(), error ? /outcome could not be confirmed.*Refresh reports/ : /Changed inputs held.*No report was built/);
+    assert.match(s.text(), error ? /outcome could not be confirmed.*Refresh reports/ : /can’t be built yet\. No report was built/);
     assert.equal(s.root.querySelector('[data-confirm-report]'), null);
     if (error) { await s.click('preview-report'); assert.equal(s.calls.length, 2); assert.equal(s.root.querySelector('[data-preview-report]').disabled, true); }
   }
@@ -45,6 +45,14 @@ test('held execute stays held, uncertain execute never retries or refreshes as s
 test('refused preview gives no confirmation; detached view ignores settled execute', async () => {
   const s = setup(() => { throw Object.assign(Error(), { code: 'NOT_AUTHORIZED_AT_SCOPE' }); }); await s.click('preview-report'); assert.match(s.text(), /not visible/); assert.equal(s.root.querySelector('[data-confirm-report]'), null);
   let resolve; const t = setup(body => body.mode === 'dry_run' ? ready : new Promise(r => { resolve = r; })); await t.click('preview-report'); const request = t.click('confirm-report'); t.root.remove(); resolve({ assessment_id: 'a', suppressed: false, report: { id: 'r' } }); await request; assert.equal(t.builds(), 0);
+});
+
+test('B35: a held preview or held build says one plain line, never the server reason', async () => {
+  for (const held of [{ ...ready, suppressed: true, status: 'held', reason: 'Secret policy' }, null]) {
+    const s = setup(body => body.mode === 'dry_run' ? (held || ready) : { assessment_id: 'a', suppressed: true, reason: 'Secret policy' });
+    await s.click('preview-report'); if (!held) await s.click('confirm-report');
+    assert.match(s.text(), /The results can’t be built yet\./); assert.doesNotMatch(s.text(), /Secret policy/);
+  }
 });
 
 import { views } from './views.js';
@@ -139,3 +147,4 @@ test('in-flight open during execute cannot paint or write the model after the bu
   assert.match(root.querySelector('[data-report-status]').textContent, /Report built/);
   assert.ok(root.querySelector('[data-report-list]'));
 });
+
