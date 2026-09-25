@@ -11,6 +11,7 @@
 import { shareUrl } from '../shared-link.js';
 import { stepper as stepperComponent, ensureStepperStyle } from './components/stepper.js';
 import { learnMore } from './components/learn-more.js';
+import { PERSPECTIVES } from '../assess/scope.js';
 
 export const STEPS = ['details', 'participants', 'information', 'review'];
 // Step names follow Bincy's screen inventory 03–06 (cookbook @933eb5f sources/bincy-design-sprint-2026-09-22/01_documents/04_screen_inventory.md).
@@ -182,6 +183,13 @@ export function expectedFor(surveyId, store = safeStore()) {
 // ---------- views (pure string renderers) ----------
 // component: Stepper (ruling 12:34) — the wizard composes the shared component; it keeps no copy of its own.
 export const stepper = n => stepperComponent(STEP_TITLES, n, { label: 'Setup steps' });
+// B20 (Bincy SI 04): step 2 groups surveys under one heading per perspective, each with the About page's one line (composed, not copied).
+export const perspectiveNote = p => { const k = pdot(p).slice(2); const hit = PERSPECTIVES.find(([key]) => key === k); return hit ? hit[2] : ''; };
+export function byPerspective(templates = []) {
+  const groups = new Map();
+  for (const t of templates) { const k = String(t.perspective ?? ''); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t); }
+  return [...groups.entries()];
+}
 // Captain order 17:05 (lane 9 less text): one heading, at most one short line, one primary action; the rest goes in `more` (shared Learn more).
 const head = (n, h, sub, more = '') => `<div class="eyebrow">Start a 3D Review · step ${n} of ${STEP_TITLES.length}</div>${stepper(n)}<h1 class="wz-h">${h}</h1>${sub ? `<p class="muted wz-sub">${sub}</p>` : ''}${learnMore(more)}`;
 const errBox = errs => errs?.length ? `<div class="note alert" role="alert">${errs.map(esc).join('<br>')}</div>` : '';
@@ -215,9 +223,10 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
     </form>`;
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Choose the groups you can reach.', '<p class="muted">Three perspectives, kept separate.</p><p class="muted">The number is optional. Leave it empty if you don\'t know for sure; counts then show as "n responded". Groups you leave out can be added later.</p>')}${errBox(errs)}
     <form data-wz-form="participants">
-      ${templates.length ? templates.map(t => { const g = d.groups[t.id]; return `<div class="group${g ? ' on' : ''}"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span>
-        <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(t.version)}"${g ? ' checked' : ''}><span><h3>${esc(t.perspective)}</h3><span class="sub">${esc(t.name)}</span></span></label>
-        <div class="gin"><label for="n-${esc(t.id)}">How many do you expect?</label><input type="number" id="n-${esc(t.id)}" name="n-${esc(t.id)}" min="1" step="1" inputmode="numeric" value="${g && g.expected ? esc(g.expected) : ''}" placeholder="optional"></div></div>`; }).join('')
+      ${templates.length ? byPerspective(templates).map(([p, ts]) => `<div class="wz-pgroup"><div class="wz-persp"><span class="pdot ${pdot(p)}" aria-hidden="true"></span><div><h3>${esc(p)}</h3>${perspectiveNote(p) ? `<p class="small muted wz-pnote">${esc(perspectiveNote(p))}</p>` : ''}</div></div>
+        ${ts.map(t => { const g = d.groups[t.id]; return `<div class="group${g ? ' on' : ''}">
+        <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(t.version)}"${g ? ' checked' : ''}><span class="wz-sname">${esc(t.name)}</span></label>
+        <div class="gin"><label for="n-${esc(t.id)}">How many do you expect?</label><input type="number" id="n-${esc(t.id)}" name="n-${esc(t.id)}" min="1" step="1" inputmode="numeric" value="${g && g.expected ? esc(g.expected) : ''}" placeholder="optional"></div></div>`; }).join('')}</div>`).join('')
         : '<p class="muted">No published surveys are available to this account.</p>'}
       ${actions(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;

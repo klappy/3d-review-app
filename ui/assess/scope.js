@@ -88,7 +88,8 @@ const storeSession = (key, v) => { try { sessionStorage.setItem(key, v); } catch
 const dropSession = key => { try { sessionStorage.removeItem(key); } catch {} };
 
 // ---------- entry (public) ----------
-const PERSPECTIVES = [['team', 'Translation team', 'Experience of the work'], ['community', 'Community', 'Experience of the translation'], ['church', 'Church', 'Experience of its use']];
+// B20: also composed by the v3 setup wizard (step 2 "Who will participate?"), one description per perspective.
+export const PERSPECTIVES = [['team', 'Translation team', 'Experience of the work'], ['community', 'Community', 'Experience of the translation'], ['church', 'Church', 'Experience of its use']];
 function entryModel(over = {}) {
   return { status: 'loaded', mode: 'welcome', step: 0, signin: { email: '', devCode: null, stage: 'email' }, example: null, exampleStatus: null, exampleError: '', params: {}, ...over };
 }

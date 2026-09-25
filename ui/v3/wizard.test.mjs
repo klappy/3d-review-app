@@ -291,3 +291,17 @@ test('L9-23 less text (captain 17:05): every setup screen = one heading, at most
   assert.match(screens.information, /Answers are grouped, never shown alone\./); assert.equal((screens.information.match(/never shown alone/g) || []).length, 1, 'privacy line once, not per group');
   assert.match(screens.done, /Learn more<\/summary><p class="muted">Nothing was sent to anyone\./);
 });
+
+test('B20 (Bincy SI 04): step 2 groups surveys under one heading per perspective, each with the About page line', async () => {
+  const { PERSPECTIVES } = await import('../assess/scope.js');
+  const templates = [
+    { id: 'c1', version: 1, perspective: 'Church', name: 'Involved-Pastor' }, { id: 'c2', version: 1, perspective: 'Church', name: 'Uninvolved-Pastor' },
+    { id: 'm1', version: 1, perspective: 'Community', name: 'Community' }, { id: 't1', version: 1, perspective: 'Translation Team', name: 'Mid-Level' },
+  ];
+  const html = renderStep('participants', { ...freshDraft(), groups: { c1: { version: 1, expected: '' } } }, { templates });
+  for (const [, , line] of PERSPECTIVES) assert.equal((html.match(new RegExp(`>${line}<`, 'g')) || []).length, 1, line);
+  assert.equal((html.match(/<h3>Church<\/h3>/g) || []).length, 1, 'one heading per perspective, not per survey');
+  assert.ok(html.indexOf('Experience of its use') < html.indexOf('Involved-Pastor'), 'description above its surveys');
+  assert.match(html, /Mid-Level/); assert.equal((html.match(/name="g"/g) || []).length, 4, 'every survey still selectable');
+  assert.doesNotMatch(renderStep('participants', freshDraft(), { templates: [{ id: 'x', version: 1, perspective: 'Reviewer', name: 'R' }] }), /Experience of/);
+});
