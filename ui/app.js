@@ -198,7 +198,7 @@ function bindClick(id, label, handler) { $(id).addEventListener('click', () => r
 async function identity() {
   if (!state.session) { text($('identity'), 'Not signed in'); return; }
   const result = await api('/v2/me'); state.principal = result.principal;
-  text($('identity'), `${result.principal.kind} · ${result.principal.id}`);
+  text($('identity'), 'Signed in');
   showAuthorizedWork(result);
   collab.identity(result);
   return result;
