@@ -459,3 +459,16 @@ test('B07: a write queued behind the rename is dropped when the identity resets 
   p.api.resetIdentity(); release(); await tick(24);
   assert.equal(patches.length, 1, 'queued write not replayed onto a new identity');
 });
+test('B07: rename updates only the assessment crumb and title, even when another crumb has the same label', async () => {
+  let release; const held = new Promise(r => { release = r; });
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: (t, data) => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { await held; return { ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => ({ ok: true, result: { assessment: { id: 'a2', name: 'Renamed' } } }), text: async () => '' }; }
+    return base(u, init); }; } });
+  const proj = p.q('header.top nav.crumbs [data-crumb="project"]'); assert.ok(proj);
+  proj.textContent = 'Spring baseline'; // a same-label crumb at another level must not be rewritten
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Renamed';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); release(); await tick(12);
+  assert.equal(p.text('header.top nav.crumbs [data-crumb="assessment"]'), 'Renamed');
+  assert.equal(p.q('header.top nav.crumbs [data-crumb="project"]').textContent, 'Spring baseline', 'project crumb untouched');
+  assert.match(p.d.title, / · Renamed · 3D Review$/);
+});
