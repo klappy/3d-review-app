@@ -15,7 +15,7 @@ function harness() {
   const navigations = [], removed = [], fetches = [];
   // K3a: the real adapter is supplied; with no #rv node the kit root is absent and the controller falls back to #app unchanged.
   const box = { ...v3, cards, mountKitRoot, shellModel, history: {replaceState() {}}, sessionStorage: {getItem() {return null;},removeItem:k=>removed.push(k)}, isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/', assign: path=>navigations.push(path) }, redactDiagnosticPath: x => x, fetch: (url, options) => { fetches.push({ url, options }); return Promise.resolve({ ok: true }); } };
-  const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn,loadAccountEmail,signOut,setFetch:fn=>fetch=fn,setCredential:t=>token=t,getCredential:()=>token,setListen:fn=>listen=fn})', box);
+  const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn,loadAccountEmail,signOut,setFetch:fn=>fetch=fn,setCredential:t=>token=t,getCredential:()=>token,setListen:fn=>listen=fn,clearPageNote})', box);
   return { ...api, nodes, disclosure, navigations, removed, fetches };
 }
 const deferred = () => { let resolve, reject; const promise = new Promise((r,j) => {resolve=r;reject=j;}); return { promise, resolve, reject }; };
@@ -179,4 +179,16 @@ test('B03: a failed re-read after accept keeps the old list and still goes Home;
   const done = s.seen.mounted.onAccepted({}); s.resetIdentity(); release(); await done;
   assert.equal(s.state.projects.some(p => p.id === 'old-identity'), false, 'an old identity\'s list never lands');
   assert.deepEqual(s.seen.navigations, [], 'no navigation from a replaced view');
+});
+
+test('U30: a route change clears the page status line; an in-flight busy label stays', () => {
+  const h = harness();
+  const note = h.nodes.get('note'), classes = new Set(['alert']);
+  note.classList = { remove: c => classes.delete(c), toggle() {} };
+  note.textContent = 'Renamed.'; h.state.busy = false;
+  h.clearPageNote();
+  assert.equal(note.textContent, ''); assert.equal(classes.has('alert'), false);
+  note.textContent = 'Saving…'; h.state.busy = true;
+  h.clearPageNote();
+  assert.equal(note.textContent, 'Saving…');
 });

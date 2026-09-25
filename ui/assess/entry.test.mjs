@@ -36,7 +36,7 @@ test('E1: generic legacy backlink is retired; the statement is generated, hidden
 test('S1: scrubCredentialHash is the first statement of boot() and of the hashchange listener; a consumed #session= re-observes identity', () => {
   const js = read('./assess.js');
   assert.match(js, /async function boot\(\) \{\n\s*if \(scrubCredentialHash\(\) === 'forwarded'\) return;/);
-  assert.match(js, /addEventListener\('hashchange', \(\) => \{ const r = scrubCredentialHash\(\); if \(r === 'forwarded'\) return; if \(r === 'session'\) \{ boot\(\); return; \} render\(\);/);
+  assert.match(js, /addEventListener\('hashchange', \(\) => \{ const r = scrubCredentialHash\(\); if \(r === 'forwarded'\) return; if \(r === 'session'\) \{ boot\(\); return; \} clearPageNote\(\); render\(\);/);
   assert.match(js, /location\.replace\('\/legacy\/' \+ h\); return 'forwarded';/);
   assert.match(js, /sessionStorage\.setItem\('facilitatorToken', m\[1\]\); \} catch \{\} resetIdentity\(\); return 'session';/);
   assert.ok(!/api\([^)]*\)[\s\S]*?scrubCredentialHash\(\) === 'forwarded'\) return;/.test(js.slice(js.indexOf('async function boot()'))), 'no api() call precedes the scrub in boot()');
