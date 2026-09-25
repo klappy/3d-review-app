@@ -206,13 +206,13 @@ app.post("/v2/auth/email", async (c) => {
   if (out.state === "invalid") return body.json ? json(fail("INVALID_PARAMS", "enter one email address", undefined, "auth.email_link", newTraceId()), 400) : signInPage(next, "Enter one email address, like name@example.org.");
   if (out.state === "limited") {
     const r = body.json ? json(fail("RATE_LIMITED", "too many links requested for this address — use the newest email or wait 15 minutes", undefined, "auth.email_link", newTraceId()), 429)
-      : page429();
+      : page429(next);
     r.headers.set("retry-after", "900"); return r;
   }
   if (out.state === "unavailable") return json(fail("RESERVED_NOT_BUILT", "email sign-in is not configured here", undefined, "auth.email_link", newTraceId()), 503);
   return body.json ? json({ ok: true, result: { sent: true, expires_in_minutes: out.minutes } }, 200) : checkEmailPage(out.minutes);
 });
-const page429 = () => { const r = signInPage(undefined, "Too many links were requested for this address. Use the newest email, or wait 15 minutes."); return new Response(r.body, { status: 429, headers: r.headers }); };
+const page429 = (next?: "oauth") => { const r = signInPage(next, "Too many links were requested for this address. Use the newest email, or wait 15 minutes."); return new Response(r.body, { status: 429, headers: r.headers }); };
 app.get("/v2/auth/email/open", (c) => {
   if (!magicLinkEnabled(c.env)) return toAccess();
   return openPage(newNonce(), nextOf(new URL(c.req.url).searchParams.get("next")));

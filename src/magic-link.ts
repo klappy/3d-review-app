@@ -61,8 +61,12 @@ export function timingSafeEqual(a: string, b: string): boolean {
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 /** Mail copy: one short sentence + the link + the expiry. Plain, no tracking, no images. */
-export function magicLinkMessage(origin: string, token: string, minutes: number, next?: "oauth") {
-  const link = `${origin}/v2/auth/email/open${next === "oauth" ? "?next=oauth" : ""}#t=${token}`;
+export function magicLinkMessage(origin: string, token: string, minutes: number, next?: "oauth", email?: string) {
+  // Connector links also carry the address (fragment only) so consent can name it; the open route shows it only when its hash
+  // matches the link's row (Bugbot 4109104674).
+  const link = next === "oauth"
+    ? `${origin}/v2/auth/email/open?next=oauth#t=${token}${email ? `&e=${encodeURIComponent(email)}` : ""}`
+    : `${origin}/v2/auth/email/open#t=${token}`;
   const subject = "Your 3D Review sign-in link";
   const text = ["Open this link to sign in to 3D Review:", "", link, "", `The link expires in ${minutes} minutes.`].join("\n");
   const html = `<p>Open this link to sign in to 3D Review:</p><p><a href="${esc(link)}">Sign in to 3D Review</a></p><p style="color:#57606a;font-size:14px">The link expires in ${minutes} minutes.</p>`;
@@ -93,7 +97,7 @@ export async function requestMagicLink(env: Env, rawEmail: unknown, opts: { now?
   const th = await sha256(token);
   await env.DB.prepare("INSERT INTO login_code (id, email_hash, code_hash, expires_at, created_at) VALUES (?,?,?,?,?)")
     .bind(id(ROW_PREFIX.slice(0, -1)), eh, th, now + minutes * 60e3, now).run();
-  const m = magicLinkMessage(origin, token, minutes, opts.next);
+  const m = magicLinkMessage(origin, token, minutes, opts.next, email);
   const result = await (opts.send ?? sendMail)(env, { to: email, subject: m.subject, text: m.text, html: m.html, idempotencyKey: `magic-link:${th.slice(0, 16)}` });
   // Never the address or the token: the hash prefix correlates with the row for an operator, nothing more.
   console.log("auth.magic_link.issued", JSON.stringify({ email_hash_prefix: eh.slice(0, 8), state: result.state, reason: result.reason ?? null }));

@@ -64,7 +64,8 @@ describe("link token", () => {
     const m = magicLinkMessage(ORIGIN, "T".repeat(43), 30);
     expect(m.link).toBe(`${ORIGIN}/v2/auth/email/open#t=${"T".repeat(43)}`);
     expect(m.text).toBe(`Open this link to sign in to 3D Review:\n\n${m.link}\n\nThe link expires in 30 minutes.`);
-    expect(magicLinkMessage(ORIGIN, "T".repeat(43), 30, "oauth").link).toBe(`${ORIGIN}/v2/auth/email/open?next=oauth#t=${"T".repeat(43)}`);
+    expect(magicLinkMessage(ORIGIN, "T".repeat(43), 30, "oauth", "a+b@example.invalid").link).toBe(`${ORIGIN}/v2/auth/email/open?next=oauth#t=${"T".repeat(43)}&e=a%2Bb%40example.invalid`);
+    expect(magicLinkMessage(ORIGIN, "T".repeat(43), 30, undefined, "a@example.invalid").link).not.toContain("example.invalid"); // ordinary links carry no address
   });
   it("is reusable until it expires, then refused", async () => {
     const t0 = Date.now();
@@ -141,6 +142,12 @@ describe("routes", () => {
     const html = await res.text();
     expect(html).toContain("Check your email"); expect(html).toContain("expires in 30 minutes");
     expect(res.headers.get("content-security-policy")).toContain("form-action 'self'");
+  });
+  it("a per-email refusal on a connector sign-in keeps next=oauth on the page it shows", async () => {
+    for (let i = 0; i < MAGIC_LINK_PER_EMAIL; i++) await issue("busy@example.invalid");
+    const res = await post("/v2/auth/email", { email: "busy@example.invalid", next: "oauth" });
+    expect(res.status).toBe(429);
+    expect(await res.text()).toContain('<input type="hidden" name="next" value="oauth">');
   });
   it("refuses cross-site posts to both endpoints", async () => {
     expect((await postJson("/v2/auth/email", { email: "x@example.invalid" }, { origin: "https://evil.invalid" })).status).toBe(403);
@@ -219,7 +226,8 @@ describe("routes", () => {
   });
   it("connector sign-in (next=oauth): with this browser's parked request the link shows consent naming the verified email and opens no web session", async () => {
     const oauthEnv = { ...env, OAUTH_KV: { get: async () => JSON.stringify({ clientId: "c1", redirectUri: "https://client.invalid/cb" }) }, OAUTH_PROVIDER: { lookupClient: async () => ({ clientName: "Test app" }) } };
-    const { token } = await issue("connector@example.invalid", { next: "oauth" });
+    const { token, sent } = await issue("connector@example.invalid", { next: "oauth" });
+    expect(sent[0].text).toContain("?next=oauth#t=" + token + "&e=connector%40example.invalid");
     const req = (e: string, cookie?: string) => app.fetch(new Request(ORIGIN + "/v2/auth/email/open?next=oauth", { method: "POST", headers: { origin: ORIGIN, "content-type": "application/x-www-form-urlencoded", ...(cookie ? { cookie } : {}) }, body: new URLSearchParams({ t: token, e }).toString() }), oauthEnv);
     const consent = await req("connector@example.invalid", "__Host-oauth_req=park1");
     expect(consent.status).toBe(200); expect(consent.headers.get("set-cookie")).toBeNull();
