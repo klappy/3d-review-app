@@ -177,7 +177,7 @@ test('B30 Permissions (owner + viewer): one heading, one line up front; the name
   const h = permissions.render({ esc }, m);
   assert.match(h, /<details class="small learn-more"><summary>Learn more<\/summary><p class="small muted" data-member-note>Names and emails/, 'names note moved, not removed');
   assert.match(h, /data-permissions-ref>receipt rcpt_1 · trace tr_1/, 'receipt kept behind Details');
-  assert.match(h, /viewer · pending · invited [A-Z0-9][^<T]*2026/, 'human date'); assert.doesNotMatch(h, /2026-09-25T/, 'never the ISO stamp');
+  assert.match(h, /viewer · invited Sep 2[456](?:, 2026)?(?=[ <])/, 'short human date (U26), no status word'); assert.doesNotMatch(h, /2026-09-25T/, 'never the ISO stamp');
   assert.doesNotMatch(h, /<h3\b/, 'section labels, not headings');
 });
 test('B30 shell: a page with its own h1 hides the shell h1 (shared kit rule, not an About patch)', () => {
