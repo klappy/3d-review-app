@@ -376,7 +376,9 @@ test('B07: project and assessment names are the heading with an edit control for
   p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
   p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(12);
   assert.ok(p.transport.log.some(l => l.key === 'PATCH /v2/assessments/a2' && l.outcome === 'mutation-refused'));
-  assert.ok(p.q('.v3-eh-form .v3-eh-msg').textContent.length > 0, 'refusal is shown at the field');
+  assert.match(p.text('#note'), /Synthetic transport refuses/, 'refusal is shown in the status line'); assert.equal(p.q('#note').classList.contains('alert'), true);
+  assert.equal(p.api.state.busy, false, 'busy cleared'); assert.equal(p.qa('[data-edit-heading]').length, 1, 'heading control back after the repaint'); assert.equal(p.q('.v3-eh h1').textContent, 'Spring baseline');
+  assert.ok(p.q('#prepare-form button[type=submit]') && !p.q('#prepare-form button[type=submit]').disabled, 'Prepare save enabled again');
   for (const [identity, project, assessment] of [['member', 0, 1], ['viewer', 0, 0]]) {
     const v = await bootPage(identity, '#project/p1');
     assert.equal(v.text('[role=main].content h1'), 'River Valley', identity); assert.equal(v.qa('[data-edit-heading]').length, project, identity + ' project');

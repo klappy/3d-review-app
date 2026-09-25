@@ -441,13 +441,16 @@ function bindPrepare(current) {
 function bindNameHeading(current) {
   const a = current.assessment;
   mountEditableHeading((app.closest('[role=main]') || app).querySelector('h1'), { canEdit: a.role === 'owner' || a.role === 'member', label: 'assessment name',
-    save: async name => { // same write lifecycle guards as act(): one write at a time, never over a dirty screen, refresh only this assessment
+    save: async name => { // act()'s write lifecycle: one write at a time, repainted while busy, never over a dirty screen, refresh only this assessment
       if (state.busy) return false;
       if (state.dirty.has(a.id)) throw new Error(state.dirty.get(a.id) === 'write' ? 'Your last change is saved but this screen is not refreshed yet. Refresh before making more changes.' : 'This assessment changed on the server. Refresh before making changes.');
-      const identity = identityGeneration; state.busy = true;
-      try { await api(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); } catch (e) { throw new Error(redact(e.message)); }
-      finally { if (identity === identityGeneration) state.busy = false; }
+      const identity = identityGeneration;
+      state.busy = true; state.message = null; note.textContent = 'Renaming…'; note.classList.remove('alert'); paint(); // other write controls render disabled
+      let failed = null;
+      try { await api(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); } catch (e) { failed = redact(e.message); }
       if (identity !== identityGeneration) return false;
+      state.busy = false; note.textContent = failed || ''; note.classList.toggle('alert', !!failed);
+      if (failed) { paint(); return false; } // the refusal stays in the status line; the heading returns with its control
       state.dirty.set(a.id, 'write'); // committed: refresh (shell title, crumbs, tabs read the committed name) only while this assessment is on screen
       const r = route(location.hash); if ((r.kind === 'assessment' || r.kind === 'survey') && r.id === a.id) render();
     } });
