@@ -19,7 +19,7 @@ import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle } from '/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor } from '/assess/v3-assessment.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
 // if the module is absent; destroyed on any route change.
 const WIZARD_JS = '/v3/wizard.js', WIZARD_CSS = '/v3/wizard.css';
@@ -246,13 +246,14 @@ function bindCounts(current) {
   app.querySelectorAll('[data-retry-count]').forEach(el => el.onclick = e => { e.preventDefault(); loadCounts(state.current, { retry: el.dataset.retryCount }); paintCounts(state.current); });
   app.querySelectorAll('[data-refresh]').forEach(el => el.onclick = e => { e.preventDefault(); render(); });
 }
-// v3 L1-5 (NEED 3→1, Bincy 07): per-survey counts on Collect read through lane 3's v3CountLine (ruling a/b): "n responded"
-// (never a denominator the facilitator did not enter; the server sends none here) + respondents. Same data-count hook so
+// v3 L1-5 (NEED 3→1, Bincy 07): per-survey counts on Collect read through lane 3's v3CountLine (ruling a/b): "n of N responded"
+// when the facilitator entered N in setup on this device (B-07), else "n responded" (never a denominator nobody entered) + respondents. Same data-count hook so
 // paintCounts repaints it via data-collect-wrap; non-loaded states keep countCell's retry/refresh wording.
+function localStore() { try { return globalThis.localStorage || null; } catch { return null; } }
 function collectCount(s) {
   const c = countFor(s.id);
   if (c.status !== 'loaded') return countCell(s);
-  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}${collectState(c.collection_status || s.collection_status)}</span>`;
+  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses, expected: demo ? null : v3ExpectedFor(s.id, localStore()) }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}${collectState(c.collection_status || s.collection_status)}</span>`;
 }
 // v3 L10-1 (prototype frame 7 rrow): each Collect row ends with its plain state word, open / closed (PARITY C6), from the server's collection_status only.
 function collectState(status) {
