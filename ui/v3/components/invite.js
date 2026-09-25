@@ -12,7 +12,7 @@ export function parseInvitationFragment(hash) {
 const ESC = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const KIND = { workspace: 'a workspace', project: 'a project', assessment: 'an assessment' };
 const ROLE = { viewer: 'a viewer', member: 'a member', owner: 'an owner' };
-const panel = (h1, line, actions = '') => `<section class="glass panel narrow" data-invite style="max-width:520px;margin:32px auto 0"><p class="eyebrow">Invitation</p><h1 style="font-size:27px">${h1}</h1><p class="muted" data-invite-line>${line}</p>${actions ? `<div class="actions">${actions}</div>` : ''}</section>`;
+const panel = (h1, line, actions = '') => `<section class="glass panel narrow" data-invite style="max-width:520px;margin:32px auto 0"><h1 style="font-size:27px">${h1}</h1><p class="muted" data-invite-line>${line}</p>${actions ? `<div class="actions">${actions}</div>` : ''}</section>`;
 const home = '<a class="rv-btn" href="#projects">Go to your projects</a>';
 // Pure: one state → one screen. States: loading · ready {kind, role} · accepting · signin · used · expired · refused · failed · missing.
 export function inviteView(m = {}) {
