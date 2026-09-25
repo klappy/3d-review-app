@@ -441,12 +441,15 @@ function bindPrepare(current) {
 function bindNameHeading(current) {
   const a = current.assessment;
   mountEditableHeading((app.closest('[role=main]') || app).querySelector('h1'), { canEdit: a.role === 'owner' || a.role === 'member', label: 'assessment name',
-    save: async name => {
+    save: async name => { // same write lifecycle guards as act(): one write at a time, never over a dirty screen, refresh only this assessment
       if (state.busy) return false;
-      const identity = identityGeneration;
+      if (state.dirty.has(a.id)) throw new Error(state.dirty.get(a.id) === 'write' ? 'Your last change is saved but this screen is not refreshed yet. Refresh before making more changes.' : 'This assessment changed on the server. Refresh before making changes.');
+      const identity = identityGeneration; state.busy = true;
       try { await api(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); } catch (e) { throw new Error(redact(e.message)); }
+      finally { if (identity === identityGeneration) state.busy = false; }
       if (identity !== identityGeneration) return false;
-      state.dirty.set(a.id, 'write'); render(); // refresh: shell title, crumbs and tabs read the committed name
+      state.dirty.set(a.id, 'write'); // committed: refresh (shell title, crumbs, tabs read the committed name) only while this assessment is on screen
+      const r = route(location.hash); if ((r.kind === 'assessment' || r.kind === 'survey') && r.id === a.id) render();
     } });
 }
 // Transition: write → (committed ⇒ dirty) → refresh → (landed ⇒ clean). Every outcome is scoped to `aid`, never to
