@@ -445,3 +445,16 @@ test('B07: a Prepare save from a rebuilt view waits for the in-flight rename (no
   assert.equal(patches.length, 2, 'the waiting Prepare save runs after the rename, not dropped'); assert.deepEqual(patches[1], { purpose: 'p' });
   assert.ok(!(p.api.state.message?.alert), 'no stale not-refreshed message');
 });
+test('B07: a write queued behind the rename is dropped when the identity resets meanwhile', async () => {
+  let release; const held = new Promise(r => { release = r; }); const patches = [];
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { patches.push(JSON.parse(init.body || '{}')); if (patches.length === 1) await held;
+      return { ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => ({ ok: true, result: { assessment: { id: 'a2', name: 'Spring review' } } }), text: async () => '' }; }
+    return base(u, init); }; } });
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  await p.go('#assessment/a2/collect'); await p.go('#assessment/a2/prepare');
+  p.q('#prepare-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  p.api.resetIdentity(); release(); await tick(24);
+  assert.equal(patches.length, 1, 'queued write not replayed onto a new identity');
+});

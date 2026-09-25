@@ -476,7 +476,10 @@ function bindNameHeading(current) {
 // Transition: write → (committed ⇒ dirty) → refresh → (landed ⇒ clean). Every outcome is scoped to `aid`, never to
 // whatever is on screen when the promise settles (Bugbot 4040525117 / 4040525128).
 async function act(aid, label, fn) {
-  if (pendingRename?.aid === aid) await pendingRename.done; // B07: never race the heading rename's PATCH
+  if (pendingRename?.aid === aid) { // B07: never race the heading rename's PATCH; a queued write survives only the same identity on the same assessment
+    const identity0 = identityGeneration; await pendingRename.done;
+    const here = route(location.hash); if (identity0 !== identityGeneration || !((here.kind === 'assessment' || here.kind === 'survey') && here.id === aid)) return;
+  }
   if (state.busy) return;
   if (state.dirty.has(aid)) { state.message = { aid, text: state.dirty.get(aid) === 'write' ? 'Your last change is saved but this screen is not refreshed yet. Refresh before making more changes.' : 'This assessment changed on the server. Refresh before making changes.', alert: true }; paint(); return; } // never silent (MED 4040990777)
   const identity = identityGeneration;
