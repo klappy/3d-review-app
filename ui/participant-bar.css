@@ -12,3 +12,5 @@
 .participant-more[open] > p{text-align:left;margin:8px 0}
 /* /participate/ has no .rv-btn.primary rule; Start is the welcome's one primary action there too (legacy .rv keeps its own). */
 body:not(.rv) #participant .participant-start{display:block;width:100%;min-height:48px;margin:18px 0 8px;background:#14685f;border-color:#14685f;color:#fff;font-size:16px}
+/* B10 context as a compact meta row under the invitation line on /participate/ (legacy .rv styles .participant-meta itself). */
+body:not(.rv) #participant .participant-context{font-size:14px;color:#526779;margin:4px 0}

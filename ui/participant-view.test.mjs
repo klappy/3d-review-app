@@ -64,8 +64,7 @@ test('v3 L1-8: welcome and pager follow prototype frames 8/9 (eyebrow, title, fu
   const intro=root.children[0];const texts=intro.children.map(n=>n.textContent);
   assert.equal(texts[0],'Church · Mark review');
   assert.ok(texts.includes('We would like your perspective'));
-  const more=intro.children.find(n=>n.className==='participant-more');assert.ok(more);
-  assert.ok(more.children.some(t=>t.textContent.includes('Tok Pisin translation')));
+  assert.ok(texts.some(t=>t.includes('Tok Pisin translation')));
   // Bincy B10: the shared context step 3 lists, once, in one compact line (empty fields skipped).
   assert.equal(intro.children.filter(n=>n.className.includes('participant-context')).length,1);
   assert.ok(texts.includes('Hill Project · Tok Pisin · Mark 1–4 · Audio'));
@@ -77,7 +76,7 @@ test('v3 L1-8: welcome and pager follow prototype frames 8/9 (eyebrow, title, fu
   c.showForm(2);assert.deepEqual(bar.children.map(s=>s.className),['done','done','done']);
 });
 
-test('Bincy B30: welcome is one heading, one short line (B10 context), one primary action; the rest behind Learn more',async()=>{
+test('Bincy B30: welcome is one heading, the visible invitation/privacy line, B10 meta row, one primary action; Time and no-sign-in behind Learn more',async()=>{
   const {mountParticipantView}=await import('./participant-view.js');
   class Node{children=[];listeners={};hidden=false;dataset={};type='';textContent='';className='';constructor(tag){this.tag=tag;}append(...n){this.children.push(...n);}setAttribute(){}addEventListener(t,f){this.listeners[t]=f;}removeEventListener(){}focus(){}remove(){}querySelector(){return null;}querySelectorAll(s){return s==='button'?[review]:[];}}
   const root=new Node(),form=new Node(),questions=new Node(),review=new Node();review.type='submit';form.contains=n=>n===review;
@@ -85,11 +84,14 @@ test('Bincy B30: welcome is one heading, one short line (B10 context), one prima
   const doc={createElement:t=>new Node(t),defaultView:{FormData}};
   mountParticipantView({doc,root,form,questions,reviewAnswers:new Node(),model:{assessment:'A',language:'Tok Pisin',project:'Hill Project',purpose:'Mark 1–4',format:'Audio',period:'Oct',items:[0,1].map(i=>({id:'q'+i,type:'text'})),template:{perspective:'Church'}},reviewButton:review});
   const intro=root.children[0];const shown=intro.children;
-  assert.deepEqual(shown.map(n=>n.tag),['p','h2','p','button','details']);
+  assert.deepEqual(shown.map(n=>n.tag),['p','h2','p','p','button','details']);
   assert.equal(shown[0].className,'eyebrow');
-  assert.equal(shown[2].textContent,'Hill Project · Tok Pisin · Mark 1–4 · Audio · Oct');
-  assert.equal(shown.filter(n=>n.tag==='button').length,1);assert.equal(shown[3].textContent,'Start');
-  const more=shown[4];assert.equal(more.children[0].tag,'summary');assert.equal(more.children[0].textContent,'Learn more');
+  // B27 privacy wording is captain-held: it stays visible, never behind Learn more.
+  assert.equal(shown[2].className,'participant-lead');assert.match(shown[2].textContent,/Tok Pisin translation.*never shown on their own/);
+  assert.match(shown[3].className,/participant-context/);assert.equal(shown[3].textContent,'Hill Project · Tok Pisin · Mark 1–4 · Audio · Oct');
+  assert.equal(shown.filter(n=>n.tag==='button').length,1);assert.equal(shown[4].textContent,'Start');
+  const more=shown[5];assert.equal(more.children[0].tag,'summary');assert.equal(more.children[0].textContent,'Learn more');
   const hidden=more.children.slice(1).map(n=>n.textContent).join(' ');
-  for(const w of ['never shown on their own','No account, no sign-in','Time: about 5 minutes · 2 questions'])assert.ok(hidden.includes(w),w);
+  for(const w of ['No account, no sign-in','Time: about 5 minutes · 2 questions'])assert.ok(hidden.includes(w),w);
+  assert.ok(!hidden.includes('never shown on their own'),'privacy wording not hidden');
 });

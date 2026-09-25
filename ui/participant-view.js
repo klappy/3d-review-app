@@ -22,23 +22,24 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   function button(label,action) {const n=el('button',label);n.type='button';n.addEventListener('click',action);return n;}
   const intro=el('section');intro.className='participant-intro';
   // v3 L1-8 (NEED 5→1): welcome = design-system-v3 prototype frame 8 (V.pWelcome): eyebrow "<perspective> · <assessment>",
-  // title, one full-width primary Start (B30: lead and Time line now sit behind "Learn more"). Presentation only; nothing stored.
+  // title, lead, one full-width primary Start (B30: Time and no-sign-in lines sit behind "Learn more"). Presentation only; nothing stored.
   const eyebrowText=[model.template?.perspective,model.assessment].filter(v=>v!==null&&v!==undefined&&v!=='').join(' · ');
   if(eyebrowText){const eb=el('p',eyebrowText);eb.className='eyebrow';intro.append(eb);}
   intro.append(el('h2','We would like your perspective'));
+  // Invitation + privacy sentence stays visible as the one short line (Bincy B27 privacy wording is captain-held, ASK 9/15).
+  const lead=el('p',`${model.language?`You were invited to say how the ${model.language} translation is going. `:''}Your answers are grouped with others and never shown on their own.`);lead.className='participant-lead';intro.append(lead);
   // Bincy B30 (LANES 18:35 ruling): one heading, one short line, one primary action; explanations behind "Learn more".
-  // Bincy B10: the shared context setup step 3 lists ("Shown to every participant"), once, is that one short line.
+  // Bincy B10: the shared context setup step 3 lists ("Shown to every participant"), once, as a compact meta row.
   const shared=[model.project,model.language,model.purpose,model.format,model.period].map(v=>typeof v==='string'?v.trim():'').filter(Boolean).join(' · ');
   if(shared){const ctx=el('p',shared);ctx.className='participant-meta participant-context';intro.append(ctx);}
   // v3 L1-5 (NEED 5→1): the instrument's source ref is provenance for facilitators, not participant copy; the raw
   // unbroken path widened the intro to 697px on a 375px phone (TRAINING.md #10). Kept on the model, never painted here.
   const start=button('Start',()=>showForm(0));start.className='rv-btn primary participant-start';intro.append(start);
-  // Same wording as before (invitation, privacy, time, no sign-in), moved behind a native disclosure; nothing dropped.
+  // Time and no-sign-in lines keep their wording, moved behind a native disclosure; nothing dropped.
   const more=el('details');more.className='participant-more';more.append(el('summary','Learn more'));
-  const lead=el('p',`${model.language?`You were invited to say how the ${model.language} translation is going. `:''}Your answers are grouped with others and never shown on their own.`);lead.className='participant-lead';
   const time=el('p',`Time: about ${Math.max(5,Math.round(items.length*0.6))} minutes · ${items.length} questions`);time.className='participant-meta';
   const foot=el('p','No account, no sign-in. You can review your answers before you send them.');foot.className='participant-foot';
-  more.append(lead,time,foot);intro.append(more);
+  more.append(time,foot);intro.append(more);
   const nav=el('div');nav.className='participant-pager';nav.hidden=true;
   const progress=el('p');progress.className='participant-progress eyebrow';progress.setAttribute('aria-live','polite');
   const controls=el('div');controls.className='participant-page-actions';
