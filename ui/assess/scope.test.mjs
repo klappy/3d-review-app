@@ -62,7 +62,7 @@ test('workspaces: empty state and create form', async () => {
 test('projects: empty state and create form', async () => {
   const ctx = ctxWith({ 'GET /v2/projects': { projects: [] } });
   const h = pages.projects.render(ctx, await pages.projects.load(ctx, {}));
-  assert.ok(h.includes('You have no projects yet.')); assert.ok(h.includes('id="create-project"')); assert.ok(h.includes('href="#workspaces"'));
+  assert.ok(h.includes('You have no projects yet.')); assert.ok(!h.includes('id="create-project"'), 'B34: no separate create-project form'); assert.ok(h.includes('data-v3-start href="#new"')); assert.ok(h.includes('href="#workspaces"'));
 });
 test('workspace: no projects grouped, viewer sees no add/rename/remove', async () => {
   const ctx = ctxWith({ 'GET /v2/workspaces/ws1': { workspace: { id: 'ws1', name: 'W <1>', role: 'viewer', archived_at: null }, projects: [] } });
@@ -100,6 +100,8 @@ test('project (owner): assessment cards link to #assessment/<id> with language n
   assert.ok(h.includes('href="#assessment/a1"')); assert.ok(h.includes('Language: Lake')); assert.ok(h.includes('Collecting'));
   assert.ok(h.includes('id="create-assessment"')); assert.ok(h.includes('<option value="l1">Lake (qaa)</option>')); assert.ok(!h.includes('<option value="l2"'), 'archived language not offered');
   assert.ok(h.includes('id="rename-form"')); assert.ok(h.includes('href="#permissions/projects/p1"')); assert.ok(h.includes('Org'));
+  // B34: Start is the one visible create action; the bare assessment / language forms sit behind a closed "More".
+  assert.ok(h.includes('data-v3-start href="#new"')); assert.match(h, /<details class="panel more-tools" id="project-more"><summary>More<\/summary>[\s\S]*id="create-assessment"[\s\S]*id="add-language"[\s\S]*<\/details>/);
 });
 
 // ---------- refusal / auth / transient ----------
