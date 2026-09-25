@@ -37,6 +37,11 @@ const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(
 
 /** Settled count, optional denominator (ruling a) and "n not yet confirmed" side by side (ruling b).
  *  `unconfirmed` is shown only when the server reports it; the facilitator side never guesses it. */
+// U05 / B31 (lanes-1321): facilitators never see the server's internal hold reason (e.g. "D7 scoring, threshold, and
+// differencing policy unresolved"): held cards carry only their band word + count; the Results block says this once. The server reason stays in the evidence table
+// behind "Show evidence and details".
+export const V3_HELD_TEXT = 'Results appear after a report is built from at least three responses per group.';
+
 export function v3CountLine(counts = {}, esc = esc0, flags = V3_FLAGS) {
   return responseCount(counts, esc, { expectedOptional: !!flags.expectedCountOptional, showUnconfirmed: !!flags.showUnconfirmed }); // component: Response count
 }
@@ -83,7 +88,7 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores
     const suppressed = !sc && b && b.state === 'suppressed';
     const note = sc ? (sc.subs.length ? `<ul class="v3-band-subs small">${sc.subs.map(x => `<li data-v3-sub="${esc(x.name)}">${esc(x.name)} · <strong>${esc(v3ScoreBand(x.score, n))}</strong></li>`).join('')}</ul>` : '')
       : scored ? '<p class="muted">Not in the latest report.</p>'
-      : held ? `<p class="muted" data-v3-band-held>${esc(r.reason || 'Results are held.')}</p>`
+      : held ? '' // U05: the card's "More input needed" says it; the one plain line sits under Results
       : suppressed ? '<div class="note">Withheld to protect a small group. This is an evidence gap, not a poor result.</div>'
       : b && b.text ? `<p>${esc(b.text)}</p>` : '';
     const count = groups ? `<div class="v3-band-count small muted" data-v3-band-count="${esc(lens)}">${esc(v3GroupCountText(groups[lens]))}</div>` : '';

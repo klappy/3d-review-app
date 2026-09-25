@@ -31,7 +31,7 @@ test('(b) settled and not-yet-confirmed side by side; never guessed', () => {
 test('(c) held results render band cards as evidence gaps, no invented band', () => {
   const h = v3BandsMarkup({ status: 'held', reason: 'policy <unresolved>' }, L);
   assert.match(h, /data-v3-bands="held"/); assert.equal((h.match(/data-v3-band=/g) || []).length, 3);
-  assert.match(h, /policy &lt;unresolved&gt;/); assert.doesNotMatch(h.slice(0, h.indexOf('data-v3-legend')), />Strong</); // cards only; the legend names every band (L3-5)
+  assert.doesNotMatch(h, /policy &lt;unresolved&gt;|Results appear after/); // U05: held cards carry no reason text assert.doesNotMatch(h.slice(0, h.indexOf('data-v3-legend')), />Strong</); // cards only; the legend names every band (L3-5)
   const s = v3BandsMarkup({ status: 'ready', bands: [{ perspective: 'Church', band: 'Growing', text: 'ok' }, { perspective: 'Community', band: '87%' }] }, L);
   assert.match(s, /data-v3-bands="shown"/); assert.match(s, />Growing</); assert.doesNotMatch(s, /87%/);
 });

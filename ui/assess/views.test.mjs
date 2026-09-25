@@ -53,12 +53,12 @@ test('A1/A2 understand: each survey shows its own counts; lens sums responses on
   assert.ok(!calls.some(c => c.url.includes('/surveys/s4')), 'archived survey is not counted');
 });
 
-test('A3 results: the held literal with the server reason; no numbers or bands', async () => {
+test('A3 results: the held literal with one plain line (U05), never the server policy code; no numbers or bands', async () => {
   const { api } = fakeApi(understandTable); const ctx = ctxFor(api);
   const html = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
   const panel = html.slice(html.indexOf('data-results>'), html.indexOf('data-reports>'));
   assert.match(panel, /<span class="badge">held<\/span>/);
-  assert.match(panel, /data-results-reason>D7 scoring, threshold, and differencing policy unresolved</);
+  assert.match(panel, /data-results-reason>Results appear after a report is built from at least three responses per group\.</); assert.doesNotMatch(panel, /D7 scoring/);
   assert.doesNotMatch(panel, /\b\d+\b/); // no numbers, no "0"
   assert.doesNotMatch(panel, /band/i);
 });
@@ -115,7 +115,7 @@ test('A6 reports 404 → unavailable; results/counts failures are per-part, neve
   assert.match(html, /data-reports-unavailable>Reports are unavailable/);
   assert.match(html, /data-count="s2" role="alert">count unavailable/);
   assert.match(html, /data-lens-sum="Translation Team">3 responses across 1 of 2 surveys <strong>\(partial\)/);
-  assert.match(html, /data-results-reason>D7/);
+  assert.match(html, /data-results-reason>Results appear after a report is built/); // U05
 });
 
 test('A7 improve viewer: read-only notes, no save control, visibility line; text escaped', async () => {

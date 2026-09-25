@@ -6,7 +6,7 @@
 // the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
-import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
+import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, V3_HELD_TEXT } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -99,9 +99,9 @@ const understand = {
       const rows = g.surveys.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="${esc(ctx.routes.survey(m.aid, s.id))}">${esc(s.template_name || s.template_id)}</a></h3><p class="small muted">${countCell(s)}</p></div></div>`).join('');
       return `<section class="lens-block" aria-label="${esc(g.lens)}"><h3>${esc(g.lens)}</h3>${sumLine}${rows}</section>`;
     }).join('');
-    // (2) Results: the held literal with the server's reason. No numbers, no bands.
+    // (2) Results: the held literal with one plain line (U05; the server reason stays in the evidence table). No numbers, no bands.
     let results;
-    if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.reason || '')}</p>`; }
+    if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.status === 'held' || r.suppressed ? V3_HELD_TEXT : (r.reason || ''))}</p>`; } // U05: plain line, not the server's policy code
     else results = refusalLine(ctx, m.results.status, 'data-retry="results"', 'Results');
     // v3 (ruling c): band layout, one card per perspective; a held result shows evidence gaps, never an invented band.
     // v3 U2: per-perspective server counts on each band card (Bincy screen 10 group counts) + evidence toggle and table.
