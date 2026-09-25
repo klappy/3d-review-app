@@ -31,3 +31,14 @@ test('refusal keeps the field open with the reason; re-mount never duplicates th
   d.querySelector('[data-edit-heading]').click(); d.querySelector('.v3-eh-form input').value = 'Y'; submit(d, d.querySelector('.v3-eh-form')); await flush();
   assert.equal(d.querySelector('.v3-eh-msg').textContent, 'The name was not saved.');
 });
+test('while saving: a second submit, Escape and Cancel are ignored; the field is locked until save settles', async () => {
+  const { d, h1 } = page(); const calls = []; let release;
+  mountEditableHeading(h1, { canEdit: true, label: 'project name', save: n => { calls.push(n); return new Promise(r => { release = r; }); } });
+  d.querySelector('[data-edit-heading]').click(); const form = d.querySelector('.v3-eh-form'), input = form.querySelector('input');
+  input.value = 'Next'; submit(d, form); submit(d, form); await flush();
+  assert.deepEqual(calls, ['Next']); assert.equal(input.readOnly, true); assert.equal(form.getAttribute('aria-busy'), 'true');
+  form.dispatchEvent(new d.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  form.querySelector('[data-cancel]').click(); assert.equal(d.querySelector('.v3-eh-form'), form); assert.equal(h1.hidden, true);
+  release(); await flush();
+  assert.equal(h1.textContent, 'Next'); assert.equal(d.querySelector('.v3-eh-form'), null); assert.deepEqual(calls, ['Next']);
+});

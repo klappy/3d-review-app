@@ -21,7 +21,7 @@ export function mountEditableHeading(h1, { canEdit = false, label = 'name', save
   const btn = doc.createElement('button');
   btn.type = 'button'; btn.className = 'v3-eh-edit'; btn.dataset.editHeading = ''; btn.setAttribute('aria-label', `Edit ${label}`); btn.title = `Edit ${label}`; btn.textContent = '✎';
   wrap.append(btn);
-  let form = null;
+  let form = null, saving = false; // saving: a save() is in flight — no second submit, no Escape/Cancel until it settles (Bugbot 4108101050)
   const close = focus => { form?.remove(); form = null; h1.hidden = false; btn.hidden = false; if (focus) btn.focus(); };
   btn.addEventListener('click', () => {
     if (form) return;
@@ -31,16 +31,17 @@ export function mountEditableHeading(h1, { canEdit = false, label = 'name', save
     const cancel = doc.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancel'; cancel.dataset.cancel = '';
     const msg = doc.createElement('p'); msg.className = 'v3-eh-msg small muted'; msg.setAttribute('role', 'status');
     form.append(input, ok, cancel, msg);
-    cancel.addEventListener('click', () => close(true));
-    form.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); close(true); } });
+    cancel.addEventListener('click', () => { if (!saving) close(true); });
+    form.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); if (!saving) close(true); } });
     form.addEventListener('submit', async e => {
       e.preventDefault();
+      if (saving) return;
       const name = input.value.trim(); if (!name) { input.focus(); return; }
       if (name === h1.textContent.trim()) { close(true); return; }
-      ok.disabled = cancel.disabled = true; msg.textContent = '';
-      let done = false, reason = ''; try { done = (await save(name)) !== false; } catch (err) { reason = String(err?.message || ''); }
+      saving = true; ok.disabled = cancel.disabled = input.readOnly = true; form.setAttribute('aria-busy', 'true'); msg.textContent = '';
+      let done = false, reason = ''; try { done = (await save(name)) !== false; } catch (err) { reason = String(err?.message || ''); } finally { saving = false; }
       if (!form) return; // the host repainted (and re-mounted) while saving
-      if (done) { h1.textContent = name; close(btn.isConnected); } else { ok.disabled = cancel.disabled = false; msg.textContent = reason || 'The name was not saved.'; input.focus(); }
+      if (done) { h1.textContent = name; close(btn.isConnected); } else { ok.disabled = cancel.disabled = input.readOnly = false; form.removeAttribute('aria-busy'); msg.textContent = reason || 'The name was not saved.'; input.focus(); }
     });
     h1.hidden = true; btn.hidden = true; wrap.append(form); input.focus(); input.select?.();
   });
