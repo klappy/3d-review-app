@@ -3,6 +3,12 @@
 // sign in, then this page again. The token lives only in memory and this tab's sessionStorage (so the sign-in round trip can come
 // back); it is never in the address bar after arrival and is cleared on accept, refusal or a used/expired invitation.
 export const INVITE_KEY = 'pendingInvite';
+// Same rule as the legacy parser (ui/public-entry.js, tested in test/invitation-entry.test.mjs); a copy because that module mounts
+// the legacy page on import.
+export function parseInvitationFragment(hash) {
+  if (typeof hash !== 'string' || !hash.startsWith('#invite=') || hash.length > 4104) return null;
+  try { const token = decodeURIComponent(hash.slice(8)); return /^[A-Za-z0-9_-]{1,4096}$/.test(token) ? token : null; } catch { return null; }
+}
 const ESC = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const KIND = { workspace: 'a workspace', project: 'a project', assessment: 'an assessment' };
 const ROLE = { viewer: 'a viewer', member: 'a member', owner: 'an owner' };

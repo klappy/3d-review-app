@@ -44,3 +44,8 @@ test('a used invitation clears the stored token; a transient failure keeps it an
   mountInvite(r2, { api: async () => { throw new Error('API unavailable'); }, token: 't', forget: () => f2++ });
   await tick(); assert.match(r2.innerHTML, /data-invite-retry/); assert.equal(f2, 0);
 });
+test('token parser: same rule as the legacy parser (and this module never mounts anything on import)', async () => {
+  const { parseInvitationFragment } = await import('./invite.js');
+  const legacy = (await import('../../public-entry.js')).parseInvitationFragment;
+  for (const h of ['#invite=SECRET_abc-12', '#invite=', '#invite=%ZZ', '#invite=abc&survey=def', '#invite=' + 'a'.repeat(4097), '#invite=abc%0A', '#survey=x']) assert.equal(parseInvitationFragment(h), legacy(h), h.slice(0, 40));
+});
