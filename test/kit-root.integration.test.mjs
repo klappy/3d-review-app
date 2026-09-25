@@ -416,3 +416,15 @@ test('B07: a view rebuilt while the rename is in flight settles like act(): refr
   assert.ok(p.transport.log.filter(l => l.key === 'GET /v2/assessments/a2').length > gets, 'committed rename refreshes the rebuilt view');
   assert.equal(p.qa('[data-edit-heading]').length, 1);
 });
+test('B07: a refused rename that settles after navigating to another assessment never repaints that page', async () => {
+  let release; const held = new Promise(r => { release = r; });
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { await held; return base(u, init); } return base(u, init); }; } });
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  await p.go('#assessment/a1/prepare');
+  p.q('#prepare-form textarea[name="purpose"]').value = 'draft on a1';
+  release(); await tick(16);
+  assert.equal(p.api.state.busy, false); assert.equal(p.api.state.current.assessment.id, 'a1');
+  assert.equal(p.q('#prepare-form textarea[name="purpose"]').value, 'draft on a1'); assert.equal(p.api.state.message, null, 'no refusal pinned on another assessment');
+});
