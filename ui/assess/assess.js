@@ -446,15 +446,20 @@ function bindNameHeading(current) {
     save: async name => {
       if (state.busy) return false;
       if (state.dirty.has(a.id)) throw new Error(state.dirty.get(a.id) === 'write' ? 'Your last change is saved but this screen is not refreshed yet. Refresh before making more changes.' : 'This assessment changed on the server. Refresh before making changes.');
-      const identity = identityGeneration, held = [...app.querySelectorAll('button:not([disabled])')].filter(b => !b.closest('.v3-eh'));
+      const identity = identityGeneration, view = app.firstElementChild, held = [...app.querySelectorAll('button:not([disabled])')].filter(b => !b.closest('.v3-eh'));
       state.busy = true; held.forEach(b => { b.disabled = true; });
-      let r;
-      try { r = await api(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); } catch (e) { throw new Error(redact(e.message)); }
-      finally { if (identity === identityGeneration) { state.busy = false; held.forEach(b => { b.disabled = false; }); } }
-      if (identity !== identityGeneration || state.current?.assessment.id !== a.id) return;
-      const next = String(r?.assessment?.name ?? name), old = state.current.assessment.name;
-      state.current.assessment.name = next;
+      let r, failed = null;
+      try { r = await api(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); } catch (e) { failed = redact(e.message); }
+      if (identity !== identityGeneration) return false;
+      // If the view was rebuilt while the PATCH ran (tab/crumb navigation, paint), its controls were drawn disabled from `busy`:
+      // then settle the way act() does — repaint (refusal) or refresh (committed) — instead of re-enabling detached nodes.
+      state.busy = false; const intact = !!view?.isConnected && held.every(b => b.isConnected); if (intact) held.forEach(b => { b.disabled = false; });
+      if (failed) { if (!intact) paint(); throw new Error(failed); }
+      const next = String(r?.assessment?.name ?? name), old = state.current?.assessment.name;
       const listed = state.lists.get(a.project_id)?.list?.find?.(x => x.id === a.id); if (listed) listed.name = next;
+      if (state.current?.assessment.id !== a.id) return;
+      state.current.assessment.name = next;
+      if (!intact) { const here = route(location.hash); if ((here.kind === 'assessment' || here.kind === 'survey') && here.id === a.id) { state.dirty.set(a.id, 'write'); render(); } return; }
       if (document.title.includes(old)) document.title = document.title.replace(old, next);
       // No shell re-sync here: a kit update empties the content mount (drafts). The component sets the heading; crumbs follow in place.
       if (kit) for (const el of document.querySelectorAll('header.top nav.crumbs a, header.top nav.crumbs [aria-current]')) if (el.children.length === 0 && el.textContent.trim() === old) el.textContent = next;

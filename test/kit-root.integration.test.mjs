@@ -401,3 +401,18 @@ test('B07: assessment heading rename disables other writes in place, keeps unsav
   assert.equal(p.text('[role=main].content .v3-eh h1'), 'Spring review'); assert.equal(p.qa('[data-edit-heading]').length, 1); assert.equal(p.api.state.current.assessment.name, 'Spring review');
   assert.equal(p.text('header.top nav.crumbs [aria-current="page"]'), 'Spring review', 'crumb follows the committed name');
 });
+test('B07: a view rebuilt while the rename is in flight settles like act(): refreshed, controls enabled', async () => {
+  let release; const held = new Promise(r => { release = r; });
+  const p = await bootPage('owner', '#assessment/a2/collect', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    if ((init.method || '').toUpperCase() === 'PATCH') { await held; return { ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => ({ ok: true, result: { assessment: { id: 'a2', name: 'Spring review' } } }), text: async () => '' }; }
+    return base(u, init); }; } });
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(4);
+  await p.go('#assessment/a2/prepare');
+  assert.equal(p.q('#prepare-form button[type=submit]').disabled, true, 'drawn disabled while busy');
+  const gets = p.transport.log.filter(l => l.key === 'GET /v2/assessments/a2').length;
+  release(); await tick(16);
+  assert.equal(p.api.state.busy, false); assert.equal(p.q('#prepare-form button[type=submit]').disabled, false, 'remounted controls enabled after settle');
+  assert.ok(p.transport.log.filter(l => l.key === 'GET /v2/assessments/a2').length > gets, 'committed rename refreshes the rebuilt view');
+  assert.equal(p.qa('[data-edit-heading]').length, 1);
+});
