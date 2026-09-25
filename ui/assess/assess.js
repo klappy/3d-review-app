@@ -466,7 +466,7 @@ function bindNameHeading(current) {
         const listed = state.lists.get(a.project_id)?.list?.find?.(x => x.id === a.id); if (listed) listed.name = next;
         if (state.current?.assessment.id !== a.id) return;
         state.current.assessment.name = next;
-        if (!intact) { if (onThis) { state.dirty.set(a.id, 'write'); if (!state.busy) render(); } return; } // an act() in flight refreshes on its own settle
+        if (!intact) { if (onThis) { state.dirty.set(a.id, 'write'); if (!state.busy) await render(); } return; } // refreshed BEFORE settle(): a waiting act() then runs on a clean screen
         if (document.title.includes(old)) document.title = document.title.replace(old, next);
         // No shell re-sync here: a kit update empties the content mount (drafts). The component sets the heading; crumbs follow in place.
         if (kit) for (const el of document.querySelectorAll('header.top nav.crumbs a, header.top nav.crumbs [aria-current]')) if (el.children.length === 0 && el.textContent.trim() === old) el.textContent = next;

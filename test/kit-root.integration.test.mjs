@@ -442,4 +442,6 @@ test('B07: a Prepare save from a rebuilt view waits for the in-flight rename (no
   assert.equal(patches.length, 1, 'Prepare waits while the rename PATCH is in flight');
   release(); await tick(24);
   assert.equal(maxInflight, 1, 'never two assessment updates at once'); assert.ok('name' in patches[0]);
+  assert.equal(patches.length, 2, 'the waiting Prepare save runs after the rename, not dropped'); assert.deepEqual(patches[1], { purpose: 'p' });
+  assert.ok(!(p.api.state.message?.alert), 'no stale not-refreshed message');
 });
