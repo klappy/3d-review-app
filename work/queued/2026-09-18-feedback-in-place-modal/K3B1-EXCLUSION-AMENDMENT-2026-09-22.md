@@ -1,4 +1,0 @@
-# K3b1 bounded asset-exclusion amendment
-Coordinator ACCEPT/FIRE-readiness scope amendment under already-authorized feedback integration. Add ONE path to the22-path ticket: `ui/.assetsignore`, solely to exclude `assess/feedback-modal.test.mjs`, preserving all existing exclusion entries and runtime delivery. Total authored/reconciliation boundary23paths. ExistingK3a writerFable retains samefile custody sequentially; no competing author, no metadata/version change or newproductscope.
-
-Reason: inherited modal test must not ship as runtime asset. FreshALLERGY/sourceinspection identified a concrete missing exclusion, anticipated by independentK3b1review. This is routine boundedcorrection, no humanapproval required. Prove local test-module404 and actualfeedback-modal.js runtime200byteequal at candidate, plus no regressions to inheritedK3a exclusions. K3b1SOURCEFIRE still waits independentlyacceptedK3atree/currentreadiness; this file is not permissiontoeditbeforeFIRE.

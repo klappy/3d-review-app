@@ -1,5 +1,0 @@
-not ok 34 - non-kit host: loaded workspace renders exactly one parent link to routes.workspaces; loaded project to routes.projects (escaped)
-not ok 36 - parent link uses the route table, not a literal: an overridden routes.projects value is what the project page links to (escaped)
-# tests 37
-# pass 35
-# fail 2

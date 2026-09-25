@@ -1,6 +1,0 @@
-# Driver-seat delta — B2/B3 evidence planning
-Version1.0.0, 2026-09-17. Read actual driver-seat prompt from klappy://canon/methods/driver-seat-lens, then applied to this bounded design.
-As the next Auditor I need to find one unproved assertion, its source and owner without treating a large suite count as its proof. Changed the ledger design to record assertion polarity and evidence provenance separately from candidate status. As root I need to see accepted main and proposed union ingredients without accidentally approving their union: added per-pin distinction and final frozen-integration binding. As Auth I need settled policy read first: added D7 ruling reconciliation rather than a generic new question.
-Rejected: fresh end-to-end rerun (duplicates native campaign, unauthorized); full83 code audit (not needed to identify evidence holes); percentage/deduplicated pass totals (erase role/transport limits); new meal/ticket identity (existing B2/B3 already owns this problem); delaying all planning until final union (independent gaps can be mapped now).
-System picture: source requirement -> exact assertion -> source-bound receipt -> residual gap -> retained owner -> later frozen-integration acceptance. This is evidence routing, not acceptance generation.
-Pre-lens challenge is retained honestly; fresh post-lens challenge follows this receipt.

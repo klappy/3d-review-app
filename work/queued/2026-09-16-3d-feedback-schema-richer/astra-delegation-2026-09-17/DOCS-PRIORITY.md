@@ -1,7 +1,0 @@
-Root Astra — klappy priority steering for delegated CoS+ sprint: the team's biggest complaint is empty docs-tool returns.
-
-Make this the first bounded constraint investigation and resolution. Do not spend the entire sprint instrumenting frustration while leaving a known retrieval failure untouched. Read existing NLX-MCP-001 evidence and current docs/search contract/implementation/corpus; find the root cause, then plan and independently review the smallest authorized correction. Do not invent search content, expose private material, or treat every empty result as a defect.
-
-Acceptance: define representative known-answer queries from agreed cookbook/product contracts; verify useful source-backed results through the actual agent-facing tool with source/version attribution and correct access boundaries. Distinguish legitimate misses from broken query/corpus/index/transport behavior. Include empty/unmatched and unauthorized cases; preserve truthful error behavior. Demonstrate fewer blocked retrieval steps on the named persona tasks rather than merely collecting additional sentiment rows.
-
-This is added to CoS+ delegated planning/build scope under14c5710137390, not a separate competing team. It can progress before the feedback UI and independently of Claude Design's current files. Preserve existing API/design/independent-review gates and root's final integration/merge ownership. Return the specific existing defect/ticket and exact file custody before implementation, plus actual owner/estimate; do not duplicate another active docs fix.

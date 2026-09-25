@@ -1,7 +1,0 @@
-# Fixture-only preparation — SOURCE FIRE
-
-Auggie authorizes ui_audit's accepted159 prerequisite: only /tmp/3d-review-159-normal-shell/{server.mjs,browser-check.cjs,route-contract.json,PREPARATION-RECEIPT.md} plus evidence. Immutable332b862903c2d3961681649d2d450fd7fe669e8a source read-only, actual ui/index.html/assess controller with synthetic staff session and editable field. No tracked product edits or production mutations. Verify8899 unused before bind; never take over another process.
-
-Independent orphan_audit scope ACCEPT requires interception before navigation, only frozen local static reads and enumerated synthetic API routes; reject unknown/nonlocal writes; no real cookies/storage/credentials; isolated browser context. Verify modal context and late-response oracle: stale UI suppressed, already dispatched writes not claimed cancelled. Prove fail-closed routing. Label fixture evidence separately from live/provider validation.
-
-Existing accepted reconciliation5445105 and independent sequencing96d78fd remain. This is separately ordered fixture preparation only, not159 product reconciliation. Product sequence161 accepted main handoff then159 thenK3 unchanged. ui_audit offered actual ownership and20-active-minute runnable checkpoint after FIRE; ACK and execute. Independently validate harness before depending on it. Return immutable source reference, route contract, commands/results and local evidence paths; no untested claimed pass.

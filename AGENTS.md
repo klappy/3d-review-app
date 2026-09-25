@@ -6,6 +6,7 @@ This app answers to [klappy/kitchen](https://github.com/klappy/kitchen). Fetch i
 - **HYGIENE 10a:** deployment happens only through the Git-connected Workers Build. No seat runs a deploy or uploads a Worker version.
 - **Topology:** `main` → existing DEV; `production` → production. Provider cutover remains separately gated; the captain owns production promotion. An explicit staging branch/app is optional future scope only if needed.
 - **HYGIENE 19:** `package.json` is the version source. Production promotes the same semantic version, canonical release pin and product source already validated in DEV; no promotion-only bump. Actual fixes go through `main` and DEV first. Build/client evidence must prove the manifest-derived `<version>+<sha7>` stamp. The current cookbook HYGIENE §10 standing rule supersedes the earlier every-promotion bump requirement.
+- **HYGIENE 35:** the work rail (work units, journals, planning, meals) lives in [klappy/3d-review-cookbook](https://github.com/klappy/3d-review-cookbook) — [`work/`](https://github.com/klappy/3d-review-cookbook/tree/main/work) and [`meals/`](https://github.com/klappy/3d-review-cookbook/tree/main/meals). This repo holds code, contract and release records only; do not add `work/` or `cookbook/` here. History before the move stays in this repo's git log.
 
 The repo-specific procedure and current promotion hold are in [docs/release.md](docs/release.md). Read it before any release action. Do not interpret this documentation as lifting that hold or proving version-stamp machinery exists.
 
