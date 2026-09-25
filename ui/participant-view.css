@@ -29,6 +29,11 @@
 .rv #participant:has(.participant-intro) > #redeem > label,
 .rv #participant:has(.participant-intro) > #redeem > button{display:none}
 
+/* Bincy B30: the welcome is one heading, one short line (B10 context), one action. On /legacy/ the facilitator-side
+   provenance line and the footer repeat what "Learn more" holds, so they step aside while the welcome shows only. */
+.rv #participant:has(.participant-intro:not([hidden])) > #form-context,
+.rv #participant:has(.participant-intro:not([hidden])) > .participant-footer{display:none}
+
 /* Shared participant route: brand + right side only; no staff chrome or wording.
    Presentation only — authority-bearing hidden flags and identity text are untouched. */
 @media screen {
