@@ -230,3 +230,13 @@ test('v3 U4 gate: viewers see the state only, no write control', async () => {
   const m = await views.understand.load(ctx, { aid: 'a1' });
   assert.doesNotMatch(views.understand.render(ctx, m), /data-v3-gate-go/);
 });
+
+test('B35: the band block offers "Build the results" only to editors, only before a report, only once a group has 3+', async () => {
+  const { buildResultsCta } = await import('./views.js'); const esc = s => String(s);
+  const ready = { 'Community': { responses: 3 } }, thin = { 'Community': { responses: 2 } };
+  assert.match(buildResultsCta({ role: 'owner', bandScores: null }, ready, esc), /data-results-build/);
+  assert.match(buildResultsCta({ role: 'member', bandScores: null }, ready, esc), /Build the results/);
+  assert.equal(buildResultsCta({ role: 'viewer', bandScores: null }, ready, esc), '');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: { Community: {} } }, ready, esc), '');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null }, thin, esc), '');
+});
