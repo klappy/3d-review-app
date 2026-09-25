@@ -11,6 +11,7 @@
 // Acceptance (cap.grant.accept) is NOT here: it stays on the legacy surface at /legacy/, reached through the root's #invite= forwarder.
 
 import { memberList, labelMembers, readAccountEmail } from '../v3/components/member-list.js';
+import { learnMore } from '../v3/components/learn-more.js'; // lane 9 L9-24: shared closed-by-default disclosure
 
 export const SCOPE_SEG = { workspaces: 'workspace', projects: 'project', assessments: 'assessment' };
 export const SCOPE_NOUN = { workspaces: 'workspace', projects: 'project', assessments: 'assessment' };
@@ -57,8 +58,8 @@ export const permissions = {
     const roleOptions = (owner ? ROLES : ROLES.filter(r => r !== 'owner')).map(r => `<option value="${r}">${r}</option>`).join('');
     const invite = member ? `<form class="line" data-invite-form><h3>Invite someone</h3><label class="field">Email<input name="email" type="email" required autocomplete="off" ${busy}></label><label class="field">Role<select name="role" ${busy}>${roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit" ${busy}>Preview invitation</button></div><p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p></form>` : '';
     const transfer = owner ? `<form class="line" data-transfer-form><h3>Transfer ownership</h3><p class="small muted">Ownership moves to another signed-up principal. Destructive: it cannot be undone from here.</p><label class="field">New owner's principal id<input name="to" required autocomplete="off" placeholder="usr_… or person_…" ${busy}></label><label class="small"><input type="checkbox" name="step_down"> Step down to member after the transfer</label><div class="actions"><button type="submit" ${busy}>Preview transfer</button></div></form>` : '';
-    const sheet = m.sheet ? renderSheet(ctx, m.sheet, m.busy) : '';
-    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}${roster}${pending}${invite}${transfer}${sheet}${status}<p class="small muted line">Accepting an invitation happens on the legacy surface (a mailed <code>#invite=</code> link opens there); it is never done from this page.</p></section>`;
+    const sheet = m.sheet ? renderSheet(ctx, m.sheet, m.busy, m.scope) : '';
+    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}${roster}${pending}${invite}${transfer}${sheet}${status}${learnMore('<p class="small muted">Accepting an invitation happens on the legacy surface (a mailed <code>#invite=</code> link opens there); it is never done from this page.</p>')}</section>`;
   },
   bind(ctx, root, m) {
     const base = `/v2/${SCOPE_SEG[m.scope]}/${ctx.enc(m.id)}`;
@@ -113,8 +114,17 @@ export const permissions = {
 };
 export default permissions;
 
-function renderSheet(ctx, s, busy) {
+// U13 (lanes-1321): the confirm sheet leads with ONE plain sentence of what will happen; the server's impact record
+// (effect, irreversible, compensating control, affected rows) stays available, verbatim, behind "Details".
+export function sheetSentence(s = {}, scope = '') {
+  const where = `this ${String(scope || '').replace(/s$/, '') || 'item'}`, p = s.params || {};
+  if (s.kind === 'invite') return `${p.email || 'They'} will be able to open ${where} as ${p.role || 'a member'} once they accept. An email is sent when you confirm.`;
+  if (s.kind === 'transfer_owner') return `Ownership of ${where} moves to the person you named${p.step_down ? ' and you become a member' : ''}. This cannot be undone from here.`;
+  if (s.kind === 'update_role') return `Their role on ${where} changes to ${p.role || 'the role you chose'}.`;
+  return 'Nothing changes until you confirm.';
+}
+function renderSheet(ctx, s, busy, scope) {
   const esc = ctx.esc, i = s.impact || {};
   const affected = Array.isArray(i.affected) ? i.affected : [];
-  return `<section class="note" data-confirm-sheet data-confirm-kind="${esc(s.kind)}"><p class="eyebrow">Confirm: ${esc(s.label)}${s.who ? ` · ${esc(s.who)}` : ''}</p><p class="small">Nothing has changed yet. Confirmation expires in ${esc(s.expiresIn ?? '')} seconds.</p><dl class="small" data-impact><dt>Effect</dt><dd>${esc(i.effect ?? '')}</dd><dt>Irreversible</dt><dd>${esc(String(i.irreversible ?? ''))}</dd><dt>Compensating control</dt><dd>${esc(i.compensating_control ?? '')}</dd><dt>Affected</dt><dd>${affected.length ? `<ul>${affected.map(a => `<li><code>${esc(JSON.stringify(a))}</code></li>`).join('')}</ul>` : '<span class="muted">none listed</span>'}</dd></dl><div class="actions"><button type="button" class="primary" data-confirm-execute ${s.token && !busy ? '' : 'disabled'}>Confirm ${esc(s.label.toLowerCase())}</button><button type="button" class="quiet" data-confirm-cancel ${busy ? 'disabled' : ''}>Cancel</button></div></section>`;
+  return `<section class="note" data-confirm-sheet data-confirm-kind="${esc(s.kind)}"><p class="eyebrow">Confirm: ${esc(s.label)}${s.who ? ` · ${esc(s.who)}` : ''}</p><p data-confirm-sentence>${esc(sheetSentence(s, scope))}</p><details class="small"><summary>Details</summary><p class="small">Nothing has changed yet. Confirmation expires in ${esc(s.expiresIn ?? '')} seconds.</p><dl class="small" data-impact><dt>Effect</dt><dd>${esc(i.effect ?? '')}</dd><dt>Irreversible</dt><dd>${esc(String(i.irreversible ?? ''))}</dd><dt>Compensating control</dt><dd>${esc(i.compensating_control ?? '')}</dd><dt>Affected</dt><dd>${affected.length ? `<ul>${affected.map(a => `<li><code>${esc(JSON.stringify(a))}</code></li>`).join('')}</ul>` : '<span class="muted">none listed</span>'}</dd></dl></details><div class="actions"><button type="button" class="primary" data-confirm-execute ${s.token && !busy ? '' : 'disabled'}>Confirm ${esc(s.label.toLowerCase())}</button><button type="button" class="quiet" data-confirm-cancel ${busy ? 'disabled' : ''}>Cancel</button></div></section>`;
 }

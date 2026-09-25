@@ -291,3 +291,26 @@ test('L9-23 less text (captain 17:05): every setup screen = one heading, at most
   assert.match(screens.information, /Answers are grouped, never shown alone\./); assert.equal((screens.information.match(/never shown alone/g) || []).length, 1, 'privacy line once, not per group');
   assert.match(screens.done, /Learn more<\/summary><p class="muted">Nothing was sent to anyone\./);
 });
+
+test('B20 (Bincy SI 04): step 2 groups surveys under one heading per perspective, each with the About page line', async () => {
+  const { PERSPECTIVES } = await import('../assess/scope.js');
+  const templates = [
+    { id: 'c1', version: 1, perspective: 'Church', name: 'Involved-Pastor' }, { id: 'c2', version: 1, perspective: 'Church', name: 'Uninvolved-Pastor' },
+    { id: 'm1', version: 1, perspective: 'Community', name: 'Community' }, { id: 't1', version: 1, perspective: 'Translation Team', name: 'Mid-Level' },
+  ];
+  const html = renderStep('participants', { ...freshDraft(), groups: { c1: { version: 1, expected: '' } } }, { templates });
+  for (const [, , line] of PERSPECTIVES) assert.equal((html.match(new RegExp(`>${line}<`, 'g')) || []).length, 1, line);
+  assert.equal((html.match(/<h3>Church<\/h3>/g) || []).length, 1, 'one heading per perspective, not per survey');
+  assert.ok(html.indexOf('Experience of its use') < html.indexOf('Involved-Pastor'), 'description above its surveys');
+  assert.match(html, /Mid-Level/); assert.equal((html.match(/name="g"/g) || []).length, 4, 'every survey still selectable');
+  assert.doesNotMatch(renderStep('participants', freshDraft(), { templates: [{ id: 'x', version: 1, perspective: 'Reviewer', name: 'R' }] }), /Experience of/);
+});
+
+test('B36 launched screen: one labelled row per group (group · survey) with Copy link and Show QR code; still one primary', () => {
+  const tpls = [{ id: 'tpl.team', version: 1, name: 'Team', perspective: 'Translation team' }, { id: 'tpl.comm', version: 1, name: 'Listening', perspective: 'Community' }];
+  const h = renderDone({ aid: 'a1', links: [{ survey: 's1', template: 'tpl.team', entry_fragment: '#survey=AAA' }, { survey: 's2', template: 'tpl.comm', entry_fragment: '#survey=BBB' }] }, 'https://x', tpls);
+  assert.match(h, /Translation team <span aria-hidden="true">·<\/span> Team/); assert.match(h, /Community <span aria-hidden="true">·<\/span> Listening/);
+  assert.equal((h.match(/data-group-copy="s[12]"/g) || []).length, 2); assert.equal((h.match(/data-group-qr="s[12]"/g) || []).length, 2);
+  assert.match(h, /#survey=AAA/); assert.match(h, /#survey=BBB/);
+  assert.equal((h.match(/class="primary"/g) || []).length, 1);
+});

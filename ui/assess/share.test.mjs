@@ -171,3 +171,77 @@ test('late issue after actual shell route departure cannot retain credential on 
  assert.equal(m.share.link,null);assert.equal(m.clipboard.text,null);
  assert.notEqual(shareFor(m.state,'a1','s1',1),m.share);
 });
+
+// B36 (Bincy): Copy link and Show QR code per group on the launched screen and on Collect — the same shared rows.
+test('B36 groupLinks: one labelled row per group (group · survey), Copy + QR as secondary buttons, no primary', async () => {
+  const { groupLinks } = await import('./share.js');
+  const h = groupLinks(ctx, [{ key: 's1', group: 'Translation team', survey: 'Validation', url: 'https://x/participate/#survey=T1' }, { key: 's2', group: 'Community', survey: 'Listening' }]);
+  assert.equal((h.match(/data-group-link=/g) || []).length, 2);
+  assert.match(h, /Translation team <span aria-hidden="true">·<\/span> Validation/); assert.match(h, /Community <span aria-hidden="true">·<\/span> Listening/);
+  assert.equal((h.match(/data-group-copy=/g) || []).length, 2); assert.equal((h.match(/data-group-qr=/g) || []).length, 2);
+  assert.match(h, new RegExp(`>${copy.copyLink}<`)); assert.match(h, new RegExp(`>${copy.qr}<`));
+  assert.doesNotMatch(h, /class="primary"/);
+});
+
+function fakeRow(key) {
+  const mk = (extra = {}) => ({ attrs: {}, textContent: '', innerHTML: '', hidden: true, className: '', dataset: {}, setAttribute(k, v) { this.attrs[k] = v; }, ...extra });
+  const status = mk(), fig = mk(), row = { querySelector: sel => sel === '[data-group-status]' ? status : sel === '[data-group-qr-figure]' ? fig : null };
+  const btn = ds => mk({ dataset: ds });
+  const copyBtn = btn({ groupCopy: key }); const qrBtn = btn({ groupQr: key });
+  copyBtn.closest = sel => sel === '[data-group-link]' ? row : copyBtn; qrBtn.closest = sel => sel === '[data-group-link]' ? row : qrBtn;
+  return { status, fig, copyBtn, qrBtn };
+}
+test('B36 bindGroupLinks: Copy copies that group\'s link in one tap; QR shows and hides that group\'s code', async () => {
+  const { bindGroupLinks } = await import('./share.js');
+  let handler; const root = { addEventListener: (ev, fn) => { handler = fn; } };
+  const clipboard = { text: null, async writeText(t) { this.text = t; } };
+  const urls = { s1: 'https://x/participate/#survey=AAA', s2: 'https://x/participate/#survey=BBB' }; const asked = [];
+  bindGroupLinks(root, { resolve: async k => { asked.push(k); return urls[k]; }, clipboard });
+  const r2 = fakeRow('s2');
+  await handler({ target: r2.copyBtn });
+  assert.equal(clipboard.text, urls.s2); assert.equal(r2.status.textContent, copy.copied); assert.deepEqual(asked, ['s2']);
+  await handler({ target: r2.qrBtn });
+  assert.equal(r2.fig.hidden, false); assert.match(r2.fig.innerHTML, /<svg/); assert.equal(r2.qrBtn.textContent, copy.hideQr);
+  await handler({ target: r2.qrBtn });
+  assert.equal(r2.fig.hidden, true); assert.equal(r2.qrBtn.textContent, copy.qr);
+  const bad = fakeRow('s9'); await handler({ target: bad.copyBtn });
+  assert.match(bad.status.className, /alert/);
+});
+
+test('B36 issueLink: one tap = dry_run then execute on that survey; returns the participant URL; Collect wires it in assess.js', async () => {
+  const { issueLink } = await import('./share.js');
+  const { api, calls } = fakeApi({ [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct1', expires_in: 300 } : { link_id: 'inv_1', entry_fragment: '#survey=TOK', expires_at: null } });
+  const link = await issueLink(api, { aid: 'a1', sid: 's1', origin: 'https://example.test' });
+  assert.deepEqual(calls.map(c => c.body.mode), ['dry_run', 'execute']); assert.equal(calls[1].body.confirm_token, 'ct1');
+  assert.equal(link.id, 'inv_1'); assert.match(link.url, /^https:\/\/example\.test\/.*#survey=TOK$/);
+  const src = read('./assess.js');
+  assert.match(src, /share\.groupLinks\(\{ esc \}, \[\{ key: s\.id \}\]\)/);
+  assert.match(src, /share\.bindGroupLinks\(root/); assert.match(src, /share\.issueLink\(api/); assert.match(src, /state\.collectLinks\.clear\(\)/);
+  assert.doesNotMatch(src.slice(src.indexOf('function bindCollectLinks'), src.indexOf('function collectPanel')), /localStorage|sessionStorage|console\./);
+});
+
+test('B36 follow-up: an uncertain Collect failure keeps the Share card warning and never silently mints a second link', async () => {
+  const { issueLink, cachedLink, bindGroupLinks, groupLinks } = await import('./share.js');
+  for (const exec of [err('NETWORK', 0), { link_id: 'x' }]) { // lost response; incomplete receipt
+    const { api, calls } = fakeApi({ [LINKS]: ({ body }) => body.mode === 'dry_run' ? prepared : exec });
+    const cache = new Map(); let handler; const root = { addEventListener: (ev, fn) => { handler = fn; } };
+    bindGroupLinks(root, { resolve: k => cachedLink(cache, k, () => issueLink(api, { aid: 'a1', sid: k, origin: 'https://example.test' })), clipboard: { async writeText() {} } });
+    const r = fakeRow('s1');
+    await handler({ target: r.copyBtn });
+    assert.equal(r.status.textContent, copy.uncertain); assert.match(r.status.className, /alert/);
+    assert.deepEqual(cache.get('s1'), { uncertain: true }); assert.equal(calls.filter(c => c.body.mode === 'execute').length, 1);
+  }
+  // a certain failure (nothing created) clears the key; an uncertain mark stays: every later tap (even after a repaint wiped the
+  // row message) shows the warning again and issues nothing
+  const cache = new Map(); let n = 0;
+  await assert.rejects(cachedLink(cache, 'k', async () => { throw Object.assign(new Error('x'), { uncertain: false }); })); assert.equal(cache.has('k'), false);
+  await assert.rejects(cachedLink(cache, 'k', async () => { n++; throw Object.assign(new Error('x'), { uncertain: true }); }));
+  assert.deepEqual(cache.get('k'), { uncertain: true });
+  for (let i = 0; i < 2; i++) await assert.rejects(cachedLink(cache, 'k', async () => { n++; return { url: 'u' }; }), e => e.uncertain === true && e.shareMessage === copy.uncertain);
+  assert.equal(n, 1); assert.deepEqual(cache.get('k'), { uncertain: true });
+  const ok = new Map(); assert.equal((await cachedLink(ok, 'k', async () => { n++; return { url: 'u' }; })).url, 'u');
+  assert.equal((await cachedLink(ok, 'k', async () => { n++; return { url: 'v' }; })).url, 'u'); assert.equal(n, 2);
+  // Collect rows show only the buttons (group and survey are in the heading just above); the footer line is gone
+  assert.doesNotMatch(groupLinks(ctx, [{ key: 's1' }]), /data-group-label/);
+  assert.doesNotMatch(read('./assess.js'), /Open a survey to share its link or print a blank questionnaire/);
+});

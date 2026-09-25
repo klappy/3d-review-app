@@ -53,14 +53,34 @@ test('A1/A2 understand: each survey shows its own counts; lens sums responses on
   assert.ok(!calls.some(c => c.url.includes('/surveys/s4')), 'archived survey is not counted');
 });
 
-test('A3 results: the held literal with the server reason; no numbers or bands', async () => {
+test('A3 results: the held literal with one plain line (U05), never the server policy code; no numbers or bands', async () => {
   const { api } = fakeApi(understandTable); const ctx = ctxFor(api);
   const html = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
-  const panel = html.slice(html.indexOf('data-results>'), html.indexOf('data-reports>'));
-  assert.match(panel, /<span class="badge">held<\/span>/);
-  assert.match(panel, /data-results-reason>D7 scoring, threshold, and differencing policy unresolved</);
+  const panel = html.slice(html.indexOf('data-v3-band-held>'), html.indexOf('</p>', html.indexOf('data-v3-band-held>')));
+  assert.match(panel, /data-v3-band-held>Results appear after a report is built from at least three responses per group\./);
+  assert.equal((html.match(/Results appear after a report is built/g) || []).length, 1, 'one plain line, shown once (not again behind Learn more)');
+  assert.doesNotMatch(html, /D7 scoring/);
   assert.doesNotMatch(panel, /\b\d+\b/); // no numbers, no "0"
-  assert.doesNotMatch(panel, /band/i);
+});
+
+// U05 validator (lanes-1510): no rendered results / evidence / report output ever carries the server reason string.
+test('U05: server reason never rendered — results, opened evidence table, held reports list, held opened report', async () => {
+  const D7 = 'D7 scoring, threshold, and differencing policy unresolved';
+  const { api } = fakeApi({ ...understandTable, 'GET /v2/assessments/a1/reports': { suppressed: true, status: 'held', reason: D7 }, 'GET /v2/reports/rep_h': { suppressed: true, reason: D7 } });
+  const ctx = ctxFor(api); const m = await views.understand.load(ctx, { aid: 'a1' });
+  for (const showEvidence of [false, true]) {
+    m.showEvidence = showEvidence;
+    const html = views.understand.render(ctx, m);
+    assert.doesNotMatch(html, /D7|differencing policy/, `evidence ${showEvidence ? 'open' : 'closed'}: no server reason`);
+    assert.equal((html.match(/Results appear after a report is built/g) || []).length, 1, 'plain held line once');
+    if (showEvidence) assert.match(html, /Held until a report is built/);
+    assert.match(html, /data-reports-held>Reports are held for now\.</);
+  }
+  const btn = el({ tag: 'button', 'data-open-report': 'rep_h' }), status = el({ 'data-report-status': '' });
+  makeRoot([btn, status, { attrs: { 'data-report-view': '' }, replaceChildren() {} }]);
+  views.understand.bind(ctx, root, m); await btn.onclick();
+  assert.equal(status.textContent, 'This report is held for now.');
+  assert.doesNotMatch(views.understand.render(ctx, m), /D7|differencing policy/);
 });
 
 test('Reports: server list plus preview control for exact assessment editor', async () => {
@@ -103,7 +123,7 @@ test('R-1: held, refused and render-failure outcomes show in the visible Reports
   const html = views.understand.render(ctx, m); const statusIdx = html.indexOf('data-report-status'), fullIdx = html.indexOf('data-report-full');
   assert.ok(statusIdx > -1 && fullIdx > -1 && statusIdx < fullIdx, 'status markup precedes the hidden full section (not nested in it)');
   assert.ok(!html.slice(fullIdx).includes('data-report-status'), 'no status element inside the hidden full section');
-  await buttons[0].onclick(); assert.equal(status.textContent, 'held by policy'); assert.equal(full.hidden, true); assert.deepEqual(viewKids, []);
+  await buttons[0].onclick(); assert.equal(status.textContent, 'This report is held for now.'); assert.equal(full.hidden, true); assert.deepEqual(viewKids, []);
   await buttons[1].onclick(); assert.equal(status.textContent, NOT_VISIBLE); assert.equal(full.hidden, true); assert.deepEqual(viewKids, []);
   await buttons[2].onclick(); assert.equal(m.openReport.status, 'error'); assert.equal(status.textContent, 'This report could not be displayed.'); assert.equal(full.hidden, true);
   for (const b of buttons) assert.equal(b.disabled, false);
@@ -115,7 +135,7 @@ test('A6 reports 404 → unavailable; results/counts failures are per-part, neve
   assert.match(html, /data-reports-unavailable>Reports are unavailable/);
   assert.match(html, /data-count="s2" role="alert">count unavailable/);
   assert.match(html, /data-lens-sum="Translation Team">3 responses across 1 of 2 surveys <strong>\(partial\)/);
-  assert.match(html, /data-results-reason>D7/);
+  assert.match(html, /data-v3-band-held>Results appear after a report is built/); // U05
 });
 
 test('A7 improve viewer: read-only notes, no save control, visibility line; text escaped', async () => {

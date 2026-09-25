@@ -9,8 +9,10 @@
 // location or the router itself. deps.go(hash) is the shell's navigation.
 
 import { shareUrl } from '../shared-link.js';
+import { groupLinks, bindGroupLinks } from '../assess/share.js';
 import { stepper as stepperComponent, ensureStepperStyle } from './components/stepper.js';
 import { learnMore } from './components/learn-more.js';
+import { PERSPECTIVES } from '../assess/scope.js';
 
 export const STEPS = ['details', 'participants', 'information', 'review'];
 // Step names follow Bincy's screen inventory 03–06 (cookbook @933eb5f sources/bincy-design-sprint-2026-09-22/01_documents/04_screen_inventory.md).
@@ -182,6 +184,13 @@ export function expectedFor(surveyId, store = safeStore()) {
 // ---------- views (pure string renderers) ----------
 // component: Stepper (ruling 12:34) — the wizard composes the shared component; it keeps no copy of its own.
 export const stepper = n => stepperComponent(STEP_TITLES, n, { label: 'Setup steps' });
+// B20 (Bincy SI 04): step 2 groups surveys under one heading per perspective, each with the About page's one line (composed, not copied).
+export const perspectiveNote = p => { const k = pdot(p).slice(2); const hit = PERSPECTIVES.find(([key]) => key === k); return hit ? hit[2] : ''; };
+export function byPerspective(templates = []) {
+  const groups = new Map();
+  for (const t of templates) { const k = String(t.perspective ?? ''); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t); }
+  return [...groups.entries()];
+}
 // Captain order 17:05 (lane 9 less text): one heading, at most one short line, one primary action; the rest goes in `more` (shared Learn more).
 const head = (n, h, sub, more = '') => `<div class="eyebrow">Start a 3D Review · step ${n} of ${STEP_TITLES.length}</div>${stepper(n)}<h1 class="wz-h">${h}</h1>${sub ? `<p class="muted wz-sub">${sub}</p>` : ''}${learnMore(more)}`;
 const errBox = errs => errs?.length ? `<div class="note alert" role="alert">${errs.map(esc).join('<br>')}</div>` : '';
@@ -215,9 +224,10 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
     </form>`;
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Choose the groups you can reach.', '<p class="muted">Three perspectives, kept separate.</p><p class="muted">The number is optional. Leave it empty if you don\'t know for sure; counts then show as "n responded". Groups you leave out can be added later.</p>')}${errBox(errs)}
     <form data-wz-form="participants">
-      ${templates.length ? templates.map(t => { const g = d.groups[t.id]; return `<div class="group${g ? ' on' : ''}"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span>
-        <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(t.version)}"${g ? ' checked' : ''}><span><h3>${esc(t.perspective)}</h3><span class="sub">${esc(t.name)}</span></span></label>
-        <div class="gin"><label for="n-${esc(t.id)}">How many do you expect?</label><input type="number" id="n-${esc(t.id)}" name="n-${esc(t.id)}" min="1" step="1" inputmode="numeric" value="${g && g.expected ? esc(g.expected) : ''}" placeholder="optional"></div></div>`; }).join('')
+      ${templates.length ? byPerspective(templates).map(([p, ts]) => `<div class="wz-pgroup"><div class="wz-persp"><span class="pdot ${pdot(p)}" aria-hidden="true"></span><div><h3>${esc(p)}</h3>${perspectiveNote(p) ? `<p class="small muted wz-pnote">${esc(perspectiveNote(p))}</p>` : ''}</div></div>
+        ${ts.map(t => { const g = d.groups[t.id]; return `<div class="group${g ? ' on' : ''}">
+        <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(t.version)}"${g ? ' checked' : ''}><span class="wz-sname">${esc(t.name)}</span></label>
+        <div class="gin"><label for="n-${esc(t.id)}">How many do you expect?</label><input type="number" id="n-${esc(t.id)}" name="n-${esc(t.id)}" min="1" step="1" inputmode="numeric" value="${g && g.expected ? esc(g.expected) : ''}" placeholder="optional"></div></div>`; }).join('')}</div>`).join('')
         : '<p class="muted">No published surveys are available to this account.</p>'}
       ${actions(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
@@ -242,11 +252,13 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
     ${locked ? `<div class="actions"><button type="button" class="rv-btn quiet" data-wz="cancel">Leave setup (what was created stays; nothing was sent)</button><span class="spacer"></span><button type="button" class="primary" data-wz="launch">Continue the launch</button></div>` : actions(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
 }
 
-function linkList(links, origin, templates) {
-  const name = id => (templates.find(t => t.id === id) || {}).perspective || id;
+// B36: one row per group (group · survey) with Copy link and Show QR code — the Share card's shared rows (assess/share.js).
+export function linkRows(links, origin, templates) {
+  const tpl = id => templates.find(t => t.id === id) || {};
   const url = l => { try { return shareUrl(origin, l.entry_fragment); } catch { return ''; } };
-  return `<ul class="wz-links">${links.map(l => `<li><label>${esc(name(l.template))}<input readonly value="${esc(url(l))}"></label></li>`).join('')}</ul>`;
+  return links.map(l => ({ key: l.survey || l.template, group: tpl(l.template).perspective || l.template, survey: tpl(l.template).name || 'Survey', url: url(l) }));
 }
+function linkList(links, origin, templates) { return `<div class="wz-links">${groupLinks({ esc }, linkRows(links, origin, templates))}</div>`; }
 export function renderDone(ctx, origin = '', templates = []) {
   return `<div class="eyebrow">Launched</div><h1 class="wz-h">The review is collecting responses</h1>
     <p class="muted">Share each link with its group.</p>${learnMore('<p class="muted">Nothing was sent to anyone.</p>')}
@@ -277,6 +289,7 @@ export function mountWizard(root, deps) {
     e.preventDefault(); if (s.partial || s.busy) return; read(e.target);
     s.errs = validateStep(s.step, s.d); if (!s.errs.length) s.step = STEPS[STEPS.indexOf(s.step) + 1] || s.step; paint();
   }, on);
+  bindGroupLinks(root, { signal: ac.signal, resolve: async key => (linkRows((s.done || s.partial || {}).links || [], deps.origin || '', latestTemplates(s.data.templates)).find(r => r.key === key) || {}).url });
   root.addEventListener('click', async e => {
     const b = e.target.closest('[data-wz]'); if (!b) return;
     const act = b.dataset.wz; s.errs = [];

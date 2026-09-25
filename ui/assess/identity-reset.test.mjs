@@ -114,7 +114,7 @@ test('account email read forbids redirect, does not repaint work and ignores sta
 });
 test('account email is text only and failures remove previous email',async()=>{
   const h=harness();h.setFetch(async()=>({ok:true,json:async()=>({email:'<synthetic>@example.invalid'})}));await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Account: <synthetic>@example.invalid');
-  h.setFetch(async()=>{throw Error('redirect');});await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Account email unavailable.');
+  h.setFetch(async()=>{throw Error('redirect');});await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Signed in');
 });
 
 for (const outcome of ['resolve', 'reject']) test(`provider logout ${outcome} cannot navigate or clear a replacement identity`, async () => {

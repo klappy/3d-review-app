@@ -11,11 +11,7 @@
 .rv #participant .participant-meta{font-size:14px;color:var(--secondary);margin:4px 0}
 .rv #participant .participant-start{display:block;width:100%;min-height:48px;margin:18px 0 8px;font-size:16px}
 .rv #participant .participant-foot{text-align:center;font-size:13px;color:var(--secondary)}
-.rv #participant .participant-pager{display:flex;flex-direction:column}
-.rv #participant .participant-bar{order:-1;display:flex;gap:4px;margin:4px 0 6px}
-.rv #participant .participant-bar span{flex:1;height:6px;border-radius:3px;background:var(--bincy-edge,#dde3e8)}
-.rv #participant .participant-bar span.done{background:var(--bincy-teal,var(--primary,#0f766e))}
-.rv #participant .participant-page-actions{display:flex;justify-content:space-between;gap:12px}
+/* B24: pager layout + segmented progress bar live in /participant-bar.css, shared with /participate/. */
 .rv #participant .participant-page-error{color:var(--warning-ink);background:var(--warning-fill);padding:12px;border-radius:var(--r-button)}
 .rv #participant .participant-change{display:block;margin-top:6px;min-height:36px}
 .rv #participant #questions fieldset{min-width:0;max-width:640px;margin:0 auto 18px;border:0;padding:0}
