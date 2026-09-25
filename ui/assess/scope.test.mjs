@@ -98,7 +98,7 @@ test('project (owner): assessment cards link to #assessment/<id> with language n
   const ctx = ctxWith({ 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'owner', organization: 'Org' }, languages: [] }, 'GET /v2/projects/p1/assessments': { assessments: [{ id: 'a1', name: 'Sept', stage: 'collect', language_id: 'l1' }] }, 'GET /v2/projects/p1/languages': { languages: [{ id: 'l1', name: 'Lake', code: 'qaa', archived_at: null }, { id: 'l2', name: 'Old', code: null, archived_at: '2026-01-01' }] } });
   const h = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
   assert.ok(h.includes('href="#assessment/a1"')); assert.ok(h.includes('Language: Lake')); assert.ok(h.includes('Collecting'));
-  assert.ok(h.includes('id="rename-form"')); assert.ok(h.includes('href="#permissions/projects/p1"')); assert.ok(h.includes('Org'));
+  assert.ok(!h.includes('id="rename-form"') && !h.includes('<h2>Rename</h2>'), 'B07: no rename card; the heading carries the edit control'); assert.ok(h.includes('href="#permissions/projects/p1"')); assert.ok(h.includes('Org'));
   // B34 (Bincy F03): Start is the ONLY create action; no create-assessment / add-language forms, not even behind "More".
   assert.equal(h.match(/data-v3-start href="#new"/g).length, 1); for (const gone of ['id="create-assessment"', 'id="add-language"', 'id="project-more"', 'Create an assessment', 'Create &amp; prepare', 'Create & prepare', '>Add language<']) assert.ok(!h.includes(gone), gone);
 });
@@ -312,7 +312,7 @@ test('project with assessments AND languages both failing renders two Retry cont
     map['GET /v2/projects/p1/assessments'] = { assessments: [] }; map['GET /v2/projects/p1/languages'] = { languages: [{ id: 'l1', name: 'Lake', code: 'qaa', archived_at: null }] };
     await buttons[which].fire('click');
     assert.equal(ctx.calls.length - before, 3, `retry #${which} re-ran the project load (project + assessments + languages)`);
-    assert.ok(root.querySelector('#rename-form'), `retry #${which}: page re-rendered from the fresh model`);
+    assert.ok(root.querySelector('[data-v3-start]'), `retry #${which}: page re-rendered from the fresh model`);
     assert.equal(root.querySelectorAll('[data-act="retry"]').length, 0, 'no failure state remains after both reads succeed');
   }
 });

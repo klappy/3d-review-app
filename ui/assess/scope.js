@@ -6,6 +6,7 @@
 // v3 lane 9 L9-1: projects page = home per Bincy screen 02 (relative import so node tests resolve it too).
 import { homeView } from '../v3/home.js';
 import { learnMore } from '../v3/components/learn-more.js';
+import { mountEditableHeading } from '../v3/components/editable-heading.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -104,16 +105,19 @@ function hero(ctx, signedIn) {
   // Sign in goes straight to the real provider; sandbox sign-in only by explicit choice (#signin). Retired labels never return.
   const choices = `<nav class="public-choices actions" aria-label="Choose where to start" style="margin-top:0"><a class="rv-btn" href="#about">Read about it</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a>${signedIn ? '' : '<a class="rv-btn primary" href="/v2/auth/access">Sign in</a>'}</nav>`; // B02: a signed-in home never offers Sign in
   // Captain order 17:05 (lane 9, L9-22) "less text": public home = the four choices, one heading, one short line; everything else behind Learn more.
-  return `<section class="hero panel" id="public-home">${choices}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">Hear from the translation team, the community and the church, then choose what to do next.</p>${learnMore(`<p class="muted">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p>${perspectivesRow(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a>${signedIn ? '' : ' · <a href="#signin">Sandbox test identities (dev only) — not a real sign-in</a>'}</p><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p>`)}</section>${continueCards}`;
+  return `<section class="hero panel" id="public-home">${choices}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">${LEAD}</p>${learnMore(`<p class="muted">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p>${perspectivesRow(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a>${signedIn ? '' : ' · <a href="#signin">Sandbox test identities (dev only) — not a real sign-in</a>'}</p><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p>`)}</section>${continueCards}`;
 }
 function surveyView(ctx) {
   return `<section class="panel narrow"><p class="eyebrow">For participants</p><h1>Your feedback starts with your invitation.</h1><p class="muted">Open the survey link or scan the QR code someone shared with you. If you were given an access code, enter it below.</p><p><a class="button" href="/participate/?demo=1">Try a sample survey — nothing is sent</a></p><form id="code-form"><label class="field">Access code<input name="code" required autocomplete="off" maxlength="64"></label><div class="actions"><button class="primary" type="submit">Open my survey</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form><p class="small muted">Missing your survey link? Ask the person who invited you or shared the survey to send you the link. You do not need an account to follow a participant link.</p></section>`;
 }
 // Captain ruling 12:53 (lane 1, L1-16): a real public About page at #about — never a sign-in panel. Cards via ctx.cards.card (shared card component).
+// B30: About and the public home share one short line (composed, not copied).
+const LEAD = 'Hear from the translation team, the community and the church, then choose what to do next.';
 const WHO = [['Who it is for', 'Translation teams, the communities they serve and the churches using the translation — with a facilitator who runs the review.'], ['When to use it', 'When your project is ready to pause, reflect and learn from feedback.'], ['How often', 'Repeat when a new assessment would be useful — for example, between books or publishing iterations.']];
 export function aboutView(ctx) {
-  const facts = WHO.map(([t, s]) => ctx.cards.card({ eyebrow: 'About', title: t, meta: [s] })).join('');
-  return `<section class="glass panel narrow" id="about-page"><a class="back" href="#">← Back to home</a><p class="eyebrow">About 3D Review</p><h1>Three perspectives. One useful next step.</h1><p class="muted lead">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps. A facilitator sets up a review, each group answers a short survey, and the results show where the project is strong and where it needs support.</p><h2>The three perspectives</h2>${perspectivesRow(ctx)}<div class="project-grid">${facts}</div><div class="actions"><a class="rv-btn primary" href="#">Back to home</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a></div></section>`;
+  // B30: behind Learn more the three facts are plain label + line pairs (no card headings: one heading per screen).
+  const facts = WHO.map(([t, s]) => `<p><strong>${ctx.esc(t)}</strong></p><p class="muted">${ctx.esc(s)}</p>`).join('');
+  return `<section class="glass panel narrow" id="about-page"><a class="back" href="#">← Back to home</a><p class="eyebrow">About 3D Review</p><h1>Three perspectives. One useful next step.</h1><p class="muted lead">${LEAD}</p>${perspectivesRow(ctx)}${learnMore(`<p class="muted">A facilitator sets up a review.</p><p class="muted">Each group answers a short survey.</p><p class="muted">The results show where the project is strong and where it needs support.</p>${facts}`)}<div class="actions"><a class="rv-btn primary" href="#">Back to home</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a></div></section>`;
 }
 function signinView(ctx, model) {
   const s = model.signin;
@@ -214,7 +218,7 @@ function pageBack(ctx, href, label) { return ctx.shellOwnsTitle === true ? '' : 
 // The read head carries role/archived state and the permissions link; the heading itself follows the host contract above.
 function kitHead(ctx, r, extra = '') { return `${pageHead(ctx, r)}<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}"><p class="muted small" style="margin:0">${r.role ? `Your role: ${ctx.esc(r.role)}` : ''}</p><div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>`; }
 const readRegion = html => `<div data-read-region class="kit-read">${html}</div>`;
-const actionRegion = html => html ? `<section data-action-region class="legacy-actions" aria-label="Existing controls (kit conversion pending)">${html}</section>` : '';
+const actionRegion = html => html ? `<section data-action-region class="legacy-actions" aria-label="More actions">${html}</section>` : '';
 
 // ---------- workspaces ----------
 const workspaces = {
@@ -347,7 +351,7 @@ const project = {
   },
   render(ctx, model) {
     const g = gate(ctx, model, { href: ctx.routes.projects, label: 'All projects' }); if (g) return g;
-    const p = model.project, edit = CAN_EDIT.has(p.role), owner = p.role === 'owner';
+    const p = model.project, edit = CAN_EDIT.has(p.role);
     const langName = new Map(model.languages.map(l => [l.id, l.name]));
     const cards = model.assessments.map(a => ctx.cards.assessmentCard({ ...a, language_name: langName.get(a.language_id) || a.language_name }));
     const assessmentsBlock = model.assessmentsStatus === 'loaded' ? ctx.cards.cardGrid(cards, 'No assessments yet.')
@@ -355,7 +359,6 @@ const project = {
       : model.assessmentsStatus === 'unauthenticated' ? `<p class="muted">Your session has ended. <a href="${ctx.routes.entry}">Sign in</a></p>`
       : `<p class="muted">${ctx.esc(model.assessmentsError)}</p><div class="actions"><button type="button" class="primary" data-act="retry">Retry</button></div>`;
     const langList = model.languages.length ? `<div class="links">${model.languages.map(l => `<p class="small">${ctx.esc(l.name)}${l.code ? ` <span class="muted">(${ctx.esc(l.code)})</span>` : ''}${l.archived_at ? ' <span class="badge">Archived</span>' : ''}</p>`).join('')}</div>` : '<p class="muted">No languages yet.</p>';
-    const rename = owner ? `<section class="panel"><h2>Rename</h2><form id="rename-form"><label class="field">Project name<input name="name" maxlength="100" required value="${ctx.esc(p.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
     // Lane 11 (LANES.md claim 11:19): retained surfaces (cookbook design-system-v3 PARITY.md, ADOPTION item 7) reachable from project
     // settings. Links only, to the existing screens; no new capability, contract unchanged. Access codes (C3) live on the legacy facilitator page.
     const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue paper codes for one survey and release them once to print (choose the assessment and survey there)', href: '/legacy/#facilitator', label: 'Open access codes' },
@@ -367,18 +370,22 @@ const project = {
     const assessmentsRead = r.assessments.status === 'ready' ? kitGrid(ctx, r.assessments.items, 'No assessments yet.') : assessmentsBlock;
     const languagesRead = r.languages.status === 'ready' ? langList : r.languages.status === 'refused' ? '<p class="muted">Languages are not visible to you here.</p>' : r.languages.status === 'unauthenticated' ? `<p class="muted">Your session has ended. <a href="${ctx.routes.entry}">Sign in</a></p>` : '<p class="muted" role="alert">Languages could not be loaded. <button type="button" class="quiet" data-act="retry">Retry</button></p>';
     return pageBack(ctx, ctx.routes.projects, 'All projects') + readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/projects/${ctx.enc(p.id)}">Permissions</a>`)}${p.organization ? `<p class="muted small">${ctx.esc(p.organization)}</p>` : ''}<h3>Assessments</h3>${assessmentsRead}<aside class="glass panel" style="margin-top:22px"><h3>Languages</h3>${languagesRead}</aside>`)
-      + actionRegion(`${edit ? START_REVIEW : ''}${rename}${settings}`);
+      + actionRegion(`${edit ? START_REVIEW : ''}${settings}`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, project, model);
     const id = model.project?.id;
     const reload = async () => { const next = await project.load(ctx, model.params); swap(ctx, root, project, next); };
-    root.querySelector('#rename-form')?.addEventListener('submit', async ev => {
-      ev.preventDefault();
-      const form = ev.target;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Rename', () => ctx.api(`/v2/projects/${ctx.enc(id)}`, { method: 'PATCH', body: { name: val(form, 'name') } }));
-      if (r) { ctx.note('Renamed.'); await reload(); }
-    });
+    // B07: the project name is the heading (kit shell's or the page's own); owners rename it in place — no rename card.
+    const heading = (root.closest?.('[role=main]') || root).querySelector?.('h1');
+    const eh = mountEditableHeading(heading, { canEdit: model.project?.role === 'owner', label: 'project name', save: async name => {
+      let reason = ''; // the refusal is shown in the heading's field (like the assessment rename); if that field is gone, in the page note
+      const quiet = Object.create(ctx, { note: { value: (text, alert) => { if (alert) reason = text; else ctx.note(text, alert); } } });
+      const r = await write(quiet, null, 'Rename', () => ctx.api(`/v2/projects/${ctx.enc(id)}`, { method: 'PATCH', body: { name } }));
+      if (!r) { if (reason && !eh?.isOpen()) ctx.note(reason, true); throw new Error(reason || 'The name was not saved.'); } // Bugbot 4108644481: never silent
+      const cached = ctx.state?.projects?.find?.(x => x.id === id); if (cached) cached.name = r.project?.name || name; // shell title + crumbs read this cache
+      ctx.note('Renamed.'); await reload();
+    } });
   },
 };
 

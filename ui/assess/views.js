@@ -7,7 +7,7 @@
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
 import { learnMore } from '../v3/components/learn-more.js'; // lane 9 L9-24: shared closed-by-default disclosure
-import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, V3_HELD_TEXT, V3_REPORTS_HELD, V3_REPORT_HELD } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
+import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, V3_HELD_TEXT, V3_REPORTS_HELD, V3_REPORT_HELD, V3_BAND_CUTOFFS } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -35,7 +35,7 @@ export const css = `
 // Classify an api() failure into the four honest states the contract names. Never a generic retry for NOT_BUILT.
 // Display helpers (readable, not new data): the payload and provenance are untouched — only the rendered text is rounded, with the
 // exact value kept on the element (title + data-exact). IDs/timestamps stay available inside <details>.
-export function humanDate(iso) { const d = new Date(iso); return isNaN(d) ? String(iso || '') : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
+import { humanDate } from './cards.js'; export { humanDate }; // one shared date formatter (moved to cards.js so permissions composes it too, B31)
 export function readableNumbers(rootEl) {
   if (!rootEl || !rootEl.ownerDocument) return 0;
   const doc = rootEl.ownerDocument, walker = doc.createTreeWalker(rootEl, 4 /* NodeFilter.SHOW_TEXT */); const nodes = []; let n; let count = 0;
@@ -56,6 +56,18 @@ export function classify(e) {
 }
 const settle = p => p.then(value => ({ status: 'loaded', value }), e => ({ status: classify(e), error: String(e?.message || 'Request could not be completed.') }));
 const isEditor = role => role === 'owner' || role === 'member';
+// B35 (lanes-1321): bands come from a built report. While none is built and some perspective already has enough responses
+// (the provisional minimum), the band block itself offers the one next action; it opens the SAME preview → confirm as
+// "Preview report build" below, shown right here in the band block (never builds without the confirm).
+export function buildResultsCta(m, lensGroups, esc) {
+  if (m.bandScores || m.resultsBuilt || !isEditor(m.role)) return '';
+  // Bugbot 4108654385: offered only when the report list is known and empty; an existing report (or an unknown list) never
+  // invites a second immutable build.
+  const rv = m.reports?.status === 'loaded' ? m.reports.value : null;
+  if (!rv || rv.suppressed || rv.status === 'held' || !Array.isArray(rv.reports) || rv.reports.length) return '';
+  const min = V3_BAND_CUTOFFS.minResponses, ready = Object.values(lensGroups || {}).some(g => (g?.responses || 0) >= min);
+  return ready ? `<div data-results-build-wrap><p class="actions"><button type="button" class="primary" data-results-build>Build the results</button></p><div data-results-preview></div></div>` : '';
+}
 const activeSurveys = surveys => (surveys || []).filter(s => s.state === 'selected' && !s.archived_at);
 const lensFor = s => LENSES.includes(s.perspective) ? s.perspective : OTHER;
 function refusalLine(ctx, status, retryAttr, what) {
@@ -64,6 +76,17 @@ function refusalLine(ctx, status, retryAttr, what) {
   if (status === 'refused') return `<p class="small muted" role="alert">${esc(NOT_VISIBLE)}.</p>`;
   if (status === 'not_built') return `<p class="small muted">${esc(what)} is not built yet.</p>`;
   return `<p class="small muted" role="alert">${esc(what)} could not be loaded. <a href="#" ${retryAttr}>Retry</a></p>`;
+}
+
+// Ruling 12:22 band input, shared by load and the post-build refresh (B35): the newest built report's per-perspective scores
+// (read-only; a failed read leaves bands held).
+async function newestBandScores(ctx, reports) {
+  const built = reports.status === 'loaded' && !reports.value?.suppressed && reports.value?.status !== 'held' && Array.isArray(reports.value?.reports) ? reports.value.reports : [];
+  const newest = built.filter(x => x && x.id).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
+  if (!newest) return null;
+  const rr = await settle(ctx.api(`/v2/reports/${ctx.enc(newest.id)}`));
+  if (rr.status !== 'loaded' || rr.value?.suppressed) return null;
+  const sc = v3ReportScores(rr.value?.report); return Object.keys(sc).length ? sc : null;
 }
 
 // ───────────────────────────────── understand ─────────────────────────────────
@@ -78,10 +101,7 @@ const understand = {
     const countMap = new Map();
     for (const [sid, r] of counts) countMap.set(sid, r.status === 'loaded' ? { status: 'loaded', responses: Number(r.value?.counts?.responses ?? 0), respondents: Number(r.value?.counts?.respondents ?? 0), unconfirmed: r.value?.counts?.unconfirmed, expected: r.value?.expected_count ?? r.value?.survey?.expected_count } : r);
     // Ruling 12:22 band input: the newest built report's per-perspective scores (read-only; a failed read leaves bands held).
-    let bandScores = null;
-    const built = reports.status === 'loaded' && !reports.value?.suppressed && reports.value?.status !== 'held' && Array.isArray(reports.value?.reports) ? reports.value.reports : [];
-    const newest = built.filter(x => x && x.id).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
-    if (newest) { const rr = await settle(ctx.api(`/v2/reports/${ctx.enc(newest.id)}`)); if (rr.status === 'loaded' && !rr.value?.suppressed) { const sc = v3ReportScores(rr.value?.report); if (Object.keys(sc).length) bandScores = sc; } }
+    const bandScores = await newestBandScores(ctx, reports);
     return { aid, role: cur?.assessment?.role, surveys, counts: countMap, results, reports, bandScores, openReport: null };
   },
   render(ctx, m) {
@@ -109,7 +129,7 @@ const understand = {
     const lensGroups = Object.fromEntries(LENSES.map(lens => { const ss = m.surveys.filter(s => lensFor(s) === lens), ld = ss.filter(s => m.counts.get(s.id)?.status === 'loaded');
       return [lens, { surveys: ss.length, loaded: ld.length, responses: ld.reduce((n, s) => n + m.counts.get(s.id).responses, 0) }]; }));
     const ev = v3EvidenceMarkup(v3EvidenceRows(m.results.value, LENSES, lensGroups, m.bandScores), !!m.showEvidence, esc);
-    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores)}${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc)}</section>` : '';
+    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores)}${buildResultsCta(m, lensGroups, esc)}<p class="status" role="status" aria-live="polite" data-results-status></p>${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc)}</section>` : '';
     // (3) Reports: server-owned eligibility and provenance; preview never writes a report.
     let reports;
     if (m.reports.status === 'loaded') {
@@ -140,13 +160,20 @@ const understand = {
       const full = root.querySelector('[data-report-full]'); if (full) full.hidden = true;
       const status = root.querySelector('[data-report-status]'); if (status) status.textContent = '';
     };
-    bindReportBuild(ctx, root, m, async () => {
+    // B35: "Build the results" runs the same preview → one confirm → build in the band block; the cards refill in place.
+    const resultsEntry = { trigger: root.querySelector('[data-results-build]'), box: root.querySelector('[data-results-preview]'), status: root.querySelector('[data-results-status]') };
+    bindReportBuild(ctx, root, m, async (source, builtReport) => {
       const reports = await settle(ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/reports`));
       if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
       m.reportReadGeneration = (m.reportReadGeneration || 0) + 1; m.reports = reports; m.openReport = null;
+      m.resultsBuilt = true; // Bugbot 4108654385: a build succeeded; never offer "Build the results" again on this view
+      m.bandScores = await newestBandScores(ctx, reports); // B35: the band cards fill from the report just built, no reload
+      if (!m.bandScores) { const sc = v3ReportScores(builtReport); if (Object.keys(sc).length) m.bandScores = sc; } // …or from the execute payload
+      if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
       root.innerHTML = understand.render(ctx, m); understand.bind(ctx, root, m);
+      if (source === 'results') { const st = root.querySelector('[data-results-status]'); if (st) st.textContent = m.bandScores ? 'Results built.' : 'Results built, but the bands could not be filled yet. Reload to try again.'; if (st || m.bandScores) return; }
       root.querySelector('[data-report-status]').textContent = reports.status === 'loaded' ? (reports.value?.suppressed ? 'Report built, but current report access is held. Reports are held for now.' : 'Report built. Open it from the current report list.') : 'Report built, but the list could not be refreshed. Refresh reports to reopen it.';
-    }, clearReport);
+    }, clearReport, resultsEntry);
     root.querySelectorAll('[data-retry]').forEach(el => el.onclick = e => { e.preventDefault(); if (m.reportBuildBusy) return; ctx.go(ctx.routes.assessment(m.aid, 'understand'), { reload: true }); });
     const evBtn = root.querySelector('[data-v3-evidence-toggle]'), evBox = root.querySelector('[data-v3-evidence]');
     if (evBtn && evBox) evBtn.onclick = () => { m.showEvidence = !m.showEvidence; evBox.hidden = !m.showEvidence; evBtn.setAttribute('aria-expanded', String(m.showEvidence)); evBtn.textContent = m.showEvidence ? 'Simple view' : 'Show evidence and details'; };
