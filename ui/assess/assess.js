@@ -510,8 +510,9 @@ async function loadAccountEmail() {
     const response = await fetch('/v2/auth/access?view=account', { headers, credentials: 'same-origin', redirect: 'error', cache: 'no-store' });
     const value = response.ok ? await response.json() : null;
     if (identity !== identityGeneration || credential !== token) return;
-    who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Account email unavailable.';
-  } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Account email unavailable.'; }
+    // U03 (lanes-1321): sandbox and cookie sessions have no account view; say "Signed in", never a failure sentence.
+    who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Signed in';
+  } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Signed in'; }
 }
 async function signOut(switchAccount = false) {
   if (demo || accountBusy || !state.principal) return;
