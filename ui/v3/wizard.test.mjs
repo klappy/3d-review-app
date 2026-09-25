@@ -110,13 +110,15 @@ test('retry after a partial failure resumes without duplicate writes', async () 
   assert.equal(ctx.links.length, 1);
 });
 
-test('locked review after a partial launch hides Back/Edit; follow-up not claimed as stored', () => {
+test('locked review after a partial launch hides Back/Edit; step 1 has no unstored controls or internal notes', () => {
   const data = { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates: [{ id: 'tpl.team', version: 3, name: 'Team', perspective: 'Translation team' }] };
-  const html = renderStep('review', draft({ followup: true }), data, [], true);
+  const html = renderStep('review', draft(), data, [], true);
   assert.ok(!html.includes('data-wz="edit"') && !html.includes('data-wz="back"') && html.includes('data-wz="cancel"'));
   assert.match(html, /Continue the launch/);
   assert.ok(!/Follow-up<\/dd>/.test(html));
-  assert.match(renderStep('details', draft(), data), /not stored yet/);
+  const details = renderStep('details', draft(), data);
+  assert.ok(!details.includes('name="followup"'));
+  assert.ok(!/not stored yet|no field for it/.test(details));
 });
 
 test('locked review shows links already issued so a partial launch never loses them', () => {
