@@ -1,10 +1,12 @@
 import type { Handler } from "./types";
 import { CapError } from "./errors";
+import { ensureLegacyTemplates } from "../legacy-templates";
 import { loadTemplate, nowIso, optInt, parseItems, renderItems, reqStr, requireSupport, requireUser, type TemplateRow } from "./common";
 
 function meta(t: TemplateRow) { return { id:t.id, version:t.version, name:t.name, perspective:t.perspective, source_ref:t.source_ref, published_at:t.published_at }; }
 export const list: Handler = async ctx => {
   requireUser(ctx);
+  await ensureLegacyTemplates(ctx);
   const {results} = await ctx.db.prepare("SELECT id, version, name, perspective, source_ref, published_at FROM survey_template WHERE published_at IS NOT NULL ORDER BY name, version DESC").all<TemplateRow>();
   return {result:{templates:results.map(meta)}};
 };
