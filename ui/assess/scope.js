@@ -103,6 +103,13 @@ function entryModel(over = {}) {
 const perspectivesRow = ctx => `<div class="perspectives">${PERSPECTIVES.map(([k, t, s]) => `<div class="perspective"><span class="dot-lg ${k}" aria-hidden="true"></span><strong>${ctx.esc(t)}</strong><small>${ctx.esc(s)}</small></div>`).join('')}</div>`;
 // B02 (lanes-1510): a signed-in visitor at "/" (the welcome, not #signin/#survey/#about) lands on the current work (#projects).
 export const landsOnWork = (r, signedIn) => !!signedIn && r?.kind === 'entry' && !['signin', 'survey', 'about'].includes(r.intent);
+// B04 (Bincy, captain ruling 2026-09-25): where a fresh sign-in lands. A pending invitation → the accept screen first; exactly one
+// project → that project; several (or none) → Home, the work list. Archived projects do not count. Pure: routes only.
+export function signInLanding({ invite = false, projects = [] } = {}) {
+  if (invite) return '#invite';
+  const open = (Array.isArray(projects) ? projects : []).filter(p => p && p.id && !p.archived_at);
+  return open.length === 1 ? `#project/${encodeURIComponent(open[0].id)}` : '#projects';
+}
 function hero(ctx, signedIn) {
   const continueCards = signedIn ? `<section class="panel"><p class="eyebrow">Signed in</p><h2>Continue</h2><div class="project-grid">${ctx.cards.card({ eyebrow: 'Continue', title: 'Workspaces', href: ctx.routes.workspaces, meta: ['Optional groupings of projects you can already open'] })}${ctx.cards.card({ eyebrow: 'Continue', title: 'Projects', href: ctx.routes.projects, meta: ['All projects your account holds a role on'] })}</div><div class="actions"><button type="button" class="quiet" data-act="signout">Sign out</button></div></section>` : '';
   // Public home contract (ui/public-choices.test.mjs, captain-named): exactly these four choices, in this order, above the headline;

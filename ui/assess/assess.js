@@ -15,7 +15,7 @@ import { learnMore } from '/v3/components/learn-more.js';
 import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment } from '/v3/components/invite.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
 const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
-import { pages, css as scopeCss, landsOnWork, whoLine } from '/assess/scope.js';
+import { pages, css as scopeCss, landsOnWork, signInLanding, whoLine } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
@@ -635,7 +635,7 @@ function bindAccountControls() {
 }
 bindAccountControls();
 // ---- scope pages + views (product overhaul): one runner for every { load, render, bind } module ----
-const setToken = t => { if (demo) return; token = t || null; try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
+const setToken = t => { if (demo) return; token = t || null; landAfterSignIn = !!t; /* B04 */ try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
 function ctxFor(extra = {}) {
   // Every page context is bound to the render generation and identity that created it: a retained control from a destroyed
   // view (route change, identity reset) can neither issue a request nor write a status line into the current view.
@@ -711,6 +711,8 @@ const LEGACY_HASHES = new Set(['#facilitator', '#workspace', '#evidence']);
 let pendingInvite = null;
 function storedInvite() { try { return sessionStorage.getItem(INVITE_KEY); } catch { return null; } }
 function forgetInvite() { pendingInvite = null; try { sessionStorage.removeItem(INVITE_KEY); } catch {} }
+// B04: set when a sign-in just happened (Access return #session=, or the entry form's setToken); boot() applies signInLanding once.
+let landAfterSignIn = false;
 // Returns 'forwarded' (this page is leaving), 'session' (a session was consumed — identity must be re-observed), or null.
 // Runs on load AND on every hashchange (Auditor S1): fragment-only navigation after load takes the same path as a fresh load.
 function scrubCredentialHash() {
@@ -723,7 +725,7 @@ function scrubCredentialHash() {
   if (/^#invite=/.test(h)) { const t = parseInvitationFragment(h); if (t) { pendingInvite = t; try { sessionStorage.setItem(INVITE_KEY, t); } catch {} } try { history.replaceState(null, '', location.pathname + '#invite'); } catch {} return null; } // B03: stays in v3; token leaves the address bar
   if (LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
   const m = /^#session=([A-Za-z0-9_]+)$/.exec(h);
-  if (m) { /* B-F02a: land on the work list; B03: a pending invitation comes first */ try { history.replaceState(null, '', location.pathname + (pendingInvite || storedInvite() ? '#invite' : '#projects')); } catch {} token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} resetIdentity(); return 'session'; }
+  if (m) { /* B-F02a: land on the work list; B03: a pending invitation comes first */ try { history.replaceState(null, '', location.pathname + (pendingInvite || storedInvite() ? '#invite' : '#projects')); } catch {} landAfterSignIn = true; token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} resetIdentity(); return 'session'; }
   if (/^#session=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} } // malformed: drop, never render
   return null;
 }
@@ -751,6 +753,7 @@ async function boot() {
   try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; }
   catch {
     if (identity !== identityGeneration) return;
+    landAfterSignIn = false; // B04: no session observed, nothing to land
     // Public entry: the welcome/tour/example/survey-code/sign-in page needs no session; every other route asks to sign in.
     accountControls(false); accountStatus();
     listen();
@@ -771,6 +774,8 @@ async function boot() {
   catch (e) { if (identity !== identityGeneration) return; // Auth A14: a direct #assessment/<id> still renders under "Granted to you"; the project list failure is a retryable notice, not a dead end.
     state.projects = []; note.innerHTML = `Could not load your project list (${esc(redact(e.message))}). <a href="#" data-retry-boot>Retry</a>`; note.querySelector('[data-retry-boot]').onclick = ev => { ev.preventDefault(); note.textContent = ''; boot(); };
     if (!['assessment', 'survey', 'feedback', 'invite'].includes(route(location.hash).kind)) /* B03: acceptance does not need the list */ { syncShell(); app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
+  // B04: once, right after a sign-in, the landing follows Bincy's rule (invitation → accept screen; one project → it; several → Home).
+  if (landAfterSignIn) { landAfterSignIn = false; if (['projects', 'invite', 'entry'].includes(route(location.hash).kind)) { try { history.replaceState(null, '', location.pathname + location.search + signInLanding({ invite: !!(pendingInvite || storedInvite()), projects: state.projects })); } catch {} } }
   listen();
   await render();
 }
