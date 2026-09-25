@@ -1,7 +1,8 @@
 // node --test ui/assess/scope.test.mjs — scope pages: render() strings, load() with a fake api, entry sign-in transitions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pages, css, classify, landsOnWork, signInLanding } from './scope.js';
+import { pages, css, classify, landsOnWork, signInLanding, whoLine, PERSPECTIVE_WHO } from './scope.js';
+import { readFileSync } from 'node:fs';
 import * as cards from './cards.js';
 
 const err = (code, message = 'nope') => Object.assign(new Error(message), { code, status: Number(code) || 400 });
@@ -99,7 +100,7 @@ test('project (owner): assessment cards link to #assessment/<id> with language n
   const h = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
   assert.ok(h.includes('href="#assessment/a1"')); assert.ok(h.includes('Language: Lake')); assert.ok(h.includes('Collecting'));
   assert.ok(h.includes('id="create-assessment"')); assert.ok(h.includes('<option value="l1">Lake (qaa)</option>')); assert.ok(!h.includes('<option value="l2"'), 'archived language not offered');
-  assert.ok(h.includes('id="rename-form"')); assert.ok(h.includes('href="#permissions/projects/p1"')); assert.ok(h.includes('Org'));
+  assert.ok(!h.includes('id="rename-form"') && !h.includes('<h2>Rename</h2>'), 'B07: no rename card; the heading carries the edit control'); assert.ok(h.includes('href="#permissions/projects/p1"')); assert.ok(h.includes('Org'));
   // B34: Start is the one visible create action; the bare assessment / language forms sit behind a closed "More".
   assert.ok(h.includes('data-v3-start href="#new"')); assert.match(h, /<details class="panel more-tools" id="project-more"><summary>More<\/summary>[\s\S]*id="create-assessment"[\s\S]*id="add-language"[\s\S]*<\/details>/);
 });
@@ -402,4 +403,13 @@ test('B04: sign-in landing — pending invitation first; one project → that pr
   assert.equal(signInLanding({ projects: [] }), '#projects');
   assert.equal(signInLanding(), '#projects');
   assert.equal(signInLanding({ projects: [{ id: 'p1' }, { id: 'p2', archived_at: '2026-01-01' }] }), '#project/p1', 'archived projects do not count');
+});
+
+test('B08+B20: one shared who-line per group (setup, launch, Collect); headings untouched; unknown groups get none', () => {
+  assert.equal(whoLine('Translation Team'), PERSPECTIVE_WHO.team); assert.equal(whoLine('Translation team'), PERSPECTIVE_WHO.team);
+  assert.equal(whoLine('Community'), PERSPECTIVE_WHO.community); assert.equal(whoLine('Church'), PERSPECTIVE_WHO.church);
+  assert.equal(whoLine('Other perspective'), ''); assert.equal(whoLine(undefined), '');
+  for (const w of Object.values(PERSPECTIVE_WHO)) assert.doesNotMatch(w, /Experience of/, 'who the group is, not what it is asked');
+  const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  assert.match(src, /<h3 style="margin:18px 0 6px">\$\{esc\(g\.lens\)\}<\/h3>\$\{whoLine\(g\.lens\)/, 'Collect group heading carries the shared who-line');
 });

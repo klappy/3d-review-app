@@ -295,18 +295,25 @@ test('L9-23 less text (captain 17:05): every setup screen = one heading, at most
   assert.match(screens.done, /Learn more<\/summary><p class="muted">Nothing was sent to anyone\./);
 });
 
-test('B20 (Bincy SI 04): step 2 groups surveys under one heading per perspective, each with the About page line', async () => {
-  const { PERSPECTIVES } = await import('../assess/scope.js');
+test('B08+B20 (Bincy SI 04): step 2 groups surveys under one heading per perspective, each with one plain who-line', async () => {
+  const { PERSPECTIVE_WHO } = await import('../assess/scope.js');
   const templates = [
     { id: 'c1', version: 1, perspective: 'Church', name: 'Involved-Pastor' }, { id: 'c2', version: 1, perspective: 'Church', name: 'Uninvolved-Pastor' },
     { id: 'm1', version: 1, perspective: 'Community', name: 'Community' }, { id: 't1', version: 1, perspective: 'Translation Team', name: 'Mid-Level' },
   ];
   const html = renderStep('participants', { ...freshDraft(), groups: { c1: { version: 1, expected: '' } } }, { templates });
-  for (const [, , line] of PERSPECTIVES) assert.equal((html.match(new RegExp(`>${line}<`, 'g')) || []).length, 1, line);
+  for (const line of Object.values(PERSPECTIVE_WHO)) assert.equal((html.match(new RegExp(`>${line}<`, 'g')) || []).length, 1, line);
   assert.equal((html.match(/<h3>Church<\/h3>/g) || []).length, 1, 'one heading per perspective, not per survey');
-  assert.ok(html.indexOf('Experience of its use') < html.indexOf('Involved-Pastor'), 'description above its surveys');
+  for (const h of ['Translation Team', 'Community', 'Church']) assert.match(html, new RegExp(`<h3>${h}</h3>`), 'headings unchanged');
+  assert.ok(html.indexOf(PERSPECTIVE_WHO.church) < html.indexOf('Involved-Pastor'), 'who-line above its surveys');
+  assert.doesNotMatch(html, /Experience of/, 'says who the group is, not what it is asked about');
   assert.match(html, /Mid-Level/); assert.equal((html.match(/name="g"/g) || []).length, 4, 'every survey still selectable');
-  assert.doesNotMatch(renderStep('participants', freshDraft(), { templates: [{ id: 'x', version: 1, perspective: 'Reviewer', name: 'R' }] }), /Experience of/);
+  assert.doesNotMatch(renderStep('participants', freshDraft(), { templates: [{ id: 'x', version: 1, perspective: 'Reviewer', name: 'R' }] }), /wz-pnote/);
+  // same shared line on the launched screen, once per group above its rows
+  const done = renderDone({ aid: 'a1', links: [{ survey: 's1', template: 'c1' }, { survey: 's2', template: 'c2' }, { survey: 's3', template: 't1' }] }, 'https://x.test', templates);
+  assert.equal((done.match(new RegExp(PERSPECTIVE_WHO.church, 'g')) || []).length, 1, 'church who-line once on launch');
+  assert.ok(done.indexOf(PERSPECTIVE_WHO.team) > -1 && done.indexOf(PERSPECTIVE_WHO.church) < done.indexOf('Involved-Pastor'), 'launch who-line above its rows');
+  assert.equal((done.match(/data-group-link=/g) || []).length, 3, 'rows unchanged');
 });
 
 test('B36 launched screen: one labelled row per group (group · survey) with Copy link and Show QR code; still one primary', () => {
