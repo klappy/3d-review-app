@@ -84,8 +84,11 @@ test('views: four steps, one primary each, optional expected count, escaped', ()
   assert.match(r, /data-step="information"/);
   assert.equal((renderStep('review', draft(), data, [], true).match(/data-wz="edit"/g) || []).length, 0);
   assert.match(renderStep('details', draft(), data), /<span>Participants<\/span>/);
-  assert.match(renderStep('review', draft({ context: '<b>x</b>' }), data), /&lt;b&gt;x&lt;\/b&gt; <span class="sub">\(not sent yet/);
-  assert.doesNotMatch(renderStep('review', draft({ context: 'x' }), data), /not stored yet/);
+  // Bincy B10: step 3 promises only what the welcome shows (project · language · material · format · when); no unsaved note box.
+  const info = renderStep('information', draft({ purpose: 'Mark 1–4', period: 'March' }), data);
+  for (const k of ['Project', 'Language', 'Material', 'Format', 'When']) assert.match(info, new RegExp(`<dt>${k}</dt>`));
+  assert.doesNotMatch(info, /textarea|not saved|Not sent/);
+  assert.doesNotMatch(renderStep('review', draft(), data), /Note for participants|not saved/);
 });
 
 test('retry after a partial failure resumes without duplicate writes', async () => {

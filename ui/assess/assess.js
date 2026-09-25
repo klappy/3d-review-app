@@ -11,6 +11,8 @@ import { breadcrumbs } from '/v3/components/breadcrumbs.js';
 import { sidebarTree } from '/v3/components/sidebar-tree.js';
 // lane 9 L9-24: shared closed-by-default disclosure
 import { learnMore } from '/v3/components/learn-more.js';
+// Bincy B03: `#invite=<token>` is handled here (v3), not forwarded to /legacy/.
+import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment } from '/v3/components/invite.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
 const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
 import { pages, css as scopeCss, landsOnWork } from '/assess/scope.js';
@@ -28,7 +30,7 @@ let wizardHandle = null;
 const startReview = () => V3_SHELL ? '<div class="v3-shell-actions actions"><a class="rv-btn primary" data-v3-start href="#new">Start a review</a></div>' : '';
 // v3 shell (lane 1): context tree removed when V3_SHELL; crumbs remain the navigation.
 // Bugbot 4094071963: the kit adapter has no 'new' kind; the shell header names the wizard page (title + current link) here.
-const v3Model = m => !V3_SHELL ? m : m?.context?.route === 'new' ? { ...m, contextTree: false, title: 'Start a review', eyebrow: 'New review', currentHref: '#new', ancestors: [{ label: 'Projects', href: cards.routes.projects, visible: true }] } : { ...m, contextTree: false };
+const v3Model = m => !V3_SHELL ? m : m?.context?.route === 'invite' ? { ...m, contextTree: false, title: 'Invitation', eyebrow: '', currentHref: '#invite', ancestors: [] } : m?.context?.route === 'new' ? { ...m, contextTree: false, title: 'Start a review', eyebrow: 'New review', currentHref: '#new', ancestors: [{ label: 'Projects', href: cards.routes.projects, visible: true }] } : { ...m, contextTree: false };
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 // Product overhaul (cookbook #16 c5721465315): five VIEWS on one assessment page. A view is a tab; a tab never mutates stage.
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
@@ -151,6 +153,7 @@ export function route(hash) {
   if (!parts[0]) return { kind: 'entry' };
   if (['how', 'example', 'signin', 'survey', 'about'].includes(parts[0]) && !parts[1]) return { kind: 'entry', intent: parts[0] };
   if (parts[0] === 'feedback' && !parts[1]) return { kind: 'feedback' };
+  if (parts[0] === 'invite' && !parts[1]) return { kind: 'invite' }; // B03: token already moved out of the address bar
   if (parts[0] === 'workspaces') return { kind: 'workspaces' };
   if (parts[0] === 'workspace' && parts[1]) return { kind: 'workspace', id: parts[1] };
   if (parts[0] === 'projects') return { kind: 'projects' };
@@ -383,7 +386,8 @@ function prepareView(current) {
 function screen(current, view = null) {
   const a = current.assessment, project = state.projects.find(p => p.id === a.project_id);
   const tab = view || (VIEWS.includes(a.stage) ? a.stage : 'prepare');
-  const roleLine = `${esc(project?.name || a.project_id)} · your role: ${esc(a.role)}`; // lane 9 L9-24: the viewer explanation moves behind Learn more (roleMore)
+  const roleLine = project ? `${esc(project.name)} · your role: ${esc(a.role)}` : `Your role: ${esc(a.role)}`; // B03: never a raw project id (shared assessment, no project role)
+  // lane 9 L9-24: the viewer explanation moves behind Learn more (roleMore)
   const roleMore = a.role === 'viewer' && tab !== 'improve' ? learnMore( /* Next steps carries its own role note (one, not two) */'<p class="muted">You can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions.</p>') : '';
   // Under the kit shell the eyebrow/h1 are the shell's (one heading); only the unique role line and stage badge remain here.
   // v3 (NEED 3→1): one state-driven primary in the headrow; viewers get none for setup/collect (lane 3 module decides).
@@ -532,12 +536,24 @@ async function render() {
     // top-level lists stand alone (showcase SOURCE-MAP: the panel is absent from public routes).
     // K3a: workspace/project read surfaces are kit-presented (tree in the shell); the legacy context sidebar remains only for permissions.
     if (r.kind === 'new') { await mountNew(gen); return; }
+    if (r.kind === 'invite') { mountInvitePage(gen); return; }
     const sidebar = state.principal && (kit ? ['permissions'] : ['workspace', 'project', 'permissions']).includes(r.kind);
     app.className = sidebar ? 'workspace-layout' : '';
     if (sidebar) { syncShell(); app.innerHTML = context(null) + '<div id="page-root"><p class="muted">Loading…</p></div></section>'; bind(null); await runPage(pageFor(r), r, gen, app.querySelector('#page-root')); }
     else await runPage(pageFor(r), r, gen);
     if (gen === generation && (r.kind === 'projects' || r.kind === 'workspaces') && state.principal && !app.querySelector('[data-v3-start]')) app.insertAdjacentHTML('afterbegin', startReview());
   }
+}
+// B03: the invitation page. Signed out → the sign-in step (the token stays in this tab so the sign-in return comes back here).
+function mountInvitePage(gen) {
+  syncShell(); app.className = ''; document.title = 'Invitation · 3D Review';
+  const t = pendingInvite || storedInvite();
+  if (!t) { app.innerHTML = inviteView({ status: 'missing' }); return; }
+  if (!state.principal) { app.innerHTML = inviteView({ status: 'signin' }); return; }
+  const ctx = ctxFor();
+  mountInvite(app, { api: ctx.api, token: t, isCurrent: () => gen === generation, forget: forgetInvite,
+    // Accepted: Home lists what was shared (projects list is re-read by the page load).
+    onAccepted: () => ctx.go(cards.routes.projects) });
 }
 async function mountNew(gen) {
   syncShell(); app.className = '';
@@ -679,6 +695,10 @@ function paint(r = route(location.hash), gen = generation) {
 // `#evidence`. `#session=` is the Access return leg (src/index.ts:138, callback unchanged): consumed here exactly as legacy does —
 // same `facilitatorToken` key, stripped from history before any render, never echoed. Nothing else stores a credential.
 const LEGACY_HASHES = new Set(['#facilitator', '#workspace', '#evidence']);
+// B03: a pending invitation token — memory + this tab's sessionStorage only (survives the sign-in round trip), cleared once used.
+let pendingInvite = null;
+function storedInvite() { try { return sessionStorage.getItem(INVITE_KEY); } catch { return null; } }
+function forgetInvite() { pendingInvite = null; try { sessionStorage.removeItem(INVITE_KEY); } catch {} }
 // Returns 'forwarded' (this page is leaving), 'session' (a session was consumed — identity must be re-observed), or null.
 // Runs on load AND on every hashchange (Auditor S1): fragment-only navigation after load takes the same path as a fresh load.
 function scrubCredentialHash() {
@@ -688,9 +708,10 @@ function scrubCredentialHash() {
   if (h === '#participant') { location.replace('/legacy/#participant'); return 'forwarded'; }
   if (h === '#reports-card') { location.replace('/#projects'); return 'forwarded'; }
   if (/^#survey=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + h); return 'forwarded'; }
-  if (/^#invite=/.test(h) || LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
+  if (/^#invite=/.test(h)) { const t = parseInvitationFragment(h); if (t) { pendingInvite = t; try { sessionStorage.setItem(INVITE_KEY, t); } catch {} } try { history.replaceState(null, '', location.pathname + '#invite'); } catch {} return null; } // B03: stays in v3; token leaves the address bar
+  if (LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
   const m = /^#session=([A-Za-z0-9_]+)$/.exec(h);
-  if (m) { /* B-F02a: land on the work list */ try { history.replaceState(null, '', location.pathname + '#projects'); } catch {} token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} resetIdentity(); return 'session'; }
+  if (m) { /* B-F02a: land on the work list; B03: a pending invitation comes first */ try { history.replaceState(null, '', location.pathname + (pendingInvite || storedInvite() ? '#invite' : '#projects')); } catch {} token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} resetIdentity(); return 'session'; }
   if (/^#session=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} } // malformed: drop, never render
   return null;
 }
@@ -721,6 +742,7 @@ async function boot() {
     // Public entry: the welcome/tour/example/survey-code/sign-in page needs no session; every other route asks to sign in.
     accountControls(false); accountStatus();
     listen();
+    if (route(location.hash).kind === 'invite') { who.textContent = 'Not signed in'; app.className = ''; syncShell(); mountInvitePage(generation); return; }
     if (route(location.hash).kind === 'entry') { who.textContent = 'Not signed in'; app.className = ''; syncShell(); await render(); return; }
     // Real sign-in only (captain: synthetic-only sign-in rejected). /v2/auth/access is the existing Cloudflare email-code
     // route; it sets the session cookie and returns to the workspace home (/#session=…), not here — stated, not hidden.
@@ -736,7 +758,7 @@ async function boot() {
   try { const result = await api('/v2/projects'); if (identity !== identityGeneration) return; state.projects = result.projects || []; }
   catch (e) { if (identity !== identityGeneration) return; // Auth A14: a direct #assessment/<id> still renders under "Granted to you"; the project list failure is a retryable notice, not a dead end.
     state.projects = []; note.innerHTML = `Could not load your project list (${esc(redact(e.message))}). <a href="#" data-retry-boot>Retry</a>`; note.querySelector('[data-retry-boot]').onclick = ev => { ev.preventDefault(); note.textContent = ''; boot(); };
-    if (!['assessment', 'survey', 'feedback'].includes(route(location.hash).kind)) { syncShell(); app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
+    if (!['assessment', 'survey', 'feedback', 'invite'].includes(route(location.hash).kind)) /* B03: acceptance does not need the list */ { syncShell(); app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
   listen();
   await render();
 }
