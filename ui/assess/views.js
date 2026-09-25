@@ -60,7 +60,11 @@ const isEditor = role => role === 'owner' || role === 'member';
 // (the provisional minimum), the band block itself offers the one next action; it opens the SAME preview → confirm as
 // "Preview report build" below, shown right here in the band block (never builds without the confirm).
 export function buildResultsCta(m, lensGroups, esc) {
-  if (m.bandScores || !isEditor(m.role)) return '';
+  if (m.bandScores || m.resultsBuilt || !isEditor(m.role)) return '';
+  // Bugbot 4108654385: offered only when the report list is known and empty; an existing report (or an unknown list) never
+  // invites a second immutable build.
+  const rv = m.reports?.status === 'loaded' ? m.reports.value : null;
+  if (!rv || rv.suppressed || rv.status === 'held' || !Array.isArray(rv.reports) || rv.reports.length) return '';
   const min = V3_BAND_CUTOFFS.minResponses, ready = Object.values(lensGroups || {}).some(g => (g?.responses || 0) >= min);
   return ready ? `<div data-results-build-wrap><p class="actions"><button type="button" class="primary" data-results-build>Build the results</button></p><div data-results-preview></div></div>` : '';
 }
@@ -158,11 +162,13 @@ const understand = {
     };
     // B35: "Build the results" runs the same preview → one confirm → build in the band block; the cards refill in place.
     const resultsEntry = { trigger: root.querySelector('[data-results-build]'), box: root.querySelector('[data-results-preview]'), status: root.querySelector('[data-results-status]') };
-    bindReportBuild(ctx, root, m, async source => {
+    bindReportBuild(ctx, root, m, async (source, builtReport) => {
       const reports = await settle(ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/reports`));
       if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
       m.reportReadGeneration = (m.reportReadGeneration || 0) + 1; m.reports = reports; m.openReport = null;
+      m.resultsBuilt = true; // Bugbot 4108654385: a build succeeded; never offer "Build the results" again on this view
       m.bandScores = await newestBandScores(ctx, reports); // B35: the band cards fill from the report just built, no reload
+      if (!m.bandScores) { const sc = v3ReportScores(builtReport); if (Object.keys(sc).length) m.bandScores = sc; } // …or from the execute payload
       if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
       root.innerHTML = understand.render(ctx, m); understand.bind(ctx, root, m);
       if (source === 'results') { const st = root.querySelector('[data-results-status]'); if (st) st.textContent = m.bandScores ? 'Results built.' : 'Results built, but the bands could not be filled yet. Reload to try again.'; if (st || m.bandScores) return; }

@@ -254,12 +254,15 @@ test('v3 U4 gate: viewers see the state only, no write control', async () => {
 
 test('B35: the band block offers "Build the results" only to editors, only before a report, only once a group has 3+', async () => {
   const { buildResultsCta } = await import('./views.js'); const esc = s => String(s);
-  const ready = { 'Community': { responses: 3 } }, thin = { 'Community': { responses: 2 } };
-  assert.match(buildResultsCta({ role: 'owner', bandScores: null }, ready, esc), /data-results-build/);
-  assert.match(buildResultsCta({ role: 'member', bandScores: null }, ready, esc), /Build the results/);
-  assert.equal(buildResultsCta({ role: 'viewer', bandScores: null }, ready, esc), '');
-  assert.equal(buildResultsCta({ role: 'owner', bandScores: { Community: {} } }, ready, esc), '');
-  assert.equal(buildResultsCta({ role: 'owner', bandScores: null }, thin, esc), '');
+  const ready = { 'Community': { responses: 3 } }, thin = { 'Community': { responses: 2 } }, none = { status: 'loaded', value: { reports: [] } };
+  assert.match(buildResultsCta({ role: 'owner', bandScores: null, reports: none }, ready, esc), /data-results-build/);
+  assert.match(buildResultsCta({ role: 'member', bandScores: null, reports: none }, ready, esc), /Build the results/);
+  assert.equal(buildResultsCta({ role: 'viewer', bandScores: null, reports: none }, ready, esc), '');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: { Community: {} }, reports: none }, ready, esc), '');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: none }, thin, esc), '');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: { status: 'loaded', value: { reports: [{ id: 'r' }] } } }, ready, esc), '', 'a report already exists');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: { status: 'error' } }, ready, esc), '', 'report list unknown');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: none, resultsBuilt: true }, ready, esc), '', 'already built here');
 });
 
 test('B35: "Build the results" on the band block previews, confirms once in place, builds, and the bands fill with no reload', async () => {

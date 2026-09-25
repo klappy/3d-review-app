@@ -51,7 +51,7 @@ export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}, e
           if (result.suppressed === true) { say(`${HELD} No report was built.`); return; }
           if (result.suppressed !== false || !result.report?.id) throw new Error('Unconfirmed report');
           built = true; say(entry.source === 'results' ? 'Results built. Filling the bands…' : 'Report built. Refreshing the report list…');
-          await onBuilt(entry.source);
+          await onBuilt(entry.source, result.report);
         } catch (e) { uncertain = !built; if (current()) say(built ? 'Report built, but the list could not be refreshed. Refresh reports to reopen it.' : failure(e, true)); }
         finally { if (current()) { busy = false; disable(uncertain); lockRefresh(false); } }
       };
