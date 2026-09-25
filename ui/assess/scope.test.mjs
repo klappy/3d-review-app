@@ -418,4 +418,6 @@ test('U28 (Bincy B32): both sign-in entry points say a new email creates an acco
   assert.equal(si.split(SIGNUP_NOTE).length - 1, 1, '#signin: once'); assert.ok(si.indexOf(SIGNUP_NOTE) > si.indexOf('>Sign in with an email code</a>'), '#signin: under the primary');
   const inx = ctxWith({}, { state: { principal: { id: 'pr_1' } } }); const signedIn = pages.entry.render(inx, await pages.entry.load(inx, {}));
   assert.ok(!signedIn.includes(SIGNUP_NOTE), 'signed in: no sign-up line');
+  const siIn = pages.entry.render(inx, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.ok(siIn.includes('Sign in with an email code'), 'signed-in #signin still renders'); assert.ok(!siIn.includes(SIGNUP_NOTE), 'signed-in #signin (typed, bookmark, Back): no sign-up line');
 });
