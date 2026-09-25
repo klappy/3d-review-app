@@ -416,7 +416,13 @@ function bind(current) {
   app.querySelectorAll('[data-retry-list]').forEach(el => el.onclick = async e => { e.preventDefault(); await assessmentsFor(el.dataset.retryList, { retry: true }); render(); });
   if (!current) return;
   const aid = current.assessment.id;
-  app.querySelector('[data-survey-set]')?.addEventListener('toggle', e => { state.surveySetOpen = e.currentTarget.open ? aid : null; }); // B30: an include/remove repaint keeps it open
+  // B30 (Bugbot 4108407845): the survey set stays open across include/remove repaints. Recorded from the rendered state (an
+  // auto-open fires no reliable toggle), from user toggles on the live node only (a replaced node may fire a stale toggle),
+  // and on every include/remove click.
+  const set = app.querySelector('[data-survey-set]');
+  if (set?.open) state.surveySetOpen = aid;
+  set?.addEventListener('toggle', e => { if (e.currentTarget.isConnected) state.surveySetOpen = e.currentTarget.open ? aid : null; });
+  set?.querySelectorAll('[data-include],[data-remove]').forEach(b => b.addEventListener('click', () => { state.surveySetOpen = aid; }));
   app.querySelectorAll('[data-refresh]').forEach(el => el.onclick = e => { e.preventDefault(); render(); });
   bindCounts(current);
   app.querySelectorAll('[data-include]').forEach(b => b.onclick = () => act(aid, 'Including survey…', async () => { const restoring = b.textContent.trim() === 'Include again'; const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/surveys`, { method: 'POST', body: { template_id: b.dataset.include, version: Number(b.dataset.version) } }); return `${restoring ? 'Survey restored with what was collected' : 'Survey included'}; collection ${r.survey?.collection_status || 'status unknown'}.`; }));
