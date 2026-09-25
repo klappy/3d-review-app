@@ -177,10 +177,13 @@ export async function issueLink(api, { aid, sid, origin = globalThis.location?.o
   return { id: r.link_id, url: shareUrl(origin, r.entry_fragment), expires_at: r.expires_at || null };
 }
 // Collect's per-key link cache. A certain failure clears the key; an uncertain one (the execute may have created a link) keeps
-// an uncertain mark so the tap shows the Share card's warning, and only the next, deliberate tap after it issues again.
+// an uncertain mark for the (aid, sid, epoch) key: every later tap shows the Share card's warning again and issues nothing, so a
+// repaint that wipes the row's message can never turn the next tap into a silent second link. A new link is then a deliberate
+// act on the survey's Share card, or follows a refresh (new epoch).
 export function cachedLink(cache, k, issue) {
   const cur = cache.get(k);
-  if (!cur || cur.uncertain) {
+  if (cur?.uncertain) return Promise.reject(failure());
+  if (!cur) {
     const p = issue().catch(e => { if (cache.get(k) === p) { if (e?.uncertain) cache.set(k, { uncertain: true }); else cache.delete(k); } throw e; });
     cache.set(k, p);
   }
