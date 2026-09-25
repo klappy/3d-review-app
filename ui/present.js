@@ -26,8 +26,12 @@ export function reviewAnswer(item, value) {
 }
 
 // B-09 (lanes-1321): the receipt reads as a short reference + local date/time, never a raw id and UTC ISO string.
+// Only a real server receipt (resp_… id, parseable time) is shortened; anything else — the practice receipt's
+// "practice-only-not-saved" / "Demonstration — not sent" — is shown as given (Bugbot #273).
 export function receiptLine(r = {}) {
-  const id = String(r.response_id || ''); const ref = id ? id.replace(/^resp_/, '').slice(0, 8).toUpperCase() : '';
-  const at = r.submitted_at ? new Date(r.submitted_at) : null; const when = at && !Number.isNaN(at.getTime()) ? at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
-  return [ref && `Reference ${ref}`, when].filter(Boolean).join(' · ') || 'Saved';
+  const id = String(r.response_id || ''), rawAt = String(r.submitted_at || '');
+  const at = rawAt ? new Date(rawAt) : null, validAt = !!at && !Number.isNaN(at.getTime());
+  if (!/^resp_/.test(id) || (rawAt && !validAt)) return [id, rawAt].filter(Boolean).join(' · ') || 'Saved';
+  const when = validAt ? at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  return [`Reference ${id.slice(5, 13).toUpperCase()}`, when].filter(Boolean).join(' · ');
 }

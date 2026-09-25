@@ -37,4 +37,5 @@ test('B-09: receipt line is a short reference and a local date, never the raw id
   assert.ok(!line.includes('resp_') && !line.includes('T17:27'));
   assert.equal(receiptLine({}), 'Saved');
   assert.equal(receiptLine({ response_id: 'resp_ab12cd34ef' }), 'Reference AB12CD34');
+  assert.equal(receiptLine({ response_id: 'practice-only-not-saved', submitted_at: 'Demonstration — not sent' }), 'practice-only-not-saved · Demonstration — not sent');
 });
