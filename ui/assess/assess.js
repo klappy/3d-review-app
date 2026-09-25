@@ -356,15 +356,19 @@ function prepareView(current) {
   const fields = `<label class="field">Assessment name<input name="name" maxlength="100" required value="${esc(a.name)}" ${mayEdit ? '' : 'readonly'}></label><label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>`;
   const form = mayEdit ? `<form id="prepare-form">${fields}<div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save preparation</button></div></form>` : `<div>${fields}<p class="small muted">Your role here is ${esc(a.role)}: preparation is read-only.</p></div>`;
   const i = PHASES.indexOf(a.stage), prev = PHASES[i - 1], next = PHASES[i + 1], n = activeSurveys(current).length;
-  const move = mayEdit ? `<div class="actions">${prev ? `<button type="button" data-stage="${prev}" ${state.busy ? 'disabled' : ''}>← Back to ${title(prev)}</button>` : ''}${next ? `<button type="button" data-stage="${next}" ${state.busy ? 'disabled' : ''}>Move to ${title(next)} →</button>` : ''}</div><p class="small muted">Moving into Collect opens collection; moving out of Collect closes it — for all ${n} included survey${n === 1 ? '' : 's'}.</p>` : ''; // lane 9 L9-24: one primary on this view (Save preparation)
-  const stage = `<aside class="panel"><p class="eyebrow">Stage</p><h2>${stageLabel(a.stage)}</h2>${move}${learnMore(`<p class="muted">The stage is the assessment's own state. Browsing these views never changes it.</p>${mayEdit ? '<p class="muted">One stage at a time, as the server allows.</p>' : ''}`)}${a.language_id ? `<p class="small muted">Language: ${esc(a.language_id)}</p>` : ''}${a.period ? `<p class="small muted">Period: ${esc(a.period)}</p>` : ''}</aside>`;
+  const move = mayEdit ? `<div class="actions">${prev ? `<button type="button" data-stage="${prev}" ${state.busy ? 'disabled' : ''}>← Back to ${title(prev)}</button>` : ''}${next ? `<button type="button" data-stage="${next}" ${state.busy ? 'disabled' : ''}>Move to ${title(next)} →</button>` : ''}</div>` : ''; // lane 9 L9-24: one primary on this view (Save preparation)
+  // Lane 9 L9-24 (validator #282): ONE view heading ("Prepare this assessment"). The stage is an eyebrow + badge, not a second
+  // heading; the collect consequence, stage notes, language and period sit behind the shared Learn more. A <section>, not an
+  // <aside>: kit.css turns every `.rv aside` into a nav flex row at ≤760px (squashed/clipped at 390px).
+  const more = `${mayEdit ? `<p class="muted">Moving into Collect opens collection; moving out of Collect closes it — for all ${n} included survey${n === 1 ? '' : 's'}.</p><p class="muted">One stage at a time, as the server allows.</p>` : ''}<p class="muted">The stage is the assessment's own state. Browsing these views never changes it.</p>${a.language_id ? `<p class="small muted">Language: ${esc(a.language_id)}</p>` : ''}${a.period ? `<p class="small muted">Period: ${esc(a.period)}</p>` : ''}`;
+  const stage = `<section class="panel" data-stage-panel><p class="eyebrow">Stage <span class="badge">${stageLabel(a.stage)}</span></p>${move}${learnMore(more)}</section>`;
   return `<div class="grid"><section class="panel"><h2>Prepare this assessment</h2>${form}</section>${stage}</div>`;
 }
 function screen(current, view = null) {
   const a = current.assessment, project = state.projects.find(p => p.id === a.project_id);
   const tab = view || (VIEWS.includes(a.stage) ? a.stage : 'prepare');
   const roleLine = `${esc(project?.name || a.project_id)} · your role: ${esc(a.role)}`; // lane 9 L9-24: the viewer explanation moves behind Learn more (roleMore)
-  const roleMore = a.role === 'viewer' ? learnMore('<p class="muted">You can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions.</p>') : '';
+  const roleMore = a.role === 'viewer' && tab !== 'improve' ? learnMore( /* Next steps carries its own role note (one, not two) */'<p class="muted">You can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions.</p>') : '';
   // Under the kit shell the eyebrow/h1 are the shell's (one heading); only the unique role line and stage badge remain here.
   // v3 (NEED 3→1): one state-driven primary in the headrow; viewers get none for setup/collect (lane 3 module decides).
   const primary = V3_SHELL ? v3StagePrimary(a.stage, a.role === 'owner' || a.role === 'member', v => `#assessment/${encodeURIComponent(a.id)}/${v}`, esc) : '';

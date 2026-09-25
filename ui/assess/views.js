@@ -127,7 +127,11 @@ const understand = {
     if (!bands) return `<div class="grid"><section class="panel"><p class="eyebrow">Understand</p><h2>Bring the perspectives together</h2>${lensBlocks}${countsNote}</section><aside class="stack"><section class="panel" data-results><p class="eyebrow">Results</p>${results}</section>${reportsPanel}</aside></div>${full}`;
     // Lane 9 L9-24 (captain 17:05 "less text"): the band panel is the screen (one heading, one primary: the review gate).
     // Per-survey counts and the results state move behind the shared Learn more; reports stay visible (they are actions).
-    return `${bands}${learnMore(`<section class="lens-detail"><p class="eyebrow">Counts per survey</p>${lensBlocks}${countsNote}</section><section data-results><p class="eyebrow">Results</p>${results}</section>`)}${reportsPanel}${full}`;
+    // Validator #282: a results error (and its Retry) is never tucked away — only the loaded results state goes behind Learn more.
+    const resultsPanel = `<section${m.results.status === 'loaded' ? '' : ' class="panel"'} data-results><p class="eyebrow">Results</p>${results}</section>`;
+    return m.results.status === 'loaded'
+      ? `${bands}${learnMore(`<section class="lens-detail"><p class="eyebrow">Counts per survey</p>${lensBlocks}${countsNote}</section>${resultsPanel}`)}${reportsPanel}${full}`
+      : `${bands}${resultsPanel}${learnMore(`<section class="lens-detail"><p class="eyebrow">Counts per survey</p>${lensBlocks}${countsNote}</section>`)}${reportsPanel}${full}`;
   },
   bind(ctx, root, m) {
     const clearReport = () => {
