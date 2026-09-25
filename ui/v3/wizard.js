@@ -9,6 +9,7 @@
 // location or the router itself. deps.go(hash) is the shell's navigation.
 
 import { shareUrl } from '../shared-link.js';
+import { groupLinks, bindGroupLinks } from '../assess/share.js';
 import { stepper as stepperComponent, ensureStepperStyle } from './components/stepper.js';
 import { learnMore } from './components/learn-more.js';
 import { PERSPECTIVES } from '../assess/scope.js';
@@ -251,11 +252,13 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
     ${locked ? `<div class="actions"><button type="button" class="rv-btn quiet" data-wz="cancel">Leave setup (what was created stays; nothing was sent)</button><span class="spacer"></span><button type="button" class="primary" data-wz="launch">Continue the launch</button></div>` : actions(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
 }
 
-function linkList(links, origin, templates) {
-  const name = id => (templates.find(t => t.id === id) || {}).perspective || id;
+// B36: one row per group (group · survey) with Copy link and Show QR code — the Share card's shared rows (assess/share.js).
+export function linkRows(links, origin, templates) {
+  const tpl = id => templates.find(t => t.id === id) || {};
   const url = l => { try { return shareUrl(origin, l.entry_fragment); } catch { return ''; } };
-  return `<ul class="wz-links">${links.map(l => `<li><label>${esc(name(l.template))}<input readonly value="${esc(url(l))}"></label></li>`).join('')}</ul>`;
+  return links.map(l => ({ key: l.survey || l.template, group: tpl(l.template).perspective || l.template, survey: tpl(l.template).name || 'Survey', url: url(l) }));
 }
+function linkList(links, origin, templates) { return `<div class="wz-links">${groupLinks({ esc }, linkRows(links, origin, templates))}</div>`; }
 export function renderDone(ctx, origin = '', templates = []) {
   return `<div class="eyebrow">Launched</div><h1 class="wz-h">The review is collecting responses</h1>
     <p class="muted">Share each link with its group.</p>${learnMore('<p class="muted">Nothing was sent to anyone.</p>')}
@@ -286,6 +289,7 @@ export function mountWizard(root, deps) {
     e.preventDefault(); if (s.partial || s.busy) return; read(e.target);
     s.errs = validateStep(s.step, s.d); if (!s.errs.length) s.step = STEPS[STEPS.indexOf(s.step) + 1] || s.step; paint();
   }, on);
+  bindGroupLinks(root, { signal: ac.signal, resolve: async key => (linkRows((s.done || s.partial || {}).links || [], deps.origin || '', latestTemplates(s.data.templates)).find(r => r.key === key) || {}).url });
   root.addEventListener('click', async e => {
     const b = e.target.closest('[data-wz]'); if (!b) return;
     const act = b.dataset.wz; s.errs = [];
