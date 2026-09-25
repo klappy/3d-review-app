@@ -258,7 +258,7 @@ test('dedicated roadmap actual bootstrap reads health before interaction despite
   assert.match(html, /<button id="version"[^>]*aria-controls="changelog"[^>]*>Version…<\/button>/);
   assert.ok(html.indexOf('id="version"') < html.indexOf('<main'), 'badge survives route content replacement');
   assert.ok(html.indexOf('id="changelog"') > html.indexOf('</main>'), 'dialog survives route content replacement');
-  assert.ok(html.indexOf('src="/changelog.js"') < html.indexOf('src="/roadmap/page.js"'), 'changelog loads before page');
+  assert.ok(html.indexOf('src="/changelog.js"') < html.indexOf('src="/roadmap/versions.js"'), 'changelog loads before page');
   const doc = fakeDocument(ids), log = [];
   const component = fs.readFileSync(new URL('./changelog.js', import.meta.url), 'utf8').replace(/export /g, '');
   vm.runInNewContext(component, {
