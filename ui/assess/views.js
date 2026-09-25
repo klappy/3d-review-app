@@ -35,7 +35,7 @@ export const css = `
 // Classify an api() failure into the four honest states the contract names. Never a generic retry for NOT_BUILT.
 // Display helpers (readable, not new data): the payload and provenance are untouched — only the rendered text is rounded, with the
 // exact value kept on the element (title + data-exact). IDs/timestamps stay available inside <details>.
-export function humanDate(iso) { const d = new Date(iso); return isNaN(d) ? String(iso || '') : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
+import { humanDate } from './cards.js'; export { humanDate }; // one shared date formatter (moved to cards.js so permissions composes it too, B31)
 export function readableNumbers(rootEl) {
   if (!rootEl || !rootEl.ownerDocument) return 0;
   const doc = rootEl.ownerDocument, walker = doc.createTreeWalker(rootEl, 4 /* NodeFilter.SHOW_TEXT */); const nodes = []; let n; let count = 0;

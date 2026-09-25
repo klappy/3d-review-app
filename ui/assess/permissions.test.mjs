@@ -57,7 +57,7 @@ test('invite two-step: dry_run params → sheet renders impact VERBATIM (effect,
   await x.submit('data-invite-form'); assert.deepEqual(seen[0], { params: { email: 'new@example.test', role: 'viewer' }, mode: 'dry_run' });
   const h = x.root.html; assert.match(h, /data-confirm-kind="invite"/); assert.match(h, /expires in 300 seconds/); assert.match(h, /<dd>external<\/dd>/); assert.match(h, /<dd>true<\/dd>/); assert.match(h, /cap.grant.revoke_invitation/); assert.match(h, /629f4df892ca/); assert.match(h, /new@example.test/);
   await x.click('data-confirm-execute'); assert.deepEqual(seen[1], { params: { email: 'new@example.test', role: 'viewer' }, mode: 'execute', confirm_token: 'cfm_1' });
-  assert.equal(x.m.sheet, null); assert.match(x.root.html, /Invitation sent\. receipt rcpt_1 · trace tr_1/); assert.equal(x.reloads(), 0); assert.equal(x.calls.filter(c => c.url === '/v2/assessment/a1/grants').length, 2);
+  assert.equal(x.m.sheet, null); assert.match(x.root.html, /Invitation sent\.<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/); assert.equal(x.reloads(), 0); assert.equal(x.calls.filter(c => c.url === '/v2/assessment/a1/grants').length, 2);
 });
 
 test('N3 member invites owner → picker never offers owner; forced 403 renders server message; N12 malformed → server 400 verbatim; N18 429 with hint', async () => {
@@ -148,7 +148,7 @@ test('F-G1-1: mutation completion refreshes real roster and role while keeping o
     else if (action === 'revoke_invitation') await x.click('data-revoke-invitation="inv_p"');
     else await x.click('data-confirm-execute');
     await x.settle();
-    assert.match(x.root.html, /data-permissions-status>[^<]*receipt rcpt_1 · trace tr_1/, action);
+    assert.match(x.root.html, /data-permissions-status>[^<]*<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/, action);
     assert.equal(x.calls.filter(c => c.url === '/v2/assessment/a1/grants').length, 2, action);
     assert.equal(x.m.sheet, null);
     assert.doesNotMatch(x.root.html, /secret-confirm|new@example.test/);
@@ -172,7 +172,7 @@ test('post-success refresh refusal/failure hides stale access controls, preserve
       'DELETE /v2/assessment/a1/grants/g_me': () => { changed = true; return { status: 'revoked' }; },
     });
     await x.click('data-revoke="g_me"'); await x.settle();
-    assert.match(x.root.html, /Access removed\. receipt rcpt_1 · trace tr_1/);
+    assert.match(x.root.html, /Access removed\.<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/);
     assert.doesNotMatch(x.root.html, /data-grant-row|data-invite-form|data-transfer-form|data-revoke=/);
     if (code === 'INTERNAL_ERROR') {
       recovered = true;
@@ -180,7 +180,7 @@ test('post-success refresh refusal/failure hides stale access controls, preserve
       // Retry handler returns no promise; allow its read/render lifecycle to settle.
       await new Promise(resolve => setImmediate(resolve));
       assert.match(x.root.html, /data-permissions-state="loaded"/);
-      assert.match(x.root.html, /Access removed\. receipt rcpt_1 · trace tr_1/);
+      assert.match(x.root.html, /Access removed\.<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/);
     }
     assert.equal(x.calls.filter(c => c.method === 'DELETE').length, 1, 'refresh never repeats a mutation');
   }
@@ -220,7 +220,7 @@ test('ownership transfer to a signed-up principal with no prior grant attaches r
   assert.equal(x.m.receipts.new_principal, undefined);
   const row = x.root.html.match(/<tr data-grant-row="g_new_owner">[\s\S]*?<\/tr>/)?.[0];
   assert.match(row, /receipt rcpt_1 · trace tr_1/);
-  assert.match(x.root.html, /data-permissions-status>Ownership transfer done\. receipt rcpt_1 · trace tr_1/);
+  assert.match(x.root.html, /data-permissions-status>Ownership transfer done\.<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/);
 });
 
 test('confirm sheet Cancel dismisses before execute and is ignored while the write is in flight', async () => {

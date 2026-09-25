@@ -1,6 +1,8 @@
 // Reusable entity cards — same markup for browser pages and MCP-rendered summaries (cookbook #16 mandate: reusable cards).
 // Pure functions: HTML strings only, no fetch, no DOM. Every text value passes through esc().
 export const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Shared human date (was views.js): "Sep 25, 2026, 4:18 PM"; a non-date is shown as given. Never a raw ISO stamp on screen (B31).
+export function humanDate(iso) { const d = new Date(iso); return isNaN(d) ? String(iso || '') : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
 export const enc = v => encodeURIComponent(String(v ?? ''));
 // v3 plain state words (lane 1; must match ui/v3-shell.js STATE_WORDS — cards.js is inlined into the MCP panel, so no import).
 // v2 words, for a one-line revert: { prepare: 'In preparation', collect: 'Collecting', understand: 'Understanding', improve: 'Improving' }
@@ -32,5 +34,5 @@ export const routes = Object.freeze({
 });
 export const workspaceCard = w => card({ eyebrow: 'Workspace', title: w.name, href: routes.workspace(w.id), counts: childCounts([[w.project_count, 'project'], [w.assessment_count, 'assessment'], [w.response_count, 'response']]), meta: [w.role ? `Your role: ${w.role}` : ''], badge: w.archived_at ? 'Archived' : '', archived: !!w.archived_at, id: w.id });
 export const projectCard = p => card({ eyebrow: 'Project', title: p.name, href: routes.project(p.id), counts: childCounts([[p.assessment_count, 'assessment'], [p.response_count, 'response']]), meta: [p.role ? `Your role: ${p.role}` : ''], badge: p.archived_at ? 'Archived' : '', archived: !!p.archived_at, id: p.id });
-export const assessmentCard = a => card({ eyebrow: 'Assessment', title: a.name, href: routes.assessment(a.id), counts: childCounts([[a.response_count, 'response']]), meta: [a.language_name || a.language_id ? `Language: ${a.language_name || a.language_id}` : ''], badge: a.archived_at ? 'Archived' : stageLabel(a.stage), archived: !!a.archived_at, id: a.id });
+export const assessmentCard = a => card({ eyebrow: 'Assessment', title: a.name, href: routes.assessment(a.id), counts: childCounts([[a.response_count, 'response']]), meta: [a.language_name ? `Language: ${a.language_name}` : ''] /* B31: never a raw lang_… id */, badge: a.archived_at ? 'Archived' : stageLabel(a.stage), archived: !!a.archived_at, id: a.id });
 export const surveyCard = (aid, s) => card({ eyebrow: s.perspective || 'Survey', title: s.template_name || s.template_id || s.id, href: routes.survey(aid, s.id), meta: [s.version ? `Version ${s.version}` : ''], badge: s.archived_at ? 'Archived' : '', archived: !!s.archived_at, id: s.id });
