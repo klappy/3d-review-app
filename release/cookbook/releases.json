@@ -1,7 +1,18 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.21.5",
+  "current": "0.21.6",
   "versions": [
+    {
+      "version": "0.21.6",
+      "status": "candidate",
+      "notes_path": "releases/0.21.6.md",
+      "sections": {
+        "changed": [
+          "Sign in by email link: enter your email, open the link we send (it works for 30 minutes, on any device) — no more one-time PIN; DEV only, behind MAGIC_LINK — production keeps Cloudflare Access. Signing out clears the session cookie with the same protections it was set with (HttpOnly, Secure, SameSite=Lax), in every environment (Bincy B38) (#305)",
+          "/roadmap shows the versions list only; stale work-item feed removed (captain 18:20) (#307)"
+        ]
+      }
+    },
     {
       "version": "0.21.5",
       "status": "candidate",
