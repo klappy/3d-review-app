@@ -195,6 +195,16 @@ test('entry: survey code stores participant token and hands off to legacy /#part
   assert.equal(stored.participantToken, 'ptok'); assert.deepEqual(assigned, ['/legacy/#participant']);
 });
 
+test('U08: a used or unknown access code says what to do next, not "Not allowed here."', async () => {
+  const assigned = []; globalThis.window = { location: { assign: u => assigned.push(u) } };
+  const ctx = ctxWith({ 'POST /v2/participate/code': err('NOT_FOUND_OR_NOT_VISIBLE', 'access code not found or not visible') });
+  const m = await pages.entry.load(ctx, {}); m.mode = 'survey'; const root = mount(pages.entry, ctx, m);
+  const form = root.querySelector('#code-form'); form.elements.code.value = 'ZZZ'; await form.fire('submit');
+  assert.deepEqual(assigned, []);
+  assert.equal(ctx.notes.at(-1).m, 'This code has been used or is not valid. Check it, or ask the person who gave it to you for a new one.');
+  assert.equal(ctx.notes.at(-1).a, true);
+});
+
 // ---------- writes ----------
 test('workspaces: create goes to the new workspace; NOT_AUTHORIZED shows the server message', async () => {
   const ctx = ctxWith({ 'GET /v2/workspaces': { workspaces: [] }, 'POST /v2/workspaces': { workspace: { id: 'ws9', name: 'N' } } });

@@ -10,7 +10,7 @@ import { reviewAnswer, templateChoices } from './present.js';
 import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
 import { renderList, renderReport, upsertRow } from './report-view.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
-import { copy as sharedCopy, createSharedLinkClient, fill, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
+import { copy as sharedCopy, createSharedLinkClient, fill, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
 // Thrown by shared-link paths that already showed the participant copy: run() marks the action as
 // needing attention without painting raw server text into #error.
 class HandledFailure extends Error { constructor() { super('handled'); this.name = 'HandledFailure'; } }
@@ -632,7 +632,7 @@ function showReceipt(result) {
   text($('participant-resume'), resumeNoticeAfterReceipt(result, $('participant-resume').textContent));
   $('receipt').hidden = false;
   if (result.submitted !== false) { $('review').hidden = true; $('answers').hidden = true; participantView?.showReceipt(); }
-  if (state.shared && result.submitted !== false) text($('participant-resume'), `${sharedCopy.receiptThanks} ${sharedCopy.sameLinkOthers}`);
+  if (state.shared && result.submitted !== false) text($('participant-resume'), receiptNotice(state.form?.template?.perspective));
 }
 bindClick('recover', 'Recovering receipt…', async () => {
   let receipt;

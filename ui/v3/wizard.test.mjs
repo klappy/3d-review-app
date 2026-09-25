@@ -305,3 +305,12 @@ test('B20 (Bincy SI 04): step 2 groups surveys under one heading per perspective
   assert.match(html, /Mid-Level/); assert.equal((html.match(/name="g"/g) || []).length, 4, 'every survey still selectable');
   assert.doesNotMatch(renderStep('participants', freshDraft(), { templates: [{ id: 'x', version: 1, perspective: 'Reviewer', name: 'R' }] }), /Experience of/);
 });
+
+test('B36 launched screen: one labelled row per group (group · survey) with Copy link and Show QR code; still one primary', () => {
+  const tpls = [{ id: 'tpl.team', version: 1, name: 'Team', perspective: 'Translation team' }, { id: 'tpl.comm', version: 1, name: 'Listening', perspective: 'Community' }];
+  const h = renderDone({ aid: 'a1', links: [{ survey: 's1', template: 'tpl.team', entry_fragment: '#survey=AAA' }, { survey: 's2', template: 'tpl.comm', entry_fragment: '#survey=BBB' }] }, 'https://x', tpls);
+  assert.match(h, /Translation team <span aria-hidden="true">·<\/span> Team/); assert.match(h, /Community <span aria-hidden="true">·<\/span> Listening/);
+  assert.equal((h.match(/data-group-copy="s[12]"/g) || []).length, 2); assert.equal((h.match(/data-group-qr="s[12]"/g) || []).length, 2);
+  assert.match(h, /#survey=AAA/); assert.match(h, /#survey=BBB/);
+  assert.equal((h.match(/class="primary"/g) || []).length, 1);
+});

@@ -116,3 +116,18 @@ test('failed first open then clean reload asks for original link without claimin
     assert.ok(![...reload.data.values()].includes('link-secret'), 'raw link token is never retained');
   }
 });
+test('B26: the thank-you names the survey\'s own group, for Church and Translation Team links alike', async () => {
+  for (const perspective of ['Church', 'Translation Team']) {
+    const h = harness({ handle: url => url.endsWith('/form') ? response({ ...form, template: { ...form.template, perspective } }) : null });
+    await h.journey.start(); h.journey.review({ q: 'answer' }); await h.journey.submit();
+    assert.equal(h.journey.state.phase, 'receipt');
+    assert.ok(h.journey.state.notice.includes(`grouped with others from the ${perspective} perspective.`), h.journey.state.notice);
+    assert.ok(!/community/i.test(h.journey.state.notice));
+  }
+});
+test('B26: a receipt reopened without the form names no other group', async () => {
+  const h = harness({ handle: url => url.endsWith('/receipt') ? response({ submitted: true, response_id: 'old' }) : null });
+  await h.journey.start();
+  assert.equal(h.journey.state.notice, `${copy.receiptThanksNoGroup} ${copy.sameLinkOthers}`);
+  assert.ok(!/community/i.test(h.journey.state.notice));
+});
