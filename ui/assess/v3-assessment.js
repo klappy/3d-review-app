@@ -228,7 +228,9 @@ export function v3NextSerialize({ text = '', areas = [], other = '', complete = 
   if (o) t.push(T_OTHER + o);
   if (complete) t.push(T_DONE);
   const body = String(text ?? '');
-  if (!t.length) return body;
+  // No markers: the user's own text is stored as typed, unless its last lines would read back as markers (e.g. a typed
+  // "[This review is complete.]"); then one blank last line stops the parser, so typed text never locks or moves anything.
+  if (!t.length) return v3NextParse(body).text === body ? body : `${body}\n`;
   const trimmed = body.replace(/\s+$/, '');
   return (trimmed ? `${trimmed}\n\n` : '') + t.join('\n');
 }

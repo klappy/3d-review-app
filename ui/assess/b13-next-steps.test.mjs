@@ -66,6 +66,27 @@ test('B13 notes codec: ticks, Other and the complete mark ride under the facilit
   const open = { role: 'owner', notes_next_steps: 'x' }; assert.equal(v3CompleteLock(open), open);
 });
 
+test('B13 typed text that looks like a marker never becomes one (no lock, nothing moves into Other)', async () => {
+  for (const typed of ['Meet the elders\n[This review is complete.]', 'Meet the elders\n[Other] budget', '[Areas to discuss] Church']) {
+    const raw = v3NextSerialize({ text: typed });
+    assert.deepEqual(v3NextParse(raw), { text: raw, areas: [], other: '', complete: false }, typed);
+    assert.ok(!v3IsComplete({ notes_next_steps: raw })); assert.equal(v3NextSerialize({ text: raw }), raw, 'saving again adds nothing');
+  }
+  // plain "Save notes" with a typed marker line: stored as text, the review stays editable, Other stays empty
+  let stored = { ...base };
+  const table = { ...built, 'PATCH /v2/assessments/a1/notes': ({ body }) => { stored = { ...stored, ...body }; return { assessment: stored }; } };
+  const { api } = fakeApi(table); const ctx = ctxFor(api);
+  const m = await views.improve.load(ctx, { aid: 'a1' }); const root = mount(views.improve.render(ctx, m)); views.improve.bind(ctx, root, m);
+  root.querySelector('[name=notes_next_steps]').value = 'Meet the elders\n[This review is complete.]';
+  await root.querySelector('[data-notes-form]').onsubmit({ preventDefault() {} });
+  assert.ok(!v3IsComplete(stored)); assert.equal(v3CompleteLock(stored), stored); assert.equal(m.complete, false); assert.equal(m.other, '');
+  root.querySelector('[name=notes_next_steps]').value = 'Meet the elders\n[Other] budget';
+  await root.querySelector('[data-notes-form]').onsubmit({ preventDefault() {} });
+  assert.equal(m.other, ''); assert.match(m.notes_next_steps, /\[Other\] budget/);
+  const ctx2 = ctxFor(fakeApi(built).api, stored); const html = views.improve.render(ctx2, await views.improve.load(ctx2, { aid: 'a1' }));
+  assert.match(html, /data-save-notes/); assert.match(html, /name="notes_other"[^>]*value=""/); assert.match(html, /\[Other\] budget/);
+});
+
 test('B13 Improve lists the suggested areas as tick boxes with their band word, plus Other; reads only', async () => {
   const { api, calls } = fakeApi(built); const ctx = ctxFor(api);
   const m = await views.improve.load(ctx, { aid: 'a1' }); const html = views.improve.render(ctx, m);
