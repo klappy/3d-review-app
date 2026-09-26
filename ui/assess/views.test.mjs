@@ -308,7 +308,7 @@ test('B35: "Build the results" on the band block previews, confirms once in plac
   const band = () => root.querySelector('[data-v3-results]');
   await band().querySelector('[data-results-build]').onclick(); assert.equal(built, false);
   const box = band().querySelector('[data-results-preview]');
-  assert.match(box.textContent, /immutable report/); assert.equal(root.querySelectorAll('[data-confirm-report]').length, 1, 'one confirm, in the band block');
+  assert.equal(box.querySelector('[data-confirm-text]').textContent, 'Build results from 3 responses? Everyone with access can see them.'); assert.doesNotMatch(box.textContent, /immutable|checked again/); assert.equal(root.querySelectorAll('[data-confirm-report]').length, 1, 'one confirm, in the band block');
   assert.deepEqual([...box.querySelectorAll('button')].map(b => b.textContent), ['Build the results', 'Not now']);
   const visibleBuild = () => [...root.querySelectorAll('button')].filter(b => b.textContent === 'Build the results' && !b.hidden).length;
   assert.equal(visibleBuild(), 1, 'U35: the trigger hides while its confirm is open');
@@ -319,4 +319,11 @@ test('B35: "Build the results" on the band block previews, confirms once in plac
   assert.ok(m.bandScores?.Community, 'bands filled from the report just built'); assert.equal(band().querySelector('[data-results-build]'), null);
   assert.equal(band().querySelector('[data-results-status]').textContent, 'Results built.');
   assert.doesNotMatch(root.textContent, /Server policy words|Open it from the current report list/);
+});
+test('U43: the build confirm is one sentence with the response count', async () => {
+  const { buildConfirmText, responsesOf } = await import('./report-build.js');
+  assert.equal(buildConfirmText(1), 'Build results from 1 response? Everyone with access can see them.');
+  assert.equal(buildConfirmText(null), 'Build results from these responses? Everyone with access can see them.');
+  const counts = new Map([['a', { status: 'loaded', responses: 2 }], ['b', { status: 'failed' }], ['c', { status: 'loaded', responses: 4 }]]);
+  assert.equal(responsesOf({ counts }), 6); assert.equal(responsesOf({ counts: new Map([['b', { status: 'failed' }]]) }), null); assert.equal(responsesOf({}), null);
 });

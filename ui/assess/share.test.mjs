@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { render, bind, shareFor, blankShare, copy, qrSvg, invitationSheetHtml, CAN_SHARE, css } from './share.js';
+import { render, bind, shareFor, blankShare, copy, qrSvg, invitationSheetHtml, CAN_SHARE, css, rememberLink } from './share.js';
 
 const read = n => readFileSync(fileURLToPath(new URL(n, import.meta.url)), 'utf8');
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -313,4 +313,28 @@ test('U36: the survey Share card and Collect share one link per survey; the card
   const c = new Map(); const l = await cachedLink(c, key, async () => ({ id: 'inv_2', url: 'U2' })); assert.equal(knownLink(c, key), l, 'a Collect-issued link is readable by the card');
   rememberLink(c, key, { id: 'inv_3', url: 'U3' }); assert.equal((await cachedLink(c, key, async () => ({ url: 'X' }))).url, 'U3');
   c.set(key, { uncertain: true }); assert.equal(knownLink(c, key), null);
+});
+
+test('U36: two consecutive views of a survey reuse the same active link (launch → Collect → survey page); new only when none is active', async () => {
+  const { issueLink, cachedLink, knownLink, linkKey, rememberLaunchLink } = await import('./share.js');
+  let issued = 0;
+  const { api } = fakeApi({ [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300 } : { link_id: `inv_${++issued}`, entry_fragment: `#survey=TOK${issued}`, expires_at: null } });
+  const cache = new Map(), k = linkKey('a1', 's1'), issue = () => issueLink(api, { aid: 'a1', sid: 's1', origin: 'https://example.test' });
+  assert.equal(k, 'a1|s1'); // no data epoch in the key: navigating away and back, or a refetch, keeps the survey's link
+  const first = await cachedLink(cache, k, issue);   // view 1 (Collect: Copy)
+  const second = await cachedLink(cache, k, issue);  // view 2 (Collect again after leaving the page)
+  assert.equal(issued, 1); assert.equal(second.url, first.url); assert.equal(knownLink(cache, k).id, 'inv_1'); // view 3 (survey page)
+  // the launch page's link is the survey's active link: Collect and the survey page reuse it and issue nothing
+  const launched = new Map();
+  rememberLaunchLink(launched, 'a1', { id: 'inv_L', survey: 's1', entry_fragment: '#survey=LAUNCH', expires_at: null }, 'https://example.test');
+  assert.match((await cachedLink(launched, k, issue)).url, /#survey=LAUNCH$/); assert.equal(knownLink(launched, k).id, 'inv_L'); assert.equal(issued, 1);
+  rememberLaunchLink(launched, 'a1', { id: 'bad', survey: 's2', entry_fragment: 'nope' }); assert.equal(launched.has(linkKey('a1', 's2')), false);
+  // an expired link is not active: the next view issues a fresh one
+  const old = new Map(); rememberLink(old, k, { id: 'inv_old', url: 'https://example.test/#survey=OLD', expires_at: '2020-01-01T00:00:00.000Z' });
+  assert.equal(knownLink(old, k), null); assert.equal((await cachedLink(old, k, issue)).id, 'inv_2');
+  // the survey page's Share card delivers the already-active link without a new execute
+  const links = new Map(); rememberLink(links, k, first); // issued meanwhile on Collect
+  const m = mount('owner', { [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300 } : { link_id: 'inv_X', entry_fragment: '#survey=X', expires_at: null } }, {}, { links, linkKey: k });
+  await m.click('data-share-open'); await m.click('data-share-copy');
+  assert.equal(m.clipboard.text, first.url); assert.equal(m.calls.filter(c => c.body?.mode === 'execute').length, 0);
 });

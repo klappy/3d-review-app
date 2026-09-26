@@ -18,7 +18,7 @@ import { groupLinks, bindGroupLinks, printAllButton, bindPrintAll } from '../ass
 import { stepper as stepperComponent, ensureStepperStyle } from './components/stepper.js';
 import { learnMore } from './components/learn-more.js';
 import { PRIVACY_LINE } from './components/privacy-line.js';
-import { packPeriod, parsePeriod, periodText, periodErrors, formatDate, todayIso } from './components/active-until.js';
+import { packPeriod, parsePeriod, periodText, periodErrors, formatDate, todayIso, PAST_UNTIL } from './components/active-until.js';
 import { deleteAssessmentFlow } from './components/delete-assessment.js';
 import { whoLine } from '../assess/scope.js';
 import { groupFields, contextValues } from './components/context-fields.js';
@@ -69,14 +69,14 @@ export function latestTemplates(templates = []) {
   return [...best.values()].sort((a, b) => String(a.perspective).localeCompare(String(b.perspective)) || String(a.name).localeCompare(String(b.name)));
 }
 
-export function validateStep(step, d) {
+export function validateStep(step, d, today = todayIso()) {
   const errs = [];
   if (step === 'details') {
     if (!d.name.trim()) errs.push('Give the review a name.');
     if (!d.project) errs.push('Choose a project.');
     if (d.project === NEW_PROJECT) { if (!d.newProject.trim()) errs.push('Name the new project.'); if (!d.newLanguage.trim()) errs.push('Name the language.'); if ((d.newLangCode || '').trim() && !LANG_CODE.test(d.newLangCode.trim())) errs.push('Language code: use an ISO 639 code such as "hil" or "en-US" (qaa–qtz for an unlisted language), or leave it blank.'); }
     else if (d.project && !d.language) errs.push('Choose a language.');
-    errs.push(...periodErrors(d.starts, d.until)); // B41: Active until required, Starts optional
+    errs.push(...periodErrors(d.starts, d.until, today)); // B41/U46: Active until required and not past, Starts optional
   }
   if (step === 'participants' && !Object.keys(d.groups).length) errs.push('Choose at least one group.');
   return errs;
@@ -163,7 +163,9 @@ async function launchInner(d, opts) {
         const url = `/v2/assessments/${enc(ctx.aid)}/surveys/${enc(s.id)}/links`;
         const dry = await api(url, { method: 'POST', body: { params: {}, mode: 'dry_run' } });
         const r = await api(url, { method: 'POST', body: { params: {}, mode: 'execute', confirm_token: dry.confirm_token } });
-        ctx.links.push({ survey: s.id, template: s.template, entry_fragment: r.entry_fragment, expires_at: r.expires_at || null });
+        const row = { id: r.link_id || null, survey: s.id, template: s.template, entry_fragment: r.entry_fragment, expires_at: r.expires_at || null };
+        ctx.links.push(row);
+        try { opts.onLink?.(ctx.aid, row); } catch {} // U36: the host keeps this as the survey's active link (Collect/survey page reuse it)
         ctx.done.push(step.cap);
       }
       continue;
@@ -312,7 +314,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   const chosen = templates.filter(t => d.groups[t.id]);
   const pre = new Map((data.pre || []).map(x => [x.template, x])); // B06f: surveys a saved draft already holds — locked on step 2
   const saved = !!data.saved, act = (back, primary) => actions(back, primary, saved); // B06: saved draft — project is fixed
-  if (step === 'details') return `${head(n, 'Assessment details', 'You can change these later.', '<p class="muted">Only what the review needs.</p>')}${errBox(errs)}
+  if (step === 'details') return `${head(n, 'Assessment details', 'You can change these later.', '<p class="muted">Only what the review needs.</p>')}${errBox(errs.filter(e => e !== PAST_UNTIL))}
     <form data-wz-form="details">
       <label>Name<input name="name" value="${esc(d.name)}" required placeholder="e.g. October assessment"></label>
       <div class="grid">
@@ -324,7 +326,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       ${isNew ? `<label>Language<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (ISO 639, optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. hil — qaa–qtz if unlisted" autocapitalize="off" spellcheck="false"></label>` : ''}
       <div class="grid">
         <label>Starts (optional)<input type="date" name="starts" value="${esc(d.starts)}"></label>
-        <label>Active until<input type="date" name="until" value="${esc(d.until)}" required></label>
+        <label>Active until<input type="date" name="until" value="${esc(d.until)}" required>${errs.includes(PAST_UNTIL) ? `<span class="wz-field-error" role="alert" data-until-error>${PAST_UNTIL}</span>` : ''}</label>
       </div>
       <div class="grid">
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
@@ -461,7 +463,7 @@ export function mountWizard(root, deps) {
     if (act === 'open') return deps.go?.(deps.assessmentHref ? deps.assessmentHref(b.dataset.aid) : `#/a/${enc(b.dataset.aid)}`);
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
-      try { const done = await launch(s.d, { api: deps.api, store: deps.store, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; if (s.saved) clearWip(session, s.saved.aid); s.done = done; s.partial = null; paint(); }
+      try { const done = await launch(s.d, { api: deps.api, store: deps.store, onLink: deps.onLink, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; if (s.saved) clearWip(session, s.saved.aid); s.done = done; s.partial = null; paint(); }
       catch (err) { if (!alive) return; const c = err.ctx, made = c ? c.done.length - (c.base || 0) : 0; s.partial = (made > 0 || c?.pending) ? c : s.partial; s.step = 'review'; note(new Error(s.partial ? `${err.message || err} ${s.partial.done.length - (s.partial.base || 0)} of the launch writes were done${s.partial.pending ? ' and the last one may have gone through' : ''}. "Continue the launch" checks what was saved and picks up from there; edits stay locked until then.` : `${err.message || err} ${s.saved ? 'Nothing more was saved; the draft is kept.' : 'Nothing was created.'} You can edit and launch again.`)); }
       finally { s.busy = false; }
     }

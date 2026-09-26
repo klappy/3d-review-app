@@ -158,6 +158,7 @@ export function bind(ctx, root, { current, survey, share, api, apiFull = null, o
   });
   const deliver = async action => {
     if (!live() || share.stage === 'busy' || !CAN_SHARE.has(current.assessment.role)) return;
+    if (!share.link && links && linkKey) { const known = knownLink(links, linkKey); if (known) { share.link = known; share.confirm = null; share.stage = 'linked'; } } // U36: issued meanwhile (Collect/launch) — reuse it
     if (!share.link) {
       if (!share.confirm || now() >= share.deadline) { share.confirm = null; fail('Sharing options expired. Try sharing again.'); return; }
       const confirm_token = share.confirm;
@@ -301,10 +302,11 @@ export async function issueLink(api, { aid, sid, origin = globalThis.location?.o
 // Collect's per-key link cache. A certain failure clears the key; an uncertain one (the execute may have created a link) keeps
 // an uncertain mark for the (aid, sid, epoch) key: every later tap shows the Share card's warning again and issues nothing, so a
 // repaint that wipes the row's message can never turn the next tap into a silent second link. A new link is then a deliberate
-// act on the survey's Share card, or follows a refresh (new epoch).
-export function cachedLink(cache, k, issue) {
-  const cur = cache.get(k);
+// act on the survey's Share card.
+export function cachedLink(cache, k, issue, now = Date.now) {
+  let cur = cache.get(k);
   if (cur?.uncertain) return Promise.reject(failure());
+  if (cur?.link && !liveLink(cur.link, now)) { cache.delete(k); cur = null; } // an expired link is never handed out again
   if (!cur) {
     const p = issue().then(l => { p.link = l; return l; }, e => { if (cache.get(k) === p) { if (e?.uncertain) cache.set(k, { uncertain: true }); else cache.delete(k); } throw e; });
     cache.set(k, p);
@@ -312,10 +314,19 @@ export function cachedLink(cache, k, issue) {
   return cache.get(k);
 }
 
-// U36: one link per survey per page load. The survey's Share card and Collect's rows read and write the same in-memory entry,
-// so Copy / QR / Print anywhere reuse the survey's current link instead of minting one per tap. The server keeps only a hash
-// of each token, so after a reload the link cannot be read back and sharing again makes a new one (see the card's sentence).
-export function knownLink(cache, k) { const c = cache?.get(k); return c && !c.uncertain && c.link ? c.link : null; }
+// U36: one active link per survey. The launch page, Collect's rows and the survey's Share card read and write the same
+// in-memory entry keyed by linkKey(aid, sid) — not by the data epoch, so moving between pages or refreshing the assessment
+// data keeps the survey's link. A new link is issued only when none is active here (none yet, revoked here, expired) or on the
+// Share card's explicit new-link action. The entry is dropped with identity. The server keeps only a hash of each token, so
+// after a browser reload the link cannot be read back and sharing again makes a new one (see the card's sentence).
+export const linkKey = (aid, sid) => `${aid}|${sid}`;
+const liveLink = (l, now = Date.now) => !l.expires_at || !(Date.parse(l.expires_at) <= now());
+export function knownLink(cache, k, now = Date.now) { const c = cache?.get(k); return c && !c.uncertain && c.link && liveLink(c.link, now) ? c.link : null; }
 export function rememberLink(cache, k, link) { const p = Promise.resolve(link); p.link = link; cache.set(k, p); }
+// The launch page's links (wizard ctx.links rows) join the same cache, so Collect and the survey page reuse them.
+export function rememberLaunchLink(cache, aid, row, origin = globalThis.location?.origin) {
+  if (!cache || !aid || !row?.id || !row.survey || typeof row.entry_fragment !== 'string' || !/^#survey=[A-Za-z0-9_-]+$/.test(row.entry_fragment)) return;
+  rememberLink(cache, linkKey(aid, row.survey), { id: row.id, url: shareUrl(origin, row.entry_fragment), expires_at: row.expires_at || null });
+}
 
 export const css = `.share-codes{margin-top:14px;border-top:1px solid var(--line,#ddd);padding-top:10px}.share-codes-list{columns:2;gap:24px;font-size:18px;line-height:1.8}.share-groups{list-style:none;padding:0;margin:10px 0;display:grid;gap:10px}.share-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.share-group-label{font-weight:600;flex:1 1 180px;min-width:0}.share-group-url{flex:1 1 100%;min-width:0;font-size:13px}.share-actions{display:flex;gap:6px;flex-wrap:wrap}.share-print-all{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:12px 0}.share-group [data-group-status]{flex:1 1 100%;word-break:break-all}.share-group [data-group-status]:empty{display:none}.share-group .share-qr{flex:1 1 100%}.share-link code{word-break:break-all;user-select:all}.share-qr{margin:14px 0 0;max-width:220px}.share-qr svg{width:100%;height:auto;display:block;background:#fff;border-radius:8px}.share-sheet{display:none}@media print{.share-sheet{display:block}.share-sheet-print{font:16px/1.5 sans-serif;padding:24px;max-width:640px}.share-sheet-url{word-break:break-all;font-family:monospace;font-size:15px}.share-sheet-qr svg{width:240px;height:240px}.share-all{max-width:none;padding:0}.share-all h1{font-size:20px;margin:0 0 4px}.share-all-list{list-style:none;padding:0;margin:12px 0 0}.share-all-item{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-top:1px solid #ccc;break-inside:avoid;page-break-inside:avoid}.share-all-item h2{font-size:16px;margin:0 0 2px}.share-all-item p{margin:0 0 2px}.share-all-qr svg{width:110px;height:110px}.share-all .share-sheet-url{font-size:11px}@page{margin:12mm}}`;

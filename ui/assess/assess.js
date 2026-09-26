@@ -11,7 +11,7 @@ import { breadcrumbs } from '/v3/components/breadcrumbs.js';
 import { sidebarTree } from '/v3/components/sidebar-tree.js';
 // lane 9 L9-24: shared closed-by-default disclosure
 import { learnMore } from '/v3/components/learn-more.js';
-import { activeUntilLine, periodText } from '/v3/components/active-until.js';
+import { collectLine, periodText } from '/v3/components/active-until.js';
 // Bincy B03: `#invite=<token>` is handled here (v3), not forwarded to /legacy/.
 import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment } from '/v3/components/invite.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
@@ -271,14 +271,13 @@ function collectState(status) {
 }
 function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'Other perspective'; }
 // B36: Copy link / Show QR code per group on Collect (owner, member; open surveys). One tap issues the link through the Share
-// card's API pair; the link lives in memory only, keyed to (aid, sid, epoch) and dropped with identity (state.collectLinks).
+// card's API pair; the link lives in memory only, keyed to (aid, sid) and dropped with identity (state.collectLinks, U36).
 function shareable(a, s) { return share.CAN_SHARE.has(a.role) && (s.collection_status === 'open' || a.stage === 'collect'); }
 function bindCollectLinks(current) {
   const root = app.querySelector('[data-collect-panel]'); if (!root) return;
   const aid = current.assessment.id, ep = epoch;
   share.bindGroupLinks(root, { resolve: async sid => {
-    const k = `${aid}|${sid}|${ep}`;
-    for (const key of state.collectLinks.keys()) if (!key.startsWith(`${aid}|`) || !key.endsWith(`|${epoch}`)) state.collectLinks.delete(key);
+    const k = share.linkKey(aid, sid); // U36: the survey's one active link, whichever page issued it
     const link = await share.cachedLink(state.collectLinks, k, () => share.issueLink(api, { aid, sid, origin: location.origin }));
     if (ep !== epoch || state.current?.assessment.id !== aid) throw share.failure(); // a link may exist but is not shown here
     return link.url;
@@ -286,7 +285,7 @@ function bindCollectLinks(current) {
   // B43: "Print all" — one page, every shareable survey (title, one line, QR). Same per-survey cache as the rows: a survey
   // whose link was already issued here reuses it; the rest are issued exactly as one Copy tap would.
   const resolveAll = () => Promise.all(current.surveys.filter(s => shareable(current.assessment, s)).map(async s => {
-    const k = `${aid}|${s.id}|${ep}`;
+    const k = share.linkKey(aid, s.id);
     const link = await share.cachedLink(state.collectLinks, k, () => share.issueLink(api, { aid, sid: s.id, origin: location.origin }));
     if (ep !== epoch || state.current?.assessment.id !== aid) throw share.failure();
     return { title: s.template_name, line: whoLine(lensFor(s)) || lensFor(s), url: link.url };
@@ -296,7 +295,7 @@ function bindCollectLinks(current) {
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
   const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${whoLine(g.lens) ? `<p class="small muted" data-who>${esc(whoLine(g.lens))}</p>` : ''}${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id, title: s.template_name, line: whoLine(g.lens) || g.lens }]) : ''}</div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
-  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${activeUntilLine(a.period) ? `<p class="small muted" data-active-until>${esc(activeUntilLine(a.period))}</p>` : ''}${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose them under Change surveys.</p>'}${current.surveys.some(s => shareable(a, s)) ? share.printAllButton({ esc }) : ''}${learnMore('<p class="small muted">Only responses are counted.</p><p class="small muted">Respondents are counted per survey and are never added up as people.</p>')}</section>`;
+  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${collectLine(a.period) ? `<p class="small muted" data-active-until>${esc(collectLine(a.period))}</p>` : ''}${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose them under Change surveys.</p>'}${current.surveys.some(s => shareable(a, s)) ? share.printAllButton({ esc }) : ''}${learnMore('<p class="small muted">Only responses are counted.</p><p class="small muted">Respondents are counted per survey and are never added up as people.</p>')}</section>`;
 }
 // Cut 2A child screen: ONE survey. B30: one heading (the survey name); Paper/Share are labels, Share is the one primary. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
@@ -406,7 +405,7 @@ function screen(current, view = null) {
   const roleMore = learnMore(`<p class="muted">${roleLine}</p>${a.role === 'viewer' && !a.complete && tab !== 'improve' ? /* Next steps carries its own role note (one, not two) */'<p class="muted">You can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions.</p>' : ''}`);
   // Under the kit shell the eyebrow/h1 are the shell's (one heading); only the unique role line and stage badge remain here.
   // v3 (NEED 3→1): one state-driven primary in the headrow; viewers get none for setup/collect (lane 3 module decides).
-  const primary = !V3_SHELL ? '' : tab === 'collect' && a.stage === 'collect' && (a.role === 'owner' || a.role === 'member') ? stageMoveButton('understand', 'Move to Understand', { primary: true, disabled: state.busy }, esc) /* U34: the one primary on Collect */ : v3StagePrimary(a.stage, a.role === 'owner' || a.role === 'member', v => `#assessment/${encodeURIComponent(a.id)}/${v}`, esc);
+  const primary = !V3_SHELL ? '' : tab === 'collect' && a.stage === 'collect' && (a.role === 'owner' || a.role === 'member') ? stageMoveButton('understand', 'Move to Understand', { primary: true, disabled: state.busy }, esc) /* U34: the one primary on Collect */ : v3StagePrimary(a.stage, a.role === 'owner' || a.role === 'member', v => `#assessment/${encodeURIComponent(a.id)}/${v}`, esc, { current: tab, secondary: tab === 'permissions' }); // U42: none on its own page; secondary on Permissions
   const head = kit ? `<div class="title assessment-head"><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`
     : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1></div><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
   const done = a.complete && tab !== 'improve' ? `<p class="note" data-review-complete>${esc(V3_SUGGEST.done)}</p>` : ''; // B13: one line; Improve draws its own
@@ -456,15 +455,15 @@ function currentShareRoute() {
   if (model && (r.kind !== 'survey' || r.id !== model.aid || r.sid !== model.sid || epoch !== model.epoch)) state.share = null;
   return state.share;
 }
-// U36: the Share card starts from the survey's link already issued on this page load (Collect or an earlier visit), if any.
+// U36: the Share card starts from the survey's active link already issued on this page load (launch, Collect or an earlier visit), if any.
 function shareModel(aid, sid) {
-  const m = share.shareFor(state, aid, sid, epoch), known = share.knownLink(state.collectLinks, `${aid}|${sid}|${epoch}`);
+  const m = share.shareFor(state, aid, sid, epoch), known = share.knownLink(state.collectLinks, share.linkKey(aid, sid));
   if (!m.link && known && m.stage !== 'busy') { m.link = known; m.stage = 'linked'; }
   return m;
 }
 function bindShare(current, s) {
   const root = app.querySelector('#share-root'); if (!root) return;
-  const model = shareModel(current.assessment.id, s.id), linkKey = `${current.assessment.id}|${s.id}|${epoch}`;
+  const model = shareModel(current.assessment.id, s.id), linkKey = share.linkKey(current.assessment.id, s.id);
   const ctx = { esc, enc: encodeURIComponent, isCurrent: () => currentShareRoute() === model };
   const onChange = () => { const el = app.querySelector('#share-root'); if (!el) return; el.innerHTML = share.render(ctx, { current, survey: s, share: model }); share.bind(ctx, el, { current, survey: s, share: model, api, apiFull, onChange, links: state.collectLinks, linkKey }); };
   share.bind(ctx, root, { current, survey: s, share: model, api, apiFull, onChange, links: state.collectLinks, linkKey });
@@ -628,7 +627,9 @@ async function mountNew(gen, resume = null) {
   if (gen !== generation) return;
   if (!mod?.mountWizard) { app.innerHTML = `<div class="narrow panel"><h1>Start a review</h1><p class="muted">The guided setup is not available on this build yet.</p><div class="actions"><a class="rv-btn primary" href="${cards.routes.projects}">Go to your projects</a></div></div>`; return; }
   const ctx = ctxFor();
+  const idg = identityGeneration;
   wizardHandle = mod.mountWizard(app, { api: ctx.api, go: ctx.go, origin: location.origin, assessmentHref: id => `#assessment/${encodeURIComponent(id)}`, resume,
+    onLink: (aid, row) => { if (idg === identityGeneration) share.rememberLaunchLink(state.collectLinks, aid, row, location.origin); }, // U36: Collect and the survey page reuse the launch links
     mark: id => { if (gen !== generation) return; try { history.replaceState(null, '', `${location.pathname}${location.search}#new/${encodeURIComponent(id)}`); } catch {} } }); // U22: a reload reopens this draft
   document.title = `${resume ? 'Continue setup' : 'Start a review'} · 3D Review`;
 }

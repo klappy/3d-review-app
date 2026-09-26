@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { packPeriod, parsePeriod, formatDate, activeUntilLine, periodText, closedLine, periodErrors, todayIso } from './active-until.js';
+import { packPeriod, parsePeriod, formatDate, activeUntilLine, periodText, closedLine, periodErrors, todayIso, collectLine, PAST_UNTIL } from './active-until.js';
 
 test('B41: Starts optional, Active until required, packed into the existing period field', () => {
   assert.equal(packPeriod('2026-09-25', '2026-10-31'), 'Starts 2026-09-25 · Active until 2026-10-31');
@@ -23,8 +23,18 @@ test('B41: plain lines for Collect and participant links', () => {
 });
 
 test('B41: setup validation', () => {
-  assert.equal(periodErrors('', '').length, 1);
-  assert.deepEqual(periodErrors('', '2026-10-31'), []);
-  assert.deepEqual(periodErrors('2026-09-25', '2026-10-31'), []);
-  assert.equal(periodErrors('2026-11-01', '2026-10-31').length, 1);
+  const today = '2026-09-25';
+  assert.equal(periodErrors('', '', today).length, 1);
+  assert.deepEqual(periodErrors('', '2026-10-31', today), []);
+  assert.deepEqual(periodErrors('2026-09-25', '2026-10-31', today), []);
+  assert.equal(periodErrors('2026-11-01', '2026-10-31', today).length, 1);
+});
+
+test('U46: setup refuses a past Active until; Collect says "Closed on <date>" once it has passed', () => {
+  assert.equal(PAST_UNTIL, 'Pick today or later');
+  assert.deepEqual(periodErrors('', '2026-09-24', '2026-09-25'), ['Pick today or later']);
+  assert.deepEqual(periodErrors('', '2026-09-25', '2026-09-25'), [], 'today is allowed');
+  assert.equal(collectLine('Active until 2026-10-31', '2026-10-31'), 'Active until 31 October 2026');
+  assert.equal(collectLine('Starts 2026-09-01 · Active until 2026-10-31', '2026-11-01'), 'Closed on 31 October 2026');
+  assert.equal(collectLine('October 2026', '2099-01-01'), '', 'older free-text periods add nothing');
 });
