@@ -162,8 +162,8 @@ export function v3SetStage(api, enc, aid, action) {
 }
 
 // Screen 11 "Next step" (Bincy 04_screen_inventory #11; prototype V.next frame 11, provisional). Same two stored notes
-// (notes_reflection, notes_next_steps) — no new field: the prototype's "Follow up on" date and Bincy's suggested-areas list
-// are not stored by the contract, so they are not drawn (PARITY A5/I1). The stage move to Improving stays on the Understand
+// (notes_reflection, notes_next_steps) — no new field: the prototype's "Follow up on" date is not drawn (PARITY A5/I1);
+// Bincy's suggested-areas list is drawn from the report bands and saved inside notes_next_steps (B13, V3_SUGGEST below). The stage move to Improving stays on the Understand
 // gate ("Choose a next step", U4); this page only saves the two notes (no second write, no race with navigation — Bugbot on #197).
 export const V3_NEXT = Object.freeze({
   eyebrow: 'Next step', title: 'What happens next?', reflection: 'What you noticed', next: 'The next step',
@@ -171,6 +171,78 @@ export const V3_NEXT = Object.freeze({
   footer: 'There is no fixed schedule. Start another review when it is appropriate; this one keeps its history.',
   save: 'Save notes',
 });
+
+// B13 (lanes-2148, captain ASK 8 option 1; Bincy screen 11): "Suggested areas to discuss" = every area the built report
+// bands Needs support / Needs urgent attention (a perspective, or one of its sub-dimensions), as tick boxes, plus "Other",
+// plus "Complete 3D Review". No new stored field: ticks, Other and the complete mark ride in notes_next_steps as a short
+// plain-words trailer under the facilitator's own text (read back by v3NextParse). The contract has no complete stage, so
+// "complete" is honoured by the app (read-only views), not by the server.
+export const V3_SUGGEST = Object.freeze({
+  heading: 'Suggested areas to discuss', other: 'Other', otherHint: 'Another area to talk about',
+  noReport: 'No report is built yet, so there are no suggested areas.',
+  none: 'No area is banded Needs support or Needs urgent attention in the latest report.',
+  unreadable: 'The suggested areas could not be loaded.',
+  complete: 'Complete 3D Review', completeAsk: 'Complete this review? Nothing in it can be changed afterwards.',
+  completeGo: 'Yes, complete it', done: 'This review is complete.',
+});
+const SUGGEST_BANDS = new Set(['Needs support', 'Needs urgent attention']);
+/** Areas the built report bands Needs support / Needs urgent attention, from v3ReportScores + per-perspective counts
+ *  (same provisional cut-offs and response gate as the band cards). Nothing is written: band words only. */
+export function v3SuggestedAreas(scores, lenses, groups = {}) {
+  const out = [];
+  if (!scores) return out;
+  for (const lens of lenses) {
+    const sc = scores[lens]; if (!sc) continue;
+    const g = groups && groups[lens], n = g && g.loaded ? g.responses : null;
+    const w = v3ScoreBand(sc.score, n);
+    if (SUGGEST_BANDS.has(w)) out.push({ area: v3AreaLabel(lens), band: w });
+    for (const s of sc.subs || []) { const sw = v3ScoreBand(s.score, n); if (SUGGEST_BANDS.has(sw)) out.push({ area: v3AreaLabel(`${lens} · ${s.name}`), band: sw }); }
+  }
+  return out;
+}
+// Trailer lines (plain words, so the raw notes read fine anywhere they are shown). One area list, one Other line, one mark.
+const T_AREAS = '[Areas to discuss] ', T_OTHER = '[Other] ', T_DONE = '[This review is complete.]';
+const oneLine = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+/** An area name as stored: one line, no ";" (the list separator). */
+export function v3AreaLabel(v) { return oneLine(v).replace(/;/g, ','); }
+/** notes_next_steps → { text, areas, other, complete }. Text without a trailer comes back unchanged. */
+export function v3NextParse(raw) {
+  const s = String(raw ?? ''), lines = s.split('\n');
+  let i = lines.length, areas = [], other = '', complete = false, seen = 0;
+  while (i > 0) {
+    const l = lines[i - 1];
+    if (l === T_DONE && !complete) complete = true;
+    else if (l.startsWith(T_AREAS) && !seen) { areas = l.slice(T_AREAS.length).split('; ').map(v3AreaLabel).filter(Boolean); seen = 1; }
+    else if (l.startsWith(T_OTHER) && !other) other = oneLine(l.slice(T_OTHER.length));
+    else break;
+    i--;
+  }
+  if (i === lines.length) return { text: s, areas: [], other: '', complete: false };
+  let j = i; while (j > 0 && lines[j - 1] === '') j--; // the blank line between the facilitator's text and the trailer
+  return { text: lines.slice(0, j).join('\n'), areas, other, complete };
+}
+/** { text, areas, other, complete } → notes_next_steps. Nothing ticked, no Other, not complete → the text alone. */
+export function v3NextSerialize({ text = '', areas = [], other = '', complete = false } = {}) {
+  const list = [...new Set(areas.map(v3AreaLabel).filter(Boolean))], o = oneLine(other), t = [];
+  if (list.length) t.push(T_AREAS + list.join('; '));
+  if (o) t.push(T_OTHER + o);
+  if (complete) t.push(T_DONE);
+  const body = String(text ?? '');
+  // No markers: the user's own text is stored as typed, unless its last lines would read back as markers (e.g. a typed
+  // "[This review is complete.]"); then one blank last line stops the parser, so typed text never locks or moves anything.
+  if (!t.length) return v3NextParse(body).text === body ? body : `${body}\n`;
+  const trimmed = body.replace(/\s+$/, '');
+  return (trimmed ? `${trimmed}\n\n` : '') + t.join('\n');
+}
+/** True when the assessment's notes carry the complete mark. */
+export function v3IsComplete(assessment) { return !!(assessment && v3NextParse(assessment.notes_next_steps).complete); }
+/** The app's read-only lock for a completed review: every view already has its viewer rendering (saved values, no edit
+ *  controls), so the effective role becomes 'viewer'; granted_role keeps the real role for the role line. The server holds no
+ *  complete state (no contract field), so this lock is the app's, not the API's. */
+export function v3CompleteLock(a) {
+  if (!v3IsComplete(a)) return a;
+  return { ...a, complete: true, granted_role: a.role, role: 'viewer' };
+}
 
 // component: Stepper (captain ruling 12:28 + 12:34). The assessment page's stage strip is the wizard's Stepper, imported
 // not copied: the server stage is the active dot, earlier stages ticked, every step links to its view (href from caller).
