@@ -148,11 +148,13 @@ export function page(title: string, body: string, status = 200, nonce?: string):
   return new Response(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} — 3D Review</title><style>${STYLE}</style>${body}</html>`,
     { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "content-security-policy": csp, "referrer-policy": "same-origin" } });
 }
+/** Back to the email form, carrying ONLY the literal next=oauth (never an arbitrary next) so a connector sign-in survives. */
+export const emailFormHref = (next?: "oauth") => (next === "oauth" ? "/v2/auth/email?next=oauth" : "/v2/auth/email");
 const nextField = (next?: "oauth") => (next === "oauth" ? '<input type="hidden" name="next" value="oauth">' : "");
 export const signInPage = (next?: "oauth", note = "") => page("Sign in",
   `<h1>Sign in to 3D Review</h1>${note ? `<p role="alert">${esc(note)}</p>` : ""}<form method="post" action="/v2/auth/email">${nextField(next)}<label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required maxlength="254"><button type="submit">Email me a sign-in link</button></form><p><small>No password. We email you a link that signs you in.</small></p>`);
-export const checkEmailPage = (minutes: number) => page("Check your email",
-  `<h1>Check your email</h1><p role="status">We sent you a sign-in link. It expires in ${minutes} minutes.</p><p><small><a href="/v2/auth/email">Use a different email</a> · <a href="/">Home</a></small></p>`);
+export const checkEmailPage = (minutes: number, next?: "oauth") => page("Check your email",
+  `<h1>Check your email</h1><p role="status">We sent you a sign-in link. It expires in ${minutes} minutes.</p><p><small><a href="${emailFormHref(next)}">Use a different email</a> · <a href="/">Home</a></small></p>`);
 /** Landing page for the emailed link. It NEVER submits by itself (validator B38 #2/#4: login CSRF; script-running mail
  *  scanners would otherwise mint sessions). The script reads `#t=…&e=…`, strips the fragment from history, asks
  *  POST /v2/auth/email/check (mints nothing) whether the link is live and whether `e` matches it, then shows one button:
@@ -162,7 +164,7 @@ export function openPage(nonce: string, next?: "oauth"): Response {
   const action = `/v2/auth/email/open${next === "oauth" ? "?next=oauth" : ""}`;
   return page("Sign in", `<h1>Sign in to 3D Review</h1><form id="f" method="post" action="${action}"><input type="hidden" name="t" id="t"><input type="hidden" name="e" id="e"><button type="submit" id="b" hidden>Sign in</button></form><button type="button" id="r" hidden>Try again</button><p id="m" class="muted">Checking your link…<noscript> Your browser blocked the script this page needs. Open the link in another browser.</noscript></p>
 <script nonce="${nonce}">(function(){var d=document,m=/^#t=([A-Za-z0-9_-]{43})(?:&e=([^&]{1,762}))?$/.exec(location.hash),msg=d.getElementById("m"),b=d.getElementById("b");try{history.replaceState(null,"",location.pathname+location.search)}catch(x){}
-function bad(t){msg.textContent=t;var a=d.createElement("a");a.href="/v2/auth/email";a.textContent=" Request a new link";msg.appendChild(a)}
+function bad(t){msg.textContent=t;var a=d.createElement("a");a.href="${emailFormHref(next)}";a.textContent=" Request a new link";msg.appendChild(a)}
 if(!m){bad("This sign-in link is incomplete.");return}var e="";if(m[2]){try{e=decodeURIComponent(m[2])}catch(x){}}
 var r=d.getElementById("r");function retry(t){msg.textContent=t;r.hidden=false;r.focus()}r.onclick=function(){r.hidden=true;check()};
 function check(){msg.textContent="Checking your link…";fetch("/v2/auth/email/check",{method:"POST",headers:{"content-type":"application/json",accept:"application/json"},body:JSON.stringify({t:m[1],e:e}),credentials:"same-origin",cache:"no-store"}).then(function(x){
@@ -172,10 +174,10 @@ if(!v||!v.valid){bad("This sign-in link is not valid or has expired.");return}
 if(!v.email){bad("This link is incomplete — request a new one.");return}
 d.getElementById("t").value=m[1];d.getElementById("e").value=v.email;b.textContent="Sign in as "+v.email;msg.textContent="Not you? Close this page.";b.hidden=false;b.focus()}).catch(function(){retry("Could not check this link. Check your connection, then try again.")})}check()})();</script>`, 200, nonce);
 }
-export const unnamedLinkPage = () => page("Link incomplete",
-  `<h1>This link is incomplete — request a new one.</h1><p><a href="/v2/auth/email">Request a new link</a></p>`, 400);
-export const badLinkPage = () => page("Link not valid",
-  `<h1>This sign-in link is not valid</h1><p>It may have expired or been copied incompletely.</p><p><a href="/v2/auth/email">Request a new link</a></p>`, 400);
+export const unnamedLinkPage = (next?: "oauth") => page("Link incomplete",
+  `<h1>This link is incomplete — request a new one.</h1><p><a href="${emailFormHref(next)}">Request a new link</a></p>`, 400);
+export const badLinkPage = (next?: "oauth") => page("Link not valid",
+  `<h1>This sign-in link is not valid</h1><p>It may have expired or been copied incompletely.</p><p><a href="${emailFormHref(next)}">Request a new link</a></p>`, 400);
 export const newNonce = (): string => b64u(crypto.getRandomValues(new Uint8Array(16)));
 
 /** Cross-site form posts are refused: a same-origin POST carries Origin (Referrer-Policy same-origin on our pages).

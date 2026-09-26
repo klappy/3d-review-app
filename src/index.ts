@@ -211,7 +211,7 @@ app.post("/v2/auth/email", async (c) => {
     r.headers.set("retry-after", "900"); return r;
   }
   if (out.state === "unavailable") return json(fail("RESERVED_NOT_BUILT", "email sign-in is not configured here", undefined, "auth.email_link", newTraceId()), 503);
-  return body.json ? json({ ok: true, result: { sent: true, expires_in_minutes: out.minutes } }, 200) : checkEmailPage(out.minutes);
+  return body.json ? json({ ok: true, result: { sent: true, expires_in_minutes: out.minutes } }, 200) : checkEmailPage(out.minutes, next);
 });
 const page429 = (next?: "oauth") => { const r = signInPage(next, "Too many links were requested for this address. Use the newest email, or wait 15 minutes."); return new Response(r.body, { status: 429, headers: r.headers }); };
 app.get("/v2/auth/email/open", (c) => {
@@ -239,14 +239,15 @@ app.post("/v2/auth/email/open", async (c) => {
     r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
   }
   const body = await formOrJson(req);
+  const back = nextOf(new URL(req.url).searchParams.get("next"));
   const link = body ? await verifyMagicToken(env, body.fields.t) : null;
-  if (!link) return badLinkPage();
+  if (!link) return badLinkPage(back);
   // Every open must carry the link's own address, hash-matched to its row (validator 2 #2): a link that does not name its
   // account never signs anyone in — the landing page showed "Sign in as <address>" before the click.
   const shown = await verifiedAddress(body!.fields.e, link.emailHash);
-  if (!shown) return unnamedLinkPage();
+  if (!shown) return unnamedLinkPage(back);
   const pr = await principalForEmailHash(env, link.emailHash);
-  if (!pr) return badLinkPage();
+  if (!pr) return badLinkPage(back);
   // A connector is waiting on THIS browser (GET /authorize parked a request): show consent, open no web session.
   // Opened in another browser (no park cookie) the link is an ordinary sign-in.
   // Consent names the hash-verified account (checked above for every open).
