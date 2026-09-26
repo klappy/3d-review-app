@@ -310,6 +310,11 @@ test('B35: "Build the results" on the band block previews, confirms once in plac
   const box = band().querySelector('[data-results-preview]');
   assert.match(box.textContent, /immutable report/); assert.equal(root.querySelectorAll('[data-confirm-report]').length, 1, 'one confirm, in the band block');
   assert.deepEqual([...box.querySelectorAll('button')].map(b => b.textContent), ['Build the results', 'Not now']);
+  const visibleBuild = () => [...root.querySelectorAll('button')].filter(b => b.textContent === 'Build the results' && !b.hidden).length;
+  assert.equal(visibleBuild(), 1, 'U35: the trigger hides while its confirm is open');
+  await box.querySelector('[data-cancel-report]').onclick(); assert.equal(box.children.length, 0);
+  assert.equal(band().querySelector('[data-results-build]').hidden, false, 'U35: cancel brings the trigger back'); assert.equal(visibleBuild(), 1);
+  await band().querySelector('[data-results-build]').onclick(); assert.equal(visibleBuild(), 1);
   await box.querySelector('[data-confirm-report]').onclick(); assert.equal(built, true); assert.equal(reloads, 0);
   assert.ok(m.bandScores?.Community, 'bands filled from the report just built'); assert.equal(band().querySelector('[data-results-build]'), null);
   assert.equal(band().querySelector('[data-results-status]').textContent, 'Results built.');

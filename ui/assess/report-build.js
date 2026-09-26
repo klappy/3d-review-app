@@ -18,7 +18,8 @@ export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}, e
   const entries = [{ source: 'reports', trigger: preview, box: root.querySelector('[data-report-preview]'), status: root.querySelector('[data-build-status]'), confirmLabel: 'Build report', cancelLabel: 'Cancel', busyText: 'Building report…' }];
   if (extra?.trigger && extra.box && extra.status) entries.push({ source: 'results', confirmLabel: 'Build the results', cancelLabel: 'Not now', busyText: 'Building the results…', ...extra });
   let pending = null, busy = false, uncertain = false;
-  const clear = () => { pending = null; entries.forEach(e => e.box.replaceChildren()); };
+  // U35: while an entry's confirm is open its trigger is hidden, so one build button shows at a time; clear() brings every trigger back.
+  const clear = () => { pending = null; entries.forEach(e => { e.box.replaceChildren(); e.trigger.hidden = false; }); };
   const disable = on => entries.forEach(e => { e.trigger.disabled = on; });
   const lockRefresh = on => { model.reportBuildBusy = on; if (refresh) refresh.disabled = on; };
   const failure = (e, executing) => {
@@ -38,7 +39,7 @@ export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}, e
       if (r.suppressed !== false || r.status !== 'ready' || typeof r.confirm_token !== 'string' || !r.confirm_token || !Number.isFinite(r.expires_in) || r.expires_in <= 0) throw new Error('Invalid preview');
       pending = { token: r.confirm_token, expires: Date.now() + r.expires_in * 1000 };
       box.innerHTML = `<p>Build a report from this assessment’s responses? This makes an immutable report available to people with access to this assessment. Current inputs and access are checked again when you confirm.</p><div class="actions"><button type="button"${entry.source === 'results' ? ' class="primary"' : ''} data-confirm-report>${entry.confirmLabel}</button><button type="button" class="quiet" data-cancel-report>${entry.cancelLabel}</button></div>`;
-      say('Preview ready. Nothing has been built.');
+      entry.trigger.hidden = true; say('Preview ready. Nothing has been built.');
       box.querySelector('[data-cancel-report]').onclick = () => { if (!current() || busy) return; clear(); say('Cancelled. Nothing was built.'); };
       box.querySelector('[data-confirm-report]').onclick = async () => {
         if (!current() || busy || !pending) return;
