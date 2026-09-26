@@ -314,7 +314,7 @@ test('B08+B20 (Bincy SI 04): step 2 groups surveys under one heading per perspec
   assert.doesNotMatch(renderStep('participants', freshDraft(), { templates: [{ id: 'x', version: 1, perspective: 'Reviewer', name: 'R' }] }), /wz-pnote/);
   // same shared line on the launched screen, once per group above its rows
   const done = renderDone({ aid: 'a1', links: [{ survey: 's1', template: 'c1' }, { survey: 's2', template: 'c2' }, { survey: 's3', template: 't1' }] }, 'https://x.test', templates);
-  assert.equal((done.match(new RegExp(PERSPECTIVE_WHO.church, 'g')) || []).length, 1, 'church who-line once on launch');
+  assert.equal((done.replace(/data-print-line="[^"]*"/g, '').match(new RegExp(PERSPECTIVE_WHO.church, 'g')) || []).length, 1, 'church who-line shown once on launch (B43: the print-only line is an attribute)');
   assert.ok(done.indexOf(PERSPECTIVE_WHO.team) > -1 && done.indexOf(PERSPECTIVE_WHO.church) < done.indexOf('Involved-Pastor'), 'launch who-line above its rows');
   assert.equal((done.match(/data-group-link=/g) || []).length, 3, 'rows unchanged');
 });
@@ -326,6 +326,9 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
   assert.equal((h.match(/data-group-copy="s[12]"/g) || []).length, 2); assert.equal((h.match(/data-group-qr="s[12]"/g) || []).length, 2);
   assert.match(h, /#survey=AAA/); assert.match(h, /#survey=BBB/);
   assert.equal((h.match(/class="primary"/g) || []).length, 1);
+  // B43: each row is the share card (Copy link · QR code · Print) and one secondary "Print all" follows the rows
+  assert.equal((h.match(/data-group-print="s[12]"/g) || []).length, 2);
+  assert.equal((h.match(/data-share-print-all/g) || []).length, 1);
 });
 
 test('B41: setup asks Active until (required) and Starts (optional, default today) on the existing period field', () => {

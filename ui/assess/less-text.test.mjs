@@ -63,6 +63,8 @@ test('L9-24 sign-in: one heading, one sentence, one primary; survey help behind 
   const body = lessText(h, 'sign-in', /<h1\b/g);
   const line = h.slice(h.indexOf('</h1>') + 5).match(/^<p class="muted">([^<]*)<\/p>/); assert.ok(line); assert.equal(sentences(line[1]), 1, 'one sentence under the heading');
   assert.match(body, /Open the link you were given; no sign-in is needed\. <a href="#survey">Have an access code\?<\/a>/);
+  // U28: the new-account line sits under the one primary (not a second line under the heading); still one heading, one primary.
+  assert.equal(count(upFront(h), /New here\? Signing in with your email creates your account\./g), 1);
 });
 
 test('L9-24 admin (permissions): heading + one note; the legacy-acceptance explanation behind Learn more', () => {
