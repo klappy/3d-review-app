@@ -353,7 +353,8 @@ test('project settings (lane 11): editors reach access codes on the existing scr
   const own = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'owner' }, languages: [] } });
   const h = pages.project.render(own, await pages.project.load(own, { id: 'p1' }));
   assert.ok(h.includes('id="project-settings"') && h.includes('Project settings'));
-  assert.ok(/href="\/legacy\/#facilitator" data-kept="access-codes"/.test(h), 'access codes link to the legacy facilitator screen');
+  assert.ok(/href="#project\/p1" data-kept="access-codes"/.test(h), 'access codes stay in v3 (no assessment yet: this project)');
+  assert.ok(!h.includes('/legacy/'), 'no link to the legacy console');
   assert.ok(!/class="[^"]*primary[^"]*"[^>]*data-kept/.test(h), 'kept links never take the page primary');
   assert.ok(/href="#workspaces" data-kept="workspaces"/.test(h), 'workspaces link to the existing #workspaces screen');
   const view = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'viewer' }, languages: [] } });

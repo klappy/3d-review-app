@@ -403,8 +403,10 @@ const project = {
       : `<p class="muted">${ctx.esc(model.assessmentsError)}</p><div class="actions"><button type="button" class="primary" data-act="retry">Retry</button></div>`;
     const langList = model.languages.length ? `<div class="links">${model.languages.map(l => `<p class="small">${ctx.esc(l.name)}${l.code ? ` <span class="muted">(${ctx.esc(l.code)})</span>` : ''}${l.archived_at ? ' <span class="badge">Archived</span>' : ''}</p>`).join('')}</div>` : '<p class="muted">No languages yet.</p>';
     // Lane 11 (LANES.md claim 11:19): retained surfaces (cookbook design-system-v3 PARITY.md, ADOPTION item 7) reachable from project
-    // settings. Links only, to the existing screens; no new capability, contract unchanged. Access codes (C3) live on the legacy facilitator page.
-    const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue paper codes for one survey and release them once to print (choose the assessment and survey there)', href: '/legacy/#facilitator', label: 'Open access codes' },
+    // settings. Links only, to the existing screens; no new capability, contract unchanged. Access codes (C3) live on the survey Share card (U10).
+    // U10: access codes now live on each survey's Share card (v3); the link opens this project's first open assessment.
+    const firstA = model.assessments.find(a => !a.archived_at);
+    const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue paper codes on a survey\'s Share card and print them once (open an assessment, then its survey)', href: firstA ? ctx.routes.assessment(firstA.id) : ctx.routes.project(p.id), label: 'Open access codes' },
       // Workspaces (W1): the existing #workspaces screen — create a workspace, add or remove projects, rename.
       { key: 'workspaces', name: 'Workspaces', what: 'Group projects in a workspace: create one, add or remove projects, rename it', href: ctx.routes.workspaces, label: 'Open workspaces' }];
     const settings = edit ? `<section class="panel" id="project-settings" aria-labelledby="project-settings-title"><p class="eyebrow" id="project-settings-title">Project settings</p><ul class="manage-rows kept-surfaces" aria-label="Kept tools">${kept.map(k => `<li class="manage-row"><span><strong>${ctx.esc(k.name)}</strong></span><a class="button quiet small" href="${ctx.esc(k.href)}" data-kept="${ctx.esc(k.key)}">${ctx.esc(k.label)}</a></li>`).join('')}</ul>${learnMore(kept.map(k => `<p class="small muted"><strong>${ctx.esc(k.name)}</strong>: ${ctx.esc(k.what)}.</p>`).join(''))}</section>` : '';

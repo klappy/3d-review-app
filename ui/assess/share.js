@@ -7,6 +7,7 @@
 //                  DELETE /v2/assessments/{aid}/surveys/{sid}/links/{link_id}
 import { shareUrl } from '../shared-link.js';
 import qrcode from './vendor-qrcode.js';
+import { stageMoveConfirm } from '../v3/components/review-gate.js'; // U10: the shared in-page confirm (never window.confirm)
 import { learnMore } from '../v3/components/learn-more.js'; // B30: the survey screen keeps one heading; the lead sits behind Learn more
 
 export const CAN_SHARE = new Set(['owner', 'member']); // issue_link / revoke_link roles O, M (contract rows)
@@ -21,6 +22,7 @@ export const copy = Object.freeze({
   readOnly: 'Your role here cannot share participant links (owner or member can).',
   notCollecting: 'This assessment is not collecting: the link opens only while the stage is Collect.',
   uncertain: 'The request may have created a link, but its result was not received. Trying again may create another link. Nothing was emailed.',
+  codes: 'Access codes', codesOnce: 'Codes are shown once only: print or save them before you leave this page.',
 });
 
 // One reading of an execute failure, shared by the Share card and Collect: only an answer proving nothing was created (expired
@@ -32,7 +34,11 @@ export function executeFailure(e) {
 }
 export function failure(f = executeFailure()) { return Object.assign(new Error(f.message), { uncertain: f.uncertain, shareMessage: f.message }); }
 
-export function blankShare() { return { stage: 'idle', open: false, confirm: null, deadline: 0, link: null, qr: false, message: null, alert: false }; }
+export function blankShare() { return { stage: 'idle', open: false, confirm: null, deadline: 0, link: null, qr: false, message: null, alert: false, codes: blankCodes() }; }
+// U10: paper access codes on the same card (cap.survey.issue_codes, then cap.survey.export_codes dry_run → confirm_token → execute).
+// Code values live only in this in-memory model, are never stored or logged, and are cleared with the link when identity,
+// assessment, survey or data epoch changes.
+export function blankCodes() { return { stage: 'idle', count: 20, ids: null, confirm: null, deadline: 0, list: null, message: '', alert: false }; }
 // share model keyed to (aid, sid, epoch) — assess.js drops it whenever any of those changes.
 export function shareFor(state, aid, sid, epoch) {
   const s = state.share;
@@ -63,9 +69,24 @@ export function render(ctx, { current, survey, share }) {
       ${link ? `<div class="share-link"><p data-share-url><code>${esc(link.url)}</code></p>${link.expires_at ? `<p class="small muted">Expires ${esc(link.expires_at)}</p>` : ''}</div>` : ''}
       <div class="actions">${ready || busy ? shareActions(ctx, { prefix: 'share', disabled: busy, qrOpen: !!(share.qr && link), primary: true }) : `<button type="button" data-share-open>Try sharing again</button>`}${link ? `<button type="button" class="quiet" data-share-revoke ${busy ? 'disabled' : ''}>${esc(copy.revoke)}</button>` : ''}<button type="button" class="quiet" data-share-close ${busy ? 'disabled' : ''}>Close</button></div>
       ${share.qr && link ? `<figure class="share-qr" data-share-qr-figure>${qrSvg(link.url)}<figcaption class="small muted">Scan to open the survey</figcaption></figure>` : ''}${link ? `<p class="small muted">${esc(copy.onceShown)}</p>` : ''}`;
-  return `<section class="panel" data-share><p class="eyebrow">Share</p>${collecting ? '' : `<p class="small muted">${esc(copy.notCollecting)}</p>`}${actions}${learnMore(`<p class="small muted">${esc(copy.lead)}</p>`)}<p class="small ${share.alert ? 'alert' : 'muted'}" role="status" data-share-status>${esc(share.message || '')}</p></section>`;
+  return `<section class="panel" data-share><p class="eyebrow">Share</p>${collecting ? '' : `<p class="small muted">${esc(copy.notCollecting)}</p>`}${actions}${codesBlock(ctx, survey, share.codes || (share.codes = blankCodes()))}${learnMore(`<p class="small muted">${esc(copy.lead)}</p>`)}<p class="small ${share.alert ? 'alert' : 'muted'}" role="status" data-share-status>${esc(share.message || '')}</p></section>`;
 }
 
+// U10: Access codes — count → preview (dry run) → in-page confirm → shown once → print-ready list. Owners and members only
+// (render returns before this for any other role).
+export function codesBlock(ctx, survey, c) {
+  const esc = ctx.esc, busy = c.stage === 'busy', n = c.ids ? c.ids.length : c.count;
+  const body = c.stage === 'shown' && c.list
+    ? `<ol class="share-codes-list" data-share-codes-list>${c.list.map(x => `<li><code>${esc(x.code)}</code></li>`).join('')}</ol><div class="actions"><button type="button" class="primary" data-share-codes-print>${esc(copy.print)}</button><button type="button" class="quiet" data-share-codes-done>Done</button></div>`
+    : c.stage === 'preview'
+      ? stageMoveConfirm(`Show ${n} access code${n === 1 ? '' : 's'} for ${survey.template_name || 'this survey'} now? ${copy.codesOnce}`, 'Show codes once', esc).replace('data-stage-confirm ', 'data-share-codes-confirm ').replace('data-stage-confirm-go', 'data-share-codes-go').replace('data-stage-confirm-cancel', 'data-share-codes-cancel')
+      : `<div class="actions"><label class="small">How many <input type="number" min="1" max="100" value="${esc(c.count)}" data-share-codes-count${busy || c.ids ? ' disabled' : ''}></label><button type="button" data-share-codes-prepare${busy ? ' disabled' : ''}>${c.ids ? 'Preview again' : 'Preview codes'}</button></div>`;
+  return `<div class="share-codes" data-share-codes><p class="eyebrow">${esc(copy.codes)}</p><p class="small muted">${esc(copy.codesOnce)}</p>${body}<p class="small ${c.alert ? 'alert' : 'muted'}" role="status" data-share-codes-status>${esc(c.message || '')}</p></div>`;
+}
+export function codesSheetHtml(ctx, { current, survey, codes }) {
+  const esc = ctx.esc;
+  return `<div class="share-sheet-print share-codes-sheet"><h1>${esc(survey.template_name || 'Survey')}</h1><p>${esc(current.assessment.name)}${survey.perspective ? ` · ${esc(survey.perspective)} perspective` : ''}</p><p>Each access code opens the survey once. No account is needed.</p><ol class="share-codes-list">${codes.map(x => `<li><code>${esc(x.code)}</code></li>`).join('')}</ol></div>`;
+}
 // Invitation sheet: a print-only element mounted directly on <body> (same approach as the blank-survey print, Auditor 2A-1),
 // removed after printing. Carries the URL, the QR and plain instructions; nothing else about the project.
 export function invitationSheetHtml(ctx, { current, survey, url }) {
@@ -172,6 +193,52 @@ export function bind(ctx, root, { current, survey, share, api, onChange, links =
       Object.assign(share, blankShare()); say(copy.revoked);
     } catch { if (same()) fail('Revocation could not be confirmed. The link may still work. Try revoking it again.'); }
   });
+  bindCodes(ctx, root, { current, survey, share, api, same, live, update, print, doc, now });
+}
+function bindCodes(ctx, root, { current, survey, share, api, same, live, update, print, doc, now }) {
+  const c = share.codes || (share.codes = blankCodes()), base = `/v2/assessments/${ctx.enc(current.assessment.id)}/surveys/${ctx.enc(survey.id)}/codes`;
+  const say = (message, alert = false) => { c.message = message; c.alert = alert; update(); };
+  const ok = () => live() && c.stage !== 'busy' && CAN_SHARE.has(current.assessment.role);
+  root.querySelector('[data-share-codes-prepare]')?.addEventListener('click', async () => {
+    if (!ok()) return;
+    if (!c.ids) {
+      const count = Number(root.querySelector('[data-share-codes-count]')?.value ?? c.count);
+      if (!Number.isInteger(count) || count < 1 || count > 100) { say('Choose between 1 and 100 codes.', true); return; }
+      c.count = count;
+    }
+    c.stage = 'busy'; say('Preparing codes…');
+    try {
+      // Issue the batch once (IDs only, no values; reversible with Undo), then preview the one-time release (dry run).
+      if (!c.ids) { const r = await api(base, { method: 'POST', body: { count: c.count } }); if (!same()) return; if (!Array.isArray(r?.ids) || !r.ids.length) throw new Error('Incomplete result'); c.ids = r.ids; }
+      const d = await api(`${base}/export`, { method: 'POST', body: { params: { ids: c.ids }, mode: 'dry_run' } });
+      if (!same()) return;
+      if (!d?.confirm_token || !(d.expires_in > 0)) throw new Error('Invalid preparation');
+      c.confirm = d.confirm_token; c.deadline = now() + d.expires_in * 1000; c.stage = 'preview'; say('');
+    } catch { if (!same()) return; c.stage = 'idle'; say(c.ids ? 'The codes are issued but could not be previewed. Press Preview again.' : 'Codes could not be prepared. Try again, or sign in if your session has ended.', true); }
+  });
+  root.querySelector('[data-share-codes-cancel]')?.addEventListener('click', () => { if (c.stage !== 'preview') return; c.confirm = null; c.stage = 'idle'; say(''); });
+  root.querySelector('[data-share-codes-go]')?.addEventListener('click', async () => {
+    if (!ok() || c.stage !== 'preview') return;
+    if (!c.confirm || now() >= c.deadline) { c.confirm = null; c.stage = 'idle'; say('The preview expired. Press Preview again.', true); return; }
+    const confirm_token = c.confirm; c.confirm = null; c.stage = 'busy'; say('Showing codes…');
+    try {
+      const r = await api(`${base}/export`, { method: 'POST', body: { params: { ids: c.ids }, mode: 'execute', confirm_token } });
+      if (!same()) return;
+      if (!Array.isArray(r?.codes) || r.codes.some(x => typeof x?.code !== 'string')) throw new Error('Incomplete result');
+      c.list = r.codes.map(x => ({ code: x.code })); c.ids = null; c.stage = 'shown'; say('');
+    } catch (e) {
+      if (!same()) return;
+      const certain = ['CONFIRM_EXPIRED', 'CONFIRM_REQUIRED'].includes(e?.code);
+      c.stage = 'idle'; if (!certain) c.ids = null;
+      say(certain ? 'The preview expired. Press Preview again.' : 'The codes may have been released, but they were not received and cannot be shown again. Prepare new codes.', true);
+    }
+  });
+  root.querySelector('[data-share-codes-print]')?.addEventListener('click', () => {
+    if (!live() || !c.list) return;
+    try { printOnBody(doc, codesSheetHtml(ctx, { current, survey, codes: c.list }), print); }
+    catch { say('Printing did not open. Press Print again.', true); }
+  });
+  root.querySelector('[data-share-codes-done]')?.addEventListener('click', () => { Object.assign(c, blankCodes(), { count: c.count }); update(); });
 }
 
 // B36 (Bincy checklist): one row per group — "Group · Survey", then Copy link and Show QR code as secondary buttons, one tap
@@ -237,4 +304,4 @@ export function cachedLink(cache, k, issue) {
 export function knownLink(cache, k) { const c = cache?.get(k); return c && !c.uncertain && c.link ? c.link : null; }
 export function rememberLink(cache, k, link) { const p = Promise.resolve(link); p.link = link; cache.set(k, p); }
 
-export const css = `.share-groups{list-style:none;padding:0;margin:10px 0;display:grid;gap:10px}.share-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.share-group-label{font-weight:600;flex:1 1 180px;min-width:0}.share-group-url{flex:1 1 100%;min-width:0;font-size:13px}.share-actions{display:flex;gap:6px;flex-wrap:wrap}.share-print-all{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:12px 0}.share-group [data-group-status]{flex:1 1 100%;word-break:break-all}.share-group [data-group-status]:empty{display:none}.share-group .share-qr{flex:1 1 100%}.share-link code{word-break:break-all;user-select:all}.share-qr{margin:14px 0 0;max-width:220px}.share-qr svg{width:100%;height:auto;display:block;background:#fff;border-radius:8px}.share-sheet{display:none}@media print{.share-sheet{display:block}.share-sheet-print{font:16px/1.5 sans-serif;padding:24px;max-width:640px}.share-sheet-url{word-break:break-all;font-family:monospace;font-size:15px}.share-sheet-qr svg{width:240px;height:240px}.share-all{max-width:none;padding:0}.share-all h1{font-size:20px;margin:0 0 4px}.share-all-list{list-style:none;padding:0;margin:12px 0 0}.share-all-item{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-top:1px solid #ccc;break-inside:avoid;page-break-inside:avoid}.share-all-item h2{font-size:16px;margin:0 0 2px}.share-all-item p{margin:0 0 2px}.share-all-qr svg{width:110px;height:110px}.share-all .share-sheet-url{font-size:11px}@page{margin:12mm}}`;
+export const css = `.share-codes{margin-top:14px;border-top:1px solid var(--line,#ddd);padding-top:10px}.share-codes-list{columns:2;gap:24px;font-size:18px;line-height:1.8}.share-groups{list-style:none;padding:0;margin:10px 0;display:grid;gap:10px}.share-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.share-group-label{font-weight:600;flex:1 1 180px;min-width:0}.share-group-url{flex:1 1 100%;min-width:0;font-size:13px}.share-actions{display:flex;gap:6px;flex-wrap:wrap}.share-print-all{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:12px 0}.share-group [data-group-status]{flex:1 1 100%;word-break:break-all}.share-group [data-group-status]:empty{display:none}.share-group .share-qr{flex:1 1 100%}.share-link code{word-break:break-all;user-select:all}.share-qr{margin:14px 0 0;max-width:220px}.share-qr svg{width:100%;height:auto;display:block;background:#fff;border-radius:8px}.share-sheet{display:none}@media print{.share-sheet{display:block}.share-sheet-print{font:16px/1.5 sans-serif;padding:24px;max-width:640px}.share-sheet-url{word-break:break-all;font-family:monospace;font-size:15px}.share-sheet-qr svg{width:240px;height:240px}.share-all{max-width:none;padding:0}.share-all h1{font-size:20px;margin:0 0 4px}.share-all-list{list-style:none;padding:0;margin:12px 0 0}.share-all-item{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-top:1px solid #ccc;break-inside:avoid;page-break-inside:avoid}.share-all-item h2{font-size:16px;margin:0 0 2px}.share-all-item p{margin:0 0 2px}.share-all-qr svg{width:110px;height:110px}.share-all .share-sheet-url{font-size:11px}@page{margin:12mm}}`;
