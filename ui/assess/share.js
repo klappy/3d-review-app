@@ -34,7 +34,7 @@ export function executeFailure(e) {
 }
 export function failure(f = executeFailure()) { return Object.assign(new Error(f.message), { uncertain: f.uncertain, shareMessage: f.message }); }
 
-export function blankShare() { return { stage: 'idle', open: false, confirm: null, deadline: 0, link: null, qr: false, message: null, alert: false, codes: blankCodes() }; }
+export function blankShare() { return { stage: 'idle', open: false, confirm: null, deadline: 0, link: null, message: null, alert: false, codes: blankCodes() }; }
 // U10: paper access codes on the same card (cap.survey.issue_codes, then cap.survey.export_codes dry_run → confirm_token → execute).
 // Code values live only in this in-memory model, are never stored or logged, and are cleared with the link when identity,
 // assessment, survey or data epoch changes.
@@ -154,7 +154,7 @@ export function bind(ctx, root, { current, survey, share, api, apiFull = null, o
   });
   root.querySelector('[data-share-close]')?.addEventListener('click', () => {
     if (share.stage === 'busy') return;
-    share.open = false; share.qr = false; share.confirm = null; share.stage = share.link ? 'linked' : 'idle'; say('');
+    share.open = false; share.confirm = null; share.stage = share.link ? 'linked' : 'idle'; say('');
   });
   const deliver = async action => {
     if (!live() || share.stage === 'busy' || !CAN_SHARE.has(current.assessment.role)) return;
@@ -178,7 +178,7 @@ export function bind(ctx, root, { current, survey, share, api, apiFull = null, o
     if (!same()) return;
     share.stage = 'linked'; say('');
     if (!live()) return;
-    if (action === 'qr') { share.qr = true; update(); return; } // U45: the QR shows inline with the link; no hide
+    if (action === 'qr') return; // U45: the QR already shows inline with the link (render); no toggle state
     if (action === 'copy') {
       try { await clipboard.writeText(share.link.url); if (same()) say(copy.copied); }
       catch { if (same()) say('Your link is ready. Press Copy link again, or select the link text and copy it.', true); }
@@ -256,13 +256,14 @@ function bindCodes(ctx, root, { current, survey, share, api, apiFull, same, live
 
 // B36 (Bincy checklist): one row per group — "Group · Survey", then Copy link and Show QR code as secondary buttons, one tap
 // each. The same copy strings, QR and clipboard path as the Share card above; used on the launched screen and on Collect.
-// `url` is known on the launched screen; on Collect it is issued on the first tap (issueLink) and kept in memory only. Collect
+// `url` is known on the launched screen; on Collect it is issued on the first tap (issueLink) and kept in memory only, and once
+// the survey has an active link (U36 cache) Collect passes it, so the row's QR shows inline across repaints (U45). Collect
 // rows pass no group/survey: the group heading and survey title sit just above, so only the buttons show (no repeated words).
 // B43: each row is the share card — shareActions (Copy link · QR code · Print). `title`/`line` feed the printed page only.
 const qrFigure = url => `${qrSvg(url)}<p class="small muted">Scan to open the survey</p>`;
 export function groupLinks(ctx, rows) {
   const esc = ctx.esc;
-  return `<ul class="share-groups" data-group-links>${rows.map(r => `<li class="share-group" data-group-link="${esc(r.key)}" data-print-title="${esc(r.title || r.survey || '')}" data-print-line="${esc(r.line || '')}">${r.group ? `<span class="share-group-label" data-group-label>${esc(r.group)} <span aria-hidden="true">·</span> ${esc(r.survey)}</span>` : ''}${r.url ? `<input class="share-group-url" readonly aria-label="${esc(`${r.group} · ${r.survey} link`)}" value="${esc(r.url)}">` : ''}${shareActions(ctx, { prefix: 'group', key: r.key, qrShown: !!r.url })}<span class="small muted" role="status" data-group-status></span>${r.url ? `<div class="share-qr" data-group-qr-figure>${qrFigure(r.url)}</div>` : '<div class="share-qr" data-group-qr-figure hidden></div>'}</li>`).join('')}</ul>`;
+  return `<ul class="share-groups" data-group-links>${rows.map(r => `<li class="share-group" data-group-link="${esc(r.key)}" data-print-title="${esc(r.title || r.survey || '')}" data-print-line="${esc(r.line || '')}">${r.group ? `<span class="share-group-label" data-group-label>${esc(r.group)} <span aria-hidden="true">·</span> ${esc(r.survey)}</span>` : ''}${r.url ? `<input class="share-group-url" readonly aria-label="${esc(r.group ? `${r.group} · ${r.survey} link` : `${r.title || 'Survey'} link`)}" value="${esc(r.url)}">` : ''}${shareActions(ctx, { prefix: 'group', key: r.key, qrShown: !!r.url })}<span class="small muted" role="status" data-group-status></span>${r.url ? `<div class="share-qr" data-group-qr-figure>${qrFigure(r.url)}</div>` : '<div class="share-qr" data-group-qr-figure hidden></div>'}</li>`).join('')}</ul>`;
 }
 
 // resolve(key) → Promise<url>. Delegated on `root`, so a repaint of the rows needs no rebinding.

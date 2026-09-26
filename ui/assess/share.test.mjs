@@ -97,7 +97,7 @@ test('QR or print can be the first outcome; each explicitly confirms only once',
     const m = mount('owner', {[LINKS]:good});
     await m.click('data-share-open'); await m.click(action);
     assert.equal(m.calls.length, 2); assert.equal(m.calls[1].body.mode, 'execute');
-    assert.equal(action === 'data-share-qr' ? m.share.qr : m.prints.length, action === 'data-share-qr' ? true : 1);
+    if (action === 'data-share-qr') { assert.match(m.root.html, /data-share-qr-figure><svg/); assert.equal('qr' in m.share, false, 'U45: no QR toggle state'); } else assert.equal(m.prints.length, 1);
   }
 });
 test('copy rejection preserves link; close/reopen and another copy never issue a second link', async () => {
@@ -215,7 +215,7 @@ test('B36 issueLink: one tap = dry_run then execute on that survey; returns the 
   assert.deepEqual(calls.map(c => c.body.mode), ['dry_run', 'execute']); assert.equal(calls[1].body.confirm_token, 'ct1');
   assert.equal(link.id, 'inv_1'); assert.match(link.url, /^https:\/\/example\.test\/.*#survey=TOK$/);
   const src = read('./assess.js');
-  assert.match(src, /share\.groupLinks\(\{ esc \}, \[\{ key: s\.id, title: s\.template_name, line: whoLine\(g\.lens\) \|\| g\.lens \}\]\)/);
+  assert.match(src, /share\.groupLinks\(\{ esc \}, \[\{ key: s\.id, title: s\.template_name, line: whoLine\(g\.lens\) \|\| g\.lens, url: share\.knownLink\(state\.collectLinks, share\.linkKey\(a\.id, s\.id\)\)\?\.url \}\]\)/);
   assert.match(src, /share\.bindGroupLinks\(root/); assert.match(src, /share\.issueLink\(api/); assert.match(src, /state\.collectLinks\.clear\(\)/);
   assert.doesNotMatch(src.slice(src.indexOf('function bindCollectLinks'), src.indexOf('function collectPanel')), /localStorage|sessionStorage|console\./);
 });
