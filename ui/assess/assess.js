@@ -300,7 +300,7 @@ function surveyScreen(current, s) {
   const a = current.assessment, lens = lensFor(s), mayPrint = printAllowed(a.role);
   const back = `<a class="back" href="#assessment/${encodeURIComponent(a.id)}">← Back to ${esc(a.name)}</a>`;
   const printBlock = mayPrint ? `<section class="panel" id="print-panel"><p class="eyebrow">Paper</p><p><button id="print-load" ${state.dirty.has(a.id) ? 'disabled' : ''}>Print survey</button></p>${learnMore('<p class="small muted">A blank questionnaire with this survey\'s actual questions — nothing personal, no codes or links on the page.</p>')}<div id="print-root"></div><p class="status" role="status" aria-live="polite" id="print-status"></p></section>` : `<section class="panel"><p class="eyebrow">Paper</p><p class="muted">Printing the blank questionnaire needs a member or owner role on this assessment; your role here is ${esc(a.role)}.</p></section>`;
-  return `${back}<div class="title"><div><p class="eyebrow">Survey · ${esc(lens)}</p><h1>${esc(s.template_name)}</h1><p class="muted" style="margin:0">${esc(a.name)} · v${esc(s.template_version)} · collection ${esc(s.collection_status)}</p></div><span class="badge">${countCell(s)}</span></div><div class="grid start">${printBlock}<div id="share-root">${share.render({ esc, enc: encodeURIComponent }, { current, survey: s, share: share.shareFor(state, a.id, s.id, epoch) })}</div><aside class="panel"><p class="eyebrow">This survey</p>${asideTile(s)}${dirtyBanner(a.id)}<p class="status" role="${showMessage(current)?.alert ? 'alert' : 'status'}" aria-live="polite">${esc(showMessage(current)?.text || '')}</p></aside></div>`;
+  return `${back}<div class="title"><div><p class="eyebrow">Survey · ${esc(lens)}</p><h1>${esc(s.template_name)}</h1><p class="muted" style="margin:0">${esc(a.name)} · v${esc(s.template_version)} · collection ${esc(s.collection_status)}</p></div><span class="badge">${countCell(s)}</span></div><div class="grid start">${printBlock}<div id="share-root">${share.render({ esc, enc: encodeURIComponent }, { current, survey: s, share: shareModel(a.id, s.id) })}</div><aside class="panel"><p class="eyebrow">This survey</p>${asideTile(s)}${dirtyBanner(a.id)}<p class="status" role="${showMessage(current)?.alert ? 'alert' : 'status'}" aria-live="polite">${esc(showMessage(current)?.text || '')}</p></aside></div>`;
 }
 // The child's aside tile is derived from the same cached count as the badge and repainted with it (MED 4040990763).
 function asideTile(s) {
@@ -445,12 +445,18 @@ function currentShareRoute() {
   if (model && (r.kind !== 'survey' || r.id !== model.aid || r.sid !== model.sid || epoch !== model.epoch)) state.share = null;
   return state.share;
 }
+// U36: the Share card starts from the survey's link already issued on this page load (Collect or an earlier visit), if any.
+function shareModel(aid, sid) {
+  const m = share.shareFor(state, aid, sid, epoch), known = share.knownLink(state.collectLinks, `${aid}|${sid}|${epoch}`);
+  if (!m.link && known && m.stage !== 'busy') { m.link = known; m.stage = 'linked'; }
+  return m;
+}
 function bindShare(current, s) {
   const root = app.querySelector('#share-root'); if (!root) return;
-  const model = share.shareFor(state, current.assessment.id, s.id, epoch);
+  const model = shareModel(current.assessment.id, s.id), linkKey = `${current.assessment.id}|${s.id}|${epoch}`;
   const ctx = { esc, enc: encodeURIComponent, isCurrent: () => currentShareRoute() === model };
-  const onChange = () => { const el = app.querySelector('#share-root'); if (!el) return; el.innerHTML = share.render(ctx, { current, survey: s, share: model }); share.bind(ctx, el, { current, survey: s, share: model, api, onChange }); };
-  share.bind(ctx, root, { current, survey: s, share: model, api, onChange });
+  const onChange = () => { const el = app.querySelector('#share-root'); if (!el) return; el.innerHTML = share.render(ctx, { current, survey: s, share: model }); share.bind(ctx, el, { current, survey: s, share: model, api, onChange, links: state.collectLinks, linkKey }); };
+  share.bind(ctx, root, { current, survey: s, share: model, api, onChange, links: state.collectLinks, linkKey });
 }
 function bindPrepare(current) {
   const aid = current.assessment.id, n = activeSurveys(current).length;

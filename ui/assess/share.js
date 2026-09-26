@@ -1,7 +1,7 @@
 // Share card for ONE survey (leaf page) — product brief row "Survey": outcome-first sharing with confirmed copy, QR, invitation
 // sheet, revoke this session's link. Behaviour reference: legacy ui/app.js issue-link-* + ui/shared-link.js (staff side).
 // Credential discipline (unchanged from legacy): the link token is shown ONCE, lives only in this module's in-memory model for
-// the survey it was minted for, is never written to storage, never logged, never echoed into the URL, and is cleared when the
+// the survey it was minted for (U36: shared in memory with Collect's per-survey cache, same aid|sid|epoch key), is never written to storage, never logged, never echoed into the URL, and is cleared when the
 // identity, assessment, survey or data epoch changes. Revoke uses the link id, never the token.
 // APIs (existing): POST /v2/assessments/{aid}/surveys/{sid}/links {params:{}, mode:'dry_run'|'execute', confirm_token}
 //                  DELETE /v2/assessments/{aid}/surveys/{sid}/links/{link_id}
@@ -59,7 +59,7 @@ export function render(ctx, { current, survey, share }) {
   const ready = !!link || share.stage === 'ready';
   const actions = !share.open
     ? `<button type="button" class="primary" data-share-open>${esc(copy.open)}</button>`
-    : `<p class="note small">${link ? 'Use the same link below.' : `Choose how to share ${esc(survey.template_name || 'this survey')}. Your choice makes a participant link available.`} You can revoke the link later; answers already sent stay with the team.</p>
+    : `<p class="note small">${link ? 'Everyone can use this one link; after a page reload, sharing makes a new one.' : `Choose how to share ${esc(survey.template_name || 'this survey')}. Your choice makes a participant link available.`} You can revoke the link later; answers already sent stay with the team.</p>
       ${link ? `<div class="share-link"><p data-share-url><code>${esc(link.url)}</code></p>${link.expires_at ? `<p class="small muted">Expires ${esc(link.expires_at)}</p>` : ''}</div>` : ''}
       <div class="actions">${ready || busy ? shareActions(ctx, { prefix: 'share', disabled: busy, qrOpen: !!(share.qr && link), primary: true }) : `<button type="button" data-share-open>Try sharing again</button>`}${link ? `<button type="button" class="quiet" data-share-revoke ${busy ? 'disabled' : ''}>${esc(copy.revoke)}</button>` : ''}<button type="button" class="quiet" data-share-close ${busy ? 'disabled' : ''}>Close</button></div>
       ${share.qr && link ? `<figure class="share-qr" data-share-qr-figure>${qrSvg(link.url)}<figcaption class="small muted">Scan to open the survey</figcaption></figure>` : ''}${link ? `<p class="small muted">${esc(copy.onceShown)}</p>` : ''}`;
@@ -104,7 +104,7 @@ export function bindPrintAll(root, { heading, items, doc = globalThis.document, 
 }
 const escHtml = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-export function bind(ctx, root, { current, survey, share, api, onChange, print = () => globalThis.print?.(), clipboard = globalThis.navigator?.clipboard, doc = globalThis.document, origin = globalThis.location?.origin, now = Date.now }) {
+export function bind(ctx, root, { current, survey, share, api, onChange, links = null, linkKey = null, print = () => globalThis.print?.(), clipboard = globalThis.navigator?.clipboard, doc = globalThis.document, origin = globalThis.location?.origin, now = Date.now }) {
   const aid = current.assessment.id, sid = survey.id, base = `/v2/assessments/${ctx.enc(aid)}/surveys/${ctx.enc(sid)}/links`;
   // The model stays current until identity, survey or epoch changes. A same-page paint disconnects this root; that must
   // not blank the model or skip onChange. Copy/print still require the bound node so a gone page cannot receive a credential.
@@ -140,6 +140,7 @@ export function bind(ctx, root, { current, survey, share, api, onChange, print =
         if (!same()) { Object.assign(share, blankShare(), { message: copy.uncertain, alert: true }); return; }
         if (!r.link_id || typeof r.entry_fragment !== 'string' || !/^#survey=[A-Za-z0-9_-]+$/.test(r.entry_fragment)) throw new Error('Incomplete result');
         share.link = { id: r.link_id, url: shareUrl(origin, r.entry_fragment), expires_at: r.expires_at || null };
+        if (links && linkKey) rememberLink(links, linkKey, share.link); // U36: Collect's Copy/QR/Print reuse this link
       } catch (e) {
         if (!same()) { Object.assign(share, blankShare(), { message: copy.uncertain, alert: true }); return; }
         fail(executeFailure(e).message);
@@ -166,6 +167,7 @@ export function bind(ctx, root, { current, survey, share, api, onChange, print =
     share.stage = 'busy'; update();
     try {
       await api(`${base}/${ctx.enc(share.link.id)}`, { method: 'DELETE' });
+      if (links && linkKey && knownLink(links, linkKey)?.id === share.link.id) links.delete(linkKey); // never hand out a revoked link
       if (!same()) return;
       Object.assign(share, blankShare()); say(copy.revoked);
     } catch { if (same()) fail('Revocation could not be confirmed. The link may still work. Try revoking it again.'); }
@@ -223,10 +225,16 @@ export function cachedLink(cache, k, issue) {
   const cur = cache.get(k);
   if (cur?.uncertain) return Promise.reject(failure());
   if (!cur) {
-    const p = issue().catch(e => { if (cache.get(k) === p) { if (e?.uncertain) cache.set(k, { uncertain: true }); else cache.delete(k); } throw e; });
+    const p = issue().then(l => { p.link = l; return l; }, e => { if (cache.get(k) === p) { if (e?.uncertain) cache.set(k, { uncertain: true }); else cache.delete(k); } throw e; });
     cache.set(k, p);
   }
   return cache.get(k);
 }
+
+// U36: one link per survey per page load. The survey's Share card and Collect's rows read and write the same in-memory entry,
+// so Copy / QR / Print anywhere reuse the survey's current link instead of minting one per tap. The server keeps only a hash
+// of each token, so after a reload the link cannot be read back and sharing again makes a new one (see the card's sentence).
+export function knownLink(cache, k) { const c = cache?.get(k); return c && !c.uncertain && c.link ? c.link : null; }
+export function rememberLink(cache, k, link) { const p = Promise.resolve(link); p.link = link; cache.set(k, p); }
 
 export const css = `.share-groups{list-style:none;padding:0;margin:10px 0;display:grid;gap:10px}.share-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.share-group-label{font-weight:600;flex:1 1 180px;min-width:0}.share-group-url{flex:1 1 100%;min-width:0;font-size:13px}.share-actions{display:flex;gap:6px;flex-wrap:wrap}.share-print-all{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:12px 0}.share-group [data-group-status]{flex:1 1 100%;word-break:break-all}.share-group [data-group-status]:empty{display:none}.share-group .share-qr{flex:1 1 100%}.share-link code{word-break:break-all;user-select:all}.share-qr{margin:14px 0 0;max-width:220px}.share-qr svg{width:100%;height:auto;display:block;background:#fff;border-radius:8px}.share-sheet{display:none}@media print{.share-sheet{display:block}.share-sheet-print{font:16px/1.5 sans-serif;padding:24px;max-width:640px}.share-sheet-url{word-break:break-all;font-family:monospace;font-size:15px}.share-sheet-qr svg{width:240px;height:240px}.share-all{max-width:none;padding:0}.share-all h1{font-size:20px;margin:0 0 4px}.share-all-list{list-style:none;padding:0;margin:12px 0 0}.share-all-item{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-top:1px solid #ccc;break-inside:avoid;page-break-inside:avoid}.share-all-item h2{font-size:16px;margin:0 0 2px}.share-all-item p{margin:0 0 2px}.share-all-qr svg{width:110px;height:110px}.share-all .share-sheet-url{font-size:11px}@page{margin:12mm}}`;
