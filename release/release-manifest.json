@@ -1,32 +1,27 @@
 {
-  "version": "0.21.1",
+  "version": "0.21.6",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "fd30520cf2f3f63b803a61ae8f4f12adcd93dbbc",
+  "cookbook_commit": "a32c87c6c205e9164a74eb31cbf5769395f21d40",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.21.1.md",
-      "blob_sha": "eb469b2ece6ecc1dbf9312b49c14dff74a10dc2e",
-      "sha256": "813e90161ddd74281be50aac93e8b299e183925aa100e33ba150962b098ac338"
+      "path": "planning/2026-09-16-parity-build/releases/0.21.6.md",
+      "blob_sha": "e36505bb08543dc75f23d54f3e6e8d4f3603c117",
+      "sha256": "ef4f806c73d0a90ce589b8fcde07b87314df43e668f24b5782c12cab65aa7024"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "d32156d0e96668fdc1ab9a578e3fdf64626c2b62",
-      "sha256": "51cd0dffe7572b8a14a8b6e7cff7fdef9bd2b3d3f29405dd5754b80fbddfceeb"
+      "blob_sha": "35476c6625c0749feeb4ac43b3f6b561d59b31eb",
+      "sha256": "c658e56526ef4c22bef8553a002e15c6e058875c3f32326579147bdc4e414eb8"
     }
   ],
   "changelog": {
     "sections": {
       "added": [],
       "changed": [
-        "roadmap: Versions section on /roadmap/ lists shipped releases and forecasts the next version from the waiting change files (#261)",
-        "roadmap forecast 0.21.1 refreshed (lane 1 card counts, lane 9 less text) (#265)"
+        "Sign in by email link: enter your email, open the link we send (it works for 30 minutes, on any device) — no more one-time PIN; DEV only, behind MAGIC_LINK — production keeps Cloudflare Access. Signing out clears the session cookie with the same protections it was set with (HttpOnly, Secure, SameSite=Lax), in every environment (Bincy B38) (#305)",
+        "/roadmap shows the versions list only; stale work-item feed removed (captain 18:20) (#307)"
       ],
-      "fixed": [
-        "cards: child counts only include assessments and projects you can list (#260)",
-        "card counts only include what you can open — workspace project count covered by a member who sees fewer (#262)",
-        "card counts only include what you can open — responses on an assessment you cannot open are not counted (#263)",
-        "public home: less text — four choices, one heading, one line; the rest behind Learn more (#264)"
-      ]
+      "fixed": []
     }
   }
 }

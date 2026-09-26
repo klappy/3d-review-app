@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { views, classify, NOTES_VISIBILITY, RECOMMENDATIONS_NOT_BUILT, NOT_VISIBLE, css } from './views.js';
 import { esc, enc, routes } from './cards.js';
+import { JSDOM } from 'jsdom';
 
 const err = (code, status, message = code) => Object.assign(new Error(message), { code, status });
 function fakeApi(table) {
@@ -53,14 +54,34 @@ test('A1/A2 understand: each survey shows its own counts; lens sums responses on
   assert.ok(!calls.some(c => c.url.includes('/surveys/s4')), 'archived survey is not counted');
 });
 
-test('A3 results: the held literal with the server reason; no numbers or bands', async () => {
+test('A3 results: the held literal with one plain line (U05), never the server policy code; no numbers or bands', async () => {
   const { api } = fakeApi(understandTable); const ctx = ctxFor(api);
   const html = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
-  const panel = html.slice(html.indexOf('data-results>'), html.indexOf('data-reports>'));
-  assert.match(panel, /<span class="badge">held<\/span>/);
-  assert.match(panel, /data-results-reason>D7 scoring, threshold, and differencing policy unresolved</);
+  const panel = html.slice(html.indexOf('data-v3-band-held>'), html.indexOf('</p>', html.indexOf('data-v3-band-held>')));
+  assert.match(panel, /data-v3-band-held>Results appear after a report is built from at least three responses per group\./);
+  assert.equal((html.match(/Results appear after a report is built/g) || []).length, 1, 'one plain line, shown once (not again behind Learn more)');
+  assert.doesNotMatch(html, /D7 scoring/);
   assert.doesNotMatch(panel, /\b\d+\b/); // no numbers, no "0"
-  assert.doesNotMatch(panel, /band/i);
+});
+
+// U05 validator (lanes-1510): no rendered results / evidence / report output ever carries the server reason string.
+test('U05: server reason never rendered — results, opened evidence table, held reports list, held opened report', async () => {
+  const D7 = 'D7 scoring, threshold, and differencing policy unresolved';
+  const { api } = fakeApi({ ...understandTable, 'GET /v2/assessments/a1/reports': { suppressed: true, status: 'held', reason: D7 }, 'GET /v2/reports/rep_h': { suppressed: true, reason: D7 } });
+  const ctx = ctxFor(api); const m = await views.understand.load(ctx, { aid: 'a1' });
+  for (const showEvidence of [false, true]) {
+    m.showEvidence = showEvidence;
+    const html = views.understand.render(ctx, m);
+    assert.doesNotMatch(html, /D7|differencing policy/, `evidence ${showEvidence ? 'open' : 'closed'}: no server reason`);
+    assert.equal((html.match(/Results appear after a report is built/g) || []).length, 1, 'plain held line once');
+    if (showEvidence) assert.match(html, /Held until a report is built/);
+    assert.match(html, /data-reports-held>Reports are held for now\.</);
+  }
+  const btn = el({ tag: 'button', 'data-open-report': 'rep_h' }), status = el({ 'data-report-status': '' });
+  makeRoot([btn, status, { attrs: { 'data-report-view': '' }, replaceChildren() {} }]);
+  views.understand.bind(ctx, root, m); await btn.onclick();
+  assert.equal(status.textContent, 'This report is held for now.');
+  assert.doesNotMatch(views.understand.render(ctx, m), /D7|differencing policy/);
 });
 
 test('Reports: server list plus preview control for exact assessment editor', async () => {
@@ -82,7 +103,8 @@ test('A4 open report: GET /v2/reports/{id} rendered by report-view.js; held → 
   views.understand.bind(ctx, root, m);
   await b1.onclick();
   assert.ok(calls.some(c => c.url === '/v2/reports/rep_1' && !c.method));
-  assert.match(appended[0].text, /^Synthetic data · source abcdef1/); // report-view.js header constant, untouched
+  assert.match(appended[0].text, /^Built /); // B31: readable built line first
+  assert.equal(appended[1].tag, 'details'); assert.match(appended[1].children[1].text, /^Synthetic data · source abcdef1/); // ids behind Technical details
   assert.equal(b1.disabled, false);
   await b2.onclick();
   assert.equal(m.openReport.status, 'held');
@@ -103,7 +125,7 @@ test('R-1: held, refused and render-failure outcomes show in the visible Reports
   const html = views.understand.render(ctx, m); const statusIdx = html.indexOf('data-report-status'), fullIdx = html.indexOf('data-report-full');
   assert.ok(statusIdx > -1 && fullIdx > -1 && statusIdx < fullIdx, 'status markup precedes the hidden full section (not nested in it)');
   assert.ok(!html.slice(fullIdx).includes('data-report-status'), 'no status element inside the hidden full section');
-  await buttons[0].onclick(); assert.equal(status.textContent, 'held by policy'); assert.equal(full.hidden, true); assert.deepEqual(viewKids, []);
+  await buttons[0].onclick(); assert.equal(status.textContent, 'This report is held for now.'); assert.equal(full.hidden, true); assert.deepEqual(viewKids, []);
   await buttons[1].onclick(); assert.equal(status.textContent, NOT_VISIBLE); assert.equal(full.hidden, true); assert.deepEqual(viewKids, []);
   await buttons[2].onclick(); assert.equal(m.openReport.status, 'error'); assert.equal(status.textContent, 'This report could not be displayed.'); assert.equal(full.hidden, true);
   for (const b of buttons) assert.equal(b.disabled, false);
@@ -115,7 +137,7 @@ test('A6 reports 404 → unavailable; results/counts failures are per-part, neve
   assert.match(html, /data-reports-unavailable>Reports are unavailable/);
   assert.match(html, /data-count="s2" role="alert">count unavailable/);
   assert.match(html, /data-lens-sum="Translation Team">3 responses across 1 of 2 surveys <strong>\(partial\)/);
-  assert.match(html, /data-results-reason>D7/);
+  assert.match(html, /data-v3-band-held>Results appear after a report is built/); // U05
 });
 
 test('A7 improve viewer: read-only notes, no save control, visibility line; text escaped', async () => {
@@ -143,7 +165,7 @@ test('A8 improve owner/member: one Save → PATCH /v2/assessments/{aid}/notes wi
   await form.onsubmit({ preventDefault() {} });
   assert.deepEqual(calls[0], { url: '/v2/assessments/a1/notes', method: 'PATCH', body: { notes_reflection: 'new r', notes_next_steps: 'new n' } });
   assert.equal(disabledDuring, true); assert.equal(btn.disabled, false);
-  assert.equal(status.textContent, 'Notes saved.'); assert.equal(refreshed, 1); assert.equal(m.notes_reflection, 'new r');
+  assert.equal(status.textContent, 'Saved'); assert.equal(refreshed, 1); assert.equal(m.notes_reflection, 'new r');
 });
 
 test('A8c v3 next step (frame 11): one "Save notes" in any stage, never a stage write from this page', async () => {
@@ -155,7 +177,20 @@ test('A8c v3 next step (frame 11): one "Save notes" in any stage, never a stage 
   const form = el({ 'data-notes-form': '' }), btn = el({ tag: 'button', 'data-save-notes': '' }), status = el({ 'data-notes-status': '' });
   makeRoot([form, btn, status, el({ name: 'notes_reflection', value: 'r' }), el({ name: 'notes_next_steps', value: 'n' })]); views.improve.bind(ctx, root, m);
   await form.onsubmit({ preventDefault() {} });
-  assert.deepEqual(calls.map(c => `${c.method} ${c.url}`), ['PATCH /v2/assessments/a1/notes']); assert.equal(status.textContent, 'Notes saved.');
+  assert.deepEqual(calls.map(c => `${c.method} ${c.url}`), ['PATCH /v2/assessments/a1/notes']); assert.equal(status.textContent, 'Saved');
+});
+
+test('U24 "Saved" survives the post-save repaint, next to the button, then is dropped', async () => {
+  const { api } = fakeApi({ 'PATCH /v2/assessments/a1/notes': ({ body }) => ({ assessment: { ...assessment, ...body } }) });
+  let repainted = '';
+  const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'member', stage: 'improve' }, surveys }, refresh: async () => { repainted = views.improve.render(ctx, await views.improve.load(ctx, { aid: 'a1' })); } });
+  const m = await views.improve.load(ctx, { aid: 'a1' });
+  assert.doesNotMatch(views.improve.render(ctx, m), /data-notes-status>Saved</);
+  const form = el({ 'data-notes-form': '' }), btn = el({ tag: 'button', 'data-save-notes': '' }), status = el({ 'data-notes-status': '' });
+  makeRoot([form, btn, status, el({ name: 'notes_reflection', value: 'r' }), el({ name: 'notes_next_steps', value: 'n' })]); views.improve.bind(ctx, root, m);
+  await form.onsubmit({ preventDefault() {} });
+  assert.match(repainted, /data-save-notes>Save notes<\/button> <span class="status" role="status" aria-live="polite" data-notes-status>Saved<\/span><\/div>/);
+  assert.doesNotMatch(views.improve.render(ctx, m), /data-notes-status>Saved</);
 });
 
 test('A8b save failure: no success claim, refusal wording', async () => {
@@ -202,7 +237,7 @@ test('report list shows a human title/date with the raw id inside <details>, not
   const ctx = ctxFor(api, { current: { assessment, surveys: [] } }); const m = await views.understand.load(ctx, { aid: 'a1' }); const html = views.understand.render(ctx, m);
   const btn = html.match(/<button type="button" data-open-report="[^"]+">([^<]+)<\/button>/)[1];
   assert.match(btn, /^Report 1 · built /); assert.doesNotMatch(btn, /sreport_|T22:15/);
-  assert.match(html, /<details class="small muted report-ids"><summary>Report id<\/summary><code>sreport_928bb601-f318-4cca-b48c-e4683371c6c8<\/code>/);
+  assert.match(html, /<details class="small muted report-ids"><summary>Technical details<\/summary><code>sreport_928bb601-f318-4cca-b48c-e4683371c6c8<\/code>/);
 });
 
 test('v3 U4 gate in Understand: checkbox arms Record my review; click posts set_stage understand then reloads', async () => {
@@ -229,4 +264,40 @@ test('v3 U4 gate: viewers see the state only, no write control', async () => {
   const ctx = ctxFor(api, { current: { assessment: { ...assessment, stage: 'collect', role: 'viewer' }, surveys } });
   const m = await views.understand.load(ctx, { aid: 'a1' });
   assert.doesNotMatch(views.understand.render(ctx, m), /data-v3-gate-go/);
+});
+
+test('B35: the band block offers "Build the results" only to editors, only before a report, only once a group has 3+', async () => {
+  const { buildResultsCta } = await import('./views.js'); const esc = s => String(s);
+  const ready = { 'Community': { responses: 3 } }, thin = { 'Community': { responses: 2 } }, none = { status: 'loaded', value: { reports: [] } };
+  assert.match(buildResultsCta({ role: 'owner', bandScores: null, reports: none }, ready, esc), /data-results-build/);
+  assert.match(buildResultsCta({ role: 'member', bandScores: null, reports: none }, ready, esc), /Build the results/);
+  assert.equal(buildResultsCta({ role: 'viewer', bandScores: null, reports: none }, ready, esc), '');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: { Community: {} }, reports: none }, ready, esc), '');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: none }, thin, esc), '');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: { status: 'loaded', value: { reports: [{ id: 'r' }] } } }, ready, esc), '', 'a report already exists');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: { status: 'error' } }, ready, esc), '', 'report list unknown');
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: none, resultsBuilt: true }, ready, esc), '', 'already built here');
+});
+
+test('B35: "Build the results" on the band block previews, confirms once in place, builds, and the bands fill with no reload', async () => {
+  const dom = new JSDOM('<main></main>'); const root = dom.window.document.querySelector('main'); let built = false, reloads = 0;
+  const report = { id: 'r', created_at: '2026-09-18', payload: { lenses: [{ lens: 'Community', score: 80, sub_dimensions: [] }] } };
+  const ctx = { enc: encodeURIComponent, esc: s => String(s ?? ''), current: { assessment: { id: 'a', role: 'owner', stage: 'understand' }, surveys: [{ id: 's1', template_id: 't', template_name: 'C', perspective: 'Community', state: 'selected', archived_at: null }] }, isCurrent: () => true, routes: { assessment: () => '#x', survey: () => '#s' }, go() { reloads++; }, api: async (url, init) => {
+    if (init?.body?.mode === 'dry_run') return { assessment_id: 'a', suppressed: false, status: 'ready', confirm_token: 'tok', expires_in: 60 };
+    if (init?.body?.mode === 'execute') { built = true; return { assessment_id: 'a', suppressed: false, report }; }
+    if (url === '/v2/reports/r') return { assessment_id: 'a', suppressed: false, report };
+    if (url.endsWith('/reports')) return { assessment_id: 'a', suppressed: false, reports: built ? [{ id: 'r', created_at: report.created_at }] : [] };
+    if (url.includes('/surveys/s1')) return { survey: { id: 's1' }, counts: { responses: 3, respondents: 3 } };
+    return { status: 'held', reason: 'Server policy words' };
+  } };
+  const m = await views.understand.load(ctx, { aid: 'a' }); root.innerHTML = views.understand.render(ctx, m); views.understand.bind(ctx, root, m);
+  const band = () => root.querySelector('[data-v3-results]');
+  await band().querySelector('[data-results-build]').onclick(); assert.equal(built, false);
+  const box = band().querySelector('[data-results-preview]');
+  assert.match(box.textContent, /immutable report/); assert.equal(root.querySelectorAll('[data-confirm-report]').length, 1, 'one confirm, in the band block');
+  assert.deepEqual([...box.querySelectorAll('button')].map(b => b.textContent), ['Build the results', 'Not now']);
+  await box.querySelector('[data-confirm-report]').onclick(); assert.equal(built, true); assert.equal(reloads, 0);
+  assert.ok(m.bandScores?.Community, 'bands filled from the report just built'); assert.equal(band().querySelector('[data-results-build]'), null);
+  assert.equal(band().querySelector('[data-results-status]').textContent, 'Results built.');
+  assert.doesNotMatch(root.textContent, /Server policy words|Open it from the current report list/);
 });

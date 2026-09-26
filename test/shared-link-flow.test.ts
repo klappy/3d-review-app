@@ -91,6 +91,8 @@ describe("shared survey link HTTP contract",()=>{
   const issued=await call('POST',linkPath,{mode:'execute',params:{},confirm_token:dry.result.confirm_token},owner);expect(issued.ok).toBe(true);
   const p=await open(issued.result.link_token);const form=await call('GET','/v2/participate/form',undefined,p.result.participant_token);expect(form.ok).toBe(true);
   expect(form.result.template).toMatchObject({id:'tpl_validation',version:2});
+  // Bincy B10: the welcome's shared context comes from the assessment row setup wrote; project name only, no organisation.
+  expect(typeof form.result.project).toBe('string');expect(form.result).toHaveProperty('purpose');expect(form.result).toHaveProperty('format');expect(form.result.project).toBe('Rill Project');expect(Object.keys(form.result)).not.toContain('organization');
   const items=form.result.items as any[];const answers:Record<string,unknown>={};
   for(const item of items) if(item.required) answers[item.id]=item.type==='multi'?[item.options[0].code]:item.type==='single'?item.options[0].code:'Synthetic response';
   const required=items.find(i=>i.required)!;const missing={...answers};delete missing[required.id];

@@ -5,6 +5,8 @@
 // Pure render: HTML strings, every text value through ctx.esc. No DOM access outside bind().
 // v3 lane 9 L9-1: projects page = home per Bincy screen 02 (relative import so node tests resolve it too).
 import { homeView } from '../v3/home.js';
+import { learnMore } from '../v3/components/learn-more.js';
+import { mountEditableHeading } from '../v3/components/editable-heading.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -21,6 +23,7 @@ export function classify(e) {
 }
 const fail = (e, message) => ({ status: classify(e), error: message(e) });
 const safeMessage = e => String(e?.message || 'Request could not be completed.');
+export const CODE_REFUSED = 'This code has been used or is not valid. Check it, or ask the person who gave it to you for a new one.';
 
 function signInPanel(ctx) {
   return `<div class="narrow"><section class="panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">This page needs a facilitator session.</p><div class="actions"><a class="button primary" href="${ctx.routes.entry}">Go to sign in</a><a class="quiet button" href="/v2/auth/access">Sign in with email code</a></div></section></div>`;
@@ -71,13 +74,13 @@ function bindRetry(ctx, root, page, model) {
   });
 }
 // A write: disables the trigger while in flight, reports the server outcome, never claims success without it.
-async function write(ctx, control, label, fn) {
+async function write(ctx, control, label, fn, { refused = 'Not allowed here.', failed = null } = {}) {
   const controls = control ? [control, ...(control.form ? Array.from(control.form.querySelectorAll('button')) : [])] : [];
   for (const c of controls) c.disabled = true;
   try { const r = await fn(); return r; }
   catch (e) {
     const kind = classify(e);
-    ctx.note(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? 'Not allowed here.' : `${label} failed: ${safeMessage(e)}`, true);
+    ctx.note(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? refused : (failed || `${label} failed: ${safeMessage(e)}`), true);
     return undefined;
   }
   finally { for (const c of controls) c.disabled = false; }
@@ -87,34 +90,51 @@ const storeSession = (key, v) => { try { sessionStorage.setItem(key, v); } catch
 const dropSession = key => { try { sessionStorage.removeItem(key); } catch {} };
 
 // ---------- entry (public) ----------
-const PERSPECTIVES = [['team', 'Translation team', 'Experience of the work'], ['community', 'Community', 'Experience of the translation'], ['church', 'Church', 'Experience of its use']];
+// B20: also composed by the v3 setup wizard (step 2 "Who will participate?"), one description per perspective.
+export const PERSPECTIVES = [['team', 'Translation team', 'Experience of the work'], ['community', 'Community', 'Experience of the translation'], ['church', 'Church', 'Experience of its use']];
+// B08+B20 (Bincy SI 04 "Translation Team, Community, and Church descriptions"): one plain who-line per group, shared by setup step 2,
+// the launched rows and the Collect heading. Headings and data unchanged. Keyed as the wizard's pdot(): team / community / church.
+export const PERSPECTIVE_WHO = Object.freeze({ team: 'The people doing the translation work.', community: 'People who speak the language.', church: 'Pastors and church leaders in the language area.' });
+export const whoLine = p => { const s = String(p || '').toLowerCase(); return PERSPECTIVE_WHO[/team/.test(s) ? 'team' : /community/.test(s) ? 'community' : /church/.test(s) ? 'church' : ''] || ''; };
 function entryModel(over = {}) {
   return { status: 'loaded', mode: 'welcome', step: 0, signin: { email: '', devCode: null, stage: 'email' }, example: null, exampleStatus: null, exampleError: '', params: {}, ...over };
 }
 // One perspectives row, shared by the public home and About (ruling 12:34: pages compose, never copy).
 const perspectivesRow = ctx => `<div class="perspectives">${PERSPECTIVES.map(([k, t, s]) => `<div class="perspective"><span class="dot-lg ${k}" aria-hidden="true"></span><strong>${ctx.esc(t)}</strong><small>${ctx.esc(s)}</small></div>`).join('')}</div>`;
+// B02 (lanes-1510): a signed-in visitor at "/" (the welcome, not #signin/#survey/#about) lands on the current work (#projects).
+export const landsOnWork = (r, signedIn) => !!signedIn && r?.kind === 'entry' && !['signin', 'survey', 'about'].includes(r.intent);
+// B04 (Bincy, captain ruling 2026-09-25): where a fresh sign-in lands. A pending invitation → the accept screen first; exactly one
+// project → that project; several (or none) → Home, the work list. Archived projects do not count. Pure: routes only.
+export function signInLanding({ invite = false, projects = [] } = {}) {
+  if (invite) return '#invite';
+  const open = (Array.isArray(projects) ? projects : []).filter(p => p && p.id && !p.archived_at);
+  return open.length === 1 ? `#project/${encodeURIComponent(open[0].id)}` : '#projects';
+}
 function hero(ctx, signedIn) {
   const continueCards = signedIn ? `<section class="panel"><p class="eyebrow">Signed in</p><h2>Continue</h2><div class="project-grid">${ctx.cards.card({ eyebrow: 'Continue', title: 'Workspaces', href: ctx.routes.workspaces, meta: ['Optional groupings of projects you can already open'] })}${ctx.cards.card({ eyebrow: 'Continue', title: 'Projects', href: ctx.routes.projects, meta: ['All projects your account holds a role on'] })}</div><div class="actions"><button type="button" class="quiet" data-act="signout">Sign out</button></div></section>` : '';
   // Public home contract (ui/public-choices.test.mjs, captain-named): exactly these four choices, in this order, above the headline;
   // Sign in goes straight to the real provider; sandbox sign-in only by explicit choice (#signin). Retired labels never return.
-  const choices = `<nav class="public-choices actions" aria-label="Choose where to start" style="margin-top:0"><a class="rv-btn" href="#about">Read about it</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a><a class="rv-btn primary" href="/v2/auth/access">Sign in</a></nav>`;
+  const choices = `<nav class="public-choices actions" aria-label="Choose where to start" style="margin-top:0"><a class="rv-btn" href="#about">Read about it</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a>${signedIn ? '' : '<a class="rv-btn primary" href="/v2/auth/access">Sign in</a>'}</nav>`; // B02: a signed-in home never offers Sign in
   // Captain order 17:05 (lane 9, L9-22) "less text": public home = the four choices, one heading, one short line; everything else behind Learn more.
-  return `<section class="hero panel" id="public-home">${choices}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">Hear from the translation team, the community and the church, then choose what to do next.</p><details class="small learn-more"><summary>Learn more</summary><p class="muted">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p>${perspectivesRow(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a>${signedIn ? '' : ' · <a href="#signin">Sandbox test identities (dev only) — not a real sign-in</a>'}</p><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p></details></section>${continueCards}`;
+  return `<section class="hero panel" id="public-home">${choices}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">${LEAD}</p>${learnMore(`<p class="muted">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p>${perspectivesRow(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a>${signedIn ? '' : ' · <a href="#signin">Sandbox test identities (dev only) — not a real sign-in</a>'}</p><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p>`)}</section>${continueCards}`;
 }
 function surveyView(ctx) {
   return `<section class="panel narrow"><p class="eyebrow">For participants</p><h1>Your feedback starts with your invitation.</h1><p class="muted">Open the survey link or scan the QR code someone shared with you. If you were given an access code, enter it below.</p><p><a class="button" href="/participate/?demo=1">Try a sample survey — nothing is sent</a></p><form id="code-form"><label class="field">Access code<input name="code" required autocomplete="off" maxlength="64"></label><div class="actions"><button class="primary" type="submit">Open my survey</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form><p class="small muted">Missing your survey link? Ask the person who invited you or shared the survey to send you the link. You do not need an account to follow a participant link.</p></section>`;
 }
 // Captain ruling 12:53 (lane 1, L1-16): a real public About page at #about — never a sign-in panel. Cards via ctx.cards.card (shared card component).
+// B30: About and the public home share one short line (composed, not copied).
+const LEAD = 'Hear from the translation team, the community and the church, then choose what to do next.';
 const WHO = [['Who it is for', 'Translation teams, the communities they serve and the churches using the translation — with a facilitator who runs the review.'], ['When to use it', 'When your project is ready to pause, reflect and learn from feedback.'], ['How often', 'Repeat when a new assessment would be useful — for example, between books or publishing iterations.']];
 export function aboutView(ctx) {
-  const facts = WHO.map(([t, s]) => ctx.cards.card({ eyebrow: 'About', title: t, meta: [s] })).join('');
-  return `<section class="glass panel narrow" id="about-page"><a class="back" href="#">← Back to home</a><p class="eyebrow">About 3D Review</p><h1>Three perspectives. One useful next step.</h1><p class="muted lead">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps. A facilitator sets up a review, each group answers a short survey, and the results show where the project is strong and where it needs support.</p><h2>The three perspectives</h2>${perspectivesRow(ctx)}<div class="project-grid">${facts}</div><div class="actions"><a class="rv-btn primary" href="#">Back to home</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a></div></section>`;
+  // B30: behind Learn more the three facts are plain label + line pairs (no card headings: one heading per screen).
+  const facts = WHO.map(([t, s]) => `<p><strong>${ctx.esc(t)}</strong></p><p class="muted">${ctx.esc(s)}</p>`).join('');
+  return `<section class="glass panel narrow" id="about-page"><a class="back" href="#">← Back to home</a><p class="eyebrow">About 3D Review</p><h1>Three perspectives. One useful next step.</h1><p class="muted lead">${LEAD}</p>${perspectivesRow(ctx)}${learnMore(`<p class="muted">A facilitator sets up a review.</p><p class="muted">Each group answers a short survey.</p><p class="muted">The results show where the project is strong and where it needs support.</p>${facts}`)}<div class="actions"><a class="rv-btn primary" href="#">Back to home</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a></div></section>`;
 }
 function signinView(ctx, model) {
   const s = model.signin;
   const codeStep = s.stage === 'code';
   // v3 prototype frame 1 (design-system-v3 V.signin): centred 420px card, eyebrow, one full-width primary, survey footer (lane 1, L1-7).
-  return `<section class="glass panel narrow v3-signin" style="max-width:420px;margin:48px auto 0"><p class="eyebrow">Sign in</p><h1 style="font-size:27px">Sign in with your email</h1><p class="muted">We email you a one-time code. There is no password.</p><div class="actions"><a class="button rv-btn primary" href="/v2/auth/access" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Sign in with an email code</a></div><p class="small muted" style="text-align:center">Here to take a survey? Open the link you were given; no sign-in is needed. <a href="#survey">Have an access code?</a></p><details class="sandbox-signin" id="sandbox-signin"${codeStep ? ' open' : ''}><summary>Sandbox test identities (dev only) — not a real sign-in</summary><form id="signin-form" data-stage="${codeStep ? 'code' : 'email'}"><label class="field">Email<input name="email" type="email" required autocomplete="email" value="${ctx.esc(s.email)}"${codeStep ? ' readonly' : ''}></label>${codeStep ? `${s.devCode ? `<p class="note small">Sandbox code: <strong>${ctx.esc(s.devCode)}</strong></p>` : '<p class="small muted">Code requested. Enter the code you received.</p>'}<label class="field">Code<input name="code" required autocomplete="one-time-code" inputmode="numeric"></label>` : ''}<div class="actions"><button class="primary" type="submit">${codeStep ? 'Sign in' : 'Send me a code'}</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form></details></section>`;
+  return `<section class="glass panel narrow v3-signin" style="max-width:420px;margin:48px auto 0"><p class="eyebrow">Sign in</p><h1 style="font-size:27px">Sign in with your email</h1>${ctx.state?.emailLinks === true ? `<p class="muted">We email you a sign-in link; there is no password.</p><form id="email-link-form" method="post" action="/v2/auth/email"><label class="field">Email<input name="email" type="email" required autocomplete="email" maxlength="254"></label><div class="actions"><button class="button rv-btn primary" type="submit" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Email me a sign-in link</button></div></form><p id="email-link-status" class="small" role="status"></p>` : `<p class="muted">We email you a one-time code; there is no password.</p><div class="actions"><a class="button rv-btn primary" href="/v2/auth/access" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Sign in with an email code</a></div>`}${learnMore('<p class="small muted">Here to take a survey? Open the link you were given; no sign-in is needed. <a href="#survey">Have an access code?</a></p>')}<details class="sandbox-signin" id="sandbox-signin"${codeStep ? ' open' : ''}><summary>Sandbox test identities (dev only) — not a real sign-in</summary><form id="signin-form" data-stage="${codeStep ? 'code' : 'email'}"><label class="field">Email<input name="email" type="email" required autocomplete="email" value="${ctx.esc(s.email)}"${codeStep ? ' readonly' : ''}></label>${codeStep ? `${s.devCode ? `<p class="note small">Sandbox code: <strong>${ctx.esc(s.devCode)}</strong></p>` : '<p class="small muted">Code requested. Enter the code you received.</p>'}<label class="field">Code<input name="code" required autocomplete="one-time-code" inputmode="numeric"></label>` : ''}<div class="actions"><button class="primary" type="submit">${codeStep ? 'Sign in' : 'Send me a code'}</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form></details></section>`;
 }
 const entry = {
   // Tour/example deep links redirect into the shared fixture-backed assessment shell.
@@ -141,12 +161,26 @@ const entry = {
     root.querySelector('#code-form')?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }));
+      // U08 (lanes-1321): a used, unknown or mistyped code gets one plain next step, not "Not allowed here." / a server message.
+      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }), { refused: CODE_REFUSED });
       if (!r) return;
       const token = r.participant_token || r.participant;
       if (!token) return ctx.note('The server accepted the code but returned no participant token.', true);
       storeSession('participantToken', token);
       window.location.assign('/legacy/#participant'); // participant flow stays on the legacy surface (unchanged)
+    });
+    // B38: email sign-in link. Stays on this screen and shows one line; without script the form posts natively to the same route.
+    root.querySelector('#email-link-form')?.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const form = ev.target, submit = form.querySelector('button[type=submit]'), status = root.querySelector('#email-link-status');
+      submit.disabled = true; status.textContent = 'Sending…';
+      try {
+        const res = await fetch('/v2/auth/email', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ email: val(form, 'email') }), credentials: 'same-origin', redirect: 'manual', cache: 'no-store' });
+        if (res.type === 'opaqueredirect') { window.location.assign('/v2/auth/access'); return; } // environment without email links
+        if (res.ok) { const b = await res.json().catch(() => null); const min = Number(b?.result?.expires_in_minutes) || 30; form.hidden = true; status.textContent = `Check your email — we sent you a sign-in link. It expires in ${min} minutes.`; return; }
+        status.textContent = res.status === 429 ? 'Too many sign-in links were requested. Use the newest email, or wait a few minutes.' : res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
+      } catch { status.textContent = 'The sign-in link could not be sent. Check your connection and try again.'; }
+      submit.disabled = false;
     });
     root.querySelector('#signin-form')?.addEventListener('submit', async ev => {
       ev.preventDefault();
@@ -163,9 +197,10 @@ const entry = {
       if (!r) return;
       if (!r.session) return ctx.note('The server answered without a session token.', true);
       storeSession('facilitatorToken', r.session);
+      // Bincy F02 / B-F02a (lanes-1321): land on the work, not back on this form. Navigate BEFORE setToken: setToken
+      // re-boots the app (new generation), after which ctx.go is a no-op and the page stayed on #signin.
+      ctx.go(ctx.routes.projects);
       if (ctx.setToken) ctx.setToken(r.session);
-      ctx.note('Signed in.');
-      ctx.go(ctx.routes.workspaces);
     });
   },
 };
@@ -207,7 +242,7 @@ function pageBack(ctx, href, label) { return ctx.shellOwnsTitle === true ? '' : 
 // The read head carries role/archived state and the permissions link; the heading itself follows the host contract above.
 function kitHead(ctx, r, extra = '') { return `${pageHead(ctx, r)}<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}"><p class="muted small" style="margin:0">${r.role ? `Your role: ${ctx.esc(r.role)}` : ''}</p><div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>`; }
 const readRegion = html => `<div data-read-region class="kit-read">${html}</div>`;
-const actionRegion = html => html ? `<section data-action-region class="legacy-actions" aria-label="Existing controls (kit conversion pending)">${html}</section>` : '';
+const actionRegion = html => html ? `<section data-action-region class="legacy-actions" aria-label="More actions">${html}</section>` : '';
 
 // ---------- workspaces ----------
 const workspaces = {
@@ -287,6 +322,9 @@ const workspace = {
 };
 
 // ---------- projects ----------
+// B34 (Bincy F03): one way to create. Projects and a project page offer only this Start entry (the guided setup at #new creates
+// the project, language and assessment); no separate create-assessment or add-language form on the project page (#new takes no preset).
+const START_REVIEW = '<div class="v3-shell-actions actions"><a class="rv-btn primary" data-v3-start href="#new">+ Start a new 3D Review</a></div>';
 const projects = {
   async load(ctx, params = {}) {
     let list;
@@ -298,25 +336,25 @@ const projects = {
       try { const a = await ctx.api(`/v2/projects/${encodeURIComponent(p.id)}/assessments`); lists[p.id] = { status: 'loaded', list: (a.assessments || []).filter(x => !x.archived_at) }; }
       catch (e) { lists[p.id] = { status: classify(e) }; }
     }));
-    return { status: 'loaded', params, projects: list, lists };
+    // B03 (Bincy F01/F02): an assessment shared directly (assessment grant, no project role) is not in /v2/projects. Home lists it
+    // from the caller's own grants (/v2/me) + the assessment read the grant already allows — no new server surface.
+    let shared = [];
+    try {
+      const me = await ctx.api('/v2/me'), here = new Set(list.map(p => p.id));
+      const ids = [...new Set((me?.grants || []).filter(g => g.scope_type === 'assessment').map(g => g.scope_id))].slice(0, 20);
+      const reads = await Promise.allSettled(ids.map(id => ctx.api(`/v2/assessments/${encodeURIComponent(id)}`)));
+      shared = reads.filter(r => r.status === 'fulfilled').map(r => r.value?.assessment).filter(a => a && !a.archived_at && !here.has(a.project_id));
+    } catch { shared = []; }
+    return { status: 'loaded', params, projects: list, lists, shared };
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('projects', model);
-    const start = '<div class="v3-shell-actions actions"><a class="rv-btn primary" data-v3-start href="#new">+ Start a new 3D Review</a></div>';
-    const home = homeView({ projects: model.projects || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start });
-    return readRegion(`${pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`)
-      + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a project</h2><form id="create-project"><label class="field">Project name<input name="name" maxlength="100" required placeholder="For example, Lake project"></label><div class="actions"><button class="primary" type="submit">Create project</button></div></form></section>`);
+    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW });
+    return readRegion(`${pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, projects, model);
-    root.querySelector('#create-project')?.addEventListener('submit', async ev => {
-      ev.preventDefault();
-      const form = ev.target;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Create project', () => ctx.api('/v2/projects', { method: 'POST', body: { name: val(form, 'name') } }));
-      if (r?.project?.id) ctx.go(ctx.routes.project(r.project.id));
-      else if (r) ctx.note('Created, but the server returned no project id.', true);
-    });
   },
 };
 
@@ -337,18 +375,14 @@ const project = {
   },
   render(ctx, model) {
     const g = gate(ctx, model, { href: ctx.routes.projects, label: 'All projects' }); if (g) return g;
-    const p = model.project, edit = CAN_EDIT.has(p.role), owner = p.role === 'owner';
-    const active = model.languages.filter(l => !l.archived_at);
+    const p = model.project, edit = CAN_EDIT.has(p.role);
     const langName = new Map(model.languages.map(l => [l.id, l.name]));
     const cards = model.assessments.map(a => ctx.cards.assessmentCard({ ...a, language_name: langName.get(a.language_id) || a.language_name }));
     const assessmentsBlock = model.assessmentsStatus === 'loaded' ? ctx.cards.cardGrid(cards, 'No assessments yet.')
       : model.assessmentsStatus === 'refused' ? '<p class="muted">Assessments are not visible to you here.</p>'
       : model.assessmentsStatus === 'unauthenticated' ? `<p class="muted">Your session has ended. <a href="${ctx.routes.entry}">Sign in</a></p>`
       : `<p class="muted">${ctx.esc(model.assessmentsError)}</p><div class="actions"><button type="button" class="primary" data-act="retry">Retry</button></div>`;
-    const langList = model.languages.length ? `<div class="links">${model.languages.map(l => `<p class="small">${ctx.esc(l.name)}${l.code ? ` <span class="muted">(${ctx.esc(l.code)})</span>` : ''}${l.archived_at ? ' <span class="badge">Archived</span>' : ''}</p>`).join('')}</div>` : '<p class="muted">No languages yet. Add one before creating an assessment.</p>';
-    const addLang = edit ? `<form id="add-language" class="line"><label class="field">Language name<input name="name" maxlength="100" required placeholder="For example, Lake language"></label><label class="field">Code (optional, BCP-47 shaped; qaa–qtz for an invented language)<input name="code" maxlength="20" pattern="[a-z]{2,3}(-[A-Za-z0-9]{1,8})*"></label><div class="actions"><button class="primary" type="submit">Add language</button></div></form>` : '';
-    const create = edit ? `<section class="panel"><p class="eyebrow">Prepare</p><h2>Create an assessment</h2>${active.length ? `<form id="create-assessment"><label class="field">Assessment name<input name="name" maxlength="100" required placeholder="For example, September review"></label><label class="field">Language<select name="language_id" required>${active.map(l => `<option value="${ctx.esc(l.id)}">${ctx.esc(l.name)}${l.code ? ` (${ctx.esc(l.code)})` : ''}</option>`).join('')}</select></label><div class="actions"><button class="primary" type="submit">Create & prepare</button></div></form>` : '<p class="muted">Add a language first; every assessment names its target language.</p>'}</section>` : '';
-    const rename = owner ? `<section class="panel"><h2>Rename</h2><form id="rename-form"><label class="field">Project name<input name="name" maxlength="100" required value="${ctx.esc(p.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
+    const langList = model.languages.length ? `<div class="links">${model.languages.map(l => `<p class="small">${ctx.esc(l.name)}${l.code ? ` <span class="muted">(${ctx.esc(l.code)})</span>` : ''}${l.archived_at ? ' <span class="badge">Archived</span>' : ''}</p>`).join('')}</div>` : '<p class="muted">No languages yet.</p>';
     // Lane 11 (LANES.md claim 11:19): retained surfaces (cookbook design-system-v3 PARITY.md, ADOPTION item 7) reachable from project
     // settings. Links only, to the existing screens; no new capability, contract unchanged. Access codes (C3) live on the legacy facilitator page.
     const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue paper codes for one survey and release them once to print (choose the assessment and survey there)', href: '/legacy/#facilitator', label: 'Open access codes' },
@@ -360,32 +394,22 @@ const project = {
     const assessmentsRead = r.assessments.status === 'ready' ? kitGrid(ctx, r.assessments.items, 'No assessments yet.') : assessmentsBlock;
     const languagesRead = r.languages.status === 'ready' ? langList : r.languages.status === 'refused' ? '<p class="muted">Languages are not visible to you here.</p>' : r.languages.status === 'unauthenticated' ? `<p class="muted">Your session has ended. <a href="${ctx.routes.entry}">Sign in</a></p>` : '<p class="muted" role="alert">Languages could not be loaded. <button type="button" class="quiet" data-act="retry">Retry</button></p>';
     return pageBack(ctx, ctx.routes.projects, 'All projects') + readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/projects/${ctx.enc(p.id)}">Permissions</a>`)}${p.organization ? `<p class="muted small">${ctx.esc(p.organization)}</p>` : ''}<h3>Assessments</h3>${assessmentsRead}<aside class="glass panel" style="margin-top:22px"><h3>Languages</h3>${languagesRead}</aside>`)
-      + actionRegion(`${create}${rename}${settings}${addLang ? `<section class="panel"><h2>Languages</h2>${addLang}</section>` : ''}`);
+      + actionRegion(`${edit ? START_REVIEW : ''}${settings}`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, project, model);
     const id = model.project?.id;
     const reload = async () => { const next = await project.load(ctx, model.params); swap(ctx, root, project, next); };
-    root.querySelector('#add-language')?.addEventListener('submit', async ev => {
-      ev.preventDefault();
-      const form = ev.target, code = val(form, 'code');
-      const body = { name: val(form, 'name') }; if (code) body.code = code;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Add language', () => ctx.api(`/v2/projects/${ctx.enc(id)}/languages`, { method: 'POST', body }));
-      if (r) { ctx.note('Language added.'); await reload(); }
-    });
-    root.querySelector('#create-assessment')?.addEventListener('submit', async ev => {
-      ev.preventDefault();
-      const form = ev.target;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Create assessment', () => ctx.api(`/v2/projects/${ctx.enc(id)}/assessments`, { method: 'POST', body: { name: val(form, 'name'), language_id: val(form, 'language_id') } }));
-      if (r?.assessment?.id) ctx.go(ctx.routes.assessment(r.assessment.id));
-      else if (r) ctx.note('Created, but the server returned no assessment id.', true);
-    });
-    root.querySelector('#rename-form')?.addEventListener('submit', async ev => {
-      ev.preventDefault();
-      const form = ev.target;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Rename', () => ctx.api(`/v2/projects/${ctx.enc(id)}`, { method: 'PATCH', body: { name: val(form, 'name') } }));
-      if (r) { ctx.note('Renamed.'); await reload(); }
-    });
+    // B07: the project name is the heading (kit shell's or the page's own); owners rename it in place — no rename card.
+    const heading = (root.closest?.('[role=main]') || root).querySelector?.('h1');
+    const eh = mountEditableHeading(heading, { canEdit: model.project?.role === 'owner', label: 'project name', save: async name => {
+      let reason = ''; // the refusal is shown in the heading's field (like the assessment rename); if that field is gone, in the page note
+      const quiet = Object.create(ctx, { note: { value: (text, alert) => { if (alert) reason = text; else ctx.note(text, alert); } } });
+      const r = await write(quiet, null, 'Rename', () => ctx.api(`/v2/projects/${ctx.enc(id)}`, { method: 'PATCH', body: { name } }));
+      if (!r) { if (reason && !eh?.isOpen()) ctx.note(reason, true); throw new Error(reason || 'The name was not saved.'); } // Bugbot 4108644481: never silent
+      const cached = ctx.state?.projects?.find?.(x => x.id === id); if (cached) cached.name = r.project?.name || name; // shell title + crumbs read this cache
+      ctx.note('Renamed.'); await reload();
+    } });
   },
 };
 

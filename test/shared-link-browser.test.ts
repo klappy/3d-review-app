@@ -583,7 +583,7 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     plan.responses = null; await edit($, { Q1: "4" });
     plan.responses = refuse(400, "INVALID_PARAMS"); await submit($);
     expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toContain(bodies[0].result.response_id);
-    expect($("participant-resume").textContent).toBe(`${copy.receiptThanks} ${copy.sameLinkOthers}`);
+    expect($("participant-resume").textContent).toBe(`Thank you. Your answers stay with the team, grouped with others from the Translation Team perspective. Reopening your link shows this receipt again. ${copy.sameLinkOthers}`); // B26: survey_tavo is tpl_validation (Translation Team)
     expect(storage.getItem(ns + "draft")).toBeNull(); expect(storage.getItem(ns + "submitKey")).toBeNull();
     expect(await counts()).toBe(before + 1);
   });

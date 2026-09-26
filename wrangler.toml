@@ -17,6 +17,9 @@ MAIL_FROM = "noreply@3dreview.app"
 # DEV sends to ANY address unless an allowlist is set; a non-empty list of normalized-recipient hashes is enforced (malformed closes sending).
 MAIL_ALLOWLIST_SHA256 = ""
 # Native Email Sending only; no inbox, inbound route or forwarding configuration.
+# B38 email sign-in link (src/magic-link.ts): DEV only. Links last MAGIC_LINK_TTL_MINUTES, reusable until then.
+MAGIC_LINK = "on"
+MAGIC_LINK_TTL_MINUTES = "30"
 # Cloudflare Access (one-time PIN) guards GET /v2/auth/access on this hostname — see src/access.ts. AUD is public.
 ACCESS_TEAM_DOMAIN = "klappy.cloudflareaccess.com"
 ACCESS_AUD = "8a1c350783d5c2d075188d66f22b5b8d6bb9ecb31694acf7f4042c1567035998"

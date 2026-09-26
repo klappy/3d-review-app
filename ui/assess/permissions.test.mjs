@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { permissions, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN } from './permissions.js';
+import { permissions, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, TEST_ADDRESS_NOTE, inviteOutcome } from './permissions.js';
+import { shortDate } from './cards.js';
 
 const read = n => readFileSync(fileURLToPath(new URL(n, import.meta.url)), 'utf8');
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -57,7 +58,7 @@ test('invite two-step: dry_run params → sheet renders impact VERBATIM (effect,
   await x.submit('data-invite-form'); assert.deepEqual(seen[0], { params: { email: 'new@example.test', role: 'viewer' }, mode: 'dry_run' });
   const h = x.root.html; assert.match(h, /data-confirm-kind="invite"/); assert.match(h, /expires in 300 seconds/); assert.match(h, /<dd>external<\/dd>/); assert.match(h, /<dd>true<\/dd>/); assert.match(h, /cap.grant.revoke_invitation/); assert.match(h, /629f4df892ca/); assert.match(h, /new@example.test/);
   await x.click('data-confirm-execute'); assert.deepEqual(seen[1], { params: { email: 'new@example.test', role: 'viewer' }, mode: 'execute', confirm_token: 'cfm_1' });
-  assert.equal(x.m.sheet, null); assert.match(x.root.html, /Invitation sent\. receipt rcpt_1 · trace tr_1/); assert.equal(x.reloads(), 0); assert.equal(x.calls.filter(c => c.url === '/v2/assessment/a1/grants').length, 2);
+  assert.equal(x.m.sheet, null); assert.match(x.root.html, /Invitation sent\.<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/); assert.equal(x.reloads(), 0); assert.equal(x.calls.filter(c => c.url === '/v2/assessment/a1/grants').length, 2);
 });
 
 test('N3 member invites owner → picker never offers owner; forced 403 renders server message; N12 malformed → server 400 verbatim; N18 429 with hint', async () => {
@@ -148,7 +149,7 @@ test('F-G1-1: mutation completion refreshes real roster and role while keeping o
     else if (action === 'revoke_invitation') await x.click('data-revoke-invitation="inv_p"');
     else await x.click('data-confirm-execute');
     await x.settle();
-    assert.match(x.root.html, /data-permissions-status>[^<]*receipt rcpt_1 · trace tr_1/, action);
+    assert.match(x.root.html, /data-permissions-status>[^<]*<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/, action);
     assert.equal(x.calls.filter(c => c.url === '/v2/assessment/a1/grants').length, 2, action);
     assert.equal(x.m.sheet, null);
     assert.doesNotMatch(x.root.html, /secret-confirm|new@example.test/);
@@ -172,7 +173,7 @@ test('post-success refresh refusal/failure hides stale access controls, preserve
       'DELETE /v2/assessment/a1/grants/g_me': () => { changed = true; return { status: 'revoked' }; },
     });
     await x.click('data-revoke="g_me"'); await x.settle();
-    assert.match(x.root.html, /Access removed\. receipt rcpt_1 · trace tr_1/);
+    assert.match(x.root.html, /Access removed\.<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/);
     assert.doesNotMatch(x.root.html, /data-grant-row|data-invite-form|data-transfer-form|data-revoke=/);
     if (code === 'INTERNAL_ERROR') {
       recovered = true;
@@ -180,7 +181,7 @@ test('post-success refresh refusal/failure hides stale access controls, preserve
       // Retry handler returns no promise; allow its read/render lifecycle to settle.
       await new Promise(resolve => setImmediate(resolve));
       assert.match(x.root.html, /data-permissions-state="loaded"/);
-      assert.match(x.root.html, /Access removed\. receipt rcpt_1 · trace tr_1/);
+      assert.match(x.root.html, /Access removed\.<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/);
     }
     assert.equal(x.calls.filter(c => c.method === 'DELETE').length, 1, 'refresh never repeats a mutation');
   }
@@ -220,7 +221,7 @@ test('ownership transfer to a signed-up principal with no prior grant attaches r
   assert.equal(x.m.receipts.new_principal, undefined);
   const row = x.root.html.match(/<tr data-grant-row="g_new_owner">[\s\S]*?<\/tr>/)?.[0];
   assert.match(row, /receipt rcpt_1 · trace tr_1/);
-  assert.match(x.root.html, /data-permissions-status>Ownership transfer done\. receipt rcpt_1 · trace tr_1/);
+  assert.match(x.root.html, /data-permissions-status>Ownership transfer done\.<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/);
 });
 
 test('confirm sheet Cancel dismisses before execute and is ignored while the write is in flight', async () => {
@@ -267,4 +268,36 @@ test('member list: same component for workspace / project / assessment; a future
   assert.deepEqual(labelMembers([{ principal_id: 'a' }, { principal_id: 'me' }, { principal_id: 'b' }], { me: 'me' }).map(r => r.person.name), ['Member 1', 'You', 'Member 2']);
   assert.equal(memberList(esc, [], {}).includes('No one listed.'), true);
   assert.equal(await readAccountEmail({ demo: true }), ''); assert.equal(await readAccountEmail({ fetchImpl: async () => { throw new Error('x'); } }), '');
+});
+
+test('U13: confirm sheet leads with one plain sentence; the impact record sits behind Details', async () => {
+  const { sheetSentence } = await import('./permissions.js');
+  assert.equal(sheetSentence({ kind: 'invite', params: { email: 'rina@x.example.invalid', role: 'member' } }, 'assessment'), 'rina@x.example.invalid will be able to open this assessment as member once they accept. An email is sent when you confirm.');
+  assert.match(sheetSentence({ kind: 'transfer_owner', params: { to: 'usr_1', step_down: true } }, 'projects'), /^Ownership of this project moves .* and you become a member\. This cannot be undone from here\.$/);
+  assert.equal(sheetSentence({ kind: 'update_role', params: { role: 'viewer' } }, 'workspace'), 'Their role on this workspace changes to viewer.');
+  assert.equal(sheetSentence({ kind: 'other' }), 'Nothing changes until you confirm.');
+});
+
+test('B31/U26: invite to a test address → one plain sentence (no reason code); pending row reads role · invited <short date> · email', async () => {
+  const t = { 'POST /v2/assessment/a1/invitations': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'c', expires_in: 300, impact: {} } : { invitation_id: 'inv_new', role: 'member', status: 'pending', accepted: true, delivered: false, delivery: { provider: null, state: 'not_sent', reason: 'synthetic_recipient' } } };
+  const x = await mount('owner', t, { email: 'persona-1812-a@training.example.invalid', role: 'member' });
+  await x.submit('data-invite-form'); await x.click('data-confirm-execute');
+  const status = x.root.html.match(/data-permissions-status>([^<]*)</)[1];
+  assert.equal(status, TEST_ADDRESS_NOTE);
+  assert.doesNotMatch(status, /synthetic_recipient|rcpt_|tr_/);
+  assert.equal(x.m.invitees.inv_new, 'persona-1812-a@training.example.invalid');
+  // the refreshed roster lists the new invitation (the service returns no address, only role/status/date)
+  const m = { ...x.m, pending: [{ id: 'inv_new', role: 'member', status: 'pending', created_at: '2026-09-25T20:40:12Z' }] };
+  const h = permissions.render({ esc }, m);
+  const li = h.match(/<li data-invitation="inv_new">([^<]*)/)[1];
+  assert.equal(li.trim(), `member · invited ${shortDate('2026-09-25T20:40:12Z')} · persona-1812-a@training.example.invalid`);
+});
+
+test('B31/U26: inviteOutcome and shortDate are plain words', () => {
+  assert.equal(inviteOutcome({ delivered: false, delivery: { state: 'not_sent', reason: 'synthetic_recipient' } }), 'Invitation recorded; not emailed (test address).');
+  assert.equal(inviteOutcome({ delivered: false, delivery: { state: 'not_sent', reason: 'duplicate_recent' } }), DUPLICATE_NOTE);
+  assert.equal(inviteOutcome({ delivered: true, delivery: { state: 'accepted' } }), 'Invitation sent.');
+  assert.equal(shortDate('2026-09-25T12:00:00Z', new Date('2026-10-01T00:00:00Z')), 'Sep 25');
+  assert.equal(shortDate('2025-09-25T12:00:00Z', new Date('2026-10-01T00:00:00Z')), 'Sep 25, 2025');
+  assert.equal(shortDate('not a date'), 'not a date');
 });

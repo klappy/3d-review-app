@@ -1,7 +1,8 @@
 // node --test ui/assess/scope.test.mjs — scope pages: render() strings, load() with a fake api, entry sign-in transitions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pages, css, classify } from './scope.js';
+import { pages, css, classify, landsOnWork, signInLanding, whoLine, PERSPECTIVE_WHO } from './scope.js';
+import { readFileSync } from 'node:fs';
 import * as cards from './cards.js';
 
 const err = (code, message = 'nope') => Object.assign(new Error(message), { code, status: Number(code) || 400 });
@@ -62,7 +63,7 @@ test('workspaces: empty state and create form', async () => {
 test('projects: empty state and create form', async () => {
   const ctx = ctxWith({ 'GET /v2/projects': { projects: [] } });
   const h = pages.projects.render(ctx, await pages.projects.load(ctx, {}));
-  assert.ok(h.includes('You have no projects yet.')); assert.ok(h.includes('id="create-project"')); assert.ok(h.includes('href="#workspaces"'));
+  assert.ok(h.includes('You have no projects yet.')); assert.ok(!h.includes('id="create-project"'), 'B34: no separate create-project form'); assert.ok(h.includes('data-v3-start href="#new"')); assert.ok(h.includes('href="#workspaces"'));
 });
 test('workspace: no projects grouped, viewer sees no add/rename/remove', async () => {
   const ctx = ctxWith({ 'GET /v2/workspaces/ws1': { workspace: { id: 'ws1', name: 'W <1>', role: 'viewer', archived_at: null }, projects: [] } });
@@ -71,10 +72,10 @@ test('workspace: no projects grouped, viewer sees no add/rename/remove', async (
   assert.equal(ctx.calls.length, 1, 'viewer does not fetch candidate projects');
   assert.ok(h.includes('href="#permissions/workspaces/ws1"'));
 });
-test('project: no assessments, no languages → create blocked until a language exists', async () => {
+test('project (member): no assessments, no languages → Start a new 3D Review is the only create action (B34)', async () => {
   const ctx = ctxWith({ 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'member' }, languages: [] }, 'GET /v2/projects/p1/assessments': { assessments: [] }, 'GET /v2/projects/p1/languages': { languages: [] } });
   const h = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
-  assert.ok(h.includes('No assessments yet.')); assert.ok(h.includes('No languages yet')); assert.ok(h.includes('id="add-language"')); assert.ok(!h.includes('id="create-assessment"')); assert.ok(!h.includes('id="rename-form"'), 'member cannot rename');
+  assert.ok(h.includes('No assessments yet.')); assert.ok(h.includes('No languages yet')); assert.ok(h.includes('data-v3-start href="#new"')); assert.ok(!h.includes('id="add-language"')); assert.ok(!h.includes('id="create-assessment"')); assert.ok(!h.includes('Add a language first')); assert.ok(!h.includes('id="rename-form"'), 'member cannot rename');
 });
 
 // ---------- card links per scope ----------
@@ -94,12 +95,13 @@ test('projects: cards link to #project/<id>', async () => {
   const ctx = ctxWith({ 'GET /v2/projects': { projects: [{ id: 'p1', name: 'One', role: 'owner' }] } });
   assert.ok(pages.projects.render(ctx, await pages.projects.load(ctx, {})).includes('href="#project/p1"'));
 });
-test('project (owner): assessment cards link to #assessment/<id> with language name, create form, permissions link', async () => {
+test('project (owner): assessment cards link to #assessment/<id> with language name, Start entry, permissions link', async () => {
   const ctx = ctxWith({ 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'owner', organization: 'Org' }, languages: [] }, 'GET /v2/projects/p1/assessments': { assessments: [{ id: 'a1', name: 'Sept', stage: 'collect', language_id: 'l1' }] }, 'GET /v2/projects/p1/languages': { languages: [{ id: 'l1', name: 'Lake', code: 'qaa', archived_at: null }, { id: 'l2', name: 'Old', code: null, archived_at: '2026-01-01' }] } });
   const h = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' }));
   assert.ok(h.includes('href="#assessment/a1"')); assert.ok(h.includes('Language: Lake')); assert.ok(h.includes('Collecting'));
-  assert.ok(h.includes('id="create-assessment"')); assert.ok(h.includes('<option value="l1">Lake (qaa)</option>')); assert.ok(!h.includes('<option value="l2"'), 'archived language not offered');
-  assert.ok(h.includes('id="rename-form"')); assert.ok(h.includes('href="#permissions/projects/p1"')); assert.ok(h.includes('Org'));
+  assert.ok(!h.includes('id="rename-form"') && !h.includes('<h2>Rename</h2>'), 'B07: no rename card; the heading carries the edit control'); assert.ok(h.includes('href="#permissions/projects/p1"')); assert.ok(h.includes('Org'));
+  // B34 (Bincy F03): Start is the ONLY create action; no create-assessment / add-language forms, not even behind "More".
+  assert.equal(h.match(/data-v3-start href="#new"/g).length, 1); for (const gone of ['id="create-assessment"', 'id="add-language"', 'id="project-more"', 'Create an assessment', 'Create &amp; prepare', 'Create & prepare', '>Add language<']) assert.ok(!h.includes(gone), gone);
 });
 
 // ---------- refusal / auth / transient ----------
@@ -154,8 +156,20 @@ test('entry: public welcome with hero, tour stepper and survey/example/sign-in b
 test('entry: signed in shows Continue cards + sign-out, hides sign-in', async () => {
   const ctx = ctxWith({}, { state: { principal: { id: 'pr_1' } } }); const h = pages.entry.render(ctx, await pages.entry.load(ctx, {}));
   assert.ok(h.includes('href="#workspaces"')); assert.ok(h.includes('href="#projects"')); assert.ok(h.includes('data-act="signout"')); assert.ok(!h.includes('data-act="signin"'));
+  // B02: a signed-in "/" never shows "Sign in" — not the nav choice, not any link to the provider
+  const nav = h.slice(h.indexOf('<nav class="public-choices'), h.indexOf('</nav>'));
+  assert.ok(!nav.includes('Sign in')); assert.ok(!h.includes('href="/v2/auth/access"')); assert.ok(!/>\s*Sign in\s*</.test(h));
 });
-test('entry: sign-in email → code step (dev code shown) → session stored, token set, go #workspaces', async () => {
+test('B02: signed in, the welcome route lands on #projects; signed out, and the explicit #signin/#survey/#about pages, stay put', () => {
+  for (const r of [{ kind: 'entry' }, { kind: 'entry', intent: 'how' }, { kind: 'entry', intent: 'example' }]) { assert.equal(landsOnWork(r, { id: 'pr_1' }), true, JSON.stringify(r)); assert.equal(landsOnWork(r, null), false, JSON.stringify(r)); }
+  for (const intent of ['signin', 'survey', 'about']) assert.equal(landsOnWork({ kind: 'entry', intent }, { id: 'pr_1' }), false, intent);
+  for (const kind of ['projects', 'workspaces', 'assessment']) assert.equal(landsOnWork({ kind }, { id: 'pr_1' }), false, kind);
+});
+test('B02: render() applies landsOnWork before routing, replacing (not pushing) the address with #projects', async () => {
+  const { readFileSync } = await import('node:fs'); const js = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  assert.match(js, /async function render\(\) \{\n[^\n]*\n\s*if \(landsOnWork\(route\(location\.hash\), state\.principal\)\) \{ try \{ history\.replaceState\(null, '', location\.pathname \+ location\.search \+ '#projects'\); \} catch \{\} \}\n\s*const gen = \+\+generation, r = route\(location\.hash\);/);
+});
+test('entry: sign-in email → code step (dev code shown) → session stored, go #projects then token set (B-F02a)', async () => {
   const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, removeItem: k => { delete stored[k]; } };
   const tokens = [];
   const ctx = ctxWith({ 'POST /v2/auth/link': { sent: true, dev_only_code: '123456' }, 'POST /v2/auth/session': { session: 'sess_abc', principal_id: 'pr_1' } }, { setToken: t => tokens.push(t) });
@@ -168,7 +182,8 @@ test('entry: sign-in email → code step (dev code shown) → session stored, to
   assert.ok(pages.entry.render(ctx, m).includes('123456'));
   form.elements.code.value = ' 123456 '; await form.fire('submit');
   assert.deepEqual(ctx.calls[1].body, { email: 'a@x.example.invalid', code: '123456' });
-  assert.equal(stored.facilitatorToken, 'sess_abc'); assert.deepEqual(tokens, ['sess_abc']); assert.deepEqual(ctx.gone, ['#workspaces']);
+  assert.equal(stored.facilitatorToken, 'sess_abc'); assert.deepEqual(tokens, ['sess_abc']); assert.deepEqual(ctx.gone, ['#projects']);
+  assert.ok(!ctx.notes.some(n => n.m === 'Signed in.'), 'no stale note after the re-boot');
 });
 test('entry: sign-in failure stays on the form and never claims success', async () => {
   const ctx = ctxWith({ 'POST /v2/auth/link': err('INVALID_PARAMS', 'synthetic only') });
@@ -193,6 +208,16 @@ test('entry: survey code stores participant token and hands off to legacy /#part
   assert.equal(stored.participantToken, 'ptok'); assert.deepEqual(assigned, ['/legacy/#participant']);
 });
 
+test('U08: a used or unknown access code says what to do next, not "Not allowed here."', async () => {
+  const assigned = []; globalThis.window = { location: { assign: u => assigned.push(u) } };
+  const ctx = ctxWith({ 'POST /v2/participate/code': err('NOT_FOUND_OR_NOT_VISIBLE', 'access code not found or not visible') });
+  const m = await pages.entry.load(ctx, {}); m.mode = 'survey'; const root = mount(pages.entry, ctx, m);
+  const form = root.querySelector('#code-form'); form.elements.code.value = 'ZZZ'; await form.fire('submit');
+  assert.deepEqual(assigned, []);
+  assert.equal(ctx.notes.at(-1).m, 'This code has been used or is not valid. Check it, or ask the person who gave it to you for a new one.');
+  assert.equal(ctx.notes.at(-1).a, true);
+});
+
 // ---------- writes ----------
 test('workspaces: create goes to the new workspace; NOT_AUTHORIZED shows the server message', async () => {
   const ctx = ctxWith({ 'GET /v2/workspaces': { workspaces: [] }, 'POST /v2/workspaces': { workspace: { id: 'ws9', name: 'N' } } });
@@ -204,12 +229,7 @@ test('workspaces: create goes to the new workspace; NOT_AUTHORIZED shows the ser
   const f2 = root2.querySelector('#create-workspace'); f2.elements.name.value = 'N'; await f2.fire('submit');
   assert.deepEqual(ctx2.gone, []); assert.ok(ctx2.notes.some(n => n.a));
 });
-test('project: create assessment posts {name, language_id} and goes to #assessment/<id>', async () => {
-  const ctx = ctxWith({ 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'member' }, languages: [] }, 'GET /v2/projects/p1/assessments': { assessments: [] }, 'GET /v2/projects/p1/languages': { languages: [{ id: 'l1', name: 'Lake', code: null, archived_at: null }] }, 'POST /v2/projects/p1/assessments': { assessment: { id: 'a7' } } });
-  const m = await pages.project.load(ctx, { id: 'p1' }); const root = mount(pages.project, ctx, m);
-  const form = root.querySelector('#create-assessment'); form.elements.name.value = 'Sept'; form.elements.language_id.value = 'l1'; await form.fire('submit');
-  assert.deepEqual(ctx.calls.at(-1).body, { name: 'Sept', language_id: 'l1' }); assert.deepEqual(ctx.gone, ['#assessment/a7']);
-});
+
 
 test('signed-in welcome never displays internal identity or invented email and delegates logout', async()=>{
   let calls=0;const ctx=ctxWith({}, {state:{principal:{id:'private-opaque',email:'not-verified@example.invalid'}},signOut:async()=>{calls++;}});
@@ -293,7 +313,7 @@ test('project with assessments AND languages both failing renders two Retry cont
     map['GET /v2/projects/p1/assessments'] = { assessments: [] }; map['GET /v2/projects/p1/languages'] = { languages: [{ id: 'l1', name: 'Lake', code: 'qaa', archived_at: null }] };
     await buttons[which].fire('click');
     assert.equal(ctx.calls.length - before, 3, `retry #${which} re-ran the project load (project + assessments + languages)`);
-    assert.ok(root.querySelector('#create-assessment'), `retry #${which}: page re-rendered from the fresh model with a language available`);
+    assert.ok(root.querySelector('[data-v3-start]'), `retry #${which}: page re-rendered from the fresh model`);
     assert.equal(root.querySelectorAll('[data-act="retry"]').length, 0, 'no failure state remains after both reads succeed');
   }
 });
@@ -302,7 +322,7 @@ test('retry failure remains a truthful failure (never empty success) and rebinds
   const root = mount(pages.project, ctx, await pages.project.load(ctx, { id: 'p1' }));
   await root.querySelectorAll('[data-act="retry"]')[1].fire('click');
   const again = root.querySelectorAll('[data-act="retry"]'); assert.equal(again.length, 2, 'still failed: both retry controls rendered again');
-  assert.equal(root.querySelector('#create-assessment'), null, 'no assessment form on a failed read');
+  assert.equal(root.querySelector('#create-assessment'), null, 'no assessment form (B34: never on the project page)');
   const before = ctx.calls.length; await again[0].fire('click'); assert.equal(ctx.calls.length - before, 3, 're-rendered controls are bound too');
 });
 test('one in-flight guard across both controls: a second click on EITHER button while a reload is pending issues no second read', async () => {
@@ -340,13 +360,26 @@ test('project settings (lane 11): editors reach access codes on the existing scr
   assert.ok(!pages.project.render(view, await pages.project.load(view, { id: 'p1' })).includes('project-settings'));
 });
 
-test('L1-7 #signin matches prototype frame 1: centred card, one primary to the real provider, survey footer, sandbox collapsed after it', async () => {
+test('L1-7 #signin with email links off (production) keeps prototype frame 1: one primary to the Access provider, survey footer, sandbox collapsed after it', async () => {
   const html = pages.entry.render({ esc: s => String(s ?? ''), state: {} }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
   assert.ok(html.includes('class="glass panel narrow v3-signin"'));
-  assert.ok(html.includes('<p class="eyebrow">Sign in</p>'));
   assert.ok(/<a class="button rv-btn primary" href="\/v2\/auth\/access" style="width:100%/.test(html), 'one full-width primary to the real provider');
+  assert.ok(!html.includes('email-link-form'), 'no email form that production would discard');
   const access = html.indexOf('href="/v2/auth/access"'), box = html.indexOf('<details class="sandbox-signin"');
   assert.ok(access > -1 && box > access, 'real provider precedes the sandbox');
+});
+test('L1-7 #signin matches prototype frame 1 (B38: one email field + one "Email me a sign-in link" button), survey footer, sandbox collapsed after it', async () => {
+  const html = pages.entry.render({ esc: s => String(s ?? ''), state: { emailLinks: true } }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.ok(html.includes('class="glass panel narrow v3-signin"'));
+  assert.ok(html.includes('<p class="eyebrow">Sign in</p>'));
+  const form = html.slice(html.indexOf('<form id="email-link-form"'), html.indexOf('</form>', html.indexOf('<form id="email-link-form"')));
+  assert.ok(form.includes('method="post" action="/v2/auth/email"'), 'posts to the email sign-in link route (works without script)');
+  assert.equal((form.match(/<input /g) || []).length, 1, 'one email field'); assert.ok(form.includes('type="email"'));
+  assert.ok(/<button class="button rv-btn primary" type="submit" style="width:100%[^>]*>Email me a sign-in link<\/button>/.test(form), 'one full-width primary');
+  assert.ok(html.includes('id="email-link-status"') && html.includes('role="status"'), 'room for the one-line confirmation');
+  assert.ok(!html.includes('/v2/auth/access') && !html.includes('cdn-cgi'), 'no Cloudflare Access hop for app sign-in');
+  const real = html.indexOf('id="email-link-form"'), box = html.indexOf('<details class="sandbox-signin"');
+  assert.ok(real > -1 && box > real, 'real sign-in precedes the sandbox');
   assert.ok(!/<details class="sandbox-signin"[^>]*\bopen\b/.test(html), 'sandbox collapsed on the email step');
   assert.ok(html.includes('no sign-in is needed') && html.includes('href="#survey"'));
 });
@@ -366,4 +399,24 @@ test('router: about is a public entry intent; unknown hashes fall back to home, 
   assert.deepEqual({ ...route('#about') }, { kind: 'entry', intent: 'about' });
   for (const h of ['#public-about', '#nonsense', '#assessment']) assert.equal(route(h).kind, 'entry', h);
   assert.equal(route('#projects').kind, 'projects');
+});
+
+test('B04: sign-in landing — pending invitation first; one project → that project; several or none → Home', () => {
+  const one = [{ id: 'prj 1' }], two = [{ id: 'p1' }, { id: 'p2' }];
+  assert.equal(signInLanding({ invite: true, projects: one }), '#invite', 'invitation beats one project');
+  assert.equal(signInLanding({ invite: true, projects: two }), '#invite', 'invitation beats several');
+  assert.equal(signInLanding({ projects: one }), '#project/prj%201');
+  assert.equal(signInLanding({ projects: two }), '#projects');
+  assert.equal(signInLanding({ projects: [] }), '#projects');
+  assert.equal(signInLanding(), '#projects');
+  assert.equal(signInLanding({ projects: [{ id: 'p1' }, { id: 'p2', archived_at: '2026-01-01' }] }), '#project/p1', 'archived projects do not count');
+});
+
+test('B08+B20: one shared who-line per group (setup, launch, Collect); headings untouched; unknown groups get none', () => {
+  assert.equal(whoLine('Translation Team'), PERSPECTIVE_WHO.team); assert.equal(whoLine('Translation team'), PERSPECTIVE_WHO.team);
+  assert.equal(whoLine('Community'), PERSPECTIVE_WHO.community); assert.equal(whoLine('Church'), PERSPECTIVE_WHO.church);
+  assert.equal(whoLine('Other perspective'), ''); assert.equal(whoLine(undefined), '');
+  for (const w of Object.values(PERSPECTIVE_WHO)) assert.doesNotMatch(w, /Experience of/, 'who the group is, not what it is asked');
+  const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  assert.match(src, /<h3 style="margin:18px 0 6px">\$\{esc\(g\.lens\)\}<\/h3>\$\{whoLine\(g\.lens\)/, 'Collect group heading carries the shared who-line');
 });

@@ -22,6 +22,15 @@ export const copy = Object.freeze({
   uncertain: 'The request may have created a link, but its result was not received. Trying again may create another link. Nothing was emailed.',
 });
 
+// One reading of an execute failure, shared by the Share card and Collect: only an answer proving nothing was created (expired
+// or missing confirmation, lost permission) is certain; anything else (lost response, incomplete receipt) may have made a link.
+export function executeFailure(e) {
+  if (['CONFIRM_EXPIRED', 'CONFIRM_REQUIRED'].includes(e?.code)) return { uncertain: false, message: 'Sharing options expired. Try sharing again.' };
+  if (e?.status === 401 || e?.status === 403) return { uncertain: false, message: 'You no longer have permission to share. Sign in and check your access.' };
+  return { uncertain: true, message: copy.uncertain };
+}
+export function failure(f = executeFailure()) { return Object.assign(new Error(f.message), { uncertain: f.uncertain, shareMessage: f.message }); }
+
 export function blankShare() { return { stage: 'idle', open: false, confirm: null, deadline: 0, link: null, qr: false, message: null, alert: false }; }
 // share model keyed to (aid, sid, epoch) — assess.js drops it whenever any of those changes.
 export function shareFor(state, aid, sid, epoch) {
@@ -94,7 +103,7 @@ export function bind(ctx, root, { current, survey, share, api, onChange, print =
         share.link = { id: r.link_id, url: shareUrl(origin, r.entry_fragment), expires_at: r.expires_at || null };
       } catch (e) {
         if (!same()) { Object.assign(share, blankShare(), { message: copy.uncertain, alert: true }); return; }
-        fail(['CONFIRM_EXPIRED', 'CONFIRM_REQUIRED'].includes(e.code) ? 'Sharing options expired. Try sharing again.' : e.status === 401 || e.status === 403 ? 'You no longer have permission to share. Sign in and check your access.' : copy.uncertain);
+        fail(executeFailure(e).message);
         return;
       }
     }
@@ -126,4 +135,59 @@ export function bind(ctx, root, { current, survey, share, api, onChange, print =
   });
 }
 
-export const css = `.share-link code{word-break:break-all;user-select:all}.share-qr{margin:14px 0 0;max-width:220px}.share-qr svg{width:100%;height:auto;display:block;background:#fff;border-radius:8px}.share-sheet{display:none}@media print{.share-sheet{display:block}.share-sheet-print{font:16px/1.5 sans-serif;padding:24px;max-width:640px}.share-sheet-url{word-break:break-all;font-family:monospace;font-size:15px}.share-sheet-qr svg{width:240px;height:240px}}`;
+// B36 (Bincy checklist): one row per group — "Group · Survey", then Copy link and Show QR code as secondary buttons, one tap
+// each. The same copy strings, QR and clipboard path as the Share card above; used on the launched screen and on Collect.
+// `url` is known on the launched screen; on Collect it is issued on the first tap (issueLink) and kept in memory only. Collect
+// rows pass no group/survey: the group heading and survey title sit just above, so only the buttons show (no repeated words).
+export function groupLinks(ctx, rows) {
+  const esc = ctx.esc;
+  return `<ul class="share-groups" data-group-links>${rows.map(r => `<li class="share-group" data-group-link="${esc(r.key)}">${r.group ? `<span class="share-group-label" data-group-label>${esc(r.group)} <span aria-hidden="true">·</span> ${esc(r.survey)}</span>` : ''}${r.url ? `<input class="share-group-url" readonly aria-label="${esc(`${r.group} · ${r.survey} link`)}" value="${esc(r.url)}">` : ''}<span class="share-group-actions"><button type="button" data-group-copy="${esc(r.key)}">${esc(copy.copyLink)}</button><button type="button" data-group-qr="${esc(r.key)}" aria-expanded="false">${esc(copy.qr)}</button></span><span class="small muted" role="status" data-group-status></span><div class="share-qr" data-group-qr-figure hidden></div></li>`).join('')}</ul>`;
+}
+
+// resolve(key) → Promise<url>. Delegated on `root`, so a repaint of the rows needs no rebinding.
+export function bindGroupLinks(root, { resolve, clipboard = globalThis.navigator?.clipboard, signal } = {}) {
+  const busy = new Set();
+  root.addEventListener('click', async e => {
+    const b = e.target?.closest?.('[data-group-copy],[data-group-qr]'); if (!b) return;
+    const row = b.closest('[data-group-link]'); if (!row) return;
+    const key = b.dataset.groupCopy ?? b.dataset.groupQr, isQr = b.dataset.groupQr !== undefined;
+    const status = row.querySelector('[data-group-status]'), fig = row.querySelector('[data-group-qr-figure]');
+    const say = (t, alert = false) => { if (status) { status.textContent = t; status.className = `small ${alert ? 'alert' : 'muted'}`; } };
+    if (isQr && fig && !fig.hidden) { fig.hidden = true; fig.innerHTML = ''; b.textContent = copy.qr; b.setAttribute('aria-expanded', 'false'); return; }
+    if (busy.has(key)) return; busy.add(key);
+    let url;
+    try { url = await resolve(key); } catch (e) { busy.delete(key); say(e?.shareMessage || 'The link could not be prepared. Try again, or sign in if your session has ended.', true); return; }
+    busy.delete(key);
+    if (!url) { say('The link could not be prepared. Try again.', true); return; }
+    if (isQr) { if (fig) { fig.innerHTML = `${qrSvg(url)}<p class="small muted">Scan to open the survey</p>`; fig.hidden = false; } b.textContent = copy.hideQr; b.setAttribute('aria-expanded', 'true'); say(''); return; }
+    try { await clipboard.writeText(url); say(copy.copied); } catch { say(`Copy did not work. Select and copy: ${url}`, true); }
+  }, signal ? { signal } : undefined);
+}
+
+// Collect: issue one participant link for a survey in one tap (dry_run → execute, the Share card's API pair). The token is
+// returned to the caller only; never stored, never logged.
+export async function issueLink(api, { aid, sid, origin = globalThis.location?.origin, enc = encodeURIComponent }) {
+  const base = `/v2/assessments/${enc(aid)}/surveys/${enc(sid)}/links`;
+  const d = await api(base, { method: 'POST', body: { params: {}, mode: 'dry_run' } });
+  if (!d?.confirm_token) throw new Error('Invalid preparation');
+  let r;
+  try { r = await api(base, { method: 'POST', body: { params: {}, mode: 'execute', confirm_token: d.confirm_token } }); }
+  catch (e) { throw failure(executeFailure(e)); }
+  if (!r?.link_id || typeof r.entry_fragment !== 'string' || !/^#survey=[A-Za-z0-9_-]+$/.test(r.entry_fragment)) throw failure();
+  return { id: r.link_id, url: shareUrl(origin, r.entry_fragment), expires_at: r.expires_at || null };
+}
+// Collect's per-key link cache. A certain failure clears the key; an uncertain one (the execute may have created a link) keeps
+// an uncertain mark for the (aid, sid, epoch) key: every later tap shows the Share card's warning again and issues nothing, so a
+// repaint that wipes the row's message can never turn the next tap into a silent second link. A new link is then a deliberate
+// act on the survey's Share card, or follows a refresh (new epoch).
+export function cachedLink(cache, k, issue) {
+  const cur = cache.get(k);
+  if (cur?.uncertain) return Promise.reject(failure());
+  if (!cur) {
+    const p = issue().catch(e => { if (cache.get(k) === p) { if (e?.uncertain) cache.set(k, { uncertain: true }); else cache.delete(k); } throw e; });
+    cache.set(k, p);
+  }
+  return cache.get(k);
+}
+
+export const css = `.share-groups{list-style:none;padding:0;margin:10px 0;display:grid;gap:10px}.share-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.share-group-label{font-weight:600;flex:1 1 180px;min-width:0}.share-group-url{flex:1 1 100%;min-width:0;font-size:13px}.share-group-actions{display:flex;gap:6px;flex-wrap:wrap}.share-group [data-group-status]{flex:1 1 100%;word-break:break-all}.share-group [data-group-status]:empty{display:none}.share-group .share-qr{flex:1 1 100%}.share-link code{word-break:break-all;user-select:all}.share-qr{margin:14px 0 0;max-width:220px}.share-qr svg{width:100%;height:auto;display:block;background:#fff;border-radius:8px}.share-sheet{display:none}@media print{.share-sheet{display:block}.share-sheet-print{font:16px/1.5 sans-serif;padding:24px;max-width:640px}.share-sheet-url{word-break:break-all;font-family:monospace;font-size:15px}.share-sheet-qr svg{width:240px;height:240px}}`;

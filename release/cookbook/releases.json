@@ -1,7 +1,95 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.21.1",
+  "current": "0.21.6",
   "versions": [
+    {
+      "version": "0.21.6",
+      "status": "candidate",
+      "notes_path": "releases/0.21.6.md",
+      "sections": {
+        "changed": [
+          "Sign in by email link: enter your email, open the link we send (it works for 30 minutes, on any device) — no more one-time PIN; DEV only, behind MAGIC_LINK — production keeps Cloudflare Access. Signing out clears the session cookie with the same protections it was set with (HttpOnly, Secure, SameSite=Lax), in every environment (Bincy B38) (#305)",
+          "/roadmap shows the versions list only; stale work-item feed removed (captain 18:20) (#307)"
+        ]
+      }
+    },
+    {
+      "version": "0.21.5",
+      "status": "candidate",
+      "notes_path": "releases/0.21.5.md",
+      "sections": {
+        "changed": [
+          "Home shows one card per review, project as sub-line, newest first (Bincy B28) (#294)",
+          "project page offers only Start a new 3D Review (Bincy B34) (#295)",
+          "each group has a plain who-line on setup, launch and Collect (Bincy B08, B20) (#296)",
+          "reports show a readable time; ids behind Technical details; scores rounded (Bincy B31) (#302)",
+          "project and assessment names are the page heading with a small edit control; the Rename card and the Prepare name field are gone (Bincy B07) (#285)",
+          "Permissions: a pending invitation reads \"member · invited Sep 25 · <email>\"; inviting a test address says \"Invitation recorded; not emailed (test address).\" (B31/U26) (#306)"
+        ],
+        "fixed": [
+          "Signing in opens your invitation first if you have one, your one project if you have just one, or Home if you have several (#297)",
+          "After you accept an invitation, the shared project shows by name right away, without reloading the page (#300)",
+          "A status line like \"Renamed.\" now clears when you move to another page, so it only shows where the action happened. (#308)",
+          "Setup step 1 no longer shows a follow-up checkbox that was never saved. (#303)",
+          "results: Build the results on the results panel asks once, builds, and the bands fill in place with no trip to Reports and no reload (Bincy 10) (#283)",
+          "\"Save notes\" on the next-step page now shows \"Saved\" next to the button after the page refreshes (U24) (#304)",
+          "Collect, Permissions and About trimmed to one heading and one line; the rest behind Learn more; no raw ids on screen (Bincy B30, B31) (#292)"
+        ]
+      }
+    },
+    {
+      "version": "0.21.4",
+      "status": "candidate",
+      "notes_path": "releases/0.21.4.md",
+      "sections": {
+        "fixed": [
+          "An invitation link opens in the app: see what was shared, accept it, and find it on your Home page (Bincy B03) (#291)",
+          "The participant welcome shows the shared context setup step 3 promises (project · language · material · format · when) in one line; step 3 no longer offers a note that was never saved (Bincy B10). (#289)"
+        ]
+      }
+    },
+    {
+      "version": "0.21.3",
+      "status": "candidate",
+      "notes_path": "releases/0.21.3.md",
+      "sections": {
+        "changed": [
+          "Copy and QR per group on the launched screen and Collect (Bincy B36) (#287)",
+          "thank-you names the participant's own group (Bincy B26) (#286)"
+        ],
+        "fixed": [
+          "signing in lands on your projects with Continue, not back on the sign-in form (Bincy F02) (#272)",
+          "header says Signed in instead of Account email unavailable. (#274)",
+          "a used or unknown access code tells the participant what to do next (#277)",
+          "Projects page cards show their counts again: assessment cards say how many responses (\"9 responses\"), project cards how many assessments and responses (#279)",
+          "Projects and a project page offer \"Start a new 3D Review\" as the one create action; add-language and bare-assessment forms move behind a closed \"More\" (Bincy B34 / F03). (#280)",
+          "setup step 2 now explains each perspective (Translation team, Community, Church) in one line above its surveys (#284)",
+          "Collect never silently makes a second link after an uncertain failure (Bincy B36) (#288)",
+          "collect shows \"n of N responded\" when an expected number was given in setup (Bincy 07) (#271)",
+          "results: one plain line while results are held, no internal policy codes (#275)",
+          "survey: optional questions say (optional), skipped answers say Skipped, the receipt shows a short reference and local time (Bincy 09) (#273)",
+          "survey: each question page shows its progress bar again and only the question, without internal notes (Bincy B24) (#273)",
+          "results, next step, sign-in, permissions and the assessment Prepare view show one heading, one line and one primary action (explanations behind Learn more; results errors stay visible; Prepare stage panel no longer squashed on phones) (#282)",
+          "permissions: confirming an invitation or transfer says what will happen in one sentence; the technical record is under Details (#278)"
+        ]
+      }
+    },
+    {
+      "version": "0.21.2",
+      "status": "candidate",
+      "notes_path": "releases/0.21.2.md",
+      "sections": {
+        "added": [
+          "DEV only: \"Mid-Level v1 (legacy)\" survey template carrying the old Lovable ML1–ML12 questions verbatim, so legacy mid-level responses import as answered (#270)"
+        ],
+        "changed": [
+          "work rail moved to the cookbook repo (HYGIENE 35) (#268)"
+        ],
+        "fixed": [
+          "setup screens trimmed to one line and one primary action (assessment details, groups, participant information, review and launch, links); explanations behind a shared Learn more (#269)"
+        ]
+      }
+    },
     {
       "version": "0.21.1",
       "status": "candidate",

@@ -9,15 +9,20 @@ import { whatsHere } from '/assess/whats-here.js';
 import * as cards from '/assess/cards.js';
 import { breadcrumbs } from '/v3/components/breadcrumbs.js';
 import { sidebarTree } from '/v3/components/sidebar-tree.js';
+// lane 9 L9-24: shared closed-by-default disclosure
+import { learnMore } from '/v3/components/learn-more.js';
+// Bincy B03: `#invite=<token>` is handled here (v3), not forwarded to /legacy/.
+import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment } from '/v3/components/invite.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
 const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
-import { pages, css as scopeCss } from '/assess/scope.js';
+import { pages, css as scopeCss, landsOnWork, signInLanding, whoLine } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle } from '/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor } from '/assess/v3-assessment.js';
+import { mountEditableHeading } from '/v3/components/editable-heading.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
 // if the module is absent; destroyed on any route change.
 const WIZARD_JS = '/v3/wizard.js', WIZARD_CSS = '/v3/wizard.css';
@@ -25,7 +30,7 @@ let wizardHandle = null;
 const startReview = () => V3_SHELL ? '<div class="v3-shell-actions actions"><a class="rv-btn primary" data-v3-start href="#new">Start a review</a></div>' : '';
 // v3 shell (lane 1): context tree removed when V3_SHELL; crumbs remain the navigation.
 // Bugbot 4094071963: the kit adapter has no 'new' kind; the shell header names the wizard page (title + current link) here.
-const v3Model = m => !V3_SHELL ? m : m?.context?.route === 'new' ? { ...m, contextTree: false, title: 'Start a review', eyebrow: 'New review', currentHref: '#new', ancestors: [{ label: 'Projects', href: cards.routes.projects, visible: true }] } : { ...m, contextTree: false };
+const v3Model = m => !V3_SHELL ? m : m?.context?.route === 'invite' ? { ...m, contextTree: false, title: 'Invitation', eyebrow: '', currentHref: '#invite', ancestors: [] } : m?.context?.route === 'new' ? { ...m, contextTree: false, title: 'Start a review', eyebrow: 'New review', currentHref: '#new', ancestors: [{ label: 'Projects', href: cards.routes.projects, visible: true }] } : { ...m, contextTree: false };
 const PHASES = ['prepare', 'collect', 'understand', 'improve'];
 // Product overhaul (cookbook #16 c5721465315): five VIEWS on one assessment page. A view is a tab; a tab never mutates stage.
 const VIEWS = ['prepare', 'collect', 'understand', 'improve', 'permissions'];
@@ -120,7 +125,7 @@ const redact = m => redactDiagnosticPath(String(m || 'Request could not be compl
 //                                                  (Bugbot 4041134416). Results are bound to (aid, epoch) (Auditor 2A-3).
 //   generation   counter                           a later render supersedes an earlier one's DOM write (supplier 1114cb1)
 let generation = 0, epoch = 0, identityGeneration = 0;
-const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null };
+const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null, collectLinks: new Map() };
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']); // visibility/authz codes (supplier 97f7402 + policy.ts)
@@ -148,6 +153,7 @@ export function route(hash) {
   if (!parts[0]) return { kind: 'entry' };
   if (['how', 'example', 'signin', 'survey', 'about'].includes(parts[0]) && !parts[1]) return { kind: 'entry', intent: parts[0] };
   if (parts[0] === 'feedback' && !parts[1]) return { kind: 'feedback' };
+  if (parts[0] === 'invite' && !parts[1]) return { kind: 'invite' }; // B03: token already moved out of the address bar
   if (parts[0] === 'workspaces') return { kind: 'workspaces' };
   if (parts[0] === 'workspace' && parts[1]) return { kind: 'workspace', id: parts[1] };
   if (parts[0] === 'projects') return { kind: 'projects' };
@@ -231,7 +237,7 @@ function countCell(s) {
 function totalTile(current) {
   const act = activeSurveys(current); const loaded = act.filter(s => countFor(s.id).status === 'loaded');
   const total = loaded.reduce((n, s) => n + countFor(s.id).responses, 0); const partial = loaded.length !== act.length;
-  return `<div data-total data-collect-total style="margin:6px 0 4px"><div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><span class="count" style="margin:0;font-size:31px;font-weight:600;line-height:1">${total}</span><span>response${total === 1 ? '' : 's'}</span><span class="muted">across ${loaded.length} of ${act.length} included survey${act.length === 1 ? '' : 's'}</span>${partial ? '<span class="badge" title="Not every survey count has loaded yet">partial</span>' : ''}</div><p class="small muted" style="margin:6px 0 0">Responses only. Respondents are counted per survey and are never added up as people.</p></div>`;
+  return `<div data-total data-collect-total style="margin:6px 0 4px"><div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><span class="count" style="margin:0;font-size:31px;font-weight:600;line-height:1">${total}</span><span>response${total === 1 ? '' : 's'}</span><span class="muted">across ${loaded.length} of ${act.length} included survey${act.length === 1 ? '' : 's'}</span>${partial ? '<span class="badge" title="Not every survey count has loaded yet">partial</span>' : ''}</div></div>`;
 }
 function paintCounts(current) {
   for (const s of activeSurveys(current)) { const el = app.querySelector(`[data-count="${CSS.escape(s.id)}"]`); if (el) el.outerHTML = countCell(s); }
@@ -244,13 +250,14 @@ function bindCounts(current) {
   app.querySelectorAll('[data-retry-count]').forEach(el => el.onclick = e => { e.preventDefault(); loadCounts(state.current, { retry: el.dataset.retryCount }); paintCounts(state.current); });
   app.querySelectorAll('[data-refresh]').forEach(el => el.onclick = e => { e.preventDefault(); render(); });
 }
-// v3 L1-5 (NEED 3→1, Bincy 07): per-survey counts on Collect read through lane 3's v3CountLine (ruling a/b): "n responded"
-// (never a denominator the facilitator did not enter; the server sends none here) + respondents. Same data-count hook so
+// v3 L1-5 (NEED 3→1, Bincy 07): per-survey counts on Collect read through lane 3's v3CountLine (ruling a/b): "n of N responded"
+// when the facilitator entered N in setup on this device (B-07), else "n responded" (never a denominator nobody entered) + respondents. Same data-count hook so
 // paintCounts repaints it via data-collect-wrap; non-loaded states keep countCell's retry/refresh wording.
+function localStore() { try { return globalThis.localStorage || null; } catch { return null; } }
 function collectCount(s) {
   const c = countFor(s.id);
   if (c.status !== 'loaded') return countCell(s);
-  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}${collectState(c.collection_status || s.collection_status)}</span>`;
+  return `<span data-count="${esc(s.id)}" data-collect-count>${v3CountLine({ responses: c.responses, expected: demo ? null : v3ExpectedFor(s.id, localStore()) }, esc)} <span aria-hidden="true">·</span> ${c.respondents} respondent${c.respondents === 1 ? '' : 's'}${collectState(c.collection_status || s.collection_status)}</span>`;
 }
 // v3 L10-1 (prototype frame 7 rrow): each Collect row ends with its plain state word, open / closed (PARITY C6), from the server's collection_status only.
 function collectState(status) {
@@ -259,10 +266,24 @@ function collectState(status) {
   return ` <span aria-hidden="true">·</span> <span class="state" data-collect-state>${esc(word)}</span>`;
 }
 function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'Other perspective'; }
+// B36: Copy link / Show QR code per group on Collect (owner, member; open surveys). One tap issues the link through the Share
+// card's API pair; the link lives in memory only, keyed to (aid, sid, epoch) and dropped with identity (state.collectLinks).
+function shareable(a, s) { return share.CAN_SHARE.has(a.role) && (s.collection_status === 'open' || a.stage === 'collect'); }
+function bindCollectLinks(current) {
+  const root = app.querySelector('[data-collect-panel]'); if (!root) return;
+  const aid = current.assessment.id, ep = epoch;
+  share.bindGroupLinks(root, { resolve: async sid => {
+    const k = `${aid}|${sid}|${ep}`;
+    for (const key of state.collectLinks.keys()) if (!key.startsWith(`${aid}|`) || !key.endsWith(`|${epoch}`)) state.collectLinks.delete(key);
+    const link = await share.cachedLink(state.collectLinks, k, () => share.issueLink(api, { aid, sid, origin: location.origin }));
+    if (ep !== epoch || state.current?.assessment.id !== aid) throw share.failure(); // a link may exist but is not shown here
+    return link.url;
+  } });
+}
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
-  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p></div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
-  return `<section class="panel"><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose surveys in the survey set.</p>'}<p class="small muted line">Open a survey to share its link or print a blank questionnaire.</p></section>`;
+  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${whoLine(g.lens) ? `<p class="small muted" data-who>${esc(whoLine(g.lens))}</p>` : ''}${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id }]) : ''}</div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
+  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose them under Change surveys.</p>'}${learnMore('<p class="small muted">Only responses are counted.</p><p class="small muted">Respondents are counted per survey and are never added up as people.</p>')}</section>`;
 }
 // Cut 2A child screen: ONE survey. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
@@ -348,33 +369,44 @@ function lensRows(current) {
 }
 // View tabs (showcase `tabs()`): links between the five views of ONE assessment. Selecting a tab never calls set_stage.
 function viewTabs(a, current) { ensureStepperStyle(globalThis.document); const perm = (a.role === 'owner' || a.role === 'member') ? `<nav class="tabs view-tabs" aria-label="Assessment settings"><a href="${cards.routes.assessment(a.id, 'permissions')}" ${current === 'permissions' ? 'aria-current="page"' : ''}>Permissions</a></nav>` : ''; return v3StageStepper(a.stage, v => cards.routes.assessment(a.id, v)) + perm; } // ruling 12:28: stage tabs → shared Stepper (component: Stepper); permissions stays a separate link (lane 11 owns its placement)
-// Prepare view (showcase `prepareView()`): name + purpose, saved through cap.assessment.update (O/M); viewers read.
+// Prepare view (showcase `prepareView()`): purpose, saved through cap.assessment.update (O/M); viewers read. The name is the heading (B07).
 function prepareView(current) {
   const a = current.assessment, mayEdit = a.role === 'owner' || a.role === 'member';
-  const fields = `<label class="field">Assessment name<input name="name" maxlength="100" required value="${esc(a.name)}" ${mayEdit ? '' : 'readonly'}></label><label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>`;
+  const fields = `<label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>`;
   const form = mayEdit ? `<form id="prepare-form">${fields}<div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save preparation</button></div></form>` : `<div>${fields}<p class="small muted">Your role here is ${esc(a.role)}: preparation is read-only.</p></div>`;
   const i = PHASES.indexOf(a.stage), prev = PHASES[i - 1], next = PHASES[i + 1], n = activeSurveys(current).length;
-  const move = mayEdit ? `<div class="actions">${prev ? `<button type="button" data-stage="${prev}" ${state.busy ? 'disabled' : ''}>← Back to ${title(prev)}</button>` : ''}${next ? `<button type="button" class="primary" data-stage="${next}" ${state.busy ? 'disabled' : ''}>Move to ${title(next)} →</button>` : ''}</div><p class="small muted">One stage at a time, as the server allows. Moving into Collect opens collection; moving out of Collect closes it — for all ${n} included survey${n === 1 ? '' : 's'}.</p>` : '';
-  const stage = `<aside class="panel"><p class="eyebrow">Stage</p><h2>${stageLabel(a.stage)}</h2><p class="muted">The stage is the assessment's own state. Browsing these views never changes it.</p>${move}${a.language_id ? `<p class="small muted">Language: ${esc(a.language_id)}</p>` : ''}${a.period ? `<p class="small muted">Period: ${esc(a.period)}</p>` : ''}</aside>`;
+  const move = mayEdit ? `<div class="actions">${prev ? `<button type="button" data-stage="${prev}" ${state.busy ? 'disabled' : ''}>← Back to ${title(prev)}</button>` : ''}${next ? `<button type="button" data-stage="${next}" ${state.busy ? 'disabled' : ''}>Move to ${title(next)} →</button>` : ''}</div>` : ''; // lane 9 L9-24: one primary on this view (Save preparation)
+  // Lane 9 L9-24 (validator #282): ONE view heading ("Prepare this assessment"). The stage is an eyebrow + badge, not a second
+  // heading; the collect consequence, stage notes, language and period sit behind the shared Learn more. A <section>, not an
+  // <aside>: kit.css turns every `.rv aside` into a nav flex row at ≤760px (squashed/clipped at 390px).
+  const more = `${mayEdit ? `<p class="muted">Moving into Collect opens collection; moving out of Collect closes it — for all ${n} included survey${n === 1 ? '' : 's'}.</p><p class="muted">One stage at a time, as the server allows.</p>` : ''}<p class="muted">The stage is the assessment's own state. Browsing these views never changes it.</p>${a.language_name ? `<p class="small muted">Language: ${esc(a.language_name)}</p>` : ''}${a.period ? `<p class="small muted">Period: ${esc(a.period)}</p>` : ''}`;
+  const stage = `<section class="panel" data-stage-panel><p class="eyebrow">Stage <span class="badge">${stageLabel(a.stage)}</span></p>${move}${learnMore(more)}</section>`;
   return `<div class="grid"><section class="panel"><h2>Prepare this assessment</h2>${form}</section>${stage}</div>`;
 }
 function screen(current, view = null) {
   const a = current.assessment, project = state.projects.find(p => p.id === a.project_id);
   const tab = view || (VIEWS.includes(a.stage) ? a.stage : 'prepare');
-  const roleLine = `${esc(project?.name || a.project_id)} · your role: ${esc(a.role)}${a.role === 'viewer' ? ' — you can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions' : ''}`;
+  const roleLine = project ? `${esc(project.name)} · your role: ${esc(a.role)}` : `Your role: ${esc(a.role)}`; // B03: never a raw project id (shared assessment, no project role)
+  // lane 9 L9-24: the viewer explanation moves behind Learn more (roleMore)
+  const roleMore = a.role === 'viewer' && tab !== 'improve' ? learnMore( /* Next steps carries its own role note (one, not two) */'<p class="muted">You can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions.</p>') : '';
   // Under the kit shell the eyebrow/h1 are the shell's (one heading); only the unique role line and stage badge remain here.
   // v3 (NEED 3→1): one state-driven primary in the headrow; viewers get none for setup/collect (lane 3 module decides).
   const primary = V3_SHELL ? v3StagePrimary(a.stage, a.role === 'owner' || a.role === 'member', v => `#assessment/${encodeURIComponent(a.id)}/${v}`, esc) : '';
-  const head = kit ? `<div class="title assessment-head"><p class="muted" style="margin:0">${roleLine}</p><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${viewTabs(a, tab)}`
-    : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${roleLine}</p></div><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
+  const head = kit ? `<div class="title assessment-head"><p class="muted" style="margin:0">${roleLine}</p><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`
+    : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1><p class="muted" style="margin:0">${roleLine}</p></div><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
   if (tab === 'prepare') return head + prepareView(current);
   if (tab !== 'collect') return head + `<div id="view-root" data-view="${tab}"><p class="muted">Loading…</p></div>`;
   return head + collectScreen(current);
 }
 function collectScreen(current) {
-  const surveySet = `<aside class="panel"><p class="eyebrow">Survey set</p><h2>Three lenses</h2><p class="muted">${(current.assessment.role === 'owner' || current.assessment.role === 'member') ? 'Within each lens, choose which surveys this assessment includes.' : 'Your role here is ' + esc(current.assessment.role) + ': you can see the survey set; changing it needs a member or owner role.'} Including a survey while the stage is Collect opens collection at once. Removing a survey that already has responses, codes or invitations archives it and keeps them; including that survey again restores it together with what was collected.${state.templates ? '' : ' Template catalogue not loaded.'}</p>${lensRows(current)}${dirtyBanner(current.assessment.id)}<p class="status" role="${showMessage(current)?.alert ? 'alert' : 'status'}" aria-live="polite">${esc(showMessage(current)?.text || '')}</p></aside>`;
-  const left = collectPanel(current);
-  return `<div class="grid start">${left}${surveySet}</div>`; // content-height alignment: an empty Collect panel never stretches to the survey-set height
+  // B30 (lane 9, less text 3): ONE heading on Collect. The survey set is secondary (surveys were chosen in setup): a closed
+  // "Change surveys" disclosure under the Collect panel (open when nothing is included yet), its notes behind Learn more.
+  // Save/refresh messages stay outside the disclosure so an outcome is never hidden.
+  const a = current.assessment, editor = a.role === 'owner' || a.role === 'member', none = !activeSurveys(current).length;
+  const setMore = learnMore(`<p class="small muted">Including a survey while the stage is Collect opens collection at once.</p><p class="small muted">Removing a survey that already has responses, codes or invitations archives it and keeps them.</p><p class="small muted">Including that survey again restores it together with what was collected.</p>`);
+  const surveySet = `<details class="panel survey-set" data-survey-set${none || state.surveySetOpen === a.id ? ' open' : ''}><summary>${editor ? 'Change surveys' : 'Surveys in this assessment'}</summary><p class="muted">${editor ? 'Within each lens, choose which surveys this assessment includes.' : 'Changing the surveys needs a member or owner role.'}${state.templates ? '' : ' Template catalogue not loaded.'}</p>${lensRows(current)}${setMore}</details>`;
+  const outcome = `${dirtyBanner(a.id)}<p class="status" role="${showMessage(current)?.alert ? 'alert' : 'status'}" aria-live="polite">${esc(showMessage(current)?.text || '')}</p>`;
+  return `<div class="stack">${collectPanel(current)}${outcome}${surveySet}</div>`; // one column: the Collect panel is the screen
 }
 function projectsView() {
   if (!state.projects.length) return `<div class="narrow panel"><p class="eyebrow">Your projects</p><h1>No project on this account</h1><p class="muted">This screen lists projects you hold a role on. An assessment you were granted directly, without a project role, is not listed here yet; the current workspace still opens it.</p></div>`;
@@ -385,6 +417,13 @@ function bind(current) {
   app.querySelectorAll('[data-retry-list]').forEach(el => el.onclick = async e => { e.preventDefault(); await assessmentsFor(el.dataset.retryList, { retry: true }); render(); });
   if (!current) return;
   const aid = current.assessment.id;
+  // B30 (Bugbot 4108407845): the survey set stays open across include/remove repaints. Recorded from the rendered state (an
+  // auto-open fires no reliable toggle), from user toggles on the live node only (a replaced node may fire a stale toggle),
+  // and on every include/remove click.
+  const set = app.querySelector('[data-survey-set]');
+  if (set?.open) state.surveySetOpen = aid;
+  set?.addEventListener('toggle', e => { if (e.currentTarget.isConnected) state.surveySetOpen = e.currentTarget.open ? aid : null; });
+  set?.querySelectorAll('[data-include],[data-remove]').forEach(b => b.addEventListener('click', () => { state.surveySetOpen = aid; }));
   app.querySelectorAll('[data-refresh]').forEach(el => el.onclick = e => { e.preventDefault(); render(); });
   bindCounts(current);
   app.querySelectorAll('[data-include]').forEach(b => b.onclick = () => act(aid, 'Including survey…', async () => { const restoring = b.textContent.trim() === 'Include again'; const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/surveys`, { method: 'POST', body: { template_id: b.dataset.include, version: Number(b.dataset.version) } }); return `${restoring ? 'Survey restored with what was collected' : 'Survey included'}; collection ${r.survey?.collection_status || 'status unknown'}.`; }));
@@ -411,11 +450,51 @@ function bindPrepare(current) {
     act(aid, 'Moving stage…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/stage`, { method: 'POST', body: { stage: to } }); return `Stage is now ${stageLabel(r.assessment.stage)}.`; }); // refusal: act() shows the server error.message verbatim
   });
   const f = app.querySelector('#prepare-form'); if (!f) return;
-  f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f); act(current.assessment.id, 'Saving preparation…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(current.assessment.id)}`, { method: 'PATCH', body: { name: String(fd.get('name')).trim(), purpose: String(fd.get('purpose')).trim() } }); return `Saved: ${r.assessment.name}`; }); };
+  f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f); act(current.assessment.id, 'Saving preparation…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(current.assessment.id)}`, { method: 'PATCH', body: { purpose: String(fd.get('purpose')).trim() } }); return `Saved: ${r.assessment.name}`; }); };
+}
+// B07: the assessment name is the heading (shell's or page's); owners/members rename it in place through cap.assessment.update.
+let pendingRename = null; // { aid, done } while a heading rename PATCH is in flight
+function bindNameHeading(current) {
+  const a = current.assessment;
+  return mountEditableHeading((app.closest('[role=main]') || app).querySelector('h1'), { canEdit: a.role === 'owner' || a.role === 'member', label: 'assessment name',
+    // Write guards without the shared busy flag (Bugbot on #285): never starts during an act() write or over a dirty screen; while the
+    // PATCH runs, this view's other controls are disabled IN PLACE (no repaint, drafts survive) and re-enabled only if still on screen.
+    // act() on this assessment waits for the rename to settle (pendingRename), so two cap.assessment.update writes never race.
+    // A view rebuilt meanwhile draws normally and, if it shows this assessment, settles like act(): refresh on commit, aid-scoped
+    // message on refusal. Other pages are untouched.
+    save: async name => {
+      if (state.busy || pendingRename) return false;
+      if (state.dirty.has(a.id)) throw new Error(state.dirty.get(a.id) === 'write' ? 'Your last change is saved but this screen is not refreshed yet. Refresh before making more changes.' : 'This assessment changed on the server. Refresh before making changes.');
+      const identity = identityGeneration, view = app.firstElementChild, held = [...app.querySelectorAll('button:not([disabled])')].filter(b => !b.closest('.v3-eh'));
+      held.forEach(b => { b.disabled = true; });
+      let settle; const mine = pendingRename = { aid: a.id, done: new Promise(res => { settle = res; }) };
+      let r, failed = null;
+      try { r = await api(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); } catch (e) { failed = redact(e.message); }
+      held.forEach(b => { if (b.isConnected) b.disabled = false; });
+      if (pendingRename === mine) pendingRename = null;
+      try {
+        if (identity !== identityGeneration) return false;
+        const intact = !!view?.isConnected && held.every(b => b.isConnected);
+        const here = route(location.hash), onThis = (here.kind === 'assessment' || here.kind === 'survey') && here.id === a.id && state.current?.assessment.id === a.id;
+        if (failed) { if (!intact && onThis && !state.busy) { state.message = { aid: a.id, text: failed, alert: true }; paint(); } throw new Error(failed); }
+        const next = String(r?.assessment?.name ?? name), old = state.current?.assessment.name;
+        const listed = state.lists.get(a.project_id)?.list?.find?.(x => x.id === a.id); if (listed) listed.name = next;
+        if (state.current?.assessment.id !== a.id) return;
+        state.current.assessment.name = next;
+        if (!intact) { if (onThis) { state.dirty.set(a.id, 'write'); if (!state.busy) await render(); } return; } // refreshed BEFORE settle(): a waiting act() then runs on a clean screen
+        const parts = document.title.split(' · '); if (parts.length === 3 && parts[1] === old) document.title = [parts[0], next, parts[2]].join(' · '); // paint()'s `<tab> · <name> · 3D Review`, by position
+        // No shell re-sync here: a kit update empties the content mount (drafts). The component sets the heading; the assessment crumb and title follow in place.
+        if (kit) document.querySelectorAll('header.top nav.crumbs [data-crumb="assessment"]').forEach(el => { el.textContent = next; }); // by level, never by label text
+      } finally { settle(); }
+    } });
 }
 // Transition: write → (committed ⇒ dirty) → refresh → (landed ⇒ clean). Every outcome is scoped to `aid`, never to
 // whatever is on screen when the promise settles (Bugbot 4040525117 / 4040525128).
 async function act(aid, label, fn) {
+  if (pendingRename?.aid === aid) { // B07: never race the heading rename's PATCH; a queued write survives only the same identity on the same assessment
+    const identity0 = identityGeneration; await pendingRename.done;
+    const here = route(location.hash); if (identity0 !== identityGeneration || !((here.kind === 'assessment' || here.kind === 'survey') && here.id === aid)) return;
+  }
   if (state.busy) return;
   if (state.dirty.has(aid)) { state.message = { aid, text: state.dirty.get(aid) === 'write' ? 'Your last change is saved but this screen is not refreshed yet. Refresh before making more changes.' : 'This assessment changed on the server. Refresh before making changes.', alert: true }; paint(); return; } // never silent (MED 4040990777)
   const identity = identityGeneration;
@@ -441,6 +520,8 @@ async function fetchAssessment(aid) {
   return { assessment: r.assessment, surveys: r.surveys || [] };
 }
 async function render() {
+  // B02: signed in, "/" is the current work (#projects), never the public welcome with its Sign in choice.
+  if (landsOnWork(route(location.hash), state.principal)) { try { history.replaceState(null, '', location.pathname + location.search + '#projects'); } catch {} }
   const gen = ++generation, r = route(location.hash);
   if (wizardHandle) { try { wizardHandle.destroy(); } catch {} wizardHandle = null; }
   currentShareRoute();
@@ -467,12 +548,31 @@ async function render() {
     // top-level lists stand alone (showcase SOURCE-MAP: the panel is absent from public routes).
     // K3a: workspace/project read surfaces are kit-presented (tree in the shell); the legacy context sidebar remains only for permissions.
     if (r.kind === 'new') { await mountNew(gen); return; }
+    if (r.kind === 'invite') { mountInvitePage(gen); return; }
     const sidebar = state.principal && (kit ? ['permissions'] : ['workspace', 'project', 'permissions']).includes(r.kind);
     app.className = sidebar ? 'workspace-layout' : '';
     if (sidebar) { syncShell(); app.innerHTML = context(null) + '<div id="page-root"><p class="muted">Loading…</p></div></section>'; bind(null); await runPage(pageFor(r), r, gen, app.querySelector('#page-root')); }
     else await runPage(pageFor(r), r, gen);
     if (gen === generation && (r.kind === 'projects' || r.kind === 'workspaces') && state.principal && !app.querySelector('[data-v3-start]')) app.insertAdjacentHTML('afterbegin', startReview());
   }
+}
+// B03: the invitation page. Signed out → the sign-in step (the token stays in this tab so the sign-in return comes back here).
+function mountInvitePage(gen) {
+  syncShell(); app.className = ''; document.title = 'Invitation · 3D Review';
+  const t = pendingInvite || storedInvite();
+  if (!t) { app.innerHTML = inviteView({ status: 'missing' }); return; }
+  if (!state.principal) { app.innerHTML = inviteView({ status: 'signin' }); return; }
+  const ctx = ctxFor();
+  mountInvite(app, { api: ctx.api, token: t, isCurrent: () => gen === generation, forget: forgetInvite,
+    // Accepted (Bugbot on #298): re-read the project list the way boot does, so the granted project's name is known to Home and
+    // the assessment header without a page reload; a failed re-read keeps the old list and still goes Home.
+    onAccepted: async () => { await reloadProjects(); if (gen === generation) ctx.go(cards.routes.projects); } });
+}
+// The project list read boot uses. Returns false (state untouched) when the identity changed while it was in flight.
+async function reloadProjects() {
+  const identity = identityGeneration;
+  try { const result = await api('/v2/projects'); if (identity !== identityGeneration) return false; state.projects = result.projects || []; return true; }
+  catch { return false; }
 }
 async function mountNew(gen) {
   syncShell(); app.className = '';
@@ -502,8 +602,9 @@ async function loadAccountEmail() {
     const response = await fetch('/v2/auth/access?view=account', { headers, credentials: 'same-origin', redirect: 'error', cache: 'no-store' });
     const value = response.ok ? await response.json() : null;
     if (identity !== identityGeneration || credential !== token) return;
-    who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Account email unavailable.';
-  } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Account email unavailable.'; }
+    // U03 (lanes-1321): sandbox and cookie sessions have no account view; say "Signed in", never a failure sentence.
+    who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Signed in';
+  } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Signed in'; }
 }
 async function signOut(switchAccount = false) {
   if (demo || accountBusy || !state.principal) return;
@@ -522,7 +623,9 @@ async function signOut(switchAccount = false) {
       // The provider request may already have taken effect; only its continuation can be suppressed.
       try { await fetch('/cdn-cgi/access/logout', { credentials: 'same-origin', redirect: 'manual', cache: 'no-store' }); } catch {}
       if (signedOutIdentity !== identityGeneration || signedOutCredential !== token) return;
-      location.assign('https://klappy.cloudflareaccess.com/cdn-cgi/access/logout'); return;
+      // B38: with email links on, another account = request a link for another email (the Access cookie is cleared above).
+      // Off (production): the Access team-domain logout, unchanged — otherwise the live Access session signs A back in.
+      location.assign(state.emailLinks === true ? '/v2/auth/email' : 'https://klappy.cloudflareaccess.com/cdn-cgi/access/logout'); return;
     }
     history.replaceState(null, '', location.pathname + '#');
     listen(); await render();
@@ -541,7 +644,7 @@ function bindAccountControls() {
 }
 bindAccountControls();
 // ---- scope pages + views (product overhaul): one runner for every { load, render, bind } module ----
-const setToken = t => { if (demo) return; token = t || null; try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
+const setToken = t => { if (demo) return; token = t || null; landAfterSignIn = !!t; /* B04 */ try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
 function ctxFor(extra = {}) {
   // Every page context is bound to the render generation and identity that created it: a retained control from a destroyed
   // view (route change, identity reset) can neither issue a request nor write a status line into the current view.
@@ -603,8 +706,8 @@ function paint(r = route(location.hash), gen = generation) {
     const a0 = state.current.assessment;
     const tab = r.view || recalledTab(tabStorage, a0.id, VIEWS.includes(a0.stage) ? a0.stage : 'prepare');
     if (r.view) rememberTab(tabStorage, a0.id, r.view);
-    app.innerHTML = ctxPanel + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') loadCounts(state.current);
-    bindPrepare(state.current); mountView(state.current, tab, gen);
+    app.innerHTML = ctxPanel + screen(state.current, tab) + '</section>'; bind(state.current); if (tab === 'collect') { bindCollectLinks(state.current); loadCounts(state.current); }
+    bindPrepare(state.current); bindNameHeading(state.current); mountView(state.current, tab, gen);
     document.title = `${title(tab)} · ${state.current.assessment.name} · 3D Review`;
   }
 }
@@ -613,6 +716,12 @@ function paint(r = route(location.hash), gen = generation) {
 // `#evidence`. `#session=` is the Access return leg (src/index.ts:138, callback unchanged): consumed here exactly as legacy does —
 // same `facilitatorToken` key, stripped from history before any render, never echoed. Nothing else stores a credential.
 const LEGACY_HASHES = new Set(['#facilitator', '#workspace', '#evidence']);
+// B03: a pending invitation token — memory + this tab's sessionStorage only (survives the sign-in round trip), cleared once used.
+let pendingInvite = null;
+function storedInvite() { try { return sessionStorage.getItem(INVITE_KEY); } catch { return null; } }
+function forgetInvite() { pendingInvite = null; try { sessionStorage.removeItem(INVITE_KEY); } catch {} }
+// B04: set when a sign-in just happened (Access return #session=, or the entry form's setToken); boot() applies signInLanding once.
+let landAfterSignIn = false;
 // Returns 'forwarded' (this page is leaving), 'session' (a session was consumed — identity must be re-observed), or null.
 // Runs on load AND on every hashchange (Auditor S1): fragment-only navigation after load takes the same path as a fresh load.
 function scrubCredentialHash() {
@@ -622,17 +731,19 @@ function scrubCredentialHash() {
   if (h === '#participant') { location.replace('/legacy/#participant'); return 'forwarded'; }
   if (h === '#reports-card') { location.replace('/#projects'); return 'forwarded'; }
   if (/^#survey=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + h); return 'forwarded'; }
-  if (/^#invite=/.test(h) || LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
+  if (/^#invite=/.test(h)) { const t = parseInvitationFragment(h); if (t) { pendingInvite = t; try { sessionStorage.setItem(INVITE_KEY, t); } catch {} } try { history.replaceState(null, '', location.pathname + '#invite'); } catch {} return null; } // B03: stays in v3; token leaves the address bar
+  if (LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
   const m = /^#session=([A-Za-z0-9_]+)$/.exec(h);
-  if (m) { try { history.replaceState(null, '', location.pathname + '#workspaces'); } catch {} token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} resetIdentity(); return 'session'; }
+  if (m) { /* B-F02a: land on the work list; B03: a pending invitation comes first */ try { history.replaceState(null, '', location.pathname + (pendingInvite || storedInvite() ? '#invite' : '#projects')); } catch {} landAfterSignIn = true; token = m[1]; try { sessionStorage.setItem('facilitatorToken', m[1]); } catch {} resetIdentity(); return 'session'; }
   if (/^#session=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} } // malformed: drop, never render
   return null;
 }
 function resetIdentity() {
   identityGeneration += 1; generation += 1; epoch += 1;
+  pendingRename = null; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
   accountBusy = false; accountControls(false); accountStatus();
   document.getElementById('account-switch-dialog')?.close();
-  state.share = null; state.principal = null; state.projects = []; state.current = null; state.templates = null;
+  state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
   state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false;
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
@@ -642,19 +753,45 @@ function syncContextDisclosure(event) {
   if (!event.matches) { const disclosure = app?.querySelector('.context-disclosure'); if (disclosure) disclosure.open = true; }
 }
 if (typeof matchMedia === 'function') matchMedia('(max-width:650px)').addEventListener('change', syncContextDisclosure);
+// U30 (Bincy B07/B31): a status line belongs to the page and action that set it. A route change clears it so "Renamed." from one
+// page never reads as feedback on the next. An in-flight action keeps its busy label; its own finally clears it.
+function clearPageNote() { if (!note || state.busy) return; note.textContent = ''; note.classList.remove('alert'); }
 let listening = false;
-function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
+function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } clearPageNote(); render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
+// B38: does this environment use email sign-in links (DEV) or Cloudflare Access (production)? Asked once; remembered only on
+// an answer (2 s timeout; a timeout or failure leaves it unknown). Unknown or off → the Access sign-in button and the team-domain logout stay exactly as before.
+async function loadEmailLinks() {
+  if (demo || typeof state.emailLinks === 'boolean') return state.emailLinks === true;
+  try { const r = await fetch('/v2/auth/email?probe', { headers: { accept: 'application/json' }, credentials: 'same-origin', redirect: 'error', cache: 'no-store', ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(2000) } : {}) }); if (r.ok) { const v = await r.json(); state.emailLinks = v?.email_links === true; if (state.emailLinks) emailLinksCopy(); } } catch {}
+  return state.emailLinks === true;
+}
+// B38, email links ON only: the markup and every Sign-in href stay byte-identical to production (/v2/auth/access, Access
+// copy); this environment re-points them at run time. Plain left clicks on an Access sign-in link go to the email sign-in
+// page instead, and the account-switch dialog gets the email-link copy. Off → nothing here runs.
+function emailLinksCopy() {
+  const dialog = document.getElementById('account-switch-dialog');
+  const paras = dialog?.querySelectorAll?.('p');
+  if (paras?.length) { paras[0].textContent = 'You will be signed out here, then asked for the email address of the other account. We email it a sign-in link.'; for (const p of [...paras].slice(1)) p.remove(); }
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('click', ev => {
+  if (state.emailLinks !== true || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+  const a = ev.target?.closest?.('a[href="/v2/auth/access"]'); if (!a) return;
+  ev.preventDefault(); location.assign('/v2/auth/email');
+});
 async function boot() {
   if (scrubCredentialHash() === 'forwarded') return; // 'session' falls through: identity is observed fresh below
   placeDemoNotice();
   const identity = identityGeneration;
+  const linksKnown = loadEmailLinks();
   try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; }
   catch {
     if (identity !== identityGeneration) return;
+    landAfterSignIn = false; // B04: no session observed, nothing to land
     // Public entry: the welcome/tour/example/survey-code/sign-in page needs no session; every other route asks to sign in.
     accountControls(false); accountStatus();
     listen();
-    if (route(location.hash).kind === 'entry') { who.textContent = 'Not signed in'; app.className = ''; syncShell(); await render(); return; }
+    if (route(location.hash).kind === 'invite') { who.textContent = 'Not signed in'; app.className = ''; syncShell(); mountInvitePage(generation); return; }
+    if (route(location.hash).kind === 'entry') { await linksKnown; if (identity !== identityGeneration) return; who.textContent = 'Not signed in'; app.className = ''; syncShell(); await render(); return; }
     // Real sign-in only (captain: synthetic-only sign-in rejected). /v2/auth/access is the existing Cloudflare email-code
     // route; it sets the session cookie and returns to the workspace home (/#session=…), not here — stated, not hidden.
     who.textContent = 'Not signed in'; app.className = ''; syncShell();
@@ -669,7 +806,9 @@ async function boot() {
   try { const result = await api('/v2/projects'); if (identity !== identityGeneration) return; state.projects = result.projects || []; }
   catch (e) { if (identity !== identityGeneration) return; // Auth A14: a direct #assessment/<id> still renders under "Granted to you"; the project list failure is a retryable notice, not a dead end.
     state.projects = []; note.innerHTML = `Could not load your project list (${esc(redact(e.message))}). <a href="#" data-retry-boot>Retry</a>`; note.querySelector('[data-retry-boot]').onclick = ev => { ev.preventDefault(); note.textContent = ''; boot(); };
-    if (!['assessment', 'survey', 'feedback'].includes(route(location.hash).kind)) { syncShell(); app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
+    if (!['assessment', 'survey', 'feedback', 'invite'].includes(route(location.hash).kind)) /* B03: acceptance does not need the list */ { syncShell(); app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
+  // B04: once, right after a sign-in, the landing follows Bincy's rule (invitation → accept screen; one project → it; several → Home).
+  if (landAfterSignIn) { landAfterSignIn = false; if (['projects', 'invite', 'entry'].includes(route(location.hash).kind)) { try { history.replaceState(null, '', location.pathname + location.search + signInLanding({ invite: !!(pendingInvite || storedInvite()), projects: state.projects })); } catch {} } }
   listen();
   await render();
 }

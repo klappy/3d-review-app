@@ -4,15 +4,16 @@ import { gate, newId, nowIso, parseItems, participantLabels, renderItems, reqStr
 
 import { collecting, sharedSession, submitShared } from "./shared-link";
 
-interface ParticipantSurvey { id: string; assessment_id: string; template_id: string; template_version: number; state: string; collection_status: string; name: string; language_name: string; period: string | null; items_json: string; scoring_json: string; perspective: string; source_ref: string | null; published_at: string | null }
+interface ParticipantSurvey { id: string; assessment_id: string; template_id: string; template_version: number; state: string; collection_status: string; name: string; language_name: string; period: string | null; purpose: string | null; format: string | null; project_name: string; items_json: string; scoring_json: string; perspective: string; source_ref: string | null; published_at: string | null }
 
 async function scopedSurvey(ctx: Ctx, requireOpen = false): Promise<ParticipantSurvey> {
   if (ctx.principal.kind !== "participant" || !ctx.principal.participantSurveyId || !ctx.principal.respondentId)
     throw new CapError("NOT_AUTHENTICATED", "participant token required");
-  const s = await ctx.db.prepare(`SELECT s.*, a.name, a.period, l.name AS language_name,
+  const s = await ctx.db.prepare(`SELECT s.*, a.name, a.period, a.purpose, a.format, l.name AS language_name, p.name AS project_name,
     t.items_json, t.scoring_json, t.perspective, t.source_ref, t.published_at
     FROM assessment_survey s JOIN assessment a ON a.id = s.assessment_id
     JOIN language l ON l.id = a.language_id
+    JOIN project p ON p.id = a.project_id
     JOIN survey_template t ON t.id = s.template_id AND t.version = s.template_version
     WHERE s.id = ?`).bind(ctx.principal.participantSurveyId).first<ParticipantSurvey>();
   if (!s) throw notVisible("survey");
@@ -57,7 +58,10 @@ export const form: Handler = async (ctx, params) => {
   const s = await scopedSurvey(ctx, true);
   const items = parseItems(s as any);
   if (!items.length) throw new CapError("STAGE_CONFLICT", "survey instrument is unavailable");
+  // Bincy B10: the shared context setup step 3 promises (project · language · material · format), read from the
+  // assessment row setup already wrote. Project name only, never the lead organisation.
   return { result: { survey_id: s.id, assessment: s.name, language: s.language_name, period: s.period,
+    project: s.project_name, purpose: s.purpose, format: s.format,
     template: { id: s.template_id, version: s.template_version, perspective: s.perspective, source_ref: s.source_ref },
     items: renderItems(items, s.language_name), participant_labels: participantLabels(s.template_id) }, scope: { type: "survey", id: s.id } };
 };
