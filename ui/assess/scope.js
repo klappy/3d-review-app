@@ -7,6 +7,7 @@
 import { homeView } from '../v3/home.js';
 import { learnMore } from '../v3/components/learn-more.js';
 import { mountEditableHeading } from '../v3/components/editable-heading.js';
+import { showSavedStatus, undoTokenOf } from '../v3/components/saved-status.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -325,8 +326,16 @@ const workspace = {
     root.querySelector('#rename-form')?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Rename', () => ctx.api(`/v2/workspaces/${ctx.enc(id)}`, { method: 'PATCH', body: { name: val(form, 'name') } }));
-      if (r) { ctx.note('Renamed.'); await reload(); }
+      // U17: the whole envelope, so the receipt's undo_token reaches the status beside this form ("Saved · Undo" / "Saved").
+      const full = ctx.apiFull || ((url, opts) => ctx.api(url, opts).then(result => ({ result })));
+      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Rename', () => full(`/v2/workspaces/${ctx.enc(id)}`, { method: 'PATCH', body: { name: val(form, 'name') } }));
+      if (!r) return;
+      await reload();
+      const here = () => root.querySelector('#rename-form');
+      showSavedStatus(here(), { undoToken: undoTokenOf(r), undo: async token => {
+        try { await ctx.api(`/v2/undo/${ctx.enc(token)}`, { method: 'POST' }); } catch (e) { throw new Error(`Undo failed: ${safeMessage(e)}`); }
+        await reload(); return here();
+      } });
     });
   },
 };

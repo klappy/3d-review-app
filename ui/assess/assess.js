@@ -24,6 +24,7 @@ import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
 import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove } from '/assess/v3-assessment.js';
 import { mountEditableHeading } from '/v3/components/editable-heading.js';
+import { showSavedStatus, undoTokenOf } from '/v3/components/saved-status.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
 // if the module is absent; destroyed on any route change.
 const WIZARD_JS = '/v3/wizard.js', WIZARD_CSS = '/v3/wizard.css';
@@ -474,8 +475,19 @@ function bindPrepare(current) {
 // B07: the assessment name is the heading (shell's or page's); owners/members rename it in place through cap.assessment.update.
 let pendingRename = null; // { aid, done } while a heading rename PATCH is in flight
 function bindNameHeading(current) {
-  const a = current.assessment;
-  return mountEditableHeading((app.closest('[role=main]') || app).querySelector('h1'), { canEdit: a.role === 'owner' || a.role === 'member', label: 'assessment name',
+  const a = current.assessment, h1 = (app.closest('[role=main]') || app).querySelector('h1');
+  // One place that shows a committed name (heading, crumb, tab title, cached list); used by the rename and by its Undo (U17).
+  const showName = (next, old) => {
+    const listed = state.lists.get(a.project_id)?.list?.find?.(x => x.id === a.id); if (listed) listed.name = next;
+    if (state.current?.assessment.id !== a.id) return false;
+    state.current.assessment.name = next;
+    return true;
+  };
+  const inPlace = (next, old) => {
+    const parts = document.title.split(' · '); if (parts.length === 3 && parts[1] === old) document.title = [parts[0], next, parts[2]].join(' · '); // paint()'s `<tab> · <name> · 3D Review`, by position
+    if (kit) document.querySelectorAll('header.top nav.crumbs [data-crumb="assessment"]').forEach(el => { el.textContent = next; }); // by level, never by label text
+  };
+  return mountEditableHeading(h1, { canEdit: a.role === 'owner' || a.role === 'member', label: 'assessment name',
     // Write guards without the shared busy flag (Bugbot on #285): never starts during an act() write or over a dirty screen; while the
     // PATCH runs, this view's other controls are disabled IN PLACE (no repaint, drafts survive) and re-enabled only if still on screen.
     // act() on this assessment waits for the rename to settle (pendingRename), so two cap.assessment.update writes never race.
@@ -488,7 +500,8 @@ function bindNameHeading(current) {
       held.forEach(b => { b.disabled = true; });
       let settle; const mine = pendingRename = { aid: a.id, done: new Promise(res => { settle = res; }) };
       let r, failed = null;
-      try { r = await api(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); } catch (e) { failed = redact(e.message); }
+      let token = null; // U17: the receipt's undo_token, when the write declares a true inverse
+      try { const j = await apiFull(`/v2/assessments/${encodeURIComponent(a.id)}`, { method: 'PATCH', body: { name } }); r = j?.result; token = undoTokenOf(j); } catch (e) { failed = redact(e.message); }
       held.forEach(b => { if (b.isConnected) b.disabled = false; });
       if (pendingRename === mine) pendingRename = null;
       try {
@@ -497,13 +510,18 @@ function bindNameHeading(current) {
         const here = route(location.hash), onThis = (here.kind === 'assessment' || here.kind === 'survey') && here.id === a.id && state.current?.assessment.id === a.id;
         if (failed) { if (!intact && onThis && !state.busy) { state.message = { aid: a.id, text: failed, alert: true }; paint(); } throw new Error(failed); }
         const next = String(r?.assessment?.name ?? name), old = state.current?.assessment.name;
-        const listed = state.lists.get(a.project_id)?.list?.find?.(x => x.id === a.id); if (listed) listed.name = next;
-        if (state.current?.assessment.id !== a.id) return;
-        state.current.assessment.name = next;
+        if (!showName(next, old)) return;
         if (!intact) { if (onThis) { state.dirty.set(a.id, 'write'); if (!state.busy) await render(); } return; } // refreshed BEFORE settle(): a waiting act() then runs on a clean screen
-        const parts = document.title.split(' · '); if (parts.length === 3 && parts[1] === old) document.title = [parts[0], next, parts[2]].join(' · '); // paint()'s `<tab> · <name> · 3D Review`, by position
         // No shell re-sync here: a kit update empties the content mount (drafts). The component sets the heading; the assessment crumb and title follow in place.
-        if (kit) document.querySelectorAll('header.top nav.crumbs [data-crumb="assessment"]').forEach(el => { el.textContent = next; }); // by level, never by label text
+        inPlace(next, old);
+        // U17: "Saved · Undo" (or "Saved") beside the heading's form; Undo calls cap.ops.undo and puts the old name back in place.
+        const was = old ?? a.name;
+        if (h1?.parentElement) showSavedStatus(h1.parentElement, { inside: true, undoToken: token, undo: async t => {
+          if (state.busy || pendingRename || identity !== identityGeneration) throw new Error('Wait for the current change to finish, then try Undo again.');
+          let u; try { u = await api(`/v2/undo/${encodeURIComponent(t)}`, { method: 'POST' }); } catch (e) { throw new Error(`Undo failed: ${redact(e.message)}`); }
+          const back = String(u?.assessment?.name ?? was), now = h1.textContent.trim();
+          if (showName(back, now)) { h1.textContent = back; inPlace(back, now); }
+        } });
       } finally { settle(); }
     } });
 }

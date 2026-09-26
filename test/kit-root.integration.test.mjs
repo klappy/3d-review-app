@@ -24,6 +24,7 @@ import { activeUntilLine, periodText } from '../ui/v3/components/active-until.js
 import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
 import { sidebarTree } from '../ui/v3/components/sidebar-tree.js';
 import { mountEditableHeading } from '../ui/v3/components/editable-heading.js';
+import { showSavedStatus, undoTokenOf } from '../ui/v3/components/saved-status.js';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const HTML = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
@@ -47,7 +48,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, activeUntilLine, periodText, learnMore, breadcrumbs, sidebarTree, mountEditableHeading }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, activeUntilLine, periodText, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf }); // v3 shell imports (assess.js lines 15–16); #190
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -388,6 +389,23 @@ test('B07: project and assessment names are the heading with an edit control for
     await v.go('#assessment/a2/prepare');
     assert.equal(v.qa('[data-edit-heading]').length, assessment, identity + ' assessment');
   }
+});
+test('U17: assessment heading rename says "Saved · Undo" beside the heading; Undo calls /v2/undo and restores the name ("Undone"); navigation clears it', async () => {
+  const posts = []; const json = body => ({ ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => body, text: async () => '' });
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    const m = (init.method || '').toUpperCase();
+    if (m === 'PATCH') return json({ ok: true, result: { assessment: { id: 'a2', name: 'Spring review' } }, receipt: { undo_token: 'undo_a2' } });
+    if (m === 'POST' && String(u).includes('/v2/undo/')) { posts.push(String(u)); return json({ ok: true, result: { undone: 'cap.assessment.update', assessment: { id: 'a2', name: 'Spring baseline' } } }); }
+    return base(u, init); }; } });
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(12);
+  assert.equal(p.text('[role=main].content .v3-eh h1'), 'Spring review');
+  assert.equal(p.q('.v3-eh [data-saved-status]').textContent, 'Saved · Undo', 'status beside the heading form');
+  p.q('.v3-eh [data-undo]').click(); await tick(12);
+  assert.deepEqual(posts.map(u => u.replace(/^.*(\/v2\/undo\/)/, '$1')), ['/v2/undo/undo_a2']);
+  assert.equal(p.q('.v3-eh [data-saved-status]').textContent, 'Undone'); assert.equal(p.text('[role=main].content .v3-eh h1'), 'Spring baseline');
+  assert.equal(p.api.state.current.assessment.name, 'Spring baseline'); assert.equal(p.text('header.top nav.crumbs [aria-current="page"]'), 'Spring baseline');
+  await p.go('#assessment/a2/collect'); assert.equal(p.q('[data-saved-status]'), null, 'navigation clears the status');
 });
 test('B07: assessment heading rename disables other writes in place, keeps unsaved drafts, and re-syncs only the shell', async () => {
   let release; const held = new Promise(r => { release = r; });
