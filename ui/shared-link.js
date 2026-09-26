@@ -15,7 +15,7 @@ export const copy = {
   draftMismatch: 'Your saved answers were for a different version of this survey and were not restored. Please answer again.',
   draftRestored: 'Your unsent answers were restored on this device.',
   submitFailed: 'Your answers were not submitted. They are still here; try again.',
-  submitUncertain: 'We could not confirm whether your answers arrived. Nothing on this device was changed and your answers are still here. Choose Submit once again: if they already arrived you will see your receipt, and nothing is sent twice.',
+  submitUncertain: 'We could not confirm whether your answers arrived. Nothing on this device was changed and your answers are still here. Choose Submit answers again: if they already arrived you will see your receipt, and nothing is sent twice.',
   // Bincy B26: the thank-you names the survey's own group (the same perspective label the welcome eyebrow shows).
   receiptThanks: 'Thank you. Your answers stay with the team, grouped with others from the {perspective} perspective. Reopening your link shows this receipt again.',
   receiptThanksNoGroup: 'Thank you. Your answers stay with the team, grouped with others from your group. Reopening your link shows this receipt again.',
