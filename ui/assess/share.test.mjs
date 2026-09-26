@@ -44,10 +44,10 @@ test('Share prepares only; Copy confirms issuance and delivers, then QR/print re
   await m.click('data-share-copy');
   assert.deepEqual(m.calls[1].body, { params: {}, mode: 'execute', confirm_token: 'ct1' });
   assert.equal(m.share.confirm, null, 'confirm token is single-use'); assert.equal(m.share.link.url, 'https://example.test/#survey=SECRET'); assert.equal(m.share.link.id, 'inv_1');
-  assert.match(m.root.html, /Keep a copy of this link/); assert.match(m.root.html, /data-share-copy/); assert.match(m.root.html, /data-share-qr/); assert.match(m.root.html, /data-share-print/); assert.match(m.root.html, /data-share-revoke/);
+  assert.match(m.root.html, /Keep a copy of this link/); assert.match(m.root.html, /data-share-copy/); assert.doesNotMatch(m.root.html, /data-share-qr(?!-figure)/, 'U45: no QR toggle once the link exists'); assert.match(m.root.html, /data-share-qr-figure/); assert.match(m.root.html, /data-share-print/); assert.match(m.root.html, /data-share-revoke/);
   assert.doesNotMatch(m.root.html, /link_token|inv_1/, 'the raw token field and link id are never rendered');
   await m.click('data-share-copy'); assert.equal(m.clipboard.text, 'https://example.test/#survey=SECRET'); assert.match(m.root.html, /Link copied/);
-  await m.click('data-share-qr'); assert.match(m.root.html, /<svg/); assert.match(m.root.html, /Hide QR code/);
+  assert.match(m.root.html, /<svg/); assert.doesNotMatch(m.root.html, /Hide QR code/); // U45: the QR is inline, never behind a toggle
   await m.click('data-share-print'); assert.equal(m.calls.length, 2, 'output retries never reissue'); assert.equal(m.prints.length, 1); assert.deepEqual(m.sheets.map(s => typeof s === 'string' ? s : 'mounted'), ['mounted', 'removed'], 'sheet mounted on body for print then removed');
 });
 
@@ -178,7 +178,7 @@ test('B36 groupLinks: one labelled row per group (group · survey), Copy + QR as
   const h = groupLinks(ctx, [{ key: 's1', group: 'Translation team', survey: 'Validation', url: 'https://x/participate/#survey=T1' }, { key: 's2', group: 'Community', survey: 'Listening' }]);
   assert.equal((h.match(/data-group-link=/g) || []).length, 2);
   assert.match(h, /Translation team <span aria-hidden="true">·<\/span> Validation/); assert.match(h, /Community <span aria-hidden="true">·<\/span> Listening/);
-  assert.equal((h.match(/data-group-copy=/g) || []).length, 2); assert.equal((h.match(/data-group-qr=/g) || []).length, 2);
+  assert.equal((h.match(/data-group-copy=/g) || []).length, 2); assert.equal((h.match(/data-group-qr=/g) || []).length, 1); assert.equal((h.match(/<svg/g) || []).length, 1); // U45: a row with its link shows its QR inline, no QR button
   assert.match(h, new RegExp(`>${copy.copyLink}<`)); assert.match(h, new RegExp(`>${copy.qr}<`));
   assert.doesNotMatch(h, /class="primary"/);
 });
@@ -191,7 +191,7 @@ function fakeRow(key) {
   copyBtn.closest = sel => sel === '[data-group-link]' ? row : copyBtn; qrBtn.closest = sel => sel === '[data-group-link]' ? row : qrBtn;
   return { status, fig, copyBtn, qrBtn };
 }
-test('B36 bindGroupLinks: Copy copies that group\'s link in one tap; QR shows and hides that group\'s code', async () => {
+test('B36/U45 bindGroupLinks: Copy copies that group\'s link in one tap; the QR then stays visible inline (no toggle)', async () => {
   const { bindGroupLinks } = await import('./share.js');
   let handler; const root = { addEventListener: (ev, fn) => { handler = fn; } };
   const clipboard = { text: null, async writeText(t) { this.text = t; } };
@@ -200,10 +200,10 @@ test('B36 bindGroupLinks: Copy copies that group\'s link in one tap; QR shows an
   const r2 = fakeRow('s2');
   await handler({ target: r2.copyBtn });
   assert.equal(clipboard.text, urls.s2); assert.equal(r2.status.textContent, copy.copied); assert.deepEqual(asked, ['s2']);
-  await handler({ target: r2.qrBtn });
-  assert.equal(r2.fig.hidden, false); assert.match(r2.fig.innerHTML, /<svg/); assert.equal(r2.qrBtn.textContent, copy.hideQr);
-  await handler({ target: r2.qrBtn });
-  assert.equal(r2.fig.hidden, true); assert.equal(r2.qrBtn.textContent, copy.qr);
+  assert.equal(r2.fig.hidden, false); assert.match(r2.fig.innerHTML, /<svg/);
+  const r1 = fakeRow('s1'); await handler({ target: r1.qrBtn });
+  assert.equal(r1.fig.hidden, false); assert.match(r1.fig.innerHTML, /<svg/);
+  await handler({ target: r1.qrBtn }); assert.equal(r1.fig.hidden, false, 'a second tap never hides the QR');
   const bad = fakeRow('s9'); await handler({ target: bad.copyBtn });
   assert.match(bad.status.className, /alert/);
 });

@@ -15,7 +15,7 @@ export const copy = Object.freeze({
   title: 'Share this survey',
   lead: 'Share a link, show a QR code or print invitations. Anyone with the link can answer without an account. Nothing is emailed from here.',
   open: 'Share survey', copyLink: 'Copy link', copied: 'Link copied.',
-  qr: 'QR code', hideQr: 'Hide QR code', print: 'Print', printAll: 'Print all',
+  qr: 'QR code', print: 'Print', printAll: 'Print all',
   revoke: 'Revoke this link',
   revoked: 'Link revoked. It no longer opens; answers already sent stay with the team.',
   onceShown: 'Keep a copy of this link before leaving. It is only available on this page for now.',
@@ -53,9 +53,11 @@ export function qrSvg(url) { const q = qrcode(0, 'M'); q.addData(url); q.make();
 
 // B43: THE share card's actions — Copy link · QR code · Print, always in this order, one tap each. Used by the survey page
 // (prefix "share"), the launched screen and Collect (prefix "group", via groupLinks). Nothing here mints a link.
-export function shareActions(ctx, { prefix, key = null, disabled = false, qrOpen = false, primary = false }) {
+// U45 (Bincy B43): no QR toggle. Once the card has a link its QR shows inline (`qrShown`) and the QR button is gone; before
+// that, "QR code" is the one tap that makes the link and shows the code.
+export function shareActions(ctx, { prefix, key = null, disabled = false, qrShown = false, primary = false }) {
   const esc = ctx.esc, v = key == null ? '' : `="${esc(key)}"`, off = disabled ? ' disabled' : '';
-  return `<span class="share-actions" data-share-actions><button type="button"${primary ? ' class="primary"' : ''} data-${prefix}-copy${v}${off}>${esc(copy.copyLink)}</button><button type="button" data-${prefix}-qr${v} aria-expanded="${qrOpen}"${off}>${esc(qrOpen ? copy.hideQr : copy.qr)}</button><button type="button" data-${prefix}-print${v}${off}>${esc(copy.print)}</button></span>`;
+  return `<span class="share-actions" data-share-actions><button type="button"${primary ? ' class="primary"' : ''} data-${prefix}-copy${v}${off}>${esc(copy.copyLink)}</button>${qrShown ? '' : `<button type="button" data-${prefix}-qr${v}${off}>${esc(copy.qr)}</button>`}<button type="button" data-${prefix}-print${v}${off}>${esc(copy.print)}</button></span>`;
 }
 
 export function render(ctx, { current, survey, share }) {
@@ -69,8 +71,8 @@ export function render(ctx, { current, survey, share }) {
     ? `<button type="button" class="primary" data-share-open>${esc(copy.open)}</button>`
     : `<p class="note small">${link ? 'Everyone can use this one link; after a page reload, sharing makes a new one.' : `Choose how to share ${esc(survey.template_name || 'this survey')}. Your choice makes a participant link available.`} You can revoke the link later; answers already sent stay with the team.</p>
       ${link ? `<div class="share-link"><p data-share-url><code>${esc(link.url)}</code></p>${link.expires_at ? `<p class="small muted">Expires ${esc(link.expires_at)}</p>` : ''}</div>` : ''}
-      <div class="actions">${ready || busy ? shareActions(ctx, { prefix: 'share', disabled: busy, qrOpen: !!(share.qr && link), primary: true }) : `<button type="button" data-share-open>Try sharing again</button>`}${link ? `<button type="button" class="quiet" data-share-revoke ${busy ? 'disabled' : ''}>${esc(copy.revoke)}</button>` : ''}<button type="button" class="quiet" data-share-close ${busy ? 'disabled' : ''}>Close</button></div>
-      ${share.qr && link ? `<figure class="share-qr" data-share-qr-figure>${qrSvg(link.url)}<figcaption class="small muted">Scan to open the survey</figcaption></figure>` : ''}${link ? `<p class="small muted">${esc(copy.onceShown)}</p>` : ''}`;
+      <div class="actions">${ready || busy ? shareActions(ctx, { prefix: 'share', disabled: busy, qrShown: !!link, primary: true }) : `<button type="button" data-share-open>Try sharing again</button>`}${link ? `<button type="button" class="quiet" data-share-revoke ${busy ? 'disabled' : ''}>${esc(copy.revoke)}</button>` : ''}<button type="button" class="quiet" data-share-close ${busy ? 'disabled' : ''}>Close</button></div>
+      ${link ? `<figure class="share-qr" data-share-qr-figure>${qrSvg(link.url)}<figcaption class="small muted">Scan to open the survey</figcaption></figure>` : ''}${link ? `<p class="small muted">${esc(copy.onceShown)}</p>` : ''}`;
   return `<section class="panel" data-share><p class="eyebrow">Share</p>${collecting ? '' : `<p class="small muted">${esc(copy.notCollecting)}</p>`}${actions}${codesBlock(ctx, survey, share.codes || (share.codes = blankCodes()))}${learnMore(`<p class="small muted">${esc(copy.lead)}</p>`)}<p class="small ${share.alert ? 'alert' : 'muted'}" role="status" data-share-status>${esc(share.message || '')}</p></section>`;
 }
 
@@ -175,7 +177,7 @@ export function bind(ctx, root, { current, survey, share, api, apiFull = null, o
     if (!same()) return;
     share.stage = 'linked'; say('');
     if (!live()) return;
-    if (action === 'qr') { share.qr = !share.qr; update(); return; }
+    if (action === 'qr') { share.qr = true; update(); return; } // U45: the QR shows inline with the link; no hide
     if (action === 'copy') {
       try { await clipboard.writeText(share.link.url); if (same()) say(copy.copied); }
       catch { if (same()) say('Your link is ready. Press Copy link again, or select the link text and copy it.', true); }
@@ -256,9 +258,10 @@ function bindCodes(ctx, root, { current, survey, share, api, apiFull, same, live
 // `url` is known on the launched screen; on Collect it is issued on the first tap (issueLink) and kept in memory only. Collect
 // rows pass no group/survey: the group heading and survey title sit just above, so only the buttons show (no repeated words).
 // B43: each row is the share card — shareActions (Copy link · QR code · Print). `title`/`line` feed the printed page only.
+const qrFigure = url => `${qrSvg(url)}<p class="small muted">Scan to open the survey</p>`;
 export function groupLinks(ctx, rows) {
   const esc = ctx.esc;
-  return `<ul class="share-groups" data-group-links>${rows.map(r => `<li class="share-group" data-group-link="${esc(r.key)}" data-print-title="${esc(r.title || r.survey || '')}" data-print-line="${esc(r.line || '')}">${r.group ? `<span class="share-group-label" data-group-label>${esc(r.group)} <span aria-hidden="true">·</span> ${esc(r.survey)}</span>` : ''}${r.url ? `<input class="share-group-url" readonly aria-label="${esc(`${r.group} · ${r.survey} link`)}" value="${esc(r.url)}">` : ''}${shareActions(ctx, { prefix: 'group', key: r.key })}<span class="small muted" role="status" data-group-status></span><div class="share-qr" data-group-qr-figure hidden></div></li>`).join('')}</ul>`;
+  return `<ul class="share-groups" data-group-links>${rows.map(r => `<li class="share-group" data-group-link="${esc(r.key)}" data-print-title="${esc(r.title || r.survey || '')}" data-print-line="${esc(r.line || '')}">${r.group ? `<span class="share-group-label" data-group-label>${esc(r.group)} <span aria-hidden="true">·</span> ${esc(r.survey)}</span>` : ''}${r.url ? `<input class="share-group-url" readonly aria-label="${esc(`${r.group} · ${r.survey} link`)}" value="${esc(r.url)}">` : ''}${shareActions(ctx, { prefix: 'group', key: r.key, qrShown: !!r.url })}<span class="small muted" role="status" data-group-status></span>${r.url ? `<div class="share-qr" data-group-qr-figure>${qrFigure(r.url)}</div>` : '<div class="share-qr" data-group-qr-figure hidden></div>'}</li>`).join('')}</ul>`;
 }
 
 // resolve(key) → Promise<url>. Delegated on `root`, so a repaint of the rows needs no rebinding.
@@ -270,13 +273,14 @@ export function bindGroupLinks(root, { resolve, clipboard = globalThis.navigator
     const key = b.dataset.groupCopy ?? b.dataset.groupQr ?? b.dataset.groupPrint, isQr = b.dataset.groupQr !== undefined, isPrint = b.dataset.groupPrint !== undefined;
     const status = row.querySelector('[data-group-status]'), fig = row.querySelector('[data-group-qr-figure]');
     const say = (t, alert = false) => { if (status) { status.textContent = t; status.className = `small ${alert ? 'alert' : 'muted'}`; } };
-    if (isQr && fig && !fig.hidden) { fig.hidden = true; fig.innerHTML = ''; b.textContent = copy.qr; b.setAttribute('aria-expanded', 'false'); return; }
     if (busy.has(key)) return; busy.add(key);
     let url;
     try { url = await resolve(key); } catch (e) { busy.delete(key); say(e?.shareMessage || 'The link could not be prepared. Try again, or sign in if your session has ended.', true); return; }
     busy.delete(key);
     if (!url) { say('The link could not be prepared. Try again.', true); return; }
-    if (isQr) { if (fig) { fig.innerHTML = `${qrSvg(url)}<p class="small muted">Scan to open the survey</p>`; fig.hidden = false; } b.textContent = copy.hideQr; b.setAttribute('aria-expanded', 'true'); say(''); return; }
+    // U45: once the row has its link the QR stays visible inline and the QR button goes (no toggle).
+    if (fig && fig.hidden) { fig.innerHTML = qrFigure(url); fig.hidden = false; row.querySelector('[data-group-qr]')?.remove?.(); }
+    if (isQr) { say(''); return; }
     if (isPrint) { try { printOnBody(doc, oneSheetHtml({ esc: escHtml }, { title: row.dataset?.printTitle, line: row.dataset?.printLine, url }), print); say(''); } catch { say('Printing did not open. Press Print again.', true); } return; }
     try { await clipboard.writeText(url); say(copy.copied); } catch { say(`Copy did not work. Select and copy: ${url}`, true); }
   }, signal ? { signal } : undefined);
