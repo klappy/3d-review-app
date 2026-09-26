@@ -1,4 +1,5 @@
 import { copy, createSharedLinkClient, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, stripFragment, submitFailureKind } from '../shared-link.js';
+import { closedLine } from '../v3/components/active-until.js';
 
 // Only the existing participant client owns transport. No staff identity is read.
 export function createParticipantJourney({ window: win, storage, fetchImpl, onChange = () => {} }) {
@@ -12,6 +13,9 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
   }
   async function loadForm() {
     form = await client.form();
+    // B41: after the review's Active until date the link shows one plain line instead of the survey.
+    const closed = closedLine(form?.period);
+    if (closed) return show('unavailable', { notice: closed });
     const draft = restoreDraft(store, form);
     if (draft?.mismatch) store.remove('draft');
     return show('form', { draft: draft?.answers || null, notice: draft?.mismatch ? copy.draftMismatch : draft?.answers ? copy.draftRestored : '' });

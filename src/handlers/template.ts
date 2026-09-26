@@ -1,14 +1,15 @@
 import type { Handler } from "./types";
 import { CapError } from "./errors";
-import { ensureLegacyTemplates } from "../legacy-templates";
+import { LEGACY_TEMPLATE_IDS } from "../legacy-templates";
 import { loadTemplate, nowIso, optInt, parseItems, renderItems, reqStr, requireSupport, requireUser, type TemplateRow } from "./common";
 
 function meta(t: TemplateRow) { return { id:t.id, version:t.version, name:t.name, perspective:t.perspective, source_ref:t.source_ref, published_at:t.published_at }; }
 export const list: Handler = async ctx => {
   requireUser(ctx);
-  await ensureLegacyTemplates(ctx);
+  // B42: the catalogue offers instruments for NEW surveys. Legacy import-only templates (Mid-Level v1 (legacy)) stay out of it so each
+  // group type appears once; they remain reachable by id (get/render/select via loadTemplate) and keep showing on the imported surveys.
   const {results} = await ctx.db.prepare("SELECT id, version, name, perspective, source_ref, published_at FROM survey_template WHERE published_at IS NOT NULL ORDER BY name, version DESC").all<TemplateRow>();
-  return {result:{templates:results.map(meta)}};
+  return {result:{templates:results.filter(t=>!LEGACY_TEMPLATE_IDS.has(t.id)).map(meta)}};
 };
 export const get: Handler = async (ctx,params) => {
   requireUser(ctx);

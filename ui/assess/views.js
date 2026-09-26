@@ -58,7 +58,7 @@ const settle = p => p.then(value => ({ status: 'loaded', value }), e => ({ statu
 const isEditor = role => role === 'owner' || role === 'member';
 // B35 (lanes-1321): bands come from a built report. While none is built and some perspective already has enough responses
 // (the provisional minimum), the band block itself offers the one next action; it opens the SAME preview → confirm as
-// "Preview report build" below, shown right here in the band block (never builds without the confirm).
+// "Preview report build" (closed behind Technical details, U32), shown right here in the band block (never builds without the confirm).
 export function buildResultsCta(m, lensGroups, esc) {
   if (m.bandScores || m.resultsBuilt || !isEditor(m.role)) return '';
   // Bugbot 4108654385: offered only when the report list is known and empty; an existing report (or an unknown list) never
@@ -245,9 +245,13 @@ const improve = {
       const T = V3_NEXT;
       const notes = m.editable
         ? `<form data-notes-form><label class="field">${esc(T.reflection)}<textarea name="notes_reflection" rows="3" maxlength="4000" placeholder="${esc(T.reflectionHint)}">${esc(m.notes_reflection)}</textarea></label><label class="field">${esc(T.next)}<textarea name="notes_next_steps" rows="2" maxlength="4000" placeholder="${esc(T.nextHint)}">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>${esc(T.save)}</button> <span class="status" role="status" aria-live="polite" data-notes-status>${esc(savedNote(m))}</span></div></form>`
-        : `<h3>${esc(T.reflection)}</h3><p data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">Nothing recorded yet.</span>'}</p><h3>${esc(T.next)}</h3><p data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next step recorded yet.</span>'}</p><p class="small muted">${esc(NOTES_VISIBILITY)}</p>`;
+        // B30 (lanes-1911, "viewer Improve: 2 h3, 3 lines"): ONE heading for viewers. The two notes are plain labels in the
+        // wizard's key/value list (no h3); nothing recorded → one short line; the visibility note joins the Learn more below.
+        : (m.notes_reflection || m.notes_next_steps
+          ? `<dl class="kv"><dt>${esc(T.reflection)}</dt><dd data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">Nothing recorded yet.</span>'}</dd><dt>${esc(T.next)}</dt><dd data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next step recorded yet.</span>'}</dd></dl>`
+          : '<p class="muted" data-notes-empty>No notes recorded yet.</p>');
       // Lane 9 L9-24: the schedule note and the role explanation move behind the shared Learn more (one line kept: who can read).
-      const more = `<p class="muted">${esc(T.footer)}</p>${m.editable ? '' : `<p class="muted">Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`}`;
+      const more = `<p class="muted">${esc(T.footer)}</p>${m.editable ? '' : `<p class="muted">${esc(NOTES_VISIBILITY)}</p><p class="muted">Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`}`;
       return `<section class="panel" data-v3-next><p class="eyebrow">${esc(T.eyebrow)}</p><h2>${esc(T.title)}</h2>${notes}${learnMore(more)}</section>`;
     }
     const notes = m.editable

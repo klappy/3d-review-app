@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot, renderDone } from './wizard.js';
+import { ORGANIZATIONS, orgChoices, ORG_OTHER, countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot, renderDone } from './wizard.js';
 
 const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
-const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
+const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', until: '2026-10-31', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
 
 test('ruling (a): denominator only when entered', () => {
   assert.equal(countLabel(4, 10), '4 of 10');
@@ -37,9 +37,9 @@ test('launch performs writes in order, never sends expected count to the API, st
     throw new Error('unexpected ' + url);
   };
   const store = mem();
-  const ctx = await launch(draft({ purpose: 'Gen 1-3' }), { api, store });
+  const ctx = await launch(draft({ purpose: 'Gen 1-3', starts: '2026-09-25' }), { api, store });
   assert.equal(calls[0].url, '/v2/projects/p1/assessments');
-  assert.deepEqual(calls[0].body, { name: 'Oct', language_id: 'l1', purpose: 'Gen 1-3', format: 'Written' });
+  assert.deepEqual(calls[0].body, { name: 'Oct', language_id: 'l1', purpose: 'Gen 1-3', period: 'Starts 2026-09-25 · Active until 2026-10-31', format: 'Written' });
   assert.deepEqual(calls[1].body, { template_id: 'tpl.team', version: 3 });
   assert.deepEqual(calls[3], { url: '/v2/assessments/a1/stage', method: 'POST', body: { stage: 'collect' } });
   assert.equal(calls.filter(c => c.url.endsWith('/links')).length, 4);
@@ -85,8 +85,8 @@ test('views: four steps, one primary each, optional expected count, escaped', ()
   assert.equal((renderStep('review', draft(), data, [], true).match(/data-wz="edit"/g) || []).length, 0);
   assert.match(renderStep('details', draft(), data), /<span>Participants<\/span>/);
   // Bincy B10: step 3 promises only what the welcome shows (project · language · material · format · when); no unsaved note box.
-  const info = renderStep('information', draft({ purpose: 'Mark 1–4', period: 'March' }), data);
-  for (const k of ['Project', 'Language', 'Material', 'Format', 'When']) assert.match(info, new RegExp(`<dt>${k}</dt>`));
+  const info = renderStep('information', draft({ purpose: 'Mark 1–4' }), data);
+  for (const k of ['Project', 'Language', 'Material', 'Format', 'Active until']) assert.match(info, new RegExp(`<dt>${k}</dt>`));
   assert.doesNotMatch(info, /textarea|not saved|Not sent/);
   assert.doesNotMatch(renderStep('review', draft(), data), /Note for participants|not saved/);
 });
@@ -214,7 +214,8 @@ test('lane 12 L12-1: lead organisation rides cap.project.create only when given 
   assert.deepEqual(body({ newOrg: '  ' }), { name: 'Hill' });
   assert.deepEqual(body({ newOrg: undefined }), { name: 'Hill' });
   const html = renderStep('details', draft({ project: NEW_PROJECT, newOrg: 'A & B' }), { projects: [], languages: [], templates: [] }, [], false, '');
-  assert.match(html, /Lead organisation<input name="newOrg" value="A &amp; B"/);
+  assert.match(html, /<option value="__other__" selected>Other \(type it\)<\/option>/);
+  assert.match(html, /Organisation name<input name="newOrg" value="A &amp; B"/);
   assert.doesNotMatch(renderStep('details', draft(), { projects: [], languages: [], templates: [] }, [], false, ''), /newOrg/);
   assert.match(renderStep('review', draft({ project: NEW_PROJECT, newProject: 'H', newOrg: 'Org' }), { projects: [], languages: [], templates: [] }, [], false, ''), /<dt>Lead organisation<\/dt><dd>Org<\/dd>/);
 });
@@ -313,7 +314,7 @@ test('B08+B20 (Bincy SI 04): step 2 groups surveys under one heading per perspec
   assert.doesNotMatch(renderStep('participants', freshDraft(), { templates: [{ id: 'x', version: 1, perspective: 'Reviewer', name: 'R' }] }), /wz-pnote/);
   // same shared line on the launched screen, once per group above its rows
   const done = renderDone({ aid: 'a1', links: [{ survey: 's1', template: 'c1' }, { survey: 's2', template: 'c2' }, { survey: 's3', template: 't1' }] }, 'https://x.test', templates);
-  assert.equal((done.match(new RegExp(PERSPECTIVE_WHO.church, 'g')) || []).length, 1, 'church who-line once on launch');
+  assert.equal((done.replace(/data-print-line="[^"]*"/g, '').match(new RegExp(PERSPECTIVE_WHO.church, 'g')) || []).length, 1, 'church who-line shown once on launch (B43: the print-only line is an attribute)');
   assert.ok(done.indexOf(PERSPECTIVE_WHO.team) > -1 && done.indexOf(PERSPECTIVE_WHO.church) < done.indexOf('Involved-Pastor'), 'launch who-line above its rows');
   assert.equal((done.match(/data-group-link=/g) || []).length, 3, 'rows unchanged');
 });
@@ -325,4 +326,42 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
   assert.equal((h.match(/data-group-copy="s[12]"/g) || []).length, 2); assert.equal((h.match(/data-group-qr="s[12]"/g) || []).length, 2);
   assert.match(h, /#survey=AAA/); assert.match(h, /#survey=BBB/);
   assert.equal((h.match(/class="primary"/g) || []).length, 1);
+  // B43: each row is the share card (Copy link · QR code · Print) and one secondary "Print all" follows the rows
+  assert.equal((h.match(/data-group-print="s[12]"/g) || []).length, 2);
+  assert.equal((h.match(/data-share-print-all/g) || []).length, 1);
+});
+
+test('B41: setup asks Active until (required) and Starts (optional, default today) on the existing period field', () => {
+  const html = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
+  assert.match(html, /Starts \(optional\)<input type="date" name="starts"/);
+  assert.match(html, /Active until<input type="date" name="until" value="2026-10-31" required>/);
+  assert.doesNotMatch(html, />When</);
+  assert.match(freshDraft().starts, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(freshDraft().until, '');
+  assert.deepEqual(validateStep('details', draft({ until: '' })), ['Choose the date the survey is active until.']);
+  assert.deepEqual(validateStep('details', draft({ starts: '' })), []);
+  const body = d => launchPlan(draft(d)).find(s => s.cap === 'cap.assessment.create').body({});
+  assert.equal(body({ starts: '2026-09-25' }).period, 'Starts 2026-09-25 · Active until 2026-10-31');
+  assert.equal(body({ starts: '' }).period, 'Active until 2026-10-31');
+  assert.match(renderStep('review', draft({ starts: '2026-09-25' }), { projects: [], languages: [], templates: [] }), /<dt>Starts<\/dt><dd>25 September 2026<\/dd><dt>Active until<\/dt><dd>31 October 2026<\/dd>/);
+});
+
+test('B40: lead organisation is a seeded select plus "Other (type it)"; the stored field is unchanged', () => {
+  const data = { projects: [{ id: 'p1', name: 'P', organization: 'Hill Bible Society' }, { id: 'p2', name: 'Q', organization: 'sil' }], languages: [], templates: [] };
+  const names = orgChoices(data.projects);
+  assert.ok(names.includes('Hill Bible Society'));
+  assert.equal(names.filter(n => n.toLowerCase() === 'sil').length, 1);
+  assert.equal(new Set(ORGANIZATIONS.map(n => n.toLowerCase())).size, ORGANIZATIONS.length);
+  const blank = renderStep('details', draft({ project: NEW_PROJECT }), data, [], false, '');
+  assert.match(blank, /<select name="newOrgPick"><option value="" selected>Choose… \(optional\)<\/option>/);
+  assert.match(blank, /<option value="Hill Bible Society">/);
+  assert.doesNotMatch(blank, /name="newOrg"/);
+  const picked = renderStep('details', draft({ project: NEW_PROJECT, newOrg: 'SIL' }), data, [], false, '');
+  assert.match(picked, /<option value="SIL" selected>SIL<\/option>/);
+  assert.doesNotMatch(picked, /name="newOrg"/);
+  const other = renderStep('details', draft({ project: NEW_PROJECT, newOrgOther: true, newOrg: '' }), data, [], false, '');
+  assert.match(other, new RegExp(`value="${ORG_OTHER}" selected`));
+  assert.match(other, /Organisation name<input name="newOrg" value=""/);
+  const body = launchPlan(draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'L', newOrg: 'SIL' }))[0].body({});
+  assert.deepEqual(body, { name: 'H', organization: 'SIL' });
 });

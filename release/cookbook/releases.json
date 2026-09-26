@@ -1,7 +1,35 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.21.6",
+  "current": "0.21.7",
   "versions": [
+    {
+      "version": "0.21.7",
+      "status": "candidate",
+      "notes_path": "releases/0.21.7.md",
+      "sections": {
+        "added": [
+          "Every shared survey link now has the same three buttons — Copy link, QR code, Print — and one \"Print all\" puts every survey (title, one line, QR code) on a single printable page. (#324)"
+        ],
+        "changed": [
+          "sign-in says a new email creates an account (Bincy B32) (#301)",
+          "The survey page now shows one heading; print and share explanations sit behind Learn more. (#316)",
+          "A viewer on the Improve step now sees one heading with the notes as plain labels; the visibility note sits behind Learn more. (#317)",
+          "The participant welcome now shows one heading, the invitation and privacy line, the survey context and a single Start button; the time estimate and sign-in note sit behind \"Learn more\". (#318)",
+          "The classic console header now says \"Signed in\" instead of showing an internal account id. (#319)",
+          "The full report's translation type agreement now reads as one plain sentence (e.g. \"Agreed: Resembling · Seen as: Resembling · Matches\") instead of raw values. (#320)",
+          "Understand now shows one build action, \"Build the results\"; the older \"Preview report build\" sits behind Technical details in Reports. (#315)",
+          "Setup step 1 \"Lead organisation\" is now a drop-down of known organisations with \"Other (type it)\" for anything else. (#322)",
+          "Setup asks \"Active until\" (required) and \"Starts\" (optional, default today) instead of \"When\"; Collect shows \"Active until <date>\" and participant links show \"This survey closed on <date>\" after that date. (#323)",
+          "On Collect, \"Move to Understand\" is the one primary action and is confirmed in the page; Prepare no longer carries that move or a browser confirm. (#325)"
+        ],
+        "fixed": [
+          "On DEV, \"Use a different email\" (and \"Request a new link\") now keeps you in the connector sign-in instead of dropping back to a plain web sign-in. (#313)",
+          "Translation Team now offers Mid-Level once when setting up or changing surveys; the old Mid-Level v1 stays only on imported responses. (#321)",
+          "Revoke invitation asks in the row (Revoke / Cancel) and the revoked row leaves the pending list at once (#326)",
+          "A survey keeps one participant link per page load: Copy link, QR code and Print on the survey page and on Collect reuse it, and the Share card now says a reload makes a new one. (#327)"
+        ]
+      }
+    },
     {
       "version": "0.21.6",
       "status": "candidate",

@@ -63,6 +63,8 @@ test('L9-24 sign-in: one heading, one sentence, one primary; survey help behind 
   const body = lessText(h, 'sign-in', /<h1\b/g);
   const line = h.slice(h.indexOf('</h1>') + 5).match(/^<p class="muted">([^<]*)<\/p>/); assert.ok(line); assert.equal(sentences(line[1]), 1, 'one sentence under the heading');
   assert.match(body, /Open the link you were given; no sign-in is needed\. <a href="#survey">Have an access code\?<\/a>/);
+  // U28: the new-account line sits under the one primary (not a second line under the heading); still one heading, one primary.
+  assert.equal(count(upFront(h), /New here\? Signing in with your email creates your account\./g), 1);
 });
 
 test('L9-24 admin (permissions): heading + one note; the legacy-acceptance explanation behind Learn more', () => {
@@ -80,16 +82,17 @@ test('L9-24 admin (permissions): heading + one note; the legacy-acceptance expla
 
 // Real render of the assessment page (head + Prepare view): assess.js runs in a headless vm with its real imports, as
 // identity-reset.test.mjs does, then screen() is called with a fixture assessment. No boot (no #app, no #rv).
+let surveyScreen; // set by assessPage (B30 survey detail)
 async function assessPage() {
   const imp = async p => import(new URL(p, import.meta.url));
-  const [demo, dp, ss, wh, cardsNs, bc, st, lm, scope, vw, share, fb, ad, v3s, v3a] = await Promise.all(['../demo.js', '../diagnostic-path.js', '../stage-screens.js', './whats-here.js', './cards.js', '../v3/components/breadcrumbs.js', '../v3/components/sidebar-tree.js', '../v3/components/learn-more.js', './scope.js', './views.js', './share.js', './feedback.js', '../kit/app-adapter.js', '../v3-shell.js', './v3-assessment.js'].map(imp));
+  const [demo, dp, ss, wh, cardsNs, bc, st, lm, scope, vw, share, fb, ad, v3s, v3a, au] = await Promise.all(['../demo.js', '../diagnostic-path.js', '../stage-screens.js', './whats-here.js', './cards.js', '../v3/components/breadcrumbs.js', '../v3/components/sidebar-tree.js', '../v3/components/learn-more.js', './scope.js', './views.js', './share.js', './feedback.js', '../kit/app-adapter.js', '../v3-shell.js', './v3-assessment.js', '../v3/components/active-until.js'].map(imp));
   const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace(/export function /g, 'function ');
-  const box = { ...demo, ...dp, ...ss, ...wh, cards: cardsNs, ...bc, ...st, ...lm, pages: scope.pages, scopeCss: scope.css, whoLine: scope.whoLine, views: vw.views, viewsCss: vw.css, share, ...fb, ...ad, ...v3s, ...v3a,
+  const box = { ...demo, ...dp, ...ss, ...wh, cards: cardsNs, ...bc, ...st, ...lm, pages: scope.pages, scopeCss: scope.css, whoLine: scope.whoLine, views: vw.views, viewsCss: vw.css, share, ...fb, ...ad, ...v3s, ...v3a, ...au,
     document: new JSDOM('<!doctype html><head></head><body></body>').window.document, location: { hash: '', pathname: '/' }, history: { replaceState() {} }, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} }, localStorage: { getItem: () => null, setItem() {} }, matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }), addEventListener() {}, setTimeout, clearTimeout, console, URL, URLSearchParams };
   box.globalThis = box;
-  const api = vm.runInNewContext(source + '\n({screen,state})', box);
-  return (role, stage = 'prepare', view = 'prepare', projects = [{ id: 'p1', name: 'Coast' }]) => { api.state.projects = projects;
-    return api.screen({ assessment: { id: 'a1', name: 'Oct', project_id: 'p1', role, stage, language_id: 'lang1', period: '2026' }, surveys: [{ id: 's1', state: 'selected' }, { id: 's2', state: 'selected' }] }, view); };
+  const api = vm.runInNewContext(source + '\n({screen,state,surveyScreen})', box); surveyScreen = api.surveyScreen;
+  return (role, stage = 'prepare', view = 'prepare', projects = [{ id: 'p1', name: 'Coast' }], period = '2026') => { api.state.projects = projects;
+    return api.screen({ assessment: { id: 'a1', name: 'Oct', project_id: 'p1', role, stage, language_id: 'lang1', period }, surveys: [{ id: 's1', state: 'selected' }, { id: 's2', state: 'selected' }] }, view); };
 }
 
 test('L9-24 assessment page, Prepare view (validator #282): one view heading, no stray lines, one primary; stage notes behind Learn more', async () => {
@@ -192,4 +195,28 @@ test('B31 Permissions (Bugbot 4108609584/4108609569): a new preview drops the pr
   assert.match(src, /if \(e\.currentTarget\.isConnected\) m\.transferOpen = /, 'stale toggle ignored');
   const h = permissions.render({ esc }, { scope: 'assessments', id: 'a1', status: 'loaded', grants: [], pending: [], me: 'me', myRole: 'owner', receipts: {}, notice: 'x', noticeRef: '' });
   assert.doesNotMatch(h, /<summary>Details<\/summary>/);
+});
+
+// B30 survey detail (lanes-1911, LANES 17:14 "survey detail (h1 + 2 h2)"): the survey name is the one heading; Paper and
+// Share are plain labels, Share is the one primary; the print and share explanations sit behind Learn more.
+test('B30 survey detail: one heading (the survey name), one primary; print + share explanations behind Learn more', async () => {
+  await assessPage();
+  const s = { id: 's1', template_name: 'Validation', template_version: 1, collection_status: 'open', perspective: 'Translation Team' };
+  for (const role of ['owner', 'member', 'viewer']) {
+    const h = surveyScreen({ assessment: { id: 'a1', name: 'Oct', role, stage: 'collect' }, surveys: [s] }, s), v = upFront(h), name = `survey ${role}`;
+    assert.equal(count(v, /<h[1-6]\b/g), 1, name + ': one heading');
+    assert.match(v, /<h1>Validation<\/h1>/);
+    assert.ok(count(v, /class="(?:[^"]* )?primary(?: [^"]*)?"/g) <= 1, name + ': at most one primary');
+    assert.doesNotMatch(v, /A blank questionnaire|Anyone with the link can answer/, name + ': explanations not up front');
+    if (role !== 'viewer') { const more = [...h.matchAll(closed)].map(x => x[0]).join('');
+      for (const moved of ["A blank questionnaire with this survey&#39;s actual questions", 'Anyone with the link can answer without an account.']) assert.ok(more.includes(moved) || more.includes(moved.replace('&#39;', "'")), `${name}: moved, not removed: ${moved}`);
+      assert.match(v, /data-share-open/, name + ': Share survey stays up front'); assert.match(v, /id="print-load"/, name + ': Print survey stays up front'); }
+  }
+});
+
+test('B41 Collect: shows "Active until <date>" from the assessment period; older free-text periods add nothing', async () => {
+  const page = await assessPage();
+  const at = period => page('owner', 'collect', 'collect', undefined, period);
+  assert.match(at('Starts 2026-09-25 · Active until 2026-10-31'), /<p class="small muted" data-active-until>Active until 31 October 2026<\/p>/);
+  assert.doesNotMatch(at('October 2026'), /data-active-until/);
 });

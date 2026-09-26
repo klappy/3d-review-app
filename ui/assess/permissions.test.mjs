@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { permissions, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, TEST_ADDRESS_NOTE, inviteOutcome } from './permissions.js';
+import { permissions, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, REVOKE_ASK, TEST_ADDRESS_NOTE, inviteOutcome } from './permissions.js';
 import { shortDate } from './cards.js';
 
 const read = n => readFileSync(fileURLToPath(new URL(n, import.meta.url)), 'utf8');
@@ -94,9 +94,9 @@ test('N5 change role: owner rows have no control; PATCH dry_run/execute with ide
 test('N4/N11 revoke: single DELETE with no mode; owner rows have no control; server 403 "owners cannot be removed" verbatim; revoke_invitation single DELETE; N14 accepted → 400 verbatim', async () => {
   const x = await mount('member', { 'DELETE /v2/assessment/a1/grants/g_view': { id: 'g_view', status: 'revoked' }, 'DELETE /v2/invitations/inv_p': { id: 'inv_p', status: 'revoked' } });
   await x.click('data-revoke="g_view"'); const d = x.calls.find(c => c.method === 'DELETE'); assert.equal(d.url, '/v2/assessment/a1/grants/g_view'); assert.equal(d.body, undefined, 'no body, no mode'); assert.match(x.root.html, /Access removed/);
-  await x.click('data-revoke-invitation="inv_p"'); assert.ok(x.calls.some(c => c.method === 'DELETE' && c.url === '/v2/invitations/inv_p' && c.body === undefined));
+  await x.click('data-revoke-invitation="inv_p"'); await x.click('data-revoke-invitation-confirm="inv_p"'); assert.ok(x.calls.some(c => c.method === 'DELETE' && c.url === '/v2/invitations/inv_p' && c.body === undefined));
   const f = await mount('member', { 'DELETE /v2/assessment/a1/grants/g_mem': err('NOT_AUTHORIZED_AT_SCOPE', 403, 'owners cannot be removed') }); await f.click('data-revoke="g_mem"'); assert.match(f.root.html, /owners cannot be removed/);
-  const acc = await mount('owner', { 'DELETE /v2/invitations/inv_p': err('INVALID_PARAMS', 400, 'already accepted — revoke the grant instead') }); await acc.click('data-revoke-invitation="inv_p"'); assert.match(acc.root.html, /already accepted — revoke the grant instead/);
+  const acc = await mount('owner', { 'DELETE /v2/invitations/inv_p': err('INVALID_PARAMS', 400, 'already accepted — revoke the grant instead') }); await acc.click('data-revoke-invitation="inv_p"'); await acc.click('data-revoke-invitation-confirm="inv_p"'); assert.match(acc.root.html, /already accepted — revoke the grant instead/);
 });
 
 test('N6/N7 transfer: owner only; principal id field; step_down off by default and omitted from params; self/unknown → server 400 verbatim; destructive impact shown verbatim', async () => {
@@ -146,7 +146,7 @@ test('F-G1-1: mutation completion refreshes real roster and role while keeping o
     if (action === 'update_role') { x.root.els['data-role-for=g_mem'] = { value: 'viewer' }; await x.click('data-change-role="g_mem"'); }
     if (action === 'transfer') await x.submit('data-transfer-form');
     if (action === 'revoke') await x.click('data-revoke="g_view"');
-    else if (action === 'revoke_invitation') await x.click('data-revoke-invitation="inv_p"');
+    else if (action === 'revoke_invitation') { await x.click('data-revoke-invitation="inv_p"'); await x.click('data-revoke-invitation-confirm="inv_p"'); }
     else await x.click('data-confirm-execute');
     await x.settle();
     assert.match(x.root.html, /data-permissions-status>[^<]*<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/, action);
@@ -300,4 +300,21 @@ test('B31/U26: inviteOutcome and shortDate are plain words', () => {
   assert.equal(shortDate('2026-09-25T12:00:00Z', new Date('2026-10-01T00:00:00Z')), 'Sep 25');
   assert.equal(shortDate('2025-09-25T12:00:00Z', new Date('2026-10-01T00:00:00Z')), 'Sep 25, 2025');
   assert.equal(shortDate('not a date'), 'not a date');
+});
+
+test('U37 Revoke invitation asks in the row (Revoke / Cancel, no window.confirm); Cancel sends nothing; a confirmed revoke drops the row even when the refetch fails', async () => {
+  assert.doesNotMatch(read('./permissions.js'), /window\.confirm|globalThis\.confirm/);
+  let listed = 0; const stale = () => (++listed === 1 ? roster('owner') : err('INTERNAL', 500, 'refetch failed'));
+  const x = await mount('owner', { [G]: stale, 'DELETE /v2/invitations/inv_p': { id: 'inv_p', status: 'revoked' } });
+  await x.click('data-revoke-invitation="inv_p"');
+  assert.match(x.root.html, new RegExp(`data-revoke-ask="inv_p">${REVOKE_ASK.replace(/[?]/g, '\\?')} <button[^>]*data-revoke-invitation-confirm="inv_p"[^>]*>Revoke</button> <button[^>]*data-revoke-invitation-cancel[^>]*>Cancel</button>`));
+  assert.equal(x.calls.filter(c => c.method === 'DELETE').length, 0, 'asking sends nothing');
+  await x.click('data-revoke-invitation-cancel'); assert.doesNotMatch(x.root.html, /data-revoke-ask/); assert.match(x.root.html, /data-invitation="inv_p"/);
+  assert.equal(x.calls.filter(c => c.method === 'DELETE').length, 0, 'Cancel sends nothing');
+  await x.click('data-revoke-invitation="inv_p"');
+  const painted = []; const set = Object.getOwnPropertyDescriptor(x.root, 'innerHTML').set; Object.defineProperty(x.root, 'innerHTML', { set(v) { painted.push(v); set.call(this, v); }, get() { return this.html; }, configurable: true });
+  await x.click('data-revoke-invitation-confirm="inv_p"');
+  const notice = painted.find(h => /Invitation revoked\./.test(h)); assert.ok(notice, 'notice painted'); assert.doesNotMatch(notice, /data-invitation="inv_p"/, 'row gone in the same paint as the notice');
+  assert.equal(x.calls.filter(c => c.method === 'DELETE' && c.url === '/v2/invitations/inv_p').length, 1);
+  assert.doesNotMatch(x.root.html, /data-invitation="inv_p"/);
 });
