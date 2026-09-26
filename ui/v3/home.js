@@ -14,7 +14,7 @@ export function assessmentRow(a, stageLabel, projectName = '') {
   // B06: a review still in setup reopens the setup wizard at its next unfinished step (#new/<id>); viewers cannot set up, so they open the review.
   const href = setup && a.role !== 'viewer' ? `#new/${encodeURIComponent(a.id)}` : `#assessment/${encodeURIComponent(a.id)}`;
   const sub = [projectName, a.language_name || ''].filter(Boolean).map(ESC).join(' · ');
-  return `<a class="v3h-card v3h-acard" href="${href}" data-v3h-assessment="${ESC(a.id)}"><div class="v3h-row-head"><h3>${ESC(a.name)}</h3><span class="v3h-pill v3h-pill-${pill(a.stage)}">${stageLabel(a.stage)}</span></div>${sub ? `<p class="v3h-meta" data-v3h-project-line>${sub}</p>` : ''}${countsLine([[a.response_count, 'response']])}<span class="v3h-continue">${setup ? 'Continue setup' : 'Continue assessment'} <span aria-hidden="true">→</span></span></a>`;
+  return `<a class="v3h-card v3h-acard" href="${href}" data-v3h-assessment="${ESC(a.id)}"><div class="v3h-row-head"><h3>${ESC(a.name)}</h3><span class="v3h-pill v3h-pill-${pill(a.stage)}">${stageLabel(a.stage)}</span></div>${sub ? `<p class="v3h-meta" data-v3h-project-line>${sub}</p>` : ''}${countsLine([[a.response_count, 'response']])}<span class="v3h-continue">${setup && a.role !== 'viewer' ? 'Continue setup' : 'Continue assessment'} <span aria-hidden="true">→</span></span></a>`;
 }
 // B28 newest first: the list read's created_at (ISO, server-sent); an assessment without it sorts last, ties keep list order.
 const newestFirst = (x, y) => String(y.a.created_at || '').localeCompare(String(x.a.created_at || ''));
