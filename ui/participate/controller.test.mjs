@@ -153,3 +153,15 @@ test('B41: after the Active until date the link shows one plain closed line, not
   const open = harness({ handle: async url => url.endsWith('/form') ? response({ ...form, period: 'Active until 2999-12-31' }) : null });
   await open.journey.start(); assert.equal(open.journey.state.phase, 'form');
 });
+test('U07: an access-code hand-off (bearer in its scoped slot, no fragment) opens the same v3 survey, resumes on reload, and submits', async () => {
+  const ns = await digestNamespace('code-bearer');
+  const saved = { 'shared:current': ns, [ns + 'bearer']: 'code-bearer' };
+  const h = harness({ hash: '', saved });
+  await h.journey.start(); assert.equal(h.journey.state.phase, 'form');
+  assert.deepEqual(h.requests.map(r => r.url), ['/v2/participate/receipt', '/v2/participate/form']);
+  assert.equal(h.requests[0].options.headers.authorization, 'Bearer code-bearer');
+  h.journey.save({ q: 'kept' });
+  const reload = harness({ hash: '', saved: Object.fromEntries(h.data) });
+  await reload.journey.start(); assert.equal(reload.journey.state.phase, 'form'); assert.deepEqual(reload.journey.state.draft, { q: 'kept' });
+  reload.journey.review({ q: 'kept' }); await reload.journey.submit(); assert.equal(reload.journey.state.phase, 'receipt');
+});

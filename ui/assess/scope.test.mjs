@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { pages, css, classify, landsOnWork, signInLanding, whoLine, PERSPECTIVE_WHO, SIGNUP_NOTE } from './scope.js';
 import { readFileSync } from 'node:fs';
 import * as cards from './cards.js';
+import { currentNamespace, digestNamespace, scopedStorage } from '../shared-link.js';
 
 const err = (code, message = 'nope') => Object.assign(new Error(message), { code, status: Number(code) || 400 });
 function ctxWith(routesMap = {}, over = {}) {
@@ -199,13 +200,17 @@ test('entry: survey guidance treats the code as optional and never implies a res
   assert.ok(!h.includes('released above'));
   assert.ok(!h.includes('send it again'));
 });
-test('entry: survey code stores participant token and hands off to legacy /#participant', async () => {
-  const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, removeItem: k => { delete stored[k]; } };
+test('U07: a valid survey code opens the v3 /participate/ survey with the bearer in its scoped session slot', async () => {
+  const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, getItem: k => stored[k] ?? null, removeItem: k => { delete stored[k]; } };
   const assigned = []; globalThis.window = { location: { assign: u => assigned.push(u) } };
   const ctx = ctxWith({ 'POST /v2/participate/code': { participant_token: 'ptok', survey_id: 's1' } });
   const m = await pages.entry.load(ctx, {}); m.mode = 'survey'; const root = mount(pages.entry, ctx, m);
   const form = root.querySelector('#code-form'); form.elements.code.value = 'ABC'; await form.fire('submit');
-  assert.equal(stored.participantToken, 'ptok'); assert.deepEqual(assigned, ['/legacy/#participant']);
+  const ns = await digestNamespace('ptok');
+  assert.deepEqual(assigned, ['/participate/']);
+  assert.equal(currentNamespace(globalThis.sessionStorage), ns);
+  assert.equal(scopedStorage(globalThis.sessionStorage, ns).get('bearer'), 'ptok');
+  assert.equal(stored.participantToken, undefined); // nothing left for the legacy surface to resume
 });
 
 test('U08: a used or unknown access code says what to do next, not "Not allowed here."', async () => {

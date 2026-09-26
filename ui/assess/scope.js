@@ -8,6 +8,7 @@ import { homeView } from '../v3/home.js';
 import { learnMore } from '../v3/components/learn-more.js';
 import { mountEditableHeading } from '../v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '../v3/components/saved-status.js';
+import { digestNamespace, rememberCurrent, scopedStorage } from '../shared-link.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -175,8 +176,11 @@ const entry = {
       if (!r) return;
       const token = r.participant_token || r.participant;
       if (!token) return ctx.note('The server accepted the code but returned no participant token.', true);
-      storeSession('participantToken', token);
-      window.location.assign('/legacy/#participant'); // participant flow stays on the legacy surface (unchanged)
+      // U07: a code participant takes the same v3 survey as a shared-link participant (intro → review → thank-you).
+      // The bearer goes into the /participate/ page's scoped session slot, so a reload resumes exactly like a link.
+      const ns = await digestNamespace(token);
+      scopedStorage(sessionStorage, ns).set('bearer', token); rememberCurrent(sessionStorage, ns);
+      window.location.assign('/participate/');
     });
     // B38: email sign-in link. Stays on this screen and shows one line; without script the form posts natively to the same route.
     root.querySelector('#email-link-form')?.addEventListener('submit', async ev => {
