@@ -320,3 +320,24 @@ test('B35: "Build the results" on the band block previews, confirms once in plac
   assert.equal(band().querySelector('[data-results-status]').textContent, 'Results built.');
   assert.doesNotMatch(root.textContent, /Server policy words|Open it from the current report list/);
 });
+test('U41: before a report exists "Build the results" is the one primary; "Look at the results" shows once a report is built', async () => {
+  const { V3_REPORT_SEEN, v3StagePrimary } = await import('./v3-assessment.js');
+  assert.match(v3StagePrimary('understand', true, undefined, undefined, { hasReport: false }), /data-v3-primary="understand"[^>]*hidden/);
+  assert.doesNotMatch(v3StagePrimary('understand', true, undefined, undefined, { hasReport: true }), /hidden/);
+  let built = false;
+  const report = { id: 'r', created_at: '2026-09-18', payload: { lenses: [{ lens: 'Community', score: 80, sub_dimensions: [] }] } };
+  const mk = () => ({ enc: encodeURIComponent, esc: s => String(s ?? ''), current: { assessment: { id: 'u41', role: 'owner', stage: 'understand' }, surveys: [{ id: 's1', template_id: 't', template_name: 'C', perspective: 'Community', state: 'selected', archived_at: null }] }, isCurrent: () => true, routes: { assessment: () => '#x', survey: () => '#s' }, go() {}, api: async url => {
+    if (url === '/v2/reports/r') return { assessment_id: 'u41', suppressed: false, report };
+    if (url.endsWith('/reports')) return { assessment_id: 'u41', suppressed: false, reports: built ? [{ id: 'r', created_at: report.created_at }] : [] };
+    if (url.includes('/surveys/s1')) return { survey: { id: 's1' }, counts: { responses: 3, respondents: 3 } };
+    return { status: 'held' };
+  } });
+  const dom = new JSDOM(`<div>${v3StagePrimary('understand', true, undefined, undefined, { hasReport: false })}</div><main></main>`), doc = dom.window.document, root = doc.querySelector('main');
+  let ctx = mk(), m = await views.understand.load(ctx, { aid: 'u41' }); root.innerHTML = views.understand.render(ctx, m); views.understand.bind(ctx, root, m);
+  assert.deepEqual([...root.querySelectorAll('.primary')].map(b => b.textContent), ['Build the results'], 'one primary before a report');
+  assert.equal(root.querySelector('[data-v3-gate-go]').textContent, 'Choose a next step', 'the gate stays, demoted');
+  assert.equal(doc.querySelector('[data-v3-primary]').hidden, true); assert.equal(V3_REPORT_SEEN.has('u41'), false);
+  built = true; ctx = mk(); m = await views.understand.load(ctx, { aid: 'u41' }); root.innerHTML = views.understand.render(ctx, m); views.understand.bind(ctx, root, m);
+  assert.equal(root.querySelector('[data-results-build]'), null); assert.match(root.querySelector('[data-v3-gate-go]').className, /primary/);
+  assert.equal(doc.querySelector('[data-v3-primary]').hidden, false); assert.equal(V3_REPORT_SEEN.has('u41'), true);
+});

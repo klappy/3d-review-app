@@ -10,12 +10,12 @@ export function v3GateAction(stage, role) {
   if (stage === 'understand') return { action: 'saveAndFinish', label: 'Choose a next step', check: false };
   return null;
 }
-export function reviewGate(stage, role, esc = esc0) {
+export function reviewGate(stage, role, esc = esc0, { primary = true } = {}) { // U41: primary:false while "Build the results" is the one primary
   const reviewed = stage === 'improve', g = v3GateAction(stage, role);
   const badge = `<span class="badge${reviewed ? '' : ' warn'}" data-v3-reviewed="${reviewed}">${reviewed ? 'Reviewed' : 'Draft · a person checks this before sharing'}</span>`;
   if (!g) return `<div class="v3-gate" data-v3-gate="none">${badge}</div>`;
   const check = g.check ? `<label class="choice"><input type="checkbox" data-v3-review-check> ${esc(V3_REVIEW_CHECK)}</label>` : '';
-  return `<div class="v3-gate" data-v3-gate="${esc(g.action)}">${badge}${check}<button type="button" class="primary" data-v3-gate-go="${esc(g.action)}"${g.check ? ' disabled' : ''}>${esc(g.label)}</button><p class="status small" role="status" aria-live="polite" data-v3-gate-status></p></div>`;
+  return `<div class="v3-gate" data-v3-gate="${esc(g.action)}">${badge}${check}<button type="button"${primary ? ' class="primary"' : ''} data-v3-gate-go="${esc(g.action)}"${g.check ? ' disabled' : ''}>${esc(g.label)}</button><p class="status small" role="status" aria-live="polite" data-v3-gate-status></p></div>`;
 }
 // U34 (lanes-2011, Bincy B37): the stage move is asked in the page, never window.confirm. One button per move (`data-stage`),
 // and one in-page confirm under the row that holds it. The write stays with the caller (cap.assessment.set_stage).

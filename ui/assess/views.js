@@ -7,7 +7,7 @@
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
 import { learnMore } from '../v3/components/learn-more.js'; // lane 9 L9-24: shared closed-by-default disclosure
-import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, V3_HELD_TEXT, V3_REPORTS_HELD, V3_REPORT_HELD, V3_BAND_CUTOFFS, V3_SUGGEST, v3SuggestedAreas, v3NextParse, v3NextSerialize, askStageMove } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
+import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, V3_HELD_TEXT, V3_REPORTS_HELD, V3_REPORT_HELD, V3_BAND_CUTOFFS, V3_SUGGEST, v3SuggestedAreas, v3NextParse, v3NextSerialize, askStageMove, V3_REPORT_SEEN } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -129,7 +129,8 @@ const understand = {
     const lensGroups = Object.fromEntries(LENSES.map(lens => { const ss = m.surveys.filter(s => lensFor(s) === lens), ld = ss.filter(s => m.counts.get(s.id)?.status === 'loaded');
       return [lens, { surveys: ss.length, loaded: ld.length, responses: ld.reduce((n, s) => n + m.counts.get(s.id).responses, 0) }]; }));
     const ev = v3EvidenceMarkup(v3EvidenceRows(m.results.value, LENSES, lensGroups, m.bandScores), !!m.showEvidence, esc);
-    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores)}${buildResultsCta(m, lensGroups, esc)}<p class="status" role="status" aria-live="polite" data-results-status></p>${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc)}</section>` : '';
+    const cta = buildResultsCta(m, lensGroups, esc); // U41: while offered, "Build the results" is the one primary; the gate steps back
+    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores)}${cta}<p class="status" role="status" aria-live="polite" data-results-status></p>${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc, { primary: !cta })}</section>` : '';
     // (3) Reports: server-owned eligibility and provenance; preview never writes a report.
     let reports;
     if (m.reports.status === 'loaded') {
@@ -154,6 +155,12 @@ const understand = {
       : `${bands}${resultsPanel}${learnMore(`<section class="lens-detail"><p class="eyebrow">Counts per survey</p>${lensBlocks}${countsNote}</section>`)}${reportsPanel}${full}`;
   },
   bind(ctx, root, m) {
+    // U41: once a report exists, the header's "Look at the results" comes back (hidden until then).
+    const rv = m.reports?.status === 'loaded' ? m.reports.value : null;
+    if (m.bandScores || m.resultsBuilt || (rv && Array.isArray(rv.reports) && rv.reports.length)) {
+      V3_REPORT_SEEN.add(m.aid);
+      const doc = root.ownerDocument; if (typeof doc?.querySelectorAll === 'function') doc.querySelectorAll('[data-v3-primary="understand"][hidden]').forEach(a => { a.hidden = false; });
+    }
     const clearReport = () => {
       m.reportReadGeneration = (m.reportReadGeneration || 0) + 1; m.openReport = null;
       root.querySelector('[data-report-view]')?.replaceChildren();

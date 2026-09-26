@@ -27,11 +27,16 @@ const esc0 = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<':
 
 export function v3StageWord(stage) { return V3_STAGES[stage]?.word || 'Setup not finished'; }
 
-/** One primary action for the assessment page, driven by stage. Viewers get no Share/Continue action. */
-export function v3StagePrimary(stage, canEdit, href = v => `#${v}`, esc = esc0) {
+// U41 (lanes-1011, Bincy B37/B30): assessments this page has seen with a built report. Until one is built, Understand's one
+// primary is "Build the results" (in the band block); "Look at the results" is drawn hidden and shown once a report exists.
+export const V3_REPORT_SEEN = new Set();
+/** One primary action for the assessment page, driven by stage. Viewers get no Share/Continue action.
+ *  Understand: "Look at the results" stays hidden until `hasReport` (U41). */
+export function v3StagePrimary(stage, canEdit, href = v => `#${v}`, esc = esc0, { hasReport = true } = {}) {
   const s = V3_STAGES[stage] || V3_STAGES.prepare;
   if (!canEdit && (s.view === 'collect' || s.view === 'prepare')) return '';
-  return `<a class="rv-btn primary" data-v3-primary="${esc(s.view)}" href="${esc(href(s.view))}">${esc(s.primary)}</a>`;
+  const hide = s.view === 'understand' && !hasReport ? ' hidden' : '';
+  return `<a class="rv-btn primary" data-v3-primary="${esc(s.view)}" href="${esc(href(s.view))}"${hide}>${esc(s.primary)}</a>`;
 }
 
 const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Math.max(0, Math.floor(Number(v))));
