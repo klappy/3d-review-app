@@ -780,8 +780,8 @@ let landAfterSignIn = false;
 // Runs on load AND on every hashchange (Auditor S1): fragment-only navigation after load takes the same path as a fresh load.
 function scrubCredentialHash() {
   const h = location.hash || '';
-  if (demo) { if (/^#(?:session|invite|survey)=/.test(h) || route(h).kind === 'entry') history.replaceState(null, '', location.pathname + '?demo=1#assessment/demo-assessment/prepare'); return null; }
-  if (h === '#how' || h === '#example') { location.replace('/?demo=1#assessment/demo-assessment/prepare'); return 'forwarded'; }
+  if (demo) { if (/^#(?:session|invite|survey)=/.test(h) || route(h).kind === 'entry') history.replaceState(null, '', location.pathname + '?demo=1#assessment/demo-assessment/collect'); return null; }
+  if (h === '#how' || h === '#example') { location.replace('/?demo=1#assessment/demo-assessment/collect'); return 'forwarded'; }
   if (h === '#participant') { location.replace('/legacy/#participant'); return 'forwarded'; }
   if (h === '#reports-card') { location.replace('/#projects'); return 'forwarded'; }
   if (/^#survey=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + h); return 'forwarded'; }

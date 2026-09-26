@@ -62,7 +62,7 @@ test('participant resume dispatches to legacy without reading or changing stored
     if(hash==='#participant'){assert.equal(result,'forwarded');assert.deepEqual(replaced,['/legacy/#participant']);assert.equal(historyCalls.length,0);}
     if(hash==='#survey'){assert.equal(result,null);assert.deepEqual(replaced,[]);}
     if(hash==='#survey=fixture')assert.deepEqual(replaced,['/participate/#survey=fixture']);
-    if(hash==='#example')assert.deepEqual(replaced,['/?demo=1#assessment/demo-assessment/prepare']);
+    if(hash==='#example')assert.deepEqual(replaced,['/?demo=1#assessment/demo-assessment/collect']);
   }
 });
 
