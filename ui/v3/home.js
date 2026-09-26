@@ -10,8 +10,9 @@ const pill = stage => stage === 'prepare' ? 'setup' : stage === 'collect' ? 'pro
 // L9-2 (prototype frame 2 `card`): each assessment is ONE whole-card link. B28 (captain 16:20–16:35 ET 2026-09-25): the review
 // name is the title with its state pill, the project name is a small sub-line under it (language kept after it), then the count and Continue.
 export function assessmentRow(a, stageLabel, projectName = '') {
-  const href = `#assessment/${encodeURIComponent(a.id)}`;
   const setup = a.stage === 'prepare';
+  // B06: a review still in setup reopens the setup wizard at its next unfinished step (#new/<id>); viewers cannot set up, so they open the review.
+  const href = setup && a.role !== 'viewer' ? `#new/${encodeURIComponent(a.id)}` : `#assessment/${encodeURIComponent(a.id)}`;
   const sub = [projectName, a.language_name || ''].filter(Boolean).map(ESC).join(' · ');
   return `<a class="v3h-card v3h-acard" href="${href}" data-v3h-assessment="${ESC(a.id)}"><div class="v3h-row-head"><h3>${ESC(a.name)}</h3><span class="v3h-pill v3h-pill-${pill(a.stage)}">${stageLabel(a.stage)}</span></div>${sub ? `<p class="v3h-meta" data-v3h-project-line>${sub}</p>` : ''}${countsLine([[a.response_count, 'response']])}<span class="v3h-continue">${setup ? 'Continue setup' : 'Continue assessment'} <span aria-hidden="true">→</span></span></a>`;
 }
