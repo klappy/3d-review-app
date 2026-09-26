@@ -7,7 +7,7 @@ const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(
 /** `opts.expectedOptional` / `opts.showUnconfirmed` default on (RULING a/b). */
 export function responseCount({ responses, expected, unconfirmed } = {}, esc = esc0, { expectedOptional = true, showUnconfirmed = true } = {}) {
   const got = num(responses) ?? 0, of = expectedOptional ? num(expected) : null, unc = num(unconfirmed);
-  const settled = of ? `${got} of ${of} responded` : `${got} responded`;
+  const settled = !of ? `${got} responded` : got < of ? `${got} of ${of} responded` : `${got} responded · ${of} expected`; // U39: never "6 of 3"
   const pending = !showUnconfirmed || unc === null ? ''
     : `<span class="${unc ? 'badge' : 'muted'}" data-v3-unconfirmed="${unc}">${unc} not yet confirmed</span>`;
   return `<span class="v3-count" data-v3-settled="${got}">${esc(settled)}</span>${pending ? ` <span aria-hidden="true">·</span> ${pending}` : ''}`;
