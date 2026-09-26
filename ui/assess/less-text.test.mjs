@@ -220,3 +220,38 @@ test('B41 Collect: shows "Active until <date>" from the assessment period; older
   assert.match(at('Starts 2026-09-25 · Active until 2026-10-31'), /<p class="small muted" data-active-until>Active until 31 October 2026<\/p>/);
   assert.doesNotMatch(at('October 2026'), /data-active-until/);
 });
+
+// Bincy B30 (lanes-2111, persona on DEV 0.21.5): the PROJECT page showed 3 lines under its heading and the assessment stage
+// headers 2. Shared fix: kitHead keeps one optional short line (the organisation); the role sentence and the kept-tool
+// explanations sit behind the shared Learn more; the assessment head's role line joins its one Learn more.
+test('B30 project page (owner + viewer, kit and non-kit hosts): one heading, at most one short line, one primary; the rest behind Learn more', async () => {
+  const cardsNs = await import('./cards.js');
+  for (const role of ['owner', 'viewer']) for (const shellOwnsTitle of [false, true]) {
+    const map = { 'GET /v2/projects/p1': { project: { id: 'p1', name: 'Coast', role, organization: 'Lake Org' }, languages: [] }, 'GET /v2/projects/p1/assessments': { assessments: [{ id: 'a1', name: 'Oct', stage: 'collect' }] }, 'GET /v2/projects/p1/languages': { languages: [{ id: 'l1', name: 'Lake' }] } };
+    const ctx = { api: async url => { if (map['GET ' + url]) return map['GET ' + url]; throw Object.assign(new Error('x'), { code: '404' }); }, esc, enc, routes, cards: cardsNs, state: {}, shellOwnsTitle };
+    const h = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' })), name = `project ${role}${shellOwnsTitle ? ' (kit)' : ''}`;
+    const v = upFront(h).replace(/<article[\s\S]*?<\/article>/g, ''); // assessment cards are the list itself, not lines under the heading
+    assert.equal(count(v, /<h[12]\b/g), shellOwnsTitle ? 0 : 1, name + ': one heading (the shell owns it under the kit)');
+    assert.equal(count(v, /<h[3-6]\b/g), 0, name + ': section labels are not headings');
+    const lines = count(v, /<p class="(?:small )?muted(?: small)?"/g); assert.ok(lines <= 1, `${name}: at most one line up front (got ${lines})`);
+    assert.match(v, />Lake Org<\/p>/, name + ': the organisation is the one line');
+    assert.ok(count(v, /class="(?:[^"]* )?primary(?: [^"]*)?"/g) <= 1, name + ': at most one primary');
+    if (role === 'owner') assert.equal(count(v, /class="(?:[^"]* )?primary(?: [^"]*)?"/g), 1, name + ': Start is the one primary');
+    const more = [...h.matchAll(closed)].map(x => x[0]).join('');
+    assert.ok(h.includes(LM) && more.includes(`Your role: ${role}`), name + ': role sentence moved, not removed');
+    if (role === 'owner') for (const moved of ['Issue paper codes for one survey', 'Group projects in a workspace']) assert.ok(more.includes(moved) && !v.includes(moved), `${name}: moved, not removed: ${moved}`);
+    assert.match(v, /class="badge">\s*/, name + ': role badge stays visible');
+  }
+});
+test('B30 assessment stage headers (Prepare / Collect / Understand / Improve, owner + viewer): no line in the head; role line behind Learn more', async () => {
+  const page = await assessPage();
+  for (const role of ['owner', 'viewer']) for (const view of ['prepare', 'collect', 'understand', 'improve']) {
+    const h = page(role, 'collect', view), name = `head ${role}/${view}`;
+    const head = h.slice(0, h.indexOf('aria-label="Assessment stages"')); assert.ok(head.length > 20, name + ': head rendered');
+    assert.equal(count(upFront(head), /<h[12]\b/g), 1, name + ': one heading');
+    assert.equal(count(upFront(head), /<p class="(?:small )?muted/g), 0, name + ': no line under the heading in the head');
+    assert.ok(count(upFront(head), /class="(?:[^"]* )?primary(?: [^"]*)?"/g) <= 1, name + ': at most one primary in the head');
+    const more = [...head.matchAll(closed)].map(x => x[0]).join('');
+    assert.ok(head.includes(LM) && more.includes(`Coast · your role: ${role}`), name + ': role line moved, not removed');
+  }
+});
