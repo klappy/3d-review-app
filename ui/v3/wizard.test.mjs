@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot, renderDone } from './wizard.js';
+import { ORGANIZATIONS, orgChoices, ORG_OTHER, countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot, renderDone } from './wizard.js';
 
 const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
 const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', until: '2026-10-31', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
@@ -214,7 +214,8 @@ test('lane 12 L12-1: lead organisation rides cap.project.create only when given 
   assert.deepEqual(body({ newOrg: '  ' }), { name: 'Hill' });
   assert.deepEqual(body({ newOrg: undefined }), { name: 'Hill' });
   const html = renderStep('details', draft({ project: NEW_PROJECT, newOrg: 'A & B' }), { projects: [], languages: [], templates: [] }, [], false, '');
-  assert.match(html, /Lead organisation<input name="newOrg" value="A &amp; B"/);
+  assert.match(html, /<option value="__other__" selected>Other \(type it\)<\/option>/);
+  assert.match(html, /Organisation name<input name="newOrg" value="A &amp; B"/);
   assert.doesNotMatch(renderStep('details', draft(), { projects: [], languages: [], templates: [] }, [], false, ''), /newOrg/);
   assert.match(renderStep('review', draft({ project: NEW_PROJECT, newProject: 'H', newOrg: 'Org' }), { projects: [], languages: [], templates: [] }, [], false, ''), /<dt>Lead organisation<\/dt><dd>Org<\/dd>/);
 });
@@ -340,4 +341,24 @@ test('B41: setup asks Active until (required) and Starts (optional, default toda
   assert.equal(body({ starts: '2026-09-25' }).period, 'Starts 2026-09-25 · Active until 2026-10-31');
   assert.equal(body({ starts: '' }).period, 'Active until 2026-10-31');
   assert.match(renderStep('review', draft({ starts: '2026-09-25' }), { projects: [], languages: [], templates: [] }), /<dt>Starts<\/dt><dd>25 September 2026<\/dd><dt>Active until<\/dt><dd>31 October 2026<\/dd>/);
+});
+
+test('B40: lead organisation is a seeded select plus "Other (type it)"; the stored field is unchanged', () => {
+  const data = { projects: [{ id: 'p1', name: 'P', organization: 'Hill Bible Society' }, { id: 'p2', name: 'Q', organization: 'sil' }], languages: [], templates: [] };
+  const names = orgChoices(data.projects);
+  assert.ok(names.includes('Hill Bible Society'));
+  assert.equal(names.filter(n => n.toLowerCase() === 'sil').length, 1);
+  assert.equal(new Set(ORGANIZATIONS.map(n => n.toLowerCase())).size, ORGANIZATIONS.length);
+  const blank = renderStep('details', draft({ project: NEW_PROJECT }), data, [], false, '');
+  assert.match(blank, /<select name="newOrgPick"><option value="" selected>Choose… \(optional\)<\/option>/);
+  assert.match(blank, /<option value="Hill Bible Society">/);
+  assert.doesNotMatch(blank, /name="newOrg"/);
+  const picked = renderStep('details', draft({ project: NEW_PROJECT, newOrg: 'SIL' }), data, [], false, '');
+  assert.match(picked, /<option value="SIL" selected>SIL<\/option>/);
+  assert.doesNotMatch(picked, /name="newOrg"/);
+  const other = renderStep('details', draft({ project: NEW_PROJECT, newOrgOther: true, newOrg: '' }), data, [], false, '');
+  assert.match(other, new RegExp(`value="${ORG_OTHER}" selected`));
+  assert.match(other, /Organisation name<input name="newOrg" value=""/);
+  const body = launchPlan(draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'L', newOrg: 'SIL' }))[0].body({});
+  assert.deepEqual(body, { name: 'H', organization: 'SIL' });
 });
