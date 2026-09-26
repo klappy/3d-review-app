@@ -623,33 +623,42 @@ async function loadAccountEmail() {
     who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Signed in';
   } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Signed in'; }
 }
+// B44 (captain report 20:39): ONE sign-out for Sign out, Use another account and every caller (ctx.signOut). It never sends the
+// person to the Access team-domain page: that logout shows only "Failed to log out." when there is no Access session
+// (already signed out, or signed in by an email link), and the app-domain one shows "No Access cookie found" — so the Access
+// logout is a background same-origin request on THIS app's domain (Cloudflare: it revokes the Access session across apps and clears
+// the app cookie), never a page. DELETE /v2/auth/session revokes the app session and expires the HttpOnly `session` cookie server
+// side (B38 email-link sessions included). Then the app's own sign-in screen, email field empty. Already signed out → straight there.
+const SIGN_OUT_ACCESS = '/cdn-cgi/access/logout';
+function landOnSignIn() {
+  who.textContent = 'Not signed in';
+  try { history.replaceState(null, '', location.pathname + '#signin'); } catch {}
+  listen(); return render();
+}
 async function signOut(switchAccount = false) {
-  if (demo || accountBusy || !state.principal) return;
+  if (demo || accountBusy) return;
+  if (!state.principal && !token) return landOnSignIn();
   const identity = identityGeneration, credential = token;
   const current = () => identity === identityGeneration && credential === token;
   accountBusy = true; accountControls(true, true); accountStatus('Signing out…');
   try {
-    const result = await api('/v2/auth/session', { method: 'DELETE' });
+    let result;
+    try { result = await api('/v2/auth/session', { method: 'DELETE' }); }
+    catch (e) { if (e?.code !== 'NOT_AUTHENTICATED') throw e; result = { signed_out: true }; } // session already gone: the person is signed out
     if (!current()) return;
     if (result?.signed_out !== true) throw new Error('Logout not confirmed');
     token = null; try { sessionStorage.removeItem('facilitatorToken'); } catch {}
     resetIdentity();
     who.textContent = 'Not signed in';
-    if (switchAccount) {
-      const signedOutIdentity = identityGeneration, signedOutCredential = token;
-      // The provider request may already have taken effect; only its continuation can be suppressed.
-      try { await fetch('/cdn-cgi/access/logout', { credentials: 'same-origin', redirect: 'manual', cache: 'no-store' }); } catch {}
-      if (signedOutIdentity !== identityGeneration || signedOutCredential !== token) return;
-      // B38: with email links on, another account = request a link for another email (the Access cookie is cleared above).
-      // Off (production): the Access team-domain logout, unchanged — otherwise the live Access session signs A back in.
-      location.assign(state.emailLinks === true ? '/v2/auth/email' : 'https://klappy.cloudflareaccess.com/cdn-cgi/access/logout'); return;
-    }
-    history.replaceState(null, '', location.pathname + '#');
-    listen(); await render();
+    const signedOutIdentity = identityGeneration, signedOutCredential = token;
+    // The provider request may already have taken effect; only its continuation can be suppressed.
+    try { await fetch(SIGN_OUT_ACCESS, { credentials: 'same-origin', redirect: 'manual', cache: 'no-store' }); } catch {}
+    if (signedOutIdentity !== identityGeneration || signedOutCredential !== token) return;
+    await landOnSignIn();
   } catch {
     if (current()) accountStatus('Sign-out could not be confirmed. Your session may still be active.');
   } finally {
-    if (current()) { accountBusy = false; accountControls(true); }
+    if (current()) { accountBusy = false; accountControls(!!state.principal); }
   }
 }
 function bindAccountControls() {

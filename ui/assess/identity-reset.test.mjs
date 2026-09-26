@@ -15,7 +15,7 @@ function harness() {
   const navigations = [], removed = [], fetches = [];
   // K3a: the real adapter is supplied; with no #rv node the kit root is absent and the controller falls back to #app unchanged.
   const box = { ...v3, cards, mountKitRoot, shellModel, history: {replaceState() {}}, sessionStorage: {getItem() {return null;},removeItem:k=>removed.push(k)}, isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/', assign: path=>navigations.push(path) }, redactDiagnosticPath: x => x, AbortSignal, fetch: (url, options) => { fetches.push({ url, options }); return Promise.resolve({ ok: true }); } };
-  const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn,loadAccountEmail,signOut,setFetch:fn=>fetch=fn,setCredential:t=>token=t,getCredential:()=>token,setListen:fn=>listen=fn,clearPageNote,loadEmailLinks})', box);
+  const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn,loadAccountEmail,signOut,setFetch:fn=>fetch=fn,setCredential:t=>token=t,getCredential:()=>token,setListen:fn=>listen=fn,setHistory:o=>{history.replaceState=o.replaceState},clearPageNote,loadEmailLinks})', box);
   return { ...api, nodes, disclosure, navigations, removed, fetches };
 }
 const deferred = () => { let resolve, reject; const promise = new Promise((r,j) => {resolve=r;reject=j;}); return { promise, resolve, reject }; };
@@ -97,22 +97,45 @@ test('unconfirmed logout stays truthful and busy prevents duplicate dispatch',as
   const pending=h.signOut(true);await h.signOut(true);assert.equal(calls,1);wait.resolve({signed_out:false});await pending;
   assert.equal(h.getCredential(),'one-token');assert.equal(h.state.principal.id,'one');assert.match(h.nodes.get('account-status').textContent,/could not be confirmed/);assert.deepEqual(h.navigations,[]);
 });
-test('confirmed switch clears current app identity then navigates to documented provider logout (email links off: production)',async()=>{
-  const h=harness();h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));await h.signOut(true);
-  assert.equal(h.getCredential(),null);assert.equal(h.state.principal,null);assert.deepEqual(h.removed,['facilitatorToken']);
-  assert.equal(h.fetches.length,1);assert.equal(h.fetches[0].url,'/cdn-cgi/access/logout');assert.equal(h.fetches[0].options.credentials,'same-origin');assert.equal(h.fetches[0].options.redirect,'manual');assert.equal(h.fetches[0].options.cache,'no-store');
-  assert.deepEqual(h.navigations,['https://klappy.cloudflareaccess.com/cdn-cgi/access/logout']);
+// B44: one sign-out. Both buttons, both environments: app session DELETE, background app-domain Access logout, then #signin.
+for (const emailLinks of [false, true]) for (const switchAccount of [false, true]) test(`B44: confirmed ${switchAccount ? 'switch' : 'sign-out'} (email links ${emailLinks ? 'on' : 'off'}) ends both sessions and lands on the app sign-in screen`, async () => {
+  const h = harness(); const replaced = []; let rendered = 0;
+  h.setHistory({ replaceState: (_s, _t, url) => replaced.push(url) }); h.setRender(() => { rendered++; }); h.setListen(() => {});
+  h.state.emailLinks = emailLinks; h.state.principal = { id: 'one' }; h.setCredential('one-token');
+  const calls = []; h.setApi(async (url, o) => { calls.push([url, o?.method]); return { signed_out: true }; });
+  await h.signOut(switchAccount);
+  assert.deepEqual(calls, [['/v2/auth/session', 'DELETE']]);
+  assert.equal(h.getCredential(), null); assert.equal(h.state.principal, null); assert.deepEqual(h.removed, ['facilitatorToken']);
+  assert.equal(h.fetches.length, 1); assert.equal(h.fetches[0].url, '/cdn-cgi/access/logout');
+  assert.equal(h.fetches[0].options.credentials, 'same-origin'); assert.equal(h.fetches[0].options.redirect, 'manual'); assert.equal(h.fetches[0].options.cache, 'no-store');
+  assert.deepEqual(h.navigations, [], 'never a page navigation to any logout URL');
+  assert.deepEqual(replaced, ['/#signin']); assert.equal(rendered, 1); assert.equal(h.nodes.get('who').textContent, 'Not signed in');
+  h.resetIdentity(); assert.equal(h.state.emailLinks, emailLinks, 'an environment fact, not identity: survives sign-out');
 });
-test('B38: confirmed switch with email links on clears identity and the Access cookie, then opens the email sign-in page',async()=>{
-  const h=harness();h.state.emailLinks=true;h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));await h.signOut(true);
-  assert.equal(h.getCredential(),null);assert.equal(h.state.principal,null);
-  assert.equal(h.fetches.length,1);assert.equal(h.fetches[0].url,'/cdn-cgi/access/logout');
-  assert.deepEqual(h.navigations,['/v2/auth/email']);
-  h.resetIdentity();assert.equal(h.state.emailLinks,true,'an environment fact, not identity: survives sign-out');
+test('B44: already signed out skips both logout calls and goes straight to sign-in', async () => {
+  const h = harness(); const replaced = []; let rendered = 0; let apiCalls = 0;
+  h.setHistory({ replaceState: (_s, _t, url) => replaced.push(url) }); h.setRender(() => { rendered++; }); h.setListen(() => {}); h.setApi(async () => { apiCalls++; });
+  h.state.principal = null; h.setCredential(null);
+  await h.signOut(true);
+  assert.equal(apiCalls, 0); assert.equal(h.fetches.length, 0); assert.deepEqual(h.navigations, []); assert.deepEqual(replaced, ['/#signin']); assert.equal(rendered, 1);
 });
-test('confirmed ordinary logout does not navigate to provider',async()=>{
-  const h=harness();h.state.principal={id:'one'};h.setCredential('one-token');h.setApi(async()=>({signed_out:true}));h.setRender(()=>{});h.setListen(()=>{});await h.signOut();
-  assert.equal(h.getCredential(),null);assert.equal(h.state.principal,null);assert.equal(h.nodes.get('who').textContent,'Not signed in');assert.deepEqual(h.navigations,[]);
+test('B44: a session the server already ended counts as signed out (no error line, lands on sign-in)', async () => {
+  const h = harness(); const replaced = [];
+  h.setHistory({ replaceState: (_s, _t, url) => replaced.push(url) }); h.setRender(() => {}); h.setListen(() => {});
+  h.state.principal = { id: 'one' }; h.setCredential('one-token');
+  h.setApi(async () => { throw Object.assign(new Error('session already revoked'), { code: 'NOT_AUTHENTICATED' }); });
+  await h.signOut();
+  assert.equal(h.getCredential(), null); assert.equal(h.fetches.length, 1); assert.deepEqual(replaced, ['/#signin']); assert.equal(h.nodes.get('account-status').textContent, '');
+});
+test('B44: no sign-out path in ui/ names the Access team domain or navigates to a logout page', async () => {
+  const { readdirSync, statSync } = await import('node:fs'); const root = new URL('../', import.meta.url);
+  const walk = dir => readdirSync(dir).flatMap(n => { const u = new URL(n, dir); return statSync(u).isDirectory() ? (n === 'node_modules' ? [] : walk(new URL(n + '/', dir))) : [u]; });
+  for (const u of walk(root)) {
+    if (!/\.(js|mjs|html)$/.test(u.pathname) || /\.test\.mjs$/.test(u.pathname)) continue;
+    const src = readFileSync(u, 'utf8');
+    assert.ok(!src.includes('cloudflareaccess.com'), `${u.pathname} names the Access team domain`);
+    assert.ok(!/location\.(assign|replace|href)\s*[(=][^;\n]*access\/logout/.test(src), `${u.pathname} navigates to a logout page`);
+  }
 });
 test('account email read forbids redirect, does not repaint work and ignores stale response',async()=>{
   const h=harness(),wait=deferred();let options;h.setFetch((_url,o)=>{options=o;return wait.promise;});h.setCredential('old-token');h.nodes.get('app').innerHTML='unsaved work';
