@@ -1,5 +1,6 @@
 // Source-shaped presentation only: no API, storage, credential or submission ownership.
 import { periodText } from './v3/components/active-until.js';
+import { PRIVACY_LINE } from './v3/components/privacy-line.js';
 export function itemError(item, values) {
   const value = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id);
   const empty = value === null || value === '' || (Array.isArray(value) && !value.length);
@@ -8,7 +9,22 @@ export function itemError(item, values) {
   return null;
 }
 
-export function mountParticipantView({doc,root,form,questions,review,reviewAnswers,receipt,context,model,onEdit,reviewButton}) {
+// B09: the optional "About you" block from cap.response.form context_fields (age range, gender; each has "Prefer not to say").
+// Nothing here is required; an untouched select sends nothing.
+export function drawAbout(doc, fields = []) {
+  if (!fields.length) return null;
+  const box = doc.createElement('fieldset'); box.className = 'participant-about'; box.dataset.about = '';
+  const legend = doc.createElement('legend'); legend.textContent = 'About you (optional)'; box.append(legend);
+  for (const f of fields) {
+    const label = doc.createElement('label'), select = doc.createElement('select'); label.textContent = f.label; select.name = `about-${f.key}`; select.dataset.key = f.key;
+    const blank = doc.createElement('option'); blank.value = ''; blank.textContent = 'Choose (optional)'; select.append(blank);
+    for (const o of f.options || []) { const opt = doc.createElement('option'); opt.value = o.code; opt.textContent = o.label; select.append(opt); }
+    label.append(select); box.append(label);
+  }
+  return box;
+}
+export const aboutValues = box => { const out = {}; for (const s of box ? box.querySelectorAll('select[data-key]') : []) if (s.value) out[s.dataset.key] = s.value; return out; };
+export function mountParticipantView({doc,root,form,questions,review,reviewAnswers,receipt,context,model,onEdit,reviewButton,about}) {
   const fields = [...questions.children];
   const items = model?.items;
   if (!Array.isArray(items) || !items.length || fields.length !== items.length || fields.some((f,i)=>f.dataset.item !== items[i].id)) throw new Error('Participant item/fieldset mismatch');
@@ -28,13 +44,15 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   if(eyebrowText){const eb=el('p',eyebrowText);eb.className='eyebrow';intro.append(eb);}
   intro.append(el('h2','We would like your perspective'));
   // Invitation + privacy sentence stays visible as the one short line (Bincy B27 privacy wording is captain-held, ASK 9/15).
-  const lead=el('p',`${model.language?`You were invited to say how the ${model.language} translation is going. `:''}Your answers are grouped with others and never shown on their own.`);lead.className='participant-lead';intro.append(lead);
+  const lead=el('p',`${model.language?`You were invited to say how the ${model.language} translation is going. `:''}${PRIVACY_LINE}`);lead.className='participant-lead';intro.append(lead);
   // Bincy B30 (LANES 18:35 ruling): one heading, one short line, one primary action; explanations behind "Learn more".
   // Bincy B10: the shared context setup step 3 lists ("Shown to every participant"), once, as a compact meta row.
   const shared=[model.project,model.language,model.purpose,model.format,periodText(model.period)].map(v=>typeof v==='string'?v.trim():'').filter(Boolean).join(' · ');
   if(shared){const ctx=el('p',shared);ctx.className='participant-meta participant-context';intro.append(ctx);}
   // v3 L1-5 (NEED 5→1): the instrument's source ref is provenance for facilitators, not participant copy; the raw
   // unbroken path widened the intro to 697px on a 375px phone (TRAINING.md #10). Kept on the model, never painted here.
+  // B09: optional "About you" (age range, gender) sits before Q1, outside the pinned instrument; Start skips it untouched.
+  if(about)intro.append(about);
   const start=button('Start',()=>showForm(0));start.className='rv-btn primary participant-start';intro.append(start);
   // Time and no-sign-in lines keep their wording, moved behind a native disclosure; nothing dropped.
   const more=el('details');more.className='participant-more';more.append(el('summary','Learn more'));

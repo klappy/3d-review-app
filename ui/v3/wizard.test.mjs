@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ORGANIZATIONS, orgChoices, ORG_OTHER, countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot, renderDone } from './wizard.js';
 
 const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
-const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', until: '2026-10-31', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
+const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', until: '2099-10-31', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
 
 test('ruling (a): denominator only when entered', () => {
   assert.equal(countLabel(4, 10), '4 of 10');
@@ -39,7 +39,7 @@ test('launch performs writes in order, never sends expected count to the API, st
   const store = mem();
   const ctx = await launch(draft({ purpose: 'Gen 1-3', starts: '2026-09-25' }), { api, store });
   assert.equal(calls[0].url, '/v2/projects/p1/assessments');
-  assert.deepEqual(calls[0].body, { name: 'Oct', language_id: 'l1', purpose: 'Gen 1-3', period: 'Starts 2026-09-25 · Active until 2026-10-31', format: 'Written' });
+  assert.deepEqual(calls[0].body, { name: 'Oct', language_id: 'l1', purpose: 'Gen 1-3', period: 'Starts 2026-09-25 · Active until 2099-10-31', format: 'Written' });
   assert.deepEqual(calls[1].body, { template_id: 'tpl.team', version: 3 });
   assert.deepEqual(calls[3], { url: '/v2/assessments/a1/stage', method: 'POST', body: { stage: 'collect' } });
   assert.equal(calls.filter(c => c.url.endsWith('/links')).length, 4);
@@ -294,7 +294,7 @@ test('L9-23 less text (captain 17:05): every setup screen = one heading, at most
   assert.match(screens.details, /Learn more<\/summary><p class="muted">Only what the review needs\./);
   assert.match(screens.participants, /Learn more<\/summary>.*Three perspectives, kept separate\..*The number is optional\./s);
   assert.ok(screens.participants.indexOf('The number is optional') < screens.participants.indexOf('</details>'), 'optional-number note lives behind Learn more');
-  assert.match(screens.information, /Answers are grouped, never shown alone\./); assert.equal((screens.information.match(/never shown alone/g) || []).length, 1, 'privacy line once, not per group');
+  assert.match(screens.information, /Your responses are confidential\./); assert.equal((screens.information.match(/responses are confidential/g) || []).length, 1, 'privacy line once, not per group');
   assert.match(screens.done, /Learn more<\/summary><p class="muted">Nothing was sent to anyone\./);
 });
 
@@ -323,7 +323,7 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
   const tpls = [{ id: 'tpl.team', version: 1, name: 'Team', perspective: 'Translation team' }, { id: 'tpl.comm', version: 1, name: 'Listening', perspective: 'Community' }];
   const h = renderDone({ aid: 'a1', links: [{ survey: 's1', template: 'tpl.team', entry_fragment: '#survey=AAA' }, { survey: 's2', template: 'tpl.comm', entry_fragment: '#survey=BBB' }] }, 'https://x', tpls);
   assert.match(h, /Translation team <span aria-hidden="true">·<\/span> Team/); assert.match(h, /Community <span aria-hidden="true">·<\/span> Listening/);
-  assert.equal((h.match(/data-group-copy="s[12]"/g) || []).length, 2); assert.equal((h.match(/data-group-qr="s[12]"/g) || []).length, 2);
+  assert.equal((h.match(/data-group-copy="s[12]"/g) || []).length, 2); assert.equal((h.match(/data-group-qr="s[12]"/g) || []).length, 0); assert.equal((h.match(/data-group-qr-figure>/g) || []).length, 2); // U45: QR inline, no toggle
   assert.match(h, /#survey=AAA/); assert.match(h, /#survey=BBB/);
   assert.equal((h.match(/class="primary"/g) || []).length, 1);
   // B43: each row is the share card (Copy link · QR code · Print) and one secondary "Print all" follows the rows
@@ -334,16 +334,16 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
 test('B41: setup asks Active until (required) and Starts (optional, default today) on the existing period field', () => {
   const html = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
   assert.match(html, /Starts \(optional\)<input type="date" name="starts"/);
-  assert.match(html, /Active until<input type="date" name="until" value="2026-10-31" required>/);
+  assert.match(html, /Active until<input type="date" name="until" value="2099-10-31" required>/);
   assert.doesNotMatch(html, />When</);
   assert.match(freshDraft().starts, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(freshDraft().until, '');
   assert.deepEqual(validateStep('details', draft({ until: '' })), ['Choose the date the survey is active until.']);
   assert.deepEqual(validateStep('details', draft({ starts: '' })), []);
   const body = d => launchPlan(draft(d)).find(s => s.cap === 'cap.assessment.create').body({});
-  assert.equal(body({ starts: '2026-09-25' }).period, 'Starts 2026-09-25 · Active until 2026-10-31');
-  assert.equal(body({ starts: '' }).period, 'Active until 2026-10-31');
-  assert.match(renderStep('review', draft({ starts: '2026-09-25' }), { projects: [], languages: [], templates: [] }), /<dt>Starts<\/dt><dd>25 September 2026<\/dd><dt>Active until<\/dt><dd>31 October 2026<\/dd>/);
+  assert.equal(body({ starts: '2026-09-25' }).period, 'Starts 2026-09-25 · Active until 2099-10-31');
+  assert.equal(body({ starts: '' }).period, 'Active until 2099-10-31');
+  assert.match(renderStep('review', draft({ starts: '2026-09-25' }), { projects: [], languages: [], templates: [] }), /<dt>Starts<\/dt><dd>25 September 2026<\/dd><dt>Active until<\/dt><dd>31 October 2099<\/dd>/);
 });
 
 test('B40: lead organisation is a seeded select plus "Other (type it)"; the stored field is unchanged', () => {
@@ -364,4 +364,232 @@ test('B40: lead organisation is a seeded select plus "Other (type it)"; the stor
   assert.match(other, /Organisation name<input name="newOrg" value=""/);
   const body = launchPlan(draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'L', newOrg: 'SIL' }))[0].body({});
   assert.deepEqual(body, { name: 'H', organization: 'SIL' });
+});
+
+// ---------- B06: draft saving / Continue setup / what Cancel keeps (captain ruling 16:20–16:35 ET, ASK 7 option 1) ----------
+import { JSDOM } from 'jsdom';
+import { mountWizard, savePlan, detailsPatch, detailsOf, draftFromSaved, launchResume, KEEP_LABEL, DISCARD_LABEL } from './wizard.js';
+const tick = () => new Promise(r => setTimeout(r, 0));
+const settle = async (n = 8) => { for (let i = 0; i < n; i++) await tick(); };
+const TEMPLATES = [{ id: 'tpl.team', version: 3, perspective: 'Translation team', name: 'Team' }, { id: 'tpl.community', version: 2, perspective: 'Community', name: 'Community' }];
+// A fake server: records every call; the assessment row lives here between mounts (the tab is closed and reopened).
+function server() {
+  const db = { a: null, surveys: [], deleted: false, n: 0 }, calls = [];
+  const api = async (url, { method = 'GET', body } = {}) => {
+    calls.push({ url, method, body });
+    if (url === '/v2/projects' && method === 'GET') return { projects: [{ id: 'p1', name: 'Lake', role: 'owner' }] };
+    if (url === '/v2/projects' && method === 'POST') return { project: { id: 'pN', name: body.name } };
+    if (url === '/v2/templates') return { templates: TEMPLATES };
+    if (url === '/v2/projects/p1/languages' || url === '/v2/projects/pN/languages') return method === 'POST' ? { language: { id: 'lN' } } : { languages: url.includes('pN') ? [{ id: 'lN', name: 'Hill' }] : [{ id: 'l1', name: 'Hindi' }] };
+    if (/\/v2\/projects\/p[1N]\/assessments$/.test(url) && method === 'POST') { db.a = { id: 'a1', project_id: url.split('/')[3], stage: 'prepare', role: 'owner', archived_at: null, ...body }; return { assessment: db.a }; }
+    if (url === '/v2/assessments/a1' && method === 'GET') return { assessment: db.a, surveys: db.surveys };
+    if (url === '/v2/assessments/a1' && method === 'PATCH') { Object.assign(db.a, body); return { assessment: db.a }; }
+    if (url === '/v2/assessments/a1' && method === 'DELETE') { if (body.mode === 'dry_run') return { impact: { affected: [{ assessment: 'a1', surveys: db.surveys.length, responses: 0 }] }, confirm_token: 'tok', expires_in: 300 }; db.deleted = true; db.a = null; return { deleted: true }; }
+    if (url === '/v2/assessments/a1/surveys') { const s = { id: 's' + (++db.n), template_id: body.template_id, template_version: body.version, state: 'selected' }; db.surveys.push(s); return { survey: s }; }
+    if (url === '/v2/assessments/a1/stage') { db.a.stage = body.stage; return { assessment: db.a }; }
+    if (url.endsWith('/links')) return body.mode === 'dry_run' ? { confirm_token: 'ct' } : { entry_fragment: '#survey=x', expires_at: null };
+    throw new Error('unexpected ' + method + ' ' + url);
+  };
+  return { db, calls, api, writes: () => calls.filter(c => c.method !== 'GET') };
+}
+function mount(srv, extra = {}) {
+  const dom = new JSDOM('<main></main>'); const w = dom.window;
+  globalThis.FormData = w.FormData; globalThis.AbortController = w.AbortController; // the wizard binds with a jsdom-owned signal
+  let confirms = 0; w.confirm = () => { confirms++; return true; }; globalThis.confirm = w.confirm;
+  const root = w.document.querySelector('main'), went = [];
+  const h = mountWizard(root, { api: srv.api, go: hash => went.push(hash), origin: 'https://x.test', store: mem(), ...extra });
+  const $ = sel => root.querySelector(sel);
+  const click = sel => $(sel).dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  const submit = () => $('form[data-wz-form]').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  const set = (name, v) => { const el = $(`[name="${name}"]`); el.value = v; return el; };
+  return { w, root, h, went, $, click, submit, set, confirms: () => confirms };
+}
+async function fillStep1(m, { project = 'p1' } = {}) {
+  await settle();
+  m.set('name', 'October review');
+  const sel = m.set('project', project); sel.dispatchEvent(new m.w.Event('change', { bubbles: true })); await settle();
+  if (project === NEW_PROJECT) { m.set('newProject', 'Hill project'); m.set('newLanguage', 'Hill'); } else m.set('language', 'l1');
+  m.set('until', '2099-10-31'); m.set('purpose', 'Genesis 1 to 3');
+}
+
+test('B06: savePlan is exactly the first writes of Launch (no new capability)', () => {
+  assert.deepEqual(savePlan(draft()).map(s => s.cap), ['cap.assessment.create']);
+  assert.deepEqual(savePlan(draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'L' })).map(s => s.cap), ['cap.project.create', 'cap.language.create', 'cap.assessment.create']);
+  const snap = detailsOf(draft({ purpose: 'Gen' }));
+  assert.equal(detailsPatch(snap, draft({ purpose: 'Gen' })), null, 'nothing changed → no write');
+  assert.deepEqual(detailsPatch(snap, draft({ purpose: '', name: 'Nov' })), { name: 'Nov', purpose: null });
+});
+
+test('B06: Continue on step 1 saves the review in Prepare (cap.assessment.create only) and moves to step 2', async () => {
+  const srv = server(), m = mount(srv);
+  await fillStep1(m); m.submit(); await settle();
+  assert.deepEqual(srv.writes().map(c => `${c.method} ${c.url}`), ['POST /v2/projects/p1/assessments']);
+  assert.deepEqual(srv.writes()[0].body, { name: 'October review', language_id: 'l1', purpose: 'Genesis 1 to 3', period: srv.db.a.period, format: 'Written' });
+  assert.match(srv.db.a.period, /Active until 2099-10-31$/);
+  assert.equal(srv.db.a.stage, 'prepare');
+  assert.equal(m.h.state.step, 'participants'); assert.match(m.root.innerHTML, /Who will participate\?/);
+  // Back to step 1: values kept, project fixed; Continue without a change writes nothing, a change is a PATCH of that field only
+  m.click('[data-wz="back"]'); await settle();
+  assert.equal(m.$('[name="name"]').value, 'October review'); assert.ok(m.$('select[name="project"]').disabled); assert.doesNotMatch(m.root.innerHTML, /New project…/);
+  m.submit(); await settle(); assert.equal(srv.writes().length, 1, 'unchanged step 1 → no second write');
+  m.click('[data-wz="back"]'); await settle(); m.set('name', 'November review'); m.submit(); await settle();
+  assert.deepEqual(srv.writes().at(-1), { url: '/v2/assessments/a1', method: 'PATCH', body: { name: 'November review' } });
+  assert.equal(srv.calls.filter(c => c.method === 'POST' && c.url.endsWith('/assessments')).length, 1, 'never a second assessment');
+});
+
+test('B06: a new project on step 1 is created with the draft, then fixed on step 1', async () => {
+  const srv = server(), m = mount(srv);
+  await fillStep1(m, { project: NEW_PROJECT }); m.submit(); await settle();
+  assert.deepEqual(srv.writes().map(c => `${c.method} ${c.url}`), ['POST /v2/projects', 'POST /v2/projects/pN/languages', 'POST /v2/projects/pN/assessments']);
+  m.click('[data-wz="back"]'); await settle();
+  assert.equal(m.$('select[name="project"] option[selected]').textContent, 'Hill project'); assert.ok(m.$('select[name="project"]').disabled);
+  m.submit(); await settle(); assert.equal(srv.writes().length, 3, 'no second project or language');
+});
+
+test('B06: close the tab after step 1 → Continue setup (#new/<id>) reopens at step 2 with the step 1 values', async () => {
+  const srv = server(); const first = mount(srv); await fillStep1(first); first.submit(); await settle(); first.h.destroy();
+  const m = mount(srv, { resume: 'a1' }); await settle();
+  assert.equal(m.h.state.step, 'participants'); assert.match(m.root.innerHTML, /Who will participate\?/);
+  m.click('[data-wz="back"]'); await settle();
+  assert.equal(m.$('[name="name"]').value, 'October review'); assert.equal(m.$('[name="purpose"]').value, 'Genesis 1 to 3');
+  assert.equal(m.$('[name="until"]').value, '2099-10-31'); assert.equal(m.$('select[name="language"]').value, 'l1');
+  assert.equal(srv.writes().length, 1, 'reopening writes nothing');
+  const d = draftFromSaved({ id: 'a2', project_id: 'p1', language_id: 'l1', name: 'X', period: null }, []);
+  assert.equal(d.step, 'details', 'incomplete step 1 reopens at step 1');
+});
+
+test('B06: Cancel after the save asks in the page — Keep as draft keeps it; Discard removes it (cap.assessment.delete, U14 flow)', async () => {
+  const srv = server(), m = mount(srv); await fillStep1(m); m.submit(); await settle();
+  m.click('[data-wz="cancel"]'); await settle();
+  const ask = m.$('[data-wz-ask]'); assert.ok(ask, 'asked in the page'); assert.equal(m.confirms(), 0, 'never window.confirm');
+  assert.match(ask.textContent, new RegExp(KEEP_LABEL)); assert.match(ask.textContent, new RegExp(DISCARD_LABEL));
+  m.click('[data-wz="keep"]'); await settle();
+  assert.deepEqual(m.went, ['#/']); assert.ok(!srv.db.deleted); assert.equal(srv.db.a.stage, 'prepare');
+  const r = mount(srv, { resume: 'a1' }); await settle();
+  r.click('[data-wz="cancel"]'); await settle(); r.click('[data-wz="discard"]'); await settle();
+  assert.deepEqual(srv.writes().slice(-2).map(c => c.body), [{ mode: 'dry_run' }, { mode: 'execute', confirm_token: 'tok' }]);
+  assert.ok(srv.db.deleted); assert.deepEqual(r.went, ['#/']); assert.equal(r.confirms(), 0);
+});
+
+test('B06: Cancel before anything is saved leaves with no ask and no write', async () => {
+  const srv = server(), m = mount(srv); await settle();
+  m.click('[data-wz="cancel"]'); await settle();
+  assert.equal(m.$('[data-wz-ask]'), null); assert.deepEqual(m.went, ['#/']); assert.equal(srv.writes().length, 0);
+});
+
+test('B06: Launch after a saved step 1 works as before, without creating the assessment again; a launched review has no setup', async () => {
+  const srv = server(), m = mount(srv); await fillStep1(m); m.submit(); await settle();
+  m.$('input[name=g][value="tpl.team"]').checked = true; m.submit(); await settle(); // step 2
+  m.submit(); await settle(); // step 3
+  m.click('[data-wz="launch"]'); await settle(12);
+  assert.deepEqual(srv.writes().map(c => `${c.method} ${c.url}`), ['POST /v2/projects/p1/assessments', 'POST /v2/assessments/a1/surveys', 'POST /v2/assessments/a1/stage', 'POST /v2/assessments/a1/surveys/s1/links', 'POST /v2/assessments/a1/surveys/s1/links']);
+  assert.ok(m.h.state.done); assert.match(m.root.innerHTML, /The review is collecting responses/);
+  const again = mount(srv, { resume: 'a1', assessmentHref: id => `#assessment/${id}` }); await settle();
+  assert.deepEqual(again.went, ['#assessment/a1'], 'launched: Continue setup is gone, the review opens instead');
+});
+
+test('B06: resuming a part-launched draft keeps the surveys it already holds (no duplicate select)', () => {
+  const back = draftFromSaved({ id: 'a1', project_id: 'p1', language_id: 'l1', name: 'Oct', period: 'Active until 2099-10-31', role: 'owner' }, [{ id: 's7', template_id: 'tpl.team', template_version: 3, state: 'selected' }]);
+  assert.equal(back.step, 'participants'); assert.deepEqual(Object.keys(back.d.groups), ['tpl.team']);
+  const ctx = launchResume(back.saved, back.d);
+  assert.deepEqual(ctx.done, ['cap.assessment.create']); assert.deepEqual(ctx.surveys.map(s => s.id), ['s7']);
+  assert.deepEqual(launchPlan(back.d, ctx.pre).map(s => s.cap), ['cap.assessment.create', 'cap.assessment.set_stage', 'cap.survey.issue_link']);
+});
+
+test('B06: a saved setup that cannot be read shows one alert and Home, never a fresh step 1', async () => {
+  const srv = server(), api = async (url, o) => { if (url === '/v2/assessments/gone') throw Object.assign(new Error('Not found.'), { status: 404 }); return srv.api(url, o); };
+  const m = mount({ ...srv, api }, { resume: 'gone' }); await settle();
+  assert.equal(m.$('form[data-wz-form]'), null); assert.match(m.$('[role=alert]').textContent, /Not found\./);
+  m.click('[data-wz="keep"]'); await settle(); assert.deepEqual(m.went, ['#/']); assert.equal(srv.writes().length, 0);
+});
+
+test('B06f: a viewer opening #new/<id> directly goes to the review, never an editable setup', async () => {
+  const srv = server(); const first = mount(srv); await fillStep1(first); first.submit(); await settle(); first.h.destroy();
+  srv.db.a.role = 'viewer';
+  const m = mount(srv, { resume: 'a1', assessmentHref: id => `#assessment/${id}` }); await settle();
+  assert.deepEqual(m.went, ['#assessment/a1']); assert.equal(m.$('form[data-wz-form]'), null); assert.equal(srv.writes().length, 1);
+});
+
+test('B06f: a part-launched draft keeps its already-added survey ticked and locked, and Launch still issues its link', async () => {
+  const srv = server(); const first = mount(srv); await fillStep1(first); first.submit(); await settle(); first.h.destroy();
+  srv.db.surveys.push({ id: 's9', template_id: 'tpl.team', template_version: 3, state: 'selected' });
+  const m = mount(srv, { resume: 'a1' }); await settle();
+  const box = m.$('input[name=g][value="tpl.team"]');
+  assert.ok(box.checked && box.disabled, 'locked'); assert.equal(m.$('[data-wz-added]').textContent, 'Already added.');
+  box.checked = false; m.submit(); await settle(); // even if unticked, it stays in the review
+  assert.deepEqual(Object.keys(m.h.state.d.groups), ['tpl.team']);
+  m.submit(); await settle(); m.click('[data-wz="launch"]'); await settle(12);
+  assert.ok(m.h.state.done); assert.deepEqual(m.h.state.done.links.map(l => l.survey), ['s9']);
+  assert.equal(srv.writes().filter(c => c.url === '/v2/assessments/a1/surveys').length, 0, 'no second select');
+  const ctx = launchResume({ aid: 'a1', pid: 'p1', pre: [{ id: 's9', template: 'tpl.team', version: 3 }] }, draft({ groups: {} }));
+  assert.deepEqual(ctx.surveys.map(s => s.id), ['s9'], 'launchResume never drops a survey the server still holds');
+});
+
+test('B09: step 3 offers optional group context per group (no names) and launch sends it only when entered', async () => {
+  const { groupContextFields } = await import('./wizard.js');
+  const templates = [{ id: 'tpl.community', version: 2, name: 'Written', perspective: 'Community' }, { id: 'tpl.team', version: 3, name: 'Validation', perspective: 'Translation Team' }];
+  const html = renderStep('information', draft(), { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates });
+  assert.equal((html.match(/data-wz-context=/g) || []).length, 2);
+  assert.match(html, /About this group \(optional\)/);
+  assert.match(html, /age range and gender/);
+  assert.doesNotMatch(html, /name="c-[^"]*name/i);
+  assert.doesNotMatch(html, /required/);
+  assert.equal(groupContextFields(templates[0], {}, true), '');
+  const sel = d => launchPlan(d).filter(s => s.cap === 'cap.survey.select').map(s => s.body({}));
+  assert.deepEqual(sel(draft()).map(b => Object.keys(b).sort()), [['template_id', 'version'], ['template_id', 'version']]);
+  const withCtx = sel(draft({ context: { 'tpl.community': { total_participants: '12' } } }));
+  assert.deepEqual(withCtx.find(b => b.template_id === 'tpl.community').context, { total_participants: '12' });
+});
+
+// U22: reload mid-setup. The same session store stands in for the tab's sessionStorage across the reload.
+const tabSession = () => { const m = new Map(); return { m, getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+test('U22: a reload on step 2 or step 3 reopens the same draft at that step with what was typed; launch clears it', async () => {
+  const srv = server(), session = tabSession(), marked = [];
+  const first = mount(srv, { session, mark: id => marked.push(id) }); await fillStep1(first); first.submit(); await settle();
+  assert.deepEqual(marked, ['a1'], 'after the save the URL names the draft (#new/a1)');
+  const box = first.$('input[name=g][value="tpl.community"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.set('n-tpl.community', '7').dispatchEvent(new first.w.Event('input', { bubbles: true })); first.h.destroy(); // reload on step 2, nothing submitted
+  const two = mount(srv, { resume: 'a1', session }); await settle();
+  assert.equal(two.h.state.step, 'participants'); assert.ok(two.$('input[name=g][value="tpl.community"]').checked); assert.equal(two.$('[name="n-tpl.community"]').value, '7');
+  two.submit(); await settle(); assert.equal(two.h.state.step, 'information');
+  const ctxIn = two.$('[data-wz-context] input'); ctxIn.value = '12'; ctxIn.dispatchEvent(new two.w.Event('input', { bubbles: true })); two.h.destroy(); // reload on step 3
+  const three = mount(srv, { resume: 'a1', session }); await settle();
+  assert.equal(three.h.state.step, 'information'); assert.equal(three.$(`[name="${ctxIn.name}"]`).value, '12');
+  assert.equal(three.$('[name="n-tpl.community"]'), null); assert.deepEqual(Object.keys(three.h.state.d.groups), ['tpl.community']);
+  assert.equal(srv.writes().length, 1, 'reloads write nothing');
+  three.submit(); await settle(); three.click('[data-wz="launch"]'); await settle(12);
+  assert.ok(three.h.state.done); assert.equal(session.m.size, 0, 'launch clears the tab copy');
+});
+
+test('U22: a reload on step 1 after the save keeps unsaved step 1 edits; Discard clears the tab copy', async () => {
+  const srv = server(), session = tabSession();
+  const first = mount(srv, { session }); await fillStep1(first); first.submit(); await settle();
+  first.click('[data-wz="back"]'); await settle(); first.set('name', 'November review').dispatchEvent(new first.w.Event('input', { bubbles: true })); first.h.destroy();
+  const m = mount(srv, { resume: 'a1', session }); await settle();
+  assert.equal(m.h.state.step, 'details'); assert.equal(m.$('[name="name"]').value, 'November review'); assert.equal(srv.db.a.name, 'October review');
+  m.click('[data-wz="cancel"]'); await settle(); m.click('[data-wz="discard"]'); await settle();
+  assert.ok(srv.db.deleted); assert.equal(session.m.size, 0);
+});
+
+test('U36: each launch link is handed to the host (with its link id) so Collect and the survey page reuse it', async () => {
+  let n = 0, k = 0; const seen = [];
+  const api = async (url, { body } = {}) => {
+    if (url.endsWith('/assessments')) return { assessment: { id: 'a1' } };
+    if (url.endsWith('/surveys')) return { survey: { id: 's' + (++n) } };
+    if (url.endsWith('/stage')) return {};
+    if (url.endsWith('/links')) return body.mode === 'dry_run' ? { confirm_token: 'ct' } : { link_id: 'inv_' + (++k), entry_fragment: '#survey=t' + k, expires_at: null };
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = await launch(draft(), { api, store: mem(), onLink: (aid, row) => seen.push([aid, row.survey, row.id, row.entry_fragment]) });
+  assert.deepEqual(seen, [['a1', 's1', 'inv_1', '#survey=t1'], ['a1', 's2', 'inv_2', '#survey=t2']]);
+  assert.equal(ctx.links[0].id, 'inv_1');
+});
+
+test('U46: setup refuses a past Active until date with one inline line under the field', () => {
+  const errs = validateStep('details', draft({ starts: '', until: '2020-01-31' }));
+  assert.deepEqual(errs, ['Pick today or later']);
+  assert.deepEqual(validateStep('details', draft({ starts: '', until: '2026-09-25' }), '2026-09-25'), [], 'today is allowed');
+  const html = renderStep('details', draft({ starts: '', until: '2020-01-31' }), { projects: [], languages: [], templates: [] }, errs);
+  assert.match(html, /name="until" value="2020-01-31" required><span class="wz-field-error" role="alert" data-until-error>Pick today or later<\/span><\/label>/);
+  assert.doesNotMatch(html, /class="note alert"/, 'not repeated in the top box');
 });

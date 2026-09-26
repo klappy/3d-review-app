@@ -83,6 +83,7 @@ test('L9-24 admin (permissions): heading + one note; the legacy-acceptance expla
 // Real render of the assessment page (head + Prepare view): assess.js runs in a headless vm with its real imports, as
 // identity-reset.test.mjs does, then screen() is called with a fixture assessment. No boot (no #app, no #rv).
 let surveyScreen; // set by assessPage (B30 survey detail)
+let assessState; // set by assessPage (U45: Collect reads the shared link cache)
 async function assessPage() {
   const imp = async p => import(new URL(p, import.meta.url));
   const [demo, dp, ss, wh, cardsNs, bc, st, lm, scope, vw, share, fb, ad, v3s, v3a, au] = await Promise.all(['../demo.js', '../diagnostic-path.js', '../stage-screens.js', './whats-here.js', './cards.js', '../v3/components/breadcrumbs.js', '../v3/components/sidebar-tree.js', '../v3/components/learn-more.js', './scope.js', './views.js', './share.js', './feedback.js', '../kit/app-adapter.js', '../v3-shell.js', './v3-assessment.js', '../v3/components/active-until.js'].map(imp));
@@ -90,7 +91,7 @@ async function assessPage() {
   const box = { ...demo, ...dp, ...ss, ...wh, cards: cardsNs, ...bc, ...st, ...lm, pages: scope.pages, scopeCss: scope.css, whoLine: scope.whoLine, views: vw.views, viewsCss: vw.css, share, ...fb, ...ad, ...v3s, ...v3a, ...au,
     document: new JSDOM('<!doctype html><head></head><body></body>').window.document, location: { hash: '', pathname: '/' }, history: { replaceState() {} }, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} }, localStorage: { getItem: () => null, setItem() {} }, matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }), addEventListener() {}, setTimeout, clearTimeout, console, URL, URLSearchParams };
   box.globalThis = box;
-  const api = vm.runInNewContext(source + '\n({screen,state,surveyScreen})', box); surveyScreen = api.surveyScreen;
+  const api = vm.runInNewContext(source + '\n({screen,state,surveyScreen})', box); surveyScreen = api.surveyScreen; assessState = api.state;
   return (role, stage = 'prepare', view = 'prepare', projects = [{ id: 'p1', name: 'Coast' }], period = '2026') => { api.state.projects = projects;
     return api.screen({ assessment: { id: 'a1', name: 'Oct', project_id: 'p1', role, stage, language_id: 'lang1', period }, surveys: [{ id: 's1', state: 'selected' }, { id: 's2', state: 'selected' }] }, view); };
 }
@@ -217,6 +218,56 @@ test('B30 survey detail: one heading (the survey name), one primary; print + sha
 test('B41 Collect: shows "Active until <date>" from the assessment period; older free-text periods add nothing', async () => {
   const page = await assessPage();
   const at = period => page('owner', 'collect', 'collect', undefined, period);
-  assert.match(at('Starts 2026-09-25 · Active until 2026-10-31'), /<p class="small muted" data-active-until>Active until 31 October 2026<\/p>/);
+  assert.match(at('Starts 2026-09-25 · Active until 2099-10-31'), /<p class="small muted" data-active-until>Active until 31 October 2099<\/p>/);
+  assert.match(at('Starts 2020-01-01 · Active until 2020-01-31'), /<p class="small muted" data-active-until>Closed on 31 January 2020<\/p>/, 'U46: no longer reads as open after the date');
   assert.doesNotMatch(at('October 2026'), /data-active-until/);
+});
+
+test('U45 Collect: a survey whose link already exists shows its QR inline (no QR button), and keeps it across repaints', async () => {
+  const page = await assessPage(), svgs = h => (h.match(/data-group-qr-figure><svg/g) || []).length;
+  assessState.collectLinks.clear();
+  const before = page('owner', 'collect', 'collect');
+  assert.equal(svgs(before), 0); assert.match(before, /data-group-qr="s1"/, 'no link yet: QR code is the one tap that makes it');
+  assessState.collectLinks.set('a1|s1', { link: { id: 'inv_1', url: 'https://example.test/#survey=ONE', expires_at: null } }); // issued on launch, Collect or the survey page
+  for (let i = 0; i < 2; i++) {
+    const h = page('owner', 'collect', 'collect');
+    assert.equal(svgs(h), 1, 'the linked survey shows its QR inline'); assert.doesNotMatch(h, /data-group-qr="s1"/); assert.match(h, /data-group-qr="s2"/);
+    assert.match(h, /value="https:\/\/example.test\/#survey=ONE"/); assert.doesNotMatch(h, /undefined/);
+  }
+  assessState.collectLinks.clear();
+});
+
+// Bincy B30 (lanes-2111, persona on DEV 0.21.5): the PROJECT page showed 3 lines under its heading and the assessment stage
+// headers 2. Shared fix: kitHead keeps one optional short line (the organisation); the role sentence and the kept-tool
+// explanations sit behind the shared Learn more; the assessment head's role line joins its one Learn more.
+test('B30 project page (owner + viewer, kit and non-kit hosts): one heading, at most one short line, one primary; the rest behind Learn more', async () => {
+  const cardsNs = await import('./cards.js');
+  for (const role of ['owner', 'viewer']) for (const shellOwnsTitle of [false, true]) {
+    const map = { 'GET /v2/projects/p1': { project: { id: 'p1', name: 'Coast', role, organization: 'Lake Org' }, languages: [] }, 'GET /v2/projects/p1/assessments': { assessments: [{ id: 'a1', name: 'Oct', stage: 'collect' }] }, 'GET /v2/projects/p1/languages': { languages: [{ id: 'l1', name: 'Lake' }] } };
+    const ctx = { api: async url => { if (map['GET ' + url]) return map['GET ' + url]; throw Object.assign(new Error('x'), { code: '404' }); }, esc, enc, routes, cards: cardsNs, state: {}, shellOwnsTitle };
+    const h = pages.project.render(ctx, await pages.project.load(ctx, { id: 'p1' })), name = `project ${role}${shellOwnsTitle ? ' (kit)' : ''}`;
+    const v = upFront(h).replace(/<article[\s\S]*?<\/article>/g, ''); // assessment cards are the list itself, not lines under the heading
+    assert.equal(count(v, /<h[12]\b/g), shellOwnsTitle ? 0 : 1, name + ': one heading (the shell owns it under the kit)');
+    assert.equal(count(v, /<h[3-6]\b/g), 0, name + ': section labels are not headings');
+    const lines = count(v, /<p class="(?:small )?muted(?: small)?"/g); assert.ok(lines <= 1, `${name}: at most one line up front (got ${lines})`);
+    assert.match(v, />Lake Org<\/p>/, name + ': the organisation is the one line');
+    assert.ok(count(v, /class="(?:[^"]* )?primary(?: [^"]*)?"/g) <= 1, name + ': at most one primary');
+    if (role === 'owner') assert.equal(count(v, /class="(?:[^"]* )?primary(?: [^"]*)?"/g), 1, name + ': Start is the one primary');
+    const more = [...h.matchAll(closed)].map(x => x[0]).join('');
+    assert.ok(h.includes(LM) && more.includes(`Your role: ${role}`), name + ': role sentence moved, not removed');
+    if (role === 'owner') for (const moved of ['Issue paper codes on a survey', 'Group projects in a workspace']) assert.ok(more.includes(moved) && !v.includes(moved), `${name}: moved, not removed: ${moved}`);
+    assert.match(v, /class="badge">\s*/, name + ': role badge stays visible');
+  }
+});
+test('B30 assessment stage headers (Prepare / Collect / Understand / Improve, owner + viewer): no line in the head; role line behind Learn more', async () => {
+  const page = await assessPage();
+  for (const role of ['owner', 'viewer']) for (const view of ['prepare', 'collect', 'understand', 'improve']) {
+    const h = page(role, 'collect', view), name = `head ${role}/${view}`;
+    const head = h.slice(0, h.indexOf('aria-label="Assessment stages"')); assert.ok(head.length > 20, name + ': head rendered');
+    assert.equal(count(upFront(head), /<h[12]\b/g), 1, name + ': one heading');
+    assert.equal(count(upFront(head), /<p class="(?:small )?muted/g), 0, name + ': no line under the heading in the head');
+    assert.ok(count(upFront(head), /class="(?:[^"]* )?primary(?: [^"]*)?"/g) <= 1, name + ': at most one primary in the head');
+    const more = [...head.matchAll(closed)].map(x => x[0]).join('');
+    assert.ok(head.includes(LM) && more.includes(`Coast · your role: ${role}`), name + ': role line moved, not removed');
+  }
 });

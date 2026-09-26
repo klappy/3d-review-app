@@ -19,6 +19,7 @@ test('set_stage mapping keeps app stage ids (ADOPTION.md)', () => {
 test('(a) denominator only when entered', () => {
   assert.match(v3CountLine({ responses: 4 }), />4 responded</);
   assert.match(v3CountLine({ responses: 4, expected: 10 }), />4 of 10 responded</);
+  assert.match(v3CountLine({ responses: 6, expected: 3 }), />6 responded · 3 expected</); // U39
   assert.match(v3CountLine({ responses: 4, expected: '' }), />4 responded</);
 });
 test('(b) settled and not-yet-confirmed side by side; never guessed', () => {
@@ -153,4 +154,11 @@ test('B-07: collect reads the expected number the wizard stored on this device',
   assert.equal(v3ExpectedFor('s1', null), null);
   assert.match(v3CountLine({ responses: 3, expected: v3ExpectedFor('s1', mem(JSON.stringify({ s1: 5 }))) }), />3 of 5 responded</);
   assert.match(v3CountLine({ responses: 3, expected: v3ExpectedFor('s9', mem('{}')) }), />3 responded</);
+});
+
+test('U42 (Bincy B30): the stage primary never links to the open page; on Permissions it is secondary', () => {
+  assert.equal(v3StagePrimary('improve', true, undefined, undefined, { current: 'improve' }), '');
+  assert.match(v3StagePrimary('improve', true, undefined, undefined, { current: 'understand' }), /class="rv-btn primary"[^>]*>Open the next step/);
+  const p = v3StagePrimary('collect', true, undefined, undefined, { current: 'permissions', secondary: true });
+  assert.match(p, /class="rv-btn" data-v3-primary="collect"/); assert.doesNotMatch(p, /class="[^"]*\bprimary\b/);
 });

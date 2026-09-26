@@ -1,41 +1,51 @@
 {
-  "version": "0.21.7",
+  "version": "0.22.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "3af6b06a93c3640b5ebf39c6ac1d6da3e7a69fc6",
+  "cookbook_commit": "c2dc4176ec7aabb0ca0bdb7dae434cfe0a393db4",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.21.7.md",
-      "blob_sha": "d627dd6275790dcfc3fc1558d3e1ca3c5b805775",
-      "sha256": "7d6ed50a97b9afda2621fc7b18ae09689d423e7e4c50c143e25c422cfc133495"
+      "path": "planning/2026-09-16-parity-build/releases/0.22.0.md",
+      "blob_sha": "7e641e908e9fbb4a5c9f557690aeea4a9ca21866",
+      "sha256": "a3a7d8e822db528f8e9ffee105bcfa48ee12c9f4c57b885e512270945cca44a5"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "82e179af32ae1c48135024e267e6f2719db05edb",
-      "sha256": "95ca3cfa340472791e065d5ea2648811366362086c07feefa1f2ad8056d2f829"
+      "blob_sha": "9537fc5395edd8f88211faa9d21f85661cd1ac37",
+      "sha256": "9d2aa85028ab6d6b90bbf467afde405045a1564d6f20f7c37c6fbbc9167501c1"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Every shared survey link now has the same three buttons — Copy link, QR code, Print — and one \"Print all\" puts every survey (title, one line, QR code) on a single printable page. (#324)"
+        "Optional demographics: setup step 3 asks each group's context (no names), participants may give an age range and gender before Q1 (both skippable), and the response list shows the group context (migration 0011). (#342)",
+        "Setup saves on step 1: Continue creates the review as a draft, Home shows it with \"Continue setup\" (reopens at the next step with what was entered), and Cancel asks in the page whether to keep the draft or discard it. (#339)",
+        "Next steps lists the areas the report bands Needs support or Needs urgent attention as tick boxes, plus Other, saved with the notes; one \"Complete 3D Review\", confirmed in the page, makes the whole review read-only with \"This review is complete.\" (#338)"
       ],
       "changed": [
-        "sign-in says a new email creates an account (Bincy B32) (#301)",
-        "The survey page now shows one heading; print and share explanations sit behind Learn more. (#316)",
-        "A viewer on the Improve step now sees one heading with the notes as plain labels; the visibility note sits behind Learn more. (#317)",
-        "The participant welcome now shows one heading, the invitation and privacy line, the survey context and a single Start button; the time estimate and sign-in note sit behind \"Learn more\". (#318)",
-        "The classic console header now says \"Signed in\" instead of showing an internal account id. (#319)",
-        "The full report's translation type agreement now reads as one plain sentence (e.g. \"Agreed: Resembling · Seen as: Resembling · Matches\") instead of raw values. (#320)",
-        "Understand now shows one build action, \"Build the results\"; the older \"Preview report build\" sits behind Technical details in Reports. (#315)",
-        "Setup step 1 \"Lead organisation\" is now a drop-down of known organisations with \"Other (type it)\" for anything else. (#322)",
-        "Setup asks \"Active until\" (required) and \"Starts\" (optional, default today) instead of \"When\"; Collect shows \"Active until <date>\" and participant links show \"This survey closed on <date>\" after that date. (#323)",
-        "On Collect, \"Move to Understand\" is the one primary action and is confirmed in the page; Prepare no longer carries that move or a browser confirm. (#325)"
+        "Participants now read one privacy line, \"Your responses are confidential.\", on the survey welcome and in setup step 3, after a check that no name, email, IP address or device detail is stored with a response. (#337)"
       ],
       "fixed": [
-        "On DEV, \"Use a different email\" (and \"Request a new link\") now keeps you in the connector sign-in instead of dropping back to a plain web sign-in. (#313)",
-        "Translation Team now offers Mid-Level once when setting up or changing surveys; the old Mid-Level v1 stays only on imported responses. (#321)",
-        "Revoke invitation asks in the row (Revoke / Cancel) and the revoked row leaves the pending list at once (#326)",
-        "A survey keeps one participant link per page load: Copy link, QR code and Print on the survey page and on Collect reuse it, and the Share card now says a reload makes a new one. (#327)"
+        "\"Take the tour\" opens the sample assessment on Collect, the stage it is actually in, so the first screen no longer says \"Prepare this assessment\" beside \"Collecting responses\". (#345)",
+        "Setup wizard survives a reload: once step 1 is saved the page URL names the draft, and a reload reopens it at the same step with what was typed (kept in this tab only). (#346)",
+        "On Collect, a group that reaches or passes its expected number reads \"6 responded · 3 expected\" instead of \"6 of 3 responded\"; below the expected number it still reads \"n of N responded\". (#344)",
+        "The participant review screen's final button now reads \"Submit answers\" and uses the shared primary button style. (#348)",
+        "The assessment header no longer shows a primary that links to the page you are on, and \"Preview invitation\" is the one primary on Permissions. (#349)",
+        "Understand: before any report exists \"Build the results\" is the one primary; \"Choose a next step\" steps back until the results are built. (#350)",
+        "The facilitator no longer gets a new participant link on every page view: the launch page, Collect and the survey page now reuse the survey's active link until it is revoked or expires. (#351)",
+        "Each share card now shows its QR code inline as soon as it has a link, with no show/hide toggle. (#352)",
+        "Setup refuses an \"Active until\" date in the past with \"Pick today or later\", and Collect shows \"Closed on <date>\" once that date has passed. (#353)",
+        "The build-results confirm now reads \"Build results from N responses? Everyone with access can see them.\"; the project page keeps its Access codes and Workspaces explanations behind Learn more. (#354)",
+        "The kit-root integration harness now injects `collectLine`, so its 23 tests pass again after U46. (#355)",
+        "Sign out and Use another account never open a Cloudflare error page: both end the app and Cloudflare sessions in the background and land on the sign-in screen with an empty email field. (#330)",
+        "The project page and the assessment stage headers now show one heading, at most one short line and one primary action; the role line and tool explanations sit behind \"Learn more\". (#332)",
+        "Facilitators issue paper access codes on the survey Share card (count, preview, show once, print), and \"Open access codes\" no longer sends them to the legacy console. (#335)",
+        "Owners can delete an empty assessment from its settings: one-sentence dry run, confirmed in the page, then back to the project with \"Assessment deleted.\" (#336)",
+        "Asking the docs what a viewer can do no longer suggests survey, code or notes changes a viewer cannot make; next steps now come from the same role table the server enforces. (#334)",
+        "After renaming a workspace or an assessment, the form now says \"Saved · Undo\" right beside it, and Undo puts the old name back and says \"Undone\". (#333)",
+        "On Understand, only one \"Build the results\" button shows at a time: the button hides while its confirm is open and comes back if you choose Not now. (#329)",
+        "Setup drafts: a viewer opening a setup link goes to the review, surveys a part-launched draft already added stay ticked (\"Already added.\"), and viewer cards on Home say \"Continue assessment\". (#340)",
+        "The root-route test for invitation links now matches how the app handles them (they stay in the app), so the test suite passes again. No change for users. (#343)",
+        "A valid access code now opens the v3 survey (intro, review and submit, thank-you) instead of the legacy participant page. (#341)"
       ]
     }
   }

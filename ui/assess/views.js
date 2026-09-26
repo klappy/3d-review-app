@@ -7,7 +7,7 @@
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
 import { learnMore } from '../v3/components/learn-more.js'; // lane 9 L9-24: shared closed-by-default disclosure
-import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, V3_HELD_TEXT, V3_REPORTS_HELD, V3_REPORT_HELD, V3_BAND_CUTOFFS } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
+import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, V3_HELD_TEXT, V3_REPORTS_HELD, V3_REPORT_HELD, V3_BAND_CUTOFFS, V3_SUGGEST, v3SuggestedAreas, v3NextParse, v3NextSerialize, askStageMove } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -129,7 +129,8 @@ const understand = {
     const lensGroups = Object.fromEntries(LENSES.map(lens => { const ss = m.surveys.filter(s => lensFor(s) === lens), ld = ss.filter(s => m.counts.get(s.id)?.status === 'loaded');
       return [lens, { surveys: ss.length, loaded: ld.length, responses: ld.reduce((n, s) => n + m.counts.get(s.id).responses, 0) }]; }));
     const ev = v3EvidenceMarkup(v3EvidenceRows(m.results.value, LENSES, lensGroups, m.bandScores), !!m.showEvidence, esc);
-    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores)}${buildResultsCta(m, lensGroups, esc)}<p class="status" role="status" aria-live="polite" data-results-status></p>${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc)}</section>` : '';
+    const cta = buildResultsCta(m, lensGroups, esc); // U41: while offered, "Build the results" is the one primary; the gate steps back
+    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores)}${cta}<p class="status" role="status" aria-live="polite" data-results-status></p>${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc, { primary: !cta })}</section>` : '';
     // (3) Reports: server-owned eligibility and provenance; preview never writes a report.
     let reports;
     if (m.reports.status === 'loaded') {
@@ -233,26 +234,66 @@ const understand = {
 let notesSaved = null;
 const NOTES_SAVED = 'Saved';
 const savedNote = m => (notesSaved && notesSaved === m.aid ? NOTES_SAVED : '');
+// B13 (lanes-2148): the suggested areas are the areas the newest built report bands Needs support / Needs urgent attention,
+// read exactly as Understand reads them (newest report scores + per-perspective response counts). Editors only; read-only.
+async function suggestedAreas(ctx, aid) {
+  const reports = await settle(ctx.api(`/v2/assessments/${ctx.enc(aid)}/reports`));
+  if (reports.status !== 'loaded') return { status: 'unreadable', areas: [] };
+  const v = reports.value || {}, built = !v.suppressed && v.status !== 'held' && Array.isArray(v.reports) ? v.reports.filter(x => x && x.id) : [];
+  if (!built.length) return { status: 'noReport', areas: [] };
+  const scores = await newestBandScores(ctx, reports);
+  if (!scores) return { status: 'unreadable', areas: [] };
+  const surveys = activeSurveys(ctx.current?.surveys);
+  const counts = await Promise.all(surveys.map(s => settle(ctx.api(`/v2/assessments/${ctx.enc(aid)}/surveys/${ctx.enc(s.id)}`)).then(r => [s, r])));
+  const groups = Object.fromEntries(LENSES.map(lens => { const cs = counts.filter(([s]) => lensFor(s) === lens), ld = cs.filter(([, r]) => r.status === 'loaded');
+    return [lens, { surveys: cs.length, loaded: ld.length, responses: ld.reduce((n, [, r]) => n + Number(r.value?.counts?.responses ?? 0), 0) }]; }));
+  const areas = v3SuggestedAreas(scores, LENSES, groups);
+  return { status: areas.length ? 'loaded' : 'none', areas };
+}
+// Ticks, Other and the complete mark are saved with the notes (one PATCH): the trailer lives in notes_next_steps.
+function notesBody(form, m, complete = false) {
+  const val = (name, dflt = '') => { const f = form.querySelector(`[name=${name}]`); return f ? f.value : dflt; };
+  const areas = [...form.querySelectorAll('[data-area]')].filter(x => x.checked).map(x => x.value);
+  return { notes_reflection: val('notes_reflection'), notes_next_steps: v3NextSerialize({ text: val('notes_next_steps'), areas, other: val('notes_other', m.other || ''), complete }) };
+}
+function keepNotes(m, a, body) {
+  m.notes_reflection = a.notes_reflection ?? body.notes_reflection;
+  const p = v3NextParse(a.notes_next_steps ?? body.notes_next_steps);
+  m.notes_next_steps = p.text; m.areas = p.areas; m.other = p.other; m.complete = p.complete;
+}
+const COMPLETE_STAGES = new Set(['collect', 'understand', 'improve']); // a launched review; the walk forward is one stage at a time
 const improve = {
   async load(ctx, { aid }) {
-    const a = ctx.current?.assessment || {};
-    return { aid, role: a.role, notes_reflection: a.notes_reflection ?? '', notes_next_steps: a.notes_next_steps ?? '', editable: isEditor(a.role) };
+    const a = ctx.current?.assessment || {}, p = v3NextParse(a.notes_next_steps ?? '');
+    const editable = isEditor(a.role) && !p.complete;
+    const suggest = editable && typeof ctx.api === 'function' ? await suggestedAreas(ctx, aid) : null;
+    return { aid, role: a.granted_role || a.role, stage: a.stage, notes_reflection: a.notes_reflection ?? '', notes_next_steps: p.text, areas: p.areas, other: p.other, complete: p.complete, editable, suggest };
   },
   render(ctx, m) {
-    const esc = ctx.esc;
+    const esc = ctx.esc, S = V3_SUGGEST, areas = m.areas || [];
     if (V3_FLAGS.nextStepPage) {
       // v3 lane 3 L3-4: Bincy screen 11 / prototype frame 11. Recommendations aside not drawn (PARITY I1).
       const T = V3_NEXT;
+      // B13: the suggested areas as tick boxes (band word beside each), saved ticks that are no longer suggested stay listed
+      // (ticked) so nothing saved is lost, then Other. No report built → one sentence.
+      const suggested = (m.suggest?.areas || []).map(x => x.area), extra = areas.filter(x => !suggested.includes(x));
+      const box = (area, band) => `<label class="choice"><input type="checkbox" name="area" value="${esc(area)}" data-area${areas.includes(area) ? ' checked' : ''}> ${esc(area)}${band ? ` <span class="small muted">· ${esc(band)}</span>` : ''}</label>`;
+      const line = m.suggest && m.suggest.status !== 'loaded' ? `<p class="muted" data-suggest-empty>${esc(S[m.suggest.status] || S.unreadable)}</p>` : '';
+      const suggest = `<fieldset class="field" data-suggest><legend>${esc(S.heading)}</legend>${line}${(m.suggest?.areas || []).map(x => box(x.area, x.band)).join('')}${extra.map(a => box(a, '')).join('')}<label class="field">${esc(S.other)}<input type="text" name="notes_other" maxlength="300" placeholder="${esc(S.otherHint)}" value="${esc(m.other || '')}"></label></fieldset>`;
+      const complete = COMPLETE_STAGES.has(m.stage) ? `<div class="actions" data-complete-row><button type="button" class="primary" data-complete-review>${esc(S.complete)}</button> <span class="status" role="status" aria-live="polite" data-complete-status></span></div>` : '';
+      const saved = areas.length || m.other ? `<dt>${esc(S.heading)}</dt><dd data-notes-areas>${areas.length ? `<ul>${areas.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}${m.other ? `<p data-notes-other>${esc(S.other)}: ${esc(m.other)}</p>` : ''}</dd>` : '';
       const notes = m.editable
-        ? `<form data-notes-form><label class="field">${esc(T.reflection)}<textarea name="notes_reflection" rows="3" maxlength="4000" placeholder="${esc(T.reflectionHint)}">${esc(m.notes_reflection)}</textarea></label><label class="field">${esc(T.next)}<textarea name="notes_next_steps" rows="2" maxlength="4000" placeholder="${esc(T.nextHint)}">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>${esc(T.save)}</button> <span class="status" role="status" aria-live="polite" data-notes-status>${esc(savedNote(m))}</span></div></form>`
+        ? `<form data-notes-form>${suggest}<label class="field">${esc(T.reflection)}<textarea name="notes_reflection" rows="3" maxlength="4000" placeholder="${esc(T.reflectionHint)}">${esc(m.notes_reflection)}</textarea></label><label class="field">${esc(T.next)}<textarea name="notes_next_steps" rows="2" maxlength="4000" placeholder="${esc(T.nextHint)}">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button type="submit" data-save-notes>${esc(T.save)}</button> <span class="status" role="status" aria-live="polite" data-notes-status>${esc(savedNote(m))}</span></div></form>${complete}`
         // B30 (lanes-1911, "viewer Improve: 2 h3, 3 lines"): ONE heading for viewers. The two notes are plain labels in the
         // wizard's key/value list (no h3); nothing recorded → one short line; the visibility note joins the Learn more below.
-        : (m.notes_reflection || m.notes_next_steps
-          ? `<dl class="kv"><dt>${esc(T.reflection)}</dt><dd data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">Nothing recorded yet.</span>'}</dd><dt>${esc(T.next)}</dt><dd data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next step recorded yet.</span>'}</dd></dl>`
+        // B13: a completed review renders this same read-only list for everyone, plus the one "This review is complete." line.
+        : (m.notes_reflection || m.notes_next_steps || saved
+          ? `<dl class="kv">${saved}<dt>${esc(T.reflection)}</dt><dd data-notes-reflection>${m.notes_reflection ? esc(m.notes_reflection) : '<span class="muted">Nothing recorded yet.</span>'}</dd><dt>${esc(T.next)}</dt><dd data-notes-next-steps>${m.notes_next_steps ? esc(m.notes_next_steps) : '<span class="muted">No next step recorded yet.</span>'}</dd></dl>`
           : '<p class="muted" data-notes-empty>No notes recorded yet.</p>');
+      const done = m.complete ? `<p class="note" data-review-complete>${esc(S.done)}</p>` : '';
       // Lane 9 L9-24: the schedule note and the role explanation move behind the shared Learn more (one line kept: who can read).
-      const more = `<p class="muted">${esc(T.footer)}</p>${m.editable ? '' : `<p class="muted">${esc(NOTES_VISIBILITY)}</p><p class="muted">Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`}`;
-      return `<section class="panel" data-v3-next><p class="eyebrow">${esc(T.eyebrow)}</p><h2>${esc(T.title)}</h2>${notes}${learnMore(more)}</section>`;
+      const more = `<p class="muted">${esc(T.footer)}</p>${m.editable ? '' : `<p class="muted">${esc(NOTES_VISIBILITY)}</p>${m.complete ? '' : `<p class="muted">Your role here is ${esc(m.role || 'viewer')}; editing needs a member or owner role.</p>`}`}`;
+      return `<section class="panel" data-v3-next><p class="eyebrow">${esc(T.eyebrow)}</p><h2>${esc(T.title)}</h2>${done}${notes}${learnMore(more)}</section>`;
     }
     const notes = m.editable
       ? `<form data-notes-form><label class="field">Reflection<textarea name="notes_reflection" maxlength="4000">${esc(m.notes_reflection)}</textarea></label><label class="field">Next steps<textarea name="notes_next_steps" maxlength="4000">${esc(m.notes_next_steps)}</textarea></label><p class="small muted">${esc(NOTES_VISIBILITY)}</p><div class="actions"><button class="primary" type="submit" data-save-notes>Save notes</button> <span class="status" role="status" aria-live="polite" data-notes-status>${esc(savedNote(m))}</span></div></form>`
@@ -264,17 +305,45 @@ const improve = {
     form.onsubmit = async e => {
       e.preventDefault();
       const btn = form.querySelector('[data-save-notes]'), status = form.querySelector('[data-notes-status]');
-      const body = { notes_reflection: form.querySelector('[name=notes_reflection]').value, notes_next_steps: form.querySelector('[name=notes_next_steps]').value };
+      const body = notesBody(form, m);
       btn.disabled = true; if (status) { status.textContent = 'Saving…'; status.setAttribute('role', 'status'); }
       try {
         const r = await ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/notes`, { method: 'PATCH', body });
-        const a = r?.assessment || {}; m.notes_reflection = a.notes_reflection ?? body.notes_reflection; m.notes_next_steps = a.notes_next_steps ?? body.notes_next_steps;
+        keepNotes(m, r?.assessment || {}, body);
         if (status) status.textContent = NOTES_SAVED;
         if (typeof ctx.refresh === 'function') { notesSaved = m.aid; try { await ctx.refresh(); } finally { notesSaved = null; } }
       } catch (err) {
         const k = classify(err);
         if (status) { status.setAttribute('role', 'alert'); status.textContent = k === 'refused' ? `${NOT_VISIBLE}: the notes were not saved.` : k === 'unauthenticated' ? 'Your sign-in is no longer active. Sign in again; the notes were not saved.' : k === 'not_built' ? 'Notes are not built yet.' : `Notes could not be saved: ${String(err.message || 'request failed')}`; }
       } finally { btn.disabled = false; }
+    };
+    // B13: "Complete 3D Review" asks in the page (never window.confirm). Confirmed: walk the stage forward to Improve one step
+    // at a time (as the server allows; leaving Collect closes collection), then save the notes, ticks and Other with the
+    // complete mark in one PATCH, then repaint read-only. Stage first, so a failed move never leaves a "complete" review collecting.
+    const cbtn = root.querySelector('[data-complete-review]'); if (!cbtn) return;
+    cbtn.onclick = () => {
+      if (cbtn.disabled) return;
+      const ask = V3_SUGGEST.completeAsk + (m.stage === 'collect' ? ' Collection closes for every survey.' : '');
+      askStageMove(cbtn, ask, V3_SUGGEST.completeGo, async () => {
+        const status = root.querySelector('[data-complete-status]'), save = form.querySelector('[data-save-notes]');
+        const body = notesBody(form, m, true);
+        cbtn.disabled = true; if (save) save.disabled = true; if (status) { status.setAttribute('role', 'status'); status.textContent = 'Saving…'; }
+        try {
+          while (m.stage === 'collect' || m.stage === 'understand') {
+            const to = m.stage === 'collect' ? 'understand' : 'improve';
+            await ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/stage`, { method: 'POST', body: { stage: to } });
+            m.stage = to; if (ctx.state?.dirty instanceof Map) ctx.state.dirty.set(m.aid, 'write');
+          }
+          const r = await ctx.api(`/v2/assessments/${ctx.enc(m.aid)}/notes`, { method: 'PATCH', body });
+          keepNotes(m, r?.assessment || {}, body); m.complete = true; m.editable = false;
+          if (status) status.textContent = V3_SUGGEST.done;
+          if (typeof ctx.refresh === 'function') await ctx.refresh();
+        } catch (err) {
+          const k = classify(err);
+          if (status) { status.setAttribute('role', 'alert'); status.textContent = k === 'refused' ? `${NOT_VISIBLE}: the review was not completed.` : k === 'unauthenticated' ? 'Your sign-in is no longer active. Sign in again; the review was not completed.' : `The review was not completed: ${String(err.message || 'request failed')}`; }
+          cbtn.disabled = false; if (save) save.disabled = false;
+        }
+      }, ctx.esc, 'Confirm completing the review');
     };
   },
 };

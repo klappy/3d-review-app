@@ -4,7 +4,7 @@ import { homeView, assessmentRow } from './home.js';
 const label = s => ({ prepare: 'Setup not finished', collect: 'Collecting responses' }[s] || s);
 test('prepare → Continue setup; other stages → Continue assessment; pill carries the state word', () => {
   const s = assessmentRow({ id: 'a1', name: 'Kapanawa', stage: 'prepare' }, label);
-  assert.match(s, /Continue setup <span aria-hidden="true">→<\/span>/); assert.match(s, /v3h-pill-setup">Setup not finished/); assert.match(s, /href="#assessment\/a1"/);
+  assert.match(s, /Continue setup <span aria-hidden="true">→<\/span>/); assert.match(s, /v3h-pill-setup">Setup not finished/); assert.match(s, /href="#new\/a1"/, 'B06: Continue setup reopens the setup wizard');
   const c = assessmentRow({ id: 'a 2', name: 'Hindi', stage: 'collect', language_name: 'Hindi' }, label);
   assert.match(c, /Continue assessment <span aria-hidden="true">→<\/span>/); assert.match(c, /v3h-pill-progress/); assert.match(c, /#assessment\/a%202/);
 });
@@ -72,4 +72,17 @@ test('B28: shared reviews sort in with the rest; no created_at sorts last, ties 
   const h = homeView({ projects: [{ id: 'p', name: 'P' }], shared: [{ id: 's', name: 'S', stage: 'collect', created_at: '2026-09-15T00:00:00Z' }],
     listFor: () => ({ status: 'loaded', list: [{ id: 'x', name: 'X', stage: 'collect' }, { id: 'y', name: 'Y', stage: 'collect', created_at: '2026-09-20T00:00:00Z' }, { id: 'z', name: 'Z', stage: 'collect' }] }), stageLabel: label });
   assert.deepEqual([...h.matchAll(/data-v3h-assessment="([^"]+)"/g)].map(m => m[1]), ['y', 's', 'x', 'z']);
+});
+
+test('B06: a review in setup is ONE card whose one action "Continue setup" reopens the wizard (#new/<id>); launched and viewer cards open the review', () => {
+  const own = assessmentRow({ id: 'a 1', name: 'Oct', stage: 'prepare', role: 'owner' }, label);
+  assert.match(own, /^<a class="v3h-card v3h-acard" href="#new\/a%201"/); assert.equal(own.match(/Continue setup/g).length, 1); assert.doesNotMatch(own, /Continue assessment/);
+  assert.match(assessmentRow({ id: 'a1', name: 'Oct', stage: 'prepare', role: 'member' }, label), /href="#new\/a1"/);
+  const viewer = assessmentRow({ id: 'a1', name: 'Oct', stage: 'prepare', role: 'viewer' }, label);
+  assert.match(viewer, /href="#assessment\/a1"/);
+  assert.match(viewer, /Continue assessment/); assert.doesNotMatch(viewer, /Continue setup/, 'B06f: a viewer card says what it does (opens the review)');
+  const launched = assessmentRow({ id: 'a1', name: 'Oct', stage: 'collect', role: 'owner' }, label);
+  assert.doesNotMatch(launched, /Continue setup|#new\//); assert.match(launched, /href="#assessment\/a1"/);
+  const h = homeView({ projects: [{ id: 'p1', name: 'Lake' }], listFor: () => ({ status: 'loaded', list: [{ id: 'a1', name: 'Oct', stage: 'prepare', role: 'owner' }] }), stageLabel: label });
+  assert.match(h, /href="#new\/a1"[\s\S]*Continue setup/);
 });
