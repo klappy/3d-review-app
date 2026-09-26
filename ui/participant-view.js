@@ -1,4 +1,5 @@
 // Source-shaped presentation only: no API, storage, credential or submission ownership.
+import { periodText } from './v3/components/active-until.js';
 export function itemError(item, values) {
   const value = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id);
   const empty = value === null || value === '' || (Array.isArray(value) && !value.length);
@@ -30,7 +31,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   const lead=el('p',`${model.language?`You were invited to say how the ${model.language} translation is going. `:''}Your answers are grouped with others and never shown on their own.`);lead.className='participant-lead';intro.append(lead);
   // Bincy B30 (LANES 18:35 ruling): one heading, one short line, one primary action; explanations behind "Learn more".
   // Bincy B10: the shared context setup step 3 lists ("Shown to every participant"), once, as a compact meta row.
-  const shared=[model.project,model.language,model.purpose,model.format,model.period].map(v=>typeof v==='string'?v.trim():'').filter(Boolean).join(' · ');
+  const shared=[model.project,model.language,model.purpose,model.format,periodText(model.period)].map(v=>typeof v==='string'?v.trim():'').filter(Boolean).join(' · ');
   if(shared){const ctx=el('p',shared);ctx.className='participant-meta participant-context';intro.append(ctx);}
   // v3 L1-5 (NEED 5→1): the instrument's source ref is provenance for facilitators, not participant copy; the raw
   // unbroken path widened the intro to 697px on a 375px phone (TRAINING.md #10). Kept on the model, never painted here.
