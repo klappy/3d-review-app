@@ -628,7 +628,8 @@ async function mountNew(gen, resume = null) {
   if (gen !== generation) return;
   if (!mod?.mountWizard) { app.innerHTML = `<div class="narrow panel"><h1>Start a review</h1><p class="muted">The guided setup is not available on this build yet.</p><div class="actions"><a class="rv-btn primary" href="${cards.routes.projects}">Go to your projects</a></div></div>`; return; }
   const ctx = ctxFor();
-  wizardHandle = mod.mountWizard(app, { api: ctx.api, go: ctx.go, origin: location.origin, assessmentHref: id => `#assessment/${encodeURIComponent(id)}`, resume });
+  wizardHandle = mod.mountWizard(app, { api: ctx.api, go: ctx.go, origin: location.origin, assessmentHref: id => `#assessment/${encodeURIComponent(id)}`, resume,
+    mark: id => { if (gen !== generation) return; try { history.replaceState(null, '', `${location.pathname}${location.search}#new/${encodeURIComponent(id)}`); } catch {} } }); // U22: a reload reopens this draft
   document.title = `${resume ? 'Continue setup' : 'Start a review'} · 3D Review`;
 }
 // Account identity remains transient and belongs to this exact app identity.
