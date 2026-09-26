@@ -217,7 +217,8 @@ test('B30 survey detail: one heading (the survey name), one primary; print + sha
 test('B41 Collect: shows "Active until <date>" from the assessment period; older free-text periods add nothing', async () => {
   const page = await assessPage();
   const at = period => page('owner', 'collect', 'collect', undefined, period);
-  assert.match(at('Starts 2026-09-25 · Active until 2026-10-31'), /<p class="small muted" data-active-until>Active until 31 October 2026<\/p>/);
+  assert.match(at('Starts 2026-09-25 · Active until 2099-10-31'), /<p class="small muted" data-active-until>Active until 31 October 2099<\/p>/);
+  assert.match(at('Starts 2020-01-01 · Active until 2020-01-31'), /<p class="small muted" data-active-until>Closed on 31 January 2020<\/p>/, 'U46: no longer reads as open after the date');
   assert.doesNotMatch(at('October 2026'), /data-active-until/);
 });
 

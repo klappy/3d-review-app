@@ -23,10 +23,15 @@ export function activeUntilLine(period) { const p = parsePeriod(period); return 
 export function periodText(period) { return activeUntilLine(period) || String(period ?? '').trim(); }
 // Participant links: after the Active until date (the participant's own calendar day) the link shows one plain line.
 export function closedLine(period, today = todayIso()) { const p = parsePeriod(period); return p && today > p.until ? `This survey closed on ${formatDate(p.until)}.` : ''; }
-// Setup validation: Active until required; Starts optional and not after Active until.
-export function periodErrors(starts, until) {
+// Collect (U46): "Closed on <date>" once the Active until day has passed, else "Active until <date>"; '' for older periods.
+export function collectLine(period, today = todayIso()) { const p = parsePeriod(period); return !p ? '' : today > p.until ? `Closed on ${formatDate(p.until)}` : `Active until ${formatDate(p.until)}`; }
+// U46: setup refuses an Active until date before today (shown inline under the field).
+export const PAST_UNTIL = 'Pick today or later';
+// Setup validation: Active until required and not in the past; Starts optional and not after Active until.
+export function periodErrors(starts, until, today = todayIso()) {
   const s = String(starts ?? '').trim(), u = String(until ?? '').trim(), errs = [];
   if (!valid(u)) errs.push('Choose the date the survey is active until.');
+  else if (u < today) errs.push(PAST_UNTIL);
   if (s && !valid(s)) errs.push('Starts: choose a date, or leave it empty.');
   if (valid(s) && valid(u) && s > u) errs.push('Starts must be on or before Active until.');
   return errs;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ORGANIZATIONS, orgChoices, ORG_OTHER, countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot, renderDone } from './wizard.js';
 
 const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
-const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', until: '2026-10-31', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
+const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', until: '2099-10-31', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
 
 test('ruling (a): denominator only when entered', () => {
   assert.equal(countLabel(4, 10), '4 of 10');
@@ -39,7 +39,7 @@ test('launch performs writes in order, never sends expected count to the API, st
   const store = mem();
   const ctx = await launch(draft({ purpose: 'Gen 1-3', starts: '2026-09-25' }), { api, store });
   assert.equal(calls[0].url, '/v2/projects/p1/assessments');
-  assert.deepEqual(calls[0].body, { name: 'Oct', language_id: 'l1', purpose: 'Gen 1-3', period: 'Starts 2026-09-25 · Active until 2026-10-31', format: 'Written' });
+  assert.deepEqual(calls[0].body, { name: 'Oct', language_id: 'l1', purpose: 'Gen 1-3', period: 'Starts 2026-09-25 · Active until 2099-10-31', format: 'Written' });
   assert.deepEqual(calls[1].body, { template_id: 'tpl.team', version: 3 });
   assert.deepEqual(calls[3], { url: '/v2/assessments/a1/stage', method: 'POST', body: { stage: 'collect' } });
   assert.equal(calls.filter(c => c.url.endsWith('/links')).length, 4);
@@ -334,16 +334,16 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
 test('B41: setup asks Active until (required) and Starts (optional, default today) on the existing period field', () => {
   const html = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
   assert.match(html, /Starts \(optional\)<input type="date" name="starts"/);
-  assert.match(html, /Active until<input type="date" name="until" value="2026-10-31" required>/);
+  assert.match(html, /Active until<input type="date" name="until" value="2099-10-31" required>/);
   assert.doesNotMatch(html, />When</);
   assert.match(freshDraft().starts, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(freshDraft().until, '');
   assert.deepEqual(validateStep('details', draft({ until: '' })), ['Choose the date the survey is active until.']);
   assert.deepEqual(validateStep('details', draft({ starts: '' })), []);
   const body = d => launchPlan(draft(d)).find(s => s.cap === 'cap.assessment.create').body({});
-  assert.equal(body({ starts: '2026-09-25' }).period, 'Starts 2026-09-25 · Active until 2026-10-31');
-  assert.equal(body({ starts: '' }).period, 'Active until 2026-10-31');
-  assert.match(renderStep('review', draft({ starts: '2026-09-25' }), { projects: [], languages: [], templates: [] }), /<dt>Starts<\/dt><dd>25 September 2026<\/dd><dt>Active until<\/dt><dd>31 October 2026<\/dd>/);
+  assert.equal(body({ starts: '2026-09-25' }).period, 'Starts 2026-09-25 · Active until 2099-10-31');
+  assert.equal(body({ starts: '' }).period, 'Active until 2099-10-31');
+  assert.match(renderStep('review', draft({ starts: '2026-09-25' }), { projects: [], languages: [], templates: [] }), /<dt>Starts<\/dt><dd>25 September 2026<\/dd><dt>Active until<\/dt><dd>31 October 2099<\/dd>/);
 });
 
 test('B40: lead organisation is a seeded select plus "Other (type it)"; the stored field is unchanged', () => {
@@ -409,7 +409,7 @@ async function fillStep1(m, { project = 'p1' } = {}) {
   m.set('name', 'October review');
   const sel = m.set('project', project); sel.dispatchEvent(new m.w.Event('change', { bubbles: true })); await settle();
   if (project === NEW_PROJECT) { m.set('newProject', 'Hill project'); m.set('newLanguage', 'Hill'); } else m.set('language', 'l1');
-  m.set('until', '2026-10-31'); m.set('purpose', 'Genesis 1 to 3');
+  m.set('until', '2099-10-31'); m.set('purpose', 'Genesis 1 to 3');
 }
 
 test('B06: savePlan is exactly the first writes of Launch (no new capability)', () => {
@@ -425,7 +425,7 @@ test('B06: Continue on step 1 saves the review in Prepare (cap.assessment.create
   await fillStep1(m); m.submit(); await settle();
   assert.deepEqual(srv.writes().map(c => `${c.method} ${c.url}`), ['POST /v2/projects/p1/assessments']);
   assert.deepEqual(srv.writes()[0].body, { name: 'October review', language_id: 'l1', purpose: 'Genesis 1 to 3', period: srv.db.a.period, format: 'Written' });
-  assert.match(srv.db.a.period, /Active until 2026-10-31$/);
+  assert.match(srv.db.a.period, /Active until 2099-10-31$/);
   assert.equal(srv.db.a.stage, 'prepare');
   assert.equal(m.h.state.step, 'participants'); assert.match(m.root.innerHTML, /Who will participate\?/);
   // Back to step 1: values kept, project fixed; Continue without a change writes nothing, a change is a PATCH of that field only
@@ -452,7 +452,7 @@ test('B06: close the tab after step 1 → Continue setup (#new/<id>) reopens at 
   assert.equal(m.h.state.step, 'participants'); assert.match(m.root.innerHTML, /Who will participate\?/);
   m.click('[data-wz="back"]'); await settle();
   assert.equal(m.$('[name="name"]').value, 'October review'); assert.equal(m.$('[name="purpose"]').value, 'Genesis 1 to 3');
-  assert.equal(m.$('[name="until"]').value, '2026-10-31'); assert.equal(m.$('select[name="language"]').value, 'l1');
+  assert.equal(m.$('[name="until"]').value, '2099-10-31'); assert.equal(m.$('select[name="language"]').value, 'l1');
   assert.equal(srv.writes().length, 1, 'reopening writes nothing');
   const d = draftFromSaved({ id: 'a2', project_id: 'p1', language_id: 'l1', name: 'X', period: null }, []);
   assert.equal(d.step, 'details', 'incomplete step 1 reopens at step 1');
@@ -489,7 +489,7 @@ test('B06: Launch after a saved step 1 works as before, without creating the ass
 });
 
 test('B06: resuming a part-launched draft keeps the surveys it already holds (no duplicate select)', () => {
-  const back = draftFromSaved({ id: 'a1', project_id: 'p1', language_id: 'l1', name: 'Oct', period: 'Active until 2026-10-31', role: 'owner' }, [{ id: 's7', template_id: 'tpl.team', template_version: 3, state: 'selected' }]);
+  const back = draftFromSaved({ id: 'a1', project_id: 'p1', language_id: 'l1', name: 'Oct', period: 'Active until 2099-10-31', role: 'owner' }, [{ id: 's7', template_id: 'tpl.team', template_version: 3, state: 'selected' }]);
   assert.equal(back.step, 'participants'); assert.deepEqual(Object.keys(back.d.groups), ['tpl.team']);
   const ctx = launchResume(back.saved, back.d);
   assert.deepEqual(ctx.done, ['cap.assessment.create']); assert.deepEqual(ctx.surveys.map(s => s.id), ['s7']);
@@ -569,4 +569,13 @@ test('U22: a reload on step 1 after the save keeps unsaved step 1 edits; Discard
   assert.equal(m.h.state.step, 'details'); assert.equal(m.$('[name="name"]').value, 'November review'); assert.equal(srv.db.a.name, 'October review');
   m.click('[data-wz="cancel"]'); await settle(); m.click('[data-wz="discard"]'); await settle();
   assert.ok(srv.db.deleted); assert.equal(session.m.size, 0);
+});
+
+test('U46: setup refuses a past Active until date with one inline line under the field', () => {
+  const errs = validateStep('details', draft({ starts: '', until: '2020-01-31' }));
+  assert.deepEqual(errs, ['Pick today or later']);
+  assert.deepEqual(validateStep('details', draft({ starts: '', until: '2026-09-25' }), '2026-09-25'), [], 'today is allowed');
+  const html = renderStep('details', draft({ starts: '', until: '2020-01-31' }), { projects: [], languages: [], templates: [] }, errs);
+  assert.match(html, /name="until" value="2020-01-31" required><span class="wz-field-error" role="alert" data-until-error>Pick today or later<\/span><\/label>/);
+  assert.doesNotMatch(html, /class="note alert"/, 'not repeated in the top box');
 });
