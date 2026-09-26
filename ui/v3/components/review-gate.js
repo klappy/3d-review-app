@@ -22,14 +22,14 @@ export function reviewGate(stage, role, esc = esc0) {
 export function stageMoveButton(to, label, { primary = false, disabled = false } = {}, esc = esc0) {
   return `<button type="button"${primary ? ' class="primary"' : ''} data-stage="${esc(to)}"${disabled ? ' disabled' : ''}>${esc(label)}</button>`;
 }
-export function stageMoveConfirm(sentence, confirmLabel, esc = esc0) {
-  return `<div class="note" data-stage-confirm role="group" aria-label="Confirm the stage move"><p>${esc(sentence)}</p><div class="actions"><button type="button" class="primary" data-stage-confirm-go>${esc(confirmLabel)}</button><button type="button" class="quiet" data-stage-confirm-cancel>Cancel</button></div></div>`;
+export function stageMoveConfirm(sentence, confirmLabel, esc = esc0, aria = 'Confirm the stage move') {
+  return `<div class="note" data-stage-confirm role="group" aria-label="${esc(aria)}"><p>${esc(sentence)}</p><div class="actions"><button type="button" class="primary" data-stage-confirm-go>${esc(confirmLabel)}</button><button type="button" class="quiet" data-stage-confirm-cancel>Cancel</button></div></div>`;
 }
 /** Opens the in-page confirm after `button`'s row; Cancel closes it, the confirm button closes it and calls `onConfirm`. */
-export function askStageMove(button, sentence, confirmLabel, onConfirm, esc = esc0) {
+export function askStageMove(button, sentence, confirmLabel, onConfirm, esc = esc0, aria) { // U14: aria names other in-page asks (delete)
   const doc = button.ownerDocument, row = button.closest('.actions, .title') || button;
   doc.querySelectorAll('[data-stage-confirm]').forEach(n => n.remove());
-  const t = doc.createElement('template'); t.innerHTML = stageMoveConfirm(sentence, confirmLabel, esc);
+  const t = doc.createElement('template'); t.innerHTML = stageMoveConfirm(sentence, confirmLabel, esc, aria);
   const box = t.content.firstElementChild; row.after(box);
   box.querySelector('[data-stage-confirm-cancel]').onclick = () => { box.remove(); button.focus(); };
   box.querySelector('[data-stage-confirm-go]').onclick = () => { box.remove(); onConfirm(); };

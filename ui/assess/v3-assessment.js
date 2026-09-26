@@ -153,6 +153,7 @@ export const v3css = `.v3-bands{display:grid;grid-template-columns:repeat(auto-f
 // move (the server allows one step at a time): Collecting → "Record my review" (checkbox first) → Reviewing →
 // "Choose a next step" → Improving. Viewers get the state word only. No new capability, no new stored field.
 export { V3_REVIEW_CHECK, v3GateAction, reviewGate as v3ReviewGateMarkup, stageMoveButton, askStageMove } from '../v3/components/review-gate.js'; // component: Review gate (ruling 12:34)
+export { deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE } from '../v3/components/delete-assessment.js'; // U14: owner-only Delete assessment
 /** The only write: POST /v2/assessments/:id/stage { stage } (cap.assessment.set_stage), stage from V3_SET_STAGE. */
 export function v3SetStage(api, enc, aid, action) {
   const stage = V3_SET_STAGE[action];

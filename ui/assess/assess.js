@@ -22,7 +22,7 @@ import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove } from '/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE } from '/assess/v3-assessment.js';
 import { mountEditableHeading } from '/v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '/v3/components/saved-status.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
@@ -379,7 +379,7 @@ function lensRows(current) {
   }).join('');
 }
 // View tabs (showcase `tabs()`): links between the five views of ONE assessment. Selecting a tab never calls set_stage.
-function viewTabs(a, current) { ensureStepperStyle(globalThis.document); const perm = (a.role === 'owner' || a.role === 'member') ? `<nav class="tabs view-tabs" aria-label="Assessment settings"><a href="${cards.routes.assessment(a.id, 'permissions')}" ${current === 'permissions' ? 'aria-current="page"' : ''}>Permissions</a></nav>` : ''; return v3StageStepper(a.stage, v => cards.routes.assessment(a.id, v)) + perm; } // ruling 12:28: stage tabs → shared Stepper (component: Stepper); permissions stays a separate link (lane 11 owns its placement)
+function viewTabs(a, current) { ensureStepperStyle(globalThis.document); const perm = (a.role === 'owner' || a.role === 'member') ? `<nav class="tabs view-tabs" aria-label="Assessment settings"><a href="${cards.routes.assessment(a.id, 'permissions')}" ${current === 'permissions' ? 'aria-current="page"' : ''}>Permissions</a>${deleteAssessmentButton(a.role, { disabled: state.busy }, esc)}</nav>` : ''; /* U14: owner-only Delete assessment in the assessment settings */ return v3StageStepper(a.stage, v => cards.routes.assessment(a.id, v)) + perm; } // ruling 12:28: stage tabs → shared Stepper (component: Stepper); permissions stays a separate link (lane 11 owns its placement)
 // Prepare view (showcase `prepareView()`): purpose, saved through cap.assessment.update (O/M); viewers read. The name is the heading (B07).
 function prepareView(current) {
   const a = current.assessment, mayEdit = a.role === 'owner' || a.role === 'member';
@@ -439,6 +439,11 @@ function bind(current) {
   set?.querySelectorAll('[data-include],[data-remove]').forEach(b => b.addEventListener('click', () => { state.surveySetOpen = aid; }));
   app.querySelectorAll('[data-refresh]').forEach(el => el.onclick = e => { e.preventDefault(); render(); });
   bindCounts(current);
+  // U14 (J5): owner-only delete — dry run, one-sentence impact asked in the page, execute, land on the project with a notice.
+  const del = app.querySelector('[data-delete-assessment]');
+  if (del) del.onclick = () => { if (state.busy) return; const pid = current.assessment.project_id, refuse = text => { state.message = { aid, text, alert: true }; paint(); };
+    deleteAssessmentFlow(del, { id: aid, api, ask: askStageMove, onRefused: refuse, onError: e => refuse(redact(e.message)),
+      onDeleted: () => { state.lists.delete(pid); state.dirty.delete(aid); state.message = null; pendingNotice = DELETED_NOTICE; location.hash = cards.routes.project(pid); } }); };
   app.querySelectorAll('[data-include]').forEach(b => b.onclick = () => act(aid, 'Including survey…', async () => { const restoring = b.textContent.trim() === 'Include again'; const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/surveys`, { method: 'POST', body: { template_id: b.dataset.include, version: Number(b.dataset.version) } }); return `${restoring ? 'Survey restored with what was collected' : 'Survey included'}; collection ${r.survey?.collection_status || 'status unknown'}.`; }));
   app.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => act(aid, 'Removing survey…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/surveys/${encodeURIComponent(b.dataset.remove)}`, { method: 'DELETE' }); return r.archived ? `Survey archived: ${r.preserved_responses} response(s), ${r.preserved_codes} code(s), ${r.preserved_invitations} invitation(s) kept. Collection is closed for it; including it again restores it.` : 'Survey removed from this assessment; nothing had been collected for it.'; }));
 }
@@ -792,7 +797,8 @@ function syncContextDisclosure(event) {
 if (typeof matchMedia === 'function') matchMedia('(max-width:650px)').addEventListener('change', syncContextDisclosure);
 // U30 (Bincy B07/B31): a status line belongs to the page and action that set it. A route change clears it so "Renamed." from one
 // page never reads as feedback on the next. An in-flight action keeps its busy label; its own finally clears it.
-function clearPageNote() { if (!note || state.busy) return; note.textContent = ''; note.classList.remove('alert'); }
+let pendingNotice = null; // U14: the one-line notice carried across the navigation that follows a delete
+function clearPageNote() { if (!note || state.busy) return; note.textContent = pendingNotice || ''; pendingNotice = null; note.classList.remove('alert'); }
 let listening = false;
 function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } clearPageNote(); render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
 // B38: does this environment use email sign-in links (DEV) or Cloudflare Access (production)? Asked once; remembered only on

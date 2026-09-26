@@ -65,5 +65,6 @@ v3/components/review-gate.test.mjs
 v3/components/card.test.mjs
 v3/components/editable-heading.test.mjs
 v3/components/saved-status.test.mjs
+v3/components/delete-assessment.test.mjs
 v3/components/invite.test.mjs
 v3/components/active-until.test.mjs
