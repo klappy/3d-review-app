@@ -239,7 +239,7 @@ test('B30 project page (owner + viewer, kit and non-kit hosts): one heading, at 
     if (role === 'owner') assert.equal(count(v, /class="(?:[^"]* )?primary(?: [^"]*)?"/g), 1, name + ': Start is the one primary');
     const more = [...h.matchAll(closed)].map(x => x[0]).join('');
     assert.ok(h.includes(LM) && more.includes(`Your role: ${role}`), name + ': role sentence moved, not removed');
-    if (role === 'owner') for (const moved of ['Issue paper codes for one survey', 'Group projects in a workspace']) assert.ok(more.includes(moved) && !v.includes(moved), `${name}: moved, not removed: ${moved}`);
+    if (role === 'owner') for (const moved of ['Issue paper codes on a survey', 'Group projects in a workspace']) assert.ok(more.includes(moved) && !v.includes(moved), `${name}: moved, not removed: ${moved}`);
     assert.match(v, /class="badge">\s*/, name + ': role badge stays visible');
   }
 });
