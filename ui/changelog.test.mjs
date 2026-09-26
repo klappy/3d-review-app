@@ -165,7 +165,7 @@ test('V4 open/close: 404 changelog renders not-listed body; close event resets a
 function appHarness() {
   const nodes = new Map(), requests = [];
   function node(id) {
-    if (!nodes.has(id)) nodes.set(id, { id, hidden: true, textContent: '', value: '', children: [], listeners: {}, attrs: new Map(),
+    if (!nodes.has(id)) nodes.set(id, { id, hidden: true, textContent: '', value: '', dataset: {}, children: [], listeners: {}, attrs: new Map(),
       addEventListener(event, fn) { this.listeners[event] = fn; }, setAttribute(k, v) { this.attrs.set(k, String(v)); }, getAttribute(k) { return this.attrs.get(k) ?? null; },
       replaceChildren(...children) { this.children = children; }, append(child) { this.children.push(child); },
       prepend(child) { this.children.unshift(child); }, add(child) { this.children.push(child); },
