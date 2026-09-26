@@ -18,13 +18,13 @@ function makeRoot(html) {
   const els = Object.fromEntries(attrs.map(a => [a, { handlers: {}, addEventListener(ev, fn) { this.handlers[ev] = fn; }, click() { return this.handlers.click?.(); } }]));
   return { html, els, querySelector(sel) { const m = /\[(data-share-[a-z-]+)\]/.exec(sel); return m ? this.els[m[1]] || null : null; }, set innerHTML(v) { this.html = v; const r = makeRoot(v); this.els = r.els; }, get innerHTML() { return this.html; } };
 }
-function mount(role, table, extras = {}) {
+function mount(role, table, extras = {}, binds = {}) {
   const { api, calls } = fakeApi(table); const state = {}; const cur = current(role); const share = shareFor(state, 'a1', 's1', 1);
   const bindCtx = { ...ctx, ...extras };
   const root = makeRoot(render(ctx, { current: cur, survey, share })); const clipboard = { text: null, async writeText(t) { this.text = t; } };
   const prints = []; const sheets = []; const doc = { createElement: () => ({ set innerHTML(v) { this.html = v; }, className: '', remove() { sheets.push('removed'); } }), body: { append: el => sheets.push(el) } };
-  const onChange = () => { root.innerHTML = render(ctx, { current: cur, survey, share }); bind(bindCtx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test' }); };
-  bind(bindCtx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test' });
+  const onChange = () => { root.innerHTML = render(ctx, { current: cur, survey, share }); bind(bindCtx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test', ...binds }); };
+  bind(bindCtx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test', ...binds });
   return { api, calls, state, share, root, clipboard, prints, sheets, click: async attr => { await root.querySelector(`[${attr}]`).click(); } };
 }
 const LINKS = 'POST /v2/assessments/a1/surveys/s1/links';
@@ -297,4 +297,20 @@ test('B43 Print all: one page, one entry per survey (title, one-line description
   fail = true; await handler({ target: btn });
   assert.equal(prints.length, 1); assert.match(status.className, /alert/);
   assert.match(css, /@page\{margin:12mm\}/); assert.match(css, /break-inside:avoid/);
+});
+
+test('U36: the survey Share card and Collect share one link per survey; the card sentence is true; revoke drops the shared entry', async () => {
+  const { cachedLink, knownLink, rememberLink } = await import('./share.js');
+  const table = { [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct1', expires_in: 300 } : { link_id: 'inv_1', entry_fragment: '#survey=ONE', expires_at: null }, 'DELETE /v2/assessments/a1/surveys/s1/links/inv_1': { id: 'inv_1', status: 'revoked' } };
+  const links = new Map(), key = 'a1|s1|1';
+  const m = mount('owner', table, {}, { links, linkKey: key });
+  await m.click('data-share-open'); await m.click('data-share-copy');
+  assert.equal(knownLink(links, key).url, 'https://example.test/#survey=ONE', 'the card writes its link where Collect reads');
+  let minted = 0; const again = await cachedLink(links, key, async () => { minted++; return { url: 'NEW' }; });
+  assert.equal(again.url, 'https://example.test/#survey=ONE'); assert.equal(minted, 0, 'Collect Copy/QR/Print reuse the card link');
+  assert.match(m.root.html, /Everyone can use this one link; after a page reload, sharing makes a new one\./); assert.doesNotMatch(m.root.html, /Use the same link below/);
+  await m.click('data-share-revoke'); assert.equal(links.has(key), false, 'a revoked link is never handed out again');
+  const c = new Map(); const l = await cachedLink(c, key, async () => ({ id: 'inv_2', url: 'U2' })); assert.equal(knownLink(c, key), l, 'a Collect-issued link is readable by the card');
+  rememberLink(c, key, { id: 'inv_3', url: 'U3' }); assert.equal((await cachedLink(c, key, async () => ({ url: 'X' }))).url, 'U3');
+  c.set(key, { uncertain: true }); assert.equal(knownLink(c, key), null);
 });
