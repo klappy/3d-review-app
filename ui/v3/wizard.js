@@ -12,6 +12,7 @@ import { shareUrl } from '../shared-link.js';
 import { groupLinks, bindGroupLinks, printAllButton, bindPrintAll } from '../assess/share.js';
 import { stepper as stepperComponent, ensureStepperStyle } from './components/stepper.js';
 import { learnMore } from './components/learn-more.js';
+import { PRIVACY_LINE } from './components/privacy-line.js';
 import { packPeriod, periodText, periodErrors, formatDate, todayIso } from './components/active-until.js';
 import { whoLine } from '../assess/scope.js';
 
@@ -260,7 +261,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       <h3>Shown to every participant</h3>
       <dl class="kv"><dt>Project</dt><dd>${esc(proj.name || '')}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd><dt>Format</dt><dd>${esc(d.format)}</dd>${dates(d)}</dl>
       <h3>Asked of each participant</h3>
-      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><h3>${esc(t.perspective)}</h3><span class="sub">The ${esc(t.name)} survey, as published.</span></div></div>`).join('')}${chosen.length ? '<p class="small muted">Answers are grouped, never shown alone.</p>' : ''}
+      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><h3>${esc(t.perspective)}</h3><span class="sub">The ${esc(t.name)} survey, as published.</span></div></div>`).join('')}${chosen.length ? `<p class="small muted">${PRIVACY_LINE}</p>` : ''}
       ${actions(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   // review

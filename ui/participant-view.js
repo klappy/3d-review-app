@@ -1,5 +1,6 @@
 // Source-shaped presentation only: no API, storage, credential or submission ownership.
 import { periodText } from './v3/components/active-until.js';
+import { PRIVACY_LINE } from './v3/components/privacy-line.js';
 export function itemError(item, values) {
   const value = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id);
   const empty = value === null || value === '' || (Array.isArray(value) && !value.length);
@@ -28,7 +29,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   if(eyebrowText){const eb=el('p',eyebrowText);eb.className='eyebrow';intro.append(eb);}
   intro.append(el('h2','We would like your perspective'));
   // Invitation + privacy sentence stays visible as the one short line (Bincy B27 privacy wording is captain-held, ASK 9/15).
-  const lead=el('p',`${model.language?`You were invited to say how the ${model.language} translation is going. `:''}Your answers are grouped with others and never shown on their own.`);lead.className='participant-lead';intro.append(lead);
+  const lead=el('p',`${model.language?`You were invited to say how the ${model.language} translation is going. `:''}${PRIVACY_LINE}`);lead.className='participant-lead';intro.append(lead);
   // Bincy B30 (LANES 18:35 ruling): one heading, one short line, one primary action; explanations behind "Learn more".
   // Bincy B10: the shared context setup step 3 lists ("Shown to every participant"), once, as a compact meta row.
   const shared=[model.project,model.language,model.purpose,model.format,periodText(model.period)].map(v=>typeof v==='string'?v.trim():'').filter(Boolean).join(' · ');

@@ -87,11 +87,11 @@ test('Bincy B30: welcome is one heading, the visible invitation/privacy line, B1
   assert.deepEqual(shown.map(n=>n.tag),['p','h2','p','p','button','details']);
   assert.equal(shown[0].className,'eyebrow');
   // B27 privacy wording is captain-held: it stays visible, never behind Learn more.
-  assert.equal(shown[2].className,'participant-lead');assert.match(shown[2].textContent,/Tok Pisin translation.*never shown on their own/);
+  assert.equal(shown[2].className,'participant-lead');assert.match(shown[2].textContent,/Tok Pisin translation.*Your responses are confidential\./);
   assert.match(shown[3].className,/participant-context/);assert.equal(shown[3].textContent,'Hill Project · Tok Pisin · Mark 1–4 · Audio · Oct');
   assert.equal(shown.filter(n=>n.tag==='button').length,1);assert.equal(shown[4].textContent,'Start');
   const more=shown[5];assert.equal(more.children[0].tag,'summary');assert.equal(more.children[0].textContent,'Learn more');
   const hidden=more.children.slice(1).map(n=>n.textContent).join(' ');
   for(const w of ['No account, no sign-in','Time: about 5 minutes · 2 questions'])assert.ok(hidden.includes(w),w);
-  assert.ok(!hidden.includes('never shown on their own'),'privacy wording not hidden');
+  assert.ok(!hidden.includes('Your responses are confidential.'),'privacy wording not hidden');
 });
