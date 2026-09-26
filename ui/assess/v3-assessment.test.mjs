@@ -19,6 +19,7 @@ test('set_stage mapping keeps app stage ids (ADOPTION.md)', () => {
 test('(a) denominator only when entered', () => {
   assert.match(v3CountLine({ responses: 4 }), />4 responded</);
   assert.match(v3CountLine({ responses: 4, expected: 10 }), />4 of 10 responded</);
+  assert.match(v3CountLine({ responses: 6, expected: 3 }), />6 responded · 3 expected</); // U39
   assert.match(v3CountLine({ responses: 4, expected: '' }), />4 responded</);
 });
 test('(b) settled and not-yet-confirmed side by side; never guessed', () => {
