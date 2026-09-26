@@ -9,7 +9,7 @@
 // location or the router itself. deps.go(hash) is the shell's navigation.
 
 import { shareUrl } from '../shared-link.js';
-import { groupLinks, bindGroupLinks } from '../assess/share.js';
+import { groupLinks, bindGroupLinks, printAllButton, bindPrintAll } from '../assess/share.js';
 import { stepper as stepperComponent, ensureStepperStyle } from './components/stepper.js';
 import { learnMore } from './components/learn-more.js';
 import { whoLine } from '../assess/scope.js';
@@ -272,7 +272,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
 export function linkRows(links, origin, templates) {
   const tpl = id => templates.find(t => t.id === id) || {};
   const url = l => { try { return shareUrl(origin, l.entry_fragment); } catch { return ''; } };
-  return links.map(l => ({ key: l.survey || l.template, group: tpl(l.template).perspective || l.template, survey: tpl(l.template).name || 'Survey', url: url(l) }));
+  return links.map(l => { const group = tpl(l.template).perspective || l.template; return { key: l.survey || l.template, group, survey: tpl(l.template).name || 'Survey', line: whoLine(group) || group, url: url(l) }; });
 }
 // B08+B20: the launched rows sit under their group's who-line (same shared line as step 2 and Collect); rows themselves unchanged.
 function linkList(links, origin, templates) {
@@ -283,7 +283,7 @@ function linkList(links, origin, templates) {
 export function renderDone(ctx, origin = '', templates = []) {
   return `<div class="eyebrow">Launched</div><h1 class="wz-h">The review is collecting responses</h1>
     <p class="muted">Share each link with its group.</p>${learnMore('<p class="muted">Nothing was sent to anyone.</p>')}
-    ${linkList(ctx.links, origin, templates)}
+    ${linkList(ctx.links, origin, templates)}${(ctx.links || []).length ? printAllButton({ esc }) : ''}
     <div class="actions"><span class="spacer"></span><button type="button" class="primary" data-wz="open" data-aid="${esc(ctx.aid)}">Open the review</button></div>`;
 }
 
@@ -312,6 +312,8 @@ export function mountWizard(root, deps) {
     s.errs = validateStep(s.step, s.d); if (!s.errs.length) s.step = STEPS[STEPS.indexOf(s.step) + 1] || s.step; paint();
   }, on);
   bindGroupLinks(root, { signal: ac.signal, resolve: async key => (linkRows((s.done || s.partial || {}).links || [], deps.origin || '', latestTemplates(s.data.templates)).find(r => r.key === key) || {}).url });
+  // B43: "Print all" — every launched survey on one page (title, one line, QR); the links are the ones already shown.
+  bindPrintAll(root, { signal: ac.signal, heading: () => s.d.name, items: async () => linkRows((s.done || {}).links || [], deps.origin || '', latestTemplates(s.data.templates)).map(r => ({ title: r.survey, line: r.line, url: r.url })) });
   root.addEventListener('click', async e => {
     const b = e.target.closest('[data-wz]'); if (!b) return;
     const act = b.dataset.wz; s.errs = [];

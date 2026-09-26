@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { render, bind, shareFor, blankShare, copy, qrSvg, invitationSheetHtml, CAN_SHARE } from './share.js';
+import { render, bind, shareFor, blankShare, copy, qrSvg, invitationSheetHtml, CAN_SHARE, css } from './share.js';
 
 const read = n => readFileSync(fileURLToPath(new URL(n, import.meta.url)), 'utf8');
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -44,11 +44,11 @@ test('Share prepares only; Copy confirms issuance and delivers, then QR/print re
   await m.click('data-share-copy');
   assert.deepEqual(m.calls[1].body, { params: {}, mode: 'execute', confirm_token: 'ct1' });
   assert.equal(m.share.confirm, null, 'confirm token is single-use'); assert.equal(m.share.link.url, 'https://example.test/#survey=SECRET'); assert.equal(m.share.link.id, 'inv_1');
-  assert.match(m.root.html, /Keep a copy of this link/); assert.match(m.root.html, /data-share-copy/); assert.match(m.root.html, /data-share-qr/); assert.match(m.root.html, /data-share-sheet/); assert.match(m.root.html, /data-share-revoke/);
+  assert.match(m.root.html, /Keep a copy of this link/); assert.match(m.root.html, /data-share-copy/); assert.match(m.root.html, /data-share-qr/); assert.match(m.root.html, /data-share-print/); assert.match(m.root.html, /data-share-revoke/);
   assert.doesNotMatch(m.root.html, /link_token|inv_1/, 'the raw token field and link id are never rendered');
   await m.click('data-share-copy'); assert.equal(m.clipboard.text, 'https://example.test/#survey=SECRET'); assert.match(m.root.html, /Link copied/);
   await m.click('data-share-qr'); assert.match(m.root.html, /<svg/); assert.match(m.root.html, /Hide QR code/);
-  await m.click('data-share-sheet'); assert.equal(m.calls.length, 2, 'output retries never reissue'); assert.equal(m.prints.length, 1); assert.deepEqual(m.sheets.map(s => typeof s === 'string' ? s : 'mounted'), ['mounted', 'removed'], 'sheet mounted on body for print then removed');
+  await m.click('data-share-print'); assert.equal(m.calls.length, 2, 'output retries never reissue'); assert.equal(m.prints.length, 1); assert.deepEqual(m.sheets.map(s => typeof s === 'string' ? s : 'mounted'), ['mounted', 'removed'], 'sheet mounted on body for print then removed');
 });
 
 test('create without a live confirm token never calls execute; a failed execute keeps no link', async () => {
@@ -93,7 +93,7 @@ const receipt = { link_id: 'inv_1', entry_fragment: '#survey=SECRET' };
 const prepared = { confirm_token: 'ct1', expires_in: 300 };
 const good = ({body}) => body.mode === 'dry_run' ? prepared : receipt;
 test('QR or print can be the first outcome; each explicitly confirms only once', async () => {
-  for (const action of ['data-share-qr', 'data-share-sheet']) {
+  for (const action of ['data-share-qr', 'data-share-print']) {
     const m = mount('owner', {[LINKS]:good});
     await m.click('data-share-open'); await m.click(action);
     assert.equal(m.calls.length, 2); assert.equal(m.calls[1].body.mode, 'execute');
@@ -215,7 +215,7 @@ test('B36 issueLink: one tap = dry_run then execute on that survey; returns the 
   assert.deepEqual(calls.map(c => c.body.mode), ['dry_run', 'execute']); assert.equal(calls[1].body.confirm_token, 'ct1');
   assert.equal(link.id, 'inv_1'); assert.match(link.url, /^https:\/\/example\.test\/.*#survey=TOK$/);
   const src = read('./assess.js');
-  assert.match(src, /share\.groupLinks\(\{ esc \}, \[\{ key: s\.id \}\]\)/);
+  assert.match(src, /share\.groupLinks\(\{ esc \}, \[\{ key: s\.id, title: s\.template_name, line: whoLine\(g\.lens\) \|\| g\.lens \}\]\)/);
   assert.match(src, /share\.bindGroupLinks\(root/); assert.match(src, /share\.issueLink\(api/); assert.match(src, /state\.collectLinks\.clear\(\)/);
   assert.doesNotMatch(src.slice(src.indexOf('function bindCollectLinks'), src.indexOf('function collectPanel')), /localStorage|sessionStorage|console\./);
 });
@@ -244,4 +244,57 @@ test('B36 follow-up: an uncertain Collect failure keeps the Share card warning a
   // Collect rows show only the buttons (group and survey are in the heading just above); the footer line is gone
   assert.doesNotMatch(groupLinks(ctx, [{ key: 's1' }]), /data-group-label/);
   assert.doesNotMatch(read('./assess.js'), /Open a survey to share its link or print a blank questionnaire/);
+});
+
+// B43 (captain 19:50): one share card everywhere — Copy link · QR code · Print — plus one secondary "Print all".
+test('B43 shareActions: Copy link · QR code · Print in that order; the same component on the survey page and every group row', async () => {
+  const { shareActions, groupLinks } = await import('./share.js');
+  const labels = h => [...h.matchAll(/<button[^>]*>([^<]+)<\/button>/g)].map(m => m[1]);
+  assert.deepEqual(labels(shareActions(ctx, { prefix: 'group', key: 's1' })), ['Copy link', 'QR code', 'Print']);
+  const rows = groupLinks(ctx, [{ key: 's1', group: 'Community', survey: 'Listening' }, { key: 's2' }]);
+  assert.equal((rows.match(/data-share-actions/g) || []).length, 2);
+  assert.equal((rows.match(/data-group-print="s[12]"/g) || []).length, 2);
+  assert.doesNotMatch(rows, /class="primary"/);
+  const m = mount('owner', { [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct1', expires_in: 300 } : { link_id: 'inv_1', entry_fragment: '#survey=TOK', expires_at: null } });
+  await m.click('data-share-open');
+  assert.match(m.root.html, /data-share-actions/);
+  assert.deepEqual(labels(m.root.html.slice(m.root.html.indexOf('data-share-actions'))).slice(0, 3), ['Copy link', 'QR code', 'Print']);
+  for (const f of ['../v3/wizard.js', './assess.js']) assert.match(read(f), /printAllButton/);
+});
+
+test('B43 group Print: prints that group\'s own sheet (title, line, link, QR) on body, then removes it; no second resolve on reuse', async () => {
+  const { bindGroupLinks } = await import('./share.js');
+  let handler; const root = { addEventListener: (ev, fn) => { handler = fn; } };
+  const sheets = []; const prints = [];
+  const doc = { createElement: () => ({ className: '', set innerHTML(v) { this.html = v; }, remove() { sheets.push('removed'); } }), body: { append: el => sheets.push(el) } };
+  bindGroupLinks(root, { resolve: async () => 'https://x/participate/#survey=PPP', clipboard: { async writeText() {} }, doc, print: () => prints.push(1) });
+  const status = { textContent: '', className: '' };
+  const row = { dataset: { printTitle: 'Listening', printLine: 'People who speak the language.' }, querySelector: sel => sel === '[data-group-status]' ? status : null };
+  const btn = { dataset: { groupPrint: 's1' }, closest: sel => sel === '[data-group-link]' ? row : btn };
+  await handler({ target: btn });
+  assert.equal(prints.length, 1); assert.equal(sheets[1], 'removed');
+  const html = sheets[0].html;
+  assert.match(html, /<h1>Listening<\/h1>/); assert.match(html, /People who speak the language\./); assert.match(html, /#survey=PPP/); assert.match(html, /<svg/);
+});
+
+test('B43 Print all: one page, one entry per survey (title, one-line description, QR); secondary; failures say so', async () => {
+  const { printAllHtml, printAllButton, bindPrintAll } = await import('./share.js');
+  assert.doesNotMatch(printAllButton(ctx), /primary/); assert.match(printAllButton(ctx), />Print all</);
+  const items = [{ title: 'Validation', line: 'The people doing the translation work.', url: 'https://x/#survey=A' }, { title: 'Listening', line: 'People who speak the language.', url: 'https://x/#survey=B' }];
+  const h = printAllHtml(ctx, { heading: 'Tavo <review>', items });
+  assert.match(h, /<h1>Tavo &lt;review&gt;<\/h1>/);
+  assert.equal((h.match(/class="share-all-item"/g) || []).length, 2); assert.equal((h.match(/<svg/g) || []).length, 2);
+  assert.match(h, /<h2>Validation<\/h2><p>The people doing the translation work\.<\/p>/);
+  let handler; const root = { addEventListener: (ev, fn) => { handler = fn; } };
+  const sheets = []; const prints = []; const status = { textContent: '', className: '' };
+  const doc = { createElement: () => ({ className: '', set innerHTML(v) { this.html = v; }, remove() { sheets.push('removed'); } }), body: { append: el => sheets.push(el) } };
+  const btn = { parentElement: { querySelector: () => status } }; btn.closest = sel => sel === '[data-share-print-all]' ? btn : null;
+  let fail = false;
+  bindPrintAll(root, { heading: 'Tavo', items: async () => { if (fail) throw new Error('x'); return items; }, doc, print: () => prints.push(1) });
+  await handler({ target: btn });
+  assert.equal(prints.length, 1); assert.equal(sheets[0].className, 'stage-print-only share-sheet'); assert.equal(sheets[1], 'removed');
+  assert.equal((sheets[0].html.match(/share-all-item/g) || []).length, 2);
+  fail = true; await handler({ target: btn });
+  assert.equal(prints.length, 1); assert.match(status.className, /alert/);
+  assert.match(css, /@page\{margin:12mm\}/); assert.match(css, /break-inside:avoid/);
 });
