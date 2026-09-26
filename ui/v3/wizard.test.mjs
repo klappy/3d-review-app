@@ -294,7 +294,7 @@ test('L9-23 less text (captain 17:05): every setup screen = one heading, at most
   assert.match(screens.details, /Learn more<\/summary><p class="muted">Only what the review needs\./);
   assert.match(screens.participants, /Learn more<\/summary>.*Three perspectives, kept separate\..*The number is optional\./s);
   assert.ok(screens.participants.indexOf('The number is optional') < screens.participants.indexOf('</details>'), 'optional-number note lives behind Learn more');
-  assert.match(screens.information, /Answers are grouped, never shown alone\./); assert.equal((screens.information.match(/never shown alone/g) || []).length, 1, 'privacy line once, not per group');
+  assert.match(screens.information, /Your responses are confidential\./); assert.equal((screens.information.match(/responses are confidential/g) || []).length, 1, 'privacy line once, not per group');
   assert.match(screens.done, /Learn more<\/summary><p class="muted">Nothing was sent to anyone\./);
 });
 
