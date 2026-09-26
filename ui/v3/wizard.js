@@ -163,7 +163,9 @@ async function launchInner(d, opts) {
         const url = `/v2/assessments/${enc(ctx.aid)}/surveys/${enc(s.id)}/links`;
         const dry = await api(url, { method: 'POST', body: { params: {}, mode: 'dry_run' } });
         const r = await api(url, { method: 'POST', body: { params: {}, mode: 'execute', confirm_token: dry.confirm_token } });
-        ctx.links.push({ survey: s.id, template: s.template, entry_fragment: r.entry_fragment, expires_at: r.expires_at || null });
+        const row = { id: r.link_id || null, survey: s.id, template: s.template, entry_fragment: r.entry_fragment, expires_at: r.expires_at || null };
+        ctx.links.push(row);
+        try { opts.onLink?.(ctx.aid, row); } catch {} // U36: the host keeps this as the survey's active link (Collect/survey page reuse it)
         ctx.done.push(step.cap);
       }
       continue;
@@ -461,7 +463,7 @@ export function mountWizard(root, deps) {
     if (act === 'open') return deps.go?.(deps.assessmentHref ? deps.assessmentHref(b.dataset.aid) : `#/a/${enc(b.dataset.aid)}`);
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
-      try { const done = await launch(s.d, { api: deps.api, store: deps.store, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; if (s.saved) clearWip(session, s.saved.aid); s.done = done; s.partial = null; paint(); }
+      try { const done = await launch(s.d, { api: deps.api, store: deps.store, onLink: deps.onLink, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; if (s.saved) clearWip(session, s.saved.aid); s.done = done; s.partial = null; paint(); }
       catch (err) { if (!alive) return; const c = err.ctx, made = c ? c.done.length - (c.base || 0) : 0; s.partial = (made > 0 || c?.pending) ? c : s.partial; s.step = 'review'; note(new Error(s.partial ? `${err.message || err} ${s.partial.done.length - (s.partial.base || 0)} of the launch writes were done${s.partial.pending ? ' and the last one may have gone through' : ''}. "Continue the launch" checks what was saved and picks up from there; edits stay locked until then.` : `${err.message || err} ${s.saved ? 'Nothing more was saved; the draft is kept.' : 'Nothing was created.'} You can edit and launch again.`)); }
       finally { s.busy = false; }
     }

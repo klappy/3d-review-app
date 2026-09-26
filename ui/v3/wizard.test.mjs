@@ -570,3 +570,17 @@ test('U22: a reload on step 1 after the save keeps unsaved step 1 edits; Discard
   m.click('[data-wz="cancel"]'); await settle(); m.click('[data-wz="discard"]'); await settle();
   assert.ok(srv.db.deleted); assert.equal(session.m.size, 0);
 });
+
+test('U36: each launch link is handed to the host (with its link id) so Collect and the survey page reuse it', async () => {
+  let n = 0, k = 0; const seen = [];
+  const api = async (url, { body } = {}) => {
+    if (url.endsWith('/assessments')) return { assessment: { id: 'a1' } };
+    if (url.endsWith('/surveys')) return { survey: { id: 's' + (++n) } };
+    if (url.endsWith('/stage')) return {};
+    if (url.endsWith('/links')) return body.mode === 'dry_run' ? { confirm_token: 'ct' } : { link_id: 'inv_' + (++k), entry_fragment: '#survey=t' + k, expires_at: null };
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = await launch(draft(), { api, store: mem(), onLink: (aid, row) => seen.push([aid, row.survey, row.id, row.entry_fragment]) });
+  assert.deepEqual(seen, [['a1', 's1', 'inv_1', '#survey=t1'], ['a1', 's2', 'inv_2', '#survey=t2']]);
+  assert.equal(ctx.links[0].id, 'inv_1');
+});

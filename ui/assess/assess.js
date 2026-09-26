@@ -271,14 +271,13 @@ function collectState(status) {
 }
 function lensFor(s) { return LENSES.includes(s.perspective) ? s.perspective : 'Other perspective'; }
 // B36: Copy link / Show QR code per group on Collect (owner, member; open surveys). One tap issues the link through the Share
-// card's API pair; the link lives in memory only, keyed to (aid, sid, epoch) and dropped with identity (state.collectLinks).
+// card's API pair; the link lives in memory only, keyed to (aid, sid) and dropped with identity (state.collectLinks, U36).
 function shareable(a, s) { return share.CAN_SHARE.has(a.role) && (s.collection_status === 'open' || a.stage === 'collect'); }
 function bindCollectLinks(current) {
   const root = app.querySelector('[data-collect-panel]'); if (!root) return;
   const aid = current.assessment.id, ep = epoch;
   share.bindGroupLinks(root, { resolve: async sid => {
-    const k = `${aid}|${sid}|${ep}`;
-    for (const key of state.collectLinks.keys()) if (!key.startsWith(`${aid}|`) || !key.endsWith(`|${epoch}`)) state.collectLinks.delete(key);
+    const k = share.linkKey(aid, sid); // U36: the survey's one active link, whichever page issued it
     const link = await share.cachedLink(state.collectLinks, k, () => share.issueLink(api, { aid, sid, origin: location.origin }));
     if (ep !== epoch || state.current?.assessment.id !== aid) throw share.failure(); // a link may exist but is not shown here
     return link.url;
@@ -286,7 +285,7 @@ function bindCollectLinks(current) {
   // B43: "Print all" — one page, every shareable survey (title, one line, QR). Same per-survey cache as the rows: a survey
   // whose link was already issued here reuses it; the rest are issued exactly as one Copy tap would.
   const resolveAll = () => Promise.all(current.surveys.filter(s => shareable(current.assessment, s)).map(async s => {
-    const k = `${aid}|${s.id}|${ep}`;
+    const k = share.linkKey(aid, s.id);
     const link = await share.cachedLink(state.collectLinks, k, () => share.issueLink(api, { aid, sid: s.id, origin: location.origin }));
     if (ep !== epoch || state.current?.assessment.id !== aid) throw share.failure();
     return { title: s.template_name, line: whoLine(lensFor(s)) || lensFor(s), url: link.url };
@@ -456,15 +455,15 @@ function currentShareRoute() {
   if (model && (r.kind !== 'survey' || r.id !== model.aid || r.sid !== model.sid || epoch !== model.epoch)) state.share = null;
   return state.share;
 }
-// U36: the Share card starts from the survey's link already issued on this page load (Collect or an earlier visit), if any.
+// U36: the Share card starts from the survey's active link already issued on this page load (launch, Collect or an earlier visit), if any.
 function shareModel(aid, sid) {
-  const m = share.shareFor(state, aid, sid, epoch), known = share.knownLink(state.collectLinks, `${aid}|${sid}|${epoch}`);
+  const m = share.shareFor(state, aid, sid, epoch), known = share.knownLink(state.collectLinks, share.linkKey(aid, sid));
   if (!m.link && known && m.stage !== 'busy') { m.link = known; m.stage = 'linked'; }
   return m;
 }
 function bindShare(current, s) {
   const root = app.querySelector('#share-root'); if (!root) return;
-  const model = shareModel(current.assessment.id, s.id), linkKey = `${current.assessment.id}|${s.id}|${epoch}`;
+  const model = shareModel(current.assessment.id, s.id), linkKey = share.linkKey(current.assessment.id, s.id);
   const ctx = { esc, enc: encodeURIComponent, isCurrent: () => currentShareRoute() === model };
   const onChange = () => { const el = app.querySelector('#share-root'); if (!el) return; el.innerHTML = share.render(ctx, { current, survey: s, share: model }); share.bind(ctx, el, { current, survey: s, share: model, api, apiFull, onChange, links: state.collectLinks, linkKey }); };
   share.bind(ctx, root, { current, survey: s, share: model, api, apiFull, onChange, links: state.collectLinks, linkKey });
@@ -628,7 +627,9 @@ async function mountNew(gen, resume = null) {
   if (gen !== generation) return;
   if (!mod?.mountWizard) { app.innerHTML = `<div class="narrow panel"><h1>Start a review</h1><p class="muted">The guided setup is not available on this build yet.</p><div class="actions"><a class="rv-btn primary" href="${cards.routes.projects}">Go to your projects</a></div></div>`; return; }
   const ctx = ctxFor();
+  const idg = identityGeneration;
   wizardHandle = mod.mountWizard(app, { api: ctx.api, go: ctx.go, origin: location.origin, assessmentHref: id => `#assessment/${encodeURIComponent(id)}`, resume,
+    onLink: (aid, row) => { if (idg === identityGeneration) share.rememberLaunchLink(state.collectLinks, aid, row, location.origin); }, // U36: Collect and the survey page reuse the launch links
     mark: id => { if (gen !== generation) return; try { history.replaceState(null, '', `${location.pathname}${location.search}#new/${encodeURIComponent(id)}`); } catch {} } }); // U22: a reload reopens this draft
   document.title = `${resume ? 'Continue setup' : 'Start a review'} · 3D Review`;
 }
