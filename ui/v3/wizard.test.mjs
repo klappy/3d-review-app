@@ -323,7 +323,7 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
   const tpls = [{ id: 'tpl.team', version: 1, name: 'Team', perspective: 'Translation team' }, { id: 'tpl.comm', version: 1, name: 'Listening', perspective: 'Community' }];
   const h = renderDone({ aid: 'a1', links: [{ survey: 's1', template: 'tpl.team', entry_fragment: '#survey=AAA' }, { survey: 's2', template: 'tpl.comm', entry_fragment: '#survey=BBB' }] }, 'https://x', tpls);
   assert.match(h, /Translation team <span aria-hidden="true">·<\/span> Team/); assert.match(h, /Community <span aria-hidden="true">·<\/span> Listening/);
-  assert.equal((h.match(/data-group-copy="s[12]"/g) || []).length, 2); assert.equal((h.match(/data-group-qr="s[12]"/g) || []).length, 2);
+  assert.equal((h.match(/data-group-copy="s[12]"/g) || []).length, 2); assert.equal((h.match(/data-group-qr="s[12]"/g) || []).length, 0); assert.equal((h.match(/data-group-qr-figure>/g) || []).length, 2); // U45: QR inline, no toggle
   assert.match(h, /#survey=AAA/); assert.match(h, /#survey=BBB/);
   assert.equal((h.match(/class="primary"/g) || []).length, 1);
   // B43: each row is the share card (Copy link · QR code · Print) and one secondary "Print all" follows the rows
