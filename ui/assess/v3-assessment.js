@@ -27,11 +27,14 @@ const esc0 = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<':
 
 export function v3StageWord(stage) { return V3_STAGES[stage]?.word || 'Setup not finished'; }
 
-/** One primary action for the assessment page, driven by stage. Viewers get no Share/Continue action. */
-export function v3StagePrimary(stage, canEdit, href = v => `#${v}`, esc = esc0) {
+/** One primary action for the assessment page, driven by stage. Viewers get no Share/Continue action.
+ *  U42 (Bincy B30): never a link to the page already open (`current` = the open view → no action), and `secondary` renders it
+ *  as a plain button where the page owns its own primary (Permissions: "Preview invitation"). */
+export function v3StagePrimary(stage, canEdit, href = v => `#${v}`, esc = esc0, { current = null, secondary = false } = {}) {
   const s = V3_STAGES[stage] || V3_STAGES.prepare;
   if (!canEdit && (s.view === 'collect' || s.view === 'prepare')) return '';
-  return `<a class="rv-btn primary" data-v3-primary="${esc(s.view)}" href="${esc(href(s.view))}">${esc(s.primary)}</a>`;
+  if (current === s.view) return '';
+  return `<a class="rv-btn${secondary ? '' : ' primary'}" data-v3-primary="${esc(s.view)}" href="${esc(href(s.view))}">${esc(s.primary)}</a>`;
 }
 
 const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Math.max(0, Math.floor(Number(v))));
