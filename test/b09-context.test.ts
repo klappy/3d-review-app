@@ -47,6 +47,15 @@ describe("B09 context",()=>{
   const row=await db.prepare("SELECT context_json FROM response WHERE id=?").bind(ok.result.response_id).first<any>();
   expect(JSON.parse(row.context_json)).toEqual({age_range:"25_34",gender:"prefer_not"});
  });
+ it("a same-key retry after reload (About you not restored) returns the original receipt",async()=>{
+  const t=await participant(),key="retry-key";
+  const first=await call("POST","/v2/participate/responses",{idempotency_key:key,answers:{Q1:4},context:{gender:"female"}},t);expect(first.ok).toBe(true);
+  const again=await call("POST","/v2/participate/responses",{idempotency_key:key,answers:{Q1:4}},t);
+  expect(again.ok).toBe(true);expect(again.result).toMatchObject({response_id:first.result.response_id,duplicate:true});
+  const changed=await call("POST","/v2/participate/responses",{idempotency_key:key,answers:{Q1:4},context:{gender:"male"}},t);
+  expect(changed.result).toMatchObject({response_id:first.result.response_id,duplicate:true});
+  const row=await db.prepare("SELECT context_json FROM response WHERE id=?").bind(first.result.response_id).first<any>();expect(JSON.parse(row.context_json)).toEqual({gender:"female"});
+ });
  it("skipping About you stores the empty default",async()=>{
   const t=await participant();const ok=await submit(t,{});expect(ok.ok).toBe(true);
   const row=await db.prepare("SELECT context_json FROM response WHERE id=?").bind(ok.result.response_id).first<any>();expect(row.context_json).toBe("{}");

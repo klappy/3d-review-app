@@ -2,7 +2,7 @@
 // Group-level fields are the Kairos Laos export fields asked of the facilitator per group in setup step 3, WITHOUT any
 // name field (facilitator_name, team_members_present, leader_name are never asked or stored). Respondent fields are
 // the optional age range and gender on the participant form. Every field is optional; unknown keys are refused.
-// Mirrored for the browser in ui/v3/context-fields.js (test/context-fields.test.ts keeps the two identical).
+// Mirrored for the browser in ui/v3/context-fields.js (test/b09-context.test.ts keeps the two identical).
 import { CapError } from "./handlers/errors";
 
 export interface ContextOption { code: string; label: string }

@@ -1,4 +1,4 @@
-// B09 (Bincy F06, ASK F06 option 2): browser mirror of src/context-fields.ts (test/context-fields.test.ts keeps them
+// B09 (Bincy F06, ASK F06 option 2): browser mirror of src/context-fields.ts (test/b09-context.test.ts keeps them
 // identical). Optional context around the pinned instrument; no name field anywhere.
 const text = (key, label) => ({ key, label, type: "text" });
 const count = (key, label) => ({ key, label, type: "count" });

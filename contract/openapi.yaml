@@ -3256,7 +3256,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: {"type":"object","properties":{"idempotency_key":{"type":"string","minLength":1,"maxLength":200},"answers":{"type":"object","description":"Known pinned item IDs only; server validates required, type, option, multi and exclusion rules before canonical hashing."}},"required":["idempotency_key","answers"],"additionalProperties":false}
+            schema: {"type":"object","properties":{"idempotency_key":{"type":"string","minLength":1,"maxLength":200},"answers":{"type":"object","description":"Known pinned item IDs only; server validates required, type, option, multi and exclusion rules before canonical hashing."},"context":{"type":"object","description":"B09: optional respondent context validated against cap.response.form context_fields (age_range, gender). Unknown keys rejected; every key optional; no names. Not part of the replay digest.","properties":{"age_range":{"type":"string"},"gender":{"type":"string"}},"additionalProperties":false}},"required":["idempotency_key","answers"],"additionalProperties":false}
   /v2/participate/receipt:
     get:
       operationId: cap.response.receipt

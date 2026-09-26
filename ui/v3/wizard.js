@@ -324,12 +324,12 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
         : '<p class="muted">No published surveys are available to this account.</p>'}
       ${act(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
-  if (step === 'information') return `${head(n, 'Participant information', 'What participants see before they answer.')}${errBox(errs)}
+  if (step === 'information') return `${head(n, 'Participant information', 'What participants see before they answer.', '<p class="muted" data-wz-about>Each participant may also give an age range and gender. Both are optional.</p>')}${errBox(errs)}
     <form data-wz-form="information">
       <h3>Shown to every participant</h3>
       <dl class="kv"><dt>Project</dt><dd>${esc(proj.name || '')}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd><dt>Format</dt><dd>${esc(d.format)}</dd>${dates(d)}</dl>
       <h3>Asked of each participant</h3>
-      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><h3>${esc(t.perspective)}</h3><span class="sub">The ${esc(t.name)} survey, as published.</span>${groupContextFields(t, (d.context || {})[t.id], pre.has(t.id))}</div></div>`).join('')}${chosen.length ? `<p class="small muted" data-wz-about>Each participant may also give an age range and gender. Both are optional.</p><p class="small muted">${PRIVACY_LINE}</p>` : ''}
+      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><h3>${esc(t.perspective)}</h3><span class="sub">The ${esc(t.name)} survey, as published.</span>${groupContextFields(t, (d.context || {})[t.id], pre.has(t.id))}</div></div>`).join('')}${chosen.length ? `<p class="small muted">${PRIVACY_LINE}</p>` : ''}
       ${act(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   // review

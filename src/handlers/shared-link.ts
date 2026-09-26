@@ -85,9 +85,10 @@ function replay(row: Claim, key: string, payload: string) {
   return { response_id: row.response_id, submitted_at: row.submitted_at, duplicate: true, undo: null };
 }
 export async function submitShared(ctx: Ctx, session: SharedSession, key: string, answers: Record<string, unknown>, template: { template_id: string; template_version: number }, context: Record<string, unknown> = {}) {
-  // B09: optional respondent context joins the payload digest only when given, so answers-only replays keep their digest.
+  // B09: optional respondent context stays out of the payload digest (it is not saved with the device draft), so an
+  // uncertain submit + reload + retry with the same key returns the original receipt whatever About you then holds.
   const hasContext = Object.keys(context).length > 0;
-  const kd = await sha256(key), pd = await sha256(hasContext ? canonical({ answers, context }) : canonical(answers));
+  const kd = await sha256(key), pd = await sha256(canonical(answers));
   const prior = await claim(ctx, session);
   if (prior) return replay(prior, kd, pd); // authority already revalidated; collection may now be closed
   await collecting(ctx, session.assessment_survey_id);
