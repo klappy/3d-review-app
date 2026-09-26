@@ -22,6 +22,16 @@ export const STEP_TITLES = ['Details', 'Participants', 'Information', 'Review'];
 export const pdot = p => { const s = String(p || '').toLowerCase(); return /team/.test(s) ? 'p-team' : /community/.test(s) ? 'p-community' : /church/.test(s) ? 'p-church' : 'p-reviewer'; };
 export const EXPECTED_KEY = 'v3:expected'; // { [surveyId]: N } — device-local, never sent to the API
 export const NEW_PROJECT = '__new__';
+// B40 (captain 19:50, Bincy): "Lead organisation" is a select plus "Other (type it)". Names only, deduplicated, from the
+// Lovable harvest (v0 lead orgs + v1.0 lead_organization options; test/placeholder values dropped). Organisations already on
+// the projects this account can see are merged in at render time. Stored value is unchanged: project.organization text.
+export const ORGANIZATIONS = ['Beyond Translation', 'Global Partnerships', 'Local church', 'SIL', 'unfoldingWord', 'Wycliffe Associates', 'Wycliffe Global Alliance', 'Wycliffe USA'];
+export const ORG_OTHER = '__other__';
+export function orgChoices(projects = []) {
+  const seen = new Map();
+  for (const n of [...ORGANIZATIONS, ...projects.map(p => p && p.organization)]) { const v = String(n ?? '').trim(); if (v && !seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v); }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const enc = encodeURIComponent;
@@ -196,6 +206,14 @@ const head = (n, h, sub, more = '') => `<div class="eyebrow">Start a 3D Review �
 const errBox = errs => errs?.length ? `<div class="note alert" role="alert">${errs.map(esc).join('<br>')}</div>` : '';
 const actions = (back, primary) => `<div class="actions">${back ? `<button type="button" class="rv-btn quiet" data-wz="back">Back</button>` : `<button type="button" class="rv-btn quiet" data-wz="cancel">Cancel</button>`}<span class="spacer"></span>${primary}</div>`;
 
+function orgField(d, projects) {
+  const names = orgChoices(projects), cur = String(d.newOrg || '').trim();
+  const listed = names.find(n => n.toLowerCase() === cur.toLowerCase());
+  const other = d.newOrgOther || (cur && !listed);
+  return `<label>Lead organisation<select name="newOrgPick"><option value=""${!other && !listed ? ' selected' : ''}>Choose… (optional)</option>${names.map(n => `<option value="${esc(n)}"${!other && n === listed ? ' selected' : ''}>${esc(n)}</option>`).join('')}<option value="${ORG_OTHER}"${other ? ' selected' : ''}>Other (type it)</option></select></label>`
+    + (other ? `<label>Organisation name<input name="newOrg" value="${esc(d.newOrg || '')}" placeholder="The organisation leading this translation"></label>` : '');
+}
+
 // locked: the partial launch ctx (or true). Links already issued are shown so they are never lost (the server keeps only a hash).
 export function renderStep(step, d, data, errs = [], locked = false, origin = '') {
   const n = STEPS.indexOf(step) + 1;
@@ -212,7 +230,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
         ${isNew ? `<label>New project name<input name="newProject" value="${esc(d.newProject)}" required></label>`
           : `<label>Language<select name="language"${d.project ? '' : ' disabled'}><option value=""${d.language ? '' : ' selected'} disabled>${d.project ? (languages.length ? 'Choose…' : 'No languages in this project') : 'Choose a project first'}</option>${languages.map(l => `<option value="${esc(l.id)}"${l.id === d.language ? ' selected' : ''}>${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</option>`).join('')}</select></label>`}
       </div>
-      ${isNew ? `<label>Lead organisation<input name="newOrg" value="${esc(d.newOrg || '')}" placeholder="e.g. the organisation leading this translation"></label>` : ''}
+      ${isNew ? orgField(d, projects) : ''}
       ${isNew ? `<label>Language<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (ISO 639, optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. hil — qaa–qtz if unlisted" autocapitalize="off" spellcheck="false"></label>` : ''}
       <div class="grid">
         <label>When<input name="period" value="${esc(d.period)}" placeholder="e.g. October 2026"></label>
@@ -281,10 +299,12 @@ export function mountWizard(root, deps) {
   const read = (form) => {
     const fd = new FormData(form), d = s.d;
     if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'period', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
+    if (form.dataset.wzForm === 'details' && fd.has('newOrgPick')) { const v = String(fd.get('newOrgPick')); d.newOrgOther = v === ORG_OTHER; if (!d.newOrgOther) d.newOrg = v; else if (!fd.has('newOrg')) d.newOrg = ''; }
     if (form.dataset.wzForm === 'details') { if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
   };
   root.addEventListener('change', async e => {
+    if (e.target.name === 'newOrgPick' && !s.partial && !s.busy) { read(e.target.form); paint(); if (s.d.newOrgOther) root.querySelector('input[name=newOrg]')?.focus(); return; }
     if (e.target.name === 'project' && !s.partial && !s.busy) { const f = e.target.form; read(f); s.d.project = e.target.value; s.d.language = ''; s.data.languages = []; s.errs = []; paint(); try { if (!(await loadLanguages())) return; } catch (err) { return note(err); } paint(); }
   }, on);
   root.addEventListener('submit', e => {
