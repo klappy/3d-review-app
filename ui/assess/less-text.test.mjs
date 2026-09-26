@@ -85,14 +85,14 @@ test('L9-24 admin (permissions): heading + one note; the legacy-acceptance expla
 let surveyScreen; // set by assessPage (B30 survey detail)
 async function assessPage() {
   const imp = async p => import(new URL(p, import.meta.url));
-  const [demo, dp, ss, wh, cardsNs, bc, st, lm, scope, vw, share, fb, ad, v3s, v3a] = await Promise.all(['../demo.js', '../diagnostic-path.js', '../stage-screens.js', './whats-here.js', './cards.js', '../v3/components/breadcrumbs.js', '../v3/components/sidebar-tree.js', '../v3/components/learn-more.js', './scope.js', './views.js', './share.js', './feedback.js', '../kit/app-adapter.js', '../v3-shell.js', './v3-assessment.js'].map(imp));
+  const [demo, dp, ss, wh, cardsNs, bc, st, lm, scope, vw, share, fb, ad, v3s, v3a, au] = await Promise.all(['../demo.js', '../diagnostic-path.js', '../stage-screens.js', './whats-here.js', './cards.js', '../v3/components/breadcrumbs.js', '../v3/components/sidebar-tree.js', '../v3/components/learn-more.js', './scope.js', './views.js', './share.js', './feedback.js', '../kit/app-adapter.js', '../v3-shell.js', './v3-assessment.js', '../v3/components/active-until.js'].map(imp));
   const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace(/export function /g, 'function ');
-  const box = { ...demo, ...dp, ...ss, ...wh, cards: cardsNs, ...bc, ...st, ...lm, pages: scope.pages, scopeCss: scope.css, whoLine: scope.whoLine, views: vw.views, viewsCss: vw.css, share, ...fb, ...ad, ...v3s, ...v3a,
+  const box = { ...demo, ...dp, ...ss, ...wh, cards: cardsNs, ...bc, ...st, ...lm, pages: scope.pages, scopeCss: scope.css, whoLine: scope.whoLine, views: vw.views, viewsCss: vw.css, share, ...fb, ...ad, ...v3s, ...v3a, ...au,
     document: new JSDOM('<!doctype html><head></head><body></body>').window.document, location: { hash: '', pathname: '/' }, history: { replaceState() {} }, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} }, localStorage: { getItem: () => null, setItem() {} }, matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }), addEventListener() {}, setTimeout, clearTimeout, console, URL, URLSearchParams };
   box.globalThis = box;
   const api = vm.runInNewContext(source + '\n({screen,state,surveyScreen})', box); surveyScreen = api.surveyScreen;
-  return (role, stage = 'prepare', view = 'prepare', projects = [{ id: 'p1', name: 'Coast' }]) => { api.state.projects = projects;
-    return api.screen({ assessment: { id: 'a1', name: 'Oct', project_id: 'p1', role, stage, language_id: 'lang1', period: '2026' }, surveys: [{ id: 's1', state: 'selected' }, { id: 's2', state: 'selected' }] }, view); };
+  return (role, stage = 'prepare', view = 'prepare', projects = [{ id: 'p1', name: 'Coast' }], period = '2026') => { api.state.projects = projects;
+    return api.screen({ assessment: { id: 'a1', name: 'Oct', project_id: 'p1', role, stage, language_id: 'lang1', period }, surveys: [{ id: 's1', state: 'selected' }, { id: 's2', state: 'selected' }] }, view); };
 }
 
 test('L9-24 assessment page, Prepare view (validator #282): one view heading, no stray lines, one primary; stage notes behind Learn more', async () => {
@@ -212,4 +212,11 @@ test('B30 survey detail: one heading (the survey name), one primary; print + sha
       for (const moved of ["A blank questionnaire with this survey&#39;s actual questions", 'Anyone with the link can answer without an account.']) assert.ok(more.includes(moved) || more.includes(moved.replace('&#39;', "'")), `${name}: moved, not removed: ${moved}`);
       assert.match(v, /data-share-open/, name + ': Share survey stays up front'); assert.match(v, /id="print-load"/, name + ': Print survey stays up front'); }
   }
+});
+
+test('B41 Collect: shows "Active until <date>" from the assessment period; older free-text periods add nothing', async () => {
+  const page = await assessPage();
+  const at = period => page('owner', 'collect', 'collect', undefined, period);
+  assert.match(at('Starts 2026-09-25 · Active until 2026-10-31'), /<p class="small muted" data-active-until>Active until 31 October 2026<\/p>/);
+  assert.doesNotMatch(at('October 2026'), /data-active-until/);
 });

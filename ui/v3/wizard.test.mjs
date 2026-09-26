@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ORGANIZATIONS, orgChoices, ORG_OTHER, countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot, renderDone } from './wizard.js';
 
 const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
-const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
+const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', until: '2026-10-31', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
 
 test('ruling (a): denominator only when entered', () => {
   assert.equal(countLabel(4, 10), '4 of 10');
@@ -37,9 +37,9 @@ test('launch performs writes in order, never sends expected count to the API, st
     throw new Error('unexpected ' + url);
   };
   const store = mem();
-  const ctx = await launch(draft({ purpose: 'Gen 1-3' }), { api, store });
+  const ctx = await launch(draft({ purpose: 'Gen 1-3', starts: '2026-09-25' }), { api, store });
   assert.equal(calls[0].url, '/v2/projects/p1/assessments');
-  assert.deepEqual(calls[0].body, { name: 'Oct', language_id: 'l1', purpose: 'Gen 1-3', format: 'Written' });
+  assert.deepEqual(calls[0].body, { name: 'Oct', language_id: 'l1', purpose: 'Gen 1-3', period: 'Starts 2026-09-25 · Active until 2026-10-31', format: 'Written' });
   assert.deepEqual(calls[1].body, { template_id: 'tpl.team', version: 3 });
   assert.deepEqual(calls[3], { url: '/v2/assessments/a1/stage', method: 'POST', body: { stage: 'collect' } });
   assert.equal(calls.filter(c => c.url.endsWith('/links')).length, 4);
@@ -85,8 +85,8 @@ test('views: four steps, one primary each, optional expected count, escaped', ()
   assert.equal((renderStep('review', draft(), data, [], true).match(/data-wz="edit"/g) || []).length, 0);
   assert.match(renderStep('details', draft(), data), /<span>Participants<\/span>/);
   // Bincy B10: step 3 promises only what the welcome shows (project · language · material · format · when); no unsaved note box.
-  const info = renderStep('information', draft({ purpose: 'Mark 1–4', period: 'March' }), data);
-  for (const k of ['Project', 'Language', 'Material', 'Format', 'When']) assert.match(info, new RegExp(`<dt>${k}</dt>`));
+  const info = renderStep('information', draft({ purpose: 'Mark 1–4' }), data);
+  for (const k of ['Project', 'Language', 'Material', 'Format', 'Active until']) assert.match(info, new RegExp(`<dt>${k}</dt>`));
   assert.doesNotMatch(info, /textarea|not saved|Not sent/);
   assert.doesNotMatch(renderStep('review', draft(), data), /Note for participants|not saved/);
 });
@@ -329,6 +329,21 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
   // B43: each row is the share card (Copy link · QR code · Print) and one secondary "Print all" follows the rows
   assert.equal((h.match(/data-group-print="s[12]"/g) || []).length, 2);
   assert.equal((h.match(/data-share-print-all/g) || []).length, 1);
+});
+
+test('B41: setup asks Active until (required) and Starts (optional, default today) on the existing period field', () => {
+  const html = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
+  assert.match(html, /Starts \(optional\)<input type="date" name="starts"/);
+  assert.match(html, /Active until<input type="date" name="until" value="2026-10-31" required>/);
+  assert.doesNotMatch(html, />When</);
+  assert.match(freshDraft().starts, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(freshDraft().until, '');
+  assert.deepEqual(validateStep('details', draft({ until: '' })), ['Choose the date the survey is active until.']);
+  assert.deepEqual(validateStep('details', draft({ starts: '' })), []);
+  const body = d => launchPlan(draft(d)).find(s => s.cap === 'cap.assessment.create').body({});
+  assert.equal(body({ starts: '2026-09-25' }).period, 'Starts 2026-09-25 · Active until 2026-10-31');
+  assert.equal(body({ starts: '' }).period, 'Active until 2026-10-31');
+  assert.match(renderStep('review', draft({ starts: '2026-09-25' }), { projects: [], languages: [], templates: [] }), /<dt>Starts<\/dt><dd>25 September 2026<\/dd><dt>Active until<\/dt><dd>31 October 2026<\/dd>/);
 });
 
 test('B40: lead organisation is a seeded select plus "Other (type it)"; the stored field is unchanged', () => {

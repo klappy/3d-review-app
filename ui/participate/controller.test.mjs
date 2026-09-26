@@ -144,3 +144,12 @@ test('B26: a receipt reopened without the form names no other group', async () =
   assert.equal(h.journey.state.notice, `${copy.receiptThanksNoGroup} ${copy.sameLinkOthers}`);
   assert.ok(!/community/i.test(h.journey.state.notice));
 });
+
+test('B41: after the Active until date the link shows one plain closed line, not the survey', async () => {
+  const closedForm = { ...form, period: 'Starts 2020-01-01 · Active until 2020-01-31' };
+  const h = harness({ handle: async url => url.endsWith('/form') ? response(closedForm) : null });
+  await h.journey.start();
+  assert.equal(h.journey.state.phase, 'unavailable'); assert.equal(h.journey.state.notice, 'This survey closed on 31 January 2020.');
+  const open = harness({ handle: async url => url.endsWith('/form') ? response({ ...form, period: 'Active until 2999-12-31' }) : null });
+  await open.journey.start(); assert.equal(open.journey.state.phase, 'form');
+});

@@ -12,6 +12,7 @@ import { shareUrl } from '../shared-link.js';
 import { groupLinks, bindGroupLinks, printAllButton, bindPrintAll } from '../assess/share.js';
 import { stepper as stepperComponent, ensureStepperStyle } from './components/stepper.js';
 import { learnMore } from './components/learn-more.js';
+import { packPeriod, periodText, periodErrors, formatDate, todayIso } from './components/active-until.js';
 import { whoLine } from '../assess/scope.js';
 
 export const STEPS = ['details', 'participants', 'information', 'review'];
@@ -38,7 +39,7 @@ const enc = encodeURIComponent;
 const LANG_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{1,8})*$/; // mirrors src/handlers/language.ts CODE (cap.language.create `code`)
 
 export function freshDraft() {
-  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', period: '', format: 'Written', purpose: '', groups: {} };
+  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', starts: todayIso(), until: '', format: 'Written', purpose: '', groups: {} };
 }
 
 // Ruling (a): a denominator appears only when the facilitator entered one.
@@ -67,6 +68,7 @@ export function validateStep(step, d) {
     if (!d.project) errs.push('Choose a project.');
     if (d.project === NEW_PROJECT) { if (!d.newProject.trim()) errs.push('Name the new project.'); if (!d.newLanguage.trim()) errs.push('Name the language.'); if ((d.newLangCode || '').trim() && !LANG_CODE.test(d.newLangCode.trim())) errs.push('Language code: use an ISO 639 code such as "hil" or "en-US" (qaa–qtz for an unlisted language), or leave it blank.'); }
     else if (d.project && !d.language) errs.push('Choose a language.');
+    errs.push(...periodErrors(d.starts, d.until)); // B41: Active until required, Starts optional
   }
   if (step === 'participants' && !Object.keys(d.groups).length) errs.push('Choose at least one group.');
   return errs;
@@ -82,7 +84,7 @@ export function launchPlan(d) {
   plan.push({ cap: 'cap.assessment.create', method: 'POST', url: ctx => `/v2/projects/${enc(ctx.pid)}/assessments`, body: ctx => {
     const b = { name: d.name.trim(), language_id: ctx.lid };
     if (d.purpose.trim()) b.purpose = d.purpose.trim();
-    if (d.period.trim()) b.period = d.period.trim();
+    const period = packPeriod(d.starts, d.until); if (period) b.period = period; // B41: existing field, no migration
     if (d.format) b.format = d.format;
     return b;
   }, keep: (r, ctx) => { ctx.aid = r.assessment.id; } });
@@ -215,6 +217,8 @@ function orgField(d, projects) {
 }
 
 // locked: the partial launch ctx (or true). Links already issued are shown so they are never lost (the server keeps only a hash).
+// B41: the two setup dates as review rows (Starts only when given).
+const dates = d => `${(d.starts || '').trim() ? `<dt>Starts</dt><dd>${esc(formatDate(d.starts.trim()) || d.starts)}</dd>` : ''}<dt>Active until</dt><dd>${esc(formatDate((d.until || '').trim()) || 'Not set')}</dd>`;
 export function renderStep(step, d, data, errs = [], locked = false, origin = '') {
   const n = STEPS.indexOf(step) + 1;
   const projects = data.projects || [], languages = data.languages || [], templates = latestTemplates(data.templates);
@@ -233,7 +237,10 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       ${isNew ? orgField(d, projects) : ''}
       ${isNew ? `<label>Language<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (ISO 639, optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. hil — qaa–qtz if unlisted" autocapitalize="off" spellcheck="false"></label>` : ''}
       <div class="grid">
-        <label>When<input name="period" value="${esc(d.period)}" placeholder="e.g. October 2026"></label>
+        <label>Starts (optional)<input type="date" name="starts" value="${esc(d.starts)}"></label>
+        <label>Active until<input type="date" name="until" value="${esc(d.until)}" required></label>
+      </div>
+      <div class="grid">
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
       </div>
       <label>What will participants consider?<input name="purpose" value="${esc(d.purpose)}" placeholder="e.g. The Genesis 1 to 3 draft"></label>
@@ -251,7 +258,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   if (step === 'information') return `${head(n, 'Participant information', 'What participants see before they answer.')}${errBox(errs)}
     <form data-wz-form="information">
       <h3>Shown to every participant</h3>
-      <dl class="kv"><dt>Project</dt><dd>${esc(proj.name || '')}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd><dt>Format</dt><dd>${esc(d.format)}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd></dl>
+      <dl class="kv"><dt>Project</dt><dd>${esc(proj.name || '')}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd><dt>Format</dt><dd>${esc(d.format)}</dd>${dates(d)}</dl>
       <h3>Asked of each participant</h3>
       ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><h3>${esc(t.perspective)}</h3><span class="sub">The ${esc(t.name)} survey, as published.</span></div></div>`).join('')}${chosen.length ? '<p class="small muted">Answers are grouped, never shown alone.</p>' : ''}
       ${actions(true, '<button class="primary" type="submit">Continue</button>')}
@@ -259,11 +266,11 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   // review
   return `${head(n, 'Ready to launch', 'Check the details, then launch.', '<p class="muted">Launching opens the survey links; nothing is sent to anyone.</p>')}${errBox(errs)}
     <div class="wz-sec"><h3>Details</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="details">Edit</button>'}</div>
-    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}${isNew && (d.newLangCode || '').trim() ? ' · ' + esc(d.newLangCode.trim()) : ''}</dd><dt>When</dt><dd>${esc(d.period || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
+    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}${isNew && (d.newLangCode || '').trim() ? ' · ' + esc(d.newLangCode.trim()) : ''}</dd>${dates(d)}<dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
     <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt><span class="pdot wz-kvdot ${pdot(t.perspective)}" aria-hidden="true"></span>${esc(t.perspective)}</dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
     <div class="wz-sec"><h3>Participant information</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="information">Edit</button>'}</div>
-    <dl class="kv"><dt>Shown to everyone</dt><dd>${esc([proj.name, lang.name, d.purpose.trim(), d.format, d.period.trim()].filter(Boolean).join(' · '))}</dd><dt>Asked of each</dt><dd>The published survey questions for each group</dd></dl>
+    <dl class="kv"><dt>Shown to everyone</dt><dd>${esc([proj.name, lang.name, d.purpose.trim(), d.format, periodText(packPeriod(d.starts, d.until))].filter(Boolean).join(' · '))}</dd><dt>Asked of each</dt><dd>The published survey questions for each group</dd></dl>
     ${locked && locked.links?.length ? `<h3>Links already opened — copy them now</h3>${linkList(locked.links, origin, templates)}` : ''}
     ${locked ? `<div class="actions"><button type="button" class="rv-btn quiet" data-wz="cancel">Leave setup (what was created stays; nothing was sent)</button><span class="spacer"></span><button type="button" class="primary" data-wz="launch">Continue the launch</button></div>` : actions(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
 }
@@ -298,7 +305,7 @@ export function mountWizard(root, deps) {
   const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
     const fd = new FormData(form), d = s.d;
-    if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'period', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
+    if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'starts', 'until', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
     if (form.dataset.wzForm === 'details' && fd.has('newOrgPick')) { const v = String(fd.get('newOrgPick')); d.newOrgOther = v === ORG_OTHER; if (!d.newOrgOther) d.newOrg = v; else if (!fd.has('newOrg')) d.newOrg = ''; }
     if (form.dataset.wzForm === 'details') { if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
