@@ -25,6 +25,7 @@ export const VIEWER_NOTE = 'Permissions are managed by members and owners.';
 export const DUPLICATE_NOTE = 'Already invited — nothing sent again.';
 export const UNCONFIRMED_NOTE = 'Could not be confirmed as sent; the invitation stays live and can be revoked.';
 export const PREVIEW_AGAIN = 'Preview again.';
+export const REVOKE_ASK = 'Revoke this invitation so its link stops working?'; // U37: one sentence, in the row
 export const TEST_ADDRESS_NOTE = 'Invitation recorded; not emailed (test address).';
 // B31/U26: one plain sentence for an invite outcome — never a delivery reason code, receipt or trace id.
 export function inviteOutcome(r = {}) {
@@ -39,7 +40,7 @@ export function inviteOutcome(r = {}) {
 const classify = e => { const c = String(e?.code || e?.status || ''); if (c === 'NOT_AUTHENTICATED' || c === '401') return 'unauthenticated'; if (c === 'NOT_AUTHORIZED_AT_SCOPE' || c === '403') return 'forbidden'; if (c === 'NOT_FOUND_OR_NOT_VISIBLE' || c === '404') return 'not_found'; if (c === 'RESERVED_NOT_BUILT' || c === '501') return 'not_built'; return 'failed'; };
 export { classify };
 
-export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myEmail: '', myRole: null, sheet: null, notice: null, alert: false, busy: false, receipts: {}, invitees: {} }; }
+export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myEmail: '', myRole: null, sheet: null, notice: null, alert: false, busy: false, receipts: {}, invitees: {}, askRevoke: null }; }
 
 export const permissions = {
   async load(ctx, { scope, id }) {
@@ -71,7 +72,7 @@ export const permissions = {
     const actions = g => { const rc = m.receipts[g.id]; return `${g.role === 'owner' ? '<span class="muted">Owner — only a transfer changes this</span>' : member && canTouch(g) ? `${owner ? `<select data-role-for="${esc(g.id)}" aria-label="New role" ${busy}>${ROLES.map(r => `<option value="${r}" ${r === g.role ? 'selected' : ''}>${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}" ${busy}>Preview role change</button> ` : ''}<button type="button" class="quiet" data-revoke="${esc(g.id)}" ${busy}>Remove</button>` : `<span class="muted">Members manage viewers and members only</span>`}${rc ? learnMore(`<p class="small muted">receipt ${esc(rc.receipt)} · trace ${esc(rc.trace)}</p>`, { summary: 'Details' }) : ''}`; };
     const roster = memberList(esc, m.grants, { me: m.me, myEmail: m.myEmail, actions, rowAttr: g => `data-grant-row="${esc(g.id)}"`, empty: 'No grants listed.', note: false });
     const namesNote = membersHidden(m.grants, { me: m.me, myEmail: m.myEmail }) ? `<p class="small muted" data-member-note>${esc(NO_EMAIL_NOTE)}</p>` : '';
-    const pending = m.pending.length ? `<p class="eyebrow" style="margin-top:18px">Pending invitations</p><ul class="small" data-pending>${m.pending.map(i => `<li data-invitation="${esc(i.id)}">${esc(i.role)}${i.created_at ? ` · invited ${esc(shortDate(i.created_at))}` : ''}${m.invitees?.[i.id] ? ` · ${esc(m.invitees[i.id])}` : ''}${i.status === 'unconfirmed' ? ` · ${esc(UNCONFIRMED_NOTE)}` : ''}${member && (owner || RANK[i.role] <= RANK.member) ? ` <button type="button" class="quiet small" data-revoke-invitation="${esc(i.id)}" ${busy}>Revoke invitation</button>` : ''}</li>`).join('')}</ul>` : ''; // B30: no pending → nothing (not another line)
+    const pending = m.pending.length ? `<p class="eyebrow" style="margin-top:18px">Pending invitations</p><ul class="small" data-pending>${m.pending.map(i => `<li data-invitation="${esc(i.id)}">${esc(i.role)}${i.created_at ? ` · invited ${esc(shortDate(i.created_at))}` : ''}${m.invitees?.[i.id] ? ` · ${esc(m.invitees[i.id])}` : ''}${i.status === 'unconfirmed' ? ` · ${esc(UNCONFIRMED_NOTE)}` : ''}${member && (owner || RANK[i.role] <= RANK.member) ? ` ${m.askRevoke === i.id ? `<span data-revoke-ask="${esc(i.id)}">${esc(REVOKE_ASK)} <button type="button" class="small" data-revoke-invitation-confirm="${esc(i.id)}" ${busy}>Revoke</button> <button type="button" class="quiet small" data-revoke-invitation-cancel ${busy}>Cancel</button></span>` : `<button type="button" class="quiet small" data-revoke-invitation="${esc(i.id)}" ${busy}>Revoke invitation</button>`}` : ''}</li>`).join('')}</ul>` : ''; // B30: no pending → nothing (not another line)
     const roleOptions = (owner ? ROLES : ROLES.filter(r => r !== 'owner')).map(r => `<option value="${r}">${r}</option>`).join('');
     const invite = member ? `<form class="line" data-invite-form><p class="eyebrow">Invite someone</p><label class="field">Email<input name="email" type="email" required autocomplete="off" ${busy}></label><label class="field">Role<select name="role" ${busy}>${roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit" ${busy}>Preview invitation</button></div></form>` : '';
     // B30 (lane 9, less text 3): transfer is rare and destructive — a closed disclosure whose first line, once opened, is the warning.
@@ -126,7 +127,15 @@ export const permissions = {
     root.querySelector('[data-transfer-form]')?.addEventListener('submit', e => { e.preventDefault(); m.transferOpen = true; const f = e.currentTarget; const to = f.querySelector('[name=to]').value.trim(); const step_down = !!f.querySelector('[name=step_down]').checked; return preview('transfer_owner', `${base}/transfer`, step_down ? { to, step_down: true } : { to }, 'Ownership transfer', { display: { who: to } }); });
     // single-call writes: mode is never sent (contract §3.5)
     root.querySelectorAll('[data-revoke]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`${base}/grants/${ctx.enc(b.dataset.revoke)}`, { method: 'DELETE' }); say(`Access removed.`, false, receiptText(env)); await refresh(); } catch (e) { m.busy = false; fail(e, 'Remove access'); } }));
-    root.querySelectorAll('[data-revoke-invitation]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`/v2/invitations/${ctx.enc(b.dataset.revokeInvitation)}`, { method: 'DELETE' }); say(`Invitation revoked.`, false, receiptText(env)); await refresh(); } catch (e) { m.busy = false; fail(e, 'Revoke invitation'); } }));
+    // U37 (lanes-2011): Revoke invitation asks in the row first (Revoke / Cancel, never a browser dialog). A revoke the server
+    // confirms drops its row in the same paint as the notice — the list never shows "revoked" beside a live-looking row while
+    // the roster refetch is in flight (or if that refetch fails); the refetch then stays the source of truth.
+    root.querySelectorAll('[data-revoke-invitation]').forEach(b => b.addEventListener('click', () => { if (m.busy) return; m.askRevoke = b.dataset.revokeInvitation; paint(); }));
+    root.querySelector('[data-revoke-invitation-cancel]')?.addEventListener('click', () => { if (m.busy) return; m.askRevoke = null; paint(); });
+    root.querySelectorAll('[data-revoke-invitation-confirm]').forEach(b => b.addEventListener('click', async () => { if (m.busy) return; const id = b.dataset.revokeInvitationConfirm; m.busy = true; paint();
+      try { const env = await call(`/v2/invitations/${ctx.enc(id)}`, { method: 'DELETE' }); m.askRevoke = null;
+        if (env.result?.status === 'revoked') { m.pending = m.pending.filter(i => i.id !== id); if (m.invitees) delete m.invitees[id]; }
+        say(`Invitation revoked.`, false, receiptText(env)); await refresh(); } catch (e) { m.busy = false; m.askRevoke = null; fail(e, 'Revoke invitation'); } }));
     root.querySelector('[data-confirm-execute]')?.addEventListener('click', execute);
     root.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => { if (m.busy) return; m.sheet = null; say(null); });
   },
