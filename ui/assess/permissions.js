@@ -5,14 +5,14 @@
 //   revoke invitation   DELETE /v2/invitations/{id}                        single call (no mode)
 //   change role         PATCH  /v2/{scope}/{id}/grants/{gid}              danger: dry_run → execute; owner only; never on owner rows
 //   revoke grant        DELETE /v2/{scope}/{id}/grants/{gid}              single call; never on owner rows; member ≤ member only
-//   transfer ownership  POST   /v2/{scope}/{id}/transfer                  danger (destructive): owner only; principal ID; step_down off
+//   transfer ownership  POST   /v2/{scope}/{id}/transfer                  danger (destructive): owner only; picked from the roster (U18), principal id sent unchanged; step_down off
 // Confirm tokens and the typed invitee address live only in this page's in-memory model: rebuilt on every load (scope change),
 // dropped on sign-out with the shell state, cleared after execute. Nothing here touches storage, URLs or logs.
 // B31/U26: the address you just invited is kept in memory (m.invitees, by invitation id) only to label its pending row;
 // the service stores a hash, not the address, so an invitation made earlier shows role and date only.
 // Acceptance (cap.grant.accept) is NOT here: the root's #invite= link opens the v3 Invitation page (ui/v3/components/invite.js, B03).
 
-import { memberList, labelMembers, readAccountEmail, membersHidden, NO_EMAIL_NOTE } from '../v3/components/member-list.js';
+import { memberList, labelMembers, memberPicker, memberLabel, readAccountEmail, membersHidden, NO_EMAIL_NOTE } from '../v3/components/member-list.js';
 import { learnMore } from '../v3/components/learn-more.js';
 import { shortDate } from './cards.js'; // B31/U26: shared short date ("Sep 25"), never an ISO stamp
 
@@ -26,6 +26,7 @@ export const DUPLICATE_NOTE = 'Already invited — nothing sent again.';
 export const UNCONFIRMED_NOTE = 'Could not be confirmed as sent; the invitation stays live and can be revoked.';
 export const PREVIEW_AGAIN = 'Preview again.';
 export const REVOKE_ASK = 'Revoke this invitation so its link stops working?'; // U37: one sentence, in the row
+export const NO_TRANSFER_TARGET = 'Invite someone first; you can transfer to people who already have access.'; // U18: one sentence
 export const TEST_ADDRESS_NOTE = 'Invitation recorded; not emailed (test address).';
 // B31/U26: one plain sentence for an invite outcome — never a delivery reason code, receipt or trace id.
 export function inviteOutcome(r = {}) {
@@ -76,7 +77,10 @@ export const permissions = {
     const roleOptions = (owner ? ROLES : ROLES.filter(r => r !== 'owner')).map(r => `<option value="${r}">${r}</option>`).join('');
     const invite = member ? `<form class="line" data-invite-form><p class="eyebrow">Invite someone</p><label class="field">Email<input name="email" type="email" required autocomplete="off" ${busy}></label><label class="field">Role<select name="role" ${busy}>${roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit" ${busy}>Preview invitation</button></div></form>` : '';
     // B30 (lane 9, less text 3): transfer is rare and destructive — a closed disclosure whose first line, once opened, is the warning.
-    const transfer = owner ? `<details class="line" data-transfer${m.transferOpen || m.sheet?.kind === 'transfer_owner' ? ' open' : ''}><summary>Transfer ownership</summary><form data-transfer-form><p class="small muted">Destructive: it cannot be undone from here.</p><p class="small muted">Ownership moves to another signed-up person.</p><label class="field">New owner's principal id<input name="to" required autocomplete="off" placeholder="usr_… or person_…" ${busy}></label><label class="small"><input type="checkbox" name="step_down"> Step down to member after the transfer</label><div class="actions"><button type="submit" ${busy}>Preview transfer</button></div></form></details>` : '';
+    // U18: pick the new owner from people who already have access (shared member picker) — never a typed principal id.
+    const picker = owner ? memberPicker(esc, m.grants, { me: m.me, myEmail: m.myEmail, name: 'to', label: 'New owner', attrs: busy, empty: NO_TRANSFER_TARGET }) : '';
+    const transferForm = /data-member-picker-empty/.test(picker) ? picker : `<form data-transfer-form><p class="small muted">Destructive: it cannot be undone from here.</p>${picker}<label class="small"><input type="checkbox" name="step_down"> Step down to member after the transfer</label><div class="actions"><button type="submit" ${busy}>Preview transfer</button></div></form>`;
+    const transfer = owner ? `<details class="line" data-transfer${m.transferOpen || m.sheet?.kind === 'transfer_owner' ? ' open' : ''}><summary>Transfer ownership</summary>${transferForm}</details>` : '';
     const sheet = m.sheet ? renderSheet(ctx, m.sheet, m.busy, m.scope) : '';
     return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}${roster}${pending}${invite}${transfer}${sheet}${status}${learnMore(`${namesNote}${member ? '<p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p>' : ''}<p class="small muted">Accepting an invitation happens from the mailed link; it is never done from this page.</p>`)}</section>`;
   },
@@ -124,7 +128,7 @@ export const permissions = {
     root.querySelector('[data-invite-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const email = f.querySelector('[name=email]').value.trim(), role = f.querySelector('[name=role]').value; return preview('invite', `${base}/invitations`, { email, role }, 'Invitation', { display: { who: email } }); });
     root.querySelectorAll('[data-change-role]').forEach(b => b.addEventListener('click', () => { const gid = b.dataset.changeRole; const role = root.querySelector(`[data-role-for="${CSS.escape(gid)}"]`)?.value; const g = m.grants.find(x => x.id === gid); if (!g || !role || role === g.role) { say('That is already the role.'); return; } const who = labelMembers(m.grants, { me: m.me, myEmail: m.myEmail }).find(x => x.row === g)?.person; return preview('update_role', `${base}/grants/${ctx.enc(gid)}`, { role }, 'Role change', { method: 'PATCH', display: { who: who ? [who.name, who.email].filter(Boolean).join(' · ') : '', gid } }); }));
     root.querySelector('[data-transfer]')?.addEventListener('toggle', e => { if (e.currentTarget.isConnected) m.transferOpen = e.currentTarget.open; }); // Bugbot 4108609584: a replaced node's stale toggle is ignored // keep it open across repaints
-    root.querySelector('[data-transfer-form]')?.addEventListener('submit', e => { e.preventDefault(); m.transferOpen = true; const f = e.currentTarget; const to = f.querySelector('[name=to]').value.trim(); const step_down = !!f.querySelector('[name=step_down]').checked; return preview('transfer_owner', `${base}/transfer`, step_down ? { to, step_down: true } : { to }, 'Ownership transfer', { display: { who: to } }); });
+    root.querySelector('[data-transfer-form]')?.addEventListener('submit', e => { e.preventDefault(); m.transferOpen = true; const f = e.currentTarget; const gid = f.querySelector('[name=to]').value; const hit = labelMembers(m.grants, { me: m.me, myEmail: m.myEmail }).find(x => x.row.id === gid && !x.person.you); if (!hit) { say('Choose who becomes the owner.', true); return; } const to = hit.row.principal_id; const step_down = !!f.querySelector('[name=step_down]').checked; return preview('transfer_owner', `${base}/transfer`, step_down ? { to, step_down: true } : { to }, 'Ownership transfer', { display: { who: memberLabel(hit.person), hide: [to] } }); });
     // single-call writes: mode is never sent (contract §3.5)
     root.querySelectorAll('[data-revoke]').forEach(b => b.addEventListener('click', async () => { m.busy = true; paint(); try { const env = await call(`${base}/grants/${ctx.enc(b.dataset.revoke)}`, { method: 'DELETE' }); say(`Access removed.`, false, receiptText(env)); await refresh(); } catch (e) { m.busy = false; fail(e, 'Remove access'); } }));
     // U37 (lanes-2011): Revoke invitation asks in the row first (Revoke / Cancel, never a browser dialog). A revoke the server
@@ -147,12 +151,12 @@ export default permissions;
 export function sheetSentence(s = {}, scope = '') {
   const where = `this ${String(scope || '').replace(/s$/, '') || 'item'}`, p = s.params || {};
   if (s.kind === 'invite') return `${p.email || 'They'} will be able to open ${where} as ${p.role || 'a member'} once they accept. An email is sent when you confirm.`;
-  if (s.kind === 'transfer_owner') return `Ownership of ${where} moves to the person you named${p.step_down ? ' and you become a member' : ''}. This cannot be undone from here.`;
+  if (s.kind === 'transfer_owner') return `Ownership of ${where} moves to the person you chose${p.step_down ? ' and you become a member' : ''}. This cannot be undone from here.`;
   if (s.kind === 'update_role') return `Their role on ${where} changes to ${p.role || 'the role you chose'}.`;
   return 'Nothing changes until you confirm.';
 }
 function renderSheet(ctx, s, busy, scope) {
   const esc = ctx.esc, i = s.impact || {};
   const affected = Array.isArray(i.affected) ? i.affected : [];
-  return `<section class="note" data-confirm-sheet data-confirm-kind="${esc(s.kind)}"><p class="eyebrow">Confirm: ${esc(s.label)}${s.who ? ` · ${esc(s.who)}` : ''}</p><p data-confirm-sentence>${esc(sheetSentence(s, scope))}</p><details class="small"><summary>Details</summary><p class="small">Nothing has changed yet. Confirmation expires in ${esc(s.expiresIn ?? '')} seconds.</p><dl class="small" data-impact><dt>Effect</dt><dd>${esc(i.effect ?? '')}</dd><dt>Irreversible</dt><dd>${esc(String(i.irreversible ?? ''))}</dd><dt>Compensating control</dt><dd>${esc(i.compensating_control ?? '')}</dd><dt>Affected</dt><dd>${affected.length ? `<ul>${affected.map(a => `<li><code>${esc(JSON.stringify(a))}</code></li>`).join('')}</ul>` : '<span class="muted">none listed</span>'}</dd></dl></details><div class="actions"><button type="button" class="primary" data-confirm-execute ${s.token && !busy ? '' : 'disabled'}>Confirm ${esc(s.label.toLowerCase())}</button><button type="button" class="quiet" data-confirm-cancel ${busy ? 'disabled' : ''}>Cancel</button></div></section>`;
+  return `<section class="note" data-confirm-sheet data-confirm-kind="${esc(s.kind)}"><p class="eyebrow">Confirm: ${esc(s.label)}${s.who ? ` · ${esc(s.who)}` : ''}</p><p data-confirm-sentence>${esc(sheetSentence(s, scope))}</p><details class="small"><summary>Details</summary><p class="small">Nothing has changed yet. Confirmation expires in ${esc(s.expiresIn ?? '')} seconds.</p><dl class="small" data-impact><dt>Effect</dt><dd>${esc(i.effect ?? '')}</dd><dt>Irreversible</dt><dd>${esc(String(i.irreversible ?? ''))}</dd><dt>Compensating control</dt><dd>${esc(i.compensating_control ?? '')}</dd><dt>Affected</dt><dd>${affected.length ? `<ul>${affected.map(a => `<li><code>${esc(JSON.stringify(a, (k, v) => s.hide?.includes(v) ? (s.who || 'the person you chose') : v))}</code></li>`).join('')}</ul>` : '<span class="muted">none listed</span>'}</dd></dl></details><div class="actions"><button type="button" class="primary" data-confirm-execute ${s.token && !busy ? '' : 'disabled'}>Confirm ${esc(s.label.toLowerCase())}</button><button type="button" class="quiet" data-confirm-cancel ${busy ? 'disabled' : ''}>Cancel</button></div></section>`;
 }

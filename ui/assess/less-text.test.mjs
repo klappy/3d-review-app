@@ -68,7 +68,7 @@ test('L9-24 sign-in: one heading, one sentence, one primary; survey help behind 
 });
 
 test('L9-24 admin (permissions): heading + one note; the legacy-acceptance explanation behind Learn more', () => {
-  const m = { scope: 'assessments', id: 'a1', status: 'loaded', grants: [{ id: 'g1', principal_id: 'me', role: 'owner' }], pending: [], me: 'me', myEmail: '', myRole: 'owner', receipts: {} };
+  const m = { scope: 'assessments', id: 'a1', status: 'loaded', grants: [{ id: 'g1', principal_id: 'me', role: 'owner' }, { id: 'g2', principal_id: 'p2', role: 'member' }], pending: [], me: 'me', myEmail: '', myRole: 'owner', receipts: {} }; // U18: someone to transfer to
   const h = permissions.render({ esc }, m);
   const body = lessText(h, 'permissions', /<h2\b/g);
   assert.match(body, /Accepting an invitation happens from the mailed link/);
