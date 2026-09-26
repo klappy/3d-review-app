@@ -1,3 +1,3 @@
 bump: patch
-lane: bincy-b40 · PR: #TBD
+lane: bincy-b40 · PR: #322
 - Changed - Setup step 1 "Lead organisation" is now a drop-down of known organisations with "Other (type it)" for anything else.
