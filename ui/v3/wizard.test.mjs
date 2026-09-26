@@ -540,3 +540,33 @@ test('B09: step 3 offers optional group context per group (no names) and launch 
   const withCtx = sel(draft({ context: { 'tpl.community': { total_participants: '12' } } }));
   assert.deepEqual(withCtx.find(b => b.template_id === 'tpl.community').context, { total_participants: '12' });
 });
+
+// U22: reload mid-setup. The same session store stands in for the tab's sessionStorage across the reload.
+const tabSession = () => { const m = new Map(); return { m, getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+test('U22: a reload on step 2 or step 3 reopens the same draft at that step with what was typed; launch clears it', async () => {
+  const srv = server(), session = tabSession(), marked = [];
+  const first = mount(srv, { session, mark: id => marked.push(id) }); await fillStep1(first); first.submit(); await settle();
+  assert.deepEqual(marked, ['a1'], 'after the save the URL names the draft (#new/a1)');
+  const box = first.$('input[name=g][value="tpl.community"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.set('n-tpl.community', '7').dispatchEvent(new first.w.Event('input', { bubbles: true })); first.h.destroy(); // reload on step 2, nothing submitted
+  const two = mount(srv, { resume: 'a1', session }); await settle();
+  assert.equal(two.h.state.step, 'participants'); assert.ok(two.$('input[name=g][value="tpl.community"]').checked); assert.equal(two.$('[name="n-tpl.community"]').value, '7');
+  two.submit(); await settle(); assert.equal(two.h.state.step, 'information');
+  const ctxIn = two.$('[data-wz-context] input'); ctxIn.value = '12'; ctxIn.dispatchEvent(new two.w.Event('input', { bubbles: true })); two.h.destroy(); // reload on step 3
+  const three = mount(srv, { resume: 'a1', session }); await settle();
+  assert.equal(three.h.state.step, 'information'); assert.equal(three.$(`[name="${ctxIn.name}"]`).value, '12');
+  assert.equal(three.$('[name="n-tpl.community"]'), null); assert.deepEqual(Object.keys(three.h.state.d.groups), ['tpl.community']);
+  assert.equal(srv.writes().length, 1, 'reloads write nothing');
+  three.submit(); await settle(); three.click('[data-wz="launch"]'); await settle(12);
+  assert.ok(three.h.state.done); assert.equal(session.m.size, 0, 'launch clears the tab copy');
+});
+
+test('U22: a reload on step 1 after the save keeps unsaved step 1 edits; Discard clears the tab copy', async () => {
+  const srv = server(), session = tabSession();
+  const first = mount(srv, { session }); await fillStep1(first); first.submit(); await settle();
+  first.click('[data-wz="back"]'); await settle(); first.set('name', 'November review').dispatchEvent(new first.w.Event('input', { bubbles: true })); first.h.destroy();
+  const m = mount(srv, { resume: 'a1', session }); await settle();
+  assert.equal(m.h.state.step, 'details'); assert.equal(m.$('[name="name"]').value, 'November review'); assert.equal(srv.db.a.name, 'October review');
+  m.click('[data-wz="cancel"]'); await settle(); m.click('[data-wz="discard"]'); await settle();
+  assert.ok(srv.db.deleted); assert.equal(session.m.size, 0);
+});

@@ -229,6 +229,23 @@ export async function reconcile(step, ctx, d, api) {
 }
 
 function safeStore() { try { return globalThis.localStorage || null; } catch { return null; } }
+// U22: a reload mid-setup resumes the same draft at the same step with what was typed. Once step 1 is saved the shell's URL
+// carries the draft (#new/<id>, deps.mark); the current step and its unsaved edits live in this tab only (sessionStorage,
+// keyed by draft id, best effort), cleared on launch or discard. Nothing new is sent to the API.
+export const WIP_KEY = aid => `v3:setup:${aid}`;
+function safeSession() { try { return globalThis.sessionStorage || null; } catch { return null; } }
+export function saveWip(session, aid, step, d) { try { session?.setItem(WIP_KEY(aid), JSON.stringify({ step, d })); } catch {} }
+export function clearWip(session, aid) { try { session?.removeItem(WIP_KEY(aid)); } catch {} }
+// The saved draft wins where the server fixed it: the project, and surveys the draft already holds (B06f).
+export function wipOver(back, session) {
+  let w = null; try { w = JSON.parse(session?.getItem(WIP_KEY(back.saved.aid)) || 'null'); } catch { w = null; }
+  if (!w || !w.d || !STEPS.includes(w.step)) return back;
+  const groups = { ...(w.d.groups || {}) };
+  for (const x of back.saved.pre) if (!groups[x.template]) groups[x.template] = back.d.groups[x.template];
+  const d = { ...back.d, ...w.d, project: back.d.project, groups };
+  const step = STEPS.indexOf(w.step) > 1 && validateStep('participants', d).length ? 'participants' : w.step; // never past an empty step 2
+  return { ...back, d, step };
+}
 export function rememberExpected(store, surveys) {
   if (!store) return;
   try {
@@ -364,13 +381,15 @@ export function renderDone(ctx, origin = '', templates = []) {
 }
 
 // ---------- mount ----------
-// deps: { api(url, {method, body}) → result, go(hash), assessmentHref(aid), origin, store, resume? (B06: saved draft's assessment id) }
+// deps: { api(url, {method, body}) → result, go(hash), assessmentHref(aid), origin, store, resume? (B06: saved draft's assessment id),
+//   mark?(aid) (U22: the shell puts #new/<aid> in the URL without a re-render), session? (U22: sessionStorage stand-in) }
 export function mountWizard(root, deps) {
   ensureStepperStyle(root?.ownerDocument);
   const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0, saved: null, saveCtx: null, asking: false };
   let alive = true; const ac = new AbortController(); const on = { signal: ac.signal };
+  const session = deps.session === undefined ? safeSession() : deps.session, wip = () => { if (s.saved && !s.done && !s.partial) saveWip(session, s.saved.aid, s.step, s.d); };
   // B06: only the current step's live form is read on paint; a form left behind by a step change was already read (never undo a save's adoption).
-  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done && live.dataset.wzForm === s.step) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [] }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; };
+  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done && live.dataset.wzForm === s.step) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [] }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; wip(); };
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
   const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
@@ -385,6 +404,8 @@ export function mountWizard(root, deps) {
     if (e.target.name === 'newOrgPick' && !s.partial && !s.busy) { read(e.target.form); paint(); if (s.d.newOrgOther) root.querySelector('input[name=newOrg]')?.focus(); return; }
     if (e.target.name === 'project' && !s.partial && !s.busy) { const f = e.target.form; read(f); s.d.project = e.target.value; s.d.language = ''; s.data.languages = []; s.errs = []; paint(); try { if (!(await loadLanguages())) return; } catch (err) { return note(err); } paint(); }
   }, on);
+  // U22: typing on a step is kept for a reload of this tab (the draft's step and values, never sent).
+  root.addEventListener('input', e => { const f = e.target.form; if (s.saved && !s.busy && !s.done && f && f.dataset.wzForm === s.step) { read(f); wip(); } }, on);
   // B06: step 1 is saved (first time: savePlan; after: cap.assessment.update with the changed fields only).
   const saveDetails = async () => {
     if (s.saved) {
@@ -404,6 +425,7 @@ export function mountWizard(root, deps) {
     }
     s.saveCtx = null;
     s.saved = { aid: ctx.aid, pid: ctx.pid, role: 'owner', snap: detailsOf(d), pre: [] }; // cap.assessment.create grants the creator owner
+    deps.mark?.(ctx.aid); // U22: the URL now names the draft, so a reload reopens it
   };
   root.addEventListener('submit', async e => {
     e.preventDefault(); if (s.partial || s.busy) return; read(e.target); s.asking = false;
@@ -431,7 +453,7 @@ export function mountWizard(root, deps) {
     if (act === 'discard' && s.saved) {
       s.busy = true; let confirmed = null;
       await deleteAssessmentFlow(b, { id: s.saved.aid, api: deps.api, ask: (_b, _sentence, _label, go) => { confirmed = go(); }, // already asked in the page
-        onDeleted: () => { s.saved = null; deps.go?.('#/'); }, onRefused: t => note(new Error(t)), onError: err => note(err) });
+        onDeleted: () => { clearWip(session, s.saved.aid); s.saved = null; deps.go?.('#/'); }, onRefused: t => note(new Error(t)), onError: err => note(err) });
       await confirmed; s.busy = false; return;
     }
     if (act === 'back') { const f = root.querySelector('form'); if (f) read(f); s.step = STEPS[Math.max(0, STEPS.indexOf(s.step) - 1)]; return paint(); }
@@ -439,7 +461,7 @@ export function mountWizard(root, deps) {
     if (act === 'open') return deps.go?.(deps.assessmentHref ? deps.assessmentHref(b.dataset.aid) : `#/a/${enc(b.dataset.aid)}`);
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
-      try { const done = await launch(s.d, { api: deps.api, store: deps.store, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; s.done = done; s.partial = null; paint(); }
+      try { const done = await launch(s.d, { api: deps.api, store: deps.store, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; if (s.saved) clearWip(session, s.saved.aid); s.done = done; s.partial = null; paint(); }
       catch (err) { if (!alive) return; const c = err.ctx, made = c ? c.done.length - (c.base || 0) : 0; s.partial = (made > 0 || c?.pending) ? c : s.partial; s.step = 'review'; note(new Error(s.partial ? `${err.message || err} ${s.partial.done.length - (s.partial.base || 0)} of the launch writes were done${s.partial.pending ? ' and the last one may have gone through' : ''}. "Continue the launch" checks what was saved and picks up from there; edits stay locked until then.` : `${err.message || err} ${s.saved ? 'Nothing more was saved; the draft is kept.' : 'Nothing was created.'} You can edit and launch again.`)); }
       finally { s.busy = false; }
     }
@@ -452,7 +474,7 @@ export function mountWizard(root, deps) {
       if (r) { // B06: Continue setup — a launched review has no setup left, and a viewer cannot set up (B06f), so both open the review; a draft reopens at its next unfinished step
         const a = r.assessment || {};
         if (a.stage !== 'prepare' || a.role === 'viewer') return deps.go?.(deps.assessmentHref ? deps.assessmentHref(a.id || deps.resume) : `#/a/${enc(a.id || deps.resume)}`);
-        const back = draftFromSaved(a, r.surveys || [], deps.store); s.d = back.d; s.step = back.step; s.saved = back.saved;
+        const back = wipOver(draftFromSaved(a, r.surveys || [], deps.store), session); s.d = back.d; s.step = back.step; s.saved = back.saved;
         if (!s.data.projects.some(x => x.id === a.project_id)) { const any = (p.projects || []).find(x => x.id === a.project_id); s.data.projects.push({ id: a.project_id, name: any?.name || 'This project' }); }
         await loadLanguages(); if (!alive) return;
       }
