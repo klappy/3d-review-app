@@ -279,11 +279,20 @@ function bindCollectLinks(current) {
     if (ep !== epoch || state.current?.assessment.id !== aid) throw share.failure(); // a link may exist but is not shown here
     return link.url;
   } });
+  // B43: "Print all" — one page, every shareable survey (title, one line, QR). Same per-survey cache as the rows: a survey
+  // whose link was already issued here reuses it; the rest are issued exactly as one Copy tap would.
+  const resolveAll = () => Promise.all(current.surveys.filter(s => shareable(current.assessment, s)).map(async s => {
+    const k = `${aid}|${s.id}|${ep}`;
+    const link = await share.cachedLink(state.collectLinks, k, () => share.issueLink(api, { aid, sid: s.id, origin: location.origin }));
+    if (ep !== epoch || state.current?.assessment.id !== aid) throw share.failure();
+    return { title: s.template_name, line: whoLine(lensFor(s)) || lensFor(s), url: link.url };
+  }));
+  share.bindPrintAll(root, { heading: current.assessment.name, items: resolveAll });
 }
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
-  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${whoLine(g.lens) ? `<p class="small muted" data-who>${esc(whoLine(g.lens))}</p>` : ''}${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id }]) : ''}</div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
-  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose them under Change surveys.</p>'}${learnMore('<p class="small muted">Only responses are counted.</p><p class="small muted">Respondents are counted per survey and are never added up as people.</p>')}</section>`;
+  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${whoLine(g.lens) ? `<p class="small muted" data-who>${esc(whoLine(g.lens))}</p>` : ''}${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id, title: s.template_name, line: whoLine(g.lens) || g.lens }]) : ''}</div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
+  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose them under Change surveys.</p>'}${current.surveys.some(s => shareable(a, s)) ? share.printAllButton({ esc }) : ''}${learnMore('<p class="small muted">Only responses are counted.</p><p class="small muted">Respondents are counted per survey and are never added up as people.</p>')}</section>`;
 }
 // Cut 2A child screen: ONE survey. B30: one heading (the survey name); Paper/Share are labels, Share is the one primary. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
