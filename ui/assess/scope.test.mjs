@@ -362,6 +362,9 @@ test('project settings (lane 11): editors reach access codes on the existing scr
   assert.ok(!h.includes('/legacy/'), 'no link to the legacy console');
   assert.ok(!/class="[^"]*primary[^"]*"[^>]*data-kept/.test(h), 'kept links never take the page primary');
   assert.ok(/href="#workspaces" data-kept="workspaces"/.test(h), 'workspaces link to the existing #workspaces screen');
+  const settings = h.slice(h.indexOf('id="project-settings"')), more = settings.slice(settings.indexOf('<details class="small learn-more">'));
+  assert.ok(/Issue paper codes/.test(more) && /Group projects in a workspace/.test(more), 'U43: both explanations sit behind the one Learn more');
+  assert.equal(settings.split('Issue paper codes').length - 1, 1, 'U43: never inline as well');
   const view = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'viewer' }, languages: [] } });
   assert.ok(!pages.project.render(view, await pages.project.load(view, { id: 'p1' })).includes('project-settings'));
 });

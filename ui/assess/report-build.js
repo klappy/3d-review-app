@@ -5,6 +5,17 @@ export function reportBuildMarkup(ctx, role) {
   // U32 (Bincy B30/B35): "Build the results" is Understand's one build action; this older path stays, closed behind Technical details.
   return `<details class="small" data-report-build-more><summary>Technical details</summary><section data-report-build><p class="small muted">Build a report from this assessment’s responses.</p><button type="button" data-preview-report>Preview report build</button><div data-report-preview></div><p class="status" role="status" aria-live="polite" data-build-status></p></section></details>`;
 }
+// U43 (lanes-1011, Bincy B30): the build confirm is one plain sentence with the response count the page already read
+// (per-survey counts summed, as the lens lines do); no count known → "these responses". The server still re-checks on execute.
+export function responsesOf(model) {
+  let n = 0, any = false;
+  for (const c of model?.counts?.values?.() || []) if (c?.status === 'loaded') { any = true; n += Number(c.responses) || 0; }
+  return any ? n : null;
+}
+export function buildConfirmText(n) {
+  const what = Number.isInteger(n) && n >= 0 ? `${n} response${n === 1 ? '' : 's'}` : 'these responses';
+  return `Build results from ${what}? Everyone with access can see them.`;
+}
 // B35: `extra` adds a second entry point (the band block's "Build the results") that runs the SAME preview → one confirm → execute,
 // with its own box/status/labels; all entry points share one pending token and one busy/uncertain state. onBuilt(source) says which.
 export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}, extra = null) {
@@ -38,7 +49,7 @@ export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}, e
       if (r.suppressed === true || r.status === 'held') { say(`${HELD} Nothing was built.`); return; }
       if (r.suppressed !== false || r.status !== 'ready' || typeof r.confirm_token !== 'string' || !r.confirm_token || !Number.isFinite(r.expires_in) || r.expires_in <= 0) throw new Error('Invalid preview');
       pending = { token: r.confirm_token, expires: Date.now() + r.expires_in * 1000 };
-      box.innerHTML = `<p>Build a report from this assessment’s responses? This makes an immutable report available to people with access to this assessment. Current inputs and access are checked again when you confirm.</p><div class="actions"><button type="button"${entry.source === 'results' ? ' class="primary"' : ''} data-confirm-report>${entry.confirmLabel}</button><button type="button" class="quiet" data-cancel-report>${entry.cancelLabel}</button></div>`;
+      box.innerHTML = `<p data-confirm-text>${buildConfirmText(responsesOf(model))}</p><div class="actions"><button type="button"${entry.source === 'results' ? ' class="primary"' : ''} data-confirm-report>${entry.confirmLabel}</button><button type="button" class="quiet" data-cancel-report>${entry.cancelLabel}</button></div>`;
       entry.trigger.hidden = true; say('Preview ready. Nothing has been built.');
       box.querySelector('[data-cancel-report]').onclick = () => { if (!current() || busy) return; clear(); say('Cancelled. Nothing was built.'); };
       box.querySelector('[data-confirm-report]').onclick = async () => {
