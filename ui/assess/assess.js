@@ -151,6 +151,8 @@ export function groupByLens({ surveys = [], templates = [] }) {
 export function route(hash) {
   const parts = hash.replace(/^#/, '').split('/').map(p => { try { return decodeURIComponent(p); } catch { return ''; } });
   // One page per scope: entry → workspaces → ONE workspace → ONE project → ONE assessment (five views) → survey.
+  // B06: #new/<assessment id> is Home's "Continue setup" — the wizard reopens that saved draft.
+  if (parts[0] === 'new' && parts[1] && !parts[2]) return { kind: 'new', id: parts[1] };
   if ((parts[0] === 'new' || (!parts[0] && parts[1] === 'new')) && !parts[2]) return { kind: 'new' };
   if (!parts[0]) return { kind: 'entry' };
   if (['how', 'example', 'signin', 'survey', 'about'].includes(parts[0]) && !parts[1]) return { kind: 'entry', intent: parts[0] };
@@ -589,7 +591,7 @@ async function render() {
     // Scope pages (workspace, project, permissions) carry the same context sidebar as the assessment page; entry and the
     // top-level lists stand alone (showcase SOURCE-MAP: the panel is absent from public routes).
     // K3a: workspace/project read surfaces are kit-presented (tree in the shell); the legacy context sidebar remains only for permissions.
-    if (r.kind === 'new') { await mountNew(gen); return; }
+    if (r.kind === 'new') { await mountNew(gen, r.id); return; }
     if (r.kind === 'invite') { mountInvitePage(gen); return; }
     const sidebar = state.principal && (kit ? ['permissions'] : ['workspace', 'project', 'permissions']).includes(r.kind);
     app.className = sidebar ? 'workspace-layout' : '';
@@ -616,7 +618,7 @@ async function reloadProjects() {
   try { const result = await api('/v2/projects'); if (identity !== identityGeneration) return false; state.projects = result.projects || []; return true; }
   catch { return false; }
 }
-async function mountNew(gen) {
+async function mountNew(gen, resume = null) {
   syncShell(); app.className = '';
   // Bugbot 4094071987: same gate as every signed-in page — no session, no wizard.
   if (!state.principal) { app.innerHTML = `<div class="narrow panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">Starting a review needs a facilitator session.</p><div class="actions"><a class="rv-btn primary" href="/v2/auth/access">Sign in with email code</a></div></div>`; return; }
@@ -625,8 +627,8 @@ async function mountNew(gen) {
   if (gen !== generation) return;
   if (!mod?.mountWizard) { app.innerHTML = `<div class="narrow panel"><h1>Start a review</h1><p class="muted">The guided setup is not available on this build yet.</p><div class="actions"><a class="rv-btn primary" href="${cards.routes.projects}">Go to your projects</a></div></div>`; return; }
   const ctx = ctxFor();
-  wizardHandle = mod.mountWizard(app, { api: ctx.api, go: ctx.go, origin: location.origin, assessmentHref: id => `#assessment/${encodeURIComponent(id)}` });
-  document.title = 'Start a review · 3D Review';
+  wizardHandle = mod.mountWizard(app, { api: ctx.api, go: ctx.go, origin: location.origin, assessmentHref: id => `#assessment/${encodeURIComponent(id)}`, resume });
+  document.title = `${resume ? 'Continue setup' : 'Start a review'} · 3D Review`;
 }
 // Account identity remains transient and belongs to this exact app identity.
 let accountBusy = false;

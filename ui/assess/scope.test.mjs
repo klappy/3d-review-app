@@ -400,6 +400,10 @@ test('router: about is a public entry intent; unknown hashes fall back to home, 
   assert.deepEqual({ ...route('#about') }, { kind: 'entry', intent: 'about' });
   for (const h of ['#public-about', '#nonsense', '#assessment']) assert.equal(route(h).kind, 'entry', h);
   assert.equal(route('#projects').kind, 'projects');
+  // B06: Home's "Continue setup" route reopens the wizard on that draft; plain #new stays a fresh setup
+  assert.deepEqual({ ...route('#new/asm%201') }, { kind: 'new', id: 'asm 1' });
+  assert.deepEqual({ ...route('#new') }, { kind: 'new' }); assert.deepEqual({ ...route('#/new') }, { kind: 'new' });
+  assert.equal(route('#new/a1/x').kind, 'entry');
 });
 
 test('B04: sign-in landing — pending invitation first; one project → that project; several or none → Home', () => {

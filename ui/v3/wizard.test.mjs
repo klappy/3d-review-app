@@ -365,3 +365,140 @@ test('B40: lead organisation is a seeded select plus "Other (type it)"; the stor
   const body = launchPlan(draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'L', newOrg: 'SIL' }))[0].body({});
   assert.deepEqual(body, { name: 'H', organization: 'SIL' });
 });
+
+// ---------- B06: draft saving / Continue setup / what Cancel keeps (captain ruling 16:20–16:35 ET, ASK 7 option 1) ----------
+import { JSDOM } from 'jsdom';
+import { mountWizard, savePlan, detailsPatch, detailsOf, draftFromSaved, launchResume, KEEP_LABEL, DISCARD_LABEL } from './wizard.js';
+const tick = () => new Promise(r => setTimeout(r, 0));
+const settle = async (n = 8) => { for (let i = 0; i < n; i++) await tick(); };
+const TEMPLATES = [{ id: 'tpl.team', version: 3, perspective: 'Translation team', name: 'Team' }, { id: 'tpl.community', version: 2, perspective: 'Community', name: 'Community' }];
+// A fake server: records every call; the assessment row lives here between mounts (the tab is closed and reopened).
+function server() {
+  const db = { a: null, surveys: [], deleted: false, n: 0 }, calls = [];
+  const api = async (url, { method = 'GET', body } = {}) => {
+    calls.push({ url, method, body });
+    if (url === '/v2/projects' && method === 'GET') return { projects: [{ id: 'p1', name: 'Lake', role: 'owner' }] };
+    if (url === '/v2/projects' && method === 'POST') return { project: { id: 'pN', name: body.name } };
+    if (url === '/v2/templates') return { templates: TEMPLATES };
+    if (url === '/v2/projects/p1/languages' || url === '/v2/projects/pN/languages') return method === 'POST' ? { language: { id: 'lN' } } : { languages: url.includes('pN') ? [{ id: 'lN', name: 'Hill' }] : [{ id: 'l1', name: 'Hindi' }] };
+    if (/\/v2\/projects\/p[1N]\/assessments$/.test(url) && method === 'POST') { db.a = { id: 'a1', project_id: url.split('/')[3], stage: 'prepare', role: 'owner', archived_at: null, ...body }; return { assessment: db.a }; }
+    if (url === '/v2/assessments/a1' && method === 'GET') return { assessment: db.a, surveys: db.surveys };
+    if (url === '/v2/assessments/a1' && method === 'PATCH') { Object.assign(db.a, body); return { assessment: db.a }; }
+    if (url === '/v2/assessments/a1' && method === 'DELETE') { if (body.mode === 'dry_run') return { impact: { affected: [{ assessment: 'a1', surveys: db.surveys.length, responses: 0 }] }, confirm_token: 'tok', expires_in: 300 }; db.deleted = true; db.a = null; return { deleted: true }; }
+    if (url === '/v2/assessments/a1/surveys') { const s = { id: 's' + (++db.n), template_id: body.template_id, template_version: body.version, state: 'selected' }; db.surveys.push(s); return { survey: s }; }
+    if (url === '/v2/assessments/a1/stage') { db.a.stage = body.stage; return { assessment: db.a }; }
+    if (url.endsWith('/links')) return body.mode === 'dry_run' ? { confirm_token: 'ct' } : { entry_fragment: '#survey=x', expires_at: null };
+    throw new Error('unexpected ' + method + ' ' + url);
+  };
+  return { db, calls, api, writes: () => calls.filter(c => c.method !== 'GET') };
+}
+function mount(srv, extra = {}) {
+  const dom = new JSDOM('<main></main>'); const w = dom.window;
+  globalThis.FormData = w.FormData; globalThis.AbortController = w.AbortController; // the wizard binds with a jsdom-owned signal
+  let confirms = 0; w.confirm = () => { confirms++; return true; }; globalThis.confirm = w.confirm;
+  const root = w.document.querySelector('main'), went = [];
+  const h = mountWizard(root, { api: srv.api, go: hash => went.push(hash), origin: 'https://x.test', store: mem(), ...extra });
+  const $ = sel => root.querySelector(sel);
+  const click = sel => $(sel).dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  const submit = () => $('form[data-wz-form]').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  const set = (name, v) => { const el = $(`[name="${name}"]`); el.value = v; return el; };
+  return { w, root, h, went, $, click, submit, set, confirms: () => confirms };
+}
+async function fillStep1(m, { project = 'p1' } = {}) {
+  await settle();
+  m.set('name', 'October review');
+  const sel = m.set('project', project); sel.dispatchEvent(new m.w.Event('change', { bubbles: true })); await settle();
+  if (project === NEW_PROJECT) { m.set('newProject', 'Hill project'); m.set('newLanguage', 'Hill'); } else m.set('language', 'l1');
+  m.set('until', '2026-10-31'); m.set('purpose', 'Genesis 1 to 3');
+}
+
+test('B06: savePlan is exactly the first writes of Launch (no new capability)', () => {
+  assert.deepEqual(savePlan(draft()).map(s => s.cap), ['cap.assessment.create']);
+  assert.deepEqual(savePlan(draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'L' })).map(s => s.cap), ['cap.project.create', 'cap.language.create', 'cap.assessment.create']);
+  const snap = detailsOf(draft({ purpose: 'Gen' }));
+  assert.equal(detailsPatch(snap, draft({ purpose: 'Gen' })), null, 'nothing changed → no write');
+  assert.deepEqual(detailsPatch(snap, draft({ purpose: '', name: 'Nov' })), { name: 'Nov', purpose: null });
+});
+
+test('B06: Continue on step 1 saves the review in Prepare (cap.assessment.create only) and moves to step 2', async () => {
+  const srv = server(), m = mount(srv);
+  await fillStep1(m); m.submit(); await settle();
+  assert.deepEqual(srv.writes().map(c => `${c.method} ${c.url}`), ['POST /v2/projects/p1/assessments']);
+  assert.deepEqual(srv.writes()[0].body, { name: 'October review', language_id: 'l1', purpose: 'Genesis 1 to 3', period: srv.db.a.period, format: 'Written' });
+  assert.match(srv.db.a.period, /Active until 2026-10-31$/);
+  assert.equal(srv.db.a.stage, 'prepare');
+  assert.equal(m.h.state.step, 'participants'); assert.match(m.root.innerHTML, /Who will participate\?/);
+  // Back to step 1: values kept, project fixed; Continue without a change writes nothing, a change is a PATCH of that field only
+  m.click('[data-wz="back"]'); await settle();
+  assert.equal(m.$('[name="name"]').value, 'October review'); assert.ok(m.$('select[name="project"]').disabled); assert.doesNotMatch(m.root.innerHTML, /New project…/);
+  m.submit(); await settle(); assert.equal(srv.writes().length, 1, 'unchanged step 1 → no second write');
+  m.click('[data-wz="back"]'); await settle(); m.set('name', 'November review'); m.submit(); await settle();
+  assert.deepEqual(srv.writes().at(-1), { url: '/v2/assessments/a1', method: 'PATCH', body: { name: 'November review' } });
+  assert.equal(srv.calls.filter(c => c.method === 'POST' && c.url.endsWith('/assessments')).length, 1, 'never a second assessment');
+});
+
+test('B06: a new project on step 1 is created with the draft, then fixed on step 1', async () => {
+  const srv = server(), m = mount(srv);
+  await fillStep1(m, { project: NEW_PROJECT }); m.submit(); await settle();
+  assert.deepEqual(srv.writes().map(c => `${c.method} ${c.url}`), ['POST /v2/projects', 'POST /v2/projects/pN/languages', 'POST /v2/projects/pN/assessments']);
+  m.click('[data-wz="back"]'); await settle();
+  assert.equal(m.$('select[name="project"] option[selected]').textContent, 'Hill project'); assert.ok(m.$('select[name="project"]').disabled);
+  m.submit(); await settle(); assert.equal(srv.writes().length, 3, 'no second project or language');
+});
+
+test('B06: close the tab after step 1 → Continue setup (#new/<id>) reopens at step 2 with the step 1 values', async () => {
+  const srv = server(); const first = mount(srv); await fillStep1(first); first.submit(); await settle(); first.h.destroy();
+  const m = mount(srv, { resume: 'a1' }); await settle();
+  assert.equal(m.h.state.step, 'participants'); assert.match(m.root.innerHTML, /Who will participate\?/);
+  m.click('[data-wz="back"]'); await settle();
+  assert.equal(m.$('[name="name"]').value, 'October review'); assert.equal(m.$('[name="purpose"]').value, 'Genesis 1 to 3');
+  assert.equal(m.$('[name="until"]').value, '2026-10-31'); assert.equal(m.$('select[name="language"]').value, 'l1');
+  assert.equal(srv.writes().length, 1, 'reopening writes nothing');
+  const d = draftFromSaved({ id: 'a2', project_id: 'p1', language_id: 'l1', name: 'X', period: null }, []);
+  assert.equal(d.step, 'details', 'incomplete step 1 reopens at step 1');
+});
+
+test('B06: Cancel after the save asks in the page — Keep as draft keeps it; Discard removes it (cap.assessment.delete, U14 flow)', async () => {
+  const srv = server(), m = mount(srv); await fillStep1(m); m.submit(); await settle();
+  m.click('[data-wz="cancel"]'); await settle();
+  const ask = m.$('[data-wz-ask]'); assert.ok(ask, 'asked in the page'); assert.equal(m.confirms(), 0, 'never window.confirm');
+  assert.match(ask.textContent, new RegExp(KEEP_LABEL)); assert.match(ask.textContent, new RegExp(DISCARD_LABEL));
+  m.click('[data-wz="keep"]'); await settle();
+  assert.deepEqual(m.went, ['#/']); assert.ok(!srv.db.deleted); assert.equal(srv.db.a.stage, 'prepare');
+  const r = mount(srv, { resume: 'a1' }); await settle();
+  r.click('[data-wz="cancel"]'); await settle(); r.click('[data-wz="discard"]'); await settle();
+  assert.deepEqual(srv.writes().slice(-2).map(c => c.body), [{ mode: 'dry_run' }, { mode: 'execute', confirm_token: 'tok' }]);
+  assert.ok(srv.db.deleted); assert.deepEqual(r.went, ['#/']); assert.equal(r.confirms(), 0);
+});
+
+test('B06: Cancel before anything is saved leaves with no ask and no write', async () => {
+  const srv = server(), m = mount(srv); await settle();
+  m.click('[data-wz="cancel"]'); await settle();
+  assert.equal(m.$('[data-wz-ask]'), null); assert.deepEqual(m.went, ['#/']); assert.equal(srv.writes().length, 0);
+});
+
+test('B06: Launch after a saved step 1 works as before, without creating the assessment again; a launched review has no setup', async () => {
+  const srv = server(), m = mount(srv); await fillStep1(m); m.submit(); await settle();
+  m.$('input[name=g][value="tpl.team"]').checked = true; m.submit(); await settle(); // step 2
+  m.submit(); await settle(); // step 3
+  m.click('[data-wz="launch"]'); await settle(12);
+  assert.deepEqual(srv.writes().map(c => `${c.method} ${c.url}`), ['POST /v2/projects/p1/assessments', 'POST /v2/assessments/a1/surveys', 'POST /v2/assessments/a1/stage', 'POST /v2/assessments/a1/surveys/s1/links', 'POST /v2/assessments/a1/surveys/s1/links']);
+  assert.ok(m.h.state.done); assert.match(m.root.innerHTML, /The review is collecting responses/);
+  const again = mount(srv, { resume: 'a1', assessmentHref: id => `#assessment/${id}` }); await settle();
+  assert.deepEqual(again.went, ['#assessment/a1'], 'launched: Continue setup is gone, the review opens instead');
+});
+
+test('B06: resuming a part-launched draft keeps the surveys it already holds (no duplicate select)', () => {
+  const back = draftFromSaved({ id: 'a1', project_id: 'p1', language_id: 'l1', name: 'Oct', period: 'Active until 2026-10-31', role: 'owner' }, [{ id: 's7', template_id: 'tpl.team', template_version: 3, state: 'selected' }]);
+  assert.equal(back.step, 'participants'); assert.deepEqual(Object.keys(back.d.groups), ['tpl.team']);
+  const ctx = launchResume(back.saved, back.d);
+  assert.deepEqual(ctx.done, ['cap.assessment.create']); assert.deepEqual(ctx.surveys.map(s => s.id), ['s7']);
+  assert.deepEqual(launchPlan(back.d, ctx.pre).map(s => s.cap), ['cap.assessment.create', 'cap.assessment.set_stage', 'cap.survey.issue_link']);
+});
+
+test('B06: a saved setup that cannot be read shows one alert and Home, never a fresh step 1', async () => {
+  const srv = server(), api = async (url, o) => { if (url === '/v2/assessments/gone') throw Object.assign(new Error('Not found.'), { status: 404 }); return srv.api(url, o); };
+  const m = mount({ ...srv, api }, { resume: 'gone' }); await settle();
+  assert.equal(m.$('form[data-wz-form]'), null); assert.match(m.$('[role=alert]').textContent, /Not found\./);
+  m.click('[data-wz="keep"]'); await settle(); assert.deepEqual(m.went, ['#/']); assert.equal(srv.writes().length, 0);
+});
