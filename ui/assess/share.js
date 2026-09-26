@@ -38,7 +38,9 @@ export function blankShare() { return { stage: 'idle', open: false, confirm: nul
 // U10: paper access codes on the same card (cap.survey.issue_codes, then cap.survey.export_codes dry_run → confirm_token → execute).
 // Code values live only in this in-memory model, are never stored or logged, and are cleared with the link when identity,
 // assessment, survey or data epoch changes.
-export function blankCodes() { return { stage: 'idle', count: 20, ids: null, confirm: null, deadline: 0, list: null, message: '', alert: false }; }
+// Nothing is issued until the in-page confirm; the batch is issued, dry-run previewed and released in that one step, and any
+// exit short of showing the codes undoes the batch (receipt undo_token), so no live batch is ever left unseen.
+export function blankCodes() { return { stage: 'idle', count: 20, list: null, live: null, message: '', alert: false }; }
 // share model keyed to (aid, sid, epoch) — assess.js drops it whenever any of those changes.
 export function shareFor(state, aid, sid, epoch) {
   const s = state.share;
@@ -75,12 +77,14 @@ export function render(ctx, { current, survey, share }) {
 // U10: Access codes — count → preview (dry run) → in-page confirm → shown once → print-ready list. Owners and members only
 // (render returns before this for any other role).
 export function codesBlock(ctx, survey, c) {
-  const esc = ctx.esc, busy = c.stage === 'busy', n = c.ids ? c.ids.length : c.count;
+  const esc = ctx.esc, busy = c.stage === 'busy', n = c.count;
   const body = c.stage === 'shown' && c.list
     ? `<ol class="share-codes-list" data-share-codes-list>${c.list.map(x => `<li><code>${esc(x.code)}</code></li>`).join('')}</ol><div class="actions"><button type="button" class="primary" data-share-codes-print>${esc(copy.print)}</button><button type="button" class="quiet" data-share-codes-done>Done</button></div>`
-    : c.stage === 'preview'
-      ? stageMoveConfirm(`Show ${n} access code${n === 1 ? '' : 's'} for ${survey.template_name || 'this survey'} now? ${copy.codesOnce}`, 'Show codes once', esc).replace('data-stage-confirm ', 'data-share-codes-confirm ').replace('data-stage-confirm-go', 'data-share-codes-go').replace('data-stage-confirm-cancel', 'data-share-codes-cancel')
-      : `<div class="actions"><label class="small">How many <input type="number" min="1" max="100" value="${esc(c.count)}" data-share-codes-count${busy || c.ids ? ' disabled' : ''}></label><button type="button" data-share-codes-prepare${busy ? ' disabled' : ''}>${c.ids ? 'Preview again' : 'Preview codes'}</button></div>`;
+    : c.live
+      ? `<p class="alert" data-share-codes-live>${esc(`${c.live.n} code${c.live.n === 1 ? ' is' : 's are'} issued and still active.`)}</p><div class="actions"><button type="button" data-share-codes-undo${busy ? ' disabled' : ''}>Undo</button></div>`
+      : c.stage === 'confirm'
+        ? stageMoveConfirm(`Issue and show ${n} access code${n === 1 ? '' : 's'} for ${survey.template_name || 'this survey'} now? ${copy.codesOnce}`, 'Show codes once', esc).replace('data-stage-confirm ', 'data-share-codes-confirm ').replace('data-stage-confirm-go', 'data-share-codes-go').replace('data-stage-confirm-cancel', 'data-share-codes-cancel')
+        : `<div class="actions"><label class="small">How many <input type="number" min="1" max="100" value="${esc(c.count)}" data-share-codes-count${busy ? ' disabled' : ''}></label><button type="button" data-share-codes-prepare${busy ? ' disabled' : ''}>Preview codes</button></div>`;
   return `<div class="share-codes" data-share-codes><p class="eyebrow">${esc(copy.codes)}</p><p class="small muted">${esc(copy.codesOnce)}</p>${body}<p class="small ${c.alert ? 'alert' : 'muted'}" role="status" data-share-codes-status>${esc(c.message || '')}</p></div>`;
 }
 export function codesSheetHtml(ctx, { current, survey, codes }) {
@@ -125,7 +129,7 @@ export function bindPrintAll(root, { heading, items, doc = globalThis.document, 
 }
 const escHtml = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-export function bind(ctx, root, { current, survey, share, api, onChange, links = null, linkKey = null, print = () => globalThis.print?.(), clipboard = globalThis.navigator?.clipboard, doc = globalThis.document, origin = globalThis.location?.origin, now = Date.now }) {
+export function bind(ctx, root, { current, survey, share, api, apiFull = null, onChange, links = null, linkKey = null, print = () => globalThis.print?.(), clipboard = globalThis.navigator?.clipboard, doc = globalThis.document, origin = globalThis.location?.origin, now = Date.now }) {
   const aid = current.assessment.id, sid = survey.id, base = `/v2/assessments/${ctx.enc(aid)}/surveys/${ctx.enc(sid)}/links`;
   // The model stays current until identity, survey or epoch changes. A same-page paint disconnects this root; that must
   // not blank the model or skip onChange. Copy/print still require the bound node so a gone page cannot receive a credential.
@@ -193,45 +197,51 @@ export function bind(ctx, root, { current, survey, share, api, onChange, links =
       Object.assign(share, blankShare()); say(copy.revoked);
     } catch { if (same()) fail('Revocation could not be confirmed. The link may still work. Try revoking it again.'); }
   });
-  bindCodes(ctx, root, { current, survey, share, api, same, live, update, print, doc, now });
+  bindCodes(ctx, root, { current, survey, share, api, apiFull: apiFull || (async (u, o) => ({ result: await api(u, o) })), same, live, update, print, doc });
 }
-function bindCodes(ctx, root, { current, survey, share, api, same, live, update, print, doc, now }) {
+function bindCodes(ctx, root, { current, survey, share, api, apiFull, same, live, update, print, doc }) {
   const c = share.codes || (share.codes = blankCodes()), base = `/v2/assessments/${ctx.enc(current.assessment.id)}/surveys/${ctx.enc(survey.id)}/codes`;
   const say = (message, alert = false) => { c.message = message; c.alert = alert; update(); };
   const ok = () => live() && c.stage !== 'busy' && CAN_SHARE.has(current.assessment.role);
-  root.querySelector('[data-share-codes-prepare]')?.addEventListener('click', async () => {
+  // Undo the whole batch (handlers/undo.ts revokes every unredeemed code or none). true only on a confirmed undo.
+  const undo = async batch => { if (!batch?.token) return false; try { await api(`/v2/undo/${ctx.enc(batch.token)}`, { method: 'POST' }); return true; } catch { return false; } };
+  root.querySelector('[data-share-codes-prepare]')?.addEventListener('click', () => {
     if (!ok()) return;
-    if (!c.ids) {
-      const count = Number(root.querySelector('[data-share-codes-count]')?.value ?? c.count);
-      if (!Number.isInteger(count) || count < 1 || count > 100) { say('Choose between 1 and 100 codes.', true); return; }
-      c.count = count;
-    }
-    c.stage = 'busy'; say('Preparing codes…');
-    try {
-      // Issue the batch once (IDs only, no values; reversible with Undo), then preview the one-time release (dry run).
-      if (!c.ids) { const r = await api(base, { method: 'POST', body: { count: c.count } }); if (!same()) return; if (!Array.isArray(r?.ids) || !r.ids.length) throw new Error('Incomplete result'); c.ids = r.ids; }
-      const d = await api(`${base}/export`, { method: 'POST', body: { params: { ids: c.ids }, mode: 'dry_run' } });
-      if (!same()) return;
-      if (!d?.confirm_token || !(d.expires_in > 0)) throw new Error('Invalid preparation');
-      c.confirm = d.confirm_token; c.deadline = now() + d.expires_in * 1000; c.stage = 'preview'; say('');
-    } catch { if (!same()) return; c.stage = 'idle'; say(c.ids ? 'The codes are issued but could not be previewed. Press Preview again.' : 'Codes could not be prepared. Try again, or sign in if your session has ended.', true); }
+    const count = Number(root.querySelector('[data-share-codes-count]')?.value ?? c.count);
+    if (!Number.isInteger(count) || count < 1 || count > 100) { say('Choose between 1 and 100 codes.', true); return; }
+    c.count = count; c.stage = 'confirm'; say('');
   });
-  root.querySelector('[data-share-codes-cancel]')?.addEventListener('click', () => { if (c.stage !== 'preview') return; c.confirm = null; c.stage = 'idle'; say(''); });
+  root.querySelector('[data-share-codes-cancel]')?.addEventListener('click', () => { if (c.stage !== 'confirm') return; c.stage = 'idle'; say('Cancelled; no codes were issued.'); });
   root.querySelector('[data-share-codes-go]')?.addEventListener('click', async () => {
-    if (!ok() || c.stage !== 'preview') return;
-    if (!c.confirm || now() >= c.deadline) { c.confirm = null; c.stage = 'idle'; say('The preview expired. Press Preview again.', true); return; }
-    const confirm_token = c.confirm; c.confirm = null; c.stage = 'busy'; say('Showing codes…');
+    if (!ok() || c.stage !== 'confirm') return;
+    c.stage = 'busy'; say('Issuing codes…');
+    let batch = null, shown = false;
     try {
-      const r = await api(`${base}/export`, { method: 'POST', body: { params: { ids: c.ids }, mode: 'execute', confirm_token } });
-      if (!same()) return;
+      const j = await apiFull(base, { method: 'POST', body: { count: c.count } });
+      const ids = j?.result?.ids; batch = { token: j?.receipt?.undo_token || null, n: Array.isArray(ids) ? ids.length : c.count };
+      if (!Array.isArray(ids) || !ids.length) throw new Error('Incomplete result');
+      const d = await api(`${base}/export`, { method: 'POST', body: { params: { ids }, mode: 'dry_run' } });
+      if (!d?.confirm_token) throw new Error('Invalid preparation');
+      const r = await api(`${base}/export`, { method: 'POST', body: { params: { ids }, mode: 'execute', confirm_token: d.confirm_token } });
       if (!Array.isArray(r?.codes) || r.codes.some(x => typeof x?.code !== 'string')) throw new Error('Incomplete result');
-      c.list = r.codes.map(x => ({ code: x.code })); c.ids = null; c.stage = 'shown'; say('');
-    } catch (e) {
-      if (!same()) return;
-      const certain = ['CONFIRM_EXPIRED', 'CONFIRM_REQUIRED'].includes(e?.code);
-      c.stage = 'idle'; if (!certain) c.ids = null;
-      say(certain ? 'The preview expired. Press Preview again.' : 'The codes may have been released, but they were not received and cannot be shown again. Prepare new codes.', true);
+      if (!same()) return; // left the page: the finally below undoes the unseen batch
+      c.list = r.codes.map(x => ({ code: x.code })); c.stage = 'shown'; shown = true; say('');
+    } catch {
+      if (!batch) { if (same()) { c.stage = 'idle'; say('Codes could not be issued. Try again, or sign in if your session has ended.', true); } return; }
+    } finally {
+      if (batch && !shown) {
+        const undone = await undo(batch);
+        if (same()) { c.stage = 'idle'; if (undone) { c.live = null; say('The codes could not be shown, so the batch was undone; no codes were issued.', true); } else { c.live = batch; say(''); } }
+      }
     }
+  });
+  root.querySelector('[data-share-codes-undo]')?.addEventListener('click', async () => {
+    if (!ok() || !c.live) return;
+    c.stage = 'busy'; update();
+    const undone = await undo(c.live);
+    if (!same()) return;
+    c.stage = 'idle';
+    if (undone) { c.live = null; say('Undone; no codes are active from that batch.'); } else say('Undo did not go through. Try again.', true);
   });
   root.querySelector('[data-share-codes-print]')?.addEventListener('click', () => {
     if (!live() || !c.list) return;

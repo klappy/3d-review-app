@@ -463,8 +463,8 @@ function bindShare(current, s) {
   const root = app.querySelector('#share-root'); if (!root) return;
   const model = shareModel(current.assessment.id, s.id), linkKey = `${current.assessment.id}|${s.id}|${epoch}`;
   const ctx = { esc, enc: encodeURIComponent, isCurrent: () => currentShareRoute() === model };
-  const onChange = () => { const el = app.querySelector('#share-root'); if (!el) return; el.innerHTML = share.render(ctx, { current, survey: s, share: model }); share.bind(ctx, el, { current, survey: s, share: model, api, onChange, links: state.collectLinks, linkKey }); };
-  share.bind(ctx, root, { current, survey: s, share: model, api, onChange, links: state.collectLinks, linkKey });
+  const onChange = () => { const el = app.querySelector('#share-root'); if (!el) return; el.innerHTML = share.render(ctx, { current, survey: s, share: model }); share.bind(ctx, el, { current, survey: s, share: model, api, apiFull, onChange, links: state.collectLinks, linkKey }); };
+  share.bind(ctx, root, { current, survey: s, share: model, api, apiFull, onChange, links: state.collectLinks, linkKey });
 }
 function bindPrepare(current) {
   const aid = current.assessment.id, n = activeSurveys(current).length;
