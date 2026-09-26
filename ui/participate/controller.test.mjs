@@ -70,14 +70,16 @@ test('concurrent clicks submit only once', async () => {
   assert.equal(h.requests.filter(r => r.url.endsWith('/responses')).length, 1); finish(response({ submitted: true })); await first;
 });
 
-test('root route forwards shared credentials to dedicated page, invitations remain legacy, both scrub first', async () => {
+test('root route forwards shared credentials to dedicated page, invitations stay in v3 (B03), both scrub first', async () => {
   const { readFileSync } = await import('node:fs'); const { runInNewContext } = await import('node:vm');
+  const { parseInvitationFragment, INVITE_KEY } = await import('../v3/components/invite.js');
   const source = readFileSync(new URL('../assess/assess.js', import.meta.url), 'utf8');
   const fn = source.slice(source.indexOf('function scrubCredentialHash()'), source.indexOf('function resetIdentity()'));
-  for (const [hash, destination] of [['#survey=link-secret', '/participate/#survey=link-secret'], ['#invite=invite-secret', '/legacy/#invite=invite-secret']]) {
-    const events = [];
-    runInNewContext(fn + '\nscrubCredentialHash();', { demo: false, location: { hash, pathname: '/', replace: value => events.push(value) }, history: { replaceState: () => events.push('scrub') }, LEGACY_HASHES: new Set() });
-    assert.deepEqual(events, ['scrub', destination]);
+  for (const [hash, expected] of [['#survey=link-secret', ['scrub', '/participate/#survey=link-secret']], ['#invite=invite-secret', ['scrub /#invite']]]) {
+    const events = [], stored = {};
+    runInNewContext(fn + '\nscrubCredentialHash();', { demo: false, location: { hash, pathname: '/', replace: value => events.push(value) }, history: { replaceState: (_s, _t, url) => events.push(url === '/' ? 'scrub' : 'scrub ' + url) }, LEGACY_HASHES: new Set(), parseInvitationFragment, INVITE_KEY, pendingInvite: null, sessionStorage: { setItem: (k, v) => { stored[k] = v; } } });
+    assert.deepEqual(events, expected);
+    if (hash.startsWith('#invite=')) assert.equal(stored[INVITE_KEY], 'invite-secret');
   }
 });
 test('429 and transport failure keep honest retry states without creating another participant', async () => {
