@@ -135,8 +135,10 @@ export function draftFromSaved(a, surveys = [], store) {
   return { d, step: validateStep('details', d).length ? 'details' : 'participants', saved: { aid: a.id, pid: a.project_id, role: a.role || '', snap, pre } };
 }
 // The launch ctx for a saved draft: the assessment exists (done), surveys it already holds and are still chosen are kept.
+// B06f: a survey the draft already holds stays selected on the server, so it is always kept (step 2 locks it: "Already added.").
 export function launchResume(saved, d) {
-  const kept = saved.pre.filter(x => d.groups[x.template] && Number(d.groups[x.template].version) === Number(x.version));
+  const kept = saved.pre;
+  for (const x of kept) if (!d.groups[x.template]) d.groups[x.template] = { version: String(x.version), expected: '' };
   return { pid: saved.pid, lid: d.language, aid: saved.aid, surveys: kept.map(x => ({ id: x.id, template: x.template, expected: expectedValue(d.groups[x.template].expected) })), links: [], done: ['cap.assessment.create'], pre: kept.map(x => x.template) };
 }
 
@@ -276,6 +278,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   const proj = isNew ? { name: d.newProject } : projects.find(p => p.id === d.project) || {};
   const lang = isNew ? { name: d.newLanguage } : languages.find(l => l.id === d.language) || {};
   const chosen = templates.filter(t => d.groups[t.id]);
+  const pre = new Map((data.pre || []).map(x => [x.template, x])); // B06f: surveys a saved draft already holds — locked on step 2
   const saved = !!data.saved, act = (back, primary) => actions(back, primary, saved); // B06: saved draft — project is fixed
   if (step === 'details') return `${head(n, 'Assessment details', 'You can change these later.', '<p class="muted">Only what the review needs.</p>')}${errBox(errs)}
     <form data-wz-form="details">
@@ -300,8 +303,8 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Choose the groups you can reach.', '<p class="muted">Three perspectives, kept separate.</p><p class="muted">The number is optional. Leave it empty if you don\'t know for sure; counts then show as "n responded". Groups you leave out can be added later.</p>')}${errBox(errs)}
     <form data-wz-form="participants">
       ${templates.length ? byPerspective(templates).map(([p, ts]) => `<div class="wz-pgroup"><div class="wz-persp"><span class="pdot ${pdot(p)}" aria-hidden="true"></span><div><h3>${esc(p)}</h3>${perspectiveNote(p) ? `<p class="small muted wz-pnote">${esc(perspectiveNote(p))}</p>` : ''}</div></div>
-        ${ts.map(t => { const g = d.groups[t.id]; return `<div class="group${g ? ' on' : ''}">
-        <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(t.version)}"${g ? ' checked' : ''}><span class="wz-sname">${esc(t.name)}</span></label>
+        ${ts.map(t => { const g = d.groups[t.id], had = pre.get(t.id); return `<div class="group${g || had ? ' on' : ''}">
+        <label class="choice"><input type="checkbox" name="g" value="${esc(t.id)}" data-version="${esc(had ? had.version : t.version)}"${g || had ? ' checked' : ''}${had ? ' disabled data-wz-pre' : ''}><span class="wz-sname">${esc(t.name)}</span></label>${had ? '<p class="small muted" data-wz-added>Already added.</p>' : ''}
         <div class="gin"><label for="n-${esc(t.id)}">How many do you expect?</label><input type="number" id="n-${esc(t.id)}" name="n-${esc(t.id)}" min="1" step="1" inputmode="numeric" value="${g && g.expected ? esc(g.expected) : ''}" placeholder="optional"></div></div>`; }).join('')}</div>`).join('')
         : '<p class="muted">No published surveys are available to this account.</p>'}
       ${act(true, '<button class="primary" type="submit">Continue</button>')}
@@ -352,7 +355,7 @@ export function mountWizard(root, deps) {
   const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0, saved: null, saveCtx: null, asking: false };
   let alive = true; const ac = new AbortController(); const on = { signal: ac.signal };
   // B06: only the current step's live form is read on paint; a form left behind by a step change was already read (never undo a save's adoption).
-  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done && live.dataset.wzForm === s.step) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; };
+  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done && live.dataset.wzForm === s.step) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [] }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; };
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
   const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
@@ -360,7 +363,7 @@ export function mountWizard(root, deps) {
     if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'starts', 'until', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
     if (form.dataset.wzForm === 'details' && fd.has('newOrgPick')) { const v = String(fd.get('newOrgPick')); d.newOrgOther = v === ORG_OTHER; if (!d.newOrgOther) d.newOrg = v; else if (!fd.has('newOrg')) d.newOrg = ''; }
     if (form.dataset.wzForm === 'details') { if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
-    if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
+    if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked || box.hasAttribute('data-wz-pre')) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
   };
   root.addEventListener('change', async e => {
     if (e.target.name === 'newOrgPick' && !s.partial && !s.busy) { read(e.target.form); paint(); if (s.d.newOrgOther) root.querySelector('input[name=newOrg]')?.focus(); return; }
@@ -430,9 +433,9 @@ export function mountWizard(root, deps) {
     try {
       const [p, t, r] = await Promise.all([deps.api('/v2/projects'), deps.api('/v2/templates'), deps.resume ? deps.api(`/v2/assessments/${enc(deps.resume)}`) : null]); if (!alive) return;
       s.data.projects = (p.projects || []).filter(x => !x.archived_at && (x.role === 'owner' || x.role === 'member')); s.data.templates = t.templates || [];
-      if (r) { // B06: Continue setup — a launched review has no setup left; a draft reopens at its next unfinished step
+      if (r) { // B06: Continue setup — a launched review has no setup left, and a viewer cannot set up (B06f), so both open the review; a draft reopens at its next unfinished step
         const a = r.assessment || {};
-        if (a.stage !== 'prepare') return deps.go?.(deps.assessmentHref ? deps.assessmentHref(a.id || deps.resume) : `#/a/${enc(a.id || deps.resume)}`);
+        if (a.stage !== 'prepare' || a.role === 'viewer') return deps.go?.(deps.assessmentHref ? deps.assessmentHref(a.id || deps.resume) : `#/a/${enc(a.id || deps.resume)}`);
         const back = draftFromSaved(a, r.surveys || [], deps.store); s.d = back.d; s.step = back.step; s.saved = back.saved;
         if (!s.data.projects.some(x => x.id === a.project_id)) { const any = (p.projects || []).find(x => x.id === a.project_id); s.data.projects.push({ id: a.project_id, name: any?.name || 'This project' }); }
         await loadLanguages(); if (!alive) return;

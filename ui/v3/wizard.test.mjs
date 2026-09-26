@@ -502,3 +502,25 @@ test('B06: a saved setup that cannot be read shows one alert and Home, never a f
   assert.equal(m.$('form[data-wz-form]'), null); assert.match(m.$('[role=alert]').textContent, /Not found\./);
   m.click('[data-wz="keep"]'); await settle(); assert.deepEqual(m.went, ['#/']); assert.equal(srv.writes().length, 0);
 });
+
+test('B06f: a viewer opening #new/<id> directly goes to the review, never an editable setup', async () => {
+  const srv = server(); const first = mount(srv); await fillStep1(first); first.submit(); await settle(); first.h.destroy();
+  srv.db.a.role = 'viewer';
+  const m = mount(srv, { resume: 'a1', assessmentHref: id => `#assessment/${id}` }); await settle();
+  assert.deepEqual(m.went, ['#assessment/a1']); assert.equal(m.$('form[data-wz-form]'), null); assert.equal(srv.writes().length, 1);
+});
+
+test('B06f: a part-launched draft keeps its already-added survey ticked and locked, and Launch still issues its link', async () => {
+  const srv = server(); const first = mount(srv); await fillStep1(first); first.submit(); await settle(); first.h.destroy();
+  srv.db.surveys.push({ id: 's9', template_id: 'tpl.team', template_version: 3, state: 'selected' });
+  const m = mount(srv, { resume: 'a1' }); await settle();
+  const box = m.$('input[name=g][value="tpl.team"]');
+  assert.ok(box.checked && box.disabled, 'locked'); assert.equal(m.$('[data-wz-added]').textContent, 'Already added.');
+  box.checked = false; m.submit(); await settle(); // even if unticked, it stays in the review
+  assert.deepEqual(Object.keys(m.h.state.d.groups), ['tpl.team']);
+  m.submit(); await settle(); m.click('[data-wz="launch"]'); await settle(12);
+  assert.ok(m.h.state.done); assert.deepEqual(m.h.state.done.links.map(l => l.survey), ['s9']);
+  assert.equal(srv.writes().filter(c => c.url === '/v2/assessments/a1/surveys').length, 0, 'no second select');
+  const ctx = launchResume({ aid: 'a1', pid: 'p1', pre: [{ id: 's9', template: 'tpl.team', version: 3 }] }, draft({ groups: {} }));
+  assert.deepEqual(ctx.surveys.map(s => s.id), ['s9'], 'launchResume never drops a survey the server still holds');
+});

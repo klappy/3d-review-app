@@ -80,6 +80,7 @@ test('B06: a review in setup is ONE card whose one action "Continue setup" reope
   assert.match(assessmentRow({ id: 'a1', name: 'Oct', stage: 'prepare', role: 'member' }, label), /href="#new\/a1"/);
   const viewer = assessmentRow({ id: 'a1', name: 'Oct', stage: 'prepare', role: 'viewer' }, label);
   assert.match(viewer, /href="#assessment\/a1"/);
+  assert.match(viewer, /Continue assessment/); assert.doesNotMatch(viewer, /Continue setup/, 'B06f: a viewer card says what it does (opens the review)');
   const launched = assessmentRow({ id: 'a1', name: 'Oct', stage: 'collect', role: 'owner' }, label);
   assert.doesNotMatch(launched, /Continue setup|#new\//); assert.match(launched, /href="#assessment\/a1"/);
   const h = homeView({ projects: [{ id: 'p1', name: 'Lake' }], listFor: () => ({ status: 'loaded', list: [{ id: 'a1', name: 'Oct', stage: 'prepare', role: 'owner' }] }), stageLabel: label });
