@@ -152,7 +152,7 @@ export const v3css = `.v3-bands{display:grid;grid-template-columns:repeat(auto-f
 // U4 review gate (PARITY.md U4; prototype V.results frame 10). One primary per state, each a single cap.assessment.set_stage
 // move (the server allows one step at a time): Collecting → "Record my review" (checkbox first) → Reviewing →
 // "Choose a next step" → Improving. Viewers get the state word only. No new capability, no new stored field.
-export { V3_REVIEW_CHECK, v3GateAction, reviewGate as v3ReviewGateMarkup } from '../v3/components/review-gate.js'; // component: Review gate (ruling 12:34)
+export { V3_REVIEW_CHECK, v3GateAction, reviewGate as v3ReviewGateMarkup, stageMoveButton, askStageMove } from '../v3/components/review-gate.js'; // component: Review gate (ruling 12:34)
 /** The only write: POST /v2/assessments/:id/stage { stage } (cap.assessment.set_stage), stage from V3_SET_STAGE. */
 export function v3SetStage(api, enc, aid, action) {
   const stage = V3_SET_STAGE[action];
