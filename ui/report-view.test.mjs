@@ -87,16 +87,19 @@ test('R4 standalone indicators, evidence and narrative rows', () => {
   assert.deepEqual(sectionRows(root, copy.narrative), ['Team scores are highest on process.', 'One lens has no comparable data.']);
 });
 
-test('R5 translation type agreement: values and agree false', () => {
+test('R5 translation type agreement: one plain sentence, agree false reads Differs', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.translationAgreement), ['Translation type agreement', 'meaning-based', 'literal · meaning-based', 'false']);
+  assert.deepEqual(sectionRows(root, copy.translationAgreement), ['Agreed: Meaning-based · Seen as: Literal, Meaning-based · Differs']);
+  const same = fakeNode('section');
+  renderReport({ doc, root: same, report: { ...REPORT, payload: { ...REPORT.payload, translation_type_agreement: { construct_name: 'x', team_values: ['resembling'], church_values: ['resembling'], agree: true } } } });
+  assert.deepEqual(sectionRows(same, copy.translationAgreement), ['Agreed: Resembling · Seen as: Resembling · Matches']);
 });
 
 test('R6 agree null prints "not comparable"; translation section absent when the payload holds null', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: { ...REPORT, payload: { ...REPORT.payload, translation_type_agreement: { ...REPORT.payload.translation_type_agreement, agree: null } } } });
-  assert.deepEqual(sectionRows(root, copy.translationAgreement), ['Translation type agreement', 'meaning-based', 'literal · meaning-based', 'not comparable']);
+  assert.deepEqual(sectionRows(root, copy.translationAgreement), ['Agreed: Meaning-based · Seen as: Literal, Meaning-based · Not comparable']);
   const bare = fakeNode('section');
   renderReport({ doc, root: bare, report: { ...REPORT, payload: { ...REPORT.payload, translation_type_agreement: null } } });
   assert.equal(sectionRows(bare, copy.translationAgreement), null);

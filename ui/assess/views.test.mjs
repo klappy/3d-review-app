@@ -89,6 +89,7 @@ test('Reports: server list plus preview control for exact assessment editor', as
   const html = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
   assert.match(html, /data-open-report="rep_1"/);
   assert.match(html, /data-preview-report/);
+  assert.match(html, /<details class="small" data-report-build-more><summary>Technical details<\/summary><section data-report-build>/); // U32: closed disclosure, not a second visible build action
   assert.doesNotMatch(html, /data-confirm-report/);
 });
 
@@ -148,8 +149,21 @@ test('A7 improve viewer: read-only notes, no save control, visibility line; text
   assert.ok(html.includes(NOTES_VISIBILITY));
   assert.doesNotMatch(html, /undo/i);
   assert.ok(!html.includes(esc(RECOMMENDATIONS_NOT_BUILT))); // v3 L3-4: aside not drawn (PARITY I1)
-  assert.match(html, /What happens next\?/); assert.match(html, /<h3>What you noticed<\/h3>/);
+  assert.match(html, /What happens next\?/); assert.match(html, /<dt>What you noticed<\/dt>/);
+  // B30 (lanes-1911): one heading, no h3; outside Learn more no explanatory line; no button or form for a viewer.
+  const [front] = html.split('<details');
+  assert.equal((html.match(/<h[1-6][\s>]/g) || []).length, 1); assert.equal((front.match(/<p[\s>]/g) || []).length, 1); // the eyebrow only
+  assert.ok(!front.includes(NOTES_VISIBILITY)); assert.doesNotMatch(html, /<button|<form/);
   assert.ok(!(await views.improve.load(ctx, { aid: 'a1' })).editable);
+});
+
+test('B30 improve viewer, nothing recorded: one heading and one short line', async () => {
+  const { api } = fakeApi({}); const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'viewer', notes_reflection: '', notes_next_steps: '' }, surveys } });
+  const html = views.improve.render(ctx, await views.improve.load(ctx, { aid: 'a1' }));
+  const [front] = html.split('<details');
+  assert.equal((html.match(/<h[1-6][\s>]/g) || []).length, 1);
+  assert.match(front, /data-notes-empty>No notes recorded yet\.</); assert.equal((front.match(/<p[\s>]/g) || []).length, 2); // eyebrow + one line
+  assert.doesNotMatch(html, /<dl|<button|<form|<textarea/);
 });
 
 test('A8 improve owner/member: one Save → PATCH /v2/assessments/{aid}/notes with both fields; refresh after server result', async () => {

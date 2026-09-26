@@ -5,3 +5,12 @@
 #participant .participant-bar span{flex:1;height:6px;border-radius:3px;background:var(--bincy-edge,#dde3e8)}
 #participant .participant-bar span.done{background:var(--bincy-teal,var(--primary,#0f766e))}
 #participant .participant-page-actions{display:flex;justify-content:space-between;gap:12px}
+
+/* Bincy B30 welcome disclosure (shared by /participate/ and /legacy/): "Learn more" is a quiet, full-height tap target. */
+.participant-more{margin:4px 0 0;text-align:center}
+.participant-more > summary{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;cursor:pointer;color:#14685f;text-decoration:underline;text-underline-offset:3px;font-size:15px}
+.participant-more[open] > p{text-align:left;margin:8px 0}
+/* /participate/ has no .rv-btn.primary rule; Start is the welcome's one primary action there too (legacy .rv keeps its own). */
+body:not(.rv) #participant .participant-start{display:block;width:100%;min-height:48px;margin:18px 0 8px;background:#14685f;border-color:#14685f;color:#fff;font-size:16px}
+/* B10 context as a compact meta row under the invitation line on /participate/ (legacy .rv styles .participant-meta itself). */
+body:not(.rv) #participant .participant-context{font-size:14px;color:#526779;margin:4px 0}
