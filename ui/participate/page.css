@@ -10,3 +10,8 @@
 /* v3 lane 1 L1-11 (TRAINING frames 8/9 #7; prototype v3.css .quiet): "Check submission" is a quiet text link, not an equal-weight second button. */
 #recover{display:block;min-height:44px;margin:16px auto 0;padding:10px 4px;border:0;background:transparent;color:#14685f;text-decoration:underline;text-underline-offset:3px;font-size:15px}
 #recover:hover{color:#0e4f48}
+/* B09: optional About you before Q1 — two selects, calm, full width on a phone. */
+#participant .participant-about{border:0;margin:14px 0 0;padding:0;display:grid;gap:8px;min-width:0}
+#participant .participant-about legend{font-weight:600;padding:0;margin-bottom:4px}
+#participant .participant-about label{display:grid;gap:4px}
+#participant .participant-about select{width:100%;min-height:44px;max-width:100%}

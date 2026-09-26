@@ -21,6 +21,7 @@ import { PRIVACY_LINE } from './components/privacy-line.js';
 import { packPeriod, parsePeriod, periodText, periodErrors, formatDate, todayIso } from './components/active-until.js';
 import { deleteAssessmentFlow } from './components/delete-assessment.js';
 import { whoLine } from '../assess/scope.js';
+import { groupFields, contextValues } from './components/context-fields.js';
 
 export const STEPS = ['details', 'participants', 'information', 'review'];
 // Step names follow Bincy's screen inventory 03–06 (cookbook @933eb5f sources/bincy-design-sprint-2026-09-22/01_documents/04_screen_inventory.md).
@@ -46,7 +47,7 @@ const enc = encodeURIComponent;
 const LANG_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{1,8})*$/; // mirrors src/handlers/language.ts CODE (cap.language.create `code`)
 
 export function freshDraft() {
-  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', starts: todayIso(), until: '', format: 'Written', purpose: '', groups: {} };
+  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', starts: todayIso(), until: '', format: 'Written', purpose: '', groups: {}, context: {} };
 }
 
 // Ruling (a): a denominator appears only when the facilitator entered one.
@@ -98,7 +99,8 @@ export function launchPlan(d, pre = []) {
   }, keep: (r, ctx) => { ctx.aid = r.assessment.id; } });
   for (const [tid, g] of Object.entries(d.groups)) {
     if (pre.includes(tid)) continue;
-    plan.push({ cap: 'cap.survey.select', method: 'POST', url: ctx => `/v2/assessments/${enc(ctx.aid)}/surveys`, body: () => ({ template_id: tid, version: Number(g.version) }),
+    const context = (d.context || {})[tid]; // B09: optional group context from step 3, sent only when something was entered
+    plan.push({ cap: 'cap.survey.select', method: 'POST', url: ctx => `/v2/assessments/${enc(ctx.aid)}/surveys`, body: () => (context && Object.keys(context).length ? { template_id: tid, version: Number(g.version), context } : { template_id: tid, version: Number(g.version) }),
       keep: (r, ctx) => { ctx.surveys.push({ id: r.survey.id, template: tid, expected: expectedValue(g.expected) }); } });
   }
   plan.push({ cap: 'cap.assessment.set_stage', method: 'POST', url: ctx => `/v2/assessments/${enc(ctx.aid)}/stage`, body: () => ({ stage: 'collect' }) });
@@ -271,6 +273,19 @@ function orgField(d, projects) {
 // locked: the partial launch ctx (or true). Links already issued are shown so they are never lost (the server keeps only a hash).
 // B41: the two setup dates as review rows (Starts only when given).
 const dates = d => `${(d.starts || '').trim() ? `<dt>Starts</dt><dd>${esc(formatDate(d.starts.trim()) || d.starts)}</dd>` : ''}<dt>Active until</dt><dd>${esc(formatDate((d.until || '').trim()) || 'Not set')}</dd>`;
+// B09: the facilitator's optional group context (Kairos Laos fields for this perspective, no names), behind one disclosure.
+// A group a saved draft already holds was selected earlier, so its context can no longer be sent: the fields are not shown.
+export function groupContextFields(t, values = {}, held = false) {
+  const fields = groupFields(t.perspective);
+  if (!fields.length || held) return '';
+  const v = values || {};
+  return `<details class="wz-context" data-wz-context="${esc(t.id)}"><summary>About this group (optional)</summary>${fields.map(f => {
+    const name = `c-${esc(t.id)}-${esc(f.key)}`;
+    return f.type === 'count'
+      ? `<label>${esc(f.label)}<input type="number" name="${name}" min="0" step="1" inputmode="numeric" value="${esc(v[f.key] ?? '')}"></label>`
+      : `<label>${esc(f.label)}<input name="${name}" maxlength="200" value="${esc(v[f.key] ?? '')}"></label>`;
+  }).join('')}</details>`;
+}
 export function renderStep(step, d, data, errs = [], locked = false, origin = '') {
   const n = STEPS.indexOf(step) + 1;
   const projects = data.projects || [], languages = data.languages || [], templates = latestTemplates(data.templates);
@@ -309,12 +324,12 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
         : '<p class="muted">No published surveys are available to this account.</p>'}
       ${act(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
-  if (step === 'information') return `${head(n, 'Participant information', 'What participants see before they answer.')}${errBox(errs)}
+  if (step === 'information') return `${head(n, 'Participant information', 'What participants see before they answer.', '<p class="muted" data-wz-about>Each participant may also give an age range and gender. Both are optional.</p>')}${errBox(errs)}
     <form data-wz-form="information">
       <h3>Shown to every participant</h3>
       <dl class="kv"><dt>Project</dt><dd>${esc(proj.name || '')}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd><dt>Format</dt><dd>${esc(d.format)}</dd>${dates(d)}</dl>
       <h3>Asked of each participant</h3>
-      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><h3>${esc(t.perspective)}</h3><span class="sub">The ${esc(t.name)} survey, as published.</span></div></div>`).join('')}${chosen.length ? `<p class="small muted">${PRIVACY_LINE}</p>` : ''}
+      ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><h3>${esc(t.perspective)}</h3><span class="sub">The ${esc(t.name)} survey, as published.</span>${groupContextFields(t, (d.context || {})[t.id], pre.has(t.id))}</div></div>`).join('')}${chosen.length ? `<p class="small muted">${PRIVACY_LINE}</p>` : ''}
       ${act(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   // review
@@ -363,6 +378,7 @@ export function mountWizard(root, deps) {
     if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'starts', 'until', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
     if (form.dataset.wzForm === 'details' && fd.has('newOrgPick')) { const v = String(fd.get('newOrgPick')); d.newOrgOther = v === ORG_OTHER; if (!d.newOrgOther) d.newOrg = v; else if (!fd.has('newOrg')) d.newOrg = ''; }
     if (form.dataset.wzForm === 'details') { if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
+    if (form.dataset.wzForm === 'information') { const c = {}; for (const box of form.querySelectorAll('[data-wz-context]')) { const tid = box.dataset.wzContext, t = latestTemplates(s.data.templates).find(x => x.id === tid); if (!t) continue; const v = contextValues(groupFields(t.perspective), k => fd.get(`c-${tid}-${k}`)); if (Object.keys(v).length) c[tid] = v; } d.context = c; }
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked || box.hasAttribute('data-wz-pre')) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
   };
   root.addEventListener('change', async e => {

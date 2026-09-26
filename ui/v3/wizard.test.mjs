@@ -524,3 +524,19 @@ test('B06f: a part-launched draft keeps its already-added survey ticked and lock
   const ctx = launchResume({ aid: 'a1', pid: 'p1', pre: [{ id: 's9', template: 'tpl.team', version: 3 }] }, draft({ groups: {} }));
   assert.deepEqual(ctx.surveys.map(s => s.id), ['s9'], 'launchResume never drops a survey the server still holds');
 });
+
+test('B09: step 3 offers optional group context per group (no names) and launch sends it only when entered', async () => {
+  const { groupContextFields } = await import('./wizard.js');
+  const templates = [{ id: 'tpl.community', version: 2, name: 'Written', perspective: 'Community' }, { id: 'tpl.team', version: 3, name: 'Validation', perspective: 'Translation Team' }];
+  const html = renderStep('information', draft(), { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates });
+  assert.equal((html.match(/data-wz-context=/g) || []).length, 2);
+  assert.match(html, /About this group \(optional\)/);
+  assert.match(html, /age range and gender/);
+  assert.doesNotMatch(html, /name="c-[^"]*name/i);
+  assert.doesNotMatch(html, /required/);
+  assert.equal(groupContextFields(templates[0], {}, true), '');
+  const sel = d => launchPlan(d).filter(s => s.cap === 'cap.survey.select').map(s => s.body({}));
+  assert.deepEqual(sel(draft()).map(b => Object.keys(b).sort()), [['template_id', 'version'], ['template_id', 'version']]);
+  const withCtx = sel(draft({ context: { 'tpl.community': { total_participants: '12' } } }));
+  assert.deepEqual(withCtx.find(b => b.template_id === 'tpl.community').context, { total_participants: '12' });
+});

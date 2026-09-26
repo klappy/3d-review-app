@@ -207,8 +207,10 @@ export function createSharedLinkClient({ fetchImpl = globalThis.fetch, store, on
       if (!key) { key = globalThis.crypto.randomUUID(); store.set('submitKey', key); }
       return key;
     },
-    async submit(answers) {
-      const result = await call('/v2/participate/responses', { method: 'POST', body: { answers, idempotency_key: this.submitKey() } });
+    async submit(answers, context) {
+      const body = { answers, idempotency_key: this.submitKey() };
+      if (context && Object.keys(context).length) body.context = context; // B09: optional About you, only when given
+      const result = await call('/v2/participate/responses', { method: 'POST', body });
       // Confirmed success only: clear this context's draft and key.
       store.remove('draft'); store.remove('submitKey');
       return result;
