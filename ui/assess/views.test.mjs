@@ -177,7 +177,7 @@ test('A8 improve owner/member: one Save → PATCH /v2/assessments/{aid}/notes wi
   makeRoot([form, btn, status, ta1, ta2]); views.improve.bind(ctx, root, m);
   let disabledDuring = null; const origApi = ctx.api; ctx.api = async (...a) => { disabledDuring = btn.disabled; return origApi(...a); };
   await form.onsubmit({ preventDefault() {} });
-  assert.deepEqual(calls[0], { url: '/v2/assessments/a1/notes', method: 'PATCH', body: { notes_reflection: 'new r', notes_next_steps: 'new n' } });
+  assert.deepEqual(calls.filter(c => c.method), [{ url: '/v2/assessments/a1/notes', method: 'PATCH', body: { notes_reflection: 'new r', notes_next_steps: 'new n' } }]); // B13: load only reads (suggested areas)
   assert.equal(disabledDuring, true); assert.equal(btn.disabled, false);
   assert.equal(status.textContent, 'Saved'); assert.equal(refreshed, 1); assert.equal(m.notes_reflection, 'new r');
 });
@@ -191,7 +191,7 @@ test('A8c v3 next step (frame 11): one "Save notes" in any stage, never a stage 
   const form = el({ 'data-notes-form': '' }), btn = el({ tag: 'button', 'data-save-notes': '' }), status = el({ 'data-notes-status': '' });
   makeRoot([form, btn, status, el({ name: 'notes_reflection', value: 'r' }), el({ name: 'notes_next_steps', value: 'n' })]); views.improve.bind(ctx, root, m);
   await form.onsubmit({ preventDefault() {} });
-  assert.deepEqual(calls.map(c => `${c.method} ${c.url}`), ['PATCH /v2/assessments/a1/notes']); assert.equal(status.textContent, 'Saved');
+  assert.deepEqual(calls.filter(c => c.method).map(c => `${c.method} ${c.url}`), ['PATCH /v2/assessments/a1/notes']); assert.equal(status.textContent, 'Saved'); // B13: the only write
 });
 
 test('U24 "Saved" survives the post-save repaint, next to the button, then is dropped', async () => {
@@ -223,9 +223,9 @@ test('A9 RESERVED_NOT_BUILT / 501 is its own state, never the generic retry', as
   const ctx = ctxFor(api); const html = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
   const panel = html.slice(html.indexOf('data-reports>'));
   assert.match(panel, /Reports is not built yet/); assert.doesNotMatch(panel, /Retry/);
-  // improve never probes recommendations: zero calls, static "not built" text
+  // improve never probes recommendations; B13: its only reads are the report list for the suggested areas (no write)
   const p = fakeApi({}); const c2 = ctxFor(p.api); views.improve.render(c2, await views.improve.load(c2, { aid: 'a1' }));
-  assert.equal(p.calls.length, 0);
+  assert.ok(!p.calls.some(c => /recommend/i.test(c.url) || c.method)); assert.deepEqual(p.calls.map(c => c.url), ['/v2/assessments/a1/reports']);
 });
 
 // G1: the Permissions page and its negative cases are covered in ./permissions.test.mjs (Auth contract 2026-09-18).
