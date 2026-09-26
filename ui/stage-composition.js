@@ -21,7 +21,7 @@ export function mountStageComposition(doc,win) {
       invitation:doc.body.dataset.invitationIntent==='active',
       shared:explicitSharedAtEntry || (!isolated && currentNamespace(win.sessionStorage)!==null) || facilitator.hidden,
       legacy:!isolated && !!win.sessionStorage.getItem('participantToken'),
-      staff:observedIdentity(identity.textContent),hash:win.location.hash,
+      staff:observedIdentity(identity),hash:win.location.hash,
       context:!workspace.hidden,
       selected:tabs.querySelector('[role="tab"][aria-selected="true"]')?.dataset.stage,
     });
@@ -31,7 +31,7 @@ export function mountStageComposition(doc,win) {
   }
   const observer=new win.MutationObserver(render);
   observer.observe(doc.body,{attributes:true,attributeFilter:['data-invitation-intent']});
-  observer.observe(identity,{childList:true,subtree:true,characterData:true});
+  observer.observe(identity,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['data-signed-in']});
   observer.observe(tabs,{childList:true,subtree:true,attributes:true,attributeFilter:['aria-selected']});
   observer.observe(workspace,{attributes:true,attributeFilter:['hidden']});
   observer.observe(facilitator,{attributes:true,attributeFilter:['hidden']});

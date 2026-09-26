@@ -18,8 +18,9 @@ import * as share from '../ui/assess/share.js';
 import { feedback } from '../ui/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '../ui/kit/app-adapter.js';
 import * as v3 from '../ui/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor } from '../ui/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove } from '../ui/assess/v3-assessment.js';
 import { learnMore } from '../ui/v3/components/learn-more.js';
+import { activeUntilLine, periodText } from '../ui/v3/components/active-until.js';
 import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
 import { sidebarTree } from '../ui/v3/components/sidebar-tree.js';
 import { mountEditableHeading } from '../ui/v3/components/editable-heading.js';
@@ -46,7 +47,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, learnMore, breadcrumbs, sidebarTree, mountEditableHeading }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, activeUntilLine, periodText, learnMore, breadcrumbs, sidebarTree, mountEditableHeading }); // v3 shell imports (assess.js lines 15–16); #190
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });

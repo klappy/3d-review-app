@@ -126,6 +126,8 @@ function clearStagePrint() {
 function note(message) { $('notice').textContent = message; $('error').hidden = true; }
 function fail(message) { $('error').textContent = message; $('error').hidden = false; $('notice').textContent = 'Action needs attention. No completion is assumed.'; }
 function text(node, value) { node.textContent = value == null ? '' : String(value); }
+// Header shows plain words only; signed-in state is a data attribute other modules read, never the text.
+function showIdentity(signedIn) { const n = $('identity'); n.dataset.signedIn = String(signedIn); text(n, signedIn ? 'Signed in' : 'Not signed in'); }
 function option(select, value, label) { select.add(new Option(label, value)); }
 function resetSelect(select, label) { select.replaceChildren(new Option(label, '')); }
 function required(value, message) { if (!value) throw new Error(message); return value; }
@@ -181,7 +183,7 @@ function resetClientIdentity() {
   for (const [id, label] of [['projects', 'Choose project'], ['assessments', 'Choose assessment'], ['surveys', 'Choose survey'], ['languages', 'Choose language'], ['templates', 'Choose template']]) resetSelect($(id), label);
   for (const id of ['project-detail', 'assessment-detail', 'survey-detail', 'form-context', 'dev-code']) text($(id), '');
   text($('participant-resume'), '');
-  text($('results'), 'Select an assessment.'); text($('identity'), 'Not signed in');
+  text($('results'), 'Select an assessment.'); showIdentity(false);
   text($('access-state'), 'Sign in to see authorized project work.');
   $('questions').replaceChildren(); $('review-answers').replaceChildren(); $('events').replaceChildren();
   text($('receipt'), '');
@@ -196,9 +198,9 @@ const languageControls = initLanguageControls({ api, run, getProject: () => stat
 function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget))); }); }
 function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler)); }
 async function identity() {
-  if (!state.session) { text($('identity'), 'Not signed in'); return; }
+  if (!state.session) { showIdentity(false); return; }
   const result = await api('/v2/me'); state.principal = result.principal;
-  text($('identity'), `${result.principal.kind} · ${result.principal.id}`);
+  showIdentity(true);
   showAuthorizedWork(result);
   collab.identity(result);
   return result;
@@ -711,7 +713,7 @@ async function openPendingInvitation(generation) {
 const invitationBootstrap = sharedMode ? run(sharedCopy.labelOpening, () => sharedLinkEntry(sharedToken, sharedResume))
 : run('Checking session…', async () => {
   try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } }
-  catch { state.session = null; state.principal = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); }
+  catch { state.session = null; state.principal = null; sessionStorage.removeItem('facilitatorToken'); showIdentity(false); }
   await openPendingInvitation(invitationGeneration);
   if (state.participant) await restoreParticipant();
 });

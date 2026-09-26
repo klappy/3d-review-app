@@ -1,7 +1,7 @@
 // node --test ui/assess/scope.test.mjs — scope pages: render() strings, load() with a fake api, entry sign-in transitions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pages, css, classify, landsOnWork, signInLanding, whoLine, PERSPECTIVE_WHO } from './scope.js';
+import { pages, css, classify, landsOnWork, signInLanding, whoLine, PERSPECTIVE_WHO, SIGNUP_NOTE } from './scope.js';
 import { readFileSync } from 'node:fs';
 import * as cards from './cards.js';
 
@@ -419,4 +419,24 @@ test('B08+B20: one shared who-line per group (setup, launch, Collect); headings 
   for (const w of Object.values(PERSPECTIVE_WHO)) assert.doesNotMatch(w, /Experience of/, 'who the group is, not what it is asked');
   const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   assert.match(src, /<h3 style="margin:18px 0 6px">\$\{esc\(g\.lens\)\}<\/h3>\$\{whoLine\(g\.lens\)/, 'Collect group heading carries the shared who-line');
+});
+
+test('U28 (Bincy B32): both sign-in entry points say a new email creates an account — one shared line, under the Sign in action', async () => {
+  assert.equal(SIGNUP_NOTE, 'New here? Signing in with your email creates your account.');
+  const ctx = ctxWith(); const home = pages.entry.render(ctx, await pages.entry.load(ctx, {}));
+  const nav = home.slice(home.indexOf('<nav class="public-choices'), home.indexOf('</nav>') + 6); const after = home.slice(home.indexOf('</nav>') + 6);
+  assert.ok(nav.endsWith('>Sign in</a></nav>'), 'home: B38 nav markup untouched'); assert.ok(after.startsWith('<small class="small muted signup-note" data-signup-note'), 'home: the line right under the choices');
+  assert.ok(after.indexOf(SIGNUP_NOTE) < after.indexOf('<h1>'), 'home: before the heading, not a line under it');
+  assert.equal(home.split(SIGNUP_NOTE).length - 1, 1, 'home: never repeated');
+  const si = pages.entry.render(ctx, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.equal(si.split(SIGNUP_NOTE).length - 1, 1, '#signin: once'); assert.ok(si.indexOf(SIGNUP_NOTE) > si.indexOf('>Sign in with an email code</a>'), '#signin: under the primary');
+  const inx = ctxWith({}, { state: { principal: { id: 'pr_1' } } }); const signedIn = pages.entry.render(inx, await pages.entry.load(inx, {}));
+  assert.ok(!signedIn.includes(SIGNUP_NOTE), 'signed in: no sign-up line');
+  const siIn = pages.entry.render(inx, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  // B38 flag on (DEV MAGIC_LINK="on"): the magic-link path also creates the account on first sign-in, so the same line, once, under its primary.
+  const on = pages.entry.render(ctxWith({}, { state: { emailLinks: true } }), { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.equal(on.split(SIGNUP_NOTE).length - 1, 1, 'flag on: once'); assert.ok(on.indexOf(SIGNUP_NOTE) > on.indexOf('>Email me a sign-in link</button>'), 'flag on: under the primary');
+  const onIn = pages.entry.render(ctxWith({}, { state: { emailLinks: true, principal: { id: 'pr_1' } } }), { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.ok(onIn.includes('Email me a sign-in link') && !onIn.includes(SIGNUP_NOTE), 'flag on, signed in: no sign-up line');
+  assert.ok(siIn.includes('Sign in with an email code'), 'signed-in #signin still renders'); assert.ok(!siIn.includes(SIGNUP_NOTE), 'signed-in #signin (typed, bookmark, Back): no sign-up line');
 });
