@@ -84,16 +84,18 @@ function replay(row: Claim, key: string, payload: string) {
   if (row.payload_digest !== payload) throw new CapError("INVALID_PARAMS", "idempotency key has different answers");
   return { response_id: row.response_id, submitted_at: row.submitted_at, duplicate: true, undo: null };
 }
-export async function submitShared(ctx: Ctx, session: SharedSession, key: string, answers: Record<string, unknown>, template: { template_id: string; template_version: number }) {
-  const kd = await sha256(key), pd = await sha256(canonical(answers));
+export async function submitShared(ctx: Ctx, session: SharedSession, key: string, answers: Record<string, unknown>, template: { template_id: string; template_version: number }, context: Record<string, unknown> = {}) {
+  // B09: optional respondent context joins the payload digest only when given, so answers-only replays keep their digest.
+  const hasContext = Object.keys(context).length > 0;
+  const kd = await sha256(key), pd = await sha256(hasContext ? canonical({ answers, context }) : canonical(answers));
   const prior = await claim(ctx, session);
   if (prior) return replay(prior, kd, pd); // authority already revalidated; collection may now be closed
   await collecting(ctx, session.assessment_survey_id);
   const responseId = newId("resp"), at = nowIso(ctx);
   try {
     const results = await ctx.db.batch([
-      ctx.db.prepare(`INSERT INTO response (id, assessment_survey_id, respondent_id, idempotency_key, answers_json, template_id, template_version, provenance_json, source, submitted_at)
-        SELECT ?, s.id, ps.respondent_id, ?, ?, s.template_id, s.template_version, ?, 'participant', ?
+      ctx.db.prepare(`INSERT INTO response (id, assessment_survey_id, respondent_id, idempotency_key, answers_json, template_id, template_version, provenance_json, source, submitted_at${hasContext ? ", context_json" : ""})
+        SELECT ?, s.id, ps.respondent_id, ?, ?, s.template_id, s.template_version, ?, 'participant', ?${hasContext ? ", ?" : ""}
         FROM participant_session ps JOIN invitation i ON i.id = ps.invitation_id
         JOIN assessment_survey s ON s.id = ps.assessment_survey_id JOIN assessment a ON a.id = s.assessment_id
         WHERE ps.id = ? AND ps.invitation_id = ? AND ps.revoked_at IS NULL AND ps.expires_at > max(?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -102,7 +104,7 @@ export async function submitShared(ctx: Ctx, session: SharedSession, key: string
         AND s.state = 'selected' AND s.collection_status = 'open' AND s.archived_at IS NULL AND a.archived_at IS NULL AND a.stage = 'collect'
         AND s.template_id = ? AND s.template_version = ?`)
         .bind(responseId, `shared:${session.respondent_id}:${kd}`, JSON.stringify(answers), JSON.stringify({ presented_template_id: template.template_id, presented_template_version: template.template_version, link_id: session.invitation_id, trace_id: ctx.traceId }),
-          at, session.id, session.invitation_id, at, at, template.template_id, template.template_version),
+          at, ...(hasContext ? [JSON.stringify(context)] : []), session.id, session.invitation_id, at, at, template.template_id, template.template_version),
       ctx.db.prepare(`INSERT INTO shared_response_claim (assessment_survey_id, respondent_id, client_key_digest, payload_digest, response_id)
         SELECT assessment_survey_id, respondent_id, ?, ?, id FROM response WHERE id = ?`).bind(kd, pd, responseId),
     ]);

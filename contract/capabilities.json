@@ -1056,7 +1056,7 @@
       "slice": "v2.0-bcs",
       "section": "E. Surveys (templates + assessment surveys)",
       "ui_surface": "Collect",
-      "notes": "template@version into assessment (D4 wording)",
+      "notes": "template@version into assessment (D4 wording) B09: optional `context` object = the facilitator's group-level context for this group from setup step 3 (Kairos Laos fields for the template perspective, no name fields; unknown keys rejected, all optional), stored in assessment_survey.context_json (migration 0011).",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -1697,6 +1697,13 @@
               "description": "Pinned source renderItems output, stable source item IDs, required/option/exclusion semantics unchanged."
             }
           },
+          "context_fields": {
+            "type": "array",
+            "description": "B09 (Bincy F06, ASK F06 option 2): optional respondent fields shown before Q1, outside the pinned instrument (age_range, gender; each select includes prefer_not). All optional; no name field.",
+            "items": {
+              "type": "object"
+            }
+          },
           "participant_labels": {
             "type": "array",
             "items": {
@@ -1764,6 +1771,10 @@
           "answers": {
             "type": "object",
             "description": "Known pinned item IDs only; server validates required, type, option, multi and exclusion rules before canonical hashing."
+          },
+          "context": {
+            "type": "object",
+            "description": "B09: optional respondent context validated against cap.response.form context_fields (age_range, gender). Unknown keys rejected; every key optional; stored in response.context_json (migration 0011). No names."
           }
         },
         "required": [
@@ -1936,7 +1947,7 @@
       "slice": "v2.0-bcs",
       "section": "G. Participation",
       "ui_surface": "Understand",
-      "notes": "**always-on small-cell suppression** (July D2 ruling) applied server-side before serialization; threshold/role details held → affected disclosure blocked until set; viewers see summary only; `SUPPRESSED` is a typed `ok:true` result (never an `ok:false` error)",
+      "notes": "**always-on small-cell suppression** (July D2 ruling) applied server-side before serialization; threshold/role details held → affected disclosure blocked until set; viewers see summary only; `SUPPRESSED` is a typed `ok:true` result (never an `ok:false` error) B09: result also lists `group_context` [{survey_id, template_id, context}] (facilitator-entered, not respondent data); respondent context (response.context_json) rides inside the suppressed rows until D7 is decided.",
       "status": "target",
       "inverse": {
         "kind": "n/a"

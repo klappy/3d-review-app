@@ -68,3 +68,4 @@ v3/components/saved-status.test.mjs
 v3/components/delete-assessment.test.mjs
 v3/components/invite.test.mjs
 v3/components/active-until.test.mjs
+participant-about.test.mjs
