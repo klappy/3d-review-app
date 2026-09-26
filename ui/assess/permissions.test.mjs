@@ -43,7 +43,7 @@ test('N1 viewer: grant.list 403 → placeholder note, no roster in DOM; N2 no ro
 
 test('roster + gating: member sees Invite (viewer|member only), Remove only on ≤member rows, no Change-role, no Transfer; owner has all but never on owner rows; pending lists sent|pending|unconfirmed only', async () => {
   const mem = await mount('member'); const h = mem.root.html;
-  assert.match(h, /data-my-role="member"/); assert.match(h, /data-invite-form/); assert.doesNotMatch(h, /<option value="owner">/); assert.doesNotMatch(h, /data-transfer-form|data-change-role/);
+  assert.match(h, /data-my-role="member"/); assert.match(h, /data-invite-form/); assert.match(h, /<button type="submit" class="primary"[^>]*>Preview invitation/); /* U42: the one primary on Permissions */ assert.doesNotMatch(h, /<option value="owner">/); assert.doesNotMatch(h, /data-transfer-form|data-change-role/);
   assert.match(h, /data-revoke="g_mem"/); assert.match(h, /data-revoke="g_view"/); assert.doesNotMatch(h, /data-revoke="g_own"/); assert.match(h, /Owner — only a transfer changes this/);
   assert.match(h, /data-invitation="inv_p"/); assert.match(h, /data-invitation="inv_u"/); assert.match(h, /Could not be confirmed as sent/); assert.doesNotMatch(h, /inv_acc/, 'accepted invitations are not pending');
   const own = await mount('owner'); const o = own.root.html;

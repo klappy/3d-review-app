@@ -11,7 +11,7 @@ import { breadcrumbs } from '/v3/components/breadcrumbs.js';
 import { sidebarTree } from '/v3/components/sidebar-tree.js';
 // lane 9 L9-24: shared closed-by-default disclosure
 import { learnMore } from '/v3/components/learn-more.js';
-import { activeUntilLine, periodText } from '/v3/components/active-until.js';
+import { collectLine, periodText } from '/v3/components/active-until.js';
 // Bincy B03: `#invite=<token>` is handled here (v3), not forwarded to /legacy/.
 import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment } from '/v3/components/invite.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
@@ -22,7 +22,7 @@ import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock as completeLock, V3_SUGGEST, V3_REPORT_SEEN } from '/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock as completeLock, V3_SUGGEST } from '/assess/v3-assessment.js';
 import { mountEditableHeading } from '/v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '/v3/components/saved-status.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
@@ -296,7 +296,7 @@ function bindCollectLinks(current) {
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
   const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${whoLine(g.lens) ? `<p class="small muted" data-who>${esc(whoLine(g.lens))}</p>` : ''}${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id, title: s.template_name, line: whoLine(g.lens) || g.lens }]) : ''}</div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
-  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${activeUntilLine(a.period) ? `<p class="small muted" data-active-until>${esc(activeUntilLine(a.period))}</p>` : ''}${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose them under Change surveys.</p>'}${current.surveys.some(s => shareable(a, s)) ? share.printAllButton({ esc }) : ''}${learnMore('<p class="small muted">Only responses are counted.</p><p class="small muted">Respondents are counted per survey and are never added up as people.</p>')}</section>`;
+  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${collectLine(a.period) ? `<p class="small muted" data-active-until>${esc(collectLine(a.period))}</p>` : ''}${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose them under Change surveys.</p>'}${current.surveys.some(s => shareable(a, s)) ? share.printAllButton({ esc }) : ''}${learnMore('<p class="small muted">Only responses are counted.</p><p class="small muted">Respondents are counted per survey and are never added up as people.</p>')}</section>`;
 }
 // Cut 2A child screen: ONE survey. B30: one heading (the survey name); Paper/Share are labels, Share is the one primary. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
@@ -406,7 +406,7 @@ function screen(current, view = null) {
   const roleMore = learnMore(`<p class="muted">${roleLine}</p>${a.role === 'viewer' && !a.complete && tab !== 'improve' ? /* Next steps carries its own role note (one, not two) */'<p class="muted">You can read this assessment; including surveys, printing, stage moves and permissions are owner/member actions.</p>' : ''}`);
   // Under the kit shell the eyebrow/h1 are the shell's (one heading); only the unique role line and stage badge remain here.
   // v3 (NEED 3→1): one state-driven primary in the headrow; viewers get none for setup/collect (lane 3 module decides).
-  const primary = !V3_SHELL ? '' : tab === 'collect' && a.stage === 'collect' && (a.role === 'owner' || a.role === 'member') ? stageMoveButton('understand', 'Move to Understand', { primary: true, disabled: state.busy }, esc) /* U34: the one primary on Collect */ : v3StagePrimary(a.stage, a.role === 'owner' || a.role === 'member', v => `#assessment/${encodeURIComponent(a.id)}/${v}`, esc, { hasReport: V3_REPORT_SEEN.has(a.id) }); /* U41 */
+  const primary = !V3_SHELL ? '' : tab === 'collect' && a.stage === 'collect' && (a.role === 'owner' || a.role === 'member') ? stageMoveButton('understand', 'Move to Understand', { primary: true, disabled: state.busy }, esc) /* U34: the one primary on Collect */ : v3StagePrimary(a.stage, a.role === 'owner' || a.role === 'member', v => `#assessment/${encodeURIComponent(a.id)}/${v}`, esc, { current: tab, secondary: tab === 'permissions' }); // U42: none on its own page; secondary on Permissions
   const head = kit ? `<div class="title assessment-head"><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`
     : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1></div><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
   const done = a.complete && tab !== 'improve' ? `<p class="note" data-review-complete>${esc(V3_SUGGEST.done)}</p>` : ''; // B13: one line; Improve draws its own
