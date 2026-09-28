@@ -1,23 +1,23 @@
 {
-  "version": "0.22.4",
+  "version": "0.22.5",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "ebd1a81872b2c22b52d59272175efc2387f617b7",
+  "cookbook_commit": "0b99881298d3f082e821c53efb5329ed5b1d811f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.22.4.md",
-      "blob_sha": "bf198f599e800419ed71e58e656201957eac4883",
-      "sha256": "bfe39991f7e0a4a965eb9d15264e431653080c6105ed82aece28f750ac8525b7"
+      "path": "planning/2026-09-16-parity-build/releases/0.22.5.md",
+      "blob_sha": "9a07068c573dad24c405d1a5b2ff7a449d64eadf",
+      "sha256": "53bd89c29a28d073ba46d5cc22f0758bcd3145c875362c58c3def72d263be8ed"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "0106f6a1bbec56b9da5bfc54611e58923e31cb6d",
-      "sha256": "4cfbc63a546e2ddbb4a8cc30b27c414e242ba13e10383c24709d05ad100db9b1"
+      "blob_sha": "723ae2cb9760691d96a037a31a87f18a53bb7662",
+      "sha256": "395f0beae402f385ae1e903202c3708fcd234b22e8c60815bed55ef4614b0b31"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Transfer ownership now offers a picker of the people who already have access, labelled by name or email, instead of asking for a raw principal id. (#331)"
+        "On a completed review, Delete assessment now shows why it cannot delete (for example \"This assessment has 1 response in 1 survey, so it cannot be deleted.\") instead of showing nothing. (#370)"
       ]
     }
   }

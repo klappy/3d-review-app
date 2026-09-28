@@ -418,8 +418,11 @@ function screen(current, view = null) {
   const head = kit ? `<div class="title assessment-head"><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`
     : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1></div><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
   const done = a.complete && tab !== 'improve' ? `<p class="note" data-review-complete>${esc(V3_SUGGEST.done)}</p>` : ''; // B13: one line; Improve draws its own
-  if (tab === 'prepare') return head + done + prepareView(current);
-  if (tab !== 'collect') return head + done + `<div id="view-root" data-view="${tab}"><p class="muted">Loading…</p></div>`;
+  // S11d (S8b defect): Delete's refusal is shown where Delete sits. Collect already prints every message in its outcome line; the
+  // other views (Prepare, Understand, Improve — every view of a completed review) had no line, so the dry-run refusal was swallowed.
+  const delMsg = tab !== 'collect' && showMessage(current)?.del ? `<p class="status" role="alert" aria-live="polite" data-delete-outcome>${esc(showMessage(current).text)}</p>` : '';
+  if (tab === 'prepare') return head + done + delMsg + prepareView(current);
+  if (tab !== 'collect') return head + done + delMsg + `<div id="view-root" data-view="${tab}"><p class="muted">Loading…</p></div>`;
   return head + done + collectScreen(current);
 }
 function collectScreen(current) {
@@ -452,7 +455,7 @@ function bind(current) {
   bindCounts(current);
   // U14 (J5): owner-only delete — dry run, one-sentence impact asked in the page, execute, land on the project with a notice.
   const del = app.querySelector('[data-delete-assessment]');
-  if (del) del.onclick = () => { if (state.busy) return; const pid = current.assessment.project_id, refuse = text => { state.message = { aid, text, alert: true }; paint(); };
+  if (del) del.onclick = () => { if (state.busy) return; const pid = current.assessment.project_id, refuse = text => { state.message = { aid, text, alert: true, del: true }; paint(); }; // S11d: del — shown on every view, not only Collect's outcome line
     deleteAssessmentFlow(del, { id: aid, api, ask: askStageMove, onRefused: refuse, onError: e => refuse(redact(e.message)),
       onDeleted: () => { state.lists.delete(pid); state.dirty.delete(aid); state.message = null; pendingNotice = DELETED_NOTICE; location.hash = cards.routes.project(pid); } }); };
   app.querySelectorAll('[data-include]').forEach(b => b.onclick = () => act(aid, 'Including survey…', async () => { const restoring = b.textContent.trim() === 'Include again'; const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/surveys`, { method: 'POST', body: { template_id: b.dataset.include, version: Number(b.dataset.version) } }); return `${restoring ? 'Survey restored with what was collected' : 'Survey included'}; collection ${r.survey?.collection_status || 'status unknown'}.`; }));
