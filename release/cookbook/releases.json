@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.22.0",
+  "current": "0.22.1",
   "versions": [
+    {
+      "version": "0.22.1",
+      "status": "candidate",
+      "notes_path": "releases/0.22.1.md",
+      "sections": {
+        "fixed": [
+          "On Collect, each survey's share card now shows its QR code as soon as the card appears: the participant link is made when the card renders (captain ruling 2026-09-28 14:42 ET, k0013 \"Mint the link on render so QR shows immediately\"). One link per survey still holds: a survey whose link is already active (launch page, an earlier visit, the survey's Share card) reuses it. Copy link and Print keep working; \"Print all\" is unchanged (window.print()). (#361)"
+        ]
+      }
+    },
     {
       "version": "0.22.0",
       "status": "candidate",
