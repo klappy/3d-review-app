@@ -10,3 +10,9 @@ test('/roadmap shows the versions list only; current comes from versions-data.js
  assert.equal(d.querySelector('#roadmap'),null);assert.equal(d.querySelector('#refresh'),null);assert.equal(d.querySelector('script[src="/roadmap/page.js"]'),null);assert.doesNotMatch(html,/What is moving|Past → Now → Future|\/v2\/roadmap/);
  assert.equal(d.querySelectorAll('main h1').length,1);assert.ok(d.querySelectorAll('main p').length<=1);assert.ok(d.querySelector('#versions'));assert.ok(d.querySelector('script[src="/roadmap/versions.js"]'));
  assert.match(renderVersions(),new RegExp(`current v${VERSIONS.current.replaceAll('.','\\.')}`));});
+test('S11f: absent release/changes/ = zero pending, forecast none, no crash',async()=>{const {mkdtempSync,mkdirSync,writeFileSync,readFileSync}=await import('node:fs');const {tmpdir}=await import('node:os');const {join}=await import('node:path');const {execFileSync}=await import('node:child_process');const {fileURLToPath}=await import('node:url');
+ const dir=mkdtempSync(join(tmpdir(),'s11f-'));mkdirSync(join(dir,'release/cookbook'),{recursive:true});mkdirSync(join(dir,'ui/roadmap'),{recursive:true});
+ writeFileSync(join(dir,'release/cookbook/releases.json'),JSON.stringify({current:'0.22.5',versions:[{version:'0.22.5',sections:{added:[],changed:[],fixed:['x']}}]}));
+ const out=execFileSync(process.execPath,[fileURLToPath(new URL('../../scripts/roadmap-versions.mjs',import.meta.url))],{cwd:dir,encoding:'utf8'});
+ assert.match(out,/forecast none \(0 units\)/);assert.match(readFileSync(join(dir,'ui/roadmap/versions-data.js'),'utf8'),/"version": null/);
+ mkdirSync(join(dir,'release/changes'));assert.match(execFileSync(process.execPath,[fileURLToPath(new URL('../../scripts/roadmap-versions.mjs',import.meta.url))],{cwd:dir,encoding:'utf8'}),/forecast none \(0 units\)/);});
