@@ -18,7 +18,7 @@ import * as share from '../ui/assess/share.js';
 import { feedback } from '../ui/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '../ui/kit/app-adapter.js';
 import * as v3 from '../ui/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock, V3_SUGGEST } from '../ui/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock, v3SettingsRole, V3_SUGGEST } from '../ui/assess/v3-assessment.js';
 import { learnMore } from '../ui/v3/components/learn-more.js';
 import { activeUntilLine, periodText, collectLine } from '../ui/v3/components/active-until.js';
 import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
@@ -48,7 +48,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, settingsRole: v3SettingsRole, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf }); // v3 shell imports (assess.js lines 15–16); #190
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -512,4 +512,37 @@ test('B13: a completed review shows saved values without edit controls on Prepar
   assert.match(p.text('[data-notes-areas]'), /Church/); assert.match(p.text('[data-notes-other]'), /Bible storying/);
   assert.equal(p.text('[data-notes-next-steps]'), 'Meet the elders');
   assert.ok(!p.transport.log.some(l => l.key && !/^GET /.test(l.key)), 'nothing was written');
+});
+
+// S11d (Receipt 11b, S8b defect): on a completed review the owner's Delete runs its dry_run and the server holds D5 (not empty);
+// the refusal sentence must be visible on the completed page, as it is on an open review's Collect view. Only the dry_run is
+// answered (200 + impact, no confirm_token); every other mutation stays refused by the synthetic transport.
+test('S11d: completed review — Delete assessment shows the dry-run refusal on Improve and Prepare', async () => {
+  const done = { id: 'a1', name: 'September assessment', project_id: 'p1', stage: 'improve', role: 'owner', language_id: 'l1', notes_next_steps: 'Meet the elders\n\n[This review is complete.]' };
+  const bodies = [];
+  const p = await bootPage('owner', '#assessment/a1/improve', { install: (t, data) => {
+    data.routes.set('GET /v2/assessments/a1', { ok: true, result: { assessment: done, surveys: [] } });
+    const inner = t.fetch;
+    t.fetch = async (input, init = {}) => {
+      if ((init.method || 'GET').toUpperCase() === 'DELETE' && String(input).endsWith('/v2/assessments/a1')) {
+        bodies.push(JSON.parse(init.body));
+        const result = { mode: 'dry_run', impact: { affected: [{ surveys: 1, responses: 1 }] }, note: 'D5 held: only empty assessments can be hard-deleted' };
+        return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ ok: true, result }), text: async () => '' };
+      }
+      return inner(input, init);
+    };
+  } });
+  const refusal = 'This assessment has 1 response in 1 survey, so it cannot be deleted.';
+  const main = () => p.q('[role=main].content') || p.d.body;
+  for (const view of ['improve', 'prepare']) {
+    await p.go(`#assessment/a1/${view}`); await tick(12);
+    assert.equal(main().querySelectorAll('[data-review-complete]').length, 1, `${view}: completed review`);
+    const del = p.q('[data-delete-assessment]'); assert.ok(del, `${view}: owner keeps Delete assessment`);
+    del.click(); await tick(16);
+    const shown = p.qa('[role=alert]').map(e => e.textContent.trim());
+    assert.ok(shown.includes(refusal), `${view}: refusal visible as an alert (got ${JSON.stringify(shown)})`);
+    assert.equal(p.qa('[role=alert]').filter(e => e.textContent.trim() === refusal).length, 1, `${view}: shown once`);
+  }
+  assert.deepEqual(bodies.map(b => b.mode), ['dry_run', 'dry_run'], 'dry run only; no execute');
+  assert.ok(!p.q('dialog[open]'), 'no confirm is offered for a refused delete');
 });

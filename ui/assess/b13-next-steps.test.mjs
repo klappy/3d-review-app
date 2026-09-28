@@ -196,7 +196,7 @@ test('B13 the assessment shell locks a completed review for every stage view and
   const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   assert.match(src, /return \{ assessment: completeLock\(r\.assessment\), surveys: r\.surveys \|\| \[\] \};/);
   assert.match(src, /const done = a\.complete && tab !== 'improve' \? `<p class="note" data-review-complete>\$\{esc\(V3_SUGGEST\.done\)\}<\/p>` : '';/);
-  assert.match(src, /if \(tab === 'prepare'\) return head \+ done \+ prepareView\(current\);/);
+  assert.match(src, /if \(tab === 'prepare'\) return head \+ done \+ delMsg \+ prepareView\(current\);/); // S11d: Delete's refusal line sits under the complete line
   assert.match(src, /return head \+ done \+ collectScreen\(current\);/);
   assert.equal(V3_SUGGEST.done, 'This review is complete.');
 });
