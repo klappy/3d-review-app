@@ -25,6 +25,7 @@ import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
 import { sidebarTree } from '../ui/v3/components/sidebar-tree.js';
 import { mountEditableHeading } from '../ui/v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '../ui/v3/components/saved-status.js';
+import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations } from '../ui/v3/components/invite.js';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const HTML = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
@@ -48,7 +49,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, signInLanding, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, signInLanding, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf, mountInvite, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations }); // v3 shell imports (assess.js lines 15–16); #190
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -72,4 +73,45 @@ test('B04 (b) control: #session= + two projects → #projects', async () => {
   await tick(30);
   console.log('hash after boot (two):', p.w.location.hash);
   assert.equal(p.w.location.hash, '#projects');
+});
+
+// S9 (B04 step c, captain ruling 2026-09-28 15:27 ET k0015; captain 16:03 ET "ships tonight"): a person invited by an owner who just
+// signs in on the site (never opened the link) lands on the "Accept invitation" screen first; with none pending, the rule above stands.
+const ONE = { ok: true, result: { projects: [{ id: 'p1', name: 'River Valley', role: 'owner', workspace_id: 'w1', archived_at: null }] } };
+const MINE = { ok: true, result: { invitations: [{ id: 'inv_1', scope: { type: 'project', id: 'p9' }, role: 'viewer', inviter_display_name: null, invited_at: '2026-09-28T20:00:00.000Z', expires_at: '2026-10-05T20:00:00.000Z' }] } };
+// The synthetic transport refuses every mutation; answer ONLY the by-id dry run so the ready screen can render.
+const answerDryRun = t => { const inner = t.fetch; t.fetch = async (input, init = {}) => {
+  const url = String(input instanceof URL ? input.href : input);
+  if ((init.method || 'GET').toUpperCase() === 'POST' && url.endsWith('/v2/me/invitations/inv_1/accept')) { t.log.push({ key: 'POST /v2/me/invitations/inv_1/accept', body: init.body, outcome: 'served' }); return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ ok: true, result: { impact: { affected: [{ scope: { type: 'project', id: 'p9' }, role: 'viewer', currently: 'none' }] }, confirm_token: 'ct' } }) }; }
+  return inner(input, init); }; };
+test('S9 B04 (c): #session= + a pending invitation (no link opened) → #invite, "Accept invitation" first — even with exactly one project', async () => {
+  const p = await bootPage('owner', '#session=tok123', { install: (t, data) => { data.routes.set('GET /v2/projects', ONE); data.routes.set('GET /v2/me/invitations', MINE); answerDryRun(t); } });
+  await tick(40);
+  assert.equal(p.w.location.hash, '#invite', 'served: ' + p.served().join(', '));
+  assert.ok(p.served().includes('GET /v2/me/invitations'), 'the landing asked the server for this person\'s invitations');
+  const panel = p.q('[data-invite]'); assert.ok(panel, 'accept screen mounted');
+  assert.equal(panel.querySelectorAll('h1').length, 1); assert.equal(panel.querySelector('h1').textContent, 'Accept invitation');
+  assert.equal(panel.querySelectorAll('p').length, 1); assert.equal(panel.querySelector('p').textContent, 'You were invited to a project as a viewer.');
+  const buttons = panel.querySelectorAll('button'); assert.equal(buttons.length, 1); assert.equal(buttons[0].textContent, 'Accept'); assert.ok(buttons[0].classList.contains('primary'));
+  const dry = p.transport.log.find(l => l.key === 'POST /v2/me/invitations/inv_1/accept'); assert.ok(dry, 'dry run by id'); assert.deepEqual(JSON.parse(dry.body), { mode: 'dry_run' }, 'no token in the body');
+});
+test('S9 B04 (c) control: #session= + no pending invitations + one project → #project/<id> (rule above unchanged)', async () => {
+  const p = await bootPage('owner', '#session=tok123', { install: (t, data) => { data.routes.set('GET /v2/projects', ONE); data.routes.set('GET /v2/me/invitations', { ok: true, result: { invitations: [] } }); } });
+  await tick(30);
+  assert.equal(p.w.location.hash, '#project/p1');
+});
+test('S9 B04 (c) control: #session= + no pending invitations + several projects → #projects', async () => {
+  const p = await bootPage('owner', '#session=tok123', { install: (t, data) => { data.routes.set('GET /v2/me/invitations', { ok: true, result: { invitations: [] } }); } });
+  await tick(30);
+  assert.equal(p.w.location.hash, '#projects');
+});
+test('S9 B04 (c) control: the invitations read failing never blocks sign-in — the existing landing stands', async () => {
+  const p = await bootPage('owner', '#session=tok123', { install: (t, data) => { data.routes.set('GET /v2/projects', ONE); data.routes.set('GET /v2/me/invitations', { ok: false, error: { code: 'INTERNAL', message: 'down' } }); } });
+  await tick(30);
+  assert.equal(p.w.location.hash, '#project/p1');
+});
+test('S9: a plain visit (no sign-in just happened) never asks for invitations and never redirects', async () => {
+  const p = await bootPage('owner', '#projects', { install: (t, data) => { data.routes.set('GET /v2/me/invitations', MINE); } });
+  await tick(30);
+  assert.equal(p.w.location.hash, '#projects'); assert.ok(!p.served().includes('GET /v2/me/invitations'));
 });

@@ -116,6 +116,7 @@ test('B04: a consumed #session= marks the sign-in; boot() applies signInLanding 
   assert.equal(drive('#projects').landing, false, 'plain navigation is not a sign-in');
   assert.equal(drive('#session=st_abc', new Map([['pendingInvite', 'tok']])).historyCalls[0][2], '/#invite');
   const boot = source.slice(source.indexOf('async function boot()'));
-  assert.match(boot, /state\.projects = result\.projects \|\| \[\];[\s\S]*if \(landAfterSignIn\) \{ landAfterSignIn = false; if \(\['projects', 'invite', 'entry'\]\.includes\(route\(location\.hash\)\.kind\)\) \{ try \{ history\.replaceState\(null, '', location\.pathname \+ location\.search \+ signInLanding\(\{ invite: !!\(pendingInvite \|\| storedInvite\(\)\), projects: state\.projects \}\)\); \} catch \{\} \} \}\n\s*listen\(\);\n\s*await render\(\);/);
+  // S9 (B04 step c, captain 2026-09-28): with no link token in the tab, the landing also asks GET /v2/me/invitations (by id, no token).
+  assert.match(boot, /state\.projects = result\.projects \|\| \[\];[\s\S]*if \(landAfterSignIn\) \{ landAfterSignIn = false; if \(\['projects', 'invite', 'entry'\]\.includes\(route\(location\.hash\)\.kind\)\) \{\n\s*const linkInvite = !!\(pendingInvite \|\| storedInvite\(\)\);\n\s*const mine = linkInvite \? \[\] : await loadMyInvitations\(\); if \(mine === null \|\| identity !== identityGeneration\) return;\n\s*try \{ history\.replaceState\(null, '', location\.pathname \+ location\.search \+ signInLanding\(\{ invite: linkInvite \|\| mine\.length > 0, projects: state\.projects \}\)\); \} catch \{\} \} \}\n\s*listen\(\);\n\s*await render\(\);/);
   assert.match(source, /const setToken = t => \{ if \(demo\) return; token = t \|\| null; landAfterSignIn = !!t;/, 'the entry form sign-in lands the same way');
 });
