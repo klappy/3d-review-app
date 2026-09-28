@@ -7,6 +7,8 @@
 import { homeView } from '../v3/home.js';
 import { learnMore } from '../v3/components/learn-more.js';
 import { mountEditableHeading } from '../v3/components/editable-heading.js';
+import { showSavedStatus, undoTokenOf } from '../v3/components/saved-status.js';
+import { digestNamespace, rememberCurrent, scopedStorage } from '../shared-link.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -120,9 +122,9 @@ function hero(ctx, signedIn) {
   const continueCards = signedIn ? `<section class="panel"><p class="eyebrow">Signed in</p><h2>Continue</h2><div class="project-grid">${ctx.cards.card({ eyebrow: 'Continue', title: 'Workspaces', href: ctx.routes.workspaces, meta: ['Optional groupings of projects you can already open'] })}${ctx.cards.card({ eyebrow: 'Continue', title: 'Projects', href: ctx.routes.projects, meta: ['All projects your account holds a role on'] })}</div><div class="actions"><button type="button" class="quiet" data-act="signout">Sign out</button></div></section>` : '';
   // Public home contract (ui/public-choices.test.mjs, captain-named): exactly these four choices, in this order, above the headline;
   // Sign in goes straight to the real provider; sandbox sign-in only by explicit choice (#signin). Retired labels never return.
-  const choices = `<nav class="public-choices actions" aria-label="Choose where to start" style="margin-top:0"><a class="rv-btn" href="#about">Read about it</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a>${signedIn ? '' : '<a class="rv-btn primary" href="/v2/auth/access">Sign in</a>'}</nav>`; // B02: a signed-in home never offers Sign in
+  const choices = `<nav class="public-choices actions" aria-label="Choose where to start" style="margin-top:0"><a class="rv-btn" href="#about">Read about it</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/collect">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a>${signedIn ? '' : '<a class="rv-btn primary" href="/v2/auth/access">Sign in</a>'}</nav>`; // B02: a signed-in home never offers Sign in
   // Captain order 17:05 (lane 9, L9-22) "less text": public home = the four choices, one heading, one short line; everything else behind Learn more.
-  return `<section class="hero panel" id="public-home">${choices}${signedIn ? '' : signupNote(ctx, '8px 0 14px')}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">${LEAD}</p>${learnMore(`<p class="muted">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p>${perspectivesRow(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a>${signedIn ? '' : ' · <a href="#signin">Sandbox test identities (dev only) — not a real sign-in</a>'}</p><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p>`)}</section>${continueCards}`;
+  return `<section class="hero panel" id="public-home">${choices}${signedIn ? '' : signupNote(ctx, '8px 0 14px')}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">${LEAD}</p>${learnMore(`<p class="muted">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p>${perspectivesRow(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/collect">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a>${signedIn ? '' : ' · <a href="#signin">Sandbox test identities (dev only) — not a real sign-in</a>'}</p><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p>`)}</section>${continueCards}`;
 }
 function surveyView(ctx) {
   return `<section class="panel narrow"><p class="eyebrow">For participants</p><h1>Your feedback starts with your invitation.</h1><p class="muted">Open the survey link or scan the QR code someone shared with you. If you were given an access code, enter it below.</p><p><a class="button" href="/participate/?demo=1">Try a sample survey — nothing is sent</a></p><form id="code-form"><label class="field">Access code<input name="code" required autocomplete="off" maxlength="64"></label><div class="actions"><button class="primary" type="submit">Open my survey</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form><p class="small muted">Missing your survey link? Ask the person who invited you or shared the survey to send you the link. You do not need an account to follow a participant link.</p></section>`;
@@ -134,7 +136,7 @@ const WHO = [['Who it is for', 'Translation teams, the communities they serve an
 export function aboutView(ctx) {
   // B30: behind Learn more the three facts are plain label + line pairs (no card headings: one heading per screen).
   const facts = WHO.map(([t, s]) => `<p><strong>${ctx.esc(t)}</strong></p><p class="muted">${ctx.esc(s)}</p>`).join('');
-  return `<section class="glass panel narrow" id="about-page"><a class="back" href="#">← Back to home</a><p class="eyebrow">About 3D Review</p><h1>Three perspectives. One useful next step.</h1><p class="muted lead">${LEAD}</p>${perspectivesRow(ctx)}${learnMore(`<p class="muted">A facilitator sets up a review.</p><p class="muted">Each group answers a short survey.</p><p class="muted">The results show where the project is strong and where it needs support.</p>${facts}`)}<div class="actions"><a class="rv-btn primary" href="#">Back to home</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/prepare">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a></div></section>`;
+  return `<section class="glass panel narrow" id="about-page"><a class="back" href="#">← Back to home</a><p class="eyebrow">About 3D Review</p><h1>Three perspectives. One useful next step.</h1><p class="muted lead">${LEAD}</p>${perspectivesRow(ctx)}${learnMore(`<p class="muted">A facilitator sets up a review.</p><p class="muted">Each group answers a short survey.</p><p class="muted">The results show where the project is strong and where it needs support.</p>${facts}`)}<div class="actions"><a class="rv-btn primary" href="#">Back to home</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/collect">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a></div></section>`;
 }
 function signinView(ctx, model, signedIn = false) {
   const s = model.signin;
@@ -174,8 +176,11 @@ const entry = {
       if (!r) return;
       const token = r.participant_token || r.participant;
       if (!token) return ctx.note('The server accepted the code but returned no participant token.', true);
-      storeSession('participantToken', token);
-      window.location.assign('/legacy/#participant'); // participant flow stays on the legacy surface (unchanged)
+      // U07: a code participant takes the same v3 survey as a shared-link participant (intro → review → thank-you).
+      // The bearer goes into the /participate/ page's scoped session slot, so a reload resumes exactly like a link.
+      const ns = await digestNamespace(token);
+      scopedStorage(sessionStorage, ns).set('bearer', token); rememberCurrent(sessionStorage, ns);
+      window.location.assign('/participate/');
     });
     // B38: email sign-in link. Stays on this screen and shows one line; without script the form posts natively to the same route.
     root.querySelector('#email-link-form')?.addEventListener('submit', async ev => {
@@ -248,7 +253,9 @@ function pageHead(ctx, r) { return ctx.shellOwnsTitle === true ? '' : `<p class=
 // /assess/ host has no crumb chrome, so the page keeps the way up (← All workspaces / ← All projects).
 function pageBack(ctx, href, label) { return ctx.shellOwnsTitle === true ? '' : `<a class="back" href="${ctx.esc(href)}">← ${ctx.esc(label)}</a>`; }
 // The read head carries role/archived state and the permissions link; the heading itself follows the host contract above.
-function kitHead(ctx, r, extra = '') { return `${pageHead(ctx, r)}<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}"><p class="muted small" style="margin:0">${r.role ? `Your role: ${ctx.esc(r.role)}` : ''}</p><div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>`; }
+// Bincy B30 (lanes-2111): the head shows at most ONE short line (`line`, e.g. the organisation); the role sentence and any page
+// explanation (`more`) sit behind the shared Learn more. The role badge stays visible, so nothing is lost up front.
+function kitHead(ctx, r, extra = '', { line = '', more = '' } = {}) { return `${pageHead(ctx, r)}<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}">${line ? `<p class="muted small" style="margin:0">${ctx.esc(line)}</p>` : '<span></span>'}<div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>${learnMore(`${r.role ? `<p class="muted small">Your role: ${ctx.esc(r.role)}</p>` : ''}${more}`)}`; }
 const readRegion = html => `<div data-read-region class="kit-read">${html}</div>`;
 const actionRegion = html => html ? `<section data-action-region class="legacy-actions" aria-label="More actions">${html}</section>` : '';
 
@@ -323,8 +330,16 @@ const workspace = {
     root.querySelector('#rename-form')?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target;
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Rename', () => ctx.api(`/v2/workspaces/${ctx.enc(id)}`, { method: 'PATCH', body: { name: val(form, 'name') } }));
-      if (r) { ctx.note('Renamed.'); await reload(); }
+      // U17: the whole envelope, so the receipt's undo_token reaches the status beside this form ("Saved · Undo" / "Saved").
+      const full = ctx.apiFull || ((url, opts) => ctx.api(url, opts).then(result => ({ result })));
+      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Rename', () => full(`/v2/workspaces/${ctx.enc(id)}`, { method: 'PATCH', body: { name: val(form, 'name') } }));
+      if (!r) return;
+      await reload();
+      const here = () => root.querySelector('#rename-form');
+      showSavedStatus(here(), { undoToken: undoTokenOf(r), undo: async token => {
+        try { await ctx.api(`/v2/undo/${ctx.enc(token)}`, { method: 'POST' }); } catch (e) { throw new Error(`Undo failed: ${safeMessage(e)}`); }
+        await reload(); return here();
+      } });
     });
   },
 };
@@ -392,16 +407,18 @@ const project = {
       : `<p class="muted">${ctx.esc(model.assessmentsError)}</p><div class="actions"><button type="button" class="primary" data-act="retry">Retry</button></div>`;
     const langList = model.languages.length ? `<div class="links">${model.languages.map(l => `<p class="small">${ctx.esc(l.name)}${l.code ? ` <span class="muted">(${ctx.esc(l.code)})</span>` : ''}${l.archived_at ? ' <span class="badge">Archived</span>' : ''}</p>`).join('')}</div>` : '<p class="muted">No languages yet.</p>';
     // Lane 11 (LANES.md claim 11:19): retained surfaces (cookbook design-system-v3 PARITY.md, ADOPTION item 7) reachable from project
-    // settings. Links only, to the existing screens; no new capability, contract unchanged. Access codes (C3) live on the legacy facilitator page.
-    const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue paper codes for one survey and release them once to print (choose the assessment and survey there)', href: '/legacy/#facilitator', label: 'Open access codes' },
+    // settings. Links only, to the existing screens; no new capability, contract unchanged. Access codes (C3) live on the survey Share card (U10).
+    // U10: access codes now live on each survey's Share card (v3); the link opens this project's first open assessment.
+    const firstA = model.assessments.find(a => !a.archived_at);
+    const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue paper codes on a survey\'s Share card and print them once (open an assessment, then its survey)', href: firstA ? ctx.routes.assessment(firstA.id) : ctx.routes.project(p.id), label: 'Open access codes' },
       // Workspaces (W1): the existing #workspaces screen — create a workspace, add or remove projects, rename.
       { key: 'workspaces', name: 'Workspaces', what: 'Group projects in a workspace: create one, add or remove projects, rename it', href: ctx.routes.workspaces, label: 'Open workspaces' }];
-    const settings = edit ? `<section class="panel" id="project-settings" aria-labelledby="project-settings-title"><h2 id="project-settings-title">Project settings</h2><ul class="manage-rows kept-surfaces" aria-label="Kept tools">${kept.map(k => `<li class="manage-row"><span><strong>${ctx.esc(k.name)}</strong> <span class="small muted">${ctx.esc(k.what)}</span></span><a class="button quiet small" href="${ctx.esc(k.href)}" data-kept="${ctx.esc(k.key)}">${ctx.esc(k.label)}</a></li>`).join('')}</ul></section>` : '';
+    const settings = edit ? `<section class="panel" id="project-settings" aria-labelledby="project-settings-title"><p class="eyebrow" id="project-settings-title">Project settings</p><ul class="manage-rows kept-surfaces" aria-label="Kept tools">${kept.map(k => `<li class="manage-row"><span><strong>${ctx.esc(k.name)}</strong></span><a class="button quiet small" href="${ctx.esc(k.href)}" data-kept="${ctx.esc(k.key)}">${ctx.esc(k.label)}</a></li>`).join('')}</ul>${learnMore(kept.map(k => `<p class="small muted"><strong>${ctx.esc(k.name)}</strong>: ${ctx.esc(k.what)}.</p>`).join(''))}</section>` : '';
     const r = readModel('project', model);
     // Assessments and languages keep their independent settled outcomes; only a 'ready' list renders as cards (never an empty success).
     const assessmentsRead = r.assessments.status === 'ready' ? kitGrid(ctx, r.assessments.items, 'No assessments yet.') : assessmentsBlock;
     const languagesRead = r.languages.status === 'ready' ? langList : r.languages.status === 'refused' ? '<p class="muted">Languages are not visible to you here.</p>' : r.languages.status === 'unauthenticated' ? `<p class="muted">Your session has ended. <a href="${ctx.routes.entry}">Sign in</a></p>` : '<p class="muted" role="alert">Languages could not be loaded. <button type="button" class="quiet" data-act="retry">Retry</button></p>';
-    return pageBack(ctx, ctx.routes.projects, 'All projects') + readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/projects/${ctx.enc(p.id)}">Permissions</a>`)}${p.organization ? `<p class="muted small">${ctx.esc(p.organization)}</p>` : ''}<h3>Assessments</h3>${assessmentsRead}<aside class="glass panel" style="margin-top:22px"><h3>Languages</h3>${languagesRead}</aside>`)
+    return pageBack(ctx, ctx.routes.projects, 'All projects') + readRegion(`${kitHead(ctx, r, `<a class="button" href="#permissions/projects/${ctx.enc(p.id)}">Permissions</a>`, { line: p.organization || '' })}<p class="eyebrow">Assessments</p>${assessmentsRead}<aside class="glass panel" style="margin-top:22px"><p class="eyebrow">Languages</p>${languagesRead}</aside>`)
       + actionRegion(`${edit ? START_REVIEW : ''}${settings}`);
   },
   bind(ctx, root, model) {

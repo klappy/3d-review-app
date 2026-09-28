@@ -3,7 +3,7 @@ import { closedLine } from '../v3/components/active-until.js';
 
 // Only the existing participant client owns transport. No staff identity is read.
 export function createParticipantJourney({ window: win, storage, fetchImpl, onChange = () => {} }) {
-  let client, store, form, answers, uncertain = false, busy = false;
+  let client, store, form, answers, context = {}, uncertain = false, busy = false;
   let state = { phase: 'opening', notice: copy.labelOpening };
   const show = (phase, extra = {}) => { state = { phase, form, answers, busy, ...extra }; onChange(state); return state; };
   const unavailable = kind => show('unavailable', { notice: ({ closed: copy.collectionClosed, cannotResume: copy.cannotResume, rateLimited: copy.rateLimited, transient: copy.transient })[kind] || copy.linkUnavailable });
@@ -62,10 +62,12 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
     save(values) { if (form && store) saveDraft(store, form, values); },
     review(values) { if (busy || state.phase !== 'form') return; answers = values; show('review', { notice: uncertain ? copy.submitUncertain : '' }); },
     edit() { if (busy || state.phase !== 'review') return; show('form', { draft: answers, notice: uncertain ? copy.submitUncertain : '' }); },
+    // B09: optional respondent context (age range, gender) from the "About you" block; empty sends nothing extra.
+    setContext(value) { context = value && typeof value === 'object' ? { ...value } : {}; },
     async submit() {
       if (state.phase !== 'review' || !answers) return;
       return action(async () => {
-        try { return receipt(await client.submit(answers)); }
+        try { return receipt(await client.submit(answers, context)); }
         catch (e) {
           const kind = submitFailureKind(e);
           const unknown = () => { uncertain = true; return show('review', { notice: copy.submitUncertain }); };

@@ -70,14 +70,16 @@ test('concurrent clicks submit only once', async () => {
   assert.equal(h.requests.filter(r => r.url.endsWith('/responses')).length, 1); finish(response({ submitted: true })); await first;
 });
 
-test('root route forwards shared credentials to dedicated page, invitations remain legacy, both scrub first', async () => {
+test('root route forwards shared credentials to dedicated page, invitations stay in v3 (B03), both scrub first', async () => {
   const { readFileSync } = await import('node:fs'); const { runInNewContext } = await import('node:vm');
+  const { parseInvitationFragment, INVITE_KEY } = await import('../v3/components/invite.js');
   const source = readFileSync(new URL('../assess/assess.js', import.meta.url), 'utf8');
   const fn = source.slice(source.indexOf('function scrubCredentialHash()'), source.indexOf('function resetIdentity()'));
-  for (const [hash, destination] of [['#survey=link-secret', '/participate/#survey=link-secret'], ['#invite=invite-secret', '/legacy/#invite=invite-secret']]) {
-    const events = [];
-    runInNewContext(fn + '\nscrubCredentialHash();', { demo: false, location: { hash, pathname: '/', replace: value => events.push(value) }, history: { replaceState: () => events.push('scrub') }, LEGACY_HASHES: new Set() });
-    assert.deepEqual(events, ['scrub', destination]);
+  for (const [hash, expected] of [['#survey=link-secret', ['scrub', '/participate/#survey=link-secret']], ['#invite=invite-secret', ['scrub /#invite']]]) {
+    const events = [], stored = {};
+    runInNewContext(fn + '\nscrubCredentialHash();', { demo: false, location: { hash, pathname: '/', replace: value => events.push(value) }, history: { replaceState: (_s, _t, url) => events.push(url === '/' ? 'scrub' : 'scrub ' + url) }, LEGACY_HASHES: new Set(), parseInvitationFragment, INVITE_KEY, pendingInvite: null, sessionStorage: { setItem: (k, v) => { stored[k] = v; } } });
+    assert.deepEqual(events, expected);
+    if (hash.startsWith('#invite=')) assert.equal(stored[INVITE_KEY], 'invite-secret');
   }
 });
 test('429 and transport failure keep honest retry states without creating another participant', async () => {
@@ -152,4 +154,16 @@ test('B41: after the Active until date the link shows one plain closed line, not
   assert.equal(h.journey.state.phase, 'unavailable'); assert.equal(h.journey.state.notice, 'This survey closed on 31 January 2020.');
   const open = harness({ handle: async url => url.endsWith('/form') ? response({ ...form, period: 'Active until 2999-12-31' }) : null });
   await open.journey.start(); assert.equal(open.journey.state.phase, 'form');
+});
+test('U07: an access-code hand-off (bearer in its scoped slot, no fragment) opens the same v3 survey, resumes on reload, and submits', async () => {
+  const ns = await digestNamespace('code-bearer');
+  const saved = { 'shared:current': ns, [ns + 'bearer']: 'code-bearer' };
+  const h = harness({ hash: '', saved });
+  await h.journey.start(); assert.equal(h.journey.state.phase, 'form');
+  assert.deepEqual(h.requests.map(r => r.url), ['/v2/participate/receipt', '/v2/participate/form']);
+  assert.equal(h.requests[0].options.headers.authorization, 'Bearer code-bearer');
+  h.journey.save({ q: 'kept' });
+  const reload = harness({ hash: '', saved: Object.fromEntries(h.data) });
+  await reload.journey.start(); assert.equal(reload.journey.state.phase, 'form'); assert.deepEqual(reload.journey.state.draft, { q: 'kept' });
+  reload.journey.review({ q: 'kept' }); await reload.journey.submit(); assert.equal(reload.journey.state.phase, 'receipt');
 });

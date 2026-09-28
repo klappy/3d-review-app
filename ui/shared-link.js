@@ -15,7 +15,7 @@ export const copy = {
   draftMismatch: 'Your saved answers were for a different version of this survey and were not restored. Please answer again.',
   draftRestored: 'Your unsent answers were restored on this device.',
   submitFailed: 'Your answers were not submitted. They are still here; try again.',
-  submitUncertain: 'We could not confirm whether your answers arrived. Nothing on this device was changed and your answers are still here. Choose Submit once again: if they already arrived you will see your receipt, and nothing is sent twice.',
+  submitUncertain: 'We could not confirm whether your answers arrived. Nothing on this device was changed and your answers are still here. Choose Submit answers again: if they already arrived you will see your receipt, and nothing is sent twice.',
   // Bincy B26: the thank-you names the survey's own group (the same perspective label the welcome eyebrow shows).
   receiptThanks: 'Thank you. Your answers stay with the team, grouped with others from the {perspective} perspective. Reopening your link shows this receipt again.',
   receiptThanksNoGroup: 'Thank you. Your answers stay with the team, grouped with others from your group. Reopening your link shows this receipt again.',
@@ -207,8 +207,10 @@ export function createSharedLinkClient({ fetchImpl = globalThis.fetch, store, on
       if (!key) { key = globalThis.crypto.randomUUID(); store.set('submitKey', key); }
       return key;
     },
-    async submit(answers) {
-      const result = await call('/v2/participate/responses', { method: 'POST', body: { answers, idempotency_key: this.submitKey() } });
+    async submit(answers, context) {
+      const body = { answers, idempotency_key: this.submitKey() };
+      if (context && Object.keys(context).length) body.context = context; // B09: optional About you, only when given
+      const result = await call('/v2/participate/responses', { method: 'POST', body });
       // Confirmed success only: clear this context's draft and key.
       store.remove('draft'); store.remove('submitKey');
       return result;

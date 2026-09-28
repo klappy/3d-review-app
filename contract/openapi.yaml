@@ -3210,7 +3210,7 @@ paths:
               schema:
                 allOf:
                 - $ref: '#/components/schemas/Envelope'
-                - {"type":"object","properties":{"result":{"type":"object","properties":{"survey_id":{"type":"string"},"assessment":{"type":"string"},"language":{"type":"string"},"period":{"type":["string","null"]},"project":{"type":"string"},"purpose":{"type":["string","null"]},"format":{"type":["string","null"]},"template":{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"},"perspective":{"type":"string"},"source_ref":{"type":["string","null"]}},"required":["id","version","perspective","source_ref"],"additionalProperties":false},"items":{"type":"array","items":{"type":"object","description":"Pinned source renderItems output, stable source item IDs, required/option/exclusion semantics unchanged."}},"participant_labels":{"type":"array","items":{"type":"string"}}},"required":["survey_id","assessment","language","period","project","purpose","format","template","items","participant_labels"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"survey_id":{"type":"string"},"assessment":{"type":"string"},"language":{"type":"string"},"period":{"type":["string","null"]},"project":{"type":"string"},"purpose":{"type":["string","null"]},"format":{"type":["string","null"]},"template":{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"},"perspective":{"type":"string"},"source_ref":{"type":["string","null"]}},"required":["id","version","perspective","source_ref"],"additionalProperties":false},"items":{"type":"array","items":{"type":"object","description":"Pinned source renderItems output, stable source item IDs, required/option/exclusion semantics unchanged."}},"participant_labels":{"type":"array","items":{"type":"string"}},"context_fields":{"type":"array","items":{"type":"object"}}},"required":["survey_id","assessment","language","period","project","purpose","format","template","items","participant_labels"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
         4XX:
           description: error envelope
           content:
@@ -3256,7 +3256,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: {"type":"object","properties":{"idempotency_key":{"type":"string","minLength":1,"maxLength":200},"answers":{"type":"object","description":"Known pinned item IDs only; server validates required, type, option, multi and exclusion rules before canonical hashing."}},"required":["idempotency_key","answers"],"additionalProperties":false}
+            schema: {"type":"object","properties":{"idempotency_key":{"type":"string","minLength":1,"maxLength":200},"answers":{"type":"object","description":"Known pinned item IDs only; server validates required, type, option, multi and exclusion rules before canonical hashing."},"context":{"type":"object","description":"B09: optional respondent context validated against cap.response.form context_fields (age_range, gender). Unknown keys rejected; every key optional; no names. Not part of the replay digest.","properties":{"age_range":{"type":"string"},"gender":{"type":"string"}},"additionalProperties":false}},"required":["idempotency_key","answers"],"additionalProperties":false}
   /v2/participate/receipt:
     get:
       operationId: cap.response.receipt

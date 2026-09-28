@@ -2,7 +2,7 @@
 import type { Ctx, Handler, Role, ScopeType } from "./types";
 import { CapError } from "./types";
 import { capabilities, byId, contractName, sourceSha, type Capability } from "../registry";
-import { roleAt } from "../policy";
+import { roleAt, requiredRole, roleMeets } from "../policy";
 
 const CEILING = "klappy://canon/constraints/mcp-tool-surface-ceiling";
 const TOPICS: Record<string, string> = {
@@ -42,12 +42,14 @@ const index = () => {
   for (const c of capabilities) (g[c.section] ??= []).push(c.id + (c.slice === "v2.1-oct" ? " (v2.1-oct, not built)" : ""));
   return g;
 };
-const allowedFor = (role: Role | "anonymous" | "participant" | "support") =>
+const NEXT_BEST = { prepare: "cap.survey.select", collect: "cap.survey.issue_codes", understand: "cap.results.summary", improve: "cap.assessment.notes.update" } as const;
+export const allowedFor = (role: Role | "anonymous" | "participant" | "support") =>
   capabilities.filter((c) => {
     if (role === "support") return true;
     if (role === "anonymous") return c.public;
     if (role === "participant") return c.roles.startsWith("P") || c.public;
-    if (role === "viewer") return c.class === "read" && !/^(O|S|P)/.test(c.roles) || c.public;
+    // Viewer: public rows, plus read rows the server's own role table (policy.requiredRole) lets a viewer call.
+    if (role === "viewer") return c.public || (c.class === "read" && !/^(S|P)/.test(c.roles) && roleMeets("viewer", requiredRole(c.roles)));
     if (role === "member") return !/^(O$|S)/.test(c.roles) && !c.roles.startsWith("P") && c.roles !== "provisioned creator (D1)";
     return !/^S$/.test(c.roles) && !c.roles.startsWith("P");
   }).map((c) => c.id);
@@ -132,7 +134,10 @@ export const docs: Handler = async (ctx, a) => {
       if (!r) throw new CapError("NOT_FOUND_OR_NOT_VISIBLE", "not found or not visible");
       role = r;
     } else if (ctx.principal.kind === "user" && !a.role) role = "member";
-    return { result: { role, scope: a.scope ?? null, can: allowedFor(role), next_best: { prepare: "cap.survey.select", collect: "cap.survey.issue_codes", understand: "cap.results.summary", improve: "cap.assessment.notes.update" } } };
+    const can = allowedFor(role);
+    // next_best never names a verb the role cannot call (U16): stages whose step is outside `can` are omitted.
+    const next_best = Object.fromEntries(Object.entries(NEXT_BEST).filter(([, id]) => can.includes(id)));
+    return { result: { role, scope: a.scope ?? null, can, next_best } };
   }
   const roles = ctx.principal.kind === "user" ? (await ctx.db.prepare("SELECT scope_type, scope_id, role FROM grant WHERE principal_id = ?").bind(ctx.principal.id).all()).results : [];
   return { result: {

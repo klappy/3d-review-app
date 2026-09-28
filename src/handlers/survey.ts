@@ -4,6 +4,7 @@ import { CapError, notVisible } from "./errors";
 import { countScalar, gate, loadTemplate, newId, nowIso, optInt, parseItems, randomToken, renderItems, reqStr, roleAt, sha256, type AssessmentRow, type SurveyRow } from "./common";
 import { codeHash, decryptCode, encryptCode } from "../code-escrow";
 import { randomCode } from "./common";
+import { groupFields, validateContext } from "../context-fields";
 
 async function assessment(ctx:Ctx,id:string,min:Role="viewer") {
   const row=await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
@@ -42,16 +43,21 @@ export const select:Handler=async(ctx,params)=>{
   const aid=reqStr(params,"aid"), {row}=await assessment(ctx,aid,"member");
   const template_id=reqStr(params,"template_id"), version=optInt(params,"version",0,0);
   const t=await loadTemplate(ctx,template_id,version||undefined);
+  // B09: optional group-level context from setup step 3 (Kairos Laos fields for this perspective, no names).
+  const context=validateContext(groupFields(t.perspective),params.context,"context"), hasContext=Object.keys(context).length>0;
   const collection_status=row.stage==="collect"?"open":"closed";
   const existing=await ctx.db.prepare("SELECT * FROM assessment_survey WHERE assessment_id = ? AND template_id = ? AND template_version = ?").bind(aid,t.id,t.version).first<SurveyRow>();
   if(existing){
     if(existing.state==="selected") throw new CapError("STAGE_CONFLICT","template version is already selected");
     await ctx.db.prepare("UPDATE assessment_survey SET state = 'selected', archived_at = NULL, collection_status = ? WHERE id = ?").bind(collection_status,existing.id).run();
+    if(hasContext) await ctx.db.prepare("UPDATE assessment_survey SET context_json = ? WHERE id = ?").bind(JSON.stringify(context),existing.id).run();
     return {result:{sid:existing.id,survey:{...existing,state:"selected",archived_at:null,collection_status},selected:true},scope:{type:"assessment",id:aid},priorState:{state:existing.state,archived_at:existing.archived_at}};
   }
   const id=newId("survey"), at=nowIso(ctx);
-  await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?, ?, ?, ?, 'selected', ?, ?)").bind(id,aid,t.id,t.version,collection_status,at).run();
-  return {result:{sid:id,survey:{id,assessment_id:aid,template_id:t.id,template_version:t.version,state:"selected",collection_status,created_at:at},selected:true},scope:{type:"assessment",id:aid}};
+  // context_json is written only when given, so a select without context never depends on migration 0011.
+  if(hasContext) await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at,context_json) VALUES (?, ?, ?, ?, 'selected', ?, ?, ?)").bind(id,aid,t.id,t.version,collection_status,at,JSON.stringify(context)).run();
+  else await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?, ?, ?, ?, 'selected', ?, ?)").bind(id,aid,t.id,t.version,collection_status,at).run();
+  return {result:{sid:id,survey:{id,assessment_id:aid,template_id:t.id,template_version:t.version,state:"selected",collection_status,created_at:at,...(hasContext?{context}:{})},selected:true},scope:{type:"assessment",id:aid}};
 };
 export const deselect:Handler=async(ctx,params)=>{
   const {aid,sid}=ids(params), row=await survey(ctx,aid,sid,"member");

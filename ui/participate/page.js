@@ -1,6 +1,6 @@
 import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
-import { mountParticipantView, itemError } from '../participant-view.js';
+import { mountParticipantView, itemError, drawAbout, aboutValues } from '../participant-view.js';
 import { reviewAnswer, receiptLine } from '../present.js';
 
 const $ = id => document.getElementById(id);
@@ -23,6 +23,7 @@ function draw(item) {
   } else field.append(element('p', 'This survey contains an unsupported question. Ask the person who shared the survey for help.'));
   return field;
 }
+let about = null;
 function values(validate = false) {
   const fd = new FormData($('answers')), out = {};
   for (const item of journey.state.form.items) {
@@ -49,7 +50,8 @@ function paint(state) {
           if (field.type === 'radio' || field.type === 'checkbox') field.checked = (Array.isArray(value) ? value : [value]).includes(field.value);
           else field.value = value;
         }
-        pager = mountParticipantView({ doc: document, root: $('participant-view-root'), form: $('answers'), questions: $('questions'), review: $('review'), reviewAnswers: $('review-answers'), receipt: $('receipt'), model: state.form, reviewButton: $('review-button'), onEdit: () => journey.edit() });
+        about = drawAbout(document, state.form.context_fields || []);
+        pager = mountParticipantView({ doc: document, root: $('participant-view-root'), form: $('answers'), questions: $('questions'), review: $('review'), reviewAnswers: $('review-answers'), receipt: $('receipt'), model: state.form, reviewButton: $('review-button'), onEdit: () => journey.edit(), about });
         if (state.draft) pager.showForm();
       } else pager?.showForm();
       $('answers').hidden = false;
@@ -80,7 +82,7 @@ const journey = createParticipantJourney({ ...(demo ? sample : { window, storage
 $('answers').addEventListener('input', () => journey.save(values()));
 $('answers').addEventListener('submit', event => { event.preventDefault(); try { journey.review(values(true)); } catch (error) { $('notice').textContent = error.message; } });
 $('edit').addEventListener('click', () => journey.edit());
-$('submit').addEventListener('click', () => journey.submit());
+$('submit').addEventListener('click', () => { journey.setContext(aboutValues(about)); journey.submit(); });
 $('recover').addEventListener('click', () => journey.recover());
 // A newly pasted link selects a fresh controller; a participant page never changes into a staff surface.
 window.addEventListener('hashchange', () => location.reload());
