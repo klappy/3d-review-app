@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22  # node:sqlite (tools/build-synthetic-attestation.ts) needs >= 22.13
           cache: npm
       - run: npm ci
       - run: npm run typecheck
