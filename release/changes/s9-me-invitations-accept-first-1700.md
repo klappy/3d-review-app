@@ -1,5 +1,0 @@
-bump: patch
-lane: 3d-sprint-s9-invitations-accept-first · PR: (below)
-- Fixed - Someone an owner invited who simply signs in on the site (without opening the invitation email) now lands on an "Accept invitation" screen first — one heading, one line, one "Accept" — instead of an empty home. With nothing pending, sign-in lands as before (one project → that project; several → the projects list). Captain ruling 2026-09-28 15:27 ET (k0015) "Add GET /v2/me/invitations + accept by invitee identity"; B04 step (c).
-- Added - `GET /v2/me/invitations` (`cap.me.invitations`, read): the signed-in person's pending invitations, matched by their hashed email — scope, role, expiry and an inviter display name (always empty for now: no names are stored). Never the invitation token.
-- Changed - `cap.grant.accept` also accepts `invitation_id` instead of the link token (HTTP: `POST /v2/me/invitations/{invitation_id}/accept`), only when the signed-in person's email is the invited one; anything else answers exactly like a missing invitation. The link-token path is unchanged.
