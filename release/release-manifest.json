@@ -1,23 +1,23 @@
 {
-  "version": "0.22.3",
+  "version": "0.22.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "6a59b3fd3ab91bae7e1122168635ffab672ec8db",
+  "cookbook_commit": "ebd1a81872b2c22b52d59272175efc2387f617b7",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.22.3.md",
-      "blob_sha": "23b342174f0c6dbc0a016f7e999386d97ce5581b",
-      "sha256": "8d252bc2e737a15231d81ae74baf46dae8a0a300d7d9882ad1b36df6f03c975e"
+      "path": "planning/2026-09-16-parity-build/releases/0.22.4.md",
+      "blob_sha": "bf198f599e800419ed71e58e656201957eac4883",
+      "sha256": "bfe39991f7e0a4a965eb9d15264e431653080c6105ed82aece28f750ac8525b7"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "1aff2d2ef77af94fd5ef7f873820de4cfe2898ff",
-      "sha256": "eecd63c709c291bf9e3aee981c263794e1c4be0e903e43161dc0548ac8224283"
+      "blob_sha": "0106f6a1bbec56b9da5bfc54611e58923e31cb6d",
+      "sha256": "4cfbc63a546e2ddbb4a8cc30b27c414e242ba13e10383c24709d05ad100db9b1"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "After \"Complete 3D Review\" the owner still sees Permissions and Delete assessment (Delete keeps its dry-run confirm). The review stays read-only for everyone: responses, setup and next-steps content cannot be changed (captain ruling 2026-09-28 15:27 ET, \"Owner keeps Permissions + Delete after Complete\"). (#364)"
+        "Transfer ownership now offers a picker of the people who already have access, labelled by name or email, instead of asking for a raw principal id. (#331)"
       ]
     }
   }
