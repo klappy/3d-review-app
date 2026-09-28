@@ -4,7 +4,10 @@ import {existsSync,readFileSync,readdirSync,writeFileSync} from 'node:fs';
 // Absent or empty release/changes/ = zero pending changes (forecast none), not a crash.
 export function readChanges(dir='release/changes'){return existsSync(dir)?readdirSync(dir).filter(f=>f.endsWith('.md')).map(f=>parseChange(f,readFileSync(`${dir}/${f}`,'utf8'))):[];}
 export function nextVersion(current,bumps){const [M,m,p]=current.split('.').map(Number);return bumps.includes('minor')?`${M}.${m+1}.0`:`${M}.${m}.${p+1}`;}
-export function parseChange(name,text){const bump=/^bump:\s*(minor|patch)/m.exec(text)?.[1]??'patch';const line=/^- (Added|Changed|Fixed) - (.+)$/m.exec(text);const lane=/^lane:\s*(\d+)/m.exec(text)?.[1]??name.split('-')[0];return {file:name,bump,lane:Number(lane),section:line?line[1]:'Changed',text:line?line[2].trim():''};}
+// Lane convention (lane 13): `lane: <N> · PR: #<n>` with <N> a whole number, file named `<N>-<HHMM>.md`;
+// without a lane line the filename prefix is the lane. A non-numeric lane is refused loudly — never NaN, never a digit prefix ("3d-review" is not lane 3).
+export function parseLane(name,text){const raw=/^lane:\s*([^\s·]+)/m.exec(text)?.[1]??name.split('-')[0];if(!/^\d+$/.test(raw))throw new Error(`release/changes/${name}: lane "${raw}" is not a number — use "lane: <N> · PR: #<n>" (e.g. "lane: 13 · PR: #372") and name the file <N>-<HHMM>.md`);return Number(raw);}
+export function parseChange(name,text){const bump=/^bump:\s*(minor|patch)/m.exec(text)?.[1]??'patch';const line=/^- (Added|Changed|Fixed) - (.+)$/m.exec(text);const lane=parseLane(name,text);return {file:name,bump,lane,section:line?line[1]:'Changed',text:line?line[2].trim():''};}
 const key=s=>s.split(';')[0].replace(/\s+/g,' ').slice(0,40);
 export function forecast(releases,changes){const shipped=releases.versions.flatMap(v=>Object.values(v.sections).flat()).join(' \n ');
  const pending=changes.filter(c=>c.text&&!shipped.includes(key(c.text))).sort((a,b)=>a.section.localeCompare(b.section)||a.lane-b.lane||a.file.localeCompare(b.file));
