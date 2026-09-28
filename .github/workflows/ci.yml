@@ -1,0 +1,31 @@
+# Required check on main (kitchen ticket 2026-09-28-3d-migration-0011-and-main-gate, Do 2).
+# Job id `ci` is the context named in ruleset 23571595 required_status_checks.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # scripts/stamp-version.mjs refuses to fabricate a sha when CI=true; give it the real one.
+      WORKERS_CI_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
