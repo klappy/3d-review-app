@@ -1,23 +1,30 @@
 {
-  "version": "0.22.1",
+  "version": "0.22.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "08f0c90ecc687d0f92cba99401aa899fa3750283",
+  "cookbook_commit": "bdaae74de1577cd2e73a0a725747567ca64618fa",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.22.1.md",
-      "blob_sha": "3514564a7c1c19f8f311a82beccf8961a9e4e649",
-      "sha256": "75da0a3ef14147a1f657fcd7b939ef233b656389e09c2a5eebd5e3643fbb3c5c"
+      "path": "planning/2026-09-16-parity-build/releases/0.22.2.md",
+      "blob_sha": "5de1f30ffec749c36c91edc1e884fa0425d6cfdc",
+      "sha256": "ecc94044aae727271079881034c08c329e0197fe7e12ae7a71d845034af42009"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "9c8c0214f816f20ac43f27a26ac3333dedbd3df7",
-      "sha256": "9117667a18bb2873d7324f20baf19c356afa02a4f1bd15d0060230be3c344a04"
+      "blob_sha": "e41bf6491a19fa8bfa9013f90bc6334fa860877d",
+      "sha256": "fb94918a99aa2da2959a30bc3f6d49f5b3e505896e4df690ad1b2e32ef4c518c"
     }
   ],
   "changelog": {
     "sections": {
+      "added": [
+        "`GET /v2/me/invitations` (`cap.me.invitations`, read): the signed-in person's pending invitations, matched by their hashed email — scope, role, expiry and an inviter display name (always empty for now: no names are stored). Never the invitation token. (#365)"
+      ],
+      "changed": [
+        "`cap.grant.accept` also accepts `invitation_id` instead of the link token (HTTP: `POST /v2/me/invitations/{invitation_id}/accept`), only when the signed-in person's email is the invited one; anything else answers exactly like a missing invitation. The link-token path is unchanged. (#365)"
+      ],
       "fixed": [
-        "On Collect, each survey's share card now shows its QR code as soon as the card appears: the participant link is made when the card renders (captain ruling 2026-09-28 14:42 ET, k0013 \"Mint the link on render so QR shows immediately\"). One link per survey still holds: a survey whose link is already active (launch page, an earlier visit, the survey's Share card) reuses it. Copy link and Print keep working; \"Print all\" is unchanged (window.print()). (#361)"
+        "Someone an owner invited who simply signs in on the site (without opening the invitation email) now lands on an \"Accept invitation\" screen first — one heading, one line, one \"Accept\" — instead of an empty home. With nothing pending, sign-in lands as before (one project → that project; several → the projects list). Captain ruling 2026-09-28 15:27 ET (k0015) \"Add GET /v2/me/invitations + accept by invitee identity\"; B04 step (c). (#365)",
+        "Survey questions with an \"Other (please describe)\" choice now show a short \"Please describe\" text field while Other is chosen (both the /participate/ page and the shared #survey= link). The text is kept with the device draft, shown beside the Other choice on Review your answers, and saved with the response inside the existing answers JSON under \"_other\" ({ question id: text }, up to 500 characters) — no migration. Text typed under Other and then abandoned for another choice is dropped. Legacy / Lovable items (option code \"other\") get the field too. (#363)"
       ]
     }
   }
