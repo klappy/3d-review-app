@@ -42,6 +42,17 @@ export function memberList(esc, rows, { me = null, myEmail = '', actions = () =>
 /** True when some row (not you) has no name or email to show — the case NO_EMAIL_NOTE explains. */
 export const membersHidden = (rows = [], { me = null, myEmail = '' } = {}) => labelMembers(rows, { me, myEmail }).some(({ person }) => !person.you && !person.email);
 
+/** One-line label for a person: "Name · email" (or just the name). Never an id. */
+export const memberLabel = person => [person?.name, person?.email].filter(Boolean).join(' · ');
+
+/** Picker of the OTHER people on a roster (U18): options are labelled by name/email and valued by the grant row id,
+ *  never the principal id; the caller maps the chosen row back to its principal. No one else → `empty` sentence instead. */
+export function memberPicker(esc, rows, { me = null, myEmail = '', name = 'person', label = 'Person', attrs = '', empty = 'No one else has access yet.' } = {}) {
+  const others = labelMembers(rows, { me, myEmail }).filter(({ person }) => !person.you);
+  if (!others.length) return `<p class="small muted" data-member-picker-empty>${esc(empty)}</p>`;
+  return `<label class="field">${esc(label)}<select name="${esc(name)}" required data-member-picker ${attrs}>${others.map(({ row, person }) => `<option value="${esc(row.id)}">${esc(memberLabel(person))}</option>`).join('')}</select></label>`;
+}
+
 /** Read the signed-in account's email (same read the shell header uses). Resolves '' on any failure; never throws. */
 export async function readAccountEmail({ demo = false, fetchImpl = globalThis.fetch } = {}) {
   if (demo || typeof fetchImpl !== 'function' || !globalThis.location?.origin) return '';
