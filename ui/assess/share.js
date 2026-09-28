@@ -52,7 +52,7 @@ export function shareFor(state, aid, sid, epoch) {
 export function qrSvg(url) { const q = qrcode(0, 'M'); q.addData(url); q.make(); return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); }
 
 // B43: THE share card's actions — Copy link · QR code · Print, always in this order, one tap each. Used by the survey page
-// (prefix "share"), the launched screen and Collect (prefix "group", via groupLinks). Nothing here mints a link.
+// (prefix "share"), the launched screen and Collect (prefix "group", via groupLinks). Nothing here mints a link (Collect mints on render: mintOnRender, U48).
 // U45 (Bincy B43): no QR toggle. Once the card has a link its QR shows inline (`qrShown`) and the QR button is gone; before
 // that, "QR code" is the one tap that makes the link and shows the code.
 export function shareActions(ctx, { prefix, key = null, disabled = false, qrShown = false, primary = false }) {
@@ -280,12 +280,34 @@ export function bindGroupLinks(root, { resolve, clipboard = globalThis.navigator
     try { url = await resolve(key); } catch (e) { busy.delete(key); say(e?.shareMessage || 'The link could not be prepared. Try again, or sign in if your session has ended.', true); return; }
     busy.delete(key);
     if (!url) { say('The link could not be prepared. Try again.', true); return; }
-    // U45: once the row has its link the QR stays visible inline and the QR button goes (no toggle).
-    if (fig && fig.hidden) { fig.innerHTML = qrFigure(url); fig.hidden = false; row.querySelector('[data-group-qr]')?.remove?.(); }
+    showRowLink(row, url); // U45: once the row has its link the QR stays visible inline and the QR button goes (no toggle)
     if (isQr) { say(''); return; }
     if (isPrint) { try { printOnBody(doc, oneSheetHtml({ esc: escHtml }, { title: row.dataset?.printTitle, line: row.dataset?.printLine, url }), print); say(''); } catch { say('Printing did not open. Press Print again.', true); } return; }
     try { await clipboard.writeText(url); say(copy.copied); } catch { say(`Copy did not work. Select and copy: ${url}`, true); }
   }, signal ? { signal } : undefined);
+}
+
+// U45/U48: paint a row's link in place — QR inline, QR button gone, link text shown. Idempotent (a row already showing its QR is left alone).
+export function showRowLink(row, url) {
+  const fig = row?.querySelector?.('[data-group-qr-figure]');
+  if (fig && fig.hidden) { fig.innerHTML = qrFigure(url); fig.hidden = false; row.querySelector('[data-group-qr]')?.remove?.(); }
+}
+// U48 (B43, captain ruling 2026-09-28 14:42 ET k0013: "Mint the link on render so QR shows immediately"): Collect's share cards
+// mint their participant link when the card renders, so the QR is visible on first paint — no tap needed. U36 still holds:
+// resolve(key) goes through the same per-survey cache as the taps, so a survey whose link is already active (launch page, an
+// earlier Collect paint, the survey's Share card) reuses it and nothing new is issued; only a survey with no active link mints.
+// Runs in the background after paint; each result patches the row present at that moment (a repaint in between is fine: the
+// cache holds the link and the next paint renders it inline). A failure lands in the row's status, exactly as a tap's would.
+export function mintOnRender(root, { keys, resolve }) {
+  const rowFor = key => root?.querySelector?.(`[data-group-link="${String(key).replace(/["\\]/g, '\\$&')}"]`);
+  return Promise.all([...keys].map(async key => {
+    const say = (t, alert = false) => { const st = rowFor(key)?.querySelector?.('[data-group-status]'); if (st) { st.textContent = t; st.className = `small ${alert ? 'alert' : 'muted'}`; } };
+    let url;
+    try { url = await resolve(key); } catch (e) { say(e?.shareMessage || 'The link could not be prepared. Try again, or sign in if your session has ended.', true); return null; }
+    if (!url) { say('The link could not be prepared. Try again.', true); return null; }
+    const row = rowFor(key); if (row) showRowLink(row, url);
+    return url;
+  }));
 }
 
 // Collect: issue one participant link for a survey in one tap (dry_run → execute, the Share card's API pair). The token is
