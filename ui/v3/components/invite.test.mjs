@@ -49,3 +49,35 @@ test('token parser: same rule as the legacy parser (and this module never mounts
   const legacy = (await import('../../public-entry.js')).parseInvitationFragment;
   for (const h of ['#invite=SECRET_abc-12', '#invite=', '#invite=%ZZ', '#invite=abc&survey=def', '#invite=' + 'a'.repeat(4097), '#invite=abc%0A', '#survey=x']) assert.equal(parseInvitationFragment(h), legacy(h), h.slice(0, 40));
 });
+// S9 (B04 step c, captain 2026-09-28): the signed-in person's own invitations — accept by id, no token.
+import { pendingInvitations } from './invite.js';
+test('S9: pendingInvitations keeps only well-formed rows from GET /v2/me/invitations; anything else is []', () => {
+  const ok = { id: 'inv_1', scope: { type: 'project', id: 'p1' }, role: 'viewer', inviter_display_name: null, expires_at: '2026-10-05T00:00:00Z' };
+  assert.deepEqual(pendingInvitations({ invitations: [ok, null, { id: '' }, { id: 'inv_2', role: 'viewer' }, { id: 'inv_3', scope: { type: 'project' } }] }), [ok]);
+  for (const bad of [undefined, null, {}, { invitations: 'x' }, []]) assert.deepEqual(pendingInvitations(bad), []);
+});
+test('S9: the accept-first screen is one heading "Accept invitation", one line, one primary "Accept" — no ids, no token', () => {
+  const h = inviteView({ status: 'ready', kind: 'project', role: 'viewer', mine: true });
+  assert.equal((h.match(/<h1/g) || []).length, 1); assert.match(h, /<h1[^>]*>Accept invitation<\/h1>/);
+  assert.equal((h.match(/<p/g) || []).length, 1); assert.match(h, /You were invited to a project as a viewer\./);
+  assert.equal((h.match(/<button/g) || []).length, 1); assert.match(h, /class="rv-btn primary" data-invite-accept\s*>Accept<\/button>/);
+  assert.equal((h.match(/<a /g) || []).length, 0);
+  assert.doesNotMatch(h, /inv_|proj_|tok/);
+  assert.match(inviteView({ status: 'accepting', kind: 'project', role: 'viewer', mine: true }), /disabled>Accepting…<\/button>/);
+  // the link-token screen is unchanged
+  assert.match(inviteView({ status: 'ready', kind: 'project', role: 'viewer' }), /<h1[^>]*>You were invited<\/h1>[\s\S]*>Accept invitation<\/button>/);
+});
+test('S9: accept by invitationId posts to /v2/me/invitations/<id>/accept (dry run → execute with the confirm token); no token in any call', async () => {
+  const calls = [], root = fakeRoot(); let accepted = null, forgot = 0;
+  const api = async (url, o) => { calls.push([url, o.body]); return o.body.mode === 'dry_run' ? { impact: { affected: [{ scope: { type: 'project', id: 'p1' }, role: 'viewer' }] }, confirm_token: 'ct' } : { granted: true, scope: { type: 'project', id: 'p1' }, role: 'viewer' }; };
+  mountInvite(root, { api, invitationId: 'inv_1', forget: () => { forgot++; }, onAccepted: s => { accepted = s; } }); await tick();
+  assert.match(root.html, /Accept invitation/); assert.match(root.html, />Accept<\/button>/);
+  await root.handlers['data-invite-accept'](); await tick();
+  assert.deepEqual(calls, [['/v2/me/invitations/inv_1/accept', { mode: 'dry_run' }], ['/v2/me/invitations/inv_1/accept', { mode: 'execute', confirm_token: 'ct' }]]);
+  assert.deepEqual(accepted, { type: 'project', id: 'p1' }); assert.equal(forgot, 1);
+});
+test('S9: someone else\'s / withdrawn invitation (NOT_FOUND_OR_NOT_VISIBLE) → the plain refused screen', async () => {
+  const root = fakeRoot();
+  mountInvite(root, { api: async () => { throw Object.assign(new Error('invitation not found or not visible'), { code: 'NOT_FOUND_OR_NOT_VISIBLE' }); }, invitationId: 'inv_x' }); await tick();
+  assert.match(root.html, /Invitation not available/); assert.doesNotMatch(root.html, /NOT_FOUND|inv_x/);
+});

@@ -1,6 +1,6 @@
 import type { Ctx, Handler } from "./types";
 import { CapError, notVisible } from "./errors";
-import { gate, newId, nowIso, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
+import { gate, isOtherOption, newId, nowIso, OTHER_TEXT_KEY, OTHER_TEXT_MAX, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
 
 import { collecting, sharedSession, submitShared } from "./shared-link";
 import { RESPONDENT_FIELDS, groupFields, validateContext } from "../context-fields";
@@ -23,12 +23,12 @@ async function scopedSurvey(ctx: Ctx, requireOpen = false): Promise<ParticipantS
   return s;
 }
 
-function validateAnswers(items: TemplateItem[], value: unknown): Record<string, unknown> {
+export function validateAnswers(items: TemplateItem[], value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new CapError("INVALID_PARAMS", "answers must be an object");
   const answers = value as Record<string, unknown>;
   const normalized: Record<string, unknown> = {};
   const ids = new Set(items.map((i) => i.id));
-  for (const key of Object.keys(answers)) if (!ids.has(key)) throw new CapError("INVALID_PARAMS", `unknown answer item ${key}`);
+  for (const key of Object.keys(answers)) if (!ids.has(key) && key !== OTHER_TEXT_KEY) throw new CapError("INVALID_PARAMS", `unknown answer item ${key}`);
   for (const item of items) {
     const answer = answers[item.id];
     if (answer === undefined || answer === null || answer === "" || (item.type === "multi" && Array.isArray(answer) && answer.length === 0)) {
@@ -46,6 +46,23 @@ function validateAnswers(items: TemplateItem[], value: unknown): Record<string, 
     if (item.type === "multi" && Array.isArray(answer) && answer.length > 1 && item.options?.some((o) => o.flag === "exclusion" && answer.includes(o.code)))
       throw new CapError("INVALID_PARAMS", `exclusion choice cannot be combined for ${item.id}`);
     normalized[item.id] = answer;
+  }
+  // C01: optional "please describe" text, kept only for items whose chosen answer includes an Other option.
+  const other = answers[OTHER_TEXT_KEY];
+  if (other !== undefined && other !== null) {
+    if (typeof other !== "object" || Array.isArray(other)) throw new CapError("INVALID_PARAMS", "other text must be an object");
+    const kept: Record<string, string> = {};
+    for (const [id, text] of Object.entries(other as Record<string, unknown>)) {
+      const item = items.find((i) => i.id === id);
+      if (!item || (item.type !== "single" && item.type !== "multi") || !item.options?.some(isOtherOption))
+        throw new CapError("INVALID_PARAMS", `unknown other-text item ${id}`);
+      if (typeof text !== "string" || text.length > OTHER_TEXT_MAX) throw new CapError("INVALID_PARAMS", `invalid other text for ${id}`);
+      const chosen = normalized[id], codes = Array.isArray(chosen) ? chosen : chosen == null ? [] : [chosen];
+      const trimmed = text.trim();
+      if (!trimmed || !item.options.some((o) => isOtherOption(o) && codes.includes(o.code))) continue; // Other not chosen → dropped
+      kept[id] = trimmed;
+    }
+    if (Object.keys(kept).length) normalized[OTHER_TEXT_KEY] = kept;
   }
   return normalized;
 }

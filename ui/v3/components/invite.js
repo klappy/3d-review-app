@@ -14,8 +14,17 @@ const KIND = { workspace: 'a workspace', project: 'a project', assessment: 'an a
 const ROLE = { viewer: 'a viewer', member: 'a member', owner: 'an owner' };
 const panel = (h1, line, actions = '') => `<section class="glass panel narrow" data-invite style="max-width:520px;margin:32px auto 0"><h1 style="font-size:27px">${h1}</h1><p class="muted" data-invite-line>${line}</p>${actions ? `<div class="actions">${actions}</div>` : ''}</section>`;
 const home = '<a class="rv-btn" href="#projects">Go to your projects</a>';
+// B04 step c (captain ruling 2026-09-28 15:27 ET k0015; captain 16:03 ET "ships tonight"): the signed-in person's own pending
+// invitations (GET /v2/me/invitations, matched server-side by hashed email — no token ever reaches the client). Pure: keeps only
+// well-formed rows, oldest first as the server sent them. Anything else → [] (the existing landing stands).
+export function pendingInvitations(result) {
+  const rows = Array.isArray(result?.invitations) ? result.invitations : [];
+  return rows.filter(i => i && typeof i.id === 'string' && i.id && i.scope && typeof i.scope.type === 'string' && typeof i.role === 'string');
+}
 // Pure: one state → one screen. States: loading · ready {kind, role} · accepting · signin · used · expired · refused · failed · missing.
+// `mine: true` (accept by invitation id, after sign-in): one heading "Accept invitation", one line, one primary "Accept".
 export function inviteView(m = {}) {
+  if (m.mine && (m.status === 'ready' || m.status === 'accepting')) return panel('Accept invitation', `You were invited to ${KIND[m.kind] || 'shared work'} as ${ROLE[m.role] || 'a collaborator'}.`, `<button type="button" class="rv-btn primary" data-invite-accept ${m.status === 'accepting' ? 'disabled' : ''}>${m.status === 'accepting' ? 'Accepting…' : 'Accept'}</button>`);
   switch (m.status) {
     case 'ready': case 'accepting': return panel('You were invited', `You were invited to ${KIND[m.kind] || 'shared work'} as ${ROLE[m.role] || 'a collaborator'}.`, `<button type="button" class="rv-btn primary" data-invite-accept ${m.status === 'accepting' ? 'disabled' : ''}>${m.status === 'accepting' ? 'Accepting…' : 'Accept invitation'}</button>`);
     case 'signin': return panel('Sign in to accept', 'Sign in with the email address that was invited; you come back here after signing in.', '<a class="rv-btn primary" href="/v2/auth/access" data-invite-signin>Sign in with an email code</a>');
@@ -38,18 +47,21 @@ export function inviteFailure(e) {
 }
 // Controller: dry run (what was shared) → Accept (execute with the dry run's confirm token) → onAccepted(scope). `forget()` clears the
 // stored token. `isCurrent()` guards every paint so a later route never receives this page's result.
-export function mountInvite(root, { api, token, forget = () => {}, onAccepted = () => {}, isCurrent = () => true }) {
+// `invitationId` (B04 step c) instead of `token`: the signed-in invitee accepts by id — POST /v2/me/invitations/{id}/accept, the same
+// cap.grant.accept with the same dry run → confirm → execute; the server checks the caller's email against the invitation.
+export function mountInvite(root, { api, token, invitationId, forget = () => {}, onAccepted = () => {}, isCurrent = () => true }) {
+  const mine = !token && typeof invitationId === 'string' && !!invitationId;
   let m = { status: 'loading' }, confirm = null;
-  const url = `/v2/invitations/${encodeURIComponent(token)}/accept`;
+  const url = mine ? `/v2/me/invitations/${encodeURIComponent(invitationId)}/accept` : `/v2/invitations/${encodeURIComponent(token)}/accept`;
   const paint = () => { if (!isCurrent()) return; root.innerHTML = inviteView(m); root.querySelector('[data-invite-accept]')?.addEventListener('click', accept); root.querySelector('[data-invite-retry]')?.addEventListener('click', load); };
-  const fail = e => { const status = inviteFailure(e); if (status !== 'failed' && status !== 'signin') forget(); m = { status, message: status === 'failed' ? 'Something went wrong. Try again.' : '' }; paint(); };
+  const fail = e => { const status = inviteFailure(e); if (status !== 'failed' && status !== 'signin') forget(); m = { status, mine, message: status === 'failed' ? 'Something went wrong. Try again.' : '' }; paint(); };
   async function load() {
     m = { status: 'loading' }; confirm = null; paint();
     try {
       const r = await api(url, { method: 'POST', body: { mode: 'dry_run' } }); if (!isCurrent()) return;
       const eff = r?.impact?.affected?.[0];
       if (typeof r?.confirm_token !== 'string' || !eff?.scope?.type) throw Object.assign(new Error('Unexpected answer'), { code: 'BAD_RESULT' });
-      confirm = r.confirm_token; m = { status: 'ready', kind: eff.scope.type, role: eff.role }; paint();
+      confirm = r.confirm_token; m = { status: 'ready', kind: eff.scope.type, role: eff.role, mine }; paint();
     } catch (e) { if (isCurrent()) fail(e); }
   }
   async function accept() {

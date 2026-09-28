@@ -151,11 +151,23 @@ export const revoke_invitation: Handler = async (ctx, p) => {
   return { result: { id, status: "revoked" }, scope };
 };
 
-/** E: accepting releases the grant — disclosure of scope contents begins. */
+/** Scopes a collaborator invitation can name. Survey (participant) invitations carry no invitee and are never listed or accepted here. */
+const GRANT_SCOPES = ["workspace", "project", "assessment"] as const;
+const LIVE_STATUSES = ["pending", "sent", "unconfirmed"] as const;
+
+/** E: accepting releases the grant — disclosure of scope contents begins.
+ *  Two ways to name the invitation (B04 step c, captain ruling 2026-09-28 15:27 ET k0015):
+ *  - `token` — the mailed link token (unchanged);
+ *  - `invitation_id` — for the signed-in invitee who never opened the link (listed by cap.me.invitations). No token: the
+ *    authenticated principal's email hash must equal the invitation's invitee_hash — the SAME check the token path makes.
+ *  Every miss (unknown id, survey invitation, revoked, someone else's) is the same NOT_FOUND_OR_NOT_VISIBLE: unauthorized == nonexistent. */
 export const accept: Handler = async (ctx, p, o) => {
   if (ctx.principal.kind !== "user") throw new CapError("NOT_AUTHENTICATED", "sign in to accept an invitation");
-  const token = reqStr(p, "token");
-  const inv = await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash FROM invitation WHERE token_hash = ?").bind(await sha256(token)).first<any>();
+  const byId = typeof p.invitation_id === "string" && p.invitation_id.length > 0;
+  if (byId && p.token !== undefined) throw new CapError("INVALID_PARAMS", "name the invitation by token or by invitation_id, not both", "the link path uses token; the signed-in path (cap.me.invitations) uses invitation_id", "cap.grant.accept");
+  const inv = byId
+    ? await ctx.db.prepare(`SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash FROM invitation WHERE id = ? AND scope_type IN (${GRANT_SCOPES.map(() => "?").join(",")})`).bind(p.invitation_id as string, ...GRANT_SCOPES).first<any>()
+    : await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash FROM invitation WHERE token_hash = ?").bind(await sha256(reqStr(p, "token"))).first<any>();
   // 'unconfirmed' is accepted like 'sent'. Acceptance is permitted by token possession PLUS the authenticated principal's
   // email matching the invitee (checked below) — possession does not establish the delivery channel or inbox arrival
   // (a DEV manual handoff path exists), so it is never treated as proof that mail was delivered.
@@ -176,6 +188,22 @@ export const accept: Handler = async (ctx, p, o) => {
     ctx.db.prepare("UPDATE invitation SET status = 'accepted', accepted_at = ? WHERE id = ?").bind(nowIso(ctx), inv.id),
   ]);
   return { result: { granted: true, scope, role }, scope, impact };
+};
+
+/** cap.me.invitations (B04 step c): the signed-in person's pending collaborator invitations, matched by their hashed email.
+ *  Returns what the invitee may know before accepting — scope (type + id), role, expiry, inviter display name — never the
+ *  token (nor its hash), never the invitee hash, never scope contents. The inviter display name is null: principals store no
+ *  name (migrations/0001_init.sql principal has email_hash only). Anyone else's invitations are simply not in the list. */
+export const mine: Handler = async (ctx) => {
+  if (ctx.principal.kind !== "user") throw new CapError("NOT_AUTHENTICATED", "sign in to see invitations addressed to you");
+  const me = await ctx.db.prepare("SELECT email_hash FROM principal WHERE id = ?").bind(ctx.principal.id).first<{ email_hash: string | null }>();
+  if (!me?.email_hash) return { result: { invitations: [] } };
+  const r = await ctx.db.prepare(`SELECT id, scope_type, scope_id, role, status, created_at, expires_at FROM invitation
+      WHERE invitee_hash = ? AND scope_type IN (${GRANT_SCOPES.map(() => "?").join(",")}) AND status IN (${LIVE_STATUSES.map(() => "?").join(",")})
+        AND (expires_at IS NULL OR expires_at > ?) ORDER BY created_at, id`)
+    .bind(me.email_hash, ...GRANT_SCOPES, ...LIVE_STATUSES, nowIso(ctx)).all<{ id: string; scope_type: string; scope_id: string; role: string; status: string; created_at: string; expires_at: string | null }>();
+  const invitations = r.results.map((i) => ({ id: i.id, scope: { type: i.scope_type, id: i.scope_id }, role: i.role, inviter_display_name: null, invited_at: i.created_at, expires_at: i.expires_at }));
+  return { result: { invitations } };
 };
 
 export const list: Handler = async (ctx, p) => {
@@ -230,7 +258,7 @@ export const transfer_owner: Handler = async (ctx, p, o) => {
 };
 
 export const handlers: Record<string, Handler> = {
-  "cap.grant.invite": invite, "cap.grant.revoke_invitation": revoke_invitation, "cap.grant.accept": accept, "cap.grant.list": list,
+  "cap.grant.invite": invite, "cap.grant.revoke_invitation": revoke_invitation, "cap.grant.accept": accept, "cap.grant.list": list, "cap.me.invitations": mine,
   "cap.grant.update_role": update_role, "cap.grant.revoke": revoke, "cap.grant.transfer_owner": transfer_owner,
 };
 void countScalar; void atLeast; void scopeExists;

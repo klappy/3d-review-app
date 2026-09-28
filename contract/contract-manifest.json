@@ -130,7 +130,8 @@
         "cap.grant.update_role",
         "cap.grant.revoke",
         "cap.grant.transfer_owner",
-        "cap.request.create"
+        "cap.request.create",
+        "cap.me.invitations"
       ],
       "state": "open",
       "frozen_sha": null,

@@ -39,3 +39,33 @@ test('B-09: receipt line is a short reference and a local date, never the raw id
   assert.equal(receiptLine({ response_id: 'resp_ab12cd34ef' }), 'Reference AB12CD34');
   assert.equal(receiptLine({ response_id: 'practice-only-not-saved', submitted_at: 'Demonstration — not sent' }), 'practice-only-not-saved · Demonstration — not sent');
 });
+
+// C01: select Other → type → Review answers shows the text.
+test('C01 review shows the Other description beside the Other label', async () => {
+  const { isOtherOption, choseOther, otherFieldName, OTHER_TEXT_KEY } = await import('./present.js');
+  const item = { id: 'CHCP-Q1', type: 'single', options: [{ code: 'a', text: 'Approach A' }, { code: 'other', text: 'Other (please describe)', other: true }] };
+  assert.equal(OTHER_TEXT_KEY, '_other');
+  assert.equal(otherFieldName('CHCP-Q1'), 'CHCP-Q1::other');
+  assert.equal(isOtherOption({ code: 'other' }), true); // legacy / Lovable items
+  assert.equal(isOtherOption({ code: 'o9', other: true }), true);
+  assert.equal(choseOther(item, 'other'), true);
+  assert.equal(choseOther(item, 'a'), false);
+  assert.equal(reviewAnswer(item, 'other', '  Oral drafting first '), 'Other (please describe): Oral drafting first');
+  assert.equal(reviewAnswer(item, 'other'), 'Other (please describe)');
+  assert.equal(reviewAnswer(item, 'a', 'ignored'), 'Approach A');
+  assert.equal(reviewAnswer({ ...item, type: 'multi' }, ['a', 'other'], 'Elders'), 'Approach A; Other (please describe): Elders');
+});
+
+test('C01 collectOther keeps text only for items answered with Other; drafts keep it', async () => {
+  const { collectOther } = await import('./present.js');
+  const { draftFor, restoreDraft } = await import('./shared-link.js');
+  const items = [{ id: 'Q1', type: 'single', options: [{ code: 'a' }, { code: 'other', other: true }] }, { id: 'Q2', type: 'single', options: [{ code: 'b' }, { code: 'other' }] }];
+  const fd = new Map([['Q1::other', ' Elders '], ['Q2::other', 'stale']]);
+  assert.deepEqual(collectOther(items, fd, { Q1: 'other', Q2: 'b' }), { Q1: 'Elders' });
+  assert.equal(collectOther(items, fd, { Q1: 'a', Q2: 'b' }), null);
+  const form = { template: { id: 't', version: 1 }, items };
+  const draft = draftFor(form, { Q1: 'other', Q2: null, _other: { Q1: 'Elders' } });
+  assert.deepEqual(draft.answers._other, { Q1: 'Elders' });
+  const store = new Map([['draft', JSON.stringify({ ...draft, answers: { ...draft.answers, _other: { Q1: 'Elders', GONE: 'x' } } })]]);
+  assert.deepEqual(restoreDraft({ get: k => store.get(k), remove: k => store.delete(k) }, form).answers._other, { Q1: 'Elders' });
+});

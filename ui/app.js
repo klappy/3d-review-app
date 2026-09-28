@@ -6,7 +6,7 @@ import { mountEntityScreen } from './entity-screen.js';
 import { mountLensSurveys } from './lens-surveys.js';
 import { loadRoleHelp, loadBlankPrint, renderAssessmentHeadrow, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
 import { initLanguageControls } from './language.js';
-import { reviewAnswer, templateChoices, receiptLine } from './present.js';
+import { reviewAnswer, templateChoices, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from './present.js';
 import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
 import { renderList, renderReport, upsertRow } from './report-view.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
@@ -275,7 +275,7 @@ function drawQuestion(item) {
   if (item.type === 'scale') { const input = document.createElement('input'); input.name = item.id; input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'text') { const input = document.createElement('textarea'); input.name = item.id; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'single' || item.type === 'multi') {
-    for (const opt of item.options || []) { const label = document.createElement('label'); const input = document.createElement('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = opt.code; input.required = item.type === 'single' && item.required !== false; label.append(input, document.createTextNode(opt.label || opt.text || opt.code)); field.append(label); }
+    for (const opt of item.options || []) { const label = document.createElement('label'); const input = document.createElement('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = opt.code; input.required = item.type === 'single' && item.required !== false; label.append(input, document.createTextNode(opt.label || opt.text || opt.code)); field.append(label); if (isOtherOption(opt)) field.append(otherBox(document, item)); } // C01
     if (item.type === 'multi' && (item.options || []).some(opt => opt.exclusive)) { const note = document.createElement('p'); note.textContent = 'An exclusion choice cannot be combined with any other choice.'; field.append(note); }
   } else { const warning = document.createElement('p'); warning.textContent = `Unsupported item type ${item.type}; cannot submit.`; field.append(warning); }
   return field;
@@ -292,6 +292,7 @@ function answersFromForm() {
     if (item.type === 'multi' && Array.isArray(value) && value.length > 1 && (item.options || []).some(opt => opt.exclusive && value.includes(opt.code))) throw new Error(`An exclusion choice cannot be combined: ${item.text || item.id}`);
     answers[item.id] = value;
   }
+  const other = collectOther(state.form.items, values, answers); if (other) answers[OTHER_TEXT_KEY] = other; // C01
   return answers;
 }
 bindForm('request-login', 'Requesting local code…', async fd => {
@@ -550,6 +551,7 @@ async function loadForm() {
 function draftValues() {
   const values = new FormData($('answers')); const out = {};
   for (const item of state.form.items) { const v = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id); if (v !== null) out[item.id] = v; }
+  const other = collectOther(state.form.items, values, out); if (other) out[OTHER_TEXT_KEY] = other; // C01
   return out;
 }
 function restoreSharedDraft() {
@@ -557,9 +559,12 @@ function restoreSharedDraft() {
   if (!draft) return;
   if (draft.mismatch) { state.sharedStore.remove('draft'); text($('participant-resume'), sharedCopy.draftMismatch); return; }
   for (const item of state.form.items) { const v = draft.answers[item.id]; if (v == null) continue; for (const input of $('answers').querySelectorAll(`[name="${CSS.escape(item.id)}"]`)) { if (input.type === 'checkbox') input.checked = v.includes(input.value); else if (input.type === 'radio') input.checked = input.value === v; else input.value = v; } }
+  for (const box of $('answers').querySelectorAll('input[data-other-for]')) { const t = draft.answers[OTHER_TEXT_KEY]?.[box.dataset.otherFor]; if (typeof t === 'string') box.value = t; } // C01
+  syncOtherBoxes($('answers'), state.form.items);
   text($('participant-resume'), sharedCopy.draftRestored);
 }
 $('answers').addEventListener('input', () => { if (state.shared && state.form) saveDraft(state.sharedStore, state.form, draftValues()); });
+$('answers').addEventListener('change', () => { if (state.form) syncOtherBoxes($('answers'), state.form.items); }); // C01: show "Please describe" only while Other is chosen
 async function restoreParticipant() {
   // A failed first receipt request must leave the saved session recoverable.
   $('recover').hidden = false;
@@ -581,7 +586,7 @@ async function restoreParticipant() {
 }
 bindForm('answers', 'Preparing answer review…', async () => {
   state.answers = answersFromForm(); $('review-answers').replaceChildren();
-  for (const item of state.form.items) { const p = document.createElement('p'); p.textContent = `${item.text || item.id}: ${reviewAnswer(item, state.answers[item.id])}`; $('review-answers').append(p); }
+  for (const item of state.form.items) { const p = document.createElement('p'); p.textContent = `${item.text || item.id}: ${reviewAnswer(item, state.answers[item.id], state.answers[OTHER_TEXT_KEY]?.[item.id])}`; $('review-answers').append(p); }
   $('answers').hidden = true; $('review').hidden = false;
   participantView?.showReview();
 });
