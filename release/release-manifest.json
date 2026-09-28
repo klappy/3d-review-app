@@ -1,27 +1,31 @@
 {
-  "version": "0.21.6",
+  "version": "0.22.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "a32c87c6c205e9164a74eb31cbf5769395f21d40",
+  "cookbook_commit": "bdaae74de1577cd2e73a0a725747567ca64618fa",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.21.6.md",
-      "blob_sha": "e36505bb08543dc75f23d54f3e6e8d4f3603c117",
-      "sha256": "ef4f806c73d0a90ce589b8fcde07b87314df43e668f24b5782c12cab65aa7024"
+      "path": "planning/2026-09-16-parity-build/releases/0.22.2.md",
+      "blob_sha": "5de1f30ffec749c36c91edc1e884fa0425d6cfdc",
+      "sha256": "ecc94044aae727271079881034c08c329e0197fe7e12ae7a71d845034af42009"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "35476c6625c0749feeb4ac43b3f6b561d59b31eb",
-      "sha256": "c658e56526ef4c22bef8553a002e15c6e058875c3f32326579147bdc4e414eb8"
+      "blob_sha": "e41bf6491a19fa8bfa9013f90bc6334fa860877d",
+      "sha256": "fb94918a99aa2da2959a30bc3f6d49f5b3e505896e4df690ad1b2e32ef4c518c"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
-      "changed": [
-        "Sign in by email link: enter your email, open the link we send (it works for 30 minutes, on any device) — no more one-time PIN; DEV only, behind MAGIC_LINK — production keeps Cloudflare Access. Signing out clears the session cookie with the same protections it was set with (HttpOnly, Secure, SameSite=Lax), in every environment (Bincy B38) (#305)",
-        "/roadmap shows the versions list only; stale work-item feed removed (captain 18:20) (#307)"
+      "added": [
+        "`GET /v2/me/invitations` (`cap.me.invitations`, read): the signed-in person's pending invitations, matched by their hashed email — scope, role, expiry and an inviter display name (always empty for now: no names are stored). Never the invitation token. (#365)"
       ],
-      "fixed": []
+      "changed": [
+        "`cap.grant.accept` also accepts `invitation_id` instead of the link token (HTTP: `POST /v2/me/invitations/{invitation_id}/accept`), only when the signed-in person's email is the invited one; anything else answers exactly like a missing invitation. The link-token path is unchanged. (#365)"
+      ],
+      "fixed": [
+        "Someone an owner invited who simply signs in on the site (without opening the invitation email) now lands on an \"Accept invitation\" screen first — one heading, one line, one \"Accept\" — instead of an empty home. With nothing pending, sign-in lands as before (one project → that project; several → the projects list). Captain ruling 2026-09-28 15:27 ET (k0015) \"Add GET /v2/me/invitations + accept by invitee identity\"; B04 step (c). (#365)",
+        "Survey questions with an \"Other (please describe)\" choice now show a short \"Please describe\" text field while Other is chosen (both the /participate/ page and the shared #survey= link). The text is kept with the device draft, shown beside the Other choice on Review your answers, and saved with the response inside the existing answers JSON under \"_other\" ({ question id: text }, up to 500 characters) — no migration. Text typed under Other and then abandoned for another choice is dropped. Legacy / Lovable items (option code \"other\") get the field too. (#363)"
+      ]
     }
   }
 }

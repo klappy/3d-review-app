@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { render, bind, shareFor, blankShare, copy, qrSvg, invitationSheetHtml, CAN_SHARE, css } from './share.js';
+import { render, bind, shareFor, blankShare, copy, qrSvg, invitationSheetHtml, CAN_SHARE, css, rememberLink } from './share.js';
 
 const read = n => readFileSync(fileURLToPath(new URL(n, import.meta.url)), 'utf8');
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -44,10 +44,10 @@ test('Share prepares only; Copy confirms issuance and delivers, then QR/print re
   await m.click('data-share-copy');
   assert.deepEqual(m.calls[1].body, { params: {}, mode: 'execute', confirm_token: 'ct1' });
   assert.equal(m.share.confirm, null, 'confirm token is single-use'); assert.equal(m.share.link.url, 'https://example.test/#survey=SECRET'); assert.equal(m.share.link.id, 'inv_1');
-  assert.match(m.root.html, /Keep a copy of this link/); assert.match(m.root.html, /data-share-copy/); assert.match(m.root.html, /data-share-qr/); assert.match(m.root.html, /data-share-print/); assert.match(m.root.html, /data-share-revoke/);
+  assert.match(m.root.html, /Keep a copy of this link/); assert.match(m.root.html, /data-share-copy/); assert.doesNotMatch(m.root.html, /data-share-qr(?!-figure)/, 'U45: no QR toggle once the link exists'); assert.match(m.root.html, /data-share-qr-figure/); assert.match(m.root.html, /data-share-print/); assert.match(m.root.html, /data-share-revoke/);
   assert.doesNotMatch(m.root.html, /link_token|inv_1/, 'the raw token field and link id are never rendered');
   await m.click('data-share-copy'); assert.equal(m.clipboard.text, 'https://example.test/#survey=SECRET'); assert.match(m.root.html, /Link copied/);
-  await m.click('data-share-qr'); assert.match(m.root.html, /<svg/); assert.match(m.root.html, /Hide QR code/);
+  assert.match(m.root.html, /<svg/); assert.doesNotMatch(m.root.html, /Hide QR code/); // U45: the QR is inline, never behind a toggle
   await m.click('data-share-print'); assert.equal(m.calls.length, 2, 'output retries never reissue'); assert.equal(m.prints.length, 1); assert.deepEqual(m.sheets.map(s => typeof s === 'string' ? s : 'mounted'), ['mounted', 'removed'], 'sheet mounted on body for print then removed');
 });
 
@@ -97,7 +97,7 @@ test('QR or print can be the first outcome; each explicitly confirms only once',
     const m = mount('owner', {[LINKS]:good});
     await m.click('data-share-open'); await m.click(action);
     assert.equal(m.calls.length, 2); assert.equal(m.calls[1].body.mode, 'execute');
-    assert.equal(action === 'data-share-qr' ? m.share.qr : m.prints.length, action === 'data-share-qr' ? true : 1);
+    if (action === 'data-share-qr') { assert.match(m.root.html, /data-share-qr-figure><svg/); assert.equal('qr' in m.share, false, 'U45: no QR toggle state'); } else assert.equal(m.prints.length, 1);
   }
 });
 test('copy rejection preserves link; close/reopen and another copy never issue a second link', async () => {
@@ -178,7 +178,7 @@ test('B36 groupLinks: one labelled row per group (group · survey), Copy + QR as
   const h = groupLinks(ctx, [{ key: 's1', group: 'Translation team', survey: 'Validation', url: 'https://x/participate/#survey=T1' }, { key: 's2', group: 'Community', survey: 'Listening' }]);
   assert.equal((h.match(/data-group-link=/g) || []).length, 2);
   assert.match(h, /Translation team <span aria-hidden="true">·<\/span> Validation/); assert.match(h, /Community <span aria-hidden="true">·<\/span> Listening/);
-  assert.equal((h.match(/data-group-copy=/g) || []).length, 2); assert.equal((h.match(/data-group-qr=/g) || []).length, 2);
+  assert.equal((h.match(/data-group-copy=/g) || []).length, 2); assert.equal((h.match(/data-group-qr=/g) || []).length, 1); assert.equal((h.match(/<svg/g) || []).length, 1); // U45: a row with its link shows its QR inline, no QR button
   assert.match(h, new RegExp(`>${copy.copyLink}<`)); assert.match(h, new RegExp(`>${copy.qr}<`));
   assert.doesNotMatch(h, /class="primary"/);
 });
@@ -191,7 +191,7 @@ function fakeRow(key) {
   copyBtn.closest = sel => sel === '[data-group-link]' ? row : copyBtn; qrBtn.closest = sel => sel === '[data-group-link]' ? row : qrBtn;
   return { status, fig, copyBtn, qrBtn };
 }
-test('B36 bindGroupLinks: Copy copies that group\'s link in one tap; QR shows and hides that group\'s code', async () => {
+test('B36/U45 bindGroupLinks: Copy copies that group\'s link in one tap; the QR then stays visible inline (no toggle)', async () => {
   const { bindGroupLinks } = await import('./share.js');
   let handler; const root = { addEventListener: (ev, fn) => { handler = fn; } };
   const clipboard = { text: null, async writeText(t) { this.text = t; } };
@@ -200,10 +200,10 @@ test('B36 bindGroupLinks: Copy copies that group\'s link in one tap; QR shows an
   const r2 = fakeRow('s2');
   await handler({ target: r2.copyBtn });
   assert.equal(clipboard.text, urls.s2); assert.equal(r2.status.textContent, copy.copied); assert.deepEqual(asked, ['s2']);
-  await handler({ target: r2.qrBtn });
-  assert.equal(r2.fig.hidden, false); assert.match(r2.fig.innerHTML, /<svg/); assert.equal(r2.qrBtn.textContent, copy.hideQr);
-  await handler({ target: r2.qrBtn });
-  assert.equal(r2.fig.hidden, true); assert.equal(r2.qrBtn.textContent, copy.qr);
+  assert.equal(r2.fig.hidden, false); assert.match(r2.fig.innerHTML, /<svg/);
+  const r1 = fakeRow('s1'); await handler({ target: r1.qrBtn });
+  assert.equal(r1.fig.hidden, false); assert.match(r1.fig.innerHTML, /<svg/);
+  await handler({ target: r1.qrBtn }); assert.equal(r1.fig.hidden, false, 'a second tap never hides the QR');
   const bad = fakeRow('s9'); await handler({ target: bad.copyBtn });
   assert.match(bad.status.className, /alert/);
 });
@@ -215,7 +215,7 @@ test('B36 issueLink: one tap = dry_run then execute on that survey; returns the 
   assert.deepEqual(calls.map(c => c.body.mode), ['dry_run', 'execute']); assert.equal(calls[1].body.confirm_token, 'ct1');
   assert.equal(link.id, 'inv_1'); assert.match(link.url, /^https:\/\/example\.test\/.*#survey=TOK$/);
   const src = read('./assess.js');
-  assert.match(src, /share\.groupLinks\(\{ esc \}, \[\{ key: s\.id, title: s\.template_name, line: whoLine\(g\.lens\) \|\| g\.lens \}\]\)/);
+  assert.match(src, /share\.groupLinks\(\{ esc \}, \[\{ key: s\.id, title: s\.template_name, line: whoLine\(g\.lens\) \|\| g\.lens, url: share\.knownLink\(state\.collectLinks, share\.linkKey\(a\.id, s\.id\)\)\?\.url \}\]\)/);
   assert.match(src, /share\.bindGroupLinks\(root/); assert.match(src, /share\.issueLink\(api/); assert.match(src, /state\.collectLinks\.clear\(\)/);
   assert.doesNotMatch(src.slice(src.indexOf('function bindCollectLinks'), src.indexOf('function collectPanel')), /localStorage|sessionStorage|console\./);
 });
@@ -313,4 +313,52 @@ test('U36: the survey Share card and Collect share one link per survey; the card
   const c = new Map(); const l = await cachedLink(c, key, async () => ({ id: 'inv_2', url: 'U2' })); assert.equal(knownLink(c, key), l, 'a Collect-issued link is readable by the card');
   rememberLink(c, key, { id: 'inv_3', url: 'U3' }); assert.equal((await cachedLink(c, key, async () => ({ url: 'X' }))).url, 'U3');
   c.set(key, { uncertain: true }); assert.equal(knownLink(c, key), null);
+});
+
+test('U36: two consecutive views of a survey reuse the same active link (launch → Collect → survey page); new only when none is active', async () => {
+  const { issueLink, cachedLink, knownLink, linkKey, rememberLaunchLink } = await import('./share.js');
+  let issued = 0;
+  const { api } = fakeApi({ [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300 } : { link_id: `inv_${++issued}`, entry_fragment: `#survey=TOK${issued}`, expires_at: null } });
+  const cache = new Map(), k = linkKey('a1', 's1'), issue = () => issueLink(api, { aid: 'a1', sid: 's1', origin: 'https://example.test' });
+  assert.equal(k, 'a1|s1'); // no data epoch in the key: navigating away and back, or a refetch, keeps the survey's link
+  const first = await cachedLink(cache, k, issue);   // view 1 (Collect: Copy)
+  const second = await cachedLink(cache, k, issue);  // view 2 (Collect again after leaving the page)
+  assert.equal(issued, 1); assert.equal(second.url, first.url); assert.equal(knownLink(cache, k).id, 'inv_1'); // view 3 (survey page)
+  // the launch page's link is the survey's active link: Collect and the survey page reuse it and issue nothing
+  const launched = new Map();
+  rememberLaunchLink(launched, 'a1', { id: 'inv_L', survey: 's1', entry_fragment: '#survey=LAUNCH', expires_at: null }, 'https://example.test');
+  assert.match((await cachedLink(launched, k, issue)).url, /#survey=LAUNCH$/); assert.equal(knownLink(launched, k).id, 'inv_L'); assert.equal(issued, 1);
+  rememberLaunchLink(launched, 'a1', { id: 'bad', survey: 's2', entry_fragment: 'nope' }); assert.equal(launched.has(linkKey('a1', 's2')), false);
+  // an expired link is not active: the next view issues a fresh one
+  const old = new Map(); rememberLink(old, k, { id: 'inv_old', url: 'https://example.test/#survey=OLD', expires_at: '2020-01-01T00:00:00.000Z' });
+  assert.equal(knownLink(old, k), null); assert.equal((await cachedLink(old, k, issue)).id, 'inv_2');
+  // the survey page's Share card delivers the already-active link without a new execute
+  const links = new Map(); rememberLink(links, k, first); // issued meanwhile on Collect
+  const m = mount('owner', { [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300 } : { link_id: 'inv_X', entry_fragment: '#survey=X', expires_at: null } }, {}, { links, linkKey: k });
+  await m.click('data-share-open'); await m.click('data-share-copy');
+  assert.equal(m.clipboard.text, first.url); assert.equal(m.calls.filter(c => c.body?.mode === 'execute').length, 0);
+});
+
+test('U48 (B43 ruling k0013): Collect mints the participant link on render and shows the QR at once; an active link is reused, not re-minted', async () => {
+  const { mintOnRender, cachedLink, issueLink, rememberLink, knownLink, linkKey, groupLinks } = await import('./share.js');
+  const { api, calls } = fakeApi({ [LINKS]: ({ body }) => body.mode === 'dry_run' ? prepared : { link_id: 'inv_R', entry_fragment: '#survey=RENDER', expires_at: null } });
+  const cache = new Map(); const rows = { s1: fakeRow('s1'), s2: fakeRow('s2') };
+  const root = { querySelector: sel => { const m = /\[data-group-link="(.+)"\]/.exec(sel); return m ? { querySelector: s => rows[m[1]][s === '[data-group-status]' ? 'status' : 'fig'] } : null; } };
+  rememberLink(cache, 's2', { id: 'inv_L', url: 'https://example.test/#survey=LAUNCH' }); // s2 already has an active link (U36)
+  const resolve = k => cachedLink(cache, k, () => issueLink(api, { aid: 'a1', sid: k, origin: 'https://example.test' })).then(l => l.url);
+  const urls = await mintOnRender(root, { keys: ['s1', 's2'], resolve });
+  assert.equal(calls.filter(c => c.body.mode === 'execute').length, 1, 'only the survey without a link mints');
+  assert.match(urls[0], /^https:\/\/example\.test\/#survey=/); assert.equal(urls[1], 'https://example.test/#survey=LAUNCH');
+  for (const k of ['s1', 's2']) { assert.equal(rows[k].fig.hidden, false, `${k}: QR visible without a tap`); assert.match(rows[k].fig.innerHTML, /<svg/); }
+  assert.equal(knownLink(cache, 's1').url, urls[0], 'the minted link is the one Copy/Print/the Share card reuse');
+  // a paint that already knows the link renders the QR inline with no QR button (U45)
+  const html = groupLinks({ esc: v => String(v) }, [{ key: 's1', url: urls[0] }]);
+  assert.match(html, /<svg/); assert.doesNotMatch(html, /data-group-qr=/);
+  // a certain failure lands in the row status, never throws out of the paint
+  const bad = new Map(); const r3 = { s3: fakeRow('s3') };
+  const root3 = { querySelector: () => ({ querySelector: s => r3.s3[s === '[data-group-status]' ? 'status' : 'fig'] }) };
+  await mintOnRender(root3, { keys: ['s3'], resolve: k => cachedLink(bad, k, async () => { throw Object.assign(new Error('x'), { uncertain: false }); }) });
+  assert.match(r3.s3.status.className, /alert/); assert.equal(r3.s3.fig.hidden, true);
+  const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  assert.match(src.slice(src.indexOf('function bindCollectLinks'), src.indexOf('function collectPanel')), /mintOnRender/, 'Collect wires mint-on-render');
 });

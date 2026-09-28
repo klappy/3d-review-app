@@ -24,6 +24,11 @@ export async function roleAt(ctx: Ctx, scope: { type: ScopeType; id: string }): 
 
 const RANK: Record<Role, number> = { viewer: 1, member: 2, owner: 3 };
 
+/** Minimum grant role a scoped matrix row needs. The one role table: authorize enforces it, docs projects it. */
+export const requiredRole = (roles: string): Role =>
+  roles.startsWith("O, M") || roles.startsWith("project O, M") ? "member" : roles === "O" ? "owner" : "viewer";
+export const roleMeets = (have: Role, need: Role): boolean => RANK[have] >= RANK[need];
+
 /** Authorize per the matrix's role string. No inheritance. Unauthorized == nonexistent. */
 export async function authorize(ctx: Ctx, cap: Capability, params: Record<string, any>): Promise<void> {
   const p = ctx.principal;
@@ -51,6 +56,6 @@ export async function authorize(ctx: Ctx, cap: Capability, params: Record<string
   if (!scope) return; // list-style rows filter by grant inside the handler
   const role = await roleAt(ctx, scope);
   if (!role) throw notVisible();
-  const need: Role = roles.startsWith("O, M") || roles.startsWith("project O, M") ? "member" : roles === "O" ? "owner" : "viewer";
-  if (RANK[role] < RANK[need]) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", `requires ${need} at ${scope.type}`, need === "owner" ? "ask an owner (D3)" : "ask an owner or member", cap.id);
+  const need = requiredRole(roles);
+  if (!roleMeets(role, need)) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", `requires ${need} at ${scope.type}`, need === "owner" ? "ask an owner (D3)" : "ask an owner or member", cap.id);
 }

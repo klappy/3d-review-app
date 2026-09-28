@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { pages, css, classify, landsOnWork, signInLanding, whoLine, PERSPECTIVE_WHO, SIGNUP_NOTE } from './scope.js';
 import { readFileSync } from 'node:fs';
 import * as cards from './cards.js';
+import { currentNamespace, digestNamespace, scopedStorage } from '../shared-link.js';
 
 const err = (code, message = 'nope') => Object.assign(new Error(message), { code, status: Number(code) || 400 });
 function ctxWith(routesMap = {}, over = {}) {
@@ -139,10 +140,10 @@ test('project: refused assessments list is shown as not visible, page still rend
 // ---------- entry ----------
 test('entry: public welcome with hero, tour stepper and survey/example/sign-in buttons', async () => {
   const ctx = ctxWith(); const m = await pages.entry.load(ctx, {}); const h = pages.entry.render(ctx, m);
-  assert.ok(h.includes('What is 3D Review?')); assert.ok(h.includes('Translation team')); assert.ok(h.includes('href="#survey">Take a survey')); assert.ok(h.includes('href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →')); assert.ok(h.includes('href="/v2/auth/access">Sign in</a>')); assert.ok(!h.includes('Continue'));
+  assert.ok(h.includes('What is 3D Review?')); assert.ok(h.includes('Translation team')); assert.ok(h.includes('href="#survey">Take a survey')); assert.ok(h.includes('href="/?demo=1#assessment/demo-assessment/collect">Browse a sample assessment (synthetic data) →')); assert.ok(h.includes('href="/v2/auth/access">Sign in</a>')); assert.ok(!h.includes('Continue'));
   // captain-named public home (ui/public-choices.test.mjs contract, now asserted on the ROOT entry): four choices, in order, above the headline
   const nav = h.slice(h.indexOf('<nav class="public-choices'), h.indexOf('</nav>')); const links = [...nav.matchAll(/<a class="rv-btn[^"]*" href="([^"]+)">([^<]+)<\/a>/g)].map(m => [m[2], m[1]]);
-  assert.deepEqual(links, [['Read about it', '#about'], ['Take the tour', '/?demo=1#assessment/demo-assessment/prepare'], ['Take a survey', '#survey'], ['Sign in', '/v2/auth/access']]);
+  assert.deepEqual(links, [['Read about it', '#about'], ['Take the tour', '/?demo=1#assessment/demo-assessment/collect'], ['Take a survey', '#survey'], ['Sign in', '/v2/auth/access']]);
   assert.ok(nav.includes('aria-label="Choose where to start"')); assert.ok(h.indexOf('<nav class="public-choices') < h.indexOf('<h1>')); assert.ok(h.includes('<p class="eyebrow" id="public-about">What is 3D Review?</p>'));
   assert.ok(h.includes('Explore the real assessment screens · Go at your own pace · Nothing is sent')); assert.ok(h.includes('href="#projects">Open your projects and reports'));
   for (const retired of ['Here to take the survey?', 'Show me how', 'Manage assessments']) assert.ok(!h.includes(retired), retired);
@@ -199,13 +200,17 @@ test('entry: survey guidance treats the code as optional and never implies a res
   assert.ok(!h.includes('released above'));
   assert.ok(!h.includes('send it again'));
 });
-test('entry: survey code stores participant token and hands off to legacy /#participant', async () => {
-  const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, removeItem: k => { delete stored[k]; } };
+test('U07: a valid survey code opens the v3 /participate/ survey with the bearer in its scoped session slot', async () => {
+  const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, getItem: k => stored[k] ?? null, removeItem: k => { delete stored[k]; } };
   const assigned = []; globalThis.window = { location: { assign: u => assigned.push(u) } };
   const ctx = ctxWith({ 'POST /v2/participate/code': { participant_token: 'ptok', survey_id: 's1' } });
   const m = await pages.entry.load(ctx, {}); m.mode = 'survey'; const root = mount(pages.entry, ctx, m);
   const form = root.querySelector('#code-form'); form.elements.code.value = 'ABC'; await form.fire('submit');
-  assert.equal(stored.participantToken, 'ptok'); assert.deepEqual(assigned, ['/legacy/#participant']);
+  const ns = await digestNamespace('ptok');
+  assert.deepEqual(assigned, ['/participate/']);
+  assert.equal(currentNamespace(globalThis.sessionStorage), ns);
+  assert.equal(scopedStorage(globalThis.sessionStorage, ns).get('bearer'), 'ptok');
+  assert.equal(stored.participantToken, undefined); // nothing left for the legacy surface to resume
 });
 
 test('U08: a used or unknown access code says what to do next, not "Not allowed here."', async () => {
@@ -353,9 +358,13 @@ test('project settings (lane 11): editors reach access codes on the existing scr
   const own = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'owner' }, languages: [] } });
   const h = pages.project.render(own, await pages.project.load(own, { id: 'p1' }));
   assert.ok(h.includes('id="project-settings"') && h.includes('Project settings'));
-  assert.ok(/href="\/legacy\/#facilitator" data-kept="access-codes"/.test(h), 'access codes link to the legacy facilitator screen');
+  assert.ok(/href="#project\/p1" data-kept="access-codes"/.test(h), 'access codes stay in v3 (no assessment yet: this project)');
+  assert.ok(!h.includes('/legacy/'), 'no link to the legacy console');
   assert.ok(!/class="[^"]*primary[^"]*"[^>]*data-kept/.test(h), 'kept links never take the page primary');
   assert.ok(/href="#workspaces" data-kept="workspaces"/.test(h), 'workspaces link to the existing #workspaces screen');
+  const settings = h.slice(h.indexOf('id="project-settings"')), more = settings.slice(settings.indexOf('<details class="small learn-more">'));
+  assert.ok(/Issue paper codes/.test(more) && /Group projects in a workspace/.test(more), 'U43: both explanations sit behind the one Learn more');
+  assert.equal(settings.split('Issue paper codes').length - 1, 1, 'U43: never inline as well');
   const view = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'viewer' }, languages: [] } });
   assert.ok(!pages.project.render(view, await pages.project.load(view, { id: 'p1' })).includes('project-settings'));
 });
@@ -399,6 +408,10 @@ test('router: about is a public entry intent; unknown hashes fall back to home, 
   assert.deepEqual({ ...route('#about') }, { kind: 'entry', intent: 'about' });
   for (const h of ['#public-about', '#nonsense', '#assessment']) assert.equal(route(h).kind, 'entry', h);
   assert.equal(route('#projects').kind, 'projects');
+  // B06: Home's "Continue setup" route reopens the wizard on that draft; plain #new stays a fresh setup
+  assert.deepEqual({ ...route('#new/asm%201') }, { kind: 'new', id: 'asm 1' });
+  assert.deepEqual({ ...route('#new') }, { kind: 'new' }); assert.deepEqual({ ...route('#/new') }, { kind: 'new' });
+  assert.equal(route('#new/a1/x').kind, 'entry');
 });
 
 test('B04: sign-in landing — pending invitation first; one project → that project; several or none → Home', () => {

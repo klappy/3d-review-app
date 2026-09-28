@@ -1,8 +1,9 @@
 import type { Ctx, Handler } from "./types";
 import { CapError, notVisible } from "./errors";
-import { gate, newId, nowIso, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
+import { gate, isOtherOption, newId, nowIso, OTHER_TEXT_KEY, OTHER_TEXT_MAX, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
 
 import { collecting, sharedSession, submitShared } from "./shared-link";
+import { RESPONDENT_FIELDS, groupFields, validateContext } from "../context-fields";
 
 interface ParticipantSurvey { id: string; assessment_id: string; template_id: string; template_version: number; state: string; collection_status: string; name: string; language_name: string; period: string | null; purpose: string | null; format: string | null; project_name: string; items_json: string; scoring_json: string; perspective: string; source_ref: string | null; published_at: string | null }
 
@@ -22,12 +23,12 @@ async function scopedSurvey(ctx: Ctx, requireOpen = false): Promise<ParticipantS
   return s;
 }
 
-function validateAnswers(items: TemplateItem[], value: unknown): Record<string, unknown> {
+export function validateAnswers(items: TemplateItem[], value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new CapError("INVALID_PARAMS", "answers must be an object");
   const answers = value as Record<string, unknown>;
   const normalized: Record<string, unknown> = {};
   const ids = new Set(items.map((i) => i.id));
-  for (const key of Object.keys(answers)) if (!ids.has(key)) throw new CapError("INVALID_PARAMS", `unknown answer item ${key}`);
+  for (const key of Object.keys(answers)) if (!ids.has(key) && key !== OTHER_TEXT_KEY) throw new CapError("INVALID_PARAMS", `unknown answer item ${key}`);
   for (const item of items) {
     const answer = answers[item.id];
     if (answer === undefined || answer === null || answer === "" || (item.type === "multi" && Array.isArray(answer) && answer.length === 0)) {
@@ -46,6 +47,23 @@ function validateAnswers(items: TemplateItem[], value: unknown): Record<string, 
       throw new CapError("INVALID_PARAMS", `exclusion choice cannot be combined for ${item.id}`);
     normalized[item.id] = answer;
   }
+  // C01: optional "please describe" text, kept only for items whose chosen answer includes an Other option.
+  const other = answers[OTHER_TEXT_KEY];
+  if (other !== undefined && other !== null) {
+    if (typeof other !== "object" || Array.isArray(other)) throw new CapError("INVALID_PARAMS", "other text must be an object");
+    const kept: Record<string, string> = {};
+    for (const [id, text] of Object.entries(other as Record<string, unknown>)) {
+      const item = items.find((i) => i.id === id);
+      if (!item || (item.type !== "single" && item.type !== "multi") || !item.options?.some(isOtherOption))
+        throw new CapError("INVALID_PARAMS", `unknown other-text item ${id}`);
+      if (typeof text !== "string" || text.length > OTHER_TEXT_MAX) throw new CapError("INVALID_PARAMS", `invalid other text for ${id}`);
+      const chosen = normalized[id], codes = Array.isArray(chosen) ? chosen : chosen == null ? [] : [chosen];
+      const trimmed = text.trim();
+      if (!trimmed || !item.options.some((o) => isOtherOption(o) && codes.includes(o.code))) continue; // Other not chosen → dropped
+      kept[id] = trimmed;
+    }
+    if (Object.keys(kept).length) normalized[OTHER_TEXT_KEY] = kept;
+  }
   return normalized;
 }
 
@@ -63,7 +81,9 @@ export const form: Handler = async (ctx, params) => {
   return { result: { survey_id: s.id, assessment: s.name, language: s.language_name, period: s.period,
     project: s.project_name, purpose: s.purpose, format: s.format,
     template: { id: s.template_id, version: s.template_version, perspective: s.perspective, source_ref: s.source_ref },
-    items: renderItems(items, s.language_name), participant_labels: participantLabels(s.template_id) }, scope: { type: "survey", id: s.id } };
+    items: renderItems(items, s.language_name), participant_labels: participantLabels(s.template_id),
+    // B09: optional "About you" fields shown before Q1, outside the pinned instrument. All optional.
+    context_fields: RESPONDENT_FIELDS }, scope: { type: "survey", id: s.id } };
 };
 
 export const submit: Handler = async (ctx, params) => {
@@ -72,10 +92,11 @@ export const submit: Handler = async (ctx, params) => {
   const idempotencyKey = reqStr(params, "idempotency_key");
   if (idempotencyKey.length > 200) throw new CapError("INVALID_PARAMS", "idempotency_key is too long");
   if (shared) {
-    if (Object.keys(params).some(k => k !== "idempotency_key" && k !== "answers")) throw new CapError("INVALID_PARAMS", "unknown submission parameter");
+    if (Object.keys(params).some(k => k !== "idempotency_key" && k !== "answers" && k !== "context")) throw new CapError("INVALID_PARAMS", "unknown submission parameter");
     const items = parseItems(s as any);
     if (!items.length) throw new CapError("STAGE_CONFLICT", "survey instrument is unavailable");
-    return { result: await submitShared(ctx, shared, idempotencyKey, validateAnswers(items, params.answers), s), scope: { type: "survey", id: s.id } };
+    const answers = validateAnswers(items, params.answers), context = validateContext(RESPONDENT_FIELDS, params.context);
+    return { result: await submitShared(ctx, shared, idempotencyKey, answers, s, context), scope: { type: "survey", id: s.id } };
   }
   const respondentId = ctx.principal.respondentId!;
   const prior = await ctx.db.prepare("SELECT id, assessment_survey_id, respondent_id, submitted_at FROM response WHERE assessment_survey_id = ? AND idempotency_key = ?")
@@ -90,13 +111,16 @@ export const submit: Handler = async (ctx, params) => {
   const items = parseItems(s as any);
   if (!items.length) throw new CapError("STAGE_CONFLICT", "survey instrument is unavailable");
   const answers = validateAnswers(items, params.answers);
+  const context = validateContext(RESPONDENT_FIELDS, params.context), hasContext = Object.keys(context).length > 0;
   const responseId = newId("resp");
   const submittedAt = nowIso(ctx);
+  // B09: context_json is written only when the respondent gave some, so an answers-only submit never depends on migration 0011.
   await ctx.db.prepare(`INSERT INTO response
-    (id, assessment_survey_id, respondent_id, idempotency_key, answers_json, template_id, template_version, provenance_json, source, submitted_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    (id, assessment_survey_id, respondent_id, idempotency_key, answers_json, template_id, template_version, provenance_json, source, submitted_at${hasContext ? ", context_json" : ""})
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${hasContext ? ", ?" : ""})`)
     .bind(responseId, s.id, respondentId, idempotencyKey, JSON.stringify(answers), s.template_id, s.template_version,
-      JSON.stringify({ presented_template_id: s.template_id, presented_template_version: s.template_version, trace_id: ctx.traceId }), "participant", submittedAt).run();
+      JSON.stringify({ presented_template_id: s.template_id, presented_template_version: s.template_version, trace_id: ctx.traceId }), "participant", submittedAt,
+      ...(hasContext ? [JSON.stringify(context)] : [])).run();
   return { result: { response_id: responseId, submitted_at: submittedAt, duplicate: false, undo: null }, scope: { type: "survey", id: s.id } };
 };
 
@@ -128,7 +152,16 @@ export const list: Handler = async (ctx, params) => {
   await assessmentGrant(ctx, aid, "member");
   // D7 threshold and differencing policy remain unresolved. Even owners get
   // a typed, successful suppression state rather than row-level disclosure.
-  return { result: { suppressed: true, status: "held", reason: "D7 disclosure policy unresolved", responses: [] }, scope: { type: "assessment", id: aid } };
+  // B09: the facilitator's own group-level context (setup step 3) is not respondent data, so it is listed per group.
+  // Respondent context (age range, gender) stays inside the suppressed rows until D7 is decided.
+  const { results } = await ctx.db.prepare("SELECT s.* FROM assessment_survey s WHERE s.assessment_id = ? AND s.state = 'selected' ORDER BY s.created_at")
+    .bind(aid).all<Record<string, unknown>>();
+  const group_context = (results || []).map((r) => {
+    let context: Record<string, unknown> = {};
+    try { const v = JSON.parse(String(r.context_json ?? "{}")); if (v && typeof v === "object" && !Array.isArray(v)) context = v; } catch { /* pre-0011 row */ }
+    return { survey_id: String(r.id), template_id: String(r.template_id), context };
+  });
+  return { result: { suppressed: true, status: "held", reason: "D7 disclosure policy unresolved", responses: [], group_context }, scope: { type: "assessment", id: aid } };
 };
 
 export const purge: Handler = async (ctx, params, opts) => {

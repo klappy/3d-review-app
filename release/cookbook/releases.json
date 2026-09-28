@@ -1,7 +1,100 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.21.6",
+  "current": "0.22.2",
   "versions": [
+    {
+      "version": "0.22.2",
+      "status": "candidate",
+      "notes_path": "releases/0.22.2.md",
+      "sections": {
+        "added": [
+          "`GET /v2/me/invitations` (`cap.me.invitations`, read): the signed-in person's pending invitations, matched by their hashed email — scope, role, expiry and an inviter display name (always empty for now: no names are stored). Never the invitation token. (#365)"
+        ],
+        "changed": [
+          "`cap.grant.accept` also accepts `invitation_id` instead of the link token (HTTP: `POST /v2/me/invitations/{invitation_id}/accept`), only when the signed-in person's email is the invited one; anything else answers exactly like a missing invitation. The link-token path is unchanged. (#365)"
+        ],
+        "fixed": [
+          "Someone an owner invited who simply signs in on the site (without opening the invitation email) now lands on an \"Accept invitation\" screen first — one heading, one line, one \"Accept\" — instead of an empty home. With nothing pending, sign-in lands as before (one project → that project; several → the projects list). Captain ruling 2026-09-28 15:27 ET (k0015) \"Add GET /v2/me/invitations + accept by invitee identity\"; B04 step (c). (#365)",
+          "Survey questions with an \"Other (please describe)\" choice now show a short \"Please describe\" text field while Other is chosen (both the /participate/ page and the shared #survey= link). The text is kept with the device draft, shown beside the Other choice on Review your answers, and saved with the response inside the existing answers JSON under \"_other\" ({ question id: text }, up to 500 characters) — no migration. Text typed under Other and then abandoned for another choice is dropped. Legacy / Lovable items (option code \"other\") get the field too. (#363)"
+        ]
+      }
+    },
+    {
+      "version": "0.22.1",
+      "status": "candidate",
+      "notes_path": "releases/0.22.1.md",
+      "sections": {
+        "fixed": [
+          "On Collect, each survey's share card now shows its QR code as soon as the card appears: the participant link is made when the card renders (captain ruling 2026-09-28 14:42 ET, k0013 \"Mint the link on render so QR shows immediately\"). One link per survey still holds: a survey whose link is already active (launch page, an earlier visit, the survey's Share card) reuses it. Copy link and Print keep working; \"Print all\" is unchanged (window.print()). (#361)"
+        ]
+      }
+    },
+    {
+      "version": "0.22.0",
+      "status": "candidate",
+      "notes_path": "releases/0.22.0.md",
+      "sections": {
+        "added": [
+          "Optional demographics: setup step 3 asks each group's context (no names), participants may give an age range and gender before Q1 (both skippable), and the response list shows the group context (migration 0011). (#342)",
+          "Setup saves on step 1: Continue creates the review as a draft, Home shows it with \"Continue setup\" (reopens at the next step with what was entered), and Cancel asks in the page whether to keep the draft or discard it. (#339)",
+          "Next steps lists the areas the report bands Needs support or Needs urgent attention as tick boxes, plus Other, saved with the notes; one \"Complete 3D Review\", confirmed in the page, makes the whole review read-only with \"This review is complete.\" (#338)"
+        ],
+        "changed": [
+          "Participants now read one privacy line, \"Your responses are confidential.\", on the survey welcome and in setup step 3, after a check that no name, email, IP address or device detail is stored with a response. (#337)"
+        ],
+        "fixed": [
+          "\"Take the tour\" opens the sample assessment on Collect, the stage it is actually in, so the first screen no longer says \"Prepare this assessment\" beside \"Collecting responses\". (#345)",
+          "Setup wizard survives a reload: once step 1 is saved the page URL names the draft, and a reload reopens it at the same step with what was typed (kept in this tab only). (#346)",
+          "On Collect, a group that reaches or passes its expected number reads \"6 responded · 3 expected\" instead of \"6 of 3 responded\"; below the expected number it still reads \"n of N responded\". (#344)",
+          "The participant review screen's final button now reads \"Submit answers\" and uses the shared primary button style. (#348)",
+          "The assessment header no longer shows a primary that links to the page you are on, and \"Preview invitation\" is the one primary on Permissions. (#349)",
+          "Understand: before any report exists \"Build the results\" is the one primary; \"Choose a next step\" steps back until the results are built. (#350)",
+          "The facilitator no longer gets a new participant link on every page view: the launch page, Collect and the survey page now reuse the survey's active link until it is revoked or expires. (#351)",
+          "Each share card now shows its QR code inline as soon as it has a link, with no show/hide toggle. (#352)",
+          "Setup refuses an \"Active until\" date in the past with \"Pick today or later\", and Collect shows \"Closed on <date>\" once that date has passed. (#353)",
+          "The build-results confirm now reads \"Build results from N responses? Everyone with access can see them.\"; the project page keeps its Access codes and Workspaces explanations behind Learn more. (#354)",
+          "The kit-root integration harness now injects `collectLine`, so its 23 tests pass again after U46. (#355)",
+          "Sign out and Use another account never open a Cloudflare error page: both end the app and Cloudflare sessions in the background and land on the sign-in screen with an empty email field. (#330)",
+          "The project page and the assessment stage headers now show one heading, at most one short line and one primary action; the role line and tool explanations sit behind \"Learn more\". (#332)",
+          "Facilitators issue paper access codes on the survey Share card (count, preview, show once, print), and \"Open access codes\" no longer sends them to the legacy console. (#335)",
+          "Owners can delete an empty assessment from its settings: one-sentence dry run, confirmed in the page, then back to the project with \"Assessment deleted.\" (#336)",
+          "Asking the docs what a viewer can do no longer suggests survey, code or notes changes a viewer cannot make; next steps now come from the same role table the server enforces. (#334)",
+          "After renaming a workspace or an assessment, the form now says \"Saved · Undo\" right beside it, and Undo puts the old name back and says \"Undone\". (#333)",
+          "On Understand, only one \"Build the results\" button shows at a time: the button hides while its confirm is open and comes back if you choose Not now. (#329)",
+          "Setup drafts: a viewer opening a setup link goes to the review, surveys a part-launched draft already added stay ticked (\"Already added.\"), and viewer cards on Home say \"Continue assessment\". (#340)",
+          "The root-route test for invitation links now matches how the app handles them (they stay in the app), so the test suite passes again. No change for users. (#343)",
+          "A valid access code now opens the v3 survey (intro, review and submit, thank-you) instead of the legacy participant page. (#341)"
+        ]
+      }
+    },
+    {
+      "version": "0.21.7",
+      "status": "candidate",
+      "notes_path": "releases/0.21.7.md",
+      "sections": {
+        "added": [
+          "Every shared survey link now has the same three buttons — Copy link, QR code, Print — and one \"Print all\" puts every survey (title, one line, QR code) on a single printable page. (#324)"
+        ],
+        "changed": [
+          "sign-in says a new email creates an account (Bincy B32) (#301)",
+          "The survey page now shows one heading; print and share explanations sit behind Learn more. (#316)",
+          "A viewer on the Improve step now sees one heading with the notes as plain labels; the visibility note sits behind Learn more. (#317)",
+          "The participant welcome now shows one heading, the invitation and privacy line, the survey context and a single Start button; the time estimate and sign-in note sit behind \"Learn more\". (#318)",
+          "The classic console header now says \"Signed in\" instead of showing an internal account id. (#319)",
+          "The full report's translation type agreement now reads as one plain sentence (e.g. \"Agreed: Resembling · Seen as: Resembling · Matches\") instead of raw values. (#320)",
+          "Understand now shows one build action, \"Build the results\"; the older \"Preview report build\" sits behind Technical details in Reports. (#315)",
+          "Setup step 1 \"Lead organisation\" is now a drop-down of known organisations with \"Other (type it)\" for anything else. (#322)",
+          "Setup asks \"Active until\" (required) and \"Starts\" (optional, default today) instead of \"When\"; Collect shows \"Active until <date>\" and participant links show \"This survey closed on <date>\" after that date. (#323)",
+          "On Collect, \"Move to Understand\" is the one primary action and is confirmed in the page; Prepare no longer carries that move or a browser confirm. (#325)"
+        ],
+        "fixed": [
+          "On DEV, \"Use a different email\" (and \"Request a new link\") now keeps you in the connector sign-in instead of dropping back to a plain web sign-in. (#313)",
+          "Translation Team now offers Mid-Level once when setting up or changing surveys; the old Mid-Level v1 stays only on imported responses. (#321)",
+          "Revoke invitation asks in the row (Revoke / Cancel) and the revoked row leaves the pending list at once (#326)",
+          "A survey keeps one participant link per page load: Copy link, QR code and Print on the survey page and on Collect reuse it, and the Share card now says a reload makes a new one. (#327)"
+        ]
+      }
+    },
     {
       "version": "0.21.6",
       "status": "candidate",

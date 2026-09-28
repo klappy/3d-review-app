@@ -32,6 +32,6 @@ test('actual demo shell strips credential fragments and never reads or changes s
  let storageTouches=0; const location={search:'?demo=1',hash:'#session=staff-secret',pathname:'/'};
  const box={ ...v3, isDemo, memoryStorage, demoApi, document:{getElementById:()=>null}, location, history:{replaceState:(_,__,url)=>{location.hash=url.slice(url.indexOf('#'));}}, get sessionStorage(){storageTouches++;throw Error('Demo touched staff storage');} };
  const shell=runInNewContext(source+'\n({scrubCredentialHash,setToken,api})',box);
- shell.scrubCredentialHash(); assert.equal(location.hash,'#assessment/demo-assessment/prepare');
+ shell.scrubCredentialHash(); assert.equal(location.hash,'#assessment/demo-assessment/collect');
  shell.setToken('another-secret'); await shell.api('/v2/me'); await assert.rejects(shell.api('/v2/auth/session',{method:'DELETE'})); assert.equal(storageTouches,0);
 });

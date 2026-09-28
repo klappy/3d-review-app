@@ -5,6 +5,12 @@ test('n of N only when N given', () => {
   assert.match(responseCount({ responses: 4, expected: 10 }), />4 of 10 responded</);
   assert.match(responseCount({ responses: 4 }), />4 responded</);
 });
+test('U39: at or over N never reads n of N', () => {
+  assert.match(responseCount({ responses: 6, expected: 3 }), />6 responded · 3 expected</);
+  assert.match(responseCount({ responses: 3, expected: 3 }), />3 responded · 3 expected</);
+  assert.match(responseCount({ responses: 2, expected: 3 }), />2 of 3 responded</);
+  assert.doesNotMatch(responseCount({ responses: 6, expected: 3 }), /6 of 3/);
+});
 test('unconfirmed shown only when sent', () => {
   assert.doesNotMatch(responseCount({ responses: 2 }), /not yet confirmed/);
   assert.match(responseCount({ responses: 2, unconfirmed: 3 }), /class="badge" data-v3-unconfirmed="3">3 not yet confirmed/);

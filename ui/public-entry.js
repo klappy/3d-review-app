@@ -21,7 +21,7 @@ export function mountPublicEntry(document,window) {
   const identity=document.getElementById('identity');
   const explicitSharedAtEntry=parseEntryFragment(window.location.hash)!==null;
   function render(){
-    if (['#how', '#example'].includes(window.location.hash)) { window.location.replace('/?demo=1#assessment/demo-assessment/prepare'); return; }
+    if (['#how', '#example'].includes(window.location.hash)) { window.location.replace('/?demo=1#assessment/demo-assessment/collect'); return; }
     const invitation=document.body.dataset.invitationIntent==='active';
     const isolated=document.body.dataset.invitationEntry==='true'; // explicit invite load: saved participant route ignored for the page lifetime (Bugbot 4039886032)
     const shared=!invitation&&(explicitSharedAtEntry||(!isolated&&currentNamespace(window.sessionStorage)!==null)||document.getElementById('facilitator')?.hidden===true);

@@ -18,12 +18,13 @@ import * as share from '../ui/assess/share.js';
 import { feedback } from '../ui/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '../ui/kit/app-adapter.js';
 import * as v3 from '../ui/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove } from '../ui/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock, V3_SUGGEST } from '../ui/assess/v3-assessment.js';
 import { learnMore } from '../ui/v3/components/learn-more.js';
-import { activeUntilLine, periodText } from '../ui/v3/components/active-until.js';
+import { activeUntilLine, periodText, collectLine } from '../ui/v3/components/active-until.js';
 import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
 import { sidebarTree } from '../ui/v3/components/sidebar-tree.js';
 import { mountEditableHeading } from '../ui/v3/components/editable-heading.js';
+import { showSavedStatus, undoTokenOf } from '../ui/v3/components/saved-status.js';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const HTML = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
@@ -47,7 +48,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, activeUntilLine, periodText, learnMore, breadcrumbs, sidebarTree, mountEditableHeading }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf }); // v3 shell imports (assess.js lines 15–16); #190
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -389,6 +390,23 @@ test('B07: project and assessment names are the heading with an edit control for
     assert.equal(v.qa('[data-edit-heading]').length, assessment, identity + ' assessment');
   }
 });
+test('U17: assessment heading rename says "Saved · Undo" beside the heading; Undo calls /v2/undo and restores the name ("Undone"); navigation clears it', async () => {
+  const posts = []; const json = body => ({ ok: true, status: 200, headers: { get: k => k.toLowerCase() === 'content-type' ? 'application/json' : null }, json: async () => body, text: async () => '' });
+  const p = await bootPage('owner', '#assessment/a2/prepare', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
+    const m = (init.method || '').toUpperCase();
+    if (m === 'PATCH') return json({ ok: true, result: { assessment: { id: 'a2', name: 'Spring review' } }, receipt: { undo_token: 'undo_a2' } });
+    if (m === 'POST' && String(u).includes('/v2/undo/')) { posts.push(String(u)); return json({ ok: true, result: { undone: 'cap.assessment.update', assessment: { id: 'a2', name: 'Spring baseline' } } }); }
+    return base(u, init); }; } });
+  p.q('[data-edit-heading]').click(); p.q('.v3-eh-form input').value = 'Spring review';
+  p.q('.v3-eh-form').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await tick(12);
+  assert.equal(p.text('[role=main].content .v3-eh h1'), 'Spring review');
+  assert.equal(p.q('.v3-eh [data-saved-status]').textContent, 'Saved · Undo', 'status beside the heading form');
+  p.q('.v3-eh [data-undo]').click(); await tick(12);
+  assert.deepEqual(posts.map(u => u.replace(/^.*(\/v2\/undo\/)/, '$1')), ['/v2/undo/undo_a2']);
+  assert.equal(p.q('.v3-eh [data-saved-status]').textContent, 'Undone'); assert.equal(p.text('[role=main].content .v3-eh h1'), 'Spring baseline');
+  assert.equal(p.api.state.current.assessment.name, 'Spring baseline'); assert.equal(p.text('header.top nav.crumbs [aria-current="page"]'), 'Spring baseline');
+  await p.go('#assessment/a2/collect'); assert.equal(p.q('[data-saved-status]'), null, 'navigation clears the status');
+});
 test('B07: assessment heading rename disables other writes in place, keeps unsaved drafts, and re-syncs only the shell', async () => {
   let release; const held = new Promise(r => { release = r; });
   const p = await bootPage('owner', '#assessment/a2/prepare', { install: t => { const base = t.fetch; t.fetch = async (u, init = {}) => {
@@ -473,4 +491,25 @@ test('B07: rename updates only the assessment crumb and title, even when another
   assert.equal(p.text('header.top nav.crumbs [data-crumb="assessment"]'), 'Renamed');
   assert.equal(p.q('header.top nav.crumbs [data-crumb="project"]').textContent, 'Spring baseline', 'project crumb untouched');
   assert.match(p.d.title, / · Renamed · 3D Review$/);
+});
+
+// B13 (lanes-2148): a completed review (complete mark saved in its notes) is read-only in every stage view of the real page,
+// even for its owner, with one "This review is complete." line; the owner's granted role stays in the role line.
+test('B13: a completed review shows saved values without edit controls on Prepare, Collect and Improve', async () => {
+  const done = { id: 'a1', name: 'September assessment', project_id: 'p1', stage: 'improve', role: 'owner', language_id: 'l1', purpose: 'Synthetic purpose', notes_reflection: 'We saw growth.', notes_next_steps: 'Meet the elders\n\n[Areas to discuss] Church\n[Other] Bible storying\n[This review is complete.]' };
+  const p = await bootPage('owner', '#assessment/a1/prepare', { install: (t, data) => { data.routes.set('GET /v2/assessments/a1', { ok: true, result: { assessment: done, surveys: [] } }); } });
+  const main = () => p.q('[role=main].content') || p.d.body;
+  const noEdit = where => {
+    assert.equal(main().querySelectorAll('[data-review-complete]').length, 1, `${where}: one complete line`);
+    assert.equal(p.text('[data-review-complete]'), 'This review is complete.');
+    assert.equal(main().querySelectorAll('form, [data-edit-heading], [data-stage], [data-include], [data-remove], [data-save-notes], [data-complete-review], [data-v3-gate-go]').length, 0, `${where}: no edit controls`);
+    assert.ok(!/editing needs a member or owner role|Your role here is viewer/.test(main().textContent), `${where}: no misleading viewer line`);
+  };
+  noEdit('prepare'); assert.equal(p.q('textarea[name="purpose"]').readOnly, true); assert.equal(p.q('textarea[name="purpose"]').value, 'Synthetic purpose');
+  assert.match(main().textContent, /your role: owner/);
+  await p.go('#assessment/a1/collect'); noEdit('collect');
+  await p.go('#assessment/a1/improve'); await tick(12); noEdit('improve');
+  assert.match(p.text('[data-notes-areas]'), /Church/); assert.match(p.text('[data-notes-other]'), /Bible storying/);
+  assert.equal(p.text('[data-notes-next-steps]'), 'Meet the elders');
+  assert.ok(!p.transport.log.some(l => l.key && !/^GET /.test(l.key)), 'nothing was written');
 });

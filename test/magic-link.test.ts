@@ -250,6 +250,10 @@ describe("routes", () => {
     expect(out.headers.get("set-cookie")).toBe("session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
     expect(await db.prepare("SELECT COUNT(*) AS n FROM session WHERE token_hash = ?").bind(await sha256(s)).first("n")).toBe(0);
     expect((await resolvePrincipal(new Request(ORIGIN + "/", { headers: { cookie: `session=${s}` } }), env)).kind).toBe("anonymous");
+    // B44: a second sign-out with the now-dead cookie (a stale tab) still expires it — the UI treats NOT_AUTHENTICATED as signed out.
+    const again = await app.fetch(new Request(ORIGIN + "/v2/auth/session", { method: "DELETE", headers: { cookie: `session=${s}`, origin: ORIGIN } }), env);
+    expect(again.status).toBe(401);
+    expect(again.headers.get("set-cookie")).toBe("session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
   });
   it("landing page: nonce'd script only, token read from the fragment, same-origin referrer", async () => {
     const res = await app.fetch(new Request(ORIGIN + "/v2/auth/email/open"), env);
