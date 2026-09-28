@@ -1,7 +1,7 @@
 import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError, drawAbout, aboutValues } from '../participant-view.js';
-import { reviewAnswer, receiptLine } from '../present.js';
+import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
 
 const $ = id => document.getElementById(id);
 let pager, renderedPhase, renderedForm;
@@ -18,6 +18,8 @@ function draw(item) {
     for (const option of item.options || []) {
       const label = element('label'), input = element('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = option.code; input.required = item.type === 'single' && item.required !== false;
       label.append(input, document.createTextNode(option.label || option.text || option.code)); field.append(label);
+      // C01: "Other (please describe)" gets its own short text field, shown only while Other is chosen.
+      if (isOtherOption(option)) field.append(otherBox(document, item));
     }
     if (item.type === 'multi' && item.options?.some(o => o.exclusive)) field.append(element('p', 'An exclusion choice cannot be combined with any other choice.'));
   } else field.append(element('p', 'This survey contains an unsupported question. Ask the person who shared the survey for help.'));
@@ -36,8 +38,10 @@ function values(validate = false) {
     if (item.type === 'scale' && value !== null) value = Number(value);
     out[item.id] = value;
   }
+  const other = collectOther(journey.state.form.items, fd, out); if (other) out[OTHER_TEXT_KEY] = other;
   return out;
 }
+const syncOther = () => { if (journey.state.form) syncOtherBoxes($('answers'), journey.state.form.items); };
 function paint(state) {
   $('notice').textContent = demo && state.phase === 'receipt' ? 'Practice only. No response was sent or saved.' : state.notice || '';
   if (state.phase !== renderedPhase || (state.form && state.form !== renderedForm)) {
@@ -46,17 +50,19 @@ function paint(state) {
       if (renderedForm !== state.form) {
         pager?.destroy(); $('questions').replaceChildren(...state.form.items.map(draw));
         for (const field of $('questions').querySelectorAll('input,textarea')) {
+          if (field.dataset.otherFor) { const text = state.draft?.[OTHER_TEXT_KEY]?.[field.dataset.otherFor]; if (typeof text === 'string') field.value = text; continue; }
           const value = state.draft?.[field.name]; if (value == null) continue;
           if (field.type === 'radio' || field.type === 'checkbox') field.checked = (Array.isArray(value) ? value : [value]).includes(field.value);
           else field.value = value;
         }
+        syncOther();
         about = drawAbout(document, state.form.context_fields || []);
         pager = mountParticipantView({ doc: document, root: $('participant-view-root'), form: $('answers'), questions: $('questions'), review: $('review'), reviewAnswers: $('review-answers'), receipt: $('receipt'), model: state.form, reviewButton: $('review-button'), onEdit: () => journey.edit(), about });
         if (state.draft) pager.showForm();
       } else pager?.showForm();
       $('answers').hidden = false;
     } else if (state.phase === 'review') {
-      $('review-answers').replaceChildren(...state.form.items.map(item => element('p', `${item.text || item.id}: ${reviewAnswer(item, state.answers[item.id])}`)));
+      $('review-answers').replaceChildren(...state.form.items.map(item => element('p', `${item.text || item.id}: ${reviewAnswer(item, state.answers[item.id], state.answers[OTHER_TEXT_KEY]?.[item.id])}`)));
       $('review').hidden = false; pager?.showReview();
     } else {
       pager?.showReceipt();
@@ -80,6 +86,7 @@ const sample = demo ? sampleParticipantEnvironment(Number(new URLSearchParams(lo
 if (demo) { $('submit').textContent = 'Finish practice — nothing sent'; $('recover').textContent = 'Check practice'; }
 const journey = createParticipantJourney({ ...(demo ? sample : { window, storage: sessionStorage }), onChange: paint });
 $('answers').addEventListener('input', () => journey.save(values()));
+$('answers').addEventListener('change', syncOther);
 $('answers').addEventListener('submit', event => { event.preventDefault(); try { journey.review(values(true)); } catch (error) { $('notice').textContent = error.message; } });
 $('edit').addEventListener('click', () => journey.edit());
 $('submit').addEventListener('click', () => { journey.setContext(aboutValues(about)); journey.submit(); });

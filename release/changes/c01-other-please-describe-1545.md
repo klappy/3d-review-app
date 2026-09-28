@@ -1,0 +1,3 @@
+bump: patch
+lane: 3d-sprint-s8a-other-textbox · PR: (below)
+- Fixed - Survey questions with an "Other (please describe)" choice now show a short "Please describe" text field while Other is chosen (both the /participate/ page and the shared #survey= link). The text is kept with the device draft, shown beside the Other choice on Review your answers, and saved with the response inside the existing answers JSON under "_other" ({ question id: text }, up to 500 characters) — no migration. Text typed under Other and then abandoned for another choice is dropped. Legacy / Lovable items (option code "other") get the field too.
