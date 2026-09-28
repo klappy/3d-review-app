@@ -333,13 +333,13 @@ describe("[fake-DOM] ui/app.js shared mode", () => {
     expect($("review").hidden).toBe(false);
     await $("submit").dispatch("click"); await settled($);
     expect($("receipt").hidden).toBe(false);
-    expect($("receipt").textContent).toMatch(/^Response saved · resp_/);
+    expect($("receipt").textContent).toMatch(/^Response saved · Reference [0-9A-F]{8}/);
     expect(storage.getItem("responseKey")).toBeNull(); expect(storage.getItem(ns + "submitKey")).toBeNull();
     // retry with a fresh key after the key was lost → server STAGE_CONFLICT → receipt replay
     (globalThis as any).crypto.randomUUID; // ensure available
     await $("submit").dispatch("click"); await settled($);
     expect($("error").hidden).toBe(true);
-    expect($("receipt").textContent).toMatch(/^Response saved · resp_/);
+    expect($("receipt").textContent).toMatch(/^Response saved · Reference [0-9A-F]{8}/);
     expect(storage.getItem("responseKey")).toBeNull();
     // reload after submit shows the receipt, not an editable form
     const $2 = await boot(storage, "");
@@ -513,7 +513,7 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     expect(await counts()).toBe(before + 1); expect(bodies[0].result.duplicate).toBe(false);
     expect(warns).toEqual([["[3dr] submit", { status: 0, code: undefined, trace_id: undefined }]]);
     plan.responses = null; await submit($);
-    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toMatch(/^Response saved · resp_/);
+    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toMatch(/^Response saved · Reference [0-9A-F]{8}/);
     expect(bodies[1].result).toMatchObject({ response_id: bodies[0].result.response_id, duplicate: true });
     expect(await counts()).toBe(before + 1);
     expect(storage.getItem(ns + "submitKey")).toBeNull(); expect(storage.getItem(ns + "draft")).toBeNull();
@@ -525,7 +525,7 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     expectUncertain($, storage, snap); expect(await counts()).toBe(before);
     expect(warns).toEqual([["[3dr] submit", { status: 503, code: "INTERNAL", trace_id: "tr_synthetic0001" }]]);
     plan.responses = null; await submit($);
-    expect($("receipt").textContent).toMatch(/^Response saved · resp_/); expect(bodies[0].result.duplicate).toBe(false); expect(await counts()).toBe(before + 1);
+    expect($("receipt").textContent).toMatch(/^Response saved · Reference [0-9A-F]{8}/); expect(bodies[0].result.duplicate).toBe(false); expect(await counts()).toBe(before + 1);
   });
   it("F3 throw before the request left: uncertain, counts unchanged; retry commits duplicate:false", async () => {
     const link = await issue(); const { $, storage, ns, plan, bodies } = await openForm(link);
@@ -533,7 +533,7 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     plan.responses = offline; await submit($);
     expectUncertain($, storage, snap); expect(await counts()).toBe(before);
     plan.responses = null; await submit($);
-    expect($("receipt").textContent).toMatch(/^Response saved · resp_/); expect(bodies[0].result.duplicate).toBe(false); expect(await counts()).toBe(before + 1);
+    expect($("receipt").textContent).toMatch(/^Response saved · Reference [0-9A-F]{8}/); expect(bodies[0].result.duplicate).toBe(false); expect(await counts()).toBe(before + 1);
   });
   it("F4 400 with no prior commit: the receipt probe says submitted:false → submitFailed; storage byte-identical", async () => {
     const link = await issue(); const { $, storage, ns, plan } = await openForm(link);
@@ -582,7 +582,7 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     plan.responses = lost; await submit($); expect($("participant-resume").textContent).toBe(copy.submitUncertain);
     plan.responses = null; await edit($, { Q1: "4" });
     plan.responses = refuse(400, "INVALID_PARAMS"); await submit($);
-    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toContain(bodies[0].result.response_id);
+    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toContain(`Reference ${bodies[0].result.response_id.slice(5, 13).toUpperCase()}`);
     expect($("participant-resume").textContent).toBe(`Thank you. Your answers stay with the team, grouped with others from the Translation Team perspective. Reopening your link shows this receipt again. ${copy.sameLinkOthers}`); // B26: survey_tavo is tpl_validation (Translation Team)
     expect(storage.getItem(ns + "draft")).toBeNull(); expect(storage.getItem(ns + "submitKey")).toBeNull();
     expect(await counts()).toBe(before + 1);
@@ -673,7 +673,7 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     expect($("review").hidden).toBe(false); expect($("answers").hidden).toBe(true); expect($("recover").hidden).toBe(false);
     expect(await counts()).toBe(before);
     plan.responses = null; plan.receipt = null; await submit($);
-    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toMatch(/^Response saved · resp_/);
+    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toMatch(/^Response saved · Reference [0-9A-F]{8}/);
     expect(bodies[0].result.duplicate).toBe(false); expect(await counts()).toBe(before + 1);
     expect(storage.getItem(ns + "draft")).toBeNull(); expect(storage.getItem(ns + "submitKey")).toBeNull();
   });
@@ -682,7 +682,7 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     plan.responses = lost; await submit($); // commit whose reply was lost
     plan.responses = null; await edit($, { Q1: "4" });
     plan.responses = refuse(409, "STAGE_CONFLICT"); await submit($); // real probe: submitted:true
-    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toContain(bodies[0].result.response_id);
+    expect($("receipt").hidden).toBe(false); expect($("receipt").textContent).toContain(`Reference ${bodies[0].result.response_id.slice(5, 13).toUpperCase()}`);
     expect($("participant-error").hidden).toBe(true);
     expect(storage.getItem(ns + "draft")).toBeNull(); expect(storage.getItem(ns + "submitKey")).toBeNull();
   });
