@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {JSDOM} from 'jsdom';
-import {renderVersions} from './versions.js';import {nextVersion,parseChange,forecast} from '../../scripts/roadmap-versions.mjs';
+import {renderVersions} from './versions.js';import {nextVersion,parseChange,parseLane,readChanges,forecast} from '../../scripts/roadmap-versions.mjs';
 test('any minor → next minor, else patch',()=>{assert.equal(nextVersion('0.21.0',['patch','patch']),'0.21.1');assert.equal(nextVersion('0.21.3',['patch','minor']),'0.22.0');});
 test('forecast counts only units not already shipped, sorted by section then lane',()=>{const rel={current:'0.21.0',versions:[{version:'0.21.0',sections:{added:['old thing shipped already here (#1)'],changed:[],fixed:[]}}]};
  const c=[parseChange('9-1.md','bump: patch\nlane: 9 · PR: #2\n- Fixed - b new fix'),parseChange('1-1.md','bump: minor\nlane: 1 · PR: #1\n- Added - old thing shipped already here'),parseChange('3-1.md','bump: patch\nlane: 3\n- Changed - a change')];
@@ -16,3 +16,6 @@ test('S11f: absent release/changes/ = zero pending, forecast none, no crash',asy
  const out=execFileSync(process.execPath,[fileURLToPath(new URL('../../scripts/roadmap-versions.mjs',import.meta.url))],{cwd:dir,encoding:'utf8'});
  assert.match(out,/forecast none \(0 units\)/);assert.match(readFileSync(join(dir,'ui/roadmap/versions-data.js'),'utf8'),/"version": null/);
  mkdirSync(join(dir,'release/changes'));assert.match(execFileSync(process.execPath,[fileURLToPath(new URL('../../scripts/roadmap-versions.mjs',import.meta.url))],{cwd:dir,encoding:'utf8'}),/forecast none \(0 units\)/);});
+test('lane must be numeric: parsed from the lane line or the filename prefix',()=>{assert.equal(parseChange('13-1854.md','bump: patch\nlane: 13 · PR: #372\n- Fixed - x').lane,13);assert.equal(parseLane('7-1200.md','bump: patch\n- Fixed - x'),7);assert.equal(parseLane('x.md','lane:13·PR: #1'),13);});
+test('non-numeric lane is refused loudly, never NaN or a digit prefix',()=>{assert.throws(()=>parseChange('s11f-roadmap-empty-changes-1854.md','bump: patch\nlane: 3d-review S11f · PR: (this PR)\n- Fixed - x'),/lane "3d-review" is not a number/);assert.throws(()=>parseChange('u07-0811.md','bump: patch\nlane: u07 · PR: #341\n- Fixed - x'),/u07-0811\.md: lane "u07"/);assert.throws(()=>parseChange('s9-me-1700.md','bump: patch\n- Fixed - x'),/lane "s9" is not a number/);});
+test('every pending change file in release/changes parses to a numeric lane',()=>{for(const c of readChanges())assert.ok(Number.isInteger(c.lane),c.file);});
