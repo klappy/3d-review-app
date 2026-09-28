@@ -338,3 +338,27 @@ test('U36: two consecutive views of a survey reuse the same active link (launch 
   await m.click('data-share-open'); await m.click('data-share-copy');
   assert.equal(m.clipboard.text, first.url); assert.equal(m.calls.filter(c => c.body?.mode === 'execute').length, 0);
 });
+
+test('U48 (B43 ruling k0013): Collect mints the participant link on render and shows the QR at once; an active link is reused, not re-minted', async () => {
+  const { mintOnRender, cachedLink, issueLink, rememberLink, knownLink, linkKey, groupLinks } = await import('./share.js');
+  const { api, calls } = fakeApi({ [LINKS]: ({ body }) => body.mode === 'dry_run' ? prepared : { link_id: 'inv_R', entry_fragment: '#survey=RENDER', expires_at: null } });
+  const cache = new Map(); const rows = { s1: fakeRow('s1'), s2: fakeRow('s2') };
+  const root = { querySelector: sel => { const m = /\[data-group-link="(.+)"\]/.exec(sel); return m ? { querySelector: s => rows[m[1]][s === '[data-group-status]' ? 'status' : 'fig'] } : null; } };
+  rememberLink(cache, 's2', { id: 'inv_L', url: 'https://example.test/#survey=LAUNCH' }); // s2 already has an active link (U36)
+  const resolve = k => cachedLink(cache, k, () => issueLink(api, { aid: 'a1', sid: k, origin: 'https://example.test' })).then(l => l.url);
+  const urls = await mintOnRender(root, { keys: ['s1', 's2'], resolve });
+  assert.equal(calls.filter(c => c.body.mode === 'execute').length, 1, 'only the survey without a link mints');
+  assert.match(urls[0], /^https:\/\/example\.test\/#survey=/); assert.equal(urls[1], 'https://example.test/#survey=LAUNCH');
+  for (const k of ['s1', 's2']) { assert.equal(rows[k].fig.hidden, false, `${k}: QR visible without a tap`); assert.match(rows[k].fig.innerHTML, /<svg/); }
+  assert.equal(knownLink(cache, 's1').url, urls[0], 'the minted link is the one Copy/Print/the Share card reuse');
+  // a paint that already knows the link renders the QR inline with no QR button (U45)
+  const html = groupLinks({ esc: v => String(v) }, [{ key: 's1', url: urls[0] }]);
+  assert.match(html, /<svg/); assert.doesNotMatch(html, /data-group-qr=/);
+  // a certain failure lands in the row status, never throws out of the paint
+  const bad = new Map(); const r3 = { s3: fakeRow('s3') };
+  const root3 = { querySelector: () => ({ querySelector: s => r3.s3[s === '[data-group-status]' ? 'status' : 'fig'] }) };
+  await mintOnRender(root3, { keys: ['s3'], resolve: k => cachedLink(bad, k, async () => { throw Object.assign(new Error('x'), { uncertain: false }); }) });
+  assert.match(r3.s3.status.className, /alert/); assert.equal(r3.s3.fig.hidden, true);
+  const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  assert.match(src.slice(src.indexOf('function bindCollectLinks'), src.indexOf('function collectPanel')), /mintOnRender/, 'Collect wires mint-on-render');
+});

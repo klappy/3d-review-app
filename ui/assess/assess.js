@@ -291,6 +291,15 @@ function bindCollectLinks(current) {
     return { title: s.template_name, line: whoLine(lensFor(s)) || lensFor(s), url: link.url };
   }));
   share.bindPrintAll(root, { heading: current.assessment.name, items: resolveAll });
+  // U48 (B43 ruling k0013): mint on render so the QR shows immediately. Only surveys with no active link mint (U36: same cache
+  // as the taps, one link per survey); the row is patched in place when its link arrives, no full repaint.
+  const pending = current.surveys.filter(s => shareable(current.assessment, s) && !share.knownLink(state.collectLinks, share.linkKey(aid, s.id))).map(s => s.id);
+  if (pending.length) share.mintOnRender(root, { keys: pending, resolve: async sid => {
+    const k = share.linkKey(aid, sid);
+    const link = await share.cachedLink(state.collectLinks, k, () => share.issueLink(api, { aid, sid, origin: location.origin }));
+    if (ep !== epoch || state.current?.assessment.id !== aid || !root.isConnected) throw share.failure();
+    return link.url;
+  } });
 }
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
