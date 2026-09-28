@@ -1,7 +1,27 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.22.2",
+  "current": "0.22.4",
   "versions": [
+    {
+      "version": "0.22.4",
+      "status": "candidate",
+      "notes_path": "releases/0.22.4.md",
+      "sections": {
+        "fixed": [
+          "Transfer ownership now offers a picker of the people who already have access, labelled by name or email, instead of asking for a raw principal id. (#331)"
+        ]
+      }
+    },
+    {
+      "version": "0.22.3",
+      "status": "candidate",
+      "notes_path": "releases/0.22.3.md",
+      "sections": {
+        "fixed": [
+          "After \"Complete 3D Review\" the owner still sees Permissions and Delete assessment (Delete keeps its dry-run confirm). The review stays read-only for everyone: responses, setup and next-steps content cannot be changed (captain ruling 2026-09-28 15:27 ET, \"Owner keeps Permissions + Delete after Complete\"). (#364)"
+        ]
+      }
+    },
     {
       "version": "0.22.2",
       "status": "candidate",
