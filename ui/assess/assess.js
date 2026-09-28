@@ -636,8 +636,8 @@ async function loadMyInvitations() {
 async function mountMyInvitation(gen) {
   const mine = await loadMyInvitations(); // read fresh on every mount: an invitation accepted or withdrawn elsewhere never re-offers
   if (gen !== generation || mine === null) return;
-  if (!mine.length) { app.innerHTML = inviteView({ status: 'missing' }); return; }
   const ctx = ctxFor();
+  if (!mine.length) { ctx.go(signInLanding({ projects: state.projects })); return; } // nothing (left) to accept, or the read failed → the existing landing, never a dead end
   mountInvite(app, { api: ctx.api, invitationId: mine[0].id, isCurrent: () => gen === generation,
     onAccepted: async () => {
       await reloadProjects(); const next = await loadMyInvitations();

@@ -10,8 +10,10 @@ import { sha256 } from "../src/handlers/common";
 import { execute } from "../src/dispatch";
 import { byId, capabilities } from "../src/registry";
 import type { Ctx } from "../src/handlers/types";
+import worker from "../src/worker";
+import { mintSession } from "../src/auth";
 
-const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "s9", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "s9-test-db" } }] }));
+const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "s9", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "s9-test-db" }, kvNamespaces: { OAUTH_KV: "s9-test-kv" } }] }));
 afterAll(() => mf.dispose());
 
 describe("S9 contract: cap.me.invitations + cap.grant.accept by invitation_id", () => {
@@ -109,5 +111,33 @@ describe("S9 contract: cap.me.invitations + cap.grant.accept by invitation_id", 
     await db.prepare("UPDATE invitation SET expires_at = ? WHERE id = ?").bind("2026-09-01T00:00:00.000Z", s4.result.invitation_id).run();
     expect((await mine(fourth, {})).result.invitations).toEqual([]);
     await expect(accept(fourth, { invitation_id: s4.result.invitation_id })).rejects.toMatchObject({ code: "INVALID_PARAMS", message: "invitation_expired" });
+  });
+  it("HTTP twins: GET /v2/me/invitations and POST /v2/me/invitations/{id}/accept run through the real worker; a stranger's answer equals an unknown id's", async () => {
+    const db = await mf.getD1Database("DB"); // same D1 as above (schema + seed already applied)
+    const env: any = { DB: db, SESSION_SECRET: "synthetic-s9-http-secret", OAUTH_KV: await mf.getKVNamespace("OAUTH_KV"), ENVIRONMENT: "dev" };
+    const now = new Date().toISOString();
+    for (const [id, email] of [["usr_h_o", "h-owner@example.invalid"], ["usr_h_v", "h-viewer@example.invalid"], ["usr_h_x", "h-stranger@example.invalid"]])
+      await db.prepare("INSERT OR IGNORE INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(email), 1, 0, now).run();
+    await db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind("g_h_o", "usr_h_o", "project", "proj_h", "owner", now).run();
+    const invId = "inv_h_1";
+    await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
+      .bind(invId, "project", "proj_h", await sha256("h-viewer@example.invalid"), "th_h_1", "viewer", "sent", "usr_h_o", now, new Date(Date.now() + 86400_000).toISOString()).run();
+    const ec = () => ({ waitUntil() {}, passThroughOnException() {}, props: undefined }) as any;
+    const http = async (cred: string, path: string, body?: unknown) => { const r = await worker.fetch(new Request("https://s9.test" + path, { method: body === undefined ? "GET" : "POST", headers: { authorization: "Bearer " + cred, "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }), env, ec()); return { status: r.status, body: await r.json() as any }; };
+    const viewer = await mintSession(env, "usr_h_v", "user"), stranger = await mintSession(env, "usr_h_x", "user");
+    const listed = await http(viewer, "/v2/me/invitations");
+    expect(listed.status).toBe(200); expect(listed.body.result.invitations.map((i: any) => [i.id, i.scope, i.role])).toEqual([[invId, { type: "project", id: "proj_h" }, "viewer"]]);
+    expect((await http(stranger, "/v2/me/invitations")).body.result.invitations).toEqual([]);
+    const theirs = await http(stranger, `/v2/me/invitations/${invId}/accept`, { mode: "dry_run" });
+    const none = await http(stranger, "/v2/me/invitations/inv_h_nope/accept", { mode: "dry_run" });
+    expect(theirs.status).toBe(404); expect(none.status).toBe(404);
+    expect([theirs.body.error.code, theirs.body.error.message]).toEqual([none.body.error.code, none.body.error.message]);
+    const dry = await http(viewer, `/v2/me/invitations/${invId}/accept`, { mode: "dry_run" });
+    expect(dry.status).toBe(200); expect(dry.body.result.impact.affected[0]).toMatchObject({ scope: { type: "project", id: "proj_h" }, role: "viewer" });
+    const done = await http(viewer, `/v2/me/invitations/${invId}/accept`, { mode: "execute", confirm_token: dry.body.result.confirm_token });
+    expect(done.status).toBe(200); expect(done.body.result).toMatchObject({ granted: true, role: "viewer" });
+    expect((await http(viewer, "/v2/me/invitations")).body.result.invitations).toEqual([]);
+    // the token twin still answers on its own path (unknown token → hidden, as before)
+    expect((await http(viewer, "/v2/invitations/il_not_a_real_token/accept", { mode: "dry_run" })).status).toBe(404);
   });
 });
