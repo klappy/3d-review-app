@@ -54,7 +54,7 @@ test('U14: assessment page wires it in the settings nav, lands on the project wi
   assert.equal(DELETED_NOTICE, 'Assessment deleted.');
   const src = readFileSync(new URL('../../assess/assess.js', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /window\.confirm\(/);
-  assert.match(src, /aria-label="Assessment settings"[^\n]*deleteAssessmentButton\(a\.role/);
+  assert.match(src, /aria-label="Assessment settings"[^\n]*deleteAssessmentButton\(sr, /); // S8b: settings role (owner keeps it after Complete)
   assert.match(src, /deleteAssessmentFlow\(del, \{ id: aid, api, ask: askStageMove/);
   assert.match(src, /pendingNotice = DELETED_NOTICE; location\.hash = cards\.routes\.project\(pid\)/);
   assert.match(src, /note\.textContent = pendingNotice \|\| ''/);

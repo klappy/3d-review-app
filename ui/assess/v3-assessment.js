@@ -246,6 +246,14 @@ export function v3CompleteLock(a) {
   if (!v3IsComplete(a)) return a;
   return { ...a, complete: true, granted_role: a.role, role: 'viewer' };
 }
+/** Captain ruling 2026-09-28 15:27 ET ("Owner keeps Permissions + Delete after Complete"): the lock covers responses, setup
+ *  and next-steps content; ownership actions stay. This is the role that gates the assessment settings (Permissions link,
+ *  Delete assessment): on a completed review the owner keeps 'owner'; everyone else keeps the lock's effective role. Every
+ *  content gate keeps reading a.role, so content writes stay refused. */
+export function v3SettingsRole(a) {
+  if (!a) return undefined;
+  return a.complete && a.granted_role === 'owner' ? 'owner' : a.role;
+}
 
 // component: Stepper (captain ruling 12:28 + 12:34). The assessment page's stage strip is the wizard's Stepper, imported
 // not copied: the server stage is the active dot, earlier stages ticked, every step links to its view (href from caller).
