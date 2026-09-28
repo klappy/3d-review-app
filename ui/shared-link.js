@@ -82,6 +82,7 @@ export function scopedStorage(storage, namespace) {
 export function draftFor(form, values) {
   const answers = {};
   for (const item of form.items) if (values[item.id] !== undefined) answers[item.id] = values[item.id];
+  if (values._other && typeof values._other === 'object') answers._other = values._other; // C01: "please describe" text rides the draft
   return { template: { id: form.template.id, version: form.template.version }, answers };
 }
 
@@ -100,6 +101,12 @@ export function restoreDraft(store, form) {
   const known = new Set(form.items.map(item => item.id));
   const answers = {};
   for (const [id, value] of Object.entries(draft.answers || {})) if (known.has(id)) answers[id] = value;
+  // C01: keep "please describe" text for known items only.
+  const other = draft.answers?._other;
+  if (other && typeof other === 'object' && !Array.isArray(other)) {
+    const kept = Object.fromEntries(Object.entries(other).filter(([id, text]) => known.has(id) && typeof text === 'string'));
+    if (Object.keys(kept).length) answers._other = kept;
+  }
   if (isEmptyDraft({ answers })) return null;
   return { answers };
 }
