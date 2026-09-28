@@ -1,30 +1,23 @@
 {
-  "version": "0.22.2",
+  "version": "0.22.3",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "bdaae74de1577cd2e73a0a725747567ca64618fa",
+  "cookbook_commit": "6a59b3fd3ab91bae7e1122168635ffab672ec8db",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.22.2.md",
-      "blob_sha": "5de1f30ffec749c36c91edc1e884fa0425d6cfdc",
-      "sha256": "ecc94044aae727271079881034c08c329e0197fe7e12ae7a71d845034af42009"
+      "path": "planning/2026-09-16-parity-build/releases/0.22.3.md",
+      "blob_sha": "23b342174f0c6dbc0a016f7e999386d97ce5581b",
+      "sha256": "8d252bc2e737a15231d81ae74baf46dae8a0a300d7d9882ad1b36df6f03c975e"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "e41bf6491a19fa8bfa9013f90bc6334fa860877d",
-      "sha256": "fb94918a99aa2da2959a30bc3f6d49f5b3e505896e4df690ad1b2e32ef4c518c"
+      "blob_sha": "1aff2d2ef77af94fd5ef7f873820de4cfe2898ff",
+      "sha256": "eecd63c709c291bf9e3aee981c263794e1c4be0e903e43161dc0548ac8224283"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "`GET /v2/me/invitations` (`cap.me.invitations`, read): the signed-in person's pending invitations, matched by their hashed email — scope, role, expiry and an inviter display name (always empty for now: no names are stored). Never the invitation token. (#365)"
-      ],
-      "changed": [
-        "`cap.grant.accept` also accepts `invitation_id` instead of the link token (HTTP: `POST /v2/me/invitations/{invitation_id}/accept`), only when the signed-in person's email is the invited one; anything else answers exactly like a missing invitation. The link-token path is unchanged. (#365)"
-      ],
       "fixed": [
-        "Someone an owner invited who simply signs in on the site (without opening the invitation email) now lands on an \"Accept invitation\" screen first — one heading, one line, one \"Accept\" — instead of an empty home. With nothing pending, sign-in lands as before (one project → that project; several → the projects list). Captain ruling 2026-09-28 15:27 ET (k0015) \"Add GET /v2/me/invitations + accept by invitee identity\"; B04 step (c). (#365)",
-        "Survey questions with an \"Other (please describe)\" choice now show a short \"Please describe\" text field while Other is chosen (both the /participate/ page and the shared #survey= link). The text is kept with the device draft, shown beside the Other choice on Review your answers, and saved with the response inside the existing answers JSON under \"_other\" ({ question id: text }, up to 500 characters) — no migration. Text typed under Other and then abandoned for another choice is dropped. Legacy / Lovable items (option code \"other\") get the field too. (#363)"
+        "After \"Complete 3D Review\" the owner still sees Permissions and Delete assessment (Delete keeps its dry-run confirm). The review stays read-only for everyone: responses, setup and next-steps content cannot be changed (captain ruling 2026-09-28 15:27 ET, \"Owner keeps Permissions + Delete after Complete\"). (#364)"
       ]
     }
   }
