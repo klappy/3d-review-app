@@ -13,7 +13,7 @@ import { sidebarTree } from '/v3/components/sidebar-tree.js';
 import { learnMore } from '/v3/components/learn-more.js';
 import { collectLine, periodText } from '/v3/components/active-until.js';
 // Bincy B03: `#invite=<token>` is handled here (v3), not forwarded to /legacy/.
-import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment } from '/v3/components/invite.js';
+import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations } from '/v3/components/invite.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
 const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
 import { pages, css as scopeCss, landsOnWork, signInLanding, whoLine } from '/assess/scope.js';
@@ -127,7 +127,7 @@ const redact = m => redactDiagnosticPath(String(m || 'Request could not be compl
 //                                                  (Bugbot 4041134416). Results are bound to (aid, epoch) (Auditor 2A-3).
 //   generation   counter                           a later render supersedes an earlier one's DOM write (supplier 1114cb1)
 let generation = 0, epoch = 0, identityGeneration = 0;
-const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null, collectLinks: new Map() };
+const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null, collectLinks: new Map(), myInvitations: null };
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']); // visibility/authz codes (supplier 97f7402 + policy.ts)
@@ -613,6 +613,7 @@ async function render() {
 function mountInvitePage(gen) {
   syncShell(); app.className = ''; document.title = 'Invitation · 3D Review';
   const t = pendingInvite || storedInvite();
+  if (!t && state.principal) { mountMyInvitation(gen); return; } // B04 step c: no link token — the signed-in person's own invitations
   if (!t) { app.innerHTML = inviteView({ status: 'missing' }); return; }
   if (!state.principal) { app.innerHTML = inviteView({ status: 'signin' }); return; }
   const ctx = ctxFor();
@@ -620,6 +621,30 @@ function mountInvitePage(gen) {
     // Accepted (Bugbot on #298): re-read the project list the way boot does, so the granted project's name is known to Home and
     // the assessment header without a page reload; a failed re-read keeps the old list and still goes Home.
     onAccepted: async () => { await reloadProjects(); if (gen === generation) ctx.go(cards.routes.projects); } });
+}
+// B04 step c (captain 2026-09-28): invitations addressed to the signed-in person (GET /v2/me/invitations, matched by hashed email on
+// the server; no token). Any failure → [] so the existing landing stands. Returns null when the identity changed while in flight.
+async function loadMyInvitations() {
+  const identity = identityGeneration;
+  let list = [];
+  try { list = pendingInvitations(await api('/v2/me/invitations')); } catch { list = []; }
+  if (identity !== identityGeneration) return null;
+  state.myInvitations = list; return list;
+}
+// "Accept invitation" first: the oldest pending invitation, accepted by id (same cap.grant.accept dry run → confirm → execute). After
+// each accept the list is read again: another pending → that one next; none → the existing landing (one project → it; else Home).
+async function mountMyInvitation(gen) {
+  const mine = await loadMyInvitations(); // read fresh on every mount: an invitation accepted or withdrawn elsewhere never re-offers
+  if (gen !== generation || mine === null) return;
+  if (!mine.length) { app.innerHTML = inviteView({ status: 'missing' }); return; }
+  const ctx = ctxFor();
+  mountInvite(app, { api: ctx.api, invitationId: mine[0].id, isCurrent: () => gen === generation,
+    onAccepted: async () => {
+      await reloadProjects(); const next = await loadMyInvitations();
+      if (gen !== generation || next === null) return;
+      if (next.length) { mountMyInvitation(gen); return; }
+      ctx.go(signInLanding({ projects: state.projects }));
+    } });
 }
 // The project list read boot uses. Returns false (state untouched) when the identity changed while it was in flight.
 async function reloadProjects() {
@@ -810,7 +835,7 @@ function resetIdentity() {
   document.getElementById('account-switch-dialog')?.close();
   state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
-  state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false;
+  state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false; state.myInvitations = null;
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
   for (const id of ['legacy-link', 'whats-here-wrap']) { const el = document.getElementById(id); if (el) el.hidden = true; }
 }
@@ -874,7 +899,11 @@ async function boot() {
     state.projects = []; note.innerHTML = `Could not load your project list (${esc(redact(e.message))}). <a href="#" data-retry-boot>Retry</a>`; note.querySelector('[data-retry-boot]').onclick = ev => { ev.preventDefault(); note.textContent = ''; boot(); };
     if (!['assessment', 'survey', 'feedback', 'invite'].includes(route(location.hash).kind)) /* B03: acceptance does not need the list */ { syncShell(); app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
   // B04: once, right after a sign-in, the landing follows Bincy's rule (invitation → accept screen; one project → it; several → Home).
-  if (landAfterSignIn) { landAfterSignIn = false; if (['projects', 'invite', 'entry'].includes(route(location.hash).kind)) { try { history.replaceState(null, '', location.pathname + location.search + signInLanding({ invite: !!(pendingInvite || storedInvite()), projects: state.projects })); } catch {} } }
+  // B04 step c: no link token in this tab → ask the server for invitations addressed to this person; any → the accept screen first.
+  if (landAfterSignIn) { landAfterSignIn = false; if (['projects', 'invite', 'entry'].includes(route(location.hash).kind)) {
+    const linkInvite = !!(pendingInvite || storedInvite());
+    const mine = linkInvite ? [] : await loadMyInvitations(); if (mine === null || identity !== identityGeneration) return;
+    try { history.replaceState(null, '', location.pathname + location.search + signInLanding({ invite: linkInvite || mine.length > 0, projects: state.projects })); } catch {} } }
   listen();
   await render();
 }
