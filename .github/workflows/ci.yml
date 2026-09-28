@@ -8,12 +8,14 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-latest
+    env:
+      # scripts/stamp-version.mjs requires the real 40-hex commit in CI (Workers Builds injects it; Actions must too)
+      WORKERS_CI_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
