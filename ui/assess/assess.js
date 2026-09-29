@@ -485,7 +485,7 @@ function bindPrepare(current) {
   app.querySelectorAll('button[data-stage]').forEach(b => b.onclick = () => {
     const to = b.dataset.stage, effect = to === 'collect' ? `opens collection for ${n} included survey${n === 1 ? '' : 's'}` : current.assessment.stage === 'collect' ? `closes collection for ${n} included survey${n === 1 ? '' : 's'}` : 'does not change collection';
     // U34: asked in the page (shared Review gate confirm), never window.confirm.
-    askStageMove(b, `Move this assessment from ${stageLabel(current.assessment.stage)} to ${stageLabel(to)}? This ${effect}.`, `Move to ${title(to)}`, () =>
+    askStageMove(b, `Move this assessment from ${stageLabel(current.assessment.stage)} to ${stageLabel(to)}? This ${effect}.`, 'Yes, move', () => // one "Move to …" label per screen: the in-page confirm says "Yes, move", never the label of the button that opened it
       act(aid, 'Moving stage…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/stage`, { method: 'POST', body: { stage: to } }); return `Stage is now ${stageLabel(r.assessment.stage)}.`; })); // refusal: act() shows the server error.message verbatim
   });
   const f = app.querySelector('#prepare-form'); if (!f) return;

@@ -593,3 +593,11 @@ test('U46: setup refuses a past Active until date with one inline line under the
   assert.match(html, /name="until" value="2020-01-31" required><span class="wz-field-error" role="alert" data-until-error>Pick today or later<\/span><\/label>/);
   assert.doesNotMatch(html, /class="note alert"/, 'not repeated in the top box');
 });
+test('Setup "Starts" defaults to the facilitator\'s local today, late evening west of UTC included', t => {
+  const tz = process.env.TZ; process.env.TZ = 'America/New_York';
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-29T01:30:00Z') }); // 21:30 on 28 Sep in New York, already 29 Sep in UTC
+  try {
+    assert.equal(freshDraft().starts, '2026-09-28');
+    assert.match(renderStep('details', freshDraft(), { projects: [], languages: [], templates: [] }), /name="starts" value="2026-09-28"/);
+  } finally { t.mock.timers.reset(); if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz; }
+});
