@@ -208,14 +208,14 @@ test('B36/U45 bindGroupLinks: Copy copies that group\'s link in one tap; the QR 
   assert.match(bad.status.className, /alert/);
 });
 
-test('B36 issueLink: one tap = dry_run then execute on that survey; returns the participant URL; Collect wires it in assess.js', async () => {
+test('B36 issueLink: one tap = dry_run then execute on that survey; returns the participant URL; Collect wires it in assess.js (with Open survey, BCS 2026-09-29)', async () => {
   const { issueLink } = await import('./share.js');
   const { api, calls } = fakeApi({ [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct1', expires_in: 300 } : { link_id: 'inv_1', entry_fragment: '#survey=TOK', expires_at: null } });
   const link = await issueLink(api, { aid: 'a1', sid: 's1', origin: 'https://example.test' });
   assert.deepEqual(calls.map(c => c.body.mode), ['dry_run', 'execute']); assert.equal(calls[1].body.confirm_token, 'ct1');
   assert.equal(link.id, 'inv_1'); assert.match(link.url, /^https:\/\/example\.test\/.*#survey=TOK$/);
   const src = read('./assess.js');
-  assert.match(src, /share\.groupLinks\(\{ esc \}, \[\{ key: s\.id, title: s\.template_name, line: whoLine\(g\.lens\) \|\| g\.lens, url: share\.knownLink\(state\.collectLinks, share\.linkKey\(a\.id, s\.id\)\)\?\.url \}\]\)/);
+  assert.match(src, /share\.groupLinks\(\{ esc \}, \[\{ key: s\.id, title: s\.template_name, line: whoLine\(g\.lens\) \|\| g\.lens, href: `#assessment\/\$\{encodeURIComponent\(a\.id\)\}\/survey\/\$\{encodeURIComponent\(s\.id\)\}`, url: share\.knownLink\(state\.collectLinks, share\.linkKey\(a\.id, s\.id\)\)\?\.url \}\]\)/);
   assert.match(src, /share\.bindGroupLinks\(root/); assert.match(src, /share\.issueLink\(api/); assert.match(src, /state\.collectLinks\.clear\(\)/);
   assert.doesNotMatch(src.slice(src.indexOf('function bindCollectLinks'), src.indexOf('function collectPanel')), /localStorage|sessionStorage|console\./);
 });

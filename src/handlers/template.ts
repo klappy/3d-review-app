@@ -1,9 +1,11 @@
 import type { Handler } from "./types";
 import { CapError } from "./errors";
 import { LEGACY_TEMPLATE_IDS } from "../legacy-templates";
+import { withDisplayName } from "../display-names";
 import { loadTemplate, nowIso, optInt, parseItems, renderItems, reqStr, requireSupport, requireUser, type TemplateRow } from "./common";
 
-function meta(t: TemplateRow) { return { id:t.id, version:t.version, name:t.name, perspective:t.perspective, source_ref:t.source_ref, published_at:t.published_at }; }
+// Display name (Translators, Team leaders & mentors) with the pinned name kept as source_name when they differ.
+function meta(row: TemplateRow) { const t=withDisplayName(row); return { id:t.id, version:t.version, name:t.name, ...(t.source_name?{source_name:t.source_name}:{}), perspective:t.perspective, source_ref:t.source_ref, published_at:t.published_at }; }
 export const list: Handler = async ctx => {
   requireUser(ctx);
   // B42: the catalogue offers instruments for NEW surveys. Legacy import-only templates (Mid-Level v1 (legacy)) stay out of it so each
