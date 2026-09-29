@@ -80,21 +80,48 @@ export function instrumentStrings(items: Item[]): string[] {
   return out;
 }
 
-/** SHA-256 hashes of every English string this scope may translate. Unknown or unpublished template → empty set. */
-export async function allowedHashes(db: D1Database | undefined, scope: TranslateScope): Promise<Set<string>> {
+/**
+ * Language names are member-authored (cap.language.create sets no length or charset limit), and the welcome lead that
+ * carries one reaches the ANONYMOUS participant-ui scope. Security review on #377 (e): only names of a strict shape are
+ * allowlisted — at most 60 characters and 6 words, Unicode letters/marks/spaces/hyphen/apostrophe/parentheses only — and
+ * every allowed welcome lead is marked `isolated` so /v2/translate sends it upstream ALONE, never in the same batch as
+ * the shared page words (an injected name cannot steer the translation of rows every project serves).
+ */
+export const MAX_LANGUAGE_NAME = 60;
+export const MAX_LANGUAGE_NAMES = 5000;
+const NAME_SHAPE = /^[\p{L}\p{M}][\p{L}\p{M} \-'’()]*$/u;
+export function allowlistableLanguageName(name: unknown): name is string {
+  if (typeof name !== "string" || !name || name.length > MAX_LANGUAGE_NAME || name !== name.trim()) return false;
+  if (!NAME_SHAPE.test(name) || /\s{2,}/.test(name)) return false;
+  return name.split(" ").length <= 6;
+}
+
+export interface ScopeAllowlist { allowed: Set<string>; isolated: Set<string> }
+
+/** SHA-256 hashes of every English string this scope may translate, and which of them must go upstream alone. */
+export async function allowedScope(db: D1Database | undefined, scope: TranslateScope): Promise<ScopeAllowlist> {
+  const isolated = new Set<string>();
   if (scope.kind === "ui") {
-    const set = new Set(await staticUiHashes());
+    const allowed = new Set(await staticUiHashes());
     if (db) {
-      try { // welcome lead names the assessment's language (language.name); only names that exist are allowed
-        const { results } = await db.prepare("SELECT DISTINCT name FROM language LIMIT 5000").all<{ name: string }>();
-        await hashAll(results.map((r) => welcomeLead(r.name)), set);
+      try { // welcome lead names the assessment's language (language.name); only well-shaped names that exist are allowed
+        const { results } = await db.prepare("SELECT DISTINCT name FROM language ORDER BY name LIMIT ?").bind(MAX_LANGUAGE_NAMES).all<{ name: string }>();
+        await hashAll(results.map((r) => r.name).filter(allowlistableLanguageName).map((n) => welcomeLead(n)), isolated);
+        for (const h of isolated) allowed.add(h);
       } catch { /* the page words still work */ }
     }
-    return set;
+    return { allowed, isolated };
   }
+  return { allowed: await formHashes(db, scope.templateId), isolated };
+}
+/** SHA-256 hashes of every English string this scope may translate. Unknown or unpublished template → empty set. */
+export async function allowedHashes(db: D1Database | undefined, scope: TranslateScope): Promise<Set<string>> {
+  return (await allowedScope(db, scope)).allowed;
+}
+async function formHashes(db: D1Database | undefined, templateId: string): Promise<Set<string>> {
   if (!db) return new Set();
   try {
-    const { results } = await db.prepare("SELECT items_json FROM survey_template WHERE id = ? AND published_at IS NOT NULL").bind(scope.templateId).all<{ items_json: string }>();
+    const { results } = await db.prepare("SELECT items_json FROM survey_template WHERE id = ? AND published_at IS NOT NULL").bind(templateId).all<{ items_json: string }>();
     if (!results.length) return new Set();
     const texts: string[] = [];
     for (const r of results) { try { texts.push(...instrumentStrings(JSON.parse(r.items_json))); } catch { /* skip a bad row */ } }

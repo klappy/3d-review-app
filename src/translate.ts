@@ -25,12 +25,14 @@
 import type { Env } from "./handlers/types";
 import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { inScript, lwcLanguage, type LwcLanguage } from "./languages";
-import { allowedHashes, parseScope, upstreamContext } from "./translate-allowlist";
+import { allowedScope, parseScope, upstreamContext } from "./translate-allowlist";
 
 export const TRANSLATE_LIMITS = Object.freeze({ maxKeys: 600, maxKeyLength: 200, maxTextLength: 2000, maxTotalChars: 150_000, timeoutMs: 45_000 });
 const CONTEXT = /^[A-Za-z0-9_.:@-]{1,120}$/;
 const ENGLISH = new Set(["en", "eng", "english"]);
 const IN_CHUNK = 90; // D1 allows 100 bound parameters per statement
+/** Isolated strings (welcome leads carrying a member-authored language name) each cost one upstream call; the page sends one. */
+export const MAX_ISOLATED_PER_REQUEST = 2;
 
 export interface TranslateRequest { targetLang: string; context: string; sourceTexts: Record<string, string> }
 type Deps = { fetch?: typeof fetch; now?: () => Date };
@@ -131,7 +133,7 @@ export async function handleTranslate(request: Request, env: Env, deps: Deps = {
 
   // Unique English strings by hash (the same sentence on two screens is one memory row), kept only when the hash is in
   // the scope's published set (F1/F2): anything else is refused before memory, upstream or storage.
-  const allowed = await allowedHashes(env.DB, scope);
+  const { allowed, isolated } = await allowedScope(env.DB, scope);
   const hashOfKey = new Map<string, string>(), textOfHash = new Map<string, string>();
   let refused = 0;
   for (const [k, text] of Object.entries(parsed.sourceTexts)) {
@@ -148,8 +150,18 @@ export async function handleTranslate(request: Request, env: Env, deps: Deps = {
   const missing = new Map(hashes.filter((h) => !found.has(h)).map((h) => [h, textOfHash.get(h)!]));
   let upstreamStatus = 200, fresh = new Map<string, string>();
   if (missing.size) {
-    const up = await askUpstream(env, deps, lang, upstreamContext(scope), missing);
-    upstreamStatus = up.status; fresh = up.texts;
+    // Security review on #377 (e): a string built from a member-authored language name never shares an upstream call
+    // with other strings — the shared batch holds page words only, and each welcome lead goes alone (bounded per request).
+    const shared = new Map([...missing].filter(([h]) => !isolated.has(h)));
+    const batches = [...missing].filter(([h]) => isolated.has(h)).slice(0, MAX_ISOLATED_PER_REQUEST).map((e) => new Map([e]));
+    if (shared.size) batches.unshift(shared);
+    const statuses: number[] = [];
+    for (const batch of batches) {
+      const up = await askUpstream(env, deps, lang, upstreamContext(scope), batch);
+      statuses.push(up.status);
+      for (const [h, t] of up.texts) fresh.set(h, t);
+    }
+    upstreamStatus = statuses.includes(200) ? 200 : statuses[statuses.length - 1] ?? 200;
     if (memory && fresh.size) {
       const at = (deps.now?.() ?? new Date()).toISOString();
       try {

@@ -22,8 +22,10 @@ Captain rulings, 2026-09-28:
 - **Prepare** view of an existing assessment (owners/members) — same checkboxes, saved with Save preparation.
 - API: `lwc` (list of BCP 47 tags, or `"lo,th"`) on `cap.project.create|update` and `cap.assessment.create|update`;
   `cap.response.form` returns `languages: [{code, name, endonym, dir, review}]`.
-- Supported table: `src/languages.ts` (browser mirror `ui/v3/lwc.js`; a test keeps them identical). 23 languages:
-  lo th km my vi id ms fil zh-Hans hi mr ne bn or ta te si ur ar sw fr es pt. `review: true` for lo km my ne or si.
+- Supported table: `src/languages.ts` (browser mirror `ui/v3/lwc.js`; a test keeps them identical). 25 tags: 24
+  machine-translated languages — lo th km my vi id ms fil zh-Hans hi mr ne bn or kn ta te si ur ar sw fr es pt — and
+  `ins` (Indian Sign Language), which is recorded as an LWC but never machine-translated (`mt: false`: not in the
+  participant picker, refused by `/v2/translate`). `review: true` for lo km my ne or kn si (and ins).
 
 ## Server: `POST /v2/translate` (src/translate.ts)
 - Request `{ targetLang: <supported tag or English name>, context, sourceTexts: {key: english} }` →
@@ -36,6 +38,10 @@ Captain rulings, 2026-09-28:
   texts and choice labels of the **published** versions of that instrument plus the About-you fields. Anything else is
   refused (`400 not_published`, or omitted with `refused: n` and `partial: true`): never sent upstream, never stored,
   never served. The upstream receives a context the server builds from the verified scope, never the caller's text.
+- **Language names are member-authored**, so the welcome sentence that carries one is allowlisted only when the name has a
+  strict shape (≤ 60 characters, ≤ 6 words, Unicode letters/marks/spaces/hyphen/apostrophe/parentheses; names read in
+  name order, at most 5,000). Each such sentence goes upstream **in its own request** (at most 2 per call), never in the
+  same batch as the page words shared by every project (security review on #377, finding e).
 - **Translation memory in D1** (`translation_memory`, migration 0012), keyed by `(locale, SHA-256 of the exact English
   text)`. A string is translated **once**, stored, and served from storage forever (first write wins; never regenerated
   on read — LLM output is not reproducible, storage is). Only strings the memory lacks go upstream. Status:
