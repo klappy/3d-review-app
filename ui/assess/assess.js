@@ -1,3 +1,4 @@
+import { mountPassages } from './passages.js';
 import { lwcFieldset, lwcFrom, LWC_CSS } from '../v3/lwc.js';
 import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
 // /assess/ — showcase-based assessment screen (cookbook #16 order c5719384228, slice 1).
@@ -394,8 +395,10 @@ function viewTabs(a, current) { ensureStepperStyle(globalThis.document); const s
 // Prepare view (showcase `prepareView()`): purpose, saved through cap.assessment.update (O/M); viewers read. The name is the heading (B07).
 function prepareView(current) {
   const a = current.assessment, mayEdit = a.role === 'owner' || a.role === 'member';
-  const fields = `<label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>${mayEdit && typeof lwcFieldset === 'function' ? `<style>${LWC_CSS}</style>${lwcFieldset(a.lwc || [], esc)}` : ''}`; // dynamic translation: languages participants may switch to (owners/members; typeof guard: vm test harnesses strip imports)
+  const fields = `<label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>${mayEdit && typeof lwcFieldset === 'function' ? `<style>${LWC_CSS}</style>${lwcFieldset(a.lwc || [], esc)}` : ''}`;
+  const passagesRoot = typeof mountPassages === 'function' && !demo ? '<div id="passages-root"></div>' : ''; // passage files and links (Lovable parity) // dynamic translation: languages participants may switch to (owners/members; typeof guard: vm test harnesses strip imports)
   const form = mayEdit ? `<form id="prepare-form">${fields}<div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save preparation</button></div></form>` : `<div>${fields}${a.complete ? '' : `<p class="small muted">Your role here is ${esc(a.role)}: preparation is read-only.</p>`}</div>`;
+  const formWithPassages = form + passagesRoot;
   const i = PHASES.indexOf(a.stage), prev = PHASES[i - 1], next = PHASES[i + 1], n = activeSurveys(current).length;
   const move = mayEdit ? `<div class="actions">${prev ? `<button type="button" data-stage="${prev}" ${state.busy ? 'disabled' : ''}>← Back to ${title(prev)}</button>` : ''}${next && a.stage !== 'collect' ? `<button type="button" data-stage="${next}" ${state.busy ? 'disabled' : ''}>Move to ${title(next)} →</button>` : ''}</div>` : ''; // lane 9 L9-24: one primary on this view (Save preparation); U34: Move to Understand lives on Collect
   // Lane 9 L9-24 (validator #282): ONE view heading ("Prepare this assessment"). The stage is an eyebrow + badge, not a second
@@ -403,7 +406,7 @@ function prepareView(current) {
   // <aside>: kit.css turns every `.rv aside` into a nav flex row at ≤760px (squashed/clipped at 390px).
   const more = `${mayEdit ? `<p class="muted">Moving into Collect opens collection; moving out of Collect closes it — for all ${n} included survey${n === 1 ? '' : 's'}.</p><p class="muted">One stage at a time, as the server allows.</p>` : ''}<p class="muted">The stage is the assessment's own state. Browsing these views never changes it.</p>${a.language_name ? `<p class="small muted">Language: ${esc(a.language_name)}</p>` : ''}${a.period ? `<p class="small muted">Period: ${esc(periodText(a.period))}</p>` : ''}`;
   const stage = `<section class="panel" data-stage-panel><p class="eyebrow">Stage <span class="badge">${stageLabel(a.stage)}</span></p>${move}${learnMore(more)}</section>`;
-  return `<div class="grid"><section class="panel"><h2>Prepare this assessment</h2>${form}</section>${stage}</div>`;
+  return `<div class="grid"><section class="panel"><h2>Prepare this assessment</h2>${formWithPassages}</section>${stage}</div>`;
 }
 function screen(current, view = null) {
   const a = current.assessment, project = state.projects.find(p => p.id === a.project_id);
@@ -489,6 +492,8 @@ function bindPrepare(current) {
     askStageMove(b, `Move this assessment from ${stageLabel(current.assessment.stage)} to ${stageLabel(to)}? This ${effect}.`, `Move to ${title(to)}`, () =>
       act(aid, 'Moving stage…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/stage`, { method: 'POST', body: { stage: to } }); return `Stage is now ${stageLabel(r.assessment.stage)}.`; })); // refusal: act() shows the server error.message verbatim
   });
+  // Passage files and links (captain 2026-09-29; Lovable parity): owners/members manage, viewers see the list.
+  const pr = app.querySelector('#passages-root'); if (pr && typeof mountPassages === 'function') { const role = current.assessment.role; mountPassages({ root: pr, aid, mayEdit: (role === 'owner' || role === 'member') && !current.assessment.complete, esc, token: () => token }); }
   const f = app.querySelector('#prepare-form'); if (!f) return;
   f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f); act(current.assessment.id, 'Saving preparation…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(current.assessment.id)}`, { method: 'PATCH', body: { purpose: String(fd.get('purpose')).trim(), ...(typeof lwcFrom === 'function' ? { lwc: lwcFrom(fd).join(',') || null } : {}) } }); return `Saved: ${r.assessment.name}`; }); };
 }

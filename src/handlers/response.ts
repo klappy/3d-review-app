@@ -1,5 +1,6 @@
 import type { Ctx, Handler } from "./types";
 import { participantLanguages } from "../languages";
+import { participantPassages } from "../passages";
 import { CapError, notVisible } from "./errors";
 import { gate, isOtherOption, newId, nowIso, OTHER_TEXT_KEY, OTHER_TEXT_MAX, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
 
@@ -86,7 +87,9 @@ export const form: Handler = async (ctx, params) => {
     const l = await ctx.db.prepare("SELECT a.lwc_json AS a_lwc, p.lwc_json AS p_lwc FROM assessment a JOIN project p ON p.id = a.project_id WHERE a.id = ?").bind(s.assessment_id).first<{ a_lwc: string; p_lwc: string }>();
     languages = participantLanguages(l?.a_lwc, l?.p_lwc);
   } catch { languages = []; }
-  return { result: { survey_id: s.id, assessment: s.name, language: s.language_name, period: s.period, languages,
+  // Passage under review (captain 2026-09-29, Lovable parity): files as 12-hour signed links, or the facilitator's link.
+  const passages = await participantPassages(ctx.env, s.assessment_id);
+  return { result: { survey_id: s.id, assessment: s.name, language: s.language_name, period: s.period, languages, passages,
     project: s.project_name, purpose: s.purpose, format: s.format,
     template: { id: s.template_id, version: s.template_version, perspective: s.perspective, source_ref: s.source_ref },
     items: renderItems(items, s.language_name), participant_labels: participantLabels(s.template_id),

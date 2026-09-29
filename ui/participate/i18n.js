@@ -49,6 +49,11 @@ export const UI_EN = Object.freeze({
   chooseOptional: 'Choose (optional)',
   pleaseDescribe: 'Please describe',
   responseSaved: 'Response saved',
+  passageTitle: 'The passage',
+  passageRead: 'Read the passage',
+  passageListen: 'Listen to the passage',
+  passageWatch: 'Watch the passage',
+  passageOpen: 'Open the passage',
 });
 
 // Every translatable string of one form, keyed by stable ids (item id + option code), never by position.
