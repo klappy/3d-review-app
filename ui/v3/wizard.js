@@ -47,7 +47,7 @@ const enc = encodeURIComponent;
 const LANG_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{1,8})*$/; // mirrors src/handlers/language.ts CODE (cap.language.create `code`)
 
 export function freshDraft() {
-  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', starts: todayIso(), until: '', format: 'Written', purpose: '', groups: {}, context: {} };
+  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', starts: todayIso(), until: '', format: 'Written', purpose: '', groups: {}, context: {}, demographics: false };
 }
 
 // Ruling (a): a denominator appears only when the facilitator entered one.
@@ -84,6 +84,10 @@ export function validateStep(step, d, today = todayIso()) {
 
 // The ordered write plan for "Launch the review". Pure, so the order is testable without a network.
 // pre: template ids whose survey a saved draft already holds (selected on an earlier, part-done launch); not selected again.
+// S15b: facilitator-only switch in step 3 (captain: hidden by default; the facilitator turns it on, never the participants).
+export function demographicsToggle(on) {
+  return `<label class="field check" data-wz-demographics><input type="checkbox" name="demographics" ${on ? 'checked' : ''}> Ask participants about themselves (age range, gender)</label><p class="small muted">Off by default. Both answers stay optional for participants.</p>`;
+}
 export function launchPlan(d, pre = []) {
   const plan = [];
   if (d.project === NEW_PROJECT) {
@@ -103,6 +107,9 @@ export function launchPlan(d, pre = []) {
     plan.push({ cap: 'cap.survey.select', method: 'POST', url: ctx => `/v2/assessments/${enc(ctx.aid)}/surveys`, body: () => (context && Object.keys(context).length ? { template_id: tid, version: Number(g.version), context } : { template_id: tid, version: Number(g.version) }),
       keep: (r, ctx) => { ctx.surveys.push({ id: r.survey.id, template: tid, expected: expectedValue(g.expected) }); } });
   }
+  // S15b: the facilitator's "Ask participants about themselves" switch (off by default). The server stores it on the selected
+  // groups, so it is written only after the groups exist, and only when the facilitator turned it on.
+  if (d.demographics === true) plan.push({ cap: 'cap.assessment.update', method: 'PATCH', url: ctx => `/v2/assessments/${enc(ctx.aid)}`, body: () => ({ demographics_enabled: true }) });
   plan.push({ cap: 'cap.assessment.set_stage', method: 'POST', url: ctx => `/v2/assessments/${enc(ctx.aid)}/stage`, body: () => ({ stage: 'collect' }) });
   plan.push({ cap: 'cap.survey.issue_link', each: 'surveys' });
   return plan;
@@ -134,6 +141,7 @@ export function draftFromSaved(a, surveys = [], store) {
     pre.push({ id: x.id, template: x.template_id, version: Number(x.template_version) });
   }
   const snap = { name: a.name || '', purpose: a.purpose ?? null, period: a.period ?? null, format: a.format ?? null, language_id: a.language_id || null };
+  d.demographics = a.demographics_enabled === true; // S15b: resume shows the switch as the server holds it
   return { d, step: validateStep('details', d).length ? 'details' : 'participants', saved: { aid: a.id, pid: a.project_id, role: a.role || '', snap, pre } };
 }
 // The launch ctx for a saved draft: the assessment exists (done), surveys it already holds and are still chosen are kept.
@@ -343,12 +351,13 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
         : '<p class="muted">No published surveys are available to this account.</p>'}
       ${act(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
-  if (step === 'information') return `${head(n, 'Participant information', 'What participants see before they answer.', '<p class="muted" data-wz-about>Each participant may also give an age range and gender. Both are optional.</p>')}${errBox(errs)}
+  if (step === 'information') return `${head(n, 'Participant information', 'What participants see before they answer.', '<p class="muted" data-wz-about>Participants are not asked their age range and gender unless you turn that on below.</p>')}${errBox(errs)}
     <form data-wz-form="information">
       <h3>Shown to every participant</h3>
       <dl class="kv"><dt>Project</dt><dd>${esc(proj.name || '')}</dd><dt>Language</dt><dd>${esc(lang.name || '')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd><dt>Format</dt><dd>${esc(d.format)}</dd>${dates(d)}</dl>
       <h3>Asked of each participant</h3>
       ${chosen.map(t => `<div class="group"><span class="pdot ${pdot(t.perspective)}" aria-hidden="true"></span><div><h3>${esc(t.perspective)}</h3><span class="sub">The ${esc(t.name)} survey, as published.</span>${groupContextFields(t, (d.context || {})[t.id], pre.has(t.id))}</div></div>`).join('')}${chosen.length ? `<p class="small muted">${PRIVACY_LINE}</p>` : ''}
+      ${chosen.length ? demographicsToggle(d.demographics === true) : ''}
       ${act(true, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   // review
@@ -401,7 +410,7 @@ export function mountWizard(root, deps) {
     if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'starts', 'until', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
     if (form.dataset.wzForm === 'details' && fd.has('newOrgPick')) { const v = String(fd.get('newOrgPick')); d.newOrgOther = v === ORG_OTHER; if (!d.newOrgOther) d.newOrg = v; else if (!fd.has('newOrg')) d.newOrg = ''; }
     if (form.dataset.wzForm === 'details') { if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
-    if (form.dataset.wzForm === 'information') { const c = {}; for (const box of form.querySelectorAll('[data-wz-context]')) { const tid = box.dataset.wzContext, t = latestTemplates(s.data.templates).find(x => x.id === tid); if (!t) continue; const v = contextValues(groupFields(t.perspective), k => fd.get(`c-${tid}-${k}`)); if (Object.keys(v).length) c[tid] = v; } d.context = c; }
+    if (form.dataset.wzForm === 'information') { const c = {}; for (const box of form.querySelectorAll('[data-wz-context]')) { const tid = box.dataset.wzContext, t = latestTemplates(s.data.templates).find(x => x.id === tid); if (!t) continue; const v = contextValues(groupFields(t.perspective), k => fd.get(`c-${tid}-${k}`)); if (Object.keys(v).length) c[tid] = v; } d.context = c; d.demographics = fd.get('demographics') === 'on'; }
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked || box.hasAttribute('data-wz-pre')) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
   };
   root.addEventListener('change', async e => {

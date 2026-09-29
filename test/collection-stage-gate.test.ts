@@ -21,6 +21,7 @@ describe("explicit Collect stage gates selected surveys", () => {
     await db.batch(statements("../migrations/0002_code_escrow.sql"));
     await db.batch(statements("../migrations/0003_language_archive.sql"));
     await db.batch(statements("../seed/synthetic.sql"));
+    await db.batch(statements("../migrations/0011_context.sql")); // S15b: cap.assessment.get reads the demographics switch (assessment_survey.context_json)
     const ctx: Ctx = { env: { DB: db, SESSION_SECRET: "synthetic-only" }, db,
       principal: { kind: "user", id: "person_mara" }, traceId: "tr_collection_gate",
       now: () => new Date("2026-09-16T20:00:00.000Z"), log: () => {} };

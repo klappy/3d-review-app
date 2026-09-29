@@ -15,7 +15,7 @@ async function call(method:string,url:string,bearer?:string) {
 }
 beforeAll(async()=>{
   db=await mf.getD1Database("DB");
-  for(const file of ["migrations/0001_init.sql","migrations/0002_code_escrow.sql","migrations/0003_language_archive.sql","migrations/0004_pinned_instruments.sql","migrations/0007_shared_link_context.sql","seed/synthetic.sql"]){
+  for(const file of ["migrations/0001_init.sql","migrations/0002_code_escrow.sql","migrations/0003_language_archive.sql","migrations/0004_pinned_instruments.sql","migrations/0007_shared_link_context.sql","seed/synthetic.sql","migrations/0011_context.sql"]){
     const sql=readFileSync(new URL("../"+file,import.meta.url),"utf8").split("\n").filter(l=>!l.trimStart().startsWith("--")).join("\n");
     await db.batch(sql.split(";\n").map(x=>x.trim()).filter(Boolean).map(x=>db.prepare(x)));
   }
