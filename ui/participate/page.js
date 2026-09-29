@@ -1,6 +1,6 @@
 import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
-import { mountParticipantView, itemError, drawAbout, aboutValues } from '../participant-view.js';
+import { mountParticipantView, itemError, drawAbout, aboutValues, aboutFields } from '../participant-view.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
 
 const $ = id => document.getElementById(id);
@@ -56,7 +56,7 @@ function paint(state) {
           else field.value = value;
         }
         syncOther();
-        about = drawAbout(document, state.form.context_fields || []);
+        about = drawAbout(document, aboutFields(state.form)); // S15a: hidden unless the facilitator turned demographics on
         pager = mountParticipantView({ doc: document, root: $('participant-view-root'), form: $('answers'), questions: $('questions'), review: $('review'), reviewAnswers: $('review-answers'), receipt: $('receipt'), model: state.form, reviewButton: $('review-button'), onEdit: () => journey.edit(), about });
         if (state.draft) pager.showForm();
       } else pager?.showForm();

@@ -216,7 +216,7 @@ export function createSharedLinkClient({ fetchImpl = globalThis.fetch, store, on
     },
     async submit(answers, context) {
       const body = { answers, idempotency_key: this.submitKey() };
-      if (context && Object.keys(context).length) body.context = context; // B09: optional About you, only when given
+      if (context && Object.keys(context).length) body.context = context; // B09: optional About you, only when given (S15a: the controller passes {} while demographics are off)
       const result = await call('/v2/participate/responses', { method: 'POST', body });
       // Confirmed success only: clear this context's draft and key.
       store.remove('draft'); store.remove('submitKey');
