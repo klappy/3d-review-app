@@ -6,7 +6,7 @@
  * Every Lovable build (the Laos field app included) translated the survey on the fly; the Cloudflare rebuild dropped it.
  *
  *   request  { targetLang: "<BCP 47 tag or English name of a supported LWC>", context: "<short id>", sourceTexts: { [key]: english } }
- *   response { translated: { [key]: text }, partial: boolean, locale, review: boolean, stored: number }
+ *   response { translated: { [key]: text }, partial: boolean, locale, review: boolean, stored: number, refused?: number }
  *
  * Translation memory (D1 `translation_memory`, migration 0012) is the source of truth, keyed by (locale, SHA-256 of the
  * exact English text): a string is translated ONCE, stored, and served from storage forever after (first write wins;
@@ -16,10 +16,16 @@
  * app's `translate-survey` wire shape; it receives only English source strings — never answers, names, codes or tokens.
  * Output checks before storing: non-empty, plausible length, and in the target script for non-Latin languages.
  * Display only: item ids and option codes never change, so answers, scores and reports are unaffected.
+ *
+ * Published strings only (reviewer FAIL on #377, F1/F2; src/translate-allowlist.ts): `context` must be `participant-ui`
+ * or `participant-form:<published template id>`, and only strings whose SHA-256 is in that scope's published set are
+ * translated and stored. Other strings are refused — never sent upstream, never stored, never served — and the upstream
+ * receives a context the server builds from the verified scope, never the caller's text.
  */
 import type { Env } from "./handlers/types";
 import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { inScript, lwcLanguage, type LwcLanguage } from "./languages";
+import { allowedHashes, parseScope, upstreamContext } from "./translate-allowlist";
 
 export const TRANSLATE_LIMITS = Object.freeze({ maxKeys: 600, maxKeyLength: 200, maxTextLength: 2000, maxTotalChars: 150_000, timeoutMs: 45_000 });
 const CONTEXT = /^[A-Za-z0-9_.:@-]{1,120}$/;
@@ -120,10 +126,20 @@ export async function handleTranslate(request: Request, env: Env, deps: Deps = {
   if (ENGLISH.has(parsed.targetLang.toLowerCase())) return reply({ translated: parsed.sourceTexts, partial: false, locale: "en", review: false, stored: 0 });
   const lang = lwcLanguage(parsed.targetLang);
   if (!lang || lang.mt === false) return reply({ error: "invalid_params", message: "this language is not available for machine translation" }, 400);
+  const scope = parseScope(parsed.context);
+  if (!scope) return reply({ error: "invalid_params", message: "context must be participant-ui or participant-form:<template id>" }, 400);
 
-  // Unique English strings by hash (the same sentence on two screens is one memory row).
+  // Unique English strings by hash (the same sentence on two screens is one memory row), kept only when the hash is in
+  // the scope's published set (F1/F2): anything else is refused before memory, upstream or storage.
+  const allowed = await allowedHashes(env.DB, scope);
   const hashOfKey = new Map<string, string>(), textOfHash = new Map<string, string>();
-  for (const [k, text] of Object.entries(parsed.sourceTexts)) { const h = await sha256Hex(text); hashOfKey.set(k, h); textOfHash.set(h, text); }
+  let refused = 0;
+  for (const [k, text] of Object.entries(parsed.sourceTexts)) {
+    const h = await sha256Hex(text);
+    if (!allowed.has(h)) { refused++; continue; }
+    hashOfKey.set(k, h); textOfHash.set(h, text);
+  }
+  if (!hashOfKey.size) return reply({ error: "not_published", message: "Only the survey's published questions and page words are translated.", refused }, 400);
   const hashes = [...textOfHash.keys()];
 
   let memory: Map<string, string> | null = null;
@@ -132,7 +148,7 @@ export async function handleTranslate(request: Request, env: Env, deps: Deps = {
   const missing = new Map(hashes.filter((h) => !found.has(h)).map((h) => [h, textOfHash.get(h)!]));
   let upstreamStatus = 200, fresh = new Map<string, string>();
   if (missing.size) {
-    const up = await askUpstream(env, deps, lang, parsed.context, missing);
+    const up = await askUpstream(env, deps, lang, upstreamContext(scope), missing);
     upstreamStatus = up.status; fresh = up.texts;
     if (memory && fresh.size) {
       const at = (deps.now?.() ?? new Date()).toISOString();
@@ -150,7 +166,7 @@ export async function handleTranslate(request: Request, env: Env, deps: Deps = {
     if (upstreamStatus === 429) return reply({ error: "rate_limited", hint: "translation is busy — try again shortly" }, 429, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
     return reply({ error: "translation_failed", message: "No translation came back. The survey stays in English." }, 502);
   }
-  return reply({ translated, partial: n < hashOfKey.size, locale: lang.code, review: lang.review, stored: [...hashOfKey.values()].filter((h) => found.has(h)).length });
+  return reply({ translated, partial: n < hashOfKey.size + refused, locale: lang.code, review: lang.review, stored: [...hashOfKey.values()].filter((h) => found.has(h)).length, ...(refused ? { refused } : {}) });
 }
 
 /** Mounted from src/index.ts; POST only. Setup screens read the supported table from ui/v3/lwc.js (mirror of src/languages.ts). */
