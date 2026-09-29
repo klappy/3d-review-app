@@ -123,3 +123,29 @@ describe("removing and degraded setups", () => {
     expect((await json(await raw("GET", base, { e }))).result.file_storage).toBe(false);
   });
 });
+
+// BCS demo 2026-09-29 (bee:10809312 u3540382372-388): a passage can be named with nothing attached; the survey and the
+// printed form then say "read or listen to Genesis 1 first". Cookbook ticket work/active/2026-09-29-3d-passage-instructions.
+describe("a passage named with nothing attached", () => {
+  it("adds a reference-only passage; refuses one with neither a name nor a link", async () => {
+    const r = await json(await raw("POST", base, { type: "application/json", body: JSON.stringify({ reference: "  Genesis   1 " }) }));
+    expect(r.status).toBe(201);
+    expect(r.result.passage).toMatchObject({ kind: "reference", media: "reference", title: "Genesis 1", reference: "Genesis 1", href: null, filename: null, size: null });
+    for (const body of [{}, { reference: "" }, { reference: "   ", title: "x" }]) {
+      const bad = await json(await raw("POST", base, { type: "application/json", body: JSON.stringify(body) }));
+      expect(bad.status).toBe(400); expect(bad.error.message).toMatch(/name the passage/);
+    }
+  });
+  it("participants see it named (no link); the file route never serves it; remove archives it", async () => {
+    const token = await participantToken();
+    const form = await json(await raw("GET", "/v2/participate/form", { bearer: token }));
+    const ref = form.result.passages.find((x: any) => x.kind === "reference");
+    expect(ref).toMatchObject({ reference: "Genesis 1", href: null });
+    expect(JSON.stringify(ref)).not.toMatch(/object_key|assessments\//);
+    const fake = await signedHref(env, ref.id, 60);
+    expect((await raw("GET", fake, { bearer: null })).status).toBe(404);
+    expect((await json(await raw("DELETE", `${base}/${ref.id}`))).status).toBe(200);
+    const after = await json(await raw("GET", "/v2/participate/form", { bearer: token }));
+    expect(after.result.passages.some((x: any) => x.kind === "reference")).toBe(false);
+  });
+});

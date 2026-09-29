@@ -54,6 +54,7 @@ export const UI_EN = Object.freeze({
   passageListen: 'Listen to the passage',
   passageWatch: 'Watch the passage',
   passageOpen: 'Open the passage',
+  passageFirst: 'Please read or listen to the passage before you answer:',
 });
 
 // Every translatable string of one form, keyed by stable ids (item id + option code), never by position.
@@ -167,3 +168,7 @@ export function initialLanguage({ search = '', storage = null } = {}) {
   try { return cleanLang(storage?.getItem('3dr.lang') || '') || 'en'; } catch { return 'en'; }
 }
 export function rememberLanguage(storage, lang) { try { storage?.setItem('3dr.lang', lang); } catch { /* best effort */ } }
+
+// Each named passage once, in order: the reference ("Genesis 1"), else the title. Joined with a middle dot (no English
+// "and" to translate). Used by the participant page and the printed form (BCS demo 2026-09-29: "read or listen first").
+export function passageNames(list) { const out = []; for (const p of list || []) { const n = String(p?.reference || p?.title || '').trim(); if (n && !out.includes(n)) out.push(n); } return out.join(' · '); }

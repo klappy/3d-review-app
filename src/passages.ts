@@ -22,8 +22,8 @@ import { atLeast, newId, roleAt } from "./handlers/common";
 import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 
 export const PASSAGE_LIMITS = Object.freeze({ maxBytes: 50 * 1024 * 1024, maxPerAssessment: 20, participantTtlSeconds: 12 * 3600, staffTtlSeconds: 3600, title: 120, reference: 120, url: 1000 });
-type Media = "text" | "pdf" | "audio" | "video" | "link";
-export interface PassageRow { id: string; assessment_id: string; kind: "file" | "link"; media: Media; title: string; reference: string | null; filename: string | null; content_type: string | null; size: number | null; object_key: string | null; url: string | null; created_at: string; created_by: string | null; archived_at: string | null }
+type Media = "text" | "pdf" | "audio" | "video" | "link" | "reference";
+export interface PassageRow { id: string; assessment_id: string; kind: "file" | "link" | "reference"; media: Media; title: string; reference: string | null; filename: string | null; content_type: string | null; size: number | null; object_key: string | null; url: string | null; created_at: string; created_by: string | null; archived_at: string | null }
 type PEnv = Env & { PASSAGES?: R2Bucket };
 
 // Accepted files: extension → what it is, how it is served, and a cheap content check (first bytes).
@@ -71,7 +71,7 @@ async function validSig(env: Env, id: string, exp: string | null, sig: string | 
 /** Participant/staff view of a passage: never the storage key. */
 export async function passageView(env: Env, p: PassageRow, ttlSeconds: number) {
   return { id: p.id, kind: p.kind, media: p.media, title: p.title, reference: p.reference, filename: p.filename, size: p.size,
-    href: p.kind === "link" ? p.url : await signedHref(env, p.id, ttlSeconds), created_at: p.created_at };
+    href: p.kind === "link" ? p.url : p.kind === "reference" ? null : await signedHref(env, p.id, ttlSeconds), created_at: p.created_at };
 }
 /** Active passages of an assessment; [] when the table does not exist yet (migration 0013 not applied). */
 export async function listPassages(db: D1Database, aid: string): Promise<PassageRow[]> {
@@ -112,6 +112,15 @@ export async function handleAdd(request: Request, env: PEnv, aid: string, now = 
   let row: PassageRow;
   if (type.startsWith("application/json")) {
     let body: Record<string, unknown>; try { body = await request.json() as Record<string, unknown>; } catch { return fail(400, "INVALID_PARAMS", "JSON object body required"); }
+    // BCS demo 2026-09-29 (bee:10809312 u3540382372-388): a passage can be named with nothing attached ("Genesis 1").
+    // The survey then says "please read or listen to Genesis 1 before you answer"; the facilitator reads or plays it.
+    if (body.url === undefined || body.url === null || body.url === "") {
+      const reference = cleanText(body.reference, PASSAGE_LIMITS.reference);
+      if (!reference) return fail(400, "INVALID_PARAMS", "name the passage (e.g. Genesis 1) or give a https:// link");
+      row = { id, assessment_id: aid, kind: "reference", media: "reference", title: cleanText(body.title, PASSAGE_LIMITS.title) ?? reference, reference, filename: null, content_type: null, size: null, object_key: null, url: null, created_at: at, created_by: who.principal.id, archived_at: null };
+      await insertPassage(env.DB, row);
+      return ok({ passage: await passageView(env, row, PASSAGE_LIMITS.staffTtlSeconds) }, 201);
+    }
     const link = linkOf(body.url);
     if (!link) return fail(400, "INVALID_PARAMS", "a link must be a full https:// address");
     const title = cleanText(body.title, PASSAGE_LIMITS.title) ?? (link.media === "video" ? "Video of the passage" : new URL(link.url).hostname);
@@ -132,10 +141,12 @@ export async function handleAdd(request: Request, env: PEnv, aid: string, now = 
     await env.PASSAGES.put(objectKey, bytes, { httpMetadata: { contentType: spec.serve } });
     row = { id, assessment_id: aid, kind: "file", media: spec.media, title: cleanText(q.get("title"), PASSAGE_LIMITS.title) ?? name, reference: cleanText(q.get("reference"), PASSAGE_LIMITS.reference), filename: name, content_type: spec.serve, size: bytes.length, object_key: objectKey, url: null, created_at: at, created_by: who.principal.id, archived_at: null };
   }
-  await env.DB.prepare("INSERT INTO assessment_passage (id, assessment_id, kind, media, title, reference, filename, content_type, size, object_key, url, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .bind(row.id, row.assessment_id, row.kind, row.media, row.title, row.reference, row.filename, row.content_type, row.size, row.object_key, row.url, row.created_at, row.created_by).run();
+  await insertPassage(env.DB, row);
   return ok({ passage: await passageView(env, row, PASSAGE_LIMITS.staffTtlSeconds) }, 201);
 }
+const insertPassage = (db: D1Database, row: PassageRow) => db.prepare("INSERT INTO assessment_passage (id, assessment_id, kind, media, title, reference, filename, content_type, size, object_key, url, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+  .bind(row.id, row.assessment_id, row.kind, row.media, row.title, row.reference, row.filename, row.content_type, row.size, row.object_key, row.url, row.created_at, row.created_by).run();
+
 
 export async function handleRemove(request: Request, env: PEnv, aid: string, pid: string, now = new Date()): Promise<Response> {
   const who = await staff(request, env, aid, "member"); if (who instanceof Response) return who;

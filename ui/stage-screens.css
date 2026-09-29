@@ -70,3 +70,4 @@
   .rv .stage-tabs button{flex:1 1 auto}
   .rv .stage-now{margin-left:0}
 }
+.p-passage{font:600 12pt/1.35 Inter,system-ui,sans-serif;margin:6px 0 0;padding:6px 10px;border:1.5px solid #14685f;border-radius:6px;max-width:34em}
