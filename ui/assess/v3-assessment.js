@@ -264,3 +264,20 @@ export function v3StageStepper(stage, hrefFor = () => null) {
   return stepper(V3_STAGE_ORDER.map(v => ({ label: labels[v], href: hrefFor(v) })), i < 0 ? 1 : i + 1, { label: 'Assessment stages' });
 }
 export { ensureStepperStyle };
+
+// S15b (cookbook Sprint 15 row 15b): the facilitator's per-assessment switch for participant demographics (age range,
+// gender). Captain: hidden by default; the facilitator turns it on, never the participants. Stored by cap.assessment.update
+// (demographics_enabled, S15a) on the assessment's selected groups; read back from cap.assessment.get.
+const ROLES = new Set(['owner', 'member']);
+export const DEMOGRAPHICS_LABEL = 'Ask participants about themselves (age range, gender)';
+/** Checkbox for the assessment settings form: owner/member only, checked only when the server says it is on. */
+export function demographicsSetting(a, esc = String) {
+  if (!a || !ROLES.has(a.role) || a.complete) return '';
+  return `<input type="hidden" name="demographics-present" value="1"><label class="field check" data-demographics><input type="checkbox" name="demographics" ${a.demographics_enabled === true ? 'checked' : ''}> ${esc(DEMOGRAPHICS_LABEL)}</label><p class="small muted">Off by default. Takes effect once at least one group is added.</p>`;
+}
+/** PATCH body fragment: present only when the form carries the switch, so viewers' and older forms never send it. */
+export function demographicsBody(fd) {
+  const box = fd && typeof fd.has === 'function' && fd.has('demographics-present');
+  if (box) return { demographics_enabled: fd.get('demographics') === 'on' };
+  return {};
+}
