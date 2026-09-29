@@ -1957,6 +1957,9 @@ paths:
     patch:
       operationId: cap.assessment.update
       summary: 'cap.assessment.update — write.reversible — roles: O, M'
+      description: 'name, purpose, period, language_id, format (string or null); demographics_enabled (boolean, S15a):
+        the facilitator switch for participant demographics, off by default. When off, cap.response.form returns
+        demographics_enabled false with no context_fields and cap.response.submit ignores any context.'
       x-capability: cap.assessment.update
       x-class: write.reversible
       x-tool: write

@@ -11,6 +11,9 @@ export function itemError(item, values, t = (k, f) => f) {
 
 // B09: the optional "About you" block from cap.response.form context_fields (age range, gender; each has "Prefer not to say").
 // Nothing here is required; an untouched select sends nothing.
+// S15a: demographics are off by default; the facilitator turns them on per assessment. Only an explicit
+// demographics_enabled === true on the form opens the block, so an older or partial form never shows it.
+export const aboutFields = model => model?.demographics_enabled === true && Array.isArray(model.context_fields) ? model.context_fields : [];
 export function drawAbout(doc, fields = [], t = (k, f) => f) {
   if (!fields.length) return null;
   const box = doc.createElement('fieldset'); box.className = 'participant-about'; box.dataset.about = '';
