@@ -872,6 +872,37 @@ paths:
       - session: []
       - bearer: []
       - participant: []
+  /v2/me/invitations:
+    get:
+      operationId: cap.me.invitations
+      summary: 'cap.me.invitations — read — roles: any signed-in (own invitations only)'
+      description: Pending collaborator invitations addressed to the signed-in person, matched by hashed email. Each item is id, scope {type, id}, role, inviter_display_name (null — no name is stored), invited_at, expires_at. Never the token, never the invitee hash, never scope contents; anyone else's invitations are simply absent. Accept one with POST /v2/me/invitations/{invitation_id}/accept (cap.grant.accept).
+      x-capability: cap.me.invitations
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: any signed-in (own invitations only)
+      x-path-inferred: false
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: ok envelope; result.invitations[]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
   /v2/participate/code:
     post:
       operationId: cap.participant.redeem_code
@@ -2955,6 +2986,50 @@ paths:
         required: true
         schema:
           type: string
+  /v2/me/invitations/{invitation_id}/accept:
+    post:
+      operationId: cap.grant.accept.by_invitation_id
+      summary: 'cap.grant.accept (by invitation id, no token) — write.effect — roles: invitee'
+      description: Same capability, handler and receipt as POST /v2/invitations/{token}/accept, for the signed-in invitee who never opened the mailed link. The caller's email hash must equal the invitation's invitee hash; any miss (unknown, withdrawn, someone else's) is NOT_FOUND_OR_NOT_VISIBLE.
+      x-capability: cap.grant.accept
+      x-class: write.effect
+      x-tool: danger
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: none
+        compensating_control: cap.grant.revoke
+      x-roles: invitee
+      x-path-inferred: false
+      tags:
+      - F. Invitations, codes, collaborators
+      responses:
+        '200':
+          description: dry_run → Impact + confirm_token; execute → receipt (inverse none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangerBody'
+      parameters:
+      - name: invitation_id
+        in: path
+        required: true
+        schema:
+          type: string
   /v2/{scope}/{id}/grants:
     get:
       operationId: cap.grant.list
@@ -3210,7 +3285,7 @@ paths:
               schema:
                 allOf:
                 - $ref: '#/components/schemas/Envelope'
-                - {"type":"object","properties":{"result":{"type":"object","properties":{"survey_id":{"type":"string"},"assessment":{"type":"string"},"language":{"type":"string"},"period":{"type":["string","null"]},"project":{"type":"string"},"purpose":{"type":["string","null"]},"format":{"type":["string","null"]},"template":{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"},"perspective":{"type":"string"},"source_ref":{"type":["string","null"]}},"required":["id","version","perspective","source_ref"],"additionalProperties":false},"items":{"type":"array","items":{"type":"object","description":"Pinned source renderItems output, stable source item IDs, required/option/exclusion semantics unchanged."}},"participant_labels":{"type":"array","items":{"type":"string"}}},"required":["survey_id","assessment","language","period","project","purpose","format","template","items","participant_labels"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"survey_id":{"type":"string"},"assessment":{"type":"string"},"language":{"type":"string"},"period":{"type":["string","null"]},"project":{"type":"string"},"purpose":{"type":["string","null"]},"format":{"type":["string","null"]},"template":{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"},"perspective":{"type":"string"},"source_ref":{"type":["string","null"]}},"required":["id","version","perspective","source_ref"],"additionalProperties":false},"items":{"type":"array","items":{"type":"object","description":"Pinned source renderItems output, stable source item IDs, required/option/exclusion semantics unchanged."}},"participant_labels":{"type":"array","items":{"type":"string"}},"context_fields":{"type":"array","items":{"type":"object"}}},"required":["survey_id","assessment","language","period","project","purpose","format","template","items","participant_labels"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
         4XX:
           description: error envelope
           content:
@@ -3256,7 +3331,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: {"type":"object","properties":{"idempotency_key":{"type":"string","minLength":1,"maxLength":200},"answers":{"type":"object","description":"Known pinned item IDs only; server validates required, type, option, multi and exclusion rules before canonical hashing."}},"required":["idempotency_key","answers"],"additionalProperties":false}
+            schema: {"type":"object","properties":{"idempotency_key":{"type":"string","minLength":1,"maxLength":200},"answers":{"type":"object","description":"Known pinned item IDs only; server validates required, type, option, multi and exclusion rules before canonical hashing."},"context":{"type":"object","description":"B09: optional respondent context validated against cap.response.form context_fields (age_range, gender). Unknown keys rejected; every key optional; no names. Not part of the replay digest.","properties":{"age_range":{"type":"string"},"gender":{"type":"string"}},"additionalProperties":false}},"required":["idempotency_key","answers"],"additionalProperties":false}
   /v2/participate/receipt:
     get:
       operationId: cap.response.receipt

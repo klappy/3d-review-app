@@ -6,7 +6,7 @@ import { mountEntityScreen } from './entity-screen.js';
 import { mountLensSurveys } from './lens-surveys.js';
 import { loadRoleHelp, loadBlankPrint, renderAssessmentHeadrow, renderStageTabs, renderStageTour, renderRoleHelp, renderBlankPrint, recalledTab, printAllowed } from './stage-screens.js';
 import { initLanguageControls } from './language.js';
-import { reviewAnswer, templateChoices, receiptLine } from './present.js';
+import { reviewAnswer, templateChoices, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from './present.js';
 import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
 import { renderList, renderReport, upsertRow } from './report-view.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
@@ -126,6 +126,8 @@ function clearStagePrint() {
 function note(message) { $('notice').textContent = message; $('error').hidden = true; }
 function fail(message) { $('error').textContent = message; $('error').hidden = false; $('notice').textContent = 'Action needs attention. No completion is assumed.'; }
 function text(node, value) { node.textContent = value == null ? '' : String(value); }
+// Header shows plain words only; signed-in state is a data attribute other modules read, never the text.
+function showIdentity(signedIn) { const n = $('identity'); n.dataset.signedIn = String(signedIn); text(n, signedIn ? 'Signed in' : 'Not signed in'); }
 function option(select, value, label) { select.add(new Option(label, value)); }
 function resetSelect(select, label) { select.replaceChildren(new Option(label, '')); }
 function required(value, message) { if (!value) throw new Error(message); return value; }
@@ -181,7 +183,7 @@ function resetClientIdentity() {
   for (const [id, label] of [['projects', 'Choose project'], ['assessments', 'Choose assessment'], ['surveys', 'Choose survey'], ['languages', 'Choose language'], ['templates', 'Choose template']]) resetSelect($(id), label);
   for (const id of ['project-detail', 'assessment-detail', 'survey-detail', 'form-context', 'dev-code']) text($(id), '');
   text($('participant-resume'), '');
-  text($('results'), 'Select an assessment.'); text($('identity'), 'Not signed in');
+  text($('results'), 'Select an assessment.'); showIdentity(false);
   text($('access-state'), 'Sign in to see authorized project work.');
   $('questions').replaceChildren(); $('review-answers').replaceChildren(); $('events').replaceChildren();
   text($('receipt'), '');
@@ -196,9 +198,9 @@ const languageControls = initLanguageControls({ api, run, getProject: () => stat
 function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget))); }); }
 function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler)); }
 async function identity() {
-  if (!state.session) { text($('identity'), 'Not signed in'); return; }
+  if (!state.session) { showIdentity(false); return; }
   const result = await api('/v2/me'); state.principal = result.principal;
-  text($('identity'), `${result.principal.kind} · ${result.principal.id}`);
+  showIdentity(true);
   showAuthorizedWork(result);
   collab.identity(result);
   return result;
@@ -273,7 +275,7 @@ function drawQuestion(item) {
   if (item.type === 'scale') { const input = document.createElement('input'); input.name = item.id; input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'text') { const input = document.createElement('textarea'); input.name = item.id; input.required = item.required !== false; field.append(input); }
   else if (item.type === 'single' || item.type === 'multi') {
-    for (const opt of item.options || []) { const label = document.createElement('label'); const input = document.createElement('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = opt.code; input.required = item.type === 'single' && item.required !== false; label.append(input, document.createTextNode(opt.label || opt.text || opt.code)); field.append(label); }
+    for (const opt of item.options || []) { const label = document.createElement('label'); const input = document.createElement('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = opt.code; input.required = item.type === 'single' && item.required !== false; label.append(input, document.createTextNode(opt.label || opt.text || opt.code)); field.append(label); if (isOtherOption(opt)) field.append(otherBox(document, item)); } // C01
     if (item.type === 'multi' && (item.options || []).some(opt => opt.exclusive)) { const note = document.createElement('p'); note.textContent = 'An exclusion choice cannot be combined with any other choice.'; field.append(note); }
   } else { const warning = document.createElement('p'); warning.textContent = `Unsupported item type ${item.type}; cannot submit.`; field.append(warning); }
   return field;
@@ -290,6 +292,7 @@ function answersFromForm() {
     if (item.type === 'multi' && Array.isArray(value) && value.length > 1 && (item.options || []).some(opt => opt.exclusive && value.includes(opt.code))) throw new Error(`An exclusion choice cannot be combined: ${item.text || item.id}`);
     answers[item.id] = value;
   }
+  const other = collectOther(state.form.items, values, answers); if (other) answers[OTHER_TEXT_KEY] = other; // C01
   return answers;
 }
 bindForm('request-login', 'Requesting local code…', async fd => {
@@ -548,6 +551,7 @@ async function loadForm() {
 function draftValues() {
   const values = new FormData($('answers')); const out = {};
   for (const item of state.form.items) { const v = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id); if (v !== null) out[item.id] = v; }
+  const other = collectOther(state.form.items, values, out); if (other) out[OTHER_TEXT_KEY] = other; // C01
   return out;
 }
 function restoreSharedDraft() {
@@ -555,9 +559,12 @@ function restoreSharedDraft() {
   if (!draft) return;
   if (draft.mismatch) { state.sharedStore.remove('draft'); text($('participant-resume'), sharedCopy.draftMismatch); return; }
   for (const item of state.form.items) { const v = draft.answers[item.id]; if (v == null) continue; for (const input of $('answers').querySelectorAll(`[name="${CSS.escape(item.id)}"]`)) { if (input.type === 'checkbox') input.checked = v.includes(input.value); else if (input.type === 'radio') input.checked = input.value === v; else input.value = v; } }
+  for (const box of $('answers').querySelectorAll('input[data-other-for]')) { const t = draft.answers[OTHER_TEXT_KEY]?.[box.dataset.otherFor]; if (typeof t === 'string') box.value = t; } // C01
+  syncOtherBoxes($('answers'), state.form.items);
   text($('participant-resume'), sharedCopy.draftRestored);
 }
 $('answers').addEventListener('input', () => { if (state.shared && state.form) saveDraft(state.sharedStore, state.form, draftValues()); });
+$('answers').addEventListener('change', () => { if (state.form) syncOtherBoxes($('answers'), state.form.items); }); // C01: show "Please describe" only while Other is chosen
 async function restoreParticipant() {
   // A failed first receipt request must leave the saved session recoverable.
   $('recover').hidden = false;
@@ -579,7 +586,7 @@ async function restoreParticipant() {
 }
 bindForm('answers', 'Preparing answer review…', async () => {
   state.answers = answersFromForm(); $('review-answers').replaceChildren();
-  for (const item of state.form.items) { const p = document.createElement('p'); p.textContent = `${item.text || item.id}: ${reviewAnswer(item, state.answers[item.id])}`; $('review-answers').append(p); }
+  for (const item of state.form.items) { const p = document.createElement('p'); p.textContent = `${item.text || item.id}: ${reviewAnswer(item, state.answers[item.id], state.answers[OTHER_TEXT_KEY]?.[item.id])}`; $('review-answers').append(p); }
   $('answers').hidden = true; $('review').hidden = false;
   participantView?.showReview();
 });
@@ -711,7 +718,7 @@ async function openPendingInvitation(generation) {
 const invitationBootstrap = sharedMode ? run(sharedCopy.labelOpening, () => sharedLinkEntry(sharedToken, sharedResume))
 : run('Checking session…', async () => {
   try { const me = await identity(); if (me && hasProjectWork(me)) { await projects(); await templates(); } }
-  catch { state.session = null; state.principal = null; sessionStorage.removeItem('facilitatorToken'); text($('identity'), 'Not signed in'); }
+  catch { state.session = null; state.principal = null; sessionStorage.removeItem('facilitatorToken'); showIdentity(false); }
   await openPendingInvitation(invitationGeneration);
   if (state.participant) await restoreParticipant();
 });

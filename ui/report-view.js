@@ -2,7 +2,7 @@ import { renderReportCards } from './report-card.js';
 import { humanDate } from './assess/cards.js'; // one shared local-time formatter (B31)
 // Synthetic report rendering. Dependency-free and importable under node --test with an injected doc.
 // Text nodes only: every value comes from the payload as returned (String(), no rounding, no word
-// mapping, no colour), plus the fixed labels in `copy`. Nothing here fetches or authorizes.
+// mapping except the agreement sentence below, no colour), plus the fixed labels in `copy`. Nothing here fetches or authorizes.
 export const copy = Object.freeze({
   headerPrefix: 'Synthetic data',
   builtStability: 'from the responses that were captured for it. Its content does not change; it may become unavailable under the current synthetic reporting policy.',
@@ -16,9 +16,22 @@ export const copy = Object.freeze({
   narrative: 'Narrative',
   oneLens: 'one lens',
   notComparable: 'not comparable',
+  agreed: 'Agreed',
+  seenAs: 'Seen as',
+  matches: 'Matches',
+  differs: 'Differs',
+  notComparableSentence: 'Not comparable',
   emptyList: 'No reports have been built for this assessment.',
 });
 const val = value => String(value);
+// Plain words for the translation type agreement (U33, B31): one sentence, capitalised values,
+// Matches/Differs in place of true/false. Display only; the payload is untouched.
+const cap = value => { const text = String(value); return text.charAt(0).toUpperCase() + text.slice(1); };
+export function agreementSentence(agreement) {
+  const words = values => (Array.isArray(values) ? values : []).map(cap).join(', ') || '—';
+  const verdict = agreement.agree === true ? copy.matches : agreement.agree === false ? copy.differs : copy.notComparableSentence;
+  return `${copy.agreed}: ${words(agreement.team_values)} · ${copy.seenAs}: ${words(agreement.church_values)} · ${verdict}`;
+}
 function el(doc, tag, textContent) {
   const node = doc.createElement(tag);
   if (textContent !== undefined) node.textContent = textContent;
@@ -67,12 +80,7 @@ export function renderReport({ doc, root, report }) {
   }
   const agreement = payload.translation_type_agreement;
   if (agreement && typeof agreement === 'object') {
-    out.push(section(doc, copy.translationAgreement, [list(doc, [
-      el(doc, 'li', val(agreement.construct_name)),
-      el(doc, 'li', rows(agreement.team_values).map(val).join(' · ')),
-      el(doc, 'li', rows(agreement.church_values).map(val).join(' · ')),
-      el(doc, 'li', agreement.agree === null || agreement.agree === undefined ? copy.notComparable : val(agreement.agree)),
-    ])]));
+    out.push(section(doc, copy.translationAgreement, [el(doc, 'p', agreementSentence(agreement))]));
   }
   const evidence = rows(payload.evidence);
   if (evidence.length) {

@@ -27,7 +27,7 @@ const BASE = {
   '../v3/home.js': [`'<p class="v3h-meta" role="alert">Your sign-in is no longer active. <a href="/v2/auth/access">Sign in again</a></p>'`],
   '../v3/components/demo-exit.js': [`export const DEMO_SIGN_IN_HREF = '/v2/auth/access';`],
   '../v3/components/invite.js': [`'<a class="rv-btn primary" href="/v2/auth/access" data-invite-signin>Sign in with an email code</a>'`],
-  '../index.html': ['<p>This also signs you out of other apps protected by this Cloudflare Access account.</p><p>After signing out, return here and choose Sign in to enter another email. Cloudflare may take up to 30 seconds to finish signing out.</p>'],
+  '../index.html': ['<p>This also signs you out of other apps protected by this Cloudflare Access account.</p><p>After signing out, the sign-in screen opens for the other email. Cloudflare may take up to 30 seconds to finish signing out.</p>'],
 };
 
 test('flag off: every base sign-in string, label and href is present verbatim', () => {

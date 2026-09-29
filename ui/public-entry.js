@@ -13,31 +13,32 @@ export function publicView({shared,authenticated,checking=false,participantResum
   if(['#facilitator','#participant','#reports-card','#workspace','#evidence'].includes(hash))return 'workspace';
   return 'home';
 }
-export function observedIdentity(text) {
-  return typeof text==='string' && text.includes(' · ') && !['Checking session…','Not signed in'].includes(text);
+// Signed-in state comes from #identity[data-signed-in], set by app.js; the header text is display-only.
+export function observedIdentity(node) {
+  return node?.dataset?.signedIn==='true';
 }
 export function mountPublicEntry(document,window) {
   const identity=document.getElementById('identity');
   const explicitSharedAtEntry=parseEntryFragment(window.location.hash)!==null;
   function render(){
-    if (['#how', '#example'].includes(window.location.hash)) { window.location.replace('/?demo=1#assessment/demo-assessment/prepare'); return; }
+    if (['#how', '#example'].includes(window.location.hash)) { window.location.replace('/?demo=1#assessment/demo-assessment/collect'); return; }
     const invitation=document.body.dataset.invitationIntent==='active';
     const isolated=document.body.dataset.invitationEntry==='true'; // explicit invite load: saved participant route ignored for the page lifetime (Bugbot 4039886032)
     const shared=!invitation&&(explicitSharedAtEntry||(!isolated&&currentNamespace(window.sessionStorage)!==null)||document.getElementById('facilitator')?.hidden===true);
     // Presence selects the existing recovery screen only; restoreParticipant still validates the session.
     const participantResume=!shared && !isolated && !!window.sessionStorage.getItem('participantToken');
     // Access return paints Not signed in and clears #session= before /v2/me; a stored token is still restoring.
-    const view=publicView({invitation,shared,participantResume,authenticated:observedIdentity(identity?.textContent),checking:identity?.textContent==='Checking session…'||(!!window.sessionStorage.getItem('facilitatorToken')&&!observedIdentity(identity?.textContent)),hash:window.location.hash});
+    const view=publicView({invitation,shared,participantResume,authenticated:observedIdentity(identity),checking:identity?.textContent==='Checking session…'||(!!window.sessionStorage.getItem('facilitatorToken')&&!observedIdentity(identity)),hash:window.location.hash});
     document.body.dataset.entryView=view;
     for(const name of ['home','how','example'])document.getElementById('public-'+name).hidden=view!==name;
     document.getElementById('public-entry').hidden=view==='workspace';
     // Unauthenticated report entry reaches real sign-in, never a sample report or implied grant.
-    if(view==='workspace'&&!shared&&!observedIdentity(identity?.textContent)&&window.location.hash==='#reports-card')document.getElementById('facilitator').scrollIntoView();
+    if(view==='workspace'&&!shared&&!observedIdentity(identity)&&window.location.hash==='#reports-card')document.getElementById('facilitator').scrollIntoView();
   }
   // "Sign in" from the public choices: land keyboard and viewport on the real sign-in control, not the card heading.
   // Presentation only — the hash, the view and the auth flow are unchanged.
   function landOnSignIn(){
-    if(window.location.hash!=='#facilitator'||observedIdentity(identity?.textContent))return;
+    if(window.location.hash!=='#facilitator'||observedIdentity(identity))return;
     const link=document.querySelector('#facilitator a[href="/v2/auth/access"]');
     if(!link)return;
     link.scrollIntoView?.({block:'center'});
@@ -45,7 +46,7 @@ export function mountPublicEntry(document,window) {
   }
   window.addEventListener('hashchange',()=>{render();landOnSignIn();});
   new window.MutationObserver(render).observe(document.body,{attributes:true,attributeFilter:['data-invitation-intent']});
-  new window.MutationObserver(render).observe(identity,{childList:true,subtree:true,characterData:true});
+  new window.MutationObserver(render).observe(identity,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['data-signed-in']});
   new window.MutationObserver(render).observe(document.getElementById('facilitator'),{attributes:true,attributeFilter:['hidden']});
   document.querySelectorAll('[data-tour-step]').forEach(button=>button.addEventListener('click',()=>{
     const step=Number(button.dataset.tourStep);

@@ -1,27 +1,25 @@
 {
-  "version": "0.21.6",
+  "version": "0.22.6",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "a32c87c6c205e9164a74eb31cbf5769395f21d40",
+  "cookbook_commit": "f435fd38682eea135e236f4e814a440842e7adea",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.21.6.md",
-      "blob_sha": "e36505bb08543dc75f23d54f3e6e8d4f3603c117",
-      "sha256": "ef4f806c73d0a90ce589b8fcde07b87314df43e668f24b5782c12cab65aa7024"
+      "path": "planning/2026-09-16-parity-build/releases/0.22.6.md",
+      "blob_sha": "7b43af5fe5c4d3533d4e6e69dff0f01708b703ae",
+      "sha256": "68022ee1886c87cb0947093469982fe908ae580abf8fe71db746e60ade52ca21"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "35476c6625c0749feeb4ac43b3f6b561d59b31eb",
-      "sha256": "c658e56526ef4c22bef8553a002e15c6e058875c3f32326579147bdc4e414eb8"
+      "blob_sha": "90e8b05872d4075593325dd9f0d09fa863bc1cc5",
+      "sha256": "1a43a08d3acbc35fb433c5f30a940fe2986ad6d2dd458e7dc8f6efc7b8adae64"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
-      "changed": [
-        "Sign in by email link: enter your email, open the link we send (it works for 30 minutes, on any device) — no more one-time PIN; DEV only, behind MAGIC_LINK — production keeps Cloudflare Access. Signing out clears the session cookie with the same protections it was set with (HttpOnly, Secure, SameSite=Lax), in every environment (Bincy B38) (#305)",
-        "/roadmap shows the versions list only; stale work-item feed removed (captain 18:20) (#307)"
-      ],
-      "fixed": []
+      "fixed": [
+        "Regenerating the roadmap versions page no longer crashes when there are no pending change files; it now shows no forecast. (#372)",
+        "After an owner completes a review, the role badge shows Owner (not Viewer), matching the Permissions and Delete controls still offered; the review content stays read-only. (#374)"
+      ]
     }
   }
 }

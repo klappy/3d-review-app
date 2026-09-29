@@ -21,7 +21,7 @@ test('explicit invitation intent overrides saved participant presentation only u
 import { mountStageComposition } from './stage-composition.js';
 test('mounted: explicit invite page load ignores leftover participant storage after the intent ends (Bugbot 4039886032)',()=>{
  const el=()=>({hidden:false,textContent:'',querySelector:()=>null});
- const nodes={identity:{textContent:'user · usr_1'},'stage-tabs-root':el(),'stage-workspace':{hidden:true},facilitator:{hidden:false},participant:el()};
+ const nodes={identity:{textContent:'Signed in',dataset:{signedIn:'true'}},'stage-tabs-root':el(),'stage-workspace':{hidden:true},facilitator:{hidden:false},participant:el()};
  const doc={body:{dataset:{invitationEntry:'true'}},getElementById:id=>nodes[id]};
  const win={location:{hash:''},sessionStorage:{getItem:k=>k==='participantToken'?'pt_leftover':null},addEventListener(){},MutationObserver:class{observe(){}}};
  mountStageComposition(doc,win);
@@ -29,4 +29,15 @@ test('mounted: explicit invite page load ignores leftover participant storage af
  const doc2={body:{dataset:{}},getElementById:id=>nodes[id]};
  mountStageComposition(doc2,win);
  assert.equal(doc2.body.dataset.workspaceRoute,'participant','a normal (non-invite) load with a saved participant token still resumes the participant route');
+});
+
+test('mounted: staff confirmation reads #identity[data-signed-in], not the header text (bincy-b31)',()=>{
+ const el=()=>({hidden:false,textContent:'',querySelector:()=>null});
+ const win={location:{hash:''},sessionStorage:{getItem:()=>null},addEventListener(){},MutationObserver:class{observe(){}}};
+ for(const [identity,want] of [[{textContent:'Signed in',dataset:{signedIn:'true'}},'true'],[{textContent:'Not signed in',dataset:{signedIn:'false'}},'false']]){
+  const nodes={identity,'stage-tabs-root':el(),'stage-workspace':{hidden:true},facilitator:{hidden:false},participant:el()};
+  const doc={body:{dataset:{}},getElementById:id=>nodes[id]};
+  mountStageComposition(doc,win);
+  assert.equal(doc.body.dataset.staffConfirmed,want);
+ }
 });

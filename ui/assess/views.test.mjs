@@ -89,6 +89,7 @@ test('Reports: server list plus preview control for exact assessment editor', as
   const html = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
   assert.match(html, /data-open-report="rep_1"/);
   assert.match(html, /data-preview-report/);
+  assert.match(html, /<details class="small" data-report-build-more><summary>Technical details<\/summary><section data-report-build>/); // U32: closed disclosure, not a second visible build action
   assert.doesNotMatch(html, /data-confirm-report/);
 });
 
@@ -148,8 +149,21 @@ test('A7 improve viewer: read-only notes, no save control, visibility line; text
   assert.ok(html.includes(NOTES_VISIBILITY));
   assert.doesNotMatch(html, /undo/i);
   assert.ok(!html.includes(esc(RECOMMENDATIONS_NOT_BUILT))); // v3 L3-4: aside not drawn (PARITY I1)
-  assert.match(html, /What happens next\?/); assert.match(html, /<h3>What you noticed<\/h3>/);
+  assert.match(html, /What happens next\?/); assert.match(html, /<dt>What you noticed<\/dt>/);
+  // B30 (lanes-1911): one heading, no h3; outside Learn more no explanatory line; no button or form for a viewer.
+  const [front] = html.split('<details');
+  assert.equal((html.match(/<h[1-6][\s>]/g) || []).length, 1); assert.equal((front.match(/<p[\s>]/g) || []).length, 1); // the eyebrow only
+  assert.ok(!front.includes(NOTES_VISIBILITY)); assert.doesNotMatch(html, /<button|<form/);
   assert.ok(!(await views.improve.load(ctx, { aid: 'a1' })).editable);
+});
+
+test('B30 improve viewer, nothing recorded: one heading and one short line', async () => {
+  const { api } = fakeApi({}); const ctx = ctxFor(api, { current: { assessment: { ...assessment, role: 'viewer', notes_reflection: '', notes_next_steps: '' }, surveys } });
+  const html = views.improve.render(ctx, await views.improve.load(ctx, { aid: 'a1' }));
+  const [front] = html.split('<details');
+  assert.equal((html.match(/<h[1-6][\s>]/g) || []).length, 1);
+  assert.match(front, /data-notes-empty>No notes recorded yet\.</); assert.equal((front.match(/<p[\s>]/g) || []).length, 2); // eyebrow + one line
+  assert.doesNotMatch(html, /<dl|<button|<form|<textarea/);
 });
 
 test('A8 improve owner/member: one Save → PATCH /v2/assessments/{aid}/notes with both fields; refresh after server result', async () => {
@@ -163,7 +177,7 @@ test('A8 improve owner/member: one Save → PATCH /v2/assessments/{aid}/notes wi
   makeRoot([form, btn, status, ta1, ta2]); views.improve.bind(ctx, root, m);
   let disabledDuring = null; const origApi = ctx.api; ctx.api = async (...a) => { disabledDuring = btn.disabled; return origApi(...a); };
   await form.onsubmit({ preventDefault() {} });
-  assert.deepEqual(calls[0], { url: '/v2/assessments/a1/notes', method: 'PATCH', body: { notes_reflection: 'new r', notes_next_steps: 'new n' } });
+  assert.deepEqual(calls.filter(c => c.method), [{ url: '/v2/assessments/a1/notes', method: 'PATCH', body: { notes_reflection: 'new r', notes_next_steps: 'new n' } }]); // B13: load only reads (suggested areas)
   assert.equal(disabledDuring, true); assert.equal(btn.disabled, false);
   assert.equal(status.textContent, 'Saved'); assert.equal(refreshed, 1); assert.equal(m.notes_reflection, 'new r');
 });
@@ -177,7 +191,7 @@ test('A8c v3 next step (frame 11): one "Save notes" in any stage, never a stage 
   const form = el({ 'data-notes-form': '' }), btn = el({ tag: 'button', 'data-save-notes': '' }), status = el({ 'data-notes-status': '' });
   makeRoot([form, btn, status, el({ name: 'notes_reflection', value: 'r' }), el({ name: 'notes_next_steps', value: 'n' })]); views.improve.bind(ctx, root, m);
   await form.onsubmit({ preventDefault() {} });
-  assert.deepEqual(calls.map(c => `${c.method} ${c.url}`), ['PATCH /v2/assessments/a1/notes']); assert.equal(status.textContent, 'Saved');
+  assert.deepEqual(calls.filter(c => c.method).map(c => `${c.method} ${c.url}`), ['PATCH /v2/assessments/a1/notes']); assert.equal(status.textContent, 'Saved'); // B13: the only write
 });
 
 test('U24 "Saved" survives the post-save repaint, next to the button, then is dropped', async () => {
@@ -209,9 +223,9 @@ test('A9 RESERVED_NOT_BUILT / 501 is its own state, never the generic retry', as
   const ctx = ctxFor(api); const html = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
   const panel = html.slice(html.indexOf('data-reports>'));
   assert.match(panel, /Reports is not built yet/); assert.doesNotMatch(panel, /Retry/);
-  // improve never probes recommendations: zero calls, static "not built" text
+  // improve never probes recommendations; B13: its only reads are the report list for the suggested areas (no write)
   const p = fakeApi({}); const c2 = ctxFor(p.api); views.improve.render(c2, await views.improve.load(c2, { aid: 'a1' }));
-  assert.equal(p.calls.length, 0);
+  assert.ok(!p.calls.some(c => /recommend/i.test(c.url) || c.method)); assert.deepEqual(p.calls.map(c => c.url), ['/v2/assessments/a1/reports']);
 });
 
 // G1: the Permissions page and its negative cases are covered in ./permissions.test.mjs (Auth contract 2026-09-18).
@@ -294,10 +308,45 @@ test('B35: "Build the results" on the band block previews, confirms once in plac
   const band = () => root.querySelector('[data-v3-results]');
   await band().querySelector('[data-results-build]').onclick(); assert.equal(built, false);
   const box = band().querySelector('[data-results-preview]');
-  assert.match(box.textContent, /immutable report/); assert.equal(root.querySelectorAll('[data-confirm-report]').length, 1, 'one confirm, in the band block');
+  assert.equal(box.querySelector('[data-confirm-text]').textContent, 'Build results from 3 responses? Everyone with access can see them.'); assert.doesNotMatch(box.textContent, /immutable|checked again/); assert.equal(root.querySelectorAll('[data-confirm-report]').length, 1, 'one confirm, in the band block');
   assert.deepEqual([...box.querySelectorAll('button')].map(b => b.textContent), ['Build the results', 'Not now']);
+  const visibleBuild = () => [...root.querySelectorAll('button')].filter(b => b.textContent === 'Build the results' && !b.hidden).length;
+  assert.equal(visibleBuild(), 1, 'U35: the trigger hides while its confirm is open');
+  await box.querySelector('[data-cancel-report]').onclick(); assert.equal(box.children.length, 0);
+  assert.equal(band().querySelector('[data-results-build]').hidden, false, 'U35: cancel brings the trigger back'); assert.equal(visibleBuild(), 1);
+  await band().querySelector('[data-results-build]').onclick(); assert.equal(visibleBuild(), 1);
   await box.querySelector('[data-confirm-report]').onclick(); assert.equal(built, true); assert.equal(reloads, 0);
   assert.ok(m.bandScores?.Community, 'bands filled from the report just built'); assert.equal(band().querySelector('[data-results-build]'), null);
   assert.equal(band().querySelector('[data-results-status]').textContent, 'Results built.');
   assert.doesNotMatch(root.textContent, /Server policy words|Open it from the current report list/);
+});
+test('U41: on Understand, "Build the results" is the one primary before a report; after it, the gate is; other tabs keep the header link', async () => {
+  const { v3StagePrimary } = await import('./v3-assessment.js');
+  // U42: no header primary links to the open view, so on Understand the page's own primary is the only one; on any other tab
+  // "Look at the results" is drawn as on base (never hidden, whatever this page load has seen).
+  assert.equal(v3StagePrimary('understand', true, undefined, undefined, { current: 'understand' }), '');
+  for (const tab of ['prepare', 'collect', 'improve']) { const h = v3StagePrimary('understand', true, undefined, undefined, { current: tab }); assert.match(h, /class="rv-btn primary" data-v3-primary="understand"/); assert.doesNotMatch(h, /hidden/); }
+  let built = false;
+  const report = { id: 'r', created_at: '2026-09-18', payload: { lenses: [{ lens: 'Community', score: 80, sub_dimensions: [] }] } };
+  const mk = () => ({ enc: encodeURIComponent, esc: s => String(s ?? ''), current: { assessment: { id: 'u41', role: 'owner', stage: 'understand' }, surveys: [{ id: 's1', template_id: 't', template_name: 'C', perspective: 'Community', state: 'selected', archived_at: null }] }, isCurrent: () => true, routes: { assessment: () => '#x', survey: () => '#s' }, go() {}, api: async url => {
+    if (url === '/v2/reports/r') return { assessment_id: 'u41', suppressed: false, report };
+    if (url.endsWith('/reports')) return { assessment_id: 'u41', suppressed: false, reports: built ? [{ id: 'r', created_at: report.created_at }] : [] };
+    if (url.includes('/surveys/s1')) return { survey: { id: 's1' }, counts: { responses: 3, respondents: 3 } };
+    return { status: 'held' };
+  } });
+  const dom = new JSDOM(`<div>${v3StagePrimary('understand', true, undefined, undefined, { current: 'understand' })}</div><main></main>`), doc = dom.window.document, root = doc.querySelector('main');
+  let ctx = mk(), m = await views.understand.load(ctx, { aid: 'u41' }); root.innerHTML = views.understand.render(ctx, m); views.understand.bind(ctx, root, m);
+  assert.deepEqual([...root.querySelectorAll('.primary')].map(b => b.textContent), ['Build the results'], 'one primary before a report');
+  assert.equal(root.querySelector('[data-v3-gate-go]').textContent, 'Choose a next step', 'the gate stays, demoted');
+  assert.equal(doc.querySelectorAll('.primary').length, 1, 'no header primary on its own page (U42)');
+  built = true; ctx = mk(); m = await views.understand.load(ctx, { aid: 'u41' }); root.innerHTML = views.understand.render(ctx, m); views.understand.bind(ctx, root, m);
+  assert.equal(root.querySelector('[data-results-build]'), null); assert.match(root.querySelector('[data-v3-gate-go]').className, /primary/);
+  assert.equal(doc.querySelectorAll('.primary').length, 1, 'one primary once a report exists');
+});
+test('U43: the build confirm is one sentence with the response count', async () => {
+  const { buildConfirmText, responsesOf } = await import('./report-build.js');
+  assert.equal(buildConfirmText(1), 'Build results from 1 response? Everyone with access can see them.');
+  assert.equal(buildConfirmText(null), 'Build results from these responses? Everyone with access can see them.');
+  const counts = new Map([['a', { status: 'loaded', responses: 2 }], ['b', { status: 'failed' }], ['c', { status: 'loaded', responses: 4 }]]);
+  assert.equal(responsesOf({ counts }), 6); assert.equal(responsesOf({ counts: new Map([['b', { status: 'failed' }]]) }), null); assert.equal(responsesOf({}), null);
 });

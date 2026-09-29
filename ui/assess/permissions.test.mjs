@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { permissions, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, TEST_ADDRESS_NOTE, inviteOutcome } from './permissions.js';
+import { permissions, NO_TRANSFER_TARGET, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, REVOKE_ASK, TEST_ADDRESS_NOTE, inviteOutcome } from './permissions.js';
 import { shortDate } from './cards.js';
 
 const read = n => readFileSync(fileURLToPath(new URL(n, import.meta.url)), 'utf8');
@@ -43,7 +43,7 @@ test('N1 viewer: grant.list 403 → placeholder note, no roster in DOM; N2 no ro
 
 test('roster + gating: member sees Invite (viewer|member only), Remove only on ≤member rows, no Change-role, no Transfer; owner has all but never on owner rows; pending lists sent|pending|unconfirmed only', async () => {
   const mem = await mount('member'); const h = mem.root.html;
-  assert.match(h, /data-my-role="member"/); assert.match(h, /data-invite-form/); assert.doesNotMatch(h, /<option value="owner">/); assert.doesNotMatch(h, /data-transfer-form|data-change-role/);
+  assert.match(h, /data-my-role="member"/); assert.match(h, /data-invite-form/); assert.match(h, /<button type="submit" class="primary"[^>]*>Preview invitation/); /* U42: the one primary on Permissions */ assert.doesNotMatch(h, /<option value="owner">/); assert.doesNotMatch(h, /data-transfer-form|data-change-role/);
   assert.match(h, /data-revoke="g_mem"/); assert.match(h, /data-revoke="g_view"/); assert.doesNotMatch(h, /data-revoke="g_own"/); assert.match(h, /Owner — only a transfer changes this/);
   assert.match(h, /data-invitation="inv_p"/); assert.match(h, /data-invitation="inv_u"/); assert.match(h, /Could not be confirmed as sent/); assert.doesNotMatch(h, /inv_acc/, 'accepted invitations are not pending');
   const own = await mount('owner'); const o = own.root.html;
@@ -94,19 +94,19 @@ test('N5 change role: owner rows have no control; PATCH dry_run/execute with ide
 test('N4/N11 revoke: single DELETE with no mode; owner rows have no control; server 403 "owners cannot be removed" verbatim; revoke_invitation single DELETE; N14 accepted → 400 verbatim', async () => {
   const x = await mount('member', { 'DELETE /v2/assessment/a1/grants/g_view': { id: 'g_view', status: 'revoked' }, 'DELETE /v2/invitations/inv_p': { id: 'inv_p', status: 'revoked' } });
   await x.click('data-revoke="g_view"'); const d = x.calls.find(c => c.method === 'DELETE'); assert.equal(d.url, '/v2/assessment/a1/grants/g_view'); assert.equal(d.body, undefined, 'no body, no mode'); assert.match(x.root.html, /Access removed/);
-  await x.click('data-revoke-invitation="inv_p"'); assert.ok(x.calls.some(c => c.method === 'DELETE' && c.url === '/v2/invitations/inv_p' && c.body === undefined));
+  await x.click('data-revoke-invitation="inv_p"'); await x.click('data-revoke-invitation-confirm="inv_p"'); assert.ok(x.calls.some(c => c.method === 'DELETE' && c.url === '/v2/invitations/inv_p' && c.body === undefined));
   const f = await mount('member', { 'DELETE /v2/assessment/a1/grants/g_mem': err('NOT_AUTHORIZED_AT_SCOPE', 403, 'owners cannot be removed') }); await f.click('data-revoke="g_mem"'); assert.match(f.root.html, /owners cannot be removed/);
-  const acc = await mount('owner', { 'DELETE /v2/invitations/inv_p': err('INVALID_PARAMS', 400, 'already accepted — revoke the grant instead') }); await acc.click('data-revoke-invitation="inv_p"'); assert.match(acc.root.html, /already accepted — revoke the grant instead/);
+  const acc = await mount('owner', { 'DELETE /v2/invitations/inv_p': err('INVALID_PARAMS', 400, 'already accepted — revoke the grant instead') }); await acc.click('data-revoke-invitation="inv_p"'); await acc.click('data-revoke-invitation-confirm="inv_p"'); assert.match(acc.root.html, /already accepted — revoke the grant instead/);
 });
 
-test('N6/N7 transfer: owner only; principal id field; step_down off by default and omitted from params; self/unknown → server 400 verbatim; destructive impact shown verbatim', async () => {
-  const seen = []; const x = await mount('owner', { 'POST /v2/assessment/a1/transfer': ({ body }) => { seen.push(body); return body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300, impact: { effect: 'destructive', irreversible: true, compensating_control: 'transfer back (requires the new owner)', affected: [{ to: 'pat', becomes: 'owner' }] } } : { transferred: true }; } }, { to: 'pat' });
-  assert.match(x.root.html, /New owner's principal id/);
+test('N6/N7 transfer: owner only; picker of people with access (U18); step_down off by default and omitted from params; self/unknown → server 400 verbatim; destructive impact shown verbatim', async () => {
+  const seen = []; const x = await mount('owner', { 'POST /v2/assessment/a1/transfer': ({ body }) => { seen.push(body); return body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300, impact: { effect: 'destructive', irreversible: true, compensating_control: 'transfer back (requires the new owner)', affected: [{ to: 'pat', becomes: 'owner' }] } } : { transferred: true }; } }, { to: 'g_mem' });
+  assert.match(x.root.html, /New owner<select name="to" required data-member-picker/); assert.doesNotMatch(x.root.html, /principal id|usr_|<input name="to"/);
   await x.submit('data-transfer-form'); assert.deepEqual(seen[0], { params: { to: 'pat' }, mode: 'dry_run' }); assert.match(x.root.html, /<dd>destructive<\/dd>/); assert.match(x.root.html, /transfer back \(requires the new owner\)/);
   await x.click('data-confirm-execute'); assert.deepEqual(seen[1], { params: { to: 'pat' }, mode: 'execute', confirm_token: 'ct' });
-  const sd = await mount('owner', { 'POST /v2/assessment/a1/transfer': ({ body }) => { seen.push(body); return { confirm_token: 'c', expires_in: 300, impact: {} }; } }, { to: 'pat', step_down_checked: true }); await sd.submit('data-transfer-form'); assert.deepEqual(seen.at(-1).params, { to: 'pat', step_down: true });
-  const self = await mount('owner', { 'POST /v2/assessment/a1/transfer': err('INVALID_PARAMS', 400, 'cannot transfer ownership to yourself', 'name another principal') }, { to: 'me' }); await self.submit('data-transfer-form'); assert.match(self.root.html, /cannot transfer ownership to yourself — name another principal/);
-  const unk = await mount('owner', { 'POST /v2/assessment/a1/transfer': err('INVALID_PARAMS', 400, 'unknown principal') }, { to: 'someone@example.test' }); await unk.submit('data-transfer-form'); assert.match(unk.root.html, /unknown principal/);
+  const sd = await mount('owner', { 'POST /v2/assessment/a1/transfer': ({ body }) => { seen.push(body); return { confirm_token: 'c', expires_in: 300, impact: {} }; } }, { to: 'g_mem', step_down_checked: true }); await sd.submit('data-transfer-form'); assert.deepEqual(seen.at(-1).params, { to: 'pat', step_down: true });
+  const self = await mount('owner', {}, { to: 'g_me' }); assert.doesNotMatch(self.root.html, /<option value="g_me"/); await self.submit('data-transfer-form'); assert.match(self.root.html, /Choose who becomes the owner\./); assert.equal(self.calls.filter(c => c.url.endsWith('/transfer')).length, 0);
+  const bad = await mount('owner', { 'POST /v2/assessment/a1/transfer': err('INVALID_PARAMS', 400, 'unknown principal') }, { to: 'g_mem' }); await bad.submit('data-transfer-form'); assert.match(bad.root.html, /unknown principal/);
   const mem = await mount('member'); assert.doesNotMatch(mem.root.html, /data-transfer-form/);
 });
 
@@ -141,12 +141,12 @@ test('F-G1-1: mutation completion refreshes real roster and role while keeping o
       'POST /v2/assessment/a1/transfer': mutate,
       'DELETE /v2/assessment/a1/grants/g_view': mutate,
       'DELETE /v2/invitations/inv_p': mutate,
-    }, { email: 'new@example.test', role: 'viewer', to: 'pat', step_down_checked: true });
+    }, { email: 'new@example.test', role: 'viewer', to: 'g_mem', step_down_checked: true });
     if (action === 'invite') await x.submit('data-invite-form');
     if (action === 'update_role') { x.root.els['data-role-for=g_mem'] = { value: 'viewer' }; await x.click('data-change-role="g_mem"'); }
     if (action === 'transfer') await x.submit('data-transfer-form');
     if (action === 'revoke') await x.click('data-revoke="g_view"');
-    else if (action === 'revoke_invitation') await x.click('data-revoke-invitation="inv_p"');
+    else if (action === 'revoke_invitation') { await x.click('data-revoke-invitation="inv_p"'); await x.click('data-revoke-invitation-confirm="inv_p"'); }
     else await x.click('data-confirm-execute');
     await x.settle();
     assert.match(x.root.html, /data-permissions-status>[^<]*<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/, action);
@@ -203,35 +203,34 @@ test('late permission refresh cannot repaint a route the user has left', async (
 });
 
 
-test('ownership transfer to a signed-up principal with no prior grant attaches receipt to the new owner row', async () => {
+test('ownership transfer to a picked person attaches receipt to their row after the refresh', async () => {
   let transferred = false;
   const after = roster('member');
-  after.grants.push({ id: 'g_new_owner', principal_id: 'new_principal', role: 'owner' });
+  after.grants.find(g => g.id === 'g_view').role = 'owner';
   const x = await mount('owner', {
     [G]: () => transferred ? after : roster('owner'),
     'POST /v2/assessment/a1/transfer': ({ body }) => {
       if (body.mode === 'dry_run') return { confirm_token: 'transfer-token', expires_in: 300, impact: {} };
       transferred = true; return { transferred: true };
     },
-  }, { to: 'new_principal', step_down_checked: true });
-  assert.equal(x.m.grants.find(g => g.principal_id === 'new_principal'), undefined);
+  }, { to: 'g_view', step_down_checked: true });
   await x.submit('data-transfer-form'); await x.click('data-confirm-execute');
   assert.equal(x.m.myRole, 'member');
-  assert.deepEqual(x.m.receipts.g_new_owner, { receipt: 'rcpt_1', trace: 'tr_1' });
-  assert.equal(x.m.receipts.new_principal, undefined);
-  const row = x.root.html.match(/<tr data-grant-row="g_new_owner">[\s\S]*?<\/tr>/)?.[0];
+  assert.deepEqual(x.m.receipts.g_view, { receipt: 'rcpt_1', trace: 'tr_1' });
+  assert.equal(x.m.receipts.val, undefined);
+  const row = x.root.html.match(/<tr data-grant-row="g_view">[\s\S]*?<\/tr>/)?.[0];
   assert.match(row, /receipt rcpt_1 · trace tr_1/);
   assert.match(x.root.html, /data-permissions-status>Ownership transfer done\.<\/p><details class="small learn-more"><summary>Details<\/summary><p class="small muted" data-permissions-ref>receipt rcpt_1 · trace tr_1/);
 });
 
 test('confirm sheet Cancel dismisses before execute and is ignored while the write is in flight', async () => {
-  const pre = await mount('owner', { 'POST /v2/assessment/a1/transfer': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300, impact: {} } : { transferred: true } }, { to: 'pat' });
+  const pre = await mount('owner', { 'POST /v2/assessment/a1/transfer': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300, impact: {} } : { transferred: true } }, { to: 'g_mem' });
   await pre.submit('data-transfer-form'); await pre.click('data-confirm-cancel');
   assert.equal(pre.m.sheet, null); assert.doesNotMatch(pre.root.html, /data-confirm-sheet/);
   assert.equal(pre.calls.filter(c => c.body?.mode === 'execute').length, 0);
 
   let finishWrite;
-  const x = await mount('owner', { 'POST /v2/assessment/a1/transfer': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300, impact: { effect: 'destructive' } } : new Promise(resolve => { finishWrite = resolve; }) }, { to: 'pat' });
+  const x = await mount('owner', { 'POST /v2/assessment/a1/transfer': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300, impact: { effect: 'destructive' } } : new Promise(resolve => { finishWrite = resolve; }) }, { to: 'g_mem' });
   await x.submit('data-transfer-form');
   const pending = x.click('data-confirm-execute');
   assert.match(x.root.html, /data-confirm-sheet/);
@@ -300,4 +299,37 @@ test('B31/U26: inviteOutcome and shortDate are plain words', () => {
   assert.equal(shortDate('2026-09-25T12:00:00Z', new Date('2026-10-01T00:00:00Z')), 'Sep 25');
   assert.equal(shortDate('2025-09-25T12:00:00Z', new Date('2026-10-01T00:00:00Z')), 'Sep 25, 2025');
   assert.equal(shortDate('not a date'), 'not a date');
+});
+
+test('U37 Revoke invitation asks in the row (Revoke / Cancel, no window.confirm); Cancel sends nothing; a confirmed revoke drops the row even when the refetch fails', async () => {
+  assert.doesNotMatch(read('./permissions.js'), /window\.confirm|globalThis\.confirm/);
+  let listed = 0; const stale = () => (++listed === 1 ? roster('owner') : err('INTERNAL', 500, 'refetch failed'));
+  const x = await mount('owner', { [G]: stale, 'DELETE /v2/invitations/inv_p': { id: 'inv_p', status: 'revoked' } });
+  await x.click('data-revoke-invitation="inv_p"');
+  assert.match(x.root.html, new RegExp(`data-revoke-ask="inv_p">${REVOKE_ASK.replace(/[?]/g, '\\?')} <button[^>]*data-revoke-invitation-confirm="inv_p"[^>]*>Revoke</button> <button[^>]*data-revoke-invitation-cancel[^>]*>Cancel</button>`));
+  assert.equal(x.calls.filter(c => c.method === 'DELETE').length, 0, 'asking sends nothing');
+  await x.click('data-revoke-invitation-cancel'); assert.doesNotMatch(x.root.html, /data-revoke-ask/); assert.match(x.root.html, /data-invitation="inv_p"/);
+  assert.equal(x.calls.filter(c => c.method === 'DELETE').length, 0, 'Cancel sends nothing');
+  await x.click('data-revoke-invitation="inv_p"');
+  const painted = []; const set = Object.getOwnPropertyDescriptor(x.root, 'innerHTML').set; Object.defineProperty(x.root, 'innerHTML', { set(v) { painted.push(v); set.call(this, v); }, get() { return this.html; }, configurable: true });
+  await x.click('data-revoke-invitation-confirm="inv_p"');
+  const notice = painted.find(h => /Invitation revoked\./.test(h)); assert.ok(notice, 'notice painted'); assert.doesNotMatch(notice, /data-invitation="inv_p"/, 'row gone in the same paint as the notice');
+  assert.equal(x.calls.filter(c => c.method === 'DELETE' && c.url === '/v2/invitations/inv_p').length, 1);
+  assert.doesNotMatch(x.root.html, /data-invitation="inv_p"/);
+});
+
+test('U18 transfer picker: people with access by name/email, no raw ids anywhere in the flow, confirm still required, id sent unchanged; nobody else → one sentence', async () => {
+  const named = { grants: [{ id: 'g_me', principal_id: 'me', role: 'owner' }, { id: 'g_a', principal_id: 'usr_ada9', role: 'member', display_name: 'Ada Example', email: 'ada@example.test' }, { id: 'g_b', principal_id: 'usr_bo7', role: 'viewer', email: 'bo@example.test' }], pending_invitations: [] };
+  const seen = [];
+  const x = await mount('owner', { [G]: named, 'POST /v2/assessment/a1/transfer': ({ body }) => { seen.push(body); return body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300, impact: { effect: 'disclosure', affected: [{ to: body.params.to, to_becomes: 'owner' }] } } : { transferred: true }; } }, { to: 'g_b' });
+  assert.match(x.root.html, /<option value="g_a">Ada Example · ada@example\.test<\/option><option value="g_b">bo@example\.test<\/option><\/select>/);
+  assert.doesNotMatch(x.root.html, /<option value="g_me"/); assert.doesNotMatch(x.root.html, /usr_/);
+  await x.submit('data-transfer-form');
+  assert.deepEqual(seen, [{ params: { to: 'usr_bo7' }, mode: 'dry_run' }]); // the chosen person's id, unchanged; nothing executed yet
+  assert.match(x.root.html, /data-confirm-sheet data-confirm-kind="transfer_owner"/); assert.match(x.root.html, /Confirm: Ownership transfer · bo@example\.test/);
+  assert.doesNotMatch(x.root.html, /usr_/); // not in the sheet, not in its Details
+  await x.click('data-confirm-execute'); assert.deepEqual(seen[1], { params: { to: 'usr_bo7' }, mode: 'execute', confirm_token: 'ct' });
+  const alone = await mount('owner', { [G]: { grants: [{ id: 'g_me', principal_id: 'me', role: 'owner' }], pending_invitations: [] } });
+  assert.match(alone.root.html, new RegExp(`data-member-picker-empty>${NO_TRANSFER_TARGET.replace(/[.;]/g, '\\$&')}</p></details>`)); assert.doesNotMatch(alone.root.html, /data-transfer-form|data-member-picker /);
+  assert.equal(NO_TRANSFER_TARGET, 'Invite someone first; you can transfer to people who already have access.');
 });

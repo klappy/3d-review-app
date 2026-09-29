@@ -7,6 +7,8 @@ export interface Capability {
   class: CapClass;
   tool: Tool;
   http: { method: string; path: string; path_inferred: boolean };
+  /** Extra HTTP routes that dispatch to the SAME capability (same handler, same receipt). cap.grant.accept by invitation_id (B04 step c). */
+  http_alt?: { method: string; path: string; path_inferred: boolean }[];
   roles: string;
   slice: string;
   section: string;

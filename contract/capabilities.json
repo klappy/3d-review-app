@@ -8,12 +8,12 @@
     "sha": "0f4413768c4365054372d917619311d7c2a00e96"
   },
   "counts": {
-    "total": 90,
-    "read": 32,
+    "total": 91,
+    "read": 33,
     "write.effect": 12,
     "write.reversible": 39,
     "write.dangerous": 7,
-    "v2.0-bcs": 85,
+    "v2.0-bcs": 86,
     "v2.1-oct": 5,
     "paths_inferred": 37,
     "inverse_unassessed": 0
@@ -1056,7 +1056,7 @@
       "slice": "v2.0-bcs",
       "section": "E. Surveys (templates + assessment surveys)",
       "ui_surface": "Collect",
-      "notes": "template@version into assessment (D4 wording)",
+      "notes": "template@version into assessment (D4 wording) B09: optional `context` object = the facilitator's group-level context for this group from setup step 3 (Kairos Laos fields for the template perspective, no name fields; unknown keys rejected, all optional), stored in assessment_survey.context_json (migration 0011).",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -1461,7 +1461,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "",
-      "notes": "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke",
+      "notes": "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke; name the invitation by `token` (mailed link, unchanged) or by `invitation_id` (signed-in invitee, listed by cap.me.invitations; http_alt POST /v2/me/invitations/{invitation_id}/accept) — both require the caller's email hash == invitee_hash; every miss is NOT_FOUND_OR_NOT_VISIBLE (captain ruling 2026-09-28 15:27 ET, B04 step c)",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1477,7 +1477,9 @@
         "twin_never_get": true,
         "effect": "external"
       },
-      "public": false
+      "public": false,
+      "http_alt": [{ "method": "POST", "path": "/v2/me/invitations/{invitation_id}/accept", "path_inferred": false }],
+      "params_schema": { "type": "object", "properties": { "token": { "type": "string", "minLength": 1 }, "invitation_id": { "type": "string", "minLength": 1 } }, "x-exactly-one-of": ["token", "invitation_id"] }
     },
     {
       "id": "cap.grant.list",
@@ -1498,6 +1500,22 @@
         "kind": "n/a"
       },
       "public": false
+    },
+    {
+      "id": "cap.me.invitations",
+      "class": "read",
+      "tool": "read",
+      "http": { "method": "GET", "path": "/v2/me/invitations", "path_inferred": false },
+      "roles": "any signed-in (own invitations only)",
+      "slice": "v2.0-bcs",
+      "section": "F. Invitations, codes, collaborators",
+      "ui_surface": "sign-in landing: \"Accept invitation\" first (B04 step c)",
+      "notes": "pending collaborator invitations addressed to the signed-in person, matched by hashed email: id, scope {type,id}, role, inviter_display_name (null — no name is stored), invited_at, expires_at; never the token, never the invitee hash, never scope contents; others' invitations are simply absent (captain ruling 2026-09-28 15:27 ET k0015)",
+      "status": "target",
+      "inverse": { "kind": "n/a" },
+      "public": false,
+      "params_schema": { "type": "object", "properties": {} },
+      "result_schema": { "type": "object", "required": ["invitations"], "properties": { "invitations": { "type": "array", "items": { "type": "object", "required": ["id", "scope", "role", "expires_at"], "properties": { "id": { "type": "string" }, "scope": { "type": "object", "properties": { "type": { "enum": ["workspace", "project", "assessment"] }, "id": { "type": "string" } } }, "role": { "enum": ["viewer", "member", "owner"] }, "inviter_display_name": { "type": ["string", "null"] }, "invited_at": { "type": "string" }, "expires_at": { "type": ["string", "null"] } } } } } }
     },
     {
       "id": "cap.grant.update_role",
@@ -1697,6 +1715,13 @@
               "description": "Pinned source renderItems output, stable source item IDs, required/option/exclusion semantics unchanged."
             }
           },
+          "context_fields": {
+            "type": "array",
+            "description": "B09 (Bincy F06, ASK F06 option 2): optional respondent fields shown before Q1, outside the pinned instrument (age_range, gender; each select includes prefer_not). All optional; no name field.",
+            "items": {
+              "type": "object"
+            }
+          },
           "participant_labels": {
             "type": "array",
             "items": {
@@ -1764,6 +1789,10 @@
           "answers": {
             "type": "object",
             "description": "Known pinned item IDs only; server validates required, type, option, multi and exclusion rules before canonical hashing."
+          },
+          "context": {
+            "type": "object",
+            "description": "B09: optional respondent context validated against cap.response.form context_fields (age_range, gender). Unknown keys rejected; every key optional; stored in response.context_json (migration 0011). No names."
           }
         },
         "required": [
@@ -1936,7 +1965,7 @@
       "slice": "v2.0-bcs",
       "section": "G. Participation",
       "ui_surface": "Understand",
-      "notes": "**always-on small-cell suppression** (July D2 ruling) applied server-side before serialization; threshold/role details held → affected disclosure blocked until set; viewers see summary only; `SUPPRESSED` is a typed `ok:true` result (never an `ok:false` error)",
+      "notes": "**always-on small-cell suppression** (July D2 ruling) applied server-side before serialization; threshold/role details held → affected disclosure blocked until set; viewers see summary only; `SUPPRESSED` is a typed `ok:true` result (never an `ok:false` error) B09: result also lists `group_context` [{survey_id, template_id, context}] (facilitator-entered, not respondent data); respondent context (response.context_json) rides inside the suppressed rows until D7 is decided.",
       "status": "target",
       "inverse": {
         "kind": "n/a"

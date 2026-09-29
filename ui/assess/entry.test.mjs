@@ -62,7 +62,7 @@ test('participant resume dispatches to legacy without reading or changing stored
     if(hash==='#participant'){assert.equal(result,'forwarded');assert.deepEqual(replaced,['/legacy/#participant']);assert.equal(historyCalls.length,0);}
     if(hash==='#survey'){assert.equal(result,null);assert.deepEqual(replaced,[]);}
     if(hash==='#survey=fixture')assert.deepEqual(replaced,['/participate/#survey=fixture']);
-    if(hash==='#example')assert.deepEqual(replaced,['/?demo=1#assessment/demo-assessment/prepare']);
+    if(hash==='#example')assert.deepEqual(replaced,['/?demo=1#assessment/demo-assessment/collect']);
   }
 });
 
@@ -92,7 +92,8 @@ test('B03: #invite= opens the v3 Invitation page; token out of the URL, kept for
 test('B03: an assessment with no known project shows no raw project id in its header', () => {
   const js = read('./assess.js');
   assert.ok(!js.includes('project?.name || a.project_id'));
-  assert.match(js, /const roleLine = project \? `\$\{esc\(project\.name\)\} · your role: \$\{esc\(a\.role\)\}` : `Your role: \$\{esc\(a\.role\)\}`;/);
+  // B13: the role shown is the granted role (a completed review is locked to viewer rendering; granted_role keeps the real one).
+  assert.match(js, /roleLine = project \? `\$\{esc\(project\.name\)\} · your role: \$\{esc\(role\)\}` : `Your role: \$\{esc\(role\)\}`;/);
 });
 test('B03 (Bugbot): a failed project-list read never blocks the invitation page', () => {
   const js = read('./assess.js');
@@ -115,6 +116,7 @@ test('B04: a consumed #session= marks the sign-in; boot() applies signInLanding 
   assert.equal(drive('#projects').landing, false, 'plain navigation is not a sign-in');
   assert.equal(drive('#session=st_abc', new Map([['pendingInvite', 'tok']])).historyCalls[0][2], '/#invite');
   const boot = source.slice(source.indexOf('async function boot()'));
-  assert.match(boot, /state\.projects = result\.projects \|\| \[\];[\s\S]*if \(landAfterSignIn\) \{ landAfterSignIn = false; if \(\['projects', 'invite', 'entry'\]\.includes\(route\(location\.hash\)\.kind\)\) \{ try \{ history\.replaceState\(null, '', location\.pathname \+ location\.search \+ signInLanding\(\{ invite: !!\(pendingInvite \|\| storedInvite\(\)\), projects: state\.projects \}\)\); \} catch \{\} \} \}\n\s*listen\(\);\n\s*await render\(\);/);
+  // S9 (B04 step c, captain 2026-09-28): with no link token in the tab, the landing also asks GET /v2/me/invitations (by id, no token).
+  assert.match(boot, /state\.projects = result\.projects \|\| \[\];[\s\S]*if \(landAfterSignIn\) \{ landAfterSignIn = false; if \(\['projects', 'invite', 'entry'\]\.includes\(route\(location\.hash\)\.kind\)\) \{\n\s*const linkInvite = !!\(pendingInvite \|\| storedInvite\(\)\);\n\s*const mine = linkInvite \? \[\] : await loadMyInvitations\(\); if \(mine === null \|\| identity !== identityGeneration\) return;\n\s*try \{ history\.replaceState\(null, '', location\.pathname \+ location\.search \+ signInLanding\(\{ invite: linkInvite \|\| mine\.length > 0, projects: state\.projects \}\)\); \} catch \{\} \} \}\n\s*listen\(\);\n\s*await render\(\);/);
   assert.match(source, /const setToken = t => \{ if \(demo\) return; token = t \|\| null; landAfterSignIn = !!t;/, 'the entry form sign-in lands the same way');
 });

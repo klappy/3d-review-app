@@ -192,6 +192,13 @@ export function parseItems(t: TemplateRow): TemplateItem[] {
   try { return JSON.parse(t.items_json) as TemplateItem[]; } catch { return []; }
 }
 /** Render-ready projection: stable ids, options, labels; no scoring internals. */
+// C01 (captain 2026-09-28): an "Other (please describe)" option carries a free-text description. Source items mark it
+// with flag "other" (pinned instruments) or code "other" (legacy / Lovable import); both count.
+export function isOtherOption(o: { code?: string | null; flag?: string | null }): boolean { return o.flag === "other" || o.code === "other"; }
+/** Reserved key inside answers_json: { [itemId]: text } for items answered with an Other option. Additive; no migration. */
+export const OTHER_TEXT_KEY = "_other";
+export const OTHER_TEXT_MAX = 500;
+
 export function renderItems(items: TemplateItem[], lang: string): Record<string, unknown>[] {
   return items.map((it) => ({
     id: it.id,
@@ -204,7 +211,7 @@ export function renderItems(items: TemplateItem[], lang: string): Record<string,
     text: it.text,
     lang,
     ...(it.scale ? { scale: it.scale } : {}),
-    ...(it.options ? { options: it.options.map((o) => ({ code: o.code, text: o.text, ...(o.flag === "exclusion" ? { exclusive: true } : {}) })) } : {}),
+    ...(it.options ? { options: it.options.map((o) => ({ code: o.code, text: o.text, ...(o.flag === "exclusion" ? { exclusive: true } : {}), ...(isOtherOption(o) ? { other: true } : {}) })) } : {}),
     ...(it.max_select ? { max_select: it.max_select } : {}),
     ...(it.standalone_indicator ? { standalone_indicator: true } : {}),
   }));

@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { render, bind, shareFor, blankShare, copy, qrSvg, invitationSheetHtml, CAN_SHARE } from './share.js';
+import { render, bind, shareFor, blankShare, copy, qrSvg, invitationSheetHtml, CAN_SHARE, css, rememberLink } from './share.js';
 
 const read = n => readFileSync(fileURLToPath(new URL(n, import.meta.url)), 'utf8');
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -18,13 +18,13 @@ function makeRoot(html) {
   const els = Object.fromEntries(attrs.map(a => [a, { handlers: {}, addEventListener(ev, fn) { this.handlers[ev] = fn; }, click() { return this.handlers.click?.(); } }]));
   return { html, els, querySelector(sel) { const m = /\[(data-share-[a-z-]+)\]/.exec(sel); return m ? this.els[m[1]] || null : null; }, set innerHTML(v) { this.html = v; const r = makeRoot(v); this.els = r.els; }, get innerHTML() { return this.html; } };
 }
-function mount(role, table, extras = {}) {
+function mount(role, table, extras = {}, binds = {}) {
   const { api, calls } = fakeApi(table); const state = {}; const cur = current(role); const share = shareFor(state, 'a1', 's1', 1);
   const bindCtx = { ...ctx, ...extras };
   const root = makeRoot(render(ctx, { current: cur, survey, share })); const clipboard = { text: null, async writeText(t) { this.text = t; } };
   const prints = []; const sheets = []; const doc = { createElement: () => ({ set innerHTML(v) { this.html = v; }, className: '', remove() { sheets.push('removed'); } }), body: { append: el => sheets.push(el) } };
-  const onChange = () => { root.innerHTML = render(ctx, { current: cur, survey, share }); bind(bindCtx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test' }); };
-  bind(bindCtx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test' });
+  const onChange = () => { root.innerHTML = render(ctx, { current: cur, survey, share }); bind(bindCtx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test', ...binds }); };
+  bind(bindCtx, root, { current: cur, survey, share, api, onChange, print: () => prints.push(1), clipboard, doc, origin: 'https://example.test', ...binds });
   return { api, calls, state, share, root, clipboard, prints, sheets, click: async attr => { await root.querySelector(`[${attr}]`).click(); } };
 }
 const LINKS = 'POST /v2/assessments/a1/surveys/s1/links';
@@ -44,11 +44,11 @@ test('Share prepares only; Copy confirms issuance and delivers, then QR/print re
   await m.click('data-share-copy');
   assert.deepEqual(m.calls[1].body, { params: {}, mode: 'execute', confirm_token: 'ct1' });
   assert.equal(m.share.confirm, null, 'confirm token is single-use'); assert.equal(m.share.link.url, 'https://example.test/#survey=SECRET'); assert.equal(m.share.link.id, 'inv_1');
-  assert.match(m.root.html, /Keep a copy of this link/); assert.match(m.root.html, /data-share-copy/); assert.match(m.root.html, /data-share-qr/); assert.match(m.root.html, /data-share-sheet/); assert.match(m.root.html, /data-share-revoke/);
+  assert.match(m.root.html, /Keep a copy of this link/); assert.match(m.root.html, /data-share-copy/); assert.doesNotMatch(m.root.html, /data-share-qr(?!-figure)/, 'U45: no QR toggle once the link exists'); assert.match(m.root.html, /data-share-qr-figure/); assert.match(m.root.html, /data-share-print/); assert.match(m.root.html, /data-share-revoke/);
   assert.doesNotMatch(m.root.html, /link_token|inv_1/, 'the raw token field and link id are never rendered');
   await m.click('data-share-copy'); assert.equal(m.clipboard.text, 'https://example.test/#survey=SECRET'); assert.match(m.root.html, /Link copied/);
-  await m.click('data-share-qr'); assert.match(m.root.html, /<svg/); assert.match(m.root.html, /Hide QR code/);
-  await m.click('data-share-sheet'); assert.equal(m.calls.length, 2, 'output retries never reissue'); assert.equal(m.prints.length, 1); assert.deepEqual(m.sheets.map(s => typeof s === 'string' ? s : 'mounted'), ['mounted', 'removed'], 'sheet mounted on body for print then removed');
+  assert.match(m.root.html, /<svg/); assert.doesNotMatch(m.root.html, /Hide QR code/); // U45: the QR is inline, never behind a toggle
+  await m.click('data-share-print'); assert.equal(m.calls.length, 2, 'output retries never reissue'); assert.equal(m.prints.length, 1); assert.deepEqual(m.sheets.map(s => typeof s === 'string' ? s : 'mounted'), ['mounted', 'removed'], 'sheet mounted on body for print then removed');
 });
 
 test('create without a live confirm token never calls execute; a failed execute keeps no link', async () => {
@@ -93,11 +93,11 @@ const receipt = { link_id: 'inv_1', entry_fragment: '#survey=SECRET' };
 const prepared = { confirm_token: 'ct1', expires_in: 300 };
 const good = ({body}) => body.mode === 'dry_run' ? prepared : receipt;
 test('QR or print can be the first outcome; each explicitly confirms only once', async () => {
-  for (const action of ['data-share-qr', 'data-share-sheet']) {
+  for (const action of ['data-share-qr', 'data-share-print']) {
     const m = mount('owner', {[LINKS]:good});
     await m.click('data-share-open'); await m.click(action);
     assert.equal(m.calls.length, 2); assert.equal(m.calls[1].body.mode, 'execute');
-    assert.equal(action === 'data-share-qr' ? m.share.qr : m.prints.length, action === 'data-share-qr' ? true : 1);
+    if (action === 'data-share-qr') { assert.match(m.root.html, /data-share-qr-figure><svg/); assert.equal('qr' in m.share, false, 'U45: no QR toggle state'); } else assert.equal(m.prints.length, 1);
   }
 });
 test('copy rejection preserves link; close/reopen and another copy never issue a second link', async () => {
@@ -178,7 +178,7 @@ test('B36 groupLinks: one labelled row per group (group · survey), Copy + QR as
   const h = groupLinks(ctx, [{ key: 's1', group: 'Translation team', survey: 'Validation', url: 'https://x/participate/#survey=T1' }, { key: 's2', group: 'Community', survey: 'Listening' }]);
   assert.equal((h.match(/data-group-link=/g) || []).length, 2);
   assert.match(h, /Translation team <span aria-hidden="true">·<\/span> Validation/); assert.match(h, /Community <span aria-hidden="true">·<\/span> Listening/);
-  assert.equal((h.match(/data-group-copy=/g) || []).length, 2); assert.equal((h.match(/data-group-qr=/g) || []).length, 2);
+  assert.equal((h.match(/data-group-copy=/g) || []).length, 2); assert.equal((h.match(/data-group-qr=/g) || []).length, 1); assert.equal((h.match(/<svg/g) || []).length, 1); // U45: a row with its link shows its QR inline, no QR button
   assert.match(h, new RegExp(`>${copy.copyLink}<`)); assert.match(h, new RegExp(`>${copy.qr}<`));
   assert.doesNotMatch(h, /class="primary"/);
 });
@@ -191,7 +191,7 @@ function fakeRow(key) {
   copyBtn.closest = sel => sel === '[data-group-link]' ? row : copyBtn; qrBtn.closest = sel => sel === '[data-group-link]' ? row : qrBtn;
   return { status, fig, copyBtn, qrBtn };
 }
-test('B36 bindGroupLinks: Copy copies that group\'s link in one tap; QR shows and hides that group\'s code', async () => {
+test('B36/U45 bindGroupLinks: Copy copies that group\'s link in one tap; the QR then stays visible inline (no toggle)', async () => {
   const { bindGroupLinks } = await import('./share.js');
   let handler; const root = { addEventListener: (ev, fn) => { handler = fn; } };
   const clipboard = { text: null, async writeText(t) { this.text = t; } };
@@ -200,10 +200,10 @@ test('B36 bindGroupLinks: Copy copies that group\'s link in one tap; QR shows an
   const r2 = fakeRow('s2');
   await handler({ target: r2.copyBtn });
   assert.equal(clipboard.text, urls.s2); assert.equal(r2.status.textContent, copy.copied); assert.deepEqual(asked, ['s2']);
-  await handler({ target: r2.qrBtn });
-  assert.equal(r2.fig.hidden, false); assert.match(r2.fig.innerHTML, /<svg/); assert.equal(r2.qrBtn.textContent, copy.hideQr);
-  await handler({ target: r2.qrBtn });
-  assert.equal(r2.fig.hidden, true); assert.equal(r2.qrBtn.textContent, copy.qr);
+  assert.equal(r2.fig.hidden, false); assert.match(r2.fig.innerHTML, /<svg/);
+  const r1 = fakeRow('s1'); await handler({ target: r1.qrBtn });
+  assert.equal(r1.fig.hidden, false); assert.match(r1.fig.innerHTML, /<svg/);
+  await handler({ target: r1.qrBtn }); assert.equal(r1.fig.hidden, false, 'a second tap never hides the QR');
   const bad = fakeRow('s9'); await handler({ target: bad.copyBtn });
   assert.match(bad.status.className, /alert/);
 });
@@ -215,7 +215,7 @@ test('B36 issueLink: one tap = dry_run then execute on that survey; returns the 
   assert.deepEqual(calls.map(c => c.body.mode), ['dry_run', 'execute']); assert.equal(calls[1].body.confirm_token, 'ct1');
   assert.equal(link.id, 'inv_1'); assert.match(link.url, /^https:\/\/example\.test\/.*#survey=TOK$/);
   const src = read('./assess.js');
-  assert.match(src, /share\.groupLinks\(\{ esc \}, \[\{ key: s\.id \}\]\)/);
+  assert.match(src, /share\.groupLinks\(\{ esc \}, \[\{ key: s\.id, title: s\.template_name, line: whoLine\(g\.lens\) \|\| g\.lens, url: share\.knownLink\(state\.collectLinks, share\.linkKey\(a\.id, s\.id\)\)\?\.url \}\]\)/);
   assert.match(src, /share\.bindGroupLinks\(root/); assert.match(src, /share\.issueLink\(api/); assert.match(src, /state\.collectLinks\.clear\(\)/);
   assert.doesNotMatch(src.slice(src.indexOf('function bindCollectLinks'), src.indexOf('function collectPanel')), /localStorage|sessionStorage|console\./);
 });
@@ -244,4 +244,121 @@ test('B36 follow-up: an uncertain Collect failure keeps the Share card warning a
   // Collect rows show only the buttons (group and survey are in the heading just above); the footer line is gone
   assert.doesNotMatch(groupLinks(ctx, [{ key: 's1' }]), /data-group-label/);
   assert.doesNotMatch(read('./assess.js'), /Open a survey to share its link or print a blank questionnaire/);
+});
+
+// B43 (captain 19:50): one share card everywhere — Copy link · QR code · Print — plus one secondary "Print all".
+test('B43 shareActions: Copy link · QR code · Print in that order; the same component on the survey page and every group row', async () => {
+  const { shareActions, groupLinks } = await import('./share.js');
+  const labels = h => [...h.matchAll(/<button[^>]*>([^<]+)<\/button>/g)].map(m => m[1]);
+  assert.deepEqual(labels(shareActions(ctx, { prefix: 'group', key: 's1' })), ['Copy link', 'QR code', 'Print']);
+  const rows = groupLinks(ctx, [{ key: 's1', group: 'Community', survey: 'Listening' }, { key: 's2' }]);
+  assert.equal((rows.match(/data-share-actions/g) || []).length, 2);
+  assert.equal((rows.match(/data-group-print="s[12]"/g) || []).length, 2);
+  assert.doesNotMatch(rows, /class="primary"/);
+  const m = mount('owner', { [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct1', expires_in: 300 } : { link_id: 'inv_1', entry_fragment: '#survey=TOK', expires_at: null } });
+  await m.click('data-share-open');
+  assert.match(m.root.html, /data-share-actions/);
+  assert.deepEqual(labels(m.root.html.slice(m.root.html.indexOf('data-share-actions'))).slice(0, 3), ['Copy link', 'QR code', 'Print']);
+  for (const f of ['../v3/wizard.js', './assess.js']) assert.match(read(f), /printAllButton/);
+});
+
+test('B43 group Print: prints that group\'s own sheet (title, line, link, QR) on body, then removes it; no second resolve on reuse', async () => {
+  const { bindGroupLinks } = await import('./share.js');
+  let handler; const root = { addEventListener: (ev, fn) => { handler = fn; } };
+  const sheets = []; const prints = [];
+  const doc = { createElement: () => ({ className: '', set innerHTML(v) { this.html = v; }, remove() { sheets.push('removed'); } }), body: { append: el => sheets.push(el) } };
+  bindGroupLinks(root, { resolve: async () => 'https://x/participate/#survey=PPP', clipboard: { async writeText() {} }, doc, print: () => prints.push(1) });
+  const status = { textContent: '', className: '' };
+  const row = { dataset: { printTitle: 'Listening', printLine: 'People who speak the language.' }, querySelector: sel => sel === '[data-group-status]' ? status : null };
+  const btn = { dataset: { groupPrint: 's1' }, closest: sel => sel === '[data-group-link]' ? row : btn };
+  await handler({ target: btn });
+  assert.equal(prints.length, 1); assert.equal(sheets[1], 'removed');
+  const html = sheets[0].html;
+  assert.match(html, /<h1>Listening<\/h1>/); assert.match(html, /People who speak the language\./); assert.match(html, /#survey=PPP/); assert.match(html, /<svg/);
+});
+
+test('B43 Print all: one page, one entry per survey (title, one-line description, QR); secondary; failures say so', async () => {
+  const { printAllHtml, printAllButton, bindPrintAll } = await import('./share.js');
+  assert.doesNotMatch(printAllButton(ctx), /primary/); assert.match(printAllButton(ctx), />Print all</);
+  const items = [{ title: 'Validation', line: 'The people doing the translation work.', url: 'https://x/#survey=A' }, { title: 'Listening', line: 'People who speak the language.', url: 'https://x/#survey=B' }];
+  const h = printAllHtml(ctx, { heading: 'Tavo <review>', items });
+  assert.match(h, /<h1>Tavo &lt;review&gt;<\/h1>/);
+  assert.equal((h.match(/class="share-all-item"/g) || []).length, 2); assert.equal((h.match(/<svg/g) || []).length, 2);
+  assert.match(h, /<h2>Validation<\/h2><p>The people doing the translation work\.<\/p>/);
+  let handler; const root = { addEventListener: (ev, fn) => { handler = fn; } };
+  const sheets = []; const prints = []; const status = { textContent: '', className: '' };
+  const doc = { createElement: () => ({ className: '', set innerHTML(v) { this.html = v; }, remove() { sheets.push('removed'); } }), body: { append: el => sheets.push(el) } };
+  const btn = { parentElement: { querySelector: () => status } }; btn.closest = sel => sel === '[data-share-print-all]' ? btn : null;
+  let fail = false;
+  bindPrintAll(root, { heading: 'Tavo', items: async () => { if (fail) throw new Error('x'); return items; }, doc, print: () => prints.push(1) });
+  await handler({ target: btn });
+  assert.equal(prints.length, 1); assert.equal(sheets[0].className, 'stage-print-only share-sheet'); assert.equal(sheets[1], 'removed');
+  assert.equal((sheets[0].html.match(/share-all-item/g) || []).length, 2);
+  fail = true; await handler({ target: btn });
+  assert.equal(prints.length, 1); assert.match(status.className, /alert/);
+  assert.match(css, /@page\{margin:12mm\}/); assert.match(css, /break-inside:avoid/);
+});
+
+test('U36: the survey Share card and Collect share one link per survey; the card sentence is true; revoke drops the shared entry', async () => {
+  const { cachedLink, knownLink, rememberLink } = await import('./share.js');
+  const table = { [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct1', expires_in: 300 } : { link_id: 'inv_1', entry_fragment: '#survey=ONE', expires_at: null }, 'DELETE /v2/assessments/a1/surveys/s1/links/inv_1': { id: 'inv_1', status: 'revoked' } };
+  const links = new Map(), key = 'a1|s1|1';
+  const m = mount('owner', table, {}, { links, linkKey: key });
+  await m.click('data-share-open'); await m.click('data-share-copy');
+  assert.equal(knownLink(links, key).url, 'https://example.test/#survey=ONE', 'the card writes its link where Collect reads');
+  let minted = 0; const again = await cachedLink(links, key, async () => { minted++; return { url: 'NEW' }; });
+  assert.equal(again.url, 'https://example.test/#survey=ONE'); assert.equal(minted, 0, 'Collect Copy/QR/Print reuse the card link');
+  assert.match(m.root.html, /Everyone can use this one link; after a page reload, sharing makes a new one\./); assert.doesNotMatch(m.root.html, /Use the same link below/);
+  await m.click('data-share-revoke'); assert.equal(links.has(key), false, 'a revoked link is never handed out again');
+  const c = new Map(); const l = await cachedLink(c, key, async () => ({ id: 'inv_2', url: 'U2' })); assert.equal(knownLink(c, key), l, 'a Collect-issued link is readable by the card');
+  rememberLink(c, key, { id: 'inv_3', url: 'U3' }); assert.equal((await cachedLink(c, key, async () => ({ url: 'X' }))).url, 'U3');
+  c.set(key, { uncertain: true }); assert.equal(knownLink(c, key), null);
+});
+
+test('U36: two consecutive views of a survey reuse the same active link (launch → Collect → survey page); new only when none is active', async () => {
+  const { issueLink, cachedLink, knownLink, linkKey, rememberLaunchLink } = await import('./share.js');
+  let issued = 0;
+  const { api } = fakeApi({ [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300 } : { link_id: `inv_${++issued}`, entry_fragment: `#survey=TOK${issued}`, expires_at: null } });
+  const cache = new Map(), k = linkKey('a1', 's1'), issue = () => issueLink(api, { aid: 'a1', sid: 's1', origin: 'https://example.test' });
+  assert.equal(k, 'a1|s1'); // no data epoch in the key: navigating away and back, or a refetch, keeps the survey's link
+  const first = await cachedLink(cache, k, issue);   // view 1 (Collect: Copy)
+  const second = await cachedLink(cache, k, issue);  // view 2 (Collect again after leaving the page)
+  assert.equal(issued, 1); assert.equal(second.url, first.url); assert.equal(knownLink(cache, k).id, 'inv_1'); // view 3 (survey page)
+  // the launch page's link is the survey's active link: Collect and the survey page reuse it and issue nothing
+  const launched = new Map();
+  rememberLaunchLink(launched, 'a1', { id: 'inv_L', survey: 's1', entry_fragment: '#survey=LAUNCH', expires_at: null }, 'https://example.test');
+  assert.match((await cachedLink(launched, k, issue)).url, /#survey=LAUNCH$/); assert.equal(knownLink(launched, k).id, 'inv_L'); assert.equal(issued, 1);
+  rememberLaunchLink(launched, 'a1', { id: 'bad', survey: 's2', entry_fragment: 'nope' }); assert.equal(launched.has(linkKey('a1', 's2')), false);
+  // an expired link is not active: the next view issues a fresh one
+  const old = new Map(); rememberLink(old, k, { id: 'inv_old', url: 'https://example.test/#survey=OLD', expires_at: '2020-01-01T00:00:00.000Z' });
+  assert.equal(knownLink(old, k), null); assert.equal((await cachedLink(old, k, issue)).id, 'inv_2');
+  // the survey page's Share card delivers the already-active link without a new execute
+  const links = new Map(); rememberLink(links, k, first); // issued meanwhile on Collect
+  const m = mount('owner', { [LINKS]: ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'ct', expires_in: 300 } : { link_id: 'inv_X', entry_fragment: '#survey=X', expires_at: null } }, {}, { links, linkKey: k });
+  await m.click('data-share-open'); await m.click('data-share-copy');
+  assert.equal(m.clipboard.text, first.url); assert.equal(m.calls.filter(c => c.body?.mode === 'execute').length, 0);
+});
+
+test('U48 (B43 ruling k0013): Collect mints the participant link on render and shows the QR at once; an active link is reused, not re-minted', async () => {
+  const { mintOnRender, cachedLink, issueLink, rememberLink, knownLink, linkKey, groupLinks } = await import('./share.js');
+  const { api, calls } = fakeApi({ [LINKS]: ({ body }) => body.mode === 'dry_run' ? prepared : { link_id: 'inv_R', entry_fragment: '#survey=RENDER', expires_at: null } });
+  const cache = new Map(); const rows = { s1: fakeRow('s1'), s2: fakeRow('s2') };
+  const root = { querySelector: sel => { const m = /\[data-group-link="(.+)"\]/.exec(sel); return m ? { querySelector: s => rows[m[1]][s === '[data-group-status]' ? 'status' : 'fig'] } : null; } };
+  rememberLink(cache, 's2', { id: 'inv_L', url: 'https://example.test/#survey=LAUNCH' }); // s2 already has an active link (U36)
+  const resolve = k => cachedLink(cache, k, () => issueLink(api, { aid: 'a1', sid: k, origin: 'https://example.test' })).then(l => l.url);
+  const urls = await mintOnRender(root, { keys: ['s1', 's2'], resolve });
+  assert.equal(calls.filter(c => c.body.mode === 'execute').length, 1, 'only the survey without a link mints');
+  assert.match(urls[0], /^https:\/\/example\.test\/#survey=/); assert.equal(urls[1], 'https://example.test/#survey=LAUNCH');
+  for (const k of ['s1', 's2']) { assert.equal(rows[k].fig.hidden, false, `${k}: QR visible without a tap`); assert.match(rows[k].fig.innerHTML, /<svg/); }
+  assert.equal(knownLink(cache, 's1').url, urls[0], 'the minted link is the one Copy/Print/the Share card reuse');
+  // a paint that already knows the link renders the QR inline with no QR button (U45)
+  const html = groupLinks({ esc: v => String(v) }, [{ key: 's1', url: urls[0] }]);
+  assert.match(html, /<svg/); assert.doesNotMatch(html, /data-group-qr=/);
+  // a certain failure lands in the row status, never throws out of the paint
+  const bad = new Map(); const r3 = { s3: fakeRow('s3') };
+  const root3 = { querySelector: () => ({ querySelector: s => r3.s3[s === '[data-group-status]' ? 'status' : 'fig'] }) };
+  await mintOnRender(root3, { keys: ['s3'], resolve: k => cachedLink(bad, k, async () => { throw Object.assign(new Error('x'), { uncertain: false }); }) });
+  assert.match(r3.s3.status.className, /alert/); assert.equal(r3.s3.fig.hidden, true);
+  const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  assert.match(src.slice(src.indexOf('function bindCollectLinks'), src.indexOf('function collectPanel')), /mintOnRender/, 'Collect wires mint-on-render');
 });

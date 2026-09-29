@@ -1,9 +1,10 @@
 // node --test ui/assess/scope.test.mjs — scope pages: render() strings, load() with a fake api, entry sign-in transitions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pages, css, classify, landsOnWork, signInLanding, whoLine, PERSPECTIVE_WHO } from './scope.js';
+import { pages, css, classify, landsOnWork, signInLanding, whoLine, PERSPECTIVE_WHO, SIGNUP_NOTE } from './scope.js';
 import { readFileSync } from 'node:fs';
 import * as cards from './cards.js';
+import { currentNamespace, digestNamespace, scopedStorage } from '../shared-link.js';
 
 const err = (code, message = 'nope') => Object.assign(new Error(message), { code, status: Number(code) || 400 });
 function ctxWith(routesMap = {}, over = {}) {
@@ -139,10 +140,10 @@ test('project: refused assessments list is shown as not visible, page still rend
 // ---------- entry ----------
 test('entry: public welcome with hero, tour stepper and survey/example/sign-in buttons', async () => {
   const ctx = ctxWith(); const m = await pages.entry.load(ctx, {}); const h = pages.entry.render(ctx, m);
-  assert.ok(h.includes('What is 3D Review?')); assert.ok(h.includes('Translation team')); assert.ok(h.includes('href="#survey">Take a survey')); assert.ok(h.includes('href="/?demo=1#assessment/demo-assessment/prepare">Browse a sample assessment (synthetic data) →')); assert.ok(h.includes('href="/v2/auth/access">Sign in</a>')); assert.ok(!h.includes('Continue'));
+  assert.ok(h.includes('What is 3D Review?')); assert.ok(h.includes('Translation team')); assert.ok(h.includes('href="#survey">Take a survey')); assert.ok(h.includes('href="/?demo=1#assessment/demo-assessment/collect">Browse a sample assessment (synthetic data) →')); assert.ok(h.includes('href="/v2/auth/access">Sign in</a>')); assert.ok(!h.includes('Continue'));
   // captain-named public home (ui/public-choices.test.mjs contract, now asserted on the ROOT entry): four choices, in order, above the headline
   const nav = h.slice(h.indexOf('<nav class="public-choices'), h.indexOf('</nav>')); const links = [...nav.matchAll(/<a class="rv-btn[^"]*" href="([^"]+)">([^<]+)<\/a>/g)].map(m => [m[2], m[1]]);
-  assert.deepEqual(links, [['Read about it', '#about'], ['Take the tour', '/?demo=1#assessment/demo-assessment/prepare'], ['Take a survey', '#survey'], ['Sign in', '/v2/auth/access']]);
+  assert.deepEqual(links, [['Read about it', '#about'], ['Take the tour', '/?demo=1#assessment/demo-assessment/collect'], ['Take a survey', '#survey'], ['Sign in', '/v2/auth/access']]);
   assert.ok(nav.includes('aria-label="Choose where to start"')); assert.ok(h.indexOf('<nav class="public-choices') < h.indexOf('<h1>')); assert.ok(h.includes('<p class="eyebrow" id="public-about">What is 3D Review?</p>'));
   assert.ok(h.includes('Explore the real assessment screens · Go at your own pace · Nothing is sent')); assert.ok(h.includes('href="#projects">Open your projects and reports'));
   for (const retired of ['Here to take the survey?', 'Show me how', 'Manage assessments']) assert.ok(!h.includes(retired), retired);
@@ -199,13 +200,17 @@ test('entry: survey guidance treats the code as optional and never implies a res
   assert.ok(!h.includes('released above'));
   assert.ok(!h.includes('send it again'));
 });
-test('entry: survey code stores participant token and hands off to legacy /#participant', async () => {
-  const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, removeItem: k => { delete stored[k]; } };
+test('U07: a valid survey code opens the v3 /participate/ survey with the bearer in its scoped session slot', async () => {
+  const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, getItem: k => stored[k] ?? null, removeItem: k => { delete stored[k]; } };
   const assigned = []; globalThis.window = { location: { assign: u => assigned.push(u) } };
   const ctx = ctxWith({ 'POST /v2/participate/code': { participant_token: 'ptok', survey_id: 's1' } });
   const m = await pages.entry.load(ctx, {}); m.mode = 'survey'; const root = mount(pages.entry, ctx, m);
   const form = root.querySelector('#code-form'); form.elements.code.value = 'ABC'; await form.fire('submit');
-  assert.equal(stored.participantToken, 'ptok'); assert.deepEqual(assigned, ['/legacy/#participant']);
+  const ns = await digestNamespace('ptok');
+  assert.deepEqual(assigned, ['/participate/']);
+  assert.equal(currentNamespace(globalThis.sessionStorage), ns);
+  assert.equal(scopedStorage(globalThis.sessionStorage, ns).get('bearer'), 'ptok');
+  assert.equal(stored.participantToken, undefined); // nothing left for the legacy surface to resume
 });
 
 test('U08: a used or unknown access code says what to do next, not "Not allowed here."', async () => {
@@ -353,9 +358,13 @@ test('project settings (lane 11): editors reach access codes on the existing scr
   const own = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'owner' }, languages: [] } });
   const h = pages.project.render(own, await pages.project.load(own, { id: 'p1' }));
   assert.ok(h.includes('id="project-settings"') && h.includes('Project settings'));
-  assert.ok(/href="\/legacy\/#facilitator" data-kept="access-codes"/.test(h), 'access codes link to the legacy facilitator screen');
+  assert.ok(/href="#project\/p1" data-kept="access-codes"/.test(h), 'access codes stay in v3 (no assessment yet: this project)');
+  assert.ok(!h.includes('/legacy/'), 'no link to the legacy console');
   assert.ok(!/class="[^"]*primary[^"]*"[^>]*data-kept/.test(h), 'kept links never take the page primary');
   assert.ok(/href="#workspaces" data-kept="workspaces"/.test(h), 'workspaces link to the existing #workspaces screen');
+  const settings = h.slice(h.indexOf('id="project-settings"')), more = settings.slice(settings.indexOf('<details class="small learn-more">'));
+  assert.ok(/Issue paper codes/.test(more) && /Group projects in a workspace/.test(more), 'U43: both explanations sit behind the one Learn more');
+  assert.equal(settings.split('Issue paper codes').length - 1, 1, 'U43: never inline as well');
   const view = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'viewer' }, languages: [] } });
   assert.ok(!pages.project.render(view, await pages.project.load(view, { id: 'p1' })).includes('project-settings'));
 });
@@ -399,6 +408,10 @@ test('router: about is a public entry intent; unknown hashes fall back to home, 
   assert.deepEqual({ ...route('#about') }, { kind: 'entry', intent: 'about' });
   for (const h of ['#public-about', '#nonsense', '#assessment']) assert.equal(route(h).kind, 'entry', h);
   assert.equal(route('#projects').kind, 'projects');
+  // B06: Home's "Continue setup" route reopens the wizard on that draft; plain #new stays a fresh setup
+  assert.deepEqual({ ...route('#new/asm%201') }, { kind: 'new', id: 'asm 1' });
+  assert.deepEqual({ ...route('#new') }, { kind: 'new' }); assert.deepEqual({ ...route('#/new') }, { kind: 'new' });
+  assert.equal(route('#new/a1/x').kind, 'entry');
 });
 
 test('B04: sign-in landing — pending invitation first; one project → that project; several or none → Home', () => {
@@ -419,4 +432,24 @@ test('B08+B20: one shared who-line per group (setup, launch, Collect); headings 
   for (const w of Object.values(PERSPECTIVE_WHO)) assert.doesNotMatch(w, /Experience of/, 'who the group is, not what it is asked');
   const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   assert.match(src, /<h3 style="margin:18px 0 6px">\$\{esc\(g\.lens\)\}<\/h3>\$\{whoLine\(g\.lens\)/, 'Collect group heading carries the shared who-line');
+});
+
+test('U28 (Bincy B32): both sign-in entry points say a new email creates an account — one shared line, under the Sign in action', async () => {
+  assert.equal(SIGNUP_NOTE, 'New here? Signing in with your email creates your account.');
+  const ctx = ctxWith(); const home = pages.entry.render(ctx, await pages.entry.load(ctx, {}));
+  const nav = home.slice(home.indexOf('<nav class="public-choices'), home.indexOf('</nav>') + 6); const after = home.slice(home.indexOf('</nav>') + 6);
+  assert.ok(nav.endsWith('>Sign in</a></nav>'), 'home: B38 nav markup untouched'); assert.ok(after.startsWith('<small class="small muted signup-note" data-signup-note'), 'home: the line right under the choices');
+  assert.ok(after.indexOf(SIGNUP_NOTE) < after.indexOf('<h1>'), 'home: before the heading, not a line under it');
+  assert.equal(home.split(SIGNUP_NOTE).length - 1, 1, 'home: never repeated');
+  const si = pages.entry.render(ctx, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.equal(si.split(SIGNUP_NOTE).length - 1, 1, '#signin: once'); assert.ok(si.indexOf(SIGNUP_NOTE) > si.indexOf('>Sign in with an email code</a>'), '#signin: under the primary');
+  const inx = ctxWith({}, { state: { principal: { id: 'pr_1' } } }); const signedIn = pages.entry.render(inx, await pages.entry.load(inx, {}));
+  assert.ok(!signedIn.includes(SIGNUP_NOTE), 'signed in: no sign-up line');
+  const siIn = pages.entry.render(inx, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  // B38 flag on (DEV MAGIC_LINK="on"): the magic-link path also creates the account on first sign-in, so the same line, once, under its primary.
+  const on = pages.entry.render(ctxWith({}, { state: { emailLinks: true } }), { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.equal(on.split(SIGNUP_NOTE).length - 1, 1, 'flag on: once'); assert.ok(on.indexOf(SIGNUP_NOTE) > on.indexOf('>Email me a sign-in link</button>'), 'flag on: under the primary');
+  const onIn = pages.entry.render(ctxWith({}, { state: { emailLinks: true, principal: { id: 'pr_1' } } }), { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
+  assert.ok(onIn.includes('Email me a sign-in link') && !onIn.includes(SIGNUP_NOTE), 'flag on, signed in: no sign-up line');
+  assert.ok(siIn.includes('Sign in with an email code'), 'signed-in #signin still renders'); assert.ok(!siIn.includes(SIGNUP_NOTE), 'signed-in #signin (typed, bookmark, Back): no sign-up line');
 });

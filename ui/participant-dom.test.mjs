@@ -12,7 +12,7 @@ import * as shared from './shared-link.js';
 function harness(saved = {}) {
   const nodes = new Map(), storage = new Map(Object.entries(saved)), requests = [];
   function node(id) {
-    if (!nodes.has(id)) nodes.set(id, { id, hidden: true, textContent: '', value: '', children: [], listeners: {},
+    if (!nodes.has(id)) nodes.set(id, { id, hidden: true, textContent: '', value: '', dataset: {}, children: [], listeners: {},
       addEventListener(event, fn) { this.listeners[event] = fn; },
       replaceChildren(...children) { this.children = children; }, append(child) { this.children.push(child); },
       prepend(child) { this.children.unshift(child); }, add(child) { this.children.push(child); },
