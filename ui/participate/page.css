@@ -49,6 +49,7 @@
 .participant-passages .pp-row{display:grid;gap:4px;padding:6px 0;border-top:1px solid #edf3f8}
 .participant-passages .pp-row:first-of-type{border-top:0}
 .participant-passages .pp-label{margin:0;font-size:14px;color:#526779}
+.participant-passages .pp-first{margin:0 0 6px;font-size:16px;line-height:1.4;color:#1d2b36}
 .participant-passages .pp-open{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid #14685f;color:#14685f;font-weight:600;text-decoration:none;justify-self:start}
 .participant-passages audio{width:100%;min-height:44px}
 .participant-passages .pp-title{list-style:none}

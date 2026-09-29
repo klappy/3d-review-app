@@ -241,6 +241,17 @@ test('renderRoleHelp hides when unauthorized and never lists other-role capabili
   assert.match(text(root), /Next here: cap\.survey\.select/);
 });
 
+// BCS demo 2026-09-29: paper names the passage to read or hear first; no line when none is named.
+test('renderBlankPrint prints the passage line under the title when the model carries one', () => {
+  const doc = fakeDocument(), root = doc.createElement('div');
+  renderBlankPrint(doc, root, { visible: true, blank: true, title: 'Translators', items: ['Q?'], passageLine: 'Before you answer, read or listen to: Genesis 1' });
+  const line = findClass(root, 'p-passage');
+  assert.ok(line); assert.equal(line.textContent, 'Before you answer, read or listen to: Genesis 1');
+  const bare = doc.createElement('div');
+  renderBlankPrint(doc, bare, { visible: true, blank: true, title: 'Translators', items: ['Q?'] });
+  assert.equal(findClass(bare, 'p-passage'), null);
+});
+
 test('module source does not import Root or Claude Design C files and CSS is a separate file', () => {
   const js = fs.readFileSync(new URL('./stage-screens.js', import.meta.url), 'utf8');
   const css = fs.readFileSync(new URL('./stage-screens.css', import.meta.url), 'utf8');

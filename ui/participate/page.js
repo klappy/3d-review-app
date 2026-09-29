@@ -1,7 +1,7 @@
 import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError, drawAbout, aboutValues, welcomeCopy } from '../participant-view.js';
-import { UI_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage } from './i18n.js';
+import { UI_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
 
 const $ = id => document.getElementById(id);
@@ -158,11 +158,12 @@ const passageBox = element('section'); passageBox.className = 'participant-passa
 langBox.after(passageBox);
 let passageSig = '';
 function renderPassages(form) {
-  const list = Array.isArray(form?.passages) ? form.passages.filter(p => p && typeof p.href === 'string' && p.href) : [];
+  // A passage is openable (href) or only named (kind 'reference': the facilitator reads or plays it; BCS demo 2026-09-29).
+  const list = Array.isArray(form?.passages) ? form.passages.filter(p => p && ((typeof p.href === 'string' && p.href) || (p.kind === 'reference' && (p.reference || p.title)))) : [];
   const sig = `${lang}|${Object.keys(tr.ui || {}).length > 0}|${list.map(p => p.id).join(',')}`; // relabel once a translation lands
   if (sig === passageSig) return;
   passageSig = sig; passageBox.hidden = !list.length;
-  const rows = list.map(p => {
+  const rows = list.filter(p => p.href).map(p => {
     const row = element('div'); row.className = `pp-row pp-${p.media}`;
     const label = element('p', [p.title, p.reference].filter(Boolean).join(' · ')); label.className = 'pp-label';
     if (p.media === 'audio') {
@@ -179,7 +180,9 @@ function renderPassages(form) {
   const wasOpen = passageDetails ? passageDetails.open : !document.querySelector('.participant-intro[hidden]');
   passageDetails = element('details'); passageDetails.className = 'pp-details'; passageDetails.open = wasOpen;
   const summary = element('summary', `${T('passageTitle')}${list.length > 1 ? ` (${list.length})` : ''}`); summary.className = 'pp-title';
-  passageDetails.append(summary, ...rows);
+  // "Please read or listen to the passage before you answer: Genesis 1" — the instruction BCS asked for, every time.
+  const first = element('p'); first.className = 'pp-first'; first.append(document.createTextNode(`${T('passageFirst')} `), element('strong', passageNames(list)));
+  passageDetails.append(summary, first, ...rows);
   passageBox.replaceChildren(passageDetails);
 }
 let passageDetails = null;
