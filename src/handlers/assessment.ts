@@ -2,6 +2,7 @@
 // Creation and archive membership are deliberately project-scoped per contract.
 import type { Ctx, Handler, Role } from "./types";
 import { CapError, notVisible } from "./errors";
+import { DEMOGRAPHICS_KEY, demographicsEnabled, parseContextJson } from "../context-fields";
 import { STAGES, countScalar, gate, loadProject, newId, nowIso, patchOf, reqStr, roleAt, type AssessmentRow } from "./common";
 
 async function exact(ctx: Ctx, id: string, min: Role = "viewer") {
@@ -41,14 +42,32 @@ export const get: Handler = async (ctx, params) => {
   const {results} = await ctx.db.prepare("SELECT s.id, s.template_id, s.template_version, s.state, s.collection_status, s.archived_at, s.created_at, t.name AS template_name, t.perspective FROM assessment_survey s JOIN survey_template t ON t.id = s.template_id AND t.version = s.template_version WHERE s.assessment_id = ? ORDER BY s.created_at").bind(id).all();
   return { result: { assessment: view(row, role), surveys: results }, scope: { type: "assessment", id } };
 };
+async function readDemographics(ctx: Ctx, id: string): Promise<boolean> {
+  const { results } = await ctx.db.prepare("SELECT context_json FROM assessment_survey WHERE assessment_id = ? AND state = 'selected'").bind(id).all<{ context_json?: string }>();
+  return (results || []).some((r) => demographicsEnabled(r.context_json));
+}
+async function writeDemographics(ctx: Ctx, id: string, on: boolean): Promise<boolean> {
+  const { results } = await ctx.db.prepare("SELECT id, context_json FROM assessment_survey WHERE assessment_id = ?").bind(id).all<{ id: string; context_json?: string }>();
+  const rows = results || [];
+  if (rows.length) await ctx.db.batch(rows.map((r) => ctx.db.prepare("UPDATE assessment_survey SET context_json = ? WHERE id = ?")
+    .bind(JSON.stringify({ ...parseContextJson(r.context_json), [DEMOGRAPHICS_KEY]: on }), r.id)));
+  // Read back: with no group selected yet there is nowhere to store the switch, so it honestly reads off.
+  return readDemographics(ctx, id);
+}
 export const update: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id, "member");
-  const patch = patchOf(params, ["name", "purpose", "period", "language_id", "format"]);
+  // S15a: demographics_enabled is the facilitator's per-assessment switch (off by default); it is stored in each
+  // group's assessment_survey.context_json. Participants hold no assessment grant, so they can never reach this.
+  const { demographics_enabled: demographicsParam, ...rest } = params;
+  if (demographicsParam !== undefined && typeof demographicsParam !== "boolean") throw new CapError("INVALID_PARAMS", "demographics_enabled must be a boolean");
+  const onlySwitch = demographicsParam !== undefined && !Object.keys(rest).some((k) => k !== "id");
+  const patch = onlySwitch ? {} as Record<string, string | null> : patchOf(rest, ["name", "purpose", "period", "language_id", "format"]);
   if (patch.name !== undefined && !patch.name) throw new CapError("INVALID_PARAMS", "name cannot be empty");
   if (patch.language_id !== undefined) { if (!patch.language_id) throw new CapError("INVALID_PARAMS", "language_id cannot be empty"); await language(ctx, row.project_id, patch.language_id); }
   const next = { name: patch.name ?? row.name, purpose: patch.purpose === undefined ? row.purpose : patch.purpose, period: patch.period === undefined ? row.period : patch.period, language_id: patch.language_id ?? row.language_id, format: patch.format === undefined ? row.format : patch.format };
   await ctx.db.prepare("UPDATE assessment SET name = ?, purpose = ?, period = ?, language_id = ?, format = ? WHERE id = ?").bind(next.name, next.purpose, next.period, next.language_id, next.format, id).run();
-  return { result: { assessment: view({...row, ...next}, role) }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format} };
+  const demographics_enabled = demographicsParam === undefined ? await readDemographics(ctx, id) : await writeDemographics(ctx, id, demographicsParam);
+  return { result: { assessment: { ...view({...row, ...next}, role), demographics_enabled } }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format} };
 };
 export const set_stage: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id, "member");
