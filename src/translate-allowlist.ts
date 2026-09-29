@@ -43,6 +43,7 @@ export const PARTICIPANT_UI_STRINGS: readonly string[] = Object.freeze([
   "This survey contains an unsupported question. Ask the person who shared the survey for help.",
   "Change", "Skipped", "About you (optional)", "Choose (optional)", "Please describe", "Response saved",
   "The passage", "Read the passage", "Listen to the passage", "Watch the passage", "Open the passage", // S16 passage card (#385)
+  "Please read or listen to the passage before you answer:", // S18 passage-first line (#387)
   // ui/participate/index.html (page.js STATIC selectors)
   "Your perspective matters", "No account is needed. Review your answers before sending them.", "Review answers",
   "Review your answers", "Edit answers", "Submit answers", "Check submission",

@@ -303,10 +303,12 @@ function bindCollectLinks(current) {
     return link.url;
   } });
 }
+// BCS demo 2026-09-29 (u3540382372): "please read or play the passage for them at this point and then launch the survey or send them the survey links".
+const PASSAGE_FIRST_FACILITATOR = 'Before you share the links or hand out paper, read or play the passage for the group. Name it or attach it on Prepare, under The passage for participants.';
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
   const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${whoLine(g.lens) ? `<p class="small muted" data-who>${esc(whoLine(g.lens))}</p>` : ''}${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id, title: s.template_name, line: whoLine(g.lens) || g.lens, href: `#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}`, url: share.knownLink(state.collectLinks, share.linkKey(a.id, s.id))?.url }]) : ''}</div>${shareable(a, s) ? '' : `<a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a>`}</div>`).join('')}` : '').join('');
-  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${collectLine(a.period) ? `<p class="small muted" data-active-until>${esc(collectLine(a.period))}</p>` : ''}${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose them under Change surveys.</p>'}${current.surveys.some(s => shareable(a, s)) ? share.printAllButton({ esc }) : ''}${learnMore('<p class="small muted">Only responses are counted.</p><p class="small muted">Respondents are counted per survey and are never added up as people.</p>')}</section>`;
+  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2><p class="note" data-passage-first>${esc(PASSAGE_FIRST_FACILITATOR)}</p>${collectLine(a.period) ? `<p class="small muted" data-active-until>${esc(collectLine(a.period))}</p>` : ''}${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose them under Change surveys.</p>'}${current.surveys.some(s => shareable(a, s)) ? share.printAllButton({ esc }) : ''}${learnMore('<p class="small muted">Only responses are counted.</p><p class="small muted">Respondents are counted per survey and are never added up as people.</p>')}</section>`;
 }
 // Cut 2A child screen: ONE survey. B30: one heading (the survey name); Paper/Share are labels, Share is the one primary. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
@@ -330,6 +332,10 @@ function dirtyBanner(aid) {
     : `<p class="note" role="alert">This assessment's survey set changed, or part of it is no longer visible to you. Nothing was written. <a href="#" data-refresh="${esc(aid)}">Refresh now</a></p>`;
 }
 function surveyUnavailable(aid, sid) { return `<div class="narrow panel"><h1>Survey unavailable</h1><p class="muted">No survey with this address is visible to you in this assessment.</p><a class="button" href="#assessment/${encodeURIComponent(aid)}">Back to assessment</a></div>`; }
+// BCS demo 2026-09-29 (bee:10809312 u3540382372-388): the printed form names the passage to read or hear first. A failed
+// read leaves the line off (the paper still prints); the names come from the passages set on Prepare, reference first.
+const passageLine = list => { const names = [...new Set((list || []).map(p => String(p?.reference || p?.title || '').trim()).filter(Boolean))]; return names.length ? `Before you answer, read or listen to: ${names.join(' · ')}` : ''; };
+async function passageLineFor(aid) { try { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/passages`); return passageLine(r?.passages); } catch { return ''; } }
 function bindPrint(current, s) {
   const btn = app.querySelector('#print-load'); if (!btn) return;
   btn.onclick = async () => {
@@ -338,6 +344,8 @@ function bindPrint(current, s) {
     const model = await loadBlankPrint({ request: (url, init) => fetch(url, init), token, aid, sid: s.id, role: current.assessment.role });
     if (gen !== generation) return; // navigated away: nothing paints; the next paint() already reset state.print (HIGH 4040990731)
     btn.disabled = false;
+    if (model.visible) model.passageLine = await passageLineFor(aid); // named once, on the paper and in the preview
+    if (gen !== generation) return;
     if (!model.visible) { state.print = { sid: s.id, status: 'error', text: model.reason === 'unsafe-print' ? 'The print payload was refused because it carried credentials.' : `Blank questionnaire unavailable (${redact(model.reason)}).` }; app.querySelector('#print-status').textContent = state.print.text; return; }
     // P2 (Auditor c5721040053): the loaded model is cached keyed to the exact entity data it came from, so a later repaint of
     // the SAME survey with the SAME survey-set data can replay it without a read; anything else drops it (see paint()).

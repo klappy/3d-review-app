@@ -324,6 +324,8 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint }
   brand.append(mark, doc.createTextNode ? doc.createTextNode(' Review') : el(doc, 'span', ' Review'));
   brandWrap.append(brand);
   brandWrap.append(el(doc, 'h1', model.title || 'Blank survey'));
+  // BCS demo 2026-09-29: paper says which passage to read or hear first ("if it's a print form then… it's just instructions").
+  if (model.passageLine) { const line = el(doc, 'p', model.passageLine); line.className = 'p-passage'; brandWrap.append(line); }
   header.append(brandWrap);
 
   const code = el(doc, 'div');
