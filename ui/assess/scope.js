@@ -76,6 +76,17 @@ function bindRetry(ctx, root, page, model) {
   });
 }
 // A write: disables the trigger while in flight, reports the server outcome, never claims success without it.
+// Captain 2026-09-29: pasting a code can submit the form by itself; not knowing that, people then tap Submit — a second
+// submit of the same code, which breaks the sign-in. So after any submit, Submit stays disabled until the code changes,
+// and the same code is never sent twice in a row (Enter, a double tap). Applies to every code box this app owns.
+export function holdUntilCodeChanges(form, name = 'code') {
+  const input = form?.querySelector?.(`input[name="${name}"]`), button = form?.querySelector?.('button[type=submit]');
+  let last = null;
+  const now = () => String(input?.value ?? '').trim();
+  const sync = () => { if (button) button.disabled = last !== null && now() === last; };
+  input?.addEventListener?.('input', sync);
+  return { repeat: () => last !== null && now() === last, sent: () => { last = now(); sync(); }, sync };
+}
 async function write(ctx, control, label, fn, { refused = 'Not allowed here.', failed = null } = {}) {
   const controls = control ? [control, ...(control.form ? Array.from(control.form.querySelectorAll('button')) : [])] : [];
   for (const c of controls) c.disabled = true;
@@ -172,11 +183,15 @@ const entry = {
         case 'signout': return ctx.signOut?.();
       }
     }));
-    root.querySelector('#code-form')?.addEventListener('submit', async ev => {
+    const codeForm = root.querySelector('#code-form'), codeHold = holdUntilCodeChanges(codeForm);
+    codeForm?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target;
+      if (codeHold.repeat()) return; // the same code again: already sent
+      codeHold.sent();
       // U08 (lanes-1321): a used, unknown or mistyped code gets one plain next step, not "Not allowed here." / a server message.
       const r = await write(ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }), { refused: CODE_REFUSED });
+      codeHold.sync(); // write() re-enabled the buttons; Submit waits for a changed code
       if (!r) return;
       const token = r.participant_token || r.participant;
       if (!token) return ctx.note('The server accepted the code but returned no participant token.', true);
@@ -199,10 +214,13 @@ const entry = {
       } catch { status.textContent = 'The sign-in link could not be sent. Check your connection and try again.'; }
       submit.disabled = false;
     });
-    root.querySelector('#signin-form')?.addEventListener('submit', async ev => {
+    const signinForm = root.querySelector('#signin-form'), signinHold = signinForm?.dataset?.stage === 'code' ? holdUntilCodeChanges(signinForm) : null;
+    signinForm?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target;
       const submit = form.querySelector('button[type=submit]');
+      if (signinHold?.repeat()) return;
+      signinHold?.sent();
       if (form.dataset.stage === 'email') {
         model.signin.email = val(form, 'email');
         const r = await write(ctx, submit, 'Code request', () => ctx.api('/v2/auth/link', { method: 'POST', body: { email: model.signin.email } }));
@@ -211,6 +229,7 @@ const entry = {
         return paint();
       }
       const r = await write(ctx, submit, 'Sign in', () => ctx.api('/v2/auth/session', { method: 'POST', body: { email: model.signin.email, code: val(form, 'code') } }));
+      signinHold?.sync();
       if (!r) return;
       if (!r.session) return ctx.note('The server answered without a session token.', true);
       storeSession('facilitatorToken', r.session);

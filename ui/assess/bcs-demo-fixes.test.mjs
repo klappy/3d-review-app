@@ -41,3 +41,33 @@ test('Access sign-in (production) keeps the base copy byte for byte and adds the
 test('email-link "sent" line names Spam', () => {
   assert.equal(SIGNIN_LINK_SENT(30), 'Check your email — we sent you a sign-in link. It expires in 30 minutes. Not there after a minute? Check your Spam or Junk folder.');
 });
+
+// Captain 2026-09-29: "on auto-submission, the submit button needs disabled until changes to the code."
+test('a code box: after a submit, Submit stays disabled until the code changes, and the same code is never sent twice', async () => {
+  const { JSDOM } = await import('jsdom');
+  const { holdUntilCodeChanges } = await import('./scope.js');
+  const { window } = new JSDOM('<form><input name="code"><button type="submit">Open my survey</button></form>');
+  const form = window.document.querySelector('form'), input = form.querySelector('input'), button = form.querySelector('button');
+  const hold = holdUntilCodeChanges(form);
+  const type = v => { input.value = v; input.dispatchEvent(new window.Event('input')); };
+  type('ABCD-EFGH');
+  assert.equal(button.disabled, false); assert.equal(hold.repeat(), false);
+  hold.sent(); // pasted → the form submitted itself
+  assert.equal(button.disabled, true, 'the natural second tap finds Submit disabled');
+  assert.equal(hold.repeat(), true, 'Enter or a double tap with the same code is ignored');
+  button.disabled = false; hold.sync(); // the request finished and re-enabled the buttons
+  assert.equal(button.disabled, true, 'still disabled: the code has not changed');
+  type('ABCD-EFGJ');
+  assert.equal(button.disabled, false, 'a changed code can be sent'); assert.equal(hold.repeat(), false);
+  type(' ABCD-EFGH '); assert.equal(button.disabled, true, 'back to the sent code (spaces ignored): disabled again');
+  const empty = holdUntilCodeChanges(null); assert.equal(empty.repeat(), false); empty.sent(); empty.sync();
+});
+
+test('both code boxes this app owns use the hold: participant access code and the test-site code step', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('./scope.js', import.meta.url), 'utf8');
+  assert.match(src, /codeHold = holdUntilCodeChanges\(codeForm\)/);
+  assert.match(src, /if \(codeHold\.repeat\(\)\) return;/);
+  assert.match(src, /signinHold = signinForm\?\.dataset\?\.stage === 'code' \? holdUntilCodeChanges\(signinForm\) : null/);
+  assert.match(src, /if \(signinHold\?\.repeat\(\)\) return;/);
+});
