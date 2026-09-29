@@ -601,3 +601,30 @@ test('Setup "Starts" defaults to the facilitator\'s local today, late evening we
     assert.match(renderStep('details', freshDraft(), { projects: [], languages: [], templates: [] }), /name="starts" value="2026-09-28"/);
   } finally { t.mock.timers.reset(); if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz; }
 });
+
+import { shellModel } from '../kit/app-adapter.js';
+import { crumbRow } from '../kit/core.js';
+import { readFileSync } from 'node:fs';
+import { routes as appRoutes } from '../assess/cards.js';
+test('B14: Launch → "Open the review" re-reads the projects first, so Collect crumbs read Home › Project › Assessment', async () => {
+  const srv = server(), order = [], known = { projects: [{ id: 'p1', name: 'Lake', role: 'owner' }], workspaces: new Map(), lists: new Map() }; // the boot list: no pN yet
+  const crumbs = () => [...crumbRow(shellModel({ route: { kind: 'assessment', id: 'a1' }, routes: appRoutes, principal: { id: 'x' }, known, current: { assessment: srv.db.a } }).ancestors.filter(x => x.visible), '').matchAll(/data-crumb="(\w+)"/g)].map(x => x[1]);
+  const m = mount(srv, { assessmentHref: id => `#assessment/${id}`, go: hash => order.push(hash),
+    beforeOpen: async aid => { order.push('reload ' + aid); await tick(); known.projects = [...known.projects, { id: 'pN', name: 'Hill project', role: 'owner' }]; } });
+  await fillStep1(m, { project: NEW_PROJECT }); m.submit(); await settle();
+  m.$('input[name=g][value="tpl.team"]').checked = true; m.submit(); await settle(); m.submit(); await settle();
+  m.click('[data-wz="launch"]'); await settle(12);
+  assert.ok(m.h.state.done);
+  assert.deepEqual(crumbs(), ['home', 'assessment'], 'without the re-read the new project is unknown (the B14 failure)');
+  m.click('[data-wz="open"]'); await settle();
+  assert.deepEqual(order, ['reload a1', '#assessment/a1'], 'the project list is re-read before Collect opens');
+  assert.deepEqual(crumbs(), ['home', 'project', 'assessment']);
+});
+test('B14: a failed re-read still opens the review; the app host wires the re-read to its project list read', async () => {
+  const srv = server(), m = mount(srv, { assessmentHref: id => `#assessment/${id}`, beforeOpen: async () => { throw new Error('offline'); } });
+  await fillStep1(m); m.submit(); await settle(); m.$('input[name=g][value="tpl.team"]').checked = true; m.submit(); await settle(); m.submit(); await settle();
+  m.click('[data-wz="launch"]'); await settle(12); m.click('[data-wz="open"]'); await settle();
+  assert.deepEqual(m.went, ['#assessment/a1']);
+  const src = readFileSync(new URL('../assess/assess.js', import.meta.url), 'utf8');
+  assert.match(src, /beforeOpen: \(\) => \(idg === identityGeneration \? reloadProjects\(\) : false\)/);
+});
