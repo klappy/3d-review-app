@@ -1,6 +1,7 @@
 // No grant inheritance: assessment reads/writes require an exact assessment grant.
 // Creation and archive membership are deliberately project-scoped per contract.
 import type { Ctx, Handler, Role } from "./types";
+import { templateDisplayName } from "../display-names";
 import { CapError, notVisible } from "./errors";
 import { DEMOGRAPHICS_KEY, demographicsEnabled, parseContextJson } from "../context-fields";
 import { STAGES, countScalar, gate, loadProject, newId, nowIso, patchOf, reqStr, roleAt, type AssessmentRow } from "./common";
@@ -37,10 +38,16 @@ export const list: Handler = async (ctx, params) => {
   const {results} = await ctx.db.prepare('SELECT a.*, g.role, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id WHERE s.assessment_id = a.id) AS response_count FROM assessment a JOIN "grant" g ON g.scope_type = ? AND g.scope_id = a.id WHERE a.project_id = ? AND g.principal_id = ? ORDER BY a.created_at').bind("assessment", pid, ctx.principal.id).all<AssessmentRow & {role:Role; response_count:number}>();
   return { result: { assessments: results.map(a => ({ ...view(a, a.role), response_count: Number(a.response_count) || 0 })) }, scope: { type: "project", id: pid } };
 };
+// Survey rows carry the template's display name (Translators, Team leaders & mentors); the pinned name stays as source_name.
+function shownSurvey(s: Record<string, unknown>) {
+  const id = String(s.template_id ?? ""), name = String(s.template_name ?? ""), shown = templateDisplayName(id, name);
+  return shown === name ? s : { ...s, template_name: shown, template_source_name: name };
+}
+
 export const get: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id);
   const {results} = await ctx.db.prepare("SELECT s.id, s.template_id, s.template_version, s.state, s.collection_status, s.archived_at, s.created_at, t.name AS template_name, t.perspective FROM assessment_survey s JOIN survey_template t ON t.id = s.template_id AND t.version = s.template_version WHERE s.assessment_id = ? ORDER BY s.created_at").bind(id).all();
-  return { result: { assessment: view(row, role), surveys: results }, scope: { type: "assessment", id } };
+  return { result: { assessment: view(row, role), surveys: results.map(s => shownSurvey(s as Record<string, unknown>)) }, scope: { type: "assessment", id } };
 };
 async function readDemographics(ctx: Ctx, id: string): Promise<boolean> {
   const { results } = await ctx.db.prepare("SELECT context_json FROM assessment_survey WHERE assessment_id = ? AND state = 'selected'").bind(id).all<{ context_json?: string }>();

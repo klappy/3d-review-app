@@ -364,21 +364,23 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
 }
 
 // B36: one row per group (group · survey) with Copy link and Show QR code — the Share card's shared rows (assess/share.js).
-export function linkRows(links, origin, templates) {
+export function linkRows(links, origin, templates, aid = '') {
   const tpl = id => templates.find(t => t.id === id) || {};
+  // BCS demo 2026-09-29: once launched, each row also opens its survey (printable questions, access codes).
+  const href = l => aid && l.survey ? `#assessment/${encodeURIComponent(aid)}/survey/${encodeURIComponent(l.survey)}` : undefined;
   const url = l => { try { return shareUrl(origin, l.entry_fragment); } catch { return ''; } };
-  return links.map(l => { const group = tpl(l.template).perspective || l.template; return { key: l.survey || l.template, group, survey: tpl(l.template).name || 'Survey', line: whoLine(group) || group, url: url(l) }; });
+  return links.map(l => { const group = tpl(l.template).perspective || l.template; return { key: l.survey || l.template, group, survey: tpl(l.template).name || 'Survey', line: whoLine(group) || group, url: url(l), href: href(l) }; });
 }
 // B08+B20: the launched rows sit under their group's who-line (same shared line as step 2 and Collect); rows themselves unchanged.
-function linkList(links, origin, templates) {
-  const rows = linkRows(links, origin, templates), groups = new Map();
+function linkList(links, origin, templates, aid = '') {
+  const rows = linkRows(links, origin, templates, aid), groups = new Map();
   for (const r of rows) { const w = whoLine(r.group); if (!groups.has(w)) groups.set(w, []); groups.get(w).push(r); }
   return `<div class="wz-links">${[...groups].map(([w, rs]) => `${w ? `<p class="small muted wz-pnote" data-who>${esc(w)}</p>` : ''}${groupLinks({ esc }, rs)}`).join('')}</div>`;
 }
 export function renderDone(ctx, origin = '', templates = []) {
   return `<div class="eyebrow">Launched</div><h1 class="wz-h">The review is collecting responses</h1>
     <p class="muted">Share each link with its group.</p>${learnMore('<p class="muted">Nothing was sent to anyone.</p>')}
-    ${linkList(ctx.links, origin, templates)}${(ctx.links || []).length ? printAllButton({ esc }) : ''}
+    ${linkList(ctx.links, origin, templates, ctx.aid)}${(ctx.links || []).length ? printAllButton({ esc }) : ''}
     <div class="actions"><span class="spacer"></span><button type="button" class="primary" data-wz="open" data-aid="${esc(ctx.aid)}">Open the review</button></div>`;
 }
 
