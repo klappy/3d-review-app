@@ -32,3 +32,14 @@ test('U34: Collect carries Move to Understand as its primary; Prepare no longer 
   assert.match(src, /next && a\.stage !== 'collect' \?/);
   assert.match(src, /askStageMove\(b, /);
 });
+test('Collect: opening the stage-move confirm leaves exactly one "Move to Understand" control on the screen', () => {
+  const src = readFileSync(new URL('../../assess/assess.js', import.meta.url), 'utf8');
+  const m = /askStageMove\(b, `Move this assessment from[^\n]*?`, ('[^']*'|`[^`]*`), \(\) =>/.exec(src);
+  assert.ok(m, 'the Prepare/Collect stage move asks in the page');
+  assert.equal(m[1], "'Yes, move'"); // the confirm names the action, not the target again
+  const doc = new JSDOM(`<div class="title">${stageMoveButton('understand', 'Move to Understand', { primary: true })}</div>`).window.document;
+  askStageMove(doc.querySelector('button[data-stage]'), 'Move this assessment from Collecting responses to Ready to look at results? This closes collection for 1 included survey.', 'Yes, move', () => {});
+  const labels = [...doc.querySelectorAll('button')].map(b => b.textContent.trim());
+  assert.equal(labels.filter(l => l === 'Move to Understand').length, 1);
+  assert.deepEqual(labels, ['Move to Understand', 'Yes, move', 'Cancel']);
+});
