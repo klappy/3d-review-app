@@ -34,7 +34,7 @@ export const NEW_PROJECT = '__new__';
 // B40 (captain 19:50, Bincy): "Lead organisation" is a select plus "Other (type it)". Names only, deduplicated, from the
 // Lovable harvest (v0 lead orgs + v1.0 lead_organization options; test/placeholder values dropped). Organisations already on
 // the projects this account can see are merged in at render time. Stored value is unchanged: project.organization text.
-export const ORGANIZATIONS = ['Beyond Translation', 'Global Partnerships', 'Local church', 'SIL', 'unfoldingWord', 'Wycliffe Associates', 'Wycliffe Global Alliance', 'Wycliffe USA'];
+export const ORGANIZATIONS = ['Beyond Translation', 'Bridge Connectivity Solutions (BCS)', 'Global Partnerships', 'Local church', 'SIL', 'unfoldingWord', 'Wycliffe Associates', 'Wycliffe Global Alliance', 'Wycliffe USA'];
 export const ORG_OTHER = '__other__';
 export function orgChoices(projects = []) {
   const seen = new Map();
@@ -460,7 +460,9 @@ export function mountWizard(root, deps) {
     }
     if (act === 'back') { const f = root.querySelector('form'); if (f) read(f); s.step = STEPS[Math.max(0, STEPS.indexOf(s.step) - 1)]; return paint(); }
     if (act === 'edit') { s.step = b.dataset.step; return paint(); }
-    if (act === 'open') return deps.go?.(deps.assessmentHref ? deps.assessmentHref(b.dataset.aid) : `#/a/${enc(b.dataset.aid)}`);
+    // B14: the host re-reads what the new review hangs under (a project made in this setup) before Collect opens, so the
+    // crumb row reads Home › Project › Assessment on this path exactly as after a fresh sign-in. A failed read still opens.
+    if (act === 'open') { const href = deps.assessmentHref ? deps.assessmentHref(b.dataset.aid) : `#/a/${enc(b.dataset.aid)}`; b.disabled = true; try { await deps.beforeOpen?.(b.dataset.aid); } catch {} if (!alive) return; return deps.go?.(href); }
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
       try { const done = await launch(s.d, { api: deps.api, store: deps.store, onLink: deps.onLink, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; if (s.saved) clearWip(session, s.saved.aid); s.done = done; s.partial = null; paint(); }

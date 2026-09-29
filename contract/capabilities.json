@@ -819,7 +819,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "Prepare",
-      "notes": "name, purpose, period, language, format",
+      "notes": "name, purpose, period, language, format; demographics_enabled (boolean, S15a: facilitator switch, off by default, stored per group in assessment_survey.context_json)",
       "status": "target",
       "inverse": {
         "kind": "true",

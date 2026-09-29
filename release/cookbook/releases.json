@@ -1,7 +1,22 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.22.6",
+  "current": "0.22.7",
   "versions": [
+    {
+      "version": "0.22.7",
+      "status": "candidate",
+      "notes_path": "releases/0.22.7.md",
+      "sections": {
+        "changed": [
+          "Setup step 1 \"Lead organisation\" lists Bridge Connectivity Solutions (BCS). (#383)",
+          "Participant demographics (About you: age range, gender) are off by default. The facilitator turns them on per assessment (`demographics_enabled` on assessment update); while off, participants see no About you block and any age range or gender sent is ignored, not stored. (#380)"
+        ],
+        "fixed": [
+          "Collect shows one \"Move to Understand\": the in-page confirm that opens under a stage-move button now reads \"Yes, move\" instead of repeating the button's label (applies to every stage move). Setup \"Starts (optional)\" was checked to default to the facilitator's local today (late evening west of UTC included); a test now pins it. (#378)",
+          "Launch → \"Open the review\" now opens Collect with the full crumb row Home › Project › Review: the project list is re-read before the review opens, so a project created during setup is named, as it is after a fresh sign-in. (#379)"
+        ]
+      }
+    },
     {
       "version": "0.22.6",
       "status": "candidate",
@@ -10,6 +25,10 @@
         "fixed": [
           "Regenerating the roadmap versions page no longer crashes when there are no pending change files; it now shows no forecast. (#372)",
           "After an owner completes a review, the role badge shows Owner (not Viewer), matching the Permissions and Delete controls still offered; the review content stays read-only. (#374)"
+        ],
+        "changed": [
+          "Persona evidence backfill (2026-09-28): on DEV 0.22.6+bb6a948, agent simulation with synthetic personas in the Claude in-app browser — live owner-badge-after-Complete persona 1/1 PASS (receipt 13d) and release gate run A 47/47 PASS; a few clauses not run (emailed links, stored-response check, expired link, print layout, request body); satisfaction, confusion and frustration NOT MEASURED. See the Persona outcome scorecard in releases/0.22.6.md.",
+          "Persona evidence backfill (2026-09-28): release gate run B on DEV 0.22.6+bb6a948, agent simulation with synthetic personas in the Claude in-app browser at 390 and 1280 — 39 PASS, 1 FAIL (B14: breadcrumb missing the project crumb when opening the review right after launch), 1 NOT RUN (B32, needs Bincy's own email code), 1 DECIDED with no screen (B33), extras 5/5 PASS; satisfaction, confusion and frustration NOT MEASURED. See the Persona outcome scorecard in releases/0.22.6.md."
         ]
       }
     },
