@@ -20,6 +20,7 @@ import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLin
 
 import { installRoadmapStream } from "./roadmap/stream";
 import { installTranslate } from "./translate";
+import { installPassages } from "./passages";
 
 const app = new Hono<{ Bindings: Env }>();
 const json = (value: unknown, status: number) => new Response(JSON.stringify(value), {
@@ -37,6 +38,8 @@ export async function contextForRequest(req: Request, env: Env): Promise<Ctx> {
 installRoadmapStream(app, contextForRequest);
 // Dynamic translation proxy for the participant survey (captain ruling 2026-09-28: restore the Lovable-era behaviour).
 installTranslate(app);
+// Passage files and links on an assessment (captain 2026-09-29; Lovable parity). Registered before the capability twins.
+installPassages(app);
 
 for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?? [])]) {
   if (cap.tool === "danger" && twin.method.toUpperCase() === "GET")

@@ -41,3 +41,17 @@
 .participant-translating.failed{background:#fbf1e7;border-color:#e8c9a8;border-left-color:#a34a0b}
 @keyframes tr-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.participant-translating .tr-spinner{animation:none;border-top-color:#14685f}.participant-translating .tr-bar span{transition:none}}
+/* The passage under review: compact card at the top of every survey screen; big tap targets; audio plays inline. */
+.participant-passages{margin:4px 0 12px;padding:12px 14px;border:1px solid #c9d8e5;border-radius:14px;background:#fff}
+.participant-passages[hidden]{display:none}
+.participant-passages .pp-title{font-size:16px;font-weight:700;margin:0;min-height:40px;display:flex;align-items:center;cursor:pointer}
+.participant-passages .pp-details[open] .pp-title{margin-bottom:6px}
+.participant-passages .pp-row{display:grid;gap:4px;padding:6px 0;border-top:1px solid #edf3f8}
+.participant-passages .pp-row:first-of-type{border-top:0}
+.participant-passages .pp-label{margin:0;font-size:14px;color:#526779}
+.participant-passages .pp-open{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid #14685f;color:#14685f;font-weight:600;text-decoration:none;justify-self:start}
+.participant-passages audio{width:100%;min-height:44px}
+.participant-passages .pp-title{list-style:none}
+.participant-passages .pp-title::-webkit-details-marker{display:none}
+.participant-passages .pp-title::after{content:"▾";margin-left:auto;font-size:18px;color:#14685f}
+.participant-passages .pp-details[open] .pp-title::after{content:"▴"}

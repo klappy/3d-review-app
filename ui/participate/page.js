@@ -57,6 +57,7 @@ function values(validate = false) {
 const syncOther = () => { if (journey.state.form) syncOtherBoxes($('answers'), journey.state.form.items); };
 function paint(state) {
   if (state.form) syncPicker(state.form);
+  if (state.form) renderPassages(view(state.form) || state.form);
   if (state.form && !isEnglish(lang) && tr.form !== state.form && pendingForm !== state.form) loadTranslations(state.form);
   const shown = view(state.form);
   $('notice').textContent = demo && state.phase === 'receipt' ? 'Practice only. No response was sent or saved.' : state.notice || '';
@@ -150,6 +151,39 @@ function hideTranslating() { trBanner.hidden = true; }
 trRetry.addEventListener('click', () => loadTranslations());
 const langBox = element('div'); langBox.className = 'participant-lang-box'; langBox.hidden = true; langBox.append(langLabel, langStatus, trBanner);
 document.querySelector('main').prepend(langBox);
+// The passage under review (captain 2026-09-29; Lovable parity): at the top of the survey on every screen. Audio plays
+// in the page; PDF / USFM / USX text, videos and links open in a new tab. Rebuilt only when the passages or the language
+// change, so audio keeps playing across questions.
+const passageBox = element('section'); passageBox.className = 'participant-passages'; passageBox.hidden = true; passageBox.setAttribute('aria-label', 'The passage');
+langBox.after(passageBox);
+let passageSig = '';
+function renderPassages(form) {
+  const list = Array.isArray(form?.passages) ? form.passages.filter(p => p && typeof p.href === 'string' && p.href) : [];
+  const sig = `${lang}|${Object.keys(tr.ui || {}).length > 0}|${list.map(p => p.id).join(',')}`; // relabel once a translation lands
+  if (sig === passageSig) return;
+  passageSig = sig; passageBox.hidden = !list.length;
+  const rows = list.map(p => {
+    const row = element('div'); row.className = `pp-row pp-${p.media}`;
+    const label = element('p', [p.title, p.reference].filter(Boolean).join(' · ')); label.className = 'pp-label';
+    if (p.media === 'audio') {
+      const audio = element('audio'); audio.controls = true; audio.preload = 'none'; audio.src = p.href; audio.setAttribute('aria-label', `${T('passageListen')}: ${p.title}`);
+      row.append(label, audio);
+    } else {
+      const a = element('a', p.media === 'video' ? `▶ ${T('passageWatch')}` : p.media === 'link' ? T('passageOpen') : T('passageRead')); // no emoji: low-end phones may lack the font
+      a.href = p.href; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.className = 'pp-open';
+      row.append(a, label);
+    }
+    return row;
+  });
+  // Open on the welcome; folds to one tappable line once the questions start, so the question stays in view.
+  const wasOpen = passageDetails ? passageDetails.open : !document.querySelector('.participant-intro[hidden]');
+  passageDetails = element('details'); passageDetails.className = 'pp-details'; passageDetails.open = wasOpen;
+  const summary = element('summary', `${T('passageTitle')}${list.length > 1 ? ` (${list.length})` : ''}`); summary.className = 'pp-title';
+  passageDetails.append(summary, ...rows);
+  passageBox.replaceChildren(passageDetails);
+}
+let passageDetails = null;
+document.addEventListener('click', e => { if (passageDetails && e.target?.closest?.('.participant-start')) passageDetails.open = false; });
 let pendingForm = null;
 function rerender() {
   // Keep the participant where they are: a translation arriving mid-survey redraws the same question, not the welcome.
