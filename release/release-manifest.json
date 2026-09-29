@@ -1,23 +1,24 @@
 {
-  "version": "0.22.5",
+  "version": "0.22.6",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "0b99881298d3f082e821c53efb5329ed5b1d811f",
+  "cookbook_commit": "f435fd38682eea135e236f4e814a440842e7adea",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.22.5.md",
-      "blob_sha": "9a07068c573dad24c405d1a5b2ff7a449d64eadf",
-      "sha256": "53bd89c29a28d073ba46d5cc22f0758bcd3145c875362c58c3def72d263be8ed"
+      "path": "planning/2026-09-16-parity-build/releases/0.22.6.md",
+      "blob_sha": "7b43af5fe5c4d3533d4e6e69dff0f01708b703ae",
+      "sha256": "68022ee1886c87cb0947093469982fe908ae580abf8fe71db746e60ade52ca21"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "723ae2cb9760691d96a037a31a87f18a53bb7662",
-      "sha256": "395f0beae402f385ae1e903202c3708fcd234b22e8c60815bed55ef4614b0b31"
+      "blob_sha": "90e8b05872d4075593325dd9f0d09fa863bc1cc5",
+      "sha256": "1a43a08d3acbc35fb433c5f30a940fe2986ad6d2dd458e7dc8f6efc7b8adae64"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "On a completed review, Delete assessment now shows why it cannot delete (for example \"This assessment has 1 response in 1 survey, so it cannot be deleted.\") instead of showing nothing. (#370)"
+        "Regenerating the roadmap versions page no longer crashes when there are no pending change files; it now shows no forecast. (#372)",
+        "After an owner completes a review, the role badge shows Owner (not Viewer), matching the Permissions and Delete controls still offered; the review content stays read-only. (#374)"
       ]
     }
   }
