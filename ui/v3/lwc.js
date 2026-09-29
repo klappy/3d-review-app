@@ -15,6 +15,7 @@ export const LWC_LANGUAGES = Object.freeze([
   { code: "ne", name: "Nepali", endonym: "नेपाली", dir: "ltr", script: "\\u0900-\\u097F", review: true },
   { code: "bn", name: "Bengali", endonym: "বাংলা", dir: "ltr", script: "\\u0980-\\u09FF", review: false },
   { code: "or", name: "Odia", endonym: "ଓଡ଼ିଆ", dir: "ltr", script: "\\u0B00-\\u0B7F", review: true },
+  { code: "kn", name: "Kannada", endonym: "ಕನ್ನಡ", dir: "ltr", script: "\\u0C80-\\u0CFF", review: true },
   { code: "ta", name: "Tamil", endonym: "தமிழ்", dir: "ltr", script: "\\u0B80-\\u0BFF", review: false },
   { code: "te", name: "Telugu", endonym: "తెలుగు", dir: "ltr", script: "\\u0C00-\\u0C7F", review: false },
   { code: "si", name: "Sinhala", endonym: "සිංහල", dir: "ltr", script: "\\u0D80-\\u0DFF", review: true },
@@ -24,6 +25,9 @@ export const LWC_LANGUAGES = Object.freeze([
   { code: "fr", name: "French", endonym: "Français", dir: "ltr", script: "", review: false },
   { code: "es", name: "Spanish", endonym: "Español", dir: "ltr", script: "", review: false },
   { code: "pt", name: "Portuguese", endonym: "Português", dir: "ltr", script: "", review: false },
+  // Sign languages are recorded as an LWC of the project but are never machine-translated (no written form to translate
+  // into): mt:false keeps them out of the participant picker and /v2/translate. Use video or an interpreter.
+  { code: "ins", name: "Indian Sign Language", endonym: "Indian Sign Language", dir: "ltr", script: "", review: true, mt: false },
 ]);
 export const MAX_LWC = 8;
 const BY_CODE = new Map(LWC_LANGUAGES.map(l => [l.code.toLowerCase(), l]));
@@ -31,7 +35,7 @@ export const lwcByCode = code => BY_CODE.get(String(code || '').toLowerCase()) |
 // Checkbox group for setup screens: name="lwc", value = BCP 47 tag, label = endonym · English name.
 export function lwcFieldset(selected = [], esc = s => String(s), { disabled = false, legend = 'Languages participants read (machine translation)' } = {}) {
   const on = new Set(selected);
-  return `<fieldset class="lwc-field"${disabled ? ' disabled' : ''}><legend>${esc(legend)}</legend><p class="small muted">Participants can switch the survey to these languages. English is always there. Up to ${MAX_LWC}.</p><div class="lwc-options">${LWC_LANGUAGES.map(l => `<label class="lwc-option"><input type="checkbox" name="lwc" value="${esc(l.code)}"${on.has(l.code) ? ' checked' : ''}> <span lang="${esc(l.code)}" dir="${esc(l.dir)}">${esc(l.endonym)}</span> <span class="muted">${esc(l.name)}</span></label>`).join('')}</div></fieldset>`;
+  return `<fieldset class="lwc-field"${disabled ? ' disabled' : ''}><legend>${esc(legend)}</legend><p class="small muted">Participants can switch the survey to these languages. English is always there. Up to ${MAX_LWC}.</p><div class="lwc-options">${LWC_LANGUAGES.map(l => `<label class="lwc-option"><input type="checkbox" name="lwc" value="${esc(l.code)}"${on.has(l.code) ? ' checked' : ''}> <span lang="${esc(l.code)}" dir="${esc(l.dir)}">${esc(l.endonym)}</span>${l.endonym === l.name ? '' : ` <span class="muted">${esc(l.name)}</span>`}${l.mt === false ? ' <span class="muted">(recorded; no machine translation)</span>' : ''}</label>`).join('')}</div></fieldset>`;
 }
 export const lwcFrom = fd => [...new Set(fd.getAll('lwc').map(String))].filter(c => BY_CODE.has(c.toLowerCase())).slice(0, MAX_LWC);
 export const LWC_CSS = '.lwc-field{border:0;padding:0;margin:14px 0 0;min-width:0}.lwc-field legend{font-weight:600;padding:0}.lwc-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px 12px;margin-top:6px}.lwc-option{display:flex;align-items:center;gap:6px;min-height:40px;font-weight:400}';

@@ -119,7 +119,7 @@ export async function handleTranslate(request: Request, env: Env, deps: Deps = {
   if (typeof parsed === "string") return reply({ error: "invalid_params", message: parsed }, 400);
   if (ENGLISH.has(parsed.targetLang.toLowerCase())) return reply({ translated: parsed.sourceTexts, partial: false, locale: "en", review: false, stored: 0 });
   const lang = lwcLanguage(parsed.targetLang);
-  if (!lang) return reply({ error: "invalid_params", message: "this language is not available for translation" }, 400);
+  if (!lang || lang.mt === false) return reply({ error: "invalid_params", message: "this language is not available for machine translation" }, 400);
 
   // Unique English strings by hash (the same sentence on two screens is one memory row).
   const hashOfKey = new Map<string, string>(), textOfHash = new Map<string, string>();

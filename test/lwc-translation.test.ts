@@ -45,6 +45,12 @@ describe("supported LWC table", () => {
     expect(parseLwc('["lo","nope","th"]')).toEqual(["lo", "th"]);
     expect(participantLanguages('["th"]', '["lo","th"]').map((l) => l.code)).toEqual(["th", "lo"]);
   });
+  it("BCS LWCs (captain 2026-09-29): Telugu, Kannada, Odia, Hindi, Indian Sign Language are accepted; the sign language is recorded but never offered for machine translation", async () => {
+    expect(normalizeLwc(["Telugu", "Kannada", "Odia", "Hindi", "Indian Sign Language"])).toEqual({ codes: ["te", "kn", "or", "hi", "ins"] });
+    expect(participantLanguages('["te","kn","or","hi","ins"]', "[]").map((l) => l.code)).toEqual(["te", "kn", "or", "hi"]);
+    const res = await handleTranslate(new Request("https://local.invalid/v2/translate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ targetLang: "ins", context: "participant-ui", sourceTexts: { a: "Start" } }) }), env);
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("LWCs on the assessment and project → participant languages", () => {

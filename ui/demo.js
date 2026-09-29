@@ -31,7 +31,7 @@ export async function demoApi(url, { method = 'GET' } = {}) {
 }
 // Actual participant controller/client/view with an in-memory transport and storage.
 // Practice prompts are not scored instruments or source-attested assessment evidence.
-const PRACTICE_LWC = ['lo', 'th', 'km', 'my', 'hi', 'bn', 'or', 'ne'];
+const PRACTICE_LWC = ['hi', 'te', 'kn', 'or', 'lo', 'th', 'km', 'my']; // BCS LWCs first (captain 2026-09-29)
 export function sampleParticipantEnvironment(surveyIndex = 0) {
   let submitted = false;
   const selected = fixture.forms[surveyIndex] || fixture.forms[0];

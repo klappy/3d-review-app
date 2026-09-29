@@ -8,9 +8,9 @@
  * text direction, a script pattern the output must contain, and `review` = machine output needs a speaker's review
  * before it is trusted (low-resource languages; see docs/translation.md for sources).
  * Support basis: Vertex AI "Gemini models" language list (checked 2026-09-28 for lo km my ne or si ta te ur th vi hi bn id);
- * the rest are high-resource languages. Mirrored for the browser in ui/v3/lwc.js (test keeps the two identical).
+ * the rest are high-resource languages. Kannada (kn) added 2026-09-29 for BCS (captain); not in the subset we verified, so review:true. Mirrored for the browser in ui/v3/lwc.js (test keeps the two identical).
  */
-export interface LwcLanguage { code: string; name: string; endonym: string; dir: "ltr" | "rtl"; script: string; review: boolean }
+export interface LwcLanguage { code: string; name: string; endonym: string; dir: "ltr" | "rtl"; script: string; review: boolean; mt?: false }
 
 export const LWC_LANGUAGES: readonly LwcLanguage[] = Object.freeze([
   { code: "lo", name: "Lao", endonym: "ລາວ", dir: "ltr", script: "\\u0E80-\\u0EFF", review: true },
@@ -27,6 +27,7 @@ export const LWC_LANGUAGES: readonly LwcLanguage[] = Object.freeze([
   { code: "ne", name: "Nepali", endonym: "नेपाली", dir: "ltr", script: "\\u0900-\\u097F", review: true },
   { code: "bn", name: "Bengali", endonym: "বাংলা", dir: "ltr", script: "\\u0980-\\u09FF", review: false },
   { code: "or", name: "Odia", endonym: "ଓଡ଼ିଆ", dir: "ltr", script: "\\u0B00-\\u0B7F", review: true },
+  { code: "kn", name: "Kannada", endonym: "ಕನ್ನಡ", dir: "ltr", script: "\\u0C80-\\u0CFF", review: true },
   { code: "ta", name: "Tamil", endonym: "தமிழ்", dir: "ltr", script: "\\u0B80-\\u0BFF", review: false },
   { code: "te", name: "Telugu", endonym: "తెలుగు", dir: "ltr", script: "\\u0C00-\\u0C7F", review: false },
   { code: "si", name: "Sinhala", endonym: "සිංහල", dir: "ltr", script: "\\u0D80-\\u0DFF", review: true },
@@ -36,6 +37,9 @@ export const LWC_LANGUAGES: readonly LwcLanguage[] = Object.freeze([
   { code: "fr", name: "French", endonym: "Français", dir: "ltr", script: "", review: false },
   { code: "es", name: "Spanish", endonym: "Español", dir: "ltr", script: "", review: false },
   { code: "pt", name: "Portuguese", endonym: "Português", dir: "ltr", script: "", review: false },
+  // Sign languages are recorded as an LWC of the project but are never machine-translated (no written form to translate
+  // into): mt:false keeps them out of the participant picker and /v2/translate. Use video or an interpreter.
+  { code: "ins", name: "Indian Sign Language", endonym: "Indian Sign Language", dir: "ltr", script: "", review: true, mt: false },
 ]);
 const BY_CODE = new Map(LWC_LANGUAGES.map((l) => [l.code.toLowerCase(), l]));
 export const MAX_LWC = 8;
@@ -74,7 +78,7 @@ export function normalizeLwc(value: unknown): { codes: string[] } | { error: str
 export function participantLanguages(assessmentLwc: unknown, projectLwc: unknown) {
   const codes = [...parseLwc(assessmentLwc)];
   for (const c of parseLwc(projectLwc)) if (!codes.includes(c)) codes.push(c);
-  return codes.slice(0, MAX_LWC).map((c) => { const l = BY_CODE.get(c.toLowerCase())!; return { code: l.code, name: l.name, endonym: l.endonym, dir: l.dir, review: l.review }; });
+  return codes.map((c) => BY_CODE.get(c.toLowerCase())!).filter((l) => l.mt !== false).slice(0, MAX_LWC).map((l) => ({ code: l.code, name: l.name, endonym: l.endonym, dir: l.dir, review: l.review }));
 }
 /** True when a translation is plausibly in the target script (non-Latin targets must contain that script). */
 export function inScript(code: string, text: string): boolean {
