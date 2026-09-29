@@ -22,6 +22,10 @@ export const cleanLang = lang => { const v = typeof lang === 'string' ? lang.tri
 export const UI_EN = Object.freeze({
   language: 'Language',
   translating: 'Translating…',
+  translatingFirst: 'The first time can take up to a minute. After that it opens straight away. You can keep reading in English meanwhile.',
+  phrases: 'phrases',
+  tryAgain: 'Try again',
+  translateFailedHint: 'Showing English. Check the internet connection, then try again.',
   translateFailed: 'Translation is not available right now. Showing English.',
   machineNote: 'Machine translation. If anything is unclear, ask the person who shared the survey.',
   machineNoteReview: 'Machine translation, not yet checked by a speaker of this language. If anything is unclear, ask the person who shared the survey.',
@@ -112,6 +116,40 @@ export async function fetchTranslations({ lang, context, sourceTexts, fetchImpl 
   if (!Object.keys(map).length) throw new Error('translate empty');
   const partial = data?.partial === true || Object.keys(map).length < Object.keys(sourceTexts).length;
   if (!partial) writeCache(storage, key, map);
+  return { map, partial, cached: false };
+}
+
+// The same, split into small parallel requests so the page can show real progress ("12 of 94 phrases") while a
+// language is translated for the first time (the upstream model answers ~20 strings per call). The whole bundle is
+// cached on the device only when complete. onProgress({ done, total }) after each chunk. Rejects only if nothing came back.
+export async function fetchTranslationsProgressive({ lang, context, sourceTexts, fetchImpl = globalThis.fetch, storage = null, endpoint = '/v2/translate', chunkSize = 20, concurrency = 3, onProgress = () => {} }) {
+  const keys = Object.keys(sourceTexts), total = keys.length;
+  if (isEnglish(lang) || !total) return { map: {}, partial: false, cached: false };
+  const cacheKey = `${CACHE_PREFIX}${lang.toLowerCase()}:${context}:${hashOf(sourceTexts)}`;
+  const hit = readCache(storage, cacheKey);
+  if (hit && typeof hit === 'object') { onProgress({ done: total, total }); return { map: hit, partial: false, cached: true }; }
+  const chunks = [];
+  for (let i = 0; i < total; i += chunkSize) chunks.push(Object.fromEntries(keys.slice(i, i + chunkSize).map(k => [k, sourceTexts[k]])));
+  const map = {};
+  let done = 0, next = 0, failures = 0;
+  onProgress({ done, total });
+  async function worker() {
+    while (next < chunks.length) {
+      const part = chunks[next++];
+      try {
+        const res = await fetchImpl(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ targetLang: lang, context, sourceTexts: part }) });
+        if (!res || !res.ok) throw new Error(`translate ${res ? res.status : 'failed'}`);
+        const data = await res.json();
+        for (const k of Object.keys(part)) if (typeof data?.translated?.[k] === 'string' && data.translated[k].trim()) map[k] = data.translated[k];
+      } catch { failures++; }
+      done += Object.keys(part).length;
+      onProgress({ done, total });
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, chunks.length) }, worker));
+  if (!Object.keys(map).length) throw new Error(failures ? 'translate failed' : 'translate empty');
+  const partial = Object.keys(map).length < total;
+  if (!partial) writeCache(storage, cacheKey, map);
   return { map, partial, cached: false };
 }
 

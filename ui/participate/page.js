@@ -1,7 +1,7 @@
 import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError, drawAbout, aboutValues, welcomeCopy } from '../participant-view.js';
-import { UI_EN, formStrings, translateForm, makeT, fetchTranslations, initialLanguage, rememberLanguage, isEnglish, pickLanguage } from './i18n.js';
+import { UI_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
 
 const $ = id => document.getElementById(id);
@@ -121,34 +121,77 @@ function syncPicker(form) {
 const currentEntry = () => pickLanguage(lang, journey?.state?.form?.languages || []);
 const langLabel = element('label'); langLabel.className = 'participant-lang'; const langWord = element('span', UI_EN.language); langLabel.append(langWord, langSelect);
 const langStatus = element('p'); langStatus.className = 'participant-lang-status'; langStatus.setAttribute('role', 'status'); langStatus.setAttribute('aria-live', 'polite');
-const langBox = element('div'); langBox.className = 'participant-lang-box'; langBox.hidden = true; langBox.append(langLabel, langStatus);
+// Visible "translating" feedback (captain 2026-09-29): never a silent wait. A card with a spinner, the language in its own
+// script, plain words about the first-time wait, and a real progress bar ("n of N phrases"); shown only if loading takes
+// longer than a moment (a stored translation appears without a flash). English stays readable underneath.
+const trBanner = element('div'); trBanner.className = 'participant-translating'; trBanner.hidden = true; trBanner.setAttribute('role', 'status'); trBanner.setAttribute('aria-live', 'polite');
+const trSpin = element('span'); trSpin.className = 'tr-spinner'; trSpin.setAttribute('aria-hidden', 'true');
+const trBody = element('div'); trBody.className = 'tr-body';
+const trTitle = element('p'); trTitle.className = 'tr-title';
+const trSub = element('p'); trSub.className = 'tr-sub';
+const trBar = element('div'); trBar.className = 'tr-bar'; trBar.setAttribute('role', 'progressbar'); trBar.setAttribute('aria-valuemin', '0'); trBar.setAttribute('aria-valuemax', '100'); trBar.setAttribute('aria-label', 'Translation progress');
+const trFill = element('span'); trBar.append(trFill);
+const trCount = element('p'); trCount.className = 'tr-count';
+const trRetry = element('button', UI_EN.tryAgain); trRetry.type = 'button'; trRetry.className = 'rv-btn quiet tr-retry'; trRetry.hidden = true;
+trBody.append(trTitle, trSub, trBar, trCount, trRetry); trBanner.append(trSpin, trBody);
+function showTranslating(entry, { done = 0, total = 0 } = {}) {
+  trBanner.hidden = false; trBanner.classList.remove('failed'); trSpin.hidden = false; trBar.hidden = false; trRetry.hidden = true;
+  trTitle.textContent = entry ? `Translating into ${entry.endonym}${entry.endonym === entry.name ? '' : ` (${entry.name})`}…` : UI_EN.translating;
+  trSub.textContent = UI_EN.translatingFirst;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  trFill.style.width = `${Math.max(4, pct)}%`; trBar.setAttribute('aria-valuenow', String(pct));
+  trCount.textContent = total ? `${done} / ${total} ${UI_EN.phrases}` : '';
+}
+function showTranslateFailed() {
+  trBanner.hidden = false; trBanner.classList.add('failed'); trSpin.hidden = true; trBar.hidden = true; trCount.textContent = '';
+  trTitle.textContent = UI_EN.translateFailed; trSub.textContent = UI_EN.translateFailedHint; trRetry.hidden = false;
+}
+function hideTranslating() { trBanner.hidden = true; }
+trRetry.addEventListener('click', () => loadTranslations());
+const langBox = element('div'); langBox.className = 'participant-lang-box'; langBox.hidden = true; langBox.append(langLabel, langStatus, trBanner);
 document.querySelector('main').prepend(langBox);
 let pendingForm = null;
 function rerender() {
+  // Keep the participant where they are: a translation arriving mid-survey redraws the same question, not the welcome.
+  const fields = [...$('questions').children], at = fields.findIndex(f => !f.hidden);
+  const midSurvey = journey?.state?.phase === 'form' && at >= 0 && !!document.querySelector('.participant-intro[hidden]');
   applyStatic(); langWord.textContent = T('language');
   document.documentElement.dir = currentEntry()?.dir === 'rtl' ? 'rtl' : 'ltr';
   renderedForm = null; renderedPhase = null;
   if (journey?.state) paint(journey.state);
+  if (midSurvey) pager?.showForm(at);
 }
 async function loadTranslations(form = journey?.state?.form || null) {
   const seq = ++loadSeq; pendingForm = form;
-  if (isEnglish(lang)) { tr = { lang, form, ui: {}, items: {}, view: null }; T = makeT({}); langStatus.textContent = ''; pendingForm = null; rerender(); return; }
-  langStatus.textContent = UI_EN.translating;
+  if (isEnglish(lang)) { tr = { lang, form, ui: {}, items: {}, view: null }; T = makeT({}); langStatus.textContent = ''; hideTranslating(); pendingForm = null; rerender(); return; }
+  const entry = pickLanguage(lang, form?.languages || []);
+  langStatus.textContent = '';
+  const main = document.querySelector('main'); main?.setAttribute('aria-busy', 'true');
   const ui = { ...UI_EN, ...staticEn };
   if (form?.items) Object.assign(ui, welcomeCopy(form, form.items.length));
+  const items = form?.items ? formStrings(form) : {};
+  const total = Object.keys(ui).length + Object.keys(items).length;
+  const seen = { ui: 0, items: 0 };
+  let shown = false;
+  const progress = () => { if (shown && seq === loadSeq) showTranslating(entry, { done: seen.ui + seen.items, total }); };
+  const reveal = setTimeout(() => { if (seq === loadSeq) { shown = true; progress(); } }, 300); // no flash when it is already stored
   try {
     const store = localStore();
     const [u, it] = await Promise.all([
-      fetchTranslations({ lang, context: 'participant-ui', sourceTexts: ui, storage: store }),
-      form?.items ? fetchTranslations({ lang, context: `participant-form:${form.template?.id || 'form'}`, sourceTexts: formStrings(form), storage: store }) : Promise.resolve({ map: {} }),
+      fetchTranslationsProgressive({ lang, context: 'participant-ui', sourceTexts: ui, storage: store, onProgress: p => { seen.ui = p.done; progress(); } }),
+      form?.items ? fetchTranslationsProgressive({ lang, context: `participant-form:${form.template?.id || 'form'}`, sourceTexts: items, storage: store, onProgress: p => { seen.items = p.done; progress(); } }) : Promise.resolve({ map: {} }),
     ]);
     if (seq !== loadSeq) return;
     tr = { lang, form, ui: u.map, items: it.map, view: form ? translateForm(form, it.map) : null }; T = makeT(u.map);
-    langStatus.textContent = currentEntry()?.review ? T('machineNoteReview') : T('machineNote');
+    hideTranslating();
+    langStatus.textContent = entry?.review ? T('machineNoteReview') : T('machineNote');
   } catch {
     if (seq !== loadSeq) return;
     tr = { lang, form, ui: {}, items: {}, view: null }; T = makeT({});
-    langStatus.textContent = UI_EN.translateFailed;
+    showTranslateFailed();
+  } finally {
+    clearTimeout(reveal);
+    if (seq === loadSeq) main?.removeAttribute('aria-busy');
   }
   pendingForm = null; rerender();
 }

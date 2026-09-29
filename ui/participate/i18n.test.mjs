@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formStrings, translateForm, makeT, fetchTranslations, initialLanguage, hashOf, isEnglish, isRtl, UI_EN, pickLanguage } from './i18n.js';
+import { formStrings, translateForm, makeT, fetchTranslations, fetchTranslationsProgressive, initialLanguage, hashOf, isEnglish, isRtl, UI_EN, pickLanguage } from './i18n.js';
 
 const form = {
   template: { id: 'tpl_mid_level' },
@@ -89,4 +89,29 @@ test('helpers', () => {
   assert.equal(hashOf({ b: '2', a: '1' }), hashOf({ a: '1', b: '2' }));
   assert.ok(isEnglish('en') && isEnglish('English') && !isEnglish('Lao'));
   assert.ok(isRtl('Urdu') && !isRtl('Lao'));
+});
+
+test('fetchTranslationsProgressive: small parallel chunks, real progress to 100%, cached only when complete', async () => {
+  const texts = Object.fromEntries(Array.from({ length: 45 }, (_, i) => [`k${i}`, `Text ${i}`]));
+  let inFlight = 0, peak = 0; const calls = [];
+  const fetchImpl = async (url, init) => { inFlight++; peak = Math.max(peak, inFlight); const b = JSON.parse(init.body); calls.push(Object.keys(b.sourceTexts).length); await new Promise(r => setTimeout(r, 5)); inFlight--; return { ok: true, status: 200, json: async () => ({ translated: Object.fromEntries(Object.entries(b.sourceTexts).map(([k, v]) => [k, `ລາວ ${v}`])) }) }; };
+  const seen = []; const storage = memoryStorage();
+  const r = await fetchTranslationsProgressive({ lang: 'lo', context: 'c', sourceTexts: texts, fetchImpl, storage, onProgress: p => seen.push(p.done) });
+  assert.deepEqual(calls.sort((a, b) => b - a), [20, 20, 5]);
+  assert.ok(peak <= 3 && peak >= 2, 'bounded parallel requests');
+  assert.equal(seen[0], 0); assert.equal(seen.at(-1), 45);
+  for (let i = 1; i < seen.length; i++) assert.ok(seen[i] >= seen[i - 1], 'progress never goes backwards');
+  assert.equal(Object.keys(r.map).length, 45); assert.equal(r.partial, false); assert.equal(storage.m.size, 1);
+  const again = await fetchTranslationsProgressive({ lang: 'lo', context: 'c', sourceTexts: texts, fetchImpl: async () => { throw new Error('no network needed'); }, storage });
+  assert.equal(again.cached, true);
+});
+
+test('fetchTranslationsProgressive: one failed chunk → partial, not cached; all failed → rejects', async () => {
+  const texts = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`k${i}`, `Text ${i}`]));
+  let n = 0;
+  const flaky = async (url, init) => { const b = JSON.parse(init.body); if (n++ === 0) return { ok: false, status: 502 }; return { ok: true, json: async () => ({ translated: Object.fromEntries(Object.keys(b.sourceTexts).map(k => [k, 'ກ'])) }) }; };
+  const storage = memoryStorage();
+  const r = await fetchTranslationsProgressive({ lang: 'lo', context: 'c', sourceTexts: texts, fetchImpl: flaky, storage, concurrency: 1 });
+  assert.equal(r.partial, true); assert.equal(storage.m.size, 0);
+  await assert.rejects(fetchTranslationsProgressive({ lang: 'lo', context: 'c', sourceTexts: texts, fetchImpl: async () => ({ ok: false, status: 503 }) }));
 });
