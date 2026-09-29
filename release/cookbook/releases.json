@@ -1,7 +1,41 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.22.6",
+  "current": "0.23.0",
   "versions": [
+    {
+      "version": "0.23.0",
+      "status": "candidate",
+      "notes_path": "releases/0.23.0.md",
+      "sections": {
+        "changed": [
+          "Survey names say who they are for. \"Validation\" is now **Translators** and \"Mid-Level\" is now **Team leaders & mentors**. The new names show in setup, on Collect, on the survey page, on the blank print and in demo mode. Template ids are unchanged. The API returns the pinned source name as `source_name`, or `template_source_name` on assessment survey rows. The pinned synthetic report keeps its labels. This follows the BCS training demo of 2026-09-29. (#386)",
+          "**Open survey** now leads each survey's share row on Collect and on the \"review is collecting\" screen after launch. It has the hint \"Print the questions or give access codes\", so the printable questions and access codes are one tap away. Before, they sat behind the QR card. (#386)"
+        ],
+        "fixed": [
+          "Printed surveys (Print survey) now list every answer choice under each question, in the survey's order: circles for \"Choose one\", boxes for \"Choose all that apply\", a write-in line for \"Other (please describe)\", and writing lines only for open questions, so paper answers match what the app stores. (#384)",
+          "Sign-in hints. On the email-code sign-in (production) the hint is \"Paste the code once and wait: it signs you in by itself\", because a second Submit showed an error page. Both sign-in paths now say to check Spam or Junk when no email arrives. (#386)",
+          "Code boxes can't be sent twice. After a code is submitted, Submit stays disabled until the code is edited, and the same code is never sent twice in a row. This covers the participant access code and the test-site sign-in code. A pasted code can submit the form by itself, and a natural second tap on Submit was breaking the sign-in (captain, 2026-09-29). (#386)"
+        ],
+        "added": [
+          "Facilitator-only \"Ask participants about themselves (age range, gender)\" switch, off by default, in setup step 3 (Participant information) and in the assessment's Prepare settings. Setup saves it right after the groups are selected; settings reads it back from the assessment (cap.assessment.get now returns demographics_enabled) and saves it through cap.assessment.update. Participants never see the control. (#382)"
+        ]
+      }
+    },
+    {
+      "version": "0.22.7",
+      "status": "candidate",
+      "notes_path": "releases/0.22.7.md",
+      "sections": {
+        "changed": [
+          "Setup step 1 \"Lead organisation\" lists Bridge Connectivity Solutions (BCS). (#383)",
+          "Participant demographics (About you: age range, gender) are off by default. The facilitator turns them on per assessment (`demographics_enabled` on assessment update); while off, participants see no About you block and any age range or gender sent is ignored, not stored. (#380)"
+        ],
+        "fixed": [
+          "Collect shows one \"Move to Understand\": the in-page confirm that opens under a stage-move button now reads \"Yes, move\" instead of repeating the button's label (applies to every stage move). Setup \"Starts (optional)\" was checked to default to the facilitator's local today (late evening west of UTC included); a test now pins it. (#378)",
+          "Launch → \"Open the review\" now opens Collect with the full crumb row Home › Project › Review: the project list is re-read before the review opens, so a project created during setup is named, as it is after a fresh sign-in. (#379)"
+        ]
+      }
+    },
     {
       "version": "0.22.6",
       "status": "candidate",
@@ -10,6 +44,10 @@
         "fixed": [
           "Regenerating the roadmap versions page no longer crashes when there are no pending change files; it now shows no forecast. (#372)",
           "After an owner completes a review, the role badge shows Owner (not Viewer), matching the Permissions and Delete controls still offered; the review content stays read-only. (#374)"
+        ],
+        "changed": [
+          "Persona evidence backfill (2026-09-28): on DEV 0.22.6+bb6a948, agent simulation with synthetic personas in the Claude in-app browser — live owner-badge-after-Complete persona 1/1 PASS (receipt 13d) and release gate run A 47/47 PASS; a few clauses not run (emailed links, stored-response check, expired link, print layout, request body); satisfaction, confusion and frustration NOT MEASURED. See the Persona outcome scorecard in releases/0.22.6.md.",
+          "Persona evidence backfill (2026-09-28): release gate run B on DEV 0.22.6+bb6a948, agent simulation with synthetic personas in the Claude in-app browser at 390 and 1280 — 39 PASS, 1 FAIL (B14: breadcrumb missing the project crumb when opening the review right after launch), 1 NOT RUN (B32, needs Bincy's own email code), 1 DECIDED with no screen (B33), extras 5/5 PASS; satisfaction, confusion and frustration NOT MEASURED. See the Persona outcome scorecard in releases/0.22.6.md."
         ]
       }
     },
