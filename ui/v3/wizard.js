@@ -34,7 +34,7 @@ export const NEW_PROJECT = '__new__';
 // B40 (captain 19:50, Bincy): "Lead organisation" is a select plus "Other (type it)". Names only, deduplicated, from the
 // Lovable harvest (v0 lead orgs + v1.0 lead_organization options; test/placeholder values dropped). Organisations already on
 // the projects this account can see are merged in at render time. Stored value is unchanged: project.organization text.
-export const ORGANIZATIONS = ['Beyond Translation', 'Global Partnerships', 'Local church', 'SIL', 'unfoldingWord', 'Wycliffe Associates', 'Wycliffe Global Alliance', 'Wycliffe USA'];
+export const ORGANIZATIONS = ['Beyond Translation', 'Bridge Connectivity Solutions (BCS)', 'Global Partnerships', 'Local church', 'SIL', 'unfoldingWord', 'Wycliffe Associates', 'Wycliffe Global Alliance', 'Wycliffe USA'];
 export const ORG_OTHER = '__other__';
 export function orgChoices(projects = []) {
   const seen = new Map();
