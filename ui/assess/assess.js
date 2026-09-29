@@ -666,6 +666,7 @@ async function mountNew(gen, resume = null) {
   const ctx = ctxFor();
   const idg = identityGeneration;
   wizardHandle = mod.mountWizard(app, { api: ctx.api, go: ctx.go, origin: location.origin, assessmentHref: id => `#assessment/${encodeURIComponent(id)}`, resume,
+    beforeOpen: () => (idg === identityGeneration ? reloadProjects() : false), // B14: a project created in this setup is not in the boot list yet
     onLink: (aid, row) => { if (idg === identityGeneration) share.rememberLaunchLink(state.collectLinks, aid, row, location.origin); }, // U36: Collect and the survey page reuse the launch links
     mark: id => { if (gen !== generation) return; try { history.replaceState(null, '', `${location.pathname}${location.search}#new/${encodeURIComponent(id)}`); } catch {} } }); // U22: a reload reopens this draft
   document.title = `${resume ? 'Continue setup' : 'Start a review'} · 3D Review`;
