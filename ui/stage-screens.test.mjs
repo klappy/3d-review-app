@@ -375,3 +375,31 @@ test('print defaults to Letter and preserves explicit A4 through isolated output
   assert.equal(doc.querySelector('.stage-print-only'), null);
   dom.window.close();
 });
+
+// Paper parity (captain 2026-09-29): printed forms carry every answer choice, in order, with ○ (one) / ☐ (all that apply).
+test('loadBlankPrint keeps structured items with every answer choice when the server sends them', async () => {
+  const items = [
+    { id: 'Q1', type: 'single', text: 'Is there a brief?', options: [{ code: 'yes', text: 'Yes' }, { code: 'no', text: 'No' }, { code: 'other', text: 'Other (please describe)' }] },
+    { id: 'Q2', type: 'multi', text: 'Which resources?', options: [{ code: 'com', text: 'Commentaries' }, { code: 'none', text: 'None', exclusive: true }] },
+    { id: 'Q3', type: 'text', text: 'Anything else?' },
+    { id: 'Q4', type: 'scale', text: 'How clear?', scale: { min: 1, max: 5 } },
+  ];
+  const request = fetchFor({ '/v2/assessments/a1/surveys/s1/print': json({ ok: true, result: { blank: true, template_id: 't', template_version: 2, html: '<h1>Form</h1><ol><li>x<hr></li></ol>', items } }) }, []);
+  const model = await loadBlankPrint({ request, token: 'st_m', aid: 'a1', sid: 's1', role: 'member' });
+  assert.equal(model.visible, true);
+  assert.deepEqual(model.items[0], { text: 'Is there a brief?', type: 'single', options: [{ text: 'Yes', other: false, exclusive: false }, { text: 'No', other: false, exclusive: false }, { text: 'Other (please describe)', other: true, exclusive: false }] });
+  assert.equal(model.items[1].type, 'multi');
+  assert.equal(model.items[1].options[1].exclusive, true);
+  assert.deepEqual(model.items[3].scale, { min: 1, max: 5 });
+  const doc = fakeDocument(); const root = doc.createElement('div');
+  renderBlankPrint(doc, root, model);
+  const page = text(root);
+  for (const s of ['Is there a brief?', 'Yes', 'No', 'Other (please describe): ___', 'Which resources?', 'Commentaries', 'None', 'Choose all that apply', 'Choose one', 'Anything else?', 'How clear?']) assert.ok(page.includes(s), `printed page shows ${s}`);
+  assert.match(page, /Mark one circle/);
+  assert.doesNotMatch(page, /Write your response on the blank lines below each question/);
+  const boxes = walk(root).filter(n => /\bp-box\b/.test(n.className || ''));
+  assert.equal(boxes.filter(n => /\brd\b/.test(n.className)).length, 3 + 5, 'single + scale choices are circles');
+  assert.equal(boxes.filter(n => /\bsq\b/.test(n.className)).length, 2, 'multi choices are boxes');
+  const lines = walk(root).filter(n => n.className === 'p-lines');
+  assert.equal(lines.length, 1, 'only the text question gets writing lines');
+});
