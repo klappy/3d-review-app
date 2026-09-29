@@ -1,28 +1,32 @@
 {
-  "version": "0.22.7",
+  "version": "0.23.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "3fc68e42f0769968c604a51c0d193bc1c203dc7f",
+  "cookbook_commit": "620d69f579b74173695b77654802f764477dcf55",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.22.7.md",
-      "blob_sha": "4f918c303c11d49ad63a03040a781ac408564911",
-      "sha256": "ef0d4c2ca3c0b3f0151b51f4525b7af4f45bc7ef4c2b02aa66aef35a9cedc595"
+      "path": "planning/2026-09-16-parity-build/releases/0.23.0.md",
+      "blob_sha": "eb540af187ca5e1b06984c6c7c2dd434df6b24d9",
+      "sha256": "c31a954e3dbe5aa82c9f0226db3fcce5eefad33cb42263ea366e5694bf26426a"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "b20e3da6ed0c73b08b311a3c3ee6980bb48a36e8",
-      "sha256": "65e77077807abaa2fa378d23100f636a10d2983e0761e7b092d2284ea5d1ba95"
+      "blob_sha": "884bb2b089ee626202eaabd1b50128b293773687",
+      "sha256": "1f7cba90946f7489968c5d977313848bcfa059c8ecd626cee132b0d6e4e765c1"
     }
   ],
   "changelog": {
     "sections": {
       "changed": [
-        "Setup step 1 \"Lead organisation\" lists Bridge Connectivity Solutions (BCS). (#383)",
-        "Participant demographics (About you: age range, gender) are off by default. The facilitator turns them on per assessment (`demographics_enabled` on assessment update); while off, participants see no About you block and any age range or gender sent is ignored, not stored. (#380)"
+        "Survey names say who they are for. \"Validation\" is now **Translators** and \"Mid-Level\" is now **Team leaders & mentors**. The new names show in setup, on Collect, on the survey page, on the blank print and in demo mode. Template ids are unchanged. The API returns the pinned source name as `source_name`, or `template_source_name` on assessment survey rows. The pinned synthetic report keeps its labels. This follows the BCS training demo of 2026-09-29. (#386)",
+        "**Open survey** now leads each survey's share row on Collect and on the \"review is collecting\" screen after launch. It has the hint \"Print the questions or give access codes\", so the printable questions and access codes are one tap away. Before, they sat behind the QR card. (#386)"
       ],
       "fixed": [
-        "Collect shows one \"Move to Understand\": the in-page confirm that opens under a stage-move button now reads \"Yes, move\" instead of repeating the button's label (applies to every stage move). Setup \"Starts (optional)\" was checked to default to the facilitator's local today (late evening west of UTC included); a test now pins it. (#378)",
-        "Launch → \"Open the review\" now opens Collect with the full crumb row Home › Project › Review: the project list is re-read before the review opens, so a project created during setup is named, as it is after a fresh sign-in. (#379)"
+        "Printed surveys (Print survey) now list every answer choice under each question, in the survey's order: circles for \"Choose one\", boxes for \"Choose all that apply\", a write-in line for \"Other (please describe)\", and writing lines only for open questions, so paper answers match what the app stores. (#384)",
+        "Sign-in hints. On the email-code sign-in (production) the hint is \"Paste the code once and wait: it signs you in by itself\", because a second Submit showed an error page. Both sign-in paths now say to check Spam or Junk when no email arrives. (#386)",
+        "Code boxes can't be sent twice. After a code is submitted, Submit stays disabled until the code is edited, and the same code is never sent twice in a row. This covers the participant access code and the test-site sign-in code. A pasted code can submit the form by itself, and a natural second tap on Submit was breaking the sign-in (captain, 2026-09-29). (#386)"
+      ],
+      "added": [
+        "Facilitator-only \"Ask participants about themselves (age range, gender)\" switch, off by default, in setup step 3 (Participant information) and in the assessment's Prepare settings. Setup saves it right after the groups are selected; settings reads it back from the assessment (cap.assessment.get now returns demographics_enabled) and saves it through cap.assessment.update. Participants never see the control. (#382)"
       ]
     }
   }

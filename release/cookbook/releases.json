@@ -1,7 +1,26 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.22.7",
+  "current": "0.23.0",
   "versions": [
+    {
+      "version": "0.23.0",
+      "status": "candidate",
+      "notes_path": "releases/0.23.0.md",
+      "sections": {
+        "changed": [
+          "Survey names say who they are for. \"Validation\" is now **Translators** and \"Mid-Level\" is now **Team leaders & mentors**. The new names show in setup, on Collect, on the survey page, on the blank print and in demo mode. Template ids are unchanged. The API returns the pinned source name as `source_name`, or `template_source_name` on assessment survey rows. The pinned synthetic report keeps its labels. This follows the BCS training demo of 2026-09-29. (#386)",
+          "**Open survey** now leads each survey's share row on Collect and on the \"review is collecting\" screen after launch. It has the hint \"Print the questions or give access codes\", so the printable questions and access codes are one tap away. Before, they sat behind the QR card. (#386)"
+        ],
+        "fixed": [
+          "Printed surveys (Print survey) now list every answer choice under each question, in the survey's order: circles for \"Choose one\", boxes for \"Choose all that apply\", a write-in line for \"Other (please describe)\", and writing lines only for open questions, so paper answers match what the app stores. (#384)",
+          "Sign-in hints. On the email-code sign-in (production) the hint is \"Paste the code once and wait: it signs you in by itself\", because a second Submit showed an error page. Both sign-in paths now say to check Spam or Junk when no email arrives. (#386)",
+          "Code boxes can't be sent twice. After a code is submitted, Submit stays disabled until the code is edited, and the same code is never sent twice in a row. This covers the participant access code and the test-site sign-in code. A pasted code can submit the form by itself, and a natural second tap on Submit was breaking the sign-in (captain, 2026-09-29). (#386)"
+        ],
+        "added": [
+          "Facilitator-only \"Ask participants about themselves (age range, gender)\" switch, off by default, in setup step 3 (Participant information) and in the assessment's Prepare settings. Setup saves it right after the groups are selected; settings reads it back from the assessment (cap.assessment.get now returns demographics_enabled) and saves it through cap.assessment.update. Participants never see the control. (#382)"
+        ]
+      }
+    },
     {
       "version": "0.22.7",
       "status": "candidate",
