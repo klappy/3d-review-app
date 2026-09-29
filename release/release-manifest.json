@@ -1,24 +1,28 @@
 {
-  "version": "0.22.6",
+  "version": "0.22.7",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "f435fd38682eea135e236f4e814a440842e7adea",
+  "cookbook_commit": "3fc68e42f0769968c604a51c0d193bc1c203dc7f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.22.6.md",
-      "blob_sha": "7b43af5fe5c4d3533d4e6e69dff0f01708b703ae",
-      "sha256": "68022ee1886c87cb0947093469982fe908ae580abf8fe71db746e60ade52ca21"
+      "path": "planning/2026-09-16-parity-build/releases/0.22.7.md",
+      "blob_sha": "4f918c303c11d49ad63a03040a781ac408564911",
+      "sha256": "ef0d4c2ca3c0b3f0151b51f4525b7af4f45bc7ef4c2b02aa66aef35a9cedc595"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "90e8b05872d4075593325dd9f0d09fa863bc1cc5",
-      "sha256": "1a43a08d3acbc35fb433c5f30a940fe2986ad6d2dd458e7dc8f6efc7b8adae64"
+      "blob_sha": "b20e3da6ed0c73b08b311a3c3ee6980bb48a36e8",
+      "sha256": "65e77077807abaa2fa378d23100f636a10d2983e0761e7b092d2284ea5d1ba95"
     }
   ],
   "changelog": {
     "sections": {
+      "changed": [
+        "Setup step 1 \"Lead organisation\" lists Bridge Connectivity Solutions (BCS). (#383)",
+        "Participant demographics (About you: age range, gender) are off by default. The facilitator turns them on per assessment (`demographics_enabled` on assessment update); while off, participants see no About you block and any age range or gender sent is ignored, not stored. (#380)"
+      ],
       "fixed": [
-        "Regenerating the roadmap versions page no longer crashes when there are no pending change files; it now shows no forecast. (#372)",
-        "After an owner completes a review, the role badge shows Owner (not Viewer), matching the Permissions and Delete controls still offered; the review content stays read-only. (#374)"
+        "Collect shows one \"Move to Understand\": the in-page confirm that opens under a stage-move button now reads \"Yes, move\" instead of repeating the button's label (applies to every stage move). Setup \"Starts (optional)\" was checked to default to the facilitator's local today (late evening west of UTC included); a test now pins it. (#378)",
+        "Launch → \"Open the review\" now opens Collect with the full crumb row Home › Project › Review: the project list is re-read before the review opens, so a project created during setup is named, as it is after a fresh sign-in. (#379)"
       ]
     }
   }
