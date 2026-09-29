@@ -15,3 +15,10 @@
 #participant .participant-about legend{font-weight:600;padding:0;margin-bottom:4px}
 #participant .participant-about label{display:grid;gap:4px}
 #participant .participant-about select{width:100%;min-height:44px;max-width:100%}
+/* Dynamic translation: language picker above the survey (big tap target), status line under it; multi-answer hint. */
+.participant-lang-box{display:flex;flex-direction:column;gap:4px;margin:0 0 12px}
+.participant-lang{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:600}
+.participant-lang select{min-height:44px;min-width:min(260px,100%);max-width:100%;padding:8px 12px;border-radius:12px;border:1px solid #c9d8e5;background:#fff;font:inherit}
+.participant-lang-status{margin:0;font-size:14px;color:#526779}
+.participant-lang-status:empty{display:none}
+.participant-hint{margin:4px 0 8px;font-size:15px;color:#526779}

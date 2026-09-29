@@ -23,7 +23,9 @@ export interface Env { ROADMAP_PUBLISHER_IDS?: string; ROADMAP_VERIFIER_IDS?: st
   /** B38 email sign-in link (src/magic-link.ts): "on" enables it; TTL in minutes (5–60, default 30). */
   MAGIC_LINK?: string; MAGIC_LINK_TTL_MINUTES?: string;
   /** OAuth provider storage + helpers (src/worker.ts); absent in unit tests that drive the Hono app directly. */
-  OAUTH_KV?: KVNamespace; OAUTH_PROVIDER?: import("@cloudflare/workers-oauth-provider").OAuthHelpers }
+  OAUTH_KV?: KVNamespace; OAUTH_PROVIDER?: import("@cloudflare/workers-oauth-provider").OAuthHelpers;
+  /** Dynamic translation proxy (src/translate.ts): upstream URL (var) and optional bearer (secret). Unset URL → English only. */
+  TRANSLATE_UPSTREAM_URL?: string; TRANSLATE_UPSTREAM_KEY?: string }
 export interface Ctx {
   env: Env;
   db: D1Database;

@@ -823,7 +823,7 @@ function scrubCredentialHash() {
   if (h === '#how' || h === '#example') { location.replace('/?demo=1#assessment/demo-assessment/collect'); return 'forwarded'; }
   if (h === '#participant') { location.replace('/legacy/#participant'); return 'forwarded'; }
   if (h === '#reports-card') { location.replace('/#projects'); return 'forwarded'; }
-  if (/^#survey=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + h); return 'forwarded'; }
+  if (/^#survey=/.test(h)) { let lang = ''; try { const m = /[?&]lang=([^&#]*)/.exec(location.search || ''); lang = m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : ''; } catch { lang = ''; } try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + (lang ? `?lang=${encodeURIComponent(lang)}` : '') + h); return 'forwarded'; } // ?lang= rides along (dynamic translation)
   if (/^#invite=/.test(h)) { const t = parseInvitationFragment(h); if (t) { pendingInvite = t; try { sessionStorage.setItem(INVITE_KEY, t); } catch {} } try { history.replaceState(null, '', location.pathname + '#invite'); } catch {} return null; } // B03: stays in v3; token leaves the address bar
   if (LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
   const m = /^#session=([A-Za-z0-9_]+)$/.exec(h);
