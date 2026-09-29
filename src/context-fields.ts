@@ -82,3 +82,9 @@ export function groupContextOnly(raw: unknown): Record<string, unknown> {
   const { [DEMOGRAPHICS_KEY]: _flag, ...rest } = parseContextJson(raw);
   return rest;
 }
+
+// S15c: results, reports and exports carry demographic (age range, gender) breakdown columns only when the facilitator
+// turned demographics on for the assessment. Off (the default, or a missing key) means no demographic key at all.
+export function demographicsProjection(enabled: boolean): { demographics_enabled: boolean; demographic_fields?: ContextField[] } {
+  return enabled ? { demographics_enabled: true, demographic_fields: RESPONDENT_FIELDS } : { demographics_enabled: false };
+}
