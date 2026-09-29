@@ -16,7 +16,7 @@ import { collectLine, periodText } from '/v3/components/active-until.js';
 import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations } from '/v3/components/invite.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
 const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
-import { pages, css as scopeCss, landsOnWork, signInLanding, whoLine } from '/assess/scope.js';
+import { pages, css as scopeCss, landsOnWork, signInLanding, whoLine, CODE_SIGNIN, emailLinkForm } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
@@ -866,13 +866,16 @@ async function loadEmailLinks() {
 function emailLinksCopy() {
   const dialog = document.getElementById('account-switch-dialog');
   const paras = dialog?.querySelectorAll?.('p');
-  if (paras?.length) { paras[0].textContent = 'You will be signed out here, then asked for the email address of the other account. We email it a sign-in link.'; for (const p of [...paras].slice(1)) p.remove(); }
+  if (paras?.length) { paras[0].textContent = 'You will be signed out here, then asked for the email address of the other account. We email it a sign-in link; you can also sign in with a code instead.'; for (const p of [...paras].slice(1)) p.remove(); }
 }
-if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('click', ev => {
+// ASK 24: the secondary "Sign in with a code instead" link (data-code-signin) is the Cloudflare Access one-time-code way in; it is
+// never re-pointed at the email page, so someone whose link never arrives still has a way in.
+function emailLinksClick(ev) {
   if (state.emailLinks !== true || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
-  const a = ev.target?.closest?.('a[href="/v2/auth/access"]'); if (!a) return;
+  const a = ev.target?.closest?.('a[href="/v2/auth/access"]'); if (!a || a.hasAttribute?.('data-code-signin')) return;
   ev.preventDefault(); location.assign('/v2/auth/email');
-});
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('click', emailLinksClick);
 async function boot() {
   if (scrubCredentialHash() === 'forwarded') return; // 'session' falls through: identity is observed fresh below
   placeDemoNotice();
@@ -889,8 +892,11 @@ async function boot() {
     if (route(location.hash).kind === 'entry') { await linksKnown; if (identity !== identityGeneration) return; who.textContent = 'Not signed in'; app.className = ''; syncShell(); await render(); return; }
     // Real sign-in only (captain: synthetic-only sign-in rejected). /v2/auth/access is the existing Cloudflare email-code
     // route; it sets the session cookie and returns to the workspace home (/#session=…), not here — stated, not hidden.
+    await linksKnown; if (identity !== identityGeneration) return; // ASK 24: the panel below depends on the email-links setting
     who.textContent = 'Not signed in'; app.className = ''; syncShell();
     const here = /(invite|session)=/.test(location.hash) ? location.pathname : location.pathname + location.hash;
+    // ASK 24, email links ON: the emailed-link form first, then "Sign in with a code instead" (Cloudflare Access). OFF: unchanged.
+    if (state.emailLinks === true) { app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p>${emailLinkForm()}${CODE_SIGNIN}</div>`; return; }
     app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p><p><a class="button primary" href="#">Go to sign in</a> <a class="button" href="/v2/auth/access">Sign in with an email code</a></p></div>`;
     return; }
   void loadAccountEmail();

@@ -13,7 +13,7 @@ import { resolvePrincipal } from "../src/auth";
 import { sha256 } from "../src/handlers/common";
 import { execute } from "../src/dispatch";
 import {
-  MAGIC_LINK_PER_EMAIL, MAGIC_TOKEN, magicLinkMessage, newMagicToken, requestMagicLink, timingSafeEqual, verifyMagicToken,
+  MAGIC_LINK_PER_EMAIL, MAGIC_TOKEN, checkEmailPage, magicLinkMessage, newMagicToken, requestMagicLink, signInPage, timingSafeEqual, verifyMagicToken,
 } from "../src/magic-link";
 
 const MIGRATIONS = ["0001_init.sql", "0002_code_escrow.sql", "0003_language_archive.sql", "0004_pinned_instruments.sql", "0006_oauth_code_redemption.sql"];
@@ -297,6 +297,36 @@ describe("routes", () => {
     const html = await (await app.fetch(new Request(ORIGIN + "/v2/auth/email"), env)).text();
     expect(html.match(/<input /g)).toHaveLength(1);
     expect(html).toContain('type="email"'); expect(html).toContain("Email me a sign-in link");
+  });
+  // ASK 24 (captain: "Both: link first, Cloudflare code as backup").
+  it("ASK 24: the sign-in page shows the emailed-link form first, then 'Sign in with a code instead' to /v2/auth/access (next=oauth kept)", async () => {
+    const html = await (await app.fetch(new Request(ORIGIN + "/v2/auth/email"), env)).text();
+    const code = '<a href="/v2/auth/access" data-code-signin>Sign in with a code instead</a>';
+    expect(html).toContain(code); expect(html.split(code)).toHaveLength(2);
+    expect(html.indexOf('<form method="post" action="/v2/auth/email">')).toBeGreaterThan(-1);
+    expect(html.indexOf("Email me a sign-in link")).toBeLessThan(html.indexOf(code));
+    const oauth = await (await app.fetch(new Request(ORIGIN + "/v2/auth/email?next=oauth"), env)).text();
+    expect(oauth).toContain('<a href="/v2/auth/access?next=oauth" data-code-signin>Sign in with a code instead</a>');
+    expect(await signInPage().text()).toContain(code);
+  });
+  it("ASK 24: 'Check your email' offers the code way in, so someone whose link never arrives can still sign in", async () => {
+    const res = await post("/v2/auth/email", { email: "slow-mail@example.invalid" });
+    const html = await res.text();
+    expect(html).toContain("Check your email");
+    expect(html).toContain('Link not arriving? <a href="/v2/auth/access" data-code-signin>Sign in with a code instead</a>');
+    const oauth = await (await post("/v2/auth/email", { email: "slow-mail@example.invalid", next: "oauth" })).text();
+    expect(oauth).toContain('<a href="/v2/auth/access?next=oauth" data-code-signin>Sign in with a code instead</a>');
+    expect(await checkEmailPage(30).text()).toContain('data-code-signin>Sign in with a code instead</a>');
+    for (const next of ["https://evil.invalid", "OAUTH"]) expect(await (await post("/v2/auth/email", { email: "slow-mail@example.invalid", next })).text()).toContain('<a href="/v2/auth/access" data-code-signin>');
+  });
+  it("ASK 24: no loop — without an Access assertion the code link makes one hop to the sign-in page (a 200, not another redirect); with one it goes to Access verification", async () => {
+    const hop = await app.fetch(new Request(ORIGIN + "/v2/auth/access"), env);
+    expect(hop.status).toBe(302); expect(hop.headers.get("location")).toBe("/v2/auth/email");
+    const landed = await app.fetch(new Request(ORIGIN + hop.headers.get("location")), env);
+    expect(landed.status).toBe(200); expect(landed.headers.get("location")).toBeNull();
+    const withAccess = await app.fetch(new Request(ORIGIN + "/v2/auth/access", { headers: { "cf-access-jwt-assertion": "not.a.jwt" } }), env);
+    expect(withAccess.headers.get("location")).not.toBe("/v2/auth/email");
+    expect(withAccess.status).not.toBe(302);
   });
   it("when not enabled every route hands the browser to the Access route; when enabled a bare Access visit lands on the sign-in page", async () => {
     const off = { ...env, MAGIC_LINK: undefined };
