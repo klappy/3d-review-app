@@ -15,7 +15,7 @@ import { sidebarTree } from '/v3/components/sidebar-tree.js';
 import { learnMore } from '/v3/components/learn-more.js';
 import { collectLine, periodText } from '/v3/components/active-until.js';
 // Bincy B03: `#invite=<token>` is handled here (v3), not forwarded to /legacy/.
-import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations } from '/v3/components/invite.js';
+import { mountInvite, mountInvitations, failureNotice, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations } from '/v3/components/invite.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
 const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
 import { pages, css as scopeCss, landsOnWork, signInLanding, whoLine, CODE_SIGNIN, emailLinkForm } from '/assess/scope.js';
@@ -648,19 +648,20 @@ async function loadMyInvitations() {
   if (identity !== identityGeneration) return null;
   state.myInvitations = list; return list;
 }
-// "Accept invitation" first: the oldest pending invitation, accepted by id (same cap.grant.accept dry run → confirm → execute). After
-// each accept the list is read again: another pending → that one next; none → the existing landing (one project → it; else Home).
-async function mountMyInvitation(gen) {
+// S19 (captain 2026-09-29, replacing the one-at-a-time accept-first loop): every pending invitation on ONE page, each named with
+// its path (cap.me.invitations, own invitations only); Accept per row, "Accept all" when there are two or more. Each accept is the
+// same cap.grant.accept dry run → confirm → execute by id; a pass stops at the first failure. After a pass the list is read again
+// (server truth): any left → this page again, with a notice naming the failed invitation when one failed; none → the existing
+// landing (one project → it; else Home) — straight away, or behind the notice's "Continue" when one failed.
+async function mountMyInvitation(gen, notice = '') {
   const mine = await loadMyInvitations(); // read fresh on every mount: an invitation accepted or withdrawn elsewhere never re-offers
   if (gen !== generation || mine === null) return;
-  const ctx = ctxFor();
-  if (!mine.length) { ctx.go(signInLanding({ projects: state.projects })); return; } // nothing (left) to accept, or the read failed → the existing landing, never a dead end
-  mountInvite(app, { api: ctx.api, invitationId: mine[0].id, isCurrent: () => gen === generation,
-    onAccepted: async () => {
-      await reloadProjects(); const next = await loadMyInvitations();
-      if (gen !== generation || next === null) return;
-      if (next.length) { mountMyInvitation(gen); return; }
-      ctx.go(signInLanding({ projects: state.projects }));
+  const ctx = ctxFor(), landing = signInLanding({ projects: state.projects });
+  if (!mine.length && !notice) { ctx.go(landing); return; } // nothing (left) to accept, or the read failed → the existing landing, never a dead end
+  mountInvitations(app, { api: ctx.api, invitations: mine, notice, continueHref: landing, isCurrent: () => gen === generation,
+    onSettled: async ({ failure }) => {
+      await reloadProjects(); if (gen !== generation) return;
+      mountMyInvitation(gen, failure ? failureNotice(failure.state, failure.invitation) : '');
     } });
 }
 // The project list read boot uses. Returns false (state untouched) when the identity changed while it was in flight.
