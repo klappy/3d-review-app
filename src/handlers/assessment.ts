@@ -1,16 +1,18 @@
 // No grant inheritance: assessment reads/writes require an exact assessment grant.
 // Creation and archive membership are deliberately project-scoped per contract.
 import type { Ctx, Handler, Role } from "./types";
+import { templateDisplayName } from "../display-names";
 import { CapError, notVisible } from "./errors";
 import { DEMOGRAPHICS_KEY, demographicsEnabled, parseContextJson } from "../context-fields";
 import { STAGES, countScalar, gate, loadProject, newId, nowIso, patchOf, reqStr, roleAt, type AssessmentRow } from "./common";
+import { lwcOf, saveLwc, saveLwcOnCreate, takeLwc } from "./lwc";
 
 async function exact(ctx: Ctx, id: string, min: Role = "viewer") {
   const row = await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
   if (!row) throw notVisible("assessment");
   return { row, role: gate(await roleAt(ctx, "assessment", id), min, "assessment") };
 }
-const view = (a: AssessmentRow, role: Role) => ({ ...a, role });
+const view = (a: AssessmentRow, role: Role) => { const { lwc_json: _raw, ...rest } = a as AssessmentRow & { lwc_json?: unknown }; return { ...rest, lwc: lwcOf(a), role }; };
 async function language(ctx: Ctx, pid: string, languageId: string) {
   const row = await ctx.db.prepare("SELECT id, archived_at FROM language WHERE id = ? AND project_id = ?").bind(languageId, pid).first<{id:string; archived_at: string | null}>();
   if (!row) throw notVisible("language");
@@ -19,6 +21,7 @@ async function language(ctx: Ctx, pid: string, languageId: string) {
 export const create: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
   await loadProject(ctx, pid, "member");
+  const lwc = takeLwc(params);
   const name = reqStr(params, "name"), language_id = reqStr(params, "language_id");
   await language(ctx, pid, language_id);
   const id = newId("assess"), at = nowIso(ctx);
@@ -29,7 +32,8 @@ export const create: Handler = async (ctx, params) => {
     ctx.db.prepare("INSERT INTO assessment (id, project_id, language_id, name, purpose, period, format, stage, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'prepare', ?, ?)").bind(id, pid, language_id, name, purpose, period, format, at, ctx.principal.id),
     ctx.db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(newId("grant"), ctx.principal.id, "assessment", id, "owner", at),
   ]);
-  return { result: { assessment: { id, project_id: pid, language_id, name, purpose, period, format, stage: "prepare", archived_at: null, created_at: at, role: "owner" } }, scope: { type: "assessment", id } };
+  const saved = await saveLwcOnCreate(ctx, "assessment", id, lwc);
+  return { result: { assessment: { id, project_id: pid, language_id, name, purpose, period, format, lwc: saved, stage: "prepare", archived_at: null, created_at: at, role: "owner" } }, scope: { type: "assessment", id } };
 };
 export const list: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
@@ -37,10 +41,16 @@ export const list: Handler = async (ctx, params) => {
   const {results} = await ctx.db.prepare('SELECT a.*, g.role, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id WHERE s.assessment_id = a.id) AS response_count FROM assessment a JOIN "grant" g ON g.scope_type = ? AND g.scope_id = a.id WHERE a.project_id = ? AND g.principal_id = ? ORDER BY a.created_at').bind("assessment", pid, ctx.principal.id).all<AssessmentRow & {role:Role; response_count:number}>();
   return { result: { assessments: results.map(a => ({ ...view(a, a.role), response_count: Number(a.response_count) || 0 })) }, scope: { type: "project", id: pid } };
 };
+// Survey rows carry the template's display name (Translators, Team leaders & mentors); the pinned name stays as source_name.
+function shownSurvey(s: Record<string, unknown>) {
+  const id = String(s.template_id ?? ""), name = String(s.template_name ?? ""), shown = templateDisplayName(id, name);
+  return shown === name ? s : { ...s, template_name: shown, template_source_name: name };
+}
+
 export const get: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id);
   const {results} = await ctx.db.prepare("SELECT s.id, s.template_id, s.template_version, s.state, s.collection_status, s.archived_at, s.created_at, t.name AS template_name, t.perspective FROM assessment_survey s JOIN survey_template t ON t.id = s.template_id AND t.version = s.template_version WHERE s.assessment_id = ? ORDER BY s.created_at").bind(id).all();
-  return { result: { assessment: view(row, role), surveys: results }, scope: { type: "assessment", id } };
+  return { result: { assessment: { ...view(row, role), demographics_enabled: await readDemographics(ctx, id) }, surveys: results.map(s => shownSurvey(s as Record<string, unknown>)) }, scope: { type: "assessment", id } };
 };
 async function readDemographics(ctx: Ctx, id: string): Promise<boolean> {
   const { results } = await ctx.db.prepare("SELECT context_json FROM assessment_survey WHERE assessment_id = ? AND state = 'selected'").bind(id).all<{ context_json?: string }>();
@@ -56,18 +66,25 @@ async function writeDemographics(ctx: Ctx, id: string, on: boolean): Promise<boo
 }
 export const update: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id, "member");
+  const lwc = takeLwc(params); // removes lwc from params
   // S15a: demographics_enabled is the facilitator's per-assessment switch (off by default); it is stored in each
   // group's assessment_survey.context_json. Participants hold no assessment grant, so they can never reach this.
   const { demographics_enabled: demographicsParam, ...rest } = params;
   if (demographicsParam !== undefined && typeof demographicsParam !== "boolean") throw new CapError("INVALID_PARAMS", "demographics_enabled must be a boolean");
+  // S13: an LWC-only update (the Prepare languages field) touches nothing else.
+  if (lwc !== undefined && demographicsParam === undefined && Object.keys(rest).every(k => k === "id")) {
+    await saveLwc(ctx, "assessment", id, lwc);
+    return { result: { assessment: { ...view(row, role), lwc } }, scope: { type: "assessment", id }, priorState: { lwc: lwcOf(row) } };
+  }
   const onlySwitch = demographicsParam !== undefined && !Object.keys(rest).some((k) => k !== "id");
   const patch = onlySwitch ? {} as Record<string, string | null> : patchOf(rest, ["name", "purpose", "period", "language_id", "format"]);
   if (patch.name !== undefined && !patch.name) throw new CapError("INVALID_PARAMS", "name cannot be empty");
   if (patch.language_id !== undefined) { if (!patch.language_id) throw new CapError("INVALID_PARAMS", "language_id cannot be empty"); await language(ctx, row.project_id, patch.language_id); }
   const next = { name: patch.name ?? row.name, purpose: patch.purpose === undefined ? row.purpose : patch.purpose, period: patch.period === undefined ? row.period : patch.period, language_id: patch.language_id ?? row.language_id, format: patch.format === undefined ? row.format : patch.format };
   await ctx.db.prepare("UPDATE assessment SET name = ?, purpose = ?, period = ?, language_id = ?, format = ? WHERE id = ?").bind(next.name, next.purpose, next.period, next.language_id, next.format, id).run();
+  if (lwc !== undefined) await saveLwc(ctx, "assessment", id, lwc);
   const demographics_enabled = demographicsParam === undefined ? await readDemographics(ctx, id) : await writeDemographics(ctx, id, demographicsParam);
-  return { result: { assessment: { ...view({...row, ...next}, role), demographics_enabled } }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format} };
+  return { result: { assessment: { ...view({...row, ...next}, role), demographics_enabled, ...(lwc !== undefined ? { lwc } : {}) } }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format} };
 };
 export const set_stage: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id, "member");

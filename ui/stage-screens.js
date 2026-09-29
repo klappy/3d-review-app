@@ -124,6 +124,17 @@ export function itemsFromPrintHtml(html) {
   return items.filter(Boolean);
 }
 
+// Structured print items → { text, type, options: [{ text, other, exclusive }], scale }. Text only, never markup.
+export function printItemsFrom(result) {
+  if (!Array.isArray(result?.items) || !result.items.length) return itemsFromPrintHtml(result?.html);
+  return result.items.filter(i => i && typeof i.text === 'string' && i.text.trim()).map(i => ({
+    text: i.text.trim(),
+    type: ['single', 'multi', 'scale', 'text'].includes(i.type) ? i.type : 'text',
+    options: Array.isArray(i.options) ? i.options.filter(o => o && typeof o.text === 'string').map(o => ({ text: o.text, other: o.code === 'other', exclusive: o.exclusive === true })) : [],
+    ...(i.scale && Number.isFinite(i.scale.min) && Number.isFinite(i.scale.max) ? { scale: { min: i.scale.min, max: i.scale.max } } : {}),
+  }));
+}
+
 export function printTitleFromHtml(html) {
   if (typeof html !== 'string') return '';
   const title = html.match(/<h1>([\s\S]*?)<\/h1>/i) || html.match(/<title>([\s\S]*?)<\/title>/i);
@@ -173,7 +184,9 @@ export async function loadBlankPrint({ request, token, aid, sid, role, lang }) {
     template_id: result.template_id,
     template_version: result.template_version,
     title: printTitleFromHtml(result.html),
-    items: itemsFromPrintHtml(result.html),
+    // Paper parity: structured items (question + every answer choice) when the server sends them; question text only
+    // from the HTML for an older server.
+    items: printItemsFrom(result),
   };
 }
 
@@ -311,6 +324,8 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint }
   brand.append(mark, doc.createTextNode ? doc.createTextNode(' Review') : el(doc, 'span', ' Review'));
   brandWrap.append(brand);
   brandWrap.append(el(doc, 'h1', model.title || 'Blank survey'));
+  // BCS demo 2026-09-29: paper says which passage to read or hear first ("if it's a print form then… it's just instructions").
+  if (model.passageLine) { const line = el(doc, 'p', model.passageLine); line.className = 'p-passage'; brandWrap.append(line); }
   header.append(brandWrap);
 
   const code = el(doc, 'div');
@@ -337,21 +352,47 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint }
   header.append(qr);
   article.append(header);
 
-  article.append(el(doc, 'p', 'Write your response on the blank lines below each question.'));
+  const structured = model.items.some(i => i && typeof i === 'object');
+  const intro = el(doc, 'p', structured
+    ? 'Mark one circle ○ for each question. Where it says "Choose all that apply", mark every box ☐ that fits. Write on the lines where there are no choices.'
+    : 'Write your response on the blank lines below each question.');
+  intro.className = 'p-intro';
+  article.append(intro);
   const list = el(doc, 'ol');
   list.className = 'p-items';
-  for (const [index, text] of model.items.entries()) {
+  for (const [index, entry] of model.items.entries()) {
+    const it = typeof entry === 'string' ? { text: entry, type: 'text', options: [] } : entry;
     const item = el(doc, 'li');
     item.className = 'p-item';
     const q = el(doc, 'div');
     q.className = 'p-q';
     const n = el(doc, 'span', String(index + 1));
     n.className = 'p-n';
-    q.append(n, el(doc, 'span', text));
-    const lines = el(doc, 'div');
-    lines.className = 'p-lines';
-    lines.append(el(doc, 'div'), el(doc, 'div'));
-    item.append(q, lines);
+    const hint = it.type === 'multi' ? 'Choose all that apply' : it.type === 'single' || it.type === 'scale' ? 'Choose one' : '';
+    q.append(n, el(doc, 'span', it.text));
+    if (hint) { const h = el(doc, 'span', hint); h.className = 'p-dim'; q.append(h); }
+    item.append(q);
+    const choices = it.options && it.options.length ? it.options
+      : it.type === 'scale' && it.scale ? Array.from({ length: Math.max(0, it.scale.max - it.scale.min + 1) }, (_, k) => ({ text: String(it.scale.min + k) })) : [];
+    if (choices.length) {
+      const opts = el(doc, 'div');
+      opts.className = 'p-opts';
+      for (const o of choices) {
+        const row = el(doc, 'div');
+        row.className = 'p-opt';
+        const box = el(doc, 'span');
+        box.className = `p-box ${it.type === 'multi' ? 'sq' : 'rd'}`;
+        box.setAttribute('aria-hidden', 'true');
+        row.append(box, el(doc, 'span', o.other ? `${o.text}: ______________________` : o.text));
+        opts.append(row);
+      }
+      item.append(opts);
+    } else {
+      const lines = el(doc, 'div');
+      lines.className = 'p-lines';
+      lines.append(el(doc, 'div'), el(doc, 'div'));
+      item.append(lines);
+    }
     list.append(item);
   }
   article.append(list);

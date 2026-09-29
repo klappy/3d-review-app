@@ -51,11 +51,13 @@ describe("S15a demographics off by default",()=>{
   expect((await call("GET","/v2/participate/form",undefined,t)).result.demographics_enabled).toBe(false);
   expect((await setDemographics("yes")).error.code).toBe("INVALID_PARAMS");
   const on=await setDemographics(true);expect(on.ok).toBe(true);expect(on.result.assessment.demographics_enabled).toBe(true);
+  expect((await call("GET",`/v2/assessments/${aid}`,undefined,owner)).result.assessment.demographics_enabled).toBe(true); // S15b: settings read path
   const raw=await db.prepare("SELECT context_json FROM assessment_survey WHERE id='survey_tavo'").first<any>();
   expect(JSON.parse(raw.context_json).demographics_enabled).toBe(true);
   const form=await call("GET","/v2/participate/form",undefined,t);expect(form.result.demographics_enabled).toBe(true);
   expect(form.result.context_fields.map((f:any)=>f.key)).toEqual(["age_range","gender"]);
   const off=await setDemographics(false);expect(off.result.assessment.demographics_enabled).toBe(false);
+  expect((await call("GET",`/v2/assessments/${aid}`,undefined,owner)).result.assessment.demographics_enabled).toBe(false);
   expect((await call("GET","/v2/participate/form",undefined,t)).result.context_fields).toEqual([]);
  });
 });

@@ -2,13 +2,15 @@
 import type { Handler, Role } from "./types";
 import { CapError } from "./errors";
 import { countScalar, loadProject, newId, nowIso, patchOf, reqStr, requireUser, type ProjectRow } from "./common";
+import { lwcOf, saveLwc, saveLwcOnCreate, takeLwc } from "./lwc";
 
-const view = (p: ProjectRow, role: Role) => ({ id: p.id, workspace_id: p.workspace_id, name: p.name, organization: p.organization, archived_at: p.archived_at, created_at: p.created_at, role });
+const view = (p: ProjectRow, role: Role) => ({ id: p.id, workspace_id: p.workspace_id, name: p.name, organization: p.organization, lwc: lwcOf(p), archived_at: p.archived_at, created_at: p.created_at, role });
 
 export const create: Handler = async (ctx, params) => {
   const actor = requireUser(ctx);
   const provisioned = await ctx.db.prepare("SELECT provisioned FROM principal WHERE id = ?").bind(actor).first<{provisioned:number}>();
   if (!provisioned?.provisioned) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "project creation is provisioned", "D1");
+  const lwc = takeLwc(params);
   const name = reqStr(params, "name");
   const organization = params.organization === undefined ? null : reqStr(params, "organization");
   const id = newId("proj"), at = nowIso(ctx);
@@ -16,7 +18,8 @@ export const create: Handler = async (ctx, params) => {
     ctx.db.prepare("INSERT INTO project (id, name, organization, created_at, created_by) VALUES (?, ?, ?, ?, ?)").bind(id, name, organization, at, actor),
     ctx.db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(newId("grant"), actor, "project", id, "owner", at),
   ]);
-  return { result: { project: { id, workspace_id: null, name, organization, archived_at: null, created_at: at, role: "owner" } }, scope: { type: "project", id } };
+  const saved = await saveLwcOnCreate(ctx, "project", id, lwc);
+  return { result: { project: { id, workspace_id: null, name, organization, lwc: saved, archived_at: null, created_at: at, role: "owner" } }, scope: { type: "project", id } };
 };
 export const list: Handler = async (ctx) => {
   const actor = requireUser(ctx);
@@ -31,12 +34,18 @@ export const get: Handler = async (ctx, params) => {
 };
 export const update: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row} = await loadProject(ctx, id, "owner");
+  const lwc = takeLwc(params);
+  if (lwc !== undefined && Object.keys(params).every(k => k === "id")) {
+    await saveLwc(ctx, "project", id, lwc);
+    return { result: { project: { ...view(row, "owner"), lwc } }, scope: { type: "project", id }, priorState: { lwc: lwcOf(row) } };
+  }
   const patch = patchOf(params, ["name", "organization"]);
   const name = patch.name === undefined ? row.name : patch.name;
   if (!name) throw new CapError("INVALID_PARAMS", "name cannot be empty");
   const organization = patch.organization === undefined ? row.organization : patch.organization;
   await ctx.db.prepare("UPDATE project SET name = ?, organization = ? WHERE id = ?").bind(name, organization, id).run();
-  return { result: { project: { ...view(row, "owner"), name, organization } }, scope: { type: "project", id }, priorState: { name: row.name, organization: row.organization } };
+  if (lwc !== undefined) await saveLwc(ctx, "project", id, lwc);
+  return { result: { project: { ...view(row, "owner"), name, organization, ...(lwc !== undefined ? { lwc } : {}) } }, scope: { type: "project", id }, priorState: { name: row.name, organization: row.organization } };
 };
 export const archive: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row} = await loadProject(ctx, id, "owner");

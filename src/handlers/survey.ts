@@ -88,8 +88,14 @@ export const print:Handler=async(ctx,params)=>{
   const lang=typeof params.lang==="string"&&params.lang?params.lang:"en";
   const items=renderItems(parseItems(t),lang);
   const esc=(s:string)=>s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]??c));
-  const html=`<!doctype html><html lang="${esc(lang)}"><meta charset="utf-8"><title>${esc(t.name)}</title><style>@media print{button{display:none}}body{font:16px system-ui;max-width:48rem;margin:2rem auto}li{margin:1.5rem 0}</style><h1>${esc(t.name)}</h1><ol>${items.map(i=>`<li>${esc(String(i.text))}<hr></li>`).join("")}</ol></html>`;
-  return {result:{html,content_type:"text/html; charset=utf-8",template_id:t.id,template_version:t.version,blank:true},scope:{type:"assessment",id:aid}};
+  // Paper parity (captain 2026-09-29): a printed form carries every answer choice, in the survey's order, so paper
+  // answers map 1:1 to the option codes the app stores. ○ = choose one, ☐ = choose all that apply.
+  const opts=(i:Record<string,any>)=>Array.isArray(i.options)&&i.options.length?`<ul class="opts">${i.options.map((o:any)=>`<li>${i.type==="multi"?"☐":"○"} ${esc(String(o.text))}</li>`).join("")}</ul>`:"";
+  const html=`<!doctype html><html lang="${esc(lang)}"><meta charset="utf-8"><title>${esc(t.name)}</title><style>@media print{button{display:none}}body{font:16px system-ui;max-width:48rem;margin:2rem auto}li{margin:1.5rem 0}ul.opts{list-style:none;padding-left:1rem}ul.opts li{margin:.3rem 0}</style><h1>${esc(t.name)}</h1><ol>${items.map(i=>`<li>${esc(String(i.text))}${opts(i as any)}<hr></li>`).join("")}</ol></html>`;
+  const printItems=items.map((i:any)=>({id:i.id,type:i.type,text:i.text,required:i.required,
+    ...(Array.isArray(i.options)?{options:i.options.map((o:any)=>({code:o.code,text:o.text,...(o.exclusive?{exclusive:true}:{})}))}:{}),
+    ...(i.scale?{scale:i.scale}:{}),...(i.max_select?{max_select:i.max_select}:{})}));
+  return {result:{html,items:printItems,content_type:"text/html; charset=utf-8",template_id:t.id,template_version:t.version,blank:true},scope:{type:"assessment",id:aid}};
 };
 export const issue_link:Handler=async(ctx,params,opts)=>{
   only(params,["aid","sid","expires_at"]);

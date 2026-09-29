@@ -159,7 +159,7 @@ const codeSignIn = (next?: "oauth", lead = "") => `<p class="code-signin">${lead
 export const signInPage = (next?: "oauth", note = "") => page("Sign in",
   `<h1>Sign in to 3D Review</h1>${note ? `<p role="alert">${esc(note)}</p>` : ""}<form method="post" action="/v2/auth/email">${nextField(next)}<label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required maxlength="254"><button type="submit">Email me a sign-in link</button></form><p><small>No password. We email you a link that signs you in.</small></p>${codeSignIn(next)}`);
 export const checkEmailPage = (minutes: number, next?: "oauth") => page("Check your email",
-  `<h1>Check your email</h1><p role="status">We sent you a sign-in link. It expires in ${minutes} minutes.</p>${codeSignIn(next, "Link not arriving? ")}<p><small><a href="${emailFormHref(next)}">Use a different email</a> · <a href="/">Home</a></small></p>`);
+  `<h1>Check your email</h1><p role="status">We sent you a sign-in link. It expires in ${minutes} minutes.</p><p>Not there after a minute? Check your Spam or Junk folder.</p>${codeSignIn(next, "Link not arriving? ")}<p><small><a href="${emailFormHref(next)}">Use a different email</a> · <a href="/">Home</a></small></p>`);
 /** Landing page for the emailed link. It NEVER submits by itself (validator B38 #2/#4: login CSRF; script-running mail
  *  scanners would otherwise mint sessions). The script reads `#t=…&e=…`, strips the fragment from history, asks
  *  POST /v2/auth/email/check (mints nothing) whether the link is live and whether `e` matches it, then shows one button:

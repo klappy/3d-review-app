@@ -26,3 +26,6 @@
 .v3-wizard .pdot.wz-kvdot{width:10px;height:10px;margin-right:6px;vertical-align:middle}
 .v3-wizard .learn-more{margin:0 0 12px}.v3-wizard .learn-more summary{cursor:pointer}
 .v3-wizard .wz-field-error{font-weight:400;font-size:14px;color:var(--warning-ink,#65511c)}
+
+/* Dynamic translation: LWC checkboxes on step 1 (ui/v3/lwc.js). */
+.lwc-field{border:0;padding:0;margin:14px 0 0;min-width:0}.lwc-field legend{font-weight:600;padding:0}.lwc-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px 12px;margin-top:6px}.lwc-option{display:flex;align-items:center;gap:6px;min-height:40px;font-weight:400}
