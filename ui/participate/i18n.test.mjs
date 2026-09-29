@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formStrings, translateForm, makeT, fetchTranslations, initialLanguage, hashOf, isEnglish, isRtl, UI_EN, LANGUAGES } from './i18n.js';
+import { formStrings, translateForm, makeT, fetchTranslations, initialLanguage, hashOf, isEnglish, isRtl, UI_EN, pickLanguage } from './i18n.js';
 
 const form = {
   template: { id: 'tpl_mid_level' },
@@ -67,18 +67,26 @@ test('fetchTranslations: English needs no request; failures reject so the page k
   await assert.rejects(fetchTranslations({ lang: 'Lao', context: 'x', sourceTexts: { a: 'A' }, fetchImpl: async () => ({ ok: true, json: async () => ({ translated: {} }) }) }));
 });
 
-test('initialLanguage: ?lang= wins, then the device choice, else English; junk is ignored', () => {
+test('initialLanguage: ?lang= wins, then the device choice, else en; junk is ignored', () => {
   const storage = memoryStorage();
-  assert.equal(initialLanguage({ search: '?lang=Lao', storage }), 'Lao');
-  assert.equal(initialLanguage({ search: '', storage }), 'English');
-  storage.setItem('3dr.lang', 'Thai');
-  assert.equal(initialLanguage({ search: '', storage }), 'Thai');
-  assert.equal(initialLanguage({ search: '?lang=%3Cscript%3E', storage }), 'Thai');
+  assert.equal(initialLanguage({ search: '?lang=lo', storage }), 'lo');
+  assert.equal(initialLanguage({ search: '', storage }), 'en');
+  storage.setItem('3dr.lang', 'th');
+  assert.equal(initialLanguage({ search: '', storage }), 'th');
+  assert.equal(initialLanguage({ search: '?lang=%3Cscript%3E', storage }), 'th');
+});
+
+test('pickLanguage: only the survey\'s languages (by tag or English name); English needs no entry', () => {
+  const offered = [{ code: 'lo', name: 'Lao', endonym: 'ລາວ' }, { code: 'th', name: 'Thai', endonym: 'ไทย' }];
+  assert.equal(pickLanguage('lo', offered).code, 'lo');
+  assert.equal(pickLanguage('Thai', offered).code, 'th');
+  assert.equal(pickLanguage('km', offered), null);
+  assert.equal(pickLanguage('en', offered), null);
+  assert.equal(pickLanguage('lo', []), null);
 });
 
 test('helpers', () => {
   assert.equal(hashOf({ b: '2', a: '1' }), hashOf({ a: '1', b: '2' }));
   assert.ok(isEnglish('en') && isEnglish('English') && !isEnglish('Lao'));
   assert.ok(isRtl('Urdu') && !isRtl('Lao'));
-  assert.equal(LANGUAGES[0][0], 'English');
 });

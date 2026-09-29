@@ -1,7 +1,7 @@
 import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError, drawAbout, aboutValues, welcomeCopy } from '../participant-view.js';
-import { LANGUAGES, UI_EN, formStrings, translateForm, makeT, fetchTranslations, initialLanguage, rememberLanguage, isEnglish, isRtl } from './i18n.js';
+import { UI_EN, formStrings, translateForm, makeT, fetchTranslations, initialLanguage, rememberLanguage, isEnglish, pickLanguage } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
 
 const $ = id => document.getElementById(id);
@@ -12,7 +12,8 @@ function element(tag, text) { const node = document.createElement(tag); if (text
 // sends its English strings to /v2/translate and shows what comes back; anything missing stays English. Display only:
 // ids and option codes never change, so answers, scores and reports are unaffected.
 function localStore() { try { return window.localStorage; } catch { return null; } }
-let lang = initialLanguage({ search: location.search, storage: localStore() });
+const wantedLang = initialLanguage({ search: location.search, storage: localStore() });
+let lang = 'en'; // set from wantedLang once the survey says which languages it offers
 let tr = { lang: 'English', form: null, ui: {}, items: {}, view: null };
 let T = makeT({});
 let loadSeq = 0;
@@ -55,6 +56,7 @@ function values(validate = false) {
 }
 const syncOther = () => { if (journey.state.form) syncOtherBoxes($('answers'), journey.state.form.items); };
 function paint(state) {
+  if (state.form) syncPicker(state.form);
   if (state.form && !isEnglish(lang) && tr.form !== state.form && pendingForm !== state.form) loadTranslations(state.form);
   const shown = view(state.form);
   $('notice').textContent = demo && state.phase === 'receipt' ? 'Practice only. No response was sent or saved.' : state.notice || '';
@@ -103,18 +105,28 @@ const STATIC = [['.intro-title', 'static.title'], ['.intro-lead', 'static.lead']
 const staticEn = {}; for (const [sel, key] of STATIC) { const n = document.querySelector(sel); if (n) staticEn[key] = n.textContent; }
 function applyStatic() { for (const [sel, key] of STATIC) { const n = document.querySelector(sel); if (n) n.textContent = T(key, staticEn[key]); } }
 const langSelect = element('select'); langSelect.id = 'participant-lang';
-for (const [value, label] of LANGUAGES) { const o = element('option', label); o.value = value; langSelect.append(o); }
-const known = LANGUAGES.find(([v]) => v.toLowerCase() === lang.toLowerCase());
-if (!known) { const o = element('option', lang); o.value = lang; langSelect.append(o); }
-langSelect.value = known ? known[0] : lang;
+let offered = null; // the survey's languages once known (form.languages); the picker is hidden while there are none
+function syncPicker(form) {
+  const list = Array.isArray(form?.languages) ? form.languages : [];
+  const sig = list.map(l => l.code).join(',');
+  if (offered === sig) return;
+  offered = sig;
+  langSelect.replaceChildren(Object.assign(element('option', 'English'), { value: 'en' }), ...list.map(l => Object.assign(element('option', `${l.endonym} · ${l.name}`), { value: l.code })));
+  langBox.hidden = !list.length;
+  const keep = pickLanguage(isEnglish(lang) ? wantedLang : lang, list);
+  const next = keep ? keep.code : 'en';
+  langSelect.value = next;
+  if (next !== lang) { lang = next; loadTranslations(form); }
+}
+const currentEntry = () => pickLanguage(lang, journey?.state?.form?.languages || []);
 const langLabel = element('label'); langLabel.className = 'participant-lang'; const langWord = element('span', UI_EN.language); langLabel.append(langWord, langSelect);
 const langStatus = element('p'); langStatus.className = 'participant-lang-status'; langStatus.setAttribute('role', 'status'); langStatus.setAttribute('aria-live', 'polite');
-const langBox = element('div'); langBox.className = 'participant-lang-box'; langBox.append(langLabel, langStatus);
+const langBox = element('div'); langBox.className = 'participant-lang-box'; langBox.hidden = true; langBox.append(langLabel, langStatus);
 document.querySelector('main').prepend(langBox);
 let pendingForm = null;
 function rerender() {
   applyStatic(); langWord.textContent = T('language');
-  document.documentElement.dir = isRtl(lang) ? 'rtl' : 'ltr';
+  document.documentElement.dir = currentEntry()?.dir === 'rtl' ? 'rtl' : 'ltr';
   renderedForm = null; renderedPhase = null;
   if (journey?.state) paint(journey.state);
 }
@@ -132,7 +144,7 @@ async function loadTranslations(form = journey?.state?.form || null) {
     ]);
     if (seq !== loadSeq) return;
     tr = { lang, form, ui: u.map, items: it.map, view: form ? translateForm(form, it.map) : null }; T = makeT(u.map);
-    langStatus.textContent = T('machineNote');
+    langStatus.textContent = currentEntry()?.review ? T('machineNoteReview') : T('machineNote');
   } catch {
     if (seq !== loadSeq) return;
     tr = { lang, form, ui: {}, items: {}, view: null }; T = makeT({});
@@ -140,7 +152,7 @@ async function loadTranslations(form = journey?.state?.form || null) {
   }
   pendingForm = null; rerender();
 }
-langSelect.addEventListener('change', () => { lang = langSelect.value; rememberLanguage(localStore(), lang); loadTranslations(); });
+langSelect.addEventListener('change', () => { lang = langSelect.value || 'en'; rememberLanguage(localStore(), lang); loadTranslations(); });
 var journey;
 journey = createParticipantJourney({ ...(demo ? sample : { window, storage: sessionStorage }), onChange: paint });
 $('answers').addEventListener('input', () => journey.save(values()));

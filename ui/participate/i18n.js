@@ -4,19 +4,16 @@
 // is translated: item ids and option codes never change, so answers, scores and reports are exactly as before.
 // Pure helpers here (node:test in i18n.test.mjs); page.js owns the DOM.
 
-// Languages offered in the picker: the value sent upstream is the English name; the label leads with the endonym.
-export const LANGUAGES = Object.freeze([
-  ['English', 'English'],
-  ['Lao', 'ລາວ · Lao'], ['Thai', 'ไทย · Thai'], ['Khmer', 'ខ្មែរ · Khmer'], ['Burmese', 'မြန်မာ · Burmese'],
-  ['Vietnamese', 'Tiếng Việt · Vietnamese'], ['Indonesian', 'Bahasa Indonesia'], ['Malay', 'Bahasa Melayu'],
-  ['Filipino', 'Filipino'], ['Chinese (Simplified)', '中文 · Chinese'], ['Hindi', 'हिन्दी · Hindi'],
-  ['Bengali', 'বাংলা · Bengali'], ['Nepali', 'नेपाली · Nepali'], ['Marathi', 'मराठी · Marathi'], ['Odia', 'ଓଡ଼ିଆ · Odia'],
-  ['Tamil', 'தமிழ் · Tamil'], ['Telugu', 'తెలుగు · Telugu'], ['Urdu', 'اردو · Urdu'], ['Arabic', 'العربية · Arabic'],
-  ['French', 'Français · French'], ['Spanish', 'Español · Spanish'], ['Portuguese', 'Português · Portuguese'],
-  ['Swahili', 'Kiswahili · Swahili'],
-]);
+// The picker offers ONLY the survey's languages (form.languages = the assessment's and project's LWCs that the model
+// supports, from src/languages.ts via cap.response.form) plus English. Values are BCP 47 tags.
 const RTL = new Set(['urdu', 'arabic', 'persian', 'farsi', 'hebrew', 'pashto', 'dari']);
 export const isEnglish = lang => !lang || ['en', 'eng', 'english'].includes(String(lang).trim().toLowerCase());
+// The allowed entry for a wanted tag or English name, else null (English is always allowed and needs no entry).
+export function pickLanguage(wanted, languages = []) {
+  const w = String(wanted || '').trim().toLowerCase();
+  if (!w || isEnglish(w)) return null;
+  return (languages || []).find(l => l.code.toLowerCase() === w || String(l.name || '').toLowerCase() === w) || null;
+}
 export const isRtl = lang => RTL.has(String(lang || '').trim().toLowerCase());
 export const LANG_PATTERN = /^[\p{L}][\p{L}\p{M} ()'.,-]{0,47}$/u;   // mirrors src/translate.ts
 export const cleanLang = lang => { const v = typeof lang === 'string' ? lang.trim() : ''; return v && LANG_PATTERN.test(v) ? v : ''; };
@@ -27,6 +24,7 @@ export const UI_EN = Object.freeze({
   translating: 'Translating…',
   translateFailed: 'Translation is not available right now. Showing English.',
   machineNote: 'Machine translation. If anything is unclear, ask the person who shared the survey.',
+  machineNoteReview: 'Machine translation, not yet checked by a speaker of this language. If anything is unclear, ask the person who shared the survey.',
   welcome: 'We would like your perspective',
   start: 'Start',
   learnMore: 'Learn more',
@@ -117,11 +115,12 @@ export async function fetchTranslations({ lang, context, sourceTexts, fetchImpl 
   return { map, partial, cached: false };
 }
 
-// Language chosen for this page: ?lang= wins (facilitators can share a pre-set link), then the device's last choice.
+// Language wanted for this page: ?lang= wins (facilitators can share a pre-set link), then the device's last choice.
+// The page keeps it only if the survey offers it (pickLanguage).
 export function initialLanguage({ search = '', storage = null } = {}) {
   let fromUrl = '';
   try { fromUrl = cleanLang(new URLSearchParams(search).get('lang') || ''); } catch { fromUrl = ''; }
   if (fromUrl) return fromUrl;
-  try { return cleanLang(storage?.getItem('3dr.lang') || '') || 'English'; } catch { return 'English'; }
+  try { return cleanLang(storage?.getItem('3dr.lang') || '') || 'en'; } catch { return 'en'; }
 }
 export function rememberLanguage(storage, lang) { try { storage?.setItem('3dr.lang', lang); } catch { /* best effort */ } }

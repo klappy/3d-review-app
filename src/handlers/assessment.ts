@@ -3,13 +3,14 @@
 import type { Ctx, Handler, Role } from "./types";
 import { CapError, notVisible } from "./errors";
 import { STAGES, countScalar, gate, loadProject, newId, nowIso, patchOf, reqStr, roleAt, type AssessmentRow } from "./common";
+import { lwcOf, saveLwc, saveLwcOnCreate, takeLwc } from "./lwc";
 
 async function exact(ctx: Ctx, id: string, min: Role = "viewer") {
   const row = await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
   if (!row) throw notVisible("assessment");
   return { row, role: gate(await roleAt(ctx, "assessment", id), min, "assessment") };
 }
-const view = (a: AssessmentRow, role: Role) => ({ ...a, role });
+const view = (a: AssessmentRow, role: Role) => { const { lwc_json: _raw, ...rest } = a as AssessmentRow & { lwc_json?: unknown }; return { ...rest, lwc: lwcOf(a), role }; };
 async function language(ctx: Ctx, pid: string, languageId: string) {
   const row = await ctx.db.prepare("SELECT id, archived_at FROM language WHERE id = ? AND project_id = ?").bind(languageId, pid).first<{id:string; archived_at: string | null}>();
   if (!row) throw notVisible("language");
@@ -18,6 +19,7 @@ async function language(ctx: Ctx, pid: string, languageId: string) {
 export const create: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
   await loadProject(ctx, pid, "member");
+  const lwc = takeLwc(params);
   const name = reqStr(params, "name"), language_id = reqStr(params, "language_id");
   await language(ctx, pid, language_id);
   const id = newId("assess"), at = nowIso(ctx);
@@ -28,7 +30,8 @@ export const create: Handler = async (ctx, params) => {
     ctx.db.prepare("INSERT INTO assessment (id, project_id, language_id, name, purpose, period, format, stage, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'prepare', ?, ?)").bind(id, pid, language_id, name, purpose, period, format, at, ctx.principal.id),
     ctx.db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(newId("grant"), ctx.principal.id, "assessment", id, "owner", at),
   ]);
-  return { result: { assessment: { id, project_id: pid, language_id, name, purpose, period, format, stage: "prepare", archived_at: null, created_at: at, role: "owner" } }, scope: { type: "assessment", id } };
+  const saved = await saveLwcOnCreate(ctx, "assessment", id, lwc);
+  return { result: { assessment: { id, project_id: pid, language_id, name, purpose, period, format, lwc: saved, stage: "prepare", archived_at: null, created_at: at, role: "owner" } }, scope: { type: "assessment", id } };
 };
 export const list: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
@@ -43,12 +46,18 @@ export const get: Handler = async (ctx, params) => {
 };
 export const update: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id, "member");
+  const lwc = takeLwc(params);
+  if (lwc !== undefined && Object.keys(params).every(k => k === "id")) {
+    await saveLwc(ctx, "assessment", id, lwc);
+    return { result: { assessment: { ...view(row, role), lwc } }, scope: { type: "assessment", id }, priorState: { lwc: lwcOf(row) } };
+  }
   const patch = patchOf(params, ["name", "purpose", "period", "language_id", "format"]);
   if (patch.name !== undefined && !patch.name) throw new CapError("INVALID_PARAMS", "name cannot be empty");
   if (patch.language_id !== undefined) { if (!patch.language_id) throw new CapError("INVALID_PARAMS", "language_id cannot be empty"); await language(ctx, row.project_id, patch.language_id); }
   const next = { name: patch.name ?? row.name, purpose: patch.purpose === undefined ? row.purpose : patch.purpose, period: patch.period === undefined ? row.period : patch.period, language_id: patch.language_id ?? row.language_id, format: patch.format === undefined ? row.format : patch.format };
   await ctx.db.prepare("UPDATE assessment SET name = ?, purpose = ?, period = ?, language_id = ?, format = ? WHERE id = ?").bind(next.name, next.purpose, next.period, next.language_id, next.format, id).run();
-  return { result: { assessment: view({...row, ...next}, role) }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format} };
+  if (lwc !== undefined) await saveLwc(ctx, "assessment", id, lwc);
+  return { result: { assessment: { ...view({...row, ...next}, role), ...(lwc !== undefined ? { lwc } : {}) } }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format} };
 };
 export const set_stage: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id, "member");
