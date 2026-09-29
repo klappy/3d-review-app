@@ -96,12 +96,28 @@ export function invitationLine(inv) {
   if (p.name === null) return `You were invited to ${KIND[inv?.scope?.type] || 'shared work'} as ${role}.`;
   return `You were invited to ${THE[inv.scope.type] || 'shared work'} "${p.name}"${p.parents.length ? ` (${p.parents.join(' › ')})` : ''} as ${role}.`;
 }
+// Pure: the notice after a failed accept — names the invitation (kind + name) for every failure state. Plain text; the view
+// escapes it (names are member-authored). Server codes are never shown raw.
+export function failureNotice(state, inv) {
+  const name = typeof inv?.scope?.name === 'string' && inv.scope.name ? inv.scope.name : null, type = inv?.scope?.type;
+  const what = `the invitation to ${name === null ? (KIND[type] || 'shared work') : `${THE[type] || 'shared work'} "${name}"`}`;
+  const What = what[0].toUpperCase() + what.slice(1);
+  switch (state) {
+    case 'used': return `${What} was already accepted.`;
+    case 'expired': return `${What} has expired. Ask the person who invited you for a new one.`;
+    case 'refused': return `${What} is no longer available: it was withdrawn, or it is not for the account you are signed in with.`;
+    case 'signin': return `Sign in again to accept ${what}.`;
+    default: return `Could not accept ${what}. Try again.`;
+  }
+}
 // Pure: the list page. m = { invitations, busy: null | 'all' | <row index>, notice }. House rules: one heading, one short line,
 // one primary. One invitation → its sentence and a primary "Accept". Two or more → one row each (kind, name with its path,
 // role, its own Accept) and "Accept all" as the primary. While accepting, every button is disabled. A notice (a failed accept)
-// is a separate status line under the short line, so the names stay in view.
+// is a separate status line under the short line, so the names stay in view. Nothing left but a notice (the failed one dropped out
+// of the list) → the notice is the line and the primary "Continue" goes to `m.continueHref` (the existing landing).
 export function invitationsView(m = {}) {
   const list = Array.isArray(m.invitations) ? m.invitations : [], busy = m.busy ?? null, off = busy !== null ? ' disabled' : '';
+  if (!list.length) return panel('Invitations', ESC(m.notice || 'No invitations are waiting.'), `<a class="rv-btn primary" href="${ESC(m.continueHref || '#projects')}" data-invite-continue>Continue</a>`);
   const notice = m.notice ? `<p class="small" role="status" data-invite-notice>${ESC(m.notice)}</p>` : '';
   const page = (h1, line, body, primary) => `<section class="glass panel narrow" data-invite style="max-width:560px;margin:32px auto 0"><h1 style="font-size:27px">${h1}</h1><p class="muted" data-invite-line>${line}</p>${notice}${body}<div class="actions">${primary}</div></section>`;
   if (list.length === 1) return page('Accept invitation', invitationLine(list[0]), '', `<button type="button" class="rv-btn primary" data-invite-accept-one="0"${off}>${busy !== null ? 'Accepting…' : 'Accept'}</button>`);
@@ -123,12 +139,14 @@ export async function acceptInvitationById(api, id) {
   if (r?.granted !== true) throw Object.assign(new Error('Unexpected answer'), { code: 'BAD_RESULT' });
   return r.scope;
 }
-// Controller: paints the list; Accept (one row) or Accept all (every row, in order) runs acceptInvitationById per invitation, then
-// onSettled({ accepted: [scope…], failed: [state…] }) once — the page re-reads the list (server truth: accepted, withdrawn and
-// expired ones drop out) and remounts, or lands when none are left. `isCurrent()` guards every paint and the hand-off.
-export function mountInvitations(root, { api, invitations, notice = '', isCurrent = () => true, onSettled = () => {} }) {
+// Controller: paints the list; Accept (one row) or Accept all (every row, in order) runs acceptInvitationById per invitation and
+// STOPS at the first failure — no later invitation is dry-run or executed — then onSettled({ accepted: [scope…], failure: null |
+// { state, invitation } }) once. Those accepted before the failure stay accepted; the page re-reads the list (server truth:
+// accepted, withdrawn and expired ones drop out) and remounts with failureNotice naming the failed one, so the rest are still
+// offered with their own Accept. `isCurrent()` guards every paint and the hand-off.
+export function mountInvitations(root, { api, invitations, notice = '', continueHref = '#projects', isCurrent = () => true, onSettled = () => {} }) {
   const list = pendingInvitations({ invitations });
-  let m = { invitations: list, busy: null, notice };
+  let m = { invitations: list, busy: null, notice, continueHref };
   const paint = () => {
     if (!isCurrent()) return;
     root.innerHTML = invitationsView(m);
@@ -138,10 +156,11 @@ export function mountInvitations(root, { api, invitations, notice = '', isCurren
   async function run(indexes) {
     if (m.busy !== null || !indexes.every(i => list[i])) return;
     m = { ...m, busy: indexes.length > 1 ? 'all' : indexes[0] }; paint();
-    const out = { accepted: [], failed: [] };
+    const out = { accepted: [], failure: null };
     for (const i of indexes) {
-      try { out.accepted.push(await acceptInvitationById(api, list[i].id)); } catch (e) { out.failed.push(inviteFailure(e)); }
+      try { out.accepted.push(await acceptInvitationById(api, list[i].id)); } catch (e) { out.failure = { state: inviteFailure(e), invitation: list[i] }; }
       if (!isCurrent()) return;
+      if (out.failure) break; // stop at the first failure: nothing after it is touched
     }
     onSettled(out);
   }
