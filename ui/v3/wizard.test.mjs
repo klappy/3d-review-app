@@ -593,3 +593,38 @@ test('U46: setup refuses a past Active until date with one inline line under the
   assert.match(html, /name="until" value="2020-01-31" required><span class="wz-field-error" role="alert" data-until-error>Pick today or later<\/span><\/label>/);
   assert.doesNotMatch(html, /class="note alert"/, 'not repeated in the top box');
 });
+test('Setup "Starts" defaults to the facilitator\'s local today, late evening west of UTC included', t => {
+  const tz = process.env.TZ; process.env.TZ = 'America/New_York';
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-29T01:30:00Z') }); // 21:30 on 28 Sep in New York, already 29 Sep in UTC
+  try {
+    assert.equal(freshDraft().starts, '2026-09-28');
+    assert.match(renderStep('details', freshDraft(), { projects: [], languages: [], templates: [] }), /name="starts" value="2026-09-28"/);
+  } finally { t.mock.timers.reset(); if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz; }
+});
+
+import { shellModel } from '../kit/app-adapter.js';
+import { crumbRow } from '../kit/core.js';
+import { readFileSync } from 'node:fs';
+import { routes as appRoutes } from '../assess/cards.js';
+test('B14: Launch → "Open the review" re-reads the projects first, so Collect crumbs read Home › Project › Assessment', async () => {
+  const srv = server(), order = [], known = { projects: [{ id: 'p1', name: 'Lake', role: 'owner' }], workspaces: new Map(), lists: new Map() }; // the boot list: no pN yet
+  const crumbs = () => [...crumbRow(shellModel({ route: { kind: 'assessment', id: 'a1' }, routes: appRoutes, principal: { id: 'x' }, known, current: { assessment: srv.db.a } }).ancestors.filter(x => x.visible), '').matchAll(/data-crumb="(\w+)"/g)].map(x => x[1]);
+  const m = mount(srv, { assessmentHref: id => `#assessment/${id}`, go: hash => order.push(hash),
+    beforeOpen: async aid => { order.push('reload ' + aid); await tick(); known.projects = [...known.projects, { id: 'pN', name: 'Hill project', role: 'owner' }]; } });
+  await fillStep1(m, { project: NEW_PROJECT }); m.submit(); await settle();
+  m.$('input[name=g][value="tpl.team"]').checked = true; m.submit(); await settle(); m.submit(); await settle();
+  m.click('[data-wz="launch"]'); await settle(12);
+  assert.ok(m.h.state.done);
+  assert.deepEqual(crumbs(), ['home', 'assessment'], 'without the re-read the new project is unknown (the B14 failure)');
+  m.click('[data-wz="open"]'); await settle();
+  assert.deepEqual(order, ['reload a1', '#assessment/a1'], 'the project list is re-read before Collect opens');
+  assert.deepEqual(crumbs(), ['home', 'project', 'assessment']);
+});
+test('B14: a failed re-read still opens the review; the app host wires the re-read to its project list read', async () => {
+  const srv = server(), m = mount(srv, { assessmentHref: id => `#assessment/${id}`, beforeOpen: async () => { throw new Error('offline'); } });
+  await fillStep1(m); m.submit(); await settle(); m.$('input[name=g][value="tpl.team"]').checked = true; m.submit(); await settle(); m.submit(); await settle();
+  m.click('[data-wz="launch"]'); await settle(12); m.click('[data-wz="open"]'); await settle();
+  assert.deepEqual(m.went, ['#assessment/a1']);
+  const src = readFileSync(new URL('../assess/assess.js', import.meta.url), 'utf8');
+  assert.match(src, /beforeOpen: \(\) => \(idg === identityGeneration \? reloadProjects\(\) : false\)/);
+});

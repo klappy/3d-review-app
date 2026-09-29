@@ -4,9 +4,9 @@ import { CapError, notVisible } from "./errors";
 import { gate, isOtherOption, newId, nowIso, OTHER_TEXT_KEY, OTHER_TEXT_MAX, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
 
 import { collecting, sharedSession, submitShared } from "./shared-link";
-import { RESPONDENT_FIELDS, groupFields, validateContext } from "../context-fields";
+import { RESPONDENT_FIELDS, demographicsEnabled, groupContextOnly, groupFields, validateContext } from "../context-fields";
 
-interface ParticipantSurvey { id: string; assessment_id: string; template_id: string; template_version: number; state: string; collection_status: string; name: string; language_name: string; period: string | null; purpose: string | null; format: string | null; project_name: string; items_json: string; scoring_json: string; perspective: string; source_ref: string | null; published_at: string | null }
+interface ParticipantSurvey { id: string; assessment_id: string; template_id: string; template_version: number; state: string; collection_status: string; name: string; language_name: string; period: string | null; purpose: string | null; format: string | null; project_name: string; items_json: string; scoring_json: string; perspective: string; source_ref: string | null; published_at: string | null; context_json?: string }
 
 async function scopedSurvey(ctx: Ctx, requireOpen = false): Promise<ParticipantSurvey> {
   if (ctx.principal.kind !== "participant" || !ctx.principal.participantSurveyId || !ctx.principal.respondentId)
@@ -91,8 +91,15 @@ export const form: Handler = async (ctx, params) => {
     template: { id: s.template_id, version: s.template_version, perspective: s.perspective, source_ref: s.source_ref },
     items: renderItems(items, s.language_name), participant_labels: participantLabels(s.template_id),
     // B09: optional "About you" fields shown before Q1, outside the pinned instrument. All optional.
-    context_fields: RESPONDENT_FIELDS }, scope: { type: "survey", id: s.id } };
+    // S15a: only when the facilitator turned demographics on for this assessment; off by default.
+    demographics_enabled: demographicsEnabled(s.context_json),
+    context_fields: demographicsEnabled(s.context_json) ? RESPONDENT_FIELDS : [] }, scope: { type: "survey", id: s.id } };
 };
+
+// S15a: with demographics off (the default) any respondent context is ignored, never validated or stored.
+function respondentContext(s: { context_json?: unknown }, value: unknown) {
+  return demographicsEnabled(s.context_json) ? validateContext(RESPONDENT_FIELDS, value) : {};
+}
 
 export const submit: Handler = async (ctx, params) => {
   const shared = await sharedSession(ctx);
@@ -103,7 +110,7 @@ export const submit: Handler = async (ctx, params) => {
     if (Object.keys(params).some(k => k !== "idempotency_key" && k !== "answers" && k !== "context")) throw new CapError("INVALID_PARAMS", "unknown submission parameter");
     const items = parseItems(s as any);
     if (!items.length) throw new CapError("STAGE_CONFLICT", "survey instrument is unavailable");
-    const answers = validateAnswers(items, params.answers), context = validateContext(RESPONDENT_FIELDS, params.context);
+    const answers = validateAnswers(items, params.answers), context = respondentContext(s, params.context);
     return { result: await submitShared(ctx, shared, idempotencyKey, answers, s, context), scope: { type: "survey", id: s.id } };
   }
   const respondentId = ctx.principal.respondentId!;
@@ -119,7 +126,7 @@ export const submit: Handler = async (ctx, params) => {
   const items = parseItems(s as any);
   if (!items.length) throw new CapError("STAGE_CONFLICT", "survey instrument is unavailable");
   const answers = validateAnswers(items, params.answers);
-  const context = validateContext(RESPONDENT_FIELDS, params.context), hasContext = Object.keys(context).length > 0;
+  const context = respondentContext(s, params.context), hasContext = Object.keys(context).length > 0;
   const responseId = newId("resp");
   const submittedAt = nowIso(ctx);
   // B09: context_json is written only when the respondent gave some, so an answers-only submit never depends on migration 0011.
@@ -165,8 +172,7 @@ export const list: Handler = async (ctx, params) => {
   const { results } = await ctx.db.prepare("SELECT s.* FROM assessment_survey s WHERE s.assessment_id = ? AND s.state = 'selected' ORDER BY s.created_at")
     .bind(aid).all<Record<string, unknown>>();
   const group_context = (results || []).map((r) => {
-    let context: Record<string, unknown> = {};
-    try { const v = JSON.parse(String(r.context_json ?? "{}")); if (v && typeof v === "object" && !Array.isArray(v)) context = v; } catch { /* pre-0011 row */ }
+    const context = groupContextOnly(r.context_json);
     return { survey_id: String(r.id), template_id: String(r.template_id), context };
   });
   return { result: { suppressed: true, status: "held", reason: "D7 disclosure policy unresolved", responses: [], group_context }, scope: { type: "assessment", id: aid } };

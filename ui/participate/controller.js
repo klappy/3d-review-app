@@ -67,7 +67,7 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
     async submit() {
       if (state.phase !== 'review' || !answers) return;
       return action(async () => {
-        try { return receipt(await client.submit(answers, context)); }
+        try { return receipt(await client.submit(answers, form?.demographics_enabled === true ? context : {})); } // S15a: nothing sent when off
         catch (e) {
           const kind = submitFailureKind(e);
           const unknown = () => { uncertain = true; return show('review', { notice: copy.submitUncertain }); };
