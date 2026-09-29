@@ -386,7 +386,9 @@ test('L1-7 #signin matches prototype frame 1 (B38: one email field + one "Email 
   assert.equal((form.match(/<input /g) || []).length, 1, 'one email field'); assert.ok(form.includes('type="email"'));
   assert.ok(/<button class="button rv-btn primary" type="submit" style="width:100%[^>]*>Email me a sign-in link<\/button>/.test(form), 'one full-width primary');
   assert.ok(html.includes('id="email-link-status"') && html.includes('role="status"'), 'room for the one-line confirmation');
-  assert.ok(!html.includes('/v2/auth/access') && !html.includes('cdn-cgi'), 'no Cloudflare Access hop for app sign-in');
+  // ASK 24: the one Access href is the secondary code link AFTER the form (the primary is the emailed link); no logout hop.
+  assert.equal(html.split('/v2/auth/access').length - 1, 1, 'one Access href: the secondary code link'); assert.ok(!html.includes('cdn-cgi'));
+  assert.ok(html.indexOf('<a class="button rv-btn" href="/v2/auth/access" data-code-signin>Sign in with a code instead</a>') > html.indexOf('</form>'), 'code link after the link form');
   const real = html.indexOf('id="email-link-form"'), box = html.indexOf('<details class="sandbox-signin"');
   assert.ok(real > -1 && box > real, 'real sign-in precedes the sandbox');
   assert.ok(!/<details class="sandbox-signin"[^>]*\bopen\b/.test(html), 'sandbox collapsed on the email step');
