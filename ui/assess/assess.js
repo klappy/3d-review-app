@@ -1,3 +1,4 @@
+import { lwcFieldset, lwcFrom, LWC_CSS } from '../v3/lwc.js';
 import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
 // /assess/ — showcase-based assessment screen (cookbook #16 order c5719384228, slice 1).
 // Starting page: the app-flows composition (sidebar · title · phase tabs · two-column body · lens survey rows).
@@ -393,7 +394,7 @@ function viewTabs(a, current) { ensureStepperStyle(globalThis.document); const s
 // Prepare view (showcase `prepareView()`): purpose, saved through cap.assessment.update (O/M); viewers read. The name is the heading (B07).
 function prepareView(current) {
   const a = current.assessment, mayEdit = a.role === 'owner' || a.role === 'member';
-  const fields = `<label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>`;
+  const fields = `<label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>${mayEdit && typeof lwcFieldset === 'function' ? `<style>${LWC_CSS}</style>${lwcFieldset(a.lwc || [], esc)}` : ''}`; // dynamic translation: languages participants may switch to (owners/members; typeof guard: vm test harnesses strip imports)
   const form = mayEdit ? `<form id="prepare-form">${fields}${demographicsSetting(a, esc)}<div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save preparation</button></div></form>` : `<div>${fields}${a.complete ? '' : `<p class="small muted">Your role here is ${esc(a.role)}: preparation is read-only.</p>`}</div>`;
   const i = PHASES.indexOf(a.stage), prev = PHASES[i - 1], next = PHASES[i + 1], n = activeSurveys(current).length;
   const move = mayEdit ? `<div class="actions">${prev ? `<button type="button" data-stage="${prev}" ${state.busy ? 'disabled' : ''}>← Back to ${title(prev)}</button>` : ''}${next && a.stage !== 'collect' ? `<button type="button" data-stage="${next}" ${state.busy ? 'disabled' : ''}>Move to ${title(next)} →</button>` : ''}</div>` : ''; // lane 9 L9-24: one primary on this view (Save preparation); U34: Move to Understand lives on Collect
@@ -489,7 +490,7 @@ function bindPrepare(current) {
       act(aid, 'Moving stage…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/stage`, { method: 'POST', body: { stage: to } }); return `Stage is now ${stageLabel(r.assessment.stage)}.`; })); // refusal: act() shows the server error.message verbatim
   });
   const f = app.querySelector('#prepare-form'); if (!f) return;
-  f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f); act(current.assessment.id, 'Saving preparation…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(current.assessment.id)}`, { method: 'PATCH', body: { purpose: String(fd.get('purpose')).trim(), ...demographicsBody(fd) } }); return `Saved: ${r.assessment.name}`; }); };
+  f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f); act(current.assessment.id, 'Saving preparation…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(current.assessment.id)}`, { method: 'PATCH', body: { purpose: String(fd.get('purpose')).trim(), ...(typeof lwcFrom === 'function' ? { lwc: lwcFrom(fd).join(',') || null } : {}), ...demographicsBody(fd) } }); return `Saved: ${r.assessment.name}`; }); };
 }
 // B07: the assessment name is the heading (shell's or page's); owners/members rename it in place through cap.assessment.update.
 let pendingRename = null; // { aid, done } while a heading rename PATCH is in flight
@@ -824,7 +825,7 @@ function scrubCredentialHash() {
   if (h === '#how' || h === '#example') { location.replace('/?demo=1#assessment/demo-assessment/collect'); return 'forwarded'; }
   if (h === '#participant') { location.replace('/legacy/#participant'); return 'forwarded'; }
   if (h === '#reports-card') { location.replace('/#projects'); return 'forwarded'; }
-  if (/^#survey=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + h); return 'forwarded'; }
+  if (/^#survey=/.test(h)) { let lang = ''; try { const m = /[?&]lang=([^&#]*)/.exec(location.search || ''); lang = m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : ''; } catch { lang = ''; } try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + (lang ? `?lang=${encodeURIComponent(lang)}` : '') + h); return 'forwarded'; } // ?lang= rides along (dynamic translation)
   if (/^#invite=/.test(h)) { const t = parseInvitationFragment(h); if (t) { pendingInvite = t; try { sessionStorage.setItem(INVITE_KEY, t); } catch {} } try { history.replaceState(null, '', location.pathname + '#invite'); } catch {} return null; } // B03: stays in v3; token leaves the address bar
   if (LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
   const m = /^#session=([A-Za-z0-9_]+)$/.exec(h);

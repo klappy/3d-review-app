@@ -19,6 +19,7 @@ import { cookieValue, handleAuthorize, handleConsent, oauthPrincipals, PARK_COOK
 import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLinkEnabled, magicSessionCookie, mintMagicSession, newNonce, openPage, principalForEmailHash, requestMagicLink, sameOriginPost, signInPage, verifyMagicToken } from "./magic-link";
 
 import { installRoadmapStream } from "./roadmap/stream";
+import { installTranslate } from "./translate";
 
 const app = new Hono<{ Bindings: Env }>();
 const json = (value: unknown, status: number) => new Response(JSON.stringify(value), {
@@ -34,6 +35,8 @@ export async function contextForRequest(req: Request, env: Env): Promise<Ctx> {
 }
 
 installRoadmapStream(app, contextForRequest);
+// Dynamic translation proxy for the participant survey (captain ruling 2026-09-28: restore the Lovable-era behaviour).
+installTranslate(app);
 
 for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?? [])]) {
   if (cap.tool === "danger" && twin.method.toUpperCase() === "GET")

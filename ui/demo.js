@@ -1,3 +1,4 @@
+import { lwcByCode } from './v3/lwc.js';
 import fixture from './demo-data.js';
 // Demonstration data only. Reuses production screens; never falls through to network.
 export const isDemo = search => new URLSearchParams(search).get('demo') === '1';
@@ -32,10 +33,13 @@ export async function demoApi(url, { method = 'GET' } = {}) {
 }
 // Actual participant controller/client/view with an in-memory transport and storage.
 // Practice prompts are not scored instruments or source-attested assessment evidence.
+const PRACTICE_LWC = ['hi', 'te', 'kn', 'or', 'lo', 'th', 'km', 'my']; // BCS LWCs first (captain 2026-09-29)
 export function sampleParticipantEnvironment(surveyIndex = 0) {
   let submitted = false;
   const selected = fixture.forms[surveyIndex] || fixture.forms[0];
-  const form = { template: { id: selected.template.templateId, version: selected.template.templateVersion }, title: 'Synthetic sample survey', items: selected.template.items };
+  // Dynamic translation practice: the sample survey offers a few LWCs so trainers can try the language switch (display only).
+  const languages = PRACTICE_LWC.map(lwcByCode).filter(Boolean).map(({ code, name, endonym, dir, review }) => ({ code, name, endonym, dir, review }));
+  const form = { template: { id: selected.template.templateId, version: selected.template.templateVersion }, title: 'Synthetic sample survey', items: selected.template.items, languages };
   const receipt = { submitted: true, response_id: 'practice-only-not-saved', submitted_at: 'Demonstration — not sent' };
   return { sampleAnswers: structuredClone(selected.responses[0].answers), storage: memoryStorage(), window: { location: { hash: '#survey=practice', pathname: '/participate/', search: '?demo=1' }, history: { replaceState() {} } },
     async fetchImpl(url, options = {}) {
