@@ -1,7 +1,75 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.22.0",
+  "current": "0.22.6",
   "versions": [
+    {
+      "version": "0.22.6",
+      "status": "candidate",
+      "notes_path": "releases/0.22.6.md",
+      "sections": {
+        "fixed": [
+          "Regenerating the roadmap versions page no longer crashes when there are no pending change files; it now shows no forecast. (#372)",
+          "After an owner completes a review, the role badge shows Owner (not Viewer), matching the Permissions and Delete controls still offered; the review content stays read-only. (#374)"
+        ]
+      }
+    },
+    {
+      "version": "0.22.5",
+      "status": "candidate",
+      "notes_path": "releases/0.22.5.md",
+      "sections": {
+        "fixed": [
+          "On a completed review, Delete assessment now shows why it cannot delete (for example \"This assessment has 1 response in 1 survey, so it cannot be deleted.\") instead of showing nothing. (#370)"
+        ]
+      }
+    },
+    {
+      "version": "0.22.4",
+      "status": "candidate",
+      "notes_path": "releases/0.22.4.md",
+      "sections": {
+        "fixed": [
+          "Transfer ownership now offers a picker of the people who already have access, labelled by name or email, instead of asking for a raw principal id. (#331)"
+        ]
+      }
+    },
+    {
+      "version": "0.22.3",
+      "status": "candidate",
+      "notes_path": "releases/0.22.3.md",
+      "sections": {
+        "fixed": [
+          "After \"Complete 3D Review\" the owner still sees Permissions and Delete assessment (Delete keeps its dry-run confirm). The review stays read-only for everyone: responses, setup and next-steps content cannot be changed (captain ruling 2026-09-28 15:27 ET, \"Owner keeps Permissions + Delete after Complete\"). (#364)"
+        ]
+      }
+    },
+    {
+      "version": "0.22.2",
+      "status": "candidate",
+      "notes_path": "releases/0.22.2.md",
+      "sections": {
+        "added": [
+          "`GET /v2/me/invitations` (`cap.me.invitations`, read): the signed-in person's pending invitations, matched by their hashed email — scope, role, expiry and an inviter display name (always empty for now: no names are stored). Never the invitation token. (#365)"
+        ],
+        "changed": [
+          "`cap.grant.accept` also accepts `invitation_id` instead of the link token (HTTP: `POST /v2/me/invitations/{invitation_id}/accept`), only when the signed-in person's email is the invited one; anything else answers exactly like a missing invitation. The link-token path is unchanged. (#365)"
+        ],
+        "fixed": [
+          "Someone an owner invited who simply signs in on the site (without opening the invitation email) now lands on an \"Accept invitation\" screen first — one heading, one line, one \"Accept\" — instead of an empty home. With nothing pending, sign-in lands as before (one project → that project; several → the projects list). Captain ruling 2026-09-28 15:27 ET (k0015) \"Add GET /v2/me/invitations + accept by invitee identity\"; B04 step (c). (#365)",
+          "Survey questions with an \"Other (please describe)\" choice now show a short \"Please describe\" text field while Other is chosen (both the /participate/ page and the shared #survey= link). The text is kept with the device draft, shown beside the Other choice on Review your answers, and saved with the response inside the existing answers JSON under \"_other\" ({ question id: text }, up to 500 characters) — no migration. Text typed under Other and then abandoned for another choice is dropped. Legacy / Lovable items (option code \"other\") get the field too. (#363)"
+        ]
+      }
+    },
+    {
+      "version": "0.22.1",
+      "status": "candidate",
+      "notes_path": "releases/0.22.1.md",
+      "sections": {
+        "fixed": [
+          "On Collect, each survey's share card now shows its QR code as soon as the card appears: the participant link is made when the card renders (captain ruling 2026-09-28 14:42 ET, k0013 \"Mint the link on render so QR shows immediately\"). One link per survey still holds: a survey whose link is already active (launch page, an earlier visit, the survey's Share card) reuses it. Copy link and Print keep working; \"Print all\" is unchanged (window.print()). (#361)"
+        ]
+      }
+    },
     {
       "version": "0.22.0",
       "status": "candidate",

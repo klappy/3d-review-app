@@ -35,12 +35,12 @@ export async function contextForRequest(req: Request, env: Env): Promise<Ctx> {
 
 installRoadmapStream(app, contextForRequest);
 
-for (const cap of capabilities) {
-  if (cap.tool === "danger" && cap.http.method.toUpperCase() === "GET")
+for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?? [])]) {
+  if (cap.tool === "danger" && twin.method.toUpperCase() === "GET")
     throw new Error(`danger twin cannot be GET: ${cap.id}`);
   // Hono cannot split two parameters in one path segment (`{id}@{ver}`).
-  const path = cap.http.path.replace("{id}@{ver}", ":idVersion").replace(/\{([^}]+)\}/g, ":$1");
-  app.on(cap.http.method.toUpperCase(), path, async (c) => {
+  const path = twin.path.replace("{id}@{ver}", ":idVersion").replace(/\{([^}]+)\}/g, ":$1");
+  app.on(twin.method.toUpperCase(), path, async (c) => {
     const ctx = await contextForRequest(c.req.raw, c.env);
     // Anonymous HTTP traffic on EVERY twin is dampened per address (auditor 5707673911 #2: ~75 twins wrote a trace row
     // per anonymous request with no limit). Spent after credential resolution and before the body is parsed; a refusal

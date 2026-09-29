@@ -13,7 +13,7 @@ import { sidebarTree } from '/v3/components/sidebar-tree.js';
 import { learnMore } from '/v3/components/learn-more.js';
 import { collectLine, periodText } from '/v3/components/active-until.js';
 // Bincy B03: `#invite=<token>` is handled here (v3), not forwarded to /legacy/.
-import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment } from '/v3/components/invite.js';
+import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations } from '/v3/components/invite.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
 const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
 import { pages, css as scopeCss, landsOnWork, signInLanding, whoLine } from '/assess/scope.js';
@@ -22,7 +22,7 @@ import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock as completeLock, V3_SUGGEST } from '/assess/v3-assessment.js';
+import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock as completeLock, v3SettingsRole as settingsRole, V3_SUGGEST } from '/assess/v3-assessment.js';
 import { mountEditableHeading } from '/v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '/v3/components/saved-status.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
@@ -127,7 +127,7 @@ const redact = m => redactDiagnosticPath(String(m || 'Request could not be compl
 //                                                  (Bugbot 4041134416). Results are bound to (aid, epoch) (Auditor 2A-3).
 //   generation   counter                           a later render supersedes an earlier one's DOM write (supplier 1114cb1)
 let generation = 0, epoch = 0, identityGeneration = 0;
-const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null, collectLinks: new Map() };
+const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null, collectLinks: new Map(), myInvitations: null };
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']); // visibility/authz codes (supplier 97f7402 + policy.ts)
@@ -291,6 +291,15 @@ function bindCollectLinks(current) {
     return { title: s.template_name, line: whoLine(lensFor(s)) || lensFor(s), url: link.url };
   }));
   share.bindPrintAll(root, { heading: current.assessment.name, items: resolveAll });
+  // U48 (B43 ruling k0013): mint on render so the QR shows immediately. Only surveys with no active link mint (U36: same cache
+  // as the taps, one link per survey); the row is patched in place when its link arrives, no full repaint.
+  const pending = current.surveys.filter(s => shareable(current.assessment, s) && !share.knownLink(state.collectLinks, share.linkKey(aid, s.id))).map(s => s.id);
+  if (pending.length) share.mintOnRender(root, { keys: pending, resolve: async sid => {
+    const k = share.linkKey(aid, sid);
+    const link = await share.cachedLink(state.collectLinks, k, () => share.issueLink(api, { aid, sid, origin: location.origin }));
+    if (ep !== epoch || state.current?.assessment.id !== aid || !root.isConnected) throw share.failure();
+    return link.url;
+  } });
 }
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
@@ -380,7 +389,7 @@ function lensRows(current) {
   }).join('');
 }
 // View tabs (showcase `tabs()`): links between the five views of ONE assessment. Selecting a tab never calls set_stage.
-function viewTabs(a, current) { ensureStepperStyle(globalThis.document); const perm = (a.role === 'owner' || a.role === 'member') ? `<nav class="tabs view-tabs" aria-label="Assessment settings"><a href="${cards.routes.assessment(a.id, 'permissions')}" ${current === 'permissions' ? 'aria-current="page"' : ''}>Permissions</a>${deleteAssessmentButton(a.role, { disabled: state.busy }, esc)}</nav>` : ''; /* U14: owner-only Delete assessment in the assessment settings */ return v3StageStepper(a.stage, v => cards.routes.assessment(a.id, v)) + perm; } // ruling 12:28: stage tabs → shared Stepper (component: Stepper); permissions stays a separate link (lane 11 owns its placement)
+function viewTabs(a, current) { ensureStepperStyle(globalThis.document); const sr = settingsRole(a); /* S8b ruling 15:27: after Complete the owner keeps Permissions + Delete */ const perm = (sr === 'owner' || sr === 'member') ? `<nav class="tabs view-tabs" aria-label="Assessment settings"><a href="${cards.routes.assessment(a.id, 'permissions')}" ${current === 'permissions' ? 'aria-current="page"' : ''}>Permissions</a>${deleteAssessmentButton(sr, { disabled: state.busy }, esc)}</nav>` : ''; /* U14: owner-only Delete assessment in the assessment settings */ return v3StageStepper(a.stage, v => cards.routes.assessment(a.id, v)) + perm; } // ruling 12:28: stage tabs → shared Stepper (component: Stepper); permissions stays a separate link (lane 11 owns its placement)
 // Prepare view (showcase `prepareView()`): purpose, saved through cap.assessment.update (O/M); viewers read. The name is the heading (B07).
 function prepareView(current) {
   const a = current.assessment, mayEdit = a.role === 'owner' || a.role === 'member';
@@ -409,8 +418,11 @@ function screen(current, view = null) {
   const head = kit ? `<div class="title assessment-head"><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`
     : `<div class="title"><div><p class="eyebrow">Assessment</p><h1>${esc(a.name)}</h1></div><span class="badge">${stageLabel(a.stage)}</span>${primary}</div>${roleMore}${viewTabs(a, tab)}`; // one strip, as the reference: the stage lives in the badge + Prepare's Stage panel
   const done = a.complete && tab !== 'improve' ? `<p class="note" data-review-complete>${esc(V3_SUGGEST.done)}</p>` : ''; // B13: one line; Improve draws its own
-  if (tab === 'prepare') return head + done + prepareView(current);
-  if (tab !== 'collect') return head + done + `<div id="view-root" data-view="${tab}"><p class="muted">Loading…</p></div>`;
+  // S11d (S8b defect): Delete's refusal is shown where Delete sits. Collect already prints every message in its outcome line; the
+  // other views (Prepare, Understand, Improve — every view of a completed review) had no line, so the dry-run refusal was swallowed.
+  const delMsg = tab !== 'collect' && showMessage(current)?.del ? `<p class="status" role="alert" aria-live="polite" data-delete-outcome>${esc(showMessage(current).text)}</p>` : '';
+  if (tab === 'prepare') return head + done + delMsg + prepareView(current);
+  if (tab !== 'collect') return head + done + delMsg + `<div id="view-root" data-view="${tab}"><p class="muted">Loading…</p></div>`;
   return head + done + collectScreen(current);
 }
 function collectScreen(current) {
@@ -443,7 +455,7 @@ function bind(current) {
   bindCounts(current);
   // U14 (J5): owner-only delete — dry run, one-sentence impact asked in the page, execute, land on the project with a notice.
   const del = app.querySelector('[data-delete-assessment]');
-  if (del) del.onclick = () => { if (state.busy) return; const pid = current.assessment.project_id, refuse = text => { state.message = { aid, text, alert: true }; paint(); };
+  if (del) del.onclick = () => { if (state.busy) return; const pid = current.assessment.project_id, refuse = text => { state.message = { aid, text, alert: true, del: true }; paint(); }; // S11d: del — shown on every view, not only Collect's outcome line
     deleteAssessmentFlow(del, { id: aid, api, ask: askStageMove, onRefused: refuse, onError: e => refuse(redact(e.message)),
       onDeleted: () => { state.lists.delete(pid); state.dirty.delete(aid); state.message = null; pendingNotice = DELETED_NOTICE; location.hash = cards.routes.project(pid); } }); };
   app.querySelectorAll('[data-include]').forEach(b => b.onclick = () => act(aid, 'Including survey…', async () => { const restoring = b.textContent.trim() === 'Include again'; const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/surveys`, { method: 'POST', body: { template_id: b.dataset.include, version: Number(b.dataset.version) } }); return `${restoring ? 'Survey restored with what was collected' : 'Survey included'}; collection ${r.survey?.collection_status || 'status unknown'}.`; }));
@@ -604,6 +616,7 @@ async function render() {
 function mountInvitePage(gen) {
   syncShell(); app.className = ''; document.title = 'Invitation · 3D Review';
   const t = pendingInvite || storedInvite();
+  if (!t && state.principal) { mountMyInvitation(gen); return; } // B04 step c: no link token — the signed-in person's own invitations
   if (!t) { app.innerHTML = inviteView({ status: 'missing' }); return; }
   if (!state.principal) { app.innerHTML = inviteView({ status: 'signin' }); return; }
   const ctx = ctxFor();
@@ -611,6 +624,30 @@ function mountInvitePage(gen) {
     // Accepted (Bugbot on #298): re-read the project list the way boot does, so the granted project's name is known to Home and
     // the assessment header without a page reload; a failed re-read keeps the old list and still goes Home.
     onAccepted: async () => { await reloadProjects(); if (gen === generation) ctx.go(cards.routes.projects); } });
+}
+// B04 step c (captain 2026-09-28): invitations addressed to the signed-in person (GET /v2/me/invitations, matched by hashed email on
+// the server; no token). Any failure → [] so the existing landing stands. Returns null when the identity changed while in flight.
+async function loadMyInvitations() {
+  const identity = identityGeneration;
+  let list = [];
+  try { list = pendingInvitations(await api('/v2/me/invitations')); } catch { list = []; }
+  if (identity !== identityGeneration) return null;
+  state.myInvitations = list; return list;
+}
+// "Accept invitation" first: the oldest pending invitation, accepted by id (same cap.grant.accept dry run → confirm → execute). After
+// each accept the list is read again: another pending → that one next; none → the existing landing (one project → it; else Home).
+async function mountMyInvitation(gen) {
+  const mine = await loadMyInvitations(); // read fresh on every mount: an invitation accepted or withdrawn elsewhere never re-offers
+  if (gen !== generation || mine === null) return;
+  const ctx = ctxFor();
+  if (!mine.length) { ctx.go(signInLanding({ projects: state.projects })); return; } // nothing (left) to accept, or the read failed → the existing landing, never a dead end
+  mountInvite(app, { api: ctx.api, invitationId: mine[0].id, isCurrent: () => gen === generation,
+    onAccepted: async () => {
+      await reloadProjects(); const next = await loadMyInvitations();
+      if (gen !== generation || next === null) return;
+      if (next.length) { mountMyInvitation(gen); return; }
+      ctx.go(signInLanding({ projects: state.projects }));
+    } });
 }
 // The project list read boot uses. Returns false (state untouched) when the identity changed while it was in flight.
 async function reloadProjects() {
@@ -801,7 +838,7 @@ function resetIdentity() {
   document.getElementById('account-switch-dialog')?.close();
   state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
-  state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false;
+  state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false; state.myInvitations = null;
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
   for (const id of ['legacy-link', 'whats-here-wrap']) { const el = document.getElementById(id); if (el) el.hidden = true; }
 }
@@ -865,7 +902,11 @@ async function boot() {
     state.projects = []; note.innerHTML = `Could not load your project list (${esc(redact(e.message))}). <a href="#" data-retry-boot>Retry</a>`; note.querySelector('[data-retry-boot]').onclick = ev => { ev.preventDefault(); note.textContent = ''; boot(); };
     if (!['assessment', 'survey', 'feedback', 'invite'].includes(route(location.hash).kind)) /* B03: acceptance does not need the list */ { syncShell(); app.innerHTML = `<div class="narrow panel"><h1>Could not load projects</h1><p class="muted">${esc(redact(e.message))}</p><p><a class="button" href="#" data-retry-boot2>Retry</a></p></div>`; app.querySelector('[data-retry-boot2]').onclick = ev => { ev.preventDefault(); boot(); }; listen(); return; } }
   // B04: once, right after a sign-in, the landing follows Bincy's rule (invitation → accept screen; one project → it; several → Home).
-  if (landAfterSignIn) { landAfterSignIn = false; if (['projects', 'invite', 'entry'].includes(route(location.hash).kind)) { try { history.replaceState(null, '', location.pathname + location.search + signInLanding({ invite: !!(pendingInvite || storedInvite()), projects: state.projects })); } catch {} } }
+  // B04 step c: no link token in this tab → ask the server for invitations addressed to this person; any → the accept screen first.
+  if (landAfterSignIn) { landAfterSignIn = false; if (['projects', 'invite', 'entry'].includes(route(location.hash).kind)) {
+    const linkInvite = !!(pendingInvite || storedInvite());
+    const mine = linkInvite ? [] : await loadMyInvitations(); if (mine === null || identity !== identityGeneration) return;
+    try { history.replaceState(null, '', location.pathname + location.search + signInLanding({ invite: linkInvite || mine.length > 0, projects: state.projects })); } catch {} } }
   listen();
   await render();
 }
