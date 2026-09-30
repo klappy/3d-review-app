@@ -1,6 +1,6 @@
 /**
  * S33 edges (Train 22 audit backlog, cook A): translate body read stays under the upstream time limit (E1), a passage
- * file does not outlive a failed row insert (E4), and two first link calls at once leave one live link per survey.
+ * file does not outlive a failed row insert (E4), and two or three first link calls at once leave one live link per survey that every caller agrees on.
  */
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -65,16 +65,39 @@ describe("E4: a passage file is removed when its row cannot be stored", () => {
 describe("one live link per survey under a simultaneous first call", () => {
   const base = `/v2/assessments/${aid}/surveys/survey_tavo/links`;
   const call = async (body: unknown, e = env) => { const r = await app.fetch(new Request("https://local.invalid" + base, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${owner}` }, body: JSON.stringify(body) }), e); return await r.json() as any; };
+  const LOOKUP = "FROM invitation WHERE assessment_survey_id = ? AND scope_type = 'survey'";
+  /** Env whose first live-link lookup (the pre-insert one) sees nothing, as if it ran before the other racer stored. */
+  const blindFirst = (extra: (sql: string) => any = () => undefined) => { let n = 0; return { ...env, DB: dbWith(
+    (sql) => (sql.includes(LOOKUP) && n++ === 0) || extra(sql) !== undefined,
+    (sql) => extra(sql) ?? { bind: () => ({ all: async () => ({ results: [] }) }) }) }; };
   const live = async () => Number((await db.prepare("SELECT COUNT(*) AS n FROM invitation WHERE assessment_survey_id = 'survey_tavo' AND status IN ('pending','accepted')").first<{ n: number }>())!.n);
   it("the second minter deletes its own row and hands back the earlier link as reused", async () => {
     const dry1 = await call({ params: {}, mode: "dry_run" });
     const first = (await call({ params: {}, mode: "execute", confirm_token: dry1.result.confirm_token })).result;
     const n = await live();
     // The racing call's pre-insert lookup ran before `first` was stored: it sees no live link.
-    const blind = { ...env, DB: dbWith((sql) => sql.includes("ORDER BY created_at DESC, id DESC LIMIT 20"), () => ({ bind: () => ({ all: async () => ({ results: [] }) }) })) };
-    const dry2 = await call({ params: {}, mode: "dry_run" }, blind);
-    const second = (await call({ params: {}, mode: "execute", confirm_token: dry2.result.confirm_token }, blind)).result;
+    const dry2 = await call({ params: {}, mode: "dry_run" }, blindFirst());
+    const second = (await call({ params: {}, mode: "execute", confirm_token: dry2.result.confirm_token }, blindFirst())).result;
     expect(second).toMatchObject({ link_id: first.link_id, link_token: first.link_token, reused: true });
     expect(await live()).toBe(n);
+  });
+  it("a third caller between a racer's insert and its delete gets the surviving earliest link", async () => {
+    const dry1 = await call({ params: {}, mode: "dry_run" });
+    const a = (await call({ params: {}, mode: "execute", confirm_token: dry1.result.confirm_token })).result;
+    // Racer X: blind pre-insert lookup, inserts its own row, but is paused before its DELETE (stubbed to a no-op).
+    const paused = () => blindFirst((sql) => sql.startsWith("DELETE FROM invitation WHERE id = ?") ? { bind: () => ({ run: async () => ({}) }) } : undefined);
+    const dryX = await call({ params: {}, mode: "dry_run" }, paused());
+    const x = (await call({ params: {}, mode: "execute", confirm_token: dryX.result.confirm_token }, paused())).result;
+    expect(x).toMatchObject({ link_id: a.link_id, reused: true });
+    const xRows = await db.prepare("SELECT id FROM invitation WHERE assessment_survey_id = 'survey_tavo' AND status IN ('pending','accepted') AND id != ?").bind(a.link_id).all<{ id: string }>();
+    expect(xRows.results.length).toBeGreaterThan(0); // X's own row is still live, newer than A
+    // Third caller C lands now, with a normal (non-blind) lookup.
+    const dryC = await call({ params: {}, mode: "dry_run" });
+    expect(JSON.stringify(dryC.result)).toContain(a.link_id); // the dry run already names A as the link it reuses
+    const c = (await call({ params: {}, mode: "execute", confirm_token: dryC.result.confirm_token })).result;
+    expect(c).toMatchObject({ link_id: a.link_id, link_token: a.link_token, reused: true });
+    // X resumes and deletes its own row; C's link must still exist.
+    for (const r of xRows.results) await db.prepare("DELETE FROM invitation WHERE id = ?").bind(r.id).run();
+    expect(await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(c.link_id).first<{ status: string }>()).toMatchObject({ status: "pending" });
   });
 });
