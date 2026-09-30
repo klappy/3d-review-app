@@ -5,6 +5,7 @@ import { CapError, notVisible } from "./errors";
 import { gate, isOtherOption, newId, nowIso, OTHER_TEXT_KEY, OTHER_TEXT_MAX, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
 
 import { collecting, sharedSession, submitShared } from "./shared-link";
+import { minimumHold } from "./results";
 import { RESPONDENT_FIELDS, demographicsEnabled, demographicsProjection, groupContextOnly, groupFields, validateContext } from "../context-fields";
 
 interface ParticipantSurvey { id: string; assessment_id: string; template_id: string; template_version: number; state: string; collection_status: string; name: string; language_name: string; period: string | null; purpose: string | null; format: string | null; project_name: string; items_json: string; scoring_json: string; perspective: string; source_ref: string | null; published_at: string | null; context_json?: string }
@@ -180,7 +181,9 @@ export const list: Handler = async (ctx, params) => {
   });
   // S15c: demographic breakdown columns (age range, gender) only when the facilitator turned demographics on.
   const demographics = demographicsProjection((results || []).some((r) => demographicsEnabled(r.context_json)));
-  return { result: { suppressed: true, status: "held", reason: "D7 disclosure policy unresolved", responses: [], group_context, ...demographics }, scope: { type: "assessment", id: aid } };
+  // Below the minimum the list names the same count Collect shows and the same minimum Results and the report name.
+  const low = await minimumHold(ctx, aid);
+  return { result: { suppressed: true, status: "held", reason: "D7 disclosure policy unresolved", responses: [], group_context, ...demographics, ...(low ?? {}) }, scope: { type: "assessment", id: aid } };
 };
 
 export const purge: Handler = async (ctx, params, opts) => {

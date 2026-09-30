@@ -55,3 +55,9 @@ test('mountPassages: lists, uploads the raw file with name and passage, adds a l
   assert.ok(calls.some(c => c.method === 'DELETE' && c.url === '/v2/assessments/a1/passages/passage_1'));
   assert.doesNotMatch(root.textContent, /Mark 4 in ISL/);
 });
+
+test('passagesHtml: a USFM passage says "Text · PDF" when PTXprint made one, else "Text file"', () => {
+  const text = (pdf) => ({ id: 'passage_3', kind: 'file', media: 'text', title: 'Mark 4.usfm', reference: null, size: 90, pdf, href: '/v2/passages/passage_3/file?exp=1&sig=s' });
+  assert.match(passagesHtml(esc, { mayEdit: false, passages: [text(true)] }), /<span class="p-kind">Text · PDF<\/span>/);
+  assert.match(passagesHtml(esc, { mayEdit: false, passages: [text(false)] }), /<span class="p-kind">Text file<\/span>/);
+});
