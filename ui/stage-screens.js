@@ -23,7 +23,14 @@ export const PRINT_WORDS = Object.freeze({
   passageLead: 'Before you answer, read or listen to:',
   codeLabel: 'Code (optional; legacy)',
   leaveBlank: 'Leave blank when answering from the shared link',
-  noLink: 'No invitation link on this blank form',
+  noLink: 'No shared link for this survey yet. Make one on its Share card, then print again.',
+  helperScan: "Helper: scan to enter this paper's answers",
+  projectLabel: 'Project',
+  assessmentLabel: 'Assessment',
+  languageLabel: 'Language evaluated',
+  printedIn: 'Printed in',
+  surveyLabel: 'Survey',
+  footNote: "Codes are never printed. The QR is the survey's own link.",
   introChoices: 'Mark one circle ○ for each question. Where it says "Choose all that apply", mark every box ☐ that fits. Write on the lines where there are no choices.',
   introLines: 'Write your response on the blank lines below each question.',
   chooseAll: 'Choose all that apply',
@@ -309,6 +316,45 @@ function writeLines(doc, className, count) {
   for (let k = 0; k < count; k++) lines.append(el(doc, 'div'));
   return lines;
 }
+// S31: the one link a printed survey may carry — the survey's shared entry link (origin/#survey=<token>) with its QR as an
+// inline SVG data URI. Anything else (codes, other URLs, markup) is dropped, so the paper falls back to "no shared link".
+export const SURVEY_LINK_RE = /^https?:\/\/[^/?#\s"<>]+\/#survey=[A-Za-z0-9_-]+$/;
+export function printableLink(link) {
+  if (!link || typeof link.url !== 'string' || !SURVEY_LINK_RE.test(link.url)) return null;
+  if (typeof link.qr !== 'string' || !link.qr.startsWith('data:image/svg+xml,')) return null;
+  return { url: link.url, qr: link.qr };
+}
+// S31 (captain 2026-09-30 13:39 ET: "which survey, assessment and project"): the identity block at the top of the paper —
+// project, assessment with the language evaluated (and the language printed in, when not English), survey and perspective,
+// then the ids in small print for data entry. Labels are paper words (translated with the rest); names are shown as given.
+const idText = v => (typeof v === 'string' ? v.trim() : '');
+function identityBlock(doc, model, w, wordEn, markEn) {
+  const id = model.identity;
+  if (!id || typeof id !== 'object') return null;
+  const box = el(doc, 'section');
+  box.className = 'p-ident';
+  box.setAttribute('aria-label', 'Which survey this paper belongs to');
+  const row = (key, parts) => {
+    const values = parts.filter(Boolean);
+    if (!values.length) return;
+    const r = el(doc, 'div');
+    r.className = 'p-id-row';
+    const k = markEn(el(doc, 'span', w[key]), wordEn.has(key));
+    k.className = 'p-id-k';
+    const v = el(doc, 'span', values.join(' · '));
+    v.className = 'p-id-v';
+    r.append(k, v);
+    box.append(r);
+  };
+  row('projectLabel', [idText(id.project?.name)]);
+  row('assessmentLabel', [idText(id.assessment?.name)]);
+  row('languageLabel', [idText(id.assessment?.language)]);
+  row('printedIn', [model.lang ? idText(model.language) : '']);
+  row('surveyLabel', [idText(id.survey?.name), idText(id.survey?.perspective)]);
+  const ids = [id.project?.id, id.assessment?.id, id.survey?.id].map(idText).filter(Boolean);
+  if (ids.length) { const small = el(doc, 'div', ids.join(' · ')); small.className = 'p-ids'; box.append(small); }
+  return box.children.length ? box : null;
+}
 export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint, printHere = false } = {}) {
   root.replaceChildren();
   root.hidden = !model || !model.visible;
@@ -345,6 +391,8 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint, 
   const w = { ...PRINT_WORDS, ...(model.words || {}) }, wordEn = new Set(model.wordsEn || []);
   const markEn = (node, english) => { if (model.lang && english) { node.setAttribute('lang', 'en'); node.setAttribute('data-en', ''); } return node; };
   if (model.lang) { article.setAttribute('lang', model.lang); if (model.dir === 'rtl') article.setAttribute('dir', 'rtl'); }
+  const ident = identityBlock(doc, model, w, wordEn, markEn);
+  if (ident) article.append(ident);
   const header = el(doc, 'header');
   header.className = 'p-head';
   const brandWrap = el(doc, 'div');
@@ -371,14 +419,29 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint, 
   code.append(codeLabel, slot, leave);
   header.append(code);
 
+  // S31 (captain 2026-09-30 13:39 ET): the survey's one shared link as QR + URL for the helper who enters paper answers.
+  // Only a survey entry link is drawn (printableLink); none → the slot says so instead of inventing one.
   const qr = el(doc, 'div');
   qr.className = 'p-qr';
-  const qrBox = el(doc, 'div');
-  qrBox.className = 'qr';
-  qrBox.setAttribute('aria-label', 'Invitation link is not printed on this blank form');
-  const qrLabel = markEn(el(doc, 'div', w.noLink), wordEn.has('noLink'));
-  qrLabel.className = 'p-label';
-  qr.append(qrBox, qrLabel);
+  const link = printableLink(model.link);
+  if (link) {
+    const img = el(doc, 'img');
+    img.className = 'qr';
+    img.setAttribute('src', link.qr);
+    img.setAttribute('alt', 'QR code: this survey\'s shared link');
+    const url = el(doc, 'div', link.url);
+    url.className = 'p-url';
+    const helper = markEn(el(doc, 'div', w.helperScan), wordEn.has('helperScan'));
+    helper.className = 'p-label';
+    qr.append(img, url, helper);
+  } else {
+    const qrBox = el(doc, 'div');
+    qrBox.className = 'qr none';
+    qrBox.setAttribute('aria-label', 'No shared link for this survey yet');
+    const qrLabel = markEn(el(doc, 'div', w.noLink), wordEn.has('noLink'));
+    qrLabel.className = 'p-label';
+    qr.append(qrBox, qrLabel);
+  }
   header.append(qr);
   article.append(header);
 
@@ -428,7 +491,7 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint, 
   foot.className = 'p-foot';
   const version = [model.template_id, model.template_version != null ? `@${model.template_version}` : ''].join('');
   foot.append(el(doc, 'span', version ? `Form ${version}` : 'Blank form'));
-  foot.append(el(doc, 'span', 'Facilitator: this page never prints codes or credentials'));
+  foot.append(markEn(el(doc, 'span', w.footNote), wordEn.has('footNote')));
   article.append(foot);
   root.append(article);
 }

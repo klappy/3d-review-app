@@ -1,4 +1,6 @@
 import { renderBlankPrint } from '../stage-screens.js';
+import { qrSvg } from './share.js';
+import { shareUrl } from '../shared-link.js';
 
 // S25 — the printed survey is its own document, never the app page.
 // Captain's print from iOS Safari 2026-09-30 11:48 ET (cookbook work/queued/2026-09-30-3d-print-and-passage-in-language/
@@ -23,6 +25,7 @@ const stringDoc = { createElement: node, createTextNode: t => ({ tag: '#text', t
 function toHtml(n) {
   if (n.tag === '#text') return esc(n.textContent);
   const attrs = [n.className ? `class="${esc(n.className)}"` : '', ...[...n.attrs].map(([k, v]) => (v === '' ? esc(k) : `${esc(k)}="${esc(v)}"`))].filter(Boolean).join(' ');
+  if (n.tag === 'img') return `<img${attrs ? ` ${attrs}` : ''}>`; // void element (S31 QR)
   return `<${n.tag}${attrs ? ` ${attrs}` : ''}>${esc(n.textContent)}${n.children.map(toHtml).join('')}</${n.tag}>`;
 }
 
@@ -42,13 +45,17 @@ body{font:15px/1.45 system-ui,sans-serif}
 main{max-width:216mm;margin:0 auto;padding:12px;box-sizing:border-box}
 .doc-tools{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:0 0 12px}.doc-tools button{font:inherit;min-height:44px;padding:6px 18px}
 .paper{background:#fff;color:#111;margin:0;padding:0;font:11pt/1.4 Georgia,"Times New Roman",serif;box-sizing:border-box;width:auto;max-width:100%}
-.p-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px}
+.p-head{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:start;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px}
 .p-brand{font:700 14pt/1 Inter,system-ui,sans-serif;letter-spacing:-.4px;margin-bottom:6px}.p-brand span{display:inline-block;background:#111;color:#fff;padding:2px 5px;border-radius:4px;margin-right:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .paper h1{font:600 16pt/1.2 Inter,system-ui,sans-serif;margin:0 0 4px;overflow-wrap:anywhere}
 .p-passage{font:600 12pt/1.35 Inter,system-ui,sans-serif;margin:6px 0 0;padding:6px 10px;border:1.5px solid #14685f;border-radius:6px}
 .p-label{font:600 7.5pt/1.2 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:#444;margin:4px 0;max-width:62mm}
 .p-slot{display:flex;gap:4px}.p-slot span{width:9mm;height:11mm;border:1.2px solid #111;border-radius:2px}
-.p-qr{display:none}
+.p-qr{max-width:44mm}.p-qr .qr{display:block;width:30mm;height:30mm;background:#fff;box-sizing:border-box}.p-qr .qr.none{border:1.2px dashed #777}
+.p-url{font:7pt/1.25 ui-monospace,Menlo,monospace;overflow-wrap:anywhere;margin:3px 0 0;color:#111}
+.p-ident{border:1.5px solid #111;border-radius:6px;padding:6px 10px;margin:0 0 10px;font:9.5pt/1.35 Inter,system-ui,sans-serif;break-inside:avoid}
+.p-id-row{display:grid;grid-template-columns:42mm minmax(0,1fr);gap:8px}.p-id-k{font-weight:600;color:#444;font-size:8pt;text-transform:uppercase;letter-spacing:.06em;padding-top:1px}.p-id-v{font-weight:600;overflow-wrap:anywhere}
+.p-ids{font:7pt/1.3 ui-monospace,Menlo,monospace;color:#555;margin-top:3px;overflow-wrap:anywhere}
 .p-intro{font-size:10pt;margin:0 0 10px}
 .p-items{list-style:none;margin:0;padding:0}
 .p-item{break-inside:avoid;page-break-inside:avoid;padding:7px 0;border-top:1px solid #bbb}
@@ -85,4 +92,34 @@ export function openPrintDocument(win, model, { paper = 'letter' } = {}) {
   if (!w) return false;
   w.document.open(); w.document.write(html); w.document.close();
   return true;
+}
+
+// S31 (captain 2026-09-30 13:39 ET: "the same single QR code from the webpage for that survey"): the survey's one active
+// shared link, read with the facilitator's session through the existing issue_link pair (src/handlers/survey.ts issue_link,
+// #404): the dry run names the active link it would hand back (`reuses`); only then is the execute sent, which returns that
+// same link (`reused: true`) and stores nothing. No active link → null: printing never mints a link.
+export async function activeSurveyLink(api, { aid, sid, origin = globalThis.location?.origin, enc = encodeURIComponent }) {
+  const base = `/v2/assessments/${enc(aid)}/surveys/${enc(sid)}/links`;
+  const d = await api(base, { method: 'POST', body: { params: {}, mode: 'dry_run' } });
+  if (!d?.reuses || !d.confirm_token) return null;
+  const r = await api(base, { method: 'POST', body: { params: {}, mode: 'execute', confirm_token: d.confirm_token } });
+  // Review #411 (rev411-1340): print only the link the dry run read — if it vanished in between, the execute minted a new
+  // one (src/handlers/survey.ts issue_link); that is not a link this paper read, so the paper says "no shared link".
+  if (r?.reused !== true || r.link_id !== d.reuses) return null;
+  if (!r?.link_id || typeof r.entry_fragment !== 'string' || !/^#survey=[A-Za-z0-9_-]+$/.test(r.entry_fragment)) return null;
+  return { id: r.link_id, url: shareUrl(origin, r.entry_fragment), expires_at: r.expires_at || null };
+}
+// The paper's link: the URL plus its QR (the Share card's own qrSvg) as an inline SVG data URI — no network on the paper.
+export const paperLink = link => (link?.url ? { url: link.url, qr: `data:image/svg+xml,${encodeURIComponent(qrSvg(link.url))}` } : null);
+
+// S31 identity, from the facilitator's rows as the API returns them: the assessment read carries language_id only
+// (src/handlers/assessment.ts, SELECT a.*), so the evaluated language's name comes from the project's languages
+// (GET /v2/projects/{pid}/languages), as ui/assess/scope.js resolves it for the project page.
+export function printIdentityFrom(a, { project = null, languages = [], survey = {}, perspective = '' } = {}) {
+  const langName = new Map((Array.isArray(languages) ? languages : []).map(l => [l?.id, l?.name]));
+  return {
+    project: { id: a.project_id, name: project?.name || a.project_name || '' },
+    assessment: { id: a.id, name: a.name, language: langName.get(a.language_id) || a.language_name || '' },
+    survey: { id: survey.id, name: survey.template_name, perspective },
+  };
 }
