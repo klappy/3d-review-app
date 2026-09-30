@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { printDocumentHtml, paperHtml, activeSurveyLink, paperLink } from './print.js';
+import { printDocumentHtml, paperHtml, activeSurveyLink, paperLink, printIdentityFrom } from './print.js';
 import { renderBlankPrint, printableLink, loadBlankPrint, credentialFields, PRINT_WORDS } from '../stage-screens.js';
 import { applyPrintTranslation } from './print-lang.js';
 
@@ -63,11 +63,31 @@ test('activeSurveyLink reads the active link through issue_link and never mints 
 test('assess.js wiring: identity and link set before translation, tab link first, then the active read', () => {
   const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   const click = src.slice(src.indexOf('btn.onclick = async () => {'));
-  assert.ok(click.indexOf('model.identity = printIdentity(current, s)') < click.indexOf('translatePrint(model'));
+  assert.ok(click.indexOf('model.identity = await printIdentity(current, s)') < click.indexOf('translatePrint(model'));
   assert.match(src, /share\.knownLink\(state\.collectLinks, k\);\s*if \(!link && !demo\) \{ try \{ link = await activeSurveyLink\(api/);
   assert.equal(PRINT_WORDS.helperScan, "Helper: scan to enter this paper's answers");
   const doc = { createElement: tag => ({ tag, children: [], attrs: {}, className: '', textContent: '', setAttribute(k, v) { this.attrs[k] = v; }, addEventListener() {}, append(...n) { this.children.push(...n); }, replaceChildren(...n) { this.children = n; } }), createTextNode: t => ({ tag: '#t', textContent: t, children: [] }) };
   const root = doc.createElement('div'); renderBlankPrint(doc, root, { ...base, link: paperLink({ url: URL1 }) });
   const texts = []; (function w(n) { texts.push(n.textContent); n.children.forEach(w); })(root);
   assert.ok(texts.includes('Hindi NT') && texts.includes(URL1), 'preview carries identity and the link');
+});
+
+test('review #411: the language name comes from language_id against the project languages (real API row shape)', () => {
+  // src/handlers/assessment.ts returns SELECT a.* — language_id, no language_name.
+  const a = { id: 'assess_1', project_id: 'proj_1', name: 'Community check March', language_id: 'lang_hin', role: 'owner', stage: 'collect' };
+  const id = printIdentityFrom(a, { project: { id: 'proj_1', name: 'Hindi NT' }, languages: [{ id: 'lang_x', name: 'Other' }, { id: 'lang_hin', name: 'Hindi' }], survey: { id: 'survey_1', template_name: 'Community-Pastor' }, perspective: 'Community' });
+  assert.equal(id.assessment.language, 'Hindi');
+  const html = printDocumentHtml({ ...base, identity: id });
+  assert.match(html, /Language evaluated<\/span><span class="p-id-v">Hindi</);
+  assert.equal(printIdentityFrom(a, { languages: [] }).assessment.language, '', 'unresolved id → no row, never the raw lang_ id');
+  assert.doesNotMatch(printDocumentHtml({ ...base, identity: printIdentityFrom(a, {}) }), /lang_hin|Language evaluated/);
+  const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  assert.match(src, /api\(`\/v2\/projects\/\$\{encodeURIComponent\(a\.project_id\)\}\/languages`\)/);
+});
+
+test('review #411: the execute is accepted only when it hands back the link the dry run read', async () => {
+  const run = exec => activeSurveyLink(async (url, init) => (init.body.mode === 'dry_run' ? { confirm_token: 'ct', reuses: 'invite_1' } : exec), { aid: 'a1', sid: 's1', origin: 'https://dev.example.test' });
+  assert.equal((await run({ link_id: 'invite_1', entry_fragment: '#survey=link_AbC123-_x', reused: true })).url, URL1);
+  assert.equal(await run({ link_id: 'invite_2', entry_fragment: '#survey=link_new', reused: undefined }), null, 'minted in between → no link printed');
+  assert.equal(await run({ link_id: 'invite_2', entry_fragment: '#survey=link_new', reused: true }), null, 'a different id → no link printed');
 });

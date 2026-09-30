@@ -183,7 +183,7 @@ test('itemsFromPrintHtml does not execute markup and printTitle is text-only', (
   assert.equal(printTitleFromHtml('<h1>Community &lt;form&gt;</h1>'), 'Community <form>');
 });
 
-test('renderBlankPrint uses empty code slot, no invitation URL, no innerHTML, no credentials', () => {
+test('renderBlankPrint uses empty code slot, says the survey has no shared link yet (S31), no innerHTML, no credentials', () => {
   const doc = fakeDocument();
   const root = doc.createElement('div');
   renderBlankPrint(doc, root, {

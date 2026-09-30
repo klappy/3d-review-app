@@ -103,8 +103,23 @@ export async function activeSurveyLink(api, { aid, sid, origin = globalThis.loca
   const d = await api(base, { method: 'POST', body: { params: {}, mode: 'dry_run' } });
   if (!d?.reuses || !d.confirm_token) return null;
   const r = await api(base, { method: 'POST', body: { params: {}, mode: 'execute', confirm_token: d.confirm_token } });
+  // Review #411 (rev411-1340): print only the link the dry run read — if it vanished in between, the execute minted a new
+  // one (src/handlers/survey.ts issue_link); that is not a link this paper read, so the paper says "no shared link".
+  if (r?.reused !== true || r.link_id !== d.reuses) return null;
   if (!r?.link_id || typeof r.entry_fragment !== 'string' || !/^#survey=[A-Za-z0-9_-]+$/.test(r.entry_fragment)) return null;
   return { id: r.link_id, url: shareUrl(origin, r.entry_fragment), expires_at: r.expires_at || null };
 }
 // The paper's link: the URL plus its QR (the Share card's own qrSvg) as an inline SVG data URI — no network on the paper.
 export const paperLink = link => (link?.url ? { url: link.url, qr: `data:image/svg+xml,${encodeURIComponent(qrSvg(link.url))}` } : null);
+
+// S31 identity, from the facilitator's rows as the API returns them: the assessment read carries language_id only
+// (src/handlers/assessment.ts, SELECT a.*), so the evaluated language's name comes from the project's languages
+// (GET /v2/projects/{pid}/languages), as ui/assess/scope.js resolves it for the project page.
+export function printIdentityFrom(a, { project = null, languages = [], survey = {}, perspective = '' } = {}) {
+  const langName = new Map((Array.isArray(languages) ? languages : []).map(l => [l?.id, l?.name]));
+  return {
+    project: { id: a.project_id, name: project?.name || a.project_name || '' },
+    assessment: { id: a.id, name: a.name, language: langName.get(a.language_id) || a.language_name || '' },
+    survey: { id: survey.id, name: survey.template_name, perspective },
+  };
+}

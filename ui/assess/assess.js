@@ -8,7 +8,7 @@ import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
 import { redactDiagnosticPath } from '/diagnostic-path.js';
 import { loadBlankPrint, renderBlankPrint, printAllowed, rememberTab, recalledTab, STAGES } from '/stage-screens.js';
 import { printLanguages, printLanguageField, translatePrint, facilitatorFetch, printReadyLine } from './print-lang.js';
-import { openPrintDocument, activeSurveyLink, paperLink } from './print.js';
+import { openPrintDocument, activeSurveyLink, paperLink, printIdentityFrom } from './print.js';
 import { whatsHere } from '/assess/whats-here.js';
 import * as cards from '/assess/cards.js';
 import { breadcrumbs } from '/v3/components/breadcrumbs.js';
@@ -343,9 +343,11 @@ const printLangs = new Map(); // assessment id → the facilitator's chosen tag,
 function printLangList(a) { if (typeof printLanguages !== 'function') return []; const p = state.projects.find(x => x.id === a.project_id); return printLanguages(a.lwc || [], p?.lwc || []); }
 const printLangField = a => (typeof printLanguageField === 'function' ? printLanguageField(printLangList(a), printLangs.get(a.id) || 'en', esc) : '');
 async function passageLineFor(aid) { try { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/passages`); return passageLine(r?.passages); } catch { return ''; } }
-function printIdentity(current, s) {
+async function printIdentity(current, s) {
   const a = current.assessment, p = state.projects.find(x => x.id === a.project_id);
-  return { project: { id: a.project_id, name: p?.name || a.project_name || '' }, assessment: { id: a.id, name: a.name, language: a.language_name || '' }, survey: { id: s.id, name: s.template_name, perspective: lensFor(s) } };
+  let languages = [];
+  if (a.language_id && !a.language_name && a.project_id && !demo) { try { languages = (await api(`/v2/projects/${encodeURIComponent(a.project_id)}/languages`))?.languages || []; } catch { languages = []; } }
+  return printIdentityFrom(a, { project: p, languages, survey: s, perspective: lensFor(s) });
 }
 async function printLinkFor(aid, sid) {
   if (typeof paperLink !== 'function') return null;
@@ -372,7 +374,7 @@ function bindPrint(current, s) {
     if (model.visible) model.passageLine = await passageLineFor(aid); // named once, on the paper and in the preview
     // S31 (captain 2026-09-30 13:39 ET): the paper names its project, assessment (language) and survey, and carries the survey's
     // one shared link — the link this tab already holds (U36), else the active one read with this session; never a new one.
-    if (model.visible && typeof printIdentity === 'function') { model.identity = printIdentity(current, s); model.link = await printLinkFor(aid, s.id); if (gen !== generation) return; }
+    if (model.visible && typeof printIdentity === 'function') { model.identity = await printIdentity(current, s); if (gen !== generation) return; model.link = await printLinkFor(aid, s.id); if (gen !== generation) return; }
     if (gen !== generation) return;
     if (!model.visible) { idle(); state.print = { sid: s.id, status: 'error', text: model.reason === 'unsafe-print' ? 'The print payload was refused because it carried credentials.' : `Blank questionnaire unavailable (${redact(model.reason)}).` }; app.querySelector('#print-status').textContent = state.print.text; return; }
     // S25: the form's published strings through POST /v2/translate with this facilitator's session (translation memory
