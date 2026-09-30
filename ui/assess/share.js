@@ -384,7 +384,7 @@ export function tabLinks(store, owner, prior = null, now = Date.now) {
   if (owner && saved?.owner === owner && saved.links && typeof saved.links === 'object') for (const [k, l] of Object.entries(saved.links)) {
     if (l && typeof l.id === 'string' && storedUrl(l.url) && (l.expires_at == null || typeof l.expires_at === 'string') && liveLink(l, now)) { const p = Promise.resolve(l); p.link = { id: l.id, url: l.url, expires_at: l.expires_at || null }; Map.prototype.set.call(cache, k, p); }
   }
-  if (prior) for (const [k, v] of prior) cache.set(k, v); // this page's own entries win
+  if (prior && prior.owner === owner) for (const [k, v] of prior) cache.set(k, v); // this page's own entries win — S24: only when they are this owner's (never another principal's link saved under this one)
   cache.save(now);
   return cache;
 }
