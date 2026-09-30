@@ -2,6 +2,7 @@
 import artifact from './synthetic-attestation-index.json';
 import { ATTESTATION_TRUST as trust } from './synthetic-attestation-trust.js';
 import { canonicalJson, parseBoundedJson, domainHash, sha256Bytes } from './report-canonical-json.js';
+import { SUPPRESSION_THRESHOLD } from './handlers/common.js';
 
 type Entry = (typeof artifact.index.entries)[number];
 export type CaptureRow = Readonly<{
@@ -12,7 +13,7 @@ export type CaptureRow = Readonly<{
 }>;
 export type AttestationResult =
   | { eligible: true; responseIds: string[]; captureDigest: string }
-  | { eligible: false; reason: 'INVALID_INPUT' | 'INDEX_INVALID' | 'IDENTITY_MISMATCH' | 'MIXED_SOURCE' };
+  | { eligible: false; reason: 'INVALID_INPUT' | 'INDEX_INVALID' | 'IDENTITY_MISMATCH' | 'MIXED_SOURCE' | 'BELOW_MINIMUM' };
 const metadata = ['responseId', 'assessmentId', 'assessmentSurveyId', 'responseTemplateId', 'responseTemplateVersion', 'selectedTemplateId', 'selectedTemplateVersion', 'submittedAt'] as const;
 const fields = [...metadata, 'answersRaw', 'templateRaw'];
 const encoder = new TextEncoder();
@@ -114,6 +115,9 @@ export async function attestCapture(expectedAssessmentId: string, capture: reado
   if (participant === true) {
     const known = rows.filter(row => entries.has(row.responseId)).length;
     if (known > 0 && known < rows.length) return { eligible: false, reason: 'MIXED_SOURCE' };
+    // D7 minimum: participant answers never become scores below SUPPRESSION_THRESHOLD, so build, get and list hold
+    // together with Results and the responses list (persona C, 0.24.1 agent track: a report scored n=1).
+    if (known === 0 && rows.length < SUPPRESSION_THRESHOLD) return { eligible: false, reason: 'BELOW_MINIMUM' };
     if (known === 0) { try { return await participantCapture(expectedAssessmentId, rows); } catch { return { eligible: false, reason: 'INVALID_INPUT' }; } }
   }
   try {
