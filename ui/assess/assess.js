@@ -7,6 +7,8 @@ import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
 // Anything the showcase draws that this slice does not wire is omitted, never rendered as a working control.
 import { redactDiagnosticPath } from '/diagnostic-path.js';
 import { loadBlankPrint, renderBlankPrint, printAllowed, rememberTab, recalledTab, STAGES } from '/stage-screens.js';
+import { printLanguages, printLanguageField, translatePrint, facilitatorFetch, printReadyLine } from './print-lang.js';
+import { openPrintDocument } from './print.js';
 import { whatsHere } from '/assess/whats-here.js';
 import * as cards from '/assess/cards.js';
 import { breadcrumbs } from '/v3/components/breadcrumbs.js';
@@ -314,7 +316,7 @@ function collectPanel(current) {
 function surveyScreen(current, s) {
   const a = current.assessment, lens = lensFor(s), mayPrint = printAllowed(a.role);
   const back = `<a class="back" href="#assessment/${encodeURIComponent(a.id)}">← Back to ${esc(a.name)}</a>`;
-  const printBlock = mayPrint ? `<section class="panel" id="print-panel"><p class="eyebrow">Paper</p><p><button id="print-load" ${state.dirty.has(a.id) ? 'disabled' : ''}>Print survey</button></p>${learnMore('<p class="small muted">A blank questionnaire with this survey\'s actual questions — nothing personal, no codes or links on the page.</p>')}<div id="print-root"></div><p class="status" role="status" aria-live="polite" id="print-status"></p></section>` : `<section class="panel"><p class="eyebrow">Paper</p><p class="muted">Printing the blank questionnaire needs a member or owner role on this assessment; your role here is ${esc(a.role)}.</p></section>`;
+  const printBlock = mayPrint ? `<section class="panel" id="print-panel"><p class="eyebrow">Paper</p>${printLangField(a)}<p><button id="print-load" ${state.dirty.has(a.id) ? 'disabled' : ''}>Print survey</button></p>${learnMore('<p class="small muted">A blank questionnaire with this survey\'s actual questions — nothing personal, no codes or links on the page.</p>')}<div id="print-root"></div><p class="status" role="status" aria-live="polite" id="print-status"></p></section>` : `<section class="panel"><p class="eyebrow">Paper</p><p class="muted">Printing the blank questionnaire needs a member or owner role on this assessment; your role here is ${esc(a.role)}.</p></section>`;
   return `${back}<div class="title"><div><p class="eyebrow">Survey · ${esc(lens)}</p><h1>${esc(s.template_name)}</h1><p class="muted" style="margin:0">${esc(a.name)} · v${esc(s.template_version)} · collection ${esc(s.collection_status)}</p></div><span class="badge">${countCell(s)}</span></div><div class="grid start">${printBlock}<div id="share-root">${share.render({ esc, enc: encodeURIComponent }, { current, survey: s, share: shareModel(a.id, s.id) })}</div><aside class="panel"><p class="eyebrow">This survey</p>${asideTile(s)}${dirtyBanner(a.id)}<p class="status" role="${showMessage(current)?.alert ? 'alert' : 'status'}" aria-live="polite">${esc(showMessage(current)?.text || '')}</p></aside></div>`;
 }
 // The child's aside tile is derived from the same cached count as the badge and repainted with it (MED 4040990763).
@@ -335,18 +337,40 @@ function surveyUnavailable(aid, sid) { return `<div class="narrow panel"><h1>Sur
 // BCS demo 2026-09-29 (bee:10809312 u3540382372-388): the printed form names the passage to read or hear first. A failed
 // read leaves the line off (the paper still prints); the names come from the passages set on Prepare, reference first.
 const passageLine = list => { const names = [...new Set((list || []).map(p => String(p?.reference || p?.title || '').trim()).filter(Boolean))]; return names.length ? `Before you answer, read or listen to: ${names.join(' · ')}` : ''; };
+// S25 (BCS 2026-09-29, "in Hindi, now what do they do?"): Print survey offers the participant drop-down's languages
+// (assessment LWCs, then the project's; English first and the default). No languages → no picker, English as before.
+const printLangs = new Map(); // assessment id → the facilitator's chosen tag, this tab only
+function printLangList(a) { if (typeof printLanguages !== 'function') return []; const p = state.projects.find(x => x.id === a.project_id); return printLanguages(a.lwc || [], p?.lwc || []); }
+const printLangField = a => (typeof printLanguageField === 'function' ? printLanguageField(printLangList(a), printLangs.get(a.id) || 'en', esc) : '');
 async function passageLineFor(aid) { try { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/passages`); return passageLine(r?.passages); } catch { return ''; } }
 function bindPrint(current, s) {
   const btn = app.querySelector('#print-load'); if (!btn) return;
+  const sel = app.querySelector('#print-lang');
+  // A new language drops the preview of the old one; the next Print survey loads the form in the new language.
+  if (sel) sel.onchange = () => { printLangs.set(current.assessment.id, sel.value); if (state.print?.sid === s.id) { state.print = null; app.querySelector('#print-root')?.replaceChildren(); app.querySelector('#print-status').textContent = ''; } };
+  const picked = () => (sel && sel.value && sel.value !== 'en' ? sel.value : null);
+  // Review of #405 (finding 1): the language is fixed from the click until the form is ready — the picker is disabled for
+  // the whole load, and if the pick still differs when the form arrives, the form is loaded again in the picked language.
+  const idle = () => { btn.disabled = false; if (sel) sel.disabled = false; };
   btn.onclick = async () => {
-    const gen = generation, aid = current.assessment.id;
-    state.print = { sid: s.id, status: 'loading', gen }; btn.disabled = true;
-    const model = await loadBlankPrint({ request: (url, init) => fetch(url, init), token, aid, sid: s.id, role: current.assessment.role });
+    const gen = generation, aid = current.assessment.id, lang = picked();
+    state.print = { sid: s.id, status: 'loading', gen }; btn.disabled = true; if (sel) sel.disabled = true;
+    let model = await loadBlankPrint({ request: (url, init) => fetch(url, init), token, aid, sid: s.id, role: current.assessment.role, lang });
     if (gen !== generation) return; // navigated away: nothing paints; the next paint() already reset state.print (HIGH 4040990731)
     btn.disabled = false;
     if (model.visible) model.passageLine = await passageLineFor(aid); // named once, on the paper and in the preview
     if (gen !== generation) return;
-    if (!model.visible) { state.print = { sid: s.id, status: 'error', text: model.reason === 'unsafe-print' ? 'The print payload was refused because it carried credentials.' : `Blank questionnaire unavailable (${redact(model.reason)}).` }; app.querySelector('#print-status').textContent = state.print.text; return; }
+    if (!model.visible) { idle(); state.print = { sid: s.id, status: 'error', text: model.reason === 'unsafe-print' ? 'The print payload was refused because it carried credentials.' : `Blank questionnaire unavailable (${redact(model.reason)}).` }; app.querySelector('#print-status').textContent = state.print.text; return; }
+    // S25: the form's published strings through POST /v2/translate with this facilitator's session (translation memory
+    // first); any string without a translation stays English and is marked on the paper. Never fails the print.
+    if (lang && typeof translatePrint === 'function') {
+      btn.disabled = true; if (sel) sel.disabled = true;
+      app.querySelector('#print-status').textContent = 'Translating the form… The first time can take up to a minute.';
+      model = await translatePrint(model, { lang, fetchImpl: facilitatorFetch(token) });
+      if (gen !== generation) return;
+    }
+    idle();
+    if (picked() !== lang) return btn.onclick(); // the paper is always in the language the picker shows
     // P2 (Auditor c5721040053): the loaded model is cached keyed to the exact entity data it came from, so a later repaint of
     // the SAME survey with the SAME survey-set data can replay it without a read; anything else drops it (see paint()).
     state.print = { aid, sid: s.id, epoch, status: 'ready', model };
@@ -790,9 +814,12 @@ function mountView(current, tab, gen) {
 }
 // Pure replay from the cached model: renderBlankPrint draws the preview + Print button (printing mounts a .stage-print-only
 // child DIRECTLY on <body>, Auditor 2A-1); the status line is derived from the model, never from the previous DOM.
+// S25: Print opens the form as its own document in a new tab (ui/assess/print.js) and prints it there — never the app page
+// (captain's iOS print 2026-09-30 11:48 ET printed the whole app and cut the choices). A blocked tab is said, not hidden.
 function replayPrint(model) {
-  renderBlankPrint(document, app.querySelector('#print-root'), model);
-  app.querySelector('#print-status').textContent = `${model.items.length} questions ready. Use Print below.`;
+  const onPrint = typeof openPrintDocument === 'function' ? paper => { if (!openPrintDocument(window, model, { paper })) app.querySelector('#print-status').textContent = 'Your browser blocked the print page. Allow pop-ups for this site, then use Print again.'; } : undefined;
+  renderBlankPrint(document, app.querySelector('#print-root'), model, onPrint ? { printHere: true, onPrint } : undefined);
+  app.querySelector('#print-status').textContent = typeof printReadyLine === 'function' ? printReadyLine(model) : `${model.items.length} questions ready. Use Print below.`;
 }
 // P2 keep test: the cached paper survives a repaint only for the same survey route, the same assessment, the same survey-set
 // data (epoch) and a role that still allows printing — read from state.current after any refetch, not from the DOM.
@@ -860,7 +887,7 @@ function resetIdentity() {
   document.getElementById('account-switch-dialog')?.close();
   state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
-  state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false; state.myInvitations = null;
+  state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false; state.myInvitations = null; printLangs.clear();
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
   for (const id of ['legacy-link', 'whats-here-wrap']) { const el = document.getElementById(id); if (el) el.hidden = true; }
 }
