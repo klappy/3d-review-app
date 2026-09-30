@@ -1,7 +1,20 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.25.0",
+  "current": "0.26.0",
   "versions": [
+    {
+      "version": "0.26.0",
+      "status": "candidate",
+      "notes_path": "releases/0.26.0.md",
+      "sections": {
+        "changed": [
+          "The printed survey now says which project, assessment (with the language being evaluated, and the language it is printed in) and survey it belongs to, with the ids in small print, and carries the survey's one shared link as a QR code with the link under it and \"Helper: scan to enter this paper's answers\". A survey with no shared link yet says so on the paper instead of inventing one. Codes are still never printed. (#411)"
+        ],
+        "fixed": [
+          "The printed survey now gives people room to write. Every \"Other (please describe)\" choice keeps its circle or box and has three full-width ruled lines right under it instead of a short blank after the words, and questions answered in words have five ruled lines instead of two. (#409)"
+        ]
+      }
+    },
     {
       "version": "0.25.0",
       "status": "candidate",

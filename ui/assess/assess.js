@@ -8,7 +8,7 @@ import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
 import { redactDiagnosticPath } from '/diagnostic-path.js';
 import { loadBlankPrint, renderBlankPrint, printAllowed, rememberTab, recalledTab, STAGES } from '/stage-screens.js';
 import { printLanguages, printLanguageField, translatePrint, facilitatorFetch, printReadyLine } from './print-lang.js';
-import { openPrintDocument } from './print.js';
+import { openPrintDocument, activeSurveyLink, paperLink, printIdentityFrom } from './print.js';
 import { whatsHere } from '/assess/whats-here.js';
 import * as cards from '/assess/cards.js';
 import { breadcrumbs } from '/v3/components/breadcrumbs.js';
@@ -316,7 +316,7 @@ function collectPanel(current) {
 function surveyScreen(current, s) {
   const a = current.assessment, lens = lensFor(s), mayPrint = printAllowed(a.role);
   const back = `<a class="back" href="#assessment/${encodeURIComponent(a.id)}">← Back to ${esc(a.name)}</a>`;
-  const printBlock = mayPrint ? `<section class="panel" id="print-panel"><p class="eyebrow">Paper</p>${printLangField(a)}<p><button id="print-load" ${state.dirty.has(a.id) ? 'disabled' : ''}>Print survey</button></p>${learnMore('<p class="small muted">A blank questionnaire with this survey\'s actual questions — nothing personal, no codes or links on the page.</p>')}<div id="print-root"></div><p class="status" role="status" aria-live="polite" id="print-status"></p></section>` : `<section class="panel"><p class="eyebrow">Paper</p><p class="muted">Printing the blank questionnaire needs a member or owner role on this assessment; your role here is ${esc(a.role)}.</p></section>`;
+  const printBlock = mayPrint ? `<section class="panel" id="print-panel"><p class="eyebrow">Paper</p>${printLangField(a)}<p><button id="print-load" ${state.dirty.has(a.id) ? 'disabled' : ''}>Print survey</button></p>${learnMore('<p class="small muted">A blank questionnaire with this survey\'s actual questions, headed by its project, assessment and survey. It carries the survey\'s one shared link as a QR code for the helper who enters paper answers; never codes or anything personal.</p>')}<div id="print-root"></div><p class="status" role="status" aria-live="polite" id="print-status"></p></section>` : `<section class="panel"><p class="eyebrow">Paper</p><p class="muted">Printing the blank questionnaire needs a member or owner role on this assessment; your role here is ${esc(a.role)}.</p></section>`;
   return `${back}<div class="title"><div><p class="eyebrow">Survey · ${esc(lens)}</p><h1>${esc(s.template_name)}</h1><p class="muted" style="margin:0">${esc(a.name)} · v${esc(s.template_version)} · collection ${esc(s.collection_status)}</p></div><span class="badge">${countCell(s)}</span></div><div class="grid start">${printBlock}<div id="share-root">${share.render({ esc, enc: encodeURIComponent }, { current, survey: s, share: shareModel(a.id, s.id) })}</div><aside class="panel"><p class="eyebrow">This survey</p>${asideTile(s)}${dirtyBanner(a.id)}<p class="status" role="${showMessage(current)?.alert ? 'alert' : 'status'}" aria-live="polite">${esc(showMessage(current)?.text || '')}</p></aside></div>`;
 }
 // The child's aside tile is derived from the same cached count as the badge and repainted with it (MED 4040990763).
@@ -343,6 +343,19 @@ const printLangs = new Map(); // assessment id → the facilitator's chosen tag,
 function printLangList(a) { if (typeof printLanguages !== 'function') return []; const p = state.projects.find(x => x.id === a.project_id); return printLanguages(a.lwc || [], p?.lwc || []); }
 const printLangField = a => (typeof printLanguageField === 'function' ? printLanguageField(printLangList(a), printLangs.get(a.id) || 'en', esc) : '');
 async function passageLineFor(aid) { try { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/passages`); return passageLine(r?.passages); } catch { return ''; } }
+async function printIdentity(current, s) {
+  const a = current.assessment, p = state.projects.find(x => x.id === a.project_id);
+  let languages = [];
+  if (a.language_id && !a.language_name && a.project_id && !demo) { try { languages = (await api(`/v2/projects/${encodeURIComponent(a.project_id)}/languages`))?.languages || []; } catch { languages = []; } }
+  return printIdentityFrom(a, { project: p, languages, survey: s, perspective: lensFor(s) });
+}
+async function printLinkFor(aid, sid) {
+  if (typeof paperLink !== 'function') return null;
+  const k = share.linkKey(aid, sid);
+  let link = share.knownLink(state.collectLinks, k);
+  if (!link && !demo) { try { link = await activeSurveyLink(api, { aid, sid, origin: location.origin }); if (link) share.rememberLink(state.collectLinks, k, link); } catch { link = null; } }
+  return paperLink(link);
+}
 function bindPrint(current, s) {
   const btn = app.querySelector('#print-load'); if (!btn) return;
   const sel = app.querySelector('#print-lang');
@@ -359,6 +372,9 @@ function bindPrint(current, s) {
     if (gen !== generation) return; // navigated away: nothing paints; the next paint() already reset state.print (HIGH 4040990731)
     btn.disabled = false;
     if (model.visible) model.passageLine = await passageLineFor(aid); // named once, on the paper and in the preview
+    // S31 (captain 2026-09-30 13:39 ET): the paper names its project, assessment (language) and survey, and carries the survey's
+    // one shared link — the link this tab already holds (U36), else the active one read with this session; never a new one.
+    if (model.visible && typeof printIdentity === 'function') { model.identity = await printIdentity(current, s); if (gen !== generation) return; model.link = await printLinkFor(aid, s.id); if (gen !== generation) return; }
     if (gen !== generation) return;
     if (!model.visible) { idle(); state.print = { sid: s.id, status: 'error', text: model.reason === 'unsafe-print' ? 'The print payload was refused because it carried credentials.' : `Blank questionnaire unavailable (${redact(model.reason)}).` }; app.querySelector('#print-status').textContent = state.print.text; return; }
     // S25: the form's published strings through POST /v2/translate with this facilitator's session (translation memory

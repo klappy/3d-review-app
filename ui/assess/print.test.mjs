@@ -19,10 +19,15 @@ test('printDocumentHtml is the finished, self-contained print document (one stri
   assert.doesNotMatch(html, /<script/, 'no auto print unless asked');
   assert.match(printDocumentHtml(model, { autoPrint: true }), /<script>addEventListener\("load"/);
   assert.match(html, /<h1>Community-Pastor &lt;&amp;&gt;<\/h1>/, 'text is escaped');
-  for (const s of ['What type of translation did your community agree upon or expect?', 'Resembling — close to the original with some adjustments for clarity', 'Other (please describe): ______________________', 'Commentaries', 'Choose one', 'Choose all that apply', 'Before you answer, read or listen to: Ruth 1', 'Code (optional; legacy)'])
+  for (const s of ['What type of translation did your community agree upon or expect?', 'Resembling — close to the original with some adjustments for clarity', 'Other (please describe)', 'Commentaries', 'Choose one', 'Choose all that apply', 'Before you answer, read or listen to: Ruth 1', 'Code (optional; legacy)'])
     assert.ok(html.includes(s), `document carries ${s}`);
   assert.equal((html.match(/class="p-opt"/g) || []).length, 3, '0.23.0: every choice');
   assert.equal((html.match(/class="p-lines"/g) || []).length, 1, '0.23.0: write-in lines for the open question');
+  // S30 (captain 2026-09-30 13:20 ET): room to write — ≥3 full-width lines right after the Other choice, ≥5 for free text.
+  assert.doesNotMatch(html, /_{3}/, 'no short inline blank after Other');
+  assert.match(html, /Other \(please describe\)<\/span><\/div><div class="p-lines p-write">(<div><\/div>){3,}<\/div>/);
+  assert.match(html, /<div class="p-lines">(<div><\/div>){5,}<\/div>/);
+  assert.match(PRINT_DOC_CSS, /\.p-opts>\.p-write\{grid-column:1\/-1;margin:0 0 4px\}/, 'write-in spans the choice column from the box edge');
   assert.doesNotMatch(html, /nav|Back to|Print survey|Learn more|Signed in/, 'no app chrome');
   assert.match(PRINT_DOC_CSS, /\.p-opts\{display:grid;grid-template-columns:minmax\(0,1fr\)/, 'one column of choices');
   assert.match(PRINT_DOC_CSS, /overflow-wrap:anywhere/, 'long choices wrap inside the page');
