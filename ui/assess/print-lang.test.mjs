@@ -142,7 +142,7 @@ function bindPrintHarness(overrides = {}) {
   const loads = [], painted = [];
   const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
   const env = {
-    app: { querySelector: q => nodes[q] || null }, state: { print: null }, generation: 1, epoch: 1, token: 'st_x', printLangs: new Map(), redact: x => x,
+    app: { querySelector: q => nodes[q] || null }, state: { print: null, dirty: new Map() }, generation: 1, epoch: 1, token: 'st_x', printLangs: new Map(), redact: x => x,
     loadBlankPrint: ({ lang }) => { const d = deferred(); loads.push({ lang, d }); return d.promise; },
     passageLineFor: async () => '', facilitatorFetch: () => null,
     translatePrint: async (model, { lang }) => ({ ...model, lang, title: `form in ${lang}` }),
@@ -203,4 +203,49 @@ test('S34 (#405 nit a): a repaint mid-load swaps the picker; idle() unlocks and 
   await done;
   assert.equal(h.nodes['#print-lang'].disabled, false, 'the live picker is unlocked'); assert.equal(h.nodes['#print-load'].disabled, false);
   assert.deepEqual(h.painted.map(m => m.lang), ['ta']);
+});
+
+test('#414 review (worth fixing): idle() never unlocks a button the dirty guard locked', async () => {
+  const h = bindPrintHarness(), oldBtn = h.nodes['#print-load'];
+  const done = oldBtn.onclick();
+  // the assessment turns dirty mid-load; the repaint renders the live button disabled on purpose (assess.js dirty guard)
+  h.env.state.dirty.set('a1', 'write');
+  h.nodes['#print-load'] = { ...oldBtn, disabled: true };
+  h.loads[0].d.resolve({ visible: true, blank: true, items: [] });
+  await done;
+  assert.equal(h.nodes['#print-load'].disabled, true, 'a dirty assessment stays locked after idle()');
+  assert.equal(h.nodes['#print-lang'].disabled, false, 'the picker is still released');
+  h.env.state.dirty.clear();
+  const again = oldBtn.onclick(); h.loads[1].d.resolve({ visible: false, reason: 'not-visible' }); await again;
+  assert.equal(h.nodes['#print-load'].disabled, false, 'clean again: idle() unlocks');
+});
+
+test('#414 review nit: a repaint mid-load keeps the live button and picker locked through the passages read and translation', async () => {
+  let release; const gate = new Promise(r => { release = r; });
+  let finishTranslate; const tgate = new Promise(r => { finishTranslate = r; });
+  const h = bindPrintHarness({ passageLineFor: () => gate, translatePrint: async (model, { lang }) => { await tgate; return { ...model, lang }; } });
+  const oldBtn = h.nodes['#print-load'], oldSel = h.nodes['#print-lang'];
+  const done = oldBtn.onclick();
+  // a repaint swaps in fresh, enabled nodes (e.g. painted before state.print was consulted)
+  h.nodes['#print-load'] = { ...oldBtn, disabled: false }; h.nodes['#print-lang'] = { ...oldSel, disabled: false };
+  h.loads[0].d.resolve({ visible: true, blank: true, items: [] });
+  await new Promise(r => setImmediate(r));
+  release('');
+  await new Promise(r => setImmediate(r));
+  assert.equal(h.nodes['#print-load'].disabled, true, 'the live button is locked during the translation');
+  assert.equal(h.nodes['#print-lang'].disabled, true, 'the live picker is locked during the translation');
+  finishTranslate();
+  await done;
+  assert.equal(h.nodes['#print-load'].disabled, false); assert.equal(h.nodes['#print-lang'].disabled, false);
+  assert.deepEqual(h.painted.map(m => m.lang), ['hi']);
+});
+
+test('#414 review nit: a throwing helper still unlocks the button and picker', async () => {
+  const h = bindPrintHarness({ passageLineFor: async () => { throw new Error('boom'); } }), btn = h.nodes['#print-load'], sel = h.nodes['#print-lang'];
+  const done = btn.onclick();
+  assert.equal(btn.disabled, true);
+  h.loads[0].d.resolve({ visible: true, blank: true, items: [] });
+  await assert.rejects(done, /boom/);
+  assert.equal(btn.disabled, false, 'not locked forever'); assert.equal(sel.disabled, false);
+  assert.equal(h.painted.length, 0);
 });
