@@ -405,7 +405,7 @@ function prepareView(current) {
   const a = current.assessment, mayEdit = a.role === 'owner' || a.role === 'member';
   const fields = `<label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>${mayEdit && typeof lwcFieldset === 'function' ? `<style>${LWC_CSS}</style>${lwcFieldset(a.lwc || [], esc)}` : ''}`; // dynamic translation: languages participants may switch to (owners/members; typeof guard: vm test harnesses strip imports)
   const passagesRoot = typeof mountPassages === 'function' && !demo ? '<div id="passages-root"></div>' : ''; // passage files and links (Lovable parity) // dynamic translation: languages participants may switch to (owners/members; typeof guard: vm test harnesses strip imports)
-  const form = mayEdit ? `<form id="prepare-form">${fields}${demographicsSetting(a, esc)}<div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save preparation</button></div></form>` : `<div>${fields}${a.complete ? '' : `<p class="small muted">Your role here is ${esc(a.role)}: preparation is read-only.</p>`}</div>`;
+  const form = mayEdit ? `<form id="prepare-form">${fields}${demographicsSetting(a, esc)}<div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save preparation</button></div>${showMessage(current)?.view === 'prepare' && showMessage(current).alert ? `<p class="status alert" role="alert" data-prepare-outcome>${esc(showMessage(current).text)}</p>` : ''}</form>` : `<div>${fields}${a.complete ? '' : `<p class="small muted">Your role here is ${esc(a.role)}: preparation is read-only.</p>`}</div>`;
   const formWithPassages = form + passagesRoot;
   const i = PHASES.indexOf(a.stage), prev = PHASES[i - 1], next = PHASES[i + 1], n = activeSurveys(current).length;
   const move = mayEdit ? `<div class="actions">${prev ? `<button type="button" data-stage="${prev}" ${state.busy ? 'disabled' : ''}>← Back to ${title(prev)}</button>` : ''}${next && a.stage !== 'collect' ? `<button type="button" data-stage="${next}" ${state.busy ? 'disabled' : ''}>Move to ${title(next)} →</button>` : ''}</div>` : ''; // lane 9 L9-24: one primary on this view (Save preparation); U34: Move to Understand lives on Collect
@@ -503,7 +503,9 @@ function bindPrepare(current) {
   // Passage files and links (captain 2026-09-29; Lovable parity): owners/members manage, viewers see the list.
   const pr = app.querySelector('#passages-root'); if (pr && typeof mountPassages === 'function') { const role = current.assessment.role; mountPassages({ root: pr, aid, mayEdit: (role === 'owner' || role === 'member') && !current.assessment.complete, esc, token: () => token }); }
   const f = app.querySelector('#prepare-form'); if (!f) return;
-  f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f); act(current.assessment.id, 'Saving preparation…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(current.assessment.id)}`, { method: 'PATCH', body: { purpose: String(fd.get('purpose')).trim(), ...(typeof lwcFrom === 'function' ? { lwc: lwcFrom(fd).join(',') || null } : {}), ...demographicsBody(fd) } }); return `Saved: ${r.assessment.name}`; }); };
+  f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f); act(current.assessment.id, 'Saving preparation…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(current.assessment.id)}`, { method: 'PATCH', body: { purpose: String(fd.get('purpose')).trim(), ...(typeof lwcFrom === 'function' ? { lwc: lwcFrom(fd).join(',') || null } : {}), ...demographicsBody(fd) } }); return `Saved: ${r.assessment.name}`; }, { view: 'prepare' }); };
+  // Gate 0.23.0 F2: the save's outcome is shown on the form that was used — the shared SavedStatus (U17) "Saved", or the error.
+  const m = showMessage(current); if (m?.view === 'prepare' && !m.alert && !state.busy) showSavedStatus(f.querySelector('.actions') || f, { inside: true });
 }
 // B07: the assessment name is the heading (shell's or page's); owners/members rename it in place through cap.assessment.update.
 let pendingRename = null; // { aid, done } while a heading rename PATCH is in flight
@@ -560,7 +562,7 @@ function bindNameHeading(current) {
 }
 // Transition: write → (committed ⇒ dirty) → refresh → (landed ⇒ clean). Every outcome is scoped to `aid`, never to
 // whatever is on screen when the promise settles (Bugbot 4040525117 / 4040525128).
-async function act(aid, label, fn) {
+async function act(aid, label, fn, { view = null } = {}) { // view: the page that shows this outcome itself (Prepare: Saved / the error)
   if (pendingRename?.aid === aid) { // B07: never race the heading rename's PATCH; a queued write survives only the same identity on the same assessment
     const identity0 = identityGeneration; await pendingRename.done;
     const here = route(location.hash); if (identity0 !== identityGeneration || !((here.kind === 'assessment' || here.kind === 'survey') && here.id === aid)) return;
@@ -570,8 +572,8 @@ async function act(aid, label, fn) {
   const identity = identityGeneration;
   state.busy = true; state.message = null; note.textContent = label; render();
   let text = null;
-  try { text = await fn(); if (identity !== identityGeneration) return; state.dirty.set(aid, 'write'); state.message = { aid, text, alert: false }; }
-  catch (e) { if (identity === identityGeneration) state.message = { aid, text: redact(e.message), alert: true }; }
+  try { text = await fn(); if (identity !== identityGeneration) return; state.dirty.set(aid, 'write'); state.message = { aid, text, alert: false, view }; }
+  catch (e) { if (identity === identityGeneration) state.message = { aid, text: redact(e.message), alert: true, view }; }
   finally { if (identity === identityGeneration) { note.textContent = ''; state.busy = false; render(); } }
 }
 // The entity read. Returns the data; the caller decides whether it is still wanted. On success for `aid` the dirty
@@ -865,7 +867,7 @@ if (typeof matchMedia === 'function') matchMedia('(max-width:650px)').addEventLi
 // U30 (Bincy B07/B31): a status line belongs to the page and action that set it. A route change clears it so "Renamed." from one
 // page never reads as feedback on the next. An in-flight action keeps its busy label; its own finally clears it.
 let pendingNotice = null; // U14: the one-line notice carried across the navigation that follows a delete
-function clearPageNote() { if (!note || state.busy) return; note.textContent = pendingNotice || ''; pendingNotice = null; note.classList.remove('alert'); }
+function clearPageNote() { if (!note || state.busy) return; note.textContent = pendingNotice || ''; pendingNotice = null; note.classList.remove('alert'); if (state.message?.view) state.message = null; } // a page's own outcome (Prepare's Saved) goes with the page
 let listening = false;
 function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } clearPageNote(); render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
 // B38: does this environment use email sign-in links (DEV) or Cloudflare Access (production)? Asked once; remembered only on
@@ -896,7 +898,7 @@ async function boot() {
   placeDemoNotice();
   const identity = identityGeneration;
   const linksKnown = loadEmailLinks();
-  try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; }
+  try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; if (!demo) state.collectLinks = share.tabLinks(tabStorage, me.principal?.id, state.collectLinks); } // gate 0.23.0 E: this tab's active links survive a reload
   catch {
     if (identity !== identityGeneration) return;
     landAfterSignIn = false; // B04: no session observed, nothing to land

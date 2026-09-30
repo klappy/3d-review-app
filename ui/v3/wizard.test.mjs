@@ -251,8 +251,18 @@ test('L2-5: group titles are h3 on participants and information (prototype frame
 test('L2-6: review rows carry the perspective dot and prototype sub-line (V.setupReview)', () => {
   const tpl = { id: 'tpl.team', version: 1, name: 'Team', perspective: 'Translation team' };
   const r = renderStep('review', { ...freshDraft(), name: 'X', project: 'p1', language: 'l1', groups: { 'tpl.team': { version: 1, expected: '' } } }, { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates: [tpl] });
-  assert.match(r, /<dt><span class="pdot wz-kvdot p-team" aria-hidden="true"><\/span>Translation team<\/dt><dd>no number given<\/dd>/);
+  assert.match(r, /<dt><span class="pdot wz-kvdot p-team" aria-hidden="true"><\/span>Translation team <span aria-hidden="true">·<\/span> <span data-wz-review-survey>Team<\/span><\/dt><dd>no number given<\/dd>/);
   assert.match(r, /Check the details, then launch\./); assert.match(r, /<summary>Learn more<\/summary><p class="muted">Launching opens the survey links; nothing is sent to anyone\.<\/p>/);
+});
+
+test('Gate 0.23.0 F1: step 4 Review "Who will participate" names the survey on every row, not only the perspective', () => {
+  const templates = [{ id: 't.church.a', version: 1, name: 'Church leaders', perspective: 'Church' }, { id: 't.church.b', version: 1, name: 'Church members', perspective: 'Church' }, { id: 't.team', version: 2, name: 'Translation team check', perspective: 'Translation Team' }];
+  const groups = { 't.church.a': { version: 1, expected: '' }, 't.church.b': { version: 1, expected: '' }, 't.team': { version: 2, expected: '2' } };
+  const r = renderStep('review', { ...freshDraft(), name: 'X', project: 'p1', language: 'l1', groups }, { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates });
+  const sec = r.slice(r.indexOf('<h3>Who will participate</h3>'), r.indexOf('<h3>Participant information</h3>'));
+  const rows = [...sec.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([^<]*)<\/dd>/g)].map(m => [m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(), m[2]]);
+  assert.deepEqual(rows, [['Church · Church leaders', 'no number given'], ['Church · Church members', 'no number given'], ['Translation Team · Translation team check', '2 expected']]);
+  assert.equal((sec.match(/data-wz-review-survey/g) || []).length, 3, 'one survey name per row');
 });
 
 test('L2-7 wizard composes the shared Stepper component (ruling 12:34): no local copy', async () => {
