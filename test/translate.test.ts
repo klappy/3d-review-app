@@ -48,6 +48,18 @@ describe("acceptable (output checks before storing)", () => {
     expect(acceptable(lo, "Next", "ລ".repeat(500))).toBe(false);
   });
   it("numbers and symbols-only sources need no script", () => { expect(acceptable(lo, "18–24", "18–24")).toBe(true); });
+  it("an echoed sentence (3+ words) is refused; one- and two-word sources may be spelled the same (E4, review of #396)", () => {
+    const es = lwcLanguage("es")!, id = lwcLanguage("id")!;
+    expect(acceptable(fr, "phrases", "phrases")).toBe(true);
+    expect(acceptable(fr, "Question", "Question")).toBe(true);
+    expect(acceptable(fr, "Total", "total")).toBe(true);
+    expect(acceptable(es, "Hospital", "Hospital")).toBe(true);
+    expect(acceptable(id, "Total", "Total")).toBe(true);
+    expect(acceptable(fr, "Learn more", "Learn more")).toBe(true);
+    expect(acceptable(fr, "Review your answers", " REVIEW  your answers ")).toBe(false);
+    expect(acceptable(fr, "Review your answers", "Vérifier vos réponses")).toBe(true);
+    expect(acceptable(lo, "Next", "Next")).toBe(false); // non-Latin targets still need their script
+  });
 });
 
 describe("handleTranslate without translation memory", () => {

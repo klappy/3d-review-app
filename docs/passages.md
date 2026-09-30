@@ -26,7 +26,10 @@ PDF / USFM / USX, videos and links open in a new tab. Labels translate with the 
   the file itself with `?name=<file.ext>&title=&reference=`
 - `DELETE /v2/assessments/:aid/passages/:pid` (owner/member)
 - `GET /v2/passages/:pid/file?exp=&sig=` → inline, exact content type, `nosniff`, Range; USFM/SFM/USX served as
-  `text/plain` with a sandbox CSP
+  `text/plain` with a sandbox CSP. The signature is checked first: only a missing, tampered or expired link spends
+  `RL_HTTP_ANON` (audit round 1 W2 — a room of phones seeking in one MP3 shares an address)
+- `cap.assessment.delete` removes the assessment's passage rows (removed ones too) and their stored files with it; the
+  dry run's `impact.affected[0].passages` counts the active ones (audit round 1 W3)
 - `cap.response.form` → `passages: [{id, kind, media, title, reference, filename, size, href}]`
 
 ## To turn files on (links work without this)

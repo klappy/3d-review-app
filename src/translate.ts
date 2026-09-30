@@ -14,7 +14,10 @@
  * `rejected` rows are never served and are replaced by the next translation. Without migration 0012 the route still
  * works as a stateless proxy. Upstream = TRANSLATE_UPSTREAM_URL (+ optional TRANSLATE_UPSTREAM_KEY), speaking the Laos
  * app's `translate-survey` wire shape; it receives only English source strings — never answers, names, codes or tokens.
- * Output checks before storing: non-empty, plausible length, and in the target script for non-Latin languages.
+ * Output checks before storing: non-empty, plausible length, not an English sentence (3+ words) echoed back, and in the
+ * target script for non-Latin languages.
+ * Rate limit: anonymous callers spend RL_HTTP_ANON per address; a caller with a live participant bearer or session spends
+ * its own RL_MCP_CEILING unit instead (translateLimiter below; audit round 1 W2).
  * Display only: item ids and option codes never change, so answers, scores and reports are unaffected.
  *
  * Published strings only (reviewer FAIL on #377, F1/F2; src/translate-allowlist.ts): `context` must be `participant-ui`
@@ -24,6 +27,7 @@
  */
 import type { Env } from "./handlers/types";
 import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { resolvePrincipal } from "./auth";
 import { inScript, lwcLanguage, type LwcLanguage } from "./languages";
 import { allowedScope, parseScope, upstreamContext } from "./translate-allowlist";
 
@@ -63,12 +67,26 @@ export function parseTranslateRequest(body: unknown): TranslateRequest | string 
   return { targetLang: targetLang.trim(), context, sourceTexts: clean };
 }
 
-/** A translation worth storing: non-empty, not absurdly long, and in the target script where that is checkable. */
+/** Same words, ignoring case and spacing: how an upstream "translation" that merely echoed the English is recognised. */
+const sameWords = (a: string, b: string) => a.replace(/\s+/g, " ").trim().toLowerCase() === b.replace(/\s+/g, " ").trim().toLowerCase();
+/** From this many words a source is a sentence, and a sentence that comes back word for word is an echo, not a translation. */
+export const ECHO_MIN_WORDS = 3;
+
+/** A translation worth storing: non-empty, not absurdly long, not an English sentence echoed back, and in the target
+ *  script where that is checkable. Audit round 1 E4: for Latin-script targets (fr, es, id, …) the script check cannot
+ *  catch an echo, and memory is first-write-wins — an echoed row would pin English for that language forever. An echoed
+ *  sentence (ECHO_MIN_WORDS or more words) is neither served nor stored; the page keeps the English it already shows
+ *  and the next request asks again. One- and two-word sources are often spelled the same in the target (fr "phrases",
+ *  "Question", "Total"; es "Hospital"), so an unchanged short source is accepted (review of #396: refusing them left
+ *  every French participant-ui response partial and never cached). Sources without letters ("18–24") legitimately
+ *  come back unchanged and stay acceptable. */
 export function acceptable(lang: LwcLanguage, source: string, text: unknown): text is string {
   if (typeof text !== "string") return false;
   const t = text.trim();
   if (!t || t.length > source.length * 8 + 80) return false;
-  return /\p{L}/u.test(source) ? inScript(lang.code, t) : true;
+  if (!/\p{L}/u.test(source)) return true;
+  const sentence = source.trim().split(/\s+/).length >= ECHO_MIN_WORDS;
+  return !(sentence && sameWords(source, t)) && inScript(lang.code, t);
 }
 
 export async function sha256Hex(text: string): Promise<string> {
@@ -118,8 +136,21 @@ async function askUpstream(env: Env, deps: Deps, lang: LwcLanguage, context: str
   return { texts, status: 200 };
 }
 
+/** Which limiter a translate request spends (audit round 1 W2). A caller presenting a live credential — the participant
+ *  bearer from the survey link, or a signed-in session — spends its OWN unit on RL_MCP_CEILING (600/60 s, keyed by the
+ *  principal), never the per-address anonymous bucket: a workshop room of ~50 phones behind one NAT fetches the survey
+ *  in 20-string chunks and would exhaust RL_HTTP_ANON (60/60 s per address) in seconds. Everyone else keeps RL_HTTP_ANON
+ *  per address. Credential resolution is the shared one (src/auth.ts): 0 D1 reads for a malformed token. */
+export async function translateLimiter(request: Request, env: Env): Promise<{ name: "RL_HTTP_ANON" | "RL_MCP_CEILING"; key: string }> {
+  let who: Awaited<ReturnType<typeof resolvePrincipal>> | null = null;
+  try { who = env.DB ? await resolvePrincipal(request, env) : null; } catch { who = null; }
+  if (who && who.kind !== "anonymous") return { name: "RL_MCP_CEILING", key: `tr:${who.kind}:${who.id}` };
+  return { name: "RL_HTTP_ANON", key: `ip:${clientIp(request)}` };
+}
+
 export async function handleTranslate(request: Request, env: Env, deps: Deps = {}): Promise<Response> {
-  if (!(await allow(env, "RL_HTTP_ANON", `ip:${clientIp(request)}`)))
+  const limiter = await translateLimiter(request, env);
+  if (!(await allow(env, limiter.name, limiter.key)))
     return reply({ error: "rate_limited", hint: `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again` }, 429, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
   let body: unknown;
   try { body = await request.json(); } catch { return reply({ error: "invalid_params", message: "JSON object body required" }, 400); }

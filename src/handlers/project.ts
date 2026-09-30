@@ -37,7 +37,7 @@ export const update: Handler = async (ctx, params) => {
   const lwc = takeLwc(params);
   if (lwc !== undefined && Object.keys(params).every(k => k === "id")) {
     await saveLwc(ctx, "project", id, lwc);
-    return { result: { project: { ...view(row, "owner"), lwc } }, scope: { type: "project", id }, priorState: { lwc: lwcOf(row) } };
+    return { result: { project: { ...view(row, "owner"), lwc } }, scope: { type: "project", id }, priorState: { lwc: lwcOf(row).join(",") } };
   }
   const patch = patchOf(params, ["name", "organization"]);
   const name = patch.name === undefined ? row.name : patch.name;
@@ -45,7 +45,7 @@ export const update: Handler = async (ctx, params) => {
   const organization = patch.organization === undefined ? row.organization : patch.organization;
   await ctx.db.prepare("UPDATE project SET name = ?, organization = ? WHERE id = ?").bind(name, organization, id).run();
   if (lwc !== undefined) await saveLwc(ctx, "project", id, lwc);
-  return { result: { project: { ...view(row, "owner"), name, organization, ...(lwc !== undefined ? { lwc } : {}) } }, scope: { type: "project", id }, priorState: { name: row.name, organization: row.organization } };
+  return { result: { project: { ...view(row, "owner"), name, organization, ...(lwc !== undefined ? { lwc } : {}) } }, scope: { type: "project", id }, priorState: { name: row.name, organization: row.organization, ...(lwc !== undefined ? { lwc: lwcOf(row).join(",") } : {}) } };
 };
 export const archive: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row} = await loadProject(ctx, id, "owner");
