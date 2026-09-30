@@ -48,10 +48,12 @@ Captain rulings, 2026-09-28:
   text)`. A string is translated **once**, stored, and served from storage forever (first write wins; never regenerated
   on read — LLM output is not reproducible, storage is). Only strings the memory lacks go upstream. Status:
   `machine` / `reviewed` / `rejected` (rejected rows are never served and are replaced by the next translation).
-- **Output checks before storing:** non-empty, plausible length, not the English source echoed back (same words,
-  ignoring case and spacing — audit round 1 E4: for Latin-script targets the script check cannot catch an echo, and
-  first-write-wins would pin English forever), and in the target script for non-Latin languages (a Lao request that
-  comes back in Latin letters is not stored or served). Sources without letters ("18–24") may come back unchanged.
+- **Output checks before storing:** non-empty, plausible length, not an English sentence of 3 or more words echoed back
+  (same words, ignoring case and spacing — audit round 1 E4: for Latin-script targets the script check cannot catch an
+  echo, and first-write-wins would pin English forever), and in the target script for non-Latin languages (a Lao request
+  that comes back in Latin letters is not stored or served). One- and two-word sources may come back spelled the same
+  (fr "phrases", "Question", "Total"; es "Hospital") and are stored. Sources without letters ("18–24") may come back
+  unchanged.
 - **Upstream** = `TRANSLATE_UPSTREAM_URL` (wrangler.toml, DEV + production) = the Laos app's live `translate-survey`
   function (Lovable AI gateway → Gemini, with its own cache); optional `TRANSLATE_UPSTREAM_KEY` secret. It receives only
   English source strings — never answers, names, codes or tokens.
