@@ -55,7 +55,8 @@ describe("shared survey link HTTP contract",()=>{
   expect((await submit(a.result.participant_token)).result).toMatchObject({response_id:x.result.response_id,duplicate:true});
   expect((await submit(a.result.participant_token,'same-client-key',{Q1:3})).error.code).toBe('INVALID_PARAMS');
   expect((await submit(a.result.participant_token,'other-key')).error.code).toBe('STAGE_CONFLICT');
-  const other=await issue();expect((await open(other.link_token,a.result.participant_token)).ok).toBe(false);
+  // S27: re-issuing returns the survey's active link; a different expiry is a different link (the one resume must not cross).
+  const other=await issue(new Date(Date.now()+86400e3).toISOString());expect(other.link_id).not.toBe(link.link_id);expect((await open(other.link_token,a.result.participant_token)).ok).toBe(false);
   expect((await open(link.link_token,'pt_forged')).ok).toBe(false);
   expect((await call('GET','/v2/participate/receipt?response_id='+x.result.response_id)).ok).toBe(false);
  });
