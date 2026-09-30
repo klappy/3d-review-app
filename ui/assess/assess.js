@@ -361,16 +361,17 @@ function bindPrint(current, s) {
   const sel = app.querySelector('#print-lang');
   // A new language drops the preview of the old one; the next Print survey loads the form in the new language.
   if (sel) sel.onchange = () => { printLangs.set(current.assessment.id, sel.value); if (state.print?.sid === s.id) { state.print = null; app.querySelector('#print-root')?.replaceChildren(); app.querySelector('#print-status').textContent = ''; } };
-  const picked = () => (sel && sel.value && sel.value !== 'en' ? sel.value : null);
+  // S34 (#405 nit a): picked()/idle() read the live nodes, so a repaint mid-load never leaves this run on a detached picker.
+  const livePick = () => app.querySelector('#print-lang'), picked = () => { const p = livePick(); return p && p.value && p.value !== 'en' ? p.value : null; };
   // Review of #405 (finding 1): the language is fixed from the click until the form is ready — the picker is disabled for
   // the whole load, and if the pick still differs when the form arrives, the form is loaded again in the picked language.
-  const idle = () => { btn.disabled = false; if (sel) sel.disabled = false; };
+  const idle = () => { const b = app.querySelector('#print-load'), p = livePick(); if (b) b.disabled = false; if (p) p.disabled = false; };
   btn.onclick = async () => {
     const gen = generation, aid = current.assessment.id, lang = picked();
     state.print = { sid: s.id, status: 'loading', gen }; btn.disabled = true; if (sel) sel.disabled = true;
     let model = await loadBlankPrint({ request: (url, init) => fetch(url, init), token, aid, sid: s.id, role: current.assessment.role, lang });
     if (gen !== generation) return; // navigated away: nothing paints; the next paint() already reset state.print (HIGH 4040990731)
-    btn.disabled = false;
+    // S34 (#405 nit b): the button stays locked through the passages read; idle() unlocks it (a double click printed twice).
     if (model.visible) model.passageLine = await passageLineFor(aid); // named once, on the paper and in the preview
     // S31 (captain 2026-09-30 13:39 ET): the paper names its project, assessment (language) and survey, and carries the survey's
     // one shared link — the link this tab already holds (U36), else the active one read with this session; never a new one.

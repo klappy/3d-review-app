@@ -134,7 +134,7 @@ test('review #405 nits: nothing translated → no "Machine translation" claim; t
 
 // Review of #405 finding 1: bindPrint from assess.js, run with stub loads — a language change during the load never leaves
 // the paper in the old language.
-function bindPrintHarness() {
+function bindPrintHarness(overrides = {}) {
   const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   const start = src.indexOf('function bindPrint(current, s) {'), end = src.indexOf('\nfunction context(current) {');
   const el = (id, extra = {}) => ({ id, disabled: false, value: '', textContent: '', onclick: null, onchange: null, replaceChildren() {}, ...extra });
@@ -147,6 +147,7 @@ function bindPrintHarness() {
     passageLineFor: async () => '', facilitatorFetch: () => null,
     translatePrint: async (model, { lang }) => ({ ...model, lang, title: `form in ${lang}` }),
     replayPrint: model => painted.push(model),
+    ...overrides,
   };
   const bindPrint = new Function(...Object.keys(env), `${src.slice(start, end)}\nreturn bindPrint;`)(...Object.values(env));
   bindPrint({ assessment: { id: 'a1', role: 'owner' } }, { id: 's1' });
@@ -175,4 +176,31 @@ test('an unchanged pick loads once, and a failed load unlocks the picker', async
   assert.equal(h.loads.length, 1); assert.deepEqual(h.painted.map(m => m.lang), ['hi']); assert.equal(sel.disabled, false);
   const bad = btn.onclick(); assert.equal(sel.disabled, true); h.loads[1].d.resolve({ visible: false, reason: 'not-visible' }); await bad;
   assert.equal(sel.disabled, false); assert.equal(btn.disabled, false); assert.equal(h.env.state.print.status, 'error');
+});
+
+test('S34 (#405 nit b): the button stays locked while the passage line is read; unlocked only when the form is ready', async () => {
+  let release; const gate = new Promise(r => { release = r; });
+  const h = bindPrintHarness({ passageLineFor: () => gate }), btn = h.nodes['#print-load'];
+  const done = btn.onclick();
+  h.loads[0].d.resolve({ visible: true, blank: true, items: [] });
+  await new Promise(r => setImmediate(r));
+  assert.equal(btn.disabled, true, 'still locked during the passages GET (a second click would print twice)');
+  release('Before you answer, read or listen to: Mark 4');
+  await done;
+  assert.equal(btn.disabled, false, 'idle() unlocks once the form is ready'); assert.equal(h.painted.length, 1);
+});
+
+test('S34 (#405 nit a): a repaint mid-load swaps the picker; idle() unlocks and picked() reads the live nodes', async () => {
+  const h = bindPrintHarness(), oldBtn = h.nodes['#print-load'], oldSel = h.nodes['#print-lang'];
+  const done = oldBtn.onclick();
+  assert.equal(oldSel.disabled, true);
+  // an error repaint replaces the nodes; the new picker shows Tamil and is disabled as painted mid-load
+  h.nodes['#print-load'] = { ...oldBtn, disabled: true }; h.nodes['#print-lang'] = { ...oldSel, value: 'ta', disabled: true };
+  h.loads[0].d.resolve({ visible: true, blank: true, items: [] });
+  await new Promise(r => setImmediate(r));
+  assert.equal(h.loads.length, 2, 'the live picker (Tamil) differs from the load (Hindi): loaded again'); assert.equal(h.loads[1].lang, 'ta');
+  h.loads[1].d.resolve({ visible: true, blank: true, items: [] });
+  await done;
+  assert.equal(h.nodes['#print-lang'].disabled, false, 'the live picker is unlocked'); assert.equal(h.nodes['#print-load'].disabled, false);
+  assert.deepEqual(h.painted.map(m => m.lang), ['ta']);
 });

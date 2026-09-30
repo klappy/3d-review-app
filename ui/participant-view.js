@@ -138,7 +138,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   function onInvalid(){if(validatingItem)return;revealAll();intro.hidden=true;nav.hidden=false;}
   originalReview.addEventListener('click',beforeReview,true);
   form.addEventListener('invalid',onInvalid,true);
-  form.addEventListener('change',onAnswer);
+  form.addEventListener('change',onAnswer);form.addEventListener('input',onAnswer); // S34: typing clears the mark, not only blur
   fields.forEach(field=>field.hidden=true);
   function removeChanges(){for(const n of changes)n.remove();changes.length=0;}
   function showReview(){
@@ -149,7 +149,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   }
   function showReceipt(){intro.hidden=true;nav.hidden=true;error.hidden=true;removeChanges();}
   function reset(){index=0;revealAll();removeChanges();intro.hidden=false;nav.hidden=true;error.hidden=true;}
-  function destroy(){if(destroyed)return;destroyed=true;originalReview.removeEventListener('click',beforeReview,true);form.removeEventListener('invalid',onInvalid,true);form.removeEventListener('change',onAnswer);markMissing([]);removeChanges();owned.forEach(n=>n.remove());fields.forEach((f,i)=>f.hidden=initialHidden[i]);}
+  function destroy(){if(destroyed)return;destroyed=true;originalReview.removeEventListener('click',beforeReview,true);form.removeEventListener('invalid',onInvalid,true);form.removeEventListener('change',onAnswer);form.removeEventListener('input',onAnswer);markMissing([]);removeChanges();owned.forEach(n=>n.remove());fields.forEach((f,i)=>f.hidden=initialHidden[i]);}
   // Caller controls #answers/#review/#receipt; the component never changes their flags.
   return {showForm,showReview,showReceipt,reset,destroy};
 }
