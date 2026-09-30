@@ -8,6 +8,8 @@ describe("default title of an untitled passage link", () => {
     expect(linkTitle("https://www.example.org/bible/GEN/1/")).toBe("example.org/bible/GEN/1");
     expect(linkTitle("https://example.org/Juan%201")).toBe("example.org/Juan 1");
     expect(linkTitle("https://example.org/bad%E0%A4")).toBe("example.org/bad%E0%A4");
+    expect(linkTitle("https://example.org/a%0Ab%00c%09%09d")).toBe("example.org/a b c d"); // review nit: cleaned after decoding
+    expect(linkTitle("https://example.org/%20")).toBe("Link");
   });
   it("is \"Link\" when there is no path to show, and stays within the title limit", () => {
     expect(linkTitle("https://example.org")).toBe("Link");
