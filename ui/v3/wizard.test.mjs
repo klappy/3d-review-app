@@ -359,7 +359,8 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
 test('B41: setup asks Active until (required) and Starts (optional, default today) on the existing period field', () => {
   const html = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
   assert.match(html, /Starts \(optional\)<input type="date" name="starts"/);
-  assert.match(html, /Active until<input type="date" name="until" value="2099-10-31" required>/);
+  assert.match(html, /Active until \(required\)<input type="date" name="until" value="2099-10-31" required>/); // S34: marked on screen
+  assert.match(html, /Starts \(optional\)<input/);
   assert.doesNotMatch(html, />When</);
   assert.match(freshDraft().starts, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(freshDraft().until, '');

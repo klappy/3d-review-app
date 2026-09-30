@@ -44,4 +44,6 @@ test('Review with three required answers missing: one message, the first missing
   answers.q0 = 'fixed'; form.listeners.change();
   assert.deepEqual(questions.children.map(f => f.dataset.missing ?? null), [null, null, 'true', 'true']);
   assert.deepEqual(nav.children[2].children.map(s => s.className), ['done', '', 'missing', 'missing']);
+  answers.q2 = 'a'; form.listeners.input(); // S34: an answer clears its mark as it is given (input), not only on change/blur
+  assert.deepEqual(questions.children.map(f => f.dataset.missing ?? null), [null, null, null, 'true']);
 });

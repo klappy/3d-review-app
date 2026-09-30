@@ -61,3 +61,29 @@ test('passagesHtml: a USFM passage says "Text · PDF" when PTXprint made one, el
   assert.match(passagesHtml(esc, { mayEdit: false, passages: [text(true)] }), /<span class="p-kind">Text · PDF<\/span>/);
   assert.match(passagesHtml(esc, { mayEdit: false, passages: [text(false)] }), /<span class="p-kind">Text file<\/span>/);
 });
+
+test('S34: a refused link (http://) keeps the typed URL, title and passage in the fields; a later success clears them', async () => {
+  const dom = new JSDOM('<div id="r"></div>'); globalThis.FormData = dom.window.FormData;
+  const root = dom.window.document.getElementById('r');
+  let refuse = true;
+  const fetchImpl = async (url, init = {}) => {
+    if ((init.method || 'GET') === 'GET') return { ok: true, status: 200, json: async () => ({ ok: true, result: { passages: [], file_storage: true } }) };
+    if (refuse) return { ok: false, status: 400, json: async () => ({ ok: false, error: { message: 'Links must start with https://.' } }) };
+    return { ok: true, status: 201, json: async () => ({ ok: true, result: { passage: {} } }) };
+  };
+  mountPassages({ root, aid: 'a1', mayEdit: true, esc, token: () => null, fetchImpl });
+  await new Promise(r => setTimeout(r, 20));
+  let ln = root.querySelector('form[data-passage-link]');
+  ln.querySelector('input[name=url]').value = 'http://example.org/v'; ln.querySelector('input[name=title]').value = 'Sign "A"'; ln.querySelector('input[name=reference]').value = 'Mark 4';
+  await ln.onsubmit({ preventDefault() {} });
+  ln = root.querySelector('form[data-passage-link]');
+  assert.match(root.querySelector('.p-status').textContent, /https:\/\//);
+  assert.equal(ln.querySelector('input[name=url]').value, 'http://example.org/v', 'the typed URL stays to be fixed');
+  assert.equal(ln.querySelector('input[name=title]').value, 'Sign "A"');
+  assert.equal(ln.querySelector('input[name=reference]').value, 'Mark 4');
+  refuse = false; ln.querySelector('input[name=url]').value = 'https://example.org/v';
+  await ln.onsubmit({ preventDefault() {} });
+  ln = root.querySelector('form[data-passage-link]');
+  assert.equal(ln.querySelector('input[name=url]').value, '');
+  assert.equal(root.querySelector('.p-status').textContent, 'Link added.');
+});

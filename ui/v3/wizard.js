@@ -338,7 +338,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       ${isNew ? `<label>Language<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (ISO 639, optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. hil — qaa–qtz if unlisted" autocapitalize="off" spellcheck="false"></label>` : ''}
       <div class="grid">
         <label>Starts (optional)<input type="date" name="starts" value="${esc(d.starts)}"></label>
-        <label>Active until<input type="date" name="until" value="${esc(d.until)}" required>${errs.includes(PAST_UNTIL) ? `<span class="wz-field-error" role="alert" data-until-error>${PAST_UNTIL}</span>` : ''}</label>
+        <label>Active until (required)<input type="date" name="until" value="${esc(d.until)}" required>${errs.includes(PAST_UNTIL) ? `<span class="wz-field-error" role="alert" data-until-error>${PAST_UNTIL}</span>` : ''}</label>
       </div>
       <div class="grid">
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
