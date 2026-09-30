@@ -115,7 +115,7 @@ test('only the words this paper shows are sent; assess.js wires the language int
   const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   assert.match(src, /loadBlankPrint\(\{[^}]*role: current\.assessment\.role, lang \}\)/);
   assert.match(src, /translatePrint\(model, \{ lang, fetchImpl: facilitatorFetch\(token\) \}\)/);
-  assert.match(src, /\$\{printLangField\(a\)\}<p><button id="print-load"/);
+  assert.match(src, /\$\{printLangField\(a\)\}<p>\$\{printLoadButton\(a\.id, s\.id\)\}/);
   const line = src.split('\n').find(l => l.startsWith('const passageLine = '));
   assert.ok(new Function(`${line}; return passageLine;`)()([{ reference: 'Genesis 1' }]).startsWith(`${PRINT_WORDS.passageLead} `), 'passage line lead is the translatable one');
 });
@@ -149,9 +149,16 @@ function bindPrintHarness(overrides = {}) {
     replayPrint: model => painted.push(model),
     ...overrides,
   };
-  const bindPrint = new Function(...Object.keys(env), `${src.slice(start, end)}\nreturn bindPrint;`)(...Object.values(env));
-  bindPrint({ assessment: { id: 'a1', role: 'owner' } }, { id: 's1' });
-  return { nodes, loads, painted, env };
+  const { bindPrint, printLoadButton } = new Function(...Object.keys(env), `${src.slice(start, end)}\nreturn { bindPrint, printLoadButton };`)(...Object.values(env));
+  const current = { assessment: { id: 'a1', role: 'owner' } }, survey = { id: 's1' };
+  bindPrint(current, survey);
+  // repaint(): what paint() does to the print panel — fresh nodes drawn by printLoadButton, then bindPrint again (no generation bump).
+  const repaint = () => {
+    const btnHtml = printLoadButton('a1', 's1');
+    nodes['#print-load'] = el('print-load', { disabled: / disabled/.test(btnHtml) }); nodes['#print-lang'] = el('print-lang', { value: nodes['#print-lang'].value });
+    bindPrint(current, survey); return btnHtml;
+  };
+  return { nodes, loads, painted, env, printLoadButton, repaint };
 }
 
 test('language changed mid-load prints the new language (picker locked during the load; a changed pick reloads)', async () => {
@@ -240,12 +247,50 @@ test('#414 review nit: a repaint mid-load keeps the live button and picker locke
   assert.deepEqual(h.painted.map(m => m.lang), ['hi']);
 });
 
-test('#414 review nit: a throwing helper still unlocks the button and picker', async () => {
+test('#414b nit: a throwing helper sets an error status, unlocks the button and picker, and never rejects', async () => {
   const h = bindPrintHarness({ passageLineFor: async () => { throw new Error('boom'); } }), btn = h.nodes['#print-load'], sel = h.nodes['#print-lang'];
   const done = btn.onclick();
   assert.equal(btn.disabled, true);
   h.loads[0].d.resolve({ visible: true, blank: true, items: [] });
-  await assert.rejects(done, /boom/);
+  await done; // handled: no unhandled rejection
+  assert.equal(h.env.state.print.status, 'error');
+  assert.match(h.nodes['#print-status'].textContent, /could not be prepared/);
   assert.equal(btn.disabled, false, 'not locked forever'); assert.equal(sel.disabled, false);
   assert.equal(h.painted.length, 0);
+});
+
+test('#414b (worth fixing): repaint mid-load + second click never double-loads; the newer run stays locked until its own idle', async () => {
+  const h = bindPrintHarness();
+  const first = h.nodes['#print-load'].onclick();
+  const firstRun = h.env.state.print;
+  // paint() mid-load (no generation bump): the loading run survives and the redrawn button is locked
+  h.repaint();
+  assert.equal(h.env.state.print, firstRun, 'the loading run survives the repaint');
+  assert.equal(h.nodes['#print-load'].disabled, true, 'the repainted button is drawn locked');
+  // a second click still gets through (e.g. assistive tech): it becomes the newer run
+  const second = h.nodes['#print-load'].onclick();
+  const secondRun = h.env.state.print;
+  assert.notEqual(secondRun, firstRun);
+  h.loads[0].d.resolve({ visible: true, blank: true, items: [] });
+  await first;
+  assert.equal(h.nodes['#print-load'].disabled, true, "the older run's idle()/finally never unlock the newer run's button");
+  assert.equal(h.nodes['#print-lang'].disabled, true);
+  assert.equal(h.painted.length, 0, 'the older run never replays');
+  h.loads[1].d.resolve({ visible: true, blank: true, items: [] });
+  await second;
+  assert.equal(h.loads.length, 2); assert.equal(h.painted.length, 1, 'exactly one replay, from the newer run');
+  assert.equal(h.env.state.print, secondRun); assert.equal(secondRun.status, 'ready');
+  assert.equal(h.nodes['#print-load'].disabled, false, 'the newer run unlocks at its own idle');
+});
+
+test('#414b nit: the rendered Print survey button is disabled while a run for this survey is loading', async () => {
+  const h = bindPrintHarness();
+  assert.doesNotMatch(h.printLoadButton('a1', 's1'), / disabled/, 'idle: enabled');
+  const done = h.nodes['#print-load'].onclick();
+  assert.match(h.printLoadButton('a1', 's1'), /<button id="print-load" disabled>/, 'loading: drawn disabled');
+  assert.doesNotMatch(h.printLoadButton('a1', 's2'), / disabled/, 'another survey is not locked by this run');
+  h.repaint(); assert.equal(h.nodes['#print-lang'].disabled, true, 'bindPrint re-locks the repainted picker mid-load');
+  h.loads[0].d.resolve({ visible: true, blank: true, items: [] }); await done;
+  assert.doesNotMatch(h.printLoadButton('a1', 's1'), / disabled/, 'ready: enabled again');
+  h.env.state.dirty.set('a1', 'write'); assert.match(h.printLoadButton('a1', 's1'), / disabled/, 'dirty guard kept');
 });
