@@ -157,8 +157,10 @@ const PARAM_FIELDS: Record<string, readonly string[]> = {
 const PRIOR_FIELDS: Record<string, readonly string[]> = {
   "cap.workspace.update": ["name"], "cap.workspace.archive": ["archived_at"], "cap.workspace.unarchive": ["archived_at"],
   "cap.workspace.add_project": ["workspace_id"], "cap.workspace.remove_project": ["workspace_id"],
-  "cap.project.update": ["name","organization"], "cap.project.archive": ["archived_at"], "cap.project.unarchive": ["archived_at"],
-  "cap.assessment.update": ["name","purpose","period","language_id","format"],
+  // lwc: the prior translation languages as a "lo,th" string (receiptFields keeps scalars only; takeLwc accepts the
+  // comma form), present only when the change touched them — so undo restores them (audit round 1: the token was dead).
+  "cap.project.update": ["name","organization","lwc"], "cap.project.archive": ["archived_at"], "cap.project.unarchive": ["archived_at"],
+  "cap.assessment.update": ["name","purpose","period","language_id","format","lwc"],
   "cap.assessment.set_stage": ["stage"], "cap.assessment.archive": ["archived_at"], "cap.assessment.unarchive": ["archived_at"],
   // Declared self:restore-prior undo requires the previous notes. This is
   // sensitive application data; receipt access and retention need owner review.

@@ -4,7 +4,7 @@ import { CapError, notVisible } from "./errors";
 import { countScalar, gate, loadTemplate, newId, nowIso, optInt, parseItems, randomToken, renderItems, reqStr, roleAt, sha256, type AssessmentRow, type SurveyRow } from "./common";
 import { codeHash, decryptCode, encryptCode } from "../code-escrow";
 import { randomCode } from "./common";
-import { groupFields, validateContext } from "../context-fields";
+import { DEMOGRAPHICS_KEY, demographicsEnabled, groupFields, parseContextJson, validateContext } from "../context-fields";
 
 async function assessment(ctx:Ctx,id:string,min:Role="viewer") {
   const row=await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
@@ -47,15 +47,19 @@ export const select:Handler=async(ctx,params)=>{
   const context=validateContext(groupFields(t.perspective),params.context,"context"), hasContext=Object.keys(context).length>0;
   const collection_status=row.stage==="collect"?"open":"closed";
   const existing=await ctx.db.prepare("SELECT * FROM assessment_survey WHERE assessment_id = ? AND template_id = ? AND template_version = ?").bind(aid,t.id,t.version).first<SurveyRow>();
+  // S15a: the assessment's demographics switch (off by default) rides in every group's context_json, so a group
+  // selected later inherits it and group context written here never drops it.
+  const sibling=await ctx.db.prepare("SELECT context_json FROM assessment_survey WHERE assessment_id = ? AND state = 'selected'").bind(aid).all<{context_json?:string}>().catch(()=>({results:[] as {context_json?:string}[]}));
+  const demographics=(sibling.results||[]).some(r=>demographicsEnabled(r.context_json));
   if(existing){
     if(existing.state==="selected") throw new CapError("STAGE_CONFLICT","template version is already selected");
     await ctx.db.prepare("UPDATE assessment_survey SET state = 'selected', archived_at = NULL, collection_status = ? WHERE id = ?").bind(collection_status,existing.id).run();
-    if(hasContext) await ctx.db.prepare("UPDATE assessment_survey SET context_json = ? WHERE id = ?").bind(JSON.stringify(context),existing.id).run();
+    if(hasContext||demographics) await ctx.db.prepare("UPDATE assessment_survey SET context_json = ? WHERE id = ?").bind(JSON.stringify({...(hasContext?context:parseContextJson((existing as any).context_json)),[DEMOGRAPHICS_KEY]:demographics||demographicsEnabled((existing as any).context_json)}),existing.id).run();
     return {result:{sid:existing.id,survey:{...existing,state:"selected",archived_at:null,collection_status},selected:true},scope:{type:"assessment",id:aid},priorState:{state:existing.state,archived_at:existing.archived_at}};
   }
   const id=newId("survey"), at=nowIso(ctx);
   // context_json is written only when given, so a select without context never depends on migration 0011.
-  if(hasContext) await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at,context_json) VALUES (?, ?, ?, ?, 'selected', ?, ?, ?)").bind(id,aid,t.id,t.version,collection_status,at,JSON.stringify(context)).run();
+  if(hasContext||demographics) await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at,context_json) VALUES (?, ?, ?, ?, 'selected', ?, ?, ?)").bind(id,aid,t.id,t.version,collection_status,at,JSON.stringify(demographics?{...context,[DEMOGRAPHICS_KEY]:true}:context)).run();
   else await ctx.db.prepare("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?, ?, ?, ?, 'selected', ?, ?)").bind(id,aid,t.id,t.version,collection_status,at).run();
   return {result:{sid:id,survey:{id,assessment_id:aid,template_id:t.id,template_version:t.version,state:"selected",collection_status,created_at:at,...(hasContext?{context}:{})},selected:true},scope:{type:"assessment",id:aid}};
 };
@@ -84,8 +88,14 @@ export const print:Handler=async(ctx,params)=>{
   const lang=typeof params.lang==="string"&&params.lang?params.lang:"en";
   const items=renderItems(parseItems(t),lang);
   const esc=(s:string)=>s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]??c));
-  const html=`<!doctype html><html lang="${esc(lang)}"><meta charset="utf-8"><title>${esc(t.name)}</title><style>@media print{button{display:none}}body{font:16px system-ui;max-width:48rem;margin:2rem auto}li{margin:1.5rem 0}</style><h1>${esc(t.name)}</h1><ol>${items.map(i=>`<li>${esc(String(i.text))}<hr></li>`).join("")}</ol></html>`;
-  return {result:{html,content_type:"text/html; charset=utf-8",template_id:t.id,template_version:t.version,blank:true},scope:{type:"assessment",id:aid}};
+  // Paper parity (captain 2026-09-29): a printed form carries every answer choice, in the survey's order, so paper
+  // answers map 1:1 to the option codes the app stores. ○ = choose one, ☐ = choose all that apply.
+  const opts=(i:Record<string,any>)=>Array.isArray(i.options)&&i.options.length?`<ul class="opts">${i.options.map((o:any)=>`<li>${i.type==="multi"?"☐":"○"} ${esc(String(o.text))}</li>`).join("")}</ul>`:"";
+  const html=`<!doctype html><html lang="${esc(lang)}"><meta charset="utf-8"><title>${esc(t.name)}</title><style>@media print{button{display:none}}body{font:16px system-ui;max-width:48rem;margin:2rem auto}li{margin:1.5rem 0}ul.opts{list-style:none;padding-left:1rem}ul.opts li{margin:.3rem 0}</style><h1>${esc(t.name)}</h1><ol>${items.map(i=>`<li>${esc(String(i.text))}${opts(i as any)}<hr></li>`).join("")}</ol></html>`;
+  const printItems=items.map((i:any)=>({id:i.id,type:i.type,text:i.text,required:i.required,
+    ...(Array.isArray(i.options)?{options:i.options.map((o:any)=>({code:o.code,text:o.text,...(o.exclusive?{exclusive:true}:{})}))}:{}),
+    ...(i.scale?{scale:i.scale}:{}),...(i.max_select?{max_select:i.max_select}:{})}));
+  return {result:{html,items:printItems,content_type:"text/html; charset=utf-8",template_id:t.id,template_version:t.version,blank:true},scope:{type:"assessment",id:aid}};
 };
 export const issue_link:Handler=async(ctx,params,opts)=>{
   only(params,["aid","sid","expires_at"]);

@@ -30,7 +30,54 @@ beforeAll(async()=>{
 },60000);
 afterAll(()=>mf.dispose());
 
+// S15a: demographics are off by default; only the facilitator (assessment update) turns them on.
+const setDemographics=(on:unknown,bearer=owner)=>call("PATCH",`/v2/assessments/${aid}`,{demographics_enabled:on},bearer);
+describe("S15a demographics off by default",()=>{
+ it("an existing group without the key reads off: no About you fields on the form",async()=>{
+  const raw=await db.prepare("SELECT context_json FROM assessment_survey WHERE id='survey_tavo'").first<any>();
+  expect(JSON.parse(raw.context_json).demographics_enabled).toBeUndefined();
+  const form=await call("GET","/v2/participate/form",undefined,await participant());expect(form.ok).toBe(true);
+  expect(form.result.demographics_enabled).toBe(false);expect(form.result.context_fields).toEqual([]);
+ });
+ it("while off, submitted demographics are ignored, never stored (even unknown keys)",async()=>{
+  const t=await participant();
+  const ok=await submit(t,{context:{age_range:"25_34",gender:"female"}});expect(ok.ok).toBe(true);
+  const row=await db.prepare("SELECT context_json FROM response WHERE id=?").bind(ok.result.response_id).first<any>();expect(row.context_json).toBe("{}");
+  const odd=await submit(await participant(),{context:{name:"Ana"}});expect(odd.ok).toBe(true);
+ });
+ it("a participant cannot set the switch; a non-boolean is refused; the facilitator turns it on and off",async()=>{
+  const t=await participant();
+  const denied=await setDemographics(true,t);expect(denied.ok).toBe(false);
+  expect((await call("GET","/v2/participate/form",undefined,t)).result.demographics_enabled).toBe(false);
+  expect((await setDemographics("yes")).error.code).toBe("INVALID_PARAMS");
+  const on=await setDemographics(true);expect(on.ok).toBe(true);expect(on.result.assessment.demographics_enabled).toBe(true);
+  expect((await call("GET",`/v2/assessments/${aid}`,undefined,owner)).result.assessment.demographics_enabled).toBe(true); // S15b: settings read path
+  const raw=await db.prepare("SELECT context_json FROM assessment_survey WHERE id='survey_tavo'").first<any>();
+  expect(JSON.parse(raw.context_json).demographics_enabled).toBe(true);
+  const form=await call("GET","/v2/participate/form",undefined,t);expect(form.result.demographics_enabled).toBe(true);
+  expect(form.result.context_fields.map((f:any)=>f.key)).toEqual(["age_range","gender"]);
+  const off=await setDemographics(false);expect(off.result.assessment.demographics_enabled).toBe(false);
+  expect((await call("GET",`/v2/assessments/${aid}`,undefined,owner)).result.assessment.demographics_enabled).toBe(false);
+  expect((await call("GET","/v2/participate/form",undefined,t)).result.context_fields).toEqual([]);
+ });
+});
+
+// S15c: results and the responses listing carry demographic breakdown columns only when the facilitator enabled them.
+describe("S15c demographic breakdowns only when enabled",()=>{
+ const surfaces=async()=>[await call("GET",`/v2/assessments/${aid}/responses`,undefined,owner),await call("GET",`/v2/assessments/${aid}/results`,undefined,owner)];
+ it("off (default): no demographic fields on results or the responses listing",async()=>{
+  expect((await setDemographics(false)).ok).toBe(true);
+  for(const r of await surfaces()){expect(r.ok).toBe(true);expect(r.result.demographics_enabled).toBe(false);expect(r.result.demographic_fields).toBeUndefined();expect(JSON.stringify(r.result)).not.toMatch(/age_range|"gender"/);}
+ });
+ it("on: both surfaces carry the age range and gender breakdown columns",async()=>{
+  expect((await setDemographics(true)).ok).toBe(true);
+  for(const r of await surfaces()){expect(r.ok).toBe(true);expect(r.result.demographics_enabled).toBe(true);expect(r.result.demographic_fields.map((f:any)=>f.key)).toEqual(["age_range","gender"]);}
+  expect((await setDemographics(false)).ok).toBe(true);
+ });
+});
+
 describe("B09 context",()=>{
+ beforeAll(async()=>{ expect((await setDemographics(true)).ok).toBe(true); });
  it("server and browser field lists are identical and carry no name field",()=>{
   expect(ui.RESPONDENT_FIELDS).toEqual(RESPONDENT_FIELDS);expect(ui.GROUP_FIELDS).toEqual(GROUP_FIELDS);
   const keys=[...RESPONDENT_FIELDS,...Object.values(GROUP_FIELDS).flat()].map(f=>f.key);
@@ -67,5 +114,7 @@ describe("B09 context",()=>{
   const list=await call("GET",`/v2/assessments/${aid}/responses`,undefined,owner);expect(list.ok).toBe(true);
   expect(list.result.suppressed).toBe(true);
   expect(list.result.group_context.find((g:any)=>g.template_id==="tpl_written").context).toEqual({total_participants:12,location_setting:"rural"});
+  const stored=await db.prepare("SELECT context_json FROM assessment_survey WHERE id=?").bind(sel.result.sid).first<any>();
+  expect(JSON.parse(stored.context_json)).toEqual({total_participants:12,location_setting:"rural",demographics_enabled:true});
  });
 });

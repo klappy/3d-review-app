@@ -27,7 +27,17 @@ const fail = (e, message) => ({ status: classify(e), error: message(e) });
 const safeMessage = e => String(e?.message || 'Request could not be completed.');
 export const CODE_REFUSED = 'This code has been used or is not valid. Check it, or ask the person who gave it to you for a new one.';
 
+// ASK 24 (captain: "Both: link first, Cloudflare code as backup"): with email links ON every sign-in entry shows the emailed-link
+// form FIRST and, under it, one clearly visible secondary way in through Cloudflare Access (one-time code). The code link keeps
+// href="/v2/auth/access" and carries data-code-signin, so the B38 click interceptor (assess.js) leaves it alone. Flag OFF output
+// is untouched (b38-production-copy.test.mjs pins it byte for byte).
+export const CODE_SIGNIN_LABEL = 'Sign in with a code instead';
+export const CODE_SIGNIN = `<p class="code-signin" style="margin:12px 0 0"><a class="button rv-btn" href="/v2/auth/access" data-code-signin>${CODE_SIGNIN_LABEL}</a></p>`;
+// The plain (no-script) email-link form for panels other than #signin: the browser posts it natively; the server answers with its
+// "Check your email" page (which carries the code link too).
+export const emailLinkForm = () => '<form class="email-link-form" method="post" action="/v2/auth/email"><label class="field">Email<input name="email" type="email" required autocomplete="email" maxlength="254"></label><div class="actions"><button class="button rv-btn primary" type="submit">Email me a sign-in link</button></div></form>';
 function signInPanel(ctx) {
+  if (ctx.state?.emailLinks === true) return `<div class="narrow"><section class="panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">This page needs a facilitator session. We email you a sign-in link; there is no password.</p>${emailLinkForm()}${CODE_SIGNIN}</section></div>`;
   return `<div class="narrow"><section class="panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">This page needs a facilitator session.</p><div class="actions"><a class="button primary" href="${ctx.routes.entry}">Go to sign in</a><a class="quiet button" href="/v2/auth/access">Sign in with email code</a></div></section></div>`;
 }
 function refusedPanel(ctx, back) {
@@ -76,6 +86,34 @@ function bindRetry(ctx, root, page, model) {
   });
 }
 // A write: disables the trigger while in flight, reports the server outcome, never claims success without it.
+// Captain 2026-09-29: pasting a code can submit the form by itself; not knowing that, people then tap Submit — a second
+// submit of the same code, which breaks the sign-in. So after any submit, Submit stays disabled until the code changes,
+// and the same code is never sent twice in a row (Enter, a double tap). Applies to every code box this app owns.
+export function holdUntilCodeChanges(form, name = 'code') {
+  const input = form?.querySelector?.(`input[name="${name}"]`), button = form?.querySelector?.('button[type=submit]');
+  let last = null;
+  const now = () => String(input?.value ?? '').trim();
+  const sync = () => { if (button) button.disabled = last !== null && now() === last; };
+  input?.addEventListener?.('input', sync);
+  return { repeat: () => last !== null && now() === last, sent: () => { last = now(); sync(); }, sync };
+}
+// Gate 0.23.0 (phone): a code form's error sits in the card next to the field — <p role="alert"> under the input, the input marked
+// aria-invalid and described by it — and focus returns to the input (write() disabled the focused Submit, dropping focus to BODY).
+// The live region is always rendered (empty collapses to nothing) so screen readers announce the text when it is set.
+// Alerts go to that element instead of the page note; anything else still goes to ctx.note. No element → ctx unchanged.
+export function inlineCodeError(ctx, form, name = 'code') {
+  const box = form?.querySelector?.('[data-code-error]'), input = form?.querySelector?.(`input[name="${name}"]`);
+  const set = text => {
+    if (!box) return;
+    box.textContent = text || '';
+    if (text) input?.setAttribute?.('aria-invalid', 'true'); else input?.removeAttribute?.('aria-invalid');
+  };
+  return {
+    ctx: box ? Object.create(ctx, { note: { value: (text, alert = false) => alert ? set(text) : ctx.note(text, alert) } }) : ctx,
+    clear: () => set(''),
+    focus: () => { if (box?.textContent) input?.focus?.(); },
+  };
+}
 async function write(ctx, control, label, fn, { refused = 'Not allowed here.', failed = null } = {}) {
   const controls = control ? [control, ...(control.form ? Array.from(control.form.querySelectorAll('button')) : [])] : [];
   for (const c of controls) c.disabled = true;
@@ -122,12 +160,13 @@ function hero(ctx, signedIn) {
   const continueCards = signedIn ? `<section class="panel"><p class="eyebrow">Signed in</p><h2>Continue</h2><div class="project-grid">${ctx.cards.card({ eyebrow: 'Continue', title: 'Workspaces', href: ctx.routes.workspaces, meta: ['Optional groupings of projects you can already open'] })}${ctx.cards.card({ eyebrow: 'Continue', title: 'Projects', href: ctx.routes.projects, meta: ['All projects your account holds a role on'] })}</div><div class="actions"><button type="button" class="quiet" data-act="signout">Sign out</button></div></section>` : '';
   // Public home contract (ui/public-choices.test.mjs, captain-named): exactly these four choices, in this order, above the headline;
   // Sign in goes straight to the real provider; sandbox sign-in only by explicit choice (#signin). Retired labels never return.
-  const choices = `<nav class="public-choices actions" aria-label="Choose where to start" style="margin-top:0"><a class="rv-btn" href="#about">Read about it</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/collect">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a>${signedIn ? '' : '<a class="rv-btn primary" href="/v2/auth/access">Sign in</a>'}</nav>`; // B02: a signed-in home never offers Sign in
+  // ASK 24: email links ON → the Home Sign in opens #signin (emailed-link form first, "Sign in with a code instead" under it).
+  const choices = (ctx.state?.emailLinks === true ? html => html.replace('<a class="rv-btn primary" href="/v2/auth/access">Sign in</a>', '<a class="rv-btn primary" href="#signin">Sign in</a>') : html => html)(`<nav class="public-choices actions" aria-label="Choose where to start" style="margin-top:0"><a class="rv-btn" href="#about">Read about it</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/collect">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a>${signedIn ? '' : '<a class="rv-btn primary" href="/v2/auth/access">Sign in</a>'}</nav>`); // B02: a signed-in home never offers Sign in
   // Captain order 17:05 (lane 9, L9-22) "less text": public home = the four choices, one heading, one short line; everything else behind Learn more.
   return `<section class="hero panel" id="public-home">${choices}${signedIn ? '' : signupNote(ctx, '8px 0 14px')}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">${LEAD}</p>${learnMore(`<p class="muted">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p>${perspectivesRow(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/collect">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a>${signedIn ? '' : ' · <a href="#signin">Sandbox test identities (dev only) — not a real sign-in</a>'}</p><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p>`)}</section>${continueCards}`;
 }
 function surveyView(ctx) {
-  return `<section class="panel narrow"><p class="eyebrow">For participants</p><h1>Your feedback starts with your invitation.</h1><p class="muted">Open the survey link or scan the QR code someone shared with you. If you were given an access code, enter it below.</p><p><a class="button" href="/participate/?demo=1">Try a sample survey — nothing is sent</a></p><form id="code-form"><label class="field">Access code<input name="code" required autocomplete="off" maxlength="64"></label><div class="actions"><button class="primary" type="submit">Open my survey</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form><p class="small muted">Missing your survey link? Ask the person who invited you or shared the survey to send you the link. You do not need an account to follow a participant link.</p></section>`;
+  return `<section class="panel narrow"><p class="eyebrow">For participants</p><h1>Your feedback starts with your invitation.</h1><p class="muted">Open the survey link or scan the QR code someone shared with you. If you were given an access code, enter it below.</p><p><a class="button" href="/participate/?demo=1">Try a sample survey — nothing is sent</a></p><form id="code-form"><label class="field">Access code<input name="code" required autocomplete="off" maxlength="64" aria-describedby="code-error"></label><p id="code-error" class="code-error" role="alert" data-code-error></p><div class="actions"><button class="primary" type="submit">Open my survey</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form><p class="small muted">Missing your survey link? Ask the person who invited you or shared the survey to send you the link. You do not need an account to follow a participant link.</p></section>`;
 }
 // Captain ruling 12:53 (lane 1, L1-16): a real public About page at #about — never a sign-in panel. Cards via ctx.cards.card (shared card component).
 // B30: About and the public home share one short line (composed, not copied).
@@ -138,13 +177,17 @@ export function aboutView(ctx) {
   const facts = WHO.map(([t, s]) => `<p><strong>${ctx.esc(t)}</strong></p><p class="muted">${ctx.esc(s)}</p>`).join('');
   return `<section class="glass panel narrow" id="about-page"><a class="back" href="#">← Back to home</a><p class="eyebrow">About 3D Review</p><h1>Three perspectives. One useful next step.</h1><p class="muted lead">${LEAD}</p>${perspectivesRow(ctx)}${learnMore(`<p class="muted">A facilitator sets up a review.</p><p class="muted">Each group answers a short survey.</p><p class="muted">The results show where the project is strong and where it needs support.</p>${facts}`)}<div class="actions"><a class="rv-btn primary" href="#">Back to home</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/collect">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a></div></section>`;
 }
+// BCS demo 2026-09-29 (bee:10809312 u3540382343-350): the Cloudflare code page signs in by itself once a code is pasted, and a
+// second Submit shows an error page; sign-in emails can land in Spam. Plain hints until production moves to email links.
+export const SIGNIN_CODE_HINT = 'Paste the code once and wait: it signs you in by itself. No email after a minute? Check your Spam or Junk folder.';
+export const SIGNIN_LINK_SENT = min => `Check your email — we sent you a sign-in link. It expires in ${min} minutes. Not there after a minute? Check your Spam or Junk folder.`;
 function signinView(ctx, model, signedIn = false) {
   const s = model.signin;
   const codeStep = s.stage === 'code';
   // v3 prototype frame 1 (design-system-v3 V.signin): centred 420px card, eyebrow, one full-width primary, survey footer (lane 1, L1-7).
   // U28: the new-account line is true on both paths (Access and B38 magic link create the principal on first sign-in); signed-out only.
   const note = signedIn ? '' : signupNote(ctx);
-  return `<section class="glass panel narrow v3-signin" style="max-width:420px;margin:48px auto 0"><p class="eyebrow">Sign in</p><h1 style="font-size:27px">Sign in with your email</h1>${ctx.state?.emailLinks === true ? `<p class="muted">We email you a sign-in link; there is no password.</p><form id="email-link-form" method="post" action="/v2/auth/email"><label class="field">Email<input name="email" type="email" required autocomplete="email" maxlength="254"></label><div class="actions"><button class="button rv-btn primary" type="submit" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Email me a sign-in link</button></div>${note}</form><p id="email-link-status" class="small" role="status"></p>` : `<p class="muted">We email you a one-time code; there is no password.</p><div class="actions"><a class="button rv-btn primary" href="/v2/auth/access" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Sign in with an email code</a></div>${note}`}${learnMore('<p class="small muted">Here to take a survey? Open the link you were given; no sign-in is needed. <a href="#survey">Have an access code?</a></p>')}<details class="sandbox-signin" id="sandbox-signin"${codeStep ? ' open' : ''}><summary>Sandbox test identities (dev only) — not a real sign-in</summary><form id="signin-form" data-stage="${codeStep ? 'code' : 'email'}"><label class="field">Email<input name="email" type="email" required autocomplete="email" value="${ctx.esc(s.email)}"${codeStep ? ' readonly' : ''}></label>${codeStep ? `${s.devCode ? `<p class="note small">Sandbox code: <strong>${ctx.esc(s.devCode)}</strong></p>` : '<p class="small muted">Code requested. Enter the code you received.</p>'}<label class="field">Code<input name="code" required autocomplete="one-time-code" inputmode="numeric"></label>` : ''}<div class="actions"><button class="primary" type="submit">${codeStep ? 'Sign in' : 'Send me a code'}</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form></details></section>`;
+  return `<section class="glass panel narrow v3-signin" style="max-width:420px;margin:48px auto 0"><p class="eyebrow">Sign in</p><h1 style="font-size:27px">Sign in with your email</h1>${ctx.state?.emailLinks === true ? `<p class="muted">We email you a sign-in link; there is no password.</p><form id="email-link-form" method="post" action="/v2/auth/email"><label class="field">Email<input name="email" type="email" required autocomplete="email" maxlength="254"></label><div class="actions"><button class="button rv-btn primary" type="submit" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Email me a sign-in link</button></div>${note}</form><p id="email-link-status" class="small" role="status"></p>${CODE_SIGNIN}` : `<p class="muted">We email you a one-time code; there is no password.</p><div class="actions"><a class="button rv-btn primary" href="/v2/auth/access" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Sign in with an email code</a></div><p class="small muted" data-code-hint>${ctx.esc(SIGNIN_CODE_HINT)}</p>${note}`}${learnMore('<p class="small muted">Here to take a survey? Open the link you were given; no sign-in is needed. <a href="#survey">Have an access code?</a></p>')}<details class="sandbox-signin" id="sandbox-signin"${codeStep ? ' open' : ''}><summary>Sandbox test identities (dev only) — not a real sign-in</summary><form id="signin-form" data-stage="${codeStep ? 'code' : 'email'}"><label class="field">Email<input name="email" type="email" required autocomplete="email" value="${ctx.esc(s.email)}"${codeStep ? ' readonly' : ''}></label>${codeStep ? `${s.devCode ? `<p class="note small">Sandbox code: <strong>${ctx.esc(s.devCode)}</strong></p>` : '<p class="small muted">Code requested. Enter the code you received.</p>'}<label class="field">Code<input name="code" required autocomplete="one-time-code" inputmode="numeric"></label>` : ''}<div class="actions"><button class="primary" type="submit">${codeStep ? 'Sign in' : 'Send me a code'}</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form></details></section>`;
 }
 const entry = {
   // Tour/example deep links redirect into the shared fixture-backed assessment shell.
@@ -168,18 +211,25 @@ const entry = {
         case 'signout': return ctx.signOut?.();
       }
     }));
-    root.querySelector('#code-form')?.addEventListener('submit', async ev => {
+    const codeForm = root.querySelector('#code-form'), codeHold = holdUntilCodeChanges(codeForm), codeError = inlineCodeError(ctx, codeForm);
+    codeForm?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target;
+      if (codeHold.repeat()) return; // the same code again: already sent
+      codeHold.sent();
+      codeError.clear();
       // U08 (lanes-1321): a used, unknown or mistyped code gets one plain next step, not "Not allowed here." / a server message.
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }), { refused: CODE_REFUSED });
-      if (!r) return;
+      // Gate 0.23.0 (phone 375x812): the error shows in the card under the field (role=alert), not in the page note below the fold.
+      const r = await write(codeError.ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }), { refused: CODE_REFUSED });
+      codeHold.sync(); // write() re-enabled the buttons; Submit waits for a changed code
+      if (!r) return codeError.focus();
       const token = r.participant_token || r.participant;
-      if (!token) return ctx.note('The server accepted the code but returned no participant token.', true);
+      if (!token) { codeError.ctx.note('The server accepted the code but returned no participant token.', true); return codeError.focus(); }
       // U07: a code participant takes the same v3 survey as a shared-link participant (intro → review → thank-you).
       // The bearer goes into the /participate/ page's scoped session slot, so a reload resumes exactly like a link.
-      const ns = await digestNamespace(token);
-      scopedStorage(sessionStorage, ns).set('bearer', token); rememberCurrent(sessionStorage, ns);
+      // 'via' = 'code' lets the thank-you say a code works once (no "reopen your link" promise).
+      const ns = await digestNamespace(token), slot = scopedStorage(sessionStorage, ns);
+      slot.set('bearer', token); slot.set('via', 'code'); rememberCurrent(sessionStorage, ns);
       window.location.assign('/participate/');
     });
     // B38: email sign-in link. Stays on this screen and shows one line; without script the form posts natively to the same route.
@@ -190,15 +240,18 @@ const entry = {
       try {
         const res = await fetch('/v2/auth/email', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ email: val(form, 'email') }), credentials: 'same-origin', redirect: 'manual', cache: 'no-store' });
         if (res.type === 'opaqueredirect') { window.location.assign('/v2/auth/access'); return; } // environment without email links
-        if (res.ok) { const b = await res.json().catch(() => null); const min = Number(b?.result?.expires_in_minutes) || 30; form.hidden = true; status.textContent = `Check your email — we sent you a sign-in link. It expires in ${min} minutes.`; return; }
+        if (res.ok) { const b = await res.json().catch(() => null); const min = Number(b?.result?.expires_in_minutes) || 30; form.hidden = true; status.textContent = SIGNIN_LINK_SENT(min); return; }
         status.textContent = res.status === 429 ? 'Too many sign-in links were requested. Use the newest email, or wait a few minutes.' : res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
       } catch { status.textContent = 'The sign-in link could not be sent. Check your connection and try again.'; }
       submit.disabled = false;
     });
-    root.querySelector('#signin-form')?.addEventListener('submit', async ev => {
+    const signinForm = root.querySelector('#signin-form'), signinHold = signinForm?.dataset?.stage === 'code' ? holdUntilCodeChanges(signinForm) : null;
+    signinForm?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target;
       const submit = form.querySelector('button[type=submit]');
+      if (signinHold?.repeat()) return;
+      signinHold?.sent();
       if (form.dataset.stage === 'email') {
         model.signin.email = val(form, 'email');
         const r = await write(ctx, submit, 'Code request', () => ctx.api('/v2/auth/link', { method: 'POST', body: { email: model.signin.email } }));
@@ -207,6 +260,7 @@ const entry = {
         return paint();
       }
       const r = await write(ctx, submit, 'Sign in', () => ctx.api('/v2/auth/session', { method: 'POST', body: { email: model.signin.email, code: val(form, 'code') } }));
+      signinHold?.sync();
       if (!r) return;
       if (!r.session) return ctx.note('The server answered without a session token.', true);
       storeSession('facilitatorToken', r.session);
@@ -446,6 +500,7 @@ export const css = `
 .hero{max-width:840px;margin:0 auto 22px;padding:40px}.hero h1{font-size:clamp(30px,4.5vw,47px);letter-spacing:-1.7px;max-width:610px}.hero .lead{font-size:17px;max-width:590px}
 .perspectives{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:30px 0}.perspective{padding:18px 14px;border-radius:18px;background:#ffffff8c;border:1px solid var(--edge)}.perspective strong{display:block;font-size:15px}.perspective small{display:block;color:var(--muted);font-size:13px;margin-top:3px}
 .dot-lg{display:block;width:24px;height:24px;border-radius:50%;margin-bottom:13px;box-shadow:inset 0 2px 3px #ffffff66}.dot-lg.team{background:#5bbd98}.dot-lg.community{background:#78aee0}.dot-lg.church{background:#e8c568}
+.code-error{margin:-8px 0 12px;padding:10px 12px;border-radius:10px;background:#fbeae7;color:#8a2a1c;font-size:14px;font-weight:600}.code-error:empty{margin:0;padding:0}
 .stepper{max-width:840px;margin:0 auto 22px}.stepper .progress{display:flex;gap:7px;margin:0 0 25px}.stepper .progress span{height:5px;flex:1;border-radius:6px;background:#cfdee5}.stepper .progress span.done{background:#367e73}.stepper .note .badge{margin:4px 5px 4px 0}
 @media(max-width:720px){.hero{padding:24px 20px}.perspectives{grid-template-columns:1fr;gap:8px}.perspective{display:grid;grid-template-columns:24px 1fr;column-gap:12px;padding:12px}.dot-lg{grid-row:1/3;align-self:center;margin:0}.perspective small{grid-column:2}}
 `;

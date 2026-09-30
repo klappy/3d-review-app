@@ -1,7 +1,77 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.22.6",
+  "current": "0.24.1",
   "versions": [
+    {
+      "version": "0.24.1",
+      "status": "candidate",
+      "notes_path": "releases/0.24.1.md",
+      "sections": {
+        "fixed": [
+          "Collect no longer makes a new participant link on every visit. Each survey keeps one link: Collect makes a link when it opens only if the survey has no active link here. Otherwise it shows the active link and its QR code. The link is kept in the browser tab, so reloading the page or coming back from the participant page shows the same link and QR code, and \"Print all\" prints the same URLs. It is dropped on sign-out or when you use another account. A new tab still makes its own link. The survey's Share card now says: \"Everyone can use this one link, also after you reload this page. In a new tab, sharing makes a new one.\" (#395)",
+          "Setup step 4 (Ready to launch) names the survey on each \"Who will participate\" row, for example \"Church · Church leaders — no number given\". Before, it showed only the perspective. (#395)",
+          "Prepare: \"Save preparation\" says \"Saved\" beside the button when the save succeeds, and shows the error there when it fails. Before, only \"Saving preparation…\" appeared. Moving to another page clears the message. (#395)",
+          "Participant survey fixes found on a phone. An access code that is used or not valid now shows its message inside the card, right under the Access code box; screen readers announce it and the cursor stays in the box (it used to appear below the screen with focus lost). The Print survey paper preview fits a phone screen and scrolls sideways if anything is still wider, instead of cutting off the right-hand choices; printed pages are unchanged. People who answer with an access code get a thank-you that says a code works only once, not \"Reopening your link shows this receipt again\". After a language is chosen, the thank-you and its Reference line are translated too, and the question counter (\"Question 3 of 17\") is one sentence that follows the language's word order. Switching from one language to another names the language that stays on screen while the new one loads, not English. Changing the language, or a translation arriving, failing or being retried while someone is answering, no longer erases the answers given so far, the Other text or the About-you choices. (#394)",
+          "A workshop room on one network is throttled less: passage files opened through their signed link no longer count against the 60-per-minute anonymous allowance of the room's address (only bad or expired links do), and translation requests that carry a participant's or signed-in person's credential are now counted per person instead of per address (the participant page starts sending its credential in a follow-up; without it, translation is counted per address as before). An assessment that has or had passages can now be deleted: the delete preview counts its passages and the delete removes them and their stored files (before, it failed with a database error). Adding a passage with an empty JSON body is a clear \"JSON object body required\" error instead of a server error. A machine translation that only repeats an English sentence is no longer served or stored as the translation; single words and short phrases that are spelled the same in both languages (French \"Question\", Spanish \"Hospital\") are kept. Undoing a change to an assessment's or project's translation languages now restores the previous languages. (#396)",
+          "The participant survey's translation requests now say which participant is asking. When the page holds the participant's own survey session, each request to translate the page sends that participant's token, so the server can count each participant separately instead of counting every phone on the same Wi-Fi as one visitor (the server half is a separate change). A page without a participant session sends nothing extra, exactly as before, and a facilitator's sign-in is never sent with these requests. (#397)",
+          "Sign-in from the tour: where email sign-in links are on, the tour's \"Sign in\" button now opens the \"Email me a sign-in link\" page, like every other way to sign in. Before, it went straight to the Cloudflare one-time code screen. Where email links are off, it is unchanged. (#398)",
+          "Sign-in when you open \"Start a review\" from another page without being signed in: where email sign-in links are on, the page now shows the \"Email me a sign-in link\" form first, with \"Sign in with a code instead\" under it, the same as when the page is opened directly. Before, it showed one \"Sign in with email code\" button that opened a different page. (#398)",
+          "Setup: the languages participants may switch to are now saved on the new review only, not also on a new project. Before, a language chosen during setup stayed on the project, so unticking it later on Prepare did not remove it for participants, in that review or in any later review in the project. (#398)",
+          "Collect: the participant link kept in the browser tab now belongs to the signed-in person only. A link made by one account is never kept or reused for another account signed in in the same tab. (#398)"
+        ]
+      }
+    },
+    {
+      "version": "0.24.0",
+      "status": "candidate",
+      "notes_path": "releases/0.24.0.md",
+      "sections": {
+        "changed": [
+          "Results and the responses listing carry demographic (age range, gender) breakdown columns only when the facilitator turned demographics on for the assessment; off by default, no demographic key at all. (#381)",
+          "Sign-in: where email sign-in links are on, every way to sign in (Home \"Sign in\", the sign-in screen, \"Use another account\", \"Sign in to open this page\", \"Sign in to continue\", and the email sign-in and \"Check your email\" pages) shows the \"Email me a sign-in link\" form first, with \"Sign in with a code instead\" under it for a one-time code. If the emailed link never arrives, the code is a way in. Where email links are off, sign-in is unchanged. (#388)",
+          "Invitations say what you are accepting, all on one page. After signing in, a person with pending invitations sees every one of them on one page. Each row shows the kind (workspace, project or assessment), its name with the workspace › project path above it, and the role, and has its own Accept button. \"Accept all\" accepts them together when there are two or more. A single invitation reads, for example, You were invited to the project \"River Valley\" as an owner. cap.me.invitations adds scope.name and scope.path (names only) to the signed-in person's own email-matched pending invitations. The mailed invitation link still names nothing before acceptance. (#392)"
+        ],
+        "added": [
+          "Dynamic translation for participants: a Language drop-down limited to the languages of wider communication set on the project and/or assessment (setup step 1 and Prepare; 25 tags in src/languages.ts: 24 machine-translated languages, and Indian Sign Language, which is recorded, not translated), questions/choices/page words machine-translated through POST /v2/translate, stored once per language in a D1 translation memory (migration 0012) and served from storage after that; English stays the fallback and answers, scores and reports are unchanged; multi-answer questions say \"Choose all that apply.\"; only the published survey's questions, choices and page words are translated and stored (other text is refused), and the translation service gets a context fixed by the server; a welcome sentence that carries a language name is allowlisted only for well-shaped names and is sent to the translation service on its own, never in the same request as the page words (#377)",
+          "Each assessment can carry the passage under review — USFM, SFM, USX, PDF or MP3 files, or a link such as a sign-language video — added on Prepare; participants see \"The passage\" at the top of every survey screen (audio plays in the page; files, videos and links open in a new tab) through private, 12-hour signed links. (#385)",
+          "The survey says which passage to read or hear first. A facilitator can name the passage with nothing attached (\"Genesis 1\") on Prepare. Participants then see \"Please read or listen to the passage before you answer: Genesis 1\" at the top of the survey; the line is translated like the rest of the page. The printed form carries \"Before you answer, read or listen to: Genesis 1\" under its title. Collect reminds the facilitator to read or play the passage before sharing links or handing out paper. This follows the BCS training demo of 2026-09-29. (#387)"
+        ]
+      }
+    },
+    {
+      "version": "0.23.0",
+      "status": "candidate",
+      "notes_path": "releases/0.23.0.md",
+      "sections": {
+        "changed": [
+          "Survey names say who they are for. \"Validation\" is now **Translators** and \"Mid-Level\" is now **Team leaders & mentors**. The new names show in setup, on Collect, on the survey page, on the blank print and in demo mode. Template ids are unchanged. The API returns the pinned source name as `source_name`, or `template_source_name` on assessment survey rows. The pinned synthetic report keeps its labels. This follows the BCS training demo of 2026-09-29. (#386)",
+          "**Open survey** now leads each survey's share row on Collect and on the \"review is collecting\" screen after launch. It has the hint \"Print the questions or give access codes\", so the printable questions and access codes are one tap away. Before, they sat behind the QR card. (#386)"
+        ],
+        "fixed": [
+          "Printed surveys (Print survey) now list every answer choice under each question, in the survey's order: circles for \"Choose one\", boxes for \"Choose all that apply\", a write-in line for \"Other (please describe)\", and writing lines only for open questions, so paper answers match what the app stores. (#384)",
+          "Sign-in hints. On the email-code sign-in (production) the hint is \"Paste the code once and wait: it signs you in by itself\", because a second Submit showed an error page. Both sign-in paths now say to check Spam or Junk when no email arrives. (#386)",
+          "Code boxes can't be sent twice. After a code is submitted, Submit stays disabled until the code is edited, and the same code is never sent twice in a row. This covers the participant access code and the test-site sign-in code. A pasted code can submit the form by itself, and a natural second tap on Submit was breaking the sign-in (captain, 2026-09-29). (#386)"
+        ],
+        "added": [
+          "Facilitator-only \"Ask participants about themselves (age range, gender)\" switch, off by default, in setup step 3 (Participant information) and in the assessment's Prepare settings. Setup saves it right after the groups are selected; settings reads it back from the assessment (cap.assessment.get now returns demographics_enabled) and saves it through cap.assessment.update. Participants never see the control. (#382)"
+        ]
+      }
+    },
+    {
+      "version": "0.22.7",
+      "status": "candidate",
+      "notes_path": "releases/0.22.7.md",
+      "sections": {
+        "changed": [
+          "Setup step 1 \"Lead organisation\" lists Bridge Connectivity Solutions (BCS). (#383)",
+          "Participant demographics (About you: age range, gender) are off by default. The facilitator turns them on per assessment (`demographics_enabled` on assessment update); while off, participants see no About you block and any age range or gender sent is ignored, not stored. (#380)"
+        ],
+        "fixed": [
+          "Collect shows one \"Move to Understand\": the in-page confirm that opens under a stage-move button now reads \"Yes, move\" instead of repeating the button's label (applies to every stage move). Setup \"Starts (optional)\" was checked to default to the facilitator's local today (late evening west of UTC included); a test now pins it. (#378)",
+          "Launch → \"Open the review\" now opens Collect with the full crumb row Home › Project › Review: the project list is re-read before the review opens, so a project created during setup is named, as it is after a fresh sign-in. (#379)"
+        ]
+      }
+    },
     {
       "version": "0.22.6",
       "status": "candidate",
@@ -10,6 +80,10 @@
         "fixed": [
           "Regenerating the roadmap versions page no longer crashes when there are no pending change files; it now shows no forecast. (#372)",
           "After an owner completes a review, the role badge shows Owner (not Viewer), matching the Permissions and Delete controls still offered; the review content stays read-only. (#374)"
+        ],
+        "changed": [
+          "Persona evidence backfill (2026-09-28): on DEV 0.22.6+bb6a948, agent simulation with synthetic personas in the Claude in-app browser — live owner-badge-after-Complete persona 1/1 PASS (receipt 13d) and release gate run A 47/47 PASS; a few clauses not run (emailed links, stored-response check, expired link, print layout, request body); satisfaction, confusion and frustration NOT MEASURED. See the Persona outcome scorecard in releases/0.22.6.md.",
+          "Persona evidence backfill (2026-09-28): release gate run B on DEV 0.22.6+bb6a948, agent simulation with synthetic personas in the Claude in-app browser at 390 and 1280 — 39 PASS, 1 FAIL (B14: breadcrumb missing the project crumb when opening the review right after launch), 1 NOT RUN (B32, needs Bincy's own email code), 1 DECIDED with no screen (B33), extras 5/5 PASS; satisfaction, confusion and frustration NOT MEASURED. See the Persona outcome scorecard in releases/0.22.6.md."
         ]
       }
     },

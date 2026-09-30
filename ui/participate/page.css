@@ -15,3 +15,44 @@
 #participant .participant-about legend{font-weight:600;padding:0;margin-bottom:4px}
 #participant .participant-about label{display:grid;gap:4px}
 #participant .participant-about select{width:100%;min-height:44px;max-width:100%}
+/* Dynamic translation: language picker above the survey (big tap target), status line under it; multi-answer hint. */
+.participant-lang-box{display:flex;flex-direction:column;gap:4px;margin:0 0 12px}
+.participant-lang{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:600}
+.participant-lang select{min-height:44px;min-width:min(260px,100%);max-width:100%;padding:8px 12px;border-radius:12px;border:1px solid #c9d8e5;background:#fff;font:inherit}
+.participant-lang-status{margin:0;font-size:14px;color:#526779}
+.participant-lang-status:empty{display:none}
+.participant-hint{margin:4px 0 8px;font-size:15px;color:#526779}
+/* Translating feedback: a calm card with a spinner, the language in its own script, first-time wait words and a real
+   progress bar. Failure turns it into a message with "Try again". Motion respects reduced-motion settings. */
+.participant-translating{display:flex;gap:14px;align-items:flex-start;margin:8px 0 4px;padding:14px 16px;border-radius:14px;background:#e3efe9;border:1px solid #b9d6ca;border-left:5px solid #14685f;color:#172e40}
+.participant-translating[hidden]{display:none}
+.participant-translating .tr-spinner{flex:none;width:28px;height:28px;border-radius:50%;border:4px solid #b9d6ca;border-top-color:#14685f;animation:tr-spin .9s linear infinite;margin-top:2px}
+.participant-translating .tr-spinner[hidden]{display:none}
+.participant-translating .tr-body{flex:1;min-width:0}
+.participant-translating p{margin:0}
+.participant-translating .tr-title{font-weight:700;font-size:17px;line-height:1.35}
+.participant-translating .tr-sub{font-size:15px;color:#35505f;margin-top:4px}
+.participant-translating .tr-bar{height:10px;border-radius:6px;background:#fff;border:1px solid #b9d6ca;overflow:hidden;margin-top:10px}
+.participant-translating .tr-bar[hidden]{display:none}
+.participant-translating .tr-bar span{display:block;height:100%;width:4%;background:#14685f;border-radius:6px;transition:width .4s ease}
+.participant-translating .tr-count{font-size:14px;color:#35505f;margin-top:4px;font-variant-numeric:tabular-nums}
+.participant-translating .tr-retry{margin-top:10px;min-height:44px}
+.participant-translating .tr-retry[hidden]{display:none}
+.participant-translating.failed{background:#fbf1e7;border-color:#e8c9a8;border-left-color:#a34a0b}
+@keyframes tr-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.participant-translating .tr-spinner{animation:none;border-top-color:#14685f}.participant-translating .tr-bar span{transition:none}}
+/* The passage under review: compact card at the top of every survey screen; big tap targets; audio plays inline. */
+.participant-passages{margin:4px 0 12px;padding:12px 14px;border:1px solid #c9d8e5;border-radius:14px;background:#fff}
+.participant-passages[hidden]{display:none}
+.participant-passages .pp-title{font-size:16px;font-weight:700;margin:0;min-height:40px;display:flex;align-items:center;cursor:pointer}
+.participant-passages .pp-details[open] .pp-title{margin-bottom:6px}
+.participant-passages .pp-row{display:grid;gap:4px;padding:6px 0;border-top:1px solid #edf3f8}
+.participant-passages .pp-row:first-of-type{border-top:0}
+.participant-passages .pp-label{margin:0;font-size:14px;color:#526779}
+.participant-passages .pp-first{margin:0 0 6px;font-size:16px;line-height:1.4;color:#1d2b36}
+.participant-passages .pp-open{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid #14685f;color:#14685f;font-weight:600;text-decoration:none;justify-self:start}
+.participant-passages audio{width:100%;min-height:44px}
+.participant-passages .pp-title{list-style:none}
+.participant-passages .pp-title::-webkit-details-marker{display:none}
+.participant-passages .pp-title::after{content:"▾";margin-left:auto;font-size:18px;color:#14685f}
+.participant-passages .pp-details[open] .pp-title::after{content:"▴"}

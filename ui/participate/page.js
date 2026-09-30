@@ -1,15 +1,31 @@
 import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
-import { mountParticipantView, itemError, drawAbout, aboutValues } from '../participant-view.js';
+import { mountParticipantView, itemError, drawAbout, aboutValues, setAboutValues, aboutFields, welcomeCopy } from '../participant-view.js';
+import { UI_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames, translatingSub } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
+import { receiptNotice } from '../shared-link.js';
 
 const $ = id => document.getElementById(id);
 let pager, renderedPhase, renderedForm;
 const disabledBeforeRequest = new WeakMap();
 function element(tag, text) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; return node; }
+// Dynamic translation (captain ruling 2026-09-28; Lovable-era behaviour): the participant picks a language, the page
+// sends its English strings to /v2/translate and shows what comes back; anything missing stays English. Display only:
+// ids and option codes never change, so answers, scores and reports are unaffected.
+function localStore() { try { return window.localStorage; } catch { return null; } }
+const wantedLang = initialLanguage({ search: location.search, storage: localStore() });
+let lang = 'en'; // set from wantedLang once the survey says which languages it offers
+let tr = { lang: 'English', form: null, ui: {}, items: {}, view: null };
+let T = makeT({});
+let loadSeq = 0;
+const view = form => (form && tr.form === form && tr.lang === lang && tr.view ? tr.view : form);
+// The language whose words are on screen now: a landed translation, else English (null).
+const shownLang = () => (!isEnglish(tr.lang) && Object.keys(tr.ui || {}).length ? tr.lang : null);
+const shownLocale = () => shownLang() || undefined;
 function draw(item) {
   const field = element('fieldset'); field.dataset.item = item.id;
-  field.append(element('legend', `${item.text || item.id}${item.requiredness === 'unresolved' ? ' (optional)' : ''}`)); // B-09: plain words, no policy text
+  field.append(element('legend', `${item.text || item.id}${item.requiredness === 'unresolved' ? ` ${T('optional')}` : ''}`)); // B-09: plain words, no policy text
+  if (item.type === 'multi') { const hint = element('p', T('chooseAll')); hint.className = 'participant-hint'; field.append(hint); } // more than one answer may be chosen
   if (item.type === 'scale' || item.type === 'text') {
     const input = element(item.type === 'text' ? 'textarea' : 'input'); input.name = item.id; input.required = item.required !== false;
     if (item.type === 'scale') { input.type = 'number'; input.min = item.scale.min; input.max = item.scale.max; input.step = 1; }
@@ -19,19 +35,20 @@ function draw(item) {
       const label = element('label'), input = element('input'); input.type = item.type === 'multi' ? 'checkbox' : 'radio'; input.name = item.id; input.value = option.code; input.required = item.type === 'single' && item.required !== false;
       label.append(input, document.createTextNode(option.label || option.text || option.code)); field.append(label);
       // C01: "Other (please describe)" gets its own short text field, shown only while Other is chosen.
-      if (isOtherOption(option)) field.append(otherBox(document, item));
+      if (isOtherOption(option)) { const box = otherBox(document, item); box.placeholder = T('pleaseDescribe'); box.setAttribute('aria-label', T('pleaseDescribe')); field.append(box); }
     }
-    if (item.type === 'multi' && item.options?.some(o => o.exclusive)) field.append(element('p', 'An exclusion choice cannot be combined with any other choice.'));
-  } else field.append(element('p', 'This survey contains an unsupported question. Ask the person who shared the survey for help.'));
+    if (item.type === 'multi' && item.options?.some(o => o.exclusive)) field.append(element('p', T('exclusionNote')));
+  } else field.append(element('p', T('unsupported')));
   return field;
 }
 let about = null;
 function values(validate = false) {
   const fd = new FormData($('answers')), out = {};
-  for (const item of journey.state.form.items) {
+  const shown = view(journey.state.form);
+  for (const item of shown.items) {
     if (validate) {
       if (!['scale', 'text', 'single', 'multi'].includes(item.type)) throw Error('This survey cannot be submitted because it contains an unsupported question.');
-      const error = itemError(item, fd); if (error) throw Error(error);
+      const error = itemError(item, fd, T); if (error) throw Error(error);
     }
     let value = item.type === 'multi' ? fd.getAll(item.id) : fd.get(item.id);
     if (value === '' || value === null || (Array.isArray(value) && !value.length)) value = null;
@@ -43,12 +60,17 @@ function values(validate = false) {
 }
 const syncOther = () => { if (journey.state.form) syncOtherBoxes($('answers'), journey.state.form.items); };
 function paint(state) {
-  $('notice').textContent = demo && state.phase === 'receipt' ? 'Practice only. No response was sent or saved.' : state.notice || '';
+  if (state.form) syncPicker(state.form);
+  if (state.form) renderPassages(view(state.form) || state.form);
+  if (state.form && !isEnglish(lang) && tr.form !== state.form && pendingForm !== state.form) loadTranslations(state.form);
+  const shown = view(state.form);
+  // Gate 0.24.0: the thank-you is said in the participant's language (the controller's notice is its English form).
+  $('notice').textContent = demo && state.phase === 'receipt' ? 'Practice only. No response was sent or saved.' : state.phase === 'receipt' && state.thanks ? receiptNotice(state.thanks.perspective, { code: state.thanks.code, t: T }) : state.notice || '';
   if (state.phase !== renderedPhase || (state.form && state.form !== renderedForm)) {
     for (const id of ['answers', 'review', 'receipt']) $(id).hidden = true;
     if (state.phase === 'form') {
       if (renderedForm !== state.form) {
-        pager?.destroy(); $('questions').replaceChildren(...state.form.items.map(draw));
+        pager?.destroy(); $('questions').replaceChildren(...shown.items.map(draw));
         for (const field of $('questions').querySelectorAll('input,textarea')) {
           if (field.dataset.otherFor) { const text = state.draft?.[OTHER_TEXT_KEY]?.[field.dataset.otherFor]; if (typeof text === 'string') field.value = text; continue; }
           const value = state.draft?.[field.name]; if (value == null) continue;
@@ -56,18 +78,18 @@ function paint(state) {
           else field.value = value;
         }
         syncOther();
-        about = drawAbout(document, state.form.context_fields || []);
-        pager = mountParticipantView({ doc: document, root: $('participant-view-root'), form: $('answers'), questions: $('questions'), review: $('review'), reviewAnswers: $('review-answers'), receipt: $('receipt'), model: state.form, reviewButton: $('review-button'), onEdit: () => journey.edit(), about });
+        about = drawAbout(document, aboutFields(shown), T); // S15a: hidden unless the facilitator turned demographics on; labels translated
+        pager = mountParticipantView({ doc: document, root: $('participant-view-root'), form: $('answers'), questions: $('questions'), review: $('review'), reviewAnswers: $('review-answers'), receipt: $('receipt'), model: shown, reviewButton: $('review-button'), onEdit: () => journey.edit(), about, t: T });
         if (state.draft) pager.showForm();
       } else pager?.showForm();
       $('answers').hidden = false;
     } else if (state.phase === 'review') {
-      $('review-answers').replaceChildren(...state.form.items.map(item => element('p', `${item.text || item.id}: ${reviewAnswer(item, state.answers[item.id], state.answers[OTHER_TEXT_KEY]?.[item.id])}`)));
+      $('review-answers').replaceChildren(...shown.items.map(item => { const answer = reviewAnswer(item, state.answers[item.id], state.answers[OTHER_TEXT_KEY]?.[item.id]); return element('p', `${item.text || item.id}: ${answer === 'Skipped' ? T('skipped') : answer}`); }));
       $('review').hidden = false; pager?.showReview();
     } else {
       pager?.showReceipt();
       if (state.phase === 'receipt') {
-        $('receipt').replaceChildren(element('h2', demo ? 'Practice complete — nothing sent' : 'Response saved'), element('p', receiptLine(state.receipt)));
+        $('receipt').replaceChildren(element('h2', demo ? 'Practice complete — nothing sent' : T('responseSaved')), element('p', receiptLine(state.receipt, { t: T, locale: shownLocale() })));
         $('receipt').hidden = false;
       }
     }
@@ -84,7 +106,153 @@ const demo = isDemo(location.search);
 if (demo) { document.querySelector('main > h1').textContent = 'Practice survey · nothing is sent'; document.querySelector('main > p').textContent = 'Use the real survey flow with source-pinned synthetic sample questions. Answers stay in memory and disappear when you leave or reload.'; const back = element('a', 'Back to the tour'); back.href = '/?demo=1#assessment/demo-assessment/collect'; document.querySelector('main').prepend(back); }
 const sample = demo ? sampleParticipantEnvironment(Number(new URLSearchParams(location.search).get('survey') || 0)) : null;
 if (demo) { $('submit').textContent = 'Finish practice — nothing sent'; $('recover').textContent = 'Check practice'; }
-const journey = createParticipantJourney({ ...(demo ? sample : { window, storage: sessionStorage }), onChange: paint });
+// Static page words (captured after the demo wording is set) and the language picker.
+const STATIC = [['.intro-title', 'static.title'], ['.intro-lead', 'static.lead'], ['#review-button', 'static.reviewButton'], ['#review > h2', 'static.reviewTitle'], ['#edit', 'static.edit'], ['#submit', 'static.submit'], ['#recover', 'static.recover']];
+const staticEn = {}; for (const [sel, key] of STATIC) { const n = document.querySelector(sel); if (n) staticEn[key] = n.textContent; }
+function applyStatic() { for (const [sel, key] of STATIC) { const n = document.querySelector(sel); if (n) n.textContent = T(key, staticEn[key]); } }
+const langSelect = element('select'); langSelect.id = 'participant-lang';
+let offered = null; // the survey's languages once known (form.languages); the picker is hidden while there are none
+function syncPicker(form) {
+  const list = Array.isArray(form?.languages) ? form.languages : [];
+  const sig = list.map(l => l.code).join(',');
+  if (offered === sig) return;
+  offered = sig;
+  langSelect.replaceChildren(Object.assign(element('option', 'English'), { value: 'en' }), ...list.map(l => Object.assign(element('option', `${l.endonym} · ${l.name}`), { value: l.code })));
+  langBox.hidden = !list.length;
+  const keep = pickLanguage(isEnglish(lang) ? wantedLang : lang, list);
+  const next = keep ? keep.code : 'en';
+  langSelect.value = next;
+  if (next !== lang) { lang = next; loadTranslations(form); }
+}
+const currentEntry = () => pickLanguage(lang, journey?.state?.form?.languages || []);
+const langLabel = element('label'); langLabel.className = 'participant-lang'; const langWord = element('span', UI_EN.language); langLabel.append(langWord, langSelect);
+const langStatus = element('p'); langStatus.className = 'participant-lang-status'; langStatus.setAttribute('role', 'status'); langStatus.setAttribute('aria-live', 'polite');
+// Visible "translating" feedback (captain 2026-09-29): never a silent wait. A card with a spinner, the language in its own
+// script, plain words about the first-time wait, and a real progress bar ("n of N phrases"); shown only if loading takes
+// longer than a moment (a stored translation appears without a flash). English stays readable underneath.
+const trBanner = element('div'); trBanner.className = 'participant-translating'; trBanner.hidden = true; trBanner.setAttribute('role', 'status'); trBanner.setAttribute('aria-live', 'polite');
+const trSpin = element('span'); trSpin.className = 'tr-spinner'; trSpin.setAttribute('aria-hidden', 'true');
+const trBody = element('div'); trBody.className = 'tr-body';
+const trTitle = element('p'); trTitle.className = 'tr-title';
+const trSub = element('p'); trSub.className = 'tr-sub';
+const trBar = element('div'); trBar.className = 'tr-bar'; trBar.setAttribute('role', 'progressbar'); trBar.setAttribute('aria-valuemin', '0'); trBar.setAttribute('aria-valuemax', '100'); trBar.setAttribute('aria-label', 'Translation progress');
+const trFill = element('span'); trBar.append(trFill);
+const trCount = element('p'); trCount.className = 'tr-count';
+const trRetry = element('button', UI_EN.tryAgain); trRetry.type = 'button'; trRetry.className = 'rv-btn quiet tr-retry'; trRetry.hidden = true;
+trBody.append(trTitle, trSub, trBar, trCount, trRetry); trBanner.append(trSpin, trBody);
+// onScreen: the language entry still shown while the new one loads (null = English) — the card names it (gate 0.24.0:
+// switching Kannada → Odia said "keep reading in English" while Kannada stayed on screen).
+function showTranslating(entry, { done = 0, total = 0 } = {}, onScreen = null) {
+  trBanner.hidden = false; trBanner.classList.remove('failed'); trSpin.hidden = false; trBar.hidden = false; trRetry.hidden = true;
+  trTitle.textContent = entry ? `Translating into ${entry.endonym}${entry.endonym === entry.name ? '' : ` (${entry.name})`}…` : UI_EN.translating;
+  trSub.textContent = translatingSub(onScreen);
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  trFill.style.width = `${Math.max(4, pct)}%`; trBar.setAttribute('aria-valuenow', String(pct));
+  trCount.textContent = total ? `${done} / ${total} ${UI_EN.phrases}` : '';
+}
+function showTranslateFailed() {
+  trBanner.hidden = false; trBanner.classList.add('failed'); trSpin.hidden = true; trBar.hidden = true; trCount.textContent = '';
+  trTitle.textContent = UI_EN.translateFailed; trSub.textContent = UI_EN.translateFailedHint; trRetry.hidden = false;
+}
+function hideTranslating() { trBanner.hidden = true; }
+trRetry.addEventListener('click', () => loadTranslations());
+const langBox = element('div'); langBox.className = 'participant-lang-box'; langBox.hidden = true; langBox.append(langLabel, langStatus, trBanner);
+document.querySelector('main').prepend(langBox);
+// The passage under review (captain 2026-09-29; Lovable parity): at the top of the survey on every screen. Audio plays
+// in the page; PDF / USFM / USX text, videos and links open in a new tab. Rebuilt only when the passages or the language
+// change, so audio keeps playing across questions.
+const passageBox = element('section'); passageBox.className = 'participant-passages'; passageBox.hidden = true; passageBox.setAttribute('aria-label', 'The passage');
+langBox.after(passageBox);
+let passageSig = '';
+function renderPassages(form) {
+  // A passage is openable (href) or only named (kind 'reference': the facilitator reads or plays it; BCS demo 2026-09-29).
+  const list = Array.isArray(form?.passages) ? form.passages.filter(p => p && ((typeof p.href === 'string' && p.href) || (p.kind === 'reference' && (p.reference || p.title)))) : [];
+  const sig = `${lang}|${Object.keys(tr.ui || {}).length > 0}|${list.map(p => p.id).join(',')}`; // relabel once a translation lands
+  if (sig === passageSig) return;
+  passageSig = sig; passageBox.hidden = !list.length;
+  const rows = list.filter(p => p.href).map(p => {
+    const row = element('div'); row.className = `pp-row pp-${p.media}`;
+    const label = element('p', [p.title, p.reference].filter(Boolean).join(' · ')); label.className = 'pp-label';
+    if (p.media === 'audio') {
+      const audio = element('audio'); audio.controls = true; audio.preload = 'none'; audio.src = p.href; audio.setAttribute('aria-label', `${T('passageListen')}: ${p.title}`);
+      row.append(label, audio);
+    } else {
+      const a = element('a', p.media === 'video' ? `▶ ${T('passageWatch')}` : p.media === 'link' ? T('passageOpen') : T('passageRead')); // no emoji: low-end phones may lack the font
+      a.href = p.href; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.className = 'pp-open';
+      row.append(a, label);
+    }
+    return row;
+  });
+  // Open on the welcome; folds to one tappable line once the questions start, so the question stays in view.
+  const wasOpen = passageDetails ? passageDetails.open : !document.querySelector('.participant-intro[hidden]');
+  passageDetails = element('details'); passageDetails.className = 'pp-details'; passageDetails.open = wasOpen;
+  const summary = element('summary', `${T('passageTitle')}${list.length > 1 ? ` (${list.length})` : ''}`); summary.className = 'pp-title';
+  // "Please read or listen to the passage before you answer: Genesis 1" — the instruction BCS asked for, every time.
+  const first = element('p'); first.className = 'pp-first'; first.append(document.createTextNode(`${T('passageFirst')} `), element('strong', passageNames(list)));
+  passageDetails.append(summary, first, ...rows);
+  passageBox.replaceChildren(passageDetails);
+}
+let passageDetails = null;
+document.addEventListener('click', e => { if (passageDetails && e.target?.closest?.('.participant-start')) passageDetails.open = false; });
+let pendingForm = null;
+function rerender() {
+  // Keep the participant where they are: a translation arriving mid-survey redraws the same question, not the welcome.
+  const fields = [...$('questions').children], at = fields.findIndex(f => !f.hidden);
+  const midSurvey = journey?.state?.phase === 'form' && at >= 0 && !!document.querySelector('.participant-intro[hidden]');
+  // Gate 0.24.0 audit: the redraw below rebuilds every field. Repainting from journey.state.draft (set once, at form load)
+  // erased every answer given since, and the About-you choices; the next keystroke then saved the erased form over the
+  // draft. Keep what is on screen now — answers and Other text mid-survey, About-you always — save it, and paint from it.
+  const kept = journey?.state?.phase === 'form' && renderedPhase === 'form' ? keepEntered(midSurvey) : null;
+  applyStatic(); langWord.textContent = T('language');
+  document.documentElement.dir = currentEntry()?.dir === 'rtl' ? 'rtl' : 'ltr';
+  renderedForm = null; renderedPhase = null;
+  if (journey?.state) paint(kept ? { ...journey.state, draft: kept.draft } : journey.state);
+  if (kept) setAboutValues(about, kept.about);
+  if (midSurvey) pager?.showForm(at);
+}
+function keepEntered(midSurvey) {
+  let draft = journey.state.draft;
+  if (midSurvey) { try { draft = values(); journey.save(draft); } catch { /* keep the load-time draft */ } }
+  return { draft, about: aboutValues(about) };
+}
+async function loadTranslations(form = journey?.state?.form || null) {
+  const seq = ++loadSeq; pendingForm = form;
+  if (isEnglish(lang)) { tr = { lang, form, ui: {}, items: {}, view: null }; T = makeT({}); langStatus.textContent = ''; hideTranslating(); pendingForm = null; rerender(); return; }
+  const entry = pickLanguage(lang, form?.languages || []);
+  const was = shownLang(), onScreen = was ? (pickLanguage(was, form?.languages || []) || was) : null; // before tr changes
+  langStatus.textContent = '';
+  const main = document.querySelector('main'); main?.setAttribute('aria-busy', 'true');
+  const ui = { ...UI_EN, ...staticEn };
+  if (form?.items) Object.assign(ui, welcomeCopy(form, form.items.length));
+  const items = form?.items ? formStrings(form) : {};
+  const total = Object.keys(ui).length + Object.keys(items).length;
+  const seen = { ui: 0, items: 0 };
+  let shown = false;
+  const progress = () => { if (shown && seq === loadSeq) showTranslating(entry, { done: seen.ui + seen.items, total }, onScreen); };
+  const reveal = setTimeout(() => { if (seq === loadSeq) { shown = true; progress(); } }, 300); // no flash when it is already stored
+  try {
+    const store = localStore(), bearer = journey?.bearer ?? null; // S23: the participant's own token, when this tab holds one
+    const [u, it] = await Promise.all([
+      fetchTranslationsProgressive({ lang, context: 'participant-ui', sourceTexts: ui, storage: store, bearer, onProgress: p => { seen.ui = p.done; progress(); } }),
+      form?.items ? fetchTranslationsProgressive({ lang, context: `participant-form:${form.template?.id || 'form'}`, sourceTexts: items, storage: store, bearer, onProgress: p => { seen.items = p.done; progress(); } }) : Promise.resolve({ map: {} }),
+    ]);
+    if (seq !== loadSeq) return;
+    tr = { lang, form, ui: u.map, items: it.map, view: form ? translateForm(form, it.map) : null }; T = makeT(u.map);
+    hideTranslating();
+    langStatus.textContent = entry?.review ? T('machineNoteReview') : T('machineNote');
+  } catch {
+    if (seq !== loadSeq) return;
+    tr = { lang, form, ui: {}, items: {}, view: null }; T = makeT({});
+    showTranslateFailed();
+  } finally {
+    clearTimeout(reveal);
+    if (seq === loadSeq) main?.removeAttribute('aria-busy');
+  }
+  pendingForm = null; rerender();
+}
+langSelect.addEventListener('change', () => { lang = langSelect.value || 'en'; rememberLanguage(localStore(), lang); loadTranslations(); });
+var journey;
+journey = createParticipantJourney({ ...(demo ? sample : { window, storage: sessionStorage }), onChange: paint });
 $('answers').addEventListener('input', () => journey.save(values()));
 $('answers').addEventListener('change', syncOther);
 $('answers').addEventListener('submit', event => { event.preventDefault(); try { journey.review(values(true)); } catch (error) { $('notice').textContent = error.message; } });

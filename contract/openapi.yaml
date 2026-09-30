@@ -876,7 +876,7 @@ paths:
     get:
       operationId: cap.me.invitations
       summary: 'cap.me.invitations — read — roles: any signed-in (own invitations only)'
-      description: Pending collaborator invitations addressed to the signed-in person, matched by hashed email. Each item is id, scope {type, id}, role, inviter_display_name (null — no name is stored), invited_at, expires_at. Never the token, never the invitee hash, never scope contents; anyone else's invitations are simply absent. Accept one with POST /v2/me/invitations/{invitation_id}/accept (cap.grant.accept).
+      description: Pending collaborator invitations addressed to the signed-in person, matched by hashed email. Each item is id, scope {type, id, name, path}, role, inviter_display_name (null — no name is stored), invited_at, expires_at. scope.name is the scope's name and scope.path its names outermost first (assessment — workspace, project, assessment; project — workspace, project; workspace — its name); names only, for these own live invitations only, never parent ids or other scope contents; name null and path empty when the scope row is gone. Never the token, never the invitee hash; anyone else's invitations are simply absent. The invitation-link token path discloses no name. Accept one with POST /v2/me/invitations/{invitation_id}/accept (cap.grant.accept).
       x-capability: cap.me.invitations
       x-class: read
       x-tool: read
@@ -1957,6 +1957,9 @@ paths:
     patch:
       operationId: cap.assessment.update
       summary: 'cap.assessment.update — write.reversible — roles: O, M'
+      description: 'name, purpose, period, language_id, format (string or null); demographics_enabled (boolean, S15a):
+        the facilitator switch for participant demographics, off by default. When off, cap.response.form returns
+        demographics_enabled false with no context_fields and cap.response.submit ignores any context.'
       x-capability: cap.assessment.update
       x-class: write.reversible
       x-tool: write
