@@ -1,7 +1,42 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.24.1",
+  "current": "0.26.0",
   "versions": [
+    {
+      "version": "0.26.0",
+      "status": "candidate",
+      "notes_path": "releases/0.26.0.md",
+      "sections": {
+        "changed": [
+          "The printed survey now says which project, assessment (with the language being evaluated, and the language it is printed in) and survey it belongs to, with the ids in small print, and carries the survey's one shared link as a QR code with the link under it and \"Helper: scan to enter this paper's answers\". A survey with no shared link yet says so on the paper instead of inventing one. Codes are still never printed. (#411)"
+        ],
+        "fixed": [
+          "The printed survey now gives people room to write. Every \"Other (please describe)\" choice keeps its circle or box and has three full-width ruled lines right under it instead of a short blank after the words, and questions answered in words have five ruled lines instead of two. (#409)"
+        ]
+      }
+    },
+    {
+      "version": "0.25.0",
+      "status": "candidate",
+      "notes_path": "releases/0.25.0.md",
+      "sections": {
+        "added": [
+          "Print survey can be printed in the participants' language. When the assessment or its project has participant languages, a \"Language on paper\" choice sits beside Print survey (English first, then the same languages the participant page offers). The questions, answer choices, the passage line and the form's own words come from the same translations the participant page uses; anything not translated yet stays in English and is marked \"EN\" on the paper. English stays the default, and nothing changes for an assessment without languages. (#405)",
+          "A USFM or SFM passage now opens as a readable PDF: when a facilitator uploads the file, the site has PTXprint typeset it once, and participants see the verses on a page instead of backslash codes; the original text stays available, and if the PDF cannot be made the text file is kept and the passage card says \"Text file\". (#403)",
+          "Surveyor mode: after someone submits, the thank-you screen offers \"Interview another person\" — one tap starts a fresh, empty survey from the same link for the next person on the same device (an access-code session goes back to code entry, since a code works once); the earlier answers stay saved. (#406)"
+        ],
+        "fixed": [
+          "Print survey prints only the questionnaire. Print now opens the form as its own page in a new tab and prints it there, so the app's menus, buttons, survey card and dark bands are no longer on the paper, and every answer choice sits in one column that wraps inside the page instead of being cut off at the right edge (seen on an iPhone print of Community-Pastor). Pages are numbered where the browser supports it. Printing the survey screen itself from the browser menu also prints only the form. (#405)",
+          "Taking a survey's participant link again through the API now gives back the survey's one active link instead of making a second one, so every share of a survey is the same link until it is revoked. (#404)",
+          "A passage link added without a title is now named by its passage reference, or by its address (for example \"example.org/sample-genesis-1\"), or \"Link\", instead of only the site name. (#404)",
+          "When a participant sends answers with several required questions left empty, one message now names every missing question and each one is marked on the page, instead of one question at a time. (#404)",
+          "While a review has fewer responses than the minimum (5 for now), Results, the responses list and the report now say the same thing: how many responses are in, how many are needed, and that scores are held until then. Before, the report could still be built with scores from a single response. (#402)"
+        ],
+        "security": [
+          "Someone without a survey link can no longer use the translation service to find out which language names exist; the welcome line that names a language is translated only for a participant, and only for their own survey's language. (#404)"
+        ]
+      }
+    },
     {
       "version": "0.24.1",
       "status": "candidate",

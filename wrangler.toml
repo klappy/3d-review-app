@@ -26,6 +26,9 @@ TRANSLATE_UPSTREAM_URL = "https://rnumwyqmxjqdkygsnbgs.supabase.co/functions/v1/
 # Cloudflare Access (one-time PIN) guards GET /v2/auth/access on this hostname — see src/access.ts. AUD is public.
 ACCESS_TEAM_DOMAIN = "klappy.cloudflareaccess.com"
 ACCESS_AUD = "8a1c350783d5c2d075188d66f22b5b8d6bb9ecb31694acf7f4042c1567035998"
+# PTXprint MCP server (klappy/ptxprint-mcp; public, no key): USFM/SFM passages are typeset into a PDF on upload
+# (src/ptxprint.ts). Unset → the text file is served as before. Production sets its own when promoted.
+PTXPRINT_MCP_URL = "https://ptxprint.klappy.dev/mcp"
 
 [[send_email]]
 name = "EMAIL"
@@ -95,6 +98,9 @@ TRANSLATE_UPSTREAM_URL = "https://rnumwyqmxjqdkygsnbgs.supabase.co/functions/v1/
 # B38 email sign-in link on in production (captain ruling, cookbook work/queued/2026-09-29-3d-prod-email-links/TICKET.md).
 MAGIC_LINK = "on"
 MAGIC_LINK_TTL_MINUTES = "30"
+# PTXprint MCP server (klappy/ptxprint-mcp; public, no key): USFM/SFM passages are typeset into a PDF on upload
+# (src/ptxprint.ts). Unset → the text file is served as before. Production sets its own when promoted.
+PTXPRINT_MCP_URL = "https://ptxprint.klappy.dev/mcp"
 # Passage files in production — bucket "3d-review-passages" exists since 2026-09-29.
 [[env.production.r2_buckets]]
 binding = "PASSAGES"
