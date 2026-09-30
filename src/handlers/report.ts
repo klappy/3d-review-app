@@ -4,6 +4,7 @@ import { CapError, notVisible } from './errors';
 import { buildMaterialized, readMaterialized, listMaterialized, observeBuildEligibility } from '../synthetic-report-store';
 import { mintReportCursor, readReportCursor } from '../report-cursor';
 import { REPORT_VERSIONS } from '../synthetic-report-renderer';
+import { minimumHold, type MinimumHold } from './results';
 const enc=new TextEncoder();
 const control='cap.report.get suppression / access control; a built report is never unsent';
 const impact:Impact={affected:[],irreversible:true,effect:'disclosure',compensating_control:control};
@@ -13,21 +14,25 @@ function params(p:Record<string,unknown>,required:string,optional?:string):strin
   return v;
 }
 const MIXED_REASON='This assessment mixes synthetic and participant responses; a report can only be built from one kind.';
-function held(aid:string,list=false,reason='Report unavailable under the current synthetic reporting policy.'):HandlerResult{
-  return {result:{assessment_id:aid,suppressed:true,status:'held',reason,
+type Why={reason?:string;low?:MinimumHold|null};
+function held(aid:string,list=false,why:Why={}):HandlerResult{
+  const reason=why.reason??'Report unavailable under the current synthetic reporting policy.';
+  return {result:{assessment_id:aid,suppressed:true,status:'held',reason,...(why.low??{}),
     ...(list?{reports:[]}:{report:null}),snapshot_version:null,algorithm_version:null,policy_version:REPORT_VERSIONS.policy},scope:{type:'assessment',id:aid}};
 }
 function failure(reason:string,executeBuild=false):never{
   if(reason==='NOT_VISIBLE')throw notVisible('report');
   throw new CapError('STAGE_CONFLICT',executeBuild?'The report build outcome could not be confirmed. Recheck reports before choosing to retry.':'The report request could not be completed.');
 }
-/** DEV only, after the store has already returned HELD for a visible assessment: name a mixed capture plainly. */
-async function heldReason(ctx:Parameters<Handler>[0],aid:string):Promise<string|undefined>{
-  if(ctx.env.ENVIRONMENT!=='dev')return undefined;
+/** Only after the store has already returned HELD for a visible assessment: below the D7 minimum, name the same numbers
+ * Results and the responses list name; on DEV, name a mixed capture plainly. */
+async function heldReason(ctx:Parameters<Handler>[0],aid:string):Promise<Why>{
+  try{const low=await minimumHold(ctx,aid);if(low)return {reason:low.reason,low};}catch{/* fall through to the plain hold */}
+  if(ctx.env.ENVIRONMENT!=='dev')return {};
   try{
     const r=await ctx.db.prepare(`SELECT count(DISTINCT r.source) AS n FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=?1`).bind(aid).first<{n:number}>();
-    return r&&r.n>1?MIXED_REASON:undefined;
-  }catch{return undefined;}
+    return r&&r.n>1?{reason:MIXED_REASON}:{};
+  }catch{return {};}
 }
 export const build:Handler=async(ctx,p,opts)=>{
   const aid=params(p,'aid');
@@ -43,14 +48,14 @@ export const build:Handler=async(ctx,p,opts)=>{
 };
 export const get:Handler=async(ctx,p)=>{
   const id=params(p,'id');const r=await readMaterialized(ctx,id);
-  if(!r.ok){if(r.reason==='HELD')return held(r.marker.assessment_id);return failure(r.reason);}
+  if(!r.ok){if(r.reason==='HELD')return held(r.marker.assessment_id,false,await heldReason(ctx,r.marker.assessment_id));return failure(r.reason);}
   return {result:{assessment_id:r.value.assessmentId,suppressed:false,report:{id:r.value.id,created_at:r.value.createdAt,payload:r.value.payload}},scope:{type:'assessment',id:r.value.assessmentId}};
 };
 export const list:Handler=async(ctx,p)=>{
   const aid=params(p,'aid','cursor');
   const after=p.cursor===undefined?null:await readReportCursor(ctx.env.SESSION_SECRET,p.cursor,ctx.principal.id,aid,ctx.now());
   const r=await listMaterialized(ctx,aid,after,5);
-  if(!r.ok){if(r.reason==='HELD')return held(r.marker.assessment_id,true);return failure(r.reason);}
+  if(!r.ok){if(r.reason==='HELD')return held(r.marker.assessment_id,true,await heldReason(ctx,r.marker.assessment_id));return failure(r.reason);}
   const next=r.value.afterId===null?null:await mintReportCursor(ctx.env.SESSION_SECRET,ctx.principal.id,aid,r.value.afterId,ctx.now());
   return {result:{assessment_id:aid,suppressed:false,reports:r.value.reports.map(v=>({id:v.id,created_at:v.createdAt})),next_cursor:next},scope:{type:'assessment',id:aid}};
 };
