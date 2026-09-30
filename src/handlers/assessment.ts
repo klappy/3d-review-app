@@ -1,15 +1,19 @@
 // No grant inheritance: assessment reads/writes require an exact assessment grant.
 // Creation and archive membership are deliberately project-scoped per contract.
 import type { Ctx, Handler, Role } from "./types";
+import { templateDisplayName } from "../display-names";
 import { CapError, notVisible } from "./errors";
+import { DEMOGRAPHICS_KEY, demographicsEnabled, parseContextJson } from "../context-fields";
 import { STAGES, countScalar, gate, loadProject, newId, nowIso, patchOf, reqStr, roleAt, type AssessmentRow } from "./common";
+import { lwcOf, saveLwc, saveLwcOnCreate, takeLwc } from "./lwc";
+import { missingTable as missingPassageTable } from "../passages";
 
 async function exact(ctx: Ctx, id: string, min: Role = "viewer") {
   const row = await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
   if (!row) throw notVisible("assessment");
   return { row, role: gate(await roleAt(ctx, "assessment", id), min, "assessment") };
 }
-const view = (a: AssessmentRow, role: Role) => ({ ...a, role });
+const view = (a: AssessmentRow, role: Role) => { const { lwc_json: _raw, ...rest } = a as AssessmentRow & { lwc_json?: unknown }; return { ...rest, lwc: lwcOf(a), role }; };
 async function language(ctx: Ctx, pid: string, languageId: string) {
   const row = await ctx.db.prepare("SELECT id, archived_at FROM language WHERE id = ? AND project_id = ?").bind(languageId, pid).first<{id:string; archived_at: string | null}>();
   if (!row) throw notVisible("language");
@@ -18,6 +22,7 @@ async function language(ctx: Ctx, pid: string, languageId: string) {
 export const create: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
   await loadProject(ctx, pid, "member");
+  const lwc = takeLwc(params);
   const name = reqStr(params, "name"), language_id = reqStr(params, "language_id");
   await language(ctx, pid, language_id);
   const id = newId("assess"), at = nowIso(ctx);
@@ -28,7 +33,8 @@ export const create: Handler = async (ctx, params) => {
     ctx.db.prepare("INSERT INTO assessment (id, project_id, language_id, name, purpose, period, format, stage, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'prepare', ?, ?)").bind(id, pid, language_id, name, purpose, period, format, at, ctx.principal.id),
     ctx.db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(newId("grant"), ctx.principal.id, "assessment", id, "owner", at),
   ]);
-  return { result: { assessment: { id, project_id: pid, language_id, name, purpose, period, format, stage: "prepare", archived_at: null, created_at: at, role: "owner" } }, scope: { type: "assessment", id } };
+  const saved = await saveLwcOnCreate(ctx, "assessment", id, lwc);
+  return { result: { assessment: { id, project_id: pid, language_id, name, purpose, period, format, lwc: saved, stage: "prepare", archived_at: null, created_at: at, role: "owner" } }, scope: { type: "assessment", id } };
 };
 export const list: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
@@ -36,19 +42,50 @@ export const list: Handler = async (ctx, params) => {
   const {results} = await ctx.db.prepare('SELECT a.*, g.role, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id WHERE s.assessment_id = a.id) AS response_count FROM assessment a JOIN "grant" g ON g.scope_type = ? AND g.scope_id = a.id WHERE a.project_id = ? AND g.principal_id = ? ORDER BY a.created_at').bind("assessment", pid, ctx.principal.id).all<AssessmentRow & {role:Role; response_count:number}>();
   return { result: { assessments: results.map(a => ({ ...view(a, a.role), response_count: Number(a.response_count) || 0 })) }, scope: { type: "project", id: pid } };
 };
+// Survey rows carry the template's display name (Translators, Team leaders & mentors); the pinned name stays as source_name.
+function shownSurvey(s: Record<string, unknown>) {
+  const id = String(s.template_id ?? ""), name = String(s.template_name ?? ""), shown = templateDisplayName(id, name);
+  return shown === name ? s : { ...s, template_name: shown, template_source_name: name };
+}
+
 export const get: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id);
   const {results} = await ctx.db.prepare("SELECT s.id, s.template_id, s.template_version, s.state, s.collection_status, s.archived_at, s.created_at, t.name AS template_name, t.perspective FROM assessment_survey s JOIN survey_template t ON t.id = s.template_id AND t.version = s.template_version WHERE s.assessment_id = ? ORDER BY s.created_at").bind(id).all();
-  return { result: { assessment: view(row, role), surveys: results }, scope: { type: "assessment", id } };
+  return { result: { assessment: { ...view(row, role), demographics_enabled: await readDemographics(ctx, id) }, surveys: results.map(s => shownSurvey(s as Record<string, unknown>)) }, scope: { type: "assessment", id } };
 };
+async function readDemographics(ctx: Ctx, id: string): Promise<boolean> {
+  const { results } = await ctx.db.prepare("SELECT context_json FROM assessment_survey WHERE assessment_id = ? AND state = 'selected'").bind(id).all<{ context_json?: string }>();
+  return (results || []).some((r) => demographicsEnabled(r.context_json));
+}
+async function writeDemographics(ctx: Ctx, id: string, on: boolean): Promise<boolean> {
+  const { results } = await ctx.db.prepare("SELECT id, context_json FROM assessment_survey WHERE assessment_id = ?").bind(id).all<{ id: string; context_json?: string }>();
+  const rows = results || [];
+  if (rows.length) await ctx.db.batch(rows.map((r) => ctx.db.prepare("UPDATE assessment_survey SET context_json = ? WHERE id = ?")
+    .bind(JSON.stringify({ ...parseContextJson(r.context_json), [DEMOGRAPHICS_KEY]: on }), r.id)));
+  // Read back: with no group selected yet there is nowhere to store the switch, so it honestly reads off.
+  return readDemographics(ctx, id);
+}
 export const update: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id, "member");
-  const patch = patchOf(params, ["name", "purpose", "period", "language_id", "format"]);
+  const lwc = takeLwc(params); // removes lwc from params
+  // S15a: demographics_enabled is the facilitator's per-assessment switch (off by default); it is stored in each
+  // group's assessment_survey.context_json. Participants hold no assessment grant, so they can never reach this.
+  const { demographics_enabled: demographicsParam, ...rest } = params;
+  if (demographicsParam !== undefined && typeof demographicsParam !== "boolean") throw new CapError("INVALID_PARAMS", "demographics_enabled must be a boolean");
+  // S13: an LWC-only update (the Prepare languages field) touches nothing else.
+  if (lwc !== undefined && demographicsParam === undefined && Object.keys(rest).every(k => k === "id")) {
+    await saveLwc(ctx, "assessment", id, lwc);
+    return { result: { assessment: { ...view(row, role), lwc } }, scope: { type: "assessment", id }, priorState: { lwc: lwcOf(row).join(",") } };
+  }
+  const onlySwitch = demographicsParam !== undefined && !Object.keys(rest).some((k) => k !== "id");
+  const patch = onlySwitch ? {} as Record<string, string | null> : patchOf(rest, ["name", "purpose", "period", "language_id", "format"]);
   if (patch.name !== undefined && !patch.name) throw new CapError("INVALID_PARAMS", "name cannot be empty");
   if (patch.language_id !== undefined) { if (!patch.language_id) throw new CapError("INVALID_PARAMS", "language_id cannot be empty"); await language(ctx, row.project_id, patch.language_id); }
   const next = { name: patch.name ?? row.name, purpose: patch.purpose === undefined ? row.purpose : patch.purpose, period: patch.period === undefined ? row.period : patch.period, language_id: patch.language_id ?? row.language_id, format: patch.format === undefined ? row.format : patch.format };
   await ctx.db.prepare("UPDATE assessment SET name = ?, purpose = ?, period = ?, language_id = ?, format = ? WHERE id = ?").bind(next.name, next.purpose, next.period, next.language_id, next.format, id).run();
-  return { result: { assessment: view({...row, ...next}, role) }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format} };
+  if (lwc !== undefined) await saveLwc(ctx, "assessment", id, lwc);
+  const demographics_enabled = demographicsParam === undefined ? await readDemographics(ctx, id) : await writeDemographics(ctx, id, demographicsParam);
+  return { result: { assessment: { ...view({...row, ...next}, role), demographics_enabled, ...(lwc !== undefined ? { lwc } : {}) } }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format, ...(lwc !== undefined ? { lwc: lwcOf(row).join(",") } : {})} };
 };
 export const set_stage: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id, "member");
@@ -84,17 +121,46 @@ export const notes_update: Handler = async (ctx, params) => {
   await ctx.db.prepare("UPDATE assessment SET notes_reflection = ?, notes_next_steps = ? WHERE id = ?").bind(notes_reflection,notes_next_steps,id).run();
   return {result:{assessment:view({...row,notes_reflection,notes_next_steps},role)},scope:{type:"assessment",id},priorState:{notes_reflection:row.notes_reflection,notes_next_steps:row.notes_next_steps}};
 };
+/** Every passage row of an assessment, removed ones included (migration 0013; none when the table is not there yet). */
+async function passageRows(ctx: Ctx, id: string): Promise<{ table: boolean; rows: { object_key: string | null; archived_at: string | null }[] }> {
+  try { return { table: true, rows: (await ctx.db.prepare("SELECT object_key, archived_at FROM assessment_passage WHERE assessment_id = ?").bind(id).all<{ object_key: string | null; archived_at: string | null }>()).results }; }
+  catch (e) { if (missingPassageTable(e)) return { table: false, rows: [] }; throw e; }
+}
 export const del: Handler = async (ctx, params, opts) => {
   const id = reqStr(params,"id"), {row} = await exact(ctx,id,"owner");
   const surveys = await countScalar(ctx,"SELECT COUNT(*) AS n FROM assessment_survey WHERE assessment_id = ?",id);
   const responses = await countScalar(ctx,"SELECT COUNT(*) AS n FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id WHERE s.assessment_id = ?",id);
-  const impact = {affected:[{assessment:id,surveys,responses}],irreversible:true,effect:"destructive" as const,retention:"D5 held: only empty assessments can be hard-deleted"};
+  // Audit round 1 W3: assessment_passage.assessment_id REFERENCES assessment(id), so ANY passage row — a removed
+  // (archived) one included — made the execute fail with a D1 FOREIGN KEY error after the dry run had said "empty".
+  // Passages are the facilitator's reading material, not participant data (D5 is about surveys and responses): the dry
+  // run counts the active ones, and the execute deletes every passage row in the same batch, then their stored files.
+  const passages = await passageRows(ctx, id);
+  const active = passages.rows.filter((p) => !p.archived_at).length;
+  const impact = {affected:[{assessment:id,surveys,responses,passages:active}],irreversible:true,effect:"destructive" as const,retention:"D5 held: only empty assessments can be hard-deleted (no surveys, no responses); its passages and their files are deleted with it"};
   if(opts?.dryRun) return {result:{assessment:view(row,"owner")},scope:{type:"assessment",id},impact};
   if(surveys || responses) throw new CapError("INVALID_PARAMS","assessment is not empty","deselect surveys first");
   await ctx.db.batch([
+    ...(passages.table ? [ctx.db.prepare("DELETE FROM assessment_passage WHERE assessment_id = ?").bind(id)] : []),
     ctx.db.prepare('DELETE FROM "grant" WHERE scope_type = ? AND scope_id = ?').bind("assessment",id),
     ctx.db.prepare("DELETE FROM assessment WHERE id = ?").bind(id),
   ]);
+  // After the rows are gone (a failed batch leaves files and rows together). Removed passages already dropped their file
+  // (src/passages.ts handleRemove); deleting again is a no-op and catches one that failed then. The files are also found
+  // by LISTING the assessment's prefix (src/passages.ts keys), not only from the rows read above: a file uploaded between
+  // that read and the batch lost its row in the batch and must not keep its stored object (review of #396).
+  const bucket = (ctx.env as { PASSAGES?: R2Bucket }).PASSAGES, found = new Set(passages.rows.flatMap((p) => p.object_key ? [p.object_key] : []));
+  if (bucket) {
+    try {
+      for (let cursor: string | undefined, more = true; more;) {
+        const page = await bucket.list({ prefix: `assessments/${id}/`, cursor, limit: 1000 });
+        for (const o of page.objects) found.add(o.key);
+        more = page.truncated; cursor = page.truncated ? page.cursor : undefined;
+      }
+    } catch (e) { console.error("assessment.delete passage_list", id, String(e)); }
+    const keys = [...found];
+    for (let i = 0; i < keys.length; i += 1000) // R2 deletes at most 1000 keys per call
+      await bucket.delete(keys.slice(i, i + 1000)).catch((e) => console.error("assessment.delete passage_files", id, String(e)));
+  }
   return {result:{deleted:true,id},scope:{type:"assessment",id},impact,priorState:{assessment:row}};
 };
 export const handlers: Record<string,Handler> = {

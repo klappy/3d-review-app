@@ -1,30 +1,45 @@
 // Source-shaped presentation only: no API, storage, credential or submission ownership.
 import { periodText } from './v3/components/active-until.js';
 import { PRIVACY_LINE } from './v3/components/privacy-line.js';
-export function itemError(item, values) {
+import { fillTranslated } from './shared-link.js';
+export function itemError(item, values, t = (k, f) => f) {
   const value = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id);
   const empty = value === null || value === '' || (Array.isArray(value) && !value.length);
-  if (empty && item.required !== false) return `Answer required: ${item.text || item.id}`;
-  if (item.type === 'multi' && Array.isArray(value) && value.length > 1 && (item.options || []).some(opt => opt.exclusive && value.includes(opt.code))) return `An exclusion choice cannot be combined: ${item.text || item.id}`;
+  if (empty && item.required !== false) return `${t('answerRequired', 'Answer required:')} ${item.text || item.id}`;
+  if (item.type === 'multi' && Array.isArray(value) && value.length > 1 && (item.options || []).some(opt => opt.exclusive && value.includes(opt.code))) return `${t('exclusionError', 'An exclusion choice cannot be combined:')} ${item.text || item.id}`;
   return null;
 }
 
 // B09: the optional "About you" block from cap.response.form context_fields (age range, gender; each has "Prefer not to say").
 // Nothing here is required; an untouched select sends nothing.
-export function drawAbout(doc, fields = []) {
+// S15a: demographics are off by default; the facilitator turns them on per assessment. Only an explicit
+// demographics_enabled === true on the form opens the block, so an older or partial form never shows it.
+export const aboutFields = model => model?.demographics_enabled === true && Array.isArray(model.context_fields) ? model.context_fields : [];
+export function drawAbout(doc, fields = [], t = (k, f) => f) {
   if (!fields.length) return null;
   const box = doc.createElement('fieldset'); box.className = 'participant-about'; box.dataset.about = '';
-  const legend = doc.createElement('legend'); legend.textContent = 'About you (optional)'; box.append(legend);
+  const legend = doc.createElement('legend'); legend.textContent = t('aboutYou', 'About you (optional)'); box.append(legend);
   for (const f of fields) {
     const label = doc.createElement('label'), select = doc.createElement('select'); label.textContent = f.label; select.name = `about-${f.key}`; select.dataset.key = f.key;
-    const blank = doc.createElement('option'); blank.value = ''; blank.textContent = 'Choose (optional)'; select.append(blank);
+    const blank = doc.createElement('option'); blank.value = ''; blank.textContent = t('chooseOptional', 'Choose (optional)'); select.append(blank);
     for (const o of f.options || []) { const opt = doc.createElement('option'); opt.value = o.code; opt.textContent = o.label; select.append(opt); }
     label.append(select); box.append(label);
   }
   return box;
 }
 export const aboutValues = box => { const out = {}; for (const s of box ? box.querySelectorAll('select[data-key]') : []) if (s.value) out[s.dataset.key] = s.value; return out; };
-export function mountParticipantView({doc,root,form,questions,review,reviewAnswers,receipt,context,model,onEdit,reviewButton,about}) {
+// Put About-you choices back after the block is redrawn (a translation redraw builds new selects; gate 0.24.0 audit).
+export const setAboutValues = (box, values = {}) => { for (const s of box ? box.querySelectorAll('select[data-key]') : []) if (typeof values[s.dataset.key] === 'string') s.value = values[s.dataset.key]; };
+// The assembled English sentences of the welcome, shared with page.js so the translation request carries exactly
+// what the page would show (dynamic translation, captain ruling 2026-09-28).
+export function welcomeCopy(model, count) {
+  return {
+    lead: `${model?.language?`You were invited to say how the ${model.language} translation is going. `:''}${PRIVACY_LINE}`,
+    time: `Time: about ${Math.max(5,Math.round(count*0.6))} minutes · ${count} questions`,
+  };
+}
+const QUESTION_OF='Question {n} of {total}';
+export function mountParticipantView({doc,root,form,questions,review,reviewAnswers,receipt,context,model,onEdit,reviewButton,about,t=(k,f)=>f}) {
   const fields = [...questions.children];
   const items = model?.items;
   if (!Array.isArray(items) || !items.length || fields.length !== items.length || fields.some((f,i)=>f.dataset.item !== items[i].id)) throw new Error('Participant item/fieldset mismatch');
@@ -42,9 +57,10 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   // title, lead, one full-width primary Start (B30: Time and no-sign-in lines sit behind "Learn more"). Presentation only; nothing stored.
   const eyebrowText=[model.template?.perspective,model.assessment].filter(v=>v!==null&&v!==undefined&&v!=='').join(' · ');
   if(eyebrowText){const eb=el('p',eyebrowText);eb.className='eyebrow';intro.append(eb);}
-  intro.append(el('h2','We would like your perspective'));
+  intro.append(el('h2',t('welcome','We would like your perspective')));
   // Invitation + privacy sentence stays visible as the one short line (Bincy B27 privacy wording is captain-held, ASK 9/15).
-  const lead=el('p',`${model.language?`You were invited to say how the ${model.language} translation is going. `:''}${PRIVACY_LINE}`);lead.className='participant-lead';intro.append(lead);
+  const copy=welcomeCopy(model,items.length);
+  const lead=el('p',t('lead',copy.lead));lead.className='participant-lead';intro.append(lead);
   // Bincy B30 (LANES 18:35 ruling): one heading, one short line, one primary action; explanations behind "Learn more".
   // Bincy B10: the shared context setup step 3 lists ("Shown to every participant"), once, as a compact meta row.
   const shared=[model.project,model.language,model.purpose,model.format,periodText(model.period)].map(v=>typeof v==='string'?v.trim():'').filter(Boolean).join(' · ');
@@ -53,17 +69,17 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   // unbroken path widened the intro to 697px on a 375px phone (TRAINING.md #10). Kept on the model, never painted here.
   // B09: optional "About you" (age range, gender) sits before Q1, outside the pinned instrument; Start skips it untouched.
   if(about)intro.append(about);
-  const start=button('Start',()=>showForm(0));start.className='rv-btn primary participant-start';intro.append(start);
+  const start=button(t('start','Start'),()=>showForm(0));start.className='rv-btn primary participant-start';intro.append(start);
   // Time and no-sign-in lines keep their wording, moved behind a native disclosure; nothing dropped.
-  const more=el('details');more.className='participant-more';more.append(el('summary','Learn more'));
-  const time=el('p',`Time: about ${Math.max(5,Math.round(items.length*0.6))} minutes · ${items.length} questions`);time.className='participant-meta';
-  const foot=el('p','No account, no sign-in. You can review your answers before you send them.');foot.className='participant-foot';
+  const more=el('details');more.className='participant-more';more.append(el('summary',t('learnMore','Learn more')));
+  const time=el('p',t('time',copy.time));time.className='participant-meta';
+  const foot=el('p',t('foot','No account, no sign-in. You can review your answers before you send them.'));foot.className='participant-foot';
   more.append(time,foot);intro.append(more);
   const nav=el('div');nav.className='participant-pager';nav.hidden=true;
   const progress=el('p');progress.className='participant-progress eyebrow';progress.setAttribute('aria-live','polite');
   const controls=el('div');controls.className='participant-page-actions';
-  const back=button('Back',()=>showForm(Math.max(0,index-1)));
-  const next=button('Next',()=>{if(validItem(index))showForm(index+1);});
+  const back=button(t('back','Back'),()=>showForm(Math.max(0,index-1)));
+  const next=button(t('next','Next'),()=>{if(validItem(index))showForm(index+1);});
   back.className='rv-btn quiet';next.className='rv-btn primary';
   controls.append(back,next);
   // v3 L1-8: prototype frame 9 segmented progress (one segment per question); decorative, the eyebrow text is the live label.
@@ -79,14 +95,14 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
     index=Math.max(0,Math.min(items.length-1,i));
     fields.forEach((f,k)=>f.hidden=k!==index);
     intro.hidden=true;nav.hidden=false;error.hidden=true;
-    progress.textContent=`Question ${index+1} of ${items.length}`;
+    progress.textContent=fillTranslated(t('questionOf',QUESTION_OF),QUESTION_OF,{n:index+1,total:items.length}); // one template: word order follows the language
     segs.forEach((seg,k)=>{seg.className=k<=index?'done':'';});
     back.disabled=index===0;next.hidden=index===items.length-1;
     focusField(index);
   }
   function revealAll(){fields.forEach(f=>f.hidden=false);}
   function validItem(i){
-    const message=itemError(items[i],values());
+    const message=itemError(items[i],values(),t);
     if(message){showForm(i);error.textContent=message;error.hidden=false;fields[i].querySelector('input,textarea,select')?.focus();return false;}
     validatingItem=true;
     try {
@@ -107,7 +123,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
     intro.hidden=true;nav.hidden=true;error.hidden=true;removeChanges();
     const rows=[...reviewAnswers.children];
     if(rows.length!==items.length)return;
-    rows.forEach((row,i)=>{const change=button('Change',()=>{onEdit?.(i);showForm(i);});change.className='participant-change';row.append(change);changes.push(change);});
+    rows.forEach((row,i)=>{const change=button(t('change','Change'),()=>{onEdit?.(i);showForm(i);});change.className='participant-change';row.append(change);changes.push(change);});
   }
   function showReceipt(){intro.hidden=true;nav.hidden=true;error.hidden=true;removeChanges();}
   function reset(){index=0;revealAll();removeChanges();intro.hidden=false;nav.hidden=true;error.hidden=true;}

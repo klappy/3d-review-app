@@ -220,6 +220,21 @@ test('lane 12 L12-1: lead organisation rides cap.project.create only when given 
   assert.match(renderStep('review', draft({ project: NEW_PROJECT, newProject: 'H', newOrg: 'Org' }), { projects: [], languages: [], templates: [] }, [], false, ''), /<dt>Lead organisation<\/dt><dd>Org<\/dd>/);
 });
 
+// S24 (DEV 0.24.0 persona pass): a new project's languages participants may switch to ride the ASSESSMENT only. No screen edits a
+// project's languages and participants see the union, so a project-level copy would outlive every later untick on Prepare.
+test('S24: new project + chosen languages → lwc on cap.assessment.create only, never on cap.project.create (launch and save)', () => {
+  const d = draft({ project: NEW_PROJECT, newProject: 'Hill', newLanguage: 'L', lwc: ['th', 'lo'] });
+  const bodies = plan => plan.filter(s => ['cap.project.create', 'cap.assessment.create'].includes(s.cap)).map(s => [s.cap, s.body({ lid: 'l1' }).lwc ?? null]);
+  assert.deepEqual(bodies(launchPlan(d)), [['cap.project.create', null], ['cap.assessment.create', 'lo,th']]);
+  assert.deepEqual(bodies(savePlan(d)), [['cap.project.create', null], ['cap.assessment.create', 'lo,th']]);
+  assert.deepEqual(launchPlan(d)[0].body({}), { name: 'Hill' });
+  assert.deepEqual(launchPlan({ ...d, newOrg: 'SIL' })[0].body({}), { name: 'Hill', organization: 'SIL' });
+  // an existing project: the assessment still carries them; no project write at all
+  const existing = launchPlan(draft({ lwc: ['lo'] }));
+  assert.ok(!existing.some(s => s.cap === 'cap.project.create'));
+  assert.equal(existing.find(s => s.cap === 'cap.assessment.create').body({ lid: 'l1' }).lwc, 'lo');
+});
+
 test('L2-4 setup look follows the design-system-v3 prototype: short stepper labels, perspective dots', () => {
   assert.deepEqual(STEP_TITLES, ['Details', 'Participants', 'Information', 'Review']);
   assert.equal(pdot('Translation team'), 'p-team'); assert.equal(pdot('Community'), 'p-community'); assert.equal(pdot('Church'), 'p-church'); assert.equal(pdot('Other'), 'p-reviewer');
@@ -251,8 +266,18 @@ test('L2-5: group titles are h3 on participants and information (prototype frame
 test('L2-6: review rows carry the perspective dot and prototype sub-line (V.setupReview)', () => {
   const tpl = { id: 'tpl.team', version: 1, name: 'Team', perspective: 'Translation team' };
   const r = renderStep('review', { ...freshDraft(), name: 'X', project: 'p1', language: 'l1', groups: { 'tpl.team': { version: 1, expected: '' } } }, { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates: [tpl] });
-  assert.match(r, /<dt><span class="pdot wz-kvdot p-team" aria-hidden="true"><\/span>Translation team<\/dt><dd>no number given<\/dd>/);
+  assert.match(r, /<dt><span class="pdot wz-kvdot p-team" aria-hidden="true"><\/span>Translation team <span aria-hidden="true">·<\/span> <span data-wz-review-survey>Team<\/span><\/dt><dd>no number given<\/dd>/);
   assert.match(r, /Check the details, then launch\./); assert.match(r, /<summary>Learn more<\/summary><p class="muted">Launching opens the survey links; nothing is sent to anyone\.<\/p>/);
+});
+
+test('Gate 0.23.0 F1: step 4 Review "Who will participate" names the survey on every row, not only the perspective', () => {
+  const templates = [{ id: 't.church.a', version: 1, name: 'Church leaders', perspective: 'Church' }, { id: 't.church.b', version: 1, name: 'Church members', perspective: 'Church' }, { id: 't.team', version: 2, name: 'Translation team check', perspective: 'Translation Team' }];
+  const groups = { 't.church.a': { version: 1, expected: '' }, 't.church.b': { version: 1, expected: '' }, 't.team': { version: 2, expected: '2' } };
+  const r = renderStep('review', { ...freshDraft(), name: 'X', project: 'p1', language: 'l1', groups }, { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates });
+  const sec = r.slice(r.indexOf('<h3>Who will participate</h3>'), r.indexOf('<h3>Participant information</h3>'));
+  const rows = [...sec.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([^<]*)<\/dd>/g)].map(m => [m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(), m[2]]);
+  assert.deepEqual(rows, [['Church · Church leaders', 'no number given'], ['Church · Church members', 'no number given'], ['Translation Team · Translation team check', '2 expected']]);
+  assert.equal((sec.match(/data-wz-review-survey/g) || []).length, 3, 'one survey name per row');
 });
 
 test('L2-7 wizard composes the shared Stepper component (ruling 12:34): no local copy', async () => {
@@ -592,4 +617,39 @@ test('U46: setup refuses a past Active until date with one inline line under the
   const html = renderStep('details', draft({ starts: '', until: '2020-01-31' }), { projects: [], languages: [], templates: [] }, errs);
   assert.match(html, /name="until" value="2020-01-31" required><span class="wz-field-error" role="alert" data-until-error>Pick today or later<\/span><\/label>/);
   assert.doesNotMatch(html, /class="note alert"/, 'not repeated in the top box');
+});
+test('Setup "Starts" defaults to the facilitator\'s local today, late evening west of UTC included', t => {
+  const tz = process.env.TZ; process.env.TZ = 'America/New_York';
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-29T01:30:00Z') }); // 21:30 on 28 Sep in New York, already 29 Sep in UTC
+  try {
+    assert.equal(freshDraft().starts, '2026-09-28');
+    assert.match(renderStep('details', freshDraft(), { projects: [], languages: [], templates: [] }), /name="starts" value="2026-09-28"/);
+  } finally { t.mock.timers.reset(); if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz; }
+});
+
+import { shellModel } from '../kit/app-adapter.js';
+import { crumbRow } from '../kit/core.js';
+import { readFileSync } from 'node:fs';
+import { routes as appRoutes } from '../assess/cards.js';
+test('B14: Launch → "Open the review" re-reads the projects first, so Collect crumbs read Home › Project › Assessment', async () => {
+  const srv = server(), order = [], known = { projects: [{ id: 'p1', name: 'Lake', role: 'owner' }], workspaces: new Map(), lists: new Map() }; // the boot list: no pN yet
+  const crumbs = () => [...crumbRow(shellModel({ route: { kind: 'assessment', id: 'a1' }, routes: appRoutes, principal: { id: 'x' }, known, current: { assessment: srv.db.a } }).ancestors.filter(x => x.visible), '').matchAll(/data-crumb="(\w+)"/g)].map(x => x[1]);
+  const m = mount(srv, { assessmentHref: id => `#assessment/${id}`, go: hash => order.push(hash),
+    beforeOpen: async aid => { order.push('reload ' + aid); await tick(); known.projects = [...known.projects, { id: 'pN', name: 'Hill project', role: 'owner' }]; } });
+  await fillStep1(m, { project: NEW_PROJECT }); m.submit(); await settle();
+  m.$('input[name=g][value="tpl.team"]').checked = true; m.submit(); await settle(); m.submit(); await settle();
+  m.click('[data-wz="launch"]'); await settle(12);
+  assert.ok(m.h.state.done);
+  assert.deepEqual(crumbs(), ['home', 'assessment'], 'without the re-read the new project is unknown (the B14 failure)');
+  m.click('[data-wz="open"]'); await settle();
+  assert.deepEqual(order, ['reload a1', '#assessment/a1'], 'the project list is re-read before Collect opens');
+  assert.deepEqual(crumbs(), ['home', 'project', 'assessment']);
+});
+test('B14: a failed re-read still opens the review; the app host wires the re-read to its project list read', async () => {
+  const srv = server(), m = mount(srv, { assessmentHref: id => `#assessment/${id}`, beforeOpen: async () => { throw new Error('offline'); } });
+  await fillStep1(m); m.submit(); await settle(); m.$('input[name=g][value="tpl.team"]').checked = true; m.submit(); await settle(); m.submit(); await settle();
+  m.click('[data-wz="launch"]'); await settle(12); m.click('[data-wz="open"]'); await settle();
+  assert.deepEqual(m.went, ['#assessment/a1']);
+  const src = readFileSync(new URL('../assess/assess.js', import.meta.url), 'utf8');
+  assert.match(src, /beforeOpen: \(\) => \(idg === identityGeneration \? reloadProjects\(\) : false\)/);
 });

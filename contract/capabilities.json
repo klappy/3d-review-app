@@ -819,7 +819,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "Prepare",
-      "notes": "name, purpose, period, language, format",
+      "notes": "name, purpose, period, language, format; demographics_enabled (boolean, S15a: facilitator switch, off by default, stored per group in assessment_survey.context_json)",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -1510,12 +1510,12 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "sign-in landing: \"Accept invitation\" first (B04 step c)",
-      "notes": "pending collaborator invitations addressed to the signed-in person, matched by hashed email: id, scope {type,id}, role, inviter_display_name (null — no name is stored), invited_at, expires_at; never the token, never the invitee hash, never scope contents; others' invitations are simply absent (captain ruling 2026-09-28 15:27 ET k0015)",
+      "notes": "pending collaborator invitations addressed to the signed-in person, matched by hashed email: id, scope {type,id,name,path}, role, inviter_display_name (null — no name is stored), invited_at, expires_at; never the token, never the invitee hash; others' invitations are simply absent (captain ruling 2026-09-28 15:27 ET k0015). S19 (captain 2026-09-29): for these own, live invitations only, scope.name is the scope's name and scope.path its names outermost first (assessment: workspace › project › assessment; project: workspace › project; workspace: its name) — names only, no parent ids, no other scope contents; name null and path [] when the scope row is gone. The #invite= token path (cap.grant.accept) still discloses no name",
       "status": "target",
       "inverse": { "kind": "n/a" },
       "public": false,
       "params_schema": { "type": "object", "properties": {} },
-      "result_schema": { "type": "object", "required": ["invitations"], "properties": { "invitations": { "type": "array", "items": { "type": "object", "required": ["id", "scope", "role", "expires_at"], "properties": { "id": { "type": "string" }, "scope": { "type": "object", "properties": { "type": { "enum": ["workspace", "project", "assessment"] }, "id": { "type": "string" } } }, "role": { "enum": ["viewer", "member", "owner"] }, "inviter_display_name": { "type": ["string", "null"] }, "invited_at": { "type": "string" }, "expires_at": { "type": ["string", "null"] } } } } } }
+      "result_schema": { "type": "object", "required": ["invitations"], "properties": { "invitations": { "type": "array", "items": { "type": "object", "required": ["id", "scope", "role", "expires_at"], "properties": { "id": { "type": "string" }, "scope": { "type": "object", "properties": { "type": { "enum": ["workspace", "project", "assessment"] }, "id": { "type": "string" }, "name": { "type": ["string", "null"] }, "path": { "type": "array", "items": { "type": "string" } } } }, "role": { "enum": ["viewer", "member", "owner"] }, "inviter_display_name": { "type": ["string", "null"] }, "invited_at": { "type": "string" }, "expires_at": { "type": ["string", "null"] } } } } } }
     },
     {
       "id": "cap.grant.update_role",

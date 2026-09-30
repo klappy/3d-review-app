@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
-import { drawAbout, aboutValues, mountParticipantView } from './participant-view.js';
+import { drawAbout, aboutValues, aboutFields, mountParticipantView } from './participant-view.js';
 import { RESPONDENT_FIELDS } from './v3/components/context-fields.js';
 
 test('About you sits in the welcome before Start, every select optional with Prefer not to say', () => {
@@ -22,4 +22,17 @@ test('About you sits in the welcome before Start, every select optional with Pre
   selects[1].value = 'prefer_not';
   assert.deepEqual(aboutValues(about), { gender: 'prefer_not' });
   assert.equal(drawAbout(doc, []), null);
+});
+
+// S15a: hidden unless the facilitator turned demographics on for the assessment (off by default).
+test('About you is hidden unless the form says demographics_enabled === true', () => {
+  const { window } = new JSDOM('<main></main>');
+  const doc = window.document;
+  for (const model of [{ context_fields: RESPONDENT_FIELDS }, { demographics_enabled: false, context_fields: RESPONDENT_FIELDS }, { demographics_enabled: 'true', context_fields: RESPONDENT_FIELDS }, null]) {
+    assert.deepEqual(aboutFields(model), []);
+    assert.equal(drawAbout(doc, aboutFields(model)), null);
+  }
+  const on = { demographics_enabled: true, context_fields: RESPONDENT_FIELDS };
+  assert.deepEqual(aboutFields(on).map(f => f.key), ['age_range', 'gender']);
+  assert.ok(drawAbout(doc, aboutFields(on)));
 });

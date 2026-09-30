@@ -18,6 +18,7 @@ describe("local synthetic owner login", () => {
       .split(";").map(s => s.trim()).filter(Boolean).map(s => db.prepare(s));
     await db.batch(statements("../migrations/0001_init.sql"));
     await db.batch(statements("../seed/synthetic.sql"));
+    await db.batch(statements("../migrations/0011_context.sql")); // S15b: cap.assessment.get reads the demographics switch (assessment_survey.context_json)
     const email = "demo.owner@example.invalid";
     const owner = await db.prepare("SELECT id, provisioned FROM principal WHERE email_hash = ?")
       .bind(await sha256(email)).first<{ id: string; provisioned: number }>();

@@ -67,3 +67,24 @@ export function validateContext(fields: ContextField[], value: unknown, what = "
   }
   return out;
 }
+
+// S15a: demographics are off by default. The facilitator turns them on per assessment; the flag lives in each of the
+// assessment's assessment_survey.context_json rows (migration 0011) under DEMOGRAPHICS_KEY. A row without the key,
+// or a pre-0011 row, reads as off. When off, participants see no About you block and any respondent context is ignored.
+export const DEMOGRAPHICS_KEY = "demographics_enabled";
+export function parseContextJson(raw: unknown): Record<string, unknown> {
+  try { const v = JSON.parse(String(raw ?? "{}")); if (v && typeof v === "object" && !Array.isArray(v)) return v as Record<string, unknown>; } catch { /* pre-0011 row */ }
+  return {};
+}
+export const demographicsEnabled = (raw: unknown): boolean => parseContextJson(raw)[DEMOGRAPHICS_KEY] === true;
+/** The facilitator's group-level fields only: the S15a switch is a setting, not group context. */
+export function groupContextOnly(raw: unknown): Record<string, unknown> {
+  const { [DEMOGRAPHICS_KEY]: _flag, ...rest } = parseContextJson(raw);
+  return rest;
+}
+
+// S15c: results, reports and exports carry demographic (age range, gender) breakdown columns only when the facilitator
+// turned demographics on for the assessment. Off (the default, or a missing key) means no demographic key at all.
+export function demographicsProjection(enabled: boolean): { demographics_enabled: boolean; demographic_fields?: ContextField[] } {
+  return enabled ? { demographics_enabled: true, demographic_fields: RESPONDENT_FIELDS } : { demographics_enabled: false };
+}

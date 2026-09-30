@@ -1,3 +1,4 @@
+import { lwcByCode } from './v3/lwc.js';
 import fixture from './demo-data.js';
 // Demonstration data only. Reuses production screens; never falls through to network.
 export const isDemo = search => new URLSearchParams(search).get('demo') === '1';
@@ -5,7 +6,9 @@ export function memoryStorage() { const data = new Map(); return { getItem: k =>
 const assessment = { id: 'demo-assessment', project_id: 'demo-project', name: 'Earning trust · synthetic January 2026', period: 'Demonstration', language_id: 'demo-language', format: 'written', stage: 'collect', role: 'viewer', purpose: 'Explore the real review screens with demonstration data.', notes_reflection: '', notes_next_step: '' };
 const project = { id: 'demo-project', workspace_id: 'demo-workspace', name: 'Earning trust · synthetic project', role: 'viewer' };
 const workspace = { id: 'demo-workspace', name: 'Sample workspace', role: 'viewer' };
-const surveys = fixture.forms.map((f, i) => ({ id: `demo-survey-${i}`, template_id: f.template.templateId, template_version: f.template.templateVersion, template_name: f.name, perspective: f.template.perspective, state: 'selected', collection_status: 'closed' }));
+// Display names match the server's (src/display-names.ts; captain ruling 2026-09-29): the fixture keeps the pinned source names.
+const SHOWN = { tpl_validation: 'Translators', tpl_mid_level: 'Team leaders & mentors' };
+const surveys = fixture.forms.map((f, i) => ({ id: `demo-survey-${i}`, template_id: f.template.templateId, template_version: f.template.templateVersion, template_name: SHOWN[f.template.templateId] ?? f.name, perspective: f.template.perspective, state: 'selected', collection_status: 'closed' }));
 const templates = surveys.map(s => ({ id: s.template_id, version: s.template_version, name: s.template_name, perspective: s.perspective }));
 const report = { id: 'demo-report', created_at: fixture.generated_at, payload: { schema_version: '3d-synthetic-assessment-report-v1', synthetic: true, source_commit: fixture.source, assessment_id: fixture.aid, versions: { scorer: 'steve-f042cde-single-assessment-v1', narrative: 'steve-f042cde-rule-narrative-v1', policy: 'synthetic-current-assessment-asof-query-v1' }, ...fixture.projection } };
 export const sampleResponses = fixture.forms.map((f, i) => ({ survey: i, name: surveys[i].template_name, count: f.responses.length }));
@@ -30,10 +33,13 @@ export async function demoApi(url, { method = 'GET' } = {}) {
 }
 // Actual participant controller/client/view with an in-memory transport and storage.
 // Practice prompts are not scored instruments or source-attested assessment evidence.
+const PRACTICE_LWC = ['hi', 'te', 'kn', 'or', 'lo', 'th', 'km', 'my']; // BCS LWCs first (captain 2026-09-29)
 export function sampleParticipantEnvironment(surveyIndex = 0) {
   let submitted = false;
   const selected = fixture.forms[surveyIndex] || fixture.forms[0];
-  const form = { template: { id: selected.template.templateId, version: selected.template.templateVersion }, title: 'Synthetic sample survey', items: selected.template.items };
+  // Dynamic translation practice: the sample survey offers a few LWCs so trainers can try the language switch (display only).
+  const languages = PRACTICE_LWC.map(lwcByCode).filter(Boolean).map(({ code, name, endonym, dir, review }) => ({ code, name, endonym, dir, review }));
+  const form = { template: { id: selected.template.templateId, version: selected.template.templateVersion }, title: 'Synthetic sample survey', items: selected.template.items, languages };
   const receipt = { submitted: true, response_id: 'practice-only-not-saved', submitted_at: 'Demonstration — not sent' };
   return { sampleAnswers: structuredClone(selected.responses[0].answers), storage: memoryStorage(), window: { location: { hash: '#survey=practice', pathname: '/participate/', search: '?demo=1' }, history: { replaceState() {} } },
     async fetchImpl(url, options = {}) {

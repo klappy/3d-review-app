@@ -167,3 +167,13 @@ test('U07: an access-code hand-off (bearer in its scoped slot, no fragment) open
   await reload.journey.start(); assert.equal(reload.journey.state.phase, 'form'); assert.deepEqual(reload.journey.state.draft, { q: 'kept' });
   reload.journey.review({ q: 'kept' }); await reload.journey.submit(); assert.equal(reload.journey.state.phase, 'receipt');
 });
+// S15a: demographics are off by default; the About you context is sent only when the form says the facilitator turned them on.
+for (const [label, enabled, expected] of [['off (default, key absent)', undefined, undefined], ['on', true, { gender: 'female' }]]) {
+  test(`About you context is ${expected ? 'sent' : 'not sent'} when demographics are ${label}`, async () => {
+    const shaped = { ...form, ...(enabled === undefined ? {} : { demographics_enabled: enabled }) };
+    const h = harness({ handle: url => url.endsWith('/form') ? response(shaped) : null });
+    await h.journey.start(); h.journey.review({ q: 'a' }); h.journey.setContext({ gender: 'female' }); await h.journey.submit();
+    const sent = JSON.parse(h.requests.find(r => r.url.endsWith('/responses')).options.body);
+    assert.deepEqual(sent.context, expected);
+  });
+}

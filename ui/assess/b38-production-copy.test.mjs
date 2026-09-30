@@ -45,5 +45,7 @@ test('flag off: sign-in screen, signed-out page and public nav render the base A
   const signin = pages.entry.render(ctx, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
   assert.ok(signin.includes(BASE['./scope.js'][2])); assert.ok(!signin.includes('/v2/auth/email'));
   const on = pages.entry.render({ ...ctx, state: { emailLinks: true } }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
-  assert.ok(on.includes('action="/v2/auth/email"') && !on.includes('/v2/auth/access'));
+  // ASK 24: on, the only Access href is the secondary "Sign in with a code instead" link (data-code-signin), after the link form.
+  assert.ok(on.includes('action="/v2/auth/email"')); assert.equal(on.split('/v2/auth/access').length - 1, 1);
+  assert.ok(on.indexOf('href="/v2/auth/access" data-code-signin>Sign in with a code instead</a>') > on.indexOf('action="/v2/auth/email"'));
 });

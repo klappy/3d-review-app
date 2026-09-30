@@ -40,7 +40,7 @@ describe("legacy Lovable mid-level v1 template (DEV only)",()=>{
   expect(await db.prepare("SELECT id FROM survey_template WHERE id=?").bind(LEGACY_MID_LEVEL_V1.id).first()).toBeNull();
  });
  it("is not offered in the DEV template list (B42: Mid-Level once per group), yet stays reachable by id and accepts a legacy response as answered",async()=>{
-  for(let i=0;i<2;i++){const r=await call(dev,"GET","/v2/templates",undefined,owner);expect(r.result.templates.some((t:any)=>t.id===LEGACY_MID_LEVEL_V1.id)).toBe(false);expect(new Set(r.result.templates.filter((t:any)=>t.perspective==="Translation Team"&&/mid-level/i.test(t.name)).map((t:any)=>t.id))).toEqual(new Set(["tpl_mid_level"]));}
+  for(let i=0;i<2;i++){const r=await call(dev,"GET","/v2/templates",undefined,owner);expect(r.result.templates.some((t:any)=>t.id===LEGACY_MID_LEVEL_V1.id)).toBe(false);expect(new Set(r.result.templates.filter((t:any)=>t.perspective==="Translation Team"&&/mid-level/i.test(t.source_name??t.name)).map((t:any)=>t.id))).toEqual(new Set(["tpl_mid_level"]));}
   const got=await call(dev,"GET","/v2/templates/"+LEGACY_MID_LEVEL_V1.id+"@1",undefined,owner);
   expect(got.result.template.items).toHaveLength(LEGACY_MID_LEVEL_V1.items.length);
   const path="/v2/assessments/assess_tavo_collect/surveys";

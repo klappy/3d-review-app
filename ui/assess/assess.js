@@ -1,3 +1,5 @@
+import { mountPassages } from './passages.js';
+import { lwcFieldset, lwcFrom, LWC_CSS } from '../v3/lwc.js';
 import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
 // /assess/ — showcase-based assessment screen (cookbook #16 order c5719384228, slice 1).
 // Starting page: the app-flows composition (sidebar · title · phase tabs · two-column body · lens survey rows).
@@ -13,16 +15,16 @@ import { sidebarTree } from '/v3/components/sidebar-tree.js';
 import { learnMore } from '/v3/components/learn-more.js';
 import { collectLine, periodText } from '/v3/components/active-until.js';
 // Bincy B03: `#invite=<token>` is handled here (v3), not forwarded to /legacy/.
-import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations } from '/v3/components/invite.js';
+import { mountInvite, mountInvitations, failureNotice, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations } from '/v3/components/invite.js';
 // P0 12:32: the context panel's crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment).
 const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.name, href: cards.routes.workspace(ws.id) } : null, project: proj ? { id: proj.id, name: proj.name, href: cards.routes.project(proj.id) } : null, assessment: a ? { id: a.id, name: a.name, href: cards.routes.assessment(a.id) } : null });
-import { pages, css as scopeCss, landsOnWork, signInLanding, whoLine } from '/assess/scope.js';
+import { pages, css as scopeCss, landsOnWork, signInLanding, whoLine, CODE_SIGNIN, emailLinkForm } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock as completeLock, v3SettingsRole as settingsRole, V3_SUGGEST } from '/assess/v3-assessment.js';
+import { demographicsSetting, demographicsBody, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock as completeLock, v3SettingsRole as settingsRole, V3_SUGGEST } from '/assess/v3-assessment.js';
 import { mountEditableHeading } from '/v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '/v3/components/saved-status.js';
 // v3 lane 1 L1-2: lane 2's four-step wizard mounts at #new / #/new (NEED 2→1). Loaded on demand so the shell never breaks
@@ -301,10 +303,12 @@ function bindCollectLinks(current) {
     return link.url;
   } });
 }
+// BCS demo 2026-09-29 (u3540382372): "please read or play the passage for them at this point and then launch the survey or send them the survey links".
+const PASSAGE_FIRST_FACILITATOR = 'Before you share the links or hand out paper, read or play the passage for the group. Name it or attach it on Prepare, under The passage for participants.';
 function collectPanel(current) {
   const a = current.assessment, groups = groupByLens({ surveys: current.surveys, templates: [] });
-  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${whoLine(g.lens) ? `<p class="small muted" data-who>${esc(whoLine(g.lens))}</p>` : ''}${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id, title: s.template_name, line: whoLine(g.lens) || g.lens, url: share.knownLink(state.collectLinks, share.linkKey(a.id, s.id))?.url }]) : ''}</div><a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a></div>`).join('')}` : '').join('');
-  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2>${collectLine(a.period) ? `<p class="small muted" data-active-until>${esc(collectLine(a.period))}</p>` : ''}${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose them under Change surveys.</p>'}${current.surveys.some(s => shareable(a, s)) ? share.printAllButton({ esc }) : ''}${learnMore('<p class="small muted">Only responses are counted.</p><p class="small muted">Respondents are counted per survey and are never added up as people.</p>')}</section>`;
+  const rows = groups.map(g => g.included.length ? `<h3 style="margin:18px 0 6px">${esc(g.lens)}</h3>${whoLine(g.lens) ? `<p class="small muted" data-who>${esc(whoLine(g.lens))}</p>` : ''}${g.included.map(s => `<div class="survey"><span class="dot ${DOTS[g.lens] || ''}"></span><div><h3><a href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">${esc(s.template_name)}</a></h3><p class="small muted" data-collect-wrap="${esc(s.id)}">${collectCount(s)}</p>${shareable(a, s) ? share.groupLinks({ esc }, [{ key: s.id, title: s.template_name, line: whoLine(g.lens) || g.lens, href: `#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}`, url: share.knownLink(state.collectLinks, share.linkKey(a.id, s.id))?.url }]) : ''}</div>${shareable(a, s) ? '' : `<a class="button" href="#assessment/${encodeURIComponent(a.id)}/survey/${encodeURIComponent(s.id)}">Open survey</a>`}</div>`).join('')}` : '').join('');
+  return `<section class="panel" data-collect-panel><p class="eyebrow">Collect</p><h2>Collect perspectives</h2><p class="note" data-passage-first>${esc(PASSAGE_FIRST_FACILITATOR)}</p>${collectLine(a.period) ? `<p class="small muted" data-active-until>${esc(collectLine(a.period))}</p>` : ''}${totalTile(current)}${rows || '<p class="muted">No survey is included yet. Choose them under Change surveys.</p>'}${current.surveys.some(s => shareable(a, s)) ? share.printAllButton({ esc }) : ''}${learnMore('<p class="small muted">Only responses are counted.</p><p class="small muted">Respondents are counted per survey and are never added up as people.</p>')}</section>`;
 }
 // Cut 2A child screen: ONE survey. B30: one heading (the survey name); Paper/Share are labels, Share is the one primary. Counts for any grant; Print survey only when the API role allows it (O, M — survey.ts:76).
 function surveyScreen(current, s) {
@@ -328,6 +332,10 @@ function dirtyBanner(aid) {
     : `<p class="note" role="alert">This assessment's survey set changed, or part of it is no longer visible to you. Nothing was written. <a href="#" data-refresh="${esc(aid)}">Refresh now</a></p>`;
 }
 function surveyUnavailable(aid, sid) { return `<div class="narrow panel"><h1>Survey unavailable</h1><p class="muted">No survey with this address is visible to you in this assessment.</p><a class="button" href="#assessment/${encodeURIComponent(aid)}">Back to assessment</a></div>`; }
+// BCS demo 2026-09-29 (bee:10809312 u3540382372-388): the printed form names the passage to read or hear first. A failed
+// read leaves the line off (the paper still prints); the names come from the passages set on Prepare, reference first.
+const passageLine = list => { const names = [...new Set((list || []).map(p => String(p?.reference || p?.title || '').trim()).filter(Boolean))]; return names.length ? `Before you answer, read or listen to: ${names.join(' · ')}` : ''; };
+async function passageLineFor(aid) { try { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/passages`); return passageLine(r?.passages); } catch { return ''; } }
 function bindPrint(current, s) {
   const btn = app.querySelector('#print-load'); if (!btn) return;
   btn.onclick = async () => {
@@ -336,6 +344,8 @@ function bindPrint(current, s) {
     const model = await loadBlankPrint({ request: (url, init) => fetch(url, init), token, aid, sid: s.id, role: current.assessment.role });
     if (gen !== generation) return; // navigated away: nothing paints; the next paint() already reset state.print (HIGH 4040990731)
     btn.disabled = false;
+    if (model.visible) model.passageLine = await passageLineFor(aid); // named once, on the paper and in the preview
+    if (gen !== generation) return;
     if (!model.visible) { state.print = { sid: s.id, status: 'error', text: model.reason === 'unsafe-print' ? 'The print payload was refused because it carried credentials.' : `Blank questionnaire unavailable (${redact(model.reason)}).` }; app.querySelector('#print-status').textContent = state.print.text; return; }
     // P2 (Auditor c5721040053): the loaded model is cached keyed to the exact entity data it came from, so a later repaint of
     // the SAME survey with the SAME survey-set data can replay it without a read; anything else drops it (see paint()).
@@ -393,8 +403,10 @@ function viewTabs(a, current) { ensureStepperStyle(globalThis.document); const s
 // Prepare view (showcase `prepareView()`): purpose, saved through cap.assessment.update (O/M); viewers read. The name is the heading (B07).
 function prepareView(current) {
   const a = current.assessment, mayEdit = a.role === 'owner' || a.role === 'member';
-  const fields = `<label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>`;
-  const form = mayEdit ? `<form id="prepare-form">${fields}<div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save preparation</button></div></form>` : `<div>${fields}${a.complete ? '' : `<p class="small muted">Your role here is ${esc(a.role)}: preparation is read-only.</p>`}</div>`;
+  const fields = `<label class="field">Purpose<textarea name="purpose" maxlength="600" ${mayEdit ? '' : 'readonly'}>${esc(a.purpose || '')}</textarea></label>${mayEdit && typeof lwcFieldset === 'function' ? `<style>${LWC_CSS}</style>${lwcFieldset(a.lwc || [], esc)}` : ''}`; // dynamic translation: languages participants may switch to (owners/members; typeof guard: vm test harnesses strip imports)
+  const passagesRoot = typeof mountPassages === 'function' && !demo ? '<div id="passages-root"></div>' : ''; // passage files and links (Lovable parity) // dynamic translation: languages participants may switch to (owners/members; typeof guard: vm test harnesses strip imports)
+  const form = mayEdit ? `<form id="prepare-form">${fields}${demographicsSetting(a, esc)}<div class="actions"><button class="primary" type="submit" ${state.busy ? 'disabled' : ''}>Save preparation</button></div>${showMessage(current)?.view === 'prepare' && showMessage(current).alert ? `<p class="status alert" role="alert" data-prepare-outcome>${esc(showMessage(current).text)}</p>` : ''}</form>` : `<div>${fields}${a.complete ? '' : `<p class="small muted">Your role here is ${esc(a.role)}: preparation is read-only.</p>`}</div>`;
+  const formWithPassages = form + passagesRoot;
   const i = PHASES.indexOf(a.stage), prev = PHASES[i - 1], next = PHASES[i + 1], n = activeSurveys(current).length;
   const move = mayEdit ? `<div class="actions">${prev ? `<button type="button" data-stage="${prev}" ${state.busy ? 'disabled' : ''}>← Back to ${title(prev)}</button>` : ''}${next && a.stage !== 'collect' ? `<button type="button" data-stage="${next}" ${state.busy ? 'disabled' : ''}>Move to ${title(next)} →</button>` : ''}</div>` : ''; // lane 9 L9-24: one primary on this view (Save preparation); U34: Move to Understand lives on Collect
   // Lane 9 L9-24 (validator #282): ONE view heading ("Prepare this assessment"). The stage is an eyebrow + badge, not a second
@@ -402,7 +414,7 @@ function prepareView(current) {
   // <aside>: kit.css turns every `.rv aside` into a nav flex row at ≤760px (squashed/clipped at 390px).
   const more = `${mayEdit ? `<p class="muted">Moving into Collect opens collection; moving out of Collect closes it — for all ${n} included survey${n === 1 ? '' : 's'}.</p><p class="muted">One stage at a time, as the server allows.</p>` : ''}<p class="muted">The stage is the assessment's own state. Browsing these views never changes it.</p>${a.language_name ? `<p class="small muted">Language: ${esc(a.language_name)}</p>` : ''}${a.period ? `<p class="small muted">Period: ${esc(periodText(a.period))}</p>` : ''}`;
   const stage = `<section class="panel" data-stage-panel><p class="eyebrow">Stage <span class="badge">${stageLabel(a.stage)}</span></p>${move}${learnMore(more)}</section>`;
-  return `<div class="grid"><section class="panel"><h2>Prepare this assessment</h2>${form}</section>${stage}</div>`;
+  return `<div class="grid"><section class="panel"><h2>Prepare this assessment</h2>${formWithPassages}</section>${stage}</div>`;
 }
 function screen(current, view = null) {
   const a = current.assessment, project = state.projects.find(p => p.id === a.project_id);
@@ -485,11 +497,15 @@ function bindPrepare(current) {
   app.querySelectorAll('button[data-stage]').forEach(b => b.onclick = () => {
     const to = b.dataset.stage, effect = to === 'collect' ? `opens collection for ${n} included survey${n === 1 ? '' : 's'}` : current.assessment.stage === 'collect' ? `closes collection for ${n} included survey${n === 1 ? '' : 's'}` : 'does not change collection';
     // U34: asked in the page (shared Review gate confirm), never window.confirm.
-    askStageMove(b, `Move this assessment from ${stageLabel(current.assessment.stage)} to ${stageLabel(to)}? This ${effect}.`, `Move to ${title(to)}`, () =>
+    askStageMove(b, `Move this assessment from ${stageLabel(current.assessment.stage)} to ${stageLabel(to)}? This ${effect}.`, 'Yes, move', () => // one "Move to …" label per screen: the in-page confirm says "Yes, move", never the label of the button that opened it
       act(aid, 'Moving stage…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(aid)}/stage`, { method: 'POST', body: { stage: to } }); return `Stage is now ${stageLabel(r.assessment.stage)}.`; })); // refusal: act() shows the server error.message verbatim
   });
+  // Passage files and links (captain 2026-09-29; Lovable parity): owners/members manage, viewers see the list.
+  const pr = app.querySelector('#passages-root'); if (pr && typeof mountPassages === 'function') { const role = current.assessment.role; mountPassages({ root: pr, aid, mayEdit: (role === 'owner' || role === 'member') && !current.assessment.complete, esc, token: () => token }); }
   const f = app.querySelector('#prepare-form'); if (!f) return;
-  f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f); act(current.assessment.id, 'Saving preparation…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(current.assessment.id)}`, { method: 'PATCH', body: { purpose: String(fd.get('purpose')).trim() } }); return `Saved: ${r.assessment.name}`; }); };
+  f.onsubmit = e => { e.preventDefault(); const fd = new FormData(f); act(current.assessment.id, 'Saving preparation…', async () => { const r = await api(`/v2/assessments/${encodeURIComponent(current.assessment.id)}`, { method: 'PATCH', body: { purpose: String(fd.get('purpose')).trim(), ...(typeof lwcFrom === 'function' ? { lwc: lwcFrom(fd).join(',') || null } : {}), ...demographicsBody(fd) } }); return `Saved: ${r.assessment.name}`; }, { view: 'prepare' }); };
+  // Gate 0.23.0 F2: the save's outcome is shown on the form that was used — the shared SavedStatus (U17) "Saved", or the error.
+  const m = showMessage(current); if (m?.view === 'prepare' && !m.alert && !state.busy) showSavedStatus(f.querySelector('.actions') || f, { inside: true });
 }
 // B07: the assessment name is the heading (shell's or page's); owners/members rename it in place through cap.assessment.update.
 let pendingRename = null; // { aid, done } while a heading rename PATCH is in flight
@@ -546,7 +562,7 @@ function bindNameHeading(current) {
 }
 // Transition: write → (committed ⇒ dirty) → refresh → (landed ⇒ clean). Every outcome is scoped to `aid`, never to
 // whatever is on screen when the promise settles (Bugbot 4040525117 / 4040525128).
-async function act(aid, label, fn) {
+async function act(aid, label, fn, { view = null } = {}) { // view: the page that shows this outcome itself (Prepare: Saved / the error)
   if (pendingRename?.aid === aid) { // B07: never race the heading rename's PATCH; a queued write survives only the same identity on the same assessment
     const identity0 = identityGeneration; await pendingRename.done;
     const here = route(location.hash); if (identity0 !== identityGeneration || !((here.kind === 'assessment' || here.kind === 'survey') && here.id === aid)) return;
@@ -556,8 +572,8 @@ async function act(aid, label, fn) {
   const identity = identityGeneration;
   state.busy = true; state.message = null; note.textContent = label; render();
   let text = null;
-  try { text = await fn(); if (identity !== identityGeneration) return; state.dirty.set(aid, 'write'); state.message = { aid, text, alert: false }; }
-  catch (e) { if (identity === identityGeneration) state.message = { aid, text: redact(e.message), alert: true }; }
+  try { text = await fn(); if (identity !== identityGeneration) return; state.dirty.set(aid, 'write'); state.message = { aid, text, alert: false, view }; }
+  catch (e) { if (identity === identityGeneration) state.message = { aid, text: redact(e.message), alert: true, view }; }
   finally { if (identity === identityGeneration) { note.textContent = ''; state.busy = false; render(); } }
 }
 // The entity read. Returns the data; the caller decides whether it is still wanted. On success for `aid` the dirty
@@ -634,19 +650,20 @@ async function loadMyInvitations() {
   if (identity !== identityGeneration) return null;
   state.myInvitations = list; return list;
 }
-// "Accept invitation" first: the oldest pending invitation, accepted by id (same cap.grant.accept dry run → confirm → execute). After
-// each accept the list is read again: another pending → that one next; none → the existing landing (one project → it; else Home).
-async function mountMyInvitation(gen) {
+// S19 (captain 2026-09-29, replacing the one-at-a-time accept-first loop): every pending invitation on ONE page, each named with
+// its path (cap.me.invitations, own invitations only); Accept per row, "Accept all" when there are two or more. Each accept is the
+// same cap.grant.accept dry run → confirm → execute by id; a pass stops at the first failure. After a pass the list is read again
+// (server truth): any left → this page again, with a notice naming the failed invitation when one failed; none → the existing
+// landing (one project → it; else Home) — straight away, or behind the notice's "Continue" when one failed.
+async function mountMyInvitation(gen, notice = '') {
   const mine = await loadMyInvitations(); // read fresh on every mount: an invitation accepted or withdrawn elsewhere never re-offers
   if (gen !== generation || mine === null) return;
-  const ctx = ctxFor();
-  if (!mine.length) { ctx.go(signInLanding({ projects: state.projects })); return; } // nothing (left) to accept, or the read failed → the existing landing, never a dead end
-  mountInvite(app, { api: ctx.api, invitationId: mine[0].id, isCurrent: () => gen === generation,
-    onAccepted: async () => {
-      await reloadProjects(); const next = await loadMyInvitations();
-      if (gen !== generation || next === null) return;
-      if (next.length) { mountMyInvitation(gen); return; }
-      ctx.go(signInLanding({ projects: state.projects }));
+  const ctx = ctxFor(), landing = signInLanding({ projects: state.projects });
+  if (!mine.length && !notice) { ctx.go(landing); return; } // nothing (left) to accept, or the read failed → the existing landing, never a dead end
+  mountInvitations(app, { api: ctx.api, invitations: mine, notice, continueHref: landing, isCurrent: () => gen === generation,
+    onSettled: async ({ failure }) => {
+      await reloadProjects(); if (gen !== generation) return;
+      mountMyInvitation(gen, failure ? failureNotice(failure.state, failure.invitation) : '');
     } });
 }
 // The project list read boot uses. Returns false (state untouched) when the identity changed while it was in flight.
@@ -658,6 +675,10 @@ async function reloadProjects() {
 async function mountNew(gen, resume = null) {
   syncShell(); app.className = '';
   // Bugbot 4094071987: same gate as every signed-in page — no session, no wizard.
+  // S24 B2: reached by in-app navigation (hashchange), it waits for the same email-links answer boot waits for and, ON, renders
+  // the same gate a fresh load of /#new renders. OFF: the base panel below, unchanged.
+  if (!state.principal) { await loadEmailLinks(); if (gen !== generation) return; }
+  if (!state.principal && state.emailLinks === true) { app.innerHTML = emailSignInGate(location.pathname + location.hash); return; }
   if (!state.principal) { app.innerHTML = `<div class="narrow panel"><p class="eyebrow">Sign in</p><h1>Sign in to continue</h1><p class="muted">Starting a review needs a facilitator session.</p><div class="actions"><a class="rv-btn primary" href="/v2/auth/access">Sign in with email code</a></div></div>`; return; }
   if (!document.querySelector(`link[href="${WIZARD_CSS}"]`)) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = WIZARD_CSS; document.head.appendChild(l); }
   let mod = null; try { mod = await import(WIZARD_JS); } catch { mod = null; }
@@ -666,6 +687,7 @@ async function mountNew(gen, resume = null) {
   const ctx = ctxFor();
   const idg = identityGeneration;
   wizardHandle = mod.mountWizard(app, { api: ctx.api, go: ctx.go, origin: location.origin, assessmentHref: id => `#assessment/${encodeURIComponent(id)}`, resume,
+    beforeOpen: () => (idg === identityGeneration ? reloadProjects() : false), // B14: a project created in this setup is not in the boot list yet
     onLink: (aid, row) => { if (idg === identityGeneration) share.rememberLaunchLink(state.collectLinks, aid, row, location.origin); }, // U36: Collect and the survey page reuse the launch links
     mark: id => { if (gen !== generation) return; try { history.replaceState(null, '', `${location.pathname}${location.search}#new/${encodeURIComponent(id)}`); } catch {} } }); // U22: a reload reopens this draft
   document.title = `${resume ? 'Continue setup' : 'Start a review'} · 3D Review`;
@@ -823,7 +845,7 @@ function scrubCredentialHash() {
   if (h === '#how' || h === '#example') { location.replace('/?demo=1#assessment/demo-assessment/collect'); return 'forwarded'; }
   if (h === '#participant') { location.replace('/legacy/#participant'); return 'forwarded'; }
   if (h === '#reports-card') { location.replace('/#projects'); return 'forwarded'; }
-  if (/^#survey=/.test(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + h); return 'forwarded'; }
+  if (/^#survey=/.test(h)) { let lang = ''; try { const m = /[?&]lang=([^&#]*)/.exec(location.search || ''); lang = m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : ''; } catch { lang = ''; } try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/participate/' + (lang ? `?lang=${encodeURIComponent(lang)}` : '') + h); return 'forwarded'; } // ?lang= rides along (dynamic translation)
   if (/^#invite=/.test(h)) { const t = parseInvitationFragment(h); if (t) { pendingInvite = t; try { sessionStorage.setItem(INVITE_KEY, t); } catch {} } try { history.replaceState(null, '', location.pathname + '#invite'); } catch {} return null; } // B03: stays in v3; token leaves the address bar
   if (LEGACY_HASHES.has(h)) { try { history.replaceState(null, '', location.pathname); } catch {} location.replace('/legacy/' + h); return 'forwarded'; }
   const m = /^#session=([A-Za-z0-9_]+)$/.exec(h);
@@ -849,14 +871,16 @@ if (typeof matchMedia === 'function') matchMedia('(max-width:650px)').addEventLi
 // U30 (Bincy B07/B31): a status line belongs to the page and action that set it. A route change clears it so "Renamed." from one
 // page never reads as feedback on the next. An in-flight action keeps its busy label; its own finally clears it.
 let pendingNotice = null; // U14: the one-line notice carried across the navigation that follows a delete
-function clearPageNote() { if (!note || state.busy) return; note.textContent = pendingNotice || ''; pendingNotice = null; note.classList.remove('alert'); }
+function clearPageNote() { if (!note || state.busy) return; note.textContent = pendingNotice || ''; pendingNotice = null; note.classList.remove('alert'); if (state.message?.view) state.message = null; } // a page's own outcome (Prepare's Saved) goes with the page
 let listening = false;
 function listen() { if (listening) return; listening = true; window.addEventListener('hashchange', () => { const r = scrubCredentialHash(); if (r === 'forwarded') return; if (r === 'session') { boot(); return; } clearPageNote(); render(); window.scrollTo(0, 0); }); } // S1: listener path == load path
 // B38: does this environment use email sign-in links (DEV) or Cloudflare Access (production)? Asked once; remembered only on
 // an answer (2 s timeout; a timeout or failure leaves it unknown). Unknown or off → the Access sign-in button and the team-domain logout stay exactly as before.
+// S24 B1: the tour asks too, so its header "Sign in" (data-v3-demo-signin) leads with the emailed link like every other way in.
+// The probe is an environment fact with no session; the tour sends it without credentials (nothing of the viewer's is sent).
 async function loadEmailLinks() {
-  if (demo || typeof state.emailLinks === 'boolean') return state.emailLinks === true;
-  try { const r = await fetch('/v2/auth/email?probe', { headers: { accept: 'application/json' }, credentials: 'same-origin', redirect: 'error', cache: 'no-store', ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(2000) } : {}) }); if (r.ok) { const v = await r.json(); state.emailLinks = v?.email_links === true; if (state.emailLinks) emailLinksCopy(); } } catch {}
+  if (typeof state.emailLinks === 'boolean') return state.emailLinks === true;
+  try { const r = await fetch('/v2/auth/email?probe', { headers: { accept: 'application/json' }, credentials: demo ? 'omit' : 'same-origin', redirect: 'error', cache: 'no-store', ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(2000) } : {}) }); if (r.ok) { const v = await r.json(); state.emailLinks = v?.email_links === true; if (state.emailLinks) emailLinksCopy(); } } catch {}
   return state.emailLinks === true;
 }
 // B38, email links ON only: the markup and every Sign-in href stay byte-identical to production (/v2/auth/access, Access
@@ -865,19 +889,27 @@ async function loadEmailLinks() {
 function emailLinksCopy() {
   const dialog = document.getElementById('account-switch-dialog');
   const paras = dialog?.querySelectorAll?.('p');
-  if (paras?.length) { paras[0].textContent = 'You will be signed out here, then asked for the email address of the other account. We email it a sign-in link.'; for (const p of [...paras].slice(1)) p.remove(); }
+  if (paras?.length) { paras[0].textContent = 'You will be signed out here, then asked for the email address of the other account. We email it a sign-in link; you can also sign in with a code instead.'; for (const p of [...paras].slice(1)) p.remove(); }
 }
-if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('click', ev => {
+// ASK 24: the secondary "Sign in with a code instead" link (data-code-signin) is the Cloudflare Access one-time-code way in; it is
+// never re-pointed at the email page, so someone whose link never arrives still has a way in.
+function emailLinksClick(ev) {
   if (state.emailLinks !== true || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
-  const a = ev.target?.closest?.('a[href="/v2/auth/access"]'); if (!a) return;
+  const a = ev.target?.closest?.('a[href="/v2/auth/access"]'); if (!a || a.hasAttribute?.('data-code-signin')) return;
   ev.preventDefault(); location.assign('/v2/auth/email');
-});
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('click', emailLinksClick);
+// ASK 24 / S24 B2: the one signed-out gate for a page that needs a session, email links ON — a fresh load (boot) and in-app
+// navigation (#new) render this same panel: the emailed-link form first, "Sign in with a code instead" under it.
+function emailSignInGate(here) {
+  return `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p>${emailLinkForm()}${CODE_SIGNIN}</div>`;
+}
 async function boot() {
   if (scrubCredentialHash() === 'forwarded') return; // 'session' falls through: identity is observed fresh below
   placeDemoNotice();
   const identity = identityGeneration;
   const linksKnown = loadEmailLinks();
-  try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; }
+  try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; if (!demo) state.collectLinks = share.tabLinks(tabStorage, me.principal?.id, state.collectLinks); } // gate 0.23.0 E: this tab's active links survive a reload
   catch {
     if (identity !== identityGeneration) return;
     landAfterSignIn = false; // B04: no session observed, nothing to land
@@ -888,8 +920,11 @@ async function boot() {
     if (route(location.hash).kind === 'entry') { await linksKnown; if (identity !== identityGeneration) return; who.textContent = 'Not signed in'; app.className = ''; syncShell(); await render(); return; }
     // Real sign-in only (captain: synthetic-only sign-in rejected). /v2/auth/access is the existing Cloudflare email-code
     // route; it sets the session cookie and returns to the workspace home (/#session=…), not here — stated, not hidden.
+    await linksKnown; if (identity !== identityGeneration) return; // ASK 24: the panel below depends on the email-links setting
     who.textContent = 'Not signed in'; app.className = ''; syncShell();
     const here = /(invite|session)=/.test(location.hash) ? location.pathname : location.pathname + location.hash;
+    // ASK 24, email links ON: the emailed-link form first, then "Sign in with a code instead" (Cloudflare Access). OFF: unchanged.
+    if (state.emailLinks === true) { app.innerHTML = emailSignInGate(here); return; }
     app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p><p><a class="button primary" href="#">Go to sign in</a> <a class="button" href="/v2/auth/access">Sign in with an email code</a></p></div>`;
     return; }
   void loadAccountEmail();
