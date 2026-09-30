@@ -14,8 +14,8 @@
  * `rejected` rows are never served and are replaced by the next translation. Without migration 0012 the route still
  * works as a stateless proxy. Upstream = TRANSLATE_UPSTREAM_URL (+ optional TRANSLATE_UPSTREAM_KEY), speaking the Laos
  * app's `translate-survey` wire shape; it receives only English source strings — never answers, names, codes or tokens.
- * Output checks before storing: non-empty, plausible length, not the English source echoed back, and in the target script
- * for non-Latin languages.
+ * Output checks before storing: non-empty, plausible length, not an English sentence (3+ words) echoed back, and in the
+ * target script for non-Latin languages.
  * Rate limit: anonymous callers spend RL_HTTP_ANON per address; a caller with a live participant bearer or session spends
  * its own RL_MCP_CEILING unit instead (translateLimiter below; audit round 1 W2).
  * Display only: item ids and option codes never change, so answers, scores and reports are unaffected.
@@ -69,18 +69,24 @@ export function parseTranslateRequest(body: unknown): TranslateRequest | string 
 
 /** Same words, ignoring case and spacing: how an upstream "translation" that merely echoed the English is recognised. */
 const sameWords = (a: string, b: string) => a.replace(/\s+/g, " ").trim().toLowerCase() === b.replace(/\s+/g, " ").trim().toLowerCase();
+/** From this many words a source is a sentence, and a sentence that comes back word for word is an echo, not a translation. */
+export const ECHO_MIN_WORDS = 3;
 
-/** A translation worth storing: non-empty, not absurdly long, not the English source echoed back, and in the target
+/** A translation worth storing: non-empty, not absurdly long, not an English sentence echoed back, and in the target
  *  script where that is checkable. Audit round 1 E4: for Latin-script targets (fr, es, id, …) the script check cannot
- *  catch an echo, and memory is first-write-wins — an echoed row would pin English for that language forever. An echo
- *  is neither served nor stored; the page keeps the English it already shows and the next request asks again.
- *  Sources without letters ("18–24") legitimately come back unchanged and stay acceptable. */
+ *  catch an echo, and memory is first-write-wins — an echoed row would pin English for that language forever. An echoed
+ *  sentence (ECHO_MIN_WORDS or more words) is neither served nor stored; the page keeps the English it already shows
+ *  and the next request asks again. One- and two-word sources are often spelled the same in the target (fr "phrases",
+ *  "Question", "Total"; es "Hospital"), so an unchanged short source is accepted (review of #396: refusing them left
+ *  every French participant-ui response partial and never cached). Sources without letters ("18–24") legitimately
+ *  come back unchanged and stay acceptable. */
 export function acceptable(lang: LwcLanguage, source: string, text: unknown): text is string {
   if (typeof text !== "string") return false;
   const t = text.trim();
   if (!t || t.length > source.length * 8 + 80) return false;
   if (!/\p{L}/u.test(source)) return true;
-  return !sameWords(source, t) && inScript(lang.code, t);
+  const sentence = source.trim().split(/\s+/).length >= ECHO_MIN_WORDS;
+  return !(sentence && sameWords(source, t)) && inScript(lang.code, t);
 }
 
 export async function sha256Hex(text: string): Promise<string> {

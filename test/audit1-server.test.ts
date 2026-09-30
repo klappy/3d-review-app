@@ -5,7 +5,8 @@
  *       (/v2/translate) or valid signed links (passage files); anonymous / invalid callers still are.
  *   W3  an assessment that has (or had) passages can be deleted; the dry run counts them; rows and files are removed.
  *   E3  a passage add whose JSON body is not an object (null, [], 5) is a 400, not a 500.
- *   E4  an upstream "translation" that echoes the English source is neither served nor stored (Latin-script targets).
+ *   E4  an upstream "translation" that echoes an English sentence (3+ words) is neither served nor stored (Latin-script
+ *       targets); one- and two-word sources spelled the same in the target (fr "phrases", "Question") are stored.
  *   +   undo of a translation-language change restores the prior languages (languages-only and combined edits).
  */
 import { readFileSync } from "node:fs";
@@ -156,23 +157,43 @@ describe("E3 — a passage add whose JSON body is not an object", () => {
   });
 });
 
-describe("E4 — an echoed English source is neither served nor stored", () => {
-  it("French (Latin script): an echo is refused and not stored; the next real translation is stored", async () => {
+describe("E4 — an echoed English sentence is neither served nor stored", () => {
+  const frRows = async (...texts: string[]) => (await db.prepare(`SELECT COUNT(*) AS n FROM translation_memory WHERE locale = 'fr' AND source_hash IN (${texts.map(() => "?").join(",")})`).bind(...await Promise.all(texts.map(sha256Hex))).first<{ n: number }>())!.n;
+  it("French (Latin script): an echoed 3+ word sentence is refused and not stored; the next real translation is stored", async () => {
+    const A = "We would like your perspective", B = "Review your answers"; // 5 and 3 words
     const echo = upstream((en) => ` ${en.toUpperCase()} `);
-    const r = await handleTranslate(translateReq({ a: "Learn more", b: "Start" }, "fr"), env, { fetch: echo.fetch });
+    const r = await handleTranslate(translateReq({ a: A, b: B }, "fr"), env, { fetch: echo.fetch });
     expect(r.status).toBe(502);
-    const n = async () => (await db.prepare("SELECT COUNT(*) AS n FROM translation_memory WHERE locale = 'fr' AND source_hash IN (?, ?)").bind(await sha256Hex("Learn more"), await sha256Hex("Start")).first<{ n: number }>())!.n;
-    expect(await n()).toBe(0);
-    const mixed = upstream((en) => (en === "Start" ? "Commencer" : en));
-    const r2 = await (await handleTranslate(translateReq({ a: "Learn more", b: "Start" }, "fr"), env, { fetch: mixed.fetch })).json() as any;
-    expect(r2).toMatchObject({ translated: { b: "Commencer" }, partial: true });
+    expect(await frRows(A, B)).toBe(0);
+    const mixed = upstream((en) => (en === B ? "Vérifier vos réponses" : en));
+    const r2 = await (await handleTranslate(translateReq({ a: A, b: B }, "fr"), env, { fetch: mixed.fetch })).json() as any;
+    expect(r2).toMatchObject({ translated: { b: "Vérifier vos réponses" }, partial: true });
     expect(r2.translated.a).toBeUndefined();
-    expect(await n()).toBe(1);
-    const real = upstream(() => "En savoir plus");
-    const r3 = await (await handleTranslate(translateReq({ a: "Learn more", b: "Start" }, "fr"), env, { fetch: real.fetch })).json() as any;
-    expect(r3).toMatchObject({ translated: { a: "En savoir plus", b: "Commencer" }, partial: false });
-    expect(Object.values(real.calls[0].sourceTexts)).toEqual(["Learn more"]);
-    expect(await n()).toBe(2);
+    expect(await frRows(A, B)).toBe(1);
+    const real = upstream(() => "Nous aimerions connaître votre avis");
+    const r3 = await (await handleTranslate(translateReq({ a: A, b: B }, "fr"), env, { fetch: real.fetch })).json() as any;
+    expect(r3).toMatchObject({ translated: { a: "Nous aimerions connaître votre avis", b: "Vérifier vos réponses" }, partial: false });
+    expect(Object.values(real.calls[0].sourceTexts)).toEqual([A]);
+    expect(await frRows(A, B)).toBe(2);
+  });
+  it("French: one- and two-word sources spelled the same (\"phrases\", \"Question\") are stored and the response is not partial", async () => {
+    const same = upstream((en) => en);
+    const r = await handleTranslate(translateReq({ p: "phrases", q: "Question" }, "fr"), env, { fetch: same.fetch });
+    expect(r.status).toBe(200); // was 502: a batch made only of such words came back empty
+    expect(await r.json()).toMatchObject({ translated: { p: "phrases", q: "Question" }, partial: false });
+    expect(await frRows("phrases", "Question")).toBe(2);
+    const again = upstream(() => { throw new Error("memory should answer"); });
+    const r2 = await (await handleTranslate(translateReq({ p: "phrases", q: "Question" }, "fr"), env, { fetch: again.fetch })).json() as any;
+    expect(r2).toMatchObject({ translated: { p: "phrases", q: "Question" }, partial: false, stored: 2 });
+    expect(again.calls).toHaveLength(0);
+  });
+  it("a source without letters (\"18–24\") that comes back unchanged is served and stored, as before", async () => {
+    const same = upstream((en) => en);
+    const req = new Request("https://local.invalid/v2/translate", { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": ROOM_IP }, body: JSON.stringify({ targetLang: "fr", context: "participant-form:tpl_validation", sourceTexts: { r: "18–24" } }) });
+    const r = await handleTranslate(req, env, { fetch: same.fetch });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ translated: { r: "18–24" }, partial: false });
+    expect(await frRows("18–24")).toBe(1);
   });
 });
 
