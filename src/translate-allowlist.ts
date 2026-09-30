@@ -5,7 +5,8 @@
  * SHA-256 matches the published set, and it sends the upstream a context the server fixes:
  *   - `participant-ui`                 → the participant page's own words (mirror below; test/translate-allowlist.test.ts
  *                                        keeps it equal to ui/participate/i18n.js UI_EN, ui/participate/index.html, the
- *                                        practice wording in ui/participate/page.js and welcomeCopy in ui/participant-view.js).
+ *                                        practice wording in ui/participate/page.js and welcomeCopy in ui/participant-view.js)
+ *                                        and the printed survey's words (ui/stage-screens.js PRINT_WORDS; S25).
  *   - `participant-form:<template id>` → item texts and choice labels of the PUBLISHED versions of that instrument
  *                                        (survey_template.published_at IS NOT NULL) plus the optional About-you fields.
  * Anything else is refused: never sent upstream, never stored, never served.
@@ -61,6 +62,12 @@ export const PARTICIPANT_UI_STRINGS: readonly string[] = Object.freeze([
   "Practice survey · nothing is sent",
   "Use the real survey flow with source-pinned synthetic sample questions. Answers stay in memory and disappear when you leave or reload.",
   "Finish practice — nothing sent", "Check practice",
+  // S25 printed survey (ui/stage-screens.js PRINT_WORDS): the paper's words for the person answering, so Print survey in
+  // a participant language reads in that language. Fixed app wording, like the page words above.
+  "Blank survey", "Before you answer, read or listen to:", "Code (optional; legacy)", "Leave blank when answering from the shared link",
+  "No invitation link on this blank form",
+  "Mark one circle ○ for each question. Where it says \"Choose all that apply\", mark every box ☐ that fits. Write on the lines where there are no choices.",
+  "Write your response on the blank lines below each question.", "Choose all that apply", "Choose one",
 ]);
 
 /** ui/participant-view.js welcomeCopy, the two assembled sentences. */

@@ -83,3 +83,17 @@
 @media screen and (max-width:700px){
   #print-root .paper{padding:16px 12px}
 }
+/* S25: a printed-in-language form marks each string that stayed English (no translation yet) with a small "EN". */
+.paper[lang] [data-en]::after{content:" EN";font:600 6.5pt/1 Inter,system-ui,sans-serif;vertical-align:super;color:#666;letter-spacing:.04em}
+/* S25 belt and braces (captain's iOS print 2026-09-30 11:48 ET): if the app page itself is printed while a paper preview is
+   on it (browser menu, Share → Print), only the paper prints — no app chrome or background bands — one column of choices
+   that wraps inside the sheet. Print normally opens the paper as its own document (ui/assess/print.js). */
+@media print{
+  body:has(#print-root .paper):not(:has(> .stage-print-only)) *:not(:has(#print-root)):not(#print-root):not(#print-root *){display:none!important}
+  body:has(#print-root .paper):not(:has(> .stage-print-only)), body:has(#print-root .paper):not(:has(> .stage-print-only)) *:has(#print-root), body:has(#print-root .paper):not(:has(> .stage-print-only)) #print-root{display:block!important;background:#fff!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;width:auto!important;max-width:none!important;min-width:0!important;min-height:0!important;overflow:visible!important;position:static!important}
+  #print-root .paper{width:auto!important;max-width:100%!important;margin:0!important;padding:0!important;box-shadow:none!important}
+  #print-root .paper .p-head{grid-template-columns:minmax(0,1fr) auto}
+  #print-root .paper .p-qr{display:none}
+  #print-root .paper .p-opts{grid-template-columns:minmax(0,1fr)}
+  #print-root .paper .p-q>span,#print-root .paper .p-opt>span:last-child{min-width:0;overflow-wrap:anywhere}
+}
