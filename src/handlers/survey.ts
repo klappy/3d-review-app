@@ -5,6 +5,7 @@ import { countScalar, gate, loadTemplate, newId, nowIso, optInt, parseItems, ran
 import { codeHash, decryptCode, encryptCode } from "../code-escrow";
 import { randomCode } from "./common";
 import { DEMOGRAPHICS_KEY, demographicsEnabled, groupFields, parseContextJson, validateContext } from "../context-fields";
+import { b64url } from "../receipt";
 
 async function assessment(ctx:Ctx,id:string,min:Role="viewer") {
   const row=await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
@@ -97,6 +98,38 @@ export const print:Handler=async(ctx,params)=>{
     ...(i.scale?{scale:i.scale}:{}),...(i.max_select?{max_select:i.max_select}:{})}));
   return {result:{html,items:printItems,content_type:"text/html; charset=utf-8",template_id:t.id,template_version:t.version,blank:true},scope:{type:"assessment",id:aid}};
 };
+// One link per survey (0.24.1 persona A: taking the link again through the API minted a second live link; Collect keeps
+// one link per survey, #395). A link token is the HMAC of its own id under a key derived from SESSION_SECRET, so the
+// survey's active link can be handed back again instead of minting another. Nothing new is stored: redeem still checks
+// the token's sha256 (shared-link.ts), and a link minted before this (random token) is simply not re-derivable.
+const linkKeys=new Map<string,Promise<CryptoKey>>();
+async function linkToken(secret:string|undefined,id:string):Promise<string|null> {
+  if(!secret) return null;
+  let key=linkKeys.get(secret);
+  if(!key){
+    const te=new TextEncoder();
+    key=crypto.subtle.importKey("raw",te.encode(secret),"HKDF",false,["deriveKey"]).then(m=>crypto.subtle.deriveKey(
+      {name:"HKDF",hash:"SHA-256",salt:te.encode("3d-review/survey-link/salt/v1"),info:te.encode("3d-review/survey-link/hmac/v1")},
+      m,{name:"HMAC",hash:"SHA-256",length:256},false,["sign"]));
+    linkKeys.set(secret,key);
+  }
+  const mac=await crypto.subtle.sign("HMAC",await key,new TextEncoder().encode(id));
+  return `link_${b64url(new Uint8Array(mac).slice(0,24))}`; // same shape as randomToken("link")
+}
+/** The survey's earliest-inserted live link with this expiry whose token can be derived again; null → mint one.
+ * One helper, one sort (rowid ASC, #415 review): the pre-insert lookup and the post-insert race check agree on a single
+ * winner, so a third concurrent caller never gets a racer's row that the racer then deletes. No LIMIT: the rows are
+ * already filtered to this survey's live links, and a window could hide the new row from the race check. */
+async function activeLink(ctx:Ctx,sid:string,expires_at:string|null,at:string):Promise<{id:string;token:string}|null> {
+  const {results}=await ctx.db.prepare("SELECT id, token_hash, expires_at FROM invitation WHERE assessment_survey_id = ? AND scope_type = 'survey' AND role = 'participant' AND status IN ('pending','accepted') AND (expires_at IS NULL OR expires_at > ?) ORDER BY rowid ASC")
+    .bind(sid,at).all<{id:string;token_hash:string;expires_at:string|null}>();
+  for(const row of results){
+    if(row.expires_at!==expires_at) continue;
+    const token=await linkToken(ctx.env.SESSION_SECRET,row.id);
+    if(token && await sha256(token)===row.token_hash) return {id:row.id,token};
+  }
+  return null;
+}
 export const issue_link:Handler=async(ctx,params,opts)=>{
   only(params,["aid","sid","expires_at"]);
   const {aid,sid}=ids(params), selected=await survey(ctx,aid,sid,"member");
@@ -108,10 +141,19 @@ export const issue_link:Handler=async(ctx,params,opts)=>{
     expires_at=new Date(params.expires_at).toISOString();
   }
   const impact={affected:[{survey:sid}],irreversible:true,effect:"disclosure" as const,compensating_control:"cap.survey.revoke_link"};
-  if(opts?.dryRun) return {result:{survey_id:sid,expires_at},scope:{type:"assessment",id:aid},impact};
-  const id=newId("invite"), token=randomToken("link"), at=nowIso(ctx);
+  const at=nowIso(ctx), active=await activeLink(ctx,sid,expires_at,at);
+  if(opts?.dryRun) return {result:{survey_id:sid,expires_at,...(active?{reuses:active.id}:{})},scope:{type:"assessment",id:aid},impact};
+  if(active) return {result:{link_id:active.id,link_token:active.token,expires_at,entry_fragment:`#survey=${encodeURIComponent(active.token)}`,reused:true},scope:{type:"assessment",id:aid},impact};
+  const id=newId("invite"), token=(await linkToken(ctx.env.SESSION_SECRET,id)) ?? randomToken("link");
   await ctx.db.prepare("INSERT INTO invitation (id,scope_type,scope_id,assessment_survey_id,role,token_hash,status,created_by,created_at,expires_at) VALUES (?, 'survey', ?, ?, 'participant', ?, 'pending', ?, ?, ?)")
     .bind(id,sid,sid,await sha256(token),ctx.principal.id,at,expires_at).run();
+  // S33: two first calls at once can both miss activeLink and both insert. Re-read in insert order (rowid): the earliest
+  // live, re-derivable link with this expiry wins; a later one deletes its own row and hands the earlier back as reused.
+  const winner=await activeLink(ctx,sid,expires_at,at);
+  if(winner && winner.id!==id){
+    await ctx.db.prepare("DELETE FROM invitation WHERE id = ?").bind(id).run();
+    return {result:{link_id:winner.id,link_token:winner.token,expires_at,entry_fragment:`#survey=${encodeURIComponent(winner.token)}`,reused:true},scope:{type:"assessment",id:aid},impact};
+  }
   return {result:{link_id:id,link_token:token,expires_at,entry_fragment:`#survey=${encodeURIComponent(token)}`},scope:{type:"assessment",id:aid},impact};
 };
 export const send_links:Handler=async(ctx,params,opts)=>{

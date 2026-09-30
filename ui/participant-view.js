@@ -2,12 +2,23 @@
 import { periodText } from './v3/components/active-until.js';
 import { PRIVACY_LINE } from './v3/components/privacy-line.js';
 import { fillTranslated } from './shared-link.js';
+const answerOf = (item, values) => item.type === 'multi' ? values.getAll(item.id) : values.get(item.id);
+const isEmpty = value => value === null || value === '' || (Array.isArray(value) && !value.length);
 export function itemError(item, values, t = (k, f) => f) {
-  const value = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id);
-  const empty = value === null || value === '' || (Array.isArray(value) && !value.length);
+  const value = answerOf(item, values);
+  const empty = isEmpty(value);
   if (empty && item.required !== false) return `${t('answerRequired', 'Answer required:')} ${item.text || item.id}`;
   if (item.type === 'multi' && Array.isArray(value) && value.length > 1 && (item.options || []).some(opt => opt.exclusive && value.includes(opt.code))) return `${t('exclusionError', 'An exclusion choice cannot be combined:')} ${item.text || item.id}`;
   return null;
+}
+
+/** S27 (0.24.1 persona B): every required item still unanswered, by index, so one message can name them all. */
+export function missingItems(items, values) {
+  return items.map((item, i) => item.required !== false && isEmpty(answerOf(item, values)) ? i : -1).filter(i => i >= 0);
+}
+/** One message naming every missing required answer: "Answer required: 2. <question> · 4. <question>". */
+export function missingMessage(items, missing, t = (k, f) => f) {
+  return `${t('answerRequired', 'Answer required:')} ${missing.map(i => `${i + 1}. ${items[i].text || items[i].id}`).join(' · ')}`;
 }
 
 // B09: the optional "About you" block from cap.response.form context_fields (age range, gender; each has "Prefer not to say").
@@ -47,7 +58,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   const originalReview = reviewButton || (candidates.length === 1 ? candidates[0] : null);
   if (!originalReview || !form.contains(originalReview) || originalReview.type !== 'submit') throw new Error('Original Review submit button required');
   const initialHidden = fields.map(f=>f.hidden);
-  let index=0, destroyed=false, validatingItem=false;
+  let index=0, destroyed=false, validatingItem=false, missingNow=[];
   const owned=[];
   const changes=[];
   function el(tag,text) {const n=doc.createElement(tag);if(text!==undefined)n.textContent=String(text);return n;}
@@ -96,7 +107,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
     fields.forEach((f,k)=>f.hidden=k!==index);
     intro.hidden=true;nav.hidden=false;error.hidden=true;
     progress.textContent=fillTranslated(t('questionOf',QUESTION_OF),QUESTION_OF,{n:index+1,total:items.length}); // one template: word order follows the language
-    segs.forEach((seg,k)=>{seg.className=k<=index?'done':'';});
+    segs.forEach((seg,k)=>{seg.className=[k<=index?'done':'',missingNow.includes(k)?'missing':''].filter(Boolean).join(' ');});
     back.disabled=index===0;next.hidden=index===items.length-1;
     focusField(index);
   }
@@ -110,13 +121,24 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
       return true;
     } finally { validatingItem=false; }
   }
+  // S27: mark every unanswered required question (fieldset data-missing + aria-invalid, its progress segment) and clear a
+  // mark as soon as that question is answered.
+  function markMissing(missing){
+    missingNow=missing;
+    fields.forEach((f,k)=>{if(missing.includes(k)){f.dataset.missing='true';f.setAttribute('aria-invalid','true');}else{delete f.dataset.missing;f.removeAttribute?.('aria-invalid');}});
+    segs.forEach((seg,k)=>{seg.className=[k<=index?'done':'',missing.includes(k)?'missing':''].filter(Boolean).join(' ');});
+  }
+  function onAnswer(){if(missingNow.length)markMissing(missingNow.filter(k=>missingItems([items[k]],values()).length));}
   function beforeReview(event){
+    const missing=missingItems(items,values());markMissing(missing);
+    if(missing.length>1){event.preventDefault();event.stopImmediatePropagation();showForm(missing[0]);error.textContent=missingMessage(items,missing,t);error.hidden=false;return;}
     for(let i=0;i<items.length;i++)if(!validItem(i)){event.preventDefault();event.stopImmediatePropagation();return;}
     revealAll(); // native submit and the existing app handler remain the sole review path
   }
   function onInvalid(){if(validatingItem)return;revealAll();intro.hidden=true;nav.hidden=false;}
   originalReview.addEventListener('click',beforeReview,true);
   form.addEventListener('invalid',onInvalid,true);
+  form.addEventListener('change',onAnswer);form.addEventListener('input',onAnswer); // S34: typing clears the mark, not only blur
   fields.forEach(field=>field.hidden=true);
   function removeChanges(){for(const n of changes)n.remove();changes.length=0;}
   function showReview(){
@@ -127,7 +149,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
   }
   function showReceipt(){intro.hidden=true;nav.hidden=true;error.hidden=true;removeChanges();}
   function reset(){index=0;revealAll();removeChanges();intro.hidden=false;nav.hidden=true;error.hidden=true;}
-  function destroy(){if(destroyed)return;destroyed=true;originalReview.removeEventListener('click',beforeReview,true);form.removeEventListener('invalid',onInvalid,true);removeChanges();owned.forEach(n=>n.remove());fields.forEach((f,i)=>f.hidden=initialHidden[i]);}
+  function destroy(){if(destroyed)return;destroyed=true;originalReview.removeEventListener('click',beforeReview,true);form.removeEventListener('invalid',onInvalid,true);form.removeEventListener('change',onAnswer);form.removeEventListener('input',onAnswer);markMissing([]);removeChanges();owned.forEach(n=>n.remove());fields.forEach((f,i)=>f.hidden=initialHidden[i]);}
   // Caller controls #answers/#review/#receipt; the component never changes their flags.
   return {showForm,showReview,showReceipt,reset,destroy};
 }

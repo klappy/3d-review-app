@@ -1,32 +1,30 @@
 {
-  "version": "0.24.1",
+  "version": "0.26.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "539cffda72cda855cb0f78954c87340eb59ca1da",
+  "cookbook_commit": "73c7c2e631cff08566bbff5c8e10060f6f1c1f95",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.24.1.md",
-      "blob_sha": "194de6fe262a0ea1ddab8ae33e93a6592248ebfa",
-      "sha256": "73a87357fe48e797e38d3ec9dbf74595c14dcc13b8629989fd81f935b38f9bd7"
+      "path": "planning/2026-09-16-parity-build/releases/0.26.1.md",
+      "blob_sha": "b4a5def0275e5ec7e9b34a8ee37a09a9d34651b7",
+      "sha256": "cdb0beadb0d243ba3d00d173eb565f41476aa76e40e95e979fe9b4094deab9e6"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "c3cbe48df613446021c6242bedeaa98eb7db1298",
-      "sha256": "cce22e967736b6f4a2090d9702893cd13e707b4edb7cff407389660de5b52268"
+      "blob_sha": "5ac086732cc244561929dec1a661e059a3522f65",
+      "sha256": "a125c2de62e93330d004640f0d5909a96256b4bbced3ff3eac36c75a61980b2d"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Collect no longer makes a new participant link on every visit. Each survey keeps one link: Collect makes a link when it opens only if the survey has no active link here. Otherwise it shows the active link and its QR code. The link is kept in the browser tab, so reloading the page or coming back from the participant page shows the same link and QR code, and \"Print all\" prints the same URLs. It is dropped on sign-out or when you use another account. A new tab still makes its own link. The survey's Share card now says: \"Everyone can use this one link, also after you reload this page. In a new tab, sharing makes a new one.\" (#395)",
-        "Setup step 4 (Ready to launch) names the survey on each \"Who will participate\" row, for example \"Church · Church leaders — no number given\". Before, it showed only the perspective. (#395)",
-        "Prepare: \"Save preparation\" says \"Saved\" beside the button when the save succeeds, and shows the error there when it fails. Before, only \"Saving preparation…\" appeared. Moving to another page clears the message. (#395)",
-        "Participant survey fixes found on a phone. An access code that is used or not valid now shows its message inside the card, right under the Access code box; screen readers announce it and the cursor stays in the box (it used to appear below the screen with focus lost). The Print survey paper preview fits a phone screen and scrolls sideways if anything is still wider, instead of cutting off the right-hand choices; printed pages are unchanged. People who answer with an access code get a thank-you that says a code works only once, not \"Reopening your link shows this receipt again\". After a language is chosen, the thank-you and its Reference line are translated too, and the question counter (\"Question 3 of 17\") is one sentence that follows the language's word order. Switching from one language to another names the language that stays on screen while the new one loads, not English. Changing the language, or a translation arriving, failing or being retried while someone is answering, no longer erases the answers given so far, the Other text or the About-you choices. (#394)",
-        "A workshop room on one network is throttled less: passage files opened through their signed link no longer count against the 60-per-minute anonymous allowance of the room's address (only bad or expired links do), and translation requests that carry a participant's or signed-in person's credential are now counted per person instead of per address (the participant page starts sending its credential in a follow-up; without it, translation is counted per address as before). An assessment that has or had passages can now be deleted: the delete preview counts its passages and the delete removes them and their stored files (before, it failed with a database error). Adding a passage with an empty JSON body is a clear \"JSON object body required\" error instead of a server error. A machine translation that only repeats an English sentence is no longer served or stored as the translation; single words and short phrases that are spelled the same in both languages (French \"Question\", Spanish \"Hospital\") are kept. Undoing a change to an assessment's or project's translation languages now restores the previous languages. (#396)",
-        "The participant survey's translation requests now say which participant is asking. When the page holds the participant's own survey session, each request to translate the page sends that participant's token, so the server can count each participant separately instead of counting every phone on the same Wi-Fi as one visitor (the server half is a separate change). A page without a participant session sends nothing extra, exactly as before, and a facilitator's sign-in is never sent with these requests. (#397)",
-        "Sign-in from the tour: where email sign-in links are on, the tour's \"Sign in\" button now opens the \"Email me a sign-in link\" page, like every other way to sign in. Before, it went straight to the Cloudflare one-time code screen. Where email links are off, it is unchanged. (#398)",
-        "Sign-in when you open \"Start a review\" from another page without being signed in: where email sign-in links are on, the page now shows the \"Email me a sign-in link\" form first, with \"Sign in with a code instead\" under it, the same as when the page is opened directly. Before, it showed one \"Sign in with email code\" button that opened a different page. (#398)",
-        "Setup: the languages participants may switch to are now saved on the new review only, not also on a new project. Before, a language chosen during setup stayed on the project, so unticking it later on Prepare did not remove it for participants, in that review or in any later review in the project. (#398)",
-        "Collect: the participant link kept in the browser tab now belongs to the signed-in person only. A link made by one account is never kept or reused for another account signed in in the same tab. (#398)"
+        "When the translation service answers slowly, the survey no longer waits forever for the rest of its reply; the same time limit now covers the whole answer. (#415)",
+        "If saving a passage file fails partway, the uploaded file is cleaned up instead of being left behind in storage. (#415)",
+        "Taking a survey's link twice at the same moment no longer creates two live links; both requests get the same link. (#415)",
+        "The assessment setup now shows that \"Active until\" is required, next to \"Starts (optional)\". (#414)",
+        "When a passage link is refused (for example one starting with http:// instead of https://), the link, title and passage you typed stay in the form so you can correct them instead of typing them again. (#414)",
+        "On the participant survey, the \"answer required\" mark on a question clears as soon as you start typing an answer, not only when you leave the field. (#414)",
+        "Printing a survey in another language now follows the language picker on screen even if the page refreshed while the form was loading, and the picker and Print survey button unlock correctly afterwards. (#414)",
+        "Clicking Print survey twice quickly no longer prints the form twice; the button stays locked until the form is ready. (#414)"
       ]
     }
   }

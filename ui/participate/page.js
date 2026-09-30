@@ -1,7 +1,7 @@
 import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError, drawAbout, aboutValues, setAboutValues, aboutFields, welcomeCopy } from '../participant-view.js';
-import { UI_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames, translatingSub } from './i18n.js';
+import { UI_EN, SURVEYOR_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames, translatingSub } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
 import { receiptNotice } from '../shared-link.js';
 
@@ -69,7 +69,7 @@ function paint(state) {
   if (state.phase !== renderedPhase || (state.form && state.form !== renderedForm)) {
     for (const id of ['answers', 'review', 'receipt']) $(id).hidden = true;
     if (state.phase === 'form') {
-      if (renderedForm !== state.form) {
+      if (renderedForm !== state.form || state.fresh) { // S29: a fresh respondent always gets freshly drawn, empty fields
         pager?.destroy(); $('questions').replaceChildren(...shown.items.map(draw));
         for (const field of $('questions').querySelectorAll('input,textarea')) {
           if (field.dataset.otherFor) { const text = state.draft?.[OTHER_TEXT_KEY]?.[field.dataset.otherFor]; if (typeof text === 'string') field.value = text; continue; }
@@ -89,7 +89,10 @@ function paint(state) {
     } else {
       pager?.showReceipt();
       if (state.phase === 'receipt') {
-        $('receipt').replaceChildren(element('h2', demo ? 'Practice complete — nothing sent' : T('responseSaved')), element('p', receiptLine(state.receipt, { t: T, locale: shownLocale() })));
+        // S29 surveyor mode (Lovable parity): one tap starts the next respondent on this device from the same link.
+        const another = element('button', SURVEYOR_EN.interviewAnother); another.type = 'button'; another.id = 'interview-another'; another.className = 'rv-btn quiet participant-another';
+        another.addEventListener('click', interviewAnother);
+        $('receipt').replaceChildren(element('h2', demo ? 'Practice complete — nothing sent' : T('responseSaved')), element('p', receiptLine(state.receipt, { t: T, locale: shownLocale() })), another);
         $('receipt').hidden = false;
       }
     }
@@ -259,6 +262,12 @@ $('answers').addEventListener('submit', event => { event.preventDefault(); try {
 $('edit').addEventListener('click', () => journey.edit());
 $('submit').addEventListener('click', () => { journey.setContext(aboutValues(about)); journey.submit(); });
 $('recover').addEventListener('click', () => journey.recover());
+async function interviewAnother() {
+  await journey.another();
+  if (journey.state.phase !== 'form') return;
+  if (passageDetails) passageDetails.open = true; // the next person starts at the passage, like a first open
+  document.querySelector('main')?.scrollIntoView?.();
+}
 // A newly pasted link selects a fresh controller; a participant page never changes into a staff surface.
 window.addEventListener('hashchange', () => location.reload());
 journey.start().then(() => { if (demo && new URLSearchParams(location.search).get('response') === '1' && journey.state.phase === 'form') { journey.save(sample.sampleAnswers); journey.review(sample.sampleAnswers); } }).catch(() => { $('notice').textContent = 'The survey could not be opened. Open your survey link again in a moment.'; });
