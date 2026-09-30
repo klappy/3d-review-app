@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.23.0",
+  "current": "0.24.0",
   "versions": [
+    {
+      "version": "0.24.0",
+      "status": "candidate",
+      "notes_path": "releases/0.24.0.md",
+      "sections": {
+        "changed": [
+          "Results and the responses listing carry demographic (age range, gender) breakdown columns only when the facilitator turned demographics on for the assessment; off by default, no demographic key at all. (#381)",
+          "Sign-in: where email sign-in links are on, every way to sign in (Home \"Sign in\", the sign-in screen, \"Use another account\", \"Sign in to open this page\", \"Sign in to continue\", and the email sign-in and \"Check your email\" pages) shows the \"Email me a sign-in link\" form first, with \"Sign in with a code instead\" under it for a one-time code. If the emailed link never arrives, the code is a way in. Where email links are off, sign-in is unchanged. (#388)",
+          "Invitations say what you are accepting, all on one page. After signing in, a person with pending invitations sees every one of them on one page. Each row shows the kind (workspace, project or assessment), its name with the workspace › project path above it, and the role, and has its own Accept button. \"Accept all\" accepts them together when there are two or more. A single invitation reads, for example, You were invited to the project \"River Valley\" as an owner. cap.me.invitations adds scope.name and scope.path (names only) to the signed-in person's own email-matched pending invitations. The mailed invitation link still names nothing before acceptance. (#392)"
+        ],
+        "added": [
+          "Dynamic translation for participants: a Language drop-down limited to the languages of wider communication set on the project and/or assessment (setup step 1 and Prepare; 25 tags in src/languages.ts: 24 machine-translated languages, and Indian Sign Language, which is recorded, not translated), questions/choices/page words machine-translated through POST /v2/translate, stored once per language in a D1 translation memory (migration 0012) and served from storage after that; English stays the fallback and answers, scores and reports are unchanged; multi-answer questions say \"Choose all that apply.\"; only the published survey's questions, choices and page words are translated and stored (other text is refused), and the translation service gets a context fixed by the server; a welcome sentence that carries a language name is allowlisted only for well-shaped names and is sent to the translation service on its own, never in the same request as the page words (#377)",
+          "Each assessment can carry the passage under review — USFM, SFM, USX, PDF or MP3 files, or a link such as a sign-language video — added on Prepare; participants see \"The passage\" at the top of every survey screen (audio plays in the page; files, videos and links open in a new tab) through private, 12-hour signed links. (#385)",
+          "The survey says which passage to read or hear first. A facilitator can name the passage with nothing attached (\"Genesis 1\") on Prepare. Participants then see \"Please read or listen to the passage before you answer: Genesis 1\" at the top of the survey; the line is translated like the rest of the page. The printed form carries \"Before you answer, read or listen to: Genesis 1\" under its title. Collect reminds the facilitator to read or play the passage before sharing links or handing out paper. This follows the BCS training demo of 2026-09-29. (#387)"
+        ]
+      }
+    },
     {
       "version": "0.23.0",
       "status": "candidate",
