@@ -1,8 +1,9 @@
 // Share card for ONE survey (leaf page) — product brief row "Survey": outcome-first sharing with confirmed copy, QR, invitation
 // sheet, revoke this session's link. Behaviour reference: legacy ui/app.js issue-link-* + ui/shared-link.js (staff side).
 // Credential discipline (unchanged from legacy): the link token is shown ONCE, lives only in this module's in-memory model for
-// the survey it was minted for (U36: shared in memory with Collect's per-survey cache, same aid|sid|epoch key), is never written to storage, never logged, never echoed into the URL, and is cleared when the
-// identity, assessment, survey or data epoch changes. Revoke uses the link id, never the token.
+// the survey it was minted for (U36: shared in memory with Collect's per-survey cache, same aid|sid|epoch key), is never logged, never echoed into the URL, and is cleared when the
+// identity, assessment, survey or data epoch changes. Revoke uses the link id, never the token. The one exception is the survey's
+// active participant link in Collect's per-survey cache: it is also kept in the store the host passes — THIS tab's session store (TabLinks, gate 0.23.0 E).
 // APIs (existing): POST /v2/assessments/{aid}/surveys/{sid}/links {params:{}, mode:'dry_run'|'execute', confirm_token}
 //                  DELETE /v2/assessments/{aid}/surveys/{sid}/links/{link_id}
 import { shareUrl } from '../shared-link.js';
@@ -71,7 +72,7 @@ export function render(ctx, { current, survey, share }) {
   const ready = !!link || share.stage === 'ready';
   const actions = !share.open
     ? `<button type="button" class="primary" data-share-open>${esc(copy.open)}</button>`
-    : `<p class="note small">${link ? 'Everyone can use this one link; after a page reload, sharing makes a new one.' : `Choose how to share ${esc(survey.template_name || 'this survey')}. Your choice makes a participant link available.`} You can revoke the link later; answers already sent stay with the team.</p>
+    : `<p class="note small">${link ? 'Everyone can use this one link, also after you reload this page. In a new tab, sharing makes a new one.' : `Choose how to share ${esc(survey.template_name || 'this survey')}. Your choice makes a participant link available.`} You can revoke the link later; answers already sent stay with the team.</p>
       ${link ? `<div class="share-link"><p data-share-url><code>${esc(link.url)}</code></p>${link.expires_at ? `<p class="small muted">Expires ${esc(link.expires_at)}</p>` : ''}</div>` : ''}
       <div class="actions">${ready || busy ? shareActions(ctx, { prefix: 'share', disabled: busy, qrShown: !!link, primary: true }) : `<button type="button" data-share-open>Try sharing again</button>`}${link ? `<button type="button" class="quiet" data-share-revoke ${busy ? 'disabled' : ''}>${esc(copy.revoke)}</button>` : ''}<button type="button" class="quiet" data-share-close ${busy ? 'disabled' : ''}>Close</button></div>
       ${link ? `<figure class="share-qr" data-share-qr-figure>${qrSvg(link.url)}<figcaption class="small muted">Scan to open the survey</figcaption></figure>` : ''}${link ? `<p class="small muted">${esc(copy.onceShown)}</p>` : ''}`;
@@ -345,11 +346,48 @@ export function cachedLink(cache, k, issue, now = Date.now) {
 // in-memory entry keyed by linkKey(aid, sid) — not by the data epoch, so moving between pages or refreshing the assessment
 // data keeps the survey's link. A new link is issued only when none is active here (none yet, revoked here, expired) or on the
 // Share card's explicit new-link action. The entry is dropped with identity. The server keeps only a hash of each token, so
-// after a browser reload the link cannot be read back and sharing again makes a new one (see the card's sentence).
+// the link cannot be read back from the server; the tab keeps it instead (TabLinks below), and only a new tab makes a new one.
 export const linkKey = (aid, sid) => `${aid}|${sid}`;
 const liveLink = (l, now = Date.now) => !l.expires_at || !(Date.parse(l.expires_at) <= now());
 export function knownLink(cache, k, now = Date.now) { const c = cache?.get(k); return c && !c.uncertain && c.link && liveLink(c.link, now) ? c.link : null; }
 export function rememberLink(cache, k, link) { const p = Promise.resolve(link); p.link = link; cache.set(k, p); }
+// Gate 0.23.0 E (captain 2026-09-28, B43/U36: one participant link per survey; mint on render only if none is active). The
+// in-memory cache alone forgot every link on each page load, so every Collect page view minted another (dry run → execute) and
+// old links stayed live. The cache now also lives in this tab's session store (the host passes it): a reload, or coming back from the participant
+// page, finds the survey's active link and reuses it. Only live links (id, url, expires_at) are written — never a pending or
+// uncertain entry — under the signed-in principal; another principal's entries are dropped on load, and clear() (identity
+// reset: sign-out, switch account, new session) removes them. Another tab keeps its own (a separate product question).
+export const LINKS_KEY = 'v3:survey-links';
+const storedUrl = u => typeof u === 'string' && /^https?:\/\/[^/?#]+\/#survey=[A-Za-z0-9_-]+$/.test(u);
+export class TabLinks extends Map {
+  constructor(store = null, owner = null) { super(); this.store = store; this.owner = owner; }
+  set(k, v) {
+    super.set(k, v);
+    if (v && typeof v.then === 'function' && !v.link) v.then(() => { if (super.get(k) === v) this.save(); }, () => {}); // saved once issued
+    else this.save();
+    return this;
+  }
+  delete(k) { const had = super.delete(k); this.save(); return had; }
+  clear() { super.clear(); this.owner = null; try { this.store?.removeItem(LINKS_KEY); } catch {} }
+  save(now = Date.now) {
+    if (!this.store || !this.owner) return;
+    const links = {};
+    for (const k of this.keys()) { const l = knownLink(this, k, now); if (l && storedUrl(l.url)) links[k] = { id: l.id, url: l.url, expires_at: l.expires_at || null }; }
+    try { this.store.setItem(LINKS_KEY, JSON.stringify({ owner: this.owner, links })); } catch {}
+  }
+}
+// The cache for `owner` in this tab: the stored live links of the same principal, plus whatever this page already holds.
+export function tabLinks(store, owner, prior = null, now = Date.now) {
+  if (prior instanceof TabLinks && owner && prior.owner === owner) return prior;
+  const cache = new TabLinks(store, owner || null);
+  let saved = null; try { saved = JSON.parse(store?.getItem(LINKS_KEY) || 'null'); } catch { saved = null; }
+  if (owner && saved?.owner === owner && saved.links && typeof saved.links === 'object') for (const [k, l] of Object.entries(saved.links)) {
+    if (l && typeof l.id === 'string' && storedUrl(l.url) && (l.expires_at == null || typeof l.expires_at === 'string') && liveLink(l, now)) { const p = Promise.resolve(l); p.link = { id: l.id, url: l.url, expires_at: l.expires_at || null }; Map.prototype.set.call(cache, k, p); }
+  }
+  if (prior) for (const [k, v] of prior) cache.set(k, v); // this page's own entries win
+  cache.save(now);
+  return cache;
+}
 // The launch page's links (wizard ctx.links rows) join the same cache, so Collect and the survey page reuse them.
 export function rememberLaunchLink(cache, aid, row, origin = globalThis.location?.origin) {
   if (!cache || !aid || !row?.id || !row.survey || typeof row.entry_fragment !== 'string' || !/^#survey=[A-Za-z0-9_-]+$/.test(row.entry_fragment)) return;
