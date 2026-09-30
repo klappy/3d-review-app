@@ -43,8 +43,12 @@ export function wordsOnPaper(model) {
   const items = model?.items || [], structured = items.some(i => i && typeof i === 'object');
   const has = t => items.some(i => i && typeof i === 'object' && (Array.isArray(t) ? t.includes(i.type) : i.type === t));
   return Object.keys(PRINT_WORDS).filter(k => ({
-    blankSurvey: !model?.title, passageLead: !!model?.passageLine, introChoices: structured, introLines: !structured, noLink: false,
+    blankSurvey: !model?.title, passageLead: !!model?.passageLine, introChoices: structured, introLines: !structured,
     chooseAll: has('multi'), chooseOne: has(['single', 'scale']),
+    // S31: the QR slot shows one of these two; the identity labels only when the paper carries its identity block.
+    noLink: !model?.link, helperScan: !!model?.link,
+    projectLabel: !!model?.identity, assessmentLabel: !!model?.identity, surveyLabel: !!model?.identity,
+    languageLabel: !!model?.identity?.assessment?.language, printedIn: !!model?.identity,
   })[k] ?? true);
 }
 

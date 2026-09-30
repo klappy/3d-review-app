@@ -23,7 +23,7 @@ const ENVELOPE = { ok: true, result: { blank: true, template_id: 'tpl_validation
 ] } };
 const HI = { 'Is there a brief?': 'क्या कोई संक्षिप्त विवरण है?', Yes: 'हाँ', 'Other (please describe)': 'अन्य (कृपया बताएं)', 'Which resources?': 'कौन से संसाधन?', Commentaries: 'टीकाएँ', 'Anything else?': 'और कुछ?',
   [PRINT_WORDS.passageLead]: 'उत्तर देने से पहले पढ़ें या सुनें:', [PRINT_WORDS.codeLabel]: 'कोड (वैकल्पिक)', [PRINT_WORDS.leaveBlank]: 'साझा लिंक से उत्तर देते समय खाली छोड़ें',
-  [PRINT_WORDS.noLink]: 'इस खाली फ़ॉर्म पर कोई आमंत्रण लिंक नहीं', [PRINT_WORDS.introChoices]: 'हर प्रश्न के लिए एक गोला ○ चिह्नित करें।', [PRINT_WORDS.chooseAll]: 'सभी लागू चुनें', [PRINT_WORDS.chooseOne]: 'एक चुनें' };
+  [PRINT_WORDS.noLink]: 'इस सर्वेक्षण का अभी कोई साझा लिंक नहीं है।', [PRINT_WORDS.footNote]: 'कोड कभी नहीं छापे जाते। QR इस सर्वेक्षण का अपना लिंक है।', [PRINT_WORDS.introChoices]: 'हर प्रश्न के लिए एक गोला ○ चिह्नित करें।', [PRINT_WORDS.chooseAll]: 'सभी लागू चुनें', [PRINT_WORDS.chooseOne]: 'एक चुनें' };
 
 async function printModel(calls, lang) {
   const request = async (url, init) => { calls.push({ url, init }); return { ok: true, json: async () => ENVELOPE }; };
@@ -106,7 +106,12 @@ test('no request when English, when the assessment has no language, or for a sig
 
 test('only the words this paper shows are sent; assess.js wires the language into Print survey', () => {
   const { ui } = printStrings({ title: 'T', items: [{ type: 'text', text: 'Q?' }] });
-  assert.deepEqual(Object.values(ui).sort(), [PRINT_WORDS.codeLabel, PRINT_WORDS.introChoices, PRINT_WORDS.leaveBlank].sort(), 'the no-link label is never on paper (review #405 nit 3)');
+  // S31: the QR slot is on paper now — "no shared link" when the survey has none, the helper line when it has one; the
+  // identity labels only when the paper carries its identity block.
+  assert.deepEqual(Object.values(ui).sort(), [PRINT_WORDS.codeLabel, PRINT_WORDS.introChoices, PRINT_WORDS.leaveBlank, PRINT_WORDS.noLink, PRINT_WORDS.footNote].sort());
+  const linked = printStrings({ title: 'T', items: [{ type: 'text', text: 'Q?' }], link: { url: 'https://x.test/#survey=link_a' }, identity: { assessment: { language: 'Hindi' } } }).ui;
+  assert.ok(Object.values(linked).includes(PRINT_WORDS.helperScan)); assert.ok(!Object.values(linked).includes(PRINT_WORDS.noLink));
+  for (const k of ['projectLabel', 'assessmentLabel', 'languageLabel', 'printedIn', 'surveyLabel']) assert.ok(Object.values(linked).includes(PRINT_WORDS[k]), k);
   const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   assert.match(src, /loadBlankPrint\(\{[^}]*role: current\.assessment\.role, lang \}\)/);
   assert.match(src, /translatePrint\(model, \{ lang, fetchImpl: facilitatorFetch\(token\) \}\)/);

@@ -192,8 +192,8 @@ test('renderBlankPrint uses empty code slot, no invitation URL, no innerHTML, no
   });
   const page = text(root);
   assert.match(page, /Blank code slot|Code \(optional/);
-  assert.match(page, /No invitation link on this blank form/);
-  assert.match(page, /never prints codes or credentials/);
+  assert.match(page, /No shared link for this survey yet/, 'S31: no link → the QR slot says so');
+  assert.match(page, /Codes are never printed\. The QR is the survey's own link\./);
   assert.match(page, /How does review work\?/);
   assert.equal(/ABCD-EFGH|st_|Bearer |link_token/.test(page), false);
   assert.equal(/https?:\/\//.test(page), false);
