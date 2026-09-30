@@ -145,10 +145,22 @@ export const del: Handler = async (ctx, params, opts) => {
     ctx.db.prepare("DELETE FROM assessment WHERE id = ?").bind(id),
   ]);
   // After the rows are gone (a failed batch leaves files and rows together). Removed passages already dropped their file
-  // (src/passages.ts handleRemove); deleting again is a no-op and catches one that failed then.
-  const bucket = (ctx.env as { PASSAGES?: R2Bucket }).PASSAGES, keys = passages.rows.flatMap((p) => p.object_key ? [p.object_key] : []);
-  if (bucket) for (let i = 0; i < keys.length; i += 1000) // R2 deletes at most 1000 keys per call
-    await bucket.delete(keys.slice(i, i + 1000)).catch((e) => console.error("assessment.delete passage_files", id, String(e)));
+  // (src/passages.ts handleRemove); deleting again is a no-op and catches one that failed then. The files are also found
+  // by LISTING the assessment's prefix (src/passages.ts keys), not only from the rows read above: a file uploaded between
+  // that read and the batch lost its row in the batch and must not keep its stored object (review of #396).
+  const bucket = (ctx.env as { PASSAGES?: R2Bucket }).PASSAGES, found = new Set(passages.rows.flatMap((p) => p.object_key ? [p.object_key] : []));
+  if (bucket) {
+    try {
+      for (let cursor: string | undefined, more = true; more;) {
+        const page = await bucket.list({ prefix: `assessments/${id}/`, cursor, limit: 1000 });
+        for (const o of page.objects) found.add(o.key);
+        more = page.truncated; cursor = page.truncated ? page.cursor : undefined;
+      }
+    } catch (e) { console.error("assessment.delete passage_list", id, String(e)); }
+    const keys = [...found];
+    for (let i = 0; i < keys.length; i += 1000) // R2 deletes at most 1000 keys per call
+      await bucket.delete(keys.slice(i, i + 1000)).catch((e) => console.error("assessment.delete passage_files", id, String(e)));
+  }
   return {result:{deleted:true,id},scope:{type:"assessment",id},impact,priorState:{assessment:row}};
 };
 export const handlers: Record<string,Handler> = {

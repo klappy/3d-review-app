@@ -137,6 +137,23 @@ describe("W3 — an assessment with passages can be deleted", () => {
     expect((await bucket.list({ prefix: `assessments/${id}/` })).objects.length).toBe(0);
     expect((await app.fetch(new Request("https://local.invalid" + file.result.passage.href), env)).status).toBe(404);
   });
+  it("a file uploaded after the rows were read loses its stored object too (the prefix is listed, not only the rows read)", async () => {
+    const id = await fresh("W3 late upload");
+    const file = await call("POST", `/v2/assessments/${id}/passages?name=MRK.usfm`, "\\id MRK\n\\c 4\n\\v 1 Again.", owner, env, { "content-type": "application/octet-stream" });
+    expect(file.status).toBe(201);
+    const dry = await call("DELETE", `/v2/assessments/${id}`, { mode: "dry_run" });
+    // the race: rows are read, then another upload lands its object (and a row the batch deletes) before the batch runs
+    const late = `assessments/${id}/pas_late.usfm`, reads = { n: 0 };
+    const racing = { ...env, DB: new Proxy(db, { get(t: any, prop) {
+      if (prop !== "prepare") return typeof t[prop] === "function" ? t[prop].bind(t) : t[prop];
+      return (sql: string) => { const st = t.prepare(sql); if (/SELECT object_key, archived_at FROM assessment_passage/.test(sql)) { reads.n++; return { bind: (...a: unknown[]) => { const b = st.bind(...a); return { all: async () => { const r = await b.all(); await bucket.put(late, "late"); return r; } }; } }; } return st; };
+    } }) };
+    const done = await call("DELETE", `/v2/assessments/${id}`, { mode: "execute", confirm_token: dry.result.confirm_token }, owner, racing);
+    expect(done.status).toBe(200);
+    expect(reads.n).toBeGreaterThan(0);
+    expect(await bucket.head(late)).toBeNull();
+    expect((await bucket.list({ prefix: `assessments/${id}/` })).objects.length).toBe(0);
+  });
   it("D5 still holds: an assessment with surveys is refused and its passages stay", async () => {
     const p = await call("POST", `/v2/assessments/${aid}/passages`, { reference: "Mark 4" });
     const { dry, done } = await del(aid);
