@@ -397,3 +397,20 @@ test('Gate 0.23.0 E: TabLinks keeps the survey\'s active link in this tab\'s sto
   assert.equal(knownLink(b, key)?.id, 'inv_5'); b.clear(); assert.equal(b.size, 0);
   assert.equal(tabLinks(null, 'usr_2').size, 0); assert.equal(tabLinks(store, null).size, 0, 'no principal, nothing restored');
 });
+
+// S24 (reviewer edge on gate 0.23.0 E): a prior cache that belongs to another principal is never merged into this owner's cache,
+// so usr_B never holds usr_A's link in memory nor saves it under usr_B in this tab.
+test('S24: tabLinks merges a prior cache only when it has the same owner', async () => {
+  const { tabLinks, LINKS_KEY, knownLink, rememberLink } = await import('./share.js');
+  const mem = () => { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+  const store = mem(), key = 'a1|s1';
+  const a = tabLinks(store, 'usr_A'); rememberLink(a, key, { id: 'inv_A', url: 'https://dev.example/#survey=link_A', expires_at: null });
+  const b = tabLinks(store, 'usr_B', a);
+  assert.equal(knownLink(b, key), null, 'B does not hold A\'s link');
+  assert.equal(b.owner, 'usr_B');
+  assert.deepEqual(JSON.parse(store.getItem(LINKS_KEY)), { owner: 'usr_B', links: {} }, 'nothing of A\'s is saved under usr_B');
+  // the same owner keeps its own cache (and its link) as before
+  const a2 = tabLinks(mem(), 'usr_A'); rememberLink(a2, key, { id: 'inv_A2', url: 'https://dev.example/#survey=link_A2', expires_at: null });
+  assert.equal(tabLinks(store, 'usr_A', a2), a2);
+  assert.equal(knownLink(tabLinks(store, 'usr_A', a2), key)?.id, 'inv_A2');
+});

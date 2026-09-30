@@ -220,6 +220,21 @@ test('lane 12 L12-1: lead organisation rides cap.project.create only when given 
   assert.match(renderStep('review', draft({ project: NEW_PROJECT, newProject: 'H', newOrg: 'Org' }), { projects: [], languages: [], templates: [] }, [], false, ''), /<dt>Lead organisation<\/dt><dd>Org<\/dd>/);
 });
 
+// S24 (DEV 0.24.0 persona pass): a new project's languages participants may switch to ride the ASSESSMENT only. No screen edits a
+// project's languages and participants see the union, so a project-level copy would outlive every later untick on Prepare.
+test('S24: new project + chosen languages → lwc on cap.assessment.create only, never on cap.project.create (launch and save)', () => {
+  const d = draft({ project: NEW_PROJECT, newProject: 'Hill', newLanguage: 'L', lwc: ['th', 'lo'] });
+  const bodies = plan => plan.filter(s => ['cap.project.create', 'cap.assessment.create'].includes(s.cap)).map(s => [s.cap, s.body({ lid: 'l1' }).lwc ?? null]);
+  assert.deepEqual(bodies(launchPlan(d)), [['cap.project.create', null], ['cap.assessment.create', 'lo,th']]);
+  assert.deepEqual(bodies(savePlan(d)), [['cap.project.create', null], ['cap.assessment.create', 'lo,th']]);
+  assert.deepEqual(launchPlan(d)[0].body({}), { name: 'Hill' });
+  assert.deepEqual(launchPlan({ ...d, newOrg: 'SIL' })[0].body({}), { name: 'Hill', organization: 'SIL' });
+  // an existing project: the assessment still carries them; no project write at all
+  const existing = launchPlan(draft({ lwc: ['lo'] }));
+  assert.ok(!existing.some(s => s.cap === 'cap.project.create'));
+  assert.equal(existing.find(s => s.cap === 'cap.assessment.create').body({ lid: 'l1' }).lwc, 'lo');
+});
+
 test('L2-4 setup look follows the design-system-v3 prototype: short stepper labels, perspective dots', () => {
   assert.deepEqual(STEP_TITLES, ['Details', 'Participants', 'Information', 'Review']);
   assert.equal(pdot('Translation team'), 'p-team'); assert.equal(pdot('Community'), 'p-community'); assert.equal(pdot('Church'), 'p-church'); assert.equal(pdot('Other'), 'p-reviewer');
