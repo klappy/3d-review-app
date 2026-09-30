@@ -124,18 +124,31 @@ export function hashOf(obj) {
   return h.toString(16).padStart(8, '0');
 }
 
+// S23 (audit of train 22, client half of the translate rate-limit fix): the participant's OWN bearer rides POST
+// /v2/translate, so the server can spend that participant's limiter instead of the per-address anonymous one (a workshop
+// room on one Wi-Fi shares one address). Only a participant token is ever sent — `pt_` + 32 (src/auth.ts
+// FIRST_PARTY_TOKEN; minted by /v2/participate/link). A staff session (`st_`), the practice stand-in or anything else
+// sends no header, exactly as before, and credentials:'omit' keeps a signed-in facilitator's cookie off the request.
+// The token rides the header only: never the body, the cache key or the device cache.
+export const PARTICIPANT_TOKEN = /^pt_[A-Za-z0-9_-]{32}$/;
+export function translateInit(body, bearer = null) {
+  const headers = { 'content-type': 'application/json' };
+  if (typeof bearer === 'string' && PARTICIPANT_TOKEN.test(bearer)) headers.authorization = `Bearer ${bearer}`;
+  return { method: 'POST', headers, credentials: 'omit', body: JSON.stringify(body) };
+}
+
 const CACHE_PREFIX = '3dr.tr.v1:';
 function readCache(storage, key) { try { const raw = storage?.getItem(key); return raw ? JSON.parse(raw) : null; } catch { return null; } }
 function writeCache(storage, key, value) { try { storage?.setItem(key, JSON.stringify(value)); } catch { /* best effort */ } }
 
 // One request to the proxy, with a device cache for complete answers. Resolves { map, partial, cached };
 // rejects on any failure so the caller can keep English and say so.
-export async function fetchTranslations({ lang, context, sourceTexts, fetchImpl = globalThis.fetch, storage = null, endpoint = '/v2/translate' }) {
+export async function fetchTranslations({ lang, context, sourceTexts, fetchImpl = globalThis.fetch, storage = null, endpoint = '/v2/translate', bearer = null }) {
   if (isEnglish(lang)) return { map: {}, partial: false, cached: false };
   const key = `${CACHE_PREFIX}${lang.toLowerCase()}:${context}:${hashOf(sourceTexts)}`;
   const hit = readCache(storage, key);
   if (hit && typeof hit === 'object') return { map: hit, partial: false, cached: true };
-  const res = await fetchImpl(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ targetLang: lang, context, sourceTexts }) });
+  const res = await fetchImpl(endpoint, translateInit({ targetLang: lang, context, sourceTexts }, bearer));
   if (!res || !res.ok) throw new Error(`translate ${res ? res.status : 'failed'}`);
   const data = await res.json();
   const map = {};
@@ -149,7 +162,8 @@ export async function fetchTranslations({ lang, context, sourceTexts, fetchImpl 
 // The same, split into small parallel requests so the page can show real progress ("12 of 94 phrases") while a
 // language is translated for the first time (the upstream model answers ~20 strings per call). The whole bundle is
 // cached on the device only when complete. onProgress({ done, total }) after each chunk. Rejects only if nothing came back.
-export async function fetchTranslationsProgressive({ lang, context, sourceTexts, fetchImpl = globalThis.fetch, storage = null, endpoint = '/v2/translate', chunkSize = 20, concurrency = 3, onProgress = () => {} }) {
+// bearer: the participant token when the page holds one (translateInit above sends it only if it is participant-shaped).
+export async function fetchTranslationsProgressive({ lang, context, sourceTexts, fetchImpl = globalThis.fetch, storage = null, endpoint = '/v2/translate', chunkSize = 20, concurrency = 3, onProgress = () => {}, bearer = null }) {
   const keys = Object.keys(sourceTexts), total = keys.length;
   if (isEnglish(lang) || !total) return { map: {}, partial: false, cached: false };
   const cacheKey = `${CACHE_PREFIX}${lang.toLowerCase()}:${context}:${hashOf(sourceTexts)}`;
@@ -164,7 +178,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
     while (next < chunks.length) {
       const part = chunks[next++];
       try {
-        const res = await fetchImpl(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ targetLang: lang, context, sourceTexts: part }) });
+        const res = await fetchImpl(endpoint, translateInit({ targetLang: lang, context, sourceTexts: part }, bearer));
         if (!res || !res.ok) throw new Error(`translate ${res ? res.status : 'failed'}`);
         const data = await res.json();
         for (const k of Object.keys(part)) if (typeof data?.translated?.[k] === 'string' && data.translated[k].trim()) map[k] = data.translated[k];
