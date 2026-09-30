@@ -95,6 +95,9 @@ TRANSLATE_UPSTREAM_URL = "https://rnumwyqmxjqdkygsnbgs.supabase.co/functions/v1/
 # B38 email sign-in link on in production (captain ruling, cookbook work/queued/2026-09-29-3d-prod-email-links/TICKET.md).
 MAGIC_LINK = "on"
 MAGIC_LINK_TTL_MINUTES = "30"
+# PTXprint MCP server (klappy/ptxprint-mcp; public, no key): USFM/SFM passages are typeset into a PDF on upload
+# (src/ptxprint.ts). Unset → the text file is served as before. Production sets its own when promoted.
+PTXPRINT_MCP_URL = "https://ptxprint.klappy.dev/mcp"
 # Passage files in production — bucket "3d-review-passages" exists since 2026-09-29.
 [[env.production.r2_buckets]]
 binding = "PASSAGES"
