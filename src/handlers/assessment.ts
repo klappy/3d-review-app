@@ -6,6 +6,7 @@ import { CapError, notVisible } from "./errors";
 import { DEMOGRAPHICS_KEY, demographicsEnabled, parseContextJson } from "../context-fields";
 import { STAGES, countScalar, gate, loadProject, newId, nowIso, patchOf, reqStr, roleAt, type AssessmentRow } from "./common";
 import { lwcOf, saveLwc, saveLwcOnCreate, takeLwc } from "./lwc";
+import { missingTable as missingPassageTable } from "../passages";
 
 async function exact(ctx: Ctx, id: string, min: Role = "viewer") {
   const row = await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
@@ -74,7 +75,7 @@ export const update: Handler = async (ctx, params) => {
   // S13: an LWC-only update (the Prepare languages field) touches nothing else.
   if (lwc !== undefined && demographicsParam === undefined && Object.keys(rest).every(k => k === "id")) {
     await saveLwc(ctx, "assessment", id, lwc);
-    return { result: { assessment: { ...view(row, role), lwc } }, scope: { type: "assessment", id }, priorState: { lwc: lwcOf(row) } };
+    return { result: { assessment: { ...view(row, role), lwc } }, scope: { type: "assessment", id }, priorState: { lwc: lwcOf(row).join(",") } };
   }
   const onlySwitch = demographicsParam !== undefined && !Object.keys(rest).some((k) => k !== "id");
   const patch = onlySwitch ? {} as Record<string, string | null> : patchOf(rest, ["name", "purpose", "period", "language_id", "format"]);
@@ -84,7 +85,7 @@ export const update: Handler = async (ctx, params) => {
   await ctx.db.prepare("UPDATE assessment SET name = ?, purpose = ?, period = ?, language_id = ?, format = ? WHERE id = ?").bind(next.name, next.purpose, next.period, next.language_id, next.format, id).run();
   if (lwc !== undefined) await saveLwc(ctx, "assessment", id, lwc);
   const demographics_enabled = demographicsParam === undefined ? await readDemographics(ctx, id) : await writeDemographics(ctx, id, demographicsParam);
-  return { result: { assessment: { ...view({...row, ...next}, role), demographics_enabled, ...(lwc !== undefined ? { lwc } : {}) } }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format} };
+  return { result: { assessment: { ...view({...row, ...next}, role), demographics_enabled, ...(lwc !== undefined ? { lwc } : {}) } }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format, ...(lwc !== undefined ? { lwc: lwcOf(row).join(",") } : {})} };
 };
 export const set_stage: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id, "member");
@@ -120,17 +121,34 @@ export const notes_update: Handler = async (ctx, params) => {
   await ctx.db.prepare("UPDATE assessment SET notes_reflection = ?, notes_next_steps = ? WHERE id = ?").bind(notes_reflection,notes_next_steps,id).run();
   return {result:{assessment:view({...row,notes_reflection,notes_next_steps},role)},scope:{type:"assessment",id},priorState:{notes_reflection:row.notes_reflection,notes_next_steps:row.notes_next_steps}};
 };
+/** Every passage row of an assessment, removed ones included (migration 0013; none when the table is not there yet). */
+async function passageRows(ctx: Ctx, id: string): Promise<{ table: boolean; rows: { object_key: string | null; archived_at: string | null }[] }> {
+  try { return { table: true, rows: (await ctx.db.prepare("SELECT object_key, archived_at FROM assessment_passage WHERE assessment_id = ?").bind(id).all<{ object_key: string | null; archived_at: string | null }>()).results }; }
+  catch (e) { if (missingPassageTable(e)) return { table: false, rows: [] }; throw e; }
+}
 export const del: Handler = async (ctx, params, opts) => {
   const id = reqStr(params,"id"), {row} = await exact(ctx,id,"owner");
   const surveys = await countScalar(ctx,"SELECT COUNT(*) AS n FROM assessment_survey WHERE assessment_id = ?",id);
   const responses = await countScalar(ctx,"SELECT COUNT(*) AS n FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id WHERE s.assessment_id = ?",id);
-  const impact = {affected:[{assessment:id,surveys,responses}],irreversible:true,effect:"destructive" as const,retention:"D5 held: only empty assessments can be hard-deleted"};
+  // Audit round 1 W3: assessment_passage.assessment_id REFERENCES assessment(id), so ANY passage row — a removed
+  // (archived) one included — made the execute fail with a D1 FOREIGN KEY error after the dry run had said "empty".
+  // Passages are the facilitator's reading material, not participant data (D5 is about surveys and responses): the dry
+  // run counts the active ones, and the execute deletes every passage row in the same batch, then their stored files.
+  const passages = await passageRows(ctx, id);
+  const active = passages.rows.filter((p) => !p.archived_at).length;
+  const impact = {affected:[{assessment:id,surveys,responses,passages:active}],irreversible:true,effect:"destructive" as const,retention:"D5 held: only empty assessments can be hard-deleted (no surveys, no responses); its passages and their files are deleted with it"};
   if(opts?.dryRun) return {result:{assessment:view(row,"owner")},scope:{type:"assessment",id},impact};
   if(surveys || responses) throw new CapError("INVALID_PARAMS","assessment is not empty","deselect surveys first");
   await ctx.db.batch([
+    ...(passages.table ? [ctx.db.prepare("DELETE FROM assessment_passage WHERE assessment_id = ?").bind(id)] : []),
     ctx.db.prepare('DELETE FROM "grant" WHERE scope_type = ? AND scope_id = ?').bind("assessment",id),
     ctx.db.prepare("DELETE FROM assessment WHERE id = ?").bind(id),
   ]);
+  // After the rows are gone (a failed batch leaves files and rows together). Removed passages already dropped their file
+  // (src/passages.ts handleRemove); deleting again is a no-op and catches one that failed then.
+  const bucket = (ctx.env as { PASSAGES?: R2Bucket }).PASSAGES, keys = passages.rows.flatMap((p) => p.object_key ? [p.object_key] : []);
+  if (bucket) for (let i = 0; i < keys.length; i += 1000) // R2 deletes at most 1000 keys per call
+    await bucket.delete(keys.slice(i, i + 1000)).catch((e) => console.error("assessment.delete passage_files", id, String(e)));
   return {result:{deleted:true,id},scope:{type:"assessment",id},impact,priorState:{assessment:row}};
 };
 export const handlers: Record<string,Handler> = {
