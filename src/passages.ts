@@ -152,7 +152,11 @@ export async function handleAdd(request: Request, env: PEnv, aid: string, now = 
     await env.PASSAGES.put(objectKey, bytes, { httpMetadata: { contentType: spec.serve } });
     row = { id, assessment_id: aid, kind: "file", media: spec.media, title: cleanText(q.get("title"), PASSAGE_LIMITS.title) ?? name, reference: cleanText(q.get("reference"), PASSAGE_LIMITS.reference), filename: name, content_type: spec.serve, size: bytes.length, object_key: objectKey, url: null, created_at: at, created_by: who.principal.id, archived_at: null };
   }
-  await insertPassage(env.DB, row);
+  try { await insertPassage(env.DB, row); }
+  catch (e) { // S33 E4: the file went to R2 before the row; a failed insert must not leave it orphaned
+    if (row.object_key && env.PASSAGES) await env.PASSAGES.delete(row.object_key).catch(() => {});
+    throw e;
+  }
   if (row.kind === "file" && row.media === "text" && env.PASSAGES) row = await withPdf(request, env as PEnv & { PASSAGES: R2Bucket }, row);
   return ok({ passage: await passageView(env, row, PASSAGE_LIMITS.staffTtlSeconds) }, 201);
 }
