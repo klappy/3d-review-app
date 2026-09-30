@@ -65,10 +65,13 @@ export function reviewAnswer(item, value, otherText) {
 // B-09 (lanes-1321): the receipt reads as a short reference + local date/time, never a raw id and UTC ISO string.
 // Only a real server receipt (resp_… id, parseable time) is shortened; anything else — the practice receipt's
 // "practice-only-not-saved" / "Demonstration — not sent" — is shown as given (Bugbot #273).
-export function receiptLine(r = {}) {
+// { t, locale } (participant page, gate 0.24.0): "Reference" and the date follow the chosen language; defaults are unchanged.
+export function receiptLine(r = {}, { t = (k, f) => f, locale } = {}) {
   const id = String(r.response_id || ''), rawAt = String(r.submitted_at || '');
   const at = rawAt ? new Date(rawAt) : null, validAt = !!at && !Number.isNaN(at.getTime());
   if (!/^resp_/.test(id) || (rawAt && !validAt)) return [id, rawAt].filter(Boolean).join(' · ') || 'Saved';
-  const when = validAt ? at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
-  return [`Reference ${id.slice(5, 13).toUpperCase()}`, when].filter(Boolean).join(' · ');
+  const opts = { dateStyle: 'medium', timeStyle: 'short' };
+  let when = '';
+  if (validAt) { try { when = at.toLocaleString(locale, opts); } catch { when = at.toLocaleString(undefined, opts); } }
+  return [`${t('reference', 'Reference')} ${id.slice(5, 13).toUpperCase()}`, when].filter(Boolean).join(' · ');
 }

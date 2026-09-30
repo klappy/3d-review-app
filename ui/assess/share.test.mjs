@@ -67,7 +67,7 @@ test('revoke uses the link id (never the token) and clears the once-shown link; 
   assert.equal(m.share.link, null); assert.match(m.root.html, /Link revoked/); assert.doesNotMatch(m.root.html, /TOK/);
 });
 
-test('credential discipline: the model is keyed to (aid, sid, epoch) and dropped on any change; nothing is written to storage', async () => {
+test('credential discipline: the model is keyed to (aid, sid, epoch) and dropped on any change; share.js never touches browser storage itself (TabLinks writes only the store its host passes)', async () => {
   const state = {}; const s1 = shareFor(state, 'a1', 's1', 1); s1.link = { id: 'x', url: 'https://example.test/#survey=T' };
   assert.equal(shareFor(state, 'a1', 's1', 1), s1);
   assert.equal(shareFor(state, 'a1', 's1', 2).link, null, 'new epoch → fresh model');
@@ -308,7 +308,7 @@ test('U36: the survey Share card and Collect share one link per survey; the card
   assert.equal(knownLink(links, key).url, 'https://example.test/#survey=ONE', 'the card writes its link where Collect reads');
   let minted = 0; const again = await cachedLink(links, key, async () => { minted++; return { url: 'NEW' }; });
   assert.equal(again.url, 'https://example.test/#survey=ONE'); assert.equal(minted, 0, 'Collect Copy/QR/Print reuse the card link');
-  assert.match(m.root.html, /Everyone can use this one link; after a page reload, sharing makes a new one\./); assert.doesNotMatch(m.root.html, /Use the same link below/);
+  assert.match(m.root.html, /Everyone can use this one link, also after you reload this page\. In a new tab, sharing makes a new one\./); assert.doesNotMatch(m.root.html, /Use the same link below/);
   await m.click('data-share-revoke'); assert.equal(links.has(key), false, 'a revoked link is never handed out again');
   const c = new Map(); const l = await cachedLink(c, key, async () => ({ id: 'inv_2', url: 'U2' })); assert.equal(knownLink(c, key), l, 'a Collect-issued link is readable by the card');
   rememberLink(c, key, { id: 'inv_3', url: 'U3' }); assert.equal((await cachedLink(c, key, async () => ({ url: 'X' }))).url, 'U3');
@@ -361,4 +361,39 @@ test('U48 (B43 ruling k0013): Collect mints the participant link on render and s
   assert.match(r3.s3.status.className, /alert/); assert.equal(r3.s3.fig.hidden, true);
   const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   assert.match(src.slice(src.indexOf('function bindCollectLinks'), src.indexOf('function collectPanel')), /mintOnRender/, 'Collect wires mint-on-render');
+});
+
+// Gate 0.23.0 E (DEV 0.23.0 persona, captain ruling 2026-09-28 B43/U36): one participant link per survey across page loads in a tab.
+test('Gate 0.23.0 E: TabLinks keeps the survey\'s active link in this tab\'s storage, for the same principal only; identity reset clears it', async () => {
+  const { tabLinks, TabLinks, LINKS_KEY, cachedLink, knownLink, rememberLink } = await import('./share.js');
+  const mem = () => { const m = new Map(); return { m, getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+  const store = mem(), key = 'a1|s1';
+  const page1 = tabLinks(store, 'usr_1');
+  assert.ok(page1 instanceof TabLinks);
+  let minted = 0; const issue = async () => { minted++; return { id: 'inv_1', url: 'https://dev.example/#survey=link_ONE', expires_at: null }; };
+  const a = await cachedLink(page1, key, issue); await Promise.resolve();
+  assert.equal(minted, 1); assert.deepEqual(JSON.parse(store.getItem(LINKS_KEY)), { owner: 'usr_1', links: { [key]: { id: 'inv_1', url: a.url, expires_at: null } } }, 'the issued link is kept (id, url, expiry only)');
+  // "reload": a new page in the same tab, same principal → the link is known before any render; nothing is issued again
+  const page2 = tabLinks(store, 'usr_1');
+  assert.equal(knownLink(page2, key)?.url, 'https://dev.example/#survey=link_ONE');
+  assert.equal((await cachedLink(page2, key, issue)).url, a.url); assert.equal(minted, 1, 'reused, not minted');
+  // another principal in this tab never sees it, and its load drops the old principal's entries
+  const other = tabLinks(store, 'usr_2');
+  assert.equal(knownLink(other, key), null); assert.equal(JSON.parse(store.getItem(LINKS_KEY)).owner, 'usr_2'); assert.deepEqual(JSON.parse(store.getItem(LINKS_KEY)).links, {});
+  // revoke (delete), expiry and uncertainty never leave a link to hand out
+  const p3 = tabLinks(store, 'usr_2'); rememberLink(p3, key, { id: 'inv_2', url: 'https://dev.example/#survey=link_TWO', expires_at: null });
+  assert.equal(Object.keys(JSON.parse(store.getItem(LINKS_KEY)).links).length, 1);
+  p3.delete(key); assert.deepEqual(JSON.parse(store.getItem(LINKS_KEY)).links, {}, 'a revoked link is dropped from the tab too');
+  rememberLink(p3, key, { id: 'inv_3', url: 'https://dev.example/#survey=link_OLD', expires_at: '2020-01-01T00:00:00Z' });
+  assert.equal(knownLink(tabLinks(store, 'usr_2'), key), null, 'an expired link is not restored');
+  p3.set(key, { uncertain: true }); assert.deepEqual(JSON.parse(store.getItem(LINKS_KEY)).links, {}, 'an uncertain entry is never stored');
+  rememberLink(p3, key, { id: 'inv_4', url: 'https://dev.example/#survey=link_FOUR', expires_at: null });
+  p3.clear(); assert.equal(store.getItem(LINKS_KEY), null, 'identity reset removes the tab copy');
+  // tampered or foreign values are ignored; a missing or throwing store degrades to the in-memory cache
+  store.setItem(LINKS_KEY, JSON.stringify({ owner: 'usr_2', links: { [key]: { id: 'x', url: 'javascript:alert(1)' } } }));
+  assert.equal(knownLink(tabLinks(store, 'usr_2'), key), null);
+  const broken = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); }, removeItem() { throw new Error('blocked'); } };
+  const b = tabLinks(broken, 'usr_2'); rememberLink(b, key, { id: 'inv_5', url: 'https://dev.example/#survey=link_FIVE', expires_at: null });
+  assert.equal(knownLink(b, key)?.id, 'inv_5'); b.clear(); assert.equal(b.size, 0);
+  assert.equal(tabLinks(null, 'usr_2').size, 0); assert.equal(tabLinks(store, null).size, 0, 'no principal, nothing restored');
 });

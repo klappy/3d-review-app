@@ -1,8 +1,9 @@
 import { isDemo, sampleParticipantEnvironment } from '../demo.js';
 import { createParticipantJourney } from './controller.js';
-import { mountParticipantView, itemError, drawAbout, aboutValues, aboutFields, welcomeCopy } from '../participant-view.js';
-import { UI_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames } from './i18n.js';
+import { mountParticipantView, itemError, drawAbout, aboutValues, setAboutValues, aboutFields, welcomeCopy } from '../participant-view.js';
+import { UI_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames, translatingSub } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
+import { receiptNotice } from '../shared-link.js';
 
 const $ = id => document.getElementById(id);
 let pager, renderedPhase, renderedForm;
@@ -18,6 +19,9 @@ let tr = { lang: 'English', form: null, ui: {}, items: {}, view: null };
 let T = makeT({});
 let loadSeq = 0;
 const view = form => (form && tr.form === form && tr.lang === lang && tr.view ? tr.view : form);
+// The language whose words are on screen now: a landed translation, else English (null).
+const shownLang = () => (!isEnglish(tr.lang) && Object.keys(tr.ui || {}).length ? tr.lang : null);
+const shownLocale = () => shownLang() || undefined;
 function draw(item) {
   const field = element('fieldset'); field.dataset.item = item.id;
   field.append(element('legend', `${item.text || item.id}${item.requiredness === 'unresolved' ? ` ${T('optional')}` : ''}`)); // B-09: plain words, no policy text
@@ -60,7 +64,8 @@ function paint(state) {
   if (state.form) renderPassages(view(state.form) || state.form);
   if (state.form && !isEnglish(lang) && tr.form !== state.form && pendingForm !== state.form) loadTranslations(state.form);
   const shown = view(state.form);
-  $('notice').textContent = demo && state.phase === 'receipt' ? 'Practice only. No response was sent or saved.' : state.notice || '';
+  // Gate 0.24.0: the thank-you is said in the participant's language (the controller's notice is its English form).
+  $('notice').textContent = demo && state.phase === 'receipt' ? 'Practice only. No response was sent or saved.' : state.phase === 'receipt' && state.thanks ? receiptNotice(state.thanks.perspective, { code: state.thanks.code, t: T }) : state.notice || '';
   if (state.phase !== renderedPhase || (state.form && state.form !== renderedForm)) {
     for (const id of ['answers', 'review', 'receipt']) $(id).hidden = true;
     if (state.phase === 'form') {
@@ -84,7 +89,7 @@ function paint(state) {
     } else {
       pager?.showReceipt();
       if (state.phase === 'receipt') {
-        $('receipt').replaceChildren(element('h2', demo ? 'Practice complete — nothing sent' : T('responseSaved')), element('p', receiptLine(state.receipt)));
+        $('receipt').replaceChildren(element('h2', demo ? 'Practice complete — nothing sent' : T('responseSaved')), element('p', receiptLine(state.receipt, { t: T, locale: shownLocale() })));
         $('receipt').hidden = false;
       }
     }
@@ -135,10 +140,12 @@ const trFill = element('span'); trBar.append(trFill);
 const trCount = element('p'); trCount.className = 'tr-count';
 const trRetry = element('button', UI_EN.tryAgain); trRetry.type = 'button'; trRetry.className = 'rv-btn quiet tr-retry'; trRetry.hidden = true;
 trBody.append(trTitle, trSub, trBar, trCount, trRetry); trBanner.append(trSpin, trBody);
-function showTranslating(entry, { done = 0, total = 0 } = {}) {
+// onScreen: the language entry still shown while the new one loads (null = English) — the card names it (gate 0.24.0:
+// switching Kannada → Odia said "keep reading in English" while Kannada stayed on screen).
+function showTranslating(entry, { done = 0, total = 0 } = {}, onScreen = null) {
   trBanner.hidden = false; trBanner.classList.remove('failed'); trSpin.hidden = false; trBar.hidden = false; trRetry.hidden = true;
   trTitle.textContent = entry ? `Translating into ${entry.endonym}${entry.endonym === entry.name ? '' : ` (${entry.name})`}…` : UI_EN.translating;
-  trSub.textContent = UI_EN.translatingFirst;
+  trSub.textContent = translatingSub(onScreen);
   const pct = total ? Math.round((done / total) * 100) : 0;
   trFill.style.width = `${Math.max(4, pct)}%`; trBar.setAttribute('aria-valuenow', String(pct));
   trCount.textContent = total ? `${done} / ${total} ${UI_EN.phrases}` : '';
@@ -192,16 +199,27 @@ function rerender() {
   // Keep the participant where they are: a translation arriving mid-survey redraws the same question, not the welcome.
   const fields = [...$('questions').children], at = fields.findIndex(f => !f.hidden);
   const midSurvey = journey?.state?.phase === 'form' && at >= 0 && !!document.querySelector('.participant-intro[hidden]');
+  // Gate 0.24.0 audit: the redraw below rebuilds every field. Repainting from journey.state.draft (set once, at form load)
+  // erased every answer given since, and the About-you choices; the next keystroke then saved the erased form over the
+  // draft. Keep what is on screen now — answers and Other text mid-survey, About-you always — save it, and paint from it.
+  const kept = journey?.state?.phase === 'form' && renderedPhase === 'form' ? keepEntered(midSurvey) : null;
   applyStatic(); langWord.textContent = T('language');
   document.documentElement.dir = currentEntry()?.dir === 'rtl' ? 'rtl' : 'ltr';
   renderedForm = null; renderedPhase = null;
-  if (journey?.state) paint(journey.state);
+  if (journey?.state) paint(kept ? { ...journey.state, draft: kept.draft } : journey.state);
+  if (kept) setAboutValues(about, kept.about);
   if (midSurvey) pager?.showForm(at);
+}
+function keepEntered(midSurvey) {
+  let draft = journey.state.draft;
+  if (midSurvey) { try { draft = values(); journey.save(draft); } catch { /* keep the load-time draft */ } }
+  return { draft, about: aboutValues(about) };
 }
 async function loadTranslations(form = journey?.state?.form || null) {
   const seq = ++loadSeq; pendingForm = form;
   if (isEnglish(lang)) { tr = { lang, form, ui: {}, items: {}, view: null }; T = makeT({}); langStatus.textContent = ''; hideTranslating(); pendingForm = null; rerender(); return; }
   const entry = pickLanguage(lang, form?.languages || []);
+  const was = shownLang(), onScreen = was ? (pickLanguage(was, form?.languages || []) || was) : null; // before tr changes
   langStatus.textContent = '';
   const main = document.querySelector('main'); main?.setAttribute('aria-busy', 'true');
   const ui = { ...UI_EN, ...staticEn };
@@ -210,7 +228,7 @@ async function loadTranslations(form = journey?.state?.form || null) {
   const total = Object.keys(ui).length + Object.keys(items).length;
   const seen = { ui: 0, items: 0 };
   let shown = false;
-  const progress = () => { if (shown && seq === loadSeq) showTranslating(entry, { done: seen.ui + seen.items, total }); };
+  const progress = () => { if (shown && seq === loadSeq) showTranslating(entry, { done: seen.ui + seen.items, total }, onScreen); };
   const reveal = setTimeout(() => { if (seq === loadSeq) { shown = true; progress(); } }, 300); // no flash when it is already stored
   try {
     const store = localStore();

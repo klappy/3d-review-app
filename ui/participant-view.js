@@ -1,6 +1,7 @@
 // Source-shaped presentation only: no API, storage, credential or submission ownership.
 import { periodText } from './v3/components/active-until.js';
 import { PRIVACY_LINE } from './v3/components/privacy-line.js';
+import { fillTranslated } from './shared-link.js';
 export function itemError(item, values, t = (k, f) => f) {
   const value = item.type === 'multi' ? values.getAll(item.id) : values.get(item.id);
   const empty = value === null || value === '' || (Array.isArray(value) && !value.length);
@@ -27,6 +28,8 @@ export function drawAbout(doc, fields = [], t = (k, f) => f) {
   return box;
 }
 export const aboutValues = box => { const out = {}; for (const s of box ? box.querySelectorAll('select[data-key]') : []) if (s.value) out[s.dataset.key] = s.value; return out; };
+// Put About-you choices back after the block is redrawn (a translation redraw builds new selects; gate 0.24.0 audit).
+export const setAboutValues = (box, values = {}) => { for (const s of box ? box.querySelectorAll('select[data-key]') : []) if (typeof values[s.dataset.key] === 'string') s.value = values[s.dataset.key]; };
 // The assembled English sentences of the welcome, shared with page.js so the translation request carries exactly
 // what the page would show (dynamic translation, captain ruling 2026-09-28).
 export function welcomeCopy(model, count) {
@@ -35,6 +38,7 @@ export function welcomeCopy(model, count) {
     time: `Time: about ${Math.max(5,Math.round(count*0.6))} minutes · ${count} questions`,
   };
 }
+const QUESTION_OF='Question {n} of {total}';
 export function mountParticipantView({doc,root,form,questions,review,reviewAnswers,receipt,context,model,onEdit,reviewButton,about,t=(k,f)=>f}) {
   const fields = [...questions.children];
   const items = model?.items;
@@ -91,7 +95,7 @@ export function mountParticipantView({doc,root,form,questions,review,reviewAnswe
     index=Math.max(0,Math.min(items.length-1,i));
     fields.forEach((f,k)=>f.hidden=k!==index);
     intro.hidden=true;nav.hidden=false;error.hidden=true;
-    progress.textContent=`${t('question','Question')} ${index+1} ${t('of','of')} ${items.length}`;
+    progress.textContent=fillTranslated(t('questionOf',QUESTION_OF),QUESTION_OF,{n:index+1,total:items.length}); // one template: word order follows the language
     segs.forEach((seg,k)=>{seg.className=k<=index?'done':'';});
     back.disabled=index===0;next.hidden=index===items.length-1;
     focusField(index);

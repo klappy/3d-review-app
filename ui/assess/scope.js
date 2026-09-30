@@ -97,6 +97,23 @@ export function holdUntilCodeChanges(form, name = 'code') {
   input?.addEventListener?.('input', sync);
   return { repeat: () => last !== null && now() === last, sent: () => { last = now(); sync(); }, sync };
 }
+// Gate 0.23.0 (phone): a code form's error sits in the card next to the field — <p role="alert"> under the input, the input marked
+// aria-invalid and described by it — and focus returns to the input (write() disabled the focused Submit, dropping focus to BODY).
+// The live region is always rendered (empty collapses to nothing) so screen readers announce the text when it is set.
+// Alerts go to that element instead of the page note; anything else still goes to ctx.note. No element → ctx unchanged.
+export function inlineCodeError(ctx, form, name = 'code') {
+  const box = form?.querySelector?.('[data-code-error]'), input = form?.querySelector?.(`input[name="${name}"]`);
+  const set = text => {
+    if (!box) return;
+    box.textContent = text || '';
+    if (text) input?.setAttribute?.('aria-invalid', 'true'); else input?.removeAttribute?.('aria-invalid');
+  };
+  return {
+    ctx: box ? Object.create(ctx, { note: { value: (text, alert = false) => alert ? set(text) : ctx.note(text, alert) } }) : ctx,
+    clear: () => set(''),
+    focus: () => { if (box?.textContent) input?.focus?.(); },
+  };
+}
 async function write(ctx, control, label, fn, { refused = 'Not allowed here.', failed = null } = {}) {
   const controls = control ? [control, ...(control.form ? Array.from(control.form.querySelectorAll('button')) : [])] : [];
   for (const c of controls) c.disabled = true;
@@ -149,7 +166,7 @@ function hero(ctx, signedIn) {
   return `<section class="hero panel" id="public-home">${choices}${signedIn ? '' : signupNote(ctx, '8px 0 14px')}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">${LEAD}</p>${learnMore(`<p class="muted">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p>${perspectivesRow(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/collect">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a>${signedIn ? '' : ' · <a href="#signin">Sandbox test identities (dev only) — not a real sign-in</a>'}</p><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p>`)}</section>${continueCards}`;
 }
 function surveyView(ctx) {
-  return `<section class="panel narrow"><p class="eyebrow">For participants</p><h1>Your feedback starts with your invitation.</h1><p class="muted">Open the survey link or scan the QR code someone shared with you. If you were given an access code, enter it below.</p><p><a class="button" href="/participate/?demo=1">Try a sample survey — nothing is sent</a></p><form id="code-form"><label class="field">Access code<input name="code" required autocomplete="off" maxlength="64"></label><div class="actions"><button class="primary" type="submit">Open my survey</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form><p class="small muted">Missing your survey link? Ask the person who invited you or shared the survey to send you the link. You do not need an account to follow a participant link.</p></section>`;
+  return `<section class="panel narrow"><p class="eyebrow">For participants</p><h1>Your feedback starts with your invitation.</h1><p class="muted">Open the survey link or scan the QR code someone shared with you. If you were given an access code, enter it below.</p><p><a class="button" href="/participate/?demo=1">Try a sample survey — nothing is sent</a></p><form id="code-form"><label class="field">Access code<input name="code" required autocomplete="off" maxlength="64" aria-describedby="code-error"></label><p id="code-error" class="code-error" role="alert" data-code-error></p><div class="actions"><button class="primary" type="submit">Open my survey</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form><p class="small muted">Missing your survey link? Ask the person who invited you or shared the survey to send you the link. You do not need an account to follow a participant link.</p></section>`;
 }
 // Captain ruling 12:53 (lane 1, L1-16): a real public About page at #about — never a sign-in panel. Cards via ctx.cards.card (shared card component).
 // B30: About and the public home share one short line (composed, not copied).
@@ -194,22 +211,25 @@ const entry = {
         case 'signout': return ctx.signOut?.();
       }
     }));
-    const codeForm = root.querySelector('#code-form'), codeHold = holdUntilCodeChanges(codeForm);
+    const codeForm = root.querySelector('#code-form'), codeHold = holdUntilCodeChanges(codeForm), codeError = inlineCodeError(ctx, codeForm);
     codeForm?.addEventListener('submit', async ev => {
       ev.preventDefault();
       const form = ev.target;
       if (codeHold.repeat()) return; // the same code again: already sent
       codeHold.sent();
+      codeError.clear();
       // U08 (lanes-1321): a used, unknown or mistyped code gets one plain next step, not "Not allowed here." / a server message.
-      const r = await write(ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }), { refused: CODE_REFUSED });
+      // Gate 0.23.0 (phone 375x812): the error shows in the card under the field (role=alert), not in the page note below the fold.
+      const r = await write(codeError.ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }), { refused: CODE_REFUSED });
       codeHold.sync(); // write() re-enabled the buttons; Submit waits for a changed code
-      if (!r) return;
+      if (!r) return codeError.focus();
       const token = r.participant_token || r.participant;
-      if (!token) return ctx.note('The server accepted the code but returned no participant token.', true);
+      if (!token) { codeError.ctx.note('The server accepted the code but returned no participant token.', true); return codeError.focus(); }
       // U07: a code participant takes the same v3 survey as a shared-link participant (intro → review → thank-you).
       // The bearer goes into the /participate/ page's scoped session slot, so a reload resumes exactly like a link.
-      const ns = await digestNamespace(token);
-      scopedStorage(sessionStorage, ns).set('bearer', token); rememberCurrent(sessionStorage, ns);
+      // 'via' = 'code' lets the thank-you say a code works once (no "reopen your link" promise).
+      const ns = await digestNamespace(token), slot = scopedStorage(sessionStorage, ns);
+      slot.set('bearer', token); slot.set('via', 'code'); rememberCurrent(sessionStorage, ns);
       window.location.assign('/participate/');
     });
     // B38: email sign-in link. Stays on this screen and shows one line; without script the form posts natively to the same route.
@@ -480,6 +500,7 @@ export const css = `
 .hero{max-width:840px;margin:0 auto 22px;padding:40px}.hero h1{font-size:clamp(30px,4.5vw,47px);letter-spacing:-1.7px;max-width:610px}.hero .lead{font-size:17px;max-width:590px}
 .perspectives{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:30px 0}.perspective{padding:18px 14px;border-radius:18px;background:#ffffff8c;border:1px solid var(--edge)}.perspective strong{display:block;font-size:15px}.perspective small{display:block;color:var(--muted);font-size:13px;margin-top:3px}
 .dot-lg{display:block;width:24px;height:24px;border-radius:50%;margin-bottom:13px;box-shadow:inset 0 2px 3px #ffffff66}.dot-lg.team{background:#5bbd98}.dot-lg.community{background:#78aee0}.dot-lg.church{background:#e8c568}
+.code-error{margin:-8px 0 12px;padding:10px 12px;border-radius:10px;background:#fbeae7;color:#8a2a1c;font-size:14px;font-weight:600}.code-error:empty{margin:0;padding:0}
 .stepper{max-width:840px;margin:0 auto 22px}.stepper .progress{display:flex;gap:7px;margin:0 0 25px}.stepper .progress span{height:5px;flex:1;border-radius:6px;background:#cfdee5}.stepper .progress span.done{background:#367e73}.stepper .note .badge{margin:4px 5px 4px 0}
 @media(max-width:720px){.hero{padding:24px 20px}.perspectives{grid-template-columns:1fr;gap:8px}.perspective{display:grid;grid-template-columns:24px 1fr;column-gap:12px;padding:12px}.dot-lg{grid-row:1/3;align-self:center;margin:0}.perspective small{grid-column:2}}
 `;

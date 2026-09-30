@@ -1,3 +1,5 @@
+import { copy, fill } from '../shared-link.js';
+
 // Dynamic translation for the participant survey (captain ruling 2026-09-28: restore the Lovable-era behaviour).
 // The page sends its English strings to POST /v2/translate (src/translate.ts, a proxy with the Laos app's
 // translate-survey wire shape) and shows whatever comes back; any missing string stays English. Only DISPLAY text
@@ -19,10 +21,14 @@ export const LANG_PATTERN = /^[\p{L}][\p{L}\p{M} ()'.,-]{0,47}$/u;   // mirrors 
 export const cleanLang = lang => { const v = typeof lang === 'string' ? lang.trim() : ''; return v && LANG_PATTERN.test(v) ? v : ''; };
 
 // Fixed participant-page chrome, keyed. Assembled sentences (lead, time) are added per form by the page.
+// Templates keep {placeholders} through translation and are filled afterwards (shared-link.js fillTranslated), so word
+// order follows the language ("Question {n} of {total}", never "Question" + n + "of" + total).
 export const UI_EN = Object.freeze({
   language: 'Language',
   translating: 'Translating…',
   translatingFirst: 'The first time can take up to a minute. After that it opens straight away. You can keep reading in English meanwhile.',
+  // Gate 0.24.0: switching from one translation to another keeps the old one on screen until the new one lands — say so.
+  translatingKeep: 'The first time can take up to a minute. After that it opens straight away. You can keep reading in {language} meanwhile.',
   phrases: 'phrases',
   tryAgain: 'Try again',
   translateFailedHint: 'Showing English. Check the internet connection, then try again.',
@@ -35,8 +41,7 @@ export const UI_EN = Object.freeze({
   foot: 'No account, no sign-in. You can review your answers before you send them.',
   back: 'Back',
   next: 'Next',
-  question: 'Question',
-  of: 'of',
+  questionOf: 'Question {n} of {total}',
   answerRequired: 'Answer required:',
   exclusionError: 'An exclusion choice cannot be combined:',
   exclusionNote: 'An exclusion choice cannot be combined with any other choice.',
@@ -49,6 +54,14 @@ export const UI_EN = Object.freeze({
   chooseOptional: 'Choose (optional)',
   pleaseDescribe: 'Please describe',
   responseSaved: 'Response saved',
+  // The thank-you under "Response saved" and its reference line (gate 0.24.0: these stayed English after a switch).
+  receiptThanks: copy.receiptThanks,
+  receiptThanksNoGroup: copy.receiptThanksNoGroup,
+  sameLinkOthers: copy.sameLinkOthers,
+  receiptThanksCode: copy.receiptThanksCode,
+  receiptThanksCodeNoGroup: copy.receiptThanksCodeNoGroup,
+  codeOnce: copy.codeOnce,
+  reference: 'Reference',
   passageTitle: 'The passage',
   passageRead: 'Read the passage',
   passageListen: 'Listen to the passage',
@@ -90,6 +103,14 @@ export function translateForm(form, map = {}) {
       ...(f.options ? { options: f.options.map(o => ({ ...o, label: pick(`about.${f.key}.opt.${o.code}`, o.label) })) } : {}),
     })) } : {}),
   };
+}
+
+// The "translating" card's second line. onScreen = the language entry ({ endonym, name } or a bare tag) still shown while
+// the new one loads, or null when English is on screen — the card never says "English" over another language (gate 0.24.0).
+export function translatingSub(onScreen = null) {
+  if (!onScreen) return UI_EN.translatingFirst;
+  const language = typeof onScreen === 'string' ? onScreen : `${onScreen.endonym || onScreen.name}${onScreen.endonym && onScreen.name && onScreen.endonym !== onScreen.name ? ` (${onScreen.name})` : ''}`;
+  return fill(UI_EN.translatingKeep, { language });
 }
 
 // t(key, fallback): translated chrome when present, else the English fallback (or UI_EN[key]).
