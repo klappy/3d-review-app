@@ -125,15 +125,18 @@ async function askUpstream(env: Env, deps: Deps, lang: LwcLanguage, context: str
   if (secret) { headers.authorization = `Bearer ${secret}`; headers.apikey = secret; }
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), TRANSLATE_LIMITS.timeoutMs);
-  let res: Response;
-  try { res = await (deps.fetch ?? fetch)(url, { method: "POST", headers, signal: ctl.signal, body: JSON.stringify({ targetLang: lang.name, context, sourceTexts }) }); }
-  catch { return { texts: new Map(), status: 502 }; }
-  finally { clearTimeout(timer); }
-  if (!res.ok) return { texts: new Map(), status: res.status === 429 ? 429 : 502 };
-  const data = await res.json().catch(() => null) as { translated?: Record<string, unknown> } | null;
-  const texts = new Map<string, string>();
-  for (const [k, hash] of keyOf) { const v = data?.translated?.[k]; if (acceptable(lang, missing.get(hash)!, v)) texts.set(hash, (v as string).trim()); }
-  return { texts, status: 200 };
+  // S33 E1: the limit covers the body read too, so the timer is cleared only after res.json() settles (every path).
+  try {
+    let res: Response;
+    try { res = await (deps.fetch ?? fetch)(url, { method: "POST", headers, signal: ctl.signal, body: JSON.stringify({ targetLang: lang.name, context, sourceTexts }) }); }
+    catch { return { texts: new Map(), status: 502 }; }
+    if (!res.ok) return { texts: new Map(), status: res.status === 429 ? 429 : 502 };
+    const data = await res.json().catch(() => null) as { translated?: Record<string, unknown> } | null;
+    if (ctl.signal.aborted) return { texts: new Map(), status: 502 };
+    const texts = new Map<string, string>();
+    for (const [k, hash] of keyOf) { const v = data?.translated?.[k]; if (acceptable(lang, missing.get(hash)!, v)) texts.set(hash, (v as string).trim()); }
+    return { texts, status: 200 };
+  } finally { clearTimeout(timer); }
 }
 
 /** Which limiter a translate request spends (audit round 1 W2). A caller presenting a live credential — the participant

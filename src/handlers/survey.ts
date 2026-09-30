@@ -116,9 +116,12 @@ async function linkToken(secret:string|undefined,id:string):Promise<string|null>
   const mac=await crypto.subtle.sign("HMAC",await key,new TextEncoder().encode(id));
   return `link_${b64url(new Uint8Array(mac).slice(0,24))}`; // same shape as randomToken("link")
 }
-/** The survey's newest live link with the same expiry whose token can be derived again; null → mint one. */
+/** The survey's earliest-inserted live link with this expiry whose token can be derived again; null → mint one.
+ * One helper, one sort (rowid ASC, #415 review): the pre-insert lookup and the post-insert race check agree on a single
+ * winner, so a third concurrent caller never gets a racer's row that the racer then deletes. No LIMIT: the rows are
+ * already filtered to this survey's live links, and a window could hide the new row from the race check. */
 async function activeLink(ctx:Ctx,sid:string,expires_at:string|null,at:string):Promise<{id:string;token:string}|null> {
-  const {results}=await ctx.db.prepare("SELECT id, token_hash, expires_at FROM invitation WHERE assessment_survey_id = ? AND scope_type = 'survey' AND role = 'participant' AND status IN ('pending','accepted') AND (expires_at IS NULL OR expires_at > ?) ORDER BY created_at DESC, id DESC LIMIT 20")
+  const {results}=await ctx.db.prepare("SELECT id, token_hash, expires_at FROM invitation WHERE assessment_survey_id = ? AND scope_type = 'survey' AND role = 'participant' AND status IN ('pending','accepted') AND (expires_at IS NULL OR expires_at > ?) ORDER BY rowid ASC")
     .bind(sid,at).all<{id:string;token_hash:string;expires_at:string|null}>();
   for(const row of results){
     if(row.expires_at!==expires_at) continue;
@@ -144,6 +147,13 @@ export const issue_link:Handler=async(ctx,params,opts)=>{
   const id=newId("invite"), token=(await linkToken(ctx.env.SESSION_SECRET,id)) ?? randomToken("link");
   await ctx.db.prepare("INSERT INTO invitation (id,scope_type,scope_id,assessment_survey_id,role,token_hash,status,created_by,created_at,expires_at) VALUES (?, 'survey', ?, ?, 'participant', ?, 'pending', ?, ?, ?)")
     .bind(id,sid,sid,await sha256(token),ctx.principal.id,at,expires_at).run();
+  // S33: two first calls at once can both miss activeLink and both insert. Re-read in insert order (rowid): the earliest
+  // live, re-derivable link with this expiry wins; a later one deletes its own row and hands the earlier back as reused.
+  const winner=await activeLink(ctx,sid,expires_at,at);
+  if(winner && winner.id!==id){
+    await ctx.db.prepare("DELETE FROM invitation WHERE id = ?").bind(id).run();
+    return {result:{link_id:winner.id,link_token:winner.token,expires_at,entry_fragment:`#survey=${encodeURIComponent(winner.token)}`,reused:true},scope:{type:"assessment",id:aid},impact};
+  }
   return {result:{link_id:id,link_token:token,expires_at,entry_fragment:`#survey=${encodeURIComponent(token)}`},scope:{type:"assessment",id:aid},impact};
 };
 export const send_links:Handler=async(ctx,params,opts)=>{
