@@ -308,7 +308,7 @@ test('U36: the survey Share card and Collect share one link per survey; the card
   assert.equal(knownLink(links, key).url, 'https://example.test/#survey=ONE', 'the card writes its link where Collect reads');
   let minted = 0; const again = await cachedLink(links, key, async () => { minted++; return { url: 'NEW' }; });
   assert.equal(again.url, 'https://example.test/#survey=ONE'); assert.equal(minted, 0, 'Collect Copy/QR/Print reuse the card link');
-  assert.match(m.root.html, /Everyone can use this one link, also after you reload this page\. In a new tab, sharing makes a new one\./); assert.doesNotMatch(m.root.html, /Use the same link below/);
+  assert.match(m.root.html, /Everyone can use this one link, also after you reload this page or open it in a new tab\./); assert.doesNotMatch(m.root.html, /Use the same link below/);
   await m.click('data-share-revoke'); assert.equal(links.has(key), false, 'a revoked link is never handed out again');
   const c = new Map(); const l = await cachedLink(c, key, async () => ({ id: 'inv_2', url: 'U2' })); assert.equal(knownLink(c, key), l, 'a Collect-issued link is readable by the card');
   rememberLink(c, key, { id: 'inv_3', url: 'U3' }); assert.equal((await cachedLink(c, key, async () => ({ url: 'X' }))).url, 'U3');

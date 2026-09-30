@@ -32,12 +32,15 @@ export function validateAnswers(items: TemplateItem[], value: unknown): Record<s
   const normalized: Record<string, unknown> = {};
   const ids = new Set(items.map((i) => i.id));
   for (const key of Object.keys(answers)) if (!ids.has(key) && key !== OTHER_TEXT_KEY) throw new CapError("INVALID_PARAMS", `unknown answer item ${key}`);
+  const blank = (item: TemplateItem, answer: unknown) => answer === undefined || answer === null || answer === "" || (item.type === "multi" && Array.isArray(answer) && answer.length === 0);
+  // 0.24.1 persona B: required answers were refused one at a time ("answer required for CW-Q4"). Name every missing
+  // required answer in one refusal, before any other check, so one retry can fix them all.
+  const missing = items.filter((item) => item.required !== false && blank(item, answers[item.id])).map((item) => item.id);
+  if (missing.length === 1) throw new CapError("INVALID_PARAMS", `answer required for ${missing[0]}`);
+  if (missing.length > 1) throw new CapError("INVALID_PARAMS", `answers required for ${missing.join(", ")}`, `answer all ${missing.length}, then submit again`);
   for (const item of items) {
     const answer = answers[item.id];
-    if (answer === undefined || answer === null || answer === "" || (item.type === "multi" && Array.isArray(answer) && answer.length === 0)) {
-      if (item.required === false) { normalized[item.id] = null; continue; }
-      throw new CapError("INVALID_PARAMS", `answer required for ${item.id}`);
-    }
+    if (blank(item, answer)) { normalized[item.id] = null; continue; } // only optional items reach here
     if (item.type === "scale" && (typeof answer !== "number" || !Number.isInteger(answer) || !item.scale || answer < item.scale.min || answer > item.scale.max))
       throw new CapError("INVALID_PARAMS", `invalid scale answer for ${item.id}`);
     if (item.type === "text" && (typeof answer !== "string" || answer.length > 5000))
