@@ -1,32 +1,35 @@
 {
-  "version": "0.24.1",
+  "version": "0.25.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "539cffda72cda855cb0f78954c87340eb59ca1da",
+  "cookbook_commit": "78237b974c6fbb7c97edd949ad4079a2f605303c",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.24.1.md",
-      "blob_sha": "194de6fe262a0ea1ddab8ae33e93a6592248ebfa",
-      "sha256": "73a87357fe48e797e38d3ec9dbf74595c14dcc13b8629989fd81f935b38f9bd7"
+      "path": "planning/2026-09-16-parity-build/releases/0.25.0.md",
+      "blob_sha": "915a408894848705872b894aebd50ea168a64209",
+      "sha256": "73ea00f8ad11c185309db520b2f64a44b2f482a2074deacaeb5c647470a3d1e6"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "c3cbe48df613446021c6242bedeaa98eb7db1298",
-      "sha256": "cce22e967736b6f4a2090d9702893cd13e707b4edb7cff407389660de5b52268"
+      "blob_sha": "fe087860b230c452dbe281a1cdee1960aa516ac7",
+      "sha256": "1bf3b054f3c38c3ff7584611db4383d36351cc0267c15b69c42bb8c6844c6633"
     }
   ],
   "changelog": {
     "sections": {
+      "added": [
+        "Print survey can be printed in the participants' language. When the assessment or its project has participant languages, a \"Language on paper\" choice sits beside Print survey (English first, then the same languages the participant page offers). The questions, answer choices, the passage line and the form's own words come from the same translations the participant page uses; anything not translated yet stays in English and is marked \"EN\" on the paper. English stays the default, and nothing changes for an assessment without languages. (#405)",
+        "A USFM or SFM passage now opens as a readable PDF: when a facilitator uploads the file, the site has PTXprint typeset it once, and participants see the verses on a page instead of backslash codes; the original text stays available, and if the PDF cannot be made the text file is kept and the passage card says \"Text file\". (#403)",
+        "Surveyor mode: after someone submits, the thank-you screen offers \"Interview another person\" — one tap starts a fresh, empty survey from the same link for the next person on the same device (an access-code session goes back to code entry, since a code works once); the earlier answers stay saved. (#406)"
+      ],
       "fixed": [
-        "Collect no longer makes a new participant link on every visit. Each survey keeps one link: Collect makes a link when it opens only if the survey has no active link here. Otherwise it shows the active link and its QR code. The link is kept in the browser tab, so reloading the page or coming back from the participant page shows the same link and QR code, and \"Print all\" prints the same URLs. It is dropped on sign-out or when you use another account. A new tab still makes its own link. The survey's Share card now says: \"Everyone can use this one link, also after you reload this page. In a new tab, sharing makes a new one.\" (#395)",
-        "Setup step 4 (Ready to launch) names the survey on each \"Who will participate\" row, for example \"Church · Church leaders — no number given\". Before, it showed only the perspective. (#395)",
-        "Prepare: \"Save preparation\" says \"Saved\" beside the button when the save succeeds, and shows the error there when it fails. Before, only \"Saving preparation…\" appeared. Moving to another page clears the message. (#395)",
-        "Participant survey fixes found on a phone. An access code that is used or not valid now shows its message inside the card, right under the Access code box; screen readers announce it and the cursor stays in the box (it used to appear below the screen with focus lost). The Print survey paper preview fits a phone screen and scrolls sideways if anything is still wider, instead of cutting off the right-hand choices; printed pages are unchanged. People who answer with an access code get a thank-you that says a code works only once, not \"Reopening your link shows this receipt again\". After a language is chosen, the thank-you and its Reference line are translated too, and the question counter (\"Question 3 of 17\") is one sentence that follows the language's word order. Switching from one language to another names the language that stays on screen while the new one loads, not English. Changing the language, or a translation arriving, failing or being retried while someone is answering, no longer erases the answers given so far, the Other text or the About-you choices. (#394)",
-        "A workshop room on one network is throttled less: passage files opened through their signed link no longer count against the 60-per-minute anonymous allowance of the room's address (only bad or expired links do), and translation requests that carry a participant's or signed-in person's credential are now counted per person instead of per address (the participant page starts sending its credential in a follow-up; without it, translation is counted per address as before). An assessment that has or had passages can now be deleted: the delete preview counts its passages and the delete removes them and their stored files (before, it failed with a database error). Adding a passage with an empty JSON body is a clear \"JSON object body required\" error instead of a server error. A machine translation that only repeats an English sentence is no longer served or stored as the translation; single words and short phrases that are spelled the same in both languages (French \"Question\", Spanish \"Hospital\") are kept. Undoing a change to an assessment's or project's translation languages now restores the previous languages. (#396)",
-        "The participant survey's translation requests now say which participant is asking. When the page holds the participant's own survey session, each request to translate the page sends that participant's token, so the server can count each participant separately instead of counting every phone on the same Wi-Fi as one visitor (the server half is a separate change). A page without a participant session sends nothing extra, exactly as before, and a facilitator's sign-in is never sent with these requests. (#397)",
-        "Sign-in from the tour: where email sign-in links are on, the tour's \"Sign in\" button now opens the \"Email me a sign-in link\" page, like every other way to sign in. Before, it went straight to the Cloudflare one-time code screen. Where email links are off, it is unchanged. (#398)",
-        "Sign-in when you open \"Start a review\" from another page without being signed in: where email sign-in links are on, the page now shows the \"Email me a sign-in link\" form first, with \"Sign in with a code instead\" under it, the same as when the page is opened directly. Before, it showed one \"Sign in with email code\" button that opened a different page. (#398)",
-        "Setup: the languages participants may switch to are now saved on the new review only, not also on a new project. Before, a language chosen during setup stayed on the project, so unticking it later on Prepare did not remove it for participants, in that review or in any later review in the project. (#398)",
-        "Collect: the participant link kept in the browser tab now belongs to the signed-in person only. A link made by one account is never kept or reused for another account signed in in the same tab. (#398)"
+        "Print survey prints only the questionnaire. Print now opens the form as its own page in a new tab and prints it there, so the app's menus, buttons, survey card and dark bands are no longer on the paper, and every answer choice sits in one column that wraps inside the page instead of being cut off at the right edge (seen on an iPhone print of Community-Pastor). Pages are numbered where the browser supports it. Printing the survey screen itself from the browser menu also prints only the form. (#405)",
+        "Taking a survey's participant link again through the API now gives back the survey's one active link instead of making a second one, so every share of a survey is the same link until it is revoked. (#404)",
+        "A passage link added without a title is now named by its passage reference, or by its address (for example \"example.org/sample-genesis-1\"), or \"Link\", instead of only the site name. (#404)",
+        "When a participant sends answers with several required questions left empty, one message now names every missing question and each one is marked on the page, instead of one question at a time. (#404)",
+        "While a review has fewer responses than the minimum (5 for now), Results, the responses list and the report now say the same thing: how many responses are in, how many are needed, and that scores are held until then. Before, the report could still be built with scores from a single response. (#402)"
+      ],
+      "security": [
+        "Someone without a survey link can no longer use the translation service to find out which language names exist; the welcome line that names a language is translated only for a participant, and only for their own survey's language. (#404)"
       ]
     }
   }
