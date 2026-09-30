@@ -13,6 +13,9 @@
  *   RL_AUTH      cap.auth.request_link + cap.auth.consume_link             key ip, email    10 / 60 s COMBINED per
  *                address (both caps share the `ip:` key on one binding — splitting would double the attacker surface)
  *   RL_MCP_CEILING  every well-shaped bearer on /mcp, and /token (src/worker.ts)  key ip          600 / 60 s
+ *                also POST /v2/translate from a caller with a LIVE participant bearer or session (src/translate.ts)
+ *                key tr:<kind>:<principal> — per principal, so a room behind one NAT never shares a bucket (audit W2)
+ *   (none)       GET /v2/passages/:pid/file with a VALID signature; a missing/tampered/expired one spends RL_HTTP_ANON
  *   RL_REDEEM    cap.participant.redeem_code + cap.participant.open_link   key ip           60 / 60 s
  *                (60 because a whole workshop room shares one NAT address — 18-I phase C: 50 concurrent participants)
  *

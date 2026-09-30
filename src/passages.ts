@@ -93,7 +93,7 @@ async function staff(request: Request, env: Env, aid: string, min: Role): Promis
   if (!atLeast(role, min)) return fail(403, "NOT_AUTHORIZED_AT_SCOPE", `${min} role required at this assessment`);
   return { principal, role };
 }
-const missingTable = (e: unknown) => /no such table: assessment_passage/i.test(`${(e as Error)?.message ?? e} ${((e as Error)?.cause as Error)?.message ?? ""}`);
+export const missingTable = (e: unknown) => /no such table: assessment_passage/i.test(`${(e as Error)?.message ?? e} ${((e as Error)?.cause as Error)?.message ?? ""}`);
 
 export async function handleList(request: Request, env: PEnv, aid: string): Promise<Response> {
   const who = await staff(request, env, aid, "viewer"); if (who instanceof Response) return who;
@@ -111,7 +111,10 @@ export async function handleAdd(request: Request, env: PEnv, aid: string, now = 
   const type = (request.headers.get("content-type") || "").toLowerCase();
   let row: PassageRow;
   if (type.startsWith("application/json")) {
-    let body: Record<string, unknown>; try { body = await request.json() as Record<string, unknown>; } catch { return fail(400, "INVALID_PARAMS", "JSON object body required"); }
+    let parsed: unknown; try { parsed = await request.json(); } catch { return fail(400, "INVALID_PARAMS", "JSON object body required"); }
+    // Audit round 1 E3: `null`, an array or a scalar parses as JSON but is not an object — 400, never a TypeError 500.
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return fail(400, "INVALID_PARAMS", "JSON object body required");
+    const body = parsed as Record<string, unknown>;
     // BCS demo 2026-09-29 (bee:10809312 u3540382372-388): a passage can be named with nothing attached ("Genesis 1").
     // The survey then says "please read or listen to Genesis 1 before you answer"; the facilitator reads or plays it.
     if (body.url === undefined || body.url === null || body.url === "") {
@@ -159,9 +162,14 @@ export async function handleRemove(request: Request, env: PEnv, aid: string, pid
 
 /** The file itself for a signed link: inline, exact content type, nosniff, Range for audio seeking. */
 export async function handleFile(request: Request, env: PEnv, pid: string): Promise<Response> {
-  if (!(await allow(env, "RL_HTTP_ANON", `ip:${clientIp(request)}`))) return fail(429, "RATE_LIMITED", "too many requests", `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`);
+  // Audit round 1 W2: the signature is checked FIRST (one HMAC, no storage) and only a missing, tampered or expired link
+  // spends RL_HTTP_ANON. A valid link is already a server-issued, short-lived capability; a workshop room behind one NAT
+  // (50 phones seeking in the same MP3 with Range requests) must not share the 60/60 s anonymous address budget.
   const q = new URL(request.url).searchParams;
-  if (!(await validSig(env, pid, q.get("exp"), q.get("sig")))) return fail(403, "NOT_AUTHORIZED_AT_SCOPE", "this passage link has expired; reopen the survey");
+  if (!(await validSig(env, pid, q.get("exp"), q.get("sig")))) {
+    if (!(await allow(env, "RL_HTTP_ANON", `ip:${clientIp(request)}`))) return fail(429, "RATE_LIMITED", "too many requests", `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`);
+    return fail(403, "NOT_AUTHORIZED_AT_SCOPE", "this passage link has expired; reopen the survey");
+  }
   const row = await env.DB.prepare("SELECT * FROM assessment_passage WHERE id = ? AND archived_at IS NULL AND kind = 'file'").bind(pid).first<PassageRow>().catch(() => null);
   if (!row || !row.object_key || !env.PASSAGES) return fail(404, "NOT_FOUND_OR_NOT_VISIBLE", "resource not found or not visible");
   const size = row.size ?? 0;
