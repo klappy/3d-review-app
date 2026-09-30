@@ -20,6 +20,7 @@ import type { Ctx, Env, Principal, Role } from "./handlers/types";
 import { resolvePrincipal } from "./auth";
 import { atLeast, newId, roleAt } from "./handlers/common";
 import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { linkTitle } from "./link-title";
 
 export const PASSAGE_LIMITS = Object.freeze({ maxBytes: 50 * 1024 * 1024, maxPerAssessment: 20, participantTtlSeconds: 12 * 3600, staffTtlSeconds: 3600, title: 120, reference: 120, url: 1000 });
 type Media = "text" | "pdf" | "audio" | "video" | "link" | "reference";
@@ -126,7 +127,7 @@ export async function handleAdd(request: Request, env: PEnv, aid: string, now = 
     }
     const link = linkOf(body.url);
     if (!link) return fail(400, "INVALID_PARAMS", "a link must be a full https:// address");
-    const title = cleanText(body.title, PASSAGE_LIMITS.title) ?? (link.media === "video" ? "Video of the passage" : new URL(link.url).hostname);
+    const title = cleanText(body.title, PASSAGE_LIMITS.title) ?? cleanText(body.reference, PASSAGE_LIMITS.title) ?? (link.media === "video" ? "Video of the passage" : linkTitle(link.url));
     row = { id, assessment_id: aid, kind: "link", media: link.media, title, reference: cleanText(body.reference, PASSAGE_LIMITS.reference), filename: null, content_type: null, size: null, object_key: null, url: link.url, created_at: at, created_by: who.principal.id, archived_at: null };
   } else {
     if (!env.PASSAGES) return fail(503, "STAGE_CONFLICT", "file storage is not set up on this site yet; add a link instead", "bind the PASSAGES R2 bucket in wrangler.toml");
