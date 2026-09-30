@@ -61,7 +61,7 @@ describe("S9 contract: cap.me.invitations + cap.grant.accept by invitation_id", 
     const sent = await invite(owner, { ...scope, email: " Viewer@Example.invalid ", role: "viewer" });
     const invId = sent.result.invitation_id as string, token = sent.result.dev_only_link_token as string;
     const listed = (await mine(viewer, {})).result.invitations as any[];
-    expect(listed).toEqual([{ id: invId, scope: { type: "assessment", id: asm }, role: "viewer", inviter_display_name: null, invited_at: now.toISOString(), expires_at: expect.any(String) }]);
+    expect(listed).toEqual([{ id: invId, scope: { type: "assessment", id: asm, name: "Tavo collection", path: ["Cedar Workshop", "Rill Project", "Tavo collection"] }, role: "viewer", inviter_display_name: null, invited_at: now.toISOString(), expires_at: expect.any(String) }]);
     const wire = JSON.stringify(listed);
     expect(wire).not.toContain(token); expect(wire).not.toContain(await sha256(token)); expect(wire).not.toContain(await sha256("viewer@example.invalid"));
     // Someone else's invitation is simply absent for everyone else.
@@ -126,7 +126,7 @@ describe("S9 contract: cap.me.invitations + cap.grant.accept by invitation_id", 
     const http = async (cred: string, path: string, body?: unknown) => { const r = await worker.fetch(new Request("https://s9.test" + path, { method: body === undefined ? "GET" : "POST", headers: { authorization: "Bearer " + cred, "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }), env, ec()); return { status: r.status, body: await r.json() as any }; };
     const viewer = await mintSession(env, "usr_h_v", "user"), stranger = await mintSession(env, "usr_h_x", "user");
     const listed = await http(viewer, "/v2/me/invitations");
-    expect(listed.status).toBe(200); expect(listed.body.result.invitations.map((i: any) => [i.id, i.scope, i.role])).toEqual([[invId, { type: "project", id: "proj_h" }, "viewer"]]);
+    expect(listed.status).toBe(200); expect(listed.body.result.invitations.map((i: any) => [i.id, i.scope, i.role])).toEqual([[invId, { type: "project", id: "proj_h", name: null, path: [] }, "viewer"]]); // S19: no project row → no name
     expect((await http(stranger, "/v2/me/invitations")).body.result.invitations).toEqual([]);
     const theirs = await http(stranger, `/v2/me/invitations/${invId}/accept`, { mode: "dry_run" });
     const none = await http(stranger, "/v2/me/invitations/inv_h_nope/accept", { mode: "dry_run" });

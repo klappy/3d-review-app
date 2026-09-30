@@ -1,32 +1,30 @@
 {
-  "version": "0.23.0",
+  "version": "0.24.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "620d69f579b74173695b77654802f764477dcf55",
+  "cookbook_commit": "34d7f4c0c3329d5d471fa69f3d309a00ae4eb716",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.23.0.md",
-      "blob_sha": "eb540af187ca5e1b06984c6c7c2dd434df6b24d9",
-      "sha256": "c31a954e3dbe5aa82c9f0226db3fcce5eefad33cb42263ea366e5694bf26426a"
+      "path": "planning/2026-09-16-parity-build/releases/0.24.0.md",
+      "blob_sha": "3fd5cdd1b3fefac4221375869bf8c4ad785997d1",
+      "sha256": "3398eeb4250a5c58bc11440d39f2a732b5f9a899f510834a98cf0f244aa15b25"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "884bb2b089ee626202eaabd1b50128b293773687",
-      "sha256": "1f7cba90946f7489968c5d977313848bcfa059c8ecd626cee132b0d6e4e765c1"
+      "blob_sha": "6d4c5b20937d5d25a79786c9a03134e530c6b2c2",
+      "sha256": "fbd207693f2d3542a8950423b9aede0f8c80e1682bfc6ad18096deb1afc481a4"
     }
   ],
   "changelog": {
     "sections": {
       "changed": [
-        "Survey names say who they are for. \"Validation\" is now **Translators** and \"Mid-Level\" is now **Team leaders & mentors**. The new names show in setup, on Collect, on the survey page, on the blank print and in demo mode. Template ids are unchanged. The API returns the pinned source name as `source_name`, or `template_source_name` on assessment survey rows. The pinned synthetic report keeps its labels. This follows the BCS training demo of 2026-09-29. (#386)",
-        "**Open survey** now leads each survey's share row on Collect and on the \"review is collecting\" screen after launch. It has the hint \"Print the questions or give access codes\", so the printable questions and access codes are one tap away. Before, they sat behind the QR card. (#386)"
-      ],
-      "fixed": [
-        "Printed surveys (Print survey) now list every answer choice under each question, in the survey's order: circles for \"Choose one\", boxes for \"Choose all that apply\", a write-in line for \"Other (please describe)\", and writing lines only for open questions, so paper answers match what the app stores. (#384)",
-        "Sign-in hints. On the email-code sign-in (production) the hint is \"Paste the code once and wait: it signs you in by itself\", because a second Submit showed an error page. Both sign-in paths now say to check Spam or Junk when no email arrives. (#386)",
-        "Code boxes can't be sent twice. After a code is submitted, Submit stays disabled until the code is edited, and the same code is never sent twice in a row. This covers the participant access code and the test-site sign-in code. A pasted code can submit the form by itself, and a natural second tap on Submit was breaking the sign-in (captain, 2026-09-29). (#386)"
+        "Results and the responses listing carry demographic (age range, gender) breakdown columns only when the facilitator turned demographics on for the assessment; off by default, no demographic key at all. (#381)",
+        "Sign-in: where email sign-in links are on, every way to sign in (Home \"Sign in\", the sign-in screen, \"Use another account\", \"Sign in to open this page\", \"Sign in to continue\", and the email sign-in and \"Check your email\" pages) shows the \"Email me a sign-in link\" form first, with \"Sign in with a code instead\" under it for a one-time code. If the emailed link never arrives, the code is a way in. Where email links are off, sign-in is unchanged. (#388)",
+        "Invitations say what you are accepting, all on one page. After signing in, a person with pending invitations sees every one of them on one page. Each row shows the kind (workspace, project or assessment), its name with the workspace › project path above it, and the role, and has its own Accept button. \"Accept all\" accepts them together when there are two or more. A single invitation reads, for example, You were invited to the project \"River Valley\" as an owner. cap.me.invitations adds scope.name and scope.path (names only) to the signed-in person's own email-matched pending invitations. The mailed invitation link still names nothing before acceptance. (#392)"
       ],
       "added": [
-        "Facilitator-only \"Ask participants about themselves (age range, gender)\" switch, off by default, in setup step 3 (Participant information) and in the assessment's Prepare settings. Setup saves it right after the groups are selected; settings reads it back from the assessment (cap.assessment.get now returns demographics_enabled) and saves it through cap.assessment.update. Participants never see the control. (#382)"
+        "Dynamic translation for participants: a Language drop-down limited to the languages of wider communication set on the project and/or assessment (setup step 1 and Prepare; 25 tags in src/languages.ts: 24 machine-translated languages, and Indian Sign Language, which is recorded, not translated), questions/choices/page words machine-translated through POST /v2/translate, stored once per language in a D1 translation memory (migration 0012) and served from storage after that; English stays the fallback and answers, scores and reports are unchanged; multi-answer questions say \"Choose all that apply.\"; only the published survey's questions, choices and page words are translated and stored (other text is refused), and the translation service gets a context fixed by the server; a welcome sentence that carries a language name is allowlisted only for well-shaped names and is sent to the translation service on its own, never in the same request as the page words (#377)",
+        "Each assessment can carry the passage under review — USFM, SFM, USX, PDF or MP3 files, or a link such as a sign-language video — added on Prepare; participants see \"The passage\" at the top of every survey screen (audio plays in the page; files, videos and links open in a new tab) through private, 12-hour signed links. (#385)",
+        "The survey says which passage to read or hear first. A facilitator can name the passage with nothing attached (\"Genesis 1\") on Prepare. Participants then see \"Please read or listen to the passage before you answer: Genesis 1\" at the top of the survey; the line is translated like the rest of the page. The printed form carries \"Before you answer, read or listen to: Genesis 1\" under its title. Collect reminds the facilitator to read or play the passage before sharing links or handing out paper. This follows the BCS training demo of 2026-09-29. (#387)"
       ]
     }
   }

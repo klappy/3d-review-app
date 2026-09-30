@@ -14,6 +14,7 @@
 // the U14 flow). Launch picks up after the saved writes (launchResume). Contract unchanged.
 
 import { shareUrl } from '../shared-link.js';
+import { lwcFieldset, lwcFrom } from './lwc.js';
 import { groupLinks, bindGroupLinks, printAllButton, bindPrintAll } from '../assess/share.js';
 import { stepper as stepperComponent, ensureStepperStyle } from './components/stepper.js';
 import { learnMore } from './components/learn-more.js';
@@ -47,7 +48,7 @@ const enc = encodeURIComponent;
 const LANG_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{1,8})*$/; // mirrors src/handlers/language.ts CODE (cap.language.create `code`)
 
 export function freshDraft() {
-  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', starts: todayIso(), until: '', format: 'Written', purpose: '', groups: {}, context: {}, demographics: false };
+  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', starts: todayIso(), until: '', format: 'Written', purpose: '', lwc: [], groups: {}, context: {}, demographics: false };
 }
 
 // Ruling (a): a denominator appears only when the facilitator entered one.
@@ -91,7 +92,7 @@ export function demographicsToggle(on) {
 export function launchPlan(d, pre = []) {
   const plan = [];
   if (d.project === NEW_PROJECT) {
-    plan.push({ cap: 'cap.project.create', method: 'POST', url: () => '/v2/projects', body: () => ((d.newOrg || '').trim() ? { name: d.newProject.trim(), organization: d.newOrg.trim() } : { name: d.newProject.trim() }), keep: (r, ctx) => { ctx.pid = r.project.id; } });
+    plan.push({ cap: 'cap.project.create', method: 'POST', url: () => '/v2/projects', body: () => ({ ...((d.newOrg || '').trim() ? { name: d.newProject.trim(), organization: d.newOrg.trim() } : { name: d.newProject.trim() }), ...(lwcText(d) ? { lwc: lwcText(d) } : {}) }), keep: (r, ctx) => { ctx.pid = r.project.id; } }); // translation languages also set on a NEW project (project and/or assessment)
     plan.push({ cap: 'cap.language.create', method: 'POST', url: ctx => `/v2/projects/${enc(ctx.pid)}/languages`, body: () => ((d.newLangCode || '').trim() ? { name: d.newLanguage.trim(), code: d.newLangCode.trim() } : { name: d.newLanguage.trim() }), keep: (r, ctx) => { ctx.lid = r.language.id; } });
   }
   plan.push({ cap: 'cap.assessment.create', method: 'POST', url: ctx => `/v2/projects/${enc(ctx.pid)}/assessments`, body: ctx => {
@@ -99,6 +100,7 @@ export function launchPlan(d, pre = []) {
     if (d.purpose.trim()) b.purpose = d.purpose.trim();
     const period = packPeriod(d.starts, d.until); if (period) b.period = period; // B41: existing field, no migration
     if (d.format) b.format = d.format;
+    if (lwcText(d)) b.lwc = lwcText(d); // dynamic translation: languages participants may switch to
     return b;
   }, keep: (r, ctx) => { ctx.aid = r.assessment.id; } });
   for (const [tid, g] of Object.entries(d.groups)) {
@@ -115,12 +117,14 @@ export function launchPlan(d, pre = []) {
   return plan;
 }
 
+// Dynamic translation (captain ruling 2026-09-28): the chosen LWCs as the API takes them ("lo,th"); null when none.
+export const lwcText = d => ((d.lwc || []).slice().sort().join(',') || null);
 // B06: Continue on step 1 makes exactly the writes Launch made first, so a saved draft is the same row Launch would create.
 export const SAVE_CAPS = ['cap.project.create', 'cap.language.create', 'cap.assessment.create'];
 export const savePlan = d => launchPlan(d).filter(step => SAVE_CAPS.includes(step.cap));
 // What the saved row holds for step 1, as cap.assessment.create sent it (nulls where nothing was given).
 export function detailsOf(d) {
-  return { name: d.name.trim(), purpose: d.purpose.trim() || null, period: packPeriod(d.starts, d.until) || null, format: d.format || null, language_id: d.language || null };
+  return { name: d.name.trim(), purpose: d.purpose.trim() || null, period: packPeriod(d.starts, d.until) || null, format: d.format || null, language_id: d.language || null, lwc: lwcText(d) };
 }
 // Step-1 edits after the save: only the changed fields, for cap.assessment.update (PATCH). null when nothing changed.
 export function detailsPatch(snap, d) {
@@ -132,7 +136,7 @@ export function detailsPatch(snap, d) {
 // unfinished step (step 2 once step 1 is complete).
 export function draftFromSaved(a, surveys = [], store) {
   const p = parsePeriod(a.period) || { starts: '', until: '' };
-  const d = { ...freshDraft(), name: a.name || '', project: a.project_id || '', language: a.language_id || '', purpose: a.purpose || '', format: a.format || 'Written', starts: p.starts || '', until: p.until || '' };
+  const d = { ...freshDraft(), name: a.name || '', project: a.project_id || '', language: a.language_id || '', purpose: a.purpose || '', format: a.format || 'Written', starts: p.starts || '', until: p.until || '', lwc: Array.isArray(a.lwc) ? [...a.lwc] : [] };
   const pre = [];
   for (const x of surveys) {
     if (x.archived_at || (x.state && x.state !== 'selected') || d.groups[x.template_id]) continue;
@@ -140,7 +144,7 @@ export function draftFromSaved(a, surveys = [], store) {
     d.groups[x.template_id] = { version: String(x.template_version), expected: N ? String(N) : '' };
     pre.push({ id: x.id, template: x.template_id, version: Number(x.template_version) });
   }
-  const snap = { name: a.name || '', purpose: a.purpose ?? null, period: a.period ?? null, format: a.format ?? null, language_id: a.language_id || null };
+  const snap = { name: a.name || '', purpose: a.purpose ?? null, period: a.period ?? null, format: a.format ?? null, language_id: a.language_id || null, lwc: lwcText(d) };
   d.demographics = a.demographics_enabled === true; // S15b: resume shows the switch as the server holds it
   return { d, step: validateStep('details', d).length ? 'details' : 'participants', saved: { aid: a.id, pid: a.project_id, role: a.role || '', snap, pre } };
 }
@@ -340,6 +344,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
       </div>
       <label>What will participants consider?<input name="purpose" value="${esc(d.purpose)}" placeholder="e.g. The Genesis 1 to 3 draft"></label>
+      ${lwcFieldset(d.lwc || [], esc)}
       ${act(false, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Choose the groups you can reach.', '<p class="muted">Three perspectives, kept separate.</p><p class="muted">The number is optional. Leave it empty if you don\'t know for sure; counts then show as "n responded". Groups you leave out can be added later.</p>')}${errBox(errs)}
@@ -408,6 +413,7 @@ export function mountWizard(root, deps) {
   const read = (form) => {
     const fd = new FormData(form), d = s.d;
     if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'starts', 'until', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
+    if (form.dataset.wzForm === 'details') d.lwc = lwcFrom(fd);
     if (form.dataset.wzForm === 'details' && fd.has('newOrgPick')) { const v = String(fd.get('newOrgPick')); d.newOrgOther = v === ORG_OTHER; if (!d.newOrgOther) d.newOrg = v; else if (!fd.has('newOrg')) d.newOrg = ''; }
     if (form.dataset.wzForm === 'details') { if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
     if (form.dataset.wzForm === 'information') { const c = {}; for (const box of form.querySelectorAll('[data-wz-context]')) { const tid = box.dataset.wzContext, t = latestTemplates(s.data.templates).find(x => x.id === tid); if (!t) continue; const v = contextValues(groupFields(t.perspective), k => fd.get(`c-${tid}-${k}`)); if (Object.keys(v).length) c[tid] = v; } d.context = c; d.demographics = fd.get('demographics') === 'on'; }

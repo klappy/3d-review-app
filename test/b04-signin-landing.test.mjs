@@ -25,7 +25,7 @@ import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
 import { sidebarTree } from '../ui/v3/components/sidebar-tree.js';
 import { mountEditableHeading } from '../ui/v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '../ui/v3/components/saved-status.js';
-import { mountInvite, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations } from '../ui/v3/components/invite.js';
+import { mountInvite, mountInvitations, failureNotice, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations } from '../ui/v3/components/invite.js';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const HTML = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
@@ -49,7 +49,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, signInLanding, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf, mountInvite, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, signInLanding, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf, mountInvite, mountInvitations, failureNotice, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations }); // v3 shell imports (assess.js lines 15–16); #190
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -78,22 +78,52 @@ test('B04 (b) control: #session= + two projects → #projects', async () => {
 // S9 (B04 step c, captain ruling 2026-09-28 15:27 ET k0015; captain 16:03 ET "ships tonight"): a person invited by an owner who just
 // signs in on the site (never opened the link) lands on the "Accept invitation" screen first; with none pending, the rule above stands.
 const ONE = { ok: true, result: { projects: [{ id: 'p1', name: 'River Valley', role: 'owner', workspace_id: 'w1', archived_at: null }] } };
-const MINE = { ok: true, result: { invitations: [{ id: 'inv_1', scope: { type: 'project', id: 'p9' }, role: 'viewer', inviter_display_name: null, invited_at: '2026-09-28T20:00:00.000Z', expires_at: '2026-10-05T20:00:00.000Z' }] } };
-// The synthetic transport refuses every mutation; answer ONLY the by-id dry run so the ready screen can render.
-const answerDryRun = t => { const inner = t.fetch; t.fetch = async (input, init = {}) => {
-  const url = String(input instanceof URL ? input.href : input);
-  if ((init.method || 'GET').toUpperCase() === 'POST' && url.endsWith('/v2/me/invitations/inv_1/accept')) { t.log.push({ key: 'POST /v2/me/invitations/inv_1/accept', body: init.body, outcome: 'served' }); return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ ok: true, result: { impact: { affected: [{ scope: { type: 'project', id: 'p9' }, role: 'viewer', currently: 'none' }] }, confirm_token: 'ct' } }) }; }
+const MINE = { ok: true, result: { invitations: [{ id: 'inv_1', scope: { type: 'project', id: 'p9', name: 'River Valley', path: ['North', 'River Valley'] }, role: 'viewer', inviter_display_name: null, invited_at: '2026-09-28T20:00:00.000Z', expires_at: '2026-10-05T20:00:00.000Z' }] } };
+// The synthetic transport refuses every mutation; answer ONLY the by-id accepts (dry run → execute) of the listed ids, and once an
+// id has executed, drop it from GET /v2/me/invitations (server truth) so the page reads what is left.
+// `refuse`: ids whose dry run answers NOT_FOUND_OR_NOT_VISIBLE (withdrawn meanwhile) and which then drop out of the list.
+const answerAccepts = (t, data, refuse = new Set()) => { const inner = t.fetch; t.fetch = async (input, init = {}) => {
+  const url = String(input instanceof URL ? input.href : input), m = /\/v2\/me\/invitations\/([^/]+)\/accept$/.exec(url);
+  if ((init.method || 'GET').toUpperCase() === 'POST' && m) {
+    const id = decodeURIComponent(m[1]), body = JSON.parse(init.body || '{}'), live = data.routes.get('GET /v2/me/invitations');
+    t.log.push({ key: `POST /v2/me/invitations/${id}/accept`, body: init.body, outcome: 'served' });
+    if (refuse.has(id)) { data.routes.set('GET /v2/me/invitations', { ok: true, result: { invitations: live.result.invitations.filter(i => i.id !== id) } }); return { ok: false, status: 404, headers: { get: () => 'application/json' }, json: async () => ({ ok: false, error: { code: 'NOT_FOUND_OR_NOT_VISIBLE', message: 'invitation not found or not visible' } }) }; }
+    const json = body.mode === 'dry_run' ? { ok: true, result: { impact: { affected: [{ scope: { type: 'project', id: 'p9' }, role: 'viewer', currently: 'none' }] }, confirm_token: 'ct_' + id } } : { ok: true, result: { granted: true, scope: { type: 'project', id: 'p9' }, role: 'viewer' } };
+    if (body.mode === 'execute') data.routes.set('GET /v2/me/invitations', { ok: true, result: { invitations: live.result.invitations.filter(i => i.id !== id) } });
+    return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => json };
+  }
   return inner(input, init); }; };
-test('S9 B04 (c): #session= + a pending invitation (no link opened) → #invite, "Accept invitation" first — even with exactly one project', async () => {
-  const p = await bootPage('owner', '#session=tok123', { install: (t, data) => { data.routes.set('GET /v2/projects', ONE); data.routes.set('GET /v2/me/invitations', MINE); answerDryRun(t); } });
+test('S19 B04 (c): #session= + one pending invitation (no link opened) → #invite, "Accept invitation" naming it — even with exactly one project', async () => {
+  const p = await bootPage('owner', '#session=tok123', { install: (t, data) => { data.routes.set('GET /v2/projects', ONE); data.routes.set('GET /v2/me/invitations', structuredClone(MINE)); answerAccepts(t, data); } });
   await tick(40);
   assert.equal(p.w.location.hash, '#invite', 'served: ' + p.served().join(', '));
   assert.ok(p.served().includes('GET /v2/me/invitations'), 'the landing asked the server for this person\'s invitations');
   const panel = p.q('[data-invite]'); assert.ok(panel, 'accept screen mounted');
   assert.equal(panel.querySelectorAll('h1').length, 1); assert.equal(panel.querySelector('h1').textContent, 'Accept invitation');
-  assert.equal(panel.querySelectorAll('p').length, 1); assert.equal(panel.querySelector('p').textContent, 'You were invited to a project as a viewer.');
+  assert.equal(panel.querySelectorAll('p').length, 1); assert.equal(panel.querySelector('p').textContent, 'You were invited to the project "River Valley" (North) as a viewer.');
   const buttons = panel.querySelectorAll('button'); assert.equal(buttons.length, 1); assert.equal(buttons[0].textContent, 'Accept'); assert.ok(buttons[0].classList.contains('primary'));
-  const dry = p.transport.log.find(l => l.key === 'POST /v2/me/invitations/inv_1/accept'); assert.ok(dry, 'dry run by id'); assert.deepEqual(JSON.parse(dry.body), { mode: 'dry_run' }, 'no token in the body');
+  assert.ok(!p.transport.log.some(l => l.key.startsWith('POST ')), 'nothing is accepted before the click');
+  buttons[0].click(); await tick(40);
+  const posts = p.transport.log.filter(l => l.key === 'POST /v2/me/invitations/inv_1/accept').map(l => JSON.parse(l.body));
+  assert.deepEqual(posts, [{ mode: 'dry_run' }, { mode: 'execute', confirm_token: 'ct_inv_1' }], 'dry run → execute by id; no token');
+  assert.equal(p.w.location.hash, '#project/p1', 'none left → the existing landing (one project → it)');
+});
+test('S19 B04 (c): several pending invitations → ONE page listing every one named (escaped), "Accept all" accepts them all, then the landing', async () => {
+  const evil = '<img src=x onerror="alert(1)">';
+  const rows = [{ id: 'inv_a', scope: { type: 'workspace', id: 'w9', name: 'North', path: ['North'] }, role: 'owner' }, { id: 'inv_b', scope: { type: 'project', id: 'p9', name: evil, path: ['North', evil] }, role: 'member' }, { id: 'inv_c', scope: { type: 'assessment', id: 'a9', name: 'Spring review', path: ['North', evil, 'Spring review'] }, role: 'viewer' }];
+  const p = await bootPage('owner', '#session=tok123', { install: (t, data) => { data.routes.set('GET /v2/projects', ONE); data.routes.set('GET /v2/me/invitations', { ok: true, result: { invitations: rows } }); answerAccepts(t, data); } });
+  await tick(40);
+  assert.equal(p.w.location.hash, '#invite');
+  const panel = p.q('[data-invite]'); assert.ok(panel);
+  assert.equal(panel.querySelector('h1').textContent, 'Accept invitations'); assert.equal(panel.querySelector('[data-invite-line]').textContent, 'You have 3 invitations waiting.');
+  const listed = [...panel.querySelectorAll('[data-invite-row]')]; assert.equal(listed.length, 3, 'one row per invitation — all on one page');
+  assert.deepEqual(listed.map(r => r.querySelector('[data-invite-name]').textContent), ['North', evil, 'Spring review']);
+  assert.equal(panel.querySelectorAll('img').length, 0, 'member-authored names are text, never markup');
+  const primary = panel.querySelectorAll('.primary'); assert.equal(primary.length, 1); assert.equal(primary[0].textContent, 'Accept all');
+  primary[0].click(); await tick(60);
+  const posts = p.transport.log.filter(l => l.key.startsWith('POST /v2/me/invitations/')).map(l => [l.key.split('/')[4], JSON.parse(l.body).mode]);
+  assert.deepEqual(posts, ['inv_a', 'inv_b', 'inv_c'].flatMap(id => [[id, 'dry_run'], [id, 'execute']]));
+  assert.equal(p.w.location.hash, '#project/p1', 'none left → the existing landing');
 });
 test('S9 B04 (c) control: #session= + no pending invitations + one project → #project/<id> (rule above unchanged)', async () => {
   const p = await bootPage('owner', '#session=tok123', { install: (t, data) => { data.routes.set('GET /v2/projects', ONE); data.routes.set('GET /v2/me/invitations', { ok: true, result: { invitations: [] } }); } });
@@ -114,4 +144,29 @@ test('S9: a plain visit (no sign-in just happened) never asks for invitations an
   const p = await bootPage('owner', '#projects', { install: (t, data) => { data.routes.set('GET /v2/me/invitations', MINE); } });
   await tick(30);
   assert.equal(p.w.location.hash, '#projects'); assert.ok(!p.served().includes('GET /v2/me/invitations'));
+});
+test('S19 B04 (c): "Accept all" stops at the first failure — later ones untouched, the notice names the failed one, the rest stay offered', async () => {
+  const evil = '<img src=x onerror="alert(1)">';
+  const rows = [{ id: 'inv_a', scope: { type: 'workspace', id: 'w9', name: 'North', path: ['North'] }, role: 'owner' }, { id: 'inv_b', scope: { type: 'project', id: 'p9', name: evil, path: ['North', evil] }, role: 'member' }, { id: 'inv_c', scope: { type: 'assessment', id: 'a9', name: 'Spring review', path: ['North', 'Hill', 'Spring review'] }, role: 'viewer' }];
+  const p = await bootPage('owner', '#session=tok123', { install: (t, data) => { data.routes.set('GET /v2/projects', ONE); data.routes.set('GET /v2/me/invitations', { ok: true, result: { invitations: rows } }); answerAccepts(t, data, new Set(['inv_b'])); } });
+  await tick(40);
+  p.q('[data-invite-accept-all]').click(); await tick(60);
+  const posts = p.transport.log.filter(l => l.key.startsWith('POST /v2/me/invitations/')).map(l => [l.key.split('/')[4], JSON.parse(l.body).mode]);
+  assert.deepEqual(posts, [['inv_a', 'dry_run'], ['inv_a', 'execute'], ['inv_b', 'dry_run']], 'nothing after the failure was dry-run or executed');
+  assert.equal(p.w.location.hash, '#invite', 'one is left, so the page stays');
+  const panel = p.q('[data-invite]');
+  assert.equal(panel.querySelector('[data-invite-notice]').textContent, `The invitation to the project "${evil}" is no longer available: it was withdrawn, or it is not for the account you are signed in with.`);
+  assert.equal(panel.querySelectorAll('img').length, 0, 'the named failure is text, never markup');
+  assert.equal(panel.querySelector('h1').textContent, 'Accept invitation'); assert.equal(panel.querySelector('[data-invite-line]').textContent, 'You were invited to the assessment "Spring review" (North › Hill) as a viewer.');
+  assert.equal(panel.querySelectorAll('button').length, 1, 'the remaining one keeps its own Accept');
+});
+test('S19 B04 (c): the last invitation failing and dropping out → its notice stays in view, with "Continue" to the existing landing', async () => {
+  const rows = [{ id: 'inv_b', scope: { type: 'project', id: 'p9', name: 'River Valley', path: ['North', 'River Valley'] }, role: 'member' }];
+  const p = await bootPage('owner', '#session=tok123', { install: (t, data) => { data.routes.set('GET /v2/projects', ONE); data.routes.set('GET /v2/me/invitations', { ok: true, result: { invitations: rows } }); answerAccepts(t, data, new Set(['inv_b'])); } });
+  await tick(40);
+  p.q('[data-invite-accept-one]').click(); await tick(60);
+  assert.equal(p.w.location.hash, '#invite');
+  const panel = p.q('[data-invite]');
+  assert.equal(panel.querySelector('[data-invite-line]').textContent, 'The invitation to the project "River Valley" is no longer available: it was withdrawn, or it is not for the account you are signed in with.');
+  const go = panel.querySelector('[data-invite-continue]'); assert.equal(go.getAttribute('href'), '#project/p1'); assert.ok(go.classList.contains('primary'));
 });

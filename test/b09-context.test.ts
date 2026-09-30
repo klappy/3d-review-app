@@ -62,6 +62,20 @@ describe("S15a demographics off by default",()=>{
  });
 });
 
+// S15c: results and the responses listing carry demographic breakdown columns only when the facilitator enabled them.
+describe("S15c demographic breakdowns only when enabled",()=>{
+ const surfaces=async()=>[await call("GET",`/v2/assessments/${aid}/responses`,undefined,owner),await call("GET",`/v2/assessments/${aid}/results`,undefined,owner)];
+ it("off (default): no demographic fields on results or the responses listing",async()=>{
+  expect((await setDemographics(false)).ok).toBe(true);
+  for(const r of await surfaces()){expect(r.ok).toBe(true);expect(r.result.demographics_enabled).toBe(false);expect(r.result.demographic_fields).toBeUndefined();expect(JSON.stringify(r.result)).not.toMatch(/age_range|"gender"/);}
+ });
+ it("on: both surfaces carry the age range and gender breakdown columns",async()=>{
+  expect((await setDemographics(true)).ok).toBe(true);
+  for(const r of await surfaces()){expect(r.ok).toBe(true);expect(r.result.demographics_enabled).toBe(true);expect(r.result.demographic_fields.map((f:any)=>f.key)).toEqual(["age_range","gender"]);}
+  expect((await setDemographics(false)).ok).toBe(true);
+ });
+});
+
 describe("B09 context",()=>{
  beforeAll(async()=>{ expect((await setDemographics(true)).ok).toBe(true); });
  it("server and browser field lists are identical and carry no name field",()=>{

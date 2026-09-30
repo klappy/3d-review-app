@@ -192,19 +192,48 @@ export const accept: Handler = async (ctx, p, o) => {
 
 /** cap.me.invitations (B04 step c): the signed-in person's pending collaborator invitations, matched by their hashed email.
  *  Returns what the invitee may know before accepting — scope (type + id), role, expiry, inviter display name — never the
- *  token (nor its hash), never the invitee hash, never scope contents. The inviter display name is null: principals store no
- *  name (migrations/0001_init.sql principal has email_hash only). Anyone else's invitations are simply not in the list. */
+ *  token (nor its hash), never the invitee hash. The inviter display name is null: principals store no name
+ *  (migrations/0001_init.sql principal has email_hash only). Anyone else's invitations are simply not in the list.
+ *  S19 (captain 2026-09-29 "it's ridiculous to not see what I'm accepting the invite to"): for THIS list only — the caller's
+ *  own email-matched, live invitations — the scope also carries its name and its path of names (workspace › project ›
+ *  assessment; project: workspace › project; workspace: its name). Names only: no parent ids, no other scope contents.
+ *  The `#invite=` token path (cap.grant.accept dry run, possibly signed out) is unchanged and still discloses no name. */
 export const mine: Handler = async (ctx) => {
   if (ctx.principal.kind !== "user") throw new CapError("NOT_AUTHENTICATED", "sign in to see invitations addressed to you");
   const me = await ctx.db.prepare("SELECT email_hash FROM principal WHERE id = ?").bind(ctx.principal.id).first<{ email_hash: string | null }>();
   if (!me?.email_hash) return { result: { invitations: [] } };
-  const r = await ctx.db.prepare(`SELECT id, scope_type, scope_id, role, status, created_at, expires_at FROM invitation
-      WHERE invitee_hash = ? AND scope_type IN (${GRANT_SCOPES.map(() => "?").join(",")}) AND status IN (${LIVE_STATUSES.map(() => "?").join(",")})
-        AND (expires_at IS NULL OR expires_at > ?) ORDER BY created_at, id`)
-    .bind(me.email_hash, ...GRANT_SCOPES, ...LIVE_STATUSES, nowIso(ctx)).all<{ id: string; scope_type: string; scope_id: string; role: string; status: string; created_at: string; expires_at: string | null }>();
-  const invitations = r.results.map((i) => ({ id: i.id, scope: { type: i.scope_type, id: i.scope_id }, role: i.role, inviter_display_name: null, invited_at: i.created_at, expires_at: i.expires_at }));
+  // One read: the WHERE is the S9 predicate unchanged (own hash, grant scopes, live, unexpired); the joins only resolve names
+  // for the rows it already admitted. Each join is keyed on the invitation's own scope_type, so a row names at most one chain.
+  const r = await ctx.db.prepare(`SELECT i.id, i.scope_type, i.scope_id, i.role, i.created_at, i.expires_at,
+        w0.name AS w0_name, p1.name AS p1_name, w1.name AS w1_name, a2.name AS a2_name, p2.name AS p2_name, w2.name AS w2_name
+      FROM invitation i
+        LEFT JOIN workspace w0 ON i.scope_type = 'workspace' AND w0.id = i.scope_id
+        LEFT JOIN project p1 ON i.scope_type = 'project' AND p1.id = i.scope_id
+        LEFT JOIN workspace w1 ON w1.id = p1.workspace_id
+        LEFT JOIN assessment a2 ON i.scope_type = 'assessment' AND a2.id = i.scope_id
+        LEFT JOIN project p2 ON p2.id = a2.project_id
+        LEFT JOIN workspace w2 ON w2.id = p2.workspace_id
+      WHERE i.invitee_hash = ? AND i.scope_type IN (${GRANT_SCOPES.map(() => "?").join(",")}) AND i.status IN (${LIVE_STATUSES.map(() => "?").join(",")})
+        AND (i.expires_at IS NULL OR i.expires_at > ?) ORDER BY i.created_at, i.id`)
+    .bind(me.email_hash, ...GRANT_SCOPES, ...LIVE_STATUSES, nowIso(ctx)).all<InvitationRow>();
+  const invitations = r.results.map((i) => {
+    const { name, path } = scopeNames(i);
+    return { id: i.id, scope: { type: i.scope_type, id: i.scope_id, name, path }, role: i.role, inviter_display_name: null, invited_at: i.created_at, expires_at: i.expires_at };
+  });
   return { result: { invitations } };
 };
+type InvitationRow = { id: string; scope_type: string; scope_id: string; role: string; created_at: string; expires_at: string | null;
+  w0_name: string | null; p1_name: string | null; w1_name: string | null; a2_name: string | null; p2_name: string | null; w2_name: string | null };
+/** The scope's own name and its path of names, outermost first, ending with the scope itself. A missing link (a project with no
+ *  workspace, a row deleted in flight) is skipped; a scope whose own row is gone has name null and an empty path. */
+function scopeNames(i: InvitationRow): { name: string | null; path: string[] } {
+  const chain = i.scope_type === "workspace" ? [i.w0_name]
+    : i.scope_type === "project" ? [i.w1_name, i.p1_name]
+    : [i.w2_name, i.p2_name, i.a2_name];
+  const name = chain[chain.length - 1] ?? null;
+  if (name === null) return { name: null, path: [] };
+  return { name, path: chain.filter((n): n is string => typeof n === "string") };
+}
 
 export const list: Handler = async (ctx, p) => {
   const scope = reqScope(p);
