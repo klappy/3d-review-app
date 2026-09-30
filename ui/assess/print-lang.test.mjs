@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { loadBlankPrint, renderBlankPrint, PRINT_WORDS } from '../stage-screens.js';
+import { loadBlankPrint, renderBlankPrint, PRINT_WORDS, printAllowed } from '../stage-screens.js';
 import { PRINT_IN_LANGUAGE, printLanguages, printLanguageField, translatePrint, facilitatorFetch, printReadyLine, printStrings } from './print-lang.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -137,19 +137,20 @@ test('review #405 nits: nothing translated → no "Machine translation" claim; t
 function bindPrintHarness(overrides = {}) {
   const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   const start = src.indexOf('function bindPrint(current, s) {'), end = src.indexOf('\nfunction context(current) {');
+  const kStart = src.indexOf('function keepPrint(r) {'), kEnd = src.indexOf('\n}\n', kStart) + 2;
   const el = (id, extra = {}) => ({ id, disabled: false, value: '', textContent: '', onclick: null, onchange: null, replaceChildren() {}, ...extra });
   const nodes = { '#print-load': el('print-load'), '#print-lang': el('print-lang', { value: 'hi' }), '#print-root': el('print-root'), '#print-status': el('print-status') };
   const loads = [], painted = [];
   const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
   const env = {
-    app: { querySelector: q => nodes[q] || null }, state: { print: null, dirty: new Map() }, generation: 1, epoch: 1, token: 'st_x', printLangs: new Map(), redact: x => x,
+    app: { querySelector: q => nodes[q] || null }, state: { print: null, dirty: new Map(), current: { assessment: { id: 'a1', role: 'owner' } } }, printAllowed, generation: 1, epoch: 1, token: 'st_x', printLangs: new Map(), redact: x => x,
     loadBlankPrint: ({ lang }) => { const d = deferred(); loads.push({ lang, d }); return d.promise; },
     passageLineFor: async () => '', facilitatorFetch: () => null,
     translatePrint: async (model, { lang }) => ({ ...model, lang, title: `form in ${lang}` }),
     replayPrint: model => painted.push(model),
     ...overrides,
   };
-  const { bindPrint, printLoadButton } = new Function(...Object.keys(env), `${src.slice(start, end)}\nreturn { bindPrint, printLoadButton };`)(...Object.values(env));
+  const { bindPrint, printLoadButton, keepPrint, bumpGeneration } = new Function(...Object.keys(env), `${src.slice(start, end)}\n${src.slice(kStart, kEnd)}\nreturn { bindPrint, printLoadButton, keepPrint, bumpGeneration: () => ++generation };`)(...Object.values(env));
   const current = { assessment: { id: 'a1', role: 'owner' } }, survey = { id: 's1' };
   bindPrint(current, survey);
   // repaint(): what paint() does to the print panel — fresh nodes drawn by printLoadButton, then bindPrint again (no generation bump).
@@ -158,7 +159,7 @@ function bindPrintHarness(overrides = {}) {
     nodes['#print-load'] = el('print-load', { disabled: / disabled/.test(btnHtml) }); nodes['#print-lang'] = el('print-lang', { value: nodes['#print-lang'].value });
     bindPrint(current, survey); return btnHtml;
   };
-  return { nodes, loads, painted, env, printLoadButton, repaint };
+  return { nodes, loads, painted, env, printLoadButton, repaint, keepPrint, bumpGeneration };
 }
 
 test('language changed mid-load prints the new language (picker locked during the load; a changed pick reloads)', async () => {
@@ -293,4 +294,36 @@ test('#414b nit: the rendered Print survey button is disabled while a run for th
   h.loads[0].d.resolve({ visible: true, blank: true, items: [] }); await done;
   assert.doesNotMatch(h.printLoadButton('a1', 's1'), / disabled/, 'ready: enabled again');
   h.env.state.dirty.set('a1', 'write'); assert.match(h.printLoadButton('a1', 's1'), / disabled/, 'dirty guard kept');
+});
+
+test('#414c (worth fixing): render() bumps the generation mid-load and repaints the same survey — Print survey and the picker end up enabled', async () => {
+  const h = bindPrintHarness();
+  const done = h.nodes['#print-load'].onclick();
+  assert.equal(h.env.state.print.status, 'loading');
+  // render(): ++generation, then paint() of the same survey route — keepPrint decides whether the in-flight run survives
+  h.bumpGeneration();
+  assert.equal(h.keepPrint({ kind: 'survey', id: 'a1', sid: 's1' }), false, 'a run from an older render is not kept');
+  h.env.state.print = null; // paint(): if (!keepPrint(r)) state.print = null
+  const html = h.repaint();
+  assert.doesNotMatch(html, / disabled/, 'the repainted button is drawn enabled');
+  assert.equal(h.nodes['#print-lang'].disabled, false, 'the repainted picker is not re-locked');
+  // the stale run finishes: it quits on its generation check and its cleanup never runs — nothing is left locked
+  h.loads[0].d.resolve({ visible: true, blank: true, items: [] });
+  await done;
+  assert.equal(h.nodes['#print-load'].disabled, false, 'Print survey is enabled'); assert.equal(h.nodes['#print-lang'].disabled, false, 'the language picker is enabled');
+  assert.equal(h.painted.length, 0, 'the stale run never replays');
+});
+
+test('#414c nits: a loading run applies the role check, and the run carries the epoch it started from', async () => {
+  const h = bindPrintHarness();
+  const done = h.nodes['#print-load'].onclick();
+  const run = h.env.state.print, r = { kind: 'survey', id: 'a1', sid: 's1' };
+  assert.equal(run.epoch, 1, 'stamped at the start');
+  assert.equal(h.keepPrint(r), true, 'same render, same survey, printing allowed: kept');
+  h.env.state.current.assessment.role = 'viewer';
+  assert.equal(printAllowed('viewer'), false);
+  assert.equal(h.keepPrint(r), false, 'a role that no longer allows printing drops the loading run');
+  h.env.state.current.assessment.role = 'owner';
+  h.loads[0].d.resolve({ visible: true, blank: true, items: [] }); await done;
+  assert.equal(run.status, 'ready'); assert.equal(run.epoch, 1);
 });

@@ -376,6 +376,7 @@ function bindPrint(current, s) {
     const gen = generation, aid = current.assessment.id, lang = picked();
     // #414b review (worth fixing): each run owns its own token. paint() does not bump generation, so a repaint plus a second
     // click used to let the older run's idle()/finally unlock the newer run's button and both runs replayed the paper.
+    // #414c nit: the run is stamped with the data version (epoch) it started from, not the one current when it finished.
     const run = { aid, sid: s.id, epoch, status: 'loading', gen, model: null };
     state.print = run; lock();
     const mine = () => gen === generation && state.print === run;
@@ -400,7 +401,7 @@ function bindPrint(current, s) {
       if (picked() !== lang) return await btn.onclick(); // the paper is always in the language the picker shows (the new run owns the button)
       // P2 (Auditor c5721040053): the loaded model is cached keyed to the exact entity data it came from, so a later repaint of
       // the SAME survey with the SAME survey-set data can replay it without a read; anything else drops it (see paint()).
-      run.epoch = epoch; run.model = model; run.status = 'ready';
+      run.model = model; run.status = 'ready';
       idle();
       replayPrint(model);
     } catch (e) {
@@ -865,7 +866,9 @@ function replayPrint(model) {
 function keepPrint(r) {
   const p = state.print;
   // #414b: a loading run for this survey survives the repaint too (it owns the button until its own idle()); only a ready one replays.
-  if (p && p.status === 'loading') return r.kind === 'survey' && p.aid === state.current.assessment.id && p.sid === r.sid;
+  // #414c: only a run from THIS render (p.gen === generation) — an older render's run quits on its generation check and never
+  // reaches idle(), so keeping it would draw Print survey and the picker locked until the route changes. Same role check as ready.
+  if (p && p.status === 'loading') return r.kind === 'survey' && p.aid === state.current.assessment.id && p.sid === r.sid && p.gen === generation && printAllowed(state.current.assessment.role);
   return !!p && p.status === 'ready' && r.kind === 'survey' && p.aid === state.current.assessment.id && p.sid === r.sid && p.epoch === epoch && printAllowed(state.current.assessment.role);
 }
 // paint(): the DOM from state only — no network. Every rebuild resets per-paint UI state (print preview) and re-derives
