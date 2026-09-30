@@ -43,7 +43,7 @@ export function wordsOnPaper(model) {
   const items = model?.items || [], structured = items.some(i => i && typeof i === 'object');
   const has = t => items.some(i => i && typeof i === 'object' && (Array.isArray(t) ? t.includes(i.type) : i.type === t));
   return Object.keys(PRINT_WORDS).filter(k => ({
-    blankSurvey: !model?.title, passageLead: !!model?.passageLine, introChoices: structured, introLines: !structured,
+    blankSurvey: !model?.title, passageLead: !!model?.passageLine, introChoices: structured, introLines: !structured, noLink: false,
     chooseAll: has('multi'), chooseOne: has(['single', 'scale']),
   })[k] ?? true);
 }
@@ -68,7 +68,7 @@ export function applyPrintTranslation(model, language, map = {}) {
   let total = 0, english = 0;
   const count = r => { total++; if (r.en) english++; return r; };
   const items = (model.items || []).map((entry, i) => {
-    if (typeof entry === 'string') return count(t(`q${i}`, entry)).text;
+    if (typeof entry === 'string') return t(`q${i}`, entry).text; // legacy string item: no mark possible, so not counted
     const q = count(t(`q${i}`, entry.text));
     return { ...entry, text: q.text, en: q.en, ...(entry.options ? { options: entry.options.map((o, j) => { const r = count(t(`q${i}.o${j}`, o.text)); return { ...o, text: r.text, en: r.en }; }) } : {}) };
   });
@@ -101,6 +101,6 @@ export async function translatePrint(model, { lang, fetchImpl = globalThis.fetch
 export function printReadyLine(model) {
   if (!model?.lang) return `${model.items.length} questions ready. Use Print below.`;
   const english = model.english ? ` ${model.english} of ${model.phrases} phrases have no translation yet and stay in English, marked EN on the paper.` : '';
-  const machine = model.review ? ' Machine translation, not yet checked by a speaker of this language.' : ' Machine translation.';
+  const machine = model.english === model.phrases ? '' : model.review ? ' Machine translation, not yet checked by a speaker of this language.' : ' Machine translation.';
   return `${model.items.length} questions ready in ${model.language}.${english}${machine} Use Print below.`;
 }

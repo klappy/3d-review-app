@@ -82,7 +82,7 @@ test('English fallback per string when memory has none, marked EN on the paper; 
   const hi = await translatePrint(await printModel([], 'hi'), { lang: 'hi', fetchImpl: facilitatorFetch('st_x', translateServer(partial, sent, { failContext: 'participant-ui' })) });
   const root = node('div'); renderBlankPrint(doc, root, hi);
   const marked = walk(root).filter(n => n.getAttribute?.('data-en') === '').map(n => n.textContent);
-  assert.ok(marked.includes('Yes') && marked.includes('Which resources?') && marked.includes('Choose one') && marked.includes(PRINT_WORDS.noLink), 'English strings carry the EN mark');
+  assert.ok(marked.includes('Yes') && marked.includes('Which resources?') && marked.includes('Choose one') && marked.includes(PRINT_WORDS.codeLabel), 'English strings carry the EN mark');
   assert.ok(!marked.includes(HI['Is there a brief?']));
   assert.equal(walk(root).find(n => n.textContent === 'Yes').getAttribute('lang'), 'en');
   assert.ok(hi.english > 0 && hi.english < hi.phrases);
@@ -106,11 +106,68 @@ test('no request when English, when the assessment has no language, or for a sig
 
 test('only the words this paper shows are sent; assess.js wires the language into Print survey', () => {
   const { ui } = printStrings({ title: 'T', items: [{ type: 'text', text: 'Q?' }] });
-  assert.deepEqual(Object.values(ui).sort(), [PRINT_WORDS.codeLabel, PRINT_WORDS.introChoices, PRINT_WORDS.leaveBlank, PRINT_WORDS.noLink].sort());
+  assert.deepEqual(Object.values(ui).sort(), [PRINT_WORDS.codeLabel, PRINT_WORDS.introChoices, PRINT_WORDS.leaveBlank].sort(), 'the no-link label is never on paper (review #405 nit 3)');
   const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   assert.match(src, /loadBlankPrint\(\{[^}]*role: current\.assessment\.role, lang \}\)/);
   assert.match(src, /translatePrint\(model, \{ lang, fetchImpl: facilitatorFetch\(token\) \}\)/);
   assert.match(src, /\$\{printLangField\(a\)\}<p><button id="print-load"/);
   const line = src.split('\n').find(l => l.startsWith('const passageLine = '));
   assert.ok(new Function(`${line}; return passageLine;`)()([{ reference: 'Genesis 1' }]).startsWith(`${PRINT_WORDS.passageLead} `), 'passage line lead is the translatable one');
+});
+
+test('review #405 nits: nothing translated → no "Machine translation" claim; the default title is marked; legacy string items are not counted', async () => {
+  const none = await translatePrint(await printModel([], 'hi'), { lang: 'hi', fetchImpl: async () => { throw new Error('offline'); } });
+  assert.doesNotMatch(printReadyLine(none), /Machine translation/);
+  assert.match(printReadyLine(none), /stay in English, marked EN on the paper/);
+  const legacy = await translatePrint({ visible: true, blank: true, items: ['Q one?', 'Q two?'] }, { lang: 'hi', fetchImpl: async () => { throw new Error('offline'); } });
+  assert.deepEqual(legacy.items, ['Q one?', 'Q two?']);
+  const root = node('div'); renderBlankPrint(doc, root, legacy);
+  const h1 = walk(root).find(n => n.tag === 'h1');
+  assert.equal(h1.textContent, PRINT_WORDS.blankSurvey); assert.equal(h1.getAttribute('data-en'), '', 'the default title stayed English and says so');
+  assert.equal(legacy.phrases, walk(root).filter(n => n.getAttribute?.('data-en') === '').length, 'every counted English phrase is marked on the paper');
+});
+
+// Review of #405 finding 1: bindPrint from assess.js, run with stub loads — a language change during the load never leaves
+// the paper in the old language.
+function bindPrintHarness() {
+  const src = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  const start = src.indexOf('function bindPrint(current, s) {'), end = src.indexOf('\nfunction context(current) {');
+  const el = (id, extra = {}) => ({ id, disabled: false, value: '', textContent: '', onclick: null, onchange: null, replaceChildren() {}, ...extra });
+  const nodes = { '#print-load': el('print-load'), '#print-lang': el('print-lang', { value: 'hi' }), '#print-root': el('print-root'), '#print-status': el('print-status') };
+  const loads = [], painted = [];
+  const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
+  const env = {
+    app: { querySelector: q => nodes[q] || null }, state: { print: null }, generation: 1, epoch: 1, token: 'st_x', printLangs: new Map(), redact: x => x,
+    loadBlankPrint: ({ lang }) => { const d = deferred(); loads.push({ lang, d }); return d.promise; },
+    passageLineFor: async () => '', facilitatorFetch: () => null,
+    translatePrint: async (model, { lang }) => ({ ...model, lang, title: `form in ${lang}` }),
+    replayPrint: model => painted.push(model),
+  };
+  const bindPrint = new Function(...Object.keys(env), `${src.slice(start, end)}\nreturn bindPrint;`)(...Object.values(env));
+  bindPrint({ assessment: { id: 'a1', role: 'owner' } }, { id: 's1' });
+  return { nodes, loads, painted, env };
+}
+
+test('language changed mid-load prints the new language (picker locked during the load; a changed pick reloads)', async () => {
+  const h = bindPrintHarness(), btn = h.nodes['#print-load'], sel = h.nodes['#print-lang'];
+  const done = btn.onclick();
+  assert.equal(sel.disabled, true, 'the picker is locked from the click'); assert.equal(btn.disabled, true);
+  assert.equal(h.loads[0].lang, 'hi');
+  sel.value = 'ta'; sel.onchange(); // a change that still gets through (e.g. assistive tech) while the form is loading
+  h.loads[0].d.resolve({ visible: true, blank: true, items: [] });
+  await new Promise(r => setImmediate(r));
+  assert.equal(h.loads.length, 2, 'loaded again in the picked language'); assert.equal(h.loads[1].lang, 'ta');
+  h.loads[1].d.resolve({ visible: true, blank: true, items: [] });
+  await done;
+  assert.deepEqual(h.painted.map(m => m.lang), ['ta'], 'only the Tamil form is painted');
+  assert.equal(h.env.state.print.model.lang, 'ta', 'and cached');
+  assert.equal(sel.disabled, false); assert.equal(btn.disabled, false);
+});
+
+test('an unchanged pick loads once, and a failed load unlocks the picker', async () => {
+  const h = bindPrintHarness(), btn = h.nodes['#print-load'], sel = h.nodes['#print-lang'];
+  const ok = btn.onclick(); h.loads[0].d.resolve({ visible: true, blank: true, items: [] }); await ok;
+  assert.equal(h.loads.length, 1); assert.deepEqual(h.painted.map(m => m.lang), ['hi']); assert.equal(sel.disabled, false);
+  const bad = btn.onclick(); assert.equal(sel.disabled, true); h.loads[1].d.resolve({ visible: false, reason: 'not-visible' }); await bad;
+  assert.equal(sel.disabled, false); assert.equal(btn.disabled, false); assert.equal(h.env.state.print.status, 'error');
 });
