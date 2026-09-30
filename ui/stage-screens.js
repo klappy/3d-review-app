@@ -301,6 +301,14 @@ export function renderStageTour(doc, root, { storage, assessmentId, stage, role,
 
 // printHere (S25, captain's iOS print 2026-09-30 11:48 ET): the paper goes to its own print document (ui/assess/print.js),
 // so Print prints this page, or hands the paper size to onPrint(paper) — no isolated copy mounted and removed around print().
+
+// Ruled write-in lines on the paper form (free-text answers and the write-in under an Other choice).
+function writeLines(doc, className, count) {
+  const lines = el(doc, 'div');
+  lines.className = className;
+  for (let k = 0; k < count; k++) lines.append(el(doc, 'div'));
+  return lines;
+}
 export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint, printHere = false } = {}) {
   root.replaceChildren();
   root.hidden = !model || !model.visible;
@@ -403,15 +411,14 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint, 
         const box = el(doc, 'span');
         box.className = `p-box ${it.type === 'multi' ? 'sq' : 'rd'}`;
         box.setAttribute('aria-hidden', 'true');
-        row.append(box, markEn(el(doc, 'span', o.other ? `${o.text}: ______________________` : o.text), o.en));
+        row.append(box, markEn(el(doc, 'span', o.text), o.en));
         opts.append(row);
+        // S30 (captain 2026-09-30 13:20 ET): people over-answer "Other" — full-width ruled lines under it, not a short blank.
+        if (o.other) opts.append(writeLines(doc, 'p-lines p-write', 3));
       }
       item.append(opts);
     } else {
-      const lines = el(doc, 'div');
-      lines.className = 'p-lines';
-      lines.append(el(doc, 'div'), el(doc, 'div'));
-      item.append(lines);
+      item.append(writeLines(doc, 'p-lines', 5));
     }
     list.append(item);
   }

@@ -67,7 +67,7 @@ test('print page requests ?lang=hi strings through /v2/translate with the facili
   assert.equal(hi.english, 0);
   const root = node('div'); renderBlankPrint(doc, root, hi);
   const page = walk(root).map(n => n.textContent).join('\n');
-  for (const s of ['क्या कोई संक्षिप्त विवरण है?', 'हाँ', 'अन्य (कृपया बताएं): ______________________', 'टीकाएँ', 'और कुछ?', 'एक चुनें', 'सभी लागू चुनें', 'उत्तर देने से पहले पढ़ें या सुनें: Genesis 1', 'हर प्रश्न के लिए']) assert.ok(page.includes(s), `paper shows ${s}`);
+  for (const s of ['क्या कोई संक्षिप्त विवरण है?', 'हाँ', 'अन्य (कृपया बताएं)', 'टीकाएँ', 'और कुछ?', 'एक चुनें', 'सभी लागू चुनें', 'उत्तर देने से पहले पढ़ें या सुनें: Genesis 1', 'हर प्रश्न के लिए']) assert.ok(page.includes(s), `paper shows ${s}`);
   assert.doesNotMatch(page, /Is there a brief\?|Choose one|Mark one circle/);
   assert.equal(article(root).getAttribute('lang'), 'hi');
   assert.equal(walk(root).some(n => n.getAttribute?.('data-en') !== null && n.getAttribute?.('data-en') !== undefined), false, 'nothing marked English');

@@ -289,7 +289,7 @@ test('blank print instructions correspond to actual empty answer lines', () => {
   assert.doesNotMatch(text(root),/Mark one box|choose all/);
   const lines=walk(root).filter(n=>n.className==='p-lines');
   assert.equal(lines.length,2);
-  assert.ok(lines.every(n=>n.children.length===2 && n.children.every(c=>text(c)==='')));
+  assert.ok(lines.every(n=>n.children.length>=5 && n.children.every(c=>text(c)==='')), 'S30: at least five lines for a free-text answer');
 });
 test('print wrapper contains only new blank article and cleans up even on print failure', () => {
   const doc=fakeDocument(); doc.body=fakeNode('body');
@@ -394,7 +394,7 @@ test('loadBlankPrint keeps structured items with every answer choice when the se
   const doc = fakeDocument(); const root = doc.createElement('div');
   renderBlankPrint(doc, root, model);
   const page = text(root);
-  for (const s of ['Is there a brief?', 'Yes', 'No', 'Other (please describe): ___', 'Which resources?', 'Commentaries', 'None', 'Choose all that apply', 'Choose one', 'Anything else?', 'How clear?']) assert.ok(page.includes(s), `printed page shows ${s}`);
+  for (const s of ['Is there a brief?', 'Yes', 'No', 'Other (please describe)', 'Which resources?', 'Commentaries', 'None', 'Choose all that apply', 'Choose one', 'Anything else?', 'How clear?']) assert.ok(page.includes(s), `printed page shows ${s}`);
   assert.match(page, /Mark one circle/);
   assert.doesNotMatch(page, /Write your response on the blank lines below each question/);
   const boxes = walk(root).filter(n => /\bp-box\b/.test(n.className || ''));
@@ -402,4 +402,15 @@ test('loadBlankPrint keeps structured items with every answer choice when the se
   assert.equal(boxes.filter(n => /\bsq\b/.test(n.className)).length, 2, 'multi choices are boxes');
   const lines = walk(root).filter(n => n.className === 'p-lines');
   assert.equal(lines.length, 1, 'only the text question gets writing lines');
+  assert.ok(lines[0].children.length >= 5, 'S30: at least five lines for the free-text answer');
+  // S30 (captain 2026-09-30 13:20 ET): "not enough room for a free form answer" — the Other choice keeps its box and label
+  // and gets full-width ruled lines right under it, inside the choice list.
+  assert.doesNotMatch(page, /_{3}/, 'no short inline blank');
+  const opts = walk(root).filter(n => n.className === 'p-opts')[0];
+  const at = opts.children.findIndex(n => text(n) === 'Other (please describe)');
+  assert.ok(at >= 0 && /\bp-box\b/.test(opts.children[at].children[0].className), 'Other keeps its box and label');
+  const write = opts.children[at + 1];
+  assert.equal(write.className, 'p-lines p-write');
+  assert.ok(write.children.length >= 3 && write.children.every(c => text(c) === ''), 'at least three write-in lines under Other');
+  assert.equal(walk(root).filter(n => n.className === 'p-lines p-write').length, 1, 'only the Other choice gets write-in lines');
 });
