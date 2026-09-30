@@ -20,6 +20,10 @@ export const copy = {
   receiptThanks: 'Thank you. Your answers stay with the team, grouped with others from the {perspective} perspective. Reopening your link shows this receipt again.',
   receiptThanksNoGroup: 'Thank you. Your answers stay with the team, grouped with others from your group. Reopening your link shows this receipt again.',
   sameLinkOthers: 'Someone else can answer using the same link on their own device.',
+  // Gate 0.23.0: an access code works once, so the code path never promises "reopen your link" or a shared link.
+  receiptThanksCode: 'Thank you. Your answers stay with the team, grouped with others from the {perspective} perspective.',
+  receiptThanksCodeNoGroup: 'Thank you. Your answers stay with the team, grouped with others from your group.',
+  codeOnce: 'An access code works only once: entering it again will not reopen this survey. Anyone else who answers needs their own code or survey link.',
   issuePreview: 'Nothing is sent until you confirm. This is the impact preview the contract requires before every write with an outside effect.',
   issueConfirm: 'Create survey link',
   issueDone: 'Survey link created. Copy it now; it is shown once. Anyone with this link can answer. Revoking it stops new opens; it does not unsend.',
@@ -39,10 +43,21 @@ export const copy = {
   createFirst: 'Create a survey link first.',
 };
 export function fill(template, values) { return template.replace(/\{(\w+)\}/g, (_, k) => String(values[k])); }
+// A translated template is filled only when it kept exactly the English placeholders ({n}, {total}, {perspective}…);
+// otherwise the English template is used, so a number or a group name is never lost or shown as "{n}"/"undefined".
+const slots = t => (String(t).match(/\{\w+\}/g) || []).sort().join();
+export function fillTranslated(translated, english, values = {}) {
+  const use = typeof translated === 'string' && translated.trim() && slots(translated) === slots(english) ? translated : english;
+  return fill(use, values);
+}
 // One thank-you for every participant route: names the survey's perspective when the form is known, never another group.
-export function receiptNotice(perspective) {
+// { code: true } (the session came from an access code): no "reopen your link" / "same link" lines — a code works once.
+// { t }: the participant page's translator, t(key, englishFallback) — the thank-you follows the chosen language (gate 0.24.0).
+export function receiptNotice(perspective, { code = false, t = null } = {}) {
   const group = typeof perspective === 'string' ? perspective.trim() : '';
-  return `${group ? fill(copy.receiptThanks, { perspective: group }) : copy.receiptThanksNoGroup} ${copy.sameLinkOthers}`;
+  const say = (key, values) => fillTranslated(t ? t(key, copy[key]) : copy[key], copy[key], values);
+  if (code) return `${group ? say('receiptThanksCode', { perspective: group }) : say('receiptThanksCodeNoGroup')} ${say('codeOnce')}`;
+  return `${group ? say('receiptThanks', { perspective: group }) : say('receiptThanksNoGroup')} ${say('sameLinkOthers')}`;
 }
 
 const FRAGMENT = /^#survey=([^&]+)$/;

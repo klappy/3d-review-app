@@ -9,7 +9,9 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
   const unavailable = kind => show('unavailable', { notice: ({ closed: copy.collectionClosed, cannotResume: copy.cannotResume, rateLimited: copy.rateLimited, transient: copy.transient })[kind] || copy.linkUnavailable });
   function receipt(result) {
     store.remove('draft'); store.remove('submitKey'); uncertain = false;
-    return show('receipt', { receipt: result, notice: receiptNotice(form?.template?.perspective) });
+    // thanks: the notice's inputs, so the page can say it in the participant's language (receiptNotice with its translator).
+    const thanks = { perspective: form?.template?.perspective, code: store.get('via') === 'code' };
+    return show('receipt', { receipt: result, notice: receiptNotice(thanks.perspective, { code: thanks.code }), thanks });
   }
   async function loadForm() {
     form = await client.form();

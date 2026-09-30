@@ -219,8 +219,11 @@ test('U08: a used or unknown access code says what to do next, not "Not allowed 
   const m = await pages.entry.load(ctx, {}); m.mode = 'survey'; const root = mount(pages.entry, ctx, m);
   const form = root.querySelector('#code-form'); form.elements.code.value = 'ZZZ'; await form.fire('submit');
   assert.deepEqual(assigned, []);
-  assert.equal(ctx.notes.at(-1).m, 'This code has been used or is not valid. Check it, or ask the person who gave it to you for a new one.');
-  assert.equal(ctx.notes.at(-1).a, true);
+  // Gate 0.23.0: the message shows in the card under the field (role=alert), not in the page note below the fold.
+  const box = root.querySelector('[data-code-error]');
+  assert.equal(box.textContent, 'This code has been used or is not valid. Check it, or ask the person who gave it to you for a new one.');
+  assert.equal(box.attrs.role, 'alert');
+  assert.equal(ctx.notes.some(n => n.a), false);
 });
 
 // ---------- writes ----------
