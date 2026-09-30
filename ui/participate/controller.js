@@ -34,6 +34,9 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
   }
   return {
     get state() { return state; },
+    // S23: the participant token this tab holds (null before the link opens), for the page's translate requests only.
+    // It is the shared-link client's own bearer — never a staff token (this journey reads no staff identity).
+    get bearer() { return client?.bearer || null; },
     async start() {
       return action(async () => {
         // Strip before the first async operation; malformed credentials cannot fall through to staff.

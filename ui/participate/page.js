@@ -231,10 +231,10 @@ async function loadTranslations(form = journey?.state?.form || null) {
   const progress = () => { if (shown && seq === loadSeq) showTranslating(entry, { done: seen.ui + seen.items, total }, onScreen); };
   const reveal = setTimeout(() => { if (seq === loadSeq) { shown = true; progress(); } }, 300); // no flash when it is already stored
   try {
-    const store = localStore();
+    const store = localStore(), bearer = journey?.bearer ?? null; // S23: the participant's own token, when this tab holds one
     const [u, it] = await Promise.all([
-      fetchTranslationsProgressive({ lang, context: 'participant-ui', sourceTexts: ui, storage: store, onProgress: p => { seen.ui = p.done; progress(); } }),
-      form?.items ? fetchTranslationsProgressive({ lang, context: `participant-form:${form.template?.id || 'form'}`, sourceTexts: items, storage: store, onProgress: p => { seen.items = p.done; progress(); } }) : Promise.resolve({ map: {} }),
+      fetchTranslationsProgressive({ lang, context: 'participant-ui', sourceTexts: ui, storage: store, bearer, onProgress: p => { seen.ui = p.done; progress(); } }),
+      form?.items ? fetchTranslationsProgressive({ lang, context: `participant-form:${form.template?.id || 'form'}`, sourceTexts: items, storage: store, bearer, onProgress: p => { seen.items = p.done; progress(); } }) : Promise.resolve({ map: {} }),
     ]);
     if (seq !== loadSeq) return;
     tr = { lang, form, ui: u.map, items: it.map, view: form ? translateForm(form, it.map) : null }; T = makeT(u.map);
