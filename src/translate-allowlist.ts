@@ -32,16 +32,26 @@ export const PARTICIPANT_UI_STRINGS: readonly string[] = Object.freeze([
   // ui/participate/i18n.js UI_EN
   "Language", "Translating…",
   "The first time can take up to a minute. After that it opens straight away. You can keep reading in English meanwhile.",
+  "The first time can take up to a minute. After that it opens straight away. You can keep reading in {language} meanwhile.", // S21
   "phrases", "Try again", "Showing English. Check the internet connection, then try again.",
   "Translation is not available right now. Showing English.",
   "Machine translation. If anything is unclear, ask the person who shared the survey.",
   "Machine translation, not yet checked by a speaker of this language. If anything is unclear, ask the person who shared the survey.",
   "We would like your perspective", "Start", "Learn more",
   "No account, no sign-in. You can review your answers before you send them.",
-  "Back", "Next", "Question", "of", "Answer required:", "An exclusion choice cannot be combined:",
+  "Back", "Next", "Question {n} of {total}", "Answer required:", "An exclusion choice cannot be combined:",
+  "Question", "of", // pre-S21 pages built the counter from these two words; kept while such pages are still open
   "An exclusion choice cannot be combined with any other choice.", "Choose all that apply.", "(optional)",
   "This survey contains an unsupported question. Ask the person who shared the survey for help.",
   "Change", "Skipped", "About you (optional)", "Choose (optional)", "Please describe", "Response saved",
+  // S21: the thank-you and its reference line (ui/shared-link.js copy; the code variants say a code works once)
+  "Thank you. Your answers stay with the team, grouped with others from the {perspective} perspective. Reopening your link shows this receipt again.",
+  "Thank you. Your answers stay with the team, grouped with others from your group. Reopening your link shows this receipt again.",
+  "Someone else can answer using the same link on their own device.",
+  "Thank you. Your answers stay with the team, grouped with others from the {perspective} perspective.",
+  "Thank you. Your answers stay with the team, grouped with others from your group.",
+  "An access code works only once: entering it again will not reopen this survey. Anyone else who answers needs their own code or survey link.",
+  "Reference",
   "The passage", "Read the passage", "Listen to the passage", "Watch the passage", "Open the passage", // S16 passage card (#385)
   "Please read or listen to the passage before you answer:", // S18 passage-first line (#387)
   // ui/participate/index.html (page.js STATIC selectors)
