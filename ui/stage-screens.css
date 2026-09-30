@@ -24,7 +24,7 @@
 .p-qr{max-width:44mm}.p-qr .qr{display:block;width:30mm;height:30mm;background:#fff;box-sizing:border-box}.p-qr .qr.none{border:1.2px dashed #777}
 .p-url{font:7pt/1.25 ui-monospace,Menlo,monospace;overflow-wrap:anywhere;margin:3px 0 0;color:#111}
 .p-ident{border:1.5px solid #111;border-radius:6px;padding:6px 10px;margin:0 0 10px;font:9.5pt/1.35 Inter,system-ui,sans-serif;break-inside:avoid}
-.p-id-row{display:grid;grid-template-columns:34mm minmax(0,1fr);gap:8px}.p-id-k{font-weight:600;color:#444;font-size:8pt;text-transform:uppercase;letter-spacing:.06em;padding-top:1px}.p-id-v{font-weight:600;overflow-wrap:anywhere}
+.p-id-row{display:grid;grid-template-columns:42mm minmax(0,1fr);gap:8px}.p-id-k{font-weight:600;color:#444;font-size:8pt;text-transform:uppercase;letter-spacing:.06em;padding-top:1px}.p-id-v{font-weight:600;overflow-wrap:anywhere}
 .p-ids{font:7pt/1.3 ui-monospace,Menlo,monospace;color:#555;margin-top:3px;overflow-wrap:anywhere}
 .p-intro{font-size:10pt;margin:0 0 10px}
 .p-items{list-style:none;margin:0;padding:0;columns:1}

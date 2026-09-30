@@ -65,7 +65,9 @@ export const PARTICIPANT_UI_STRINGS: readonly string[] = Object.freeze([
   // S25 printed survey (ui/stage-screens.js PRINT_WORDS): the paper's words for the person answering, so Print survey in
   // a participant language reads in that language. Fixed app wording, like the page words above.
   "Blank survey", "Before you answer, read or listen to:", "Code (optional; legacy)", "Leave blank when answering from the shared link",
-  "No invitation link on this blank form",
+  // S31: the QR slot, the identity block labels and the footer (the paper now names its project, assessment and survey).
+  "No shared link for this survey yet. Make one on its Share card, then print again.", "Helper: scan to enter this paper's answers",
+  "Project", "Assessment", "Language evaluated", "Printed in", "Survey", "Codes are never printed. The QR is the survey's own link.",
   "Mark one circle ○ for each question. Where it says \"Choose all that apply\", mark every box ☐ that fits. Write on the lines where there are no choices.",
   "Write your response on the blank lines below each question.", "Choose all that apply", "Choose one",
 ]);
