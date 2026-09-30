@@ -5,7 +5,8 @@
  * SHA-256 matches the published set, and it sends the upstream a context the server fixes:
  *   - `participant-ui`                 → the participant page's own words (mirror below; test/translate-allowlist.test.ts
  *                                        keeps it equal to ui/participate/i18n.js UI_EN, ui/participate/index.html, the
- *                                        practice wording in ui/participate/page.js and welcomeCopy in ui/participant-view.js).
+ *                                        practice wording in ui/participate/page.js and welcomeCopy in ui/participant-view.js)
+ *                                        and the printed survey's words (ui/stage-screens.js PRINT_WORDS; S25).
  *   - `participant-form:<template id>` → item texts and choice labels of the PUBLISHED versions of that instrument
  *                                        (survey_template.published_at IS NOT NULL) plus the optional About-you fields.
  * Anything else is refused: never sent upstream, never stored, never served.
@@ -61,6 +62,12 @@ export const PARTICIPANT_UI_STRINGS: readonly string[] = Object.freeze([
   "Practice survey · nothing is sent",
   "Use the real survey flow with source-pinned synthetic sample questions. Answers stay in memory and disappear when you leave or reload.",
   "Finish practice — nothing sent", "Check practice",
+  // S25 printed survey (ui/stage-screens.js PRINT_WORDS): the paper's words for the person answering, so Print survey in
+  // a participant language reads in that language. Fixed app wording, like the page words above.
+  "Blank survey", "Before you answer, read or listen to:", "Code (optional; legacy)", "Leave blank when answering from the shared link",
+  "No invitation link on this blank form",
+  "Mark one circle ○ for each question. Where it says \"Choose all that apply\", mark every box ☐ that fits. Write on the lines where there are no choices.",
+  "Write your response on the blank lines below each question.", "Choose all that apply", "Choose one",
 ]);
 
 /** ui/participant-view.js welcomeCopy, the two assembled sentences. */
@@ -94,13 +101,12 @@ export function instrumentStrings(items: Item[]): string[] {
 
 /**
  * Language names are member-authored (cap.language.create sets no length or charset limit), and the welcome lead that
- * carries one reaches the ANONYMOUS participant-ui scope. Security review on #377 (e): only names of a strict shape are
+ * carries one reaches the participant-ui scope (a participant's own survey language only, W1). Security review on #377 (e): only names of a strict shape are
  * allowlisted — at most 60 characters and 6 words, Unicode letters/marks/spaces/hyphen/apostrophe/parentheses only — and
  * every allowed welcome lead is marked `isolated` so /v2/translate sends it upstream ALONE, never in the same batch as
  * the shared page words (an injected name cannot steer the translation of rows every project serves).
  */
 export const MAX_LANGUAGE_NAME = 60;
-export const MAX_LANGUAGE_NAMES = 5000;
 const NAME_SHAPE = /^[\p{L}\p{M}][\p{L}\p{M} \-'’()]*$/u;
 export function allowlistableLanguageName(name: unknown): name is string {
   if (typeof name !== "string" || !name || name.length > MAX_LANGUAGE_NAME || name !== name.trim()) return false;
@@ -110,15 +116,23 @@ export function allowlistableLanguageName(name: unknown): name is string {
 
 export interface ScopeAllowlist { allowed: Set<string>; isolated: Set<string> }
 
-/** SHA-256 hashes of every English string this scope may translate, and which of them must go upstream alone. */
-export async function allowedScope(db: D1Database | undefined, scope: TranslateScope): Promise<ScopeAllowlist> {
+/** The one language a participant's welcome lead may name: its own survey's (the same join cap.response.form uses). */
+const SURVEY_LANGUAGE_SQL = "SELECT l.name FROM assessment_survey s JOIN assessment a ON a.id = s.assessment_id JOIN language l ON l.id = a.language_id WHERE s.id = ?";
+
+/**
+ * SHA-256 hashes of every English string this scope may translate, and which of them must go upstream alone.
+ * Security W1 (train 22 audit; signature and SQL from #397): a welcome lead that names a language is allowed ONLY for a
+ * participant (`participantSurveyId` from its own token) and only for that survey's own language. An anonymous caller
+ * gets the page words and the name-free lead, so /v2/translate can no longer be asked whether a language name exists.
+ */
+export async function allowedScope(db: D1Database | undefined, scope: TranslateScope, participantSurveyId: string | null = null): Promise<ScopeAllowlist> {
   const isolated = new Set<string>();
   if (scope.kind === "ui") {
     const allowed = new Set(await staticUiHashes());
-    if (db) {
-      try { // welcome lead names the assessment's language (language.name); only well-shaped names that exist are allowed
-        const { results } = await db.prepare("SELECT DISTINCT name FROM language ORDER BY name LIMIT ?").bind(MAX_LANGUAGE_NAMES).all<{ name: string }>();
-        await hashAll(results.map((r) => r.name).filter(allowlistableLanguageName).map((n) => welcomeLead(n)), isolated);
+    if (db && participantSurveyId) {
+      try {
+        const row = await db.prepare(SURVEY_LANGUAGE_SQL).bind(participantSurveyId).first<{ name: string }>();
+        if (row && allowlistableLanguageName(row.name)) await hashAll([welcomeLead(row.name)], isolated);
         for (const h of isolated) allowed.add(h);
       } catch { /* the page words still work */ }
     }
@@ -127,8 +141,8 @@ export async function allowedScope(db: D1Database | undefined, scope: TranslateS
   return { allowed: await formHashes(db, scope.templateId), isolated };
 }
 /** SHA-256 hashes of every English string this scope may translate. Unknown or unpublished template → empty set. */
-export async function allowedHashes(db: D1Database | undefined, scope: TranslateScope): Promise<Set<string>> {
-  return (await allowedScope(db, scope)).allowed;
+export async function allowedHashes(db: D1Database | undefined, scope: TranslateScope, participantSurveyId: string | null = null): Promise<Set<string>> {
+  return (await allowedScope(db, scope, participantSurveyId)).allowed;
 }
 async function formHashes(db: D1Database | undefined, templateId: string): Promise<Set<string>> {
   if (!db) return new Set();
