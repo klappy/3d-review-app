@@ -28,10 +28,7 @@ export function bookOf(usfm: string): string | null {
   return PARATEXT_BOOK[code] ? code : null;
 }
 
-export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const d = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+export { sha256HexBytes as sha256Hex } from "./crypto";
 
 const cfgKey = "shared/ptxprint/Default/ptxprint.cfg";
 /** submit_typeset payload (server schema v1.0, src/payload.ts there) for one book of one passage file. */

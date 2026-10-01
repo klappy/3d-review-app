@@ -30,6 +30,7 @@ import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { resolvePrincipal } from "./auth";
 import { inScript, lwcLanguage, type LwcLanguage } from "./languages";
 import { allowedScope, parseScope, upstreamContext } from "./translate-allowlist";
+import { sha256Hex } from "./crypto";
 
 export const TRANSLATE_LIMITS = Object.freeze({ maxKeys: 600, maxKeyLength: 200, maxTextLength: 2000, maxTotalChars: 150_000, timeoutMs: 45_000, maxBodyBytes: 1_048_576 });
 const CONTEXT = /^[A-Za-z0-9_.:@-]{1,120}$/;
@@ -115,10 +116,7 @@ export function acceptable(lang: LwcLanguage, source: string, text: unknown): te
   return !(sentence && sameWords(source, t)) && inScript(lang.code, t);
 }
 
-export async function sha256Hex(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+export { sha256Hex };
 
 type Row = { source_hash: string; text: string; status: string };
 async function readMemory(db: D1Database, locale: string, hashes: string[]): Promise<Map<string, string>> {

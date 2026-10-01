@@ -15,7 +15,8 @@ const BASE = {
   ],
   './scope.js': [
     '<a class="quiet button" href="/v2/auth/access">Sign in with email code</a></div></section></div>`;',
-    `\${signedIn ? '' : '<a class="rv-btn primary" href="/v2/auth/access">Sign in</a>'}</nav>\``,
+    // E6 (S48): the Home href is computed, not string-swapped; the rendered flag-off nav stays pinned (test 3).
+    '${signedIn ? \'\' : `<a class="rv-btn primary" href="${signInHref}">Sign in</a>`}</nav>`',
     '<p class="muted">We email you a one-time code; there is no password.</p><div class="actions"><a class="button rv-btn primary" href="/v2/auth/access" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Sign in with an email code</a></div>',
   ],
   './views.js': [`const SIGNIN = '<a href="/v2/auth/access">Sign in again</a>';`],

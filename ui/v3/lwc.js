@@ -1,4 +1,4 @@
-// Browser mirror of src/languages.ts LWC_LANGUAGES (test/languages.test.ts keeps the two identical).
+// Browser mirror of src/languages.ts LWC_LANGUAGES (test/lwc-translation.test.ts "browser mirror is identical" keeps the two identical).
 // Captain ruling 2026-09-28: participants may only pick the project's / assessment's LWCs that the model supports.
 export const LWC_LANGUAGES = Object.freeze([
   { code: "lo", name: "Lao", endonym: "ລາວ", dir: "ltr", script: "\\u0E80-\\u0EFF", review: true },

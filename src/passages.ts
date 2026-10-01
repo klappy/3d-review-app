@@ -26,7 +26,8 @@ import { resolvePrincipal } from "./auth";
 import { atLeast, newId, roleAt } from "./handlers/common";
 import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { linkTitle } from "./link-title";
-import { bookOf, renderPassagePdf, sha256Hex } from "./ptxprint";
+import { bookOf, renderPassagePdf } from "./ptxprint";
+import { hmacSha256Base64Url as hmac, sha256HexBytes } from "./crypto";
 
 export const PASSAGE_LIMITS = Object.freeze({ maxBytes: 50 * 1024 * 1024, maxPerAssessment: 20, participantTtlSeconds: 12 * 3600, staffTtlSeconds: 3600, title: 120, reference: 120, url: 1000 });
 type Media = "text" | "pdf" | "audio" | "video" | "link" | "reference";
@@ -58,11 +59,6 @@ export function linkOf(raw: unknown): { url: string; media: Media } | null {
   return { url: u.toString(), media: VIDEO_HOSTS.test(u.hostname) ? "video" : "link" };
 }
 
-async function hmac(secret: string, data: string): Promise<string> {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
-  return btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
 export async function signedHref(env: Env, id: string, ttlSeconds: number, now = Date.now()): Promise<string> {
   const exp = Math.floor(now / 1000) + ttlSeconds;
   return `/v2/passages/${encodeURIComponent(id)}/file?exp=${exp}&sig=${await hmac(env.SESSION_SECRET, `passage:${id}:${exp}`)}`;
@@ -177,7 +173,7 @@ async function withPdf(request: Request, env: PEnv & { PASSAGES: R2Bucket }, row
   if (!book) return skip("no \\id book PTXprint can place");
   const origin = (env.PUBLIC_ORIGIN || new URL(request.url).origin).replace(/\/$/, "");
   const sourceUrl = `${origin}${await signedHref(env, row.id, 600)}&raw=1`;
-  const r = await renderPassagePdf({ mcpUrl: env.PTXPRINT_MCP_URL, sourceUrl, sha256: await sha256Hex(bytes), book, title: row.title });
+  const r = await renderPassagePdf({ mcpUrl: env.PTXPRINT_MCP_URL, sourceUrl, sha256: await sha256HexBytes(bytes), book, title: row.title });
   if (!r.ok) return skip(r.reason);
   const pdfKey = `assessments/${row.assessment_id}/${row.id}.pdf`;
   try {

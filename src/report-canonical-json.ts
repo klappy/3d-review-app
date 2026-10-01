@@ -1,3 +1,4 @@
+import { sha256HexBytes as sha256Bytes } from './crypto';
 /** Bounded RFC 8785 JSON for attestation. This is deliberately stricter than JSON. */
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export const JSON_LIMITS = Object.freeze({ depth: 16, stringBytes: 4096, members: 1024 });
@@ -136,10 +137,7 @@ export function canonicalJson(input: unknown, maxBytes = 524288): string {
   if (result.length > maxBytes || utf8.encode(result).length > maxBytes) fail();
   return result;
 }
-export async function sha256Bytes(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
-}
+export { sha256Bytes };
 export async function domainHash(domain: string, value: unknown): Promise<string> {
   if (!/^3d-(answer|template|response|index|capture)-v1$/.test(domain)) fail();
   return sha256Bytes(utf8.encode(domain + '\0' + canonicalJson(value)));

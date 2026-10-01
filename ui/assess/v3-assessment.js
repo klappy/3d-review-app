@@ -9,6 +9,7 @@ import { responseCount } from '../v3/components/response-count.js'; // component
 import { bandCard, bandLegend, BAND_LEGEND } from '../v3/components/band-card.js'; // component: Band card + legend (ruling 12:34)
 import { evidenceTable } from '../v3/components/evidence-table.js'; // component: Evidence table (ruling 12:34)
 import { learnMore } from '../v3/components/learn-more.js'; // component: Learn more (lane 9 L9-24)
+import { heldText } from './report-build.js'; // S51: the S28 held line (responses_in / responses_needed) reused for Results
 
 export const V3_FLAGS = Object.freeze({ expectedCountOptional: true, showUnconfirmed: true, bandResults: true, nextStepPage: true });
 
@@ -44,7 +45,10 @@ const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(
 // U05 / B31 (lanes-1321): facilitators never see the server's internal hold reason (e.g. "D7 scoring, threshold, and
 // differencing policy unresolved"): held cards carry only their band word + count; the Results block says this once. The evidence
 // table behind "Show evidence and details" shows a plain phrase too (V3_HELD_LIMIT), never the server reason.
-export const V3_HELD_TEXT = 'Results appear after a report is built from at least three responses per group.';
+// S51: the floor is the server's (results summary responses_in / responses_needed), never a number written here; with
+// the numbers, v3HeldText says them in the S28 shape (report-build.js heldText); without them, the plain number-free line.
+export const V3_HELD_TEXT = 'Results appear after a report is built from enough responses.';
+export const v3HeldText = r => heldText(r, V3_HELD_TEXT);
 // U05 validator (lanes-1510): every facilitator-visible held reason is a plain phrase; the server's reason string is never rendered.
 export const V3_HELD_LIMIT = 'Held until a report is built';
 export const V3_REPORTS_HELD = 'Reports are held for now.';
@@ -114,7 +118,7 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores
   }).join('');
   const legend = bandLegend(V3_LEGEND, esc);
   const prov = scored && V3_BAND_CUTOFFS.provisional ? learnMore(`<p class="small muted" data-v3-provisional>${esc(V3_BAND_PROVISIONAL)}</p>`) : ''; // lane 9 L9-24: cut-offs behind Learn more
-  const heldLine = held ? `<p class="muted" data-v3-band-held>${esc(V3_HELD_TEXT)}</p>` : '';
+  const heldLine = held ? `<p class="muted" data-v3-band-held>${esc(v3HeldText(r))}</p>` : '';
   return `<div class="v3-bands three" data-v3-bands="${scored ? 'provisional' : held ? 'held' : 'shown'}">${cards}</div>${heldLine}${legend}${prov}`;
 }
 
