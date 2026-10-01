@@ -23,6 +23,10 @@ test('U14: the dry run reads as one sentence; a non-empty assessment cannot be d
   assert.deepEqual(deleteImpact(dryOf(0, 0)), { ok: true, sentence: 'This deletes the assessment; it has no surveys or responses.' });
   assert.deepEqual(deleteImpact(dryOf(2, 12)), { ok: false, sentence: 'This assessment has 12 responses in 2 surveys, so it cannot be deleted.' });
   assert.equal(deleteImpact(dryOf(1, 1)).sentence, 'This assessment has 1 response in 1 survey, so it cannot be deleted.');
+  assert.deepEqual(deleteImpact(dryOf(2, 0)), { ok: false, sentence: 'This assessment includes 2 surveys, so it cannot be deleted.' });
+  assert.equal(deleteImpact(dryOf(1, 0)).sentence, 'This assessment includes 1 survey, so it cannot be deleted.');
+  assert.deepEqual(deleteImpact(dryOf(0, 3)), { ok: false, sentence: 'This assessment has 3 responses, so it cannot be deleted.' });
+  for (const [s, r] of [[2, 0], [1, 0], [0, 3], [2, 12]]) assert.doesNotMatch(deleteImpact(dryOf(s, r)).sentence, /\b0 (responses?|surveys?)\b/);
 });
 test('U14: dry run → ask in the page → Cancel writes nothing; confirm executes once with the token', async () => {
   const h = harness(dryOf(0, 0));
@@ -44,6 +48,11 @@ test('U14: non-empty → one sentence, no confirm, no execute; an expired previe
   assert.equal(h.doc.querySelectorAll('[data-stage-confirm]').length, 0);
   assert.deepEqual(h.out.refused, ['This assessment has 12 responses in 2 surveys, so it cannot be deleted.']);
   assert.equal(h.calls.length, 1);
+  const s = harness(dryOf(2, 0));
+  await s.run();
+  assert.equal(s.doc.querySelectorAll('[data-stage-confirm]').length, 0);
+  assert.deepEqual(s.out.refused, ['This assessment includes 2 surveys, so it cannot be deleted.']);
+  assert.equal(s.calls.length, 1);
   const e = harness(dryOf(0, 0)); let t = 0;
   await e.run({ now: () => t }); t = 301_000;
   e.doc.querySelector('[data-stage-confirm-go]').click(); await tick();
