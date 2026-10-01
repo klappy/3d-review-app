@@ -451,7 +451,7 @@ export function mountWizard(root, deps) {
   // F4: the Passages forms on Review talk to /v2/assessments/:aid/passages directly (as Prepare does), with the facilitator token.
   const passagesToken = deps.token || (() => { try { return globalThis.sessionStorage?.getItem('facilitatorToken') || null; } catch { return null; } });
   // rev440 S1: mount once per draft id and keep that node across repaints (re-inserted, never re-rendered), so an upload or link
-  // add in flight keeps its status, its typed fields and its single request. Remount only for a new aid or after Skip.
+  // add in flight keeps its status, its typed fields and its single request. Remount only for a new aid; Skip keeps the node (rev440b).
   // rev440 S2: every passages request counts as pending; Launch stays disabled until it finishes.
   let pHost = null;
   const syncLaunch = () => { const l = root.querySelector('[data-wz="launch"]'); if (l && !s.busy) l.disabled = s.passagesPending > 0; };
@@ -534,7 +534,7 @@ export function mountWizard(root, deps) {
     if (act === 'edit') { s.step = b.dataset.step; return paint(); }
     // F4: Passages on Review — skip folds the forms away (launch is unchanged); open brings them back. No saved draft yet: save
     // step 1 first exactly as Continue on step 1 does, then the forms attach to that row.
-    if (act === 'passages-skip') { s.passagesSkipped = true; pHost = null; return paint(); }
+    if (act === 'passages-skip') { s.passagesSkipped = true; return paint(); }
     if (act === 'passages-open' || act === 'passages-save') {
       s.passagesSkipped = false;
       if (!s.saved) {

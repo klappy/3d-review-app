@@ -916,3 +916,21 @@ test('rev440 S1+S2: a repaint while a link add is pending keeps the same passage
   assert.equal(m.$('[data-wz-passages] .p-status').textContent, 'Link added.');
   assert.equal(m.$('[data-wz="launch"]').disabled, false, 'Launch is available again');
 });
+
+test('rev440b nit: Skip for now then Add passages while a link add is pending keeps the same node and its status', async () => {
+  const srv = server(), p = passagesApi(); let release;
+  const gate = new Promise(r => { release = r; });
+  const fetchImpl = async (url, init = {}) => { if (init.method === 'POST') await gate; return p.fetchImpl(url, init); };
+  const m = await toReview(srv, { fetchImpl }); await settle();
+  const host = m.$('[data-wz-passages]');
+  const ln = m.$('form[data-passage-link]'); ln.querySelector('[name=url]').value = 'https://youtu.be/x';
+  ln.dispatchEvent(new m.w.Event('submit', { bubbles: true, cancelable: true })); await settle();
+  m.click('[data-wz="passages-skip"]'); await settle();
+  assert.equal(m.$('[data-wz-passages]'), null, 'Skip folds the block away');
+  m.click('[data-wz="passages-open"]'); await settle();
+  assert.equal(m.$('[data-wz-passages]'), host, 'Add passages brings back the same mounted node');
+  assert.equal(m.$('[data-wz-passages] .p-status').textContent, 'Adding link…', 'the pending status survives Skip');
+  release(); await settle();
+  assert.deepEqual(p.calls.map(c => c.method), ['GET', 'POST', 'GET'], 'no second mount, no second list read');
+  assert.equal(m.$('[data-wz-passages] .p-status').textContent, 'Link added.');
+});
