@@ -48,7 +48,7 @@ main{max-width:216mm;margin:0 auto;padding:12px;box-sizing:border-box}
 .p-head{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:start;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px}
 .p-brand{font:700 14pt/1 Inter,system-ui,sans-serif;letter-spacing:-.4px;margin-bottom:6px}.p-brand span{display:inline-block;background:#111;color:#fff;padding:2px 5px;border-radius:4px;margin-right:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .paper h1{font:600 16pt/1.2 Inter,system-ui,sans-serif;margin:0 0 4px;overflow-wrap:anywhere}
-.p-passage{font:600 12pt/1.35 Inter,system-ui,sans-serif;margin:6px 0 0;padding:6px 10px;border:1.5px solid #14685f;border-radius:6px}
+.p-passage{font:600 12pt/1.35 Inter,system-ui,sans-serif;margin:6px 0 0;padding:6px 10px;border:1.5px solid #14685f;border-radius:6px;overflow-wrap:anywhere}
 .p-label{font:600 7.5pt/1.2 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:#444;margin:4px 0;max-width:62mm}
 .p-slot{display:flex;gap:4px}.p-slot span{width:9mm;height:11mm;border:1.2px solid #111;border-radius:2px}
 .p-qr{max-width:44mm}.p-qr .qr{display:block;width:30mm;height:30mm;background:#fff;box-sizing:border-box}.p-qr .qr.none{border:1.2px dashed #777}

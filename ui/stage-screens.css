@@ -76,7 +76,7 @@
   .rv .stage-tabs button{flex:1 1 auto}
   .rv .stage-now{margin-left:0}
 }
-.p-passage{font:600 12pt/1.35 Inter,system-ui,sans-serif;margin:6px 0 0;padding:6px 10px;border:1.5px solid #14685f;border-radius:6px;max-width:34em}
+.p-passage{font:600 12pt/1.35 Inter,system-ui,sans-serif;margin:6px 0 0;padding:6px 10px;border:1.5px solid #14685f;border-radius:6px;max-width:34em;overflow-wrap:anywhere}
 
 /* Gate 0.23.0 (phone 375 px): the on-screen paper preview on a survey page never widens its grid column — .rv clips
    overflow-x, so a wider column cut the right-hand choices off with no way to scroll. The panel may shrink to its column and
