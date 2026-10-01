@@ -98,9 +98,9 @@ test('S40: n pending invitations → one hint line with the count, linking to #i
   const ctx = homeCtx({ '/v2/projects': { projects: [{ id: 'p1', name: 'Lake' }] }, '/v2/projects/p1/assessments': { assessments: [] }, '/v2/me': { grants: [] }, '/v2/me/invitations': { invitations: [INV('i1'), INV('i2', 'assessment'), INV('i3')] } });
   const h = pages.projects.render(ctx, await pages.projects.load(ctx, {}));
   assert.equal((h.match(/data-v3h-invitations>/g) || []).length, 1);
-  assert.match(h, /data-v3h-invitations>You have 3 invitations waiting\. <a href="#invite" data-v3h-invitations-link>See invitations<\/a><\/p>/);
+  assert.match(h, /data-v3h-invitations>You have 3 invitations waiting\. <a href="#invite\/list" data-v3h-invitations-link>See invitations<\/a><\/p>/);
   assert.equal((h.match(/rv-btn primary/g) || []).length, 1, 'one primary action: Start');
-  assert.match(invitationsHint(1), /You have 1 invitation waiting\. <a href="#invite"[^>]*>See the invitation<\/a>/);
+  assert.match(invitationsHint(1), /You have 1 invitation waiting\. <a href="#invite\/list"[^>]*>See the invitation<\/a>/);
   assert.match(homeView({ projects: [], listFor: () => ({}), invitations: 2 }), /You have 2 invitations waiting/, 'empty account still shows the hint');
 });
 test('S40: zero invitations (or a failed read) → no hint', async () => {
