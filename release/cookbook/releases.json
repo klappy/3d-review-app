@@ -1,7 +1,18 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.26.4",
+  "current": "0.26.5",
   "versions": [
+    {
+      "version": "0.26.5",
+      "status": "candidate",
+      "notes_path": "releases/0.26.5.md",
+      "sections": {
+        "fixed": [
+          "On the printed survey, a long passage name or link now wraps inside the passage box instead of running off the page. (#430)",
+          "While you accept many invitations at once, the page now shows how many are done and a spinner, so you can see it is still working. (#431)"
+        ]
+      }
+    },
     {
       "version": "0.26.4",
       "status": "candidate",
