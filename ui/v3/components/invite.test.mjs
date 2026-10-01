@@ -63,7 +63,7 @@ test('S9: pendingInvitations keeps only well-formed rows from GET /v2/me/invitat
 // S19 (captain 2026-09-29: "it's ridiculous to not see what I'm accepting the invite to! And there's multiple so they just keep
 // coming!!!"): every pending invitation on ONE page, named with its path; Accept per row; "Accept all" the primary when ≥2.
 import { JSDOM } from 'jsdom';
-import { invitationsView, invitationLine, mountInvitations, acceptInvitationById, failureNotice } from './invite.js';
+import { invitationsView, invitationLine, mountInvitations, acceptInvitationById, failureNotice, progressLabel } from './invite.js';
 const doc = html => new JSDOM(`<!doctype html><body>${html}</body>`).window.document;
 const inv = (id, type, name, path, role = 'viewer') => ({ id, scope: { type, id: 'x_' + id, name, path }, role, inviter_display_name: null });
 const THREE = [inv('inv_w', 'workspace', 'North', ['North'], 'owner'), inv('inv_p', 'project', 'Hill Project', ['North', 'Hill Project'], 'member'), inv('inv_a', 'assessment', 'Spring review', ['North', 'Hill Project', 'Spring review'])];
@@ -193,4 +193,59 @@ test('S19: the failure notice escapes the member-authored name; without a name i
 test('S19: acceptInvitationById refuses an answer without a confirm token or a grant (no silent success)', async () => {
   await assert.rejects(acceptInvitationById(async () => ({}), 'inv_1'), { code: 'BAD_RESULT' });
   await assert.rejects(acceptInvitationById(async (_u, o) => (o.body.mode === 'dry_run' ? { confirm_token: 'ct' } : { granted: false }), 'inv_1'), { code: 'BAD_RESULT' });
+});
+// S44 (captain 2026-10-01 02:53 ET: "It took a while to accept all 41 invitations and should have had a loading spinner so i knew
+// it wasn't crashed or frozen"): live progress, a spinner, aria-busy and a polite live region while accepting.
+function gatedApi() {
+  const calls = [], gates = [];
+  const api = (url, o) => {
+    calls.push([url, o.body]); const id = decodeURIComponent(url.split('/')[4]);
+    const answer = o.body.mode === 'dry_run' ? { confirm_token: 'ct_' + id } : { granted: true, scope: { type: 'project', id: 'x_' + id } };
+    if (o.body.mode === 'dry_run') return Promise.resolve(answer);
+    return new Promise(r => gates.push(() => r(answer))); // each execute waits until the test lets it land
+  };
+  return { api, calls, land: async () => { await tick(); gates.shift()(); await tick(); await tick(); } };
+}
+test('S44: "Accept all" shows "Accepting <n> of <total>…" advancing as each lands, accepted rows read "Accepted", then hands over once', async () => {
+  const root = domRoot(), { api, calls, land } = gatedApi(); let settled = null, n = 0;
+  mountInvitations(root, { api, invitations: THREE, onSettled: out => { settled = out; n++; } });
+  root.querySelector('[data-invite-accept-all]').click();
+  const progress = () => root.querySelector('[data-invite-progress]');
+  const rowLabels = () => [...root.querySelectorAll('[data-invite-row] button')].map(b => b.textContent);
+  assert.equal(progress().textContent, 'Accepting 1 of 3…'); assert.equal(root.querySelector('[data-invite-accept-all]').textContent, 'Accepting 1 of 3…');
+  assert.equal(progress().getAttribute('aria-live'), 'polite'); assert.equal(progress().getAttribute('role'), 'status');
+  assert.deepEqual(rowLabels(), ['Accept', 'Accept', 'Accept']);
+  const live = progress();
+  await land();
+  assert.equal(progress().textContent, 'Accepting 2 of 3…'); assert.equal(progress(), live, 'the live region is the same node (so it is announced)');
+  assert.deepEqual(rowLabels(), ['Accepted', 'Accept', 'Accept']); assert.equal(n, 0);
+  await land();
+  assert.equal(progress().textContent, 'Accepting 3 of 3…'); assert.deepEqual(rowLabels(), ['Accepted', 'Accepted', 'Accept']); assert.equal(n, 0);
+  assert.ok([...root.querySelectorAll('button')].every(b => b.disabled), 'still disabled while running');
+  await land();
+  assert.equal(n, 1); assert.deepEqual(settled, { accepted: ['inv_w', 'inv_p', 'inv_a'].map(id => ({ type: 'project', id: 'x_' + id })), failure: null });
+  assert.deepEqual(calls.map(c => [c[0].split('/')[4], c[1].mode]), ['inv_w', 'inv_p', 'inv_a'].flatMap(id => [[id, 'dry_run'], [id, 'execute']]), 'order and dry run → execute unchanged');
+});
+test('S44: aria-busy and the spinner are present while accepting and cleared after', async () => {
+  const root = domRoot(), { api, land } = gatedApi();
+  mountInvitations(root, { api, invitations: THREE });
+  assert.equal(root.querySelector('[data-invite]').getAttribute('aria-busy'), null); assert.equal(root.querySelector('[data-invite-spinner]'), null);
+  root.querySelector('[data-invite-accept-all]').click();
+  assert.equal(root.querySelector('[data-invite]').getAttribute('aria-busy'), 'true');
+  const sp = root.querySelector('[data-invite-accept-all] [data-invite-spinner]'); assert.ok(sp, 'spinner on the primary'); assert.equal(sp.getAttribute('aria-hidden'), 'true');
+  assert.match(root.querySelector('[data-invite-spin-css]').textContent, /prefers-reduced-motion:reduce/);
+  await land(); assert.equal(root.querySelector('[data-invite]').getAttribute('aria-busy'), 'true'); assert.ok(root.querySelector('[data-invite-spinner]'));
+  await land(); await land();
+  assert.equal(root.querySelector('[data-invite]').getAttribute('aria-busy'), null, 'aria-busy cleared after');
+  assert.equal(root.querySelector('[data-invite-spinner]'), null, 'spinner gone after');
+});
+test('S44: a single Accept keeps "Accepting…" and gains the spinner (row and single-invitation page); idle pages have none', () => {
+  const row = doc(invitationsView({ invitations: THREE, busy: 1 }));
+  const b = row.querySelectorAll('[data-invite-row] button')[1];
+  assert.equal(b.textContent, 'Accepting…'); assert.ok(b.querySelector('[data-invite-spinner]'));
+  assert.equal(row.querySelectorAll('[data-invite-spinner]').length, 1); assert.equal(row.querySelector('[data-invite]').getAttribute('aria-busy'), 'true');
+  const one = doc(invitationsView({ invitations: [THREE[0]], busy: 0 }));
+  assert.equal(one.querySelector('.primary').textContent, 'Accepting…'); assert.ok(one.querySelector('.actions [data-invite-spinner] + .primary'), 'spinner beside the single primary');
+  for (const h of [invitationsView({ invitations: THREE }), invitationsView({ invitations: [THREE[0]] })]) assert.doesNotMatch(h, /data-invite-spinner|aria-busy|<style/);
+  assert.equal(progressLabel(6, 41), 'Accepting 7 of 41…'); assert.equal(progressLabel(), 'Accepting…');
 });
