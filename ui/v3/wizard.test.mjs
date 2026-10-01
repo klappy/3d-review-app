@@ -751,6 +751,19 @@ test('S38: a stale device copy (snap mismatch) keeps the "Ask participants about
   assert.equal(again.h.state.d.demographics, true, 'the switch is not silently reverted');
 });
 
+test('S38 fix422c: the server switch moved from Prepare wins over the device copy on resume (stale and matching snap)', async () => {
+  for (const rename of [true, false]) {
+    const srv = server(), store = tabSession();
+    const first = mount(srv, { session: tabSession(), store }); await fillStep1(first); first.submit(); await settle();
+    const box = first.$('input[name=g][value="tpl.team"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+    first.submit(); await settle(); assert.equal(first.h.state.step, 'information'); first.h.destroy();
+    Object.assign(srv.db.a, { demographics_enabled: true }, rename ? { name: 'Renamed elsewhere' } : {}); // Prepare flipped the switch on
+    const again = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle();
+    assert.equal(again.h.state.d.demographics, true, `server switch wins (${rename ? 'stale' : 'matching'} snap)`);
+    assert.equal(again.$('[data-wz-demographics] input')?.checked ?? true, true, 'the wizard shows what launch will send');
+  }
+});
+
 // val422-2341 Worth fixing 2: a failed projects/templates read is not the draft being gone.
 test('S38: a 404 from projects or templates keeps the device copy; only the draft\'s own 404 clears it', async () => {
   const store = tabSession(), rec = JSON.stringify({ step: 'participants', d: freshDraft() });

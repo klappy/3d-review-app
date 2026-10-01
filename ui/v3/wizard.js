@@ -144,7 +144,7 @@ export function draftFromSaved(a, surveys = [], store) {
     d.groups[x.template_id] = { version: String(x.template_version), expected: N ? String(N) : '' };
     pre.push({ id: x.id, template: x.template_id, version: Number(x.template_version) });
   }
-  const snap = { name: a.name || '', purpose: a.purpose ?? null, period: a.period ?? null, format: a.format ?? null, language_id: a.language_id || null, lwc: lwcText(d) };
+  const snap = { name: a.name || '', purpose: a.purpose ?? null, period: a.period ?? null, format: a.format ?? null, language_id: a.language_id || null, lwc: lwcText(d), demographics_enabled: a.demographics_enabled === true };
   d.demographics = a.demographics_enabled === true; // S15b: resume shows the switch as the server holds it
   return { d, step: validateStep('details', d).length ? 'details' : 'participants', saved: { aid: a.id, pid: a.project_id, role: a.role || '', snap, pre } };
 }
@@ -252,7 +252,7 @@ function safeStore() { try { return globalThis.localStorage || null; } catch { r
 // copy wins when both exist; both are cleared on launch or discard. Client-side only; no API field, no server round-trip.
 // The record also keeps the step-1 values the server held when it was written (snap). A device copy whose snap no longer
 // matches the server (renamed or re-dated from another device) gives up its step-1 values: only what the server never holds
-// (group ticks and counts, group context, the demographics switch, the step) is taken from it. It is also cleared once the draft
+// (group ticks and counts, group context, the step; the demographics switch only while the server still holds the value it saw) is taken from it. It is also cleared once the draft
 // left prepare or is gone (its own read 404s; a failed projects/templates read never clears it).
 // val422-2341: the copy is keyed by the signed-in principal as well as the draft (deps.user), so another account on the same
 // device never reads it, and sign-out sweeps every v3:setup: key (clearAllWip, ui/assess/assess.js). Copies written before the
@@ -266,14 +266,18 @@ export function clearWip(session, aid, store = null, uid = '') { for (const st o
 export function clearAllWip(...stores) { for (const st of stores) try { const ks = []; for (let i = 0; i < (st?.length || 0); i++) { const k = st.key(i); if (k && k.startsWith(WIP_PREFIX)) ks.push(k); } for (const k of ks) st.removeItem(k); } catch {} }
 const readWip = (st, aid, uid = '') => { try { const w = JSON.parse(st?.getItem(WIP_KEY(aid, uid)) || 'null'); return w && w.d && STEPS.includes(w.step) ? w : null; } catch { return null; } };
 // The saved draft wins where the server fixed it: the project, and surveys the draft already holds (B06f).
-const sameSnap = (a, b) => !!a && !!b && Object.keys(b).every(k => (a[k] ?? null) === (b[k] ?? null));
+// fix422c-2341: the switch (demographics_enabled) is also held by the server during prepare (the Prepare form PATCHes it), so it is
+// compared on its own: the device value stands only while the server still holds what the copy saw; a copy without it yields.
+const sameSnap = (a, b) => !!a && !!b && Object.keys(b).every(k => k === 'demographics_enabled' || (a[k] ?? null) === (b[k] ?? null));
+const keepSwitch = (w, server) => typeof w.d.demographics === 'boolean' && typeof w.snap?.demographics_enabled === 'boolean' && w.snap.demographics_enabled === server.demographics_enabled;
 export function wipOver(back, session, store = null, uid = '') {
   const tab = readWip(session, back.saved.aid, uid), w = tab || readWip(store, back.saved.aid, uid);
   if (!w) return back;
   const groups = { ...(w.d.groups || {}) };
   for (const x of back.saved.pre) if (!groups[x.template]) groups[x.template] = back.d.groups[x.template];
   const fresh = tab || sameSnap(w.snap, back.saved.snap); // a device copy older than the server's step 1 keeps only client-only fields
-  const d = fresh ? { ...back.d, ...w.d, project: back.d.project, groups } : { ...back.d, groups, context: { ...(w.d.context || {}) }, demographics: typeof w.d.demographics === 'boolean' ? w.d.demographics : back.d.demographics }; // demographics reaches the server only at launch (val422-2341)
+  const demographics = keepSwitch(w, back.saved.snap) ? w.d.demographics : back.d.demographics; // server wins once it moved the switch (fix422c-2341)
+  const d = fresh ? { ...back.d, ...w.d, project: back.d.project, groups, demographics } : { ...back.d, groups, context: { ...(w.d.context || {}) }, demographics };
   const step = STEPS.indexOf(w.step) > 1 && validateStep('participants', d).length ? 'participants' : w.step; // never past an empty step 2
   return { ...back, d, step };
 }
@@ -463,7 +467,7 @@ export function mountWizard(root, deps) {
       d.project = ctx.pid; d.language = ctx.lid;
     }
     s.saveCtx = null;
-    s.saved = { aid: ctx.aid, pid: ctx.pid, role: 'owner', snap: detailsOf(d), pre: [] }; // cap.assessment.create grants the creator owner
+    s.saved = { aid: ctx.aid, pid: ctx.pid, role: 'owner', snap: { ...detailsOf(d), demographics_enabled: false }, pre: [] }; // cap.assessment.create grants the creator owner
     deps.mark?.(ctx.aid); // U22: the URL now names the draft, so a reload reopens it
   };
   root.addEventListener('submit', async e => {
