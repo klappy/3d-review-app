@@ -332,6 +332,7 @@ test('S35 (rev414d nit): a repaint mid-load keeps the print status line and the 
   let finishTranslate; const tgate = new Promise(r => { finishTranslate = r; });
   const h = bindPrintHarness({ translatePrint: async (model, { lang }) => { await tgate; return { ...model, lang }; } });
   const done = h.nodes['#print-load'].onclick();
+  assert.equal(h.nodes['#print-status'].textContent, 'Preparing the form…', 'the click shows the status at once');
   h.repaint(); // before any status text: the redrawn line says why the button is locked
   assert.equal(h.nodes['#print-status'].textContent, 'Preparing the form…');
   h.loads[0].d.resolve({ visible: true, blank: true, items: [] });

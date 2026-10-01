@@ -360,6 +360,7 @@ test('S35: Name, New project name and Language carry the (required) mark like Ac
   const existing = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
   assert.match(existing, /Name \(required\)<input name="name"/);
   assert.match(existing, /Language \(required\)<select name="language"/);
+  assert.match(existing, /Project \(required\)<select name="project"/);
   const fresh = renderStep('details', draft({ project: NEW_PROJECT }), { projects: [], languages: [], templates: [] });
   assert.match(fresh, /New project name \(required\)<input name="newProject"/);
   assert.match(fresh, /Language \(required\)<input name="newLanguage"/);

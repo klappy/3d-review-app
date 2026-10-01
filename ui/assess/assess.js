@@ -379,7 +379,9 @@ function bindPrint(current, s) {
     // click used to let the older run's idle()/finally unlock the newer run's button and both runs replayed the paper.
     // #414c nit: the run is stamped with the data version (epoch) it started from, not the one current when it finished.
     const run = { aid, sid: s.id, epoch, status: 'loading', gen, model: null };
-    state.print = run; lock();
+    // S35 (rev418 nit): the run says why the button is locked from the click on; a repaint redraws the same text (:375).
+    run.text = 'Preparing the form…';
+    state.print = run; lock(); setStatus(run.text);
     const mine = () => gen === generation && state.print === run;
     const idle = () => { if (state.print !== run) return; const b = app.querySelector('#print-load'), p = livePick(); if (b) b.disabled = state.dirty.has(aid); if (p) p.disabled = false; };
     try {

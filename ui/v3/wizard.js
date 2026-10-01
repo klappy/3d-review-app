@@ -330,7 +330,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
     <form data-wz-form="details">
       <label>Name (required)<input name="name" value="${esc(d.name)}" required placeholder="e.g. October assessment"></label>
       <div class="grid">
-        <label>Project<select name="project"${saved ? ' disabled' : ''}><option value=""${d.project ? '' : ' selected'} disabled>Choose…</option>${projects.map(p => `<option value="${esc(p.id)}"${p.id === d.project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}${saved ? '' : `<option value="${NEW_PROJECT}"${isNew ? ' selected' : ''}>New project…</option>`}</select></label>
+        <label>Project (required)<select name="project"${saved ? ' disabled' : ''}><option value=""${d.project ? '' : ' selected'} disabled>Choose…</option>${projects.map(p => `<option value="${esc(p.id)}"${p.id === d.project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}${saved ? '' : `<option value="${NEW_PROJECT}"${isNew ? ' selected' : ''}>New project…</option>`}</select></label>
         ${isNew ? `<label>New project name (required)<input name="newProject" value="${esc(d.newProject)}" required></label>`
           : `<label>Language (required)<select name="language"${d.project ? '' : ' disabled'}><option value=""${d.language ? '' : ' selected'} disabled>${d.project ? (languages.length ? 'Choose…' : 'No languages in this project') : 'Choose a project first'}</option>${languages.map(l => `<option value="${esc(l.id)}"${l.id === d.language ? ' selected' : ''}>${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</option>`).join('')}</select></label>`}
       </div>
