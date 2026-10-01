@@ -7,6 +7,9 @@
 // only in this browser (EXPECTED_KEY, best effort) and "n of N" shows only when N was entered; otherwise "n responded".
 // Lane 1 owns routing and the shell: this module exports pure helpers plus mountWizard(root, deps); it never touches
 // location or the router itself. deps.go(hash) is the shell's navigation.
+// F4 (Bincy 2026-10-01): the Review step carries an optional, skippable Passages block — the same three attachment forms as
+// Prepare (passage name, file up to 50 MB, https link + title) from ../assess/passages.js, attached to the draft saved on step 1.
+// A block, not a fifth step: the four-step contract (STEPS, "step n of 4", Information → Review) stays as tested.
 // B06 (captain ruling 16:20–16:35 ET, ASK 7 option 1): Continue on step 1 saves the review as a draft in Prepare with the same
 // writes Launch used to make first (savePlan: cap.project.create / cap.language.create only for a new project, then
 // cap.assessment.create); later step-1 edits ride cap.assessment.update. Home's "Continue setup" reopens #new/<id> at the next
@@ -23,6 +26,7 @@ import { packPeriod, parsePeriod, periodText, periodErrors, formatDate, todayIso
 import { deleteAssessmentFlow } from './components/delete-assessment.js';
 import { whoLine } from '../assess/scope.js';
 import { groupFields, contextValues } from './components/context-fields.js';
+import { mountPassages } from '../assess/passages.js';
 
 export const STEPS = ['details', 'participants', 'information', 'review'];
 // Step names follow Bincy's screen inventory 03–06 (cookbook @933eb5f sources/bincy-design-sprint-2026-09-22/01_documents/04_screen_inventory.md).
@@ -341,6 +345,14 @@ export function groupContextFields(t, values = {}, held = false) {
       : `<label>${esc(f.label)}<input name="${name}" maxlength="200" value="${esc(v[f.key] ?? '')}"></label>`;
   }).join('')}</details>`;
 }
+// F4: the optional Passages block on Review. saved: the draft row exists (step 1 saved it), so the forms mount on
+// [data-wz-passages]; without one, the facilitator saves the draft first. skipped: "Skip for now" folds the forms away.
+export const PASSAGES_LATER = 'You can add passages later under Prepare.';
+export function passagesBlock(saved, skipped) {
+  const toggle = skipped ? '<button type="button" class="rv-btn quiet" data-wz="passages-open">Add passages</button>' : '<button type="button" class="rv-btn quiet" data-wz="passages-skip">Skip for now</button>';
+  const body = skipped ? '' : saved ? '<div data-wz-passages></div>' : '<p><button type="button" class="rv-btn quiet" data-wz="passages-save">Save the draft and add passages</button></p>';
+  return `<section class="wz-passages" data-wz-passages-block aria-label="Passages"><div class="wz-sec"><h3>Passages (optional)</h3>${toggle}</div><p class="small muted" data-wz-passages-later>${PASSAGES_LATER}</p>${body}</section>`;
+}
 export function renderStep(step, d, data, errs = [], locked = false, origin = '') {
   const n = STEPS.indexOf(step) + 1;
   const projects = data.projects || [], languages = data.languages || [], templates = latestTemplates(data.templates);
@@ -397,6 +409,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
     <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt><span class="pdot wz-kvdot ${pdot(t.perspective)}" aria-hidden="true"></span>${esc(t.perspective)} <span aria-hidden="true">·</span> <span data-wz-review-survey>${esc(t.name)}</span></dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
     <div class="wz-sec"><h3>Participant information</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="information">Edit</button>'}</div>
     <dl class="kv"><dt>Shown to everyone</dt><dd>${esc([proj.name, lang.name, d.purpose.trim(), d.format, periodText(packPeriod(d.starts, d.until))].filter(Boolean).join(' · '))}</dd><dt>Asked of each</dt><dd>The published survey questions for each group</dd></dl>
+    ${locked ? '' : passagesBlock(saved, data.passagesSkipped === true)}
     ${locked && locked.links?.length ? `<h3>Links already opened — copy them now</h3>${linkList(locked.links, origin, templates)}` : ''}
     ${locked ? `<div class="actions"><button type="button" class="rv-btn quiet" data-wz="cancel">Leave setup (what was created stays; nothing was sent)</button><span class="spacer"></span><button type="button" class="primary" data-wz="launch">Continue the launch</button></div>` : act(true, '<button type="button" class="primary" data-wz="launch">Launch the review</button>')}`;
 }
@@ -428,13 +441,16 @@ export function renderDone(ctx, origin = '', templates = []) {
 //   user? (val422-2341: signed-in principal id; keys the setup copies) }
 export function mountWizard(root, deps) {
   ensureStepperStyle(root?.ownerDocument);
-  const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0, saved: null, saveCtx: null, asking: false };
+  const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0, saved: null, saveCtx: null, asking: false, passagesSkipped: false };
   let alive = true; const ac = new AbortController(); const on = { signal: ac.signal };
   const session = deps.session === undefined ? safeSession() : deps.session, store = deps.store === undefined ? safeStore() : deps.store; // S38: device-local copy
   const uid = deps.user ? String(deps.user) : ''; // val422-2341: the signed-in principal id (assess.js passes state.principal.id)
   const wip = () => { if (s.saved && !s.done && !s.partial) saveWip(session, s.saved.aid, s.step, s.d, store, s.saved.snap, uid); };
   // B06: only the current step's live form is read on paint; a form left behind by a step change was already read (never undo a save's adoption).
-  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done && live.dataset.wzForm === s.step) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [] }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; wip(); };
+  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done && live.dataset.wzForm === s.step) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [], passagesSkipped: s.passagesSkipped }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; wip(); passagesMount(); };
+  // F4: the Passages forms on Review talk to /v2/assessments/:aid/passages directly (as Prepare does), with the facilitator token.
+  const passagesToken = deps.token || (() => { try { return globalThis.sessionStorage?.getItem('facilitatorToken') || null; } catch { return null; } });
+  const passagesMount = () => { const pr = root.querySelector('[data-wz-passages]'); if (pr && s.saved) mountPassages({ root: pr, aid: s.saved.aid, mayEdit: s.saved.role !== 'viewer', esc, token: passagesToken, fetchImpl: deps.fetchImpl || globalThis.fetch }); };
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
   const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
@@ -474,6 +490,7 @@ export function mountWizard(root, deps) {
     deps.mark?.(ctx.aid); // U22: the URL now names the draft, so a reload reopens it
   };
   root.addEventListener('submit', async e => {
+    if (!e.target.matches?.('form[data-wz-form]')) return; // F4: the Passages forms submit themselves (passages.js), never a wizard step
     e.preventDefault(); if (s.partial || s.busy) return; read(e.target); s.asking = false;
     s.errs = validateStep(s.step, s.d); if (s.errs.length) return paint();
     if (s.step === 'details') {
@@ -504,6 +521,19 @@ export function mountWizard(root, deps) {
     }
     if (act === 'back') { const f = root.querySelector('form'); if (f) read(f); s.step = STEPS[Math.max(0, STEPS.indexOf(s.step) - 1)]; return paint(); }
     if (act === 'edit') { s.step = b.dataset.step; return paint(); }
+    // F4: Passages on Review — skip folds the forms away (launch is unchanged); open brings them back. No saved draft yet: save
+    // step 1 first exactly as Continue on step 1 does, then the forms attach to that row.
+    if (act === 'passages-skip') { s.passagesSkipped = true; return paint(); }
+    if (act === 'passages-open' || act === 'passages-save') {
+      s.passagesSkipped = false;
+      if (!s.saved) {
+        const errs = validateStep('details', s.d); if (errs.length) { s.step = 'details'; s.errs = errs; return paint(); }
+        s.busy = true; b.disabled = true; b.textContent = 'Saving…';
+        try { await saveDetails(); } catch (err) { if (!alive) return; s.busy = false; return note(new Error(`${err.message || err} The review was not saved yet, so passages cannot be added. Try again, or skip for now.`)); }
+        s.busy = false; if (!alive) return;
+      }
+      return paint();
+    }
     // B14: the host re-reads what the new review hangs under (a project made in this setup) before Collect opens, so the
     // crumb row reads Home › Project › Assessment on this path exactly as after a fresh sign-in. A failed read still opens.
     if (act === 'open') { const href = deps.assessmentHref ? deps.assessmentHref(b.dataset.aid) : `#/a/${enc(b.dataset.aid)}`; b.disabled = true; try { await deps.beforeOpen?.(b.dataset.aid); } catch {} if (!alive) return; return deps.go?.(href); }
