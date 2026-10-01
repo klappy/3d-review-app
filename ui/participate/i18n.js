@@ -69,6 +69,14 @@ export const UI_EN = Object.freeze({
   passageOpen: 'Open the passage',
   passageFirst: 'Please read or listen to the passage before you answer:',
 });
+// S29 surveyor mode: the thank-you offers a fresh survey for the next person on the same device. English only for now:
+// /v2/translate serves only strings in the server mirror (src/translate-allowlist.ts PARTICIPANT_UI_STRINGS, which
+// test/translate-allowlist.test.ts pins to UI_EN), so these move into UI_EN together with that mirror.
+export const SURVEYOR_EN = Object.freeze({
+  interviewAnother: 'Interview another person',
+  nextPerson: 'The last answers were saved. This is a new, empty survey for the next person.',
+  openLinkForNext: 'To interview the next person, open the survey link again on this device. The last answers were saved.',
+});
 
 // Every translatable string of one form, keyed by stable ids (item id + option code), never by position.
 export function formStrings(form) {

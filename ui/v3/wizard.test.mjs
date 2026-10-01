@@ -356,10 +356,23 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
   assert.equal((h.match(/data-share-print-all/g) || []).length, 1);
 });
 
+test('S35: Name, New project name and Language carry the (required) mark like Active until; the ISO code stays optional', () => {
+  const existing = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
+  assert.match(existing, /Name \(required\)<input name="name"/);
+  assert.match(existing, /Language \(required\)<select name="language"/);
+  assert.match(existing, /Project \(required\)<select name="project"/);
+  const fresh = renderStep('details', draft({ project: NEW_PROJECT }), { projects: [], languages: [], templates: [] });
+  assert.match(fresh, /New project name \(required\)<input name="newProject"/);
+  assert.match(fresh, /Language \(required\)<input name="newLanguage"/);
+  assert.match(fresh, /Language code \(ISO 639, optional\)<input name="newLangCode"/);
+  assert.doesNotMatch(fresh, /Language code \(ISO 639, optional\) \(required\)|newLangCode"[^>]*required/);
+});
+
 test('B41: setup asks Active until (required) and Starts (optional, default today) on the existing period field', () => {
   const html = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
   assert.match(html, /Starts \(optional\)<input type="date" name="starts"/);
-  assert.match(html, /Active until<input type="date" name="until" value="2099-10-31" required>/);
+  assert.match(html, /Active until \(required\)<input type="date" name="until" value="2099-10-31" required>/); // S34: marked on screen
+  assert.match(html, /Starts \(optional\)<input/);
   assert.doesNotMatch(html, />When</);
   assert.match(freshDraft().starts, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(freshDraft().until, '');

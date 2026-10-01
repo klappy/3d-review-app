@@ -12,6 +12,13 @@ export function responsesOf(model) {
   for (const c of model?.counts?.values?.() || []) if (c?.status === 'loaded') { any = true; n += Number(c.responses) || 0; }
   return any ? n : null;
 }
+// S28: below the minimum the server names the same two numbers on Results, the responses list and the report
+// (responses_in, responses_needed); say them plainly. Anything else stays the one plain held line (U05).
+export function heldText(r, HELD) {
+  const n = r?.responses_in, min = r?.responses_needed;
+  if (!Number.isInteger(n) || !Number.isInteger(min) || n < 0 || n >= min) return HELD;
+  return `${HELD} ${n} response${n === 1 ? '' : 's'} so far; at least ${min} are needed before any score is shown.`;
+}
 export function buildConfirmText(n) {
   const what = Number.isInteger(n) && n >= 0 ? `${n} response${n === 1 ? '' : 's'}` : 'these responses';
   return `Build results from ${what}? Everyone with access can see them.`;
@@ -46,7 +53,7 @@ export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}, e
       const r = await ctx.api(url, { method: 'POST', body: { mode: 'dry_run' } });
       if (!current()) return;
       if (r?.assessment_id !== aid) throw new Error('Invalid preview scope');
-      if (r.suppressed === true || r.status === 'held') { say(`${HELD} Nothing was built.`); return; }
+      if (r.suppressed === true || r.status === 'held') { say(`${heldText(r, HELD)} Nothing was built.`); return; }
       if (r.suppressed !== false || r.status !== 'ready' || typeof r.confirm_token !== 'string' || !r.confirm_token || !Number.isFinite(r.expires_in) || r.expires_in <= 0) throw new Error('Invalid preview');
       pending = { token: r.confirm_token, expires: Date.now() + r.expires_in * 1000 };
       box.innerHTML = `<p data-confirm-text>${buildConfirmText(responsesOf(model))}</p><div class="actions"><button type="button"${entry.source === 'results' ? ' class="primary"' : ''} data-confirm-report>${entry.confirmLabel}</button><button type="button" class="quiet" data-cancel-report>${entry.cancelLabel}</button></div>`;
@@ -61,7 +68,7 @@ export function bindReportBuild(ctx, root, model, onBuilt, onClear = () => {}, e
           const result = await ctx.api(url, { method: 'POST', body: { mode: 'execute', confirm_token } });
           if (!current()) return;
           if (result?.assessment_id !== aid) throw new Error('Invalid build scope');
-          if (result.suppressed === true) { say(`${HELD} No report was built.`); return; }
+          if (result.suppressed === true) { say(`${heldText(result, HELD)} No report was built.`); return; }
           if (result.suppressed !== false || !result.report?.id) throw new Error('Unconfirmed report');
           built = true; say(entry.source === 'results' ? 'Results built. Filling the bands…' : 'Report built. Refreshing the report list…');
           await onBuilt(entry.source, result.report);

@@ -328,17 +328,17 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   const saved = !!data.saved, act = (back, primary) => actions(back, primary, saved); // B06: saved draft — project is fixed
   if (step === 'details') return `${head(n, 'Assessment details', 'You can change these later.', '<p class="muted">Only what the review needs.</p>')}${errBox(errs.filter(e => e !== PAST_UNTIL))}
     <form data-wz-form="details">
-      <label>Name<input name="name" value="${esc(d.name)}" required placeholder="e.g. October assessment"></label>
+      <label>Name (required)<input name="name" value="${esc(d.name)}" required placeholder="e.g. October assessment"></label>
       <div class="grid">
-        <label>Project<select name="project"${saved ? ' disabled' : ''}><option value=""${d.project ? '' : ' selected'} disabled>Choose…</option>${projects.map(p => `<option value="${esc(p.id)}"${p.id === d.project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}${saved ? '' : `<option value="${NEW_PROJECT}"${isNew ? ' selected' : ''}>New project…</option>`}</select></label>
-        ${isNew ? `<label>New project name<input name="newProject" value="${esc(d.newProject)}" required></label>`
-          : `<label>Language<select name="language"${d.project ? '' : ' disabled'}><option value=""${d.language ? '' : ' selected'} disabled>${d.project ? (languages.length ? 'Choose…' : 'No languages in this project') : 'Choose a project first'}</option>${languages.map(l => `<option value="${esc(l.id)}"${l.id === d.language ? ' selected' : ''}>${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</option>`).join('')}</select></label>`}
+        <label>Project (required)<select name="project"${saved ? ' disabled' : ''}><option value=""${d.project ? '' : ' selected'} disabled>Choose…</option>${projects.map(p => `<option value="${esc(p.id)}"${p.id === d.project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}${saved ? '' : `<option value="${NEW_PROJECT}"${isNew ? ' selected' : ''}>New project…</option>`}</select></label>
+        ${isNew ? `<label>New project name (required)<input name="newProject" value="${esc(d.newProject)}" required></label>`
+          : `<label>Language (required)<select name="language"${d.project ? '' : ' disabled'}><option value=""${d.language ? '' : ' selected'} disabled>${d.project ? (languages.length ? 'Choose…' : 'No languages in this project') : 'Choose a project first'}</option>${languages.map(l => `<option value="${esc(l.id)}"${l.id === d.language ? ' selected' : ''}>${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</option>`).join('')}</select></label>`}
       </div>
       ${isNew ? orgField(d, projects) : ''}
-      ${isNew ? `<label>Language<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (ISO 639, optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. hil — qaa–qtz if unlisted" autocapitalize="off" spellcheck="false"></label>` : ''}
+      ${isNew ? `<label>Language (required)<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (ISO 639, optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. hil — qaa–qtz if unlisted" autocapitalize="off" spellcheck="false"></label>` : ''}
       <div class="grid">
         <label>Starts (optional)<input type="date" name="starts" value="${esc(d.starts)}"></label>
-        <label>Active until<input type="date" name="until" value="${esc(d.until)}" required>${errs.includes(PAST_UNTIL) ? `<span class="wz-field-error" role="alert" data-until-error>${PAST_UNTIL}</span>` : ''}</label>
+        <label>Active until (required)<input type="date" name="until" value="${esc(d.until)}" required>${errs.includes(PAST_UNTIL) ? `<span class="wz-field-error" role="alert" data-until-error>${PAST_UNTIL}</span>` : ''}</label>
       </div>
       <div class="grid">
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>

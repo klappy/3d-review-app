@@ -125,15 +125,18 @@ async function askUpstream(env: Env, deps: Deps, lang: LwcLanguage, context: str
   if (secret) { headers.authorization = `Bearer ${secret}`; headers.apikey = secret; }
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), TRANSLATE_LIMITS.timeoutMs);
-  let res: Response;
-  try { res = await (deps.fetch ?? fetch)(url, { method: "POST", headers, signal: ctl.signal, body: JSON.stringify({ targetLang: lang.name, context, sourceTexts }) }); }
-  catch { return { texts: new Map(), status: 502 }; }
-  finally { clearTimeout(timer); }
-  if (!res.ok) return { texts: new Map(), status: res.status === 429 ? 429 : 502 };
-  const data = await res.json().catch(() => null) as { translated?: Record<string, unknown> } | null;
-  const texts = new Map<string, string>();
-  for (const [k, hash] of keyOf) { const v = data?.translated?.[k]; if (acceptable(lang, missing.get(hash)!, v)) texts.set(hash, (v as string).trim()); }
-  return { texts, status: 200 };
+  // S33 E1: the limit covers the body read too, so the timer is cleared only after res.json() settles (every path).
+  try {
+    let res: Response;
+    try { res = await (deps.fetch ?? fetch)(url, { method: "POST", headers, signal: ctl.signal, body: JSON.stringify({ targetLang: lang.name, context, sourceTexts }) }); }
+    catch { return { texts: new Map(), status: 502 }; }
+    if (!res.ok) return { texts: new Map(), status: res.status === 429 ? 429 : 502 };
+    const data = await res.json().catch(() => null) as { translated?: Record<string, unknown> } | null;
+    if (ctl.signal.aborted) return { texts: new Map(), status: 502 };
+    const texts = new Map<string, string>();
+    for (const [k, hash] of keyOf) { const v = data?.translated?.[k]; if (acceptable(lang, missing.get(hash)!, v)) texts.set(hash, (v as string).trim()); }
+    return { texts, status: 200 };
+  } finally { clearTimeout(timer); }
 }
 
 /** Which limiter a translate request spends (audit round 1 W2). A caller presenting a live credential — the participant
@@ -141,11 +144,13 @@ async function askUpstream(env: Env, deps: Deps, lang: LwcLanguage, context: str
  *  principal), never the per-address anonymous bucket: a workshop room of ~50 phones behind one NAT fetches the survey
  *  in 20-string chunks and would exhaust RL_HTTP_ANON (60/60 s per address) in seconds. Everyone else keeps RL_HTTP_ANON
  *  per address. Credential resolution is the shared one (src/auth.ts): 0 D1 reads for a malformed token. */
-export async function translateLimiter(request: Request, env: Env): Promise<{ name: "RL_HTTP_ANON" | "RL_MCP_CEILING"; key: string }> {
+export async function translateLimiter(request: Request, env: Env): Promise<{ name: "RL_HTTP_ANON" | "RL_MCP_CEILING"; key: string; participantSurveyId: string | null }> {
   let who: Awaited<ReturnType<typeof resolvePrincipal>> | null = null;
   try { who = env.DB ? await resolvePrincipal(request, env) : null; } catch { who = null; }
-  if (who && who.kind !== "anonymous") return { name: "RL_MCP_CEILING", key: `tr:${who.kind}:${who.id}` };
-  return { name: "RL_HTTP_ANON", key: `ip:${clientIp(request)}` };
+  // Security W1: the participant's own survey scopes which language name its welcome lead may carry (allowedScope).
+  const participantSurveyId = who?.kind === "participant" ? who.participantSurveyId ?? null : null;
+  if (who && who.kind !== "anonymous") return { name: "RL_MCP_CEILING", key: `tr:${who.kind}:${who.id}`, participantSurveyId };
+  return { name: "RL_HTTP_ANON", key: `ip:${clientIp(request)}`, participantSurveyId: null };
 }
 
 export async function handleTranslate(request: Request, env: Env, deps: Deps = {}): Promise<Response> {
@@ -164,7 +169,7 @@ export async function handleTranslate(request: Request, env: Env, deps: Deps = {
 
   // Unique English strings by hash (the same sentence on two screens is one memory row), kept only when the hash is in
   // the scope's published set (F1/F2): anything else is refused before memory, upstream or storage.
-  const { allowed, isolated } = await allowedScope(env.DB, scope);
+  const { allowed, isolated } = await allowedScope(env.DB, scope, limiter.participantSurveyId);
   const hashOfKey = new Map<string, string>(), textOfHash = new Map<string, string>();
   let refused = 0;
   for (const [k, text] of Object.entries(parsed.sourceTexts)) {
