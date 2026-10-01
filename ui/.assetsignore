@@ -70,3 +70,4 @@ v3/components/invite.test.mjs
 v3/components/active-until.test.mjs
 participant-about.test.mjs
 assess/s12a-complete-owner-badge.test.mjs
+server-files.test.mjs
