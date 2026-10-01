@@ -23,7 +23,7 @@ const crumbScope = (ws, proj, a) => ({ workspace: ws ? { id: ws.id, name: ws.nam
 import { pages, css as scopeCss, landsOnWork, signInLanding, whoLine, CODE_SIGNIN, emailLinkForm } from '/assess/scope.js';
 import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
-import { feedback } from '/assess/feedback.js';
+import { feedback, openFeedbackDialog } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
 import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
 import { demographicsSetting, demographicsBody, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock as completeLock, v3SettingsRole as settingsRole, V3_SUGGEST } from '/assess/v3-assessment.js';
@@ -828,6 +828,20 @@ function bindAccountControls() {
   document.getElementById('account-switch-confirm')?.addEventListener('click', () => { dialog?.close(); signOut(true); });
 }
 bindAccountControls();
+// S54: the menu's "App feedback" opens the form in place over the current screen (no hash change, no re-render); the #feedback
+// route stays for deep links. A modified click (new tab/window) keeps the browser's default. Identity-bound, not view-bound:
+// the dialog outlives a background re-render but not a sign-out or identity switch.
+document.addEventListener('click', event => {
+  const link = event.target.closest?.('a[href="#feedback"]');
+  if (!link || !link.closest('#account-menu, .shell-nav') || event.defaultPrevented || event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  const identity = identityGeneration, live = () => identity === identityGeneration;
+  const stale = () => Promise.reject(Object.assign(new Error('This view is no longer current.'), { code: 'STALE_VIEW' }));
+  const toggle = document.getElementById('account-menu-toggle');
+  const returnFocus = toggle && !toggle.closest('[hidden]') ? toggle : link;
+  document.getElementById('account-menu')?.setAttribute('hidden', ''); toggle?.setAttribute('aria-expanded', 'false');
+  openFeedbackDialog({ demo, state, isCurrent: live, api: (url, opts) => live() ? api(url, opts) : stale() }, { doc: document, returnFocus });
+});
 // ---- scope pages + views (product overhaul): one runner for every { load, render, bind } module ----
 const setToken = t => { if (demo) return; token = t || null; landAfterSignIn = !!t; /* B04 */ try { t ? sessionStorage.setItem('facilitatorToken', t) : sessionStorage.removeItem('facilitatorToken'); } catch {} resetIdentity(); boot(); };
 function ctxFor(extra = {}) {

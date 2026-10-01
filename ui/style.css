@@ -48,6 +48,7 @@ body.rv{border-radius:0;min-height:100vh;overflow:visible}
 .rv .version-badge{font-size:12px;min-height:32px;margin:0}
 .rv .version-badge[aria-disabled=true]{opacity:.6;cursor:default}
 .rv dialog#changelog{width:min(640px,calc(100% - 32px));max-height:85vh;overflow:auto;background:var(--paper);color:var(--ink);margin:auto}
+dialog#feedback-dialog{width:min(560px,calc(100% - 32px));max-height:85vh;overflow:auto;background:var(--paper);color:var(--ink);margin:auto}
 .rv dialog::backdrop{background:rgba(23,46,64,.28);backdrop-filter:blur(3px)}
 .rv details{border-top:1px solid var(--line);padding:12px 0}
 .rv summary{cursor:pointer;font-weight:550}

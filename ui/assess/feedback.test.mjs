@@ -65,3 +65,61 @@ test('optional ratings stay compatible and leaving without submission sends noth
  assert.deepEqual(h.calls[0][1].body,{helpful:true,require_authenticated:true});
  const cancel=await setup(success);cancel.fill('note','Unsent draft');assert.equal(cancel.root.querySelector('.actions a').getAttribute('href'),'#');cancel.stop();assert.equal(cancel.calls.length,0);
 });
+
+// S54 (captain fb_c9324db7e9774c59a89b): the menu opens the same form in place as a dialog and closes back to the untouched screen.
+import { openFeedbackDialog } from './feedback.js';
+async function modal(api = success, options = {}) {
+  const dom = new JSDOM('<button id="account-menu-toggle">Account</button><main id="app"><h1>Assessment</h1><label>Answer<input id="work"></label></main>', { url: 'https://fixture.test/#assessment/a1' });
+  const doc = dom.window.document, toggle = doc.getElementById('account-menu-toggle'), calls = [];
+  doc.getElementById('work').value = 'unfinished answer';
+  const before = doc.getElementById('app').innerHTML;
+  const ctx = { demo: false, state: { principal: { kind: 'user', id: 'fixture' } }, isCurrent: () => true, api: async (...args) => { calls.push(args); return api(...args); }, ...options };
+  const handle = await openFeedbackDialog(ctx, { doc, returnFocus: toggle });
+  return { dom, doc, toggle, calls, before, handle, dialog: () => doc.getElementById('feedback-dialog'), app: () => doc.getElementById('app') };
+}
+test('S54: menu feedback opens a labelled dialog over the current screen without changing the hash', async () => {
+  const h = await modal();
+  assert.equal(h.dom.window.location.hash, '#assessment/a1');
+  const d = h.dialog(); assert.ok(d); assert.equal(d.hasAttribute('open'), true); assert.equal(d.getAttribute('aria-labelledby'), 'feedback-dialog-title');
+  assert.match(h.doc.getElementById('feedback-dialog-title').textContent, /Share app feedback/);
+  assert.equal(h.doc.activeElement, d.querySelector('textarea'));
+  assert.equal(d.querySelector('a[href="#"]'), null); // no "Back to home" navigation inside the dialog
+  assert.equal(h.app().innerHTML, h.before); assert.equal(h.doc.getElementById('work').value, 'unfinished answer');
+});
+test('S54: Close, Escape and backdrop each remove only the dialog, restore focus and leave the screen untouched', async () => {
+  const ways = { close: (h, d) => d.querySelector('[data-feedback-close]').click(), escape: (h, d) => d.dispatchEvent(new h.dom.window.Event('cancel', { cancelable: true })), backdrop: (h, d) => d.dispatchEvent(new h.dom.window.MouseEvent('click', { bubbles: true })) };
+  for (const [name, act] of Object.entries(ways)) {
+    const h = await modal(); h.doc.querySelector('#feedback-dialog textarea').value = 'unsent';
+    act(h, h.dialog());
+    assert.equal(h.dialog(), null, name); assert.equal(h.doc.activeElement, h.toggle, name);
+    assert.equal(h.app().innerHTML, h.before, name); assert.equal(h.doc.getElementById('work').value, 'unfinished answer', name);
+    assert.equal(h.dom.window.location.hash, '#assessment/a1', name); assert.equal(h.calls.length, 0, name);
+  }
+});
+test('S54: a click inside the dialog box does not close it', async () => {
+  const h = await modal(), d = h.dialog();
+  d.querySelector('textarea').dispatchEvent(new h.dom.window.MouseEvent('click', { bubbles: true }));
+  assert.ok(h.dialog());
+});
+test('S54: dialog submit sends the same body as the route and shows the receipt with Close still available', async () => {
+  const h = await modal(), d = h.dialog();
+  d.querySelector('[name=note]').value = 'Keep my place'; d.querySelector('[name=satisfaction]').value = '2';
+  await d.querySelector('form').onsubmit({ preventDefault() {} });
+  assert.deepEqual(h.calls, [['/v2/feedback', { method: 'POST', body: { require_authenticated: true, note: 'Keep my place', satisfaction: 2 } }]]);
+  assert.match(d.textContent, /was recorded/); assert.match(d.querySelector('#feedback-receipt').textContent, /fb_fixture/);
+  const close = d.querySelector('[data-feedback-close]'); assert.equal(close.disabled, false); assert.equal(d.querySelector('button[type=submit]').disabled, true);
+  close.click(); assert.equal(h.dialog(), null); assert.equal(h.app().innerHTML, h.before); assert.equal(h.doc.activeElement, h.toggle);
+  assert.equal(h.dom.window.localStorage.length, 0); assert.equal(h.dom.window.sessionStorage.length, 0);
+});
+test('S54: a reply arriving after the dialog closed publishes nothing; signed-out dialog offers sign-in and Close', async () => {
+  let resolve; const h = await modal(() => new Promise(r => { resolve = r; })), d = h.dialog();
+  d.querySelector('[name=note]').value = 'late'; const pending = d.querySelector('form').onsubmit({ preventDefault() {} });
+  h.handle.close(); resolve(success()); await pending; assert.equal(d.querySelector('#feedback-receipt').textContent, '');
+  const anon = await modal(success, { state: { principal: null } });
+  assert.equal(anon.dialog().querySelector('form'), null); assert.match(anon.dialog().textContent, /Sign in/); anon.dialog().querySelector('[data-feedback-close]').click(); assert.equal(anon.dialog(), null); assert.equal(anon.calls.length, 0);
+});
+test('S54: menu link is intercepted in place while the #feedback route still renders the page version', async () => {
+  const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  assert.match(source, /a\[href="#feedback"\]/); assert.match(source, /openFeedbackDialog\(/);
+  const h = await setup(success); assert.ok(h.root.querySelector('h1')); assert.equal(h.root.querySelector('.actions a').getAttribute('href'), '#'); assert.equal(h.root.querySelector('[data-feedback-close]'), null);
+});
