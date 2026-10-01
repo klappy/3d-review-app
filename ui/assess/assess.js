@@ -371,7 +371,8 @@ function bindPrint(current, s) {
   const lock = () => { const b = app.querySelector('#print-load'), p = livePick(); if (b) b.disabled = true; if (p) p.disabled = true; };
   const setStatus = text => { const st = app.querySelector('#print-status'); if (st) st.textContent = text; };
   // #414b (render path): a repaint mid-load draws the button disabled (printLoadButton) and re-locks the live picker here.
-  if (printLoading(aid0, s.id)) lock();
+  // S35 (rev414d nit): the status line lives on the run (state.print.text), so a repaint mid-load redraws it instead of blanking it.
+  if (printLoading(aid0, s.id)) { lock(); if (state.print.text) setStatus(state.print.text); }
   btn.onclick = async () => {
     const gen = generation, aid = current.assessment.id, lang = picked();
     // #414b review (worth fixing): each run owns its own token. paint() does not bump generation, so a repaint plus a second
@@ -394,7 +395,7 @@ function bindPrint(current, s) {
       // first); any string without a translation stays English and is marked on the paper. Never fails the print.
       if (lang && typeof translatePrint === 'function') {
         lock();
-        setStatus('Translating the form… The first time can take up to a minute.');
+        run.text = 'Translating the form… The first time can take up to a minute.'; setStatus(run.text);
         model = await translatePrint(model, { lang, fetchImpl: facilitatorFetch(token) });
         if (!mine()) return;
       }
