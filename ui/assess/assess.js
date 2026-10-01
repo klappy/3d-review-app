@@ -831,7 +831,7 @@ bindAccountControls();
 // S54: the menu's "App feedback" opens the form in place over the current screen (no hash change, no re-render); the #feedback
 // route stays for deep links. A modified click (new tab/window) keeps the browser's default. Identity-bound, not view-bound:
 // the dialog outlives a background re-render but not a sign-out or identity switch.
-document.addEventListener('click', event => {
+document.addEventListener?.('click', event => {
   const link = event.target.closest?.('a[href="#feedback"]');
   if (!link || !link.closest('#account-menu, .shell-nav') || event.defaultPrevented || event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
