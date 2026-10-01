@@ -76,7 +76,7 @@ export function validateAnswers(items: TemplateItem[], value: unknown): Record<s
 export const form: Handler = async (ctx, params) => {
   const shared = await sharedSession(ctx);
   if (shared) {
-    if (Object.keys(params).length) throw new CapError("INVALID_PARAMS", "form takes no parameters");
+    if (Object.keys(params).length) throw new CapError("INVALID_PARAMS", "form takes no parameters (language is chosen with POST /v2/translate); pass nothing");
     await collecting(ctx, shared.assessment_survey_id);
   }
   const s = await scopedSurvey(ctx, true);
@@ -148,12 +148,14 @@ export const submit: Handler = async (ctx, params) => {
 
 export const receipt: Handler = async (ctx, params) => {
   const shared = await sharedSession(ctx);
-  if (shared && Object.keys(params).length) throw new CapError("INVALID_PARAMS", "receipt takes no parameters");
+  if (shared && Object.keys(params).length) throw new CapError("INVALID_PARAMS", "receipt takes no parameters; pass nothing");
   const s = await scopedSurvey(ctx);
   const row = await ctx.db.prepare("SELECT id, submitted_at, template_id, template_version FROM response WHERE assessment_survey_id = ? AND respondent_id = ? ORDER BY submitted_at DESC LIMIT 1")
     .bind(s.id, ctx.principal.respondentId).first<{ id: string; submitted_at: string; template_id: string; template_version: number }>();
+  // Persona friction (waves AB-AD): the receipt names the review. Additive; read from the survey row already in hand.
   return { result: { submitted: !!row, response_id: row?.id ?? null, submitted_at: row?.submitted_at ?? null,
-    template: row ? { id: row.template_id, version: row.template_version } : null }, scope: { type: "survey", id: s.id } };
+    template: row ? { id: row.template_id, version: row.template_version } : null,
+    assessment: { name: s.name } }, scope: { type: "survey", id: s.id } };
 };
 
 export const assisted_next: Handler = async (ctx) => {
