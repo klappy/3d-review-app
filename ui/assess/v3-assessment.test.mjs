@@ -162,3 +162,14 @@ test('U42 (Bincy B30): the stage primary never links to the open page; on Permis
   const p = v3StagePrimary('collect', true, undefined, undefined, { current: 'permissions', secondary: true });
   assert.match(p, /class="rv-btn" data-v3-primary="collect"/); assert.doesNotMatch(p, /class="[^"]*\bprimary\b/);
 });
+
+// S51: the held floor is the server's number (responses_in / responses_needed), never "three" written in the UI.
+test('S51 v3HeldText: API numbers when below the floor; the number-free line otherwise', async () => {
+  const { v3HeldText, V3_HELD_TEXT, v3BandsMarkup } = await import('./v3-assessment.js');
+  assert.doesNotMatch(V3_HELD_TEXT, /\d|three/);
+  assert.equal(v3HeldText({ responses_in: 1, responses_needed: 5 }), `${V3_HELD_TEXT} 1 response so far; at least 5 are needed before any score is shown.`);
+  for (const r of [null, {}, { responses_in: 5, responses_needed: 5 }, { reason: 'D7 scoring, threshold, and differencing policy unresolved' }]) assert.equal(v3HeldText(r), V3_HELD_TEXT);
+  const h = v3BandsMarkup({ status: 'held', responses_in: 2, responses_needed: 5, reason: 'D7 x' }, ['Translation Team'], s => String(s));
+  assert.match(h, /data-v3-band-held>Results appear after a report is built from enough responses\. 2 responses so far; at least 5 are needed/);
+  assert.doesNotMatch(h, /D7 x/);
+});
