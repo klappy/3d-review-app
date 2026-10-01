@@ -437,7 +437,9 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint, 
   } else {
     const qrBox = el(doc, 'div');
     qrBox.className = 'qr none';
-    qrBox.setAttribute('aria-label', 'No shared link for this survey yet');
+    // #405 nit c: a translated preview names the empty box with the label's own (translated) words; English kept → lang="en".
+    qrBox.setAttribute('aria-label', model.lang ? w.noLink : 'No shared link for this survey yet');
+    if (model.lang && wordEn.has('noLink')) qrBox.setAttribute('lang', 'en');
     const qrLabel = markEn(el(doc, 'div', w.noLink), wordEn.has('noLink'));
     qrLabel.className = 'p-label';
     qr.append(qrBox, qrLabel);
