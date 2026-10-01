@@ -753,7 +753,7 @@ async function mountNew(gen, resume = null) {
   if (!mod?.mountWizard) { app.innerHTML = `<div class="narrow panel"><h1>Start a review</h1><p class="muted">The guided setup is not available on this build yet.</p><div class="actions"><a class="rv-btn primary" href="${cards.routes.projects}">Go to your projects</a></div></div>`; return; }
   const ctx = ctxFor();
   const idg = identityGeneration;
-  wizardHandle = mod.mountWizard(app, { api: ctx.api, go: ctx.go, origin: location.origin, assessmentHref: id => `#assessment/${encodeURIComponent(id)}`, resume,
+  wizardHandle = mod.mountWizard(app, { api: ctx.api, go: ctx.go, origin: location.origin, assessmentHref: id => `#assessment/${encodeURIComponent(id)}`, resume, user: state.principal?.id, // val422-2341: setup copies are keyed by user + draft
     beforeOpen: () => (idg === identityGeneration ? reloadProjects() : false), // B14: a project created in this setup is not in the boot list yet
     onLink: (aid, row) => { if (idg === identityGeneration) share.rememberLaunchLink(state.collectLinks, aid, row, location.origin); }, // U36: Collect and the survey page reuse the launch links
     mark: id => { if (gen !== generation) return; try { history.replaceState(null, '', `${location.pathname}${location.search}#new/${encodeURIComponent(id)}`); } catch {} } }); // U22: a reload reopens this draft
@@ -804,6 +804,7 @@ async function signOut(switchAccount = false) {
     if (!current()) return;
     if (result?.signed_out !== true) throw new Error('Logout not confirmed');
     token = null; try { sessionStorage.removeItem('facilitatorToken'); } catch {}
+    import(WIZARD_JS).then(m => m.clearAllWip?.(localStorage, sessionStorage)).catch(() => {}); // val422-2341: no setup copy outlives sign-out
     resetIdentity();
     who.textContent = 'Not signed in';
     const signedOutIdentity = identityGeneration, signedOutCredential = token;

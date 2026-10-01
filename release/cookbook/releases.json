@@ -1,7 +1,23 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.26.2",
+  "current": "0.26.3",
   "versions": [
+    {
+      "version": "0.26.3",
+      "status": "candidate",
+      "notes_path": "releases/0.26.3.md",
+      "sections": {
+        "fixed": [
+          "A survey link opened with an unexpected setting now says which settings it accepts (token, resume_token) instead of only \"unknown link parameter\". (#419)",
+          "Asking for the survey form with extra settings (such as a language) now says the language is chosen through translation, not on the form. (#419)",
+          "The receipt returned by `GET /v2/participate/receipt` (cap.response.receipt) now names the review it belongs to; the on-screen receipt is unchanged. (#419)",
+          "If the page reloads while you are setting up an assessment, the wizard now returns to the step you were on with your choices kept. (#422)",
+          "The Project field in the assessment setup is now marked as required in the form itself, so the browser points to it if it is left empty, as it already does for Name and Active until. (#422)",
+          "Translation requests that are far too large are now refused before being read, so an oversized request cannot slow the service. (#423)",
+          "When you sign in and someone has invited you to a review, Home now says so and takes you to the invitation. (#424)"
+        ]
+      }
+    },
     {
       "version": "0.26.2",
       "status": "candidate",
