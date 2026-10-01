@@ -18,8 +18,15 @@ export function assessmentRow(a, stageLabel, projectName = '') {
 }
 // B28 newest first: the list read's created_at (ISO, server-sent); an assessment without it sorts last, ties keep list order.
 const newestFirst = (x, y) => String(y.a.created_at || '').localeCompare(String(x.a.created_at || ''));
-export function homeView({ projects = [], shared = [], listFor, stageLabel = s => ESC(s), start = '', title = '' }) {
-  const head = `<link rel="stylesheet" href="${HOME_CSS}"><div class="v3h-head"><div>${title ? `<h1>${ESC(title)}</h1>` : ''}<p class="v3h-sub">Your 3D Reviews, newest first.</p></div>${start}</div>`;
+// S40 (persona C, gate 0.24.0): a signed-in invitee with pending invitations gets ONE quiet secondary line linking to the existing
+// invitations screen (#invite → the signed-in person's own list, S19). The count is the length of the list the caller read
+// (GET /v2/me/invitations through pendingInvitations); 0, missing or not a whole number → nothing. Never a second primary.
+export function invitationsHint(n) {
+  if (!Number.isInteger(n) || n < 1) return '';
+  return `<p class="v3h-meta v3h-invites" data-v3h-invitations>You have ${n} invitation${n === 1 ? '' : 's'} waiting. <a href="#invite" data-v3h-invitations-link>See ${n === 1 ? 'the invitation' : 'invitations'}</a></p>`;
+}
+export function homeView({ projects = [], shared = [], listFor, stageLabel = s => ESC(s), start = '', title = '', invitations = 0 }) {
+  const head = `<link rel="stylesheet" href="${HOME_CSS}"><div class="v3h-head"><div>${title ? `<h1>${ESC(title)}</h1>` : ''}<p class="v3h-sub">Your 3D Reviews, newest first.</p>${invitationsHint(invitations)}</div>${start}</div>`;
   // B28: one card per review across all projects (+ B03 shared ones, sub-line "Shared with you"), newest first; then one card per
   // project that has no review to show (empty, not loaded, or archived) so nothing is hidden.
   const reviews = projects.filter(p => !p.archived_at).flatMap(p => { const l = listFor(p.id) || {}; return l.status === 'loaded' ? l.list.map(a => ({ a, sub: p.name })) : []; })

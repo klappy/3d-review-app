@@ -5,6 +5,7 @@
 // Pure render: HTML strings, every text value through ctx.esc. No DOM access outside bind().
 // v3 lane 9 L9-1: projects page = home per Bincy screen 02 (relative import so node tests resolve it too).
 import { homeView } from '../v3/home.js';
+import { pendingInvitations } from '../v3/components/invite.js';
 import { learnMore } from '../v3/components/learn-more.js';
 import { mountEditableHeading } from '../v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '../v3/components/saved-status.js';
@@ -415,6 +416,9 @@ const projects = {
     }));
     // B03 (Bincy F01/F02): an assessment shared directly (assessment grant, no project role) is not in /v2/projects. Home lists it
     // from the caller's own grants (/v2/me) + the assessment read the grant already allows — no new server surface.
+    // S40: the signed-in person's own pending invitations — the same read the invitations screen uses (cap.me.invitations via
+    // pendingInvitations); any failure → none, Home unchanged.
+    const mine = ctx.api('/v2/me/invitations').then(pendingInvitations, () => []);
     let shared = [];
     try {
       const me = await ctx.api('/v2/me'), here = new Set(list.map(p => p.id));
@@ -422,12 +426,12 @@ const projects = {
       const reads = await Promise.allSettled(ids.map(id => ctx.api(`/v2/assessments/${encodeURIComponent(id)}`)));
       shared = reads.filter(r => r.status === 'fulfilled').map(r => r.value?.assessment).filter(a => a && !a.archived_at && !here.has(a.project_id));
     } catch { shared = []; }
-    return { status: 'loaded', params, projects: list, lists, shared };
+    return { status: 'loaded', params, projects: list, lists, shared, invitations: await mine };
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('projects', model);
-    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW });
+    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW, invitations: (model.invitations || []).length });
     return readRegion(`${pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`);
   },
   bind(ctx, root, model) {
