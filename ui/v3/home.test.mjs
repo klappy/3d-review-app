@@ -92,7 +92,7 @@ import { invitationsHint } from './home.js';
 import { pages } from '../assess/scope.js';
 import * as cards from '../assess/cards.js';
 const INV = (id, type = 'project') => ({ id, role: 'member', scope: { type, id: `${type}_${id}`, name: `N${id}` } });
-const homeCtx = map => ({ api: async url => { const r = map[url]; if (r === undefined || r instanceof Error) throw r || Object.assign(new Error('unmapped'), { code: '500' }); return r; },
+const homeCtx = map => ({ requested: [], api: async function (url) { this.requested.push(url); const r = map[url]; if (r === undefined || r instanceof Error) throw r || Object.assign(new Error('unmapped'), { code: '500' }); return r; },
   esc: cards.esc, enc: cards.enc, go: () => {}, note: () => {}, state: { principal: null }, routes: cards.routes, cards });
 test('S40: n pending invitations → one hint line with the count, linking to #invite; Start stays the one primary', async () => {
   const ctx = homeCtx({ '/v2/projects': { projects: [{ id: 'p1', name: 'Lake' }] }, '/v2/projects/p1/assessments': { assessments: [] }, '/v2/me': { grants: [] }, '/v2/me/invitations': { invitations: [INV('i1'), INV('i2', 'assessment'), INV('i3')] } });
@@ -116,4 +116,5 @@ test('S40: signed out → no hint, even if the invitations read would answer', a
   const ctx = homeCtx({ '/v2/projects': Object.assign(new Error('no session'), { code: 'NOT_AUTHENTICATED' }), '/v2/me/invitations': { invitations: [INV('i1')] } });
   const h = pages.projects.render(ctx, await pages.projects.load(ctx, {}));
   assert.match(h, /Sign in to continue/); assert.doesNotMatch(h, /data-v3h-invitations|invitation/i);
+  assert.deepEqual(ctx.requested, ['/v2/projects'], 'signed out: /v2/me/invitations is never requested');
 });

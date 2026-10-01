@@ -408,6 +408,10 @@ const projects = {
     let list;
     try { const r = await ctx.api('/v2/projects'); list = r.projects || []; }
     catch (e) { return { ...fail(e, safeMessage), params }; }
+    // S40: the signed-in person's own pending invitations — the same read the invitations screen uses (cap.me.invitations via
+    // pendingInvitations); any failure → none, Home unchanged. Started here (after the signed-out return above, so a signed-out
+    // visitor makes no request) so it runs alongside the assessment and /v2/me reads instead of after them.
+    const mine = ctx.api('/v2/me/invitations').then(pendingInvitations, () => []);
     // v3 lane 9: each project's assessments, read-only, same endpoint the project page uses; first 20 projects, the rest link out.
     const lists = {};
     await Promise.allSettled(list.filter(p => !p.archived_at).slice(0, 20).map(async p => {
@@ -416,9 +420,6 @@ const projects = {
     }));
     // B03 (Bincy F01/F02): an assessment shared directly (assessment grant, no project role) is not in /v2/projects. Home lists it
     // from the caller's own grants (/v2/me) + the assessment read the grant already allows — no new server surface.
-    // S40: the signed-in person's own pending invitations — the same read the invitations screen uses (cap.me.invitations via
-    // pendingInvitations); any failure → none, Home unchanged.
-    const mine = ctx.api('/v2/me/invitations').then(pendingInvitations, () => []);
     let shared = [];
     try {
       const me = await ctx.api('/v2/me'), here = new Set(list.map(p => p.id));
