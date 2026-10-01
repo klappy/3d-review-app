@@ -249,3 +249,19 @@ test('S44: a single Accept keeps "Accepting…" and gains the spinner (row and s
   for (const h of [invitationsView({ invitations: THREE }), invitationsView({ invitations: [THREE[0]] })]) assert.doesNotMatch(h, /data-invite-spinner|aria-busy|<style/);
   assert.equal(progressLabel(6, 41), 'Accepting 7 of 41…'); assert.equal(progressLabel(), 'Accepting…');
 });
+test('S44: a failed accept mid-run stops there, names the failed one, and clears aria-busy and the spinner; buttons stay disabled', async () => {
+  const err = Object.assign(new Error('invitation_expired'), { code: 'INVALID_PARAMS' });
+  const root = domRoot(), { api, calls } = acceptApi({ inv_p: { execute: err } }); let settled = null, n = 0;
+  mountInvitations(root, { api, invitations: THREE, onSettled: out => { settled = out; n++; } });
+  root.querySelector('[data-invite-accept-all]').click();
+  assert.equal(root.querySelector('[data-invite]').getAttribute('aria-busy'), 'true'); assert.ok(root.querySelector('[data-invite-spinner]'));
+  await tick(); await tick(); await tick(); await tick();
+  assert.equal(n, 1); assert.deepEqual(settled.accepted, [{ type: 'project', id: 'x_inv_w' }]);
+  assert.ok(!calls.some(c => c[0].includes('inv_a')), 'nothing after the failure was touched');
+  assert.equal(failureNotice(settled.failure.state, settled.failure.invitation), 'The invitation to the project "Hill Project" has expired. Ask the person who invited you for a new one.');
+  assert.equal(root.querySelector('[data-invite-progress]').textContent, 'Accepting 2 of 3…', 'the count stops at the failed one');
+  assert.deepEqual([...root.querySelectorAll('[data-invite-row] button')].map(b => b.textContent), ['Accepted', 'Accept', 'Accept']);
+  assert.equal(root.querySelector('[data-invite]').getAttribute('aria-busy'), null, 'aria-busy cleared');
+  assert.equal(root.querySelector('[data-invite-spinner]'), null, 'spinner gone'); assert.equal(root.querySelector('[data-invite-spin-css]'), null);
+  assert.ok([...root.querySelectorAll('button')].every(b => b.disabled), 'buttons stay disabled until the hand-over remounts');
+});
