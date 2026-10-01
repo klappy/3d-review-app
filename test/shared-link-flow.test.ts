@@ -126,6 +126,10 @@ describe("shared survey link HTTP contract",()=>{
  it("rejects session expiry/revocation and client-supplied identity overrides",async()=>{
   const link=await issue(),p=await open(link.link_token);
   expect((await call('POST','/v2/participate/link',{token:link.link_token,respondent_id:'forged'})).error.code).toBe('INVALID_PARAMS');
+  expect((await call('POST','/v2/participate/link',{token:link.link_token,respondent_id:'forged'})).error.message).toContain('accepted: token, resume_token');
+  expect((await call('GET','/v2/participate/form?lang=hi',undefined,p.result.participant_token)).error.message).toContain('language is chosen with POST /v2/translate');
+  expect((await call('GET','/v2/participate/receipt?response_id=x',undefined,p.result.participant_token)).error.message).toContain('receipt takes no parameters; pass nothing');
+  const named=(await call('GET','/v2/participate/receipt',undefined,p.result.participant_token)).result.assessment;const seeded=(await db.prepare("SELECT name FROM assessment WHERE id='assess_tavo_collect'").first<any>()).name;expect(seeded).toBeTruthy();expect(named).toEqual({name:seeded});
   expect((await call('POST','/v2/participate/responses',{idempotency_key:'x',answers:{Q1:4},respondent_id:'forged'},p.result.participant_token)).error.code).toBe('INVALID_PARAMS');
   await db.prepare("UPDATE participant_session SET revoked_at='2026-09-17T00:00:00Z' WHERE token_hash=?").bind(await sha256(p.result.participant_token)).run();
   expect((await open(link.link_token,p.result.participant_token)).ok).toBe(false);

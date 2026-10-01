@@ -3358,7 +3358,7 @@ paths:
               schema:
                 allOf:
                 - $ref: '#/components/schemas/Envelope'
-                - {"type":"object","properties":{"result":{"type":"object","properties":{"submitted":{"type":"boolean"},"response_id":{"type":["string","null"]},"submitted_at":{"type":["string","null"],"format":"date-time"},"template":{"oneOf":[{"type":"null"},{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"}},"required":["id","version"],"additionalProperties":false}]}},"required":["submitted","response_id","submitted_at","template"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"submitted":{"type":"boolean"},"response_id":{"type":["string","null"]},"submitted_at":{"type":["string","null"],"format":"date-time"},"template":{"oneOf":[{"type":"null"},{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"}},"required":["id","version"],"additionalProperties":false}]},"assessment":{"type":"object","properties":{"name":{"type":"string"}},"required":["name"],"additionalProperties":false}},"required":["submitted","response_id","submitted_at","template"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
         4XX:
           description: error envelope
           content:

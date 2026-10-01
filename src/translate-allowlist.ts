@@ -83,10 +83,34 @@ async function sha256Hex(text: string): Promise<string> {
 }
 const hashAll = async (texts: Iterable<string>, into = new Set<string>()) => { for (const t of new Set(texts)) into.add(await sha256Hex(t)); return into; };
 
-let staticUi: Promise<Set<string>> | null = null; // per isolate
-function staticUiHashes(): Promise<Set<string>> {
-  staticUi ??= hashAll([...PARTICIPANT_UI_STRINGS, welcomeLead(null), ...Array.from({ length: MAX_FORM_ITEMS }, (_, i) => welcomeTime(i + 1))]);
-  return staticUi;
+/** The fixed participant-ui source: built once per isolate; a new deploy is a new isolate and a new source. */
+const STATIC_UI_SOURCE: readonly string[] = Object.freeze([...PARTICIPANT_UI_STRINGS, welcomeLead(null), ...Array.from({ length: MAX_FORM_ITEMS }, (_, i) => welcomeTime(i + 1))]);
+/**
+ * Audit E2 (train 22): hashing is done once per isolate per source, never per request. The static page-word set is
+ * memoized by the source array's identity (a different source is hashed afresh), and each welcome lead's hash by its
+ * language name (bounded; cleared when full). Callers get a copy of the static set, so the memo is never mutated.
+ */
+const staticMemo = new WeakMap<readonly string[], Promise<Set<string>>>();
+export function staticUiHashes(source: readonly string[] = STATIC_UI_SOURCE): Promise<Set<string>> {
+  let p = staticMemo.get(source);
+  if (!p) {
+    p = hashAll(source);
+    p.catch(() => staticMemo.delete(source));
+    staticMemo.set(source, p);
+  }
+  return p;
+}
+const LEAD_MEMO_MAX = 512;
+const leadMemo = new Map<string, Promise<string>>();
+export function welcomeLeadHash(language: string): Promise<string> {
+  let p = leadMemo.get(language);
+  if (!p) {
+    if (leadMemo.size >= LEAD_MEMO_MAX) leadMemo.clear();
+    p = sha256Hex(welcomeLead(language));
+    p.catch(() => leadMemo.delete(language));
+    leadMemo.set(language, p);
+  }
+  return p;
 }
 
 type Item = { text?: unknown; options?: { text?: unknown; label?: unknown }[] };
@@ -134,7 +158,7 @@ export async function allowedScope(db: D1Database | undefined, scope: TranslateS
     if (db && participantSurveyId) {
       try {
         const row = await db.prepare(SURVEY_LANGUAGE_SQL).bind(participantSurveyId).first<{ name: string }>();
-        if (row && allowlistableLanguageName(row.name)) await hashAll([welcomeLead(row.name)], isolated);
+        if (row && allowlistableLanguageName(row.name)) isolated.add(await welcomeLeadHash(row.name));
         for (const h of isolated) allowed.add(h);
       } catch { /* the page words still work */ }
     }

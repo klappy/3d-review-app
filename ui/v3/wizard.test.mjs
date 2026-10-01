@@ -356,11 +356,12 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
   assert.equal((h.match(/data-share-print-all/g) || []).length, 1);
 });
 
-test('S35: Name, New project name and Language carry the (required) mark like Active until; the ISO code stays optional', () => {
+test('S35: Name, Project, New project name and Language carry the (required) mark like Active until; the ISO code stays optional', () => {
   const existing = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
   assert.match(existing, /Name \(required\)<input name="name"/);
   assert.match(existing, /Language \(required\)<select name="language"/);
-  assert.match(existing, /Project \(required\)<select name="project"/);
+  assert.match(existing, /Project \(required\)<select name="project" required/, 'S38: the select carries required, as validateStep enforces');
+  assert.match(renderStep('details', draft(), { projects: [], languages: [], templates: [], saved: true }), /<select name="project" required disabled>/, 'a saved draft keeps the project fixed');
   const fresh = renderStep('details', draft({ project: NEW_PROJECT }), { projects: [], languages: [], templates: [] });
   assert.match(fresh, /New project name \(required\)<input name="newProject"/);
   assert.match(fresh, /Language \(required\)<input name="newLanguage"/);
@@ -580,7 +581,7 @@ test('B09: step 3 offers optional group context per group (no names) and launch 
 });
 
 // U22: reload mid-setup. The same session store stands in for the tab's sessionStorage across the reload.
-const tabSession = () => { const m = new Map(); return { m, getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+const tabSession = () => { const m = new Map(); return { m, getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), get length() { return m.size; }, key: i => [...m.keys()][i] ?? null }; };
 test('U22: a reload on step 2 or step 3 reopens the same draft at that step with what was typed; launch clears it', async () => {
   const srv = server(), session = tabSession(), marked = [];
   const first = mount(srv, { session, mark: id => marked.push(id) }); await fillStep1(first); first.submit(); await settle();
@@ -607,6 +608,75 @@ test('U22: a reload on step 1 after the save keeps unsaved step 1 edits; Discard
   assert.equal(m.h.state.step, 'details'); assert.equal(m.$('[name="name"]').value, 'November review'); assert.equal(srv.db.a.name, 'October review');
   m.click('[data-wz="cancel"]'); await settle(); m.click('[data-wz="discard"]'); await settle();
   assert.ok(srv.db.deleted); assert.equal(session.m.size, 0);
+});
+
+// S38 (persona C, gate 0.24.0): #new/<id> must come back at the step the facilitator was on with steps 2–4 kept, even when the
+// tab copy is gone (the same link reopened in a fresh tab). The device-local store keeps the same { step, d } per draft id.
+test('S38: restore after reload: steps 2–4 and the current step come back from the device copy when the tab copy is gone', async () => {
+  const srv = server(), store = tabSession();
+  const first = mount(srv, { session: tabSession(), store }); await fillStep1(first); first.submit(); await settle();
+  const box = first.$('input[name=g][value="tpl.team"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.set('n-tpl.team', '9'); first.submit(); await settle(); assert.equal(first.h.state.step, 'information');
+  const demo = first.$('[data-wz-demographics] input'); demo.checked = true; demo.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.submit(); await settle(); assert.equal(first.h.state.step, 'review'); first.h.destroy();
+  // serialized state: one entry per draft id
+  assert.deepEqual([...store.m.keys()].filter(k => k.startsWith('v3:setup:')), ['v3:setup:a1']); assert.equal(JSON.parse(store.m.get('v3:setup:a1')).step, 'review');
+  const again = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle(); // new instance, fresh tab copy
+  assert.equal(again.h.state.step, 'review', 'back on the step the facilitator was on, not step 2');
+  assert.deepEqual(Object.keys(again.h.state.d.groups), ['tpl.team']); assert.equal(again.h.state.d.groups['tpl.team'].expected, '9');
+  assert.equal(again.h.state.d.demographics, true);
+  assert.match(again.root.innerHTML, /9 expected/);
+  assert.equal(srv.writes().length, 1, 'restoring writes nothing');
+  // the pure path: a wizard state serialized by saveWip is read back by wipOver for the same draft id only
+  const { saveWip, wipOver } = await import('./wizard.js');
+  const st = tabSession(); saveWip(null, 'a7', 'information', draft({ groups: { 'tpl.team': { version: '3', expected: '' } } }), st);
+  const back = { d: freshDraft(), step: 'participants', saved: { aid: 'a7', pre: [] } };
+  const r = wipOver(back, tabSession(), st); assert.equal(r.step, 'information'); assert.deepEqual(Object.keys(r.d.groups), ['tpl.team']);
+  assert.equal(wipOver({ ...back, saved: { aid: 'a8', pre: [] } }, null, st).step, 'participants', 'another draft is not touched');
+});
+
+// rev422-2241 Blocking: the device copy outlives the tab, so a co-owner (or the same owner on another device) may have changed
+// step 1 since it was written. The server's step-1 values win over an older device copy; only client-only fields are taken.
+test('S38: a device copy older than the server step 1 yields to the server values; its groups, context and step still come back', async () => {
+  const srv = server(), store = tabSession();
+  const first = mount(srv, { session: tabSession(), store }); await fillStep1(first); first.submit(); await settle();
+  const box = first.$('input[name=g][value="tpl.team"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.set('n-tpl.team', '9'); first.submit(); await settle(); assert.equal(first.h.state.step, 'information'); first.h.destroy();
+  const rec = JSON.parse(store.m.get('v3:setup:a1')); assert.equal(rec.snap.name, 'October review', 'the record keeps the server step 1 it was written against');
+  Object.assign(srv.db.a, { name: 'Renamed elsewhere', purpose: 'Changed on another device' }); // a newer step 1 saved from elsewhere
+  const again = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle(); // fresh mount, tab copy empty
+  assert.equal(again.h.state.d.name, 'Renamed elsewhere'); assert.equal(again.h.state.d.purpose, 'Changed on another device');
+  assert.equal(again.h.state.step, 'information'); assert.equal(again.h.state.d.groups['tpl.team'].expected, '9');
+  const { detailsPatch } = await import('./wizard.js');
+  assert.equal(detailsPatch(again.h.state.saved.snap, again.h.state.d), null, 'step 1 resubmitted would PATCH nothing old over the server');
+  assert.equal(srv.writes().length, 1, 'restoring writes nothing');
+});
+
+// rev422-2241 Worth fixing: a draft launched or discarded from another device leaves no device copy behind on this one.
+test('S38: the device copy is cleared when the draft left prepare or is gone (404)', async () => {
+  const srv = server(), store = tabSession();
+  const first = mount(srv, { session: tabSession(), store }); await fillStep1(first); first.submit(); await settle(); first.h.destroy();
+  assert.ok(store.m.has('v3:setup:a1')); srv.db.a.stage = 'collect'; // launched elsewhere
+  const m = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle();
+  assert.deepEqual(m.went, ['#/a/a1']); assert.equal(store.m.has('v3:setup:a1'), false, 'left prepare: device copy cleared');
+  store.setItem('v3:setup:a1', JSON.stringify({ step: 'participants', d: freshDraft() })); const gone = server();
+  const api = async (url, o = {}) => { if (url === '/v2/assessments/a1') throw Object.assign(new Error('Not found'), { status: 404 }); return gone.api(url, o); };
+  const g = mount({ ...gone, api }, { resume: 'a1', session: tabSession(), store }); await settle();
+  assert.match(g.root.innerHTML, /Setup could not be opened/); assert.equal(store.m.has('v3:setup:a1'), false, '404: device copy cleared');
+});
+
+test('S38: finishing the launch or discarding the draft clears both the tab copy and the device copy', async () => {
+  const srv = server(), session = tabSession(), store = tabSession();
+  const first = mount(srv, { session, store }); await fillStep1(first); first.submit(); await settle();
+  const box = first.$('input[name=g][value="tpl.community"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  assert.ok(store.m.has('v3:setup:a1') && session.m.has('v3:setup:a1'));
+  first.submit(); await settle(); first.submit(); await settle(); first.click('[data-wz="launch"]'); await settle(12);
+  assert.ok(first.h.state.done); assert.equal(store.m.has('v3:setup:a1'), false, 'finish clears the device copy'); assert.equal(session.m.size, 0);
+  const srv2 = server(), session2 = tabSession(), store2 = tabSession();
+  const m = mount(srv2, { session: session2, store: store2 }); await fillStep1(m); m.submit(); await settle();
+  assert.ok(store2.m.has('v3:setup:a1'));
+  m.click('[data-wz="cancel"]'); await settle(); m.click('[data-wz="discard"]'); await settle();
+  assert.ok(srv2.db.deleted); assert.equal(store2.m.has('v3:setup:a1'), false, 'discard clears the device copy'); assert.equal(session2.m.size, 0);
 });
 
 test('U36: each launch link is handed to the host (with its link id) so Collect and the survey page reuse it', async () => {
@@ -665,4 +735,58 @@ test('B14: a failed re-read still opens the review; the app host wires the re-re
   assert.deepEqual(m.went, ['#assessment/a1']);
   const src = readFileSync(new URL('../assess/assess.js', import.meta.url), 'utf8');
   assert.match(src, /beforeOpen: \(\) => \(idg === identityGeneration \? reloadProjects\(\) : false\)/);
+});
+
+// val422-2341 Worth fixing 1: the demographics switch reaches the server only at launch, so a stale device copy keeps it.
+test('S38: a stale device copy (snap mismatch) keeps the "Ask participants about themselves" switch', async () => {
+  const srv = server(), store = tabSession();
+  const first = mount(srv, { session: tabSession(), store }); await fillStep1(first); first.submit(); await settle();
+  const box = first.$('input[name=g][value="tpl.team"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.submit(); await settle(); assert.equal(first.h.state.step, 'information');
+  const demo = first.$('[data-wz-demographics] input'); demo.checked = true; demo.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.h.destroy();
+  Object.assign(srv.db.a, { name: 'Renamed elsewhere' }); // snap no longer matches
+  const again = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle();
+  assert.equal(again.h.state.d.name, 'Renamed elsewhere', 'server step 1 still wins');
+  assert.equal(again.h.state.d.demographics, true, 'the switch is not silently reverted');
+});
+
+test('S38 fix422c: the server switch moved from Prepare wins over the device copy on resume (stale and matching snap)', async () => {
+  for (const rename of [true, false]) {
+    const srv = server(), store = tabSession();
+    const first = mount(srv, { session: tabSession(), store }); await fillStep1(first); first.submit(); await settle();
+    const box = first.$('input[name=g][value="tpl.team"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+    first.submit(); await settle(); assert.equal(first.h.state.step, 'information'); first.h.destroy();
+    Object.assign(srv.db.a, { demographics_enabled: true }, rename ? { name: 'Renamed elsewhere' } : {}); // Prepare flipped the switch on
+    const again = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle();
+    assert.equal(again.h.state.d.demographics, true, `server switch wins (${rename ? 'stale' : 'matching'} snap)`);
+    assert.equal(again.$('[data-wz-demographics] input')?.checked ?? true, true, 'the wizard shows what launch will send');
+  }
+});
+
+// val422-2341 Worth fixing 2: a failed projects/templates read is not the draft being gone.
+test('S38: a 404 from projects or templates keeps the device copy; only the draft\'s own 404 clears it', async () => {
+  const store = tabSession(), rec = JSON.stringify({ step: 'participants', d: freshDraft() });
+  for (const bad of ['/v2/projects', '/v2/templates']) {
+    store.setItem('v3:setup:a1', rec); const srv = server();
+    const api = async (url, o = {}) => { if (url === bad) throw Object.assign(new Error('Not found'), { status: 404 }); return srv.api(url, o); };
+    const m = mount({ ...srv, api }, { resume: 'a1', session: tabSession(), store }); await settle();
+    assert.match(m.root.innerHTML, /Setup could not be opened/); assert.equal(store.m.has('v3:setup:a1'), true, `${bad} 404 keeps the copy`);
+  }
+});
+
+// val422-2341 Worth fixing 3: keyed by user + draft; another account never reads it; sign-out sweeps every wizard copy.
+test('S38: the device copy is keyed by user and draft, and clearAllWip sweeps every setup copy on sign-out', async () => {
+  const { clearAllWip, WIP_KEY } = await import('./wizard.js');
+  const srv = server(), store = tabSession();
+  const first = mount(srv, { session: tabSession(), store, user: 'u1' }); await fillStep1(first); first.submit(); await settle();
+  const box = first.$('input[name=g][value="tpl.team"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.submit(); await settle(); assert.equal(first.h.state.step, 'information'); first.h.destroy();
+  assert.equal(WIP_KEY('a1', 'u1'), 'v3:setup:u1:a1'); assert.ok(store.m.has('v3:setup:u1:a1')); assert.equal(store.m.has('v3:setup:a1'), false);
+  const other = mount(srv, { resume: 'a1', session: tabSession(), store, user: 'u2' }); await settle();
+  assert.equal(other.h.state.step, 'participants', 'another account does not get u1\'s copy'); assert.deepEqual(Object.keys(other.h.state.d.groups), []);
+  other.h.destroy();
+  store.setItem('v3:setup:a9', '{}'); store.setItem('keep:me', '1'); const sess = tabSession(); sess.setItem('v3:setup:u1:a1', '{}');
+  clearAllWip(store, sess, null);
+  assert.deepEqual([...store.m.keys()].filter(k => k.startsWith('v3:setup:')), []); assert.equal(sess.m.size, 0); assert.equal(store.getItem('keep:me'), '1');
 });

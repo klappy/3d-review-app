@@ -86,3 +86,35 @@ test('B06: a review in setup is ONE card whose one action "Continue setup" reope
   const h = homeView({ projects: [{ id: 'p1', name: 'Lake' }], listFor: () => ({ status: 'loaded', list: [{ id: 'a1', name: 'Oct', stage: 'prepare', role: 'owner' }] }), stageLabel: label });
   assert.match(h, /href="#new\/a1"[\s\S]*Continue setup/);
 });
+
+// S40 (persona C, gate 0.24.0): a signed-in invitee on Home sees one quiet line with the count and a link to the invitations screen.
+import { invitationsHint } from './home.js';
+import { pages } from '../assess/scope.js';
+import * as cards from '../assess/cards.js';
+const INV = (id, type = 'project') => ({ id, role: 'member', scope: { type, id: `${type}_${id}`, name: `N${id}` } });
+const homeCtx = map => ({ requested: [], api: async function (url) { this.requested.push(url); const r = map[url]; if (r === undefined || r instanceof Error) throw r || Object.assign(new Error('unmapped'), { code: '500' }); return r; },
+  esc: cards.esc, enc: cards.enc, go: () => {}, note: () => {}, state: { principal: null }, routes: cards.routes, cards });
+test('S40: n pending invitations → one hint line with the count, linking to #invite; Start stays the one primary', async () => {
+  const ctx = homeCtx({ '/v2/projects': { projects: [{ id: 'p1', name: 'Lake' }] }, '/v2/projects/p1/assessments': { assessments: [] }, '/v2/me': { grants: [] }, '/v2/me/invitations': { invitations: [INV('i1'), INV('i2', 'assessment'), INV('i3')] } });
+  const h = pages.projects.render(ctx, await pages.projects.load(ctx, {}));
+  assert.equal((h.match(/data-v3h-invitations>/g) || []).length, 1);
+  assert.match(h, /data-v3h-invitations>You have 3 invitations waiting\. <a href="#invite" data-v3h-invitations-link>See invitations<\/a><\/p>/);
+  assert.equal((h.match(/rv-btn primary/g) || []).length, 1, 'one primary action: Start');
+  assert.match(invitationsHint(1), /You have 1 invitation waiting\. <a href="#invite"[^>]*>See the invitation<\/a>/);
+  assert.match(homeView({ projects: [], listFor: () => ({}), invitations: 2 }), /You have 2 invitations waiting/, 'empty account still shows the hint');
+});
+test('S40: zero invitations (or a failed read) → no hint', async () => {
+  const base = { '/v2/projects': { projects: [{ id: 'p1', name: 'Lake' }] }, '/v2/projects/p1/assessments': { assessments: [] }, '/v2/me': { grants: [] } };
+  for (const inv of [{ invitations: [] }, { invitations: [{ id: 'bad' }] }, undefined]) {
+    const ctx = homeCtx(inv === undefined ? base : { ...base, '/v2/me/invitations': inv });
+    assert.doesNotMatch(pages.projects.render(ctx, await pages.projects.load(ctx, {})), /data-v3h-invitations|#invite/);
+  }
+  for (const n of [0, undefined, -1, 1.5, '3', NaN]) assert.equal(invitationsHint(n), '');
+  assert.doesNotMatch(homeView({ projects: [], listFor: () => ({}) }), /data-v3h-invitations/);
+});
+test('S40: signed out → no hint, even if the invitations read would answer', async () => {
+  const ctx = homeCtx({ '/v2/projects': Object.assign(new Error('no session'), { code: 'NOT_AUTHENTICATED' }), '/v2/me/invitations': { invitations: [INV('i1')] } });
+  const h = pages.projects.render(ctx, await pages.projects.load(ctx, {}));
+  assert.match(h, /Sign in to continue/); assert.doesNotMatch(h, /data-v3h-invitations|invitation/i);
+  assert.deepEqual(ctx.requested, ['/v2/projects'], 'signed out: /v2/me/invitations is never requested');
+});
