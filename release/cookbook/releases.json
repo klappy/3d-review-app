@@ -1,7 +1,18 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.26.1",
+  "current": "0.26.2",
   "versions": [
+    {
+      "version": "0.26.2",
+      "status": "candidate",
+      "notes_path": "releases/0.26.2.md",
+      "sections": {
+        "fixed": [
+          "The assessment setup now marks every field you must fill in with \"(required)\": Name, Project, New project name and Language, as \"Active until\" already was; the language code stays optional. (#418)",
+          "When you print a survey in another language, the \"Translating the form…\" message stays on screen until the form is ready, even if the page refreshes while it loads. (#418)"
+        ]
+      }
+    },
     {
       "version": "0.26.1",
       "status": "candidate",

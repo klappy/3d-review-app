@@ -1,30 +1,24 @@
 {
-  "version": "0.26.1",
+  "version": "0.26.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "73c7c2e631cff08566bbff5c8e10060f6f1c1f95",
+  "cookbook_commit": "6c9a9f55a86c751efb78b458a604540c26d77490",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.26.1.md",
-      "blob_sha": "b4a5def0275e5ec7e9b34a8ee37a09a9d34651b7",
-      "sha256": "cdb0beadb0d243ba3d00d173eb565f41476aa76e40e95e979fe9b4094deab9e6"
+      "path": "planning/2026-09-16-parity-build/releases/0.26.2.md",
+      "blob_sha": "30b6db42afdfc0056dc9b2788cfc7eedc7583e08",
+      "sha256": "fd460a57b32c7ed1edd3a95a01511116e08dbde257475f125f6a081e5d9019f4"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "5ac086732cc244561929dec1a661e059a3522f65",
-      "sha256": "a125c2de62e93330d004640f0d5909a96256b4bbced3ff3eac36c75a61980b2d"
+      "blob_sha": "9a40c638d6ff72a3d15db1f36bb44de9d351eb38",
+      "sha256": "2d061927da46bf444ebbb5ced5398df107476d4cca0b3acb89cf337d3635d5f8"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "When the translation service answers slowly, the survey no longer waits forever for the rest of its reply; the same time limit now covers the whole answer. (#415)",
-        "If saving a passage file fails partway, the uploaded file is cleaned up instead of being left behind in storage. (#415)",
-        "Taking a survey's link twice at the same moment no longer creates two live links; both requests get the same link. (#415)",
-        "The assessment setup now shows that \"Active until\" is required, next to \"Starts (optional)\". (#414)",
-        "When a passage link is refused (for example one starting with http:// instead of https://), the link, title and passage you typed stay in the form so you can correct them instead of typing them again. (#414)",
-        "On the participant survey, the \"answer required\" mark on a question clears as soon as you start typing an answer, not only when you leave the field. (#414)",
-        "Printing a survey in another language now follows the language picker on screen even if the page refreshed while the form was loading, and the picker and Print survey button unlock correctly afterwards. (#414)",
-        "Clicking Print survey twice quickly no longer prints the form twice; the button stays locked until the form is ready. (#414)"
+        "The assessment setup now marks every field you must fill in with \"(required)\": Name, Project, New project name and Language, as \"Active until\" already was; the language code stays optional. (#418)",
+        "When you print a survey in another language, the \"Translating the form…\" message stays on screen until the form is ready, even if the page refreshes while it loads. (#418)"
       ]
     }
   }
