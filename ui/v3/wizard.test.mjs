@@ -635,6 +635,36 @@ test('S38: restore after reload: steps 2–4 and the current step come back from
   assert.equal(wipOver({ ...back, saved: { aid: 'a8', pre: [] } }, null, st).step, 'participants', 'another draft is not touched');
 });
 
+// rev422-2241 Blocking: the device copy outlives the tab, so a co-owner (or the same owner on another device) may have changed
+// step 1 since it was written. The server's step-1 values win over an older device copy; only client-only fields are taken.
+test('S38: a device copy older than the server step 1 yields to the server values; its groups, context and step still come back', async () => {
+  const srv = server(), store = tabSession();
+  const first = mount(srv, { session: tabSession(), store }); await fillStep1(first); first.submit(); await settle();
+  const box = first.$('input[name=g][value="tpl.team"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.set('n-tpl.team', '9'); first.submit(); await settle(); assert.equal(first.h.state.step, 'information'); first.h.destroy();
+  const rec = JSON.parse(store.m.get('v3:setup:a1')); assert.equal(rec.snap.name, 'October review', 'the record keeps the server step 1 it was written against');
+  Object.assign(srv.db.a, { name: 'Renamed elsewhere', purpose: 'Changed on another device' }); // a newer step 1 saved from elsewhere
+  const again = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle(); // fresh mount, tab copy empty
+  assert.equal(again.h.state.d.name, 'Renamed elsewhere'); assert.equal(again.h.state.d.purpose, 'Changed on another device');
+  assert.equal(again.h.state.step, 'information'); assert.equal(again.h.state.d.groups['tpl.team'].expected, '9');
+  const { detailsPatch } = await import('./wizard.js');
+  assert.equal(detailsPatch(again.h.state.saved.snap, again.h.state.d), null, 'step 1 resubmitted would PATCH nothing old over the server');
+  assert.equal(srv.writes().length, 1, 'restoring writes nothing');
+});
+
+// rev422-2241 Worth fixing: a draft launched or discarded from another device leaves no device copy behind on this one.
+test('S38: the device copy is cleared when the draft left prepare or is gone (404)', async () => {
+  const srv = server(), store = tabSession();
+  const first = mount(srv, { session: tabSession(), store }); await fillStep1(first); first.submit(); await settle(); first.h.destroy();
+  assert.ok(store.m.has('v3:setup:a1')); srv.db.a.stage = 'collect'; // launched elsewhere
+  const m = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle();
+  assert.deepEqual(m.went, ['#/a/a1']); assert.equal(store.m.has('v3:setup:a1'), false, 'left prepare: device copy cleared');
+  store.setItem('v3:setup:a1', JSON.stringify({ step: 'participants', d: freshDraft() })); const gone = server();
+  const api = async (url, o = {}) => { if (url === '/v2/assessments/a1') throw Object.assign(new Error('Not found'), { status: 404 }); return gone.api(url, o); };
+  const g = mount({ ...gone, api }, { resume: 'a1', session: tabSession(), store }); await settle();
+  assert.match(g.root.innerHTML, /Setup could not be opened/); assert.equal(store.m.has('v3:setup:a1'), false, '404: device copy cleared');
+});
+
 test('S38: finishing the launch or discarding the draft clears both the tab copy and the device copy', async () => {
   const srv = server(), session = tabSession(), store = tabSession();
   const first = mount(srv, { session, store }); await fillStep1(first); first.submit(); await settle();
