@@ -371,14 +371,17 @@ function bindPrint(current, s) {
   const lock = () => { const b = app.querySelector('#print-load'), p = livePick(); if (b) b.disabled = true; if (p) p.disabled = true; };
   const setStatus = text => { const st = app.querySelector('#print-status'); if (st) st.textContent = text; };
   // #414b (render path): a repaint mid-load draws the button disabled (printLoadButton) and re-locks the live picker here.
-  if (printLoading(aid0, s.id)) lock();
+  // S35 (rev414d nit): the status line lives on the run (state.print.text), so a repaint mid-load redraws it instead of blanking it.
+  if (printLoading(aid0, s.id)) { lock(); setStatus(state.print.text || 'Preparing the form…'); }
   btn.onclick = async () => {
     const gen = generation, aid = current.assessment.id, lang = picked();
     // #414b review (worth fixing): each run owns its own token. paint() does not bump generation, so a repaint plus a second
     // click used to let the older run's idle()/finally unlock the newer run's button and both runs replayed the paper.
     // #414c nit: the run is stamped with the data version (epoch) it started from, not the one current when it finished.
     const run = { aid, sid: s.id, epoch, status: 'loading', gen, model: null };
-    state.print = run; lock();
+    // S35 (rev418 nit): the run says why the button is locked from the click on; a repaint redraws the same text (:375).
+    run.text = 'Preparing the form…';
+    state.print = run; lock(); setStatus(run.text);
     const mine = () => gen === generation && state.print === run;
     const idle = () => { if (state.print !== run) return; const b = app.querySelector('#print-load'), p = livePick(); if (b) b.disabled = state.dirty.has(aid); if (p) p.disabled = false; };
     try {
@@ -394,7 +397,7 @@ function bindPrint(current, s) {
       // first); any string without a translation stays English and is marked on the paper. Never fails the print.
       if (lang && typeof translatePrint === 'function') {
         lock();
-        setStatus('Translating the form… The first time can take up to a minute.');
+        run.text = 'Translating the form… The first time can take up to a minute.'; setStatus(run.text);
         model = await translatePrint(model, { lang, fetchImpl: facilitatorFetch(token) });
         if (!mine()) return;
       }
