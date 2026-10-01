@@ -100,7 +100,7 @@ const ENVELOPE = "#/components/schemas/Envelope";
 const deref = (s: Json): Json => {
   for (let n = 0; s && s.$ref; n++) {
     if (n > 10) throw new Error(`$ref loop at ${s.$ref}`);
-    s = oas.components.schemas[String(s.$ref).replace("#/components/schemas/", "")];
+    s = oas.components.schemas[String(s.$ref).replace(/^(openapi\.yaml)?#\/components\/schemas\//, "")];
   }
   return s;
 };
@@ -302,14 +302,6 @@ const KNOWN_DISAGREEMENTS: Record<string, { why: string; problems: string[] }> =
   "cap.response.submit request": {
     why: "openapi declares a nested shape for params.context; capabilities leaves context undeclared",
     problems: ["context nested shape on one side only (openapi)"],
-  },
-  "cap.report.build result": {
-    why: "openapi declares a nested shape for report.payload; capabilities leaves payload undeclared",
-    problems: ["oneOf[0].report.payload nested shape on one side only (openapi)"],
-  },
-  "cap.report.get result": {
-    why: "openapi declares a nested shape for report.payload; capabilities leaves payload undeclared",
-    problems: ["oneOf[0].report.payload nested shape on one side only (openapi)"],
   },
 };
 
