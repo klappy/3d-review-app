@@ -356,11 +356,12 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
   assert.equal((h.match(/data-share-print-all/g) || []).length, 1);
 });
 
-test('S35: Name, New project name and Language carry the (required) mark like Active until; the ISO code stays optional', () => {
+test('S35: Name, Project, New project name and Language carry the (required) mark like Active until; the ISO code stays optional', () => {
   const existing = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
   assert.match(existing, /Name \(required\)<input name="name"/);
   assert.match(existing, /Language \(required\)<select name="language"/);
-  assert.match(existing, /Project \(required\)<select name="project"/);
+  assert.match(existing, /Project \(required\)<select name="project" required/, 'S38: the select carries required, as validateStep enforces');
+  assert.match(renderStep('details', draft(), { projects: [], languages: [], templates: [], saved: true }), /<select name="project" required disabled>/, 'a saved draft keeps the project fixed');
   const fresh = renderStep('details', draft({ project: NEW_PROJECT }), { projects: [], languages: [], templates: [] });
   assert.match(fresh, /New project name \(required\)<input name="newProject"/);
   assert.match(fresh, /Language \(required\)<input name="newLanguage"/);
@@ -607,6 +608,45 @@ test('U22: a reload on step 1 after the save keeps unsaved step 1 edits; Discard
   assert.equal(m.h.state.step, 'details'); assert.equal(m.$('[name="name"]').value, 'November review'); assert.equal(srv.db.a.name, 'October review');
   m.click('[data-wz="cancel"]'); await settle(); m.click('[data-wz="discard"]'); await settle();
   assert.ok(srv.db.deleted); assert.equal(session.m.size, 0);
+});
+
+// S38 (persona C, gate 0.24.0): #new/<id> must come back at the step the facilitator was on with steps 2–4 kept, even when the
+// tab copy is gone (the same link reopened in a fresh tab). The device-local store keeps the same { step, d } per draft id.
+test('S38: restore after reload: steps 2–4 and the current step come back from the device copy when the tab copy is gone', async () => {
+  const srv = server(), store = tabSession();
+  const first = mount(srv, { session: tabSession(), store }); await fillStep1(first); first.submit(); await settle();
+  const box = first.$('input[name=g][value="tpl.team"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.set('n-tpl.team', '9'); first.submit(); await settle(); assert.equal(first.h.state.step, 'information');
+  const demo = first.$('[data-wz-demographics] input'); demo.checked = true; demo.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.submit(); await settle(); assert.equal(first.h.state.step, 'review'); first.h.destroy();
+  // serialized state: one entry per draft id
+  assert.deepEqual([...store.m.keys()].filter(k => k.startsWith('v3:setup:')), ['v3:setup:a1']); assert.equal(JSON.parse(store.m.get('v3:setup:a1')).step, 'review');
+  const again = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle(); // new instance, fresh tab copy
+  assert.equal(again.h.state.step, 'review', 'back on the step the facilitator was on, not step 2');
+  assert.deepEqual(Object.keys(again.h.state.d.groups), ['tpl.team']); assert.equal(again.h.state.d.groups['tpl.team'].expected, '9');
+  assert.equal(again.h.state.d.demographics, true);
+  assert.match(again.root.innerHTML, /9 expected/);
+  assert.equal(srv.writes().length, 1, 'restoring writes nothing');
+  // the pure path: a wizard state serialized by saveWip is read back by wipOver for the same draft id only
+  const { saveWip, wipOver } = await import('./wizard.js');
+  const st = tabSession(); saveWip(null, 'a7', 'information', draft({ groups: { 'tpl.team': { version: '3', expected: '' } } }), st);
+  const back = { d: freshDraft(), step: 'participants', saved: { aid: 'a7', pre: [] } };
+  const r = wipOver(back, tabSession(), st); assert.equal(r.step, 'information'); assert.deepEqual(Object.keys(r.d.groups), ['tpl.team']);
+  assert.equal(wipOver({ ...back, saved: { aid: 'a8', pre: [] } }, null, st).step, 'participants', 'another draft is not touched');
+});
+
+test('S38: finishing the launch or discarding the draft clears both the tab copy and the device copy', async () => {
+  const srv = server(), session = tabSession(), store = tabSession();
+  const first = mount(srv, { session, store }); await fillStep1(first); first.submit(); await settle();
+  const box = first.$('input[name=g][value="tpl.community"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  assert.ok(store.m.has('v3:setup:a1') && session.m.has('v3:setup:a1'));
+  first.submit(); await settle(); first.submit(); await settle(); first.click('[data-wz="launch"]'); await settle(12);
+  assert.ok(first.h.state.done); assert.equal(store.m.has('v3:setup:a1'), false, 'finish clears the device copy'); assert.equal(session.m.size, 0);
+  const srv2 = server(), session2 = tabSession(), store2 = tabSession();
+  const m = mount(srv2, { session: session2, store: store2 }); await fillStep1(m); m.submit(); await settle();
+  assert.ok(store2.m.has('v3:setup:a1'));
+  m.click('[data-wz="cancel"]'); await settle(); m.click('[data-wz="discard"]'); await settle();
+  assert.ok(srv2.db.deleted); assert.equal(store2.m.has('v3:setup:a1'), false, 'discard clears the device copy'); assert.equal(session2.m.size, 0);
 });
 
 test('U36: each launch link is handed to the host (with its link id) so Collect and the survey page reuse it', async () => {
