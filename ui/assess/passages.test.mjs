@@ -87,3 +87,29 @@ test('S34: a refused link (http://) keeps the typed URL, title and passage in th
   assert.equal(ln.querySelector('input[name=url]').value, '');
   assert.equal(root.querySelector('.p-status').textContent, 'Link added.');
 });
+
+test('S34 pin: the API refusal "a link must be a full https:// address" (src/passages.ts 400) is the status line and the draft is put back', async () => {
+  const refusal = 'a link must be a full https:// address';
+  assert.match(passagesHtml(esc, { mayEdit: true, linkDraft: { url: 'http://x.org/"v"', title: '', reference: 'Mark 4' } }), /<input value="http:\/\/x\.org\/&quot;v&quot;" type="url" name="url"/);
+  const dom = new JSDOM('<div id="r"></div>'); globalThis.FormData = dom.window.FormData;
+  const root = dom.window.document.getElementById('r');
+  const posts = [];
+  const fetchImpl = async (url, init = {}) => {
+    if ((init.method || 'GET') === 'GET') return { ok: true, status: 200, json: async () => ({ ok: true, result: { passages: [], file_storage: true } }) };
+    posts.push(JSON.parse(init.body));
+    return { ok: false, status: 400, json: async () => ({ ok: false, error: { code: 'INVALID_PARAMS', message: refusal } }) };
+  };
+  mountPassages({ root, aid: 'a1', mayEdit: true, esc, token: () => null, fetchImpl });
+  await new Promise(r => setTimeout(r, 20));
+  let ln = root.querySelector('form[data-passage-link]');
+  ln.querySelector('input[name=url]').value = '  http://youtu.be/sign  '; ln.querySelector('input[name=title]').value = 'Mark 4 in ISL';
+  await ln.onsubmit({ preventDefault() {} });
+  assert.deepEqual(posts[0], { url: 'http://youtu.be/sign', title: 'Mark 4 in ISL', reference: '' });
+  assert.equal(root.querySelector('.p-status').textContent, refusal, 'the 400 message is the status line, word for word');
+  ln = root.querySelector('form[data-passage-link]');
+  assert.notEqual(ln, null);
+  assert.equal(ln.querySelector('input[name=url]').value, 'http://youtu.be/sign', 'the kept draft is put back after the repaint');
+  assert.equal(ln.querySelector('input[name=title]').value, 'Mark 4 in ISL');
+  assert.equal(ln.querySelector('input[name=reference]').value, '');
+  assert.ok([...ln.querySelectorAll('button,input')].every(el => !el.disabled), 'the form is usable again to fix the link');
+});

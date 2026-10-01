@@ -54,7 +54,4 @@ export type Handler = (ctx: Ctx, params: Record<string, any>, opts?: { dryRun?: 
 
 export { CapError, notVisible } from "./errors";
 export const id = (p: string) => `${p}_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
-export async function sha256(s: string): Promise<string> {
-  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
-}
+export { sha256Hex as sha256 } from "../crypto";

@@ -830,3 +830,89 @@ test('S38: the device copy is keyed by user and draft, and clearAllWip sweeps ev
   clearAllWip(store, sess, null);
   assert.deepEqual([...store.m.keys()].filter(k => k.startsWith('v3:setup:')), []); assert.equal(sess.m.size, 0); assert.equal(store.getItem('keep:me'), '1');
 });
+
+// ---------- F4 (Bincy 2026-10-01): optional Passages block on Review, the same three forms as Prepare (ui/assess/passages.js) ----------
+import { passagesBlock, PASSAGES_LATER, STEPS } from './wizard.js';
+// A fake passages endpoint: GET lists, POST adds; records every call with its auth header.
+function passagesApi() {
+  const list = [], calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url, method: init.method || 'GET', auth: init.headers?.authorization || null, body: init.body });
+    if (init.method === 'POST') { const b = JSON.parse(init.body); list.push({ id: 'p' + (list.length + 1), media: 'link', title: b.title || b.url, href: b.url, reference: b.reference || null }); return { ok: true, json: async () => ({ ok: true, result: { passage: list.at(-1) } }) }; }
+    return { ok: true, json: async () => ({ ok: true, result: { passages: list, file_storage: true } }) };
+  };
+  return { list, calls, fetchImpl };
+}
+const toReview = async (srv, extra) => {
+  const m = mount(srv, { session: tabSession(), ...extra }); await fillStep1(m); m.submit(); await settle();
+  const box = m.$('input[name=g][value="tpl.team"]'); box.checked = true; m.submit(); await settle(); m.submit(); await settle();
+  assert.equal(m.h.state.step, 'review'); return m;
+};
+
+test('F4: a block on Review, not a fifth step — the four-step contract stays; skip line and Save-first shown without a saved draft', () => {
+  assert.deepEqual(STEPS, ['details', 'participants', 'information', 'review']);
+  const data = { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'L' }], templates: TEMPLATES };
+  const r = renderStep('review', draft(), { ...data, saved: true });
+  assert.match(r, /<h3>Passages \(optional\)<\/h3>/); assert.match(r, /data-wz="passages-skip">Skip for now</); assert.ok(r.includes(PASSAGES_LATER));
+  assert.match(r, /<div data-wz-passages><\/div>/);
+  assert.match(renderStep('review', draft(), data), /data-wz="passages-save">Save the draft and add passages</, 'no saved row yet: save first');
+  const skipped = passagesBlock(true, true);
+  assert.doesNotMatch(skipped, /data-wz-passages>/); assert.match(skipped, /data-wz="passages-open">Add passages</); assert.ok(skipped.includes(PASSAGES_LATER));
+  assert.doesNotMatch(renderStep('review', draft(), { ...data, saved: true }, [], { done: ['x'], links: [] }), /Passages \(optional\)/, 'a part-done launch is locked: no block');
+});
+
+test('F4: on Review the three Prepare forms attach to the saved draft (aid a1); adding a link posts there and does not move the wizard', async () => {
+  const srv = server(), p = passagesApi();
+  const m = await toReview(srv, { fetchImpl: p.fetchImpl, token: () => 'tok' }); await settle();
+  for (const f of ['data-passage-ref', 'data-passage-upload', 'data-passage-link']) assert.ok(m.$(`[data-wz-passages] form[${f}]`), f);
+  assert.match(m.$('[data-wz-passages]').innerHTML, /up to 50 MB/);
+  assert.deepEqual(p.calls.map(c => `${c.method} ${c.url}`), ['GET /v2/assessments/a1/passages']); assert.equal(p.calls[0].auth, 'Bearer tok');
+  const ln = m.$('form[data-passage-link]'); ln.querySelector('[name=url]').value = 'https://youtu.be/x'; ln.querySelector('[name=title]').value = 'Mark 4 in sign language';
+  ln.dispatchEvent(new m.w.Event('submit', { bubbles: true, cancelable: true })); await settle();
+  assert.equal(p.calls.filter(c => c.method === 'POST').length, 1); assert.equal(p.calls.find(c => c.method === 'POST').url, '/v2/assessments/a1/passages');
+  assert.equal(m.h.state.step, 'review'); assert.deepEqual(m.h.state.errs, []);
+  assert.match(m.$('[data-wz-passages]').innerHTML, /Mark 4 in sign language/);
+  assert.equal(srv.writes().length, 1, 'the wizard itself wrote only the step-1 save (nothing for the passage form)');
+});
+
+test('F4: Skip for now folds the forms away with the Prepare line; launch is unchanged; Add passages brings them back', async () => {
+  const srv = server(), p = passagesApi();
+  const m = await toReview(srv, { fetchImpl: p.fetchImpl }); await settle();
+  m.click('[data-wz="passages-skip"]'); await settle();
+  assert.equal(m.$('[data-wz-passages]'), null); assert.ok(m.$('[data-wz-passages-later]').textContent.includes('You can add passages later under Prepare.'));
+  m.click('[data-wz="passages-open"]'); await settle(); assert.ok(m.$('[data-wz-passages] form[data-passage-link]'));
+  m.click('[data-wz="passages-skip"]'); await settle();
+  m.click('[data-wz="launch"]'); await settle(12); assert.ok(m.h.state.done, 'launched with no passage');
+  assert.equal(p.calls.filter(c => c.method !== 'GET').length, 0, 'skipping writes no passage');
+});
+
+test('F4: Continue setup resumed on Review shows the passages already on the draft', async () => {
+  const srv = server(), store = tabSession(), p = passagesApi();
+  (await toReview(srv, { store, fetchImpl: p.fetchImpl })).h.destroy();
+  p.list.push({ id: 'p1', media: 'link', title: 'Genesis 1 audio', href: 'https://example.org/g1' });
+  const again = mount(srv, { resume: 'a1', session: tabSession(), store, fetchImpl: p.fetchImpl }); await settle();
+  assert.equal(again.h.state.step, 'review');
+  assert.match(again.$('[data-wz-passages]').innerHTML, /Genesis 1 audio/);
+  assert.ok(p.calls.every(c => c.url === '/v2/assessments/a1/passages'));
+});
+
+test('rev440 S1+S2: a repaint while a link add is pending keeps the same passages node, its status and one request; Launch waits', async () => {
+  const srv = server(), p = passagesApi(); let release;
+  const gate = new Promise(r => { release = r; });
+  const fetchImpl = async (url, init = {}) => { if (init.method === 'POST') await gate; return p.fetchImpl(url, init); };
+  const m = await toReview(srv, { fetchImpl }); await settle();
+  const host = m.$('[data-wz-passages]');
+  const ln = m.$('form[data-passage-link]'); ln.querySelector('[name=url]').value = 'https://youtu.be/x';
+  ln.dispatchEvent(new m.w.Event('submit', { bubbles: true, cancelable: true })); await settle();
+  assert.equal(m.$('[data-wz="launch"]').disabled, true, 'Launch waits for the pending passage');
+  m.click('[data-wz="cancel"]'); await settle(); // repaint: Leave setup asks in the page
+  assert.ok(m.$('[data-wz-ask]'), 'the wizard repainted');
+  assert.equal(m.$('[data-wz-passages]'), host, 'the same mounted node, re-inserted');
+  assert.equal(m.$('[data-wz-passages] .p-status').textContent, 'Adding link…', 'status survives the repaint');
+  assert.equal(m.$('[data-wz="launch"]').disabled, true, 'still waiting after the repaint');
+  m.click('[data-wz="launch"]'); await settle(); assert.equal(m.h.state.done, null, 'a click while pending does not launch');
+  release(); await settle();
+  assert.deepEqual(p.calls.map(c => c.method), ['GET', 'POST', 'GET'], 'one list read, one add, one re-read; no second GET/POST from the repaint');
+  assert.equal(m.$('[data-wz-passages] .p-status').textContent, 'Link added.');
+  assert.equal(m.$('[data-wz="launch"]').disabled, false, 'Launch is available again');
+});

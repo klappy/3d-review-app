@@ -1,7 +1,27 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.26.5",
+  "current": "0.27.0",
   "versions": [
+    {
+      "version": "0.27.0",
+      "status": "candidate",
+      "notes_path": "releases/0.27.0.md",
+      "sections": {
+        "added": [
+          "While you set up a review, the last step now lets you add the passage for participants (a file up to 50 MB, a link such as a sign-language video, or just the passage name). It is optional: choose \"Skip for now\" and add passages later under Prepare. (#440)"
+        ],
+        "changed": [
+          "The app's hashing and signing helpers now live in one place; links, codes and receipts are signed exactly as before. (#435)",
+          "The Home \"Sign in\" button picks its destination directly from the email-links setting instead of rewriting the page text afterwards; where it leads is unchanged. (#436)",
+          "On a print preview in another language, a screen reader now hears the \"no shared link\" box in that language (or is told it is English when no translation exists). (#436)",
+          "No behaviour change: a test now pins that a refused passage link (the \"a link must be a full https:// address\" message) stays typed in the link fields and that message shows as the status line. (#437)"
+        ],
+        "fixed": [
+          "While results are held, the Results line no longer says \"at least three responses per group\"; it now says how many responses are in and how many the server needs (for example 3 so far, at least 5 needed), or a plain line when those numbers are not given. (#438)",
+          "When an assessment cannot be deleted, the message now names what is in the way (its surveys, its responses, or both) instead of saying \"0 responses\". (#439)"
+        ]
+      }
+    },
     {
       "version": "0.26.5",
       "status": "candidate",

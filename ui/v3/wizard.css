@@ -29,3 +29,7 @@
 
 /* Dynamic translation: LWC checkboxes on step 1 (ui/v3/lwc.js). */
 .lwc-field{border:0;padding:0;margin:14px 0 0;min-width:0}.lwc-field legend{font-weight:600;padding:0}.lwc-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px 12px;margin-top:6px}.lwc-option{display:flex;align-items:center;gap:6px;min-height:40px;font-weight:400}
+
+/* F4: optional Passages block on Review (forms from ui/assess/passages.js; its own heading is kept for the section's name). */
+.v3-wizard .wz-passages{margin:8px 0 20px}.v3-wizard .wz-passages .passages{margin-top:0}.v3-wizard .wz-passages .passages>h3{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.v3-wizard .wz-passages .p-forms label{margin:0;font-weight:400}.v3-wizard .wz-passages .p-forms input{min-width:0}
