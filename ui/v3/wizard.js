@@ -252,21 +252,28 @@ function safeStore() { try { return globalThis.localStorage || null; } catch { r
 // copy wins when both exist; both are cleared on launch or discard. Client-side only; no API field, no server round-trip.
 // The record also keeps the step-1 values the server held when it was written (snap). A device copy whose snap no longer
 // matches the server (renamed or re-dated from another device) gives up its step-1 values: only what the server never holds
-// (group ticks and counts, group context, the step) is taken from it. It is also cleared once the draft left prepare or is gone.
-export const WIP_KEY = aid => `v3:setup:${aid}`;
+// (group ticks and counts, group context, the demographics switch, the step) is taken from it. It is also cleared once the draft
+// left prepare or is gone (its own read 404s; a failed projects/templates read never clears it).
+// val422-2341: the copy is keyed by the signed-in principal as well as the draft (deps.user), so another account on the same
+// device never reads it, and sign-out sweeps every v3:setup: key (clearAllWip, ui/assess/assess.js). Copies written before the
+// user key existed simply miss the new key and are ignored (left for the sign-out sweep).
+export const WIP_PREFIX = 'v3:setup:';
+export const WIP_KEY = (aid, uid = '') => uid ? `${WIP_PREFIX}${uid}:${aid}` : `${WIP_PREFIX}${aid}`;
 function safeSession() { try { return globalThis.sessionStorage || null; } catch { return null; } }
-export function saveWip(session, aid, step, d, store = null, snap = null) { const v = JSON.stringify(snap ? { step, d, snap } : { step, d }); for (const st of [session, store]) try { st?.setItem(WIP_KEY(aid), v); } catch {} }
-export function clearWip(session, aid, store = null) { for (const st of [session, store]) try { st?.removeItem?.(WIP_KEY(aid)); } catch {} }
-const readWip = (st, aid) => { try { const w = JSON.parse(st?.getItem(WIP_KEY(aid)) || 'null'); return w && w.d && STEPS.includes(w.step) ? w : null; } catch { return null; } };
+export function saveWip(session, aid, step, d, store = null, snap = null, uid = '') { const v = JSON.stringify(snap ? { step, d, snap } : { step, d }); for (const st of [session, store]) try { st?.setItem(WIP_KEY(aid, uid), v); } catch {} }
+export function clearWip(session, aid, store = null, uid = '') { for (const st of [session, store]) try { st?.removeItem?.(WIP_KEY(aid, uid)); } catch {} }
+// Sign-out: remove every wizard copy (any draft, any user) from the given storages; a prefix scan of the keys.
+export function clearAllWip(...stores) { for (const st of stores) try { const ks = []; for (let i = 0; i < (st?.length || 0); i++) { const k = st.key(i); if (k && k.startsWith(WIP_PREFIX)) ks.push(k); } for (const k of ks) st.removeItem(k); } catch {} }
+const readWip = (st, aid, uid = '') => { try { const w = JSON.parse(st?.getItem(WIP_KEY(aid, uid)) || 'null'); return w && w.d && STEPS.includes(w.step) ? w : null; } catch { return null; } };
 // The saved draft wins where the server fixed it: the project, and surveys the draft already holds (B06f).
 const sameSnap = (a, b) => !!a && !!b && Object.keys(b).every(k => (a[k] ?? null) === (b[k] ?? null));
-export function wipOver(back, session, store = null) {
-  const tab = readWip(session, back.saved.aid), w = tab || readWip(store, back.saved.aid);
+export function wipOver(back, session, store = null, uid = '') {
+  const tab = readWip(session, back.saved.aid, uid), w = tab || readWip(store, back.saved.aid, uid);
   if (!w) return back;
   const groups = { ...(w.d.groups || {}) };
   for (const x of back.saved.pre) if (!groups[x.template]) groups[x.template] = back.d.groups[x.template];
   const fresh = tab || sameSnap(w.snap, back.saved.snap); // a device copy older than the server's step 1 keeps only client-only fields
-  const d = fresh ? { ...back.d, ...w.d, project: back.d.project, groups } : { ...back.d, groups, context: { ...(w.d.context || {}) } };
+  const d = fresh ? { ...back.d, ...w.d, project: back.d.project, groups } : { ...back.d, groups, context: { ...(w.d.context || {}) }, demographics: typeof w.d.demographics === 'boolean' ? w.d.demographics : back.d.demographics }; // demographics reaches the server only at launch (val422-2341)
   const step = STEPS.indexOf(w.step) > 1 && validateStep('participants', d).length ? 'participants' : w.step; // never past an empty step 2
   return { ...back, d, step };
 }
@@ -410,13 +417,15 @@ export function renderDone(ctx, origin = '', templates = []) {
 
 // ---------- mount ----------
 // deps: { api(url, {method, body}) → result, go(hash), assessmentHref(aid), origin, store, resume? (B06: saved draft's assessment id),
-//   mark?(aid) (U22: the shell puts #new/<aid> in the URL without a re-render), session? (U22: sessionStorage stand-in) }
+//   mark?(aid) (U22: the shell puts #new/<aid> in the URL without a re-render), session? (U22: sessionStorage stand-in),
+//   user? (val422-2341: signed-in principal id; keys the setup copies) }
 export function mountWizard(root, deps) {
   ensureStepperStyle(root?.ownerDocument);
   const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0, saved: null, saveCtx: null, asking: false };
   let alive = true; const ac = new AbortController(); const on = { signal: ac.signal };
   const session = deps.session === undefined ? safeSession() : deps.session, store = deps.store === undefined ? safeStore() : deps.store; // S38: device-local copy
-  const wip = () => { if (s.saved && !s.done && !s.partial) saveWip(session, s.saved.aid, s.step, s.d, store, s.saved.snap); };
+  const uid = deps.user ? String(deps.user) : ''; // val422-2341: the signed-in principal id (assess.js passes state.principal.id)
+  const wip = () => { if (s.saved && !s.done && !s.partial) saveWip(session, s.saved.aid, s.step, s.d, store, s.saved.snap, uid); };
   // B06: only the current step's live form is read on paint; a form left behind by a step change was already read (never undo a save's adoption).
   const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done && live.dataset.wzForm === s.step) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [] }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; wip(); };
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
@@ -483,7 +492,7 @@ export function mountWizard(root, deps) {
     if (act === 'discard' && s.saved) {
       s.busy = true; let confirmed = null;
       await deleteAssessmentFlow(b, { id: s.saved.aid, api: deps.api, ask: (_b, _sentence, _label, go) => { confirmed = go(); }, // already asked in the page
-        onDeleted: () => { clearWip(session, s.saved.aid, store); s.saved = null; deps.go?.('#/'); }, onRefused: t => note(new Error(t)), onError: err => note(err) });
+        onDeleted: () => { clearWip(session, s.saved.aid, store, uid); s.saved = null; deps.go?.('#/'); }, onRefused: t => note(new Error(t)), onError: err => note(err) });
       await confirmed; s.busy = false; return;
     }
     if (act === 'back') { const f = root.querySelector('form'); if (f) read(f); s.step = STEPS[Math.max(0, STEPS.indexOf(s.step) - 1)]; return paint(); }
@@ -493,7 +502,7 @@ export function mountWizard(root, deps) {
     if (act === 'open') { const href = deps.assessmentHref ? deps.assessmentHref(b.dataset.aid) : `#/a/${enc(b.dataset.aid)}`; b.disabled = true; try { await deps.beforeOpen?.(b.dataset.aid); } catch {} if (!alive) return; return deps.go?.(href); }
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
-      try { const done = await launch(s.d, { api: deps.api, store: deps.store, onLink: deps.onLink, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; if (s.saved) clearWip(session, s.saved.aid, store); s.done = done; s.partial = null; paint(); }
+      try { const done = await launch(s.d, { api: deps.api, store: deps.store, onLink: deps.onLink, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; if (s.saved) clearWip(session, s.saved.aid, store, uid); s.done = done; s.partial = null; paint(); }
       catch (err) { if (!alive) return; const c = err.ctx, made = c ? c.done.length - (c.base || 0) : 0; s.partial = (made > 0 || c?.pending) ? c : s.partial; s.step = 'review'; note(new Error(s.partial ? `${err.message || err} ${s.partial.done.length - (s.partial.base || 0)} of the launch writes were done${s.partial.pending ? ' and the last one may have gone through' : ''}. "Continue the launch" checks what was saved and picks up from there; edits stay locked until then.` : `${err.message || err} ${s.saved ? 'Nothing more was saved; the draft is kept.' : 'Nothing was created.'} You can edit and launch again.`)); }
       finally { s.busy = false; }
     }
@@ -501,13 +510,14 @@ export function mountWizard(root, deps) {
   (async () => {
     if (deps.resume) root.innerHTML = '<div class="v3-wizard glass panel"><p class="muted">Loading the saved setup…</p></div>'; else paint(); // B06: no empty step 1 while the draft loads
     try {
-      const [p, t, r] = await Promise.all([deps.api('/v2/projects'), deps.api('/v2/templates'), deps.resume ? deps.api(`/v2/assessments/${enc(deps.resume)}`) : null]); if (!alive) return;
+      let gone = false; // val422-2341: only the draft's own 404 clears the copy, never a failed projects/templates read
+      const [p, t, r] = await Promise.all([deps.api('/v2/projects'), deps.api('/v2/templates'), deps.resume ? deps.api(`/v2/assessments/${enc(deps.resume)}`).catch(e => { if (e?.status === 404) gone = true; throw e; }) : null]).catch(e => { if (gone) clearWip(session, deps.resume, store, uid); throw e; }); if (!alive) return;
       s.data.projects = (p.projects || []).filter(x => !x.archived_at && (x.role === 'owner' || x.role === 'member')); s.data.templates = t.templates || [];
       if (r) { // B06: Continue setup — a launched review has no setup left, and a viewer cannot set up (B06f), so both open the review; a draft reopens at its next unfinished step
         const a = r.assessment || {};
-        if (a.stage !== 'prepare') clearWip(session, a.id || deps.resume, store); // launched (or left prepare) from another device
+        if (a.stage !== 'prepare') clearWip(session, a.id || deps.resume, store, uid); // launched (or left prepare) from another device
         if (a.stage !== 'prepare' || a.role === 'viewer') return deps.go?.(deps.assessmentHref ? deps.assessmentHref(a.id || deps.resume) : `#/a/${enc(a.id || deps.resume)}`);
-        const back = wipOver(draftFromSaved(a, r.surveys || [], deps.store), session, store); s.d = back.d; s.step = back.step; s.saved = back.saved;
+        const back = wipOver(draftFromSaved(a, r.surveys || [], deps.store), session, store, uid); s.d = back.d; s.step = back.step; s.saved = back.saved;
         if (!s.data.projects.some(x => x.id === a.project_id)) { const any = (p.projects || []).find(x => x.id === a.project_id); s.data.projects.push({ id: a.project_id, name: any?.name || 'This project' }); }
         await loadLanguages(); if (!alive) return;
       }
@@ -515,7 +525,6 @@ export function mountWizard(root, deps) {
     }
     catch (err) { // B06: a draft that cannot be read is never replaced by a fresh setup (Continue would make a second review)
       if (!alive) return;
-      if (deps.resume && !s.saved && err?.status === 404) clearWip(session, deps.resume, store); // discarded from another device
       if (deps.resume && !s.saved) { root.innerHTML = `<div class="v3-wizard glass panel"><h1 class="wz-h">Setup could not be opened</h1><div class="note alert" role="alert">${esc(err?.message || String(err))}</div><div class="actions"><button type="button" class="rv-btn quiet" data-wz="keep">Back to Home</button></div></div>`; return; }
       note(err);
     }

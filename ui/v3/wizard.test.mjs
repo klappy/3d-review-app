@@ -581,7 +581,7 @@ test('B09: step 3 offers optional group context per group (no names) and launch 
 });
 
 // U22: reload mid-setup. The same session store stands in for the tab's sessionStorage across the reload.
-const tabSession = () => { const m = new Map(); return { m, getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+const tabSession = () => { const m = new Map(); return { m, getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), get length() { return m.size; }, key: i => [...m.keys()][i] ?? null }; };
 test('U22: a reload on step 2 or step 3 reopens the same draft at that step with what was typed; launch clears it', async () => {
   const srv = server(), session = tabSession(), marked = [];
   const first = mount(srv, { session, mark: id => marked.push(id) }); await fillStep1(first); first.submit(); await settle();
@@ -735,4 +735,45 @@ test('B14: a failed re-read still opens the review; the app host wires the re-re
   assert.deepEqual(m.went, ['#assessment/a1']);
   const src = readFileSync(new URL('../assess/assess.js', import.meta.url), 'utf8');
   assert.match(src, /beforeOpen: \(\) => \(idg === identityGeneration \? reloadProjects\(\) : false\)/);
+});
+
+// val422-2341 Worth fixing 1: the demographics switch reaches the server only at launch, so a stale device copy keeps it.
+test('S38: a stale device copy (snap mismatch) keeps the "Ask participants about themselves" switch', async () => {
+  const srv = server(), store = tabSession();
+  const first = mount(srv, { session: tabSession(), store }); await fillStep1(first); first.submit(); await settle();
+  const box = first.$('input[name=g][value="tpl.team"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.submit(); await settle(); assert.equal(first.h.state.step, 'information');
+  const demo = first.$('[data-wz-demographics] input'); demo.checked = true; demo.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.h.destroy();
+  Object.assign(srv.db.a, { name: 'Renamed elsewhere' }); // snap no longer matches
+  const again = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle();
+  assert.equal(again.h.state.d.name, 'Renamed elsewhere', 'server step 1 still wins');
+  assert.equal(again.h.state.d.demographics, true, 'the switch is not silently reverted');
+});
+
+// val422-2341 Worth fixing 2: a failed projects/templates read is not the draft being gone.
+test('S38: a 404 from projects or templates keeps the device copy; only the draft\'s own 404 clears it', async () => {
+  const store = tabSession(), rec = JSON.stringify({ step: 'participants', d: freshDraft() });
+  for (const bad of ['/v2/projects', '/v2/templates']) {
+    store.setItem('v3:setup:a1', rec); const srv = server();
+    const api = async (url, o = {}) => { if (url === bad) throw Object.assign(new Error('Not found'), { status: 404 }); return srv.api(url, o); };
+    const m = mount({ ...srv, api }, { resume: 'a1', session: tabSession(), store }); await settle();
+    assert.match(m.root.innerHTML, /Setup could not be opened/); assert.equal(store.m.has('v3:setup:a1'), true, `${bad} 404 keeps the copy`);
+  }
+});
+
+// val422-2341 Worth fixing 3: keyed by user + draft; another account never reads it; sign-out sweeps every wizard copy.
+test('S38: the device copy is keyed by user and draft, and clearAllWip sweeps every setup copy on sign-out', async () => {
+  const { clearAllWip, WIP_KEY } = await import('./wizard.js');
+  const srv = server(), store = tabSession();
+  const first = mount(srv, { session: tabSession(), store, user: 'u1' }); await fillStep1(first); first.submit(); await settle();
+  const box = first.$('input[name=g][value="tpl.team"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.submit(); await settle(); assert.equal(first.h.state.step, 'information'); first.h.destroy();
+  assert.equal(WIP_KEY('a1', 'u1'), 'v3:setup:u1:a1'); assert.ok(store.m.has('v3:setup:u1:a1')); assert.equal(store.m.has('v3:setup:a1'), false);
+  const other = mount(srv, { resume: 'a1', session: tabSession(), store, user: 'u2' }); await settle();
+  assert.equal(other.h.state.step, 'participants', 'another account does not get u1\'s copy'); assert.deepEqual(Object.keys(other.h.state.d.groups), []);
+  other.h.destroy();
+  store.setItem('v3:setup:a9', '{}'); store.setItem('keep:me', '1'); const sess = tabSession(); sess.setItem('v3:setup:u1:a1', '{}');
+  clearAllWip(store, sess, null);
+  assert.deepEqual([...store.m.keys()].filter(k => k.startsWith('v3:setup:')), []); assert.equal(sess.m.size, 0); assert.equal(store.getItem('keep:me'), '1');
 });
