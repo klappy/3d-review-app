@@ -78,7 +78,14 @@ export async function openFeedbackDialog(ctx, { doc = document, returnFocus = nu
     const r = dialog.getBoundingClientRect();
     return !r.width || event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom;
   };
-  dialog.addEventListener('click', event => { if (onBackdrop(event) || event.target.closest?.('[data-feedback-close]')) close(); });
+  // rev444: a drag that starts in the form and is released on the backdrop must not close (and lose the draft); only a press that
+  // also began on the backdrop counts. The press target is recorded on the dialog element and checked on click.
+  let pressedOnBackdrop = false;
+  for (const type of ['pointerdown', 'mousedown']) dialog.addEventListener(type, event => { pressedOnBackdrop = onBackdrop(event); });
+  dialog.addEventListener('click', event => {
+    const backdrop = pressedOnBackdrop && onBackdrop(event); pressedOnBackdrop = false;
+    if (backdrop || event.target.closest?.('[data-feedback-close]')) close();
+  });
   dialog.addEventListener('cancel', event => { event.preventDefault(); close(); }); // Escape
   dialog.addEventListener('close', close);
   if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');

@@ -87,7 +87,7 @@ test('S54: menu feedback opens a labelled dialog over the current screen without
   assert.equal(h.app().innerHTML, h.before); assert.equal(h.doc.getElementById('work').value, 'unfinished answer');
 });
 test('S54: Close, Escape and backdrop each remove only the dialog, restore focus and leave the screen untouched', async () => {
-  const ways = { close: (h, d) => d.querySelector('[data-feedback-close]').click(), escape: (h, d) => d.dispatchEvent(new h.dom.window.Event('cancel', { cancelable: true })), backdrop: (h, d) => d.dispatchEvent(new h.dom.window.MouseEvent('click', { bubbles: true })) };
+  const ways = { close: (h, d) => d.querySelector('[data-feedback-close]').click(), escape: (h, d) => d.dispatchEvent(new h.dom.window.Event('cancel', { cancelable: true })), backdrop: (h, d) => { d.dispatchEvent(new h.dom.window.MouseEvent('mousedown', { bubbles: true })); d.dispatchEvent(new h.dom.window.MouseEvent('click', { bubbles: true })); } };
   for (const [name, act] of Object.entries(ways)) {
     const h = await modal(); h.doc.querySelector('#feedback-dialog textarea').value = 'unsent';
     act(h, h.dialog());
@@ -122,4 +122,21 @@ test('S54: menu link is intercepted in place while the #feedback route still ren
   const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
   assert.match(source, /a\[href="#feedback"\]/); assert.match(source, /openFeedbackDialog\(/);
   const h = await setup(success); assert.ok(h.root.querySelector('h1')); assert.equal(h.root.querySelector('.actions a').getAttribute('href'), '#'); assert.equal(h.root.querySelector('[data-feedback-close]'), null);
+});
+test('rev444: a press inside the form released on the backdrop keeps the dialog and its draft', async () => {
+  const h = await modal(), d = h.dialog(), text = d.querySelector('textarea'); text.value = 'half-written draft';
+  text.dispatchEvent(new h.dom.window.MouseEvent('mousedown', { bubbles: true }));
+  d.dispatchEvent(new h.dom.window.MouseEvent('click', { bubbles: true })); // browsers target the common ancestor (the dialog) on such a release
+  assert.ok(h.dialog()); assert.equal(h.dialog().querySelector('textarea').value, 'half-written draft'); assert.equal(h.calls.length, 0);
+});
+test('rev444: an identity reset removes an open feedback dialog', async () => {
+  const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  const reset = source.slice(source.indexOf('function resetIdentity()'), source.indexOf('\n}', source.indexOf('function resetIdentity()')));
+  const line = reset.split('\n').find(l => l.includes("getElementById('feedback-dialog')"));
+  assert.ok(line && /\?\.remove\(\)/.test(line), 'resetIdentity removes #feedback-dialog');
+  let resolve; const h = await modal(() => new Promise(r => { resolve = r; })), d = h.dialog();
+  d.querySelector('[name=note]').value = 'old identity'; const pending = d.querySelector('form').onsubmit({ preventDefault() {} });
+  new Function('document', line.split('//')[0])(h.doc); // run resetIdentity's own line against this document
+  assert.equal(h.dialog(), null); assert.equal(h.app().innerHTML, h.before);
+  resolve(success()); await pending; assert.equal(d.querySelector('#feedback-receipt').textContent, '');
 });
