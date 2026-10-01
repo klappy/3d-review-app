@@ -13,6 +13,9 @@ const count = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 /** The dry run's impact as one sentence; ok=false when the server would refuse (D5: not empty). */
 export function deleteImpact(dry) {
   const a = dry?.impact?.affected?.[0] || {}, surveys = Number(a.surveys) || 0, responses = Number(a.responses) || 0;
+  // UX-8 C231: name only what blocks — never "0 responses". D5 (server) still refuses either one.
+  if (surveys && !responses) return { ok: false, sentence: `This assessment includes ${count(surveys, 'survey')}, so it cannot be deleted. Remove its surveys first.` };
+  if (responses && !surveys) return { ok: false, sentence: `This assessment has ${count(responses, 'response')}, so it cannot be deleted.` };
   if (surveys || responses) return { ok: false, sentence: `This assessment has ${count(responses, 'response')} in ${count(surveys, 'survey')}, so it cannot be deleted.` };
   return { ok: true, sentence: 'This deletes the assessment; it has no surveys or responses.' };
 }
