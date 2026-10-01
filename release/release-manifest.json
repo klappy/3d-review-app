@@ -1,24 +1,29 @@
 {
-  "version": "0.26.2",
+  "version": "0.26.3",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "6c9a9f55a86c751efb78b458a604540c26d77490",
+  "cookbook_commit": "b39ab28623b0f2c0fd546cd9b27b53116ffc2e70",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.26.2.md",
-      "blob_sha": "30b6db42afdfc0056dc9b2788cfc7eedc7583e08",
-      "sha256": "fd460a57b32c7ed1edd3a95a01511116e08dbde257475f125f6a081e5d9019f4"
+      "path": "planning/2026-09-16-parity-build/releases/0.26.3.md",
+      "blob_sha": "c7a7c5570e1bd3675f493edaaa9dd073c5e71cf3",
+      "sha256": "1a7f9c18ae8bb38b44d1d94dd00ce36c7d22b7d7df408af4a0cb79870722d23a"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "9a40c638d6ff72a3d15db1f36bb44de9d351eb38",
-      "sha256": "2d061927da46bf444ebbb5ced5398df107476d4cca0b3acb89cf337d3635d5f8"
+      "blob_sha": "f9953d0f6ef48e65b093e3231ca91217d38b36e3",
+      "sha256": "4735d244e4fa6d2bc76d2fb4ed1fef87e923b57baa201e821cde23d7082367e9"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "The assessment setup now marks every field you must fill in with \"(required)\": Name, Project, New project name and Language, as \"Active until\" already was; the language code stays optional. (#418)",
-        "When you print a survey in another language, the \"Translating the form…\" message stays on screen until the form is ready, even if the page refreshes while it loads. (#418)"
+        "A survey link opened with an unexpected setting now says which settings it accepts (token, resume_token) instead of only \"unknown link parameter\". (#419)",
+        "Asking for the survey form with extra settings (such as a language) now says the language is chosen through translation, not on the form. (#419)",
+        "The receipt returned by `GET /v2/participate/receipt` (cap.response.receipt) now names the review it belongs to; the on-screen receipt is unchanged. (#419)",
+        "If the page reloads while you are setting up an assessment, the wizard now returns to the step you were on with your choices kept. (#422)",
+        "The Project field in the assessment setup is now marked as required in the form itself, so the browser points to it if it is left empty, as it already does for Name and Active until. (#422)",
+        "Translation requests that are far too large are now refused before being read, so an oversized request cannot slow the service. (#423)",
+        "When you sign in and someone has invited you to a review, Home now says so and takes you to the invitation. (#424)"
       ]
     }
   }
