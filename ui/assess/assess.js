@@ -372,7 +372,7 @@ function bindPrint(current, s) {
   const setStatus = text => { const st = app.querySelector('#print-status'); if (st) st.textContent = text; };
   // #414b (render path): a repaint mid-load draws the button disabled (printLoadButton) and re-locks the live picker here.
   // S35 (rev414d nit): the status line lives on the run (state.print.text), so a repaint mid-load redraws it instead of blanking it.
-  if (printLoading(aid0, s.id)) { lock(); if (state.print.text) setStatus(state.print.text); }
+  if (printLoading(aid0, s.id)) { lock(); setStatus(state.print.text || 'Preparing the form…'); }
   btn.onclick = async () => {
     const gen = generation, aid = current.assessment.id, lang = picked();
     // #414b review (worth fixing): each run owns its own token. paint() does not bump generation, so a repaint plus a second
