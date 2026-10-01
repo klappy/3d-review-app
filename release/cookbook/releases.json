@@ -1,7 +1,18 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.26.3",
+  "current": "0.26.4",
   "versions": [
+    {
+      "version": "0.26.4",
+      "status": "candidate",
+      "notes_path": "releases/0.26.4.md",
+      "sections": {
+        "fixed": [
+          "\"See invitations\" on Home now opens your list of invitations, not an emailed invitation you opened earlier and did not accept; emailed invitation links work as before. (#425)",
+          "If you turn off \"Ask participants about themselves\" in setup after it was turned on in Prepare, the review now launches with it off. (#429)"
+        ]
+      }
+    },
     {
       "version": "0.26.3",
       "status": "candidate",
