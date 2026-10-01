@@ -183,7 +183,7 @@ export async function handleTranslate(request: Request, env: Env, deps: Deps = {
   const limiter = await translateLimiter(request, env);
   if (!(await allow(env, limiter.name, limiter.key)))
     return reply({ error: "rate_limited", hint: `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again` }, 429, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
-  const raw = await readCappedBody(request).catch(() => null);
+  const raw = await readCappedBody(request).catch(() => ""); // a broken stream is a bad body (400 below), not an oversized one
   if (raw === null) return reply({ error: "invalid_params", message: "request is too large" }, 413);
   let body: unknown;
   try { body = JSON.parse(raw); } catch { return reply({ error: "invalid_params", message: "JSON object body required" }, 400); }
