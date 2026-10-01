@@ -31,3 +31,6 @@ a.v3h-acard:hover, a.v3h-acard:focus-visible { box-shadow: 0 4px 14px rgba(15, 2
 a.v3h-acard .v3h-continue { border: 0; padding: 0; margin-top: 10px; background: none; color: var(--green, #1f7a45); font-size: 14px; }
 a.v3h-acard:hover .v3h-continue, a.v3h-acard:focus-visible .v3h-continue { background: none; color: var(--green, #1f7a45); text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) { a.v3h-acard { transition: none; } }
+/* S40: the pending-invitations hint — secondary text under the sub-line, link in the primary token (never a button). */
+.v3h-invites { margin-top: 6px; }
+.v3h-invites a { color: var(--primary, #1f6f6a); font-weight: 600; }

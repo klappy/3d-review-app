@@ -72,7 +72,7 @@ export function render(ctx, { current, survey, share }) {
   const ready = !!link || share.stage === 'ready';
   const actions = !share.open
     ? `<button type="button" class="primary" data-share-open>${esc(copy.open)}</button>`
-    : `<p class="note small">${link ? 'Everyone can use this one link, also after you reload this page. In a new tab, sharing makes a new one.' : `Choose how to share ${esc(survey.template_name || 'this survey')}. Your choice makes a participant link available.`} You can revoke the link later; answers already sent stay with the team.</p>
+    : `<p class="note small">${link ? 'Everyone can use this one link, also after you reload this page or open it in a new tab.' : `Choose how to share ${esc(survey.template_name || 'this survey')}. Your choice makes a participant link available.`} You can revoke the link later; answers already sent stay with the team.</p>
       ${link ? `<div class="share-link"><p data-share-url><code>${esc(link.url)}</code></p>${link.expires_at ? `<p class="small muted">Expires ${esc(link.expires_at)}</p>` : ''}</div>` : ''}
       <div class="actions">${ready || busy ? shareActions(ctx, { prefix: 'share', disabled: busy, qrShown: !!link, primary: true }) : `<button type="button" data-share-open>Try sharing again</button>`}${link ? `<button type="button" class="quiet" data-share-revoke ${busy ? 'disabled' : ''}>${esc(copy.revoke)}</button>` : ''}<button type="button" class="quiet" data-share-close ${busy ? 'disabled' : ''}>Close</button></div>
       ${link ? `<figure class="share-qr" data-share-qr-figure>${qrSvg(link.url)}<figcaption class="small muted">Scan to open the survey</figcaption></figure>` : ''}${link ? `<p class="small muted">${esc(copy.onceShown)}</p>` : ''}`;

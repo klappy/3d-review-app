@@ -5,6 +5,7 @@ import { CapError, notVisible } from "./errors";
 import { gate, isOtherOption, newId, nowIso, OTHER_TEXT_KEY, OTHER_TEXT_MAX, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
 
 import { collecting, sharedSession, submitShared } from "./shared-link";
+import { minimumHold } from "./results";
 import { RESPONDENT_FIELDS, demographicsEnabled, demographicsProjection, groupContextOnly, groupFields, validateContext } from "../context-fields";
 
 interface ParticipantSurvey { id: string; assessment_id: string; template_id: string; template_version: number; state: string; collection_status: string; name: string; language_name: string; period: string | null; purpose: string | null; format: string | null; project_name: string; items_json: string; scoring_json: string; perspective: string; source_ref: string | null; published_at: string | null; context_json?: string }
@@ -31,12 +32,15 @@ export function validateAnswers(items: TemplateItem[], value: unknown): Record<s
   const normalized: Record<string, unknown> = {};
   const ids = new Set(items.map((i) => i.id));
   for (const key of Object.keys(answers)) if (!ids.has(key) && key !== OTHER_TEXT_KEY) throw new CapError("INVALID_PARAMS", `unknown answer item ${key}`);
+  const blank = (item: TemplateItem, answer: unknown) => answer === undefined || answer === null || answer === "" || (item.type === "multi" && Array.isArray(answer) && answer.length === 0);
+  // 0.24.1 persona B: required answers were refused one at a time ("answer required for CW-Q4"). Name every missing
+  // required answer in one refusal, before any other check, so one retry can fix them all.
+  const missing = items.filter((item) => item.required !== false && blank(item, answers[item.id])).map((item) => item.id);
+  if (missing.length === 1) throw new CapError("INVALID_PARAMS", `answer required for ${missing[0]}`);
+  if (missing.length > 1) throw new CapError("INVALID_PARAMS", `answers required for ${missing.join(", ")}`, `answer all ${missing.length}, then submit again`);
   for (const item of items) {
     const answer = answers[item.id];
-    if (answer === undefined || answer === null || answer === "" || (item.type === "multi" && Array.isArray(answer) && answer.length === 0)) {
-      if (item.required === false) { normalized[item.id] = null; continue; }
-      throw new CapError("INVALID_PARAMS", `answer required for ${item.id}`);
-    }
+    if (blank(item, answer)) { normalized[item.id] = null; continue; } // only optional items reach here
     if (item.type === "scale" && (typeof answer !== "number" || !Number.isInteger(answer) || !item.scale || answer < item.scale.min || answer > item.scale.max))
       throw new CapError("INVALID_PARAMS", `invalid scale answer for ${item.id}`);
     if (item.type === "text" && (typeof answer !== "string" || answer.length > 5000))
@@ -72,7 +76,7 @@ export function validateAnswers(items: TemplateItem[], value: unknown): Record<s
 export const form: Handler = async (ctx, params) => {
   const shared = await sharedSession(ctx);
   if (shared) {
-    if (Object.keys(params).length) throw new CapError("INVALID_PARAMS", "form takes no parameters");
+    if (Object.keys(params).length) throw new CapError("INVALID_PARAMS", "form takes no parameters (language is chosen with POST /v2/translate); pass nothing");
     await collecting(ctx, shared.assessment_survey_id);
   }
   const s = await scopedSurvey(ctx, true);
@@ -144,12 +148,14 @@ export const submit: Handler = async (ctx, params) => {
 
 export const receipt: Handler = async (ctx, params) => {
   const shared = await sharedSession(ctx);
-  if (shared && Object.keys(params).length) throw new CapError("INVALID_PARAMS", "receipt takes no parameters");
+  if (shared && Object.keys(params).length) throw new CapError("INVALID_PARAMS", "receipt takes no parameters; pass nothing");
   const s = await scopedSurvey(ctx);
   const row = await ctx.db.prepare("SELECT id, submitted_at, template_id, template_version FROM response WHERE assessment_survey_id = ? AND respondent_id = ? ORDER BY submitted_at DESC LIMIT 1")
     .bind(s.id, ctx.principal.respondentId).first<{ id: string; submitted_at: string; template_id: string; template_version: number }>();
+  // Persona friction (waves AB-AD): the receipt names the review. Additive; read from the survey row already in hand.
   return { result: { submitted: !!row, response_id: row?.id ?? null, submitted_at: row?.submitted_at ?? null,
-    template: row ? { id: row.template_id, version: row.template_version } : null }, scope: { type: "survey", id: s.id } };
+    template: row ? { id: row.template_id, version: row.template_version } : null,
+    assessment: { name: s.name } }, scope: { type: "survey", id: s.id } };
 };
 
 export const assisted_next: Handler = async (ctx) => {
@@ -180,7 +186,9 @@ export const list: Handler = async (ctx, params) => {
   });
   // S15c: demographic breakdown columns (age range, gender) only when the facilitator turned demographics on.
   const demographics = demographicsProjection((results || []).some((r) => demographicsEnabled(r.context_json)));
-  return { result: { suppressed: true, status: "held", reason: "D7 disclosure policy unresolved", responses: [], group_context, ...demographics }, scope: { type: "assessment", id: aid } };
+  // Below the minimum the list names the same count Collect shows and the same minimum Results and the report name.
+  const low = await minimumHold(ctx, aid);
+  return { result: { suppressed: true, status: "held", reason: "D7 disclosure policy unresolved", responses: [], group_context, ...demographics, ...(low ?? {}) }, scope: { type: "assessment", id: aid } };
 };
 
 export const purge: Handler = async (ctx, params, opts) => {

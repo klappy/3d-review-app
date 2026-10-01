@@ -1,9 +1,13 @@
 import { copy, createSharedLinkClient, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, stripFragment, submitFailureKind } from '../shared-link.js';
 import { closedLine } from '../v3/components/active-until.js';
+import { SURVEYOR_EN } from './i18n.js';
 
 // Only the existing participant client owns transport. No staff identity is read.
 export function createParticipantJourney({ window: win, storage, fetchImpl, onChange = () => {} }) {
   let client, store, form, answers, context = {}, uncertain = false, busy = false;
+  // S29 surveyor mode: the raw link token, in memory only (never storage, URL or log) so "Interview another person"
+  // can open the same link again as a new respondent. Gone after a reload.
+  let linkToken = null;
   let state = { phase: 'opening', notice: copy.labelOpening };
   const show = (phase, extra = {}) => { state = { phase, form, answers, busy, ...extra }; onChange(state); return state; };
   const unavailable = kind => show('unavailable', { notice: ({ closed: copy.collectionClosed, cannotResume: copy.cannotResume, rateLimited: copy.rateLimited, transient: copy.transient })[kind] || copy.linkUnavailable });
@@ -44,6 +48,7 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
         const token = parseEntryFragment(hash);
         if (hash) stripFragment(win);
         if (hash && token === null) return unavailable('unavailable');
+        linkToken = token;
         const namespace = token === null ? currentNamespace(storage) : await digestNamespace(token);
         if (!namespace) return unavailable('unavailable');
         store = scopedStorage(storage, namespace);
@@ -87,6 +92,28 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
             return errorKind(probe) === 'unavailable' ? unavailable(uncertain ? 'cannotResume' : 'unavailable') : unknown();
           }
         }
+      });
+    },
+    // S29 surveyor mode (Lovable parity): after a submit, start the next respondent on this device from the same link.
+    // A link opened without a resume credential is a new respondent (src/handlers/shared-link.ts openSharedLink), so this
+    // drops only this tab's bearer for the link and opens it again; the earlier response stays committed and its session
+    // is not revoked. An access code works once (src/handlers/participant.ts redeem_code), so a code session goes back to
+    // code entry. After a reload the token is gone: the tab lets go of the old session and asks for the link again.
+    async another() {
+      if (busy || state.phase !== 'receipt' || !store) return state;
+      if (store.get('via') === 'code') { win.location.assign('/#survey'); return state; }
+      const previous = store.get('bearer');
+      const drop = () => { store.remove('bearer'); store.remove('draft'); store.remove('submitKey'); answers = undefined; context = {}; uncertain = false; };
+      if (!linkToken) { drop(); client = createSharedLinkClient({ store, fetchImpl }); return show('unavailable', { notice: SURVEYOR_EN.openLinkForNext }); }
+      return action(async () => {
+        drop(); client = createSharedLinkClient({ store, fetchImpl });
+        try { await client.open(linkToken); }
+        catch (e) {
+          if (previous) store.set('bearer', previous); client = createSharedLinkClient({ store, fetchImpl }); // the old session stays this tab's
+          const kind = errorKind(e); return unavailable(kind === 'conflict' ? 'closed' : kind);
+        }
+        try { const next = await loadForm(); return next.phase === 'form' ? show('form', { draft: null, notice: SURVEYOR_EN.nextPerson, fresh: true }) : next; }
+        catch (e) { return unavailable(errorKind(e)); }
       });
     },
     async recover() {

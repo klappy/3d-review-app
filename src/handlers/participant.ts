@@ -46,7 +46,7 @@ export const redeem_code: Handler = async (ctx, params) => {
 };
 
 export const open_link: Handler = async (ctx, params) => {
-  if (Object.keys(params).some(k => k !== "token" && k !== "resume_token")) throw new CapError("INVALID_PARAMS", "unknown link parameter");
+  if (Object.keys(params).some(k => k !== "token" && k !== "resume_token")) throw new CapError("INVALID_PARAMS", "unknown link parameter; accepted: token, resume_token");
   return openSharedLink(ctx, reqStr(params, "token"), params.resume_token);
 };
 

@@ -99,9 +99,14 @@ test('B: at 375 px the preview panel can shrink to its column and the preview sc
   assert.equal(paper.style.getPropertyValue('padding'), '16px 12px');
 });
 
+// S25 (captain's iOS print 2026-09-30 11:48 ET printed the whole app page): print rules scoped to the preview were added on
+// purpose — printing the app page prints only the paper. The S21 phone rules stay screen-only and the earlier print rules
+// stay exactly as they were, first.
+const S25_PRINT = r => r.media === 'print' && /#print-root/.test(r.sel);
 test('B: print output is unchanged — the new rules are screen-only and the print rules are exactly as before', () => {
-  for (const r of rules.filter(r => /#print-(root|panel)/.test(r.sel))) assert.match(r.media, /^screen\b/, `${r.sel} applies on screen only`);
-  assert.deepEqual(rules.filter(r => r.media === 'print').map(r => r.css), [
+  for (const r of rules.filter(r => /#print-(root|panel)/.test(r.sel) && !S25_PRINT(r))) assert.match(r.media, /^screen\b/, `${r.sel} applies on screen only`);
+  assert.ok(rules.some(S25_PRINT), 'S25 belt and braces: printing the app page prints only the paper');
+  assert.deepEqual(rules.filter(r => r.media === 'print' && !S25_PRINT(r)).map(r => r.css), [
     'html,body { background: rgb(255, 255, 255); }',
     '.no-print,#toasts,#layer { display: none !important; }',
     '.paper { margin: 0px; padding: 6mm 4mm; box-shadow: none; width: auto; min-height: 0px; }',
