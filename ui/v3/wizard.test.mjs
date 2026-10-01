@@ -895,3 +895,24 @@ test('F4: Continue setup resumed on Review shows the passages already on the dra
   assert.match(again.$('[data-wz-passages]').innerHTML, /Genesis 1 audio/);
   assert.ok(p.calls.every(c => c.url === '/v2/assessments/a1/passages'));
 });
+
+test('rev440 S1+S2: a repaint while a link add is pending keeps the same passages node, its status and one request; Launch waits', async () => {
+  const srv = server(), p = passagesApi(); let release;
+  const gate = new Promise(r => { release = r; });
+  const fetchImpl = async (url, init = {}) => { if (init.method === 'POST') await gate; return p.fetchImpl(url, init); };
+  const m = await toReview(srv, { fetchImpl }); await settle();
+  const host = m.$('[data-wz-passages]');
+  const ln = m.$('form[data-passage-link]'); ln.querySelector('[name=url]').value = 'https://youtu.be/x';
+  ln.dispatchEvent(new m.w.Event('submit', { bubbles: true, cancelable: true })); await settle();
+  assert.equal(m.$('[data-wz="launch"]').disabled, true, 'Launch waits for the pending passage');
+  m.click('[data-wz="cancel"]'); await settle(); // repaint: Leave setup asks in the page
+  assert.ok(m.$('[data-wz-ask]'), 'the wizard repainted');
+  assert.equal(m.$('[data-wz-passages]'), host, 'the same mounted node, re-inserted');
+  assert.equal(m.$('[data-wz-passages] .p-status').textContent, 'Adding link…', 'status survives the repaint');
+  assert.equal(m.$('[data-wz="launch"]').disabled, true, 'still waiting after the repaint');
+  m.click('[data-wz="launch"]'); await settle(); assert.equal(m.h.state.done, null, 'a click while pending does not launch');
+  release(); await settle();
+  assert.deepEqual(p.calls.map(c => c.method), ['GET', 'POST', 'GET'], 'one list read, one add, one re-read; no second GET/POST from the repaint');
+  assert.equal(m.$('[data-wz-passages] .p-status').textContent, 'Link added.');
+  assert.equal(m.$('[data-wz="launch"]').disabled, false, 'Launch is available again');
+});

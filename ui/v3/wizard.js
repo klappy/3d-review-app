@@ -441,7 +441,7 @@ export function renderDone(ctx, origin = '', templates = []) {
 //   user? (val422-2341: signed-in principal id; keys the setup copies) }
 export function mountWizard(root, deps) {
   ensureStepperStyle(root?.ownerDocument);
-  const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0, saved: null, saveCtx: null, asking: false, passagesSkipped: false };
+  const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0, saved: null, saveCtx: null, asking: false, passagesSkipped: false, passagesPending: 0 };
   let alive = true; const ac = new AbortController(); const on = { signal: ac.signal };
   const session = deps.session === undefined ? safeSession() : deps.session, store = deps.store === undefined ? safeStore() : deps.store; // S38: device-local copy
   const uid = deps.user ? String(deps.user) : ''; // val422-2341: the signed-in principal id (assess.js passes state.principal.id)
@@ -450,7 +450,18 @@ export function mountWizard(root, deps) {
   const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done && live.dataset.wzForm === s.step) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [], passagesSkipped: s.passagesSkipped }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; wip(); passagesMount(); };
   // F4: the Passages forms on Review talk to /v2/assessments/:aid/passages directly (as Prepare does), with the facilitator token.
   const passagesToken = deps.token || (() => { try { return globalThis.sessionStorage?.getItem('facilitatorToken') || null; } catch { return null; } });
-  const passagesMount = () => { const pr = root.querySelector('[data-wz-passages]'); if (pr && s.saved) mountPassages({ root: pr, aid: s.saved.aid, mayEdit: s.saved.role !== 'viewer', esc, token: passagesToken, fetchImpl: deps.fetchImpl || globalThis.fetch }); };
+  // rev440 S1: mount once per draft id and keep that node across repaints (re-inserted, never re-rendered), so an upload or link
+  // add in flight keeps its status, its typed fields and its single request. Remount only for a new aid or after Skip.
+  // rev440 S2: every passages request counts as pending; Launch stays disabled until it finishes.
+  let pHost = null;
+  const syncLaunch = () => { const l = root.querySelector('[data-wz="launch"]'); if (l && !s.busy) l.disabled = s.passagesPending > 0; };
+  const passagesFetch = async (...a) => { s.passagesPending++; syncLaunch(); try { return await (deps.fetchImpl || globalThis.fetch)(...a); } finally { s.passagesPending--; syncLaunch(); } };
+  const passagesMount = () => {
+    const slot = root.querySelector('[data-wz-passages]'); if (!slot || !s.saved) return syncLaunch();
+    if (pHost && pHost.aid === s.saved.aid) slot.replaceWith(pHost.el);
+    else { const el = slot.ownerDocument.createElement('div'); el.setAttribute('data-wz-passages', ''); slot.replaceWith(el); pHost = { aid: s.saved.aid, el }; mountPassages({ root: el, aid: s.saved.aid, mayEdit: s.saved.role !== 'viewer', esc, token: passagesToken, fetchImpl: passagesFetch }); }
+    syncLaunch();
+  };
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
   const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
@@ -523,7 +534,7 @@ export function mountWizard(root, deps) {
     if (act === 'edit') { s.step = b.dataset.step; return paint(); }
     // F4: Passages on Review — skip folds the forms away (launch is unchanged); open brings them back. No saved draft yet: save
     // step 1 first exactly as Continue on step 1 does, then the forms attach to that row.
-    if (act === 'passages-skip') { s.passagesSkipped = true; return paint(); }
+    if (act === 'passages-skip') { s.passagesSkipped = true; pHost = null; return paint(); }
     if (act === 'passages-open' || act === 'passages-save') {
       s.passagesSkipped = false;
       if (!s.saved) {
@@ -537,6 +548,7 @@ export function mountWizard(root, deps) {
     // B14: the host re-reads what the new review hangs under (a project made in this setup) before Collect opens, so the
     // crumb row reads Home › Project › Assessment on this path exactly as after a fresh sign-in. A failed read still opens.
     if (act === 'open') { const href = deps.assessmentHref ? deps.assessmentHref(b.dataset.aid) : `#/a/${enc(b.dataset.aid)}`; b.disabled = true; try { await deps.beforeOpen?.(b.dataset.aid); } catch {} if (!alive) return; return deps.go?.(href); }
+    if (act === 'launch' && s.passagesPending > 0) return; // rev440 S2: a passage is still being added
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
       try { const done = await launch(s.d, { api: deps.api, store: deps.store, onLink: deps.onLink, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; if (s.saved) clearWip(session, s.saved.aid, store, uid); s.done = done; s.partial = null; paint(); }
