@@ -155,7 +155,7 @@ export const receipt: Handler = async (ctx, params) => {
   // Persona friction (waves AB-AD): the receipt names the review. Additive; read from the survey row already in hand.
   return { result: { submitted: !!row, response_id: row?.id ?? null, submitted_at: row?.submitted_at ?? null,
     template: row ? { id: row.template_id, version: row.template_version } : null,
-    assessment: { id: s.assessment_id, name: s.name } }, scope: { type: "survey", id: s.id } };
+    assessment: { name: s.name } }, scope: { type: "survey", id: s.id } };
 };
 
 export const assisted_next: Handler = async (ctx) => {
