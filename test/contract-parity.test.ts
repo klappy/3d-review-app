@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // S37 offline contract parity: contract/openapi.yaml ↔ contract/capabilities.json, row by row, no server and no SESS bearer.
-// Row ↔ route mapping is borrowed from scripts/parity.mjs: each capability row's HTTP twin is c.http.{method,path}
-// (plus c.http_alt), and path placeholders ({aid}, {sid}, …) are carried as params. Schema agreement is judged only on what
-// both files declare: property names, the `required` list and `additionalProperties` (compared when both sides state it).
+// Row ↔ route mapping is borrowed from scripts/parity.mjs: each capability row's HTTP twin is c.http.{method,path}, and path
+// placeholders ({aid}, {sid}, …) are carried as params. Every route (c.http plus c.http_alt) must exist in openapi.yaml, but
+// schemas are compared on c.http only, as scripts/parity.mjs does. Schema agreement is judged only on what both files declare:
+// property names, the `required` list and `additionalProperties` (compared when both sides state it), recursing into nested
+// `properties`, array `items` and `oneOf` branches wherever both sides declare a nested shape.
 
 type Json = any;
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
@@ -12,7 +14,7 @@ const caps: Json[] = catalog.capabilities;
 
 // Minimal YAML reader for the subset contract/openapi.yaml uses: block maps and sequences, plain/quoted scalars with
 // indented continuation lines, and inline JSON flow values (single- or multi-line). No YAML dependency is in package.json.
-export function parseYaml(src: string): Json {
+function parseYaml(src: string): Json {
   const P = src.split("\n");
   let i = 0;
   const ind = (l: string) => l.length - l.trimStart().length;
@@ -102,27 +104,42 @@ const deref = (s: Json): Json => {
   return s;
 };
 const routes = (c: Json): { method: string; path: string }[] => [c.http, ...(c.http_alt ?? [])];
-const op = (r: { method: string; path: string }) => oas.paths?.[r.path]?.[r.method.toLowerCase()];
+const op = (r: { method: string; path: string }): Json | null => oas.paths?.[r.path]?.[r.method.toLowerCase()] ?? null;
 const pathParams = (path: string) => [...path.matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
 
-type Shape = { props: string[]; required: string[]; additionalProperties?: Json } | { oneOf: Shape[] };
+type Shape = { props: string[]; required: string[]; additionalProperties?: Json; nested?: Record<string, Shape> } | { oneOf: Shape[] };
 const sorted = (a: string[]) => [...new Set(a)].sort();
 // A schema declares fields when it carries `properties` (or a oneOf of such branches); an open generic object does not.
-function shape(s: Json): Shape | null {
+// Nested shapes are kept per property (`name`, or `name[]` for an array's items) so diff() can recurse into them.
+function shape(s: Json, level = 0): Shape | null {
   s = deref(s);
-  if (!s) return null;
-  if (Array.isArray(s.oneOf)) { const b = s.oneOf.map(shape); return b.every(Boolean) ? { oneOf: b as Shape[] } : null; }
+  if (!s || level > 20) return null;
+  if (Array.isArray(s.oneOf)) {
+    // A branch with no fields (e.g. {type: "null"}) stays as an empty placeholder so the object branches still line up.
+    const b = s.oneOf.map((x: Json) => shape(x, level + 1));
+    return b.some(Boolean) ? { oneOf: b.map((x: Shape | null) => x ?? { props: [], required: [] }) } : null;
+  }
   if (!s.properties) return null;
   const props = Object.keys(s.properties);
   if (props.length === 0 && s.additionalProperties === true) return null;
   const out: Shape = { props: sorted(props), required: sorted(s.required ?? []) };
   if ("additionalProperties" in s) out.additionalProperties = s.additionalProperties;
+  const nested: Record<string, Shape> = {};
+  for (const k of props) {
+    const v = deref(s.properties[k]);
+    const sub = shape(v, level + 1);
+    if (sub) nested[k] = sub;
+    const items = v?.items ? shape(v.items, level + 1) : null;
+    if (items) nested[`${k}[]`] = items;
+  }
+  if (Object.keys(nested).length) out.nested = nested;
   return out;
 }
 // OpenAPI request side for one route: JSON body (unwrapping a {params} envelope the capability itself does not name),
 // plus path placeholders carried as params as scripts/parity.mjs does; a body-less route declares its path/query parameters.
 function oasRequest(c: Json, route: { method: string; path: string }): Shape | null {
   const o = op(route);
+  if (!o) return null; // the per-route existence test names the missing route
   let body = deref(o.requestBody?.content?.["application/json"]?.schema);
   if (body?.properties?.params && !c.params_schema?.properties?.params) body = body.properties.params;
   if (body) {
@@ -138,7 +155,9 @@ function oasRequest(c: Json, route: { method: string; path: string }): Shape | n
 // OpenAPI 200 result: the per-capability `result` beside the shared Envelope (allOf), or a fully spelled envelope's result.
 // The shared Envelope's generic result ({suppressed}, additionalProperties: true) is not a per-capability declaration.
 function oasResult(route: { method: string; path: string }): Shape | null {
-  const raw = op(route).responses?.["200"]?.content?.["application/json"]?.schema;
+  const o = op(route);
+  if (!o) return null; // the per-route existence test names the missing route
+  const raw = o.responses?.["200"]?.content?.["application/json"]?.schema;
   if (!raw || raw.$ref === ENVELOPE) return null;
   const parts = Array.isArray(raw.allOf) ? raw.allOf.filter((p: Json) => p.$ref !== ENVELOPE).map(deref) : [deref(raw)];
   const holder = parts.find((p: Json) => p?.properties?.result);
@@ -156,21 +175,55 @@ function diff(a: Shape, b: Shape, at = ""): string[] {
   if (a.required.join() !== b.required.join()) out.push(`${at}required capabilities=[${a.required}] openapi=[${b.required}]`);
   if ("additionalProperties" in a && "additionalProperties" in b && JSON.stringify(a.additionalProperties) !== JSON.stringify(b.additionalProperties))
     out.push(`${at}additionalProperties capabilities=${JSON.stringify(a.additionalProperties)} openapi=${JSON.stringify(b.additionalProperties)}`);
+  for (const k of Object.keys(a.nested ?? {}).sort()) if (b.nested?.[k]) out.push(...diff(a.nested![k], b.nested[k], `${at}${k}.`));
   return out;
 }
 
 type Check = { key: string; problems: string[] };
 const checks: Check[] = [];
+const oneSided: string[] = []; // rows where exactly one file declares a field shape, so nothing is compared
+const record = (key: string, a: Shape | null, b: Shape | null) => {
+  if (a && b) checks.push({ key, problems: diff(a, b) });
+  else if (a || b) oneSided.push(`${key} (${a ? "capabilities" : "openapi"} only)`);
+};
 for (const c of caps) {
-  if (c.params_schema) {
-    const a = shape(c.params_schema), b = oasRequest(c, c.http);
-    if (a && b) checks.push({ key: `${c.id} request`, problems: diff(a, b) });
-  }
-  if (c.result_schema) {
-    const a = shape(c.result_schema), b = oasResult(c.http);
-    if (a && b) checks.push({ key: `${c.id} result`, problems: diff(a, b) });
-  }
+  if (c.params_schema) record(`${c.id} request`, shape(c.params_schema), oasRequest(c, c.http));
+  if (c.result_schema) record(`${c.id} result`, shape(c.result_schema), oasResult(c.http));
 }
+
+// Rows compared today (both files declare a field shape). A row that stops being compared, for example because one side
+// loses its `properties`, fails the exact-set test below by name. Add or remove a key here when the contract changes.
+const COMPARED = [
+  "cap.participant.open_link request",
+  "cap.participant.open_link result",
+  "cap.survey.issue_link request",
+  "cap.survey.issue_link result",
+  "cap.grant.accept request",
+  "cap.me.invitations request",
+  "cap.response.form request",
+  "cap.response.form result",
+  "cap.response.submit request",
+  "cap.response.submit result",
+  "cap.response.receipt request",
+  "cap.response.receipt result",
+  "cap.report.build request",
+  "cap.report.build result",
+  "cap.report.get request",
+  "cap.report.get result",
+  "cap.report.list request",
+  "cap.report.list result",
+  "cap.ops.feedback request",
+  "cap.ops.feedback result",
+  "cap.ops.feedback_get request",
+  "cap.ops.roadmap_read request",
+  "cap.ops.roadmap_publish request",
+  "cap.ops.roadmap_summary request",
+  "cap.ops.roadmap_verify request",
+  "cap.ops.roadmap_redact request",
+  "cap.ops.roadmap_history request",
+];
+// Rows where only one file declares a field shape, so there is nothing to compare. Kept exact for the same reason.
+const ONE_SIDED = ["cap.me.invitations result (capabilities only)"];
 
 // Rows where the two files disagree today (S37 findings; the contract is not edited here). Remove a line once fixed upstream.
 const KNOWN_DISAGREEMENTS: Record<string, string> = {
@@ -180,7 +233,8 @@ const KNOWN_DISAGREEMENTS: Record<string, string> = {
 
 describe("contract parity: capabilities.json ↔ openapi.yaml (offline)", () => {
   it("parses openapi.yaml with one operation per capability route", () => {
-    const ops = Object.values(oas.paths as Record<string, Json>).reduce((n, p) => n + Object.keys(p).length, 0);
+    const methods = new Set(["get", "put", "post", "delete", "options", "head", "patch", "trace"]);
+    const ops = Object.values(oas.paths as Record<string, Json>).reduce((n, p) => n + Object.keys(p).filter((k) => methods.has(k)).length, 0);
     expect(ops).toBe(caps.reduce((n, c) => n + routes(c).length, 0));
   });
 
@@ -199,6 +253,14 @@ describe("contract parity: capabilities.json ↔ openapi.yaml (offline)", () => 
       if (KNOWN_DISAGREEMENTS[ch.key]) it.todo(`${ch.key} — ${KNOWN_DISAGREEMENTS[ch.key]}`);
       else it(ch.key, () => expect(ch.problems).toEqual([]));
     }
+    it("the compared set is exactly COMPARED (a row that drops out of comparison fails here by name)", () => {
+      const got = sorted(checks.map((ch) => ch.key)), want = sorted(COMPARED);
+      const dropped = want.filter((k) => !got.includes(k)), added = got.filter((k) => !want.includes(k));
+      expect({ dropped, added }, "add/remove the key in COMPARED (and ONE_SIDED) when the contract changes").toEqual({ dropped: [], added: [] });
+    });
+    it("the one-sided set is exactly ONE_SIDED", () => {
+      expect(sorted(oneSided), "add/remove the key in ONE_SIDED when the contract changes").toEqual(sorted(ONE_SIDED));
+    });
     it("the known-disagreement table names exactly the rows that disagree today", () => {
       const live = checks.filter((ch) => ch.problems.length).map((ch) => `${ch.key}: ${ch.problems.join("; ")}`);
       expect(sorted(checks.filter((ch) => ch.problems.length).map((ch) => ch.key)), live.join("\n")).toEqual(sorted(Object.keys(KNOWN_DISAGREEMENTS)));
