@@ -7,7 +7,7 @@
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
 import { learnMore } from '../v3/components/learn-more.js'; // lane 9 L9-24: shared closed-by-default disclosure
-import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, V3_HELD_TEXT, V3_REPORTS_HELD, V3_REPORT_HELD, V3_BAND_CUTOFFS, V3_SUGGEST, v3SuggestedAreas, v3NextParse, v3NextSerialize, askStageMove } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
+import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, v3HeldText, V3_REPORTS_HELD, V3_REPORT_HELD, V3_BAND_CUTOFFS, V3_SUGGEST, v3SuggestedAreas, v3NextParse, v3NextSerialize, askStageMove } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -122,7 +122,7 @@ const understand = {
     }).join('');
     // (2) Results: the held literal with one plain line (U05; the server reason is never rendered anywhere). No numbers, no bands.
     let results;
-    if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.status === 'held' || r.suppressed ? V3_HELD_TEXT : '')}</p>`; } // U05: plain line; the server reason is never rendered
+    if (m.results.status === 'loaded') { const r = m.results.value || {}; results = `<p><span class="badge">${esc(r.status || 'held')}</span></p><p class="muted" data-results-reason>${esc(r.status === 'held' || r.suppressed ? v3HeldText(r) : '')}</p>`; } // U05: plain line; the server reason is never rendered
     else results = refusalLine(ctx, m.results.status, 'data-retry="results"', 'Results');
     // v3 (ruling c): band layout, one card per perspective; a held result shows evidence gaps, never an invented band.
     // v3 U2: per-perspective server counts on each band card (Bincy screen 10 group counts) + evidence toggle and table.

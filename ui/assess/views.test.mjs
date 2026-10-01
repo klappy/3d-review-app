@@ -58,10 +58,22 @@ test('A3 results: the held literal with one plain line (U05), never the server p
   const { api } = fakeApi(understandTable); const ctx = ctxFor(api);
   const html = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
   const panel = html.slice(html.indexOf('data-v3-band-held>'), html.indexOf('</p>', html.indexOf('data-v3-band-held>')));
-  assert.match(panel, /data-v3-band-held>Results appear after a report is built from at least three responses per group\./);
+  assert.match(panel, /data-v3-band-held>Results appear after a report is built from enough responses\./);
+  assert.doesNotMatch(html, /at least three/); // S51: the UI never states its own floor
   assert.equal((html.match(/Results appear after a report is built/g) || []).length, 1, 'one plain line, shown once (not again behind Learn more)');
   assert.doesNotMatch(html, /D7 scoring/);
   assert.doesNotMatch(panel, /\b\d+\b/); // no numbers, no "0"
+});
+
+// S51: the held line carries the server's floor (results responses_in / responses_needed), never a number written in the UI.
+test('S51 results held line: the API floor (responses_in of responses_needed) on Results and under the bands; never the reason', async () => {
+  const D7 = 'D7 scoring, threshold, and differencing policy unresolved';
+  const { api } = fakeApi({ ...understandTable, 'GET /v2/assessments/a1/results': { suppressed: true, status: 'held', reason: D7, responses_in: 3, responses_needed: 5 } }); const ctx = ctxFor(api);
+  const html = views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a1' }));
+  const line = 'Results appear after a report is built from enough responses. 3 responses so far; at least 5 are needed before any score is shown.';
+  assert.ok(html.includes(`data-v3-band-held>${line}</p>`), 'band held line carries the API numbers');
+  assert.doesNotMatch(html, /at least three/);
+  assert.doesNotMatch(html, /D7 scoring/);
 });
 
 // U05 validator (lanes-1510): no rendered results / evidence / report output ever carries the server reason string.
