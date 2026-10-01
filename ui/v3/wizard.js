@@ -89,7 +89,8 @@ export function validateStep(step, d, today = todayIso()) {
 export function demographicsToggle(on) {
   return `<label class="field check" data-wz-demographics><input type="checkbox" name="demographics" ${on ? 'checked' : ''}> Ask participants about themselves (age range, gender)</label><p class="small muted">Off by default. Both answers stay optional for participants.</p>`;
 }
-export function launchPlan(d, pre = []) {
+// saved: the assessment existed before this launch (a saved draft: launchResume set ctx.pre), so the server may hold the switch.
+export function launchPlan(d, pre = [], saved = false) {
   const plan = [];
   if (d.project === NEW_PROJECT) {
     plan.push({ cap: 'cap.project.create', method: 'POST', url: () => '/v2/projects', body: () => ((d.newOrg || '').trim() ? { name: d.newProject.trim(), organization: d.newOrg.trim() } : { name: d.newProject.trim() }), keep: (r, ctx) => { ctx.pid = r.project.id; } }); // S24: translation languages ride the assessment only — no screen edits a project's, and participants see the union
@@ -110,8 +111,10 @@ export function launchPlan(d, pre = []) {
       keep: (r, ctx) => { ctx.surveys.push({ id: r.survey.id, template: tid, expected: expectedValue(g.expected) }); } });
   }
   // S15b: the facilitator's "Ask participants about themselves" switch (off by default). The server stores it on the selected
-  // groups, so it is written only after the groups exist, and only when the facilitator turned it on.
-  if (d.demographics === true) plan.push({ cap: 'cap.assessment.update', method: 'PATCH', url: ctx => `/v2/assessments/${enc(ctx.aid)}`, body: () => ({ demographics_enabled: true }) });
+  // groups, so it is written only after the groups exist. S42 (rev422d): a saved draft may already hold it on (the Prepare form
+  // PATCHes it), so its launch sends the wizard's final choice both ways, in the Prepare form's shape ({ demographics_enabled: bool });
+  // a brand-new assessment starts off, so it is written there only when the facilitator turned it on.
+  if (d.demographics === true || saved) plan.push({ cap: 'cap.assessment.update', method: 'PATCH', url: ctx => `/v2/assessments/${enc(ctx.aid)}`, body: () => ({ demographics_enabled: d.demographics === true }) });
   plan.push({ cap: 'cap.assessment.set_stage', method: 'POST', url: ctx => `/v2/assessments/${enc(ctx.aid)}/stage`, body: () => ({ stage: 'collect' }) });
   plan.push({ cap: 'cap.survey.issue_link', each: 'surveys' });
   return plan;
@@ -144,7 +147,7 @@ export function draftFromSaved(a, surveys = [], store) {
     d.groups[x.template_id] = { version: String(x.template_version), expected: N ? String(N) : '' };
     pre.push({ id: x.id, template: x.template_id, version: Number(x.template_version) });
   }
-  const snap = { name: a.name || '', purpose: a.purpose ?? null, period: a.period ?? null, format: a.format ?? null, language_id: a.language_id || null, lwc: lwcText(d) };
+  const snap = { name: a.name || '', purpose: a.purpose ?? null, period: a.period ?? null, format: a.format ?? null, language_id: a.language_id || null, lwc: lwcText(d), demographics_enabled: a.demographics_enabled === true };
   d.demographics = a.demographics_enabled === true; // S15b: resume shows the switch as the server holds it
   return { d, step: validateStep('details', d).length ? 'details' : 'participants', saved: { aid: a.id, pid: a.project_id, role: a.role || '', snap, pre } };
 }
@@ -168,7 +171,7 @@ async function launchInner(d, opts) {
   if (ctx.base == null) ctx.base = ctx.done.length; // writes already made before this launch (B06: the saved draft)
   opts._ctx = ctx;
   let i = 0;
-  for (const step of opts.plan || launchPlan(d, ctx.pre || [])) {
+  for (const step of opts.plan || launchPlan(d, ctx.pre || [], Array.isArray(ctx.pre))) {
     if (step.each === 'surveys') {
       for (const s of ctx.surveys) {
         if (i++ < ctx.done.length) continue;
@@ -244,19 +247,40 @@ export async function reconcile(step, ctx, d, api) {
 
 function safeStore() { try { return globalThis.localStorage || null; } catch { return null; } }
 // U22: a reload mid-setup resumes the same draft at the same step with what was typed. Once step 1 is saved the shell's URL
-// carries the draft (#new/<id>, deps.mark); the current step and its unsaved edits live in this tab only (sessionStorage,
-// keyed by draft id, best effort), cleared on launch or discard. Nothing new is sent to the API.
-export const WIP_KEY = aid => `v3:setup:${aid}`;
+// carries the draft (#new/<id>, deps.mark); the current step and its unsaved edits live in this tab (sessionStorage, keyed by
+// draft id, best effort), cleared on launch or discard. Nothing new is sent to the API.
+// S38 (persona C, gate 0.24.0: #new/<id> came back on step 2 with the groups unticked): the tab copy alone is lost whenever the
+// page comes back in a fresh tab context (the same #new/<id> opened again, a restored or discarded tab), so the same
+// { step, d } is also kept device-local in the store EXPECTED_KEY already uses (localStorage), keyed by the same draft id. The tab
+// copy wins when both exist; both are cleared on launch or discard. Client-side only; no API field, no server round-trip.
+// The record also keeps the step-1 values the server held when it was written (snap). A device copy whose snap no longer
+// matches the server (renamed or re-dated from another device) gives up its step-1 values: only what the server never holds
+// (group ticks and counts, group context, the step; the demographics switch only while the server still holds the value it saw) is taken from it. It is also cleared once the draft
+// left prepare or is gone (its own read 404s; a failed projects/templates read never clears it).
+// val422-2341: the copy is keyed by the signed-in principal as well as the draft (deps.user), so another account on the same
+// device never reads it, and sign-out sweeps every v3:setup: key (clearAllWip, ui/assess/assess.js). Copies written before the
+// user key existed simply miss the new key and are ignored (left for the sign-out sweep).
+export const WIP_PREFIX = 'v3:setup:';
+export const WIP_KEY = (aid, uid = '') => uid ? `${WIP_PREFIX}${uid}:${aid}` : `${WIP_PREFIX}${aid}`;
 function safeSession() { try { return globalThis.sessionStorage || null; } catch { return null; } }
-export function saveWip(session, aid, step, d) { try { session?.setItem(WIP_KEY(aid), JSON.stringify({ step, d })); } catch {} }
-export function clearWip(session, aid) { try { session?.removeItem(WIP_KEY(aid)); } catch {} }
+export function saveWip(session, aid, step, d, store = null, snap = null, uid = '') { const v = JSON.stringify(snap ? { step, d, snap } : { step, d }); for (const st of [session, store]) try { st?.setItem(WIP_KEY(aid, uid), v); } catch {} }
+export function clearWip(session, aid, store = null, uid = '') { for (const st of [session, store]) try { st?.removeItem?.(WIP_KEY(aid, uid)); } catch {} }
+// Sign-out: remove every wizard copy (any draft, any user) from the given storages; a prefix scan of the keys.
+export function clearAllWip(...stores) { for (const st of stores) try { const ks = []; for (let i = 0; i < (st?.length || 0); i++) { const k = st.key(i); if (k && k.startsWith(WIP_PREFIX)) ks.push(k); } for (const k of ks) st.removeItem(k); } catch {} }
+const readWip = (st, aid, uid = '') => { try { const w = JSON.parse(st?.getItem(WIP_KEY(aid, uid)) || 'null'); return w && w.d && STEPS.includes(w.step) ? w : null; } catch { return null; } };
 // The saved draft wins where the server fixed it: the project, and surveys the draft already holds (B06f).
-export function wipOver(back, session) {
-  let w = null; try { w = JSON.parse(session?.getItem(WIP_KEY(back.saved.aid)) || 'null'); } catch { w = null; }
-  if (!w || !w.d || !STEPS.includes(w.step)) return back;
+// fix422c-2341: the switch (demographics_enabled) is also held by the server during prepare (the Prepare form PATCHes it), so it is
+// compared on its own: the device value stands only while the server still holds what the copy saw; a copy without it yields.
+const sameSnap = (a, b) => !!a && !!b && Object.keys(b).every(k => k === 'demographics_enabled' || (a[k] ?? null) === (b[k] ?? null));
+const keepSwitch = (w, server) => typeof w.d.demographics === 'boolean' && typeof w.snap?.demographics_enabled === 'boolean' && w.snap.demographics_enabled === server.demographics_enabled;
+export function wipOver(back, session, store = null, uid = '') {
+  const tab = readWip(session, back.saved.aid, uid), w = tab || readWip(store, back.saved.aid, uid);
+  if (!w) return back;
   const groups = { ...(w.d.groups || {}) };
   for (const x of back.saved.pre) if (!groups[x.template]) groups[x.template] = back.d.groups[x.template];
-  const d = { ...back.d, ...w.d, project: back.d.project, groups };
+  const fresh = tab || sameSnap(w.snap, back.saved.snap); // a device copy older than the server's step 1 keeps only client-only fields
+  const demographics = keepSwitch(w, back.saved.snap) ? w.d.demographics : back.d.demographics; // server wins once it moved the switch (fix422c-2341)
+  const d = fresh ? { ...back.d, ...w.d, project: back.d.project, groups, demographics } : { ...back.d, groups, context: { ...(w.d.context || {}) }, demographics };
   const step = STEPS.indexOf(w.step) > 1 && validateStep('participants', d).length ? 'participants' : w.step; // never past an empty step 2
   return { ...back, d, step };
 }
@@ -328,17 +352,17 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   const saved = !!data.saved, act = (back, primary) => actions(back, primary, saved); // B06: saved draft — project is fixed
   if (step === 'details') return `${head(n, 'Assessment details', 'You can change these later.', '<p class="muted">Only what the review needs.</p>')}${errBox(errs.filter(e => e !== PAST_UNTIL))}
     <form data-wz-form="details">
-      <label>Name<input name="name" value="${esc(d.name)}" required placeholder="e.g. October assessment"></label>
+      <label>Name (required)<input name="name" value="${esc(d.name)}" required placeholder="e.g. October assessment"></label>
       <div class="grid">
-        <label>Project<select name="project"${saved ? ' disabled' : ''}><option value=""${d.project ? '' : ' selected'} disabled>Choose…</option>${projects.map(p => `<option value="${esc(p.id)}"${p.id === d.project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}${saved ? '' : `<option value="${NEW_PROJECT}"${isNew ? ' selected' : ''}>New project…</option>`}</select></label>
-        ${isNew ? `<label>New project name<input name="newProject" value="${esc(d.newProject)}" required></label>`
-          : `<label>Language<select name="language"${d.project ? '' : ' disabled'}><option value=""${d.language ? '' : ' selected'} disabled>${d.project ? (languages.length ? 'Choose…' : 'No languages in this project') : 'Choose a project first'}</option>${languages.map(l => `<option value="${esc(l.id)}"${l.id === d.language ? ' selected' : ''}>${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</option>`).join('')}</select></label>`}
+        <label>Project (required)<select name="project" required${saved ? ' disabled' : ''}><option value=""${d.project ? '' : ' selected'} disabled>Choose…</option>${projects.map(p => `<option value="${esc(p.id)}"${p.id === d.project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}${saved ? '' : `<option value="${NEW_PROJECT}"${isNew ? ' selected' : ''}>New project…</option>`}</select></label>
+        ${isNew ? `<label>New project name (required)<input name="newProject" value="${esc(d.newProject)}" required></label>`
+          : `<label>Language (required)<select name="language"${d.project ? '' : ' disabled'}><option value=""${d.language ? '' : ' selected'} disabled>${d.project ? (languages.length ? 'Choose…' : 'No languages in this project') : 'Choose a project first'}</option>${languages.map(l => `<option value="${esc(l.id)}"${l.id === d.language ? ' selected' : ''}>${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</option>`).join('')}</select></label>`}
       </div>
       ${isNew ? orgField(d, projects) : ''}
-      ${isNew ? `<label>Language<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (ISO 639, optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. hil — qaa–qtz if unlisted" autocapitalize="off" spellcheck="false"></label>` : ''}
+      ${isNew ? `<label>Language (required)<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (ISO 639, optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. hil — qaa–qtz if unlisted" autocapitalize="off" spellcheck="false"></label>` : ''}
       <div class="grid">
         <label>Starts (optional)<input type="date" name="starts" value="${esc(d.starts)}"></label>
-        <label>Active until<input type="date" name="until" value="${esc(d.until)}" required>${errs.includes(PAST_UNTIL) ? `<span class="wz-field-error" role="alert" data-until-error>${PAST_UNTIL}</span>` : ''}</label>
+        <label>Active until (required)<input type="date" name="until" value="${esc(d.until)}" required>${errs.includes(PAST_UNTIL) ? `<span class="wz-field-error" role="alert" data-until-error>${PAST_UNTIL}</span>` : ''}</label>
       </div>
       <div class="grid">
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
@@ -400,12 +424,15 @@ export function renderDone(ctx, origin = '', templates = []) {
 
 // ---------- mount ----------
 // deps: { api(url, {method, body}) → result, go(hash), assessmentHref(aid), origin, store, resume? (B06: saved draft's assessment id),
-//   mark?(aid) (U22: the shell puts #new/<aid> in the URL without a re-render), session? (U22: sessionStorage stand-in) }
+//   mark?(aid) (U22: the shell puts #new/<aid> in the URL without a re-render), session? (U22: sessionStorage stand-in),
+//   user? (val422-2341: signed-in principal id; keys the setup copies) }
 export function mountWizard(root, deps) {
   ensureStepperStyle(root?.ownerDocument);
   const s = { step: 'details', d: freshDraft(), data: { projects: [], languages: [], templates: [] }, errs: [], busy: false, done: null, partial: null, langGen: 0, saved: null, saveCtx: null, asking: false };
   let alive = true; const ac = new AbortController(); const on = { signal: ac.signal };
-  const session = deps.session === undefined ? safeSession() : deps.session, wip = () => { if (s.saved && !s.done && !s.partial) saveWip(session, s.saved.aid, s.step, s.d); };
+  const session = deps.session === undefined ? safeSession() : deps.session, store = deps.store === undefined ? safeStore() : deps.store; // S38: device-local copy
+  const uid = deps.user ? String(deps.user) : ''; // val422-2341: the signed-in principal id (assess.js passes state.principal.id)
+  const wip = () => { if (s.saved && !s.done && !s.partial) saveWip(session, s.saved.aid, s.step, s.d, store, s.saved.snap, uid); };
   // B06: only the current step's live form is read on paint; a form left behind by a step change was already read (never undo a save's adoption).
   const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done && live.dataset.wzForm === s.step) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [] }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; wip(); };
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
@@ -443,7 +470,7 @@ export function mountWizard(root, deps) {
       d.project = ctx.pid; d.language = ctx.lid;
     }
     s.saveCtx = null;
-    s.saved = { aid: ctx.aid, pid: ctx.pid, role: 'owner', snap: detailsOf(d), pre: [] }; // cap.assessment.create grants the creator owner
+    s.saved = { aid: ctx.aid, pid: ctx.pid, role: 'owner', snap: { ...detailsOf(d), demographics_enabled: false }, pre: [] }; // cap.assessment.create grants the creator owner
     deps.mark?.(ctx.aid); // U22: the URL now names the draft, so a reload reopens it
   };
   root.addEventListener('submit', async e => {
@@ -472,7 +499,7 @@ export function mountWizard(root, deps) {
     if (act === 'discard' && s.saved) {
       s.busy = true; let confirmed = null;
       await deleteAssessmentFlow(b, { id: s.saved.aid, api: deps.api, ask: (_b, _sentence, _label, go) => { confirmed = go(); }, // already asked in the page
-        onDeleted: () => { clearWip(session, s.saved.aid); s.saved = null; deps.go?.('#/'); }, onRefused: t => note(new Error(t)), onError: err => note(err) });
+        onDeleted: () => { clearWip(session, s.saved.aid, store, uid); s.saved = null; deps.go?.('#/'); }, onRefused: t => note(new Error(t)), onError: err => note(err) });
       await confirmed; s.busy = false; return;
     }
     if (act === 'back') { const f = root.querySelector('form'); if (f) read(f); s.step = STEPS[Math.max(0, STEPS.indexOf(s.step) - 1)]; return paint(); }
@@ -482,7 +509,7 @@ export function mountWizard(root, deps) {
     if (act === 'open') { const href = deps.assessmentHref ? deps.assessmentHref(b.dataset.aid) : `#/a/${enc(b.dataset.aid)}`; b.disabled = true; try { await deps.beforeOpen?.(b.dataset.aid); } catch {} if (!alive) return; return deps.go?.(href); }
     if (act === 'launch' && !s.busy) {
       s.busy = true; b.disabled = true; b.textContent = 'Launching…';
-      try { const done = await launch(s.d, { api: deps.api, store: deps.store, onLink: deps.onLink, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; if (s.saved) clearWip(session, s.saved.aid); s.done = done; s.partial = null; paint(); }
+      try { const done = await launch(s.d, { api: deps.api, store: deps.store, onLink: deps.onLink, resume: s.partial || (s.saved ? launchResume(s.saved, s.d) : null) }); if (!alive) return; if (s.saved) clearWip(session, s.saved.aid, store, uid); s.done = done; s.partial = null; paint(); }
       catch (err) { if (!alive) return; const c = err.ctx, made = c ? c.done.length - (c.base || 0) : 0; s.partial = (made > 0 || c?.pending) ? c : s.partial; s.step = 'review'; note(new Error(s.partial ? `${err.message || err} ${s.partial.done.length - (s.partial.base || 0)} of the launch writes were done${s.partial.pending ? ' and the last one may have gone through' : ''}. "Continue the launch" checks what was saved and picks up from there; edits stay locked until then.` : `${err.message || err} ${s.saved ? 'Nothing more was saved; the draft is kept.' : 'Nothing was created.'} You can edit and launch again.`)); }
       finally { s.busy = false; }
     }
@@ -490,12 +517,14 @@ export function mountWizard(root, deps) {
   (async () => {
     if (deps.resume) root.innerHTML = '<div class="v3-wizard glass panel"><p class="muted">Loading the saved setup…</p></div>'; else paint(); // B06: no empty step 1 while the draft loads
     try {
-      const [p, t, r] = await Promise.all([deps.api('/v2/projects'), deps.api('/v2/templates'), deps.resume ? deps.api(`/v2/assessments/${enc(deps.resume)}`) : null]); if (!alive) return;
+      let gone = false; // val422-2341: only the draft's own 404 clears the copy, never a failed projects/templates read
+      const [p, t, r] = await Promise.all([deps.api('/v2/projects'), deps.api('/v2/templates'), deps.resume ? deps.api(`/v2/assessments/${enc(deps.resume)}`).catch(e => { if (e?.status === 404) gone = true; throw e; }) : null]).catch(e => { if (gone) clearWip(session, deps.resume, store, uid); throw e; }); if (!alive) return;
       s.data.projects = (p.projects || []).filter(x => !x.archived_at && (x.role === 'owner' || x.role === 'member')); s.data.templates = t.templates || [];
       if (r) { // B06: Continue setup — a launched review has no setup left, and a viewer cannot set up (B06f), so both open the review; a draft reopens at its next unfinished step
         const a = r.assessment || {};
+        if (a.stage !== 'prepare') clearWip(session, a.id || deps.resume, store, uid); // launched (or left prepare) from another device
         if (a.stage !== 'prepare' || a.role === 'viewer') return deps.go?.(deps.assessmentHref ? deps.assessmentHref(a.id || deps.resume) : `#/a/${enc(a.id || deps.resume)}`);
-        const back = wipOver(draftFromSaved(a, r.surveys || [], deps.store), session); s.d = back.d; s.step = back.step; s.saved = back.saved;
+        const back = wipOver(draftFromSaved(a, r.surveys || [], deps.store), session, store, uid); s.d = back.d; s.step = back.step; s.saved = back.saved;
         if (!s.data.projects.some(x => x.id === a.project_id)) { const any = (p.projects || []).find(x => x.id === a.project_id); s.data.projects.push({ id: a.project_id, name: any?.name || 'This project' }); }
         await loadLanguages(); if (!alive) return;
       }

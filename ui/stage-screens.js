@@ -14,6 +14,28 @@ export const STAGES = Object.freeze([
 export const REPEAT_WHEN_APPROPRIATE = 'Repeat when appropriate';
 
 export const PRINT_ROLES = Object.freeze(['owner', 'member']);
+// S25 (BCS 2026-09-29: "in Hindi, now what do they do?"): the words the printed form carries for the person answering, in
+// one place so ui/assess/print-lang.js can send them through POST /v2/translate (participant-ui scope; mirrored in
+// src/translate-allowlist.ts). model.words overrides any of them; anything missing stays English. The facilitator line in
+// the footer and the form id stay English (they are for the facilitator, not the respondent).
+export const PRINT_WORDS = Object.freeze({
+  blankSurvey: 'Blank survey',
+  passageLead: 'Before you answer, read or listen to:',
+  codeLabel: 'Code (optional; legacy)',
+  leaveBlank: 'Leave blank when answering from the shared link',
+  noLink: 'No shared link for this survey yet. Make one on its Share card, then print again.',
+  helperScan: "Helper: scan to enter this paper's answers",
+  projectLabel: 'Project',
+  assessmentLabel: 'Assessment',
+  languageLabel: 'Language evaluated',
+  printedIn: 'Printed in',
+  surveyLabel: 'Survey',
+  footNote: "Codes are never printed. The QR is the survey's own link.",
+  introChoices: 'Mark one circle ○ for each question. Where it says "Choose all that apply", mark every box ☐ that fits. Write on the lines where there are no choices.',
+  introLines: 'Write your response on the blank lines below each question.',
+  chooseAll: 'Choose all that apply',
+  chooseOne: 'Choose one',
+});
 export const HELP_ROLES = Object.freeze(['owner', 'member', 'viewer']);
 
 // In-stage first-run copy from views-coordinator STAGE_TOUR, remapped to app stage ids
@@ -284,7 +306,56 @@ export function renderStageTour(doc, root, { storage, assessmentId, stage, role,
   root.append(disclosure);
 }
 
-export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint } = {}) {
+// printHere (S25, captain's iOS print 2026-09-30 11:48 ET): the paper goes to its own print document (ui/assess/print.js),
+// so Print prints this page, or hands the paper size to onPrint(paper) — no isolated copy mounted and removed around print().
+
+// Ruled write-in lines on the paper form (free-text answers and the write-in under an Other choice).
+function writeLines(doc, className, count) {
+  const lines = el(doc, 'div');
+  lines.className = className;
+  for (let k = 0; k < count; k++) lines.append(el(doc, 'div'));
+  return lines;
+}
+// S31: the one link a printed survey may carry — the survey's shared entry link (origin/#survey=<token>) with its QR as an
+// inline SVG data URI. Anything else (codes, other URLs, markup) is dropped, so the paper falls back to "no shared link".
+export const SURVEY_LINK_RE = /^https?:\/\/[^/?#\s"<>]+\/#survey=[A-Za-z0-9_-]+$/;
+export function printableLink(link) {
+  if (!link || typeof link.url !== 'string' || !SURVEY_LINK_RE.test(link.url)) return null;
+  if (typeof link.qr !== 'string' || !link.qr.startsWith('data:image/svg+xml,')) return null;
+  return { url: link.url, qr: link.qr };
+}
+// S31 (captain 2026-09-30 13:39 ET: "which survey, assessment and project"): the identity block at the top of the paper —
+// project, assessment with the language evaluated (and the language printed in, when not English), survey and perspective,
+// then the ids in small print for data entry. Labels are paper words (translated with the rest); names are shown as given.
+const idText = v => (typeof v === 'string' ? v.trim() : '');
+function identityBlock(doc, model, w, wordEn, markEn) {
+  const id = model.identity;
+  if (!id || typeof id !== 'object') return null;
+  const box = el(doc, 'section');
+  box.className = 'p-ident';
+  box.setAttribute('aria-label', 'Which survey this paper belongs to');
+  const row = (key, parts) => {
+    const values = parts.filter(Boolean);
+    if (!values.length) return;
+    const r = el(doc, 'div');
+    r.className = 'p-id-row';
+    const k = markEn(el(doc, 'span', w[key]), wordEn.has(key));
+    k.className = 'p-id-k';
+    const v = el(doc, 'span', values.join(' · '));
+    v.className = 'p-id-v';
+    r.append(k, v);
+    box.append(r);
+  };
+  row('projectLabel', [idText(id.project?.name)]);
+  row('assessmentLabel', [idText(id.assessment?.name)]);
+  row('languageLabel', [idText(id.assessment?.language)]);
+  row('printedIn', [model.lang ? idText(model.language) : '']);
+  row('surveyLabel', [idText(id.survey?.name), idText(id.survey?.perspective)]);
+  const ids = [id.project?.id, id.assessment?.id, id.survey?.id].map(idText).filter(Boolean);
+  if (ids.length) { const small = el(doc, 'div', ids.join(' · ')); small.className = 'p-ids'; box.append(small); }
+  return box.children.length ? box : null;
+}
+export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint, printHere = false } = {}) {
   root.replaceChildren();
   root.hidden = !model || !model.visible;
   if (!model || !model.visible) return;
@@ -301,20 +372,27 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint }
   }
   paperSelect.addEventListener('change', event => {
     const next = event.currentTarget.value === 'letter' ? 'letter' : 'a4';
-    renderBlankPrint(doc, root, model, { paper: next, onPrint });
+    renderBlankPrint(doc, root, model, { paper: next, onPrint, printHere });
   });
   paperLabel.append(paperSelect);
   tools.append(paperLabel);
   const printBtn = el(doc, 'button', 'Print');
   printBtn.type = 'button';
   printBtn.className = 'primary';
-  printBtn.addEventListener('click', () => printBlankForm(doc, model, { paper, print: onPrint }));
+  printBtn.addEventListener('click', () => (printHere ? (onPrint ? onPrint(paper) : doc.defaultView.print()) : printBlankForm(doc, model, { paper, print: onPrint })));
   tools.append(printBtn);
   tools.append(el(doc, 'span', `${model.items.length} questions · ${paper.toUpperCase()} · nothing personal on the page`));
   root.append(tools);
 
   const article = el(doc, 'article');
   article.className = `paper ${paper}`;
+  // S25: a form printed in a participant language names it (fonts, hyphenation, right-to-left); a string that had no
+  // translation keeps its English and is marked (lang="en" + data-en, shown as a small "EN" by stage-screens.css).
+  const w = { ...PRINT_WORDS, ...(model.words || {}) }, wordEn = new Set(model.wordsEn || []);
+  const markEn = (node, english) => { if (model.lang && english) { node.setAttribute('lang', 'en'); node.setAttribute('data-en', ''); } return node; };
+  if (model.lang) { article.setAttribute('lang', model.lang); if (model.dir === 'rtl') article.setAttribute('dir', 'rtl'); }
+  const ident = identityBlock(doc, model, w, wordEn, markEn);
+  if (ident) article.append(ident);
   const header = el(doc, 'header');
   header.className = 'p-head';
   const brandWrap = el(doc, 'div');
@@ -323,39 +401,52 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint }
   const mark = el(doc, 'span', '3D');
   brand.append(mark, doc.createTextNode ? doc.createTextNode(' Review') : el(doc, 'span', ' Review'));
   brandWrap.append(brand);
-  brandWrap.append(el(doc, 'h1', model.title || 'Blank survey'));
+  brandWrap.append(markEn(el(doc, 'h1', model.title || w.blankSurvey), !model.title && wordEn.has('blankSurvey')));
   // BCS demo 2026-09-29: paper says which passage to read or hear first ("if it's a print form then… it's just instructions").
-  if (model.passageLine) { const line = el(doc, 'p', model.passageLine); line.className = 'p-passage'; brandWrap.append(line); }
+  if (model.passageLine) { const line = markEn(el(doc, 'p', model.passageLine), wordEn.has('passageLead')); line.className = 'p-passage'; brandWrap.append(line); }
   header.append(brandWrap);
 
   const code = el(doc, 'div');
   code.className = 'p-code';
-  const codeLabel = el(doc, 'div', 'Code (optional; legacy)');
+  const codeLabel = markEn(el(doc, 'div', w.codeLabel), wordEn.has('codeLabel'));
   codeLabel.className = 'p-label';
   const slot = el(doc, 'div');
   slot.className = 'p-slot';
   slot.setAttribute('aria-label', 'Blank code slot');
   for (let i = 0; i < 6; i++) slot.append(el(doc, 'span'));
-  const leave = el(doc, 'div', 'Leave blank when answering from the shared link');
+  const leave = markEn(el(doc, 'div', w.leaveBlank), wordEn.has('leaveBlank'));
   leave.className = 'p-label';
   code.append(codeLabel, slot, leave);
   header.append(code);
 
+  // S31 (captain 2026-09-30 13:39 ET): the survey's one shared link as QR + URL for the helper who enters paper answers.
+  // Only a survey entry link is drawn (printableLink); none → the slot says so instead of inventing one.
   const qr = el(doc, 'div');
   qr.className = 'p-qr';
-  const qrBox = el(doc, 'div');
-  qrBox.className = 'qr';
-  qrBox.setAttribute('aria-label', 'Invitation link is not printed on this blank form');
-  const qrLabel = el(doc, 'div', 'No invitation link on this blank form');
-  qrLabel.className = 'p-label';
-  qr.append(qrBox, qrLabel);
+  const link = printableLink(model.link);
+  if (link) {
+    const img = el(doc, 'img');
+    img.className = 'qr';
+    img.setAttribute('src', link.qr);
+    img.setAttribute('alt', 'QR code: this survey\'s shared link');
+    const url = el(doc, 'div', link.url);
+    url.className = 'p-url';
+    const helper = markEn(el(doc, 'div', w.helperScan), wordEn.has('helperScan'));
+    helper.className = 'p-label';
+    qr.append(img, url, helper);
+  } else {
+    const qrBox = el(doc, 'div');
+    qrBox.className = 'qr none';
+    qrBox.setAttribute('aria-label', 'No shared link for this survey yet');
+    const qrLabel = markEn(el(doc, 'div', w.noLink), wordEn.has('noLink'));
+    qrLabel.className = 'p-label';
+    qr.append(qrBox, qrLabel);
+  }
   header.append(qr);
   article.append(header);
 
   const structured = model.items.some(i => i && typeof i === 'object');
-  const intro = el(doc, 'p', structured
-    ? 'Mark one circle ○ for each question. Where it says "Choose all that apply", mark every box ☐ that fits. Write on the lines where there are no choices.'
-    : 'Write your response on the blank lines below each question.');
+  const intro = markEn(el(doc, 'p', structured ? w.introChoices : w.introLines), wordEn.has(structured ? 'introChoices' : 'introLines'));
   intro.className = 'p-intro';
   article.append(intro);
   const list = el(doc, 'ol');
@@ -368,9 +459,9 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint }
     q.className = 'p-q';
     const n = el(doc, 'span', String(index + 1));
     n.className = 'p-n';
-    const hint = it.type === 'multi' ? 'Choose all that apply' : it.type === 'single' || it.type === 'scale' ? 'Choose one' : '';
-    q.append(n, el(doc, 'span', it.text));
-    if (hint) { const h = el(doc, 'span', hint); h.className = 'p-dim'; q.append(h); }
+    const hintKey = it.type === 'multi' ? 'chooseAll' : it.type === 'single' || it.type === 'scale' ? 'chooseOne' : '';
+    q.append(n, markEn(el(doc, 'span', it.text), it.en));
+    if (hintKey) { const h = markEn(el(doc, 'span', w[hintKey]), wordEn.has(hintKey)); h.className = 'p-dim'; q.append(h); }
     item.append(q);
     const choices = it.options && it.options.length ? it.options
       : it.type === 'scale' && it.scale ? Array.from({ length: Math.max(0, it.scale.max - it.scale.min + 1) }, (_, k) => ({ text: String(it.scale.min + k) })) : [];
@@ -383,15 +474,14 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint }
         const box = el(doc, 'span');
         box.className = `p-box ${it.type === 'multi' ? 'sq' : 'rd'}`;
         box.setAttribute('aria-hidden', 'true');
-        row.append(box, el(doc, 'span', o.other ? `${o.text}: ______________________` : o.text));
+        row.append(box, markEn(el(doc, 'span', o.text), o.en));
         opts.append(row);
+        // S30 (captain 2026-09-30 13:20 ET): people over-answer "Other" — full-width ruled lines under it, not a short blank.
+        if (o.other) opts.append(writeLines(doc, 'p-lines p-write', 3));
       }
       item.append(opts);
     } else {
-      const lines = el(doc, 'div');
-      lines.className = 'p-lines';
-      lines.append(el(doc, 'div'), el(doc, 'div'));
-      item.append(lines);
+      item.append(writeLines(doc, 'p-lines', 5));
     }
     list.append(item);
   }
@@ -401,7 +491,7 @@ export function renderBlankPrint(doc, root, model, { paper = 'letter', onPrint }
   foot.className = 'p-foot';
   const version = [model.template_id, model.template_version != null ? `@${model.template_version}` : ''].join('');
   foot.append(el(doc, 'span', version ? `Form ${version}` : 'Blank form'));
-  foot.append(el(doc, 'span', 'Facilitator: this page never prints codes or credentials'));
+  foot.append(markEn(el(doc, 'span', w.footNote), wordEn.has('footNote')));
   article.append(foot);
   root.append(article);
 }
