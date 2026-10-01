@@ -1,29 +1,24 @@
 {
-  "version": "0.26.3",
+  "version": "0.26.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "b39ab28623b0f2c0fd546cd9b27b53116ffc2e70",
+  "cookbook_commit": "cd8e7304c9c0d4c7b72e6973e0908e185fec15df",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.26.3.md",
-      "blob_sha": "c7a7c5570e1bd3675f493edaaa9dd073c5e71cf3",
-      "sha256": "1a7f9c18ae8bb38b44d1d94dd00ce36c7d22b7d7df408af4a0cb79870722d23a"
+      "path": "planning/2026-09-16-parity-build/releases/0.26.4.md",
+      "blob_sha": "af6037ecc35fb80b4ecf80deafbc38e77eac1e45",
+      "sha256": "e3af1230b4091ff94a50fbb89a7b2cf94350ce77b577b8318448e76323c23b70"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "f9953d0f6ef48e65b093e3231ca91217d38b36e3",
-      "sha256": "4735d244e4fa6d2bc76d2fb4ed1fef87e923b57baa201e821cde23d7082367e9"
+      "blob_sha": "40c47d1188371930fd184abc1063f9a21ab30070",
+      "sha256": "3e77ea19837f4b100f1339cf69d750a2b376f8fd23544d9f041f63946277492c"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "A survey link opened with an unexpected setting now says which settings it accepts (token, resume_token) instead of only \"unknown link parameter\". (#419)",
-        "Asking for the survey form with extra settings (such as a language) now says the language is chosen through translation, not on the form. (#419)",
-        "The receipt returned by `GET /v2/participate/receipt` (cap.response.receipt) now names the review it belongs to; the on-screen receipt is unchanged. (#419)",
-        "If the page reloads while you are setting up an assessment, the wizard now returns to the step you were on with your choices kept. (#422)",
-        "The Project field in the assessment setup is now marked as required in the form itself, so the browser points to it if it is left empty, as it already does for Name and Active until. (#422)",
-        "Translation requests that are far too large are now refused before being read, so an oversized request cannot slow the service. (#423)",
-        "When you sign in and someone has invited you to a review, Home now says so and takes you to the invitation. (#424)"
+        "\"See invitations\" on Home now opens your list of invitations, not an emailed invitation you opened earlier and did not accept; emailed invitation links work as before. (#425)",
+        "If you turn off \"Ask participants about themselves\" in setup after it was turned on in Prepare, the review now launches with it off. (#429)"
       ]
     }
   }

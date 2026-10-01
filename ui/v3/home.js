@@ -23,7 +23,7 @@ const newestFirst = (x, y) => String(y.a.created_at || '').localeCompare(String(
 // (GET /v2/me/invitations through pendingInvitations); 0, missing or not a whole number → nothing. Never a second primary.
 export function invitationsHint(n) {
   if (!Number.isInteger(n) || n < 1) return '';
-  return `<p class="v3h-meta v3h-invites" data-v3h-invitations>You have ${n} invitation${n === 1 ? '' : 's'} waiting. <a href="#invite" data-v3h-invitations-link>See ${n === 1 ? 'the invitation' : 'invitations'}</a></p>`;
+  return `<p class="v3h-meta v3h-invites" data-v3h-invitations>You have ${n} invitation${n === 1 ? '' : 's'} waiting. <a href="#invite/list" data-v3h-invitations-link>See ${n === 1 ? 'the invitation' : 'invitations'}</a></p>`;
 }
 export function homeView({ projects = [], shared = [], listFor, stageLabel = s => ESC(s), start = '', title = '', invitations = 0 }) {
   const head = `<link rel="stylesheet" href="${HOME_CSS}"><div class="v3h-head"><div>${title ? `<h1>${ESC(title)}</h1>` : ''}<p class="v3h-sub">Your 3D Reviews, newest first.</p>${invitationsHint(invitations)}</div>${start}</div>`;

@@ -162,6 +162,7 @@ export function route(hash) {
   if (['how', 'example', 'signin', 'survey', 'about'].includes(parts[0]) && !parts[1]) return { kind: 'entry', intent: parts[0] };
   if (parts[0] === 'feedback' && !parts[1]) return { kind: 'feedback' };
   if (parts[0] === 'invite' && !parts[1]) return { kind: 'invite' }; // B03: token already moved out of the address bar
+  if (parts[0] === 'invite' && parts[1] === 'list' && !parts[2]) return { kind: 'invite', list: true }; // S41: Home's "See invitations" — the list, never a stored emailed token
   if (parts[0] === 'workspaces') return { kind: 'workspaces' };
   if (parts[0] === 'workspace' && parts[1]) return { kind: 'workspace', id: parts[1] };
   if (parts[0] === 'projects') return { kind: 'projects' };
@@ -687,7 +688,7 @@ async function render() {
     // top-level lists stand alone (showcase SOURCE-MAP: the panel is absent from public routes).
     // K3a: workspace/project read surfaces are kit-presented (tree in the shell); the legacy context sidebar remains only for permissions.
     if (r.kind === 'new') { await mountNew(gen, r.id); return; }
-    if (r.kind === 'invite') { mountInvitePage(gen); return; }
+    if (r.kind === 'invite') { mountInvitePage(gen, r.list); return; }
     const sidebar = state.principal && (kit ? ['permissions'] : ['workspace', 'project', 'permissions']).includes(r.kind);
     app.className = sidebar ? 'workspace-layout' : '';
     if (sidebar) { syncShell(); app.innerHTML = context(null) + '<div id="page-root"><p class="muted">Loading…</p></div></section>'; bind(null); await runPage(pageFor(r), r, gen, app.querySelector('#page-root')); }
@@ -696,9 +697,10 @@ async function render() {
   }
 }
 // B03: the invitation page. Signed out → the sign-in step (the token stays in this tab so the sign-in return comes back here).
-function mountInvitePage(gen) {
+function mountInvitePage(gen, list = false) {
   syncShell(); app.className = ''; document.title = 'Invitation · 3D Review';
-  const t = pendingInvite || storedInvite();
+  // S41 (rev424b): `#invite/list` skips a stored, unaccepted emailed token (it stays stored for its own `#invite` return).
+  const t = list ? null : pendingInvite || storedInvite();
   if (!t && state.principal) { mountMyInvitation(gen); return; } // B04 step c: no link token — the signed-in person's own invitations
   if (!t) { app.innerHTML = inviteView({ status: 'missing' }); return; }
   if (!state.principal) { app.innerHTML = inviteView({ status: 'signin' }); return; }

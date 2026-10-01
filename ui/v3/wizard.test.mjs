@@ -521,7 +521,8 @@ test('B06: Launch after a saved step 1 works as before, without creating the ass
   m.$('input[name=g][value="tpl.team"]').checked = true; m.submit(); await settle(); // step 2
   m.submit(); await settle(); // step 3
   m.click('[data-wz="launch"]'); await settle(12);
-  assert.deepEqual(srv.writes().map(c => `${c.method} ${c.url}`), ['POST /v2/projects/p1/assessments', 'POST /v2/assessments/a1/surveys', 'POST /v2/assessments/a1/stage', 'POST /v2/assessments/a1/surveys/s1/links', 'POST /v2/assessments/a1/surveys/s1/links']);
+  assert.deepEqual(srv.writes().map(c => `${c.method} ${c.url}`), ['POST /v2/projects/p1/assessments', 'POST /v2/assessments/a1/surveys', 'PATCH /v2/assessments/a1', 'POST /v2/assessments/a1/stage', 'POST /v2/assessments/a1/surveys/s1/links', 'POST /v2/assessments/a1/surveys/s1/links']);
+  assert.deepEqual(srv.writes().find(c => c.method === 'PATCH').body, { demographics_enabled: false }, 'S42: a saved draft launches with the switch as shown (off)');
   assert.ok(m.h.state.done); assert.match(m.root.innerHTML, /The review is collecting responses/);
   const again = mount(srv, { resume: 'a1', assessmentHref: id => `#assessment/${id}` }); await settle();
   assert.deepEqual(again.went, ['#assessment/a1'], 'launched: Continue setup is gone, the review opens instead');
@@ -760,8 +761,47 @@ test('S38 fix422c: the server switch moved from Prepare wins over the device cop
     Object.assign(srv.db.a, { demographics_enabled: true }, rename ? { name: 'Renamed elsewhere' } : {}); // Prepare flipped the switch on
     const again = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle();
     assert.equal(again.h.state.d.demographics, true, `server switch wins (${rename ? 'stale' : 'matching'} snap)`);
-    assert.equal(again.$('[data-wz-demographics] input')?.checked ?? true, true, 'the wizard shows what launch will send');
+    const shown = again.$('[data-wz-demographics] input'); // rev422d nit: the switch must be on screen, not skipped by `?? true`
+    assert.ok(shown, 'the switch is rendered on the resumed step'); assert.equal(shown.checked, true, 'the wizard shows what launch will send');
   }
+});
+
+// rev422d-0041 worth fixing: launch sends the switch both ways, so the server follows the wizard's final choice.
+const toInformation = async (srv, store) => {
+  const first = mount(srv, { session: tabSession(), store }); await fillStep1(first); first.submit(); await settle();
+  const box = first.$('input[name=g][value="tpl.team"]'); box.checked = true; box.dispatchEvent(new first.w.Event('input', { bubbles: true }));
+  first.submit(); await settle(); assert.equal(first.h.state.step, 'information'); return first;
+};
+const setSwitch = (m, on) => { const demo = m.$('[data-wz-demographics] input'); assert.ok(demo, 'the switch is on screen'); demo.checked = on; demo.dispatchEvent(new m.w.Event('input', { bubbles: true })); };
+const launchFromInformation = async m => { m.submit(); await settle(); assert.equal(m.h.state.step, 'review'); m.click('[data-wz="launch"]'); await settle(12); assert.ok(m.h.state.done, 'launched'); };
+
+test('S42: Prepare turned the switch on, the facilitator unticks it in the wizard: the review launches with it off', async () => {
+  const srv = server(), store = tabSession();
+  (await toInformation(srv, store)).h.destroy();
+  srv.db.a.demographics_enabled = true; // Prepare flipped the switch on
+  const again = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle();
+  assert.equal(again.$('[data-wz-demographics] input').checked, true, 'resume shows the server switch');
+  setSwitch(again, false); await launchFromInformation(again);
+  const patches = srv.writes().filter(c => c.method === 'PATCH' && 'demographics_enabled' in (c.body || {}));
+  assert.deepEqual(patches.map(c => c.body), [{ demographics_enabled: false }], 'launch sends false in the Prepare form shape');
+  const stage = srv.writes().findIndex(c => c.url.endsWith('/stage')), patch = srv.writes().indexOf(patches[0]);
+  assert.ok(patch >= 0 && patch < stage, 'written before collection opens');
+  assert.equal(srv.db.a.demographics_enabled, false, 'the server follows the wizard\'s final choice');
+});
+
+test('S42: a device copy with the switch on while the server turned it off: the server wins and launch sends off', async () => {
+  const srv = server(), store = tabSession();
+  (await toInformation(srv, store)).h.destroy();
+  srv.db.a.demographics_enabled = true; // Prepare on
+  const mid = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle();
+  setSwitch(mid, true); assert.equal(mid.h.state.d.demographics, true); mid.h.destroy(); // device copy: on, saw the server on
+  srv.db.a.demographics_enabled = false; // Prepare turned it off afterwards
+  const again = mount(srv, { resume: 'a1', session: tabSession(), store }); await settle();
+  assert.equal(again.h.state.d.demographics, false, 'server wins (keepSwitch: the copy saw on, the server now holds off)');
+  const shown = again.$('[data-wz-demographics] input'); assert.ok(shown); assert.equal(shown.checked, false, 'the wizard shows what launch will send');
+  await launchFromInformation(again);
+  assert.deepEqual(srv.writes().filter(c => c.method === 'PATCH' && 'demographics_enabled' in (c.body || {})).map(c => c.body), [{ demographics_enabled: false }]);
+  assert.equal(srv.db.a.demographics_enabled, false);
 });
 
 // val422-2341 Worth fixing 2: a failed projects/templates read is not the draft being gone.
