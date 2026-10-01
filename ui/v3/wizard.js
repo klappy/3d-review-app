@@ -89,7 +89,8 @@ export function validateStep(step, d, today = todayIso()) {
 export function demographicsToggle(on) {
   return `<label class="field check" data-wz-demographics><input type="checkbox" name="demographics" ${on ? 'checked' : ''}> Ask participants about themselves (age range, gender)</label><p class="small muted">Off by default. Both answers stay optional for participants.</p>`;
 }
-export function launchPlan(d, pre = []) {
+// saved: the assessment existed before this launch (a saved draft: launchResume set ctx.pre), so the server may hold the switch.
+export function launchPlan(d, pre = [], saved = false) {
   const plan = [];
   if (d.project === NEW_PROJECT) {
     plan.push({ cap: 'cap.project.create', method: 'POST', url: () => '/v2/projects', body: () => ((d.newOrg || '').trim() ? { name: d.newProject.trim(), organization: d.newOrg.trim() } : { name: d.newProject.trim() }), keep: (r, ctx) => { ctx.pid = r.project.id; } }); // S24: translation languages ride the assessment only — no screen edits a project's, and participants see the union
@@ -110,8 +111,10 @@ export function launchPlan(d, pre = []) {
       keep: (r, ctx) => { ctx.surveys.push({ id: r.survey.id, template: tid, expected: expectedValue(g.expected) }); } });
   }
   // S15b: the facilitator's "Ask participants about themselves" switch (off by default). The server stores it on the selected
-  // groups, so it is written only after the groups exist, and only when the facilitator turned it on.
-  if (d.demographics === true) plan.push({ cap: 'cap.assessment.update', method: 'PATCH', url: ctx => `/v2/assessments/${enc(ctx.aid)}`, body: () => ({ demographics_enabled: true }) });
+  // groups, so it is written only after the groups exist. S42 (rev422d): a saved draft may already hold it on (the Prepare form
+  // PATCHes it), so its launch sends the wizard's final choice both ways, in the Prepare form's shape ({ demographics_enabled: bool });
+  // a brand-new assessment starts off, so it is written there only when the facilitator turned it on.
+  if (d.demographics === true || saved) plan.push({ cap: 'cap.assessment.update', method: 'PATCH', url: ctx => `/v2/assessments/${enc(ctx.aid)}`, body: () => ({ demographics_enabled: d.demographics === true }) });
   plan.push({ cap: 'cap.assessment.set_stage', method: 'POST', url: ctx => `/v2/assessments/${enc(ctx.aid)}/stage`, body: () => ({ stage: 'collect' }) });
   plan.push({ cap: 'cap.survey.issue_link', each: 'surveys' });
   return plan;
@@ -168,7 +171,7 @@ async function launchInner(d, opts) {
   if (ctx.base == null) ctx.base = ctx.done.length; // writes already made before this launch (B06: the saved draft)
   opts._ctx = ctx;
   let i = 0;
-  for (const step of opts.plan || launchPlan(d, ctx.pre || [])) {
+  for (const step of opts.plan || launchPlan(d, ctx.pre || [], Array.isArray(ctx.pre))) {
     if (step.each === 'surveys') {
       for (const s of ctx.surveys) {
         if (i++ < ctx.done.length) continue;
