@@ -1,33 +1,30 @@
 {
-  "version": "0.27.0",
+  "version": "0.28.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "97922f25955ae2539b9c45e67f89911f97ef5b68",
+  "cookbook_commit": "64666d62bab462ca14f4b1769d8c6efa3a3dbc49",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.27.0.md",
-      "blob_sha": "c7ee5e8bf9db11857f8017775b2cecf64851baba",
-      "sha256": "1d19d7f80bce2b6b1d6800d5b92e8f8edd98d0a3b94b9d524d8a1a9f692acdaa"
+      "path": "planning/2026-09-16-parity-build/releases/0.28.0.md",
+      "blob_sha": "c75fbaf50c3ee126e80849fb5ddfee076083d36e",
+      "sha256": "ebebefbe7a25d4808b85f7af14be001d963c3ba1a9f9122ce3d56b10e7d412fd"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "c379f1122197263e4cca21b14aa208c12da0cc8c",
-      "sha256": "45c0710c81be42c5a67d473c5db037fbf0465f9575d7770068e5f8f442a55787"
+      "blob_sha": "1bb3bfab63c4f899bc43eac8eb4b09b17e049f14",
+      "sha256": "3b858f91b8e6f4d6f28a3f3474814030cd4415a64081fd053737be409b5814fd"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "While you set up a review, the last step now lets you add the passage for participants (a file up to 50 MB, a link such as a sign-language video, or just the passage name). It is optional: choose \"Skip for now\" and add passages later under Prepare. (#440)"
+        "No behaviour change: a test now fails when a page uses a file the local server does not serve. (#445)"
       ],
       "changed": [
-        "The app's hashing and signing helpers now live in one place; links, codes and receipts are signed exactly as before. (#435)",
-        "The Home \"Sign in\" button picks its destination directly from the email-links setting instead of rewriting the page text afterwards; where it leads is unchanged. (#436)",
-        "On a print preview in another language, a screen reader now hears the \"no shared link\" box in that language (or is told it is English when no translation exists). (#436)",
-        "No behaviour change: a test now pins that a refused passage link (the \"a link must be a full https:// address\" message) stays typed in the link fields and that message shows as the status line. (#437)"
+        "\"App feedback\" in the account menu now opens in a window over the screen you are on. Close it (the Close button, Escape, or a click outside) and you are back where you were, with your unfinished work untouched. A link to #feedback still opens the feedback page. (#444)"
       ],
       "fixed": [
-        "While results are held, the Results line no longer says \"at least three responses per group\"; it now says how many responses are in and how many the server needs (for example 3 so far, at least 5 needed), or a plain line when those numbers are not given. (#438)",
-        "When an assessment cannot be deleted, the message now names what is in the way (its surveys, its responses, or both) instead of saying \"0 responses\". (#439)"
+        "When the app is run on a developer's own computer, Prepare and the setup wizard's Passages block now load: the local server serves every file the pages use (the passages file was missing, along with the print, translation and kit files). Nothing changes on the hosted app. (#445)",
+        "On the setup wizard's last step, choosing \"Skip for now\" and then \"Add passages\" brings back the same passages block, so an upload or link still in progress keeps its status. (#445)"
       ]
     }
   }
