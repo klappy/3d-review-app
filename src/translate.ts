@@ -31,7 +31,7 @@ import { resolvePrincipal } from "./auth";
 import { inScript, lwcLanguage, type LwcLanguage } from "./languages";
 import { allowedScope, parseScope, upstreamContext } from "./translate-allowlist";
 
-export const TRANSLATE_LIMITS = Object.freeze({ maxKeys: 600, maxKeyLength: 200, maxTextLength: 2000, maxTotalChars: 150_000, timeoutMs: 45_000 });
+export const TRANSLATE_LIMITS = Object.freeze({ maxKeys: 600, maxKeyLength: 200, maxTextLength: 2000, maxTotalChars: 150_000, timeoutMs: 45_000, maxBodyBytes: 1_048_576 });
 const CONTEXT = /^[A-Za-z0-9_.:@-]{1,120}$/;
 const ENGLISH = new Set(["en", "eng", "english"]);
 const IN_CHUNK = 90; // D1 allows 100 bound parameters per statement
@@ -44,6 +44,32 @@ type Deps = { fetch?: typeof fetch; now?: () => Date };
 const reply = (value: unknown, status = 200, extra: Record<string, string> = {}) => new Response(JSON.stringify(value), {
   status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra },
 });
+
+/**
+ * Security review (train 22 audit): the body is size-checked BEFORE it is parsed. A declared content-length over
+ * maxBodyBytes is refused without reading; otherwise the stream is read only up to maxBodyBytes and cancelled past it.
+ * 1 MiB covers the largest request parseTranslateRequest accepts (600 keys × 200 + 150 000 text characters, UTF-8 and
+ * JSON escaping included); the page itself sends 20-string chunks of a few KB. Returns the text, or null when too large.
+ */
+export async function readCappedBody(request: Request, max = TRANSLATE_LIMITS.maxBodyBytes): Promise<string | null> {
+  const declared = request.headers.get("content-length");
+  if (declared !== null && declared.trim() !== "" && !(Number(declared) <= max)) return null;
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) { await reader.cancel().catch(() => {}); return null; }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) { bytes.set(c, at); at += c.byteLength; }
+  return new TextDecoder("utf-8").decode(bytes);
+}
 
 /** Shape check; returns the clean request or a one-line reason. Language support is checked by the handler. */
 export function parseTranslateRequest(body: unknown): TranslateRequest | string {
@@ -157,8 +183,10 @@ export async function handleTranslate(request: Request, env: Env, deps: Deps = {
   const limiter = await translateLimiter(request, env);
   if (!(await allow(env, limiter.name, limiter.key)))
     return reply({ error: "rate_limited", hint: `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again` }, 429, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
+  const raw = await readCappedBody(request).catch(() => null);
+  if (raw === null) return reply({ error: "invalid_params", message: "request is too large" }, 413);
   let body: unknown;
-  try { body = await request.json(); } catch { return reply({ error: "invalid_params", message: "JSON object body required" }, 400); }
+  try { body = JSON.parse(raw); } catch { return reply({ error: "invalid_params", message: "JSON object body required" }, 400); }
   const parsed = parseTranslateRequest(body);
   if (typeof parsed === "string") return reply({ error: "invalid_params", message: parsed }, 400);
   if (ENGLISH.has(parsed.targetLang.toLowerCase())) return reply({ translated: parsed.sourceTexts, partial: false, locale: "en", review: false, stored: 0 });
