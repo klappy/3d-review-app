@@ -1,24 +1,24 @@
 {
-  "version": "0.26.4",
+  "version": "0.26.5",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "cd8e7304c9c0d4c7b72e6973e0908e185fec15df",
+  "cookbook_commit": "16f204eb6f1690ede3b37df31c879ef7d9c015b9",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.26.4.md",
-      "blob_sha": "af6037ecc35fb80b4ecf80deafbc38e77eac1e45",
-      "sha256": "e3af1230b4091ff94a50fbb89a7b2cf94350ce77b577b8318448e76323c23b70"
+      "path": "planning/2026-09-16-parity-build/releases/0.26.5.md",
+      "blob_sha": "6d5d95fb8f1d0404c8e52d64426c518aa1af5dbb",
+      "sha256": "b44077f34ecbe3328a4d8580feec963aa1c24a9f6c863b072a51b9730d8e7f1a"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "40c47d1188371930fd184abc1063f9a21ab30070",
-      "sha256": "3e77ea19837f4b100f1339cf69d750a2b376f8fd23544d9f041f63946277492c"
+      "blob_sha": "350386f9f945907c2e2e722cf1c45d4abcf08257",
+      "sha256": "11356274afcdf67a43cf94d8795c4a667ec4eb2d1ec6e0af1ef68eb035c31c62"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "\"See invitations\" on Home now opens your list of invitations, not an emailed invitation you opened earlier and did not accept; emailed invitation links work as before. (#425)",
-        "If you turn off \"Ask participants about themselves\" in setup after it was turned on in Prepare, the review now launches with it off. (#429)"
+        "On the printed survey, a long passage name or link now wraps inside the passage box instead of running off the page. (#430)",
+        "While you accept many invitations at once, the page now shows how many are done and a spinner, so you can see it is still working. (#431)"
       ]
     }
   }

@@ -76,3 +76,11 @@ test('the app page wires Print to the print document; printing the app page itse
   assert.match(css, /body:has\(#print-root \.paper\):not\(:has\(> \.stage-print-only\)\) \*:not\(:has\(#print-root\)\):not\(#print-root\):not\(#print-root \*\)\{display:none!important\}/);
   assert.match(css, /#print-root \.paper \.p-opts\{grid-template-columns:minmax\(0,1fr\)\}/);
 });
+
+// Persona C (gate 0.24.0): the passage line names each passage's reference or title; a link-only passage is one long
+// unbroken string that ran past the sheet instead of wrapping inside the box.
+test('the passage line wraps a long unbroken reference inside the page (paper and preview)', () => {
+  assert.match(PRINT_DOC_CSS, /\.p-passage\{[^}]*overflow-wrap:anywhere/, 'print document wraps the passage line');
+  const css = readFileSync(new URL('../stage-screens.css', import.meta.url), 'utf8');
+  assert.match(css, /\.p-passage\{[^}]*overflow-wrap:anywhere/, 'preview paper wraps the passage line');
+});
