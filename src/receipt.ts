@@ -2,6 +2,7 @@
 import type { Ctx, ScopeType } from "./handlers/types";
 import type { Capability } from "./registry";
 import type { Receipt } from "./envelope";
+import { hmacSha256Base64Url, hmacSha256Key, sha256Hex } from "./crypto";
 
 export const CONFIRM_TTL_SECONDS = 300; // inherited from 05 sketch; 18-D open item D-2 (18-C rules the final value)
 
@@ -29,10 +30,7 @@ export function b64urlDecode(s: string): Uint8Array {
 }
 const enc = new TextEncoder();
 
-export async function sha256Hex(input: string): Promise<string> {
-  const d = await crypto.subtle.digest("SHA-256", enc.encode(input));
-  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+export { sha256Hex };
 
 /** Canonical JSON: sorted keys, so the same intent hashes the same on both faces. */
 export function canonical(v: unknown): string {
@@ -42,15 +40,9 @@ export function canonical(v: unknown): string {
   return `{${Object.keys(o).sort().map((k) => `${JSON.stringify(k)}:${canonical(o[k])}`).join(",")}}`;
 }
 
-async function hmacKey(secret: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
-}
-export async function sign(secret: string, payload: string): Promise<string> {
-  const key = await hmacKey(secret);
-  return b64url(await crypto.subtle.sign("HMAC", key, enc.encode(payload)));
-}
+export const sign = (secret: string, payload: string): Promise<string> => hmacSha256Base64Url(secret, payload);
 export async function verify(secret: string, payload: string, sig: string): Promise<boolean> {
-  const key = await hmacKey(secret);
+  const key = await hmacSha256Key(secret, ["verify"]);
   try { return await crypto.subtle.verify("HMAC", key, b64urlDecode(sig), enc.encode(payload)); } catch { return false; }
 }
 

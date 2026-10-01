@@ -17,6 +17,7 @@
  */
 import type { AuthRequest, ClientInfo, OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import type { Env, Principal } from "./handlers/types";
+import { hmacSha256Base64Url } from "./crypto";
 
 export interface OAuthProps { principal_id: string; client_id: string; external?: never }
 export interface ExternalProps { external: true }
@@ -39,10 +40,7 @@ export async function principalFromProps(env: Env, props: OAuthProps): Promise<P
 }
 
 const b64u = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-async function hmac(secret: string, msg: string): Promise<string> {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  return b64u(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`oauth-consent.v1|${msg}`))));
-}
+const hmac = (secret: string, msg: string) => hmacSha256Base64Url(secret, `oauth-consent.v1|${msg}`);
 const timingSafeEqual = (a: string, b: string) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
 
 export async function mintTicket(env: Env, parkId: string, principalId: string, now = Date.now()): Promise<string> {

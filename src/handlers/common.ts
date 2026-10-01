@@ -26,10 +26,7 @@ export function nowIso(ctx: Ctx): string {
 export function plusSeconds(ctx: Ctx, s: number): string {
   return new Date(ctx.now().getTime() + s * 1000).toISOString();
 }
-export async function sha256(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+export { sha256Hex as sha256 } from "../crypto";
 /** One normaliser for every email-derived key and hash (limiter `em:` key, login_code.email_hash): trim + lowercase. */
 export const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 export function randomToken(prefix: string): string {

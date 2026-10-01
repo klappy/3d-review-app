@@ -12,6 +12,7 @@
  * Anything else is refused: never sent upstream, never stored, never served.
  */
 import { RESPONDENT_FIELDS } from "./context-fields";
+import { sha256Hex } from "./crypto";
 
 export type TranslateScope = { kind: "ui" } | { kind: "form"; templateId: string };
 
@@ -77,10 +78,6 @@ export const welcomeLead = (language?: string | null) => `${language ? `You were
 export const welcomeTime = (count: number) => `Time: about ${Math.max(5, Math.round(count * 0.6))} minutes · ${count} questions`;
 export const MAX_FORM_ITEMS = 300;
 
-async function sha256Hex(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 const hashAll = async (texts: Iterable<string>, into = new Set<string>()) => { for (const t of new Set(texts)) into.add(await sha256Hex(t)); return into; };
 
 /** The fixed participant-ui source: built once per isolate; a new deploy is a new isolate and a new source. */
