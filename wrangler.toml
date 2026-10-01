@@ -34,8 +34,8 @@ PTXPRINT_MCP_URL = "https://ptxprint.klappy.dev/mcp"
 name = "EMAIL"
 allowed_sender_addresses = ["noreply@3dreview.app"]
 
-# Passage files (src/passages.ts; migration 0013). Create the bucket first, then uncomment — a binding to a bucket that
-# does not exist fails the deploy. Without it, uploads answer 503 and links still work.
+# Passage files (src/passages.ts; migration 0013). The dev bucket exists and this binding is live. Any environment that
+# drops the binding still runs: uploads answer 503 and links still work.
 [[r2_buckets]]
 binding = "PASSAGES"
 bucket_name = "3d-review-passages-dev"
