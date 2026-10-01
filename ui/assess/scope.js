@@ -5,6 +5,7 @@
 // Pure render: HTML strings, every text value through ctx.esc. No DOM access outside bind().
 // v3 lane 9 L9-1: projects page = home per Bincy screen 02 (relative import so node tests resolve it too).
 import { homeView } from '../v3/home.js';
+import { pendingInvitations } from '../v3/components/invite.js';
 import { learnMore } from '../v3/components/learn-more.js';
 import { mountEditableHeading } from '../v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '../v3/components/saved-status.js';
@@ -407,6 +408,10 @@ const projects = {
     let list;
     try { const r = await ctx.api('/v2/projects'); list = r.projects || []; }
     catch (e) { return { ...fail(e, safeMessage), params }; }
+    // S40: the signed-in person's own pending invitations — the same read the invitations screen uses (cap.me.invitations via
+    // pendingInvitations); any failure → none, Home unchanged. Started here (after the signed-out return above, so a signed-out
+    // visitor makes no request) so it runs alongside the assessment and /v2/me reads instead of after them.
+    const mine = ctx.api('/v2/me/invitations').then(pendingInvitations, () => []);
     // v3 lane 9: each project's assessments, read-only, same endpoint the project page uses; first 20 projects, the rest link out.
     const lists = {};
     await Promise.allSettled(list.filter(p => !p.archived_at).slice(0, 20).map(async p => {
@@ -422,12 +427,12 @@ const projects = {
       const reads = await Promise.allSettled(ids.map(id => ctx.api(`/v2/assessments/${encodeURIComponent(id)}`)));
       shared = reads.filter(r => r.status === 'fulfilled').map(r => r.value?.assessment).filter(a => a && !a.archived_at && !here.has(a.project_id));
     } catch { shared = []; }
-    return { status: 'loaded', params, projects: list, lists, shared };
+    return { status: 'loaded', params, projects: list, lists, shared, invitations: await mine };
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('projects', model);
-    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW });
+    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW, invitations: (model.invitations || []).length });
     return readRegion(`${pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`);
   },
   bind(ctx, root, model) {

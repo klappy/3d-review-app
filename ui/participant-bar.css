@@ -4,6 +4,9 @@
 #participant .participant-bar{order:-1;display:flex;gap:4px;margin:4px 0 6px}
 #participant .participant-bar span{flex:1;height:6px;border-radius:3px;background:var(--bincy-edge,#dde3e8)}
 #participant .participant-bar span.done{background:var(--bincy-teal,var(--primary,#0f766e))}
+/* S27: a required question left unanswered at Review is marked on the bar and on its own question. */
+#participant .participant-bar span.missing{background:#b3261e}
+#participant fieldset[data-missing] legend{color:#922f22}
 #participant .participant-page-actions{display:flex;justify-content:space-between;gap:12px}
 
 /* Bincy B30 welcome disclosure (shared by /participate/ and /legacy/): "Learn more" is a quiet, full-height tap target. */

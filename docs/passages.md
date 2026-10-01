@@ -18,7 +18,23 @@ are checked so a renamed file is refused), or add an https link with a title; ea
 ## Participants
 A **The passage** card sits at the top of every survey screen: open on the welcome, folded to one line once the
 questions start. Audio plays in the page (with seeking — the file route answers Range requests, which phones need);
-PDF / USFM / USX, videos and links open in a new tab. Labels translate with the rest of the page.
+PDF / USFM / USX, videos and links open in a new tab. Labels translate with the rest of the page. A USFM or SFM passage
+opens as a **PDF typeset by PTXprint** (verses, not backslash markers) when one was made — see below.
+
+## USFM/SFM → PDF through the PTXprint MCP server
+Captain 2026-09-30 12:08 ET: "Use PTXprintmcp server that i use for converting the usfm/usx/sfm files to print/pdf."
+On upload of a `.usfm`/`.sfm` file the Worker (src/ptxprint.ts) calls the PTXprint MCP server once
+(`PTXPRINT_MCP_URL`, streamable-HTTP MCP, e.g. `https://ptxprint.klappy.dev/mcp`, no key): `initialize` →
+`submit_typeset` with the file as a 10-minute signed `?raw=1` link plus its sha256 (the server's container fetches and
+verifies it) → poll `get_job_status` → fetch the PDF. The layout is the server's own proven smoke fixture
+(`smoke/bsb-jhn-empirical.json`: A5, two columns, Gentium Plus), copied to `src/ptxprint-passage-config.json`; only the
+book (from the `\id` line; the 66 books, Paratext numbering) changes. The PDF is stored beside the original
+(`assessments/<aid>/<pid>.pdf`) and `assessment_passage.pdf_key` names it (migration **0014**).
+- `GET /v2/passages/:pid/file` serves the PDF for that passage; `?raw=1` serves the original text.
+- Degrade, never a 500: URL unset, no known `\id` book, a failed render, over 30 s, a PDF over 25 MB, or 0014 not applied
+  → the raw file stays, no `pdf_key`, one `passage.pdf` log line; the facilitator's card says "Text file" (else "Text · PDF").
+- USX is not sent (the server documents USFM sources only); it stays a text file. Gentium Plus covers Latin, Greek and
+  Cyrillic; other scripts need a font in the payload (follow-up).
 
 ## API (src/passages.ts; envelope `{ok, result}`)
 - `GET /v2/assessments/:aid/passages` (viewer+) → `{ passages, file_storage, accepts, max_bytes }`
@@ -30,10 +46,11 @@ PDF / USFM / USX, videos and links open in a new tab. Labels translate with the 
   `RL_HTTP_ANON` (audit round 1 W2 — a room of phones seeking in one MP3 shares an address)
 - `cap.assessment.delete` removes the assessment's passage rows (removed ones too) and their stored files with it; the
   dry run's `impact.affected[0].passages` counts the active ones (audit round 1 W3)
-- `cap.response.form` → `passages: [{id, kind, media, title, reference, filename, size, href}]`
+- `cap.response.form` → `passages: [{id, kind, media, title, reference, filename, size, pdf?, href}]` (`pdf` on text
+  passages: true when the link opens a PTXprint PDF)
 
 ## To turn files on (links work without this)
-1. Apply migration **0013** to DEV and production D1.
+1. Apply migrations **0013** and **0014** to DEV and production D1; set `PTXPRINT_MCP_URL` per environment.
 2. Create R2 buckets `3d-review-passages-dev` and `3d-review-passages`, then uncomment the two `r2_buckets` blocks in
    `wrangler.toml` (a binding to a missing bucket fails the deploy, so they ship commented).
 
