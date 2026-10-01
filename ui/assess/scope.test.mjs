@@ -458,3 +458,12 @@ test('U28 (Bincy B32): both sign-in entry points say a new email creates an acco
   assert.ok(onIn.includes('Email me a sign-in link') && !onIn.includes(SIGNUP_NOTE), 'flag on, signed in: no sign-up line');
   assert.ok(siIn.includes('Sign in with an email code'), 'signed-in #signin still renders'); assert.ok(!siIn.includes(SIGNUP_NOTE), 'signed-in #signin (typed, bookmark, Back): no sign-up line');
 });
+
+test('E6: the Home Sign in href is computed from the email-links flag (off → Access provider, on → #signin), the rest of the nav unchanged', async () => {
+  const navOf = state => { const ctx = ctxWith(); ctx.state = state; const h = pages.entry.render(ctx, {}); return h.slice(h.indexOf('<nav class="public-choices'), h.indexOf('</nav>') + 6); };
+  const off = navOf({}), on = navOf({ emailLinks: true });
+  assert.ok(off.endsWith('<a class="rv-btn primary" href="/v2/auth/access">Sign in</a></nav>'), off);
+  assert.ok(on.endsWith('<a class="rv-btn primary" href="#signin">Sign in</a></nav>'), on);
+  assert.equal(on.replace('href="#signin"', 'href="/v2/auth/access"'), off, 'only the href differs');
+  assert.equal(navOf({ emailLinks: 'yes' }), off, 'only a literal true turns it on');
+});

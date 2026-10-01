@@ -91,3 +91,12 @@ test('review #411: the execute is accepted only when it hands back the link the 
   assert.equal(await run({ link_id: 'invite_2', entry_fragment: '#survey=link_new', reused: undefined }), null, 'minted in between → no link printed');
   assert.equal(await run({ link_id: 'invite_2', entry_fragment: '#survey=link_new', reused: true }), null, 'a different id → no link printed');
 });
+
+test('#405 nit c: a translated preview names the empty QR box in the label\'s words; English kept → lang="en"; English paper unchanged', () => {
+  const hiLang = { code: 'hi', name: 'Hindi', endonym: 'हिन्दी', dir: 'ltr' };
+  const hi = printDocumentHtml(applyPrintTranslation({ ...base }, hiLang, { 'w.noLink': 'अभी कोई साझा लिंक नहीं है।' }));
+  assert.match(hi, /<div class="qr none" aria-label="अभी कोई साझा लिंक नहीं है।"><\/div>/);
+  const kept = printDocumentHtml(applyPrintTranslation({ ...base }, hiLang, { 'w.projectLabel': 'परियोजना' }));
+  assert.match(kept, new RegExp(`<div class="qr none" aria-label="${PRINT_WORDS.noLink.replace(/[.]/g, '\\.')}" lang="en"><\\/div>`));
+  assert.match(printDocumentHtml(base), /<div class="qr none" aria-label="No shared link for this survey yet"><\/div>/);
+});
