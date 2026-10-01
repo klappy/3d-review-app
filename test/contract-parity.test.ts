@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 // placeholders ({aid}, {sid}, …) are carried as params. Every route (c.http plus c.http_alt) must exist in openapi.yaml, but
 // schemas are compared on c.http only, as scripts/parity.mjs does. Schema agreement is judged only on what both files declare:
 // property names, the `required` list and `additionalProperties` (compared when both sides state it), recursing into nested
-// `properties`, array `items` and `oneOf` branches wherever both sides declare a nested shape.
+// `properties`, array `items` and `oneOf` branches; a nested shape on one side only is reported. Both sides are recorded per
+// row, so a shape only one file declares lands in ONE_SIDED by name.
 
 type Json = any;
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
@@ -146,7 +147,8 @@ function oasRequest(c: Json, route: { method: string; path: string }): Shape | n
     const b = shape(body);
     const pp = pathParams(route.path);
     if (!b && pp.length === 0) return null;
-    if (b && "oneOf" in b) return b;
+    if (b && "oneOf" in b)
+      return pp.length ? { oneOf: b.oneOf.map((x) => ("oneOf" in x ? x : { ...x, props: sorted([...x.props, ...pp]), required: sorted([...x.required, ...pp]) })) } : b;
     return { ...(b ?? {}), props: sorted([...(b?.props ?? []), ...pp]), required: sorted([...(b?.required ?? []), ...pp]) } as Shape;
   }
   const ps = (o.parameters ?? []).map(deref).filter((p: Json) => p.in === "path" || p.in === "query");
@@ -175,7 +177,12 @@ function diff(a: Shape, b: Shape, at = ""): string[] {
   if (a.required.join() !== b.required.join()) out.push(`${at}required capabilities=[${a.required}] openapi=[${b.required}]`);
   if ("additionalProperties" in a && "additionalProperties" in b && JSON.stringify(a.additionalProperties) !== JSON.stringify(b.additionalProperties))
     out.push(`${at}additionalProperties capabilities=${JSON.stringify(a.additionalProperties)} openapi=${JSON.stringify(b.additionalProperties)}`);
-  for (const k of Object.keys(a.nested ?? {}).sort()) if (b.nested?.[k]) out.push(...diff(a.nested![k], b.nested[k], `${at}${k}.`));
+  // A nested shape declared on only one side is reported, not skipped, so it cannot drop out of comparison silently.
+  for (const k of sorted([...Object.keys(a.nested ?? {}), ...Object.keys(b.nested ?? {})])) {
+    const x = a.nested?.[k], y = b.nested?.[k];
+    if (x && y) out.push(...diff(x, y, `${at}${k}.`));
+    else out.push(`${at}${k} nested shape on one side only (${x ? "capabilities" : "openapi"})`);
+  }
   return out;
 }
 
@@ -186,9 +193,12 @@ const record = (key: string, a: Shape | null, b: Shape | null) => {
   if (a && b) checks.push({ key, problems: diff(a, b) });
   else if (a || b) oneSided.push(`${key} (${a ? "capabilities" : "openapi"} only)`);
 };
+// Both sides are recorded whatever capabilities.json declares, so a shape only openapi.yaml declares lands in ONE_SIDED by name.
+// A body-less route with no path/query parameters declares no request fields, so an empty OpenAPI request is not a shape.
+const declared = (s: Shape | null) => (s && "props" in s && s.props.length === 0 && !s.nested ? null : s);
 for (const c of caps) {
-  if (c.params_schema) record(`${c.id} request`, shape(c.params_schema), oasRequest(c, c.http));
-  if (c.result_schema) record(`${c.id} result`, shape(c.result_schema), oasResult(c.http));
+  record(`${c.id} request`, c.params_schema ? shape(c.params_schema) : null, c.params_schema ? oasRequest(c, c.http) : declared(oasRequest(c, c.http)));
+  record(`${c.id} result`, c.result_schema ? shape(c.result_schema) : null, oasResult(c.http));
 }
 
 // Rows compared today (both files declare a field shape). A row that stops being compared, for example because one side
@@ -223,12 +233,84 @@ const COMPARED = [
   "cap.ops.roadmap_history request",
 ];
 // Rows where only one file declares a field shape, so there is nothing to compare. Kept exact for the same reason.
-const ONE_SIDED = ["cap.me.invitations result (capabilities only)"];
+// Both sides are recorded, so "(openapi only)" rows include results such as cap.ops.feedback_get's FeedbackGetResult and
+// requests whose route carries path/query parameters while the capability declares no params_schema.
+const ONE_SIDED = [
+  "cap.assessment.archive request (openapi only)",
+  "cap.assessment.create request (openapi only)",
+  "cap.assessment.delete request (openapi only)",
+  "cap.assessment.get request (openapi only)",
+  "cap.assessment.list request (openapi only)",
+  "cap.assessment.notes.update request (openapi only)",
+  "cap.assessment.set_stage request (openapi only)",
+  "cap.assessment.unarchive request (openapi only)",
+  "cap.assessment.update request (openapi only)",
+  "cap.grant.invite request (openapi only)",
+  "cap.grant.list request (openapi only)",
+  "cap.grant.revoke request (openapi only)",
+  "cap.grant.revoke_invitation request (openapi only)",
+  "cap.grant.transfer_owner request (openapi only)",
+  "cap.grant.update_role request (openapi only)",
+  "cap.language.archive request (openapi only)",
+  "cap.language.create request (openapi only)",
+  "cap.language.list request (openapi only)",
+  "cap.language.unarchive request (openapi only)",
+  "cap.me.invitations result (capabilities only)",
+  "cap.ops.feedback_get result (openapi only)",
+  "cap.ops.trace request (openapi only)",
+  "cap.ops.undo request (openapi only)",
+  "cap.project.archive request (openapi only)",
+  "cap.project.delete request (openapi only)",
+  "cap.project.get request (openapi only)",
+  "cap.project.unarchive request (openapi only)",
+  "cap.project.update request (openapi only)",
+  "cap.recommendation.propose request (openapi only)",
+  "cap.recommendation.review request (openapi only)",
+  "cap.response.list request (openapi only)",
+  "cap.response.purge request (openapi only)",
+  "cap.results.summary request (openapi only)",
+  "cap.rollup.project request (openapi only)",
+  "cap.rollup.workspace request (openapi only)",
+  "cap.survey.deselect request (openapi only)",
+  "cap.survey.export_codes request (openapi only)",
+  "cap.survey.get_status request (openapi only)",
+  "cap.survey.issue_codes request (openapi only)",
+  "cap.survey.print request (openapi only)",
+  "cap.survey.revoke_code request (openapi only)",
+  "cap.survey.revoke_link request (openapi only)",
+  "cap.survey.select request (openapi only)",
+  "cap.survey.send_links request (openapi only)",
+  "cap.template.get request (openapi only)",
+  "cap.template.publish_version request (openapi only)",
+  "cap.template.render request (openapi only)",
+  "cap.workspace.add_project request (openapi only)",
+  "cap.workspace.archive request (openapi only)",
+  "cap.workspace.delete request (openapi only)",
+  "cap.workspace.get request (openapi only)",
+  "cap.workspace.remove_project request (openapi only)",
+  "cap.workspace.unarchive request (openapi only)",
+  "cap.workspace.update request (openapi only)",
+];
 
-// Rows where the two files disagree today (S37 findings; the contract is not edited here). Remove a line once fixed upstream.
-const KNOWN_DISAGREEMENTS: Record<string, string> = {
-  "cap.grant.accept request":
-    "capabilities declares params {token, invitation_id} with x-exactly-one-of across http + http_alt and no required; openapi's primary route takes only {token} as a required path param and its DangerBody params are an open object",
+// Rows where the two files disagree today (S37 findings; the contract is not edited here). Each row pins its exact problem
+// strings, so a known row that changes into a different mismatch fails. Remove a line once fixed upstream.
+const KNOWN_DISAGREEMENTS: Record<string, { why: string; problems: string[] }> = {
+  "cap.grant.accept request": {
+    why: "capabilities declares params {token, invitation_id} with x-exactly-one-of across http + http_alt and no required; openapi's primary route takes only {token} as a required path param and its DangerBody params are an open object",
+    problems: ["properties capabilities=[invitation_id,token] openapi=[token]", "required capabilities=[] openapi=[token]"],
+  },
+  "cap.response.submit request": {
+    why: "openapi declares a nested shape for params.context; capabilities leaves context undeclared",
+    problems: ["context nested shape on one side only (openapi)"],
+  },
+  "cap.report.build result": {
+    why: "openapi declares a nested shape for report.payload; capabilities leaves payload undeclared",
+    problems: ["oneOf[0].report.payload nested shape on one side only (openapi)"],
+  },
+  "cap.report.get result": {
+    why: "openapi declares a nested shape for report.payload; capabilities leaves payload undeclared",
+    problems: ["oneOf[0].report.payload nested shape on one side only (openapi)"],
+  },
 };
 
 describe("contract parity: capabilities.json ↔ openapi.yaml (offline)", () => {
@@ -250,7 +332,8 @@ describe("contract parity: capabilities.json ↔ openapi.yaml (offline)", () => 
 
   describe("request/result schemas agree on fields both files declare", () => {
     for (const ch of checks) {
-      if (KNOWN_DISAGREEMENTS[ch.key]) it.todo(`${ch.key} — ${KNOWN_DISAGREEMENTS[ch.key]}`);
+      const known = KNOWN_DISAGREEMENTS[ch.key];
+      if (known) it(`${ch.key} (known disagreement: ${known.why})`, () => expect(ch.problems).toEqual(known.problems));
       else it(ch.key, () => expect(ch.problems).toEqual([]));
     }
     it("the compared set is exactly COMPARED (a row that drops out of comparison fails here by name)", () => {
