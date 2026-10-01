@@ -110,24 +110,39 @@ export function failureNotice(state, inv) {
     default: return `Could not accept ${what}. Try again.`;
   }
 }
-// Pure: the list page. m = { invitations, busy: null | 'all' | <row index>, notice }. House rules: one heading, one short line,
-// one primary. One invitation → its sentence and a primary "Accept". Two or more → one row each (kind, name with its path,
-// role, its own Accept) and "Accept all" as the primary. While accepting, every button is disabled. A notice (a failed accept)
+// S44 (captain 2026-10-01 02:53 ET: "It took a while to accept all 41 invitations and should have had a loading spinner so i knew
+// it wasn't crashed or frozen"): a small spinner beside every "Accepting…" (motion off under prefers-reduced-motion); the
+// stylesheet rides in the page only while busy (this component has no stylesheet of its own).
+const SPIN_CSS = '<style data-invite-spin-css>.rv-invite-spin{display:inline-block;width:1em;height:1em;margin-right:.5em;vertical-align:-.15em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rv-invite-spin .8s linear infinite}@keyframes rv-invite-spin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.rv-invite-spin{animation:none;border-right-color:currentColor;opacity:.55}}</style>';
+const SPINNER = '<span class="rv-invite-spin" data-invite-spinner aria-hidden="true"></span>';
+// Pure: the progress words while "Accept all" runs — the invitation now in flight, counted from 1. Without a count → "Accepting…".
+export function progressLabel(done, total) {
+  return Number.isInteger(done) && Number.isInteger(total) && total > 0 ? `Accepting ${Math.min(done + 1, total)} of ${total}…` : 'Accepting…';
+}
+// Pure: the list page. m = { invitations, busy: null | 'all' | <row index>, notice, done, accepted: [row index…], settled }. House
+// rules: one heading, one short line, one primary. One invitation → its sentence and a primary "Accept". Two or more → one row each
+// (kind, name with its path, role, its own Accept) and "Accept all" as the primary. While accepting, every button is disabled, the
+// page is aria-busy and the busy button carries a spinner; during "Accept all" the primary reads "Accepting <n> of <total>…" in a
+// polite live region and every row already accepted reads "Accepted" (S44). `settled` (the run is over, the page is being handed
+// over) keeps the buttons disabled but drops the spinner and aria-busy. A notice (a failed accept)
 // is a separate status line under the short line, so the names stay in view. Nothing left but a notice (the failed one dropped out
 // of the list) → the notice is the line and the primary "Continue" goes to `m.continueHref` (the existing landing).
 export function invitationsView(m = {}) {
   const list = Array.isArray(m.invitations) ? m.invitations : [], busy = m.busy ?? null, off = busy !== null ? ' disabled' : '';
+  const running = busy !== null && !m.settled, spin = running ? SPINNER : '', done = new Set(Array.isArray(m.accepted) ? m.accepted : []);
   if (!list.length) return panel('Invitations', ESC(m.notice || 'No invitations are waiting.'), `<a class="rv-btn primary" href="${ESC(m.continueHref || '#projects')}" data-invite-continue>Continue</a>`);
   const notice = m.notice ? `<p class="small" role="status" data-invite-notice>${ESC(m.notice)}</p>` : '';
-  const page = (h1, line, body, primary) => `<section class="glass panel narrow" data-invite style="max-width:560px;margin:32px auto 0"><h1 style="font-size:27px">${h1}</h1><p class="muted" data-invite-line>${line}</p>${notice}${body}<div class="actions">${primary}</div></section>`;
-  if (list.length === 1) return page('Accept invitation', invitationLine(list[0]), '', `<button type="button" class="rv-btn primary" data-invite-accept-one="0"${off}>${busy !== null ? 'Accepting…' : 'Accept'}</button>`);
+  const page = (h1, line, body, primary) => `${running ? SPIN_CSS : ''}<section class="glass panel narrow" data-invite${running ? ' aria-busy="true"' : ''} style="max-width:560px;margin:32px auto 0"><h1 style="font-size:27px">${h1}</h1><p class="muted" data-invite-line>${line}</p>${notice}${body}<div class="actions">${primary}</div></section>`;
+  if (list.length === 1) return page('Accept invitation', invitationLine(list[0]), '', `${spin}<button type="button" class="rv-btn primary" data-invite-accept-one="0"${off}>${busy !== null ? 'Accepting…' : 'Accept'}</button>`); // spinner beside it
   const rows = list.map((inv, i) => {
     const p = invitationParts(inv);
     const name = p.name === null ? '<span class="muted">Name not available</span>' : `${p.parents.length ? `<span class="muted" data-invite-path>${p.parents.join(' › ')} › </span>` : ''}<strong data-invite-name>${p.name}</strong>`;
-    return `<li data-invite-row style="display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid rgba(127,127,127,.25)"><div><div class="small muted" data-invite-kind>${p.kind} · ${p.role}</div><div>${name}</div></div><button type="button" class="rv-btn" data-invite-accept-one="${i}"${off}>${busy === i ? 'Accepting…' : 'Accept'}</button></li>`;
+    const label = done.has(i) ? 'Accepted' : busy === i ? `${spin}Accepting…` : 'Accept';
+    return `<li data-invite-row${done.has(i) ? ' data-invite-accepted' : ''} style="display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid rgba(127,127,127,.25)"><div><div class="small muted" data-invite-kind>${p.kind} · ${p.role}</div><div>${name}</div></div><button type="button" class="rv-btn" data-invite-accept-one="${i}"${off}>${label}</button></li>`;
   }).join('');
+  const all = busy === 'all' ? `${spin}<span role="status" aria-live="polite" data-invite-progress>${progressLabel(m.done, Number.isInteger(m.done) ? list.length : undefined)}</span>` : 'Accept all';
   return page('Accept invitations', `You have ${list.length} invitations waiting.`, `<ul data-invite-list style="list-style:none;margin:12px 0 0;padding:0">${rows}</ul>`,
-    `<button type="button" class="rv-btn primary" data-invite-accept-all${off}>${busy === 'all' ? 'Accepting…' : 'Accept all'}</button>`);
+    `<button type="button" class="rv-btn primary" data-invite-accept-all${off}>${all}</button>`);
 }
 // One invitation by id: the same cap.grant.accept dry run → execute with its confirm token (POST /v2/me/invitations/{id}/accept;
 // the server checks the caller's email against the invitation). Resolves to the granted scope; throws the server's error.
@@ -153,15 +168,33 @@ export function mountInvitations(root, { api, invitations, notice = '', continue
     for (const b of root.querySelectorAll('[data-invite-accept-one]')) b.addEventListener('click', () => run([Number(b.getAttribute('data-invite-accept-one'))]));
     root.querySelector('[data-invite-accept-all]')?.addEventListener('click', () => run(list.map((_, i) => i)));
   };
+  // S44: one invitation landed → its row reads "Accepted"; during "Accept all" the progress words advance to the next one.
+  const land = i => {
+    if (!isCurrent()) return;
+    const b = root.querySelector(`[data-invite-accept-one="${i}"]`), row = b?.closest?.('[data-invite-row]');
+    if (row) { b.textContent = 'Accepted'; row.setAttribute('data-invite-accepted', ''); }
+    const p = root.querySelector('[data-invite-progress]');
+    if (p && m.done < list.length) p.textContent = progressLabel(m.done, list.length);
+  };
+  // S44: the run is over (hand-over next): not busy any more — spinner and aria-busy go; the buttons stay disabled.
+  const settle = () => {
+    if (!isCurrent()) return;
+    root.querySelector('[data-invite]')?.removeAttribute('aria-busy');
+    for (const el of root.querySelectorAll('[data-invite-spinner],[data-invite-spin-css]')) el.remove();
+  };
   async function run(indexes) {
     if (m.busy !== null || !indexes.every(i => list[i])) return;
-    m = { ...m, busy: indexes.length > 1 ? 'all' : indexes[0] }; paint();
+    const many = indexes.length > 1;
+    m = { ...m, busy: many ? 'all' : indexes[0], done: many ? 0 : undefined, accepted: [] }; paint();
     const out = { accepted: [], failure: null };
     for (const i of indexes) {
       try { out.accepted.push(await acceptInvitationById(api, list[i].id)); } catch (e) { out.failure = { state: inviteFailure(e), invitation: list[i] }; }
       if (!isCurrent()) return;
       if (out.failure) break; // stop at the first failure: nothing after it is touched
+      // S44: progress lands as each invitation does — patched in place so the live region stays the same node (announced)
+      m = { ...m, done: many ? m.done + 1 : m.done, accepted: [...m.accepted, i] }; land(i);
     }
+    m = { ...m, settled: true }; settle();
     onSettled(out);
   }
   paint();
