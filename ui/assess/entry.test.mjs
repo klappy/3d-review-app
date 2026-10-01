@@ -120,3 +120,26 @@ test('B04: a consumed #session= marks the sign-in; boot() applies signInLanding 
   assert.match(boot, /state\.projects = result\.projects \|\| \[\];[\s\S]*if \(landAfterSignIn\) \{ landAfterSignIn = false; if \(\['projects', 'invite', 'entry'\]\.includes\(route\(location\.hash\)\.kind\)\) \{\n\s*const linkInvite = !!\(pendingInvite \|\| storedInvite\(\)\);\n\s*const mine = linkInvite \? \[\] : await loadMyInvitations\(\); if \(mine === null \|\| identity !== identityGeneration\) return;\n\s*try \{ history\.replaceState\(null, '', location\.pathname \+ location\.search \+ signInLanding\(\{ invite: linkInvite \|\| mine\.length > 0, projects: state\.projects \}\)\); \} catch \{\} \} \}\n\s*listen\(\);\n\s*await render\(\);/);
   assert.match(source, /const setToken = t => \{ if \(demo\) return; token = t \|\| null; landAfterSignIn = !!t;/, 'the entry form sign-in lands the same way');
 });
+// S41 (rev424b, #424 low): Home's "See invitations" goes to `#invite/list` — the signed-in person's invitation list, never a
+// stored, unaccepted emailed token; the token stays stored, and `#invite` (the emailed-link return) still opens it.
+test('S41: #invite/list shows the invitations list even with a stored emailed invite; #invite still accepts that invite', () => {
+  const src = read('./assess.js');
+  const route = vm.runInNewContext(`const VIEWS=[];${src.slice(src.indexOf('export function route('), src.indexOf('async function assessmentsFor')).replace('export function', 'function')};route`, {});
+  assert.deepEqual({ ...route('#invite/list') }, { kind: 'invite', list: true });
+  assert.deepEqual({ ...route('#invite') }, { kind: 'invite' });
+  assert.equal(route('#invite/list/x').kind, 'entry');
+  assert.match(src, /if \(r\.kind === 'invite'\) \{ mountInvitePage\(gen, r\.list\); return; \}/);
+  const page = src.slice(src.indexOf('function mountInvitePage('), src.indexOf('// B04 step c (captain 2026-09-28)'));
+  const drive = (list, principal = { id: 'u1' }) => {
+    const store = new Map([['pendingInvite', 'tok_emailed']]), calls = [];
+    const box = { INVITE_KEY: 'pendingInvite', pendingInvite: null, generation: 1, state: { principal }, app: {}, document: {}, cards: { routes: {} },
+      syncShell() {}, storedInvite: () => store.get('pendingInvite') ?? null, forgetInvite() {}, ctxFor: () => ({ api: {}, go() {} }),
+      inviteView: o => `view:${o.status}`, mountMyInvitation: () => calls.push('list'), mountInvite: (_, o) => calls.push(`accept:${o.token}`) };
+    vm.runInNewContext(`${page}\nmountInvitePage(1, ${list})`, box);
+    return { calls, store, html: box.app.innerHTML };
+  };
+  const fromHome = drive(true);
+  assert.deepEqual(fromHome.calls, ['list'], 'Home link lands on the list');
+  assert.equal(fromHome.store.get('pendingInvite'), 'tok_emailed', 'the emailed token is not consumed');
+  assert.deepEqual(drive(false).calls, ['accept:tok_emailed'], '#invite (emailed deep-link return) unchanged');
+});
