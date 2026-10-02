@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { welcomeCopy } from '../participant-view.js';
 import { formStrings, translateForm, makeT, fetchTranslations, fetchTranslationsProgressive, initialLanguage, hashOf, isEnglish, isRtl, UI_EN, pickLanguage } from './i18n.js';
 
 const form = {
@@ -114,4 +115,49 @@ test('fetchTranslationsProgressive: one failed chunk → partial, not cached; al
   const r = await fetchTranslationsProgressive({ lang: 'lo', context: 'c', sourceTexts: texts, fetchImpl: flaky, storage, concurrency: 1 });
   assert.equal(r.partial, true); assert.equal(storage.m.size, 0);
   await assert.rejects(fetchTranslationsProgressive({ lang: 'lo', context: 'c', sourceTexts: texts, fetchImpl: async () => ({ ok: false, status: 503 }) }));
+});
+
+// S57 (E3): a language name that fails the server's shape check (src/translate-allowlist.ts NAME_SHAPE) makes the proxy
+// refuse the welcome lead: the reply omits that key, reports it `refused` and says `partial` (src/translate.ts reply).
+// The page words still cache on the device, the cached bundle never holds the refused key, and the lead stays English.
+function refusingProxy(calls = []) {
+  return async (url, init) => {
+    const { sourceTexts } = JSON.parse(init.body); calls.push(sourceTexts);
+    const translated = {}; let refused = 0;
+    for (const [k, v] of Object.entries(sourceTexts)) { if (/Tavo#1/.test(v)) refused++; else translated[k] = `lo:${v}`; }
+    const n = Object.keys(translated).length;
+    return { ok: true, status: 200, json: async () => ({ translated, partial: n < Object.keys(sourceTexts).length, locale: 'lo', ...(refused ? { refused } : {}) }) };
+  };
+}
+const pageWords = () => ({ start: 'Start', back: 'Back', ...Object.fromEntries(Array.from({ length: 25 }, (_, i) => [`w${i}`, `Word ${i}`])), lead: welcomeCopy({ language: 'Tavo#1' }, 10).lead });
+
+test('S57 fetchTranslations: a refused welcome lead (name fails the shape check) still caches the page words; lead stays English', async () => {
+  const texts = pageWords(); const calls = []; const storage = memoryStorage();
+  const r = await fetchTranslations({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: refusingProxy(calls), storage });
+  assert.equal(r.partial, false); assert.equal('lead' in r.map, false); assert.equal(storage.m.size, 1);
+  const cached = JSON.parse([...storage.m.values()][0]); assert.equal('lead' in cached, false);
+  const again = await fetchTranslations({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: async () => { throw new Error('no network needed'); }, storage });
+  assert.equal(again.cached, true); assert.equal(calls.length, 1);
+  const t = makeT(again.map);
+  assert.equal(t('lead', texts.lead), texts.lead); assert.equal(t('start', 'Start'), 'lo:Start');
+  // A key missing without being refused still keeps the bundle uncached.
+  const store2 = memoryStorage();
+  const lossy = async (u, init) => { const res = await refusingProxy()(u, init); const d = await res.json(); delete d.translated.back; d.partial = true; return { ok: true, json: async () => d }; };
+  const p = await fetchTranslations({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: lossy, storage: store2 });
+  assert.equal(p.partial, true); assert.equal(store2.m.size, 0);
+});
+
+test('S57 fetchTranslationsProgressive: a refused welcome lead (name fails the shape check) still caches the page words; lead stays English', async () => {
+  const texts = pageWords(); const calls = []; const storage = memoryStorage();
+  const r = await fetchTranslationsProgressive({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: refusingProxy(calls), storage });
+  assert.ok(calls.length > 1); assert.equal(r.partial, false); assert.equal('lead' in r.map, false); assert.equal(storage.m.size, 1);
+  const cached = JSON.parse([...storage.m.values()][0]); assert.equal('lead' in cached, false);
+  const again = await fetchTranslationsProgressive({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: async () => { throw new Error('no network needed'); }, storage });
+  assert.equal(again.cached, true);
+  assert.equal(makeT(again.map)('lead', texts.lead), texts.lead);
+  // A failed chunk alongside a refused key still keeps the bundle uncached.
+  let n = 0; const store2 = memoryStorage(); const proxy = refusingProxy();
+  const flaky = async (u, init) => (n++ === 0 ? { ok: false, status: 502 } : proxy(u, init));
+  const p = await fetchTranslationsProgressive({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: flaky, storage: store2, concurrency: 1 });
+  assert.equal(p.partial, true); assert.equal(store2.m.size, 0);
 });

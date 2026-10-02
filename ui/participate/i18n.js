@@ -146,6 +146,8 @@ export function translateInit(body, bearer = null) {
 }
 
 const CACHE_PREFIX = '3dr.tr.v1:';
+// The server's `refused` count (src/translate.ts reply), a non-negative integer or 0. Refused keys are never in `translated`.
+const refusedCount = (data) => (Number.isInteger(data?.refused) && data.refused > 0 ? data.refused : 0);
 function readCache(storage, key) { try { const raw = storage?.getItem(key); return raw ? JSON.parse(raw) : null; } catch { return null; } }
 function writeCache(storage, key, value) { try { storage?.setItem(key, JSON.stringify(value)); } catch { /* best effort */ } }
 
@@ -162,7 +164,11 @@ export async function fetchTranslations({ lang, context, sourceTexts, fetchImpl 
   const map = {};
   for (const k of Object.keys(sourceTexts)) if (typeof data?.translated?.[k] === 'string' && data.translated[k].trim()) map[k] = data.translated[k];
   if (!Object.keys(map).length) throw new Error('translate empty');
-  const partial = data?.partial === true || Object.keys(map).length < Object.keys(sourceTexts).length;
+  // S57 (E3): keys the server refused (src/translate.ts `refused`, e.g. a welcome lead whose language name fails the
+  // shape check) can never translate, so they count as settled: the bundle caches without them and t() keeps English.
+  // Its own `partial` is true whenever anything was refused, so it only counts when nothing was.
+  const refused = refusedCount(data);
+  const partial = (data?.partial === true && !refused) || Object.keys(map).length + refused < Object.keys(sourceTexts).length;
   if (!partial) writeCache(storage, key, map);
   return { map, partial, cached: false };
 }
@@ -180,7 +186,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
   const chunks = [];
   for (let i = 0; i < total; i += chunkSize) chunks.push(Object.fromEntries(keys.slice(i, i + chunkSize).map(k => [k, sourceTexts[k]])));
   const map = {};
-  let done = 0, next = 0, failures = 0;
+  let done = 0, next = 0, failures = 0, refused = 0; // refused: keys the server will never translate (S57, E3)
   onProgress({ done, total });
   async function worker() {
     while (next < chunks.length) {
@@ -190,6 +196,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
         if (!res || !res.ok) throw new Error(`translate ${res ? res.status : 'failed'}`);
         const data = await res.json();
         for (const k of Object.keys(part)) if (typeof data?.translated?.[k] === 'string' && data.translated[k].trim()) map[k] = data.translated[k];
+        refused += Math.min(refusedCount(data), Object.keys(part).length);
       } catch { failures++; }
       done += Object.keys(part).length;
       onProgress({ done, total });
@@ -197,7 +204,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, chunks.length) }, worker));
   if (!Object.keys(map).length) throw new Error(failures ? 'translate failed' : 'translate empty');
-  const partial = Object.keys(map).length < total;
+  const partial = Object.keys(map).length + refused < total;
   if (!partial) writeCache(storage, cacheKey, map);
   return { map, partial, cached: false };
 }
