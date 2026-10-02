@@ -208,8 +208,8 @@ export async function handleRemove(request: Request, env: PEnv, aid: string, pid
   const row = await env.DB.prepare("SELECT * FROM assessment_passage WHERE id = ? AND assessment_id = ? AND archived_at IS NULL").bind(pid, aid).first<PassageRow>().catch(() => null);
   if (!row) return fail(404, "NOT_FOUND_OR_NOT_VISIBLE", "resource not found or not visible");
   await env.DB.prepare("UPDATE assessment_passage SET archived_at = ? WHERE id = ?").bind(now.toISOString(), pid).run();
-  await passageReceipt(env, who.principal, "cap.passage.remove", row, now);
   if (row.object_key && env.PASSAGES) await env.PASSAGES.delete(row.pdf_key ? [row.object_key, row.pdf_key] : row.object_key).catch(() => {});
+  await passageReceipt(env, who.principal, "cap.passage.remove", row, now);
   return ok({ removed: pid });
 }
 
