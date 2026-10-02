@@ -161,3 +161,30 @@ test('S57 fetchTranslationsProgressive: a refused welcome lead (name fails the s
   const p = await fetchTranslationsProgressive({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: flaky, storage: store2, concurrency: 1 });
   assert.equal(p.partial, true); assert.equal(store2.m.size, 0);
 });
+
+test('B1 a bundle cached while a key was refused expires after a day; a later full answer caches as a plain map', async () => {
+  const texts = pageWords(); const DAY = 24 * 60 * 60 * 1000; let clock = 1_000_000;
+  const now = () => clock; let calls = 0; let refuse = true;
+  const proxy = async (u, init) => { calls++; const { sourceTexts } = JSON.parse(init.body); const translated = {}; let refused = 0;
+    for (const [k, v] of Object.entries(sourceTexts)) { if (refuse && /Tavo#1/.test(v)) refused++; else translated[k] = `lo:${v}`; }
+    return { ok: true, status: 200, json: async () => ({ translated, partial: refused > 0, locale: 'lo', ...(refused ? { refused } : {}) }) }; };
+  for (const fetchFn of [fetchTranslations, fetchTranslationsProgressive]) {
+    const storage = memoryStorage(); clock = 1_000_000; calls = 0; refuse = true;
+    const args = { lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: proxy, storage, now };
+    const first = await fetchFn(args); const n1 = calls;
+    assert.equal(first.partial, false); assert.equal(makeT(first.map)('lead', texts.lead), texts.lead);
+    const stored = JSON.parse([...storage.m.values()][0]);
+    assert.equal(stored.refused, 1); assert.equal(stored.at, 1_000_000); assert.equal('lead' in stored.map, false);
+    clock += DAY - 1; // still inside the day: a hit, no extra request
+    const inside = await fetchFn(args);
+    assert.equal(inside.cached, true); assert.equal(calls, n1); assert.equal(makeT(inside.map)('lead', texts.lead), texts.lead);
+    clock += 2; refuse = false; // past a day: a miss, and the server now translates everything
+    const after = await fetchFn(args);
+    assert.equal(after.cached, false); assert.ok(calls > n1); assert.equal(after.map.lead, `lo:${texts.lead}`);
+    const plain = JSON.parse([...storage.m.values()][0]);
+    assert.equal('refused' in plain, false); assert.equal(plain.lead, `lo:${texts.lead}`);
+    const n2 = calls; clock += 10 * DAY; // a plain map stays a permanent hit
+    const later = await fetchFn(args);
+    assert.equal(later.cached, true); assert.equal(calls, n2); assert.equal(later.map.lead, `lo:${texts.lead}`);
+  }
+});

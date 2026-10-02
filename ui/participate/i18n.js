@@ -148,15 +148,30 @@ export function translateInit(body, bearer = null) {
 const CACHE_PREFIX = '3dr.tr.v1:';
 // The server's `refused` count (src/translate.ts reply), a non-negative integer or 0. Refused keys are never in `translated`.
 const refusedCount = (data) => (Number.isInteger(data?.refused) && data.refused > 0 ? data.refused : 0);
-function readCache(storage, key) { try { const raw = storage?.getItem(key); return raw ? JSON.parse(raw) : null; } catch { return null; } }
-function writeCache(storage, key, value) { try { storage?.setItem(key, JSON.stringify(value)); } catch { /* best effort */ } }
+// B1 (rev454-0241): a refusal can be temporary (a swallowed allowlist lookup error, a load without a participant token,
+// deploy skew), so a bundle cached while keys were refused is written as { map, refused, at } and reads as a miss once it
+// is older than a day; the refused lines are then asked for again. A plain map (nothing refused) stays a permanent hit.
+const REFUSED_TTL_MS = 24 * 60 * 60 * 1000;
+function readCache(storage, key, now = Date.now()) {
+  try {
+    const raw = storage?.getItem(key); const hit = raw ? JSON.parse(raw) : null;
+    if (!hit || typeof hit !== 'object') return null;
+    if (Number.isInteger(hit.refused) && hit.refused > 0 && hit.map && typeof hit.map === 'object') {
+      return Number.isFinite(hit.at) && now - hit.at < REFUSED_TTL_MS ? hit.map : null;
+    }
+    return hit;
+  } catch { return null; }
+}
+function writeCache(storage, key, map, refused = 0, now = Date.now()) {
+  try { storage?.setItem(key, JSON.stringify(refused > 0 ? { map, refused, at: now } : map)); } catch { /* best effort */ }
+}
 
 // One request to the proxy, with a device cache for complete answers. Resolves { map, partial, cached };
 // rejects on any failure so the caller can keep English and say so.
-export async function fetchTranslations({ lang, context, sourceTexts, fetchImpl = globalThis.fetch, storage = null, endpoint = '/v2/translate', bearer = null }) {
+export async function fetchTranslations({ lang, context, sourceTexts, fetchImpl = globalThis.fetch, storage = null, endpoint = '/v2/translate', bearer = null, now = Date.now }) {
   if (isEnglish(lang)) return { map: {}, partial: false, cached: false };
   const key = `${CACHE_PREFIX}${lang.toLowerCase()}:${context}:${hashOf(sourceTexts)}`;
-  const hit = readCache(storage, key);
+  const hit = readCache(storage, key, now());
   if (hit && typeof hit === 'object') return { map: hit, partial: false, cached: true };
   const res = await fetchImpl(endpoint, translateInit({ targetLang: lang, context, sourceTexts }, bearer));
   if (!res || !res.ok) throw new Error(`translate ${res ? res.status : 'failed'}`);
@@ -165,11 +180,11 @@ export async function fetchTranslations({ lang, context, sourceTexts, fetchImpl 
   for (const k of Object.keys(sourceTexts)) if (typeof data?.translated?.[k] === 'string' && data.translated[k].trim()) map[k] = data.translated[k];
   if (!Object.keys(map).length) throw new Error('translate empty');
   // S57 (E3): keys the server refused (src/translate.ts `refused`, e.g. a welcome lead whose language name fails the
-  // shape check) can never translate, so they count as settled: the bundle caches without them and t() keeps English.
+  // shape check) count as settled: the bundle caches without them (for a day, see readCache) and t() keeps English.
   // Its own `partial` is true whenever anything was refused, so it only counts when nothing was.
   const refused = refusedCount(data);
   const partial = (data?.partial === true && !refused) || Object.keys(map).length + refused < Object.keys(sourceTexts).length;
-  if (!partial) writeCache(storage, key, map);
+  if (!partial) writeCache(storage, key, map, refused, now());
   return { map, partial, cached: false };
 }
 
@@ -177,11 +192,11 @@ export async function fetchTranslations({ lang, context, sourceTexts, fetchImpl 
 // language is translated for the first time (the upstream model answers ~20 strings per call). The whole bundle is
 // cached on the device only when complete. onProgress({ done, total }) after each chunk. Rejects only if nothing came back.
 // bearer: the participant token when the page holds one (translateInit above sends it only if it is participant-shaped).
-export async function fetchTranslationsProgressive({ lang, context, sourceTexts, fetchImpl = globalThis.fetch, storage = null, endpoint = '/v2/translate', chunkSize = 20, concurrency = 3, onProgress = () => {}, bearer = null }) {
+export async function fetchTranslationsProgressive({ lang, context, sourceTexts, fetchImpl = globalThis.fetch, storage = null, endpoint = '/v2/translate', chunkSize = 20, concurrency = 3, onProgress = () => {}, bearer = null, now = Date.now }) {
   const keys = Object.keys(sourceTexts), total = keys.length;
   if (isEnglish(lang) || !total) return { map: {}, partial: false, cached: false };
   const cacheKey = `${CACHE_PREFIX}${lang.toLowerCase()}:${context}:${hashOf(sourceTexts)}`;
-  const hit = readCache(storage, cacheKey);
+  const hit = readCache(storage, cacheKey, now());
   if (hit && typeof hit === 'object') { onProgress({ done: total, total }); return { map: hit, partial: false, cached: true }; }
   const chunks = [];
   for (let i = 0; i < total; i += chunkSize) chunks.push(Object.fromEntries(keys.slice(i, i + chunkSize).map(k => [k, sourceTexts[k]])));
@@ -205,7 +220,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
   await Promise.all(Array.from({ length: Math.min(concurrency, chunks.length) }, worker));
   if (!Object.keys(map).length) throw new Error(failures ? 'translate failed' : 'translate empty');
   const partial = Object.keys(map).length + refused < total;
-  if (!partial) writeCache(storage, cacheKey, map);
+  if (!partial) writeCache(storage, cacheKey, map, refused, now());
   return { map, partial, cached: false };
 }
 
