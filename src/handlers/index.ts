@@ -28,6 +28,7 @@ export const handlers: Record<string, Handler> = {
   "cap.ops.health": p.opsHealth,
   "cap.ops.feedback": p.opsFeedback,
   "cap.ops.feedback_get": p.opsFeedbackGet,
+  "cap.ops.feedback_list": p.opsFeedbackList,
   "cap.ops.trace": p.opsTrace,
   "cap.ops.undo": opsUndo,
   "cap.docs.get": docs,

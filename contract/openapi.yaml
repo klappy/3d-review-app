@@ -675,6 +675,67 @@ components:
               type: string
             stripped:
               type: boolean
+    FeedbackListRow:
+      type: object
+      additionalProperties: false
+      description: locator only (N8 option 2); never body, actor, scope_id or provenance
+      required:
+      - id
+      - created_at
+      - scope_type
+      properties:
+        id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        scope_type:
+          type: string
+    FeedbackListResult:
+      type: object
+      additionalProperties: false
+      required:
+      - since
+      - after_id
+      - limit
+      - rows
+      - next
+      - has_more
+      properties:
+        since:
+          type: string
+          format: date-time
+          description: normalized lower bound of the composite cursor
+        after_id:
+          type:
+          - string
+          - 'null'
+          description: cursor tie-break echoed back; null when not sent
+        limit:
+          type: integer
+        rows:
+          type: array
+          description: after the (since, after_id) cursor, ordered (created_at, id); malformed rows skipped; locators only — bodies via cap.ops.feedback_get
+          items:
+            $ref: '#/components/schemas/FeedbackListRow'
+        next:
+          type:
+          - object
+          - 'null'
+          description: cursor of the last scanned row (malformed rows included); page by this, not by the last returned row; null on an empty page
+          additionalProperties: false
+          required:
+          - since
+          - after_id
+          properties:
+            since:
+              type: string
+              format: date-time
+            after_id:
+              type: string
+        has_more:
+          type: boolean
+          description: true when the SQL page held more than limit rows
 paths:
   /v2/entry:
     get:
@@ -4705,6 +4766,63 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/FeedbackParams'
+  /v2/ops/feedback:
+    get:
+      operationId: cap.ops.feedback_list
+      summary: 'cap.ops.feedback_list — read — roles: S'
+      x-capability: cap.ops.feedback_list
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: S
+      x-path-inferred: false
+      tags:
+      - J. Ops, telemetry, xray, docs, feedback
+      responses:
+        '200':
+          description: S-only list-since of locators {id, created_at, scope_type}; bodies via cap.ops.feedback_get
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - type: object
+                  properties:
+                    result:
+                      $ref: '#/components/schemas/FeedbackListResult'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      parameters:
+      - name: since
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+      - name: after_id
+        in: query
+        required: false
+        description: with since, also rows with created_at = since and id > after_id (from a previous page's next)
+        schema:
+          type: string
+          minLength: 1
   /v2/ops/feedback/{id}:
     get:
       operationId: cap.ops.feedback_get
