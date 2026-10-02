@@ -149,3 +149,56 @@ describe("a passage named with nothing attached", () => {
     expect(after.result.passages.some((x: any) => x.kind === "reference")).toBe(false);
   });
 });
+
+// S56 (cookbook ASK-2026-10-01-passage-receipts, option 1): add and remove leave one audit receipt each.
+describe("passage receipts", () => {
+  type R = { id: string; actor: string; capability: string; scope_type: string; scope_id: string; class: string; inverse: string; trace_id: string; prior_state_json: string };
+  const receiptsFor = async (pid: string) => (await db.prepare("SELECT * FROM receipt WHERE capability IN ('cap.passage.add', 'cap.passage.remove') ORDER BY at, id").all<R>()).results.filter((r) => JSON.parse(r.prior_state_json).passage_id === pid);
+  const passageReceiptCount = async () => Number((await db.prepare("SELECT COUNT(*) AS n FROM receipt WHERE capability IN ('cap.passage.add', 'cap.passage.remove')").first<{ n: number }>())?.n ?? 0);
+  const expectReceipt = (r: R, capability: string, pid: string, kind: string, media: string) => {
+    expect(r).toMatchObject({ actor: "person_mara", capability, scope_type: "assessment", scope_id: aid, class: "audit", inverse: "none" });
+    expect(r.trace_id).toMatch(/^tr/);
+    const detail = JSON.parse(r.prior_state_json);
+    expect(Object.keys(detail).sort()).toEqual(["kind", "media", "passage_id"]);
+    expect(detail).toEqual({ passage_id: pid, kind, media });
+  };
+  it("adding a link, a reference or a file leaves one cap.passage.add receipt with ids, kind and media only", async () => {
+    for (const [req, kind, media] of [
+      [{ type: "application/json", body: JSON.stringify({ url: "https://example.org/secret-title-page", title: "Private title" }) }, "link", "link"],
+      [{ type: "application/json", body: JSON.stringify({ reference: "Luke 15" }) }, "reference", "reference"],
+      [{ type: "application/octet-stream", body: MP3, q: "?name=Luke%2015.mp3&title=Private%20title" }, "file", "audio"],
+    ] as const) {
+      const before = await passageReceiptCount();
+      const r = await json(await raw("POST", base + ((req as any).q ?? ""), { type: req.type, body: req.body }));
+      expect(r.status, kind).toBe(201);
+      const pid = r.result.passage.id as string;
+      expect(await passageReceiptCount()).toBe(before + 1);
+      const rows = await receiptsFor(pid);
+      expect(rows).toHaveLength(1);
+      expectReceipt(rows[0], "cap.passage.add", pid, kind, media);
+      expect(rows[0].prior_state_json).not.toMatch(/Private title|example\.org|Luke 15\.mp3/);
+    }
+  });
+  it("removing leaves one cap.passage.remove receipt, with its own trace id", async () => {
+    const add = await json(await raw("POST", base, { type: "application/json", body: JSON.stringify({ url: "https://youtu.be/receipt" }) }));
+    const pid = add.result.passage.id as string;
+    expect((await raw("DELETE", `${base}/${pid}`)).status).toBe(200);
+    const rows = await receiptsFor(pid);
+    expect(rows.map((x) => x.capability)).toEqual(["cap.passage.add", "cap.passage.remove"]);
+    expectReceipt(rows[1], "cap.passage.remove", pid, "link", "video");
+    expect(rows[1].trace_id).not.toBe(rows[0].trace_id);
+    // A refused remove (already archived) writes nothing more.
+    expect((await raw("DELETE", `${base}/${pid}`)).status).toBe(404);
+    expect(await receiptsFor(pid)).toHaveLength(2);
+  });
+  it("a failed insert writes no receipt", async () => {
+    const failingDb = new Proxy(db, { get(t, k) {
+      if (k === "prepare") return (sql: string) => sql.startsWith("INSERT INTO assessment_passage") ? { bind: () => ({ run: async () => { throw new Error("D1 insert failed"); } }) } : t.prepare(sql);
+      const v = (t as any)[k]; return typeof v === "function" ? v.bind(t) : v;
+    } });
+    const before = await passageReceiptCount();
+    const r = await raw("POST", base, { type: "application/json", body: JSON.stringify({ url: "https://example.org/fails" }), e: { ...env, DB: failingDb } });
+    expect(r.status).toBeGreaterThanOrEqual(500);
+    expect(await passageReceiptCount()).toBe(before);
+  });
+});

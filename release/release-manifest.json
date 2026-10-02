@@ -1,30 +1,28 @@
 {
-  "version": "0.28.0",
+  "version": "0.28.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "64666d62bab462ca14f4b1769d8c6efa3a3dbc49",
+  "cookbook_commit": "f04adb2882580f07f67105c23ac1360fce59baa0",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.28.0.md",
-      "blob_sha": "c75fbaf50c3ee126e80849fb5ddfee076083d36e",
-      "sha256": "ebebefbe7a25d4808b85f7af14be001d963c3ba1a9f9122ce3d56b10e7d412fd"
+      "path": "planning/2026-09-16-parity-build/releases/0.28.1.md",
+      "blob_sha": "8284ea3b2ec37ea3cf4b744426a8ed790adffe88",
+      "sha256": "5ee7521bb29fb53efef876374b66e2a658aca8fd57c5a4f0dc1724339ec4bc14"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "1bb3bfab63c4f899bc43eac8eb4b09b17e049f14",
-      "sha256": "3b858f91b8e6f4d6f28a3f3474814030cd4415a64081fd053737be409b5814fd"
+      "blob_sha": "8c3a8a63ca4b6c5702010b3ebe4e5dc1e27fdcc6",
+      "sha256": "96bdbd2e1a4a4c5b096b31f49d171ee462d11fa307e8972b96978d42734c094d"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "No behaviour change: a test now fails when a page uses a file the local server does not serve. (#445)"
+        "Adding or removing a passage on an assessment now leaves a receipt saying who did it and when, like every other change in the app. (#452)"
       ],
-      "changed": [
-        "\"App feedback\" in the account menu now opens in a window over the screen you are on. Close it (the Close button, Escape, or a click outside) and you are back where you were, with your unfinished work untouched. A link to #feedback still opens the feedback page. (#444)"
-      ],
+      "changed": [],
       "fixed": [
-        "When the app is run on a developer's own computer, Prepare and the setup wizard's Passages block now load: the local server serves every file the pages use (the passages file was missing, along with the print, translation and kit files). Nothing changes on the hosted app. (#445)",
-        "On the setup wizard's last step, choosing \"Skip for now\" and then \"Add passages\" brings back the same passages block, so an upload or link still in progress keeps its status. (#445)"
+        "In the setup wizard, the Language list for an existing project is now a required field to the browser and screen readers too, like Name, Project, New project name and Active until (it was already marked \"(required)\" on screen and checked before Next). (#450)",
+        "When a survey's language name is spelled in a way the translator refuses (for example with a symbol in it), participants' page words now stay saved on their device after the first load instead of being translated again every time; the welcome line stays in English, and refused lines are asked for again after a day in case the refusal was temporary. (#454)"
       ]
     }
   }

@@ -1,7 +1,22 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.28.0",
+  "current": "0.28.1",
   "versions": [
+    {
+      "version": "0.28.1",
+      "status": "candidate",
+      "notes_path": "releases/0.28.1.md",
+      "sections": {
+        "added": [
+          "Adding or removing a passage on an assessment now leaves a receipt saying who did it and when, like every other change in the app. (#452)"
+        ],
+        "changed": [],
+        "fixed": [
+          "In the setup wizard, the Language list for an existing project is now a required field to the browser and screen readers too, like Name, Project, New project name and Active until (it was already marked \"(required)\" on screen and checked before Next). (#450)",
+          "When a survey's language name is spelled in a way the translator refuses (for example with a symbol in it), participants' page words now stay saved on their device after the first load instead of being translated again every time; the welcome line stays in English, and refused lines are asked for again after a day in case the refusal was temporary. (#454)"
+        ]
+      }
+    },
     {
       "version": "0.28.0",
       "status": "candidate",
