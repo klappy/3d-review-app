@@ -675,6 +675,25 @@ components:
               type: string
             stripped:
               type: boolean
+    FeedbackListResult:
+      type: object
+      additionalProperties: false
+      required:
+      - since
+      - limit
+      - rows
+      properties:
+        since:
+          type: string
+          format: date-time
+          description: normalized lower bound (exclusive)
+        limit:
+          type: integer
+        rows:
+          type: array
+          description: created_at > since, oldest first (created_at, id); next page uses the last row's created_at as since
+          items:
+            $ref: '#/components/schemas/FeedbackGetResult'
 paths:
   /v2/entry:
     get:
@@ -4705,6 +4724,56 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/FeedbackParams'
+  /v2/ops/feedback:
+    get:
+      operationId: cap.ops.feedback_list
+      summary: 'cap.ops.feedback_list — read — roles: S'
+      x-capability: cap.ops.feedback_list
+      x-class: read
+      x-tool: read
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: n/a
+      x-roles: S
+      x-path-inferred: false
+      tags:
+      - J. Ops, telemetry, xray, docs, feedback
+      responses:
+        '200':
+          description: S-only list-since of per-row projections
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Envelope'
+                - type: object
+                  properties:
+                    result:
+                      $ref: '#/components/schemas/FeedbackListResult'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      parameters:
+      - name: since
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
   /v2/ops/feedback/{id}:
     get:
       operationId: cap.ops.feedback_get

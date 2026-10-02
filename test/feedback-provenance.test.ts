@@ -70,5 +70,5 @@ for(const face of ['http','mcp'])describe(`${face}: provenance local Request+D1 
 it('contract projects the same optional input and immutable amendment provenance on both faces',()=>{
  const c:any=contract.capabilities.find(c=>c.id==='cap.ops.feedback');const e=c.params_schema.properties.experience;
  const raw=readFileSync(new URL('../contract/openapi.yaml',import.meta.url),'utf8');const line=raw.split('\n').find(l=>l.startsWith('    FeedbackExperience: '))!;
- expect(JSON.parse(line.slice('    FeedbackExperience: '.length))).toEqual(e);expect(e['x-cookbook-source']).toContain('f5d925f');expect(c.params_schema.required??[]).not.toContain('experience');expect(contract.capabilities.filter(c=>c.id.startsWith('cap.ops.feedback')).map(c=>c.id)).toEqual(['cap.ops.feedback','cap.ops.feedback_get']);
+ expect(JSON.parse(line.slice('    FeedbackExperience: '.length))).toEqual(e);expect(e['x-cookbook-source']).toContain('f5d925f');expect(c.params_schema.required??[]).not.toContain('experience');expect(contract.capabilities.filter(c=>c.id.startsWith('cap.ops.feedback')).map(c=>c.id)).toEqual(['cap.ops.feedback','cap.ops.feedback_get','cap.ops.feedback_list']);
 });

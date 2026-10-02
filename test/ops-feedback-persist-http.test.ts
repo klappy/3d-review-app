@@ -243,15 +243,16 @@ describe("ops feedback persist HTTP — Prefer 5732375 F1–F7 / N1–N9", () =>
     expect(read.body).not.toHaveProperty("context");
   });
 
-  it("N8: no public list or aggregate capability or collection route", async () => {
-    expect(capabilities.some((c) => c.id === "cap.ops.feedback_list")).toBe(false);
-    expect(capabilities.some((c) => /cap\.ops\.feedback_.+/.test(c.id) && c.id !== "cap.ops.feedback_get")).toBe(false);
+  it("N8: no public list or aggregate capability; the only list is S-only cap.ops.feedback_list", async () => {
+    // Narrowed by ops-list-2041: the triage list-since read is support-only (role S), never public, never an aggregate.
     expect(capabilities.filter((c) => c.id.startsWith("cap.ops.feedback")).map((c) => c.id).sort())
-      .toEqual(["cap.ops.feedback", "cap.ops.feedback_get"]);
+      .toEqual(["cap.ops.feedback", "cap.ops.feedback_get", "cap.ops.feedback_list"]);
+    expect(capabilities.filter((c) => /^cap\.ops\.feedback_/.test(c.id)).every((c) => c.roles === "S" && c.public === false && c.class === "read")).toBe(true);
+    expect(capabilities.some((c) => /feedback_(aggregate|summary|scorecard|count)/.test(c.id))).toBe(false);
     const list = await app.fetch(new Request("https://t.invalid/v2/feedback", { method: "GET" }), env);
     expect(list.status).toBe(404);
-    const collection = await app.fetch(new Request("https://t.invalid/v2/ops/feedback", { method: "GET" }), env);
-    expect(collection.status).toBe(404);
+    const collection = await app.fetch(new Request("https://t.invalid/v2/ops/feedback?since=2026-01-01T00:00:00Z", { method: "GET" }), env);
+    expect(collection.status).toBe(401);
   });
 
   it("N9: unknown scope_type value is accepted as opaque", async () => {

@@ -190,9 +190,10 @@ describe("ops feedback persist MCP twins — Prefer 5732375 F1–F7 / N1–N9", 
 
   it("N8: no public list/aggregate on MCP contract", async () => {
     expect(capabilities.map((c) => c.id).filter((id) => id.includes("feedback")).sort())
-      .toEqual(["cap.ops.feedback", "cap.ops.feedback_get"]);
-    const listed = await mcp("read", "cap.ops.feedback_list", {});
-    expect(listed.env).toMatchObject({ ok: false, error: { code: "INVALID_PARAMS" } });
+      .toEqual(["cap.ops.feedback", "cap.ops.feedback_get", "cap.ops.feedback_list"]);
+    // The only list is S-only (ops-list-2041); a non-S caller is refused before any row is read.
+    const listed = await mcp("read", "cap.ops.feedback_list", { since: "2026-01-01T00:00:00Z" }, userToken);
+    expect(listed.env).toMatchObject({ ok: false, error: { code: "NOT_AUTHORIZED_AT_SCOPE" } });
   });
 
   it("N9: unknown scope_type accepted", async () => {

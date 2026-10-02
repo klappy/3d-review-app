@@ -209,12 +209,11 @@ function projectStoredFeedbackBody(raw: Record<string, unknown>): Record<string,
   return body;
 }
 
-/** S-only per-row read. Role gate is policy.ts N6; missing/malformed rows are existence-hidden. */
-export const opsFeedbackGet: Handler = async (ctx, p) => {
-  if (typeof p.id !== "string" || !p.id) throw new CapError("INVALID_PARAMS", "id required");
-  const row = await ctx.db.prepare("SELECT id, actor, scope_type, scope_id, body, created_at FROM feedback WHERE id = ?")
-    .bind(p.id).first<{ id: string; actor: string | null; scope_type: string | null; scope_id: string | null; body: string; created_at: string }>();
-  if (!row) throw notVisible("feedback");
+type FeedbackRow = { id: string; actor: string | null; scope_type: string | null; scope_id: string | null; body: string; created_at: string };
+const FEEDBACK_COLUMNS = "id, actor, scope_type, scope_id, body, created_at";
+
+/** Shared S-only row projection (cap.ops.feedback_get and cap.ops.feedback_list); malformed rows are existence-hidden. */
+function projectFeedbackRow(row: FeedbackRow) {
   let stored: unknown;
   try { stored = JSON.parse(row.body); } catch { throw notVisible("feedback"); }
   if (!stored || typeof stored !== "object" || Array.isArray(stored)) throw notVisible("feedback");
@@ -226,16 +225,49 @@ export const opsFeedbackGet: Handler = async (ctx, p) => {
   }
   catch { throw notVisible("feedback"); }
   return {
-    result: {
-      id: row.id,
-      actor: row.actor ?? "anon",
-      scope_type: row.scope_type ?? "platform",
-      scope_id: row.scope_id ?? "-",
-      created_at: row.created_at,
-      body,
-      provenance,
-    },
+    id: row.id,
+    actor: row.actor ?? "anon",
+    scope_type: row.scope_type ?? "platform",
+    scope_id: row.scope_id ?? "-",
+    created_at: row.created_at,
+    body,
+    provenance,
   };
+}
+
+/** S-only per-row read. Role gate is policy.ts N6; missing/malformed rows are existence-hidden. */
+export const opsFeedbackGet: Handler = async (ctx, p) => {
+  if (typeof p.id !== "string" || !p.id) throw new CapError("INVALID_PARAMS", "id required");
+  const row = await ctx.db.prepare(`SELECT ${FEEDBACK_COLUMNS} FROM feedback WHERE id = ?`)
+    .bind(p.id).first<FeedbackRow>();
+  if (!row) throw notVisible("feedback");
+  return { result: projectFeedbackRow(row) };
+};
+
+const ISO_8601 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
+export const FEEDBACK_LIST_DEFAULT = 50;
+export const FEEDBACK_LIST_MAX = 200;
+
+/** S-only list-since read for triage: rows with created_at > since, oldest first, at most `limit`. Role gate is policy.ts N6;
+ * each row is the cap.ops.feedback_get projection, and a malformed row is skipped (existence-hidden), never returned. */
+export const opsFeedbackList: Handler = async (ctx, p) => {
+  if (typeof p.since !== "string" || !ISO_8601.test(p.since) || Number.isNaN(Date.parse(p.since)))
+    throw new CapError("INVALID_PARAMS", "since required (ISO-8601 date-time, e.g. 2026-10-01T00:00:00Z)");
+  let limit = FEEDBACK_LIST_DEFAULT;
+  if (p.limit !== undefined) {
+    const n = typeof p.limit === "string" && /^\d+$/.test(p.limit) ? Number(p.limit) : p.limit;
+    if (typeof n !== "number" || !Number.isInteger(n) || n < 1 || n > FEEDBACK_LIST_MAX)
+      throw new CapError("INVALID_PARAMS", `limit must be an integer 1..${FEEDBACK_LIST_MAX}`);
+    limit = n;
+  }
+  const since = new Date(p.since).toISOString();
+  const { results } = await ctx.db.prepare(`SELECT ${FEEDBACK_COLUMNS} FROM feedback WHERE created_at > ? ORDER BY created_at ASC, id ASC LIMIT ?`)
+    .bind(since, limit).all<FeedbackRow>();
+  const rows = [];
+  for (const row of results ?? []) {
+    try { rows.push(projectFeedbackRow(row)); } catch (e) { if (!(e instanceof CapError)) throw e; }
+  }
+  return { result: { since, limit, rows } };
 };
 
 export const opsTrace: Handler = async (ctx, p) => {
