@@ -369,6 +369,17 @@ test('S35: Name, Project, New project name and Language carry the (required) mar
   assert.doesNotMatch(fresh, /Language code \(ISO 639, optional\) \(required\)|newLangCode"[^>]*required/);
 });
 
+test('ux-1840: every required details field carries the S34 mark — "(required)" label text and the HTML required attribute — Language select included', () => {
+  const existing = renderStep('details', draft({ project: '' }), { projects: [], languages: [], templates: [] });
+  assert.match(existing, /Name \(required\)<input name="name" value="[^"]*" required/);
+  assert.match(existing, /Language \(required\)<select name="language" required disabled>/, 'no project yet: required, and disabled until a project is chosen');
+  const picked = renderStep('details', draft({ project: 'p1' }), { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'Hiligaynon' }], templates: [] });
+  assert.match(picked, /Language \(required\)<select name="language" required>/, 'project chosen: required and enabled, as validateStep enforces');
+  const fresh = renderStep('details', draft({ project: NEW_PROJECT }), { projects: [], languages: [], templates: [] });
+  assert.match(fresh, /New project name \(required\)<input name="newProject" value="[^"]*" required>/);
+  assert.match(fresh, /Language \(required\)<input name="newLanguage" value="[^"]*" required/);
+});
+
 test('B41: setup asks Active until (required) and Starts (optional, default today) on the existing period field', () => {
   const html = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
   assert.match(html, /Starts \(optional\)<input type="date" name="starts"/);
