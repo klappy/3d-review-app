@@ -1,17 +1,17 @@
 {
   "version": "0.28.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "289fd42f6c1bb8663a9c5625c54f11dc901e3dc8",
+  "cookbook_commit": "f04adb2882580f07f67105c23ac1360fce59baa0",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.28.1.md",
-      "blob_sha": "02e743dad98d9383ebafc7e348b41467b26dc4d4",
-      "sha256": "6478e19f9469c308300ea31af8e7372eeada92ab76ddf0c42c6d245dfe16b233"
+      "blob_sha": "8284ea3b2ec37ea3cf4b744426a8ed790adffe88",
+      "sha256": "5ee7521bb29fb53efef876374b66e2a658aca8fd57c5a4f0dc1724339ec4bc14"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "e97f60d6546b26af095f09ee717f207d0a6e9526",
-      "sha256": "2f535e10c42a8194c2666b0aefaad6b2a3251e2146d500768be6b97c20641d9b"
+      "blob_sha": "8c3a8a63ca4b6c5702010b3ebe4e5dc1e27fdcc6",
+      "sha256": "96bdbd2e1a4a4c5b096b31f49d171ee462d11fa307e8972b96978d42734c094d"
     }
   ],
   "changelog": {
@@ -21,7 +21,8 @@
       ],
       "changed": [],
       "fixed": [
-        "In the setup wizard, the Language list for an existing project is now a required field to the browser and screen readers too, like Name, Project, New project name and Active until (it was already marked \"(required)\" on screen and checked before Next). (#450)"
+        "In the setup wizard, the Language list for an existing project is now a required field to the browser and screen readers too, like Name, Project, New project name and Active until (it was already marked \"(required)\" on screen and checked before Next). (#450)",
+        "When a survey's language name is spelled in a way the translator refuses (for example with a symbol in it), participants' page words now stay saved on their device after the first load instead of being translated again every time; the welcome line stays in English, and refused lines are asked for again after a day in case the refusal was temporary. (#454)"
       ]
     }
   }
