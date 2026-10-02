@@ -4,7 +4,7 @@ Super admin is the existing support switch on an account (`principal.support`, r
 
 ## What it opens
 
-Everything a support principal can do (`src/policy.ts`, `authorize`): every workspace, project and assessment, reads and writes, template publishing and participant unlock — plus the app-wide totals read `cap.ops.usage`. An agent connected as that account through the MCP connector acts as that account and holds the same access. Writes still leave receipts. `docs {topic: permissions}` says the same to callers.
+Everything a support principal can do (`src/policy.ts`, `authorize`): every workspace, project and assessment, reads and writes, template publishing and participant unlock — plus the app-wide totals read `cap.ops.usage`. A signed-in session of that account (web sign-in, login code or a session bearer) holds it. An agent connected through the OAuth MCP connector does **not**: `src/oauth.ts` `principalFromProps` always maps a connector to a plain delegated user, so `cap.ops.usage` refuses it. Writes still leave receipts. `docs {topic: permissions}` says the same to callers.
 
 ## `cap.ops.usage`
 
@@ -23,4 +23,5 @@ node scripts/super-admin.mjs off --email <account> --by <operator> --env dev --a
 - The account must have signed in once. Emails are normalised and hashed locally, as sign-in does; no address is sent or stored.
 - `--apply` runs one batch: a `receipt` row (`capability` `script.super_admin.on|off`, `actor` = the operator's account id, `scope` = `principal:<account id>`, `prior_state_json` = the old switch) and the flip. Already in that state → no change, no receipt.
 - `--env production` targets the production database. Production flagging is the product owner's call; the script records who ran it, it does not decide who may.
+- `off` also downgrades that account's existing support sessions to plain user sessions in the same batch (sessions minted while on carry kind `support`, which `src/auth.ts` honours by itself); the holder stays signed in. `on` needs no session change: `src/auth.ts` reads the switch live, so existing sessions act as support at once. The receipt's prior state records the switch and the support-session count.
 - Needs `wrangler` authenticated to the Cloudflare account. `--local` targets the local dev database.

@@ -147,21 +147,44 @@ describe("super admin on/off step (done-line 4)", () => {
       .bind("person_core", emailHash("Core.Member@team.invalid"), 1, 0, "2026-10-02T00:00:00.000Z").run();
     await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)")
       .bind("person_operator", emailHash("operator@team.invalid"), 1, 0, "2026-10-02T00:00:00.000Z").run();
+    const before = await mintSession(env, "person_core", "user"); // signed in before the switch
+    expect((await http(before)).json.error.code).toBe("NOT_AUTHORIZED_AT_SCOPE");
     const on = await run("on", "  core.member@TEAM.invalid ", "operator@team.invalid", 1);
     expect(on.state!.support).toBe(1);
     expect(on.receipt).toMatchObject({ actor: "person_operator", capability: "script.super_admin.on", scope_type: "principal", scope_id: "person_core" });
-    expect(JSON.parse(on.receipt.prior_state_json)).toEqual({ support: 0 });
+    expect(JSON.parse(on.receipt.prior_state_json)).toEqual({ support: 0, support_sessions: 0 });
+    // on: no session upgrade needed — auth reads principal.support live, so the earlier session acts as support at once.
+    expect((await http(before)).json.ok).toBe(true);
+    // A session minted while on carries kind 'support' (as magic link / Access / login code mint it).
+    const during = await mintSession(env, "person_core", "support");
+    expect((await http(during)).json.ok).toBe(true);
     const again = await run("on", "core.member@team.invalid", "operator@team.invalid", 2);
     expect(again.state!.support).toBe(1);
     expect(again.receipt).toBeNull(); // no change, no receipt
     const off = await run("off", "core.member@team.invalid", "someone-else@team.invalid", 3);
     expect(off.state!.support).toBe(0);
     expect(off.receipt.actor).toBe(`operator:${emailHash("someone-else@team.invalid").slice(0, 12)}`);
-    expect(JSON.parse(off.receipt.prior_state_json)).toEqual({ support: 1 });
+    expect(JSON.parse(off.receipt.prior_state_json)).toEqual({ support: 1, support_sessions: 1 });
+    expect((off.state as any).support_sessions).toBe(0);
+    // off: both pre-existing sessions are refused the support-only read; the holder stays signed in as a user.
+    expect((await http(during)).json.error.code).toBe("NOT_AUTHORIZED_AT_SCOPE");
+    expect((await http(before)).json.error.code).toBe("NOT_AUTHORIZED_AT_SCOPE");
+    const me = await app.fetch(new Request("https://t.invalid/mcp", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${during}` },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "read", arguments: { capability: "cap.auth.me", params: {} } } }) }), env);
+    expect(JSON.stringify(await me.json())).not.toContain("NOT_AUTHENTICATED");
+  });
+  it("off also downgrades stray support sessions when the switch is already off, with a receipt", async () => {
+    const stray = await mintSession(env, "person_core", "support");
+    expect((await http(stray)).json.ok).toBe(true); // kind 'support' alone is honoured — the hazard off must close
+    const off = await run("off", "core.member@team.invalid", "operator@team.invalid", 4);
+    expect(off.receipt).toMatchObject({ capability: "script.super_admin.off", scope_id: "person_core" });
+    expect(JSON.parse(off.receipt.prior_state_json)).toEqual({ support: 0, support_sessions: 1 });
+    expect((await http(stray)).json.error.code).toBe("NOT_AUTHORIZED_AT_SCOPE");
   });
   it("refuses anything that is not a hash or a safe id", () => {
     expect(() => buildStatements({ action: "on", targetHash: "x' OR 1=1 --", operatorHash: emailHash("a@b.invalid"), receiptId: "r", traceId: "t", at: "a" })).toThrow();
     expect(() => buildStatements({ action: "maybe", targetHash: emailHash("a@b.invalid"), operatorHash: emailHash("a@b.invalid"), receiptId: "r", traceId: "t", at: "a" })).toThrow();
     expect(() => buildStatements({ action: "on", targetHash: emailHash("a@b.invalid"), operatorHash: emailHash("a@b.invalid"), receiptId: "r'; DROP", traceId: "t", at: "a" })).toThrow();
+    expect(() => receiptStatement("x' OR '1'='1")).toThrow();
   });
 });
