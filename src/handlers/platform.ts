@@ -212,7 +212,7 @@ function projectStoredFeedbackBody(raw: Record<string, unknown>): Record<string,
 type FeedbackRow = { id: string; actor: string | null; scope_type: string | null; scope_id: string | null; body: string; created_at: string };
 const FEEDBACK_COLUMNS = "id, actor, scope_type, scope_id, body, created_at";
 
-/** Shared S-only row projection (cap.ops.feedback_get and cap.ops.feedback_list); malformed rows are existence-hidden. */
+/** S-only row projection for cap.ops.feedback_get (cap.ops.feedback_list uses it only to skip malformed rows); malformed rows are existence-hidden. */
 function projectFeedbackRow(row: FeedbackRow) {
   let stored: unknown;
   try { stored = JSON.parse(row.body); } catch { throw notVisible("feedback"); }
@@ -248,11 +248,12 @@ const ISO_8601 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2
 export const FEEDBACK_LIST_DEFAULT = 50;
 export const FEEDBACK_LIST_MAX = 200;
 
-/** S-only list-since read for triage: rows after the composite cursor (created_at, id) — created_at > since, or
- * created_at = since and id > after_id — ordered (created_at, id), at most `limit` scanned. Role gate is policy.ts N6;
- * each row is the cap.ops.feedback_get projection, and a malformed row is skipped (existence-hidden), never returned.
- * `next` is the last scanned row's cursor (malformed rows included) and `has_more` comes from the SQL page (limit+1),
- * so callers page by `next`, not by the last returned row. */
+/** S-only list-since index for triage (N8 ruling option 2): rows after the composite cursor (created_at, id) —
+ * created_at > since, or created_at = since and id > after_id — ordered (created_at, id), at most `limit` scanned.
+ * Role gate is policy.ts N6. Each row is the locator `{id, created_at, scope_type}` only — never body, actor, scope_id
+ * or provenance; bodies stay behind per-id cap.ops.feedback_get. A row feedback_get would existence-hide (malformed)
+ * is skipped here too, so every listed id resolves. `next` is the last scanned row's cursor (malformed rows included)
+ * and `has_more` comes from the SQL page (limit+1), so callers page by `next`, not by the last returned row. */
 export const opsFeedbackList: Handler = async (ctx, p) => {
   if (typeof p.since !== "string" || !ISO_8601.test(p.since) || Number.isNaN(Date.parse(p.since)))
     throw new CapError("INVALID_PARAMS", "since required (ISO-8601 date-time, e.g. 2026-10-01T00:00:00Z)");
@@ -277,7 +278,9 @@ export const opsFeedbackList: Handler = async (ctx, p) => {
   const has_more = (results ?? []).length > limit;
   const rows = [];
   for (const row of scanned) {
-    try { rows.push(projectFeedbackRow(row)); } catch (e) { if (!(e instanceof CapError)) throw e; }
+    let projected;
+    try { projected = projectFeedbackRow(row); } catch (e) { if (!(e instanceof CapError)) throw e; continue; }
+    rows.push({ id: projected.id, created_at: projected.created_at, scope_type: projected.scope_type });
   }
   const last = scanned[scanned.length - 1];
   const next = last ? { since: last.created_at, after_id: last.id } : null;

@@ -2917,7 +2917,7 @@
       "slice": "v2.0-bcs",
       "section": "J. Ops, telemetry, xray, docs, feedback",
       "ui_surface": "staff triage list-since",
-      "notes": "support-only; N6 role gate; rows with created_at > since, oldest first (created_at, id), at most limit (default 50, max 200); each row is the cap.ops.feedback_get projection; malformed rows are existence-hidden (skipped); opaque scope_type/scope_id; no public list; no aggregate; composite cursor (created_at, id): rows with created_at > since, or created_at = since and id > after_id; next page: since = next.since, after_id = next.after_id (next is the last scanned row, malformed included); has_more from the SQL page (limit+1)",
+      "notes": "support-only; N6 role gate; rows with created_at > since, oldest first (created_at, id), at most limit (default 50, max 200); each row is {id, created_at, scope_type} only (N8 ruling option 2) — never body, actor, scope_id or provenance; bodies stay behind per-id cap.ops.feedback_get; malformed rows (those feedback_get existence-hides) are skipped; opaque scope_type; no public list; no aggregate; composite cursor (created_at, id): rows with created_at > since, or created_at = since and id > after_id; next page: since = next.since, after_id = next.after_id (next is the last scanned row, malformed included); has_more from the SQL page (limit+1)",
       "status": "target",
       "inverse": {
         "kind": "n/a"

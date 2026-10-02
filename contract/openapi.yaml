@@ -675,6 +675,22 @@ components:
               type: string
             stripped:
               type: boolean
+    FeedbackListRow:
+      type: object
+      additionalProperties: false
+      description: locator only (N8 option 2); never body, actor, scope_id or provenance
+      required:
+      - id
+      - created_at
+      - scope_type
+      properties:
+        id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        scope_type:
+          type: string
     FeedbackListResult:
       type: object
       additionalProperties: false
@@ -699,9 +715,9 @@ components:
           type: integer
         rows:
           type: array
-          description: after the (since, after_id) cursor, ordered (created_at, id); malformed rows skipped
+          description: after the (since, after_id) cursor, ordered (created_at, id); malformed rows skipped; locators only — bodies via cap.ops.feedback_get
           items:
-            $ref: '#/components/schemas/FeedbackGetResult'
+            $ref: '#/components/schemas/FeedbackListRow'
         next:
           type:
           - object
@@ -4766,7 +4782,7 @@ paths:
       - J. Ops, telemetry, xray, docs, feedback
       responses:
         '200':
-          description: S-only list-since of per-row projections
+          description: S-only list-since of locators {id, created_at, scope_type}; bodies via cap.ops.feedback_get
           content:
             application/json:
               schema:

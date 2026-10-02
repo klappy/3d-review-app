@@ -4,7 +4,7 @@ import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import app from "../src/index";
 import { mintSession } from "../src/auth";
 
-// cap.ops.feedback_list — S-only list-since read for the hourly triage (GET /v2/ops/feedback?since=&limit=).
+// cap.ops.feedback_list — S-only list-since index ({id, created_at, scope_type}) for the hourly triage (GET /v2/ops/feedback?since=&limit=).
 const mf = new Miniflare(convertV4MiniflareOptions({
   workers: [{ name: "fb-list", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "fb-list-db" } }],
 }));
@@ -15,7 +15,8 @@ function statements(db: D1Database, path: string) {
   return sql.split(";\n").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s));
 }
 
-const ROW_KEYS = ["actor", "body", "created_at", "id", "provenance", "scope_id", "scope_type"];
+const ROW_KEYS = ["created_at", "id", "scope_type"]; // N8 ruling option 2: locators only; bodies via cap.ops.feedback_get
+const FORBIDDEN_KEYS = ["body", "actor", "scope_id", "provenance", "note", "context", "helpful", "stripped"];
 
 let db: D1Database;
 let env: { DB: D1Database; SESSION_SECRET: string; ENVIRONMENT: string };
@@ -69,7 +70,7 @@ beforeAll(async () => {
 }, 60_000);
 
 describe("cap.ops.feedback_list (S-only list-since)", () => {
-  it("happy path: oldest first, each row is exactly the cap.ops.feedback_get projection, default limit 50", async () => {
+  it("happy path: oldest first, each row is exactly {id, created_at, scope_type} matching cap.ops.feedback_get, default limit 50", async () => {
     const got = await list("?since=2000-01-01T00:00:00Z", supportToken);
     expect(got.status).toBe(200);
     expect(got.json.ok).toBe(true);
@@ -79,9 +80,27 @@ describe("cap.ops.feedback_list (S-only list-since)", () => {
     expect(rows.map((r) => r.id)).toEqual(ids);
     for (const r of rows) {
       expect(Object.keys(r).sort()).toEqual(ROW_KEYS);
-      expect(r).toEqual((await getOne(r.id)).result);
+      const full = (await getOne(r.id)).result;
+      expect(r).toEqual({ id: full.id, created_at: full.created_at, scope_type: full.scope_type });
     }
-    expect(rows.map((r) => r.body.note)).toEqual(["list-a", "list-b", "list-c"]);
+    // bodies stay behind per-id cap.ops.feedback_get
+    expect((await Promise.all(rows.map(async (r) => (await getOne(r.id)).result.body.note)))).toEqual(["list-a", "list-b", "list-c"]);
+  });
+
+  it("N8 option 2: no body, actor, scope_id or provenance field ever appears in a list response (HTTP or MCP)", async () => {
+    const http = await list("?since=2000-01-01T00:00:00Z&limit=200", supportToken);
+    const mcp = await mcpList({ since: "2000-01-01T00:00:00Z", limit: 200 }, supportToken);
+    for (const result of [http.json.result, mcp.result]) {
+      expect(result.rows.length).toBeGreaterThan(0);
+      for (const r of result.rows) {
+        expect(Object.keys(r).sort()).toEqual(ROW_KEYS);
+        for (const k of FORBIDDEN_KEYS) expect(r).not.toHaveProperty(k);
+      }
+      expect(Object.keys(result).sort()).toEqual(["after_id", "has_more", "limit", "next", "rows", "since"]);
+      const text = JSON.stringify(result);
+      for (const note of ["list-a", "list-b", "list-c", "person_mara", "_feedback_provenance"]) expect(text).not.toContain(note);
+      for (const k of FORBIDDEN_KEYS) expect(text).not.toContain(`"${k}"`);
+    }
   });
 
   it("since filter: strictly after since; a later since returns nothing", async () => {
