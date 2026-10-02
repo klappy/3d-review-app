@@ -4,6 +4,7 @@ import * as p from "./platform";
 import { handlers as roadmap } from "../roadmap/handlers";
 import { docs } from "./docs";
 import { opsUndo } from "./undo";
+import { opsUsage } from "./usage";
 import { handlers as workspace } from "./workspace";
 import { handlers as project } from "./project";
 import { handlers as assessment } from "./assessment";
@@ -29,6 +30,7 @@ export const handlers: Record<string, Handler> = {
   "cap.ops.feedback": p.opsFeedback,
   "cap.ops.feedback_get": p.opsFeedbackGet,
   "cap.ops.trace": p.opsTrace,
+  "cap.ops.usage": opsUsage,
   "cap.ops.undo": opsUndo,
   "cap.docs.get": docs,
   "cap.docs.capabilities": p.docsCapabilities,
