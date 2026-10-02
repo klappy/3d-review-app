@@ -149,21 +149,30 @@ const CACHE_PREFIX = '3dr.tr.v1:';
 // The server's `refused` count (src/translate.ts reply), a non-negative integer or 0. Refused keys are never in `translated`.
 const refusedCount = (data) => (Number.isInteger(data?.refused) && data.refused > 0 ? data.refused : 0);
 // B1 (rev454-0241): a refusal can be temporary (a swallowed allowlist lookup error, a load without a participant token,
-// deploy skew), so a bundle cached while keys were refused is written as { map, refused, at } and reads as a miss once it
-// is older than a day; the refused lines are then asked for again. A plain map (nothing refused) stays a permanent hit.
+// deploy skew), so a bundle cached while keys were refused reads as a miss once it is older than a day; the refused lines
+// are then asked for again. A bundle with no meta (nothing refused) stays a permanent hit.
+// W1 (rev454b-0341): the value under the v1 key is always a flat map, so older code (a rollback, a tab open from before
+// the deploy) still reads it as a map. `{ refused, at }` lives under a sibling key, `3dr.tr.v1m:` + the same suffix.
+const META_PREFIX = '3dr.tr.v1m:';
+const metaKeyOf = (key) => META_PREFIX + key.slice(CACHE_PREFIX.length);
 const REFUSED_TTL_MS = 24 * 60 * 60 * 1000;
 function readCache(storage, key, now = Date.now()) {
   try {
     const raw = storage?.getItem(key); const hit = raw ? JSON.parse(raw) : null;
     if (!hit || typeof hit !== 'object') return null;
-    if (Number.isInteger(hit.refused) && hit.refused > 0 && hit.map && typeof hit.map === 'object') {
-      return Number.isFinite(hit.at) && now - hit.at < REFUSED_TTL_MS ? hit.map : null;
+    const metaRaw = storage.getItem(metaKeyOf(key)); const meta = metaRaw ? JSON.parse(metaRaw) : null;
+    if (meta && Number.isInteger(meta.refused) && meta.refused > 0) {
+      return Number.isFinite(meta.at) && now - meta.at < REFUSED_TTL_MS ? hit : null;
     }
     return hit;
   } catch { return null; }
 }
 function writeCache(storage, key, map, refused = 0, now = Date.now()) {
-  try { storage?.setItem(key, JSON.stringify(refused > 0 ? { map, refused, at: now } : map)); } catch { /* best effort */ }
+  try {
+    storage?.setItem(key, JSON.stringify(map));
+    if (refused > 0) storage?.setItem(metaKeyOf(key), JSON.stringify({ refused, at: now }));
+    else storage?.removeItem?.(metaKeyOf(key));
+  } catch { /* best effort */ }
 }
 
 // One request to the proxy, with a device cache for complete answers. Resolves { map, partial, cached };

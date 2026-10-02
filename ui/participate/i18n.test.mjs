@@ -42,7 +42,9 @@ test('makeT falls back to English', () => {
   assert.equal(t('start'), UI_EN.start);
 });
 
-function memoryStorage() { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), m }; }
+const mainOf = (s) => { for (const [k, v] of s.m) if (k.startsWith('3dr.tr.v1:')) return v; return null; };
+const metaOf = (s) => { for (const [k, v] of s.m) if (k.startsWith('3dr.tr.v1m:')) return v; return null; };
+function memoryStorage() { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), m }; }
 
 test('fetchTranslations posts the Lovable wire shape, caches complete answers, keeps partial ones uncached', async () => {
   const calls = [];
@@ -134,8 +136,8 @@ const pageWords = () => ({ start: 'Start', back: 'Back', ...Object.fromEntries(A
 test('S57 fetchTranslations: a refused welcome lead (name fails the shape check) still caches the page words; lead stays English', async () => {
   const texts = pageWords(); const calls = []; const storage = memoryStorage();
   const r = await fetchTranslations({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: refusingProxy(calls), storage });
-  assert.equal(r.partial, false); assert.equal('lead' in r.map, false); assert.equal(storage.m.size, 1);
-  const cached = JSON.parse([...storage.m.values()][0]); assert.equal('lead' in cached, false);
+  assert.equal(r.partial, false); assert.equal('lead' in r.map, false); assert.equal(storage.m.size, 2);
+  const cached = JSON.parse(mainOf(storage)); assert.equal('lead' in cached, false); assert.equal('map' in cached, false);
   const again = await fetchTranslations({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: async () => { throw new Error('no network needed'); }, storage });
   assert.equal(again.cached, true); assert.equal(calls.length, 1);
   const t = makeT(again.map);
@@ -150,8 +152,8 @@ test('S57 fetchTranslations: a refused welcome lead (name fails the shape check)
 test('S57 fetchTranslationsProgressive: a refused welcome lead (name fails the shape check) still caches the page words; lead stays English', async () => {
   const texts = pageWords(); const calls = []; const storage = memoryStorage();
   const r = await fetchTranslationsProgressive({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: refusingProxy(calls), storage });
-  assert.ok(calls.length > 1); assert.equal(r.partial, false); assert.equal('lead' in r.map, false); assert.equal(storage.m.size, 1);
-  const cached = JSON.parse([...storage.m.values()][0]); assert.equal('lead' in cached, false);
+  assert.ok(calls.length > 1); assert.equal(r.partial, false); assert.equal('lead' in r.map, false); assert.equal(storage.m.size, 2);
+  const cached = JSON.parse(mainOf(storage)); assert.equal('lead' in cached, false); assert.equal('map' in cached, false);
   const again = await fetchTranslationsProgressive({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: async () => { throw new Error('no network needed'); }, storage });
   assert.equal(again.cached, true);
   assert.equal(makeT(again.map)('lead', texts.lead), texts.lead);
@@ -173,15 +175,17 @@ test('B1 a bundle cached while a key was refused expires after a day; a later fu
     const args = { lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: proxy, storage, now };
     const first = await fetchFn(args); const n1 = calls;
     assert.equal(first.partial, false); assert.equal(makeT(first.map)('lead', texts.lead), texts.lead);
-    const stored = JSON.parse([...storage.m.values()][0]);
-    assert.equal(stored.refused, 1); assert.equal(stored.at, 1_000_000); assert.equal('lead' in stored.map, false);
+    // W1: the v1 value stays a flat map (older readers see a map); refused/at ride the sibling 3dr.tr.v1m: key.
+    const stored = JSON.parse(mainOf(storage)); const meta = JSON.parse(metaOf(storage));
+    assert.equal('map' in stored, false); assert.equal('refused' in stored, false); assert.equal('lead' in stored, false); assert.equal(stored.start, 'lo:Start');
+    assert.equal(meta.refused, 1); assert.equal(meta.at, 1_000_000);
     clock += DAY - 1; // still inside the day: a hit, no extra request
     const inside = await fetchFn(args);
     assert.equal(inside.cached, true); assert.equal(calls, n1); assert.equal(makeT(inside.map)('lead', texts.lead), texts.lead);
     clock += 2; refuse = false; // past a day: a miss, and the server now translates everything
     const after = await fetchFn(args);
     assert.equal(after.cached, false); assert.ok(calls > n1); assert.equal(after.map.lead, `lo:${texts.lead}`);
-    const plain = JSON.parse([...storage.m.values()][0]);
+    const plain = JSON.parse(mainOf(storage)); assert.equal(metaOf(storage), null); assert.equal(storage.m.size, 1);
     assert.equal('refused' in plain, false); assert.equal(plain.lead, `lo:${texts.lead}`);
     const n2 = calls; clock += 10 * DAY; // a plain map stays a permanent hit
     const later = await fetchFn(args);
