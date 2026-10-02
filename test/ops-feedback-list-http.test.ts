@@ -139,6 +139,50 @@ describe("cap.ops.feedback_list (S-only list-since)", () => {
     const r = await list(`?since=${encodeURIComponent(stamps[2])}`, supportToken);
     expect(r.status).toBe(200);
     expect(r.json.result.rows).toEqual([]);
-    expect(JSON.stringify(r.json)).not.toMatch(/fb_list_malformed|SQLITE|SyntaxError/);
+    // the cursor names the skipped row's (created_at, id) so paging advances; its body never leaks
+    expect(r.json.result.next).toEqual({ since: "2099-01-01T00:00:00.000Z", after_id: "fb_list_malformed" });
+    expect(r.json.result.has_more).toBe(false);
+    expect(JSON.stringify(r.json)).not.toMatch(/not json|SQLITE|SyntaxError/);
+  });
+
+  it("a page of only malformed rows still returns next and has_more, and paging by next advances past them", async () => {
+    const t = "2098-01-01T00:00:00.000Z";
+    for (const id of ["fb_mal_1", "fb_mal_2"]) {
+      await db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
+        .bind(id, "person_mara", "platform", "-", "{not json", t).run();
+    }
+    const p1 = await list(`?since=${encodeURIComponent("2097-12-31T23:59:59Z")}&limit=2`, supportToken);
+    expect(p1.status).toBe(200);
+    expect(p1.json.result.rows).toEqual([]);
+    expect(p1.json.result.next).toEqual({ since: t, after_id: "fb_mal_2" });
+    expect(p1.json.result.has_more).toBe(true); // 2099 malformed row is behind it
+    const p2 = await list(`?since=${encodeURIComponent(p1.json.result.next.since)}&after_id=${p1.json.result.next.after_id}&limit=2`, supportToken);
+    expect(p2.json.result.rows).toEqual([]);
+    expect(p2.json.result.next).toEqual({ since: "2099-01-01T00:00:00.000Z", after_id: "fb_list_malformed" });
+    expect(p2.json.result.has_more).toBe(false);
+    await db.prepare("DELETE FROM feedback WHERE id IN ('fb_mal_1','fb_mal_2')").run();
+  });
+
+  it("same-millisecond boundary: rows sharing created_at across a page edge are not skipped (composite (created_at, id) cursor)", async () => {
+    const t = "2097-06-01T00:00:00.000Z";
+    const src = (await db.prepare("SELECT actor, scope_type, scope_id, body FROM feedback WHERE id = ?").bind(ids[0]).first<any>())!;
+    const parsed = JSON.parse(src.body);
+    if (parsed._feedback_provenance?.submission) parsed._feedback_provenance.submission.submitted_at = t;
+    const body = JSON.stringify(parsed);
+    for (const id of ["fb_tie_a", "fb_tie_b", "fb_tie_c"]) {
+      await db.prepare("INSERT INTO feedback (id, actor, scope_type, scope_id, body, created_at) VALUES (?,?,?,?,?,?)")
+        .bind(id, src.actor, src.scope_type, src.scope_id, body, t).run();
+    }
+    const p1 = await list(`?since=${encodeURIComponent("2097-05-31T23:59:59Z")}&limit=2`, supportToken);
+    expect(p1.json.result.rows.map((r: any) => r.id)).toEqual(["fb_tie_a", "fb_tie_b"]);
+    expect(p1.json.result.next).toEqual({ since: t, after_id: "fb_tie_b" });
+    expect(p1.json.result.has_more).toBe(true);
+    const p2 = await list(`?since=${encodeURIComponent(t)}&after_id=fb_tie_b&limit=2`, supportToken);
+    expect(p2.json.result.rows.map((r: any) => r.id)).toEqual(["fb_tie_c"]);
+    // without after_id the old since-only cursor would have skipped fb_tie_c
+    const sinceOnly = await list(`?since=${encodeURIComponent(t)}&limit=2`, supportToken);
+    expect(sinceOnly.json.result.rows.map((r: any) => r.id)).not.toContain("fb_tie_c");
+    expect((await list(`?since=${encodeURIComponent(t)}&after_id=`, supportToken)).status).toBe(400);
+    await db.prepare("DELETE FROM feedback WHERE id IN ('fb_tie_a','fb_tie_b','fb_tie_c')").run();
   });
 });

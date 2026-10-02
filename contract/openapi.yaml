@@ -680,20 +680,46 @@ components:
       additionalProperties: false
       required:
       - since
+      - after_id
       - limit
       - rows
+      - next
+      - has_more
       properties:
         since:
           type: string
           format: date-time
-          description: normalized lower bound (exclusive)
+          description: normalized lower bound of the composite cursor
+        after_id:
+          type:
+          - string
+          - 'null'
+          description: cursor tie-break echoed back; null when not sent
         limit:
           type: integer
         rows:
           type: array
-          description: created_at > since, oldest first (created_at, id); next page uses the last row's created_at as since
+          description: after the (since, after_id) cursor, ordered (created_at, id); malformed rows skipped
           items:
             $ref: '#/components/schemas/FeedbackGetResult'
+        next:
+          type:
+          - object
+          - 'null'
+          description: cursor of the last scanned row (malformed rows included); page by this, not by the last returned row; null on an empty page
+          additionalProperties: false
+          required:
+          - since
+          - after_id
+          properties:
+            since:
+              type: string
+              format: date-time
+            after_id:
+              type: string
+        has_more:
+          type: boolean
+          description: true when the SQL page held more than limit rows
 paths:
   /v2/entry:
     get:
@@ -4774,6 +4800,13 @@ paths:
           minimum: 1
           maximum: 200
           default: 50
+      - name: after_id
+        in: query
+        required: false
+        description: with since, also rows with created_at = since and id > after_id (from a previous page's next)
+        schema:
+          type: string
+          minLength: 1
   /v2/ops/feedback/{id}:
     get:
       operationId: cap.ops.feedback_get

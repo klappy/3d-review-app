@@ -248,8 +248,11 @@ const ISO_8601 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2
 export const FEEDBACK_LIST_DEFAULT = 50;
 export const FEEDBACK_LIST_MAX = 200;
 
-/** S-only list-since read for triage: rows with created_at > since, oldest first, at most `limit`. Role gate is policy.ts N6;
- * each row is the cap.ops.feedback_get projection, and a malformed row is skipped (existence-hidden), never returned. */
+/** S-only list-since read for triage: rows after the composite cursor (created_at, id) — created_at > since, or
+ * created_at = since and id > after_id — ordered (created_at, id), at most `limit` scanned. Role gate is policy.ts N6;
+ * each row is the cap.ops.feedback_get projection, and a malformed row is skipped (existence-hidden), never returned.
+ * `next` is the last scanned row's cursor (malformed rows included) and `has_more` comes from the SQL page (limit+1),
+ * so callers page by `next`, not by the last returned row. */
 export const opsFeedbackList: Handler = async (ctx, p) => {
   if (typeof p.since !== "string" || !ISO_8601.test(p.since) || Number.isNaN(Date.parse(p.since)))
     throw new CapError("INVALID_PARAMS", "since required (ISO-8601 date-time, e.g. 2026-10-01T00:00:00Z)");
@@ -260,14 +263,25 @@ export const opsFeedbackList: Handler = async (ctx, p) => {
       throw new CapError("INVALID_PARAMS", `limit must be an integer 1..${FEEDBACK_LIST_MAX}`);
     limit = n;
   }
+  if (p.after_id !== undefined && (typeof p.after_id !== "string" || !p.after_id))
+    throw new CapError("INVALID_PARAMS", "after_id must be a non-empty string (the id from a previous page's next)");
+  const afterId: string | null = typeof p.after_id === "string" ? p.after_id : null;
   const since = new Date(p.since).toISOString();
-  const { results } = await ctx.db.prepare(`SELECT ${FEEDBACK_COLUMNS} FROM feedback WHERE created_at > ? ORDER BY created_at ASC, id ASC LIMIT ?`)
-    .bind(since, limit).all<FeedbackRow>();
+  const stmt = afterId === null
+    ? ctx.db.prepare(`SELECT ${FEEDBACK_COLUMNS} FROM feedback WHERE created_at > ? ORDER BY created_at ASC, id ASC LIMIT ?`)
+        .bind(since, limit + 1)
+    : ctx.db.prepare(`SELECT ${FEEDBACK_COLUMNS} FROM feedback WHERE created_at > ? OR (created_at = ? AND id > ?) ORDER BY created_at ASC, id ASC LIMIT ?`)
+        .bind(since, since, afterId, limit + 1);
+  const { results } = await stmt.all<FeedbackRow>();
+  const scanned = (results ?? []).slice(0, limit);
+  const has_more = (results ?? []).length > limit;
   const rows = [];
-  for (const row of results ?? []) {
+  for (const row of scanned) {
     try { rows.push(projectFeedbackRow(row)); } catch (e) { if (!(e instanceof CapError)) throw e; }
   }
-  return { result: { since, limit, rows } };
+  const last = scanned[scanned.length - 1];
+  const next = last ? { since: last.created_at, after_id: last.id } : null;
+  return { result: { since, after_id: afterId, limit, rows, next, has_more } };
 };
 
 export const opsTrace: Handler = async (ctx, p) => {
