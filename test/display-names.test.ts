@@ -1,5 +1,5 @@
 // Captain ruling 2026-09-29 (BCS training demo, bee:10809312 u3540382253-264): people read "Translators" and
-// "Team leaders & mentors"; ids and the pinned source names never change (source_name carries them).
+// "Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)"; ids and the pinned source names never change (source_name carries them).
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
@@ -27,7 +27,7 @@ afterAll(()=>mf.dispose());
 describe("template display names",()=>{
   it("maps only the two ruled templates (and the legacy mid-level); everything else passes through",()=>{
     expect(templateDisplayName("tpl_validation","Validation")).toBe("Translators");
-    expect(templateDisplayName("tpl_mid_level","Mid-Level")).toBe("Team leaders & mentors");
+    expect(templateDisplayName("tpl_mid_level","Mid-Level")).toBe("Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)");
     expect(templateDisplayName("tpl_written","Written")).toBe("Written");
     expect(withDisplayName({id:"tpl_written",name:"Written"})).toEqual({id:"tpl_written",name:"Written"});
     expect(withDisplayName({id:"tpl_validation",name:"Validation"})).toEqual({id:"tpl_validation",name:"Translators",source_name:"Validation"});
@@ -40,7 +40,7 @@ describe("template display names",()=>{
     expect(names).not.toContain("Validation"); expect(names).not.toContain("Mid-Level");
     const v=r.result.templates.find((t:any)=>t.id==="tpl_validation"), m=r.result.templates.find((t:any)=>t.id==="tpl_mid_level");
     expect([v.name,v.source_name]).toEqual(["Translators","Validation"]);
-    expect([m.name,m.source_name]).toEqual(["Team leaders & mentors","Mid-Level"]);
+    expect([m.name,m.source_name]).toEqual(["Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)","Mid-Level"]);
     expect(r.result.templates.find((t:any)=>t.id==="tpl_written").source_name).toBeUndefined();
     const one=await call("GET","/v2/templates/tpl_validation@2",owner);
     expect([one.result.template.name,one.result.template.source_name]).toEqual(["Translators","Validation"]);

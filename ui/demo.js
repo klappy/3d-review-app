@@ -7,7 +7,7 @@ const assessment = { id: 'demo-assessment', project_id: 'demo-project', name: 'E
 const project = { id: 'demo-project', workspace_id: 'demo-workspace', name: 'Earning trust · synthetic project', role: 'viewer' };
 const workspace = { id: 'demo-workspace', name: 'Sample workspace', role: 'viewer' };
 // Display names match the server's (src/display-names.ts; captain ruling 2026-09-29): the fixture keeps the pinned source names.
-const SHOWN = { tpl_validation: 'Translators', tpl_mid_level: 'Team leaders & mentors' };
+const SHOWN = { tpl_validation: 'Translators', tpl_mid_level: 'Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)' };
 const surveys = fixture.forms.map((f, i) => ({ id: `demo-survey-${i}`, template_id: f.template.templateId, template_version: f.template.templateVersion, template_name: SHOWN[f.template.templateId] ?? f.name, perspective: f.template.perspective, state: 'selected', collection_status: 'closed' }));
 const templates = surveys.map(s => ({ id: s.template_id, version: s.template_version, name: s.template_name, perspective: s.perspective }));
 const report = { id: 'demo-report', created_at: fixture.generated_at, payload: { schema_version: '3d-synthetic-assessment-report-v1', synthetic: true, source_commit: fixture.source, assessment_id: fixture.aid, versions: { scorer: 'steve-f042cde-single-assessment-v1', narrative: 'steve-f042cde-rule-narrative-v1', policy: 'synthetic-current-assessment-asof-query-v1' }, ...fixture.projection } };

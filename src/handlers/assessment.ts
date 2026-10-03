@@ -42,7 +42,7 @@ export const list: Handler = async (ctx, params) => {
   const {results} = await ctx.db.prepare('SELECT a.*, g.role, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id WHERE s.assessment_id = a.id) AS response_count FROM assessment a JOIN "grant" g ON g.scope_type = ? AND g.scope_id = a.id WHERE a.project_id = ? AND g.principal_id = ? ORDER BY a.created_at').bind("assessment", pid, ctx.principal.id).all<AssessmentRow & {role:Role; response_count:number}>();
   return { result: { assessments: results.map(a => ({ ...view(a, a.role), response_count: Number(a.response_count) || 0 })) }, scope: { type: "project", id: pid } };
 };
-// Survey rows carry the template's display name (Translators, Team leaders & mentors); the pinned name stays as source_name.
+// Survey rows carry the template's display name (Translators, Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)); the pinned name stays as source_name.
 function shownSurvey(s: Record<string, unknown>) {
   const id = String(s.template_id ?? ""), name = String(s.template_name ?? ""), shown = templateDisplayName(id, name);
   return shown === name ? s : { ...s, template_name: shown, template_source_name: name };
