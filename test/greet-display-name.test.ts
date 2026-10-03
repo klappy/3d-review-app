@@ -61,6 +61,26 @@ describe("greet by display name (captain a1)", () => {
     expect((await authMe(mk(db, { kind: "participant", id: "rsp_1" } as any), {})).result.principal.display_name).toBeNull();
   });
 
+  it("rev461 B1: support redeeming another account's undo token is refused and renames nobody; the owner's undo still works", async () => {
+    const db = await mf.getD1Database("DB");
+    await db.prepare("INSERT OR IGNORE INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind("usr_sup", await sha256("sup@example.invalid"), 1, 1, now.toISOString()).run();
+    const ana = () => mk(db, { kind: "user", id: "usr_ana", provisioned: true }), sup = () => mk(db, { kind: "support", id: "usr_sup", provisioned: true });
+    await authMeUpdate(ana(), { display_name: "Ana" }); await authMeUpdate(sup(), { display_name: "Sam Support" });
+    const renamed: any = await execute(ana(), "cap.auth.me_update", { display_name: "Ana Two" }, { tool: "write" });
+    const token = renamed.receipt?.undo_token ?? renamed.result?.receipt?.undo_token;
+    expect(typeof token).toBe("string");
+    const hijack: any = await execute(sup(), "cap.ops.undo", { token }, { tool: "write" }).catch((e: any) => ({ ok: false, error: { code: e.code } }));
+    expect(hijack.ok).toBe(false); expect(hijack.error.code).toBe("NOT_AUTHORIZED_AT_SCOPE");
+    expect((await authMe(sup(), {})).result.principal.display_name).toBe("Sam Support"); // support was not renamed to Ana's prior name
+    expect((await authMe(ana(), {})).result.principal.display_name).toBe("Ana Two");
+    // A direct PATCH naming another account is refused the same way; naming one's own id is fine.
+    await expect(authMeUpdate(sup(), { id: "usr_ana", display_name: "X" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await authMeUpdate(ana(), { id: "usr_ana", display_name: "Ana Two" });
+    const own: any = await execute(ana(), "cap.ops.undo", { token }, { tool: "write" });
+    expect(own.ok).toBe(true);
+    expect((await authMe(ana(), {})).result.principal.display_name).toBe("Ana");
+  });
+
   it("before migration 0015 is applied, GET /v2/me still answers with display_name null (production promotes the migration as step 0)", async () => {
     const db = await setup("OLD", false);
     expect((await authMe(mk(db, { kind: "user", id: "usr_ana" }), {})).result.principal).toMatchObject({ id: "usr_ana", display_name: null });

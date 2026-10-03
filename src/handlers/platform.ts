@@ -104,10 +104,13 @@ export const authMeUpdate: Handler = async (ctx, p) => {
   if (pr.kind === "anonymous") throw new CapError("NOT_AUTHENTICATED", "no session");
   if (pr.kind !== "user" && pr.kind !== "support") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "only a signed-in account has a display name");
   if (!("display_name" in (p ?? {}))) throw new CapError("INVALID_PARAMS", "display_name required (a string, or null to clear)");
+  // Own account only (rev461 B1): an undo replays the receipt's prior state, which names the account it belongs to; a caller who is
+  // not that account (support redeeming someone else's token) is refused instead of renaming itself.
+  if (p.id !== undefined && p.id !== pr.id) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "a display name can only be changed by its own account");
   const next = cleanDisplayName(p.display_name);
   const prior = await readDisplayName(ctx, pr.id);
   await ctx.db.prepare("UPDATE principal SET display_name = ? WHERE id = ?").bind(next, pr.id).run();
-  return { result: { principal: { id: pr.id, display_name: next } }, scope: { type: "platform", id: "account" }, priorState: { display_name: prior } };
+  return { result: { principal: { id: pr.id, display_name: next } }, scope: { type: "platform", id: "account" }, priorState: { id: pr.id, display_name: prior } };
 };
 
 export const opsHealth: Handler = async (ctx) => {

@@ -776,7 +776,9 @@ function displayName(v) {
   const s = v.normalize('NFC').replace(/\s+/g, ' ').trim();
   return s && [...s].length <= NAME_MAX && !/[<>\u0000-\u001f\u007f-\u009f]/.test(s) ? s : '';
 }
+let accountSeq = 0; // rev461 W1: only the latest greeting call may write the header
 async function loadAccountEmail() {
+  const seq = ++accountSeq;
   if (demo) { who.textContent = 'Sample account'; accountControls(false); return; }
   const identity = identityGeneration, credential = token;
   const name = displayName(state.principal?.display_name);
@@ -786,10 +788,10 @@ async function loadAccountEmail() {
     const headers = { accept: 'application/json' }; if (credential) headers.authorization = `Bearer ${credential}`;
     const response = await fetch('/v2/auth/access?view=account', { headers, credentials: 'same-origin', redirect: 'error', cache: 'no-store' });
     const value = response.ok ? await response.json() : null;
-    if (identity !== identityGeneration || credential !== token) return;
+    if (identity !== identityGeneration || credential !== token || seq !== accountSeq || displayName(state.principal?.display_name)) return; // W1: a later call or a saved name wins
     // U03 (lanes-1321): sandbox and cookie sessions have no account view; say "Signed in", never a failure sentence.
     who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Signed in';
-  } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Signed in'; }
+  } catch { if (identity === identityGeneration && credential === token && seq === accountSeq && !displayName(state.principal?.display_name)) who.textContent = 'Signed in'; }
 }
 // B44 (captain report 20:39): ONE sign-out for Sign out, Use another account and every caller (ctx.signOut). It never sends the
 // person to the Access team-domain page: that logout shows only "Failed to log out." when there is no Access session
@@ -859,6 +861,7 @@ async function saveName(event) {
     if (identity !== identityGeneration) return;
     state.principal = { ...state.principal, display_name: r?.principal?.display_name ?? null };
     dialog?.close(); void loadAccountEmail();
+    if (route(location.hash).kind === 'projects') void render(); // rev461 W2: the home "Welcome, <name>" line follows the save
   } catch { if (status) status.textContent = 'Your name could not be saved. Try again.'; }
 }
 function skipName() {

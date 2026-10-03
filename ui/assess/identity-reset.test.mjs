@@ -148,6 +148,12 @@ test('greet by name (captain a1): the header greets by display_name, the email s
   for(const display_name of [null,'','   ','<b>x</b>','x'.repeat(81)]){h.state.principal={id:'usr_ana',kind:'user',display_name};await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Account: ana@example.invalid');}
   assert.equal(fetched,5);
 });
+test('rev461 W1: an email lookup still in flight never overwrites the name greeting',async()=>{
+  const h=harness();let release;h.setFetch(()=>new Promise(r=>{release=()=>r({ok:true,json:async()=>({email:'ana@example.invalid'})});}));
+  h.state.principal={id:'usr_ana',kind:'user',display_name:null};const pending=h.loadAccountEmail();
+  h.state.principal={id:'usr_ana',kind:'user',display_name:'Ana'};await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Hi, Ana');
+  release();await pending;assert.equal(h.nodes.get('who').textContent,'Hi, Ana');
+});
 test('account email is text only and failures remove previous email',async()=>{
   const h=harness();h.setFetch(async()=>({ok:true,json:async()=>({email:'<synthetic>@example.invalid'})}));await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Account: <synthetic>@example.invalid');
   h.setFetch(async()=>{throw Error('redirect');});await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Signed in');
