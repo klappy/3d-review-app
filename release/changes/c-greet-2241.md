@@ -1,3 +1,3 @@
 bump: minor
-lane: c (greet by name) · PR: #TBD
+lane: c (greet by name) · PR: #461
 - Added - Your account can carry an optional **display name**: asked once after you sign in (skippable with "Not now"), changeable any time from the account menu ("Your name…"). The header greets you by it ("Hi, Ana") and the home page says "Welcome, Ana"; with no name set you see your email as before. `GET /v2/me` returns it as `principal.display_name` and the new `PATCH /v2/me` (`cap.auth.me_update`, undoable) sets or clears it (at most 80 characters, no `<` `>`). Production promotion step 0: apply D1 migration `0015_display_name.sql` (additive nullable column; until it is applied `/v2/me` answers `display_name: null`).
