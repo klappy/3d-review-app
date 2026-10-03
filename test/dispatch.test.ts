@@ -18,7 +18,7 @@ function context(): Ctx {
 afterEach(() => { delete handlers["cap.auth.request_link"]; });
 
 describe("shared dispatch boundary", () => {
-  it("loads all 92 contract capabilities", () => expect(capabilities).toHaveLength(92));
+  it("loads all 93 contract capabilities", () => expect(capabilities).toHaveLength(93));
 
   it("rejects the wrong tool before dispatch", async () => {
     const result = await execute(context(), "cap.entry.intents", {}, { tool: "write" });

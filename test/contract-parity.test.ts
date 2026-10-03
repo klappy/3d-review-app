@@ -208,6 +208,7 @@ const COMPARED = [
   "cap.participant.open_link result",
   "cap.survey.issue_link request",
   "cap.survey.issue_link result",
+  "cap.auth.me_update request",
   "cap.grant.accept request",
   "cap.me.invitations request",
   "cap.response.form request",
@@ -238,6 +239,8 @@ const COMPARED = [
 // Both sides are recorded, so "(openapi only)" rows include results such as cap.ops.feedback_get's FeedbackGetResult and
 // requests whose route carries path/query parameters while the capability declares no params_schema.
 const ONE_SIDED = [
+  "cap.auth.me result (capabilities only)",
+  "cap.auth.me_update result (capabilities only)",
   "cap.assessment.archive request (openapi only)",
   "cap.assessment.create request (openapi only)",
   "cap.assessment.delete request (openapi only)",

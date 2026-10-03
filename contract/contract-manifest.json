@@ -14,6 +14,7 @@
         "cap.auth.consume_link",
         "cap.auth.logout",
         "cap.auth.me",
+        "cap.auth.me_update",
         "cap.participant.redeem_code",
         "cap.participant.open_link"
       ],

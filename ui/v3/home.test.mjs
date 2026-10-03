@@ -118,3 +118,9 @@ test('S40: signed out → no hint, even if the invitations read would answer', a
   assert.match(h, /Sign in to continue/); assert.doesNotMatch(h, /data-v3h-invitations|invitation/i);
   assert.deepEqual(ctx.requested, ['/v2/projects'], 'signed out: /v2/me/invitations is never requested');
 });
+
+test('greet by name (captain a1): "Welcome, <name>" escaped when /v2/me carries a display_name; nothing otherwise', () => {
+  const named = homeView({ projects: [], listFor: () => ({}), name: ' Ana <Ruiz> ' });
+  assert.match(named, /<p class="v3h-welcome" data-v3h-welcome>Welcome, Ana &lt;Ruiz&gt;<\/p>/);
+  for (const name of ['', '   ', null, undefined, 42]) assert.doesNotMatch(homeView({ projects: [], listFor: () => ({}), name }), /data-v3h-welcome/);
+});
