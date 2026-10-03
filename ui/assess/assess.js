@@ -766,11 +766,21 @@ let accountBusy = false;
 function accountStatus(message = '') { const el = document.getElementById('account-status'); if (el) el.textContent = message; }
 function accountControls(visible, busy = false) {
   const actions = document.getElementById('account-actions'); if (actions) actions.hidden = !visible;
-  for (const id of ['account-signout', 'account-switch', 'account-switch-confirm']) { const el = document.getElementById(id); if (el) el.disabled = busy; }
+  for (const id of ['account-signout', 'account-switch', 'account-switch-confirm', 'account-name']) { const el = document.getElementById(id); if (el) el.disabled = busy; }
+}
+// Greet by name (captain ruling a1, 2026-10-02): /v2/me carries the account's optional display_name; the header greets by it,
+// with the email (or "Signed in") as the fallback when none is set. Same rules as the server (src/handlers/platform.ts cleanDisplayName).
+const NAME_MAX = 80;
+function displayName(v) {
+  if (typeof v !== 'string') return '';
+  const s = v.normalize('NFC').replace(/\s+/g, ' ').trim();
+  return s && [...s].length <= NAME_MAX && !/[<>\u0000-\u001f\u007f-\u009f]/.test(s) ? s : '';
 }
 async function loadAccountEmail() {
   if (demo) { who.textContent = 'Sample account'; accountControls(false); return; }
   const identity = identityGeneration, credential = token;
+  const name = displayName(state.principal?.display_name);
+  if (name) { who.textContent = `Hi, ${name}`; accountControls(true, accountBusy); return; }
   who.textContent = 'Checking account…'; accountControls(true, accountBusy);
   try {
     const headers = { accept: 'application/json' }; if (credential) headers.authorization = `Bearer ${credential}`;
@@ -820,8 +830,46 @@ async function signOut(switchAccount = false) {
     if (current()) { accountBusy = false; accountControls(!!state.principal); }
   }
 }
+// Your name (captain a1): asked once after sign-in while the account has none (skippable; "Not now" is remembered on this
+// device per account), and editable any time from the account menu. Saved through PATCH /v2/me (cap.auth.me_update).
+const NAME_SKIP_KEY = id => `3dr.name.skip:${id}`;
+function openNameDialog() {
+  const dialog = document.getElementById('account-name-dialog'), input = document.getElementById('account-name-input');
+  if (!dialog || !input || !state.principal || demo) return;
+  input.value = displayName(state.principal.display_name);
+  const status = document.getElementById('account-name-status'); if (status) status.textContent = '';
+  try { dialog.showModal(); } catch { return; }
+  try { input.focus(); } catch {}
+}
+function maybeAskName() {
+  const pr = state.principal;
+  if (demo || !pr || (pr.kind && pr.kind !== 'user' && pr.kind !== 'support') || displayName(pr.display_name)) return;
+  try { if (localStorage.getItem(NAME_SKIP_KEY(pr.id))) return; } catch {}
+  openNameDialog();
+}
+async function saveName(event) {
+  event?.preventDefault?.();
+  const dialog = document.getElementById('account-name-dialog'), input = document.getElementById('account-name-input'), status = document.getElementById('account-name-status');
+  if (!state.principal || !input) return;
+  const raw = input.value.replace(/\s+/g, ' ').trim(), name = displayName(raw);
+  if (raw && !name) { if (status) status.textContent = `Use up to ${NAME_MAX} characters, without < or >.`; return; }
+  const identity = identityGeneration;
+  try {
+    const r = await api('/v2/me', { method: 'PATCH', body: { display_name: name || null } });
+    if (identity !== identityGeneration) return;
+    state.principal = { ...state.principal, display_name: r?.principal?.display_name ?? null };
+    dialog?.close(); void loadAccountEmail();
+  } catch { if (status) status.textContent = 'Your name could not be saved. Try again.'; }
+}
+function skipName() {
+  const pr = state.principal; if (pr) { try { localStorage.setItem(NAME_SKIP_KEY(pr.id), '1'); } catch {} }
+  document.getElementById('account-name-dialog')?.close();
+}
 function bindAccountControls() {
   document.getElementById('account-signout')?.addEventListener('click', () => signOut());
+  document.getElementById('account-name')?.addEventListener('click', () => { if (!accountBusy && state.principal) openNameDialog(); });
+  document.getElementById('account-name-form')?.addEventListener('submit', saveName);
+  document.getElementById('account-name-skip')?.addEventListener('click', skipName);
   const dialog = document.getElementById('account-switch-dialog');
   document.getElementById('account-switch')?.addEventListener('click', () => { if (!accountBusy && state.principal) dialog?.showModal(); });
   document.getElementById('account-switch-cancel')?.addEventListener('click', () => dialog?.close());
@@ -948,7 +996,7 @@ function resetIdentity() {
   identityGeneration += 1; generation += 1; epoch += 1;
   pendingRename = null; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
   accountBusy = false; accountControls(false); accountStatus();
-  document.getElementById('account-switch-dialog')?.close();
+  document.getElementById('account-switch-dialog')?.close(); document.getElementById('account-name-dialog')?.close();
   document.getElementById('feedback-dialog')?.remove(); // S54/rev444: the in-place feedback dialog belongs to the old identity
   state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
@@ -1020,6 +1068,7 @@ async function boot() {
     app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p><p><a class="button primary" href="#">Go to sign in</a> <a class="button" href="/v2/auth/access">Sign in with an email code</a></p></div>`;
     return; }
   void loadAccountEmail();
+  maybeAskName(); // captain a1: asked at sign-up, skippable
   // E1: signed-in staff get the real-app way back (same-origin session, no token) and the generated functionality statement.
   const back = document.getElementById('legacy-link'); if (back) back.hidden = true;
   const wh = document.getElementById('whats-here'); if (wh) { wh.textContent = whatsHere(); const wrap = document.getElementById('whats-here-wrap'); if (wrap) wrap.hidden = false; else wh.hidden = false; }

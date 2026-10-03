@@ -3,6 +3,7 @@
 .v3h-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
 .v3h-head h1 { margin: 0; font-size: 1.75rem; font-weight: 700; }
 .v3h-sub { margin: 4px 0 0; color: var(--muted, #475569); }
+.v3h-welcome { margin: 0 0 4px; font-weight: 600; } /* captain a1: greet by display name */
 .v3h-head .v3-shell-actions, .v3h-head .actions { margin: 0; }
 .v3h-card { background: #fff; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; padding: 18px 20px; display: grid; gap: 12px; }
 .v3h-card h2 { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--muted, #475569); }

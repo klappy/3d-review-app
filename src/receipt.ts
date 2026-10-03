@@ -147,6 +147,7 @@ const PARAM_FIELDS: Record<string, readonly string[]> = {
   "cap.language.archive": ["id"], "cap.language.unarchive": ["id"],
 };
 const PRIOR_FIELDS: Record<string, readonly string[]> = {
+  "cap.auth.me_update": ["display_name"], // undo restores the prior name (null clears)
   "cap.workspace.update": ["name"], "cap.workspace.archive": ["archived_at"], "cap.workspace.unarchive": ["archived_at"],
   "cap.workspace.add_project": ["workspace_id"], "cap.workspace.remove_project": ["workspace_id"],
   // lwc: the prior translation languages as a "lo,th" string (receiptFields keeps scalars only; takeLwc accepts the

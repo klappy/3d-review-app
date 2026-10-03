@@ -70,11 +70,44 @@ export const authLogout: Handler = async (ctx) => {
   return { result: { signed_out: true }, scope: { type: "platform", id: "auth" } };
 };
 
+/** Greet by name (captain a1, 2026-10-02): the account's optional display name. Trimmed, inner whitespace collapsed,
+ *  1–80 characters, no markup characters (< >) and no control characters; "" or null clears it. */
+export const DISPLAY_NAME_MAX = 80;
+export function cleanDisplayName(v: unknown): string | null {
+  if (v === null) return null;
+  if (typeof v !== "string") throw new CapError("INVALID_PARAMS", "display_name must be a string or null");
+  const s = v.normalize("NFC").replace(/\s+/g, " ").trim();
+  if (!s) return null;
+  if ([...s].length > DISPLAY_NAME_MAX) throw new CapError("INVALID_PARAMS", `display_name is at most ${DISPLAY_NAME_MAX} characters`);
+  if (/[<>]/.test(s) || /[\u0000-\u001f\u007f-\u009f]/.test(s)) throw new CapError("INVALID_PARAMS", "display_name may not contain < > or control characters");
+  return s;
+}
+async function readDisplayName(ctx: Parameters<Handler>[0], principalId: string): Promise<string | null> {
+  try {
+    const row = await ctx.db.prepare("SELECT display_name FROM principal WHERE id = ?").bind(principalId).first<{ display_name: string | null }>();
+    return typeof row?.display_name === "string" && row.display_name ? row.display_name : null;
+  } catch { return null; } // column not migrated yet (0015): no name, the email greeting stands
+}
+
 export const authMe: Handler = async (ctx) => {
   const pr = ctx.principal;
   if (pr.kind === "anonymous") throw new CapError("NOT_AUTHENTICATED", "no session");
-  const grants = pr.kind === "user" || pr.kind === "support" ? (await ctx.db.prepare("SELECT scope_type, scope_id, role FROM grant WHERE principal_id = ?").bind(pr.id).all()).results : [];
-  return { result: { principal: { id: pr.id, kind: pr.kind, provisioned: !!pr.provisioned, delegated_by: pr.delegatedBy ?? null, support_actor: pr.supportActor ?? null, participant_survey_id: pr.participantSurveyId ?? null }, grants } };
+  const account = pr.kind === "user" || pr.kind === "support";
+  const grants = account ? (await ctx.db.prepare("SELECT scope_type, scope_id, role FROM grant WHERE principal_id = ?").bind(pr.id).all()).results : [];
+  const display_name = account ? await readDisplayName(ctx, pr.id) : null;
+  return { result: { principal: { id: pr.id, kind: pr.kind, provisioned: !!pr.provisioned, delegated_by: pr.delegatedBy ?? null, support_actor: pr.supportActor ?? null, participant_survey_id: pr.participantSurveyId ?? null, display_name }, grants } };
+};
+
+/** PATCH /v2/me {display_name}: the signed-in account sets or clears its own display name (participants have no account). */
+export const authMeUpdate: Handler = async (ctx, p) => {
+  const pr = ctx.principal;
+  if (pr.kind === "anonymous") throw new CapError("NOT_AUTHENTICATED", "no session");
+  if (pr.kind !== "user" && pr.kind !== "support") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "only a signed-in account has a display name");
+  if (!("display_name" in (p ?? {}))) throw new CapError("INVALID_PARAMS", "display_name required (a string, or null to clear)");
+  const next = cleanDisplayName(p.display_name);
+  const prior = await readDisplayName(ctx, pr.id);
+  await ctx.db.prepare("UPDATE principal SET display_name = ? WHERE id = ?").bind(next, pr.id).run();
+  return { result: { principal: { id: pr.id, display_name: next } }, scope: { type: "platform", id: "account" }, priorState: { display_name: prior } };
 };
 
 export const opsHealth: Handler = async (ctx) => {

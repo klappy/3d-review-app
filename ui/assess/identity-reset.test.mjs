@@ -142,6 +142,12 @@ test('account email read forbids redirect, does not repaint work and ignores sta
   const pending=h.loadAccountEmail();assert.equal(options.redirect,'error');assert.equal(options.credentials,'same-origin');assert.equal(options.cache,'no-store');assert.equal(h.nodes.get('app').innerHTML,'unsaved work');
   h.resetIdentity();h.setCredential('new-token');h.nodes.get('who').textContent='Account: next@example.invalid';wait.resolve({ok:true,json:async()=>({email:'prior@example.invalid'})});await pending;assert.equal(h.nodes.get('who').textContent,'Account: next@example.invalid');
 });
+test('greet by name (captain a1): the header greets by display_name, the email stays the fallback',async()=>{
+  const h=harness();let fetched=0;h.setFetch(async()=>{fetched++;return {ok:true,json:async()=>({email:'ana@example.invalid'})};});
+  h.state.principal={id:'usr_ana',kind:'user',display_name:'  Ana   Ruiz '};await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Hi, Ana Ruiz');assert.equal(fetched,0);
+  for(const display_name of [null,'','   ','<b>x</b>','x'.repeat(81)]){h.state.principal={id:'usr_ana',kind:'user',display_name};await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Account: ana@example.invalid');}
+  assert.equal(fetched,5);
+});
 test('account email is text only and failures remove previous email',async()=>{
   const h=harness();h.setFetch(async()=>({ok:true,json:async()=>({email:'<synthetic>@example.invalid'})}));await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Account: <synthetic>@example.invalid');
   h.setFetch(async()=>{throw Error('redirect');});await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Signed in');

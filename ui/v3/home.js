@@ -1,6 +1,6 @@
 // v3 lane 9 L9-1: home / dashboard per Bincy screen 02 (cookbook sources/bincy-design-sprint-2026-09-22, 02_home_dashboard.png).
 // Pure: returns an HTML string; no fetch, no DOM. Data: /v2/projects + /v2/projects/:id/assessments (loaded by scope.js
-// projects page). L9-2: body is prototype frame 2 (design-system-v3 app.js card()). /v2/me carries no display name, so no "Welcome, <name>". B17: cards show the list read's child counts through the shared Card childCounts line (overall — the list reads carry no per-group count); never a number the server did not send.
+// projects page). L9-2: body is prototype frame 2 (design-system-v3 app.js card()). Greet by name (captain a1, 2026-10-02): /v2/me carries the account's optional display_name; when set, the head says "Welcome, <name>" (escaped), otherwise nothing changes. B17: cards show the list read's child counts through the shared Card childCounts line (overall — the list reads carry no per-group count); never a number the server did not send.
 const ESC = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 import { childCounts } from './components/card.js';
 export const HOME_CSS = '/v3/home.css';
@@ -25,8 +25,9 @@ export function invitationsHint(n) {
   if (!Number.isInteger(n) || n < 1) return '';
   return `<p class="v3h-meta v3h-invites" data-v3h-invitations>You have ${n} invitation${n === 1 ? '' : 's'} waiting. <a href="#invite/list" data-v3h-invitations-link>See ${n === 1 ? 'the invitation' : 'invitations'}</a></p>`;
 }
-export function homeView({ projects = [], shared = [], listFor, stageLabel = s => ESC(s), start = '', title = '', invitations = 0 }) {
-  const head = `<link rel="stylesheet" href="${HOME_CSS}"><div class="v3h-head"><div>${title ? `<h1>${ESC(title)}</h1>` : ''}<p class="v3h-sub">Your 3D Reviews, newest first.</p>${invitationsHint(invitations)}</div>${start}</div>`;
+export function homeView({ projects = [], shared = [], listFor, stageLabel = s => ESC(s), start = '', title = '', invitations = 0, name = '' }) {
+  const welcome = typeof name === 'string' && name.trim() ? `<p class="v3h-welcome" data-v3h-welcome>Welcome, ${ESC(name.trim())}</p>` : '';
+  const head = `<link rel="stylesheet" href="${HOME_CSS}"><div class="v3h-head"><div>${welcome}${title ? `<h1>${ESC(title)}</h1>` : ''}<p class="v3h-sub">Your 3D Reviews, newest first.</p>${invitationsHint(invitations)}</div>${start}</div>`;
   // B28: one card per review across all projects (+ B03 shared ones, sub-line "Shared with you"), newest first; then one card per
   // project that has no review to show (empty, not loaded, or archived) so nothing is hidden.
   const reviews = projects.filter(p => !p.archived_at).flatMap(p => { const l = listFor(p.id) || {}; return l.status === 'loaded' ? l.list.map(a => ({ a, sub: p.name })) : []; })
