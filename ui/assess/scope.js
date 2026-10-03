@@ -6,6 +6,7 @@
 // v3 lane 9 L9-1: projects page = home per Bincy screen 02 (relative import so node tests resolve it too).
 import { homeView } from '../v3/home.js';
 import { pendingInvitations } from '../v3/components/invite.js';
+import { welcomeLine, shouldAskName, skipKey, nameToSend } from '../v3/components/greeting.js';
 import { learnMore } from '../v3/components/learn-more.js';
 import { mountEditableHeading } from '../v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '../v3/components/saved-status.js';
@@ -434,13 +435,35 @@ const projects = {
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('projects', model);
-    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW, invitations: (model.invitations || []).length });
+    // Ruling a1: greet by the account's own display name, the email as fallback; first sign-in asks for the name (skippable).
+    const principal = ctx.state?.principal, signedIn = !ctx.demo && !!principal;
+    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW, invitations: (model.invitations || []).length,
+      greeting: signedIn ? welcomeLine(principal, ctx.state?.accountEmail) : '', askName: signedIn && shouldAskName(principal, nameAskSkipped(principal.id)) });
     return readRegion(`${pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, projects, model);
+    bindNameAsk(ctx, root);
   },
 };
+
+// Ruling a1: the skip is remembered per account on this device only; storage failures just mean it may ask again.
+function nameAskSkipped(id) { try { return globalThis.localStorage?.getItem(skipKey(id)) === '1'; } catch { return false; } }
+function bindNameAsk(ctx, root) {
+  const card = root.querySelector('[data-name-ask]'); if (!card) return;
+  const form = card.querySelector('[data-name-form]'), status = card.querySelector('[data-name-status]'), id = ctx.state?.principal?.id;
+  const busy = on => card.querySelectorAll('input,button').forEach(el => { el.disabled = on; });
+  card.querySelector('[data-name-skip]')?.addEventListener('click', () => { try { globalThis.localStorage?.setItem(skipKey(id), '1'); } catch {} card.remove(); });
+  form?.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const next = nameToSend(form.elements.display_name?.value);
+    if (!next.ok) { status.textContent = next.message; return; }
+    if (next.value === null) { status.textContent = 'Type a name, or choose Skip.'; return; }
+    busy(true); status.textContent = 'Saving…';
+    try { const r = await ctx.api('/v2/me', { method: 'PATCH', body: { display_name: next.value } }); ctx.setDisplayName?.(r?.display_name ?? null); card.remove(); const g = root.querySelector('[data-v3h-greeting]'); if (g) g.textContent = welcomeLine(ctx.state?.principal, ctx.state?.accountEmail); }
+    catch (e) { busy(false); status.textContent = `Could not save your name: ${e?.message || 'try again'}.`; }
+  });
+}
 
 // ---------- project ----------
 const project = {

@@ -4,6 +4,7 @@
 // account/version controls into the shell's header host.
 import { mountShell } from './tree.js';
 import { safeHref } from './core.js';
+import { welcomeLine } from '../v3/components/greeting.js';
 
 // Role contract (captain, 2026-09-22; src/policy.ts RANK): exactly owner | member | viewer. The label is the actual current-scope
 // role — Viewer displays as Viewer. Anything else (missing, unknown) is a separate condition and yields NO label; nothing is invented.
@@ -51,7 +52,7 @@ export function treeNodes(routes, known = {}) {
 }
 
 // Ancestry/title/role for the current route from loaded data only. `current` is state.current (assessment) or null.
-export function shellModel({ route, routes, principal, known = {}, current = null, page = null, identityLabel = '', sectionLabel, contextCollapsible = false }) {
+export function shellModel({ route, routes, principal, email = '', known = {}, current = null, page = null, identityLabel = '', sectionLabel, contextCollapsible = false }) {
   const kind = route?.kind || 'entry';
   const nodes = treeNodes(routes, { ...known, page });
   const projects = known.projects || [];
@@ -71,7 +72,8 @@ export function shellModel({ route, routes, principal, known = {}, current = nul
     if (!p) nodes.push({ id: 'a:' + a.id, kind: 'assessment', label: String(a.name ?? ''), detail: a.stage ? CAP(a.stage) : undefined, href: currentHref, visible: true, role: roleLabel(a.granted_role || a.role), children: [] }); }
   else if (kind === 'permissions') { title = 'Permissions'; eyebrow = CAP(route.scope); currentHref = safeHref('#permissions/' + route.scope + '/' + encodeURIComponent(route.id)) || ''; }
   else if (kind === 'feedback') { title = 'App feedback'; eyebrow = 'Feedback'; currentHref = '#feedback'; }
-  else { title = principal ? 'Welcome' : '3D Review'; eyebrow = ''; currentHref = '#'; }
+  // Ruling a1 (2026-10-02): greet by the account's own display name, the verified email as fallback (plain text; the kit escapes titles).
+  else { title = principal ? welcomeLine(principal, email) : '3D Review'; eyebrow = ''; currentHref = '#'; }
   const seen = new Set(); ancestors = ancestors.filter(x => safeHref(x.href) && !seen.has(x.href) && seen.add(x.href));
   // Review F3: the role label comes ONLY from loaded authority for the current scope; with none it is empty — never a synthesized permission.
   // Identity is shown by the real account control in the header host (#who); the shell adds no identity pill unless a label is supplied.

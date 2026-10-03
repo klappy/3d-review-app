@@ -857,7 +857,7 @@ paths:
       - A. Entry, identity, session
       responses:
         '200':
-          description: ok envelope
+          description: ok envelope; result.principal.display_name is the caller's own optional name (null when unset)
           content:
             application/json:
               schema:
@@ -872,6 +872,7 @@ paths:
       - session: []
       - bearer: []
       - participant: []
+    patch: {"operationId": "cap.me.update", "summary": "cap.me.update — write.reversible — roles: any signed-in (own account only)", "description": "Set or clear your OWN optional display name. There is no id parameter: it always names the signed-in account (a connector or delegated session sets the name of the person who granted it). Trimmed, inner whitespace collapsed, at most 60 characters, one plain line; null or an empty string clears it. Read back by GET /v2/me as principal.display_name. Undo restores the prior name.", "x-capability": "cap.me.update", "x-class": "write.reversible", "x-tool": "write", "x-slice": "v2.0-bcs", "x-inverse": {"kind": "true", "via": "self:restore-prior", "provenance": "receipt carries the prior display_name"}, "x-roles": "any signed-in (own account only)", "x-path-inferred": false, "x-cookbook-source": "https://github.com/klappy/3d-review-cookbook/blob/ef78064/work/queued/2026-09-29-3d-train22-audit-backlog/RULING-2026-10-02-greet-alias.md", "tags": ["A. Entry, identity, session"], "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "additionalProperties": false, "required": ["display_name"], "properties": {"display_name": {"type": ["string", "null"], "maxLength": 60}}}}}}, "responses": {"200": {"description": "ok envelope; result.display_name is the stored name (null when cleared) + receipt with undo_token", "content": {"application/json": {"schema": {"allOf": [{"$ref": "#/components/schemas/Envelope"}, {"type": "object", "properties": {"result": {"type": "object", "additionalProperties": false, "required": ["display_name"], "properties": {"display_name": {"type": ["string", "null"]}}}}}]}}}}, "4XX": {"description": "error envelope", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}}}}}, "security": [{"session": []}, {"bearer": []}]}
   /v2/me/invitations:
     get:
       operationId: cap.me.invitations

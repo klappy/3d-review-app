@@ -5,6 +5,7 @@ import { handlers as roadmap } from "../roadmap/handlers";
 import { docs } from "./docs";
 import { opsUndo } from "./undo";
 import { opsUsage } from "./usage";
+import { handlers as me } from "./me";
 import { handlers as workspace } from "./workspace";
 import { handlers as project } from "./project";
 import { handlers as assessment } from "./assessment";
@@ -26,6 +27,7 @@ export const handlers: Record<string, Handler> = {
   "cap.auth.consume_link": p.authConsumeLink,
   "cap.auth.logout": p.authLogout,
   "cap.auth.me": p.authMe,
+  ...me,
   "cap.ops.health": p.opsHealth,
   "cap.ops.feedback": p.opsFeedback,
   "cap.ops.feedback_get": p.opsFeedbackGet,
