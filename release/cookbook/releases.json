@@ -1,7 +1,21 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.28.1",
+  "current": "0.29.0",
   "versions": [
+    {
+      "version": "0.29.0",
+      "status": "candidate",
+      "notes_path": "releases/0.29.0.md",
+      "sections": {
+        "added": [
+          "Super admin (the support switch) can read app-wide usage totals with `cap.ops.usage` (counts and dates only: accounts, projects, languages, assessments by stage, surveys, survey links, participant sessions, responses, requests per day and writes by capability). `docs {topic: permissions}` now says plainly what super admin opens, and `scripts/super-admin.mjs` switches it on or off for one account with a receipt. (#455)"
+        ],
+        "changed": [
+          "The \"Mid-Level\" survey now shows as **Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)** (it was \"Team leaders & mentors\"), in the Product Owner's own words, in setup, on Collect, on the survey page, on the blank print and in demo mode; the legacy v1 row reads the same with \"v1 (legacy)\". Template ids and the pinned source name (`source_name`) are unchanged. (#457)"
+        ],
+        "fixed": []
+      }
+    },
     {
       "version": "0.28.1",
       "status": "candidate",
@@ -10,7 +24,9 @@
         "added": [
           "Adding or removing a passage on an assessment now leaves a receipt saying who did it and when, like every other change in the app. (#452)"
         ],
-        "changed": [],
+        "changed": [
+          "Persona evidence backfill (2026-10-02): Wave AI on DEV 0.28.1+07bb308 — agent simulation over HTTP with synthetic personas (no browser, no human sample). Smoke 4/4 goals; agent rubric sat 3.75 / conf 2.25 / frust 2.00, unchanged from Wave AH (0.28.0); turns 10.00 vs 10.25, a harness gap rather than an app change. The passage receipt (#452) was confirmed by a read-only DEV database read: 6/6 add and remove rows, with no title, link or filename stored; agents cannot read receipts over the API. The wizard's required Language list (#450) and the on-device word cache (#454) are browser-only and NOT MEASURED. Human satisfaction, confusion and frustration NOT MEASURED. See persona-testing/waves/AI-07bb308.md."
+        ],
         "fixed": [
           "In the setup wizard, the Language list for an existing project is now a required field to the browser and screen readers too, like Name, Project, New project name and Active until (it was already marked \"(required)\" on screen and checked before Next). (#450)",
           "When a survey's language name is spelled in a way the translator refuses (for example with a symbol in it), participants' page words now stay saved on their device after the first load instead of being translated again every time; the welcome line stays in English, and refused lines are asked for again after a day in case the refusal was temporary. (#454)"
