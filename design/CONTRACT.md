@@ -13,14 +13,14 @@ Written from the app as it is on `main` @dbfecf8 (release train 0.29.0). Lines m
 | Behaviour (how components act) | Generative Glass 1.0.0, `klappy/bt-design-system-generative-glass` @6aa9bc3 | house default |
 | Values (colour, radius, blur, spacing) | `ui/design-system-v3/tokens.css`, copied from the 3D Review cookbook's v3 candidate @66d97f3 (header line 1 of that file) | in use; upstream calls it a candidate |
 | Shipping layout and flow | the v3 facilitator-first candidate @66d97f3: sign in → Home → four setup steps → the review's home → Results → Next step; participants on a phone | in use |
-| Next round (reference only) | the v4 glass redesign canvas @3654f1a, 19 artboards at 1440 and 390, plus one dark artboard | proposed upstream, not adopted here |
+| Next round (reference only) | the v4 glass redesign canvas @3654f1a, 19 artboards at 1440 and 390 (one of them, `CollectDark`, dark; one, `Foundations`, a token sheet) | proposed upstream, not adopted here |
 | Concept frames | Bincy's 11 design-sprint screens (2026-09-22), cookbook @91824f8 | concept, not a spec |
 
 Precedence: a conflict on a **value** goes to the token file; a conflict on **behaviour** goes to Generative Glass; something neither covers is an extension and waits for the captain.
 
 ## 2. Tokens actually in use
 
-One token source for new work: `ui/design-system-v3/tokens.css` (123 distinct custom properties; light block `:root, [data-theme="light"]`, dark block `[data-theme="dark"]`, shared sizes in a second `:root`). Do not edit it in this repo; rebuild it from upstream.
+One token source for new work: `ui/design-system-v3/tokens.css` (123 distinct custom properties; light block `:root, [data-theme="light"]` at line 3, dark block `[data-theme="dark"]` at line 67, shared sizes in a second `:root` at line 118). Do not edit it in this repo; rebuild it from upstream.
 
 | Group | Tokens (light values) |
 |---|---|
@@ -34,7 +34,12 @@ One token source for new work: `ui/design-system-v3/tokens.css` (123 distinct cu
 | Type | `--font-ui` system-ui stack · `--font-scripture-latin` Noto Serif · weights `--fw-regular` 400, `--fw-label` 550, `--fw-semibold` 600, `--fw-eyebrow` 650 · `.fs-h1` 31px/600, `.fs-h2` 20px/600 |
 | Layout sizes | `--mobile-bp` 760px · `--phone-max-w` 430px · `--stage-max-w` 840px · `--wizard-max-w` 720px · `--h1-max-w` 650px · `--main-pad` 30px · `--panel-pad` 23px · `--button-min-h` 42px · `--gap-grid` 18px |
 
-Also loaded on `ui/index.html` today: `kit/tokens.css`, `kit/components.css`, `kit/kit.css`, `v3-shell.css`, `stage-screens.css`, and per-screen sheets such as `v3/home.css`. They are the shipping kit, not a second token source.
+Two other places still define tokens on `ui/index.html` today, so drift is measured against the right file:
+
+- the first inline `<style>` in `ui/index.html` sets `--ink --muted --green --line --glass --edge` on `:root` with raw values. It is legacy. `--muted` and `--edge` are defined only there; the other four are overridden by the files below.
+- `ui/kit/tokens.css` ("glass 2", 119 custom properties, mostly the same names as v3).
+
+Load order on `ui/index.html`: inline `<style>` → `stage-screens.css` → `kit/tokens.css` → `kit/components.css` → `kit/kit.css` → `design-system-v3/tokens.css` → `v3-shell.css`, then per-screen sheets such as `v3/home.css`. The selectors have equal weight, so **v3 wins by load order only**: where a name is in both, v3's value is what renders. A value check (rule 7 drift) compares against `design-system-v3/tokens.css`; a legacy-only name (`--muted`, `--edge`) has no v3 counterpart yet and should not be used in new work.
 
 Rules for a rendered PR:
 - Where a token of the same value exists, use it: no new raw hex, px radius or inline style.
@@ -46,12 +51,13 @@ Rules for a rendered PR:
 | | Phone 390×844 | Laptop 1280×800 |
 |---|---|---|
 | Breakpoint | below `--mobile-bp` (760px) | at or above 760px |
-| Side gutter | 14–16px (`v3-shell.css` mobile rule) | `--main-pad` 30px inside the shell |
+| Side gutter | 14px (`v3-shell.css:4` mobile rule, `padding:20px 14px`) | `--main-pad` 30px inside the shell |
 | Content width | full width minus gutters | stage up to `--stage-max-w` 840px; setup up to `--wizard-max-w` 720px |
 | Page title | one H1, wraps; never truncated | one H1, up to `--h1-max-w` 650px |
 | Primary action | one per screen, full width under the title or in the thumb zone | one per screen, top right of the page head, same row as the H1 |
 | Scroll | no horizontal scroll (`scrollWidth` equals the viewport) | no horizontal scroll |
-| Dialogs | width `min(560px, 100% − 32px)`, centred, backdrop dims and blurs the page | same |
+| Dialogs (today) | base `dialog` rule in the inline `<style>` of `ui/index.html`: `max-width:600px; width:calc(100% - 32px); border-radius:22px; background:#f4f9fb`; backdrop dims and blurs (5px). Only `dialog#feedback-dialog` (`ui/style.css:51`) uses `min(560px, calc(100% - 32px))` | same |
+| Dialogs (**Proposal**) | one width for every dialog: `min(560px, 100% − 32px)`, centred, `--r-panel`, backdrop dims and blurs. Not in the code yet; a lens run grades today's rule until the captain adopts this | same |
 
 Every screen: one primary action in a fixed place; plain words only (no data-model names, ids, roles in capitals or version strings on screen); help and teaching behind ? or outside the task flow.
 
@@ -61,7 +67,7 @@ Every screen: one primary action in a fixed place; plain words only (no data-mod
 
 Why this one: the sprint's home frame makes the welcome the page title; the v4 canvas keeps the header to an identity chip; one greeting removes the "Hi" and "Welcome" pair that the first design-lens run flagged on #461.
 
-Fallback when no name is saved: as ruled on 2026-10-02 (display name, email fallback) the title reads "Welcome, <email>". See open question 2.
+Fallback when no name is saved: as ruled on 2026-10-02 (display name, email fallback) the title reads "Welcome, <email>". See § 9, question 2.
 
 ## 5. Name dialog and home welcome — placement
 
@@ -86,7 +92,7 @@ Shown once, after the first sign-in with no saved name; reopens from the account
 ```
 
 - 1280×800: centred, 520–560px wide, page behind dimmed and blurred.
-- 390×844: centred, full width minus 16px each side; buttons stay on one row, Save first.
+- 390×844: centred, full width minus 16px each side (the base `dialog` rule's `calc(100% - 32px)`); buttons stay on one row, Save first.
 - One primary (Save). Escape and the backdrop mean "Not now". Focus starts in the field; Enter saves.
 - Words: the three lines above only. No "display name", no "profile", no account id.
 
@@ -110,7 +116,7 @@ Shown once, after the first sign-in with no saved name; reopens from the account
 - The subline keeps the existing words "Your 3D Reviews, newest first." in `--secondary`.
 - 1280: the primary sits on the H1's row at the right edge; it does not drift beside the welcome text.
 - 390: the primary is full width under the subline.
-- The header carries the person's name as the account-menu trigger, truncated with an ellipsis if it would wrap; on phones it may show initials instead (open question 3).
+- The header carries the person's name as the account-menu trigger, truncated with an ellipsis if it would wrap; on phones it may show initials instead (§ 9, question 3).
 
 ## 6. Dark mode — none today
 
@@ -118,25 +124,39 @@ The token file carries a `[data-theme="dark"]` block, but nothing in the app set
 
 ## 7. Mockup per screen
 
-Labels below are the upstream frame names; files live in the 3D Review cookbook at the sha shown. "v3" = facilitator-first candidate @66d97f3 (desktop 1280 and phone 390 artboards, generated from its prototype). "v4" = glass redesign canvas @3654f1a (reference only). "Bincy" = sprint frames @91824f8.
+All three sources live in the 3D Review cookbook at the sha shown.
+
+- "v3" = facilitator-first candidate @66d97f3. Its artboards are **not committed files**: `design-system-v3/scripts/build-artboards.mjs` @66d97f3 generates them (`<id>.dc.html`) from `design-system-v3/prototype/` (also viewable as `prototype/standalone.html`). The v3 column uses that script's artboard ids and F-numbers. Desktop artboards render at 1280×900 (`build-artboards.mjs:17`), phone at 390×844; the lens pair is 1280×800, so the bottom 100px of a desktop artboard falls below its fold.
+- "v4" = glass redesign canvas @3654f1a, `design/2026-09-28-glass-redesign/canvas/<Name>.dc.html` (reference only).
+- "Bincy" = sprint frames @91824f8.
 
 | Screen | Primary mockup | Also consult |
 |---|---|---|
-| Sign in (email, then code) | v3 sign-in | Bincy 01 sign in · v4 SignInCheck |
-| Home (your reviews) | v3 frame 2 (Home: one card per review, one Start button) | Bincy 02 home dashboard (welcome as title) · v4 Home, HomePhone |
+| Sign in (email, then code) | v3 `Main` (F1 Sign in), `SignInCode` (F1b), `PhoneSignIn` | Bincy 01 sign in · v4 SignInCheck |
+| Home (your reviews) | v3 `Home` (F2 Home), `PhoneHome` | Bincy 02 home dashboard (welcome as title) · v4 Home, HomePhone |
 | Name dialog | **this file § 5** (none upstream) | — |
 | Account menu | none upstream — gap | — |
-| Setup step 1 · Details | v3 setup 1 | Bincy 03 assessment details · v4 Setup1 |
-| Setup step 2 · Who will participate? | v3 setup 2 | Bincy 04 participant groups · v4 Setup2 |
-| Setup step 3 · Participant information | v3 setup 3 | Bincy 05 participant information · v4 Setup3 |
-| Setup step 4 · Ready to launch | v3 setup 4 | Bincy 06 review and launch · v4 Setup4 |
-| Review home · Collect / Share | v3 review home | Bincy 07 collect responses · v4 Main, Collect, CollectPhone, Share |
-| Participant welcome | v3 participant welcome (phone) | Bincy 08 survey welcome · v4 PWelcome |
-| Participant questions | v3 participant question (phone) | Bincy 09 survey questions · v4 PQuestion |
-| Participant review and receipt | v3 participant review, receipt | v4 PReview, PReceipt |
-| Results | v3 results | Bincy 10 results dashboard · v4 Results |
-| Next step | v3 next step | Bincy 11 next steps · v4 NextStep |
+| Setup step 1 · Details | v3 `Setup1Details` (F3) | Bincy 03 assessment details · v4 Setup1 |
+| Setup step 2 · Who will participate? | v3 `Setup2Participants` (F4), `PhoneSetup2` | Bincy 04 participant groups · v4 Setup2 |
+| Setup step 3 · Participant information | v3 `Setup3Information` (F5) | Bincy 05 participant information · v4 Setup3 |
+| Setup step 4 · Ready to launch | v3 `Setup4Review` (F6), `PhoneSetup4` | Bincy 06 review and launch · v4 Setup4 |
+| Review home · Collect / Share | v3 `Collect` (F7), `Share` (F7 Share), `PhoneCollect`, `PhoneShare` | Bincy 07 collect responses · v4 Main, Collect, CollectPhone, Share |
+| Participant welcome | v3 `PWelcome` (F8, phone) | Bincy 08 survey welcome · v4 PWelcome |
+| Participant questions | v3 `PQuestion` (F9, phone) | Bincy 09 survey questions · v4 PQuestion |
+| Participant review and receipt | v3 `PReview` (F9c), `PReceipt` (F9f) | v4 PReview, PReceipt |
+| Results | v3 `Results` (F10), `PhoneResults` | Bincy 10 results dashboard · v4 Results |
+| Next step | v3 `NextStep` (F11) | Bincy 11 next steps · v4 NextStep |
 
 ## 8. Versioning
 
 This file carries no version number of its own until adopted. Once adopted: a rule or token-source change is a new section in a PR with the captain's nod; adding a screen's mockup reference is a plain PR.
+
+## 9. Open questions for the captain
+
+These are the choices this draft leaves open. A nod on the PR without an answer keeps the default named in each.
+
+1. **Adopt?** Nod this draft as the 3D Review design contract, or send edits back.
+2. **Greeting with no saved name** (§ 4). Use the email fallback ruled on 2026-10-02 ("Welcome, <email>"), or show a plain "Welcome" so no account id appears on screen? Default: the email fallback, as ruled.
+3. **Phone header** (§ 5). Show the full name truncated with an ellipsis, or initials as the v4 canvas does? Default: full name, truncated.
+4. **Dark mode** (§ 6). Keep it off, or open a unit to turn on the existing dark tokens with dark lens pairs for every screen? Default: off.
+5. **Where this file lives.** The design lens expects the contract in the 3D Review cookbook; this draft lives in the app repo beside the code it governs. Keep it here and register this path and sha with the lens, or move it? Default: keep it here and register it.
