@@ -225,6 +225,8 @@ const COMPARED = [
   "cap.ops.feedback request",
   "cap.ops.feedback result",
   "cap.ops.feedback_get request",
+  "cap.ops.usage request",
+  "cap.ops.usage result",
   "cap.ops.roadmap_read request",
   "cap.ops.roadmap_publish request",
   "cap.ops.roadmap_summary request",

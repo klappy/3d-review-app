@@ -6,8 +6,8 @@
  */
 export const TEMPLATE_DISPLAY_NAMES: Readonly<Record<string, string>> = Object.freeze({
   tpl_validation: "Translators",
-  tpl_mid_level: "Team leaders & mentors",
-  tpl_mid_level_v1_legacy: "Team leaders & mentors v1 (legacy)",
+  tpl_mid_level: "Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)",
+  tpl_mid_level_v1_legacy: "Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs) v1 (legacy)",
 });
 
 export function templateDisplayName(id: string, name: string): string {
