@@ -1,29 +1,28 @@
 {
-  "version": "0.28.1",
+  "version": "0.29.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "f04adb2882580f07f67105c23ac1360fce59baa0",
+  "cookbook_commit": "241caf5f1c7b733806df668f78f726c6849dd243",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.28.1.md",
-      "blob_sha": "8284ea3b2ec37ea3cf4b744426a8ed790adffe88",
-      "sha256": "5ee7521bb29fb53efef876374b66e2a658aca8fd57c5a4f0dc1724339ec4bc14"
+      "path": "planning/2026-09-16-parity-build/releases/0.29.0.md",
+      "blob_sha": "2f957325ccf668c15d07f635da70bd9db0fd4825",
+      "sha256": "b1caabe01603d60e675ee6ddbbc5c0647eff28a8a297ac3765044c9d08db0a4b"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "8c3a8a63ca4b6c5702010b3ebe4e5dc1e27fdcc6",
-      "sha256": "96bdbd2e1a4a4c5b096b31f49d171ee462d11fa307e8972b96978d42734c094d"
+      "blob_sha": "bec8367181e10742152b282fb7cb8b1fb63079be",
+      "sha256": "0604820c4408f8dbe6a04836ed8a4afce6959719771267c2ff1844c568af3c76"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Adding or removing a passage on an assessment now leaves a receipt saying who did it and when, like every other change in the app. (#452)"
+        "Super admin (the support switch) can read app-wide usage totals with `cap.ops.usage` (counts and dates only: accounts, projects, languages, assessments by stage, surveys, survey links, participant sessions, responses, requests per day and writes by capability). `docs {topic: permissions}` now says plainly what super admin opens, and `scripts/super-admin.mjs` switches it on or off for one account with a receipt. (#455)"
       ],
-      "changed": [],
-      "fixed": [
-        "In the setup wizard, the Language list for an existing project is now a required field to the browser and screen readers too, like Name, Project, New project name and Active until (it was already marked \"(required)\" on screen and checked before Next). (#450)",
-        "When a survey's language name is spelled in a way the translator refuses (for example with a symbol in it), participants' page words now stay saved on their device after the first load instead of being translated again every time; the welcome line stays in English, and refused lines are asked for again after a day in case the refusal was temporary. (#454)"
-      ]
+      "changed": [
+        "The \"Mid-Level\" survey now shows as **Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)** (it was \"Team leaders & mentors\"), in the Product Owner's own words, in setup, on Collect, on the survey page, on the blank print and in demo mode; the legacy v1 row reads the same with \"v1 (legacy)\". Template ids and the pinned source name (`source_name`) are unchanged. (#457)"
+      ],
+      "fixed": []
     }
   }
 }
