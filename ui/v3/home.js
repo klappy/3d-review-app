@@ -1,8 +1,9 @@
 // v3 lane 9 L9-1: home / dashboard per Bincy screen 02 (cookbook sources/bincy-design-sprint-2026-09-22, 02_home_dashboard.png).
 // Pure: returns an HTML string; no fetch, no DOM. Data: /v2/projects + /v2/projects/:id/assessments (loaded by scope.js
-// projects page). L9-2: body is prototype frame 2 (design-system-v3 app.js card()). /v2/me carries no display name, so no "Welcome, <name>". B17: cards show the list read's child counts through the shared Card childCounts line (overall — the list reads carry no per-group count); never a number the server did not send.
+// projects page). L9-2: body is prototype frame 2 (design-system-v3 app.js card()). Ruling a1 (2026-10-02): /v2/me carries the account's own optional display_name; home greets "Welcome, <name>" with the email as fallback (components/greeting.js), and on first sign-in asks for the name (skippable). B17: cards show the list read's child counts through the shared Card childCounts line (overall — the list reads carry no per-group count); never a number the server did not send.
 const ESC = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 import { childCounts } from './components/card.js';
+import { nameAskCard } from './components/greeting.js';
 export const HOME_CSS = '/v3/home.css';
 // B17 (captain 14:52): "9 responses" on the card; the shared childCounts builder, only counts the server sent.
 const countsLine = pairs => { const c = childCounts(pairs); return c ? `<p class="v3h-meta v3-child-counts" data-v3-counts>${ESC(c)}</p>` : ''; };
@@ -25,13 +26,15 @@ export function invitationsHint(n) {
   if (!Number.isInteger(n) || n < 1) return '';
   return `<p class="v3h-meta v3h-invites" data-v3h-invitations>You have ${n} invitation${n === 1 ? '' : 's'} waiting. <a href="#invite/list" data-v3h-invitations-link>See ${n === 1 ? 'the invitation' : 'invitations'}</a></p>`;
 }
-export function homeView({ projects = [], shared = [], listFor, stageLabel = s => ESC(s), start = '', title = '', invitations = 0 }) {
-  const head = `<link rel="stylesheet" href="${HOME_CSS}"><div class="v3h-head"><div>${title ? `<h1>${ESC(title)}</h1>` : ''}<p class="v3h-sub">Your 3D Reviews, newest first.</p>${invitationsHint(invitations)}</div>${start}</div>`;
+// greeting: plain text from greeting.js welcomeLine (escaped here). askName: the first sign-in "What should we call you?" card.
+export function homeView({ projects = [], shared = [], listFor, stageLabel = s => ESC(s), start = '', title = '', invitations = 0, greeting = '', askName = false }) {
+  const ask = askName ? nameAskCard() : '';
+  const head = `<link rel="stylesheet" href="${HOME_CSS}"><div class="v3h-head"><div>${greeting ? `<p class="v3h-greet" data-v3h-greeting>${ESC(greeting)}</p>` : ''}${title ? `<h1>${ESC(title)}</h1>` : ''}<p class="v3h-sub">Your 3D Reviews, newest first.</p>${invitationsHint(invitations)}</div>${start}</div>`;
   // B28: one card per review across all projects (+ B03 shared ones, sub-line "Shared with you"), newest first; then one card per
   // project that has no review to show (empty, not loaded, or archived) so nothing is hidden.
   const reviews = projects.filter(p => !p.archived_at).flatMap(p => { const l = listFor(p.id) || {}; return l.status === 'loaded' ? l.list.map(a => ({ a, sub: p.name })) : []; })
     .concat(shared.map(a => ({ a, sub: 'Shared with you' })));
-  if (!projects.length && !reviews.length) return `<div class="v3h">${head}<div class="v3h-card"><h2>You have no projects yet.</h2><p class="v3h-meta">Start a new 3D Review to set one up.</p></div></div>`;
+  if (!projects.length && !reviews.length) return `<div class="v3h">${head}${ask}<div class="v3h-card"><h2>You have no projects yet.</h2><p class="v3h-meta">Start a new 3D Review to set one up.</p></div></div>`;
   const reviewCards = reviews.map((r, i) => ({ ...r, i })).sort((x, y) => newestFirst(x, y) || x.i - y.i).map(r => assessmentRow(r.a, stageLabel, r.sub));
   const projectCards = projects.flatMap(p => {
     const l = listFor(p.id) || {}, open = `<a href="#project/${encodeURIComponent(p.id)}">Open project</a>`;
@@ -50,5 +53,5 @@ export function homeView({ projects = [], shared = [], listFor, stageLabel = s =
   // Validator #209 (high): projects shown only through assessment cards stay reachable — one quiet line of project links below the grid.
   const shown = projects.filter(p => !p.archived_at && (listFor(p.id) || {}).status === 'loaded' && listFor(p.id).list.length);
   const plinks = shown.length ? `<p class="v3h-meta v3h-projects">Projects: ${shown.map(p => `<a href="#project/${encodeURIComponent(p.id)}">${ESC(p.name)}</a>`).join(' · ')}</p>` : '';
-  return `<div class="v3h">${head}<div class="v3h-cards">${body}</div>${plinks}</div>`;
+  return `<div class="v3h">${head}${ask}<div class="v3h-cards">${body}</div>${plinks}</div>`;
 }

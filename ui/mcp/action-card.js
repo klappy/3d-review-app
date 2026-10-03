@@ -16,7 +16,9 @@ export function createActionCard({ root, esc, call, explore, execution, canExplo
     if (env) {
       if (env.ok === false || env.isError) { title = 'Not available'; body = 'This request could not be completed.'; state = 'refused'; }
       else if (cap === 'cap.ops.feedback') { title = 'Feedback received'; body = 'Your feedback was recorded. Its private contents are not displayed here.'; state = 'complete'; }
-      else if (cap === 'cap.auth.me') { title = 'Sign-in checked'; body = 'The assistant received the current authorization details.'; state = 'complete'; }
+      else if (cap === 'cap.auth.me') { title = 'Sign-in checked'; body = typeof result.principal?.display_name === 'string' && result.principal.display_name.trim() ? `Signed in as ${result.principal.display_name.trim()}.` : 'The assistant received the current authorization details.'; state = 'complete'; }
+      // Ruling a1: the account's own display name (write cap.me.update). Text is escaped at render like every other body.
+      else if (cap === 'cap.me.update') { const n = typeof result.display_name === 'string' ? result.display_name : ''; title = n ? 'Name saved' : 'Name cleared'; body = n ? `You will be greeted as ${n}. Undo is available from the assistant.` : 'You will be greeted by your email.'; state = 'complete'; }
       else if (cap === 'cap.ops.health') { title = 'Service status'; body = `Version ${typeof result.version === 'string' ? result.version : 'unavailable'}`; state = 'complete'; }
       else if (result.suppressed === true || result.status === 'held') { title = 'Result held'; body = 'This result remains unavailable under the current policy.'; state = 'held'; }
       else if (['cap.template.get','cap.template.render'].includes(cap)) { title = result.template?.name || 'Survey questionnaire'; body = 'Questions returned by this request. This view does not submit answers.'; state = 'complete'; questions = templateQuestions(result); }

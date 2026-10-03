@@ -127,7 +127,8 @@ function note(message) { $('notice').textContent = message; $('error').hidden = 
 function fail(message) { $('error').textContent = message; $('error').hidden = false; $('notice').textContent = 'Action needs attention. No completion is assumed.'; }
 function text(node, value) { node.textContent = value == null ? '' : String(value); }
 // Header shows plain words only; signed-in state is a data attribute other modules read, never the text.
-function showIdentity(signedIn) { const n = $('identity'); n.dataset.signedIn = String(signedIn); text(n, signedIn ? 'Signed in' : 'Not signed in'); }
+// Ruling a1: greet by the account's own display name (GET /v2/me principal.display_name) when set; textContent only.
+function showIdentity(signedIn) { const n = $('identity'); n.dataset.signedIn = String(signedIn); const v = signedIn ? state.principal?.display_name : null, name = typeof v === 'string' && v.trim() && [...v.trim()].length <= 60 ? v.trim() : ''; text(n, signedIn ? (name ? `Signed in as ${name}` : 'Signed in') : 'Not signed in'); }
 function option(select, value, label) { select.add(new Option(label, value)); }
 function resetSelect(select, label) { select.replaceChildren(new Option(label, '')); }
 function required(value, message) { if (!value) throw new Error(message); return value; }

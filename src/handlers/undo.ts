@@ -27,6 +27,9 @@ const BATCH_INVERSE: Record<string, (ctx: Parameters<Handler>[0], params: Record
 export const opsUndo: Handler = async (ctx, p) => {
   const row: any = await findReceiptByUndoToken(ctx, String(p.token ?? ""));
   if (!row || (row.actor !== ctx.principal.id && ctx.principal.kind !== "support")) throw notVisible();
+  // An account's own display name is restored only by that account: support may undo others' scoped rows, but
+  // cap.me.update always writes the CALLER's row, so another caller's undo would rename the wrong account.
+  if (row.capability === "cap.me.update" && row.actor !== ctx.principal.id) throw notVisible();
   const cap = byId.get(row.capability)!;
   if (cap.inverse.kind !== "true") throw new CapError("NO_INVERSE", `${row.capability} has no true inverse`, cap.inverse.compensating_control ?? "see 17-IRREVERSIBILITY", row.capability);
   const blob = row.prior_state_json ? JSON.parse(row.prior_state_json) : {};

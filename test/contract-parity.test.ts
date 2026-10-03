@@ -210,6 +210,8 @@ const COMPARED = [
   "cap.survey.issue_link result",
   "cap.grant.accept request",
   "cap.me.invitations request",
+  "cap.me.update request",
+  "cap.me.update result",
   "cap.response.form request",
   "cap.response.form result",
   "cap.response.submit request",

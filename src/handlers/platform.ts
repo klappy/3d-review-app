@@ -3,6 +3,7 @@ import { feedbackExperience, feedbackProvenance, projectFeedbackProvenance } fro
 import type { Handler } from "./types";
 import { CapError, id, sha256, notVisible } from "./types";
 import { normalizeEmail } from "./common";
+import { ownDisplayName } from "./me";
 import { mintSession, revokeSessionByHash } from "../auth";
 import { revokeOAuthGrants, type OAuthEnv } from "../oauth";
 import contract from "../../contract/capabilities.json";
@@ -74,7 +75,9 @@ export const authMe: Handler = async (ctx) => {
   const pr = ctx.principal;
   if (pr.kind === "anonymous") throw new CapError("NOT_AUTHENTICATED", "no session");
   const grants = pr.kind === "user" || pr.kind === "support" ? (await ctx.db.prepare("SELECT scope_type, scope_id, role FROM grant WHERE principal_id = ?").bind(pr.id).all()).results : [];
-  return { result: { principal: { id: pr.id, kind: pr.kind, provisioned: !!pr.provisioned, delegated_by: pr.delegatedBy ?? null, support_actor: pr.supportActor ?? null, participant_survey_id: pr.participantSurveyId ?? null }, grants } };
+  // display_name: the caller's OWN optional name (cap.me.update), null when unset — screens greet by it, the email as fallback.
+  const display_name = await ownDisplayName(ctx);
+  return { result: { principal: { id: pr.id, kind: pr.kind, provisioned: !!pr.provisioned, display_name, delegated_by: pr.delegatedBy ?? null, support_actor: pr.supportActor ?? null, participant_survey_id: pr.participantSurveyId ?? null }, grants } };
 };
 
 export const opsHealth: Handler = async (ctx) => {

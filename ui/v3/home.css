@@ -34,3 +34,7 @@ a.v3h-acard:hover .v3h-continue, a.v3h-acard:focus-visible .v3h-continue { backg
 /* S40: the pending-invitations hint — secondary text under the sub-line, link in the primary token (never a button). */
 .v3h-invites { margin-top: 6px; }
 .v3h-invites a { color: var(--primary, #1f6f6a); font-weight: 600; }
+/* Ruling a1: greeting by display name (email fallback) and the skippable first sign-in name ask. */
+.v3h-greet { margin: 0 0 2px; font-weight: 600; overflow-wrap: anywhere; }
+.v3h-name-ask form { display: grid; gap: 8px; }
+.v3h-name-ask input { max-width: 100%; }

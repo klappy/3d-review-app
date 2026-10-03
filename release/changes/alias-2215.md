@@ -1,0 +1,3 @@
+bump: minor
+lane: 2215 · PR: #TBD
+- Added - Your account can carry an optional **name**. On your first sign-in the home screen asks "What should we call you?" (you can skip it), and **Your name…** in the account menu changes or clears it later. The app greets you by that name ("Welcome, Mara", "Account: Mara") and by your email when no name is set, and the people on your reviews see it in member lists. Agents can read it with `read cap.auth.me` and set or clear it with `write cap.me.update` (your own name only, with undo), and the MCP panel greets you by it. Requires D1 migration `0015_display_name.sql` (additive).

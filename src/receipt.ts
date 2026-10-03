@@ -159,6 +159,8 @@ const PRIOR_FIELDS: Record<string, readonly string[]> = {
   "cap.assessment.notes.update": ["notes_reflection","notes_next_steps"],
   "cap.survey.select": ["state","archived_at"], "cap.survey.deselect": ["state","archived_at"],
   "cap.language.archive": ["archived_at"], "cap.language.unarchive": ["archived_at"],
+  // The account's own prior display name, so undo restores it. The new name is not kept in params.
+  "cap.me.update": ["display_name"],
 };
 function receiptFields(source: Record<string,unknown> | undefined, allowed: readonly string[]): Record<string,unknown> | null {
   if(!source) return null;

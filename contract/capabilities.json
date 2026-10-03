@@ -8,12 +8,12 @@
     "sha": "0f4413768c4365054372d917619311d7c2a00e96"
   },
   "counts": {
-    "total": 92,
+    "total": 93,
     "read": 34,
     "write.effect": 12,
-    "write.reversible": 39,
+    "write.reversible": 40,
     "write.dangerous": 7,
-    "v2.0-bcs": 87,
+    "v2.0-bcs": 88,
     "v2.1-oct": 5,
     "paths_inferred": 37,
     "inverse_unassessed": 0
@@ -167,7 +167,7 @@
       "slice": "v2.0-bcs",
       "section": "A. Entry, identity, session",
       "ui_surface": "header/scope badge",
-      "notes": "grants + roles per scope",
+      "notes": "grants + roles per scope; principal.display_name is the caller's own optional name (null when unset; set or clear it with cap.me.update) — screens greet by it with the email as fallback",
       "status": "target",
       "inverse": {
         "kind": "n/a"
@@ -1516,6 +1516,23 @@
       "public": false,
       "params_schema": { "type": "object", "properties": {} },
       "result_schema": { "type": "object", "required": ["invitations"], "properties": { "invitations": { "type": "array", "items": { "type": "object", "required": ["id", "scope", "role", "expires_at"], "properties": { "id": { "type": "string" }, "scope": { "type": "object", "properties": { "type": { "enum": ["workspace", "project", "assessment"] }, "id": { "type": "string" }, "name": { "type": ["string", "null"] }, "path": { "type": "array", "items": { "type": "string" } } } }, "role": { "enum": ["viewer", "member", "owner"] }, "inviter_display_name": { "type": ["string", "null"] }, "invited_at": { "type": "string" }, "expires_at": { "type": ["string", "null"] } } } } } }
+    },
+    {
+      "id": "cap.me.update",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": { "method": "PATCH", "path": "/v2/me", "path_inferred": false },
+      "roles": "any signed-in (own account only)",
+      "slice": "v2.0-bcs",
+      "section": "A. Entry, identity, session",
+      "ui_surface": "first sign-in \"What should we call you?\" (skippable) + account menu \"Your name…\"; greetings read it with the email as fallback",
+      "notes": "set or clear the caller's OWN optional display name (captain ruling a1 2026-10-02, cookbook work/queued/2026-09-29-3d-train22-audit-backlog/RULING-2026-10-02-greet-alias.md). No id parameter: it always names the signed-in account — a connector (OAuth) or delegated session sets the name of the person who granted it, never anyone else's; participants have no account (NOT_AUTHORIZED_AT_SCOPE). Trimmed, inner whitespace collapsed, NFC, at most 60 characters, one plain line (no control, line-break or direction characters); null or \"\" clears it. Read back by cap.auth.me as principal.display_name (null when unset). Undo restores the prior name (own receipts only)",
+      "status": "target",
+      "inverse": { "kind": "true", "via": "self:restore-prior", "provenance": "receipt carries the prior display_name" },
+      "undo_token": true,
+      "public": false,
+      "params_schema": { "type": "object", "additionalProperties": false, "required": ["display_name"], "properties": { "display_name": { "type": ["string", "null"], "maxLength": 60, "description": "your own name as others should read it; null or empty clears it" } } },
+      "result_schema": { "type": "object", "additionalProperties": false, "required": ["display_name"], "properties": { "display_name": { "type": ["string", "null"] } } }
     },
     {
       "id": "cap.grant.update_role",

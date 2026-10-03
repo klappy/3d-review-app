@@ -25,6 +25,7 @@ import { views, css as viewsCss } from '/assess/views.js';
 import * as share from '/assess/share.js';
 import { feedback, openFeedbackDialog } from '/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '/kit/app-adapter.js';
+import { accountLine, displayNameOf, nameToSend, NAME_MAX } from '/v3/components/greeting.js';
 import { V3_SHELL, onePrimary, stateWord, placeDemoExit, DEMO_EXIT_HREF } from '/v3-shell.js';
 import { demographicsSetting, demographicsBody, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock as completeLock, v3SettingsRole as settingsRole, V3_SUGGEST } from '/assess/v3-assessment.js';
 import { mountEditableHeading } from '/v3/components/editable-heading.js';
@@ -58,7 +59,7 @@ function syncShell(page = null) {
   // A workspace page has already loaded its workspace: keep it in the same identity-scoped cache workspaceFor() uses (cleared by
   // resetIdentity) so later crumbs can name it without a discovery read. Data only; never a new request.
   if (page?.kind === 'workspace' && page.model?.status === 'loaded' && page.model.workspace?.id) state.workspaces.set(page.model.workspace.id, { id: page.model.workspace.id, name: page.model.workspace.name, role: page.model.workspace.role, projects: (page.model.projects || []).map(x => x.id) });
-  kit.update(v3Model(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() })));
+  kit.update(v3Model(shellModel({ route: r, routes: cards.routes, principal: state.principal, email: state.accountEmail, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() })));
   placeDemoNotice(); // Bugbot 4073693755: the shell repaint preserves only its content/header hosts; the disclosure is restored by the controller
 }
 // Demo disclosure (Bugbot 4073693755): ONE controller-owned node, built once, placed before the content element and re-placed by the
@@ -131,7 +132,7 @@ const redact = m => redactDiagnosticPath(String(m || 'Request could not be compl
 //                                                  (Bugbot 4041134416). Results are bound to (aid, epoch) (Auditor 2A-3).
 //   generation   counter                           a later render supersedes an earlier one's DOM write (supplier 1114cb1)
 let generation = 0, epoch = 0, identityGeneration = 0;
-const state = { principal: null, projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null, collectLinks: new Map(), myInvitations: null };
+const state = { principal: null, accountEmail: '', projects: [], workspaces: new Map(), openProjects: new Set(), lists: new Map(), inflight: new Map(), seq: new Map(), templates: null, current: null, busy: false, message: null, dirty: new Map(), counts: new Map(), countInflight: new Set(), print: null, collectLinks: new Map(), myInvitations: null };
 // Bugbot 4040745881: authentication failures are NOT authorization refusals — they recover by signing in again / retry.
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']); // visibility/authz codes (supplier 97f7402 + policy.ts)
@@ -766,7 +767,7 @@ let accountBusy = false;
 function accountStatus(message = '') { const el = document.getElementById('account-status'); if (el) el.textContent = message; }
 function accountControls(visible, busy = false) {
   const actions = document.getElementById('account-actions'); if (actions) actions.hidden = !visible;
-  for (const id of ['account-signout', 'account-switch', 'account-switch-confirm']) { const el = document.getElementById(id); if (el) el.disabled = busy; }
+  for (const id of ['account-name', 'account-signout', 'account-switch', 'account-switch-confirm']) { const el = document.getElementById(id); if (el) el.disabled = busy; }
 }
 async function loadAccountEmail() {
   if (demo) { who.textContent = 'Sample account'; accountControls(false); return; }
@@ -778,8 +779,22 @@ async function loadAccountEmail() {
     const value = response.ok ? await response.json() : null;
     if (identity !== identityGeneration || credential !== token) return;
     // U03 (lanes-1321): sandbox and cookie sessions have no account view; say "Signed in", never a failure sentence.
-    who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Signed in';
-  } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Signed in'; }
+    state.accountEmail = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? value.email : '';
+    paintWho();
+  } catch { if (identity === identityGeneration && credential === token) { state.accountEmail = ''; paintWho(); } }
+}
+// Ruling a1 (2026-10-02): greet by the account's own display name (GET /v2/me), the verified email as fallback. When the name
+// shows, the email stays on the control's tooltip so the account in use is still checkable. textContent only — never HTML.
+function paintWho() {
+  if (demo) return;
+  who.textContent = accountLine(state.principal, state.accountEmail);
+  if (displayNameOf(state.principal) && state.accountEmail) who.title = state.accountEmail; else who.removeAttribute?.('title');
+}
+// After a successful PATCH /v2/me (cap.me.update): the signed-in account's own name, everywhere it greets.
+function setDisplayName(name) {
+  if (!state.principal) return;
+  state.principal = { ...state.principal, display_name: typeof name === 'string' && name ? name : null };
+  paintWho(); syncShell();
 }
 // B44 (captain report 20:39): ONE sign-out for Sign out, Use another account and every caller (ctx.signOut). It never sends the
 // person to the Access team-domain page: that logout shows only "Failed to log out." when there is no Access session
@@ -826,6 +841,33 @@ function bindAccountControls() {
   document.getElementById('account-switch')?.addEventListener('click', () => { if (!accountBusy && state.principal) dialog?.showModal(); });
   document.getElementById('account-switch-cancel')?.addEventListener('click', () => dialog?.close());
   document.getElementById('account-switch-confirm')?.addEventListener('click', () => { dialog?.close(); signOut(true); });
+  bindNameDialog();
+}
+// Ruling a1: "Your name…" in the account menu edits the account's OWN display name later (PATCH /v2/me, cap.me.update).
+// Empty clears it (greetings fall back to the email). The dialog is identity-bound: a sign-out or switch closes it.
+function bindNameDialog() {
+  const dialog = document.getElementById('account-name-dialog'), form = document.getElementById('account-name-form');
+  const input = document.getElementById('account-name-input'), status = document.getElementById('account-name-status');
+  if (!dialog || !form || !input) return;
+  input.maxLength = NAME_MAX;
+  document.getElementById('account-name')?.addEventListener('click', () => {
+    if (accountBusy || !state.principal || demo) return;
+    input.value = displayNameOf(state.principal); if (status) status.textContent = ''; dialog.showModal?.();
+  });
+  document.getElementById('account-name-cancel')?.addEventListener('click', () => dialog.close?.());
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const next = nameToSend(input.value);
+    if (!next.ok) { if (status) status.textContent = next.message; return; }
+    const identity = identityGeneration;
+    if (status) status.textContent = 'Saving…';
+    try {
+      const r = await api('/v2/me', { method: 'PATCH', body: { display_name: next.value } });
+      if (identity !== identityGeneration) return;
+      setDisplayName(r?.display_name ?? null); dialog.close?.();
+      accountStatus(r?.display_name ? 'Name saved.' : 'Name cleared. You are greeted by your email.');
+    } catch (e) { if (identity === identityGeneration && status) status.textContent = `Could not save your name: ${redact(e?.message)}`; }
+  });
 }
 bindAccountControls();
 // S54: the menu's "App feedback" opens the form in place over the current screen (no hash change, no re-render); the #feedback
@@ -851,7 +893,7 @@ function ctxFor(extra = {}) {
   const stale = () => Promise.reject(Object.assign(new Error('This view is no longer current.'), { code: 'STALE_VIEW' }));
   // shellOwnsTitle (Bugbot 4073693743): explicit host contract — only a mounted kit root shows the page title in its header, so only
   // then do scope pages omit their own heading. The non-kit /assess/index.html host keeps page-owned headings.
-  return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, shellOwnsTitle: !!kit, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
+  return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, setDisplayName: name => { if (identity === identityGeneration) setDisplayName(name); }, shellOwnsTitle: !!kit, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
     // Review F2: a completion arriving after the view was replaced must not navigate the newer route (it cannot undo a dispatched write).
     go: (hash, { reload = false } = {}) => { if (!live()) return; if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
 }
@@ -949,8 +991,9 @@ function resetIdentity() {
   pendingRename = null; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
   accountBusy = false; accountControls(false); accountStatus();
   document.getElementById('account-switch-dialog')?.close();
+  document.getElementById('account-name-dialog')?.close?.();
   document.getElementById('feedback-dialog')?.remove(); // S54/rev444: the in-place feedback dialog belongs to the old identity
-  state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
+  state.share = null; state.collectLinks.clear(); state.principal = null; state.accountEmail = ''; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
   state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false; state.myInvitations = null; printLangs.clear();
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';

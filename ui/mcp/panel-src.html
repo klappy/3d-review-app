@@ -185,8 +185,13 @@ const actionCard = createActionCard({root:$('app'),esc,call,canExplore:()=>state
   $('app').innerHTML='<p class="muted">Loading workspaces…</p>';
   try { const me=await read('cap.auth.me'); if(generation!==routeGeneration)return; state.me=me; }
   catch(e) { if(generation!==routeGeneration)return; state.me=null; }
+  if(generation===routeGeneration)greet(state.me);
   if(generation===routeGeneration)go('#workspaces');
 }});
+// Ruling a1 (2026-10-02): greet by the account's own display name from read cap.auth.me (principal.display_name; set with
+// write cap.me.update). The panel never receives the email, so without a name it says "Signed in". textContent only.
+function greetName(me) { const v=me?.principal?.display_name; if(typeof v!=='string')return ''; const s=v.replace(/\s+/g,' ').trim(); return s&&[...s].length<=60?s:''; }
+function greet(me) { const n=greetName(me); $('who').textContent = me?.principal ? (n ? `Signed in as ${n}` : 'Signed in') : 'Tool result'; }
 function beginCard() { ++routeGeneration; ++gen; state.mode='card'; state.sheet=null; state.hostError=null; state.notice=null; state.busy=false; $('crumbs').innerHTML=''; $('status').textContent=''; document.body.classList.add('mcp-compact'); }
 app.addEventListener('toolinput', ev => { if(state.executing)return; beginCard(); actionCard.receiveInput(ev); });
 app.addEventListener('toolresult', ev => { if(state.executing)return; beginCard(); actionCard.receiveResult(ev); });
