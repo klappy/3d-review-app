@@ -1009,3 +1009,18 @@ test('definite assessment refusal keeps created language while allowing correcti
   assert.equal(srv.writes().filter(c=>c.url.endsWith('/languages')).length,1);
   assert.equal(srv.db.a.language_id,'lN');assert.equal(srv.db.a.name,'Corrected review');
 });
+
+test('definite language refusal after new project creation keeps language fields editable', async () => {
+  const srv=server(), orig=srv.api; let refuse=true;
+  srv.api=async (url, opts={})=>{
+    if(url.endsWith('/languages') && opts.method==='POST' && refuse) {
+      refuse=false; throw Object.assign(new Error('Correct the language'),{status:400});
+    }
+    return orig(url,opts);
+  };
+  const m=mount(srv);await fillStep1(m,{project:NEW_PROJECT});
+  m.submit();await settle();assert.equal(m.$('[name="newLanguage"]').disabled,false);
+  m.set('newLanguage','Corrected language');m.submit();await settle();
+  assert.equal(srv.writes().filter(c=>c.url==='/v2/projects').length,1);
+  assert.equal(srv.db.a.language_id,'lN');assert.equal(m.h.state.step,'participants');
+});

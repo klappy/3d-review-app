@@ -452,7 +452,7 @@ export function mountWizard(root, deps) {
   const uid = deps.user ? String(deps.user) : ''; // val422-2341: the signed-in principal id (assess.js passes state.principal.id)
   const wip = () => { if (s.saved && !s.done && !s.partial) saveWip(session, s.saved.aid, s.step, s.d, store, s.saved.snap, uid); };
   // B06: only the current step's live form is read on paint; a form left behind by a step change was already read (never undo a save's adoption).
-  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.skipReadOnce && !s.done && live.dataset.wzForm === s.step) read(live); s.skipReadOnce = false; root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [], passagesSkipped: s.passagesSkipped }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; if (s.saveCtx && !s.saved) for (const field of root.querySelectorAll('input, select, textarea')) field.disabled = true; wip(); passagesMount(); };
+  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.skipReadOnce && !s.done && live.dataset.wzForm === s.step) read(live); s.skipReadOnce = false; root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [], passagesSkipped: s.passagesSkipped }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; if (s.saveCtx?.pending && !s.saved) for (const field of root.querySelectorAll('input, select, textarea')) field.disabled = true; wip(); passagesMount(); };
   // F4: the Passages forms on Review talk to /v2/assessments/:aid/passages directly (as Prepare does), with the facilitator token.
   const passagesToken = deps.token || (() => { try { return globalThis.sessionStorage?.getItem('facilitatorToken') || null; } catch { return null; } });
   // rev440 S1: mount once per draft id and keep that node across repaints (re-inserted, never re-rendered), so an upload or link
@@ -470,7 +470,7 @@ export function mountWizard(root, deps) {
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
   const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
-    if (s.saveCtx && !s.saved) return; // uncertain first-save writes must be reconciled before changing their identity
+    if (s.saveCtx?.pending && !s.saved) return; // uncertain first-save writes must be reconciled before changing their identity
     const fd = new FormData(form), d = s.d;
     if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'starts', 'until', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
     if (form.dataset.wzForm === 'details') d.lwc = lwcFrom(fd);
@@ -527,7 +527,7 @@ export function mountWizard(root, deps) {
     if (s.step === 'details') {
       s.busy = true; const btn = e.target.querySelector('button[type=submit]'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
       try { await saveDetails(); }
-      catch (err) { if (!alive) return; s.busy = false; return note(new Error(`${err.message || err} ${s.saved ? 'Your changes were not saved; the draft keeps what was saved before.' : s.saveCtx ? 'Some setup may be saved. Continue checks what was saved before retrying; fields stay locked until then.' : 'The review was not saved yet. Continue tries again.'}`)); }
+      catch (err) { if (!alive) return; s.busy = false; return note(new Error(`${err.message || err} ${s.saved ? 'Your changes were not saved; the draft keeps what was saved before.' : s.saveCtx?.pending ? 'Some setup may be saved. Continue checks what was saved before retrying; fields stay locked until then.' : 'The review was not saved yet. Continue tries again.'}`)); }
       s.busy = false; if (!alive) return;
     }
     s.step = STEPS[STEPS.indexOf(s.step) + 1] || s.step; paint();
