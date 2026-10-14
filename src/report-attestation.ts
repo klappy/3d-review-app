@@ -88,9 +88,9 @@ async function construct(): Promise<ReadonlyMap<string, Entry>> {
 function index(): Promise<ReadonlyMap<string, Entry>> { return initialized ??= construct(); }
 /** For local initialization measurement; no trust injection or fixture factory exists. */
 export async function initializeAttestation(): Promise<void> { await index(); }
-/** DEV-only participant path (captain 2026-09-24 15:03): rows absent from the pinned
+/** Participant path: rows absent from the pinned
  * synthetic index are digested over their real answers/templates. Mixed captures refuse.
- * Callers pass participant=true only when ENVIRONMENT === 'dev'. */
+ * Store callers pass participant=true only under server-owned report admission. */
 async function participantCapture(expectedAssessmentId: string, rows: CaptureRow[]): Promise<AttestationResult> {
   const responses: { responseId: string; responseDigest: string }[] = [];
   for (const row of rows) {
