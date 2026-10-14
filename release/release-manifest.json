@@ -1,28 +1,27 @@
 {
-  "version": "0.29.0",
+  "version": "0.29.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "241caf5f1c7b733806df668f78f726c6849dd243",
+  "cookbook_commit": "4cbf09727de57ed6f68a8865cf960bbdc98460a2",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.29.0.md",
-      "blob_sha": "2f957325ccf668c15d07f635da70bd9db0fd4825",
-      "sha256": "b1caabe01603d60e675ee6ddbbc5c0647eff28a8a297ac3765044c9d08db0a4b"
+      "path": "planning/2026-09-16-parity-build/releases/0.29.1.md",
+      "blob_sha": "e7c95afeabd7c14d65969c6233bc1b738a3f1074",
+      "sha256": "095ac38a6ee5b56af91bac4f4226cf3febf97a6c7cdc4c180d423f1b2eb68220"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "bec8367181e10742152b282fb7cb8b1fb63079be",
-      "sha256": "0604820c4408f8dbe6a04836ed8a4afce6959719771267c2ff1844c568af3c76"
+      "blob_sha": "3e1d65377e47dac6add41ef664e103ffefd80aed",
+      "sha256": "35c12146404c5bad384ca79d57914df32bd842712b11c4345139eb40ad508ed4"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Super admin (the support switch) can read app-wide usage totals with `cap.ops.usage` (counts and dates only: accounts, projects, languages, assessments by stage, surveys, survey links, participant sessions, responses, requests per day and writes by capability). `docs {topic: permissions}` now says plainly what super admin opens, and `scripts/super-admin.mjs` switches it on or off for one account with a receipt. (#455)"
-      ],
-      "changed": [
-        "The \"Mid-Level\" survey now shows as **Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)** (it was \"Team leaders & mentors\"), in the Product Owner's own words, in setup, on Collect, on the survey page, on the blank print and in demo mode; the legacy v1 row reads the same with \"v1 (legacy)\". Template ids and the pinned source name (`source_name`) are unchanged. (#457)"
-      ],
-      "fixed": []
+      "added": [],
+      "changed": [],
+      "fixed": [
+        "Assessment setup can add a named language to an existing project or explicitly restore and select an archived language. Optional language codes accept mixed case and store lowercase; duplicate and retry handling preserve the assessment's language identity. Survey translation support stays separate. (#463)",
+        "Local facilitator fixture outcomes: six of six setup runs passed across phone and laptop (existing project, new project, archived restore with failure/retry). No human usability measurement or Bincy exact-input reproduction. DEV and production verification pending."
+      ]
     }
   }
 }
