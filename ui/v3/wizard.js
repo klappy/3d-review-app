@@ -1,7 +1,7 @@
 // v3 lane 2 · four-step setup wizard (design-system-v3 CHANGE-MAP "Setup (frames 3 to 6)", PARITY P2/P7/A1/C1).
 // Steps (Bincy 03–06): Assessment details · Who will participate? · Participant information · Review & launch. One primary action per step.
 // Contract unchanged (ADOPTION.md): launch maps onto cap.project.create (only for "New project…"), cap.language.create
-// (only with a new project), cap.assessment.create, cap.survey.select, cap.assessment.set_stage (collect) and
+// (when adding a language to either a new or existing project), cap.assessment.create, cap.survey.select, cap.assessment.set_stage (collect) and
 // cap.survey.issue_link (dry_run → execute). Nothing is sent to anyone; links are opened, not mailed.
 // Ruling (a), captain 2026-09-24: "How many do you expect?" is OPTIONAL. The contract stores no expected count, so N lives
 // only in this browser (EXPECTED_KEY, best effort) and "n of N" shows only when N was entered; otherwise "n responded".
@@ -36,6 +36,8 @@ export const STEP_TITLES = ['Details', 'Participants', 'Information', 'Review'];
 export const pdot = p => { const s = String(p || '').toLowerCase(); return /team/.test(s) ? 'p-team' : /community/.test(s) ? 'p-community' : /church/.test(s) ? 'p-church' : 'p-reviewer'; };
 export const EXPECTED_KEY = 'v3:expected'; // { [surveyId]: N } — device-local, never sent to the API
 export const NEW_PROJECT = '__new__';
+export const NEW_LANGUAGE = '__new_language__';
+const addingLanguage = d => d.project === NEW_PROJECT || d.language === NEW_LANGUAGE;
 // B40 (captain 19:50, Bincy): "Lead organisation" is a select plus "Other (type it)". Names only, deduplicated, from the
 // Lovable harvest (v0 lead orgs + v1.0 lead_organization options; test/placeholder values dropped). Organisations already on
 // the projects this account can see are merged in at render time. Stored value is unchanged: project.organization text.
@@ -49,7 +51,7 @@ export function orgChoices(projects = []) {
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const enc = encodeURIComponent;
-const LANG_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{1,8})*$/; // mirrors src/handlers/language.ts CODE (cap.language.create `code`)
+const LANG_CODE = /^[a-z]{2,3}(-[a-z0-9]{1,8})*$/i; // mirrors src/handlers/language.ts CODE (cap.language.create `code`)
 
 export function freshDraft() {
   return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', starts: todayIso(), until: '', format: 'Written', purpose: '', lwc: [], groups: {}, context: {}, demographics: false };
@@ -79,7 +81,8 @@ export function validateStep(step, d, today = todayIso()) {
   if (step === 'details') {
     if (!d.name.trim()) errs.push('Give the review a name.');
     if (!d.project) errs.push('Choose a project.');
-    if (d.project === NEW_PROJECT) { if (!d.newProject.trim()) errs.push('Name the new project.'); if (!d.newLanguage.trim()) errs.push('Name the language.'); if ((d.newLangCode || '').trim() && !LANG_CODE.test(d.newLangCode.trim())) errs.push('Language code: use an ISO 639 code such as "hil" or "en-US" (qaa–qtz for an unlisted language), or leave it blank.'); }
+    if (d.project === NEW_PROJECT && !d.newProject.trim()) errs.push('Name the new project.');
+    if (addingLanguage(d)) { if (!d.newLanguage.trim()) errs.push('Name the language.'); if ((d.newLangCode || '').trim() && !LANG_CODE.test(d.newLangCode.trim())) errs.push('Language code: use a 2–3 letter code, optionally with script or region (for example, ory or en-US), or leave it blank if unknown.'); }
     else if (d.project && !d.language) errs.push('Choose a language.');
     errs.push(...periodErrors(d.starts, d.until, today)); // B41/U46: Active until required and not past, Starts optional
   }
@@ -98,7 +101,9 @@ export function launchPlan(d, pre = [], saved = false) {
   const plan = [];
   if (d.project === NEW_PROJECT) {
     plan.push({ cap: 'cap.project.create', method: 'POST', url: () => '/v2/projects', body: () => ((d.newOrg || '').trim() ? { name: d.newProject.trim(), organization: d.newOrg.trim() } : { name: d.newProject.trim() }), keep: (r, ctx) => { ctx.pid = r.project.id; } }); // S24: translation languages ride the assessment only — no screen edits a project's, and participants see the union
-    plan.push({ cap: 'cap.language.create', method: 'POST', url: ctx => `/v2/projects/${enc(ctx.pid)}/languages`, body: () => ((d.newLangCode || '').trim() ? { name: d.newLanguage.trim(), code: d.newLangCode.trim() } : { name: d.newLanguage.trim() }), keep: (r, ctx) => { ctx.lid = r.language.id; } });
+  }
+  if (addingLanguage(d)) {
+    plan.push({ cap: 'cap.language.create', method: 'POST', url: ctx => `/v2/projects/${enc(ctx.pid)}/languages`, body: () => ((d.newLangCode || '').trim() ? { name: d.newLanguage.trim(), code: d.newLangCode.trim().toLowerCase() } : { name: d.newLanguage.trim() }), keep: (r, ctx) => { ctx.lid = r.language.id; } });
   }
   plan.push({ cap: 'cap.assessment.create', method: 'POST', url: ctx => `/v2/projects/${enc(ctx.pid)}/assessments`, body: ctx => {
     const b = { name: d.name.trim(), language_id: ctx.lid };
@@ -171,7 +176,7 @@ export async function launch(d, opts) {
 }
 async function launchInner(d, opts) {
   const { api, store = safeStore(), resume = null } = opts;
-  const ctx = resume || { pid: d.project === NEW_PROJECT ? null : d.project, lid: d.project === NEW_PROJECT ? null : d.language, aid: null, surveys: [], links: [], done: [] };
+  const ctx = resume || { pid: d.project === NEW_PROJECT ? null : d.project, lid: addingLanguage(d) ? null : d.language, aid: null, surveys: [], links: [], done: [] };
   if (ctx.base == null) ctx.base = ctx.done.length; // writes already made before this launch (B06: the saved draft)
   opts._ctx = ctx;
   let i = 0;
@@ -191,8 +196,8 @@ async function launchInner(d, opts) {
     }
     if (i++ < ctx.done.length) continue;
     // #188: a write whose response was lost may have committed. Read it back by ids already known before retrying.
-    // language.create is also read back on any resume: the project is this launch's own (created or reconciled), so a
-    // same-name language there is ours; a "name already exists" 400 would otherwise block Continue forever (Bugbot 4094916357).
+    // language.create is also read back on any resume in the chosen project, so a
+    // same-name and code language can be reused; a "name already exists" 400 would otherwise block Continue forever (Bugbot 4094916357).
     if ((ctx.pending && ctx.pending.cap === step.cap) || (resume && step.cap === 'cap.language.create')) {
       const found = await reconcile(step, ctx, d, api);
       if (found) { if (step.keep) step.keep(found, ctx); ctx.pending = null; ctx.done.push(step.cap); continue; }
@@ -228,7 +233,7 @@ export async function reconcile(step, ctx, d, api) {
   }
   if (step.cap === 'cap.language.create') {
     const r = await api(`/v2/projects/${enc(ctx.pid)}/languages`); const name = d.newLanguage.trim();
-    const hit = newest((r.languages || []).filter(l => l.name === name && !l.archived_at));
+    const hit = newest((r.languages || []).filter(l => l.name === name && (l.code || '').toLowerCase() === (d.newLangCode || '').trim().toLowerCase() && !l.archived_at));
     return hit ? { language: hit } : null;
   }
   if (step.cap === 'cap.assessment.create') {
@@ -358,7 +363,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   const projects = data.projects || [], languages = data.languages || [], templates = latestTemplates(data.templates);
   const isNew = d.project === NEW_PROJECT;
   const proj = isNew ? { name: d.newProject } : projects.find(p => p.id === d.project) || {};
-  const lang = isNew ? { name: d.newLanguage } : languages.find(l => l.id === d.language) || {};
+  const lang = addingLanguage(d) ? { name: d.newLanguage } : languages.find(l => l.id === d.language) || {};
   const chosen = templates.filter(t => d.groups[t.id]);
   const pre = new Map((data.pre || []).map(x => [x.template, x])); // B06f: surveys a saved draft already holds — locked on step 2
   const saved = !!data.saved, act = (back, primary) => actions(back, primary, saved); // B06: saved draft — project is fixed
@@ -368,10 +373,10 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       <div class="grid">
         <label>Project (required)<select name="project" required${saved ? ' disabled' : ''}><option value=""${d.project ? '' : ' selected'} disabled>Choose…</option>${projects.map(p => `<option value="${esc(p.id)}"${p.id === d.project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}${saved ? '' : `<option value="${NEW_PROJECT}"${isNew ? ' selected' : ''}>New project…</option>`}</select></label>
         ${isNew ? `<label>New project name (required)<input name="newProject" value="${esc(d.newProject)}" required></label>`
-          : `<label>Language (required)<select name="language" required${d.project ? '' : ' disabled'}><option value=""${d.language ? '' : ' selected'} disabled>${d.project ? (languages.length ? 'Choose…' : 'No languages in this project') : 'Choose a project first'}</option>${languages.map(l => `<option value="${esc(l.id)}"${l.id === d.language ? ' selected' : ''}>${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</option>`).join('')}</select></label>`}
+          : `<label>Language (required)<select name="language" required${d.project ? '' : ' disabled'}><option value=""${d.language ? '' : ' selected'} disabled>${d.project ? (languages.length ? 'Choose…' : 'No languages in this project') : 'Choose a project first'}</option>${languages.map(l => `<option value="${esc(l.id)}"${l.id === d.language ? ' selected' : ''}>${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</option>`).join('')}${d.project && !saved ? `<option value="${NEW_LANGUAGE}"${d.language === NEW_LANGUAGE ? ' selected' : ''}>Add language…</option>` : ''}</select></label>`}
       </div>
       ${isNew ? orgField(d, projects) : ''}
-      ${isNew ? `<label>Language (required)<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (ISO 639, optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. hil — qaa–qtz if unlisted" autocapitalize="off" spellcheck="false"></label>` : ''}
+      ${addingLanguage(d) ? `<label>Language (required)<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. ory or en-US; leave blank if unknown" autocapitalize="off" spellcheck="false"></label><p class="small muted">The language of the translation being reviewed. Survey translation languages are chosen separately below.</p>` : ''}
       <div class="grid">
         <label>Starts (optional)<input type="date" name="starts" value="${esc(d.starts)}"></label>
         <label>Active until (required)<input type="date" name="until" value="${esc(d.until)}" required>${errs.includes(PAST_UNTIL) ? `<span class="wz-field-error" role="alert" data-until-error>${PAST_UNTIL}</span>` : ''}</label>
@@ -404,7 +409,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   // review
   return `${head(n, 'Ready to launch', 'Check the details, then launch.', '<p class="muted">Launching opens the survey links; nothing is sent to anyone.</p>')}${errBox(errs)}
     <div class="wz-sec"><h3>Details</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="details">Edit</button>'}</div>
-    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}${isNew && (d.newLangCode || '').trim() ? ' · ' + esc(d.newLangCode.trim()) : ''}</dd>${dates(d)}<dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
+    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}${addingLanguage(d) && (d.newLangCode || '').trim() ? ' · ' + esc(d.newLangCode.trim()) : ''}</dd>${dates(d)}<dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
     <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt><span class="pdot wz-kvdot ${pdot(t.perspective)}" aria-hidden="true"></span>${esc(t.perspective)} <span aria-hidden="true">·</span> <span data-wz-review-survey>${esc(t.name)}</span></dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
     <div class="wz-sec"><h3>Participant information</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="information">Edit</button>'}</div>
@@ -447,7 +452,7 @@ export function mountWizard(root, deps) {
   const uid = deps.user ? String(deps.user) : ''; // val422-2341: the signed-in principal id (assess.js passes state.principal.id)
   const wip = () => { if (s.saved && !s.done && !s.partial) saveWip(session, s.saved.aid, s.step, s.d, store, s.saved.snap, uid); };
   // B06: only the current step's live form is read on paint; a form left behind by a step change was already read (never undo a save's adoption).
-  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.done && live.dataset.wzForm === s.step) read(live); root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [], passagesSkipped: s.passagesSkipped }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; wip(); passagesMount(); };
+  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.skipReadOnce && !s.done && live.dataset.wzForm === s.step) read(live); s.skipReadOnce = false; root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [], passagesSkipped: s.passagesSkipped }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; if (s.saveCtx && !s.saved) for (const field of root.querySelectorAll('input, select, textarea')) field.disabled = true; wip(); passagesMount(); };
   // F4: the Passages forms on Review talk to /v2/assessments/:aid/passages directly (as Prepare does), with the facilitator token.
   const passagesToken = deps.token || (() => { try { return globalThis.sessionStorage?.getItem('facilitatorToken') || null; } catch { return null; } });
   // rev440 S1: mount once per draft id and keep that node across repaints (re-inserted, never re-rendered), so an upload or link
@@ -465,21 +470,34 @@ export function mountWizard(root, deps) {
   const note = e => { s.errs = [e?.message || String(e)]; paint(); };
   const loadLanguages = async () => { const g = ++s.langGen, pid = s.d.project; s.data.languages = []; if (pid && pid !== NEW_PROJECT) { const r = await deps.api(`/v2/projects/${enc(pid)}/languages`); if (g !== s.langGen || !alive) return false; s.data.languages = (r.languages || []).filter(l => !l.archived_at); } return true; };
   const read = (form) => {
+    if (s.saveCtx && !s.saved) return; // uncertain first-save writes must be reconciled before changing their identity
     const fd = new FormData(form), d = s.d;
     if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'starts', 'until', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
     if (form.dataset.wzForm === 'details') d.lwc = lwcFrom(fd);
     if (form.dataset.wzForm === 'details' && fd.has('newOrgPick')) { const v = String(fd.get('newOrgPick')); d.newOrgOther = v === ORG_OTHER; if (!d.newOrgOther) d.newOrg = v; else if (!fd.has('newOrg')) d.newOrg = ''; }
-    if (form.dataset.wzForm === 'details') { if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = s.data.languages.some(l => l.id === v) ? v : ''; } }
+    if (form.dataset.wzForm === 'details') { if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = ((!s.saved && v === NEW_LANGUAGE) || s.data.languages.some(l => l.id === v)) ? v : ''; } }
     if (form.dataset.wzForm === 'information') { const c = {}; for (const box of form.querySelectorAll('[data-wz-context]')) { const tid = box.dataset.wzContext, t = latestTemplates(s.data.templates).find(x => x.id === tid); if (!t) continue; const v = contextValues(groupFields(t.perspective), k => fd.get(`c-${tid}-${k}`)); if (Object.keys(v).length) c[tid] = v; } d.context = c; d.demographics = fd.get('demographics') === 'on'; }
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked || box.hasAttribute('data-wz-pre')) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
   };
   root.addEventListener('change', async e => {
+    if (e.target.name === 'language' && !s.partial && !s.busy) { read(e.target.form); paint(); if (s.d.language === NEW_LANGUAGE) root.querySelector('input[name=newLanguage]')?.focus(); return; }
     if (e.target.name === 'newOrgPick' && !s.partial && !s.busy) { read(e.target.form); paint(); if (s.d.newOrgOther) root.querySelector('input[name=newOrg]')?.focus(); return; }
     if (e.target.name === 'project' && !s.partial && !s.busy) { const f = e.target.form; read(f); s.d.project = e.target.value; s.d.language = ''; s.data.languages = []; s.errs = []; paint(); try { if (!(await loadLanguages())) return; } catch (err) { return note(err); } paint(); }
   }, on);
   // U22: typing on a step is kept for a reload of this tab (the draft's step and values, never sent).
   root.addEventListener('input', e => { const f = e.target.form; if (s.saved && !s.busy && !s.done && f && f.dataset.wzForm === s.step) { read(f); wip(); } }, on);
   // B06: step 1 is saved (first time: savePlan; after: cap.assessment.update with the changed fields only).
+  const adoptLanguage = ctx => {
+    const d = s.d;
+    if (d.project === NEW_PROJECT) {
+      s.data.projects = [...s.data.projects, { id: ctx.pid, name: d.newProject.trim(), organization: (d.newOrg || '').trim() || null, role: 'owner' }];
+      d.project = ctx.pid;
+    }
+    if (ctx.done.includes('cap.language.create')) {
+      if (!s.data.languages.some(l => l.id === ctx.lid)) s.data.languages.push({ id: ctx.lid, name: d.newLanguage.trim(), code: (d.newLangCode || '').trim().toLowerCase() || null });
+      d.language = ctx.lid;
+    }
+  };
   const saveDetails = async () => {
     if (s.saved) {
       const body = detailsPatch(s.saved.snap, s.d); if (!body) return;
@@ -489,13 +507,15 @@ export function mountWizard(root, deps) {
     if (s.saveCtx && s.saveCtx.choice !== s.d.project) s.saveCtx = null; // a part-done save is resumed only for the same project choice
     let ctx;
     try { ctx = await launch(s.d, { api: deps.api, store: deps.store, resume: s.saveCtx, plan: savePlan(s.d) }); }
-    catch (err) { if (err.ctx && (err.ctx.done.length || err.ctx.pending)) { err.ctx.choice = s.d.project; s.saveCtx = err.ctx; } throw err; }
-    const d = s.d;
-    if (d.project === NEW_PROJECT) { // the new project is now an existing one: the draft points at it, and it stays fixed
-      s.data.projects = [...s.data.projects, { id: ctx.pid, name: d.newProject.trim(), organization: (d.newOrg || '').trim() || null, role: 'owner' }];
-      s.data.languages = [{ id: ctx.lid, name: d.newLanguage.trim(), code: (d.newLangCode || '').trim() || null }];
-      d.project = ctx.pid; d.language = ctx.lid;
+    catch (err) {
+      if (err.ctx && !err.ctx.pending && err.ctx.done.includes('cap.language.create')) {
+        // A definite assessment refusal is editable; keep the language we already created and do not create it twice.
+        adoptLanguage(err.ctx); s.skipReadOnce = true; s.saveCtx = null;
+      } else if (err.ctx && (err.ctx.done.length || err.ctx.pending)) { err.ctx.choice = s.d.project; s.saveCtx = err.ctx; }
+      throw err;
     }
+    const d = s.d;
+    adoptLanguage(ctx);
     s.saveCtx = null;
     s.saved = { aid: ctx.aid, pid: ctx.pid, role: 'owner', snap: { ...detailsOf(d), demographics_enabled: false }, pre: [] }; // cap.assessment.create grants the creator owner
     deps.mark?.(ctx.aid); // U22: the URL now names the draft, so a reload reopens it
@@ -507,7 +527,7 @@ export function mountWizard(root, deps) {
     if (s.step === 'details') {
       s.busy = true; const btn = e.target.querySelector('button[type=submit]'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
       try { await saveDetails(); }
-      catch (err) { if (!alive) return; s.busy = false; return note(new Error(`${err.message || err} ${s.saved ? 'Your changes were not saved; the draft keeps what was saved before.' : 'The review was not saved yet. Continue tries again.'}`)); }
+      catch (err) { if (!alive) return; s.busy = false; return note(new Error(`${err.message || err} ${s.saved ? 'Your changes were not saved; the draft keeps what was saved before.' : s.saveCtx ? 'Some setup may be saved. Continue checks what was saved before retrying; fields stay locked until then.' : 'The review was not saved yet. Continue tries again.'}`)); }
       s.busy = false; if (!alive) return;
     }
     s.step = STEPS[STEPS.indexOf(s.step) + 1] || s.step; paint();
