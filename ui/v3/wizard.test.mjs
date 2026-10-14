@@ -364,7 +364,7 @@ test('S35: Name, Project, New project name and Language carry the (required) mar
   assert.match(renderStep('details', draft(), { projects: [], languages: [], templates: [], saved: true }), /<select name="project" required disabled>/, 'a saved draft keeps the project fixed');
   const fresh = renderStep('details', draft({ project: NEW_PROJECT }), { projects: [], languages: [], templates: [] });
   assert.match(fresh, /New project name \(required\)<input name="newProject"/);
-  assert.match(fresh, /Language \(required\)<input name="newLanguage"/);
+  assert.match(fresh, /New language name \(required\)<input name="newLanguage"/);
   assert.match(fresh, /Language code \(optional\)<input name="newLangCode"/);
   assert.doesNotMatch(fresh, /Language code \(optional\) \(required\)|newLangCode"[^>]*required/);
 });
@@ -377,7 +377,7 @@ test('ux-1840: every required details field carries the S34 mark — "(required)
   assert.match(picked, /Language \(required\)<select name="language" required>/, 'project chosen: required and enabled, as validateStep enforces');
   const fresh = renderStep('details', draft({ project: NEW_PROJECT }), { projects: [], languages: [], templates: [] });
   assert.match(fresh, /New project name \(required\)<input name="newProject" value="[^"]*" required>/);
-  assert.match(fresh, /Language \(required\)<input name="newLanguage" value="[^"]*" required/);
+  assert.match(fresh, /New language name \(required\)<input name="newLanguage" value="[^"]*" required/);
 });
 
 test('B41: setup asks Active until (required) and Starts (optional, default today) on the existing period field', () => {
@@ -1023,4 +1023,54 @@ test('definite language refusal after new project creation keeps language fields
   m.set('newLanguage','Corrected language');m.submit();await settle();
   assert.equal(srv.writes().filter(c=>c.url==='/v2/projects').length,1);
   assert.equal(srv.db.a.language_id,'lN');assert.equal(m.h.state.step,'participants');
+});
+
+
+test('archived language requires explicit restore, then assessment reuses its identity', async () => {
+  const srv = server(), original = srv.api, restores = [];
+  const archived = {id:'l-old',name:'Odia',code:'ory',archived_at:'2026-01-01'};
+  srv.api = async (url, opts = {}) => {
+    if (url === '/v2/projects/p1/languages' && !opts.method) return {languages:[{id:'l1',name:'Hindi'}, archived]};
+    if (url === '/v2/languages/l-old/unarchive') { restores.push(opts); return {language:{...archived,archived_at:null}}; }
+    return original(url,opts);
+  };
+  const m = mount(srv); await fillStep1(m);
+  assert.equal(m.$('[name=language] option[value="l-old"]'), null);
+  assert.equal(restores.length, 0);
+  assert.match(m.$('[data-wz="restore-language"]').textContent, /Restore and select Odia · ory/);
+  m.click('[data-wz="restore-language"]'); await settle();
+  assert.deepEqual(restores, [{method:'POST',body:{}}]);
+  assert.equal(m.$('[name=language]').value, 'l-old');
+  m.submit(); await settle();
+  assert.equal(srv.db.a.language_id, 'l-old');
+  assert.equal(srv.writes().filter(c => c.url.endsWith('/languages')).length, 0);
+});
+
+test('failed restore stays retryable and never selects archived identity', async () => {
+  const srv = server(), original = srv.api; let attempts = 0;
+  const archived = {id:'l-old',name:'Odia',code:'ory',archived_at:'2026-01-01'};
+  srv.api = async (url, opts = {}) => {
+    if (url === '/v2/projects/p1/languages' && !opts.method) return {languages:[archived]};
+    if (url === '/v2/languages/l-old/unarchive') {
+      if (++attempts === 1) throw new Error('Connection lost');
+      return {language:{...archived,archived_at:null}};
+    }
+    return original(url,opts);
+  };
+  const m = mount(srv); await fillStep1(m);
+  m.click('[data-wz="restore-language"]'); await settle();
+  assert.match(m.root.textContent, /Connection lost/);
+  assert.notEqual(m.$('[name=language]').value, 'l-old');
+  assert.equal(m.$('[data-wz="restore-language"]').disabled, false);
+  m.click('[data-wz="restore-language"]'); await settle();
+  assert.equal(m.$('[name=language]').value, 'l-old');
+  assert.equal(attempts, 2);
+});
+
+test('language review normalizes code and explanatory text stays inside Learn more', () => {
+  const d = draft({language:NEW_LANGUAGE,newLanguage:'Odia',newLangCode:'ORY'});
+  assert.match(renderStep('review', d, {}), /Odia · ory/);
+  const doc = new JSDOM(renderStep('details', d, {})).window.document;
+  assert.match(doc.querySelector('details').textContent, /Survey translation languages are chosen separately/);
+  assert.doesNotMatch(doc.querySelector('form').textContent, /Survey translation languages are chosen separately/);
 });
