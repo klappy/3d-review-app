@@ -17,7 +17,8 @@
 // the U14 flow). Launch picks up after the saved writes (launchResume). Contract unchanged.
 
 import { shareUrl } from '../shared-link.js';
-import { lwcFieldset, lwcFrom } from './lwc.js';
+import { LWC_LANGUAGES, MAX_LWC, lwcFrom } from './lwc.js';
+import { languagePicker, refreshPickers, bindLanguagePickers } from './language-picker.js';
 import { groupLinks, bindGroupLinks, printAllButton, bindPrintAll } from '../assess/share.js';
 import { stepper as stepperComponent, ensureStepperStyle } from './components/stepper.js';
 import { learnMore } from './components/learn-more.js';
@@ -373,9 +374,9 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       <div class="grid">
         <label>Project (required)<select name="project" required${saved ? ' disabled' : ''}><option value=""${d.project ? '' : ' selected'} disabled>Choose…</option>${projects.map(p => `<option value="${esc(p.id)}"${p.id === d.project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}${saved ? '' : `<option value="${NEW_PROJECT}"${isNew ? ' selected' : ''}>New project…</option>`}</select></label>
         ${isNew ? `<label>New project name (required)<input name="newProject" value="${esc(d.newProject)}" required></label>`
-          : `<label>Language (required)<select name="language" required${d.project ? '' : ' disabled'}><option value=""${d.language ? '' : ' selected'} disabled>${d.project ? (languages.length ? 'Choose…' : 'No languages in this project') : 'Choose a project first'}</option>${languages.map(l => `<option value="${esc(l.id)}"${l.id === d.language ? ' selected' : ''}>${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</option>`).join('')}${d.project && !saved ? `<option value="${NEW_LANGUAGE}"${d.language === NEW_LANGUAGE ? ' selected' : ''}>Add language…</option>` : ''}</select></label>`}
+          : languagePicker({name:'language',label:'Language (required)',options:[...languages.map(l=>({id:l.id,name:l.name,code:l.code})),...(d.project&&!saved?[{id:NEW_LANGUAGE,name:'New language'}]:[])],selected:[d.language],disabled:!d.project,addValue:d.project&&!saved?NEW_LANGUAGE:''})}
       </div>
-      ${!isNew && !saved && (data.archivedLanguages || []).length ? `<details><summary>Archived languages</summary><p class="small muted">Restore a language to use it for this assessment.</p>${data.archivedLanguages.map(l => `<button type="button" class="rv-btn quiet" data-wz="restore-language" data-language-id="${esc(l.id)}">Restore and select ${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</button>`).join('')}</details>` : ''}
+      ${!isNew && !saved && (data.archivedLanguages || []).length ? `<details data-archive-picker><summary>Archived languages</summary><label>Find an archived language<input type="search" data-archive-query placeholder="Search by name or code"></label><p class="small muted" data-archive-status role="status"></p><div class="picker-results">${data.archivedLanguages.map(l => `<button type="button" class="rv-btn quiet" data-wz="restore-language" data-language-id="${esc(l.id)}" data-search="${esc(l.name+' '+(l.code||''))}">Restore and select ${esc(l.name)}${l.code ? ' · ' + esc(l.code) : ''}</button>`).join('')}</div></details>` : ''}
       ${isNew ? orgField(d, projects) : ''}
       ${addingLanguage(d) ? `<label>New language name (required)<input name="newLanguage" value="${esc(d.newLanguage)}" required placeholder="The language this translation is in"></label><label>Language code (optional)<input name="newLangCode" value="${esc(d.newLangCode || '')}" placeholder="e.g. ory or en-US; leave blank if unknown" autocapitalize="off" spellcheck="false"></label>` : ''}
       <div class="grid">
@@ -386,7 +387,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
       </div>
       <label>What will participants consider?<input name="purpose" value="${esc(d.purpose)}" placeholder="e.g. The Genesis 1 to 3 draft"></label>
-      ${lwcFieldset(d.lwc || [], esc)}
+      <p class="small muted">English is always available for participants.</p>${languagePicker({name:'lwc',label:'Participant survey languages',options:LWC_LANGUAGES.map(l=>({id:l.code,name:l.name+(l.mt===false?' (interpreter or video)':''),native:l.endonym,code:l.code})),selected:d.lwc||[],multiple:true,max:MAX_LWC})}
       ${act(false, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Choose the groups you can reach.', '<p class="muted">Three perspectives, kept separate.</p><p class="muted">The number is optional. Leave it empty if you don\'t know for sure; counts then show as "n responded". Groups you leave out can be added later.</p>')}${errBox(errs)}
@@ -453,7 +454,7 @@ export function mountWizard(root, deps) {
   const uid = deps.user ? String(deps.user) : ''; // val422-2341: the signed-in principal id (assess.js passes state.principal.id)
   const wip = () => { if (s.saved && !s.done && !s.partial) saveWip(session, s.saved.aid, s.step, s.d, store, s.saved.snap, uid); };
   // B06: only the current step's live form is read on paint; a form left behind by a step change was already read (never undo a save's adoption).
-  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.skipReadOnce && !s.done && live.dataset.wzForm === s.step) read(live); s.skipReadOnce = false; root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [], passagesSkipped: s.passagesSkipped }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; if (s.saveCtx?.pending && !s.saved) for (const field of root.querySelectorAll('input, select, textarea')) field.disabled = true; wip(); passagesMount(); };
+  const paint = () => { if (!alive) return; const live = root.querySelector('form[data-wz-form]'); if (live && !s.skipReadOnce && !s.done && live.dataset.wzForm === s.step) read(live); s.skipReadOnce = false; root.innerHTML = `<div class="v3-wizard glass panel">${s.done ? renderDone(s.done, deps.origin || '', latestTemplates(s.data.templates)) : renderStep(s.step, s.d, { ...s.data, saved: !!s.saved, pre: s.saved ? s.saved.pre : [], passagesSkipped: s.passagesSkipped }, s.errs, s.partial || false, deps.origin || '')}${s.asking && !s.done ? cancelAsk() : ''}</div>`; if (s.saveCtx?.pending && !s.saved) for (const field of root.querySelectorAll('input, select, textarea')) field.disabled = true; refreshPickers(root); wip(); passagesMount(); };
   // F4: the Passages forms on Review talk to /v2/assessments/:aid/passages directly (as Prepare does), with the facilitator token.
   const passagesToken = deps.token || (() => { try { return globalThis.sessionStorage?.getItem('facilitatorToken') || null; } catch { return null; } });
   // rev440 S1: mount once per draft id and keep that node across repaints (re-inserted, never re-rendered), so an upload or link
@@ -480,6 +481,7 @@ export function mountWizard(root, deps) {
     if (form.dataset.wzForm === 'information') { const c = {}; for (const box of form.querySelectorAll('[data-wz-context]')) { const tid = box.dataset.wzContext, t = latestTemplates(s.data.templates).find(x => x.id === tid); if (!t) continue; const v = contextValues(groupFields(t.perspective), k => fd.get(`c-${tid}-${k}`)); if (Object.keys(v).length) c[tid] = v; } d.context = c; d.demographics = fd.get('demographics') === 'on'; }
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked || box.hasAttribute('data-wz-pre')) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
   };
+  bindLanguagePickers(root, {signal:ac.signal, canEdit:()=>!s.busy&&!s.partial&&!s.saveCtx?.pending});
   root.addEventListener('change', async e => {
     if (e.target.name === 'language' && !s.partial && !s.busy) { read(e.target.form); paint(); if (s.d.language === NEW_LANGUAGE) root.querySelector('input[name=newLanguage]')?.focus(); return; }
     if (e.target.name === 'newOrgPick' && !s.partial && !s.busy) { read(e.target.form); paint(); if (s.d.newOrgOther) root.querySelector('input[name=newOrg]')?.focus(); return; }

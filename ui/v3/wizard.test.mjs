@@ -359,7 +359,7 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
 test('S35: Name, Project, New project name and Language carry the (required) mark like Active until; the ISO code stays optional', () => {
   const existing = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
   assert.match(existing, /Name \(required\)<input name="name"/);
-  assert.match(existing, /Language \(required\)<select name="language"/);
+  assert.match(existing, /Language \(required\)<input type="search"/);
   assert.match(existing, /Project \(required\)<select name="project" required/, 'S38: the select carries required, as validateStep enforces');
   assert.match(renderStep('details', draft(), { projects: [], languages: [], templates: [], saved: true }), /<select name="project" required disabled>/, 'a saved draft keeps the project fixed');
   const fresh = renderStep('details', draft({ project: NEW_PROJECT }), { projects: [], languages: [], templates: [] });
@@ -372,9 +372,10 @@ test('S35: Name, Project, New project name and Language carry the (required) mar
 test('ux-1840: every required details field carries the S34 mark — "(required)" label text and the HTML required attribute — Language select included', () => {
   const existing = renderStep('details', draft({ project: '' }), { projects: [], languages: [], templates: [] });
   assert.match(existing, /Name \(required\)<input name="name" value="[^"]*" required/);
-  assert.match(existing, /Language \(required\)<select name="language" required disabled>/, 'no project yet: required, and disabled until a project is chosen');
+  assert.match(existing, /<select name="language" hidden tabindex="-1" aria-hidden="true" disabled>/, 'hidden serializer is disabled until a project is chosen');
   const picked = renderStep('details', draft({ project: 'p1' }), { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'Hiligaynon' }], templates: [] });
-  assert.match(picked, /Language \(required\)<select name="language" required>/, 'project chosen: required and enabled, as validateStep enforces');
+  assert.match(picked, /<select name="language" hidden tabindex="-1" aria-hidden="true">/, 'hidden serializer has no invisible browser validation target');
+  assert.ok(validateStep('details', draft({language:''})).includes('Choose a language.'));
   const fresh = renderStep('details', draft({ project: NEW_PROJECT }), { projects: [], languages: [], templates: [] });
   assert.match(fresh, /New project name \(required\)<input name="newProject" value="[^"]*" required>/);
   assert.match(fresh, /New language name \(required\)<input name="newLanguage" value="[^"]*" required/);
@@ -1073,4 +1074,33 @@ test('language review normalizes code and explanatory text stays inside Learn mo
   const doc = new JSDOM(renderStep('details', d, {})).window.document;
   assert.match(doc.querySelector('details').textContent, /Survey translation languages are chosen separately/);
   assert.doesNotMatch(doc.querySelector('form').textContent, /Survey translation languages are chosen separately/);
+});
+
+
+test('searchable languages preserve participant selections and save real project identity', async () => {
+  const srv=server(), m=mount(srv);await fillStep1(m);
+  const picker=name=>m.$(`select[name="${name}"]`).closest('[data-picker]');
+  const query=(name,value)=>{const q=picker(name).querySelector('[data-picker-query]');q.value=value;q.dispatchEvent(new m.w.Event('input',{bubbles:true}));};
+  query('language','HINDI');
+  // Existing chosen Hindi remains visibly selected when the query changes.
+  assert.match(picker('language').querySelector('[data-picker-selected]').textContent,/Hindi/);
+  query('lwc','ລາວ');picker('lwc').querySelector('[data-picker-pick="lo"]').click();
+  query('lwc','TH');picker('lwc').querySelector('[data-picker-pick="th"]').click();
+  query('lwc','no matches');
+  assert.deepEqual([...new m.w.FormData(m.$('form')).getAll('lwc')],['lo','th']);
+  assert.match(picker('lwc').querySelector('[data-picker-selected]').textContent,/Lao/);
+  picker('lwc').querySelector('[data-picker-remove="th"]').click();
+  m.submit();await settle();
+  assert.equal(srv.db.a.lwc,'lo');assert.equal(srv.db.a.language_id,'l1');
+});
+
+test('archived search bounds visible restores and matches codes beyond first six', async () => {
+ const srv=server(), orig=srv.api;
+ srv.api=async (url,opts={})=>url==='/v2/projects/p1/languages'&&!opts.method?{languages:[...Array.from({length:15},(_,i)=>({id:'old'+i,name:'Language '+i,code:'code'+i,archived_at:'2026-01-01'}))]}:orig(url,opts);
+ const m=mount(srv);await fillStep1(m);
+ const visible=()=>[...m.root.querySelectorAll('[data-wz=restore-language]')].filter(b=>!b.hidden);
+ assert.equal(visible().length,6);
+ const q=m.$('[data-archive-query]');q.value='CODE14';q.dispatchEvent(new m.w.Event('input',{bubbles:true}));
+ assert.equal(visible().length,1);assert.equal(visible()[0].dataset.languageId,'old14');
+ assert.equal(srv.writes().length,0);
 });
