@@ -1,26 +1,24 @@
 {
-  "version": "0.30.0",
+  "version": "0.30.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "90893285dd216b558bdca2be80f3ee73c8b437dd",
+  "cookbook_commit": "20d236d225a99e33af2fe7f19d1d14e7299c0c42",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.30.0.md",
-      "blob_sha": "d36012be164503cab28d504f90eed04485707eb1",
-      "sha256": "2749e18fc3097da1132b6a6be0fe8313c18c41d382fd34f4096418774b19cc58"
+      "path": "planning/2026-09-16-parity-build/releases/0.30.1.md",
+      "blob_sha": "cf29009eddc9fc795ee3cce6687f333aa7232d76",
+      "sha256": "e17459abf8e8140bdd57de6f5f77dcd54e6caf186550cd33a9d4e075ec020f34"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "657f25bb0a7db0b568d3e42ec6dd753fc55c2a1d",
-      "sha256": "bc0ac5be74630dc3bfc9c76c4b5d32c983ea2482525351b45ad5f30e6890dd71"
+      "blob_sha": "454dfd321dd9cd74e470066941d61134e5f902f2",
+      "sha256": "35897a2497894dcea43a0a33868ec09f90202c448a35ee75af295d8a79007efc"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Default-off production participant-report admission, retaining existing scoring, snapshots, access checks and the assessment response minimum. Activation requires explicit disclosure-policy approval; this candidate configures no environment. (#464)"
-      ],
-      "changed": [],
-      "fixed": []
+      "fixed": [
+        "Understand result bands support swappable signal bars, faces, jars and plants with distinct missing-input visuals; existing labels, scores, thresholds, response gates and permissions unchanged. (#467)"
+      ]
     }
   }
 }
