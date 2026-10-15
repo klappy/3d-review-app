@@ -1,6 +1,7 @@
 import type { Ctx, Role, ScopeType } from "./handlers/types";
 import { CapError, notVisible } from "./handlers/types";
 import type { Capability } from "./registry";
+import { projectRole } from "./handlers/common";
 
 /** Where a capability's target scope comes from in params. */
 export function targetScope(cap: Capability, params: Record<string, any>): { type: ScopeType; id: string } | null {
@@ -17,6 +18,8 @@ export function targetScope(cap: Capability, params: Record<string, any>): { typ
 }
 
 export async function roleAt(ctx: Ctx, scope: { type: ScopeType; id: string }): Promise<Role | null> {
+  // Projects inherit their workspace's grant (cookbook work/active/2026-10-15-3d-workspace-permissions).
+  if (scope.type === "project") return projectRole(ctx, scope.id);
   const r = await ctx.db.prepare("SELECT role FROM grant WHERE principal_id = ? AND scope_type = ? AND scope_id = ?")
     .bind(ctx.principal.id, scope.type, scope.id).first<{ role: Role }>();
   return r?.role ?? null;
@@ -29,7 +32,7 @@ export const requiredRole = (roles: string): Role =>
   roles.startsWith("O, M") || roles.startsWith("project O, M") ? "member" : roles === "O" ? "owner" : "viewer";
 export const roleMeets = (have: Role, need: Role): boolean => RANK[have] >= RANK[need];
 
-/** Authorize per the matrix's role string. No inheritance. Unauthorized == nonexistent. */
+/** Authorize per the matrix's role string. Only inheritance: workspace → grouped project. Unauthorized == nonexistent. */
 export async function authorize(ctx: Ctx, cap: Capability, params: Record<string, any>): Promise<void> {
   const p = ctx.principal;
   if (cap.public) return;

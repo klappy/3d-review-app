@@ -1,9 +1,11 @@
 import { ensureLegacyTemplates, LEGACY_TEMPLATE_IDS } from "../legacy-templates";
 import { withDisplayName } from "../display-names";
 // Shared helpers for data handlers: ids, hashing, params, visibility/role checks.
-// Roles come from `grant` rows at the exact scope (D2: no inheritance). The one
-// grouping-listing exception (03 matrix): a project grant lets its holder see the
-// project's assessments; a workspace grant lists grouped projects (names only).
+// Roles come from `grant` rows at the exact scope, with ONE inheritance edge
+// (3d-review-cookbook work/active/2026-10-15-3d-workspace-permissions): a workspace
+// grant (owner/member/viewer) applies to every project grouped in that workspace —
+// effective project role = max(project grant, workspace grant). Assessments still
+// open only by an explicit assessment grant (D9 unchanged).
 import type { Ctx, Role, ScopeType } from "./types";
 import { CapError, notVisible } from "./errors";
 
@@ -107,6 +109,19 @@ export async function roleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): P
     .first<{ role: Role }>();
   return row?.role ?? null;
 }
+/** Effective project role: max(direct project grant, grant on the workspace that groups it). One query; null when neither. */
+export async function projectRole(ctx: Ctx, projectId: string): Promise<Role | null> {
+  if (ctx.principal.kind !== "user" && ctx.principal.kind !== "support") return null;
+  const { results } = await ctx.db
+    .prepare(`SELECT g.role AS role FROM "grant" g WHERE g.principal_id = ? AND ((g.scope_type = 'project' AND g.scope_id = ?) OR (g.scope_type = 'workspace' AND g.scope_id = (SELECT p.workspace_id FROM project p WHERE p.id = ?)))`)
+    .bind(ctx.principal.id, projectId, projectId)
+    .all<{ role: Role }>();
+  return (results ?? []).reduce<Role | null>((acc, r) => maxRole(acc, r.role), null);
+}
+/** Role at a scope as authorization sees it: projects inherit from their workspace; other scopes are exact. */
+export async function effectiveRoleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<Role | null> {
+  return scopeType === "project" ? projectRole(ctx, scopeId) : roleAt(ctx, scopeType, scopeId);
+}
 export function maxRole(a: Role | null, b: Role | null): Role | null {
   if (!a) return b;
   if (!b) return a;
@@ -141,7 +156,7 @@ export async function loadWorkspace(ctx: Ctx, id: string, min: Role = "viewer"):
 }
 export async function loadProject(ctx: Ctx, id: string, min: Role = "viewer"): Promise<{ row: ProjectRow; role: Role }> {
   const row = await ctx.db.prepare("SELECT * FROM project WHERE id = ?").bind(id).first<ProjectRow>();
-  const role = row ? await roleAt(ctx, "project", id) : null;
+  const role = row ? await projectRole(ctx, id) : null;
   if (!row) throw notVisible("project");
   return { row, role: gate(role, min, "project") };
 }

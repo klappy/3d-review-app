@@ -3,7 +3,7 @@
 import { magicLinkEnabled } from "../magic-link";
 import type { Ctx, Handler, Role, ScopeType } from "./types";
 import { CapError, notVisible } from "./errors";
-import { ROLE_RANK, atLeast, countScalar, gate, newId, nowIso, randomToken, reqRole, reqScope, reqStr, roleAt, sha256 } from "./common";
+import { ROLE_RANK, atLeast, countScalar, gate, newId, nowIso, randomToken, reqRole, reqScope, reqStr, roleAt, effectiveRoleAt, sha256 } from "./common";
 import { invitationMessage, normalizeAddress, publicOrigin, sendMail, type MailEnv, type MailResult } from "../mail";
 
 type Scope = { type: "workspace" | "project" | "assessment"; id: string };
@@ -22,7 +22,7 @@ const INVITES_PER_INVITER_HOUR = 30;  // outbound mail from the captain's domain
 
 /** The caller's role at the scope; hidden when none. */
 async function callerAt(ctx: Ctx, scope: Scope, min: Role): Promise<Role> {
-  return gate(await roleAt(ctx, scope.type, scope.id), min, scope.type);
+  return gate(await effectiveRoleAt(ctx, scope.type, scope.id), min, scope.type);
 }
 /** D3: a member may act only up to member. */
 function ceiling(caller: Role, target: Role, what: string) {

@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.30.5",
+  "current": "0.31.0",
   "versions": [
+    {
+      "version": "0.31.0",
+      "status": "candidate",
+      "notes_path": "releases/0.31.0.md",
+      "sections": {
+        "changed": [
+          "Workspace roles now apply to every project grouped in the workspace: a workspace owner, member or viewer opens each grouped project at that role (the higher of the workspace and any direct project grant) without a per-project invite. Viewers still cannot edit; people outside the workspace still see none of its projects; assessments still open only with their own grant. Workspace cards count every grouped project. (#PR)"
+        ]
+      }
+    },
     {
       "version": "0.30.5",
       "status": "candidate",
