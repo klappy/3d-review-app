@@ -45,7 +45,7 @@ const click = (h, attrs) => {
 test('ASK 24 (a): #signin with email links on — the link form first, then "Sign in with a code instead" to /v2/auth/access', () => {
   const html = pages.entry.render(ctx(true), signinModel());
   linkFirst(html, '#signin'); assert.equal(CODE_SIGNIN_LABEL, 'Sign in with a code instead');
-  assert.ok(html.indexOf(CODE) < html.indexOf('<details class="sandbox-signin"'), 'code link above the sandbox');
+  assert.ok(!html.includes('sandbox-signin'), 'normal sign-in does not expose sandbox identities');
 });
 test('ASK 24 (a): public Home "Sign in" with email links on opens #signin (the link-first screen), never the Access route directly', () => {
   const home = pages.entry.render(ctx(true), { mode: 'welcome', signin: { email: '', devCode: null, stage: 'email' } });

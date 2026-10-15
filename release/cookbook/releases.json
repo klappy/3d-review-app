@@ -1,16 +1,28 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.30.1",
+  "current": "0.30.2",
   "versions": [
     {
-      "version": "0.30.1",
+      "version": "0.30.2",
       "status": "candidate",
+      "notes_path": "releases/0.30.2.md",
+      "sections": {
+        "fixed": [
+          "Human-facing pages remove capability inventories and generic help accordions, show essential guidance inline, and keep synthetic sign-in tools off normal login screens. Reporting activation and authentication rules unchanged."
+        ]
+      }
+    },
+    {
+      "version": "0.30.1",
+      "status": "released",
       "notes_path": "releases/0.30.1.md",
       "sections": {
         "fixed": [
           "Understand result bands support swappable signal bars, faces, jars and plants with distinct missing-input visuals; existing labels, scores, thresholds, response gates and permissions unchanged. (#467)"
         ]
-      }
+      },
+      "tag": "v0.30.1",
+      "date": "2026-10-15"
     },
     {
       "version": "0.30.0",
