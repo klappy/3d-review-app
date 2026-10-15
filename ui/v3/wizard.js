@@ -387,7 +387,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
       </div>
       <label>What will participants consider?<input name="purpose" value="${esc(d.purpose)}" placeholder="e.g. The Genesis 1 to 3 draft"></label>
-      <p class="small muted">English is always available for participants.</p>${languagePicker({name:'lwc',label:'Participant survey languages',options:LWC_LANGUAGES.map(l=>({id:l.code,name:l.name+(l.mt===false?' (interpreter or video)':''),native:l.endonym,code:l.code})),selected:d.lwc||[],multiple:true,max:MAX_LWC})}
+      <p class="small muted">English is always available for participants.</p>${languagePicker({name:'lwc',label:'Participant survey languages',options:LWC_LANGUAGES.map(l=>({id:l.code,name:l.name+(l.mt===false?' (interpreter or video)':''),native:l.endonym===l.name?'':l.endonym,code:l.code})),selected:d.lwc||[],multiple:true,max:MAX_LWC})}
       ${act(false, '<button class="primary" type="submit">Continue</button>')}
     </form>`;
   if (step === 'participants') return `${head(n, 'Who will participate?', 'Choose the groups you can reach.', '<p class="muted">Three perspectives, kept separate.</p><p class="muted">The number is optional. Leave it empty if you don\'t know for sure; counts then show as "n responded". Groups you leave out can be added later.</p>')}${errBox(errs)}
