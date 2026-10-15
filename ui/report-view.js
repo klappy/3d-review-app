@@ -44,6 +44,7 @@ function list(doc, rows) {
 }
 function section(doc, heading, body) {
   const s = el(doc, 'section');
+  s.className = 'report-detail-section glass panel';
   s.append(el(doc, 'h4', heading), ...body);
   return s;
 }

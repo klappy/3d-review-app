@@ -1,23 +1,42 @@
 /* Pinned glass composition; identity colors do not encode score or a band. */
-.rv #report-view .report-lens-grid {
+.rv :is(#report-view, [data-report-view]) .report-lens-grid {
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
   gap:var(--gap-three);
   list-style:none;
   padding:0;
 }
-.rv #report-view .report-lens-card {
+.rv :is(#report-view, [data-report-view]) .report-lens-card {
   min-width:0;
   margin:0;
   overflow-wrap:anywhere;
   border-top:var(--lens-w) solid var(--line);
 }
-.rv #report-view .report-lens-card[data-lens="team" i], .rv #report-view .report-lens-card[data-lens="Translation Team"] { border-top-color:var(--lens-green); }
-.rv #report-view .report-lens-card[data-lens="community" i] { border-top-color:var(--lens-blue); }
-.rv #report-view .report-lens-card[data-lens="church" i] { border-top-color:var(--lens-yellow); }
-.rv #report-view .report-lens-card > h5 { font-size:16px; margin:0 0 7px; }
-.rv #report-view .report-lens-score { font-size:clamp(14px,1.3vw,18px); font-weight:600; font-variant-numeric:tabular-nums; }
+.rv :is(#report-view, [data-report-view]) .report-lens-card[data-lens="team" i], .rv :is(#report-view, [data-report-view]) .report-lens-card[data-lens="Translation Team"] { border-top-color:var(--lens-green); }
+.rv :is(#report-view, [data-report-view]) .report-lens-card[data-lens="community" i] { border-top-color:var(--lens-blue); }
+.rv :is(#report-view, [data-report-view]) .report-lens-card[data-lens="church" i] { border-top-color:var(--lens-yellow); }
+.rv :is(#report-view, [data-report-view]) .report-lens-card > h5 { font-size:16px; margin:0 0 7px; }
+.rv :is(#report-view, [data-report-view]) .report-lens-score { font-size:clamp(14px,1.3vw,18px); font-weight:600; font-variant-numeric:tabular-nums; }
 @media(max-width:760px) {
-  .rv #report-view .report-lens-grid { grid-template-columns:1fr; }
-  .rv #report-view .report-lens-score { font-size:18px; }
+  .rv :is(#report-view, [data-report-view]) .report-lens-grid { grid-template-columns:1fr; }
+  .rv :is(#report-view, [data-report-view]) .report-lens-score { font-size:18px; }
 }
+
+/* Full report detail only: the assessment overview keeps its existing band composition. */
+.rv :is(#report-view, [data-report-view]) { display:grid; gap:var(--gap-grid); }
+.rv :is(#report-view, [data-report-view]) > p { margin:0; color:var(--secondary); line-height:1.5; }
+.rv :is(#report-view, [data-report-view]) > details { color:var(--secondary); }
+.rv :is(#report-view, [data-report-view]) > details summary { cursor:pointer; }
+.rv :is(#report-view, [data-report-view]) h4 { margin:0 0 var(--gap-grid); font-size:1.125rem; line-height:1.4; }
+.rv :is(#report-view, [data-report-view]) .report-lens-grid { margin:0; }
+.rv :is(#report-view, [data-report-view]) .report-lens-score { margin:var(--gap-row) 0; color:var(--ink); overflow-wrap:anywhere; }
+.rv :is(#report-view, [data-report-view]) .report-lens-card > ul,
+.rv :is(#report-view, [data-report-view]) .report-detail-section > ul { list-style:none; padding:0; margin:0; }
+.rv :is(#report-view, [data-report-view]) .report-lens-card > ul > li,
+.rv :is(#report-view, [data-report-view]) .report-detail-section > ul > li { padding:var(--gap-row) 0; line-height:1.5; overflow-wrap:anywhere; }
+.rv :is(#report-view, [data-report-view]) li + li { border-top:1px solid var(--line); }
+.rv :is(#report-view, [data-report-view]) .report-detail-section > ul > li > ul { display:flex; flex-wrap:wrap; gap:var(--gap-pip) var(--gap-grid); list-style:none; padding:0; margin:var(--gap-pip) 0 0; color:var(--secondary); font-size:.875rem; }
+.rv :is(#report-view, [data-report-view]) .report-detail-section > ul > li > ul > li { border:0; }
+.rv :is(#report-view, [data-report-view]) .report-detail-section > p { line-height:1.65; max-width:65ch; margin:0; }
+.rv :is(#report-view, [data-report-view]) .report-detail-section > p + p { margin-top:var(--gap-grid); }
+.rv :is(#report-view, [data-report-view]) .report-detail-section { margin:0; min-width:0; padding:var(--panel-pad); }
