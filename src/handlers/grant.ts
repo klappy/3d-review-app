@@ -1,5 +1,5 @@
 // cap.grant.* — invitations and grants at exactly one scope. D3: members invite ≤ member; owners are never removed or demoted;
-// the last owner is protected; transfer is dangerous. No inheritance (D2). Existence never leaks. Lane B (Fable) — owner per #14 c5704577820.
+// the last owner is protected; transfer is dangerous. Grants are stored at one scope; a workspace grant applies to its grouped projects (common.projectRole). Existence never leaks. Lane B (Fable) — owner per #14 c5704577820.
 import { magicLinkEnabled } from "../magic-link";
 import type { Ctx, Handler, Role, ScopeType } from "./types";
 import { CapError, notVisible } from "./errors";

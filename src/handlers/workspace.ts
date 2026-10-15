@@ -3,7 +3,7 @@
 import type { Handler, Role } from "./types";
 import { CapError, notVisible } from "./errors";
 import {
-  atLeast, countScalar, loadProject, loadWorkspace, newId, nowIso, patchOf, reqStr, requireUser,
+  countScalar, loadProject, loadWorkspace, newId, nowIso, patchOf, reqStr, requireUser, roleAt,
   type ProjectRow, type WorkspaceRow,
 } from "./common";
 
@@ -92,19 +92,26 @@ export const del: Handler = async (ctx, params, opts) => {
   return { result: { deleted: true, id }, scope: { type: "workspace", id }, impact, priorState: { workspace: row } };
 };
 
-/** Requires share authority over the project (D2): owner at workspace, or member+ at workspace with owner on the project. */
-async function shareAuthority(ctx: Parameters<Handler>[0], wid: string, pid: string): Promise<{ w: WorkspaceRow; p: ProjectRow }> {
+/**
+ * Share authority over a project (D2). Grouping hands the project's roles to every workspace grantee, so the
+ * project-side condition reads the DIRECT project grant only — an inherited role can never satisfy it
+ * (HOLD #483 c6204382554: member → self-service workspace owner → add_project → inherited project owner).
+ * - add: workspace member+ AND direct project owner.
+ * - remove: workspace owner (ungrouping only narrows access), or workspace member+ with direct project owner.
+ */
+async function shareAuthority(ctx: Parameters<Handler>[0], wid: string, pid: string, op: "add" | "remove"): Promise<{ w: WorkspaceRow; p: ProjectRow }> {
   const { row: w, role: wRole } = await loadWorkspace(ctx, wid, "member");
-  const { row: p, role: pRole } = await loadProject(ctx, pid, "viewer");
-  const ok = (wRole === "owner" && atLeast(pRole, "member")) || (wRole === "member" && pRole === "owner");
-  if (!ok) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "share authority over the project is required", "D2");
+  const { row: p } = await loadProject(ctx, pid, "viewer");
+  const directOwner = (await roleAt(ctx, "project", pid)) === "owner";
+  const ok = op === "add" ? directOwner : wRole === "owner" || directOwner;
+  if (!ok) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "a direct owner grant on the project is required", "D2: share authority needs a direct project owner grant, not an inherited one");
   return { w, p };
 }
 
 export const add_project: Handler = async (ctx, params) => {
   const wid = reqStr(params, "id");
   const pid = reqStr(params, "pid");
-  const { p } = await shareAuthority(ctx, wid, pid);
+  const { p } = await shareAuthority(ctx, wid, pid, "add");
   if (p.workspace_id && p.workspace_id !== wid) throw new CapError("INVALID_PARAMS", "project already grouped in another workspace", "remove_project first");
   await ctx.db.prepare("UPDATE project SET workspace_id = ? WHERE id = ?").bind(wid, pid).run();
   const affectedGrants = await countScalar(ctx, 'SELECT COUNT(*) AS n FROM "grant" WHERE scope_type = ? AND scope_id = ?', "workspace", wid);
@@ -114,7 +121,7 @@ export const add_project: Handler = async (ctx, params) => {
 export const remove_project: Handler = async (ctx, params) => {
   const wid = reqStr(params, "id");
   const pid = reqStr(params, "pid");
-  const { p } = await shareAuthority(ctx, wid, pid);
+  const { p } = await shareAuthority(ctx, wid, pid, "remove");
   if (p.workspace_id !== wid) throw notVisible("project in workspace");
   await ctx.db.prepare("UPDATE project SET workspace_id = NULL WHERE id = ?").bind(pid).run();
   const affectedGrants = await countScalar(ctx, 'SELECT COUNT(*) AS n FROM "grant" WHERE scope_type = ? AND scope_id = ?', "workspace", wid);

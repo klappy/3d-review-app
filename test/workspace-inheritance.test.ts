@@ -91,3 +91,56 @@ describe("workspace → project role inheritance", () => {
     await expect(add_project(mem, { id: "ws_a", pid: "prj_out" })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
   });
 });
+
+// HOLD #483 c6204382554: grouping hands the project's roles to every workspace grantee, so add_project needs a
+// DIRECT project owner grant. A project member must not become owner via a self-service workspace.
+const mf2 = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "w2", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "ws-escalation-db" } }] }));
+afterAll(() => mf2.dispose());
+
+describe("workspace grouping cannot mint project ownership", () => {
+  it("member → self-service workspace → add_project is refused; direct owner still groups", async () => {
+    const db = await mf2.getD1Database("DB");
+    const sql = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
+    await db.batch(sql("../migrations/0001_init.sql").split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)));
+    const now = new Date("2026-10-15T23:00:00.000Z");
+    const at = now.toISOString();
+    let trace = 0;
+    const mk = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_esc_${++trace}`, now: () => now, log: () => {} });
+    for (const id of ["u_m", "u_po", "u_wo"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    for (const id of ["prj_x", "prj_y"]) await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind(id, null, id, at, "u_po").run();
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_po", "Owner WS", at, "u_po").run();
+    const grant = (id: string, p: string, t: string, s: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, t, s, r, at).run();
+    await grant("e1", "u_m", "project", "prj_x", "member");
+    await grant("e2", "u_po", "project", "prj_x", "owner");
+    await grant("e3", "u_po", "project", "prj_y", "owner");
+    await grant("e4", "u_po", "workspace", "ws_po", "owner");
+    await grant("e5", "u_wo", "workspace", "ws_po", "owner");
+    const m = mk("u_m"), po = mk("u_po"), wo = mk("u_wo");
+
+    // u_m (direct project member) creates a workspace — self-service, becomes its owner
+    const created: any = await execute(mk("u_m"), "cap.workspace.create", { name: "Mine" }, { tool: "write" });
+    expect(JSON.stringify(created)).not.toContain("NOT_AUTHORIZED");
+    const wsM = (await db.prepare('SELECT scope_id FROM "grant" WHERE principal_id = ? AND scope_type = ?').bind("u_m", "workspace").first<{ scope_id: string }>())!.scope_id;
+
+    // NEGATIVE: grouping prj_x is refused on both faces; the project stays ungrouped and u_m stays member
+    await expect(add_project(m, { id: wsM, pid: "prj_x" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    const viaDispatch: any = await execute(mk("u_m"), "cap.workspace.add_project", { id: wsM, pid: "prj_x" }, { tool: "write" });
+    expect(JSON.stringify(viaDispatch)).toContain("NOT_AUTHORIZED_AT_SCOPE");
+    expect((await db.prepare("SELECT workspace_id FROM project WHERE id = ?").bind("prj_x").first<{ workspace_id: string | null }>())!.workspace_id).toBeNull();
+    expect((await projectGet(m, { id: "prj_x" })).result.project.role).toBe("member");
+    await expect(projectUpdate(m, { id: "prj_x", name: "hijacked" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+
+    // A direct project owner groups prj_y into their workspace; inherited ownership does not let another
+    // workspace owner re-home it, nor let a project's inherited owner group a different project.
+    await expect(add_project(po, { id: "ws_po", pid: "prj_y" })).resolves.toMatchObject({ result: { grouped: true } });
+    expect((await projectGet(wo, { id: "prj_y" })).result.project.role).toBe("owner"); // intended: owner shared it
+    await expect(add_project(wo, { id: wsM, pid: "prj_y" })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" }); // wo has no grant on wsM
+    // inherited owner (wo) cannot use add_project as an authority source on its own workspace either
+    await grant("e6", "u_wo", "project", "prj_x", "member");
+    await expect(add_project(wo, { id: "ws_po", pid: "prj_x" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+
+    // ungrouping only narrows access: a workspace owner may remove a grouped project
+    await expect(remove_project(wo, { id: "ws_po", pid: "prj_y" })).resolves.toMatchObject({ result: { grouped: false } });
+    await expect(projectGet(wo, { id: "prj_y" })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
+  });
+});

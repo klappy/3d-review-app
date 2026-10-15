@@ -1,4 +1,4 @@
-// Project grants are exact-scope; no workspace or assessment grant is inherited.
+// Project role = max(direct project grant, grant on the workspace that groups it); assessment grants are never inherited (D9).
 import type { Handler, Role } from "./types";
 import { CapError } from "./errors";
 import { countScalar, loadProject, newId, nowIso, patchOf, reqStr, requireUser, type ProjectRow } from "./common";
