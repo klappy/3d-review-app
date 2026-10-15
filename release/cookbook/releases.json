@@ -1,7 +1,20 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.29.0",
+  "current": "0.29.1",
   "versions": [
+    {
+      "version": "0.29.1",
+      "status": "candidate",
+      "notes_path": "releases/0.29.1.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Assessment setup can add a named language to an existing project or explicitly restore and select an archived language. Optional language codes accept mixed case and store lowercase; duplicate and retry handling preserve the assessment's language identity. Survey translation support stays separate. (#463)",
+          "Local facilitator fixture outcomes: six of six setup runs passed across phone and laptop (existing project, new project, archived restore with failure/retry). No human usability measurement or Bincy exact-input reproduction. DEV and production verification pending."
+        ]
+      }
+    },
     {
       "version": "0.29.0",
       "status": "candidate",
