@@ -27,6 +27,14 @@ test('L1 spread cut points: ≤10 agree, ≥30 disagree, between is mixed', () =
   assert.deepEqual([0, 10, 10.01, 29.99, 30, 80].map(x => spreadBand(x)), ['agree', 'agree', 'mixed', 'mixed', 'disagree', 'disagree']);
 });
 
+test('L1b the chip classifies the rounded difference it displays (10.25 shows 10 → agree; 29.5 shows 30 → disagree)', () => {
+  const at = spread => lensSpreadRows({ payload: { cross_lens_multi: [{ construct_name: 'x', lens_scores: [{ lens: 'Church', score: 50 + spread }, { lens: 'Community', score: 50 }] }] } })[0];
+  for (const [spread, band, shownText] of [[10.25, 'agree', 'Lenses agree · Difference 10'], [10.5, 'mixed', 'Some difference · Difference 11'], [29.49, 'mixed', 'Some difference · Difference 29'], [29.5, 'disagree', 'Lenses disagree · Difference 30']]) {
+    assert.equal(at(spread).band, band, `spread ${spread}`);
+    assert.match(lensesAgreeMarkup({ payload: { cross_lens_multi: [{ construct_name: 'x', lens_scores: [{ lens: 'Church', score: 50 + spread }, { lens: 'Community', score: 50 }] }] } }), new RegExp(shownText));
+  }
+});
+
 test('L2 respondent counts per lens come from the report evidence labels', () => {
   assert.deepEqual([...lensRespondents(SYNTH.payload)], [['Church', 5], ['Community', 7], ['Translation Team', 1]]);
   // The Consultant form sits inside the Church lens score (pinned scorer); its share is named, never re-scored here.

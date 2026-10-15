@@ -65,7 +65,7 @@ export function lensSpreadRows(report) {
     if (!lenses.length) return null;
     const scores = lenses.map(s => s.score);
     const spread = lenses.length >= 2 ? Math.max(...scores) - Math.min(...scores) : null;
-    return { name: String(entry.construct_name), spread, band: spread === null ? null : spreadBand(spread), lenses, order };
+    return { name: String(entry.construct_name), spread, band: spread === null ? null : spreadBand(Math.round(spread)), lenses, order }; // band from the whole-point value the chip shows
   }).filter(Boolean);
   return all.sort((a, b) => (a.spread === null) - (b.spread === null) || (b.spread ?? 0) - (a.spread ?? 0) || a.order - b.order)
     .map(({ order, ...row }) => row);
