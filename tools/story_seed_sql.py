@@ -2,9 +2,11 @@
 """seed/story/scenarios.json + seed/synthetic/answer-sets.json -> seed/story-scenarios.sql
 
 Two demo story projects remixed from the existing synthetic persona submissions (no real data):
-  A  church high / translation team + consultant low, weakness "no translation brief" (TR-Q1),
+  A  Church lens high / Translation Team lens low, weakness "no documented translation brief" (TR-Q1),
      assessment next-step note carries a PLACEHOLDER video link (link not yet provided);
   B  the reverse.
+Church lens = Involved-Pastor rows only: the product files tpl_consultant under perspective Church,
+so consultant rows are left out to keep the lens split clean.
 Each source row is copied from answer-sets.json; `set` pins named items to an option code and
 `transform` floor|ceiling moves every scored single item to its lowest|highest scored option.
 Every derivation is written into provenance_json. Rows are source='synthetic', names carry SYNTHETIC.
