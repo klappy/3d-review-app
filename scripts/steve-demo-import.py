@@ -226,7 +226,9 @@ def build_batch(plan, expected_hash, source):
     for table in TABLE_ORDER:
         rows=plan['rows'][table]
         guard('(SELECT COUNT(*) FROM "'+table+'" WHERE id IN (SELECT value FROM json_each(?)))=?',[canonical([r['id'] for r in rows]),len(rows)])
-    guard('EXISTS(SELECT 1 FROM receipt WHERE id=? AND actor=? AND scope_id=? AND json_extract(prior_state_json,\'$.plan_sha256\')=?)',[receipt_id,plan['owner'],plan['workspace_id'],expected_hash])
+        same=' AND '.join('actual."'+c+'" IS '+"json_extract(j.value,'$."+c+"')" for c in rows[0])
+        guard("NOT EXISTS(SELECT 1 FROM json_each(?) j JOIN \""+table+"\" actual ON actual.id=json_extract(j.value,'$.id') WHERE NOT ("+same+"))",[canonical(rows)])
+    guard('EXISTS(SELECT 1 FROM receipt WHERE id IS ? AND actor IS ? AND capability IS ? AND scope_type IS ? AND scope_id IS ? AND class IS ? AND inverse IS ? AND trace_id IS ? AND prior_state_json IS ? AND at IS ?)',[receipt_id,plan['owner'],'script.steve_demo_import','workspace',plan['workspace_id'],'write.reversible','reviewed namespace removal only','script_sd_'+plan['namespace'],canonical(receipt),plan['created_at']])
     return {'batch':batch}
 
 

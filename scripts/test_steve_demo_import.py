@@ -41,6 +41,16 @@ class ImportTests(unittest.TestCase):
   self.db.execute("CREATE TRIGGER fail_response BEFORE INSERT ON response BEGIN SELECT RAISE(ABORT,'simulated failure'); END;")
   with self.assertRaises(sqlite3.IntegrityError):self.run_batch(self.batch())
   self.assertEqual(self.db.execute('SELECT COUNT(*) FROM workspace').fetchone()[0],0)
+ def test_actual_rest_batch_transformed_rows_roll_back(self):
+  self.db.execute("CREATE TRIGGER transform_project AFTER INSERT ON project BEGIN UPDATE project SET name='unexpected transformed name' WHERE id=NEW.id; END;")
+  with self.assertRaises(sqlite3.OperationalError):self.run_batch(self.batch())
+  for table in m.TABLE_ORDER+['receipt']:
+   self.assertEqual(self.db.execute('SELECT COUNT(*) FROM "'+table+'"').fetchone()[0],0)
+ def test_actual_rest_batch_receipt_mismatch_refused(self):
+  self.run_batch(self.batch())
+  self.db.execute("UPDATE receipt SET prior_state_json=json_set(prior_state_json,'$.counts.response',0)");self.db.commit()
+  with self.assertRaises(sqlite3.OperationalError):self.run_batch(self.batch())
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM response').fetchone()[0],425)
  def test_actual_rest_batch_partial_refused(self):
   self.db.execute('INSERT INTO workspace(id,name,created_at)VALUES(?,?,?)',(self.plan['workspace_id'],'collision','test'));self.db.commit()
   with self.assertRaises(sqlite3.OperationalError):self.run_batch(self.batch())
