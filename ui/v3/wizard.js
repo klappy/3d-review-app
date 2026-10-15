@@ -482,6 +482,14 @@ export function mountWizard(root, deps) {
     if (form.dataset.wzForm === 'participants') { const g = {}; for (const box of form.querySelectorAll('input[name=g]')) if (box.checked || box.hasAttribute('data-wz-pre')) g[box.value] = { version: box.dataset.version, expected: String(fd.get('n-' + box.value) || '') }; d.groups = g; }
   };
   bindLanguagePickers(root, {signal:ac.signal, canEdit:()=>!s.busy&&!s.partial&&!s.saveCtx?.pending});
+  // Sticky Continue must never obscure a keyboard-focused field or result.
+  root.addEventListener('focusin', e => {
+    const form = e.target.closest('form[data-wz-form="details"]');
+    const footer = form?.querySelector(':scope > .actions');
+    if (!footer || footer.contains(e.target)) return;
+    const target = e.target.getBoundingClientRect(), edge = footer.getBoundingClientRect();
+    if (target.bottom > edge.top && target.top < edge.bottom) e.target.scrollIntoView?.({block:'center', inline:'nearest'});
+  }, on);
   root.addEventListener('change', async e => {
     if (e.target.name === 'language' && !s.partial && !s.busy) { read(e.target.form); paint(); if (s.d.language === NEW_LANGUAGE) root.querySelector('input[name=newLanguage]')?.focus(); return; }
     if (e.target.name === 'newOrgPick' && !s.partial && !s.busy) { read(e.target.form); paint(); if (s.d.newOrgOther) root.querySelector('input[name=newOrg]')?.focus(); return; }

@@ -41,3 +41,6 @@
 /* F4: optional Passages block on Review (forms from ui/assess/passages.js; its own heading is kept for the section's name). */
 .v3-wizard .wz-passages{margin:8px 0 20px}.v3-wizard .wz-passages .passages{margin-top:0}.v3-wizard .wz-passages .passages>h3{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .v3-wizard .wz-passages .p-forms label{margin:0;font-weight:400}.v3-wizard .wz-passages .p-forms input{min-width:0}
+
+/* Reserve a safe scroll landing above the sticky Continue strip, including help. */
+.v3-wizard form[data-wz-form=details] :is(input,button,label,summary,[data-picker-status]){scroll-margin-block:100px}
