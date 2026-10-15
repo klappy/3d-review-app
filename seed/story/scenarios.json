@@ -1,0 +1,32 @@
+{
+ "_note": "Two clearly-synthetic demo stories remixed from seed/synthetic/answer-sets.json (persona generator @ f042cde). No real participant data. Consumed by tools/story_seed_sql.py.",
+ "synthetic": true,
+ "scenarios": [
+  {
+   "id": "church-high-team-low",
+   "name": "Demo Story A: church high, team and consultant low (SYNTHETIC)",
+   "language": "Story A language (invented, synthetic)",
+   "period": "2026-09",
+   "weakness": {"item": "TR-Q1", "label": "no translation brief"},
+   "notes_next_steps": "SYNTHETIC DEMO. Highlighted weakness: no translation brief (TR-Q1). Next step: watch the short video on writing a translation brief. Link: PLACEHOLDER (video link not yet provided).",
+   "sources": [
+    {"project": "model-project", "form": "Involved-Pastor"},
+    {"project": "struggling-project", "form": "Validation", "set": {"TR-Q1": "working-on"}},
+    {"project": "trust-unchecked", "form": "Consultant", "cycle": "trust-unchecked-2026-01", "transform": "floor"}
+   ]
+  },
+  {
+   "id": "team-high-church-low",
+   "name": "Demo Story B: team and consultant high, church low (SYNTHETIC)",
+   "language": "Story B language (invented, synthetic)",
+   "period": "2026-09",
+   "weakness": null,
+   "notes_next_steps": null,
+   "sources": [
+    {"project": "struggling-project", "form": "Involved-Pastor"},
+    {"project": "model-project", "form": "Validation", "set": {"TR-Q1": "documented"}},
+    {"project": "trust-outvoted-expert", "form": "Consultant", "cycle": "trust-outvoted-expert-2026-01", "transform": "ceiling"}
+   ]
+  }
+ ]
+}
