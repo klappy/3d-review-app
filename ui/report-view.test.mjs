@@ -70,14 +70,14 @@ test('R2 lenses print scores exactly as returned; an empty sub-dimension list ad
   assert.deepEqual(sectionRows(root, copy.lenses), ['team', '66.66666', 'Overall score', 'process', 'Score', '70', 'Items included', '3', 'relationships', 'Score', '63.3333', 'Items included', '2', 'church', '0', 'Overall score']);
 });
 
-test('R3 lenses agree block leads: scores and spread only, no average, multi before single, counts visible', () => {
+test('R3 lenses agree block leads: exact scores and spread as returned, no average, multi before single, counts visible', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
   const rowsText = sectionRows(root, copy.crossLens);
   assert.deepEqual(rowsText.slice(0, 15), [
-    'Each line shows one area scored by more than one lens, on a 0–100 scale. Biggest difference first.',
-    'Shared understanding', 'Some difference · Difference 12', '0', '100', 'team ', '62', ' responses not counted', 'community ', '50', ' responses not counted',
-    'Church involvement', 'Only one lens scored this area', '0', '100',
+    'Each line shows one area scored by more than one perspective, on a 0–100 scale. Biggest difference first.',
+    'Shared understanding', 'Some difference · Difference 12.25', '0', '100', 'Translation team ', '61.75', ' responses not counted', 'Community ', '49.5', ' responses not counted',
+    'Church involvement', 'Only one perspective scored this area', '0', '100',
   ]);
   assert.doesNotMatch(rowsText.join('\n'), /average|mean/i);
 });
