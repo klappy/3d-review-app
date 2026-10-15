@@ -1,23 +1,25 @@
 {
-  "version": "0.30.4",
+  "version": "0.30.5",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "b7f4404e1822e7b09899e6c32207a18e7509daff",
+  "cookbook_commit": "9fd5e1b9e97b050f86720b02a97a702f4c95472a",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.30.4.md",
-      "blob_sha": "f2469fe7b19cbfa4e293029baab597817ac502f1",
-      "sha256": "6f42972112364c01c71f2da1778188de4c23e47a7869a999db12f5938040acf7"
+      "path": "planning/2026-09-16-parity-build/releases/0.30.5.md",
+      "blob_sha": "7e46d7cfdbfdf253a7018bef96a9ffbeba942eef",
+      "sha256": "c422d0a539f4e747484dd9b018349c96ad3b9ea44aa99393f04529a8a7a77042"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "8ba64b3a7c1a8d8dabc4316da98c2fa901ad6a56",
-      "sha256": "c76c62c3d8430cfcaff434698b9109e8dde7d6d04d7f8a0915a351658a2434df"
+      "blob_sha": "153ed4b7600f0c0318e05db366806ce796778592",
+      "sha256": "abdfeaa44d6fdf3d57a110181466e131f98ba61d02ed1b578c9540320bb0ea1f"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Missing participant/print translation strings receive one bounded second batch; successful strings remain unchanged and still-missing strings retain marked English fallback. Local source18/18 and print2/2 scenarios passed; live and language-quality verification pending. (#477)"
+        "Full report details use the existing card styling in the assessment host, label scores and evidence counts, and separate narrative observations for easier scanning. Overview bands, values and report content remain unchanged. (#478)",
+        "Facilitator report-detail scenario: 15/15 renderer tests passed; matched automated local fixtures at phone and desktop widths in light and dark were independently inspected. Live DEV/production and full-app navigation remain untested; human satisfaction, confusion and frustration are not measured.",
+        "Recovery correction: independent review found that actual ui/index.html and ui/assess/index.html omit report-cards.css; the earlier fixture supplied it and does not establish real-host styling. The same 0.30.5 correction loads the existing stylesheet only in ui/index.html for the /#assessment route. The direct ui/assess/index.html host remains unrepaired because its .rv wrapper and token gaps are unresolved. Root-host verification, exact-head review and release-pin checks are pending; no DEV or production acceptance is claimed. Aggregation and longitudinal features remain outside this increment."
       ]
     }
   }

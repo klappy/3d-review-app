@@ -67,23 +67,23 @@ test('R1 full payload renders header, stability line and every section in payloa
 test('R2 lenses print scores exactly as returned; an empty sub-dimension list adds no rows', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.lenses), ['team', '66.66666', 'process · 70 · 3', 'relationships · 63.3333 · 2', 'church', '0']);
+  assert.deepEqual(sectionRows(root, copy.lenses), ['team', '66.66666', 'Overall score', 'process', 'Score', '70', 'Items included', '3', 'relationships', 'Score', '63.3333', 'Items included', '2', 'church', '0', 'Overall score']);
 });
 
 test('R3 cross-lens: multi before single, null agreement_range prints the fixed label "one lens"', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
   assert.deepEqual(sectionRows(root, copy.crossLens), [
-    'Shared understanding · 55.5 · 12.25', 'team: 61.75', 'community: 49.5',
-    'Church involvement · 40 · one lens', 'church: 40',
+    'Shared understanding', 'Average score', '55.5', 'Score spread', '12.25', 'team: 61.75', 'community: 49.5',
+    'Church involvement', 'Average score', '40', 'Score spread', 'one lens', 'church: 40',
   ]);
 });
 
 test('R4 standalone indicators, evidence and narrative rows', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.standalone), ['Is the meaning clear? · community · clarity · 82.5 · 9']);
-  assert.deepEqual(sectionRows(root, copy.evidence), ['Team form · 4', 'Church form · 2']);
+  assert.deepEqual(sectionRows(root, copy.standalone), ['Is the meaning clear?', 'community · clarity', 'Score', '82.5', 'Responses', '9']);
+  assert.deepEqual(sectionRows(root, copy.evidence), ['Team form', 'Submissions', '4', 'Church form', 'Submissions', '2']);
   assert.deepEqual(sectionRows(root, copy.narrative), ['Team scores are highest on process.', 'One lens has no comparable data.']);
 });
 
