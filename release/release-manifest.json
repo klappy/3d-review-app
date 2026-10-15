@@ -1,25 +1,26 @@
 {
-  "version": "0.30.5",
+  "version": "0.32.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "9fd5e1b9e97b050f86720b02a97a702f4c95472a",
+  "cookbook_commit": "dad3f0dbb884c2d148e10bc4a307d338dfce57c1",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.30.5.md",
-      "blob_sha": "7e46d7cfdbfdf253a7018bef96a9ffbeba942eef",
-      "sha256": "c422d0a539f4e747484dd9b018349c96ad3b9ea44aa99393f04529a8a7a77042"
+      "path": "planning/2026-09-16-parity-build/releases/0.32.0.md",
+      "blob_sha": "050aed54f41004e221586c4f08e846403c591fca",
+      "sha256": "e0f3516b2ddff79d75619f8e2d0a72c6c2b7e0f3dbf74974e0cbb453500ad011"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "153ed4b7600f0c0318e05db366806ce796778592",
-      "sha256": "abdfeaa44d6fdf3d57a110181466e131f98ba61d02ed1b578c9540320bb0ea1f"
+      "blob_sha": "dbbd363e02ff926da269f11f6a2ab2e2676b317b",
+      "sha256": "0ea765d4077273b4da73611d308cd2ee8fd4683199a982f87217cc4bf5c6530b"
     }
   ],
   "changelog": {
     "sections": {
-      "fixed": [
-        "Full report details use the existing card styling in the assessment host, label scores and evidence counts, and separate narrative observations for easier scanning. Overview bands, values and report content remain unchanged. (#478)",
-        "Facilitator report-detail scenario: 15/15 renderer tests passed; matched automated local fixtures at phone and desktop widths in light and dark were independently inspected. Live DEV/production and full-app navigation remain untested; human satisfaction, confusion and frustration are not measured.",
-        "Recovery correction: independent review found that actual ui/index.html and ui/assess/index.html omit report-cards.css; the earlier fixture supplied it and does not establish real-host styling. The same 0.30.5 correction loads the existing stylesheet only in ui/index.html for the /#assessment route. The direct ui/assess/index.html host remains unrepaired because its .rv wrapper and token gaps are unresolved. Root-host verification, exact-head review and release-pin checks are pending; no DEV or production acceptance is claimed. Aggregation and longitudinal features remain outside this increment."
+      "added": [
+        "\"Do the lenses agree?\" leads the results overview and the full report: one barbell per area scored by two or more lenses (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), with response counts beside each lens score and Consultant responses named inside the Church count."
+      ],
+      "changed": [
+        "The full report no longer shows the cross-lens average; lens scores and their difference only. Payload, scoring and narrative unchanged."
       ]
     }
   }

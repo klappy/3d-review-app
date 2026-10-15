@@ -6,6 +6,7 @@
 // the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
+import { lensesAgreeMarkup } from '../report-lenses.js'; // lenses agree / disagree block, overview + full report
 import { learnMore } from '../v3/components/learn-more.js'; // lane 9 L9-24: shared closed-by-default disclosure
 import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, v3HeldText, V3_REPORTS_HELD, V3_REPORT_HELD, V3_BAND_CUTOFFS, V3_SUGGEST, v3SuggestedAreas, v3NextParse, v3NextSerialize, askStageMove } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
@@ -81,12 +82,16 @@ function refusalLine(ctx, status, retryAttr, what) {
 // Ruling 12:22 band input, shared by load and the post-build refresh (B35): the newest built report's per-perspective scores
 // (read-only; a failed read leaves bands held).
 async function newestBandScores(ctx, reports) {
+  const sc = v3ReportScores(await newestReport(ctx, reports)); return Object.keys(sc).length ? sc : null;
+}
+// The newest built report itself (read-only), also feeding the lenses agree / disagree block (report-lenses.js).
+async function newestReport(ctx, reports) {
   const built = reports.status === 'loaded' && !reports.value?.suppressed && reports.value?.status !== 'held' && Array.isArray(reports.value?.reports) ? reports.value.reports : [];
   const newest = built.filter(x => x && x.id).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
   if (!newest) return null;
   const rr = await settle(ctx.api(`/v2/reports/${ctx.enc(newest.id)}`));
   if (rr.status !== 'loaded' || rr.value?.suppressed) return null;
-  const sc = v3ReportScores(rr.value?.report); return Object.keys(sc).length ? sc : null;
+  return rr.value?.report || null;
 }
 
 // ───────────────────────────────── understand ─────────────────────────────────
@@ -101,8 +106,8 @@ const understand = {
     const countMap = new Map();
     for (const [sid, r] of counts) countMap.set(sid, r.status === 'loaded' ? { status: 'loaded', responses: Number(r.value?.counts?.responses ?? 0), respondents: Number(r.value?.counts?.respondents ?? 0), unconfirmed: r.value?.counts?.unconfirmed, expected: r.value?.expected_count ?? r.value?.survey?.expected_count } : r);
     // Ruling 12:22 band input: the newest built report's per-perspective scores (read-only; a failed read leaves bands held).
-    const bandScores = await newestBandScores(ctx, reports);
-    return { aid, role: cur?.assessment?.role, surveys, counts: countMap, results, reports, bandScores, openReport: null };
+    const bandReport = await newestReport(ctx, reports), sc = v3ReportScores(bandReport), bandScores = Object.keys(sc).length ? sc : null;
+    return { aid, role: cur?.assessment?.role, surveys, counts: countMap, results, reports, bandScores, bandReport, openReport: null };
   },
   render(ctx, m) {
     const esc = ctx.esc;
@@ -130,7 +135,7 @@ const understand = {
       return [lens, { surveys: ss.length, loaded: ld.length, responses: ld.reduce((n, s) => n + m.counts.get(s.id).responses, 0) }]; }));
     const ev = v3EvidenceMarkup(v3EvidenceRows(m.results.value, LENSES, lensGroups, m.bandScores), !!m.showEvidence, esc);
     const cta = buildResultsCta(m, lensGroups, esc); // U41: while offered, "Build the results" is the one primary; the gate steps back
-    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores)}${cta}<p class="status" role="status" aria-live="polite" data-results-status></p>${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc, { primary: !cta })}</section>` : '';
+    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${lensesAgreeMarkup(m.bandReport, esc)}${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores)}${cta}<p class="status" role="status" aria-live="polite" data-results-status></p>${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc, { primary: !cta })}</section>` : '';
     // (3) Reports: server-owned eligibility and provenance; preview never writes a report.
     let reports;
     if (m.reports.status === 'loaded') {
@@ -168,8 +173,9 @@ const understand = {
       if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
       m.reportReadGeneration = (m.reportReadGeneration || 0) + 1; m.reports = reports; m.openReport = null;
       m.resultsBuilt = true; // Bugbot 4108654385: a build succeeded; never offer "Build the results" again on this view
-      m.bandScores = await newestBandScores(ctx, reports); // B35: the band cards fill from the report just built, no reload
-      if (!m.bandScores) { const sc = v3ReportScores(builtReport); if (Object.keys(sc).length) m.bandScores = sc; } // …or from the execute payload
+      m.bandReport = await newestReport(ctx, reports); // B35: the band cards fill from the report just built, no reload
+      { const sc = v3ReportScores(m.bandReport); m.bandScores = Object.keys(sc).length ? sc : null; }
+      if (!m.bandScores) { const sc = v3ReportScores(builtReport); if (Object.keys(sc).length) { m.bandScores = sc; m.bandReport = builtReport; } } // …or from the execute payload
       if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false) return;
       root.innerHTML = understand.render(ctx, m); understand.bind(ctx, root, m);
       if (source === 'results') { const st = root.querySelector('[data-results-status]'); if (st) st.textContent = m.bandScores ? 'Results built.' : 'Results built, but the bands could not be filled yet. Reload to try again.'; if (st || m.bandScores) return; }

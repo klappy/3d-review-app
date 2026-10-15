@@ -1,0 +1,163 @@
+// Lenses agree / disagree: one barbell per cross-lens sub-score, biggest spread first.
+// Decision record: cookbook atoms/DEC-0012 and DEC-0013; unit work/active/2026-10-15-3d-report-lenses-disagree.
+// Presentation only, shared by the assessment overview (HTML string) and the full report (DOM). It reads the existing
+// payload fields (cross_lens_multi, cross_lens_single, lens_scores, evidence) and never changes or re-scores them.
+// No mean of the lenses is shown: the lens scores and the spread (highest minus lowest) only.
+
+// Spread cut points (points on the 0–100 axis), recorded in the PR: spread ≤ 10 agree (green), 10 < spread < 30 some
+// difference (amber), spread ≥ 30 disagree (red). One place to change them.
+export const SPREAD_CUTS = Object.freeze({ agree: 10, disagree: 30 });
+export const SPREAD_WORDS = Object.freeze({ agree: 'Lenses agree', mixed: 'Some difference', disagree: 'Lenses disagree' });
+export const lensesCopy = Object.freeze({
+  heading: 'Do the lenses agree?',
+  intro: 'Each line shows one area scored by more than one lens, on a 0–100 scale. Biggest difference first.',
+  spread: 'Difference',
+  oneLens: 'Only one lens scored this area',
+  respondents: n => `${n} ${n === 1 ? 'response' : 'responses'}`,
+  noCount: 'responses not counted',
+  consultants: n => `${n} of them ${n === 1 ? 'consultant' : 'consultants'}`,
+  legend: `Difference of ${SPREAD_CUTS.agree} points or less: lenses agree · more than ${SPREAD_CUTS.agree} and less than ${SPREAD_CUTS.disagree}: some difference · ${SPREAD_CUTS.disagree} or more: lenses disagree.`,
+});
+
+const rows = value => (Array.isArray(value) ? value : []);
+const num = v => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
+const clamp = v => Math.max(0, Math.min(100, v));
+const shown = v => String(Math.round(v)); // whole points for reading; the exact value rides in title
+
+/** Spread (points) → 'agree' | 'mixed' | 'disagree'. */
+export function spreadBand(spread, cuts = SPREAD_CUTS) {
+  return spread <= cuts.agree ? 'agree' : spread >= cuts.disagree ? 'disagree' : 'mixed';
+}
+
+/** Submissions per lens from the report's own evidence rows ("<Lens> — <form>" labels). Unmatched lens → null.
+ *  The Consultant form (CHCC, "Church — Consultant") is scored by the pinned scorer inside the Church lens; this block
+ *  never re-scores, so it counts consultant submissions separately (consultantsByLens) and says so beside the count. */
+export function lensRespondents(payload) {
+  const out = new Map();
+  for (const e of rows(payload && payload.evidence)) {
+    if (!e || typeof e.label !== 'string' || !Number.isFinite(num(e.n))) continue;
+    const lens = e.label.split(' — ')[0];
+    out.set(lens, (out.get(lens) || 0) + num(e.n));
+  }
+  return out;
+}
+export const CONSULTANT_FORM = 'CHCC';
+export function consultantsByLens(payload) {
+  const out = new Map();
+  for (const e of rows(payload && payload.evidence)) {
+    if (!e || e.form_type !== CONSULTANT_FORM || typeof e.label !== 'string' || !Number.isFinite(num(e.n))) continue;
+    const lens = e.label.split(' — ')[0];
+    out.set(lens, (out.get(lens) || 0) + num(e.n));
+  }
+  return out;
+}
+
+/** Barbell rows for a built report: [{ name, spread, band, lenses:[{lens, score, n}] }], biggest spread first;
+ *  single-lens areas follow with spread null. Malformed entries are skipped, never guessed. */
+export function lensSpreadRows(report) {
+  const payload = report && typeof report === 'object' ? report.payload : null;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return [];
+  const counts = lensRespondents(payload), consultants = consultantsByLens(payload);
+  const all = [...rows(payload.cross_lens_multi), ...rows(payload.cross_lens_single)].map((entry, order) => {
+    if (!entry || typeof entry !== 'object') return null;
+    const lenses = rows(entry.lens_scores).filter(s => s && typeof s.lens === 'string' && Number.isFinite(num(s.score)))
+      .map(s => ({ lens: s.lens, score: num(s.score), n: counts.has(s.lens) ? counts.get(s.lens) : null, ...(consultants.get(s.lens) ? { consultants: consultants.get(s.lens) } : {}) }));
+    if (!lenses.length) return null;
+    const scores = lenses.map(s => s.score);
+    const spread = lenses.length >= 2 ? Math.max(...scores) - Math.min(...scores) : null;
+    return { name: String(entry.construct_name), spread, band: spread === null ? null : spreadBand(spread), lenses, order };
+  }).filter(Boolean);
+  return all.sort((a, b) => (a.spread === null) - (b.spread === null) || (b.spread ?? 0) - (a.spread ?? 0) || a.order - b.order)
+    .map(({ order, ...row }) => row);
+}
+
+export const lensesCss = `.lens-agree{margin:12px 0}.lens-agree h3,.lens-agree h4{margin:0 0 4px}.lens-agree>p{margin:0 0 10px}
+.lens-agree ul.lens-agree-rows{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+.lens-agree-row{padding:10px 12px;border:1px solid var(--line,#d8dee6);border-left-width:6px;border-radius:12px;min-width:0}
+.lens-agree-row[data-spread-band=agree]{border-left-color:#2e7d32}.lens-agree-row[data-spread-band=mixed]{border-left-color:#c77700}
+.lens-agree-row[data-spread-band=disagree]{border-left-color:#c62828}
+.lens-agree-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;align-items:baseline}
+.lens-agree-head strong{overflow-wrap:anywhere}
+.lens-agree-chip{font-size:13px;font-weight:600;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.lens-agree-row[data-spread-band=agree] .lens-agree-chip{background:#e3f1e4;color:#1b5e20}
+.lens-agree-row[data-spread-band=mixed] .lens-agree-chip{background:#fdf0d9;color:#7a4800}
+.lens-agree-row[data-spread-band=disagree] .lens-agree-chip{background:#fbe3e1;color:#8e1b14}
+.lens-agree-track{position:relative;height:18px;margin:10px 9px 6px;background:linear-gradient(var(--line,#d8dee6),var(--line,#d8dee6)) center/100% 2px no-repeat}
+.lens-agree-bar{position:absolute;top:6px;height:6px;border-radius:3px;background:#9aa5b1}
+.lens-agree-row[data-spread-band=agree] .lens-agree-bar{background:#2e7d32}.lens-agree-row[data-spread-band=mixed] .lens-agree-bar{background:#c77700}
+.lens-agree-row[data-spread-band=disagree] .lens-agree-bar{background:#c62828}
+.lens-agree-dot{position:absolute;top:1px;width:16px;height:16px;margin-left:-8px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #4a5560;background:#4a5560}
+.lens-agree-dot[data-lens="Translation Team"]{background:var(--lens-green,#3c8d5a)}.lens-agree-dot[data-lens=Community]{background:var(--lens-blue,#3b74c4)}
+.lens-agree-dot[data-lens=Church]{background:var(--lens-yellow,#d9a400)}
+.lens-agree-scale{display:flex;justify-content:space-between;font-size:11px;color:var(--muted,#66707a);margin:0 0 4px}
+ul.lens-agree-scores{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px}
+.lens-agree-scores li{display:flex;align-items:center;gap:6px;border:0!important;padding:0!important}
+.lens-agree-scores .lens-agree-dot{position:static;margin:0;width:10px;height:10px;border-width:1px}
+.lens-agree-scores b{font-variant-numeric:tabular-nums}.lens-agree-n{color:var(--muted,#66707a);font-size:13px}
+.lens-agree-legend{font-size:13px;color:var(--muted,#66707a);margin:10px 0 0}`;
+
+const escape0 = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const countText = s => (s.n === null ? lensesCopy.noCount : s.consultants ? `${lensesCopy.respondents(s.n)}, ${lensesCopy.consultants(s.consultants)}` : lensesCopy.respondents(s.n));
+const headText = row => (row.spread === null ? lensesCopy.oneLens : `${SPREAD_WORDS[row.band]} · ${lensesCopy.spread} ${shown(row.spread)}`);
+
+// One node spec ({tag, cls, text, data, style, title, hidden, kids}) serialised two ways: an escaped HTML string for the
+// overview template and plain createElement/textContent nodes for the full report (which never uses innerHTML).
+const n = (tag, cls, kids = [], extra = {}) => ({ tag, cls, kids, ...extra });
+function spec(report, level) {
+  const list = lensSpreadRows(report);
+  if (!list.length) return null;
+  const items = list.map(row => {
+    const pos = row.lenses.map(s => clamp(s.score)), lo = Math.min(...pos), hi = Math.max(...pos);
+    const dots = row.lenses.map(s => n('span', 'lens-agree-dot', [], { data: { lens: s.lens }, style: { left: `${clamp(s.score)}%` }, title: `${s.lens}: ${s.score}` }));
+    const bar = row.spread === null ? [] : [n('span', 'lens-agree-bar', [], { style: { left: `${lo}%`, width: `${hi - lo}%` } })];
+    const scores = row.lenses.map(s => n('li', null, [
+      n('span', 'lens-agree-dot', [], { data: { lens: s.lens }, hidden: true }), n('span', null, [], { text: `${s.lens} ` }),
+      n('b', null, [], { text: shown(s.score), title: String(s.score) }), n('span', 'lens-agree-n', [], { text: ` ${countText(s)}` }),
+    ], { data: { lensScore: s.lens } }));
+    const data = { spreadBand: row.band || 'single' };
+    if (row.spread !== null) data.spread = String(row.spread);
+    return n('li', 'lens-agree-row', [
+      n('div', 'lens-agree-head', [n('strong', null, [], { text: row.name }), n('span', 'lens-agree-chip', [], { text: headText(row) })]),
+      n('div', 'lens-agree-track', [...bar, ...dots], { hidden: true }),
+      n('div', 'lens-agree-scale', [n('span', null, [], { text: '0' }), n('span', null, [], { text: '100' })], { hidden: true }),
+      n('ul', 'lens-agree-scores', scores),
+    ], { data });
+  });
+  return n('section', 'lens-agree', [
+    n(level, null, [], { text: lensesCopy.heading }),
+    n('p', 'small muted', [], { text: lensesCopy.intro }), n('ul', 'lens-agree-rows', items),
+    n('p', 'lens-agree-legend', [], { text: lensesCopy.legend }), n('style', null, [], { text: lensesCss, raw: true }),
+  ], { data: { lensesAgree: '' } });
+}
+const kebab = k => k.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`);
+function toHtml(node, esc) {
+  const attrs = [node.cls ? ` class="${esc(node.cls)}"` : '', ...Object.entries(node.data || {}).map(([k, v]) => ` data-${kebab(k)}${v === '' ? '' : `="${esc(v)}"`}`),
+    node.style ? ` style="${esc(Object.entries(node.style).map(([k, v]) => `${k}:${v}`).join(';'))}"` : '', node.title ? ` title="${esc(node.title)}"` : '', node.hidden ? ' aria-hidden="true"' : ''].join('');
+  const text = node.text === undefined ? '' : node.raw ? node.text : esc(node.text);
+  return `<${node.tag}${attrs}>${text}${node.kids.map(k => toHtml(k, esc)).join('')}</${node.tag}>`;
+}
+function toDom(doc, node) {
+  const el = doc.createElement(node.tag);
+  if (node.cls) el.className = node.cls;
+  if (node.text !== undefined) el.textContent = node.text;
+  for (const [k, v] of Object.entries(node.data || {})) el.dataset[k] = v;
+  if (node.style && el.style) for (const [k, v] of Object.entries(node.style)) el.style[k] = v;
+  if (node.title) el.title = node.title;
+  if (node.hidden && el.setAttribute) el.setAttribute('aria-hidden', 'true');
+  if (node.kids.length) el.append(...node.kids.map(k => toDom(doc, k)));
+  return el;
+}
+
+/** Overview: HTML string (every value escaped), or '' when the report has no cross-lens areas. */
+export function lensesAgreeMarkup(report, esc = escape0, level = 'h3') {
+  const tree = spec(report, level);
+  return tree ? toHtml(tree, esc) : '';
+}
+
+/** Full report: detached DOM section (createElement/textContent only), or null when there is nothing to show. */
+export function renderLensesAgree({ doc, report }) {
+  const tree = spec(report, 'h4');
+  if (!tree) return null;
+  tree.cls = 'lens-agree report-detail-section glass panel';
+  return toDom(doc, tree);
+}

@@ -1,7 +1,30 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.30.5",
+  "current": "0.32.0",
   "versions": [
+    {
+      "version": "0.32.0",
+      "status": "candidate",
+      "notes_path": "releases/0.32.0.md",
+      "sections": {
+        "added": [
+          "\"Do the lenses agree?\" leads the results overview and the full report: one barbell per area scored by two or more lenses (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), with response counts beside each lens score and Consultant responses named inside the Church count."
+        ],
+        "changed": [
+          "The full report no longer shows the cross-lens average; lens scores and their difference only. Payload, scoring and narrative unchanged."
+        ]
+      }
+    },
+    {
+      "version": "0.31.0",
+      "status": "candidate",
+      "notes_path": "releases/0.31.0.md",
+      "sections": {
+        "changed": [
+          "Workspace roles now apply to every project grouped in the workspace: a workspace owner, member or viewer opens each grouped project at that role (the higher of the workspace and any direct project grant) without a per-project invite. Viewers still cannot edit; people outside the workspace still see none of its projects; assessments still open only with their own grant. Workspace cards count every grouped project. (#483)"
+        ]
+      }
+    },
     {
       "version": "0.30.5",
       "status": "candidate",
