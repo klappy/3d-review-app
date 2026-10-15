@@ -25,5 +25,29 @@ class ImportTests(unittest.TestCase):
  def test_tampered_plan_refused(self):
   self.plan['rows']['workspace'][0]['name']='changed'
   with self.assertRaisesRegex(ValueError,'hash'):m.apply_local(self.db,self.plan)
+ def batch(self):
+  with patch.object(m,'build_plan',return_value=self.plan):
+   return m.build_batch(self.plan,self.plan['plan_sha256'],pathlib.Path('/unused-source'))['batch']
+ def run_batch(self,batch):
+  with self.db:
+   self.db.execute('BEGIN IMMEDIATE')
+   for item in batch:self.db.execute(item['sql'],item['params']).fetchall()
+ def test_actual_rest_batch_sql_idempotency(self):
+  self.plan=json.loads(m.canonical(self.plan))
+  b=self.batch();self.run_batch(b);self.run_batch(b)
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM response').fetchone()[0],425)
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM receipt').fetchone()[0],1)
+ def test_actual_rest_batch_sql_rolls_back(self):
+  self.db.execute("CREATE TRIGGER fail_response BEFORE INSERT ON response BEGIN SELECT RAISE(ABORT,'simulated failure'); END;")
+  with self.assertRaises(sqlite3.IntegrityError):self.run_batch(self.batch())
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM workspace').fetchone()[0],0)
+ def test_actual_rest_batch_partial_refused(self):
+  self.db.execute('INSERT INTO workspace(id,name,created_at)VALUES(?,?,?)',(self.plan['workspace_id'],'collision','test'));self.db.commit()
+  with self.assertRaises(sqlite3.OperationalError):self.run_batch(self.batch())
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM project').fetchone()[0],0)
+ def test_actual_rest_batch_changed_instrument_refused(self):
+  self.db.execute("UPDATE survey_template SET items_json='[]'");self.db.commit()
+  with self.assertRaises(sqlite3.OperationalError):self.run_batch(self.batch())
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM workspace').fetchone()[0],0)
  def tearDown(self):self.db.close()
 if __name__=='__main__':unittest.main()

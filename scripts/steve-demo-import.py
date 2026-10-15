@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PIN = 'f042cde553761a6a7f24132cef7802f956378ee0'
+TABLE_ORDER = ['workspace', 'project', 'language', 'assessment', 'assessment_survey', 'grant', 'response']
 ANSWERS_SHA256 = 'efc50c5ff9139d9235e4323233d27c54059527f92c54099e2f9dbf0cd71df1b5'
 
 def digest(value):
@@ -93,7 +94,7 @@ def build_plan(owner, workspace_name, source, at):
     namespace = digest(owner + ':' + PIN + ':steve-demo-v1')[:16]
     ident = lambda kind, key: kind + '_sd_' + digest(namespace + ':' + kind + ':' + key)[:24]
     workspace = ident('ws', 'workspace')
-    rows = {t: {} for t in ['workspace', 'project', 'language', 'assessment', 'assessment_survey', 'grant', 'response']}
+    rows = {t: {} for t in TABLE_ORDER}
     def add(table, row):
         old = rows[table].get(row['id'])
         if old is not None and old != row:
@@ -165,7 +166,8 @@ def apply_local(connection, plan):
         state=preflight(connection,plan)
         if state['status']=='already imported':
             return state
-        for table, rows in plan['rows'].items():
+        for table in TABLE_ORDER:
+            rows=plan['rows'][table]
             for row in rows:
                 columns=list(row)
                 connection.execute('INSERT INTO "'+table+'" ('+','.join('"'+c+'"' for c in columns)+') VALUES ('+','.join('?' for _ in columns)+')',list(row.values()))
@@ -176,6 +178,58 @@ def apply_local(connection, plan):
     return {'status':'imported','counts':plan['counts']}
 
 
+def build_batch(plan, expected_hash, source):
+    """Cloudflare D1 REST /query body: one atomic {batch:[{sql,params},...]}.
+
+    Exact reviewed hash plus regeneration from the clean pinned source is required.
+    Every guard is inside the same transaction as inserts and the receipt.
+    """
+    if expected_hash != plan.get('plan_sha256'):
+        raise ValueError('Expected reviewed plan hash differs')
+    regenerated=build_plan(plan['owner'],plan['workspace_name'],source,plan['created_at'])
+    if canonical(regenerated)!=canonical(plan):
+        raise ValueError('Plan does not match the pinned source and fixed import schema')
+    allowed={'workspace','project','language','assessment','assessment_survey','grant','response'}
+    if set(plan['rows'])!=allowed or any(plan['counts'][t]!=len(rows) for t,rows in plan['rows'].items()):
+        raise ValueError('Invalid import table/count schema')
+    batch=[]
+    def statement(sql, params=()): batch.append({'sql':sql,'params':list(params)})
+    def guard(condition, params=()):
+        statement("SELECT CASE WHEN ("+condition+") THEN 1 ELSE json('STEVE_IMPORT_GUARD_FAILED') END AS verified",params)
+    guard('EXISTS(SELECT 1 FROM principal WHERE id=? AND provisioned=1)',[plan['owner']])
+    for t in plan['templates']:
+        guard('EXISTS(SELECT 1 FROM survey_template WHERE id=? AND version=?)',[t['id'],t['version']])
+        for field in ['items_json','scoring_json']:
+            actual='SELECT fullkey,type,atom FROM json_tree((SELECT '+field+' FROM survey_template WHERE id=? AND version=?))'
+            expected='SELECT fullkey,type,atom FROM json_tree(?)'
+            guard('NOT EXISTS('+actual+' EXCEPT '+expected+') AND NOT EXISTS('+expected+' EXCEPT '+actual+')',[t['id'],t['version'],t[field],t[field],t['id'],t['version']])
+    receipt_id='rc_sd_'+plan['namespace']
+    total_sql=[];total_params=[]
+    for table in TABLE_ORDER:
+        rows=plan['rows'][table]
+        total_sql.append('(SELECT COUNT(*) FROM "'+table+'" WHERE id IN (SELECT value FROM json_each(?)))')
+        total_params.append(canonical([r['id'] for r in rows]))
+    total=' + '.join(total_sql)
+    guard('(('+total+')=0 AND NOT EXISTS(SELECT 1 FROM receipt WHERE id=?)) OR (('+total+')=? AND EXISTS(SELECT 1 FROM receipt WHERE id=? AND json_extract(prior_state_json,\'$.plan_sha256\')=?))',total_params+[receipt_id]+total_params+[sum(plan['counts'].values()),receipt_id,expected_hash])
+    for table in TABLE_ORDER:
+        rows=plan['rows'][table]
+        columns=list(rows[0])
+        if any(list(r)!=columns for r in rows):
+            raise ValueError('Inconsistent fixed column schema')
+        payload=canonical(rows)
+        extract=lambda c: "json_extract(j.value,'$."+c+"')"
+        same=' AND '.join('actual."'+c+'" IS '+extract(c) for c in columns)
+        guard('NOT EXISTS(SELECT 1 FROM json_each(?) j JOIN "'+table+'" actual ON actual.id='+extract('id')+' WHERE NOT ('+same+'))',[payload])
+        statement('INSERT INTO "'+table+'" ('+','.join('"'+c+'"' for c in columns)+') SELECT '+','.join(extract(c) for c in columns)+' FROM json_each(?) j WHERE NOT EXISTS(SELECT 1 FROM "'+table+'" actual WHERE actual.id='+extract('id')+')',[payload])
+    receipt={'plan_sha256':expected_hash,'counts':plan['counts'],'source_commit':plan['source_commit'],'answer_set_sha256':plan['answer_set_sha256'],'quarantined':plan['quarantined'],'source_missing_required_answers':plan['source_missing_required_answers']}
+    statement('INSERT INTO receipt(id,actor,capability,scope_type,scope_id,class,inverse,trace_id,prior_state_json,at) SELECT ?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM receipt WHERE id=?)',[receipt_id,plan['owner'],'script.steve_demo_import','workspace',plan['workspace_id'],'write.reversible','reviewed namespace removal only','script_sd_'+plan['namespace'],canonical(receipt),plan['created_at'],receipt_id])
+    for table in TABLE_ORDER:
+        rows=plan['rows'][table]
+        guard('(SELECT COUNT(*) FROM "'+table+'" WHERE id IN (SELECT value FROM json_each(?)))=?',[canonical([r['id'] for r in rows]),len(rows)])
+    guard('EXISTS(SELECT 1 FROM receipt WHERE id=? AND actor=? AND scope_id=? AND json_extract(prior_state_json,\'$.plan_sha256\')=?)',[receipt_id,plan['owner'],plan['workspace_id'],expected_hash])
+    return {'batch':batch}
+
+
 if __name__ == '__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--source',required=True,type=pathlib.Path)
@@ -183,8 +237,14 @@ if __name__ == '__main__':
     p.add_argument('--workspace-name',required=True)
     p.add_argument('--plan-output',type=pathlib.Path)
     p.add_argument('--at',default=datetime.now(timezone.utc).isoformat())
+    p.add_argument('--batch-output',type=pathlib.Path)
+    p.add_argument('--expected-plan-hash')
     args=p.parse_args()
     plan=build_plan(args.owner,args.workspace_name,args.source,args.at)
     if args.plan_output:
         args.plan_output.write_text(canonical(plan)+'\n')
+    if args.batch_output:
+        if not args.expected_plan_hash:
+            p.error('--batch-output requires the externally reviewed --expected-plan-hash')
+        args.batch_output.write_text(canonical(build_batch(plan,args.expected_plan_hash,args.source))+'\n')
     print(json.dumps({k:v for k,v in plan.items() if k not in ['rows','templates']},indent=2))
