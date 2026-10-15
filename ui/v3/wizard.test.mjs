@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ORGANIZATIONS, orgChoices, ORG_OTHER, countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot, renderDone } from './wizard.js';
+import { ORGANIZATIONS, orgChoices, ORG_OTHER, countLabel, expectedValue, launchPlan, launch, validateStep, freshDraft, latestTemplates, renderStep, NEW_PROJECT, NEW_LANGUAGE, expectedFor, EXPECTED_KEY, reconcile, STEP_TITLES, pdot, renderDone } from './wizard.js';
 
 const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
 const draft = (o = {}) => ({ ...freshDraft(), name: 'Oct', project: 'p1', language: 'l1', until: '2099-10-31', groups: { 'tpl.team': { version: '3', expected: '10' }, 'tpl.community': { version: '2', expected: '' } }, ...o });
@@ -250,7 +250,7 @@ test('lane 12 L12-2: language ISO code rides cap.language.create only when given
   assert.ok(validateStep('details', draft({ ...base, newLangCode: 'Hil!' })).some(e => /Language code/.test(e)));
   assert.ok(!validateStep('details', draft({ ...base, newLangCode: 'en-US' })).some(e => /Language code/.test(e)));
   const empty = { projects: [], languages: [], templates: [] };
-  assert.match(renderStep('details', draft({ project: NEW_PROJECT, newLangCode: 'x"y' }), empty, [], false, ''), /Language code \(ISO 639, optional\)<input name="newLangCode" value="x&quot;y"/);
+  assert.match(renderStep('details', draft({ project: NEW_PROJECT, newLangCode: 'x"y' }), empty, [], false, ''), /Language code \(optional\)<input name="newLangCode" value="x&quot;y"/);
   assert.doesNotMatch(renderStep('details', draft(), empty, [], false, ''), /newLangCode/);
   assert.match(renderStep('review', draft({ project: NEW_PROJECT, newProject: 'H', newLanguage: 'Hiligaynon', newLangCode: 'hil' }), empty, [], false, ''), /<dt>Language<\/dt><dd>Hiligaynon · hil<\/dd>/);
 });
@@ -359,25 +359,26 @@ test('B36 launched screen: one labelled row per group (group · survey) with Cop
 test('S35: Name, Project, New project name and Language carry the (required) mark like Active until; the ISO code stays optional', () => {
   const existing = renderStep('details', draft(), { projects: [], languages: [], templates: [] });
   assert.match(existing, /Name \(required\)<input name="name"/);
-  assert.match(existing, /Language \(required\)<select name="language"/);
+  assert.match(existing, /Language \(required\)<input type="search"/);
   assert.match(existing, /Project \(required\)<select name="project" required/, 'S38: the select carries required, as validateStep enforces');
   assert.match(renderStep('details', draft(), { projects: [], languages: [], templates: [], saved: true }), /<select name="project" required disabled>/, 'a saved draft keeps the project fixed');
   const fresh = renderStep('details', draft({ project: NEW_PROJECT }), { projects: [], languages: [], templates: [] });
   assert.match(fresh, /New project name \(required\)<input name="newProject"/);
-  assert.match(fresh, /Language \(required\)<input name="newLanguage"/);
-  assert.match(fresh, /Language code \(ISO 639, optional\)<input name="newLangCode"/);
-  assert.doesNotMatch(fresh, /Language code \(ISO 639, optional\) \(required\)|newLangCode"[^>]*required/);
+  assert.match(fresh, /New language name \(required\)<input name="newLanguage"/);
+  assert.match(fresh, /Language code \(optional\)<input name="newLangCode"/);
+  assert.doesNotMatch(fresh, /Language code \(optional\) \(required\)|newLangCode"[^>]*required/);
 });
 
 test('ux-1840: every required details field carries the S34 mark — "(required)" label text and the HTML required attribute — Language select included', () => {
   const existing = renderStep('details', draft({ project: '' }), { projects: [], languages: [], templates: [] });
   assert.match(existing, /Name \(required\)<input name="name" value="[^"]*" required/);
-  assert.match(existing, /Language \(required\)<select name="language" required disabled>/, 'no project yet: required, and disabled until a project is chosen');
+  assert.match(existing, /<select name="language" hidden tabindex="-1" aria-hidden="true" disabled>/, 'hidden serializer is disabled until a project is chosen');
   const picked = renderStep('details', draft({ project: 'p1' }), { projects: [{ id: 'p1', name: 'P' }], languages: [{ id: 'l1', name: 'Hiligaynon' }], templates: [] });
-  assert.match(picked, /Language \(required\)<select name="language" required>/, 'project chosen: required and enabled, as validateStep enforces');
+  assert.match(picked, /<select name="language" hidden tabindex="-1" aria-hidden="true">/, 'hidden serializer has no invisible browser validation target');
+  assert.ok(validateStep('details', draft({language:''})).includes('Choose a language.'));
   const fresh = renderStep('details', draft({ project: NEW_PROJECT }), { projects: [], languages: [], templates: [] });
   assert.match(fresh, /New project name \(required\)<input name="newProject" value="[^"]*" required>/);
-  assert.match(fresh, /Language \(required\)<input name="newLanguage" value="[^"]*" required/);
+  assert.match(fresh, /New language name \(required\)<input name="newLanguage" value="[^"]*" required/);
 });
 
 test('B41: setup asks Active until (required) and Starts (optional, default today) on the existing period field', () => {
@@ -944,4 +945,162 @@ test('rev440b nit: Skip for now then Add passages while a link add is pending ke
   release(); await settle();
   assert.deepEqual(p.calls.map(c => c.method), ['GET', 'POST', 'GET'], 'no second mount, no second list read');
   assert.equal(m.$('[data-wz-passages] .p-status').textContent, 'Link added.');
+});
+
+
+test('real language identity accepts case/script/custom names independently of survey translations', () => {
+  for (const code of ['OR', 'ORY', 'or-Orya-IN', 'qaa-x-local', '']) {
+    const d = draft({language: NEW_LANGUAGE, newLanguage: 'Odia variety', newLangCode: code});
+    assert.deepEqual(validateStep('details', d), []);
+    assert.deepEqual(savePlan(d).map(s => s.cap), ['cap.language.create', 'cap.assessment.create']);
+    assert.equal(savePlan(d)[0].body({}).code, code ? code.toLowerCase() : undefined);
+  }
+  assert.ok(validateStep('details', draft({language: NEW_LANGUAGE, newLanguage: 'Odia', newLangCode:'not a code'})).length);
+  const html = renderStep('details', draft({language: NEW_LANGUAGE}), {projects:[{id:'p1',name:'P'}],languages:[]});
+  assert.match(html, /Add language…/); assert.match(html, /name="newLanguage"/);
+  assert.match(html, /Survey translation languages are chosen separately/);
+});
+
+test('existing project Add language saves and selects returned identity without creating a project', async () => {
+  const srv = server(), m = mount(srv);
+  await fillStep1(m);
+  m.set('language', NEW_LANGUAGE).dispatchEvent(new m.w.Event('change', {bubbles:true}));
+  m.set('newLanguage', 'Odia'); m.set('newLangCode', 'ORY');
+  m.submit(); await settle();
+  assert.deepEqual(srv.writes().map(c=>c.url), ['/v2/projects/p1/languages','/v2/projects/p1/assessments']);
+  assert.deepEqual(srv.writes()[0].body, {name:'Odia',code:'ory'});
+  assert.equal(srv.db.a.language_id, 'lN');
+  assert.equal(m.h.state.d.language, 'lN');
+  m.click('[data-wz="back"]');
+  assert.equal(m.$('[name="language"]').value, 'lN');
+  assert.doesNotMatch(m.root.innerHTML, /Add language…/);
+});
+
+test('lost existing-project language response locks identity and reconciles without duplicate writes', async () => {
+  const srv=server(), orig=srv.api; let count=0, row=null;
+  srv.api=async (url, opts={})=>{
+    if(url==='/v2/projects/p1/languages') {
+      if(opts.method==='POST') { count++; row={id:'new-ory', name:opts.body.name,code:opts.body.code}; throw new Error('lost response'); }
+      return {languages:row?[row]:[{id:'l1',name:'Hindi'}]};
+    }
+    return orig(url,opts);
+  };
+  const m=mount(srv); await fillStep1(m);
+  m.set('language',NEW_LANGUAGE).dispatchEvent(new m.w.Event('change',{bubbles:true}));
+  m.set('newLanguage','Odia');m.set('newLangCode','ORY');m.submit();await settle();
+  assert.equal(count,1);assert.ok(m.$('[name="language"]').disabled);
+  m.submit();await settle();
+  assert.equal(count,1);assert.equal(srv.db.a.language_id,'new-ory');assert.equal(m.h.state.step,'participants');
+});
+
+
+test('definite assessment refusal keeps created language while allowing correction', async () => {
+  const srv=server(), orig=srv.api; let refuse=true;
+  srv.api=async (url, opts={})=>{
+    if(url.endsWith('/assessments') && opts.method==='POST' && refuse) {
+      refuse=false; throw Object.assign(new Error('Correct the review name'),{status:400});
+    }
+    return orig(url,opts);
+  };
+  const m=mount(srv);await fillStep1(m);
+  m.set('language',NEW_LANGUAGE).dispatchEvent(new m.w.Event('change',{bubbles:true}));
+  m.set('newLanguage','Odia');m.set('newLangCode','ORY');m.submit();await settle();
+  assert.equal(m.$('[name="language"]').value,'lN');assert.equal(m.$('[name="name"]').disabled,false);
+  m.set('name','Corrected review');m.submit();await settle();
+  assert.equal(srv.writes().filter(c=>c.url.endsWith('/languages')).length,1);
+  assert.equal(srv.db.a.language_id,'lN');assert.equal(srv.db.a.name,'Corrected review');
+});
+
+test('definite language refusal after new project creation keeps language fields editable', async () => {
+  const srv=server(), orig=srv.api; let refuse=true;
+  srv.api=async (url, opts={})=>{
+    if(url.endsWith('/languages') && opts.method==='POST' && refuse) {
+      refuse=false; throw Object.assign(new Error('Correct the language'),{status:400});
+    }
+    return orig(url,opts);
+  };
+  const m=mount(srv);await fillStep1(m,{project:NEW_PROJECT});
+  m.submit();await settle();assert.equal(m.$('[name="newLanguage"]').disabled,false);
+  m.set('newLanguage','Corrected language');m.submit();await settle();
+  assert.equal(srv.writes().filter(c=>c.url==='/v2/projects').length,1);
+  assert.equal(srv.db.a.language_id,'lN');assert.equal(m.h.state.step,'participants');
+});
+
+
+test('archived language requires explicit restore, then assessment reuses its identity', async () => {
+  const srv = server(), original = srv.api, restores = [];
+  const archived = {id:'l-old',name:'Odia',code:'ory',archived_at:'2026-01-01'};
+  srv.api = async (url, opts = {}) => {
+    if (url === '/v2/projects/p1/languages' && !opts.method) return {languages:[{id:'l1',name:'Hindi'}, archived]};
+    if (url === '/v2/languages/l-old/unarchive') { restores.push(opts); return {language:{...archived,archived_at:null}}; }
+    return original(url,opts);
+  };
+  const m = mount(srv); await fillStep1(m);
+  assert.equal(m.$('[name=language] option[value="l-old"]'), null);
+  assert.equal(restores.length, 0);
+  assert.match(m.$('[data-wz="restore-language"]').textContent, /Restore and select Odia · ory/);
+  m.click('[data-wz="restore-language"]'); await settle();
+  assert.deepEqual(restores, [{method:'POST',body:{}}]);
+  assert.equal(m.$('[name=language]').value, 'l-old');
+  m.submit(); await settle();
+  assert.equal(srv.db.a.language_id, 'l-old');
+  assert.equal(srv.writes().filter(c => c.url.endsWith('/languages')).length, 0);
+});
+
+test('failed restore stays retryable and never selects archived identity', async () => {
+  const srv = server(), original = srv.api; let attempts = 0;
+  const archived = {id:'l-old',name:'Odia',code:'ory',archived_at:'2026-01-01'};
+  srv.api = async (url, opts = {}) => {
+    if (url === '/v2/projects/p1/languages' && !opts.method) return {languages:[archived]};
+    if (url === '/v2/languages/l-old/unarchive') {
+      if (++attempts === 1) throw new Error('Connection lost');
+      return {language:{...archived,archived_at:null}};
+    }
+    return original(url,opts);
+  };
+  const m = mount(srv); await fillStep1(m);
+  m.click('[data-wz="restore-language"]'); await settle();
+  assert.match(m.root.textContent, /Connection lost/);
+  assert.notEqual(m.$('[name=language]').value, 'l-old');
+  assert.equal(m.$('[data-wz="restore-language"]').disabled, false);
+  m.click('[data-wz="restore-language"]'); await settle();
+  assert.equal(m.$('[name=language]').value, 'l-old');
+  assert.equal(attempts, 2);
+});
+
+test('language review normalizes code and explanatory text stays inside Learn more', () => {
+  const d = draft({language:NEW_LANGUAGE,newLanguage:'Odia',newLangCode:'ORY'});
+  assert.match(renderStep('review', d, {}), /Odia · ory/);
+  const doc = new JSDOM(renderStep('details', d, {})).window.document;
+  assert.match(doc.querySelector('details').textContent, /Survey translation languages are chosen separately/);
+  assert.doesNotMatch(doc.querySelector('form').textContent, /Survey translation languages are chosen separately/);
+});
+
+
+test('searchable languages preserve participant selections and save real project identity', async () => {
+  const srv=server(), m=mount(srv);await fillStep1(m);
+  const picker=name=>m.$(`select[name="${name}"]`).closest('[data-picker]');
+  const query=(name,value)=>{const q=picker(name).querySelector('[data-picker-query]');q.value=value;q.dispatchEvent(new m.w.Event('input',{bubbles:true}));};
+  query('language','HINDI');
+  // Existing chosen Hindi remains visibly selected when the query changes.
+  assert.match(picker('language').querySelector('[data-picker-selected]').textContent,/Hindi/);
+  query('lwc','ລາວ');picker('lwc').querySelector('[data-picker-pick="lo"]').click();
+  query('lwc','TH');picker('lwc').querySelector('[data-picker-pick="th"]').click();
+  query('lwc','no matches');
+  assert.deepEqual([...new m.w.FormData(m.$('form')).getAll('lwc')],['lo','th']);
+  assert.match(picker('lwc').querySelector('[data-picker-selected]').textContent,/Lao/);
+  picker('lwc').querySelector('[data-picker-remove="th"]').click();
+  m.submit();await settle();
+  assert.equal(srv.db.a.lwc,'lo');assert.equal(srv.db.a.language_id,'l1');
+});
+
+test('archived search bounds visible restores and matches codes beyond first six', async () => {
+ const srv=server(), orig=srv.api;
+ srv.api=async (url,opts={})=>url==='/v2/projects/p1/languages'&&!opts.method?{languages:[...Array.from({length:15},(_,i)=>({id:'old'+i,name:'Language '+i,code:'code'+i,archived_at:'2026-01-01'}))]}:orig(url,opts);
+ const m=mount(srv);await fillStep1(m);
+ const visible=()=>[...m.root.querySelectorAll('[data-wz=restore-language]')].filter(b=>!b.hidden);
+ assert.equal(visible().length,6);
+ const q=m.$('[data-archive-query]');q.value='CODE14';q.dispatchEvent(new m.w.Event('input',{bubbles:true}));
+ assert.equal(visible().length,1);assert.equal(visible()[0].dataset.languageId,'old14');
+ assert.equal(srv.writes().length,0);
 });
