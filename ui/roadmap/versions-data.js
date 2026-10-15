@@ -7,7 +7,8 @@ export const VERSIONS = {
    "added": [],
    "changed": [],
    "fixed": [
-    "Full report details use the existing card styling in the assessment host, label scores and evidence counts, and separate narrative observations for easier scanning. Overview bands, values and report content remain unchanged. (#478)"
+    "Full report details use the existing card styling in the assessment host, label scores and evidence counts, and separate narrative observations for easier scanning. Overview bands, values and report content remain unchanged. (#478)",
+    "Facilitator report-detail scenario: 15/15 renderer tests passed; matched automated local fixtures at phone and desktop widths in light and dark were independently inspected. Live DEV/production and full-app navigation remain untested; human satisfaction, confusion and frustration are not measured."
    ]
   },
   {

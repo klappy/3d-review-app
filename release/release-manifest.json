@@ -1,7 +1,7 @@
 {
   "version": "0.30.5",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "efceb7dc08995cd6140ff90375f35b7263022f9a",
+  "cookbook_commit": "9dde91555cd8fd10d54d60a17ec627d4567d9676",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.30.5.md",
@@ -10,14 +10,15 @@
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "84a0b835bc96769c18cd859ff379c8700c85f5cd",
-      "sha256": "b0de423d3043923766cbc1959dbedcc04ca6e7262b32c6b344a38e1f45dd426c"
+      "blob_sha": "cbce42315743a3974aba8cec0271ea2109c401cc",
+      "sha256": "4e476cf3ae913c6524d9bbc6ab6e5a2039056bc2f0f7ba101901a85f26e8562a"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Full report details use the existing card styling in the assessment host, label scores and evidence counts, and separate narrative observations for easier scanning. Overview bands, values and report content remain unchanged. (#478)"
+        "Full report details use the existing card styling in the assessment host, label scores and evidence counts, and separate narrative observations for easier scanning. Overview bands, values and report content remain unchanged. (#478)",
+        "Facilitator report-detail scenario: 15/15 renderer tests passed; matched automated local fixtures at phone and desktop widths in light and dark were independently inspected. Live DEV/production and full-app navigation remain untested; human satisfaction, confusion and frustration are not measured."
       ]
     }
   }
