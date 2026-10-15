@@ -15,3 +15,15 @@ test('held/high-score and missing differ from valid zero; each metaphor has its 
 test('jar clip references are unique and resolved across repeated cards',()=>{
  const s=bandImagery('Needs support')+bandImagery('Needs support');const ids=[...s.matchAll(/id="([^"]+)"/g)].map(m=>m[1]);assert.equal(ids.length,new Set(ids).size);for(const m of s.matchAll(/url\(#([^)]+)\)/g))assert.ok(ids.includes(m[1]));
 });
+
+// Prevent imported SVG assets from silently falling back to black/missing paint.
+test('every adapter custom-property dependency resolves through aliases or shipped app tokens',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const source=await readFile(new URL('./band-visual.js',import.meta.url),'utf8');
+ const tokens=await readFile(new URL('../../design-system-v3/tokens.css',import.meta.url),'utf8');
+ const defined=new Set([...source.matchAll(/(--[a-z0-9-]+)\s*:/g),...tokens.matchAll(/(--[a-z0-9-]+)\s*:/g)].map(m=>m[1]));
+ const used=new Set([...source.matchAll(/var\((--[a-z0-9-]+)/g)].map(m=>m[1]));
+ for(const property of used)assert.ok(defined.has(property),`Unresolved SVG/CSS token: ${property}`);
+ assert.match(source,/--baseline:var\(--line\)/);
+ assert.match(source,/--surface-1:var\(--paper\)/);
+});
