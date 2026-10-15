@@ -16,13 +16,13 @@ test('E1: legacy header (now at /legacy/) carries exactly one Assessments link t
   assert.equal(links.length, 1); assert.ok(links[0].includes('href="/assess/#"')); assert.ok(!/session=|st_/.test(links[0]));
   assert.match(css, /\.rv:not\(\[data-staff-confirmed="true"\]\) #assess-link,\s*\.rv:not\(\[data-entry-view="workspace"\]\) #assess-link,\s*\.rv\[data-workspace-route="participant"\] #assess-link \{ display:none; \}/);
 });
-test('E1: generic legacy backlink is retired; the statement is generated, hidden until signed in, and names where the rest lives', () => {
+test('E1: generic legacy backlink is retired; the capability statement stays machine-discoverable without a visible inventory', () => {
   for (const file of ['./index.html', '../index.html']) { // /assess/ alias and the root shell carry the same header
     const html = read(file);
     const back = html.match(/<a id="legacy-link"[^>]*>[^<]*<\/a>/g) || [];
     assert.equal(back.length, 0, file);
-    assert.ok(html.includes('<details class="storage-note" id="whats-here-wrap" hidden>'), file);
-    assert.ok(html.includes('<p class="storage-note" id="whats-here"></p>'), file);
+    assert.ok(!html.includes('id="whats-here-wrap"'), file);
+    assert.ok(html.includes('<meta name="3d-review-capability-source" content="/assess/whats-here.js">'), file);
   }
   assert.deepEqual(MOUNTED, ['entry (tour, example, survey code, sign-in)', 'workspaces', 'one workspace (its projects)', 'projects', 'one project (assessments, languages)', 'one assessment: Prepare · Collect · Understand · Improve · Permissions (roster, invite, revoke, role change, ownership transfer at that one scope)', 'stage move (one step, confirmed)', 'survey screen', 'survey counts', 'print blank survey', 'share survey: participant link (two-step), copy, QR, invitation sheet, revoke', 'invitation acceptance']);
   assert.deepEqual(ELSEWHERE.items, ['access codes and code-based participant surveys']);
@@ -45,7 +45,7 @@ test('S1: scrubCredentialHash is the first statement of boot() and of the hashch
 // Auditor N4: the local harness allowlist serves every file the product shell and the legacy surface reference.
 test('N4: ui/server.mjs allowlist covers /, /assess/, /legacy/ and every /assess/*.js module the shell imports', () => {
   const server = read('../server.mjs'), shell = read('./assess.js') + read('./index.html');
-  for (const p of ['/', '/assess/', '/legacy/', '/assess/assess.js', '/assess/whats-here.js', '/assess/cards.js', '/assess/scope.js', '/assess/views.js']) assert.ok(server.includes(`'${p}':`), p);
+  for (const p of ['/', '/assess/', '/legacy/', '/assess/assess.js', '/assess/whats-here.js', '/assess/cards.js', '/assess/scope.js', '/assess/sandbox-tools.js', '/assess/views.js']) assert.ok(server.includes(`'${p}':`), p);
   for (const m of shell.matchAll(/from ["'](\/assess\/[^"']+)["']/g)) assert.ok(server.includes(`'${m[1]}':`), `shell import ${m[1]} must be served`);
   assert.ok(server.includes("'/legacy/': ['legacy/index.html', 'text/html']"));
 });

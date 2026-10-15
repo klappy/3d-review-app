@@ -173,7 +173,7 @@ test('B02: render() applies landsOnWork before routing, replacing (not pushing) 
 test('entry: sign-in email → code step (dev code shown) → session stored, go #projects then token set (B-F02a)', async () => {
   const stored = {}; globalThis.sessionStorage = { setItem: (k, v) => { stored[k] = v; }, removeItem: k => { delete stored[k]; } };
   const tokens = [];
-  const ctx = ctxWith({ 'POST /v2/auth/link': { sent: true, dev_only_code: '123456' }, 'POST /v2/auth/session': { session: 'sess_abc', principal_id: 'pr_1' } }, { setToken: t => tokens.push(t) });
+  const ctx = ctxWith({ 'POST /v2/auth/link': { sent: true, dev_only_code: '123456' }, 'POST /v2/auth/session': { session: 'sess_abc', principal_id: 'pr_1' } }, { setToken: t => tokens.push(t), location: { hostname: 'dev.3dreview.app', search: '?dev-tools=signin' } });
   const m = await pages.entry.load(ctx, {}); m.mode = 'signin';
   const root = mount(pages.entry, ctx, m);
   let form = root.querySelector('#signin-form'); assert.equal(form.dataset.stage, 'email'); assert.equal(form.querySelector('[name=code]'), null);
@@ -187,7 +187,7 @@ test('entry: sign-in email → code step (dev code shown) → session stored, go
   assert.ok(!ctx.notes.some(n => n.m === 'Signed in.'), 'no stale note after the re-boot');
 });
 test('entry: sign-in failure stays on the form and never claims success', async () => {
-  const ctx = ctxWith({ 'POST /v2/auth/link': err('INVALID_PARAMS', 'synthetic only') });
+  const ctx = ctxWith({ 'POST /v2/auth/link': err('INVALID_PARAMS', 'synthetic only') }, { location: { hostname: 'dev.3dreview.app', search: '?dev-tools=signin' } });
   const m = await pages.entry.load(ctx, {}); m.mode = 'signin'; const root = mount(pages.entry, ctx, m);
   const form = root.querySelector('#signin-form'); form.elements.email.value = 'real@example.com'; await form.fire('submit');
   assert.equal(m.signin.stage, 'email'); assert.ok(ctx.notes.some(n => n.a && n.m.includes('synthetic only'))); assert.deepEqual(ctx.gone, []);
@@ -365,22 +365,22 @@ test('project settings (lane 11): editors reach access codes on the existing scr
   assert.ok(!h.includes('/legacy/'), 'no link to the legacy console');
   assert.ok(!/class="[^"]*primary[^"]*"[^>]*data-kept/.test(h), 'kept links never take the page primary');
   assert.ok(/href="#workspaces" data-kept="workspaces"/.test(h), 'workspaces link to the existing #workspaces screen');
-  const settings = h.slice(h.indexOf('id="project-settings"')), more = settings.slice(settings.indexOf('<details class="small learn-more">'));
-  assert.ok(/Issue paper codes/.test(more) && /Group projects in a workspace/.test(more), 'U43: both explanations sit behind the one Learn more');
-  assert.equal(settings.split('Issue paper codes').length - 1, 1, 'U43: never inline as well');
+  const settings = h.slice(h.indexOf('id="project-settings"'));
+  assert.ok(settings.includes('Share card to print access codes') && settings.includes('Group related projects'), 'action-specific guidance stays next to its link');
+  assert.ok(!h.includes('<summary>Learn more</summary>'), 'project has no generic help disclosure');
   const view = ctxWith({ ...base, 'GET /v2/projects/p1': { project: { id: 'p1', name: 'P', role: 'viewer' }, languages: [] } });
   assert.ok(!pages.project.render(view, await pages.project.load(view, { id: 'p1' })).includes('project-settings'));
 });
 
-test('L1-7 #signin with email links off (production) keeps prototype frame 1: one primary to the Access provider, survey footer, sandbox collapsed after it', async () => {
+test('L1-7 #signin with email links off (production) keeps prototype frame 1: one primary to the Access provider, survey footer, no sandbox on normal sign-in', async () => {
   const html = pages.entry.render({ esc: s => String(s ?? ''), state: {} }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
   assert.ok(html.includes('class="glass panel narrow v3-signin"'));
   assert.ok(/<a class="button rv-btn primary" href="\/v2\/auth\/access" style="width:100%/.test(html), 'one full-width primary to the real provider');
   assert.ok(!html.includes('email-link-form'), 'no email form that production would discard');
   const access = html.indexOf('href="/v2/auth/access"'), box = html.indexOf('<details class="sandbox-signin"');
-  assert.ok(access > -1 && box > access, 'real provider precedes the sandbox');
+  assert.ok(access > -1 && box === -1, 'real provider without sandbox controls');
 });
-test('L1-7 #signin matches prototype frame 1 (B38: one email field + one "Email me a sign-in link" button), survey footer, sandbox collapsed after it', async () => {
+test('L1-7 #signin matches prototype frame 1 (B38: one email field + one "Email me a sign-in link" button), survey footer, no sandbox on normal sign-in', async () => {
   const html = pages.entry.render({ esc: s => String(s ?? ''), state: { emailLinks: true } }, { mode: 'signin', signin: { email: '', devCode: null, stage: 'email' } });
   assert.ok(html.includes('class="glass panel narrow v3-signin"'));
   assert.ok(html.includes('<p class="eyebrow">Sign in</p>'));
@@ -393,9 +393,9 @@ test('L1-7 #signin matches prototype frame 1 (B38: one email field + one "Email 
   assert.equal(html.split('/v2/auth/access').length - 1, 1, 'one Access href: the secondary code link'); assert.ok(!html.includes('cdn-cgi'));
   assert.ok(html.indexOf('<a class="button rv-btn" href="/v2/auth/access" data-code-signin>Sign in with a code instead</a>') > html.indexOf('</form>'), 'code link after the link form');
   const real = html.indexOf('id="email-link-form"'), box = html.indexOf('<details class="sandbox-signin"');
-  assert.ok(real > -1 && box > real, 'real sign-in precedes the sandbox');
+  assert.ok(real > -1 && box === -1, 'real sign-in without sandbox controls');
   assert.ok(!/<details class="sandbox-signin"[^>]*\bopen\b/.test(html), 'sandbox collapsed on the email step');
-  assert.ok(html.includes('no sign-in is needed') && html.includes('href="#survey"'));
+  assert.ok(html.includes('No sign-in needed') && html.includes('href="#survey"'));
 });
 
 // Captain ruling 12:53 (L1-16): public About is a real page; public routes never show sign-in.
