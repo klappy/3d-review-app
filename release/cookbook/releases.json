@@ -1,7 +1,19 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.29.1",
+  "current": "0.30.0",
   "versions": [
+    {
+      "version": "0.30.0",
+      "status": "candidate",
+      "notes_path": "releases/0.30.0.md",
+      "sections": {
+        "added": [
+          "Default-off production participant-report admission, retaining existing scoring, snapshots, access checks and the assessment response minimum. Activation requires explicit disclosure-policy approval; this candidate configures no environment. (#464)"
+        ],
+        "changed": [],
+        "fixed": []
+      }
+    },
     {
       "version": "0.29.1",
       "status": "candidate",

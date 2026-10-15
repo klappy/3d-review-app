@@ -4,10 +4,10 @@ import { REPORT_CAPTURE_CTE, attestPackedCapture, type CapturedAssessment } from
 import { canonicalJson, parseBoundedJson, sha256Bytes } from './report-canonical-json.js';
 import { ATTESTATION_TRUST } from './synthetic-attestation-trust.js';
 import { renderSyntheticReport, REPORT_SCHEMA, REPORT_VERSIONS } from './synthetic-report-renderer.js';
+import { participantReportsAllowed } from './report-admission.js';
 
-type StoreContext = Pick<Ctx, 'db' | 'principal' | 'now'> & { env?: { ENVIRONMENT?: string } };
-/** Fail closed: only an explicit ENVIRONMENT='dev' admits participant-source captures (captain 2026-09-24 15:03). */
-function dev(ctx:StoreContext):boolean{return ctx.env?.ENVIRONMENT==='dev';}
+type StoreContext = Pick<Ctx, 'db' | 'principal' | 'now'> & { env?: { ENVIRONMENT?: string; PARTICIPANT_REPORTS?: string } };
+function participantAdmission(ctx:StoreContext):boolean{return participantReportsAllowed(ctx.env);}
 type VersionTuple = Readonly<{sourcePin:string;indexRoot:string;scorerVersion:string;narrativeVersion:string;policyVersion:string;outputSchemaVersion:string}>;
 type RendererDescriptor = Readonly<{
   tuple:VersionTuple;
@@ -139,7 +139,7 @@ async function observeBuild(ctx:StoreContext,assessmentId:string):Promise<BuildO
   try{row=await ctx.db.prepare(REPORT_OBSERVE_SQL).bind(who[0],null,aid,who[1],'member').first<Observation>();}catch{return UNAVAILABLE;}
   if(!row)return NOT_VISIBLE;
   if(row.assessment_id!==aid)return UNAVAILABLE;
-  const current=await attestPackedCapture(aid,row.current_capture??'',dev(ctx));
+  const current=await attestPackedCapture(aid,row.current_capture??'',participantAdmission(ctx));
   return {ok:true,aid,capture:current.eligible?current.capture:null};
 }
 /** Preview exposes no captured token, count, digest or report identity. */
@@ -162,7 +162,7 @@ export async function commitMaterialized(ctx:StoreContext,assessmentId:string,ca
   try{
     approved(r);aid=text(assessmentId);
     // Reattest the raw token, ignoring any caller assertion of its digest/rows/eligibility.
-    const capture=await attestPackedCapture(aid,captured.packedCapture,dev(ctx));if(!capture.eligible)return UNAVAILABLE;c=capture.capture;
+    const capture=await attestPackedCapture(aid,captured.packedCapture,participantAdmission(ctx));if(!capture.eligible)return UNAVAILABLE;c=capture.capture;
     const rendered=await r.render(c);payloadBytes=canonicalJson(rendered,PAYLOAD_LIMIT);
     const parsed=parseBoundedJson(payloadBytes,PAYLOAD_LIMIT);if(!await r.validate(parsed,c))return UNAVAILABLE;
     key=await reportKey(c,r.tuple);payloadHash=await sha256Bytes(encoder.encode(payloadBytes));
@@ -178,11 +178,11 @@ export async function commitMaterialized(ctx:StoreContext,assessmentId:string,ca
   try{row=await ctx.db.prepare(REPORT_BUILD_RESULT_SQL).bind(who[0],null,aid,who[1],'member',key).first<StoredRow>();}catch{return UNAVAILABLE;}
   if(!row)return NOT_VISIBLE;
   if(row.assessment_id!==aid)return UNAVAILABLE;
-  const current=await attestPackedCapture(aid,row.current_capture??'',dev(ctx));
+  const current=await attestPackedCapture(aid,row.current_capture??'',participantAdmission(ctx));
   if(!current.eligible)return held(aid);
   if(row.id===null)return {ok:false,reason:'CONFLICT'};
   try{
-    const valid=await validateStored(row,r,current.capture,dev(ctx));
+    const valid=await validateStored(row,r,current.capture,participantAdmission(ctx));
     if(valid.report.assessmentId!==aid||valid.report.reportKey!==key||valid.report.captureDigest!==c.captureDigest||valid.payloadHash!==payloadHash||valid.payloadBytes!==payloadBytes)return {ok:false,reason:'DETERMINISM'};
     return {ok:true,value:valid.report};
   }catch{return held(aid);}
@@ -195,7 +195,7 @@ export async function readMaterialized(ctx:StoreContext,reportId:string):Promise
   try{row=await ctx.db.prepare(REPORT_GET_SQL).bind(who[0],rid,null,who[1],'viewer').first<StoredRow>();}catch{return UNAVAILABLE;}
   if(!row)return NOT_VISIBLE;
   let aid:string;try{aid=text(row.assessment_id);}catch{return UNAVAILABLE;}
-  try{return {ok:true,value:(await validateStored(row,r,undefined,dev(ctx))).report};}catch{return held(aid);}
+  try{return {ok:true,value:(await validateStored(row,r,undefined,participantAdmission(ctx))).report};}catch{return held(aid);}
 }
 export async function listMaterialized(ctx:StoreContext,assessmentId:string,afterId:string|null=null,pageSize=5):Promise<StoreResult<ReportPage>>{
   const r=descriptor();
@@ -206,12 +206,12 @@ export async function listMaterialized(ctx:StoreContext,assessmentId:string,afte
   if(rows.length===0)return NOT_VISIBLE;
   if(rows.length>pageSize+1||rows.some(row=>row.assessment_id!==aid))return UNAVAILABLE;
   try{
-    const current=await attestPackedCapture(aid,rows[0].current_capture??'',dev(ctx));if(!current.eligible)return held(aid);
+    const current=await attestPackedCapture(aid,rows[0].current_capture??'',participantAdmission(ctx));if(!current.eligible)return held(aid);
     if(rows.some(row=>row.current_capture!==current.capture.packedCapture))return held(aid);
     if(rows.length===1&&rows[0].id===null)return {ok:true,value:{reports:[],afterId:null}};
     const validated:ReportSummary[]=[];let previous=afterId??'';
     for(const row of rows){
-      const result=await validateStored(row,r,current.capture,dev(ctx));if(result.report.id<=previous)invalid();previous=result.report.id;
+      const result=await validateStored(row,r,current.capture,participantAdmission(ctx));if(result.report.id<=previous)invalid();previous=result.report.id;
       const {payload,...summary}=result.report;validated.push(Object.freeze(summary));
     }
     const reports=Object.freeze(validated.slice(0,pageSize));
