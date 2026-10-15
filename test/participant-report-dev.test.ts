@@ -1,3 +1,4 @@
+import {participantReportsAllowed} from '../src/report-admission';
 import {readFileSync} from 'node:fs';
 import {beforeAll,afterAll,describe,it,expect} from 'vitest';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
@@ -51,4 +52,28 @@ describe('participant-source reports (DEV only)',()=>{
   expect(dev).toEqual(plain);expect(plain.eligible).toBe(true);
   expect((await renderSyntheticReport(src,c.capture.rows,true))).toEqual(await renderSyntheticReport(src,c.capture.rows));
  },60000);
+ it('admits only DEV or explicitly enabled production',()=>{
+  expect(participantReportsAllowed({ENVIRONMENT:'dev'})).toBe(true);
+  expect(participantReportsAllowed({ENVIRONMENT:'production',PARTICIPANT_REPORTS:'enabled'})).toBe(true);
+  for(const ENVIRONMENT of ['production','staging','DEV','',undefined]) for(const PARTICIPANT_REPORTS of ['', 'on', 'true', 'ENABLED', ' enabled ', undefined])
+   expect(participantReportsAllowed({ENVIRONMENT,PARTICIPANT_REPORTS})).toBe(false);
+  for(const ENVIRONMENT of ['staging','DEV','',undefined]) expect(participantReportsAllowed({ENVIRONMENT,PARTICIPANT_REPORTS:'enabled'})).toBe(false);
+  expect(participantReportsAllowed()).toBe(false);
+ });
+ it('production opt-in reuses the report and disabling it holds stored reports again',async()=>{
+  const enabled={...ctx('production'),env:{ENVIRONMENT:'production',PARTICIPANT_REPORTS:'enabled'}};
+  const preview=await store.observeBuildEligibility(enabled,aid);expect(preview.ok&&preview.marker.eligible).toBe(true);
+  const r=await store.buildMaterialized(enabled,aid);expect(r.ok).toBe(true);if(!r.ok)return;
+  const dev=await store.buildMaterialized(ctx('dev'),aid);expect(dev.ok&&dev.value.payload).toEqual(r.value.payload);
+  const got=await store.readMaterialized(enabled,r.value.id);expect(got.ok&&got.value.captureDigest).toBe(r.value.captureDigest);
+  const listed=await store.listMaterialized(enabled,aid);expect(listed.ok&&listed.value.reports.map(x=>x.id)).toContain(r.value.id);
+  const off=await store.readMaterialized(ctx('production'),r.value.id);expect(off.ok).toBe(false);if(!off.ok)expect(off.reason).toBe('HELD');
+  const ungranted={...enabled,principal:{id:'ungranted',kind:'user' as const}};
+  const hidden=await store.readMaterialized(ungranted,r.value.id);expect(hidden.ok).toBe(false);if(!hidden.ok)expect(hidden.reason).toBe('NOT_VISIBLE');
+ },60000);
+ it('production admission retains the five-response floor',async()=>{
+  const c=await captureForBuild(ctx(),src);expect(c.eligible).toBe(true);if(!c.eligible)return;
+  const rows=c.capture.rows.slice(0,4).map(row=>({...row,responseId:'p_'+row.responseId}));
+  expect(await attestCapture(src,rows,participantReportsAllowed({ENVIRONMENT:'production',PARTICIPANT_REPORTS:'enabled'}))).toEqual({eligible:false,reason:'BELOW_MINIMUM'});
+ });
 });

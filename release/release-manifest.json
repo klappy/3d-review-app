@@ -1,27 +1,26 @@
 {
-  "version": "0.29.1",
+  "version": "0.30.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "4cbf09727de57ed6f68a8865cf960bbdc98460a2",
+  "cookbook_commit": "90893285dd216b558bdca2be80f3ee73c8b437dd",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.29.1.md",
-      "blob_sha": "e7c95afeabd7c14d65969c6233bc1b738a3f1074",
-      "sha256": "095ac38a6ee5b56af91bac4f4226cf3febf97a6c7cdc4c180d423f1b2eb68220"
+      "path": "planning/2026-09-16-parity-build/releases/0.30.0.md",
+      "blob_sha": "d36012be164503cab28d504f90eed04485707eb1",
+      "sha256": "2749e18fc3097da1132b6a6be0fe8313c18c41d382fd34f4096418774b19cc58"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "3e1d65377e47dac6add41ef664e103ffefd80aed",
-      "sha256": "35c12146404c5bad384ca79d57914df32bd842712b11c4345139eb40ad508ed4"
+      "blob_sha": "657f25bb0a7db0b568d3e42ec6dd753fc55c2a1d",
+      "sha256": "bc0ac5be74630dc3bfc9c76c4b5d32c983ea2482525351b45ad5f30e6890dd71"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [],
+      "added": [
+        "Default-off production participant-report admission, retaining existing scoring, snapshots, access checks and the assessment response minimum. Activation requires explicit disclosure-policy approval; this candidate configures no environment. (#464)"
+      ],
       "changed": [],
-      "fixed": [
-        "Assessment setup can add a named language to an existing project or explicitly restore and select an archived language. Optional language codes accept mixed case and store lowercase; duplicate and retry handling preserve the assessment's language identity. Survey translation support stays separate. (#463)",
-        "Local facilitator fixture outcomes: six of six setup runs passed across phone and laptop (existing project, new project, archived restore with failure/retry). No human usability measurement or Bincy exact-input reproduction. DEV and production verification pending."
-      ]
+      "fixed": []
     }
   }
 }
