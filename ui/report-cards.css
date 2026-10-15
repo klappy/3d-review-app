@@ -40,3 +40,17 @@
 .rv :is(#report-view, [data-report-view]) .report-detail-section > p { line-height:1.65; max-width:65ch; margin:0; }
 .rv :is(#report-view, [data-report-view]) .report-detail-section > p + p { margin-top:var(--gap-grid); }
 .rv :is(#report-view, [data-report-view]) .report-detail-section { margin:0; min-width:0; padding:var(--panel-pad); }
+.rv :is(#report-view, [data-report-view]) .report-metrics { display:flex; flex-wrap:wrap; gap:var(--gap-row) var(--panel-pad); margin:var(--gap-row) 0 0; }
+.rv :is(#report-view, [data-report-view]) .report-metrics > div { display:flex; flex-direction:column; gap:var(--gap-pip); }
+.rv :is(#report-view, [data-report-view]) .report-metrics dt,
+.rv :is(#report-view, [data-report-view]) .report-metric-label { color:var(--secondary); }
+.rv :is(#report-view, [data-report-view]) .report-metrics dd { margin:0; font-weight:600; font-variant-numeric:tabular-nums; }
+.rv :is(#report-view, [data-report-view]) .report-lens-score { margin-bottom:0; }
+.rv :is(#report-view, [data-report-view]) .report-metric-label { display:block; margin:var(--gap-pip) 0 var(--gap-row); }
+.rv :is(#report-view, [data-report-view]) .report-subdimension strong { font-weight:500; }
+.rv :is(#report-view, [data-report-view]) .report-detail-section h5 { margin:0; font-size:1rem; font-weight:600; line-height:1.5; }
+.rv :is(#report-view, [data-report-view]) .report-detail-section li > p { margin:var(--gap-pip) 0; color:var(--secondary); }
+.rv :is(#report-view, [data-report-view]) .report-evidence-row { display:flex; justify-content:space-between; gap:var(--gap-grid); align-items:center; }
+.rv :is(#report-view, [data-report-view]) .report-evidence-row .report-metrics { margin:0; flex-shrink:0; text-align:end; }
+.rv :is(#report-view, [data-report-view]) .report-observations { max-width:65ch; }
+.rv :is(#report-view, [data-report-view]) .report-observations > li { line-height:1.65; }

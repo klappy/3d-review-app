@@ -48,6 +48,14 @@ function section(doc, heading, body) {
   s.append(el(doc, 'h4', heading), ...body);
   return s;
 }
+function metrics(doc, pairs) {
+  const dl = el(doc, 'dl'); dl.className = 'report-metrics';
+  for (const [label, value] of pairs) {
+    const pair = el(doc, 'div'); const term = el(doc, 'dt', label); term.className = 'fs-label';
+    pair.append(term, el(doc, 'dd', val(value))); dl.append(pair);
+  }
+  return dl;
+}
 const rows = value => (Array.isArray(value) ? value : []);
 // A held or malformed result renders nothing at all rather than a partial report.
 export function renderReport({ doc, root, report }) {
@@ -69,7 +77,8 @@ export function renderReport({ doc, root, report }) {
   if (cross.length) {
     out.push(section(doc, copy.crossLens, [list(doc, cross.map(entry => {
       const agreement = entry.agreement_range === null || entry.agreement_range === undefined ? copy.oneLens : val(entry.agreement_range);
-      const li = el(doc, 'li', `${val(entry.construct_name)} · ${val(entry.triangulated_mean)} · ${agreement}`);
+      const li = el(doc, 'li');
+      li.append(el(doc, 'h5', val(entry.construct_name)), metrics(doc, [['Average score', entry.triangulated_mean], ['Score spread', agreement]]));
       const perLens = rows(entry.lens_scores);
       if (perLens.length) li.append(list(doc, perLens.map(score => el(doc, 'li', `${val(score.lens)}: ${val(score.score)}`))));
       return li;
@@ -77,7 +86,11 @@ export function renderReport({ doc, root, report }) {
   }
   const standalone = rows(payload.standalone_indicators);
   if (standalone.length) {
-    out.push(section(doc, copy.standalone, [list(doc, standalone.map(ind => el(doc, 'li', `${val(ind.question_text)} · ${val(ind.lens)} · ${val(ind.sub_dimension)} · ${val(ind.score)} · ${val(ind.n_responses)}`)))]));
+    out.push(section(doc, copy.standalone, [list(doc, standalone.map(ind => {
+      const li = el(doc, 'li');
+      li.append(el(doc, 'h5', val(ind.question_text)), el(doc, 'p', `${val(ind.lens)} · ${val(ind.sub_dimension)}`), metrics(doc, [['Score', ind.score], ['Responses', ind.n_responses]]));
+      return li;
+    }))]));
   }
   const agreement = payload.translation_type_agreement;
   if (agreement && typeof agreement === 'object') {
@@ -85,10 +98,17 @@ export function renderReport({ doc, root, report }) {
   }
   const evidence = rows(payload.evidence);
   if (evidence.length) {
-    out.push(section(doc, copy.evidence, [list(doc, evidence.map(entry => el(doc, 'li', `${val(entry.label)} · ${val(entry.n)}`)))]));
+    out.push(section(doc, copy.evidence, [list(doc, evidence.map(entry => {
+      const li = el(doc, 'li'); li.className = 'report-evidence-row';
+      li.append(el(doc, 'strong', val(entry.label)), metrics(doc, [['Submissions', entry.n]])); return li;
+    }))]));
   }
   const narrative = rows(payload.narrative);
-  if (narrative.length) out.push(section(doc, copy.narrative, narrative.map(line => el(doc, 'p', val(line)))));
+  if (narrative.length) {
+    const observations = list(doc, narrative.map(line => el(doc, 'li', val(line))));
+    observations.className = 'report-observations';
+    out.push(section(doc, copy.narrative, [observations]));
+  }
   root.replaceChildren(...out);
   return true;
 }
