@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.30.3",
+  "current": "0.30.4",
   "versions": [
+    {
+      "version": "0.30.4",
+      "status": "candidate",
+      "notes_path": "releases/0.30.4.md",
+      "sections": {
+        "fixed": [
+          "Missing participant/print translation strings receive one bounded second batch; successful strings remain unchanged and still-missing strings retain marked English fallback. Local source18/18 and print2/2 scenarios passed; live and language-quality verification pending. (#477)"
+        ]
+      }
+    },
     {
       "version": "0.30.3",
       "status": "candidate",

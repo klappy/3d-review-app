@@ -109,13 +109,13 @@ test('fetchTranslationsProgressive: small parallel chunks, real progress to 100%
   assert.equal(again.cached, true);
 });
 
-test('fetchTranslationsProgressive: one failed chunk → partial, not cached; all failed → rejects', async () => {
+test('fetchTranslationsProgressive: one failed chunk → second-pass recovery, cached; persistent failures reject', async () => {
   const texts = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`k${i}`, `Text ${i}`]));
   let n = 0;
   const flaky = async (url, init) => { const b = JSON.parse(init.body); if (n++ === 0) return { ok: false, status: 502 }; return { ok: true, json: async () => ({ translated: Object.fromEntries(Object.keys(b.sourceTexts).map(k => [k, 'ກ'])) }) }; };
   const storage = memoryStorage();
   const r = await fetchTranslationsProgressive({ lang: 'lo', context: 'c', sourceTexts: texts, fetchImpl: flaky, storage, concurrency: 1 });
-  assert.equal(r.partial, true); assert.equal(storage.m.size, 0);
+  assert.equal(r.partial, false); assert.equal(storage.m.size, 1); assert.equal(n, 3);
   await assert.rejects(fetchTranslationsProgressive({ lang: 'lo', context: 'c', sourceTexts: texts, fetchImpl: async () => ({ ok: false, status: 503 }) }));
 });
 
@@ -161,7 +161,7 @@ test('S57 fetchTranslationsProgressive: a refused welcome lead (name fails the s
   let n = 0; const store2 = memoryStorage(); const proxy = refusingProxy();
   const flaky = async (u, init) => (n++ === 0 ? { ok: false, status: 502 } : proxy(u, init));
   const p = await fetchTranslationsProgressive({ lang: 'lo', context: 'participant-ui', sourceTexts: texts, fetchImpl: flaky, storage: store2, concurrency: 1 });
-  assert.equal(p.partial, true); assert.equal(store2.m.size, 0);
+  assert.equal(p.partial, false); assert.equal(store2.m.size, 2);
 });
 
 test('B1 a bundle cached while a key was refused expires after a day; a later full answer caches as a plain map', async () => {
@@ -190,5 +190,59 @@ test('B1 a bundle cached while a key was refused expires after a day; a later fu
     const n2 = calls; clock += 10 * DAY; // a plain map stays a permanent hit
     const later = await fetchFn(args);
     assert.equal(later.cached, true); assert.equal(calls, n2); assert.equal(later.map.lead, `lo:${texts.lead}`);
+  }
+});
+
+test('second pass sends only missing or invalid strings once and preserves first successes', async () => {
+  const calls = [];
+  const result = await fetchTranslationsProgressive({lang:'fr',context:'participant-form:tpl',sourceTexts:{a:'Question',b:'Second',c:'Third'},
+    fetchImpl: async (_, init) => { const part=JSON.parse(init.body).sourceTexts; calls.push(part);
+      return {ok:true,json:async()=>calls.length===1?{translated:{a:'Question',b:'  ',c:17}}:{translated:{a:'WRONG',b:'Deux',c:'Trois'}}}; }});
+  assert.deepEqual(calls,[{a:'Question',b:'Second',c:'Third'},{b:'Second',c:'Third'}]);
+  assert.deepEqual(result.map,{a:'Question',b:'Deux',c:'Trois'}); assert.equal(result.partial,false);
+});
+
+test('persistent missing strings stop after second round and remain uncached', async () => {
+  const calls=[];const storage=memoryStorage();
+  const r=await fetchTranslationsProgressive({lang:'hi',context:'participant-ui',sourceTexts:{a:'One',b:'Two'},storage,
+    fetchImpl:async(_,init)=>{calls.push(JSON.parse(init.body).sourceTexts);return {ok:true,json:async()=>({translated:{a:'एक'}})};}});
+  assert.equal(calls.length,2);assert.deepEqual(calls[1],{b:'Two'});assert.deepEqual(r.map,{a:'एक'});assert.equal(r.partial,true);assert.equal(storage.m.size,0);
+});
+
+test('complete translation makes no second request', async () => {
+  let calls=0;await fetchTranslationsProgressive({lang:'hi',context:'participant-ui',sourceTexts:{a:'One'},
+    fetchImpl:async()=>{calls++;return {ok:true,json:async()=>({translated:{a:'एक'}})};}});
+  assert.equal(calls,1);
+});
+
+test('authorization, validation and abort failures are never retried', async () => {
+  for(const status of [400,401,403,404,'abort']) {let calls=0;
+    await assert.rejects(fetchTranslationsProgressive({lang:'hi',context:'participant-ui',sourceTexts:{a:'One'},
+      fetchImpl:async()=>{calls++;if(status==='abort')throw Object.assign(new Error('cancelled'),{name:'AbortError'});return {ok:false,status};}}));
+    assert.equal(calls,1);
+  }
+});
+
+test('server-refused omissions are not retried without per-key refusal identities', async () => {
+  let calls=0;const r=await fetchTranslationsProgressive({lang:'hi',context:'participant-ui',sourceTexts:{a:'One',b:'Not published'},
+    fetchImpl:async()=>{calls++;return {ok:true,json:async()=>({translated:{a:'एक'},refused:1,partial:true})};}});
+  assert.equal(calls,1);assert.deepEqual(r.map,{a:'एक'});assert.equal(r.partial,false);
+});
+
+test('facilitator printed survey retries only missing question and keeps truthful EN fallback', async () => {
+  const {translatePrint}=await import('../assess/print-lang.js');
+  const model={visible:true,blank:true,template_id:'tpl_written',title:'Written',items:[{text:'First question',type:'single',options:[{text:'Yes',code:'yes'},{text:'No',code:'no'}]},{text:'Second question',type:'free'}]};
+  for(const persistent of [false,true]) {
+    const calls=[];let first=true;
+    const result=await translatePrint(model,{lang:'hi',fetchImpl:async(_,init)=>{
+      const body=JSON.parse(init.body);calls.push(body);const translated={};
+      for(const [key,value] of Object.entries(body.sourceTexts)) {if(key==='q1'&&(persistent||first))continue;translated[key]='अनुवाद '+value;}
+      if(body.context.startsWith('participant-form:'))first=false;
+      return {ok:true,json:async()=>({translated})};
+    }});
+    const formCalls=calls.filter(x=>x.context.startsWith('participant-form:'));
+    assert.equal(formCalls.length,2);assert.deepEqual(Object.keys(formCalls[1].sourceTexts),['q1']);
+    assert.equal(result.english,persistent?1:0);assert.equal(result.items[1].en,persistent);
+    assert.equal(result.items[0].options[0].code,'yes');
   }
 });
