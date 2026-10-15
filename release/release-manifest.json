@@ -1,23 +1,23 @@
 {
-  "version": "0.30.2",
+  "version": "0.30.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "09fb4b953ae2fce964653003e399a6599f1844a1",
+  "cookbook_commit": "b7f4404e1822e7b09899e6c32207a18e7509daff",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.30.2.md",
-      "blob_sha": "796b2d38ebf73b1894ccc741c3fb65b61e9ab9d0",
-      "sha256": "3520a4409288a67c4f09aa7d069c89eadd303ff584ad8cde095de5ada366bc72"
+      "path": "planning/2026-09-16-parity-build/releases/0.30.4.md",
+      "blob_sha": "f2469fe7b19cbfa4e293029baab597817ac502f1",
+      "sha256": "6f42972112364c01c71f2da1778188de4c23e47a7869a999db12f5938040acf7"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "9c4c04e324bb4e77e617f0d5767121157dca7df3",
-      "sha256": "966c0b60d9c6d17217a77d17459dc57be0e8e52317e1f08644fc1a70f6414a41"
+      "blob_sha": "8ba64b3a7c1a8d8dabc4316da98c2fa901ad6a56",
+      "sha256": "c76c62c3d8430cfcaff434698b9109e8dde7d6d04d7f8a0915a351658a2434df"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Human-facing pages remove capability inventories and generic help accordions, show essential guidance inline, and keep synthetic sign-in tools off normal login screens. Reporting activation and authentication rules unchanged."
+        "Missing participant/print translation strings receive one bounded second batch; successful strings remain unchanged and still-missing strings retain marked English fallback. Local source18/18 and print2/2 scenarios passed; live and language-quality verification pending. (#477)"
       ]
     }
   }
