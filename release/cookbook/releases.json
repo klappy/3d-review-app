@@ -1,16 +1,28 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.30.2",
+  "current": "0.30.3",
   "versions": [
     {
-      "version": "0.30.2",
+      "version": "0.30.3",
       "status": "candidate",
+      "notes_path": "releases/0.30.3.md",
+      "sections": {
+        "fixed": [
+          "Incomplete printed translations clearly name missing phrases and the existing retry action while preserving marked-English printable fallback. Facilitator local status simulation:4/4 cases passed; no human usability or translation-coverage improvement claim. (#475)"
+        ]
+      }
+    },
+    {
+      "version": "0.30.2",
+      "status": "released",
       "notes_path": "releases/0.30.2.md",
       "sections": {
         "fixed": [
           "Human-facing pages remove capability inventories and generic help accordions, show essential guidance inline, and keep synthetic sign-in tools off normal login screens. Reporting activation and authentication rules unchanged."
         ]
-      }
+      },
+      "tag": "v0.30.2",
+      "date": "2026-10-15"
     },
     {
       "version": "0.30.1",
