@@ -210,23 +210,44 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
   const chunks = [];
   for (let i = 0; i < total; i += chunkSize) chunks.push(Object.fromEntries(keys.slice(i, i + chunkSize).map(k => [k, sourceTexts[k]])));
   const map = {};
-  let done = 0, next = 0, failures = 0, refused = 0; // refused: keys the server will never translate (S57, E3)
+  let done = 0, failures = 0, refused = 0;
+  const retry = {};
   onProgress({ done, total });
-  async function worker() {
-    while (next < chunks.length) {
-      const part = chunks[next++];
-      try {
-        const res = await fetchImpl(endpoint, translateInit({ targetLang: lang, context, sourceTexts: part }, bearer));
-        if (!res || !res.ok) throw new Error(`translate ${res ? res.status : 'failed'}`);
-        const data = await res.json();
-        for (const k of Object.keys(part)) if (typeof data?.translated?.[k] === 'string' && data.translated[k].trim()) map[k] = data.translated[k];
-        refused += Math.min(refusedCount(data), Object.keys(part).length);
-      } catch { failures++; }
-      done += Object.keys(part).length;
-      onProgress({ done, total });
+  // Exactly two bounded rounds. Successful first-round values are never sent again or replaced.
+  // A refusal count has no per-key identities: do not guess which omitted keys may be retried.
+  async function round(parts, first) {
+    let next = 0;
+    async function worker() {
+      while (next < parts.length) {
+        const part = parts[next++];
+        let mayRetry = first;
+        try {
+          const res = await fetchImpl(endpoint, translateInit({ targetLang: lang, context, sourceTexts: part }, bearer));
+          if (!res || !res.ok) {
+            if (res && [400, 401, 403, 404].includes(res.status)) mayRetry = false;
+            throw new Error(`translate ${res ? res.status : 'failed'}`);
+          }
+          const data = await res.json();
+          for (const k of Object.keys(part)) if (!(k in map) && typeof data?.translated?.[k] === 'string' && data.translated[k].trim()) map[k] = data.translated[k];
+          const denied = Math.min(refusedCount(data), Object.keys(part).length);
+          refused += denied;
+          if (denied) mayRetry = false;
+        } catch (error) {
+          failures++;
+          if (error?.name === 'AbortError') mayRetry = false;
+        }
+        if (mayRetry) for (const k of Object.keys(part)) if (!(k in map)) retry[k] = part[k];
+        if (first) done += Object.keys(part).length;
+        onProgress({ done, total });
+      }
     }
+    await Promise.all(Array.from({ length: Math.min(concurrency, parts.length) }, worker));
   }
-  await Promise.all(Array.from({ length: Math.min(concurrency, chunks.length) }, worker));
+  await round(chunks, true);
+  const missing = Object.keys(retry).filter(k => !(k in map));
+  const retryChunks = [];
+  for (let i = 0; i < missing.length; i += chunkSize) retryChunks.push(Object.fromEntries(missing.slice(i, i + chunkSize).map(k => [k, retry[k]])));
+  if (retryChunks.length) await round(retryChunks, false);
   if (!Object.keys(map).length) throw new Error(failures ? 'translate failed' : 'translate empty');
   const partial = Object.keys(map).length + refused < total;
   if (!partial) writeCache(storage, cacheKey, map, refused, now());
