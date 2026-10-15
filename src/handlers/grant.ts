@@ -273,6 +273,10 @@ export const transfer_owner: Handler = async (ctx, p, o) => {
   if (ctx.principal.kind === "support" && (await roleAt(ctx, scope.type, scope.id)) !== "owner")
     throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "transfer by support without the owner's consent is not ruled", "proposed, pending source — the owner runs this step");
   await callerAt(ctx, scope, "owner");
+  // Ownership moves only from a DIRECT owner grant at this scope. An owner inherited from the grouping workspace cannot
+  // transfer or step down here: step_down rewrites only the direct grant, so the inherited powers would silently remain.
+  if ((await roleAt(ctx, scope.type, scope.id)) !== "owner")
+    throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "ownership transfer requires a direct owner grant at this scope", "your owner role is inherited from the workspace — a direct project owner runs this step");
   if (to === ctx.principal.id) throw new CapError("INVALID_PARAMS", "cannot transfer ownership to yourself", "name another principal");
   if (!(await ctx.db.prepare("SELECT id FROM principal WHERE id = ?").bind(to).first())) throw new CapError("INVALID_PARAMS", "unknown principal", "to must be a signed-up principal id");
   const current = await owners(ctx, scope);

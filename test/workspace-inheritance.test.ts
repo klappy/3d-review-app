@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { get as projectGet, list as projectList, update as projectUpdate } from "../src/handlers/project";
 import { list as workspaceList, add_project, remove_project } from "../src/handlers/workspace";
-import { list as grantList, invite } from "../src/handlers/grant";
+import { list as grantList, invite, transfer_owner } from "../src/handlers/grant";
 import { get as assessmentGet } from "../src/handlers/assessment";
 import { execute } from "../src/dispatch";
 import { sha256 } from "../src/handlers/common";
@@ -73,6 +73,15 @@ describe("workspace → project role inheritance", () => {
 
     // workspace owner manages grouped-project grants through inheritance
     await expect(grantList(own, { scope: "project", id: "prj_2" })).resolves.toBeTruthy();
+    // NEGATIVE: an inherited (workspace) owner cannot transfer ownership or step down — no direct project owner grant
+    await expect(transfer_owner(own, { scope: "project", id: "prj_2", to: "u_mem", step_down: true }, { dryRun: true })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await expect(transfer_owner(own, { scope: "project", id: "prj_2", to: "u_mem", step_down: true })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    const viaDispatchTransfer: any = await execute(own, "cap.grant.transfer_owner", { scope: "project", id: "prj_2", to: "u_mem", step_down: true }, { tool: "danger", mode: "dry_run" });
+    expect(JSON.stringify(viaDispatchTransfer)).toContain("NOT_AUTHORIZED_AT_SCOPE");
+    expect((await db.prepare('SELECT COUNT(*) AS n FROM "grant" WHERE scope_type = ? AND scope_id = ?').bind("project", "prj_2").first<{ n: number }>())!.n).toBe(0);
+    // a DIRECT project owner still transfers
+    await grant("g6", "u_pown", "project", "prj_1", "owner");
+    await expect(transfer_owner(mk("u_pown"), { scope: "project", id: "prj_1", to: "u_mem" })).resolves.toMatchObject({ result: { transferred: true } });
     // workspace card count reflects every grouped project
     expect((await workspaceList(mem, {})).result.workspaces[0]).toMatchObject({ id: "ws_a", role: "member", project_count: 2 });
 

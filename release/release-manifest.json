@@ -1,25 +1,23 @@
 {
-  "version": "0.30.5",
+  "version": "0.31.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "9fd5e1b9e97b050f86720b02a97a702f4c95472a",
+  "cookbook_commit": "728c6a60fff0f843b9547a39fc4ca071b45e6c80",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.30.5.md",
-      "blob_sha": "7e46d7cfdbfdf253a7018bef96a9ffbeba942eef",
-      "sha256": "c422d0a539f4e747484dd9b018349c96ad3b9ea44aa99393f04529a8a7a77042"
+      "path": "planning/2026-09-16-parity-build/releases/0.31.0.md",
+      "blob_sha": "8677c7e78923a21191f0868daec4edb2c44f0f44",
+      "sha256": "7dae8e889a98ada6c4750b4d549fbfb5cb708e5c424a2385569f1ec21b45790f"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "153ed4b7600f0c0318e05db366806ce796778592",
-      "sha256": "abdfeaa44d6fdf3d57a110181466e131f98ba61d02ed1b578c9540320bb0ea1f"
+      "blob_sha": "a9a6011ee8730f41c918c3eed0f5669ee543f2fe",
+      "sha256": "5d515b3903d021a2ab43a8f50a377079cea5b19123fb7e8e44112717812212a3"
     }
   ],
   "changelog": {
     "sections": {
-      "fixed": [
-        "Full report details use the existing card styling in the assessment host, label scores and evidence counts, and separate narrative observations for easier scanning. Overview bands, values and report content remain unchanged. (#478)",
-        "Facilitator report-detail scenario: 15/15 renderer tests passed; matched automated local fixtures at phone and desktop widths in light and dark were independently inspected. Live DEV/production and full-app navigation remain untested; human satisfaction, confusion and frustration are not measured.",
-        "Recovery correction: independent review found that actual ui/index.html and ui/assess/index.html omit report-cards.css; the earlier fixture supplied it and does not establish real-host styling. The same 0.30.5 correction loads the existing stylesheet only in ui/index.html for the /#assessment route. The direct ui/assess/index.html host remains unrepaired because its .rv wrapper and token gaps are unresolved. Root-host verification, exact-head review and release-pin checks are pending; no DEV or production acceptance is claimed. Aggregation and longitudinal features remain outside this increment."
+      "changed": [
+        "Workspace roles now apply to every project grouped in the workspace: a workspace owner, member or viewer opens each grouped project at that role (the higher of the workspace and any direct project grant) without a per-project invite. Viewers still cannot edit; people outside the workspace still see none of its projects; assessments still open only with their own grant. Workspace cards count every grouped project. (#483)"
       ]
     }
   }
