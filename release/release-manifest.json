@@ -1,23 +1,23 @@
 {
-  "version": "0.30.3",
+  "version": "0.30.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "a5d0cc5d8b8080f20df9c5655401c181df50a6d2",
+  "cookbook_commit": "b7f4404e1822e7b09899e6c32207a18e7509daff",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.30.3.md",
-      "blob_sha": "0d62c544454923c7800e0f1d11330d75c712b307",
-      "sha256": "27a6da3a2de27b3d4a756e6afed7f8f6bcf1a33ddef24ae0d2b5aa8a0e3436c6"
+      "path": "planning/2026-09-16-parity-build/releases/0.30.4.md",
+      "blob_sha": "f2469fe7b19cbfa4e293029baab597817ac502f1",
+      "sha256": "6f42972112364c01c71f2da1778188de4c23e47a7869a999db12f5938040acf7"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "b124d05bcf539630ba21d091c0009ba4928e2460",
-      "sha256": "e980bb544d356e8fdd1bee25169cffa6ac8cf47010bbe68df30202c047cc1636"
+      "blob_sha": "8ba64b3a7c1a8d8dabc4316da98c2fa901ad6a56",
+      "sha256": "c76c62c3d8430cfcaff434698b9109e8dde7d6d04d7f8a0915a351658a2434df"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Incomplete printed translations clearly name missing phrases and the existing retry action while preserving marked-English printable fallback. Facilitator local status simulation:4/4 cases passed; no human usability or translation-coverage improvement claim. (#475)"
+        "Missing participant/print translation strings receive one bounded second batch; successful strings remain unchanged and still-missing strings retain marked English fallback. Local source18/18 and print2/2 scenarios passed; live and language-quality verification pending. (#477)"
       ]
     }
   }
