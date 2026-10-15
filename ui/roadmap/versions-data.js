@@ -8,7 +8,8 @@ export const VERSIONS = {
    "changed": [],
    "fixed": [
     "Full report details use the existing card styling in the assessment host, label scores and evidence counts, and separate narrative observations for easier scanning. Overview bands, values and report content remain unchanged. (#478)",
-    "Facilitator report-detail scenario: 15/15 renderer tests passed; matched automated local fixtures at phone and desktop widths in light and dark were independently inspected. Live DEV/production and full-app navigation remain untested; human satisfaction, confusion and frustration are not measured."
+    "Facilitator report-detail scenario: 15/15 renderer tests passed; matched automated local fixtures at phone and desktop widths in light and dark were independently inspected. Live DEV/production and full-app navigation remain untested; human satisfaction, confusion and frustration are not measured.",
+    "Recovery correction: independent review found that actual ui/index.html and ui/assess/index.html omit report-cards.css; the earlier fixture supplied it and does not establish real-host styling. The same 0.30.5 correction loads the existing stylesheet only in ui/index.html for the /#assessment route. The direct ui/assess/index.html host remains unrepaired because its .rv wrapper and token gaps are unresolved. Root-host verification, exact-head review and release-pin checks are pending; no DEV or production acceptance is claimed. Aggregation and longitudinal features remain outside this increment."
    ]
   },
   {

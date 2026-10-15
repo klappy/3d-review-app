@@ -1,24 +1,25 @@
 {
   "version": "0.30.5",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "9dde91555cd8fd10d54d60a17ec627d4567d9676",
+  "cookbook_commit": "9fd5e1b9e97b050f86720b02a97a702f4c95472a",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.30.5.md",
-      "blob_sha": "c1e85638a28e4c74712ef255472219d1bdaed9fb",
-      "sha256": "3c311b2eb7fb71e7040971d9236087c11e9f3378c325583774ca9cffd73ad639"
+      "blob_sha": "7e46d7cfdbfdf253a7018bef96a9ffbeba942eef",
+      "sha256": "c422d0a539f4e747484dd9b018349c96ad3b9ea44aa99393f04529a8a7a77042"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "cbce42315743a3974aba8cec0271ea2109c401cc",
-      "sha256": "4e476cf3ae913c6524d9bbc6ab6e5a2039056bc2f0f7ba101901a85f26e8562a"
+      "blob_sha": "153ed4b7600f0c0318e05db366806ce796778592",
+      "sha256": "abdfeaa44d6fdf3d57a110181466e131f98ba61d02ed1b578c9540320bb0ea1f"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
         "Full report details use the existing card styling in the assessment host, label scores and evidence counts, and separate narrative observations for easier scanning. Overview bands, values and report content remain unchanged. (#478)",
-        "Facilitator report-detail scenario: 15/15 renderer tests passed; matched automated local fixtures at phone and desktop widths in light and dark were independently inspected. Live DEV/production and full-app navigation remain untested; human satisfaction, confusion and frustration are not measured."
+        "Facilitator report-detail scenario: 15/15 renderer tests passed; matched automated local fixtures at phone and desktop widths in light and dark were independently inspected. Live DEV/production and full-app navigation remain untested; human satisfaction, confusion and frustration are not measured.",
+        "Recovery correction: independent review found that actual ui/index.html and ui/assess/index.html omit report-cards.css; the earlier fixture supplied it and does not establish real-host styling. The same 0.30.5 correction loads the existing stylesheet only in ui/index.html for the /#assessment route. The direct ui/assess/index.html host remains unrepaired because its .rv wrapper and token gaps are unresolved. Root-host verification, exact-head review and release-pin checks are pending; no DEV or production acceptance is claimed. Aggregation and longitudinal features remain outside this increment."
       ]
     }
   }
