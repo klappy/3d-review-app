@@ -89,6 +89,7 @@ name = "3d-review"
 workers_dev = false # preserve prior custom-domain-only production configuration
 [env.production.vars]
 ENVIRONMENT = "production"
+PARTICIPANT_REPORTS = "enabled"
 PUBLIC_ORIGIN = "https://3dreview.app"
 MAIL_FROM = "noreply@3dreview.app"
 # Production uses the same native sender; no inbound routing or API key.
