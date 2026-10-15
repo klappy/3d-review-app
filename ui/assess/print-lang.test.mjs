@@ -349,3 +349,18 @@ test('S35 (rev414d nit): a repaint mid-load keeps the print status line and the 
   assert.equal(h.nodes['#print-load'].disabled, false); assert.equal(h.nodes['#print-lang'].disabled, false);
   assert.deepEqual(h.painted.map(m => m.lang), ['hi']); assert.equal(h.env.state.print.status, 'ready');
 });
+
+
+test('incomplete paper translation is named before printable fallback; complete paper stays ready', () => {
+  const base = { items: [{ text: 'A question' }], lang: 'hi', language: 'Hindi', phrases: 10, english: 7 };
+  const partial = printReadyLine(base);
+  assert.match(partial, /^Translation incomplete for Hindi\./);
+  assert.match(partial, /7 of 10 phrases/);
+  assert.doesNotMatch(partial, /questions ready/);
+  assert.match(partial, /Print survey again to retry/);
+  const offline = printReadyLine({ ...base, english: 10 });
+  assert.match(offline, /^Translation incomplete/);
+  assert.match(offline, /10 of 10 phrases/);
+  assert.doesNotMatch(offline, /Machine translation/);
+  assert.match(printReadyLine({ ...base, english: 0 }), /^1 questions ready in Hindi\./);
+});
