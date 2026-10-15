@@ -42,6 +42,20 @@ describe("cap.language.* — a fresh project can host an assessment (D9 gap)",()
     // outsider: project hidden
     const out=await execute(ctx("usr_nobody"),"cap.language.list",{pid:"proj_rill"},{tool:"read"});
     expect(out.ok).toBe(false); if(!out.ok) expect(out.error.code).toBe("NOT_FOUND_OR_NOT_VISIBLE");
+    // Representative field cases, not a reproduction of the reporter's unknown exact input.
+    for (const [name, code, stored] of [["Odia", " ORY ", "ory"], ["Odia script", "OR-Orya-IN", "or-orya-in"], ["Community variety", "", null], ["Local dialect", "qaa-x-local", "qaa-x-local"]]) {
+      const made=await execute(ctx(),"cap.language.create",{pid:"proj_rill",name,code},{tool:"write"});
+      expect(made.ok).toBe(true); if(!made.ok) throw new Error(made.error.message);
+      const language=made.result.language as any; expect(language.code).toBe(stored);
+      const assessment=await execute(ctx(),"cap.assessment.create",{pid:"proj_rill",name:name+" review",language_id:language.id},{tool:"write"});
+      expect(assessment.ok).toBe(true);
+    }
+    const caseDup=await execute(ctx(),"cap.language.create",{pid:"proj_rill",name:"Odia alternative spelling",code:"oRy"},{tool:"write"});
+    expect(caseDup.ok).toBe(false);
+    // Pre-existing mixed-case rows are also treated as the same identifier, without migrating them.
+    await db.prepare("INSERT INTO language (id,project_id,name,code,created_at) VALUES (?,?,?,?,?)").bind("lang_case_old","proj_rill","Legacy script","en-Latn-US",at.toISOString()).run();
+    expect((await execute(ctx(),"cap.language.create",{pid:"proj_rill",name:"Another script spelling",code:"EN-latn-us"},{tool:"write"})).ok).toBe(false);
+    expect((await execute(ctx("usr_nobody"),"cap.language.create",{pid:"proj_rill",name:"Unauthorized",code:"xy"},{tool:"write"})).ok).toBe(false);
     const wrong=await execute(ctx(),"cap.language.list",{pid:"proj_rill"},{tool:"write"});
     expect(wrong.ok).toBe(false); if(!wrong.ok) expect(wrong.error.code).toBe("WRONG_TOOL_FOR_CLASS");
   },30_000);

@@ -19,10 +19,10 @@ export const create: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
   await loadProject(ctx, pid, "member");
   const name = reqStr(params, "name").trim();
-  const code = optStr(params, "code")?.trim() ?? null;
+  const code = optStr(params, "code")?.trim().toLowerCase() || null;
   if (!name) throw new CapError("INVALID_PARAMS", "name is required");
   if (code !== null && !CODE.test(code)) throw new CapError("INVALID_PARAMS", "code must be BCP-47-shaped (e.g. qaa for an invented language)");
-  const dup = await ctx.db.prepare("SELECT id FROM language WHERE project_id = ? AND (name = ? OR (code IS NOT NULL AND code = ?))").bind(pid, name, code).first<{ id: string }>();
+  const dup = await ctx.db.prepare("SELECT id FROM language WHERE project_id = ? AND (name = ? OR (code IS NOT NULL AND lower(code) = ?))").bind(pid, name, code).first<{ id: string }>();
   if (dup) throw new CapError("INVALID_PARAMS", "a language with that name or code already exists in this project", "use cap.language.list");
   const id = newId("lang"), at = nowIso(ctx);
   await ctx.db.prepare("INSERT INTO language (id, project_id, code, name, created_at) VALUES (?, ?, ?, ?, ?)").bind(id, pid, code, name, at).run();
