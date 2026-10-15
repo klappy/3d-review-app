@@ -1,5 +1,6 @@
 /** Pure internal source projection. No authorization, query, storage or route. */
 import { attestCapture, type CaptureRow } from './report-attestation.js';
+import { isAttestedCapture, type CapturedAssessment } from './report-capture.js';
 import { parseBoundedJson, canonicalJson } from './report-canonical-json.js';
 import { scoreSourceItem, type SourceItem } from './source-item-score.js';
 import { rollupReference, crossLensReference, translationTypeReference, type ScoredRow, type IndicatorResult, type TranslationTypeResponse } from './reference-rollup.js';
@@ -64,14 +65,20 @@ export function projectStandaloneIndicators(indicators:readonly IndicatorResult[
 }
 function assemble(aid:string,rows:readonly CaptureRow[]) {
   const scored:ScoredRow[]=[],categorical:TranslationTypeResponse[]=[];
-  const itemMap=new Map<string,{item:SourceItem;lens:string}>(),evidenceCounts=new Map<string,number>();
+  const itemMap=new Map<string,{item:SourceItem;lens:string;key:string}>(),evidenceCounts=new Map<string,number>();
+  // Parse each distinct template string once and compute each item's equality key once.
+  // Keyed by exact bytes: a template differing by any byte is parsed and keyed on its own.
+  const parsed=new Map<string,{t:{items:SourceItem[];perspective:string};keys:string[]}>();
   for(const row of rows){
-    const t=parseBoundedJson(row.templateRaw,65536) as unknown as {items:SourceItem[];perspective:string};
+    let tk=parsed.get(row.templateRaw);
+    if(!tk){const t=parseBoundedJson(row.templateRaw,65536) as unknown as {items:SourceItem[];perspective:string};tk={t,keys:t.items.map(item=>canonicalJson(item))};parsed.set(row.templateRaw,tk);}
+    const {t,keys}=tk;
     const answers=parseBoundedJson(row.answersRaw,8192) as Record<string,unknown>;
     const form=formTypes.get(row.selectedTemplateId);if(!form)refuse();evidenceCounts.set(form,(evidenceCounts.get(form)??0)+1);
-    for(const item of t.items){
-      const previous=itemMap.get(item.id);if(previous&&(canonicalJson(previous.item)!==canonicalJson(item)||previous.lens!==t.perspective))refuse();
-      itemMap.set(item.id,{item,lens:t.perspective});
+    for(let i=0;i<t.items.length;i++){
+      const item=t.items[i],key=keys[i];
+      const previous=itemMap.get(item.id);if(previous&&(previous.key!==key||previous.lens!==t.perspective))refuse();
+      itemMap.set(item.id,{item,lens:t.perspective,key});
       const answer=Object.hasOwn(answers,item.id)?answers[item.id]:null;
       sourceInputFlags(item,answer); // preserve/validate source cleaning semantics; never add raw flags to payload
       const r=scoreSourceItem(item,answer);if(r.status==='held')refuse();
@@ -108,5 +115,15 @@ export async function renderSyntheticReport(expectedAssessmentId:string,rows:rea
     const captured=snapshot(rows);
     const attested=await attestCapture(expectedAssessmentId,captured,participant===true);if(!attested.eligible)return {eligible:false,reason:'HELD'};
     return {eligible:true,...assemble(expectedAssessmentId,[...captured].sort((a,b)=>sourceOrder(a.responseId,b.responseId))),captureDigest:attested.captureDigest};
+  }catch{return {eligible:false,reason:'HELD'};}
+}
+/** Same render for a capture minted by attestPackedCapture in this isolate (see isAttestedCapture):
+ * its frozen rows already passed attestCapture, so the attestation is reused, not repeated. Any
+ * other object takes the full renderSyntheticReport path, attestation included. */
+export async function renderAttestedCapture(c:CapturedAssessment):Promise<RenderResult> {
+  if(!isAttestedCapture(c))return renderSyntheticReport(c.assessmentId,c.rows,c.participant===true);
+  try {
+    const captured=snapshot(c.rows);
+    return {eligible:true,...assemble(c.assessmentId,[...captured].sort((a,b)=>sourceOrder(a.responseId,b.responseId))),captureDigest:c.captureDigest};
   }catch{return {eligible:false,reason:'HELD'};}
 }

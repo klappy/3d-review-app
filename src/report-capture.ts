@@ -167,13 +167,23 @@ export function decodePackedCapture(expectedAssessmentId: string, raw: string): 
   if (used.size !== dictionary.size) refuse();
   return Object.freeze(rows);
 }
+/** Identity of every capture object minted below after a full attestCapture pass. Module-private:
+ * nothing outside this file can add to it, and minted captures (and their rows) are frozen, so a
+ * branded object's rows and digest are exactly what was attested. Lets later stages of the same
+ * request reuse that attestation instead of re-hashing the same frozen rows. */
+const attested = new WeakSet<object>();
+export function isAttestedCapture(c: unknown): boolean {
+  return typeof c === 'object' && c !== null && attested.has(c);
+}
 /** Internal adapter, not authorization: callers must obtain the token in one guarded SELECT. */
 export async function attestPackedCapture(expectedAssessmentId: string, raw: string, participant = false): Promise<CaptureResult> {
   try {
     const rows = decodePackedCapture(expectedAssessmentId, raw);
     const result = await attestCapture(expectedAssessmentId, rows, participant === true);
     if (!result.eligible) return { eligible: false, reason: 'HELD' };
-    return { eligible: true, capture: Object.freeze({ assessmentId: expectedAssessmentId, packedCapture: raw, rows, responseIds: Object.freeze(result.responseIds), captureDigest: result.captureDigest, participant: participant === true }) };
+    const capture: CapturedAssessment = Object.freeze({ assessmentId: expectedAssessmentId, packedCapture: raw, rows, responseIds: Object.freeze(result.responseIds), captureDigest: result.captureDigest, participant: participant === true });
+    attested.add(capture);
+    return { eligible: true, capture };
   } catch { return { eligible: false, reason: 'HELD' }; }
 }
 /** Server-owned member minimum and null report ID; no caller-supplied SQL/role selector.
