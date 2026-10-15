@@ -228,3 +228,21 @@ test('server-refused omissions are not retried without per-key refusal identitie
     fetchImpl:async()=>{calls++;return {ok:true,json:async()=>({translated:{a:'एक'},refused:1,partial:true})};}});
   assert.equal(calls,1);assert.deepEqual(r.map,{a:'एक'});assert.equal(r.partial,false);
 });
+
+test('facilitator printed survey retries only missing question and keeps truthful EN fallback', async () => {
+  const {translatePrint}=await import('../assess/print-lang.js');
+  const model={visible:true,blank:true,template_id:'tpl_written',title:'Written',items:[{text:'First question',type:'single',options:[{text:'Yes',code:'yes'},{text:'No',code:'no'}]},{text:'Second question',type:'free'}]};
+  for(const persistent of [false,true]) {
+    const calls=[];let first=true;
+    const result=await translatePrint(model,{lang:'hi',fetchImpl:async(_,init)=>{
+      const body=JSON.parse(init.body);calls.push(body);const translated={};
+      for(const [key,value] of Object.entries(body.sourceTexts)) {if(key==='q1'&&(persistent||first))continue;translated[key]='अनुवाद '+value;}
+      if(body.context.startsWith('participant-form:'))first=false;
+      return {ok:true,json:async()=>({translated})};
+    }});
+    const formCalls=calls.filter(x=>x.context.startsWith('participant-form:'));
+    assert.equal(formCalls.length,2);assert.deepEqual(Object.keys(formCalls[1].sourceTexts),['q1']);
+    assert.equal(result.english,persistent?1:0);assert.equal(result.items[1].en,persistent);
+    assert.equal(result.items[0].options[0].code,'yes');
+  }
+});
