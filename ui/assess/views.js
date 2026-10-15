@@ -176,6 +176,8 @@ const understand = {
       root.querySelector('[data-report-status]').textContent = reports.status === 'loaded' ? (reports.value?.suppressed ? 'Report built, but current report access is held. Reports are held for now.' : 'Report built. Open it from the current report list.') : 'Report built, but the list could not be refreshed. Refresh reports to reopen it.';
     }, clearReport, resultsEntry);
     root.querySelectorAll('[data-retry]').forEach(el => el.onclick = e => { e.preventDefault(); if (m.reportBuildBusy) return; ctx.go(ctx.routes.assessment(m.aid, 'understand'), { reload: true }); });
+    const visual=root.querySelector('[data-band-visual]');
+    if(visual) { visual.value=m.bandVisual||'signal'; visual.closest('[data-band-style]').dataset.bandStyle=visual.value; visual.onchange=()=>{m.bandVisual=visual.value;visual.closest('[data-band-style]').dataset.bandStyle=visual.value;}; }
     const evBtn = root.querySelector('[data-v3-evidence-toggle]'), evBox = root.querySelector('[data-v3-evidence]');
     if (evBtn && evBox) evBtn.onclick = () => { m.showEvidence = !m.showEvidence; evBox.hidden = !m.showEvidence; evBtn.setAttribute('aria-expanded', String(m.showEvidence)); evBtn.textContent = m.showEvidence ? 'Simple view' : 'Show evidence and details'; };
     const closeBtn = root.querySelector('[data-close-report]'); if (closeBtn) closeBtn.onclick = clearReport;
