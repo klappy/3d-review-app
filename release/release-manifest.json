@@ -1,26 +1,26 @@
 {
-  "version": "0.32.0",
+  "version": "0.33.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "30849451b8f4c399656d544c8cb045edf051f79d",
+  "cookbook_commit": "027c4a692866c6dc981c3adecb557e5887dda1c0",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.32.0.md",
-      "blob_sha": "c50dc0eb78a91384f8950f948c014870221a7423",
-      "sha256": "8513e6e72f9ca1c5b709ddccd85736c3e772ea70a07396e14d99a2804868ca09"
+      "path": "planning/2026-09-16-parity-build/releases/0.33.0.md",
+      "blob_sha": "9daeaf620776b3304f13fc7bd8550562c8fccbf0",
+      "sha256": "ba4677b92860cf76a53174bdcaaf9308d30c1b89c190b9eaeea340ae1b68dbdb"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "cc84efa7af881483e63ac7ed8cb08902a78a0b02",
-      "sha256": "a1bd593a95b4f4ac580896ad722eb7b4f62ae40f978c09bdd894a37053473b7c"
+      "blob_sha": "46d03703ec6d7da6e88f9d8dc62a071e605e206a",
+      "sha256": "02e8d86684250f37819045ea65a052517e4c4c94d2c3af2c75e6ca812f1c0ce6"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "\"Do the perspectives agree?\" leads the results overview and the full report: one barbell per area scored by two or more perspectives (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), then areas only one perspective scored, with response counts beside each perspective score and Consultant responses named inside the Church count."
+        "\"Perspectives at a glance\" radar in the full report, after \"Do the perspectives agree?\": one spoke per area scored by two or more perspectives (three or more areas), one outline per perspective, rings at 25/50/75/100; a perspective not asked about an area has no point on that spoke."
       ],
       "changed": [
-        "The full report no longer shows the cross-lens average; lens scores and their difference only. Payload, scoring and narrative unchanged."
+        "Every numeric score in the full report is labelled \"out of 100\". Payload, scoring and narrative unchanged."
       ]
     }
   }

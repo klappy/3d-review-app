@@ -1,7 +1,20 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.32.0",
+  "current": "0.33.0",
   "versions": [
+    {
+      "version": "0.33.0",
+      "status": "candidate",
+      "notes_path": "releases/0.33.0.md",
+      "sections": {
+        "added": [
+          "\"Perspectives at a glance\" radar in the full report, after \"Do the perspectives agree?\": one spoke per area scored by two or more perspectives (three or more areas), one outline per perspective, rings at 25/50/75/100; a perspective not asked about an area has no point on that spoke."
+        ],
+        "changed": [
+          "Every numeric score in the full report is labelled \"out of 100\". Payload, scoring and narrative unchanged."
+        ]
+      }
+    },
     {
       "version": "0.32.0",
       "status": "candidate",
