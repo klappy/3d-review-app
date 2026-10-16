@@ -204,3 +204,29 @@ describe("#496 review lows (terry review496-0541)", () => {
     expect(footer).not.toMatch(/workspace/i);
   });
 });
+
+// DoD 6, participant translation: when every /v2/translate call is refused with 429, the page said "not available …
+// check the internet connection" — not that it was a rate limit. The refusal now carries the rate-limit kind and wait,
+// and the page words it as a rate limit and holds its Try again for the wait.
+describe("translation refused by a rate limit (DoD 6)", () => {
+  it("fetchTranslationsProgressive rejects with RATE_LIMITED and the server's wait when nothing came back and a 429 did", async () => {
+    // @ts-expect-error plain browser module, no types
+    const { fetchTranslationsProgressive } = await import("../ui/participate/i18n.js");
+    const fetchImpl = async () => new Response(JSON.stringify({ error: "rate_limited", message: RATE_LIMIT_MESSAGE, retry_after: 60 }), { status: 429, headers: { "retry-after": "45" } });
+    const err: any = await fetchTranslationsProgressive({ lang: "es", context: "participant-ui", sourceTexts: { a: "Hello" }, fetchImpl }).catch((e: any) => e);
+    expect(err).toBeInstanceOf(Error); expect(err.code).toBe("RATE_LIMITED"); expect(err.status).toBe(429); expect(err.retryAfter).toBe("45");
+    const other: any = await fetchTranslationsProgressive({ lang: "es", context: "participant-ui", sourceTexts: { a: "Hello" }, fetchImpl: async () => new Response("{}", { status: 502 }) }).catch((e: any) => e);
+    expect(other.code).toBeUndefined(); // a non-limit failure keeps the existing "not available" path
+  });
+  it("the page words a rate-limited translation as a rate limit and holds Try again for the wait", () => {
+    const page = readFileSync(new URL("../ui/participate/page.js", import.meta.url), "utf8");
+    expect(page).toMatch(/catch \(error\) \{\s*if \(seq !== loadSeq\) return;[^\n]*\n[^\n]*\n\s*showTranslateFailed\(error\);/);
+    expect(page).toMatch(/function showTranslateFailed\(error\) \{[\s\S]{0,600}isRateLimitedError\(error\)[\s\S]{0,300}rateLimitedTranslate\(error\.retryAfter\)[\s\S]{0,300}holdRetry\(trRetry, error\.retryAfter/);
+  });
+  it("rateLimitedTranslate says rate limit, keeps English, and names the wait", async () => {
+    // @ts-expect-error plain browser module, no types
+    const { rateLimitedTranslate } = await import("../ui/rate-limit.js");
+    expect(rateLimitedTranslate()).toBe("Rate limit: too many requests right now. Showing English. Try again in one minute.");
+    expect(rateLimitedTranslate("30")).toBe("Rate limit: too many requests right now. Showing English. Try again in 30 seconds.");
+  });
+});

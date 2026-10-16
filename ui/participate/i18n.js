@@ -211,7 +211,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
   const chunks = [];
   for (let i = 0; i < total; i += chunkSize) chunks.push(Object.fromEntries(keys.slice(i, i + chunkSize).map(k => [k, sourceTexts[k]])));
   const map = {};
-  let done = 0, failures = 0, refused = 0;
+  let done = 0, failures = 0, refused = 0, limited = null; // limited: the last 429's Retry-After (DoD 6)
   const retry = {};
   onProgress({ done, total });
   // Exactly two bounded rounds. Successful first-round values are never sent again or replaced.
@@ -226,6 +226,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
           const res = await fetchImpl(endpoint, translateInit({ targetLang: lang, context, sourceTexts: part }, bearer));
           if (!res || !res.ok) {
             if (res && [400, 401, 403, 404].includes(res.status)) mayRetry = false;
+            if (res && res.status === 429) limited = res.headers?.get?.('retry-after') || '60';
             throw new Error(`translate ${res ? res.status : 'failed'}`);
           }
           const data = await res.json();
@@ -249,7 +250,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
   const retryChunks = [];
   for (let i = 0; i < missing.length; i += chunkSize) retryChunks.push(Object.fromEntries(missing.slice(i, i + chunkSize).map(k => [k, retry[k]])));
   if (retryChunks.length) await round(retryChunks, false);
-  if (!Object.keys(map).length) throw new Error(failures ? 'translate failed' : 'translate empty');
+  if (!Object.keys(map).length) throw limited !== null ? Object.assign(new Error('translate rate limited'), { code: 'RATE_LIMITED', status: 429, retryAfter: limited }) : new Error(failures ? 'translate failed' : 'translate empty');
   const partial = Object.keys(map).length + refused < total;
   if (!partial) writeCache(storage, cacheKey, map, refused, now());
   return { map, partial, cached: false };

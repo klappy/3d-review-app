@@ -1,26 +1,24 @@
 {
-  "version": "0.32.0",
+  "version": "0.32.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "30849451b8f4c399656d544c8cb045edf051f79d",
+  "cookbook_commit": "12f578f74dc879f84f639165003cabc6597c75b5",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.32.0.md",
-      "blob_sha": "c50dc0eb78a91384f8950f948c014870221a7423",
-      "sha256": "8513e6e72f9ca1c5b709ddccd85736c3e772ea70a07396e14d99a2804868ca09"
+      "path": "planning/2026-09-16-parity-build/releases/0.32.1.md",
+      "blob_sha": "f6526099b5cd956e8338722d645c1a03af14bc54",
+      "sha256": "8a4cbe125f9d3b64b6d2ec98c3bac4570062b3f9d70a2109cf715839dcebf3ec"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "cc84efa7af881483e63ac7ed8cb08902a78a0b02",
-      "sha256": "a1bd593a95b4f4ac580896ad722eb7b4f62ae40f978c09bdd894a37053473b7c"
+      "blob_sha": "2471158e58aed542f9759f446b593389f9435a76",
+      "sha256": "3f27dd0e59075f53d5ab4ebdda93b8f9676b1c205356b462647f1aa8d6e432fe"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "\"Do the perspectives agree?\" leads the results overview and the full report: one barbell per area scored by two or more perspectives (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), then areas only one perspective scored, with response counts beside each perspective score and Consultant responses named inside the Church count."
-      ],
-      "changed": [
-        "The full report no longer shows the cross-lens average; lens scores and their difference only. Payload, scoring and narrative unchanged."
+      "fixed": [
+        "Shared survey link: reopening the link while a rate limit refuses it, or while the limiter refuses the receipt check after a closed-collection answer, now shows the rate-limit words with the server's wait and offers Recover receipt, held for that wait, instead of only \"open your link again\".",
+        "Participant translation: when every translation request is refused by a rate limit, the page says it is a rate limit, keeps English and holds Try again for the server's wait, instead of \"check the internet connection\"."
       ]
     }
   }

@@ -4,7 +4,7 @@ import { mountParticipantView, itemError, drawAbout, aboutValues, setAboutValues
 import { UI_EN, SURVEYOR_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames, translatingSub } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
 import { receiptNotice, copy as linkCopy } from '../shared-link.js';
-import { holdRetry, underHold, setControlLabel, rateLimitNotice } from '../rate-limit.js';
+import { holdRetry, underHold, setControlLabel, rateLimitNotice, isRateLimitedError, rateLimitedTranslate } from '../rate-limit.js';
 
 const $ = id => document.getElementById(id);
 let pager, renderedPhase, renderedForm;
@@ -190,9 +190,13 @@ function showTranslating(entry, { done = 0, total = 0 } = {}, onScreen = null) {
   trFill.style.width = `${Math.max(4, pct)}%`; trBar.setAttribute('aria-valuenow', String(pct));
   trCount.textContent = total ? `${done} / ${total} ${UI_EN.phrases}` : '';
 }
-function showTranslateFailed() {
+let trHold = null;
+function showTranslateFailed(error) {
   trBanner.hidden = false; trBanner.classList.add('failed'); trSpin.hidden = true; trBar.hidden = true; trCount.textContent = '';
   trTitle.textContent = UI_EN.translateFailed; trSub.textContent = UI_EN.translateFailedHint; trRetry.hidden = false;
+  trHold?.(); trHold = null;
+  // DoD 6: a rate-limited translation says so (not "check the internet connection") and Try again waits out Retry-After.
+  if (isRateLimitedError(error)) { trSub.textContent = rateLimitedTranslate(error.retryAfter); trHold = holdRetry(trRetry, error.retryAfter, { label: UI_EN.tryAgain }); }
 }
 function hideTranslating() { trBanner.hidden = true; }
 trRetry.addEventListener('click', () => loadTranslations());
@@ -280,10 +284,10 @@ async function loadTranslations(form = journey?.state?.form || null) {
     tr = { lang, form, ui: u.map, items: it.map, view: form ? translateForm(form, it.map) : null }; T = makeT(u.map);
     hideTranslating();
     langStatus.textContent = entry?.review ? T('machineNoteReview') : T('machineNote');
-  } catch {
+  } catch (error) {
     if (seq !== loadSeq) return;
     tr = { lang, form, ui: {}, items: {}, view: null }; T = makeT({});
-    showTranslateFailed();
+    showTranslateFailed(error);
   } finally {
     clearTimeout(reveal);
     if (seq === loadSeq) main?.removeAttribute('aria-busy');
