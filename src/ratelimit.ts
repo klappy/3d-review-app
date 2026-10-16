@@ -8,6 +8,7 @@
  * alphabet ≈ 1.1e12; sessions are 24 random bytes). Windows are 60 s because the binding only offers 10 s or 60 s.
  *
  *   RL_MCP_ANON  anonymous POST /mcp — one unit per JSON-RPC message        key ip           30 / 60 s
+ *                except a tools/call on one of the four capabilities below with their own limiter (counted there once)
  *   RL_HTTP_ANON anonymous request on any capability HTTP twin (src/index.ts) key ip           60 / 60 s
  *                spent after credential resolution and before the body is parsed; a refusal writes nothing.
  *                NOT spent on the four twins that have their own capability limiter below (RL_AUTH / RL_REDEEM):

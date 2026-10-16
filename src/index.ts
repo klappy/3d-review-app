@@ -119,9 +119,21 @@ app.post("/mcp", async (c) => {
   // MESSAGE (Bugbot 9ea1c79e: one POST must not buy many calls), and no caller may batch more than MCP_MAX_BATCH.
   const rpcError = (status: number, code: number, message: string, data?: Record<string, unknown>, headers: Record<string, string> = {}) =>
     new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code, message, ...(data ? { data } : {}) } }), { status, headers: { "content-type": "application/json", ...headers } });
-  let units = 1;
-  try { const peek: unknown = await c.req.raw.clone().json(); if (Array.isArray(peek)) units = Math.max(1, peek.length); } catch { /* handleMcp answers the parse error */ }
-  if (units > MCP_MAX_BATCH) return rpcError(400, -32600, `batch too large: at most ${MCP_MAX_BATCH} messages per request`);
+  // A tools/call on a capability with its own limiter (RL_REDEEM, RL_AUTH — spent in execute() before any storage) is
+  // not also charged here: like its HTTP twin it is counted once, by that limiter (DEV shared-IP burst 2026-10-16).
+  // Every other message — docs, initialize, tools/list, other capabilities, unparseable bodies — spends one unit.
+  const ownLimiter = (m: unknown) => {
+    const p = (m as any)?.params;
+    return (m as any)?.method === "tools/call" && p?.name !== "docs" && typeof p?.arguments?.capability === "string" && hasCapabilityLimiter(p.arguments.capability);
+  };
+  let messages = 1, units = 1;
+  try {
+    const peek: unknown = await c.req.raw.clone().json();
+    const list = Array.isArray(peek) ? peek : [peek];
+    messages = Math.max(1, list.length);
+    units = list.length === 0 ? 1 : list.filter((m) => !ownLimiter(m)).length;
+  } catch { /* handleMcp answers the parse error */ }
+  if (messages > MCP_MAX_BATCH) return rpcError(400, -32600, `batch too large: at most ${MCP_MAX_BATCH} messages per request`);
   if (ctx.principal.kind === "anonymous") for (let i = 0; i < units; i++)
     if (!(await allow(c.env, "RL_MCP_ANON", `ip:${ctx.clientIp}`)))
       return rpcError(429, -32029, `rate limited — sign in, or wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`, { code: "RATE_LIMITED", retry_after: RATE_LIMIT_WINDOW_SECONDS, trace_id: ctx.traceId }, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });

@@ -1,6 +1,6 @@
 /**
  * Shared-IP room (DEV burst 2026-10-16: 200 cap.participant.open_link from one address, 142 refused by RL_HTTP_ANON
- * before RL_REDEEM was consulted). A twin whose capability has its own limiter (RL_REDEEM, RL_AUTH) is counted once,
+ * before RL_REDEEM was consulted; over /mcp RL_MCP_ANON charged the same call first). A twin or MCP tools/call whose capability has its own limiter (RL_REDEEM, RL_AUTH) is counted once,
  * by that limiter; every other anonymous twin still spends RL_HTTP_ANON exactly as before. Limiters are counting
  * fakes: the test proves WIRING (which bucket each call spends), not Cloudflare's counting.
  */
@@ -18,6 +18,8 @@ const base = "/v2/assessments/assess_tavo_collect/surveys/survey_tavo/links";
 let db: D1Database, token: string;
 const mkEnv = (over: Record<string, unknown> = {}) => ({ DB: db, SESSION_SECRET: "synthetic-anon-rl", ENVIRONMENT: "dev",
   RL_MCP_ANON: limiter(1000), RL_MCP_CEILING: limiter(1000), RL_HTTP_ANON: limiter(60), RL_AUTH: limiter(1000), RL_REDEEM: limiter(1000), ...over }) as any;
+const rpc = (method: string, params?: unknown, id = 1) => ({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) });
+const openRpc = (id = 1) => rpc("tools/call", { name: "write", arguments: { capability: "cap.participant.open_link", params: { token } } }, id);
 const call = (env: any, method: string, path: string, body?: unknown, bearer?: string, ip = ROOM_IP) => app.fetch(new Request("https://t.invalid" + path, { method,
   headers: { "content-type": "application/json", "cf-connecting-ip": ip, ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) },
   body: body === undefined ? undefined : JSON.stringify(body) }), env);
@@ -87,5 +89,41 @@ describe("anonymous twins with their own capability limiter skip RL_HTTP_ANON", 
     const bearer = await mintSession(env, "person_mara", "user");
     expect((await call(env, "GET", "/v2/health", undefined, bearer)).status).toBe(200);
     expect(env.RL_HTTP_ANON.seen.get(`ip:${ROOM_IP}`)).toBe(5);
+  }, 30_000);
+
+  it("over /mcp, a 200-open burst is limited only by RL_REDEEM: RL_MCP_ANON is never charged for open_link", async () => {
+    const env = mkEnv({ RL_MCP_ANON: limiter(30), RL_REDEEM: limiter(300) });
+    let refused = 0, opened = 0;
+    for (let i = 0; i < 200; i += 20) for (const r of await Promise.all(Array.from({ length: 20 }, () => call(env, "POST", "/mcp", openRpc())))) {
+      const j: any = await r.json();
+      if (r.status === 429 || j.result?.structuredContent?.error?.code === "RATE_LIMITED") refused++;
+      else if (j.result?.structuredContent?.ok) opened++;
+    }
+    expect(refused).toBe(0); expect(opened).toBe(200);
+    expect(env.RL_REDEEM.seen.get(`ip:${ROOM_IP}`)).toBe(200);
+    expect(env.RL_MCP_ANON.seen.get(`ip:${ROOM_IP}`) ?? 0).toBe(0);
+    // RL_REDEEM exhausted → the capability's own refusal, never the transport's -32029
+    const tight = mkEnv({ RL_MCP_ANON: limiter(30), RL_REDEEM: limiter(1) });
+    expect(((await (await call(tight, "POST", "/mcp", openRpc())).json()) as any).result.structuredContent.ok).toBe(true);
+    const r = await call(tight, "POST", "/mcp", openRpc()); expect(r.status).toBe(200);
+    expect(((await r.json()) as any).result.structuredContent.error.code).toBe("RATE_LIMITED");
+    expect(tight.RL_MCP_ANON.seen.size).toBe(0);
+  }, 120_000);
+
+  it("every other anonymous /mcp message still spends RL_MCP_ANON per message (batch included), as before", async () => {
+    const env = mkEnv({ RL_MCP_ANON: limiter(3) });
+    // a batch of open_link + tools/list + a docs lookup ABOUT open_link: only the two non-exempt messages are charged
+    const batch = [openRpc(1), rpc("tools/list", undefined, 2), rpc("tools/call", { name: "docs", arguments: { capability: "cap.participant.open_link" } }, 3)];
+    expect((await call(env, "POST", "/mcp", batch)).status).toBe(200);
+    expect(env.RL_MCP_ANON.seen.get(`ip:${ROOM_IP}`)).toBe(2);
+    expect((await call(env, "POST", "/mcp", rpc("tools/list"))).status).toBe(200);
+    const r = await call(env, "POST", "/mcp", rpc("tools/list"));
+    expect(r.status).toBe(429); expect(((await r.json()) as any).error.data.code).toBe("RATE_LIMITED");
+    // another capability over /mcp is charged too
+    expect((await call(env, "POST", "/mcp", rpc("tools/call", { name: "read", arguments: { capability: "cap.ops.health" } }))).status).toBe(429);
+    // the exhausted address can still open its link over /mcp (its own budget)
+    expect(((await (await call(env, "POST", "/mcp", openRpc())).json()) as any).result.structuredContent.ok).toBe(true);
+    // the batch cap still counts every message, exempt or not
+    expect((await call(env, "POST", "/mcp", Array.from({ length: 11 }, (_, i) => openRpc(i + 1)))).status).toBe(400);
   }, 30_000);
 });
