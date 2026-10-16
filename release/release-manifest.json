@@ -1,23 +1,23 @@
 {
-  "version": "0.34.3",
+  "version": "0.34.6",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "07b4d906cd2878ff1c0451e14d043078beecd477",
+  "cookbook_commit": "2aff7dfefb12e13e98ef225bacd53e805449b15d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.3.md",
-      "blob_sha": "a71da257fab463b04a0b798e0a42bd114cba42fa",
-      "sha256": "749fb66fb8e181d95117eb5e98bb3bbf4ad2248c585928e0251ccedb7acb3f91"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.6.md",
+      "blob_sha": "3f223a54d8b9360744a81f5a8bcdc14c17a5af8f",
+      "sha256": "a42b57426256ca74bcf4d2fd34cd8f8d1c7ac9788df9b2a1fa45aff2b06e87b4"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "9dec60302fb953c775ef84fab6ac7b9421551981",
-      "sha256": "5881eda71a48d89a12b85db8731fc9efb1968f02ed19d051b9f3c10abe3877f7"
+      "blob_sha": "c0257f7e8285aefab900757303c3449f77ef36fe",
+      "sha256": "fdf849aa98bffcddcdf66f179649c23742c3bb4ed69bcf1a6a7da350b7e08eb5"
     }
   ],
   "changelog": {
     "sections": {
-      "changed": [
-        "Inviting someone: the button is \"Invite\", and the confirm opens right under it, naming the address you typed and the role, with Confirm and Cancel. The separate \"Preview invitation\" step and the confirm at the bottom of the page are gone (Permissions page, collaborators panel and MCP panel)."
+      "fixed": [
+        "Setup step 1 on a phone: the sticky Cancel/Continue strip is now opaque with a hairline top edge, so the Location, Facilitator and other fields no longer show through it while you scroll. A focused field still scrolls clear of the strip, as before."
       ]
     }
   }
