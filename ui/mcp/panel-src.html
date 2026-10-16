@@ -126,7 +126,7 @@ async function assessmentPage(r) {
   else if (tab === 'permissions') {
     let g; try { g = await read('cap.grant.list', { scope: 'assessment', id: a.id }); } catch (e) { return { html: head + (kindOf(e) === 'refused' && String(e.code) === 'NOT_AUTHORIZED_AT_SCOPE' ? '<section class="panel narrow"><p class="eyebrow">Permissions</p><p class="muted">Permissions are managed by members and owners.</p></section>' : refusal(e, 'permissions')), trail, current: null }; }
     const owner = a.role === 'owner';
-    body = `<section class="panel"><p class="eyebrow">Permissions</p><h2>Who can open this assessment</h2><p class="note small">Permissions apply to this assessment only; nothing is inherited.</p><table class="grants"><thead><tr><th>Principal</th><th>Role</th></tr></thead><tbody>${(g.grants || []).map(x => `<tr><td>${esc(x.principal_id)}${x.principal_id === state.me?.principal?.id ? ' <span class="small muted">(you)</span>' : ''}</td><td>${esc(x.role)}</td></tr>`).join('')}</tbody></table>${(g.pending_invitations || []).length ? `<p class="small muted">${g.pending_invitations.length} pending invitation(s)</p>` : ''}${mayEdit ? `<form class="line" data-invite-form><h3>Invite someone</h3><label class="field">Email<input name="email" type="email" required></label><label class="field">Role<select name="role"><option value="viewer">viewer</option><option value="member">member</option>${owner ? '<option value="owner">owner</option>' : ''}</select></label><div class="actions"><button type="button" data-invite-preview ${state.busy ? 'disabled' : ''}>Invite</button></div>${state.sheet ? sheet(state.sheet) : ''}</form>` : ''}</section>`;
+    body = `<section class="panel"><p class="eyebrow">Permissions</p><h2>Who can open this assessment</h2><p class="note small">Permissions apply to this assessment only; nothing is inherited.</p><table class="grants"><thead><tr><th>Principal</th><th>Role</th></tr></thead><tbody>${(g.grants || []).map(x => `<tr><td>${esc(x.principal_id)}${x.principal_id === state.me?.principal?.id ? ' <span class="small muted">(you)</span>' : ''}</td><td>${esc(x.role)}</td></tr>`).join('')}</tbody></table>${(g.pending_invitations || []).length ? `<p class="small muted">${g.pending_invitations.length} pending invitation(s)</p>` : ''}${mayEdit ? `<form class="line" data-invite-form><h3>Invite someone</h3><label class="field">Email<input name="email" type="email" required${state.sheet ? ` value="${esc(state.sheet.params.email || '')}"` : ''}></label><label class="field">Role<select name="role">${['viewer', 'member', ...(owner ? ['owner'] : [])].map(r => `<option value="${r}"${state.sheet?.params.role === r ? ' selected' : ''}>${r}</option>`).join('')}</select></label><div class="actions"><button type="button" data-invite-preview ${state.busy ? 'disabled' : ''}>Invite</button></div>${state.sheet ? sheet(state.sheet) : ''}</form>` : ''}</section>`;
   }
   return { html: head + body, trail, current: { a, surveys } };
 }
@@ -168,6 +168,11 @@ function bind(root) {
       state.notice = `Invitation — ${err.message}${err.hint ? ` (${err.hint})` : ''}`; state.alert = true;
     } finally { if (generation === routeGeneration) { state.busy = false; render(); } }
   });
+  // PR #508 (Bugbot 4299319887): an edit to email or role while the invite confirm is open drops the confirm — the frozen dry-run
+  // params would otherwise invite the old values. No repaint, so the typed text and caret stay. Mirrors ui/assess/permissions.js.
+  const dropInvite = () => { if (!state.sheet || state.busy) return; state.sheet = null; const f = root.querySelector('[data-invite-form]');
+    f?.querySelector('[data-confirm-sheet]')?.remove(); state.notice = 'Details changed. Invite again to preview.'; state.alert = false; $('status').textContent = state.notice; $('status').className = 'small muted'; };
+  for (const ev of ['input', 'change']) root.querySelector('[data-invite-form]')?.addEventListener(ev, dropInvite);
   root.querySelector('[data-confirm-execute]')?.addEventListener('click', async () => {
     if (state.busy) return;
     const s = state.sheet;
