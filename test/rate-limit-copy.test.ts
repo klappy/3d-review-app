@@ -153,6 +153,9 @@ describe("#490 re-review lows (terry-rereview490-0341)", () => {
     expect(rateLimitWaitOver({ ...state, rateLimited: false }, button)).toBe(false);
     expect(rateLimitWaitOver({ ...state, phase: "form" }, button)).toBe(false);
     expect(rateLimitWaitOver(state, null)).toBe(false);
+    // A Try again in flight (controller emits busy: true, same phase) is not "ready": the button is hidden meanwhile.
+    expect(rateLimitWaitOver({ ...state, busy: true }, button)).toBe(false);
+    expect(rateLimitWaitOver({ ...state, busy: false }, button)).toBe(true);
     expect(page).toMatch(/function paintReadyNotice\(state\) \{\s*if \(rateLimitWaitOver\(state, retryButton\)\) \$\('notice'\)\.textContent = linkCopy\.rateLimitedReady;/);
     expect(page).not.toMatch(/state\.notice === linkCopy\.rateLimited/);
   });
