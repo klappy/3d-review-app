@@ -11,7 +11,7 @@ export const SPREAD_CUTS = Object.freeze({ agree: 10, disagree: 30 });
 export const SPREAD_WORDS = Object.freeze({ agree: 'Perspectives agree', mixed: 'Some difference', disagree: 'Perspectives disagree' });
 export const lensesCopy = Object.freeze({
   heading: 'Do the perspectives agree?',
-  intro: 'Each line shows one area scored by more than one perspective, on a 0–100 scale. Biggest difference first.',
+  intro: 'Each line shows one area and the score each perspective gave it, on a 0–100 scale. Biggest difference first; areas only one perspective scored come last.',
   spread: 'Difference',
   oneLens: 'Only one perspective scored this area',
   respondents: n => `${n} ${n === 1 ? 'response' : 'responses'}`,

@@ -75,7 +75,7 @@ test('R3 lenses agree block leads: exact scores and spread as returned, no avera
   renderReport({ doc, root, report: REPORT });
   const rowsText = sectionRows(root, copy.crossLens);
   assert.deepEqual(rowsText.slice(0, 15), [
-    'Each line shows one area scored by more than one perspective, on a 0–100 scale. Biggest difference first.',
+    'Each line shows one area and the score each perspective gave it, on a 0–100 scale. Biggest difference first; areas only one perspective scored come last.',
     'Shared understanding', 'Some difference · Difference 12.25', '0', '100', 'Translation team ', '61.75', ' responses not counted', 'Community ', '49.5', ' responses not counted',
     'Church involvement', 'Only one perspective scored this area', '0', '100',
   ]);

@@ -1,23 +1,23 @@
 {
   "version": "0.32.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "ffca652bc5a02600814146a64269609bdba43534",
+  "cookbook_commit": "30849451b8f4c399656d544c8cb045edf051f79d",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.32.0.md",
-      "blob_sha": "11bda531dc24d32fd6f64d8ffde37a2aae7155e8",
-      "sha256": "fb54fb8e75c411237aa115e97c5bf0ef84896386a40c3c7308bc239aeb3430ea"
+      "blob_sha": "c50dc0eb78a91384f8950f948c014870221a7423",
+      "sha256": "8513e6e72f9ca1c5b709ddccd85736c3e772ea70a07396e14d99a2804868ca09"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "234b332610f4780eedc2465eed9821def32cd0a3",
-      "sha256": "1b63b7af3c60c942b88c57668a79639c9a590cc7923c40747c8a1658d20a7365"
+      "blob_sha": "cc84efa7af881483e63ac7ed8cb08902a78a0b02",
+      "sha256": "a1bd593a95b4f4ac580896ad722eb7b4f62ae40f978c09bdd894a37053473b7c"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "\"Do the lenses agree?\" leads the results overview and the full report: one barbell per area scored by two or more lenses (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), with response counts beside each lens score and Consultant responses named inside the Church count."
+        "\"Do the perspectives agree?\" leads the results overview and the full report: one barbell per area scored by two or more perspectives (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), then areas only one perspective scored, with response counts beside each perspective score and Consultant responses named inside the Church count."
       ],
       "changed": [
         "The full report no longer shows the cross-lens average; lens scores and their difference only. Payload, scoring and narrative unchanged."

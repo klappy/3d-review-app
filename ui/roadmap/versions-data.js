@@ -5,7 +5,7 @@ export const VERSIONS = {
   {
    "version": "0.32.0",
    "added": [
-    "\"Do the lenses agree?\" leads the results overview and the full report: one barbell per area scored by two or more lenses (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), with response counts beside each lens score and Consultant responses named inside the Church count."
+    "\"Do the perspectives agree?\" leads the results overview and the full report: one barbell per area scored by two or more perspectives (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), then areas only one perspective scored, with response counts beside each perspective score and Consultant responses named inside the Church count."
    ],
    "changed": [
     "The full report no longer shows the cross-lens average; lens scores and their difference only. Payload, scoring and narrative unchanged."
