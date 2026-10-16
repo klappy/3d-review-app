@@ -218,6 +218,14 @@ describe("translation refused by a rate limit (DoD 6)", () => {
     const other: any = await fetchTranslationsProgressive({ lang: "es", context: "participant-ui", sourceTexts: { a: "Hello" }, fetchImpl: async () => new Response("{}", { status: 502 }) }).catch((e: any) => e);
     expect(other.code).toBeUndefined(); // a non-limit failure keeps the existing "not available" path
   });
+  it("PR501 6216474718: a 429 is not resent in the second round, and the envelope's retry_after is read (not only the header)", async () => {
+    const { fetchTranslationsProgressive } = await import("../ui/participate/i18n.js");
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return new Response(JSON.stringify({ ok: false, error: { code: "RATE_LIMITED", message: RATE_LIMIT_MESSAGE, data: { retry_after: 120 } } }), { status: 429 }); };
+    const err: any = await fetchTranslationsProgressive({ lang: "es", context: "participant-ui", sourceTexts: { a: "Hello" }, fetchImpl }).catch((e: any) => e);
+    expect(calls).toBe(1);
+    expect(err.code).toBe("RATE_LIMITED"); expect(String(err.retryAfter)).toBe("120");
+  });
   it("the page words a rate-limited translation as a rate limit and holds Try again for the wait", () => {
     const page = readFileSync(new URL("../ui/participate/page.js", import.meta.url), "utf8");
     expect(page).toMatch(/catch \(error\) \{\s*if \(seq !== loadSeq\) return;[^\n]*\n[^\n]*\n\s*showTranslateFailed\(error\);/);

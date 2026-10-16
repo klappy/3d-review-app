@@ -1,4 +1,5 @@
 import { copy, fill } from '../shared-link.js';
+import { retryAfterOf } from '../rate-limit.js';
 
 // Dynamic translation for the participant survey (captain ruling 2026-09-28: restore the Lovable-era behaviour).
 // The page sends its English strings to POST /v2/translate (src/translate.ts, a proxy with the Laos app's
@@ -226,7 +227,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
           const res = await fetchImpl(endpoint, translateInit({ targetLang: lang, context, sourceTexts: part }, bearer));
           if (!res || !res.ok) {
             if (res && [400, 401, 403, 404].includes(res.status)) mayRetry = false;
-            if (res && res.status === 429) limited = res.headers?.get?.('retry-after') || '60';
+            if (res && res.status === 429) { mayRetry = false; const b = await res.json?.().catch(() => null); limited = retryAfterOf(b?.error, res) ?? '60'; } // PR501 6216474718: no immediate resend; envelope wait first
             throw new Error(`translate ${res ? res.status : 'failed'}`);
           }
           const data = await res.json();
