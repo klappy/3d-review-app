@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.34.0",
+  "current": "0.34.1",
   "versions": [
+    {
+      "version": "0.34.1",
+      "status": "candidate",
+      "notes_path": "releases/0.34.1.md",
+      "sections": {
+        "changed": [
+          "Report build: each stage of a dry run and a build (D1 reads and write, attestation, render, canonical JSON, validation, hashing) records one `report.stage` span with only the stage name and milliseconds in the request trace, so the owner can see where build time goes. Report bytes, capture digest, report key and payload hash are unchanged. On Workers, CPU-only stages read near 0 ms (the clock advances only across I/O); the local bench gives the CPU split."
+        ]
+      }
+    },
     {
       "version": "0.34.0",
       "status": "candidate",

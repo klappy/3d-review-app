@@ -125,6 +125,15 @@ async function main() {
   const dry = await call("POST", `/v2/assessments/${aid}/reports`, { mode: "dry_run" }, sess);
   const exe = await call("POST", `/v2/assessments/${aid}/reports`, { mode: "execute", ...(dry.body?.result?.confirm_token ? { confirm_token: dry.body.result.confirm_token } : {}) }, sess);
   const reportMs = performance.now() - rb0;
+  // report.stage spans (0.34.1+): {stage, ms} per build stage from each request's own trace (cap.ops.trace, actor = sess).
+  // On Workers CPU-only stages read ~0 ms (clock advances only across I/O); the local bench gives the CPU split.
+  async function stages(r) {
+    const id = r.body?.trace_id; if (!id) return null;
+    const t = await call("GET", `/v2/ops/traces/${encodeURIComponent(id)}`, null, sess);
+    if (!t.body?.ok) return { trace_id: id, error: t.body?.error?.code ?? t.status };
+    return { trace_id: id, spans: (t.body.result.spans ?? []).filter((x) => x.span === "report.stage").map((x) => ({ stage: x.data?.stage, ms: x.data?.ms })) };
+  }
+  const reportStages = { dry_run: await stages(dry), execute: await stages(exe) };
 
   console.log(JSON.stringify({
     base: BASE, tag: TAG, project_id: pid, assessment_id: aid, surveys: surveys.map(({ token, ...s }) => s),
@@ -140,7 +149,7 @@ async function main() {
     e2e_ms: { p50: pct(e2eMs, 50), p95: pct(e2eMs, 95) },
     rate_limited_429_retries: rateLimited, errors,
     report: { ms: +reportMs.toFixed(0), dry_status: dry.status, dry_result_status: dry.body?.result?.status ?? dry.body?.error?.code, exec_status: exe.status,
-      ok: !!exe.body?.ok, suppressed: exe.body?.result?.suppressed ?? null, reason: exe.body?.result?.reason ?? exe.body?.error?.message ?? null, report_id: exe.body?.result?.report?.id ?? null },
+      ok: !!exe.body?.ok, suppressed: exe.body?.result?.suppressed ?? null, reason: exe.body?.result?.reason ?? exe.body?.error?.message ?? null, report_id: exe.body?.result?.report?.id ?? null, stages: reportStages },
   }, null, 2));
 }
 main().catch((e) => { console.error(String(e)); console.log(JSON.stringify({ fatal: String(e), errors, rate_limited_429_retries: rateLimited })); process.exit(1); });

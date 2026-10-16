@@ -1,23 +1,23 @@
 {
-  "version": "0.34.0",
+  "version": "0.34.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "f0550f00247250c261d168fe420f2912214d6886",
+  "cookbook_commit": "d646baae405ea5f012a85950361a3c69e84aba73",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.0.md",
-      "blob_sha": "45be9612831e8a74501ac487e1473aab633a0606",
-      "sha256": "6cf9329d65d0752145e1d64b32e83b99801ed0a5c8b261d0689f9897d0314dfc"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.1.md",
+      "blob_sha": "ad33257d30999d2e0df5926891c018f11be1e319",
+      "sha256": "b561d11f664ca2f73eada8a7ffe03128349dd8369d27de6266b988aa1fefd5fe"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "33182b784db44eaa0f3add8fb411c4878afa9148",
-      "sha256": "718608c5508296937ad8ac6a3c03ac48a6a0d37263c1b2884c0f00b41231bcd9"
+      "blob_sha": "a668d5b8b59d8f26cd1e3342dcffa407ee0da8cf",
+      "sha256": "d6c690668b565c179b0ca9dcf292b7dfa3fc16f267d3171dd7293be9dc438469"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Setup step 1 asks \"Location or community\" and \"Facilitator\" (both optional); Review and the assessment's Prepare view (Learn more) show both. Stored on the assessment (migration 0015); cap.assessment.create / update take location and facilitator (string or null). Older clients unchanged."
+      "changed": [
+        "Report build: each stage of a dry run and a build (D1 reads and write, attestation, render, canonical JSON, validation, hashing) records one `report.stage` span with only the stage name and milliseconds in the request trace, so the owner can see where build time goes. Report bytes, capture digest, report key and payload hash are unchanged. On Workers, CPU-only stages read near 0 ms (the clock advances only across I/O); the local bench gives the CPU split."
       ]
     }
   }
