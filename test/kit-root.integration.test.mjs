@@ -83,8 +83,12 @@ test('DoD3: Workspaces is in the primary shell nav and opens with zero projects 
   assert.ok(link, 'Workspaces link in the shell nav'); assert.equal(link.textContent.trim(), 'Workspaces');
   assert.deepEqual(p.qa('#shell-links a').map(a => a.getAttribute('href')), ['#workspaces', '#feedback', '/roadmap/'], 'Workspaces leads the existing nav items');
   assert.equal(p.api.state.projects.length, 0, 'zero-project account');
-  await p.go('#workspaces');
+  const toggle = p.q('#account-menu-toggle'), menu = p.q('#account-menu');
+  toggle.click(); assert.equal(menu.hidden, false, 'menu opens'); assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+  link.click(); await tick(16); // a real activation: jsdom follows the fragment link like a browser
+  assert.equal(p.w.location.hash, '#workspaces', 'clicking the shell-nav link navigates');
   assert.equal(p.api.route(p.w.location.hash).kind, 'workspaces'); assert.equal(p.text('[role=main].content h1'), 'Workspaces');
+  assert.equal(menu.hidden, true, 'menu closes after activating the Workspaces link'); assert.equal(toggle.getAttribute('aria-expanded'), 'false');
 });
 
 test('journey: Workspaces → workspace → project (two distinct assessments, language state) → assessment → back; route/title/crumb agree', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: #195' }, async () => {
