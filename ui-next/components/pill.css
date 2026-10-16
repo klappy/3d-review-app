@@ -1,0 +1,38 @@
+/* UI Next (v4) Stage pill. Status: provisional. Paints only from ui-next/tokens.css.
+   Contract: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas/design-system.md section 2, Stage pill row;
+   section 1.2 Stage row (--stage-* all neutral) and Transparency row.
+   Values: design/2026-10-15-glass-redesign/generator/gen.py .pill rules (lines 44-46).
+   Ported: setup, collecting, results, reviewed, done. Not ported: closed (V-09).
+   Differences from gen.py, reported as contract gaps rather than invented here:
+   - radius: section 1.2 grants pills 999 but names no token, and the ui-next lint refuses any px radius;
+     --radius-xl is used, which draws the same stadium on a 28px-high pill (any radius >= 14px does).
+   - the 8px dot is gen.py's value; --dot (10) is named for perspective dots only, so no token is used.
+   - reduced transparency: section 1.2 turns every glass surface into --field; gen.py/helmet do not apply it
+     to .pill (V-48). The contract rule is ported here. */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 11px 0 9px;
+  border-radius: var(--radius-xl);
+  font-weight: 600;
+  font-size: var(--t-13);
+  line-height: 1;
+  white-space: nowrap;
+  background: var(--glass-hi);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.pill i { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--stage); }
+
+.pill[data-stage=setup] { --stage: var(--stage-setup); }
+.pill[data-stage=collecting] { --stage: var(--stage-collecting); }
+.pill[data-stage=results] { --stage: var(--stage-results); }
+.pill[data-stage=reviewed] { --stage: var(--stage-reviewed); }
+.pill[data-stage=done] { --stage: var(--stage-done); }
+
+@media (prefers-reduced-transparency: reduce) {
+  .pill { background: var(--field); }
+}
