@@ -8,8 +8,13 @@
  * alphabet ≈ 1.1e12; sessions are 24 random bytes). Windows are 60 s because the binding only offers 10 s or 60 s.
  *
  *   RL_MCP_ANON  anonymous POST /mcp — one unit per JSON-RPC message        key ip           30 / 60 s
- *   RL_HTTP_ANON anonymous request on ANY capability HTTP twin (src/index.ts) key ip           60 / 60 s
- *                spent after credential resolution and before the body is parsed; a refusal writes nothing
+ *                except a tools/call on one of the four capabilities below with their own limiter (counted there once)
+ *   RL_HTTP_ANON anonymous request on any capability HTTP twin (src/index.ts) key ip           60 / 60 s
+ *                spent after credential resolution and before the body is parsed; a refusal writes nothing.
+ *                NOT spent (key ip) on the four twins that have their own capability limiter below (RL_AUTH / RL_REDEEM):
+ *                each such call is counted once, by the limiter sized for it (DEV shared-IP burst 2026-10-16:
+ *                RL_HTTP_ANON refused 142/200 room opens before RL_REDEEM was consulted). The sign-in `au:` key
+ *                below lives on this binding too (KEY_ROUTE.signInAddress) — a different key, not the `ip:` bucket.
  *   RL_AUTH      cap.auth.request_link                                      key email        10 / 60 s per email
  *                (the per-ADDRESS sign-in key moved to `au:` below: 10 / 60 s per address refused a room of facilitators)
  *   RL_MCP_CEILING  every well-shaped bearer on /mcp, and /token (src/worker.ts)  key ip          600 / 60 s
@@ -51,6 +56,9 @@ const CAP_LIMITER: Record<string, LimiterName> = {
   "cap.participant.redeem_code": "RL_REDEEM",
   "cap.participant.open_link": "RL_REDEEM",
 };
+
+/** true when the capability has its own limiter in execute(); the HTTP twin then skips RL_HTTP_ANON (src/index.ts). */
+export const hasCapabilityLimiter = (capabilityId: string): boolean => Object.hasOwn(CAP_LIMITER, capabilityId);
 
 export const clientIp = (req: Request): string => req.headers.get("cf-connecting-ip") ?? "unknown";
 

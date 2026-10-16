@@ -23,8 +23,8 @@
  *
  * Rate limits (captain: per email and per IP):
  *   per email  MAGIC_LINK_PER_EMAIL links per MAGIC_LINK_WINDOW_MS, counted in D1 (durable, global)
- *   per IP     RL_AUTH `ip:` key (10 / 60 s, the repo's sign-in limiter binding) before any storage access
- *   open       RL_REDEEM `ip:` key (60 / 60 s, sized for a workshop room behind one NAT) before any storage access
+ *   per IP     sign-in `au:` key + `g:auth` ceiling (KEY_ROUTE in src/ratelimit.ts) before any storage access
+ *   open       RL_REDEEM `ip:` key (limit in wrangler.toml, sized for a room behind one NAT) before any storage access
  * The request answer is the same whether or not the address has ever signed in (principals are created on first use).
  */
 import type { Env } from "./handlers/types";
