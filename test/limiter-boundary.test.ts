@@ -183,7 +183,11 @@ describe("B3 — token-shape gate in resolvePrincipal (Otto P1 5706955103 / audi
     expect((await post(env, "/v2/auth/link", { email: "x@example.invalid" }, "192.0.2.20", { cookie: "session=garbage" })).status).toBe(429);
     expect((await post(env, "/mcp", rpc("tools/list"), "192.0.2.20", { authorization: "Bearer a:b:c" })).status).toBe(200);
     expect(counted.counts.reads).toBe(0);
-    expect(env.RL_HTTP_ANON.seen.get("ip:192.0.2.20")).toBe(3); // malformed credential = anonymous = metered
+    expect((await get(env, "/v2/health", "192.0.2.20", { authorization: "Bearer garbage" })).status).toBe(200); // after the read count: health itself reads
+    // auth/link has its own limiter (RL_AUTH), so it is counted there once and never on RL_HTTP_ANON (shared-IP fix);
+    // a generic twin with a malformed credential is still anonymous and still metered on RL_HTTP_ANON.
+    expect(env.RL_AUTH.seen.get("ip:192.0.2.20")).toBe(3);
+    expect(env.RL_HTTP_ANON.seen.get("ip:192.0.2.20")).toBe(1); // malformed credential = anonymous = metered
     expect(env.RL_MCP_ANON.seen.get("ip:192.0.2.20")).toBe(1);
   }, 30_000);
   it("flood: 50 rotating bogus bearers → 0 reads (before: 100)", async () => {
