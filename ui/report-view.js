@@ -1,5 +1,6 @@
 import { renderReportCards } from './report-card.js';
 import { lensesCopy, renderLensesAgree } from './report-lenses.js';
+import { renderLensRadar } from './report-radar.js';
 import { humanDate } from './assess/cards.js'; // one shared local-time formatter (B31)
 // Synthetic report rendering. Dependency-free and importable under node --test with an injected doc.
 // Text nodes only: every value comes from the payload as returned (String(), no rounding, no word
@@ -24,6 +25,7 @@ export const copy = Object.freeze({
   matches: 'Matches',
   differs: 'Differs',
   notComparableSentence: 'Not comparable',
+  score: 'Score (out of 100)', // DEC-0014: every numeric score is labelled out of 100
   emptyList: 'No reports have been built for this assessment.',
 });
 const val = value => String(value);
@@ -77,13 +79,16 @@ export function renderReport({ doc, root, report }) {
   // leads (cookbook DEC-0012), one barbell per area scored by two or more lenses, biggest spread first.
   const agree = renderLensesAgree({ doc, report });
   if (agree) out.push(agree);
+  // DEC-0014: the radar (high-numeracy view) follows the agree / disagree block; null below three shared areas.
+  const radar = renderLensRadar({ doc, report });
+  if (radar) out.push(radar);
   const cards = renderReportCards({ doc, report });
   if (cards) out.push(cards);
   const standalone = rows(payload.standalone_indicators);
   if (standalone.length) {
     out.push(section(doc, copy.standalone, [list(doc, standalone.map(ind => {
       const li = el(doc, 'li');
-      li.append(el(doc, 'h5', val(ind.question_text)), el(doc, 'p', `${val(ind.lens)} · ${val(ind.sub_dimension)}`), metrics(doc, [['Score', ind.score], ['Responses', ind.n_responses]]));
+      li.append(el(doc, 'h5', val(ind.question_text)), el(doc, 'p', `${val(ind.lens)} · ${val(ind.sub_dimension)}`), metrics(doc, [[copy.score, ind.score], ['Responses', ind.n_responses]]));
       return li;
     }))]));
   }

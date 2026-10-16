@@ -13,6 +13,7 @@ export const lensesCopy = Object.freeze({
   heading: 'Do the perspectives agree?',
   intro: 'Each line shows one area and the score each perspective gave it, on a 0–100 scale. Biggest difference first; areas only one perspective scored come last.',
   spread: 'Difference',
+  outOf: 'out of 100', // full report only (DEC-0014): every numeric score labelled out of 100
   oneLens: 'Only one perspective scored this area',
   respondents: n => `${n} ${n === 1 ? 'response' : 'responses'}`,
   noCount: 'responses not counted',
@@ -124,7 +125,7 @@ function spec(report, level, exact = false) {
     const bar = row.spread === null ? [] : [n('span', 'lens-agree-bar', [], { style: { left: `${lo}%`, width: `${hi - lo}%` } })];
     const scores = row.lenses.map(s => n('li', null, [
       n('span', 'lens-agree-dot', [], { data: { lens: s.lens }, hidden: true }), n('span', null, [], { text: `${lensLabel(s.lens)} ` }),
-      n('b', null, [], exact ? { text: shown(s.score) } : { text: shown(s.score), title: String(s.score) }), n('span', 'lens-agree-n', [], { text: ` ${countText(s)}` }),
+      n('b', null, [], exact ? { text: shown(s.score) } : { text: shown(s.score), title: String(s.score) }), ...(exact ? [n('span', 'lens-agree-of', [], { text: ` ${lensesCopy.outOf}` })] : []), n('span', 'lens-agree-n', [], { text: ` ${countText(s)}` }),
     ], { data: { lensScore: s.lens } }));
     const data = { spreadBand: row.band || 'single' };
     if (row.spread !== null) data.spread = String(row.spread);

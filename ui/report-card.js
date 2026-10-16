@@ -29,7 +29,7 @@ export function renderReportCards({ doc, report }) {
     card.dataset.lens = String(lens.lens);
     const score = node(doc, 'p', String(lens.score));
     score.className = 'report-lens-score fs-metric';
-    card.append(node(doc, 'h5', String(lens.lens)), score, node(doc, 'span', 'Overall score'));
+    card.append(node(doc, 'h5', String(lens.lens)), score, node(doc, 'span', 'Overall score (out of 100)'));
     card.children[card.children.length - 1].className = 'report-metric-label fs-label';
     const subs = rows(lens.sub_dimensions);
     if (subs.length) {
@@ -39,7 +39,7 @@ export function renderReportCards({ doc, report }) {
         row.className = 'report-subdimension';
         const name = node(doc, 'strong', sub.sub_dimension);
         const metrics = node(doc, 'dl'); metrics.className = 'report-metrics';
-        for (const [label, value] of [['Score', sub.score], ['Items included', sub.n_items_included]]) {
+        for (const [label, value] of [['Score (out of 100)', sub.score], ['Items included', sub.n_items_included]]) {
           const pair = node(doc, 'div'); const term = node(doc, 'dt', label); term.className = 'fs-label';
           pair.append(term, node(doc, 'dd', value)); metrics.append(pair);
         }
