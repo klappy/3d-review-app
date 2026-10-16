@@ -680,7 +680,7 @@ bindClick('recover', 'Recovering receipt…', async () => {
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
 { const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); text($('identity'), 'Checking session…'); } }
 function showSharedUnavailable(kind) {
-  const message = { closed: sharedCopy.collectionClosed, cannotResume: sharedCopy.cannotResume, rateLimited: sharedCopy.rateLimited, transient: sharedCopy.transient }[kind] || sharedCopy.linkUnavailable;
+  const message = { closed: sharedCopy.collectionClosed, cannotResume: sharedCopy.cannotResume, rateLimited: sharedCopy.rateLimitedReopen, transient: sharedCopy.transient }[kind] || sharedCopy.linkUnavailable;
   text($('participant-error'), message); $('participant-error').hidden = false;
   text($('participant-resume'), ''); // terminal copy replaces any sticky retry instruction
   $('answers').hidden = true; $('review').hidden = true; $('recover').hidden = true; participantView?.showReceipt();

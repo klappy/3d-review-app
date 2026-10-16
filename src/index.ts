@@ -223,8 +223,8 @@ app.post("/v2/auth/email", async (c) => {
   const env = c.env, req = c.req.raw;
   if (!magicLinkEnabled(env)) return toAccess();
   if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in request refused", undefined, "auth.email_link", newTraceId()), 403);
-  // Per-IP dampener first: a refusal costs no storage access and sends nothing.
-  // The body is read first (no storage, nothing sent) so a refusal keeps the form's hidden next=oauth (signInPage posts it
+  // Per-IP dampener before any storage access or send: a refusal costs neither.
+  // The body is parsed before the dampener (no storage, nothing sent) so a refusal keeps the form's hidden next=oauth (signInPage posts it
   // in the body, not the query): a rate-limited connector sign-in still completes after the wait.
   const body = await formOrJson(req);
   if (!(await allow(env, "RL_AUTH", `ip:${clientIp(req)}`))) {

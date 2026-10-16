@@ -84,3 +84,40 @@ describe("one-minute copy names no source the page cannot know (review 620799665
     expect(src).toMatch(/retryHeading = element\('h2', T\('rateLimitHeading'\)\)/); expect(src).toMatch(/\$\('notice'\)\.before\(retryHeading\)/);
   });
 });
+
+describe("#490 review follow-ups (Bugbot 4292184464, HOLD lows 1–4, ready copy)", () => {
+  const page = readFileSync(new URL("../ui/participate/page.js", import.meta.url), "utf8");
+  it("Bugbot 4292184464: Try again after a refused Interview another runs the next-person setup", () => {
+    expect(page).toMatch(/journey\.start\(\{ retry: true \}\)\.then\(\(\) => \{ if \(journey\.state\.phase === 'form' && journey\.state\.fresh\) startNextPerson\(\); \}\)/);
+    expect(page).toMatch(/async function interviewAnother\(\) \{\s*await journey\.another\(\);\s*if \(journey\.state\.phase === 'form'\) startNextPerson\(\);/);
+    expect(page).toMatch(/function startNextPerson\(\) \{\s*if \(passageDetails\) passageDetails\.open = true;[^\n]*\n\s*document\.querySelector\('main'\)\?\.scrollIntoView\?\.\(\);/);
+  });
+  it("low 1: the Check countdown ends only when the phase leaves form/review", () => {
+    expect(page).toMatch(/state\.rateLimited !== true && recoverHold && !\['form', 'review'\]\.includes\(state\.phase\)/);
+  });
+  it("low 2: /legacy/ (no Try again control) tells the person to open the link again", () => {
+    const app = readFileSync(new URL("../ui/app.js", import.meta.url), "utf8");
+    expect(app).toMatch(/rateLimited: sharedCopy\.rateLimitedReopen/);
+    expect(sharedCopy.rateLimitedReopen).toMatch(/^Rate limit.*Open your link again in one minute\.$/);
+  });
+  it("low 3: the /v2/auth/email comment no longer says the dampener runs first", () => {
+    const src = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+    expect(src).not.toMatch(/Per-IP dampener first/);
+  });
+  it("low 4: a label swapped mid-wait shows in the countdown and after it", async () => {
+    const { holdRetry } = await import("../ui/rate-limit.js");
+    let t = 0, tick: () => void = () => {};
+    const button = { disabled: false, textContent: "Try again", dataset: {} as Record<string, string> };
+    holdRetry(button as unknown as HTMLButtonElement, 60, { label: "Try again", setTimer: (fn: () => void) => { tick = fn; return 1; }, clearTimer: () => {}, now: () => t });
+    expect(button.textContent).toBe("Try again (60 s)");
+    button.dataset.retryLabel = "Réessayer"; t = 30_000; tick();
+    expect(button.textContent).toBe("Réessayer (30 s)");
+    t = 60_000; tick();
+    expect(button.textContent).toBe("Réessayer"); expect(button.disabled).toBe(false);
+    expect(page).toMatch(/if \(underHold\(retryButton\)\) retryButton\.dataset\.retryLabel = T\('tryAgain'\); else retryButton\.textContent = T\('tryAgain'\);/);
+  });
+  it("ready copy: once the wait is over the notice no longer says 'in one minute'", () => {
+    expect(sharedCopy.rateLimitedReady).not.toMatch(/minute/); expect(sharedCopy.rateLimitedReady).toMatch(/^Rate limit/);
+    expect(page).toMatch(/onReady: \(\) => \{ paintReadyNotice\(journey\.state\); retryButton\.focus\(\); \}/);
+  });
+});

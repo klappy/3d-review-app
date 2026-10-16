@@ -12,6 +12,9 @@ export const copy = {
   collectionClosed: 'Collection has closed. New answers are not accepted. If you already submitted from this device, your receipt is shown below.',
   cannotResume: 'Your earlier session on this link could not be resumed from this device. Nothing saved on this device was changed. If you already sent answers, that send may have succeeded without a confirmation shown here; the facilitator can confirm whether it arrived.',
   rateLimited: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. Try again in one minute.`, // one 'nothing changed', one 'one minute' (review 6207996655)
+  rateLimitedReady: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. You can try again now.`, // the wait is over (#490 copy nit)
+  // /legacy/ shows no Try again control and a reload lands on "link no longer works": tell that person to reopen the link (#490 low 2).
+  rateLimitedReopen: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. Open your link again in one minute.`,
   transient: 'The server could not be reached or did not answer. Nothing saved on this device was changed; open your link again in a moment.',
   draftMismatch: 'Your saved answers were for a different version of this survey and were not restored. Please answer again.',
   draftRestored: 'Your unsent answers were restored on this device.',

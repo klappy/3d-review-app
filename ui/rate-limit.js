@@ -59,12 +59,13 @@ export function holdRetry(button, seconds, { label, setTimer = setInterval, clea
   const until = now() + retryAfterSeconds(seconds) * 1000;
   let id = null;
   let over = false;
-  const done = () => { if (over) return; over = true; if (id !== null) clearTimer(id); id = null; if (holds.get(button) === done) holds.delete(button); button.disabled = false; button.textContent = base; delete button.dataset.rateLimited; delete button.dataset.retryLabel; };
+  const label_ = () => button.dataset.retryLabel || base; // a page may swap dataset.retryLabel mid-wait (language switch)
+  const done = () => { if (over) return; over = true; if (id !== null) clearTimer(id); id = null; if (holds.get(button) === done) holds.delete(button); button.disabled = false; button.textContent = label_(); delete button.dataset.rateLimited; delete button.dataset.retryLabel; };
   holds.set(button, done);
   const tick = () => {
     const s = Math.ceil((until - now()) / 1000);
     if (s <= 0) { done(); onReady?.(); return; }
-    button.disabled = true; button.dataset.rateLimited = 'true'; button.textContent = `${base} (${left(s)})`;
+    button.disabled = true; button.dataset.rateLimited = 'true'; button.textContent = `${label_()} (${left(s)})`;
   };
   tick();
   id = setTimer(tick, 1000);
