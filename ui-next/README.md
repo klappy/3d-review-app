@@ -41,3 +41,13 @@ The lint reads `.html .css .js .mjs .svg` files and fails on: an inline `font-si
 - Lint rules: `design/2026-10-15-glass-redesign/generator/lint.py`.
 - Recipe: `design/2026-10-15-glass-redesign/canvas/playbook.md` (rule 11: a gap goes back through the canvas first; rule 12: provisional).
 - Unit: `work/active/2026-10-15-glass-redesign-v4/TICKET.md`, acceptance item 1.
+
+## Svelte 5 components and the `/next/` gallery (provisional)
+
+Button, Stage pill and Lens dot are Svelte 5 components in `src/` (`Button.svelte`, `Pill.svelte`, `LensDot.svelte`): light DOM, the literal contract classes, the external `components/*.css` and `tokens.css` unchanged, text bound as text. No `<style>` blocks, no `customElement`, no shadow DOM, no inline styles; the lint enforces this.
+
+```sh
+npm run build:next   # builds ui-next/index.html into ui/next/ (gitignored); wrangler serves ./ui, so /next/ when deployed
+```
+
+`src/App.svelte` is a fixture gallery: every ported state, light and dark, with a theme toggle (`?theme=light|dark`). Tests: `test/ui-next-*.test.ts` run as the `ui-next` vitest project (@testing-library/svelte under jsdom). The Workers Builds build command does not run `build:next` yet (cookbook `work/queued/2026-10-16-ui-next-vite-build-step/`).

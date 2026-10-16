@@ -42,7 +42,7 @@ beforeEach(() => corpusOperation.drain(),15000);
 afterEach(() => corpusOperation.drain(),15000);
 afterAll(async () => { try { await corpusOperation.drain(); } finally { await mf.dispose(); } },30000);
 describe('real compiled renderer with local D1',()=>{
- describe.sequential('all34/425 corpus with shared coexistence', () => {
+ describe('all34/425 corpus with shared coexistence', () => {
   const measurements:any[]=[]; let total=0,max=0,corpusStarted=0;
   beforeAll(async () => { await clearReports(); corpusStarted=performance.now(); });
   Object.keys(sourceFixture.contexts).forEach((id,index) => {

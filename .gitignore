@@ -16,3 +16,6 @@ ui/changelog.json
 
 # Server-only projection of private CI publisher permissions
 src/roadmap/permissions.generated.ts
+
+# UI Next /next/ build output (npm run build:next); never tracked
+ui/next/
