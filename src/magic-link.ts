@@ -23,7 +23,8 @@
  *
  * Rate limits (captain: per email and per IP):
  *   per email  MAGIC_LINK_PER_EMAIL links per MAGIC_LINK_WINDOW_MS, counted in D1 (durable, global)
- *   per IP     sign-in `au:` key + `g:auth` ceiling (KEY_ROUTE in src/ratelimit.ts) before any storage access
+ *   per IP     sign-in `au:` key (KEY_ROUTE in src/ratelimit.ts) before any storage access
+ *   global     `g:auth` ceiling spent only after the per-email cap passes, just before a link is sent (opts.ceiling)
  *   open       RL_REDEEM `ip:` key (limit in wrangler.toml, sized for a room behind one NAT) before any storage access
  * The request answer is the same whether or not the address has ever signed in (principals are created on first use).
  */
@@ -73,7 +74,7 @@ export function magicLinkMessage(origin: string, token: string, minutes: number,
   return { subject, text, html, link };
 }
 
-export type RequestOutcome = { state: "sent"; minutes: number } | { state: "invalid" } | { state: "limited" } | { state: "unavailable" };
+export type RequestOutcome = { state: "sent"; minutes: number } | { state: "invalid" } | { state: "limited" } | { state: "unavailable" } | { state: "ceiling" };
 export type Sender = (env: Env, m: MailMessage) => Promise<MailResult>;
 
 /**
@@ -81,7 +82,7 @@ export type Sender = (env: Env, m: MailMessage) => Promise<MailResult>;
  * message (the outcome is logged without the address) — the caller cannot learn anything about an account from it.
  * The IP limiter runs in the route before this; the per-email count runs here.
  */
-export async function requestMagicLink(env: Env, rawEmail: unknown, opts: { now?: number; next?: "oauth"; send?: Sender } = {}): Promise<RequestOutcome> {
+export async function requestMagicLink(env: Env, rawEmail: unknown, opts: { now?: number; next?: "oauth"; send?: Sender; ceiling?: () => Promise<boolean> } = {}): Promise<RequestOutcome> {
   const email = normalizeAddress(rawEmail);
   if (!email) return { state: "invalid" };
   const origin = publicOrigin(env);
@@ -94,10 +95,14 @@ export async function requestMagicLink(env: Env, rawEmail: unknown, opts: { now?
   const token = newMagicToken();
   const th = await sha256(token);
   // Atomic per-email cap: the count and the insert are ONE statement, so concurrent requests cannot both pass a stale count.
+  const rowId = id(ROW_PREFIX.slice(0, -1));
   const inserted = await env.DB.prepare(
     "INSERT INTO login_code (id, email_hash, code_hash, expires_at, created_at) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM login_code WHERE id LIKE 'ml\\_%' ESCAPE '\\' AND email_hash = ? AND created_at > ?) < ?"
-  ).bind(id(ROW_PREFIX.slice(0, -1)), eh, th, now + minutes * 60e3, now, eh, now - MAGIC_LINK_WINDOW_MS, MAGIC_LINK_PER_EMAIL).run();
+  ).bind(rowId, eh, th, now + minutes * 60e3, now, eh, now - MAGIC_LINK_WINDOW_MS, MAGIC_LINK_PER_EMAIL).run();
   if ((inserted.meta?.changes ?? 0) !== 1) return { state: "limited" };
+  // Global issuance ceiling (g:auth) LAST: only an attempt that parsed, validated and passed its per-email cap — one that
+  // is about to send — spends the shared bucket; a refusal withdraws the row so it neither works nor counts (Bugbot 4290485125).
+  if (opts.ceiling && !(await opts.ceiling())) { await env.DB.prepare("DELETE FROM login_code WHERE id = ?").bind(rowId).run(); return { state: "ceiling" }; }
   const m = magicLinkMessage(origin, token, minutes, email, opts.next);
   const result = await (opts.send ?? sendMail)(env, { to: email, subject: m.subject, text: m.text, html: m.html, idempotencyKey: `magic-link:${th.slice(0, 16)}` });
   // Never the address or the token: the hash prefix correlates with the row for an operator, nothing more.

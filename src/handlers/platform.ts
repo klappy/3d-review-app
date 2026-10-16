@@ -3,6 +3,7 @@ import { feedbackExperience, feedbackProvenance, projectFeedbackProvenance } fro
 import type { Handler } from "./types";
 import { CapError, id, sha256, notVisible } from "./types";
 import { normalizeEmail } from "./common";
+import { spendSignInIssuance } from "../ratelimit";
 import { mintSession, revokeSessionByHash } from "../auth";
 import { revokeOAuthGrants, type OAuthEnv } from "../oauth";
 import contract from "../../contract/capabilities.json";
@@ -33,6 +34,7 @@ export const authRequestLink: Handler = async (ctx, p, o) => {
   if (!dev) throw new CapError("RESERVED_NOT_BUILT", "email-code delivery is not wired in this environment yet", "production sign-in is Cloudflare email-code (OF-7); pending the auth lane", "cap.auth.request_link");
   const eh = await sha256(email);
   if (o?.dryRun) return { result: {}, impact: { affected: [{ email_hash: eh.slice(0, 12) }], irreversible: true, effect: "external", compensating_control: "expire code" } };
+  await spendSignInIssuance(ctx.env, "cap.auth.request_link"); // g:auth only on the path that issues (Bugbot 4290485125)
   const code = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)); // CSPRNG, not Math.random
   await ctx.db.prepare("INSERT INTO login_code (id, email_hash, code_hash, expires_at, created_at) VALUES (?,?,?,?,?)").bind(id("lc"), eh, await sha256(code), Date.now() + 10 * 60e3, Date.now()).run();
   await ctx.db.prepare("INSERT OR IGNORE INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id("usr"), eh, 1, 0, new Date().toISOString()).run(); // provisioned = 1: self-service creation of OWN workspaces/projects (captain ruling 2026-09-17); support stays 0

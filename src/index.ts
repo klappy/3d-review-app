@@ -223,20 +223,25 @@ app.post("/v2/auth/email", async (c) => {
   const env = c.env, req = c.req.raw;
   if (!magicLinkEnabled(env)) return toAccess();
   if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in request refused", undefined, "auth.email_link", newTraceId()), 403);
-  // Per-IP dampener first: a refusal costs no storage access and sends nothing.
-  if (!(await allowSignInAddress(env, clientIp(req))) || !(await allowSignInGlobal(env))) {
+  // Per-IP dampener first: a refusal costs no storage access and sends nothing. The global g:auth ceiling is NOT spent
+  // here: requestMagicLink spends it only once the body parsed, the address validated and the per-email cap passed.
+  if (!(await allowSignInAddress(env, clientIp(req)))) {
     const r = json(fail("RATE_LIMITED", "rate limit reached — too many sign-in requests; try again in one minute", undefined, "auth.email_link", newTraceId()), 429);
     r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
   }
   const body = await formOrJson(req);
   if (!body) return json(fail("INVALID_PARAMS", "email required", undefined, "auth.email_link", newTraceId()), 400);
   const next = nextOf(body.fields.next);
-  const out = await requestMagicLink(env, body.fields.email, { next });
+  const out = await requestMagicLink(env, body.fields.email, { next, ceiling: () => allowSignInGlobal(env) });
   if (out.state === "invalid") return body.json ? json(fail("INVALID_PARAMS", "enter one email address", undefined, "auth.email_link", newTraceId()), 400) : signInPage(next, "Enter one email address, like name@example.org.");
   if (out.state === "limited") {
     const r = body.json ? json(fail("RATE_LIMITED", "too many links requested for this address — use the newest email or wait 15 minutes", undefined, "auth.email_link", newTraceId()), 429)
       : page429(next);
     r.headers.set("retry-after", "900"); return r;
+  }
+  if (out.state === "ceiling") {
+    const r = json(fail("RATE_LIMITED", "rate limit reached — too many sign-in requests; try again in one minute", undefined, "auth.email_link", newTraceId()), 429);
+    r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
   }
   if (out.state === "unavailable") return json(fail("RESERVED_NOT_BUILT", "email sign-in is not configured here", undefined, "auth.email_link", newTraceId()), 503);
   return body.json ? json({ ok: true, result: { sent: true, expires_in_minutes: out.minutes } }, 200) : checkEmailPage(out.minutes, next);

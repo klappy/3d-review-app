@@ -29,7 +29,11 @@
  * Non-IP keys (workshop-same-ip DoD 3) — KEY_ROUTE below is the one place that says which binding counts which key:
  *   sign-in address  `au:<ip>`   request_link + consume_link + POST /v2/auth/email (RL_HTTP_ANON today; a dedicated
  *                                binding later makes the sign-in per-address number a one-line wrangler.toml change)
- *   sign-in global   `g:auth`    request_link + POST /v2/auth/email — every link/code issuance, per Cloudflare location
+ *   sign-in global   `g:auth`    request_link + POST /v2/auth/email — every link/code ISSUANCE, per Cloudflare location;
+ *                                spent last, only on the path that issues (after parse, validation, au: and em:/D1
+ *                                per-email caps); never on a parse failure, INVALID_PARAMS, RESERVED_NOT_BUILT or dry run.
+ *                                Still a bounded lockout lever by design: a distributed attacker issuing to many real
+ *                                mailboxes can fill it for one location for up to 60 s
  *   per principal    `pr:<kind>:<id>` every capability call by a signed-in user or a participant bearer (both faces):
  *                                bounds write floods per session/account whatever address they come from
  *   per email        `em:<hash>` request_link (RL_AUTH); POST /v2/auth/email counts per email durably in D1
@@ -91,6 +95,10 @@ export const KEY_ROUTE = {
 export const allowSignInAddress = (env: Env, ip: string) => allow(env, KEY_ROUTE.signInAddress, `au:${ip}`);
 /** Global sign-in issuance ceiling (codes and email links), per Cloudflare location. true = allowed. */
 export const allowSignInGlobal = (env: Env) => allow(env, KEY_ROUTE.signInGlobal, "g:auth");
+/** For a capability handler about to issue a sign-in code: spends g:auth, throws RATE_LIMITED when the ceiling is reached. */
+export async function spendSignInIssuance(env: Env, capabilityId: string): Promise<void> {
+  if (!(await allowSignInGlobal(env))) throw limited(capabilityId);
+}
 
 /** Called by execute() for both faces, before authorization and before the capability's handler runs.
  *  (Credential resolution happens earlier: 0 D1 reads for a malformed credential, up to two indexed reads for a
@@ -133,6 +141,7 @@ export async function enforceCapabilityLimit(ctx: Ctx, capabilityId: string, par
       const eh = (await sha256(normalizeEmail(params.email))).slice(0, 32); // same normaliser as the handler's email_hash (review #12-11)
       if (!(await allow(ctx.env, name, `em:${eh}`))) throw limited(capabilityId);
     }
-    if (!(await allowSignInGlobal(ctx.env))) throw limited(capabilityId);
+    // g:auth (global issuance ceiling) is NOT spent here: the handler spends it via spendSignInIssuance() only on the
+    // path that actually issues a code — after validation, never on RESERVED_NOT_BUILT or a dry run (Bugbot 4290485125).
   }
 }

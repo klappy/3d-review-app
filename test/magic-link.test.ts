@@ -402,3 +402,28 @@ describe("connector end to end through the real worker: register â†’ authorize â
     expect(me.result.structuredContent.result.principal).toMatchObject({ id: pr.id, kind: "user", delegated_by: `oauth:${clientId}` });
   });
 });
+
+// Bugbot 4290485125: POST /v2/auth/email spent the global sign-in ceiling (g:auth) before the body was parsed, so junk
+// requests drained the shared bucket and 429'd real sign-in for everyone at that location. g:auth is now spent last,
+// only by an attempt that is about to send a link.
+describe("g:auth is spent only on issuance", () => {
+  const counting = (limit: number) => { const seen = new Map<string, number>(); return { seen, limit: async ({ key }: { key: string }) => { const n = (seen.get(key) ?? 0) + 1; seen.set(key, n); return { success: n <= limit }; } }; };
+  it("N invalid bodies and N per-email-limited requests leave g:auth unspent; a real sign-in still succeeds", async () => {
+    env.RL_MCP_CEILING = counting(1);
+    for (let i = 0; i < 10; i++) expect((await app.fetch(new Request(ORIGIN + "/v2/auth/email", { method: "POST", headers: { origin: ORIGIN, "content-type": "application/json" }, body: "{not json" }), env)).status).toBe(400);
+    for (let i = 0; i < 10; i++) expect((await postJson("/v2/auth/email", { email: "not an address" })).status).toBe(400);
+    for (let i = 0; i < MAGIC_LINK_PER_EMAIL; i++) await issue("busy@example.invalid"); // direct issuance, no ceiling: fills the per-email cap
+    for (let i = 0; i < 10; i++) expect((await postJson("/v2/auth/email", { email: "busy@example.invalid" })).status).toBe(429); // per-email limited
+    expect(env.RL_MCP_CEILING.seen.get("g:auth") ?? 0).toBe(0);
+    const ok = await postJson("/v2/auth/email", { email: "real.person@example.invalid" });
+    expect(ok.status).toBe(200); expect(((await ok.json()) as any).result.sent).toBe(true);
+    expect(env.RL_MCP_CEILING.seen.get("g:auth")).toBe(1);
+  });
+  it("once the ceiling is reached the next issuance is 429 RATE_LIMITED and its row is withdrawn", async () => {
+    env.RL_MCP_CEILING = counting(0);
+    const r = await postJson("/v2/auth/email", { email: "late@example.invalid" });
+    expect(r.status).toBe(429); expect(r.headers.get("retry-after")).toBe("60");
+    expect(((await r.json()) as any).error.code).toBe("RATE_LIMITED");
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM login_code WHERE email_hash = ?").bind(await sha256("late@example.invalid")).first()).n).toBe(0);
+  });
+});

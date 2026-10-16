@@ -74,6 +74,21 @@ describe("anonymous twins with their own capability limiter skip RL_HTTP_ANON", 
     expect([...env.RL_AUTH.seen.keys()].every((k: string) => k.startsWith("em:"))).toBe(true);
   }, 30_000);
 
+  // Bugbot 4290485125: g:auth (global sign-in ceiling) was spent before the production handler returned RESERVED_NOT_BUILT,
+  // so 501 twin calls drained the shared bucket and 429'd real sign-in for every user at that location.
+  it("N RESERVED_NOT_BUILT (501) and N INVALID_PARAMS sign-in twin calls leave g:auth unspent; a real sign-in still succeeds", async () => {
+    const prod = mkEnv({ ENVIRONMENT: "production", RL_MCP_CEILING: limiter(1) });
+    for (let i = 0; i < 20; i++) expect((await call(prod, "POST", "/v2/auth/link", { email: `p${i}@example.org` }, undefined, `198.51.100.${i}`)).status).toBe(501);
+    expect(prod.RL_MCP_CEILING.seen.get("g:auth") ?? 0).toBe(0);
+    const dev = mkEnv({ RL_MCP_CEILING: limiter(1) });
+    for (let i = 0; i < 20; i++) expect((await call(dev, "POST", "/v2/auth/link", { email: `real${i}@example.org` }, undefined, `198.51.100.${i}`)).status).toBe(400); // dev: non-synthetic → INVALID_PARAMS
+    expect((await call(dev, "POST", "/v2/auth/link", { email: "x@example.invalid", }, undefined, "198.51.100.99", )).status).toBe(200);
+    expect(dev.RL_MCP_CEILING.seen.get("g:auth")).toBe(1); // only the one real issuance
+    // and the ceiling, once reached, refuses the next real issuance with RATE_LIMITED
+    const r = await call(dev, "POST", "/v2/auth/link", { email: "y@example.invalid" }, undefined, "198.51.100.98");
+    expect(r.status).toBe(429); expect(((await r.json()) as any).error.code).toBe("RATE_LIMITED");
+  }, 30_000);
+
   it("every other anonymous twin still spends RL_HTTP_ANON per address and is refused at the limit, as before", async () => {
     const env = mkEnv({ RL_HTTP_ANON: limiter(3) });
     for (let i = 0; i < 3; i++) expect((await call(env, "GET", "/v2/health")).status).toBe(200);

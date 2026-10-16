@@ -7,6 +7,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { allow, allowSignInAddress, allowSignInGlobal, enforceCapabilityLimit, LIMITER_NAMES, type LimiterName } from "../src/ratelimit";
+import { authRequestLink } from "../src/handlers/platform";
 
 const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8").split(/^\[env\.production\]$/m)[0];
 const declared = Object.fromEntries([...toml.matchAll(/name = "(RL_[A-Z_]+)"[\s\S]*?simple = \{ limit = (\d+)/g)].map((m) => [m[1], Number(m[2])])) as Record<LimiterName, number>;
@@ -26,6 +27,15 @@ const call = async (env: any, ip: string, cap: string, params: Record<string, un
   catch (e: any) { if (e.code === "RATE_LIMITED") return false; throw e; }
 };
 
+/** cap.auth.request_link end to end through the limiter AND the handler (g:auth is spent in the handler, only on issuance).
+ *  ENVIRONMENT "dev" with every binding present: the counters still count; D1 is a no-op stub. */
+const issueCode = async (env: any, ip: string, email: string) => {
+  const db = { prepare: () => ({ bind: () => ({ run: async () => ({}) }) }) };
+  const c = { ...ctx(env, ip), env: { ...env, ENVIRONMENT: "dev" }, db, log: () => {} };
+  try { await enforceCapabilityLimit(c, "cap.auth.request_link", { email }); await authRequestLink(c, { email }); return true; }
+  catch (e: any) { if (e.code === "RATE_LIMITED") return false; throw e; }
+};
+
 const ROOM = "203.0.113.50";
 const P = 200, F = 20, LINKS = ["link-a".padEnd(43, "a"), "link-b".padEnd(43, "b"), "link-c".padEnd(43, "c")];
 
@@ -36,7 +46,7 @@ async function busiestMinute(env: any, signIn: "email-link" | "dev-code") {
       expect(await allowSignInAddress(env, ROOM)).toBe(true); expect(await allowSignInGlobal(env)).toBe(true);
       expect(await allow(env, "RL_REDEEM", `ip:${ROOM}`)).toBe(true); expect(await allow(env, "RL_REDEEM", `ip:${ROOM}`)).toBe(true);
     } else { // DEV: cap.auth.request_link + cap.auth.consume_link
-      expect(await call(env, ROOM, "cap.auth.request_link", { email: `fac${f}@example.invalid` })).toBe(true);
+      expect(await issueCode(env, ROOM, `fac${f}@example.invalid`)).toBe(true);
       expect(await call(env, ROOM, "cap.auth.consume_link", { email: `fac${f}@example.invalid`, code: "123456" })).toBe(true);
     }
   }
@@ -93,7 +103,7 @@ describe("abuse stays bounded when the attacker rotates addresses (non-IP keys)"
   });
   it("sign-in issuance to 1000 different mailboxes from 1000 addresses: the global g:auth ceiling refuses past 600", async () => {
     const env = mkEnv(AFTER_486);
-    let ok = 0; for (let i = 0; i < 1000; i++) if (await call(env, rotating(i), "cap.auth.request_link", { email: `x${i}@example.invalid` })) ok++;
+    let ok = 0; for (let i = 0; i < 1000; i++) if (await issueCode(env, rotating(i), `x${i}@example.invalid`)) ok++;
     expect(ok).toBe(declared.RL_MCP_CEILING);
     expect(env.RL_MCP_CEILING.refused.every((k: string) => k === "g:auth")).toBe(true);
   });
