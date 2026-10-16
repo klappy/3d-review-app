@@ -8,16 +8,19 @@
  * alphabet ≈ 1.1e12; sessions are 24 random bytes). Windows are 60 s because the binding only offers 10 s or 60 s.
  *
  *   RL_MCP_ANON  anonymous POST /mcp — one unit per JSON-RPC message        key ip           30 / 60 s
- *   RL_HTTP_ANON anonymous request on ANY capability HTTP twin (src/index.ts) key ip           60 / 60 s
- *                spent after credential resolution and before the body is parsed; a refusal writes nothing
+ *   RL_HTTP_ANON anonymous request on any capability HTTP twin (src/index.ts) key ip           60 / 60 s
+ *                spent after credential resolution and before the body is parsed; a refusal writes nothing.
+ *                NOT spent on the four twins that have their own capability limiter below (RL_AUTH / RL_REDEEM):
+ *                each such call is counted once, by the limiter sized for it (DEV shared-IP burst 2026-10-16:
+ *                RL_HTTP_ANON refused 142/200 room opens before RL_REDEEM was consulted)
  *   RL_AUTH      cap.auth.request_link + cap.auth.consume_link             key ip, email    10 / 60 s COMBINED per
  *                address (both caps share the `ip:` key on one binding — splitting would double the attacker surface)
  *   RL_MCP_CEILING  every well-shaped bearer on /mcp, and /token (src/worker.ts)  key ip          600 / 60 s
  *                also POST /v2/translate from a caller with a LIVE participant bearer or session (src/translate.ts)
  *                key tr:<kind>:<principal> — per principal, so a room behind one NAT never shares a bucket (audit W2)
  *   (none)       GET /v2/passages/:pid/file with a VALID signature; a missing/tampered/expired one spends RL_HTTP_ANON
- *   RL_REDEEM    cap.participant.redeem_code + cap.participant.open_link   key ip           60 / 60 s
- *                (60 because a whole workshop room shares one NAT address — 18-I phase C: 50 concurrent participants)
+ *   RL_REDEEM    cap.participant.redeem_code + cap.participant.open_link   key ip           limit: see wrangler.toml
+ *                (sized for a whole room behind one NAT address; the number lives in wrangler.toml, not here)
  *
  * Failure posture: binding absent → allowed ONLY when ENVIRONMENT is exactly "dev" (local + unit tests); anywhere
  * else an absent binding refuses (fail closed — a production Worker without its limiter is a misdeploy, not a pass).
@@ -41,6 +44,9 @@ const CAP_LIMITER: Record<string, LimiterName> = {
   "cap.participant.redeem_code": "RL_REDEEM",
   "cap.participant.open_link": "RL_REDEEM",
 };
+
+/** true when the capability has its own limiter in execute(); the HTTP twin then skips RL_HTTP_ANON (src/index.ts). */
+export const hasCapabilityLimiter = (capabilityId: string): boolean => Object.hasOwn(CAP_LIMITER, capabilityId);
 
 export const clientIp = (req: Request): string => req.headers.get("cf-connecting-ip") ?? "unknown";
 

@@ -14,7 +14,7 @@ import { verifyAccessJwt } from "./access";
 import synthResponsesSql from "../seed/synthetic-responses.sql";
 import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
-import { allow, clientIp, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { allow, clientIp, hasCapabilityLimiter, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { cookieValue, handleAuthorize, handleConsent, oauthPrincipals, PARK_COOKIE, renderConsentIfParked, type OAuthEnv } from "./oauth";
 import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLinkEnabled, magicSessionCookie, mintMagicSession, newNonce, openPage, principalForEmailHash, requestMagicLink, sameOriginPost, signInPage, verifyMagicToken } from "./magic-link";
 
@@ -51,7 +51,10 @@ for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?
     // Anonymous HTTP traffic on EVERY twin is dampened per address (auditor 5707673911 #2: ~75 twins wrote a trace row
     // per anonymous request with no limit). Spent after credential resolution and before the body is parsed; a refusal
     // returns the contract error and writes nothing. Credential holders are not counted here. Mirrors /mcp below.
-    if (ctx.principal.kind === "anonymous" && !(await allow(c.env, "RL_HTTP_ANON", `ip:${ctx.clientIp}`))) {
+    // Twins whose capability has its own limiter (RL_AUTH, RL_REDEEM — spent in execute() before any storage) are
+    // counted there only, once: a room behind one NAT opening its link must not be refused by the generic dampener
+    // before RL_REDEEM is consulted (DEV shared-IP burst 2026-10-16: 142/200 opens refused by RL_HTTP_ANON).
+    if (ctx.principal.kind === "anonymous" && !hasCapabilityLimiter(cap.id) && !(await allow(c.env, "RL_HTTP_ANON", `ip:${ctx.clientIp}`))) {
       const res = json(fail("RATE_LIMITED", `too many anonymous requests — sign in, or wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`, `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again`, cap.id, ctx.traceId, { retry_after: RATE_LIMIT_WINDOW_SECONDS }), 429);
       res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
       return res;
