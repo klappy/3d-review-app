@@ -35,7 +35,7 @@ export const PARTICIPANT_UI_STRINGS: readonly string[] = Object.freeze([
   "Language", "Translating…",
   "The first time can take up to a minute. After that it opens straight away. You can keep reading in English meanwhile.",
   "The first time can take up to a minute. After that it opens straight away. You can keep reading in {language} meanwhile.", // S21
-  "phrases", "Try again", "Showing English. Check the internet connection, then try again.",
+  "phrases", "Try again", "Too many requests at once", "Showing English. Check the internet connection, then try again.",
   "Translation is not available right now. Showing English.",
   "Machine translation. If anything is unclear, ask the person who shared the survey.",
   "Machine translation, not yet checked by a speaker of this language. If anything is unclear, ask the person who shared the survey.",

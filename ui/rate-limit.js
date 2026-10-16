@@ -50,13 +50,17 @@ const left = s => s >= 120 ? `${Math.ceil(s / 60)} min` : `${s} s`;
 /** Keep a retry control disabled for the wait, with a visible countdown, then enable it again. While the hold runs the
  *  button carries data-rate-limited, so a page's busy/idle repaint must leave it alone. Returns a cancel function.
  *  Timer and clock are injectable for tests. */
+const holds = new WeakMap(); // button → cancel of its running hold: a second hold replaces the first, never stacks
 export function holdRetry(button, seconds, { label, setTimer = setInterval, clearTimer = clearInterval, now = Date.now, onReady } = {}) {
   if (!button) return () => {};
   const base = label ?? button.dataset.retryLabel ?? button.textContent;
+  holds.get(button)?.();
   button.dataset.retryLabel = base;
   const until = now() + retryAfterSeconds(seconds) * 1000;
   let id = null;
-  const done = () => { if (id !== null) clearTimer(id); id = null; button.disabled = false; button.textContent = base; delete button.dataset.rateLimited; delete button.dataset.retryLabel; };
+  let over = false;
+  const done = () => { if (over) return; over = true; if (id !== null) clearTimer(id); id = null; if (holds.get(button) === done) holds.delete(button); button.disabled = false; button.textContent = base; delete button.dataset.rateLimited; delete button.dataset.retryLabel; };
+  holds.set(button, done);
   const tick = () => {
     const s = Math.ceil((until - now()) / 1000);
     if (s <= 0) { done(); onReady?.(); return; }

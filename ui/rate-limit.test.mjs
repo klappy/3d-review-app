@@ -42,3 +42,16 @@ test('holdRetry honours a non-minute cap: an hourly wait counts down in minutes,
   assert.equal(button.textContent, 'Invite (60 min)'); assert.equal(button.disabled, true);
   t = 3_540_000; tick(); assert.equal(button.textContent, 'Invite (60 s)');
 });
+test('a second holdRetry on one button replaces the first: one timer, no early enable from the old one', () => {
+  let t = 0; const timers = new Map(); let next = 0;
+  const opts = { now: () => t, setTimer: fn => { timers.set(++next, fn); return next; }, clearTimer: id => timers.delete(id) };
+  const button = { disabled: false, textContent: 'Try again', dataset: {} };
+  const first = holdRetry(button, 10, opts);
+  t = 5_000; holdRetry(button, 60, opts);
+  assert.equal(timers.size, 1, 'the first interval was cleared'); assert.equal(button.textContent, 'Try again (60 s)');
+  t = 11_000; [...timers.values()].forEach(fn => fn());
+  assert.equal(button.disabled, true, 'still held by the second wait'); assert.ok(underHold(button));
+  first(); assert.equal(button.disabled, true, "the stale cancel does not end the running hold");
+  t = 65_000; [...timers.values()].forEach(fn => fn());
+  assert.equal(button.disabled, false); assert.equal(button.textContent, 'Try again'); assert.equal(timers.size, 0);
+});

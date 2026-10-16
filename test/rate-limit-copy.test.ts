@@ -75,4 +75,12 @@ describe("one-minute copy names no source the page cannot know (review 620799665
     expect(t.match(/nothing/gi)?.length).toBe(1);
     expect(t).toMatch(/^Rate limit/); expect(t).toMatch(/one minute/);
   });
+  it("design lens (#490): the participant notice gives the same instruction as its Try again button", () => {
+    expect(sharedCopy.rateLimited).not.toMatch(/open your link again/i); expect(sharedCopy.rateLimited).toMatch(/Try again in one minute\.$/);
+  });
+  it("design lens (#490): the participant retry is the primary block button under a heading", () => {
+    const src = readFileSync(new URL("../ui/participate/page.js", import.meta.url), "utf8");
+    expect(src).toMatch(/retryButton\.id = 'rate-retry'; retryButton\.className = 'rv-btn primary participant-primary'/);
+    expect(src).toMatch(/retryHeading = element\('h2', T\('rateLimitHeading'\)\)/); expect(src).toMatch(/\$\('notice'\)\.before\(retryHeading\)/);
+  });
 });

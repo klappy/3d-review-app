@@ -96,9 +96,11 @@ export function holdUntilCodeChanges(form, name = 'code') {
   const input = form?.querySelector?.(`input[name="${name}"]`), button = form?.querySelector?.('button[type=submit]');
   let last = null;
   const now = () => String(input?.value ?? '').trim();
-  const sync = () => { if (button) button.disabled = last !== null && now() === last; };
+  // A Submit under a rate-limit countdown (holdRetry) stays disabled whatever the code: editing it never ends the wait early.
+  const sync = () => { if (button) button.disabled = underHold(button) || (last !== null && now() === last); };
   input?.addEventListener?.('input', sync);
-  return { repeat: () => last !== null && now() === last, sent: () => { last = now(); sync(); }, sync };
+  // reset(): the server refused before reading the code (a rate limit), so the same code may be sent again after the wait.
+  return { repeat: () => last !== null && now() === last, sent: () => { last = now(); sync(); }, reset: () => { last = null; }, sync };
 }
 // Gate 0.23.0 (phone): a code form's error sits in the card next to the field — <p role="alert"> under the input, the input marked
 // aria-invalid and described by it — and focus returns to the input (write() disabled the focused Submit, dropping focus to BODY).
@@ -230,7 +232,8 @@ const entry = {
       // U08 (lanes-1321): a used, unknown or mistyped code gets one plain next step, not "Not allowed here." / a server message.
       // Gate 0.23.0 (phone 375x812): the error shows in the card under the field (role=alert), not in the page note below the fold.
       const r = await write(codeError.ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }), { refused: CODE_REFUSED });
-      codeHold.sync(); // write() re-enabled the buttons; Submit waits for a changed code
+      if (underHold(form.querySelector('button[type=submit]'))) codeHold.reset(); // DoD 6: a 429 never read the code; retry it after the wait
+      codeHold.sync(); // write() re-enabled the buttons; Submit waits for a changed code (or the countdown)
       if (!r) return codeError.focus();
       const token = r.participant_token || r.participant;
       if (!token) { codeError.ctx.note('The server accepted the code but returned no participant token.', true); return codeError.focus(); }
@@ -273,6 +276,7 @@ const entry = {
         return paint();
       }
       const r = await write(ctx, submit, 'Sign in', () => ctx.api('/v2/auth/session', { method: 'POST', body: { email: model.signin.email, code: val(form, 'code') } }));
+      if (underHold(submit)) signinHold?.reset(); // a 429 never read the code: the same code may be retried after the wait
       signinHold?.sync();
       if (!r) return;
       if (!r.session) return ctx.note('The server answered without a session token.', true);

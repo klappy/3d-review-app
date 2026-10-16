@@ -224,10 +224,12 @@ app.post("/v2/auth/email", async (c) => {
   if (!magicLinkEnabled(env)) return toAccess();
   if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in request refused", undefined, "auth.email_link", newTraceId()), 403);
   // Per-IP dampener first: a refusal costs no storage access and sends nothing.
-  if (!(await allow(env, "RL_AUTH", `ip:${clientIp(req)}`))) {
-    return signInLimited(req, "too many sign-in requests", RATE_LIMIT_COPY, nextOf(new URL(req.url).searchParams.get("next")));
-  }
+  // The body is read first (no storage, nothing sent) so a refusal keeps the form's hidden next=oauth (signInPage posts it
+  // in the body, not the query): a rate-limited connector sign-in still completes after the wait.
   const body = await formOrJson(req);
+  if (!(await allow(env, "RL_AUTH", `ip:${clientIp(req)}`))) {
+    return signInLimited(req, "too many sign-in requests", RATE_LIMIT_COPY, nextOf(body?.fields.next ?? new URL(req.url).searchParams.get("next")));
+  }
   if (!body) return json(fail("INVALID_PARAMS", "email required", undefined, "auth.email_link", newTraceId()), 400);
   const next = nextOf(body.fields.next);
   const out = await requestMagicLink(env, body.fields.email, { next });

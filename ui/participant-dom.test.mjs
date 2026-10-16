@@ -71,3 +71,19 @@ for(const submitted of [false,true])test(`successful ${submitted?'receipt':'form
  assert.equal(h.node(submitted?'receipt':'answers').hidden,false);
  assert.equal(h.requests.some(r=>r.url.endsWith('/code')),false);
 });
+test('DoD 6: a 429 on a confirm control holds its preview step, never the spent confirm button', async () => {
+  const h = harness({ facilitatorToken: 'staff-token' }); await h.settle();
+  const limited = { ok: false, status: 429, headers: { get: k => (k === 'retry-after' ? '30' : null) }, json: async () => ({ ok: false, error: { code: 'RATE_LIMITED', message: 'Rate limit.', data: { retry_after: 30 } } }) };
+  h.setResponder(async (url, options) => ok(url.includes('/links') ? { confirm_token: 'link-token', impact: {}, expires_in: 60 } : { assessments: [], surveys: [] }));
+  h.node('assessments').value = 'a1'; await h.node('assessments').listeners.change?.(); await h.settle();
+  h.node('surveys').value = 's1'; h.node('surveys').listeners.change(); await h.settle();
+  for (const id of ['issue-link-preview', 'issue-link-confirm']) h.node(id).hidden = false;
+  await h.event('issue-link-preview', 'click');
+  assert.equal(h.node('issue-link-confirm').disabled, false, 'preview minted a confirm token');
+  h.setResponder(async () => limited);
+  await h.event('issue-link-confirm', 'click');
+  assert.equal(h.node('issue-link-confirm').disabled, true, 'its token was spent: it stays disabled');
+  assert.equal(rateLimit.underHold(h.node('issue-link-confirm')), false, 'no countdown that would end on a dead control');
+  assert.equal(rateLimit.underHold(h.node('issue-link-preview')), true, 'the countdown runs on the preview step');
+  assert.equal(h.node('issue-link-preview').disabled, true);
+});

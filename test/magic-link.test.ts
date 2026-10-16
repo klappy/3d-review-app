@@ -142,6 +142,13 @@ describe("rate limits", () => {
     expect(keys).toEqual(["ip:192.0.2.7"]); expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });
+  it("DoD 6: a per-IP sign-in refusal of the browser form keeps next=oauth from the POST body", async () => {
+    env.RL_AUTH = { limit: async () => ({ success: false }) };
+    const res = await post("/v2/auth/email", { email: "oauth@example.invalid", next: "oauth" });
+    expect(res.status).toBe(429); expect(res.headers.get("retry-after")).toBe("60");
+    const html = await res.text();
+    expect(html).toContain(RATE_LIMIT_COPY); expect(html).toContain('<input type="hidden" name="next" value="oauth">');
+  });
   it("per IP on opening a link: RL_REDEEM ip: key refuses before any storage access", async () => {
     env.RL_REDEEM = { limit: async () => ({ success: false }) };
     const spy = vi.spyOn(env.DB, "prepare");

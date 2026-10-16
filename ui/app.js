@@ -147,6 +147,14 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   const li = document.createElement('li'); li.textContent = `${method} ${redactDiagnosticPath(url)} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
   return data.result;
 }
+// A confirm control spends its token before the request, so after a refusal it can only fail ("Preview … again"). A rate
+// limit on one of these holds its preview step instead: the countdown ends on the step that mints a fresh token.
+const CONFIRM_STEP = { 'release-codes': ['preview-export', () => state.confirmToken], 'issue-link-confirm': ['issue-link-preview', () => state.linkConfirm], 'build-report': ['preview-report', () => state.reportConfirm] };
+function retryControl(control) {
+  const step = control && CONFIRM_STEP[control.id];
+  if (!step || step[1]()) return control;
+  control.disabled = true; return $(step[0]);
+}
 async function run(label, task, control) {
   note(label); const buttons = [...document.querySelectorAll('button')].filter(b => b.id !== 'version' && b.id !== 'changelog-close'); buttons.forEach(b => b.disabled = true);
   let wait = 0;
@@ -159,7 +167,7 @@ async function run(label, task, control) {
   finally {
     // A control still under an earlier holdRetry keeps its countdown (review 6207520971 item 1).
     buttons.forEach(b => { if (!underHold(b)) b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : b.id === 'build-report' ? !state.reportConfirm : false; });
-    if (wait && control) holdRetry(control, wait);
+    if (wait && control) holdRetry(retryControl(control), wait);
   }
 }
 function showAuthorizedWork(me) {

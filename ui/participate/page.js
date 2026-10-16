@@ -62,20 +62,23 @@ function values(validate = false) {
 const syncOther = () => { if (journey.state.form) syncOtherBoxes($('answers'), journey.state.form.items); };
 // DoD 6: a rate-limit refusal on the link shows one "Try again" control under the notice, enabled after the wait.
 // A refusal while the form shows (the "Check" / recover path) holds that control for the same wait instead.
-let retryButton = null, retryHold = null, retryFor = null, recoverFor = null;
+let retryButton = null, retryHeading = null, retryHold = null, retryFor = null, recoverFor = null, recoverHold = null;
 function paintRateLimit(state) {
   if (state.rateLimited === true && state.phase !== 'unavailable' && recoverFor !== state.limitId) {
-    recoverFor = state.limitId; holdRetry($('recover'), state.retryAfter);
-  }
+    recoverFor = state.limitId; recoverHold = holdRetry($('recover'), state.retryAfter); // replaces any earlier hold on #recover
+  } else if (state.rateLimited !== true && recoverHold) { recoverHold(); recoverHold = null; recoverFor = null; } // a later non-limited state ends it
   const limited = state.rateLimited === true && state.phase === 'unavailable';
-  if (!limited) { retryHold?.(); retryHold = null; retryFor = null; if (retryButton) retryButton.hidden = true; return; }
+  if (!limited) { retryHold?.(); retryHold = null; retryFor = null; if (retryButton) retryButton.hidden = true; if (retryHeading) retryHeading.hidden = true; return; }
   if (retryFor === state.limitId) return; // same refusal repainted: keep the running countdown
   retryFor = state.limitId;
   if (!retryButton) {
-    retryButton = element('button', T('tryAgain')); retryButton.type = 'button'; retryButton.id = 'rate-retry';
-    retryButton.addEventListener('click', () => { retryHold?.(); retryHold = null; retryButton.hidden = true; journey.start({ retry: true }); });
-    $('notice').after(retryButton);
+    // Design lens (PProblemBusy): a heading names the problem; the retry is the one primary block button under the notice.
+    retryHeading = element('h2', T('rateLimitHeading')); retryHeading.id = 'rate-heading';
+    retryButton = element('button', T('tryAgain')); retryButton.type = 'button'; retryButton.id = 'rate-retry'; retryButton.className = 'rv-btn primary participant-primary';
+    retryButton.addEventListener('click', () => { retryHold?.(); retryHold = null; retryButton.hidden = true; retryHeading.hidden = true; journey.start({ retry: true }); });
+    $('notice').before(retryHeading); $('notice').after(retryButton);
   }
+  retryHeading.textContent = T('rateLimitHeading'); retryHeading.hidden = false;
   retryButton.hidden = false; retryHold?.();
   retryHold = holdRetry(retryButton, state.retryAfter, { label: T('tryAgain'), onReady: () => retryButton.focus() });
 }
