@@ -114,10 +114,49 @@ describe("#490 review follow-ups (Bugbot 4292184464, HOLD lows 1–4, ready copy
     expect(button.textContent).toBe("Réessayer (30 s)");
     t = 60_000; tick();
     expect(button.textContent).toBe("Réessayer"); expect(button.disabled).toBe(false);
-    expect(page).toMatch(/if \(underHold\(retryButton\)\) retryButton\.dataset\.retryLabel = T\('tryAgain'\); else retryButton\.textContent = T\('tryAgain'\);/);
+    expect(page).toMatch(/setControlLabel\(retryButton, T\('tryAgain'\)\);/);
   });
   it("ready copy: once the wait is over the notice no longer says 'in one minute'", () => {
     expect(sharedCopy.rateLimitedReady).not.toMatch(/minute/); expect(sharedCopy.rateLimitedReady).toMatch(/^Rate limit/);
     expect(page).toMatch(/onReady: \(\) => \{ paintReadyNotice\(journey\.state\); retryButton\.focus\(\); \}/);
+  });
+});
+
+describe("#490 re-review lows (terry-rereview490-0341)", () => {
+  const page = readFileSync(new URL("../ui/participate/page.js", import.meta.url), "utf8");
+  const held = async (label: string) => {
+    const { holdRetry } = await import("../ui/rate-limit.js");
+    let t = 0, tick: () => void = () => {};
+    const button = { disabled: false, textContent: label, dataset: {} as Record<string, string> };
+    holdRetry(button as unknown as HTMLButtonElement, 60, { setTimer: (fn: () => void) => { tick = fn; return 1; }, clearTimer: () => {}, now: () => t });
+    return { button, advance: (ms: number) => { t += ms; tick(); } };
+  };
+  it("low 1: a language switch mid-wait relabels the Check countdown and the control after it", async () => {
+    const { setControlLabel } = await import("../ui/rate-limit.js");
+    const { button, advance } = await held("Check my answers");
+    setControlLabel(button as unknown as HTMLButtonElement, "Vérifier mes réponses");
+    advance(30_000);
+    expect(button.textContent).toBe("Vérifier mes réponses (30 s)");
+    advance(30_000);
+    expect(button.textContent).toBe("Vérifier mes réponses"); expect(button.disabled).toBe(false);
+    setControlLabel(button as unknown as HTMLButtonElement, "Check my answers");
+    expect(button.textContent).toBe("Check my answers");
+    expect(page).toMatch(/function applyStatic\(\) \{ for \(const \[sel, key\] of STATIC\) setControlLabel\(document\.querySelector\(sel\), T\(key, staticEn\[key\]\)\);/);
+  });
+  it("low 2: once a longer cap's wait ends, its own '15 minutes' notice is replaced too", async () => {
+    const { rateLimitWaitOver } = await import("../ui/rate-limit.js");
+    const state = { phase: "unavailable", rateLimited: true, notice: "Rate limit reached. Retry after 15 minutes.", retryAfter: 900 };
+    const { button, advance } = await held("Try again");
+    expect(rateLimitWaitOver(state, button)).toBe(false);
+    advance(60_000);
+    expect(rateLimitWaitOver(state, button)).toBe(true);
+    expect(rateLimitWaitOver({ ...state, rateLimited: false }, button)).toBe(false);
+    expect(rateLimitWaitOver({ ...state, phase: "form" }, button)).toBe(false);
+    expect(rateLimitWaitOver(state, null)).toBe(false);
+    expect(page).toMatch(/function paintReadyNotice\(state\) \{\s*if \(rateLimitWaitOver\(state, retryButton\)\) \$\('notice'\)\.textContent = linkCopy\.rateLimitedReady;/);
+    expect(page).not.toMatch(/state\.notice === linkCopy\.rateLimited/);
+  });
+  it("prior low 3: a failed Try again start says so instead of an unhandled rejection", () => {
+    expect(page).toMatch(/journey\.start\(\{ retry: true \}\)\.then\([^\n]*\)\.catch\(\(\) => \{ \$\('notice'\)\.textContent = /);
   });
 });

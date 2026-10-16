@@ -4,7 +4,7 @@ import { mountParticipantView, itemError, drawAbout, aboutValues, setAboutValues
 import { UI_EN, SURVEYOR_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames, translatingSub } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
 import { receiptNotice, copy as linkCopy } from '../shared-link.js';
-import { holdRetry, underHold } from '../rate-limit.js';
+import { holdRetry, underHold, setControlLabel, rateLimitWaitOver } from '../rate-limit.js';
 
 const $ = id => document.getElementById(id);
 let pager, renderedPhase, renderedForm;
@@ -71,7 +71,7 @@ function paintRateLimit(state) {
   if (!limited) { retryHold?.(); retryHold = null; retryFor = null; if (retryButton) retryButton.hidden = true; if (retryHeading) retryHeading.hidden = true; return; }
   if (retryFor === state.limitId) { // same refusal repainted: keep the running countdown, but follow a language switch (#490 review low 4)
     retryHeading.textContent = T('rateLimitHeading');
-    if (underHold(retryButton)) retryButton.dataset.retryLabel = T('tryAgain'); else retryButton.textContent = T('tryAgain');
+    setControlLabel(retryButton, T('tryAgain'));
     return;
   }
   retryFor = state.limitId;
@@ -79,16 +79,16 @@ function paintRateLimit(state) {
     // Design lens (PProblemBusy): a heading names the problem; the retry is the one primary block button under the notice.
     retryHeading = element('h2', T('rateLimitHeading')); retryHeading.id = 'rate-heading';
     retryButton = element('button', T('tryAgain')); retryButton.type = 'button'; retryButton.id = 'rate-retry'; retryButton.className = 'rv-btn primary participant-primary';
-    retryButton.addEventListener('click', () => { retryHold?.(); retryHold = null; retryButton.hidden = true; retryHeading.hidden = true; journey.start({ retry: true }).then(() => { if (journey.state.phase === 'form' && journey.state.fresh) startNextPerson(); }); }); // a retried Interview another gets its setup (Bugbot 4292184464)
+    retryButton.addEventListener('click', () => { retryHold?.(); retryHold = null; retryButton.hidden = true; retryHeading.hidden = true; journey.start({ retry: true }).then(() => { if (journey.state.phase === 'form' && journey.state.fresh) startNextPerson(); }).catch(() => { $('notice').textContent = 'The survey could not be opened. Open your survey link again in a moment.'; }); }); // a retried Interview another gets its setup (Bugbot 4292184464)
     $('notice').before(retryHeading); $('notice').after(retryButton);
   }
   retryHeading.textContent = T('rateLimitHeading'); retryHeading.hidden = false;
   retryButton.hidden = false; retryHold?.();
   retryHold = holdRetry(retryButton, state.retryAfter, { label: T('tryAgain'), onReady: () => { paintReadyNotice(journey.state); retryButton.focus(); } });
 }
-// Once the wait is over, the one-minute notice stops saying "in one minute" (#490 review copy nit).
+// Once the wait is over, the notice stops naming a wait — one minute or a longer cap's own (#490 review copy nit; re-review low 2).
 function paintReadyNotice(state) {
-  if (state.phase === 'unavailable' && state.rateLimited === true && state.notice === linkCopy.rateLimited && retryButton && !underHold(retryButton)) $('notice').textContent = linkCopy.rateLimitedReady;
+  if (rateLimitWaitOver(state, retryButton)) $('notice').textContent = linkCopy.rateLimitedReady;
 }
 function paint(state) {
   paintRateLimit(state);
@@ -147,7 +147,7 @@ if (demo) { $('submit').textContent = 'Finish practice — nothing sent'; $('rec
 // Static page words (captured after the demo wording is set) and the language picker.
 const STATIC = [['.intro-title', 'static.title'], ['.intro-lead', 'static.lead'], ['#review-button', 'static.reviewButton'], ['#review > h2', 'static.reviewTitle'], ['#edit', 'static.edit'], ['#submit', 'static.submit'], ['#recover', 'static.recover']];
 const staticEn = {}; for (const [sel, key] of STATIC) { const n = document.querySelector(sel); if (n) staticEn[key] = n.textContent; }
-function applyStatic() { for (const [sel, key] of STATIC) { const n = document.querySelector(sel); if (n) n.textContent = T(key, staticEn[key]); } }
+function applyStatic() { for (const [sel, key] of STATIC) setControlLabel(document.querySelector(sel), T(key, staticEn[key])); } // a Check countdown follows a language switch (re-review low 1)
 const langSelect = element('select'); langSelect.id = 'participant-lang';
 let offered = null; // the survey's languages once known (form.languages); the picker is hidden while there are none
 function syncPicker(form) {
