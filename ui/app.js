@@ -714,7 +714,7 @@ async function sharedLinkEntry(token, namespace) {
     const resuming = !!state.shared.bearer; // a stored bearer means open() sends resume_token
     if (token !== null) {
       try { await state.shared.open(token); }
-      catch (error) { const kind = entryFailureKind(error, resuming); if (kind !== 'conflict') { showSharedUnavailable(kind); return; } throw error; } // no automatic fresh open; scoped storage untouched
+      catch (error) { const kind = entryFailureKind(error, resuming); if (kind !== 'conflict' && !(kind === 'rateLimited' && resuming)) { showSharedUnavailable(kind); return; } throw error; } // no automatic fresh open; scoped storage untouched; a rate-limited resume keeps its live session for Recover (below)
     } else if (!state.shared.bearer) { showSharedUnavailable('unavailable'); return; }
     let receipt;
     try { receipt = await state.shared.receipt(); } // receipt is checked before any editable form
@@ -725,8 +725,13 @@ async function sharedLinkEntry(token, namespace) {
     $('recover').hidden = false;
     if (resumeTarget(receipt) === 'receipt') showReceipt(receipt); else await loadForm();
   } catch (error) {
-    const kind = errorKind(error);
-    if (kind === 'conflict') { const resolved = await resolveConflict(state.shared); if (resolved.state === 'receipt') { $('recover').hidden = false; showReceipt(resolved.receipt); return; } showSharedUnavailable(resolved.state); return; }
+    let kind = errorKind(error);
+    if (kind === 'conflict') {
+      const resolved = await resolveConflict(state.shared);
+      if (resolved.state === 'receipt') { $('recover').hidden = false; showReceipt(resolved.receipt); return; }
+      if (resolved.state !== 'rateLimited') { showSharedUnavailable(resolved.state); return; }
+      kind = 'rateLimited'; error = { retryAfter: resolved.retryAfter }; // the probe was limited: the same held Recover as below (DoD 6)
+    }
     if (kind === 'rateLimited' && state.shared.bearer) { // the session is live: offer Recover, held for the wait, instead of a bare refusal (#496 review finding 2)
       showSharedUnavailable(kind, rateLimitedCopy(error?.retryAfter)); $('recover').hidden = false;
       throw new HandledFailure({ retryAfter: error?.retryAfter, control: $('recover') });

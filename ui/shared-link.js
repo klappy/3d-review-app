@@ -184,7 +184,7 @@ export async function resolveConflict(client) {
   let receipt;
   try { receipt = await client.receipt(); } catch (error) {
     const kind = errorKind(error);
-    return { state: kind === 'unavailable' ? 'unavailable' : kind === 'rateLimited' ? 'rateLimited' : 'transient' };
+    return kind === 'rateLimited' ? { state: 'rateLimited', retryAfter: error?.retryAfter } : { state: kind === 'unavailable' ? 'unavailable' : 'transient' }; // the wait travels to the held control
   }
   return receipt.submitted ? { state: 'receipt', receipt } : { state: 'closed' };
 }

@@ -63,7 +63,7 @@ def build():
         for src in sc["sources"]:
             t = tpl[src["form"]]
             sid = f"survey_story_{sc['id']}_{t['id'][4:]}"
-            rows["survey"].append(f"INSERT OR IGNORE INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES ({q(sid)},{q(aid)},{q(t['id'])},2,'selected','closed',{q(AT)});")
+            if not any(f"({q(sid)}," in x for x in rows["survey"]): rows["survey"].append(f"INSERT OR IGNORE INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES ({q(sid)},{q(aid)},{q(t['id'])},2,'selected','closed',{q(AT)});")
             picked = [r for r in recs if r["project_id"] == src["project"] and r["form_variant"] == src["form"] and ("cycle" not in src or r["assessment_cycle"] == src["cycle"])]
             if not picked: raise SystemExit(f"no source rows for {sc['id']} {src}")
             for r in picked:

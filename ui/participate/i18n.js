@@ -1,4 +1,5 @@
 import { copy, fill } from '../shared-link.js';
+import { retryAfterOf } from '../rate-limit.js';
 
 // Dynamic translation for the participant survey (captain ruling 2026-09-28: restore the Lovable-era behaviour).
 // The page sends its English strings to POST /v2/translate (src/translate.ts, a proxy with the Laos app's
@@ -211,7 +212,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
   const chunks = [];
   for (let i = 0; i < total; i += chunkSize) chunks.push(Object.fromEntries(keys.slice(i, i + chunkSize).map(k => [k, sourceTexts[k]])));
   const map = {};
-  let done = 0, failures = 0, refused = 0;
+  let done = 0, failures = 0, refused = 0, limited = null; // limited: the last 429's Retry-After (DoD 6)
   const retry = {};
   onProgress({ done, total });
   // Exactly two bounded rounds. Successful first-round values are never sent again or replaced.
@@ -226,6 +227,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
           const res = await fetchImpl(endpoint, translateInit({ targetLang: lang, context, sourceTexts: part }, bearer));
           if (!res || !res.ok) {
             if (res && [400, 401, 403, 404].includes(res.status)) mayRetry = false;
+            if (res && res.status === 429) { mayRetry = false; const b = await res.json?.().catch(() => null); const w = retryAfterOf(b?.error?.data ? b.error : { data: b }, res); limited = w == null ? '60' : String(w); } // PR501 6216474718/6217581828: no immediate resend; body wait (envelope data or /v2/translate top-level retry_after) before header
             throw new Error(`translate ${res ? res.status : 'failed'}`);
           }
           const data = await res.json();
@@ -249,7 +251,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
   const retryChunks = [];
   for (let i = 0; i < missing.length; i += chunkSize) retryChunks.push(Object.fromEntries(missing.slice(i, i + chunkSize).map(k => [k, retry[k]])));
   if (retryChunks.length) await round(retryChunks, false);
-  if (!Object.keys(map).length) throw new Error(failures ? 'translate failed' : 'translate empty');
+  if (!Object.keys(map).length) throw limited !== null ? Object.assign(new Error('translate rate limited'), { code: 'RATE_LIMITED', status: 429, retryAfter: limited }) : new Error(failures ? 'translate failed' : 'translate empty');
   const partial = Object.keys(map).length + refused < total;
   if (!partial) writeCache(storage, cacheKey, map, refused, now());
   return { map, partial, cached: false };
