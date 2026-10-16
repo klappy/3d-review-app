@@ -88,6 +88,20 @@ describe('real compiled renderer with local D1',()=>{
  });
  describe('refusal and race regressions', () => {
  beforeEach(clearReports);
+ it('stage spans are observe-only: report.stage {stage, ms} per stage, bytes and digests unchanged',async()=>{
+  const row=(id:string)=>db.prepare('SELECT report_key,capture_digest,payload_json,payload_sha256 FROM synthetic_report WHERE id=?').bind(id).first<any>();
+  const plain=await report(),before=await row(plain.id);
+  await clearReports();
+  const spans:{span:string;data?:Record<string,unknown>}[]=[];
+  const logged={...context(),log:(span:string,data?:Record<string,unknown>)=>{spans.push({span,data});}};
+  expect(await store.observeBuildEligibility(logged,aid)).toEqual({ok:true,marker:marker(true)});
+  const r=await store.buildMaterialized(logged,aid);expect(r.ok).toBe(true);if(!r.ok)return;
+  const after=await row(r.value.id);
+  expect(after).toEqual(before);expect(r.value.payload).toEqual(plain.payload);
+  expect(r.value.reportKey).toBe(plain.reportKey);expect(r.value.captureDigest).toBe(plain.captureDigest);
+  expect(spans.every(s=>s.span==='report.stage'&&Object.keys(s.data??{}).join()==='stage,ms'&&typeof s.data?.ms==='number'&&(s.data.ms as number)>=0)).toBe(true);
+  expect(spans.map(s=>s.data?.stage)).toEqual(['observe_sql','attest_observe','render_preview','observe_sql','attest_observe','attest_commit','render','canonicalize','validate','hash','commit_sql','result_sql','attest_current','validate_stored']);
+ });
  it('refuses rehashed well-typed semantic forgery, not just malformed schema',async()=>{
   const r=await report(),original=await db.prepare('SELECT payload_json,payload_sha256 FROM synthetic_report WHERE id=?').bind(r.id).first<any>();
   const mutations=[
