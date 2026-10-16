@@ -1,8 +1,8 @@
 /**
  * Audit round 1 (train 22 security review) — server fixes, falsified against real D1 + R2 (Miniflare), repo migrations
- * and seed, with counting fake limiters (the pattern of test/limiter-boundary.test.ts):
- *   W2  a workshop room behind one NAT is not throttled by RL_HTTP_ANON when it presents valid participant bearers
- *       (/v2/translate) or valid signed links (passage files); anonymous / invalid callers still are.
+ * and seed:
+ *   W2  a workshop room behind one NAT is never throttled (app-level rate limiting removed, captain 2026-10-16): valid
+ *       participant bearers, anonymous callers and signed passage links on one address are all served.
  *   W3  an assessment that has (or had) passages can be deleted; the dry run counts them; rows and files are removed.
  *   E3  a passage add whose JSON body is not an object (null, [], 5) is a 400, not a 500.
  *   E4  an upstream "translation" that echoes an English sentence (3+ words) is neither served nor stored (Latin-script
@@ -19,9 +19,6 @@ import { handleTranslate, sha256Hex } from "../src/translate";
 const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "audit1", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "audit1" }, r2Buckets: ["PASSAGES"] }] }));
 let db: D1Database, bucket: R2Bucket, env: any, owner: string;
 const aid = "assess_tavo_collect", ROOM_IP = "198.51.100.23";
-/** Counting fake limiter: success while the key has spent ≤ limit units. */
-const limiter = (limit: number) => { const seen = new Map<string, number>(); return { seen, limit: async ({ key }: { key: string }) => { const n = (seen.get(key) ?? 0) + 1; seen.set(key, n); return { success: n <= limit }; } }; };
-const limited = () => ({ ...env, RL_HTTP_ANON: limiter(60), RL_MCP_CEILING: limiter(600) });
 async function call(method: string, url: string, body?: unknown, bearer: string | null = owner, e: any = env, headers: Record<string, string> = {}) {
   const r = await app.fetch(new Request("https://local.invalid" + url, { method, headers: { "content-type": "application/json", ...(bearer ? { authorization: `Bearer ${bearer}` } : {}), ...headers }, body: body === undefined ? undefined : typeof body === "string" || body instanceof Uint8Array ? body as BodyInit : JSON.stringify(body) }), e);
   return { status: r.status, ...(await r.json() as any) };
@@ -49,53 +46,39 @@ beforeAll(async () => {
   owner = await mintSession(env, "person_mara", "user");
 }, 60000);
 
-describe("W2 — a room behind one address is not throttled by the anonymous limit", () => {
-  it("/v2/translate: 80 chunk requests with valid participant bearers pass; anonymous callers on the same address stop at 60", async () => {
-    const e = limited(), up = upstream((en) => `ລາວ ${en}`);
+describe("W2 — a room behind one address is never throttled (no app-level rate limit)", () => {
+  it("/v2/translate: 80 chunk requests with valid participant bearers and 61 anonymous ones on the same address all pass", async () => {
+    const e = env, up = upstream((en) => `ລາວ ${en}`);
     const tokens = [await participant(), await participant()];
     for (let i = 0; i < 80; i++) {
       const r = await handleTranslate(translateReq({ a: "Start", b: "Next" }, "lo", { authorization: `Bearer ${tokens[i % 2]}` }), e, { fetch: up.fetch });
       expect(r.status, `participant request ${i + 1}`).toBe(200);
     }
-    expect(e.RL_HTTP_ANON.seen.get(`ip:${ROOM_IP}`) ?? 0).toBe(0); // the address bucket was never touched
-    expect([...e.RL_MCP_CEILING.seen.keys()].every((k) => k.startsWith("tr:participant:"))).toBe(true);
     expect(up.calls.length).toBe(1); // stored once, served from memory after that
     const statuses: number[] = [];
     for (let i = 0; i < 61; i++) statuses.push((await handleTranslate(translateReq({ a: "Start" }, "lo"), e, { fetch: up.fetch })).status);
-    expect(statuses.slice(0, 60).every((s) => s === 200)).toBe(true);
-    expect(statuses[60]).toBe(429);
+    expect(statuses.every((s) => s === 200)).toBe(true);
   });
-  it("/v2/translate: an unknown or revoked-shaped bearer is anonymous and spends the address bucket", async () => {
-    const e = limited(), up = upstream((en) => `ລາວ ${en}`);
+  it("/v2/translate: an unknown or revoked-shaped bearer is anonymous and still served", async () => {
+    const e = env, up = upstream((en) => `ລາວ ${en}`);
     const bogus = `pt_${"0".repeat(32)}`;
     const statuses: number[] = [];
     for (let i = 0; i < 61; i++) statuses.push((await handleTranslate(translateReq({ a: "Start" }, "lo", { authorization: `Bearer ${bogus}` }), e, { fetch: up.fetch })).status);
-    expect(statuses[59]).toBe(200);
-    expect(statuses[60]).toBe(429);
-    expect(e.RL_MCP_CEILING.seen.size).toBe(0);
+    expect(statuses.every((s) => s === 200)).toBe(true);
   });
-  it("/v2/translate: a participant still has its own ceiling (RL_MCP_CEILING, keyed per principal)", async () => {
-    const e = { ...env, RL_HTTP_ANON: limiter(60), RL_MCP_CEILING: limiter(2) }, up = upstream((en) => `ລາວ ${en}`);
-    const token = await participant();
-    const s = [];
-    for (let i = 0; i < 3; i++) s.push((await handleTranslate(translateReq({ a: "Start" }, "lo", { authorization: `Bearer ${token}` }), e, { fetch: up.fetch })).status);
-    expect(s).toEqual([200, 200, 429]);
-  });
-  it("passage file: 80 requests with a valid signature pass; tampered links spend the address bucket and stop at 60", async () => {
+  it("passage file: 80 requests with a valid signature pass; 61 tampered links are each refused 403, never 429", async () => {
     const add = await call("POST", `/v2/assessments/${aid}/passages?name=Mark%204.mp3`, new Uint8Array([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 10, ...Array(64).fill(7)]), owner, env, { "content-type": "application/octet-stream" });
     expect(add.status).toBe(201);
     const href: string = add.result.passage.href;
-    const e = limited();
+    const e = env;
     for (let i = 0; i < 80; i++) {
       const r = await app.fetch(new Request("https://local.invalid" + href, { headers: { "cf-connecting-ip": ROOM_IP, range: "bytes=0-9" } }), e);
       expect(r.status, `valid request ${i + 1}`).toBe(206);
       await r.arrayBuffer();
     }
-    expect(e.RL_HTTP_ANON.seen.get(`ip:${ROOM_IP}`) ?? 0).toBe(0);
     const bad = href.replace(/sig=.{4}/, "sig=AAAA"), statuses: number[] = [];
     for (let i = 0; i < 61; i++) { const r = await app.fetch(new Request("https://local.invalid" + bad, { headers: { "cf-connecting-ip": ROOM_IP } }), e); statuses.push(r.status); await r.arrayBuffer(); }
-    expect(statuses.slice(0, 60).every((s) => s === 403)).toBe(true);
-    expect(statuses[60]).toBe(429);
+    expect(statuses.every((s) => s === 403)).toBe(true);
     await call("DELETE", `/v2/assessments/${aid}/passages/${add.result.passage.id}`);
   });
 });

@@ -41,8 +41,7 @@ export const authRequestLink: Handler = async (ctx, p, o) => {
 };
 
 export const authConsumeLink: Handler = async (ctx, p) => {
-  // Strings only, by the limiter's own well-formed rule: a numeric code used to reach the lookup here via String(p.code)
-  // while the limiter counted it as malformed and skipped g:RL_AUTH (Bugbot 4291079028).
+  // Strings only (nonEmptyStr): a numeric code must not reach the lookup via String(p.code) (Bugbot 4291079028).
   if (!nonEmptyStr(p.email) || !nonEmptyStr(p.code)) throw new CapError("INVALID_PARAMS", "email and code required");
   const eh = await sha256(normalizeEmail(p.email));
   const row = await ctx.db.prepare("SELECT id, expires_at, redeemed_at AS used_at FROM login_code WHERE email_hash = ? AND code_hash = ? AND id NOT LIKE 'ml\\_%' ESCAPE '\\' ORDER BY created_at DESC LIMIT 1").bind(eh, await sha256(p.code)).first<any>();

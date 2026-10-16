@@ -4,7 +4,7 @@
 // global (g:) limiters, and the page cannot tell which one refused (review 6207996655, copy finding).
 export const RATE_LIMIT_LEAD = 'Rate limit: too many requests right now.';
 export const RATE_LIMIT_COPY = `${RATE_LIMIT_LEAD} Nothing was lost. Try again in one minute.`;
-/** The server's plain message for every one-minute limiter (src/ratelimit.ts RATE_LIMIT_MESSAGE). */
+/** The server's plain message for every one-minute limiter (kept for any one-minute 429, e.g. from upstream; the app's own limiter was removed 2026-10-16). */
 export const SERVER_MINUTE_MESSAGE = 'rate limit — try again in a minute';
 export const isRateLimited = (status, code) => Number(status) === 429 || String(code || '') === 'RATE_LIMITED' || String(code || '') === '429';
 /** true when the refusal is one of the one-minute limiters. Any other cap (the hourly invite cap, the 900 s mail cap)

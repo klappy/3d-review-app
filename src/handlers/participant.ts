@@ -5,7 +5,7 @@ import { newId, nonEmptyStr, nowIso, randomToken, reqStr, sha256 } from "./commo
 import { codeHash } from "../code-escrow";
 import { openSharedLink } from "./shared-link";
 
-/** reqStr plus the shared nonEmptyStr rule (the one RL_GLOBAL's wellFormed uses): a whitespace-only secret is
+/** reqStr plus the shared nonEmptyStr rule : a whitespace-only secret is
  *  refused as INVALID_PARAMS before any lookup, never hashed and looked up as "". */
 function reqSecret(params: Record<string, unknown>, key: string): string {
   const v = reqStr(params, key);
