@@ -657,6 +657,16 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     expect($("notice").textContent).toBe(ATTENTION);
     expect(snapshot(storage)).toBe(snap);
   });
+  it("F11g fresh open, Recover with GET /receipt → 429: Recover is held for the wait instead of staying clickable (#490 re-review prior low 4)", async () => {
+    const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
+    const $ = await boot(storage, link.entry_fragment, fetcher); strict($);
+    plan.receipt = refuse(429, "RATE_LIMITED");
+    await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("participant-resume").textContent).toBe(copy.rateLimited);
+    expect($("recover").disabled).toBe(true); expect($("recover").dataset.rateLimited).toBe("true");
+    expect($("recover").textContent).toMatch(/\((60|59) s\)$/); // the fake DOM has no button label; the countdown shows
+    expect($("submit").disabled).toBe(false); // only the refused control waits
+  });
   const unreadable = async () => new Response("<html>gateway</html>", { status: 502 });
   const conflictProbes: [string, string, Route][] = [
     ["F5-M1", "probe 429", refuse(429, "RATE_LIMITED")],

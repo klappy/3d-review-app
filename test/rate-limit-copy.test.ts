@@ -153,13 +153,36 @@ describe("#490 re-review lows (terry-rereview490-0341)", () => {
     expect(rateLimitWaitOver({ ...state, rateLimited: false }, button)).toBe(false);
     expect(rateLimitWaitOver({ ...state, phase: "form" }, button)).toBe(false);
     expect(rateLimitWaitOver(state, null)).toBe(false);
-    // A Try again in flight (controller emits busy: true, same phase) is not "ready": the button is hidden meanwhile.
-    expect(rateLimitWaitOver({ ...state, busy: true }, button)).toBe(false);
-    expect(rateLimitWaitOver({ ...state, busy: false }, button)).toBe(true);
-    expect(page).toMatch(/function paintReadyNotice\(state\) \{\s*if \(rateLimitWaitOver\(state, retryButton\)\) \$\('notice'\)\.textContent = linkCopy\.rateLimitedReady;/);
+    // A Try again in flight is not "ready": the page hides the button meanwhile (see the #495 review block below).
+    expect(rateLimitWaitOver(state, { ...button, hidden: true })).toBe(false);
+    expect(page).toMatch(/function paintReadyNotice\(state\) \{\s*const text = rateLimitNotice\(state, retryButton, \{ retrying: linkCopy\.labelOpening, ready: linkCopy\.rateLimitedReady \}\);\s*if \(text\) \$\('notice'\)\.textContent = text;/);
     expect(page).not.toMatch(/state\.notice === linkCopy\.rateLimited/);
   });
   it("prior low 3: a failed Try again start says so instead of an unhandled rejection", () => {
     expect(page).toMatch(/journey\.start\(\{ retry: true \}\)\.then\([^\n]*\)\.catch\(\(\) => \{ \$\('notice'\)\.textContent = /);
+  });
+});
+
+describe("#495 review lows (terry review495-0441)", () => {
+  const limited = { phase: "unavailable", rateLimited: true, notice: sharedCopy.rateLimited, retryAfter: 60, limitId: 1 };
+  const words = { retrying: sharedCopy.labelOpening, ready: sharedCopy.rateLimitedReady };
+  const shown = () => ({ hidden: false, disabled: false, textContent: "Try again", dataset: {} as Record<string, string> });
+  it("ready check reads the button's hidden state, not busy: a rejected Try again (busy false, button still hidden) is not ready", async () => {
+    const { rateLimitWaitOver } = await import("../ui/rate-limit.js");
+    expect(rateLimitWaitOver({ ...limited, busy: false }, { ...shown(), hidden: true })).toBe(false); // reject path
+    expect(rateLimitWaitOver({ ...limited, busy: true }, { ...shown(), hidden: true })).toBe(false); // in flight
+    expect(rateLimitWaitOver({ ...limited, busy: false }, shown())).toBe(true); // wait over, control visible
+  });
+  it("low: while a Try again is in flight the notice is neutral, not the wait copy that already ran out", async () => {
+    const { rateLimitNotice } = await import("../ui/rate-limit.js");
+    const hidden = { ...shown(), hidden: true };
+    // The controller emits { ...state, busy: true } (same phase, same notice) before the request; the click hid the button.
+    const inFlight = rateLimitNotice({ ...limited, busy: true }, hidden, words);
+    expect(inFlight).toBe(sharedCopy.labelOpening);
+    expect(inFlight).not.toMatch(/minute/);
+    expect(rateLimitNotice({ ...limited, notice: "Rate limit reached. Retry after 15 minutes.", busy: true }, hidden, words)).toBe(sharedCopy.labelOpening);
+    expect(rateLimitNotice({ ...limited, busy: false }, shown(), words)).toBe(sharedCopy.rateLimitedReady); // wait over
+    expect(rateLimitNotice({ ...limited, busy: false }, hidden, words)).toBe(null); // rejected: keep the page's own failure words
+    expect(rateLimitNotice({ phase: "form", busy: true }, hidden, words)).toBe(null);
   });
 });

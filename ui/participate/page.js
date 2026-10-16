@@ -4,7 +4,7 @@ import { mountParticipantView, itemError, drawAbout, aboutValues, setAboutValues
 import { UI_EN, SURVEYOR_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames, translatingSub } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
 import { receiptNotice, copy as linkCopy } from '../shared-link.js';
-import { holdRetry, underHold, setControlLabel, rateLimitWaitOver } from '../rate-limit.js';
+import { holdRetry, underHold, setControlLabel, rateLimitNotice } from '../rate-limit.js';
 
 const $ = id => document.getElementById(id);
 let pager, renderedPhase, renderedForm;
@@ -87,8 +87,10 @@ function paintRateLimit(state) {
   retryHold = holdRetry(retryButton, state.retryAfter, { label: T('tryAgain'), onReady: () => { paintReadyNotice(journey.state); retryButton.focus(); } });
 }
 // Once the wait is over, the notice stops naming a wait — one minute or a longer cap's own (#490 review copy nit; re-review low 2).
+// While a Try again is in flight it says the survey is opening, not the wait that already ran out (#495 review low).
 function paintReadyNotice(state) {
-  if (rateLimitWaitOver(state, retryButton)) $('notice').textContent = linkCopy.rateLimitedReady;
+  const text = rateLimitNotice(state, retryButton, { retrying: linkCopy.labelOpening, ready: linkCopy.rateLimitedReady });
+  if (text) $('notice').textContent = text;
 }
 function paint(state) {
   paintRateLimit(state);
