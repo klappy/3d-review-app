@@ -68,11 +68,29 @@ describe("protection that does not rest on the address key (DoD 3)", () => {
     for (let i = 0; i < n; i++) expect(await refusal(enforceCapabilityLimit(ctxFor(env, ip(i)), "cap.participant.open_link", { token: "one-link" }))).toBeNull();
     const e = await refusal(enforceCapabilityLimit(ctxFor(env, ip(n)), "cap.participant.open_link", { token: "one-link" }));
     expect(e?.code).toBe("RATE_LIMITED"); expect(e?.hint).toMatch(/too many opens of this link/);
-    expect(env.RL_GLOBAL.seen.get("g:RL_REDEEM")).toBe(n + 1); // the global key allowed it; the link key refused
+    expect(env.RL_GLOBAL.seen.get("g:RL_REDEEM")).toBe(n); // the link key refused before the global key was spent (review 6207996655 #2)
     expect([...env.RL_PER_LINK.seen.keys()].every((k: string) => k.startsWith("link:") && !k.includes("one-link"))).toBe(true);
     expect([...env.RL_GLOBAL.seen.keys(), ...env.RL_REDEEM.seen.keys()].some((k: string) => k.startsWith("link:"))).toBe(false);
     // a second link is its own bucket
     expect(await refusal(enforceCapabilityLimit(ctxFor(env, ip(n + 1)), "cap.participant.open_link", { token: "other-link" }))).toBeNull();
+  });
+  it("per link: one address at full rate cannot drain a shared link and lock the room out (review 6207996655 #1)", async () => {
+    expect(RATE_LIMITS.RL_PER_LINK).toBeGreaterThanOrEqual(4 * RATE_LIMITS.RL_REDEEM); // recorded trade: 4 addresses still can
+    const env = sized();
+    const attacker = "203.0.113.66";
+    let allowed = 0;
+    for (let i = 0; i < RATE_LIMITS.RL_REDEEM + 100; i++)
+      if (!(await refusal(enforceCapabilityLimit(ctxFor(env, attacker), "cap.participant.open_link", { token: "room-link" })))) allowed++;
+    expect(allowed).toBe(RATE_LIMITS.RL_REDEEM); // the attacker's own address key stops it, and its refusals spend no link units
+    // the room, on its own address, still opens the same link: all 200
+    for (let i = 0; i < 200; i++)
+      expect(await refusal(enforceCapabilityLimit(ctxFor(env, ROOM), "cap.participant.open_link", { token: "room-link" }))).toBeNull();
+    // three attacker addresses at full rate still leave the room room to open
+    const env3 = sized();
+    for (const a of ["203.0.113.1", "203.0.113.2", "203.0.113.3"])
+      for (let i = 0; i < RATE_LIMITS.RL_REDEEM; i++) await enforceCapabilityLimit(ctxFor(env3, a), "cap.participant.open_link", { token: "room-link" });
+    for (let i = 0; i < 200; i++)
+      expect(await refusal(enforceCapabilityLimit(ctxFor(env3, ROOM), "cap.participant.open_link", { token: "room-link" }))).toBeNull();
   });
   it("per link at today's wrangler numbers (RL_REDEEM 60, RL_GLOBAL unbound): 200 opens of one link from 200 addresses are all allowed", async () => {
     const env = sized({ RL_REDEEM: limiter(60), RL_GLOBAL: undefined, RL_PER_KEY: undefined, RL_PER_LINK: undefined });
@@ -85,6 +103,25 @@ describe("protection that does not rest on the address key (DoD 3)", () => {
     for (let i = 0; i < 4; i++) out.push(await refusal(enforceCapabilityLimit(ctxFor(env, `203.0.113.${i}`), "cap.participant.redeem_code", { code: `CODE000${i}` })));
     expect(out.slice(0, 3).every((e) => e === null)).toBe(true); expect(out[3]?.code).toBe("RATE_LIMITED");
     expect([...env.RL_GLOBAL.seen.keys()]).toEqual(["g:RL_REDEEM"]);
+  });
+  it("global ceiling is spent last: malformed requests and per-secret refusals spend no g: unit (review 6207996655 #2)", async () => {
+    const env = sized();
+    const ip = (i: number) => `10.2.${i >> 8}.${i & 255}`;
+    // malformed: missing / empty / non-string secrets — the handler refuses them; the service-wide budget is untouched
+    await refusal(enforceCapabilityLimit(ctxFor(env, ip(1)), "cap.participant.open_link", {}));
+    await refusal(enforceCapabilityLimit(ctxFor(env, ip(2)), "cap.participant.open_link", { token: "" }));
+    await refusal(enforceCapabilityLimit(ctxFor(env, ip(3)), "cap.participant.redeem_code", { code: 12345678 }));
+    await refusal(enforceCapabilityLimit(ctxFor(env, ip(4)), "cap.auth.request_link", {}));
+    await refusal(enforceCapabilityLimit(ctxFor(env, ip(5)), "cap.auth.request_link", { email: 7 })); // INVALID_PARAMS
+    await refusal(enforceCapabilityLimit(ctxFor(env, ip(6)), "cap.auth.consume_link", { email: "a@example.org" })); // no code
+    expect(env.RL_GLOBAL.seen.size).toBe(0);
+    // per-code refusals (the 11th+ try on one code) do not spend g:RL_REDEEM either
+    for (let i = 0; i < 30; i++) await refusal(enforceCapabilityLimit(ctxFor(env, ip(100 + i)), "cap.participant.redeem_code", { code: "ABCD2345" }));
+    expect(env.RL_GLOBAL.seen.get("g:RL_REDEEM")).toBe(RATE_LIMITS.RL_PER_KEY);
+    // and an address refused by its own key spends nothing further
+    const env2 = sized({ RL_REDEEM: limiter(0) });
+    await refusal(enforceCapabilityLimit(ctxFor(env2, ROOM), "cap.participant.open_link", { token: "room-link" }));
+    expect(env2.RL_GLOBAL.seen.size).toBe(0); expect(env2.RL_PER_LINK.seen.size).toBe(0);
   });
   it("optional limiters absent: skipped, never refused (an unbound RL_GLOBAL / RL_PER_KEY does not stop a workshop)", async () => {
     const env = sized({ RL_GLOBAL: undefined, RL_PER_KEY: undefined, RL_PER_LINK: undefined });
@@ -125,25 +162,38 @@ describe("every rate-limit refusal says so and offers a retry in one minute (DoD
   });
 });
 
+const boundIn = (toml: string, section: string) => {
+  const out: Record<string, number> = {}; let cur: string | null = null, name = "";
+  for (const line of toml.split("\n")) {
+    const t = line.trim(); const arr = t.match(/^\[\[([\w.]+)\]\]$/);
+    if (arr) { cur = arr[1]; name = ""; continue; } if (/^\[[\w.]+\]$/.test(t)) { cur = null; continue; }
+    if (cur !== section) continue;
+    const n = t.match(/^name\s*=\s*"(\w+)"/); if (n) name = n[1];
+    const l = t.match(/^simple\s*=.*limit\s*=\s*(\d+)/); if (l && name) out[name] = Number(l[1]);
+  }
+  return out;
+};
+
 describe("one config place: wrangler.toml mirrors RATE_LIMITS", () => {
   // Bindings Otto has not yet re-numbered or added (wrangler.toml is Otto's; see the PR body). When his commit sets them,
   // this test fails until the matching line here is deleted — the mismatch can never go quiet.
   const AWAITING_WRANGLER: Record<string, number | "unbound"> = { RL_HTTP_ANON: 60, RL_AUTH: 10, RL_REDEEM: 60, RL_PER_KEY: "unbound", RL_PER_LINK: "unbound", RL_GLOBAL: "unbound" };
+  it("RL_AUTH is never bound above RL_PER_KEY's number unless RL_PER_KEY is bound beside it (review 6207996655 #3)", () => {
+    // While RL_PER_KEY is unbound the em: key rides RL_AUTH (src/ratelimit.ts), so raising RL_AUTH alone loosens the
+    // per-mailbox sign-in limit with it. Otto binds both in one change; this refuses the one without the other.
+    const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+    for (const section of ["ratelimits", "env.production.ratelimits"]) {
+      const b = boundIn(toml, section);
+      if (b.RL_AUTH !== undefined && b.RL_AUTH > RATE_LIMITS.RL_PER_KEY) expect(b.RL_PER_KEY, `${section}: RL_AUTH ${b.RL_AUTH} needs RL_PER_KEY bound`).toBeDefined();
+    }
+    // the rule itself, on a sample that raises RL_AUTH alone
+    const sample = `[[ratelimits]]\nname = "RL_AUTH"\nnamespace_id = "1"\nsimple = { limit = 100, period = 60 }\n`;
+    expect(boundIn(sample, "ratelimits")).toEqual({ RL_AUTH: 100 });
+  });
   it("every limiter's bound number equals RATE_LIMITS (top level and production), except the named pending ones", () => {
     const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
-    const bound = (section: string) => {
-      const out: Record<string, number> = {}; let cur: string | null = null, name = "";
-      for (const line of toml.split("\n")) {
-        const t = line.trim(); const arr = t.match(/^\[\[([\w.]+)\]\]$/);
-        if (arr) { cur = arr[1]; name = ""; continue; } if (/^\[[\w.]+\]$/.test(t)) { cur = null; continue; }
-        if (cur !== section) continue;
-        const n = t.match(/^name\s*=\s*"(\w+)"/); if (n) name = n[1];
-        const l = t.match(/^simple\s*=.*limit\s*=\s*(\d+)/); if (l && name) out[name] = Number(l[1]);
-      }
-      return out;
-    };
     for (const section of ["ratelimits", "env.production.ratelimits"]) {
-      const b = bound(section);
+      const b = boundIn(toml, section);
       for (const n of [...LIMITER_NAMES, ...OPTIONAL_LIMITER_NAMES]) {
         const actual = b[n] ?? "unbound";
         if (n in AWAITING_WRANGLER) expect(actual, `${section} ${n}: Otto set it — delete its AWAITING_WRANGLER entry`).toBe(AWAITING_WRANGLER[n]);

@@ -26,13 +26,22 @@
  *   RL_PER_KEY   (optional) one secret or one mailbox, whatever the address   keys em:, code:   see RATE_LIMITS
  *                request_link per email (falls back to RL_AUTH's em: key while unbound), redeem_code per code —
  *                bounds a flood on one secret when an attacker rotates addresses.
+ *                BINDING ORDER (review 6207996655 #3): while RL_PER_KEY is unbound the em: key rides RL_AUTH, so raising
+ *                RL_AUTH above RATE_LIMITS.RL_PER_KEY loosens the per-mailbox limit with it. Bind RL_PER_KEY in the same
+ *                wrangler change that raises RL_AUTH (test/workshop-same-ip.test.ts refuses the one without the other).
  *   RL_GLOBAL    (optional) one key per secret-guessing limiter across ALL addresses   keys g:RL_AUTH, g:RL_REDEEM
  *                a ceiling for code/link guessing and sign-in spam spread over many IPs (workshop 2026-10-15 DoD 3).
+ *                Spent LAST, and only by a well-formed request that every per-address and per-secret key allowed
+ *                (review 6207996655 #2): malformed or already-refused requests must not drain the service-wide budget.
+ *                Residual: ~10 addresses sending well-formed requests at RL_REDEEM's rate can still spend it — binding
+ *                RL_GLOBAL is a recorded call, not a default.
  *   RL_PER_LINK  (optional) one shared link, whatever the address            key link:<hash>      see RATE_LIMITS
  *                a shared link is opened by a whole room, so it needs a room-sized number of its own: not RL_PER_KEY's
  *                (one secret, too small), not RL_REDEEM's per-address one (Bugbot 4290591310), and not RL_GLOBAL's,
  *                where g:RL_REDEEM is spent first on the same number so link: could never be the key that refuses
- *                (Bugbot 4290741302).
+ *                (Bugbot 4290741302). Sized ABOVE RL_REDEEM (review 6207996655 #1): the address key is spent first and
+ *                caps one address at RL_REDEEM opens, so one address can never spend a link's whole budget and lock the
+ *                room out. Trade, recorded: RL_PER_LINK / RL_REDEEM (4) addresses at full rate on one link still can.
  *   RL_MCP_CEILING also meters every write/danger call by a signed-in or link-holding principal    key wr:<kind>:<id>
  *                per session/principal, never per address, so a room behind one NAT never shares a bucket.
  *
@@ -67,7 +76,7 @@ export const RATE_LIMITS: Record<LimiterName | OptionalLimiterName, number> = {
   RL_REDEEM: 500,      // link/code opens per address: 200 opens + 20 × 2 email-link check/open = 240, ×2 headroom
   RL_MCP_CEILING: 600, // per bearer address on /mcp, per principal for translate (tr:) and writes (wr:)
   RL_PER_KEY: 10,      // per email / per code, any address
-  RL_PER_LINK: 400,    // per shared link, any address: a room of 200 opening one link, ×2 headroom; < RL_GLOBAL
+  RL_PER_LINK: 2000,   // per shared link, any address: ≥ 4 × RL_REDEEM so one address cannot drain it; < RL_GLOBAL
   RL_GLOBAL: 5000,     // all addresses together, per secret-guessing limiter
 };
 /** The plain refusal every rate limit returns, on every face (DoD 6). */
@@ -140,8 +149,6 @@ export async function enforceCapabilityLimit(ctx: Ctx, capabilityId: string, par
   // first fix) let a non-string email be INVALID_PARAMS with no unit spent and a trace row written per request:
   // an unlimited D1 write path (Bugbot 4032246360, auditor 5707673911 #1). One unit per attempt, whatever its shape.
   if (!(await allow(ctx.env, name, `ip:${ip}`))) throw limited(capabilityId, "too many attempts from this network");
-  // Global ceiling across every address (DoD 3): rotating addresses cannot multiply the guessing rate past it.
-  if (!(await allowOptional(ctx.env, "RL_GLOBAL", `g:${name}`))) throw limited(capabilityId, "the service is busy");
   if (name === "RL_AUTH" && params.email !== undefined && typeof params.email !== "string")
     throw new CapError("INVALID_PARAMS", "email must be a string", undefined, capabilityId); // a non-string must not dodge the email key (review #12-2)
   // Per-email key on request_link only: stops code-issuance spam at one mailbox from rotating addresses.
@@ -167,4 +174,21 @@ export async function enforceCapabilityLimit(ctx: Ctx, capabilityId: string, par
   if (capabilityId === "cap.participant.open_link" && typeof params.token === "string" && params.token
     && !(await allowOptional(ctx.env, "RL_PER_LINK", `link:${await secretHash(params.token)}`)))
     throw limited(capabilityId, "too many opens of this link");
+  // Global ceiling across every address (DoD 3), spent LAST: only a well-formed request that every per-address and
+  // per-secret key above allowed may spend it, so a flood of malformed or already-refused requests cannot drain the
+  // service-wide budget (review 6207996655 #2). A malformed request spends nothing here; its handler refuses it.
+  if (wellFormed(capabilityId, params) && !(await allowOptional(ctx.env, "RL_GLOBAL", `g:${name}`)))
+    throw limited(capabilityId, "the service is busy");
 }
+
+const nonEmpty = (v: unknown) => typeof v === "string" && v.trim().length > 0;
+/** The params each limited capability needs before its handler can do any work (handlers refuse the rest). */
+const wellFormed = (capabilityId: string, params: Record<string, unknown>): boolean => {
+  switch (capabilityId) {
+    case "cap.auth.request_link": return nonEmpty(params.email);
+    case "cap.auth.consume_link": return nonEmpty(params.email) && nonEmpty(params.code);
+    case "cap.participant.redeem_code": return nonEmpty(params.code);
+    case "cap.participant.open_link": return nonEmpty(params.token);
+    default: return false;
+  }
+};

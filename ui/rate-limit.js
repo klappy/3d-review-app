@@ -1,6 +1,9 @@
 // One message for every one-minute rate-limit refusal a person can see (workshop same-IP ticket, DoD 6): it says it is
 // a rate limit, that nothing was lost, and that a retry after one minute will work. The server sends Retry-After: 60.
-export const RATE_LIMIT_COPY = 'Rate limit: too many requests from this network right now. Nothing was lost. Try again in one minute.';
+// It names no source ("this network", "this session"): the same copy covers the per-address, per-session (wr:) and
+// global (g:) limiters, and the page cannot tell which one refused (review 6207996655, copy finding).
+export const RATE_LIMIT_LEAD = 'Rate limit: too many requests right now.';
+export const RATE_LIMIT_COPY = `${RATE_LIMIT_LEAD} Nothing was lost. Try again in one minute.`;
 /** The server's plain message for every one-minute limiter (src/ratelimit.ts RATE_LIMIT_MESSAGE). */
 export const SERVER_MINUTE_MESSAGE = 'rate limit — try again in a minute';
 export const isRateLimited = (status, code) => Number(status) === 429 || String(code || '') === 'RATE_LIMITED' || String(code || '') === '429';

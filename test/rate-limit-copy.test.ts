@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error plain browser module, no types
 import { RATE_LIMIT_COPY, SERVER_MINUTE_MESSAGE, rateLimitText, retryAfterOf } from "../ui/rate-limit.js";
+// @ts-expect-error plain browser module, no types
+import { copy as sharedCopy } from "../ui/shared-link.js";
 import { RATE_LIMIT_MESSAGE } from "../src/ratelimit";
 
 describe("rate-limit copy follows the server's retry", () => {
@@ -55,5 +57,22 @@ describe("assess refusal paints the rate-limit hint once (Bugbot 4290741304)", (
     const src = readFileSync(new URL("../ui/assess/assess.js", import.meta.url), "utf8");
     expect(src.match(/throw refusalError\(r\.status, j\?\.error, r\)/g)?.length).toBe(2);
     expect(src).not.toMatch(/e\.hint = j\?\.error\?\.hint/);
+  });
+});
+
+describe("one-minute copy names no source the page cannot know (review 6207996655, copy finding)", () => {
+  // The same copy covers the per-address, per-session (wr:) and global (g:) limiters, so it must not say "this network".
+  const surfaces: [string, string][] = [
+    ["ui/rate-limit.js RATE_LIMIT_COPY", RATE_LIMIT_COPY],
+    ["ui/shared-link.js copy.rateLimited", sharedCopy.rateLimited],
+    ["ui/assess/feedback.js", readFileSync(new URL("../ui/assess/feedback.js", import.meta.url), "utf8")],
+    ["src/mcp-panel.html", readFileSync(new URL("../src/mcp-panel.html", import.meta.url), "utf8")],
+  ];
+  for (const [where, text] of surfaces) it(`${where}: no "from this network"`, () => { expect(text).not.toMatch(/from this network/i); });
+  it("shared-link rate-limit copy says 'one minute' once and 'nothing … changed/lost' once", () => {
+    const t: string = sharedCopy.rateLimited;
+    expect(t.match(/minute/g)?.length).toBe(1);
+    expect(t.match(/nothing/gi)?.length).toBe(1);
+    expect(t).toMatch(/^Rate limit/); expect(t).toMatch(/one minute/);
   });
 });
