@@ -55,19 +55,33 @@ simple = { limit = 30, period = 60 }
 name = "RL_HTTP_ANON"
 # 30104/30204 are RL_MCP_CEILING on fable/mcp-oauth (stacked on this branch); keep RL_HTTP_ANON distinct at the merged head.
 namespace_id = "30105"
-simple = { limit = 60, period = 60 }
+simple = { limit = 200, period = 60 }
 [[ratelimits]]
 name = "RL_AUTH"
 namespace_id = "30102"
-simple = { limit = 10, period = 60 }
+simple = { limit = 100, period = 60 }
 [[ratelimits]]
 name = "RL_REDEEM"
 namespace_id = "30103"
-simple = { limit = 60, period = 60 }
+simple = { limit = 500, period = 60 }
 [[ratelimits]]
 name = "RL_MCP_CEILING"
 namespace_id = "30104"
 simple = { limit = 600, period = 60 }
+# Optional non-address limiters (src/ratelimit.ts OPTIONAL_LIMITER_NAMES). DEV only for now: production numbers and
+# bindings wait for the captain (workshop-same-ip DoD 5). RL_PER_KEY is bound in the same change that raises RL_AUTH.
+[[ratelimits]]
+name = "RL_PER_KEY"
+namespace_id = "30106"
+simple = { limit = 10, period = 60 }
+[[ratelimits]]
+name = "RL_PER_LINK"
+namespace_id = "30107"
+simple = { limit = 2000, period = 60 }
+[[ratelimits]]
+name = "RL_GLOBAL"
+namespace_id = "30108"
+simple = { limit = 5000, period = 60 }
 
 # OAuth provider storage (src/worker.ts, src/oauth.ts): hashed grants/tokens/clients + parked authorization requests.
 [[kv_namespaces]]
