@@ -192,7 +192,7 @@ async function commitWith(ctx:StoreContext,assessmentId:string,captured:Captured
   let aid:string,key:string,payloadBytes:string,payloadHash:string,c:CapturedAssessment,id:string,createdAt:string;
   try{
     approved(r);aid=text(assessmentId);
-    // Reattest the raw token, ignoring any caller assertion of its digest/rows/eligibility.
+    // Attest the raw token via the per-build memo (a hit only for identical bytes), ignoring any caller assertion of its digest/rows/eligibility.
     let t=clock();
     const capture=await attest(aid,captured.packedCapture,participantAdmission(ctx));t=stageSpan(ctx,'attest_commit',t);if(!capture.eligible)return UNAVAILABLE;c=capture.capture;
     const rendered=await r.render(c);t=stageSpan(ctx,'render',t);payloadBytes=canonicalJson(rendered,PAYLOAD_LIMIT);t=stageSpan(ctx,'canonicalize',t);
