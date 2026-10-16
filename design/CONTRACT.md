@@ -4,7 +4,7 @@ Status: **adopted 2026-10-16** by the captain, with the defaults named in § 9 (
 
 What it is for: every PR that changes a rendered screen names this file (path and sha) and the mockup for each screen it touches, then shows a screenshot pair at 390×844 and 1280×800 beside that mockup. A screen with no mockup listed below is a gap to fill here first, as its own PR, never a pass.
 
-Written from the app as it is on `main` @dbfecf8 (release train 0.29.0); refreshed against `main` @ccc9cab (0.32.0, `package.json:3`). Lines marked **Proposal** were the draft's proposals; § 9 records the decisions taken on adoption.
+Written from the app as it is on `main` @dbfecf8 (release train 0.29.0); refreshed against `main` @ccc9cab (0.32.0, `package.json:3`). The draft's two proposals, one dialog width (§ 3) and one greeting style (§ 4), are in force since adoption on 2026-10-16; § 9 records the decisions on the open questions.
 
 Scope: this contract governs the **current UI** (`ui/`) only. UI Next (`ui-next/`, the planned `/next/` route; not served on `main` @ccc9cab per `ui-next/README.md`) follows its own contract, cookbook `design/2026-10-15-glass-redesign/canvas/design-system.md`, and is not made to adapt to this file. Only explicit product constraints and decisions that persist (captain rulings, and cookbook decision and constraint records that bind the product rather than the v3 look) carry across, and UI Next's contract cites each one it inherits. Authority: cookbook `work/queued/2026-09-29-3d-train22-audit-backlog/RULING-2026-10-16-contract-462.md`.
 
@@ -58,14 +58,14 @@ Rules for a rendered PR:
 | Page title | one H1, wraps; never truncated | one H1, up to `--h1-max-w` 650px |
 | Primary action | one per screen, full width under the title or in the thumb zone | one per screen, top right of the page head, same row as the H1 |
 | Scroll | no horizontal scroll (`scrollWidth` equals the viewport) | no horizontal scroll |
-| Dialogs (today) | base `dialog` rule in the inline `<style>` of `ui/index.html`: `max-width:600px; width:calc(100% - 32px); border-radius:22px; background:#f4f9fb`; backdrop dims and blurs (5px). Only `dialog#feedback-dialog` (`ui/style.css:51`) uses `min(560px, calc(100% - 32px))` | same |
-| Dialogs (**Proposal**) | one width for every dialog: `min(560px, 100% − 32px)`, centred, `--r-panel`, backdrop dims and blurs. Not in the code yet; a lens run grades today's rule until the captain adopts this | same |
+| Dialogs (existing code) | base `dialog` rule in the inline `<style>` of `ui/index.html`: `max-width:600px; width:calc(100% - 32px); border-radius:22px; background:#f4f9fb`; backdrop dims and blurs (5px). Only `dialog#feedback-dialog` (`ui/style.css:51`) uses `min(560px, calc(100% - 32px))` | same |
+| Dialogs (rule, in force since 2026-10-16) | one width for every dialog: `min(560px, 100% − 32px)`, centred, `--r-panel`, backdrop dims and blurs. A lens run grades any dialog a PR adds or changes against this rule; a dialog the PR does not touch is not failed for still using the existing base rule above | same |
 
 Every screen: one primary action in a fixed place; plain words only (no data-model names, ids, roles in capitals or version strings on screen); help and teaching behind ? or outside the task flow.
 
-## 4. Greeting — one style (Proposal)
+## 4. Greeting — one style
 
-**Proposal for the captain: greet once, on Home, as the page title — "Welcome, <name>".** The header shows who is signed in (the name, opening the account menu) but does not greet a second time; "Hi, <name>" goes away.
+**In force since adoption (2026-10-16): greet once, on Home, as the page title — "Welcome, <name>".** The header shows who is signed in (the name, opening the account menu) but does not greet a second time; "Hi, <name>" goes away.
 
 Why this one: the sprint's home frame makes the welcome the page title; the v4 canvas keeps the header to an identity chip; one greeting removes the "Hi" and "Welcome" pair that the first design-lens run flagged on #461.
 
@@ -103,7 +103,7 @@ Shown once, after the first sign-in with no saved name; reopens from the account
 ```
 1280×800                                                     390×844
 ┌──────────────────────────────────────────────────────┐     ┌──────────────────────┐
-│ [3D] Review                         Ana Lucía ▾      │     │ [3D] Review  Ana ▾   │
+│ [3D] Review                         Ana Lucía ▾      │     │ [3D] Review Ana Lu…▾ │
 ├──────────────────────────────────────────────────────┤     ├──────────────────────┤
 │ Welcome, Ana Lucía            [+ Start a new 3D Review]│   │ Welcome, Ana Lucía   │
 │ Your 3D Reviews, newest first.                        │    │ Your 3D Reviews,     │
@@ -118,7 +118,7 @@ Shown once, after the first sign-in with no saved name; reopens from the account
 - The subline keeps the existing words "Your 3D Reviews, newest first." in `--secondary`.
 - 1280: the primary sits on the H1's row at the right edge; it does not drift beside the welcome text.
 - 390: the primary is full width under the subline.
-- The header carries the person's name as the account-menu trigger, truncated with an ellipsis if it would wrap, on phones too (§ 9, question 3).
+- The header carries the person's name as the account-menu trigger, truncated with an ellipsis if it would wrap, on phones too (§ 9, question 3). The 390 wireframe draws that cut ("Ana Lu…"); it is the full name shortened at the edge, never a first name or initials.
 
 ## 6. Dark mode — none today
 
