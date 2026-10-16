@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { get as projectGet, list as projectList, update as projectUpdate } from "../src/handlers/project";
 import { list as workspaceList, add_project, remove_project } from "../src/handlers/workspace";
-import { list as grantList, invite, transfer_owner } from "../src/handlers/grant";
+import { list as grantList, invite, transfer_owner, accept, update_role } from "../src/handlers/grant";
 import { get as assessmentGet } from "../src/handlers/assessment";
 import { execute } from "../src/dispatch";
 import { sha256 } from "../src/handlers/common";
@@ -142,5 +142,55 @@ describe("workspace grouping cannot mint project ownership", () => {
     // ungrouping only narrows access: a workspace owner may remove a grouped project
     await expect(remove_project(wo, { id: "ws_po", pid: "prj_y" })).resolves.toMatchObject({ result: { grouped: false } });
     await expect(projectGet(wo, { id: "prj_y" })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
+  });
+  // HOLD #483 c6204865181 #1/#2: an inherited workspace role must never be laundered into a direct project grant.
+  it("inherited roles cannot self-invite, accept their own invitation, or mint project owners", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-16T00:30:00.000Z"); const at = now.toISOString();
+    let trace = 0;
+    const mk = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_wl_${++trace}`, now: () => now, log: () => {} });
+    const ids = ["l_wo", "l_wm", "l_po", "l_pm", "l_new"];
+    for (const id of ids) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_l", "Launder WS", at, "l_wo").run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_l", "ws_l", "prj_l", at, "l_po").run();
+    const grant = (id: string, p: string, t: string, s: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, t, s, r, at).run();
+    await grant("l1", "l_wo", "workspace", "ws_l", "owner");
+    await grant("l2", "l_wm", "workspace", "ws_l", "member");
+    await grant("l3", "l_po", "project", "prj_l", "owner");
+    await grant("l4", "l_pm", "project", "prj_l", "member");
+    const direct = async (pid: string) => (await db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind(pid, "project", "prj_l").first<{ role: string }>())?.role ?? null;
+    const wo = mk("l_wo"), wm = mk("l_wm"), po = mk("l_po");
+
+    // #1 NEGATIVE: inherited owner self-invites as owner (old code: OK, then accept → permanent direct owner)
+    await expect(invite(wo, { scope: "project", id: "prj_l", email: "l_wo@example.invalid", role: "owner" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    // inherited owner / member may not self-invite at member either (access would outlive ungrouping)
+    await expect(invite(wo, { scope: "project", id: "prj_l", email: "l_wo@example.invalid", role: "member" })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
+    await expect(invite(wm, { scope: "project", id: "prj_l", email: "l_wm@example.invalid", role: "member" })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
+    // nor invite anyone else who already holds a role there (inherited or direct)
+    await expect(invite(po, { scope: "project", id: "prj_l", email: "l_wm@example.invalid", role: "member" })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
+    await expect(invite(po, { scope: "project", id: "prj_l", email: "l_pm@example.invalid", role: "owner" })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
+    // a self-invitation minted before this check cannot be accepted by its creator
+    await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
+      .bind("inv_legacy", "project", "prj_l", await sha256("l_wo@example.invalid"), await sha256("il_legacy"), "owner", "sent", "l_wo", at, "2026-10-20T00:00:00.000Z").run();
+    await expect(accept(wo, { token: "il_legacy" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await expect(accept(wo, { invitation_id: "inv_legacy" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    expect(await direct("l_wo")).toBeNull();
+    expect(await direct("l_wm")).toBeNull();
+    // a legacy owner invitation from an inherited owner to someone else is not honoured either
+    await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
+      .bind("inv_legacy2", "project", "prj_l", await sha256("l_new@example.invalid"), await sha256("il_legacy2"), "owner", "sent", "l_wo", at, "2026-10-20T00:00:00.000Z").run();
+    await expect(accept(mk("l_new"), { invitation_id: "inv_legacy2" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    expect(await direct("l_new")).toBeNull();
+    await db.prepare("UPDATE invitation SET status = 'revoked' WHERE id = ?").bind("inv_legacy2").run(); // clear the dedupe window
+
+    // #2 NEGATIVE: inherited owner promotes a direct member to owner (old code: OK, undemotable owner)
+    await expect(update_role(wo, { scope: "project", id: "prj_l", gid: "l4", role: "owner" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    expect(await direct("l_pm")).toBe("member");
+
+    // POSITIVE: a direct owner still invites a new owner, the invitee accepts, and a direct owner still promotes
+    const inv: any = await invite(po, { scope: "project", id: "prj_l", email: "l_new@example.invalid", role: "owner" });
+    await expect(accept(mk("l_new"), { invitation_id: inv.result.invitation_id })).resolves.toMatchObject({ result: { granted: true, role: "owner" } });
+    expect(await direct("l_new")).toBe("owner");
+    await expect(update_role(po, { scope: "project", id: "prj_l", gid: "l4", role: "owner" })).resolves.toMatchObject({ result: { role: "owner" } });
   });
 });

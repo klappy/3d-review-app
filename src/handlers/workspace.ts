@@ -3,7 +3,7 @@
 import type { Handler, Role } from "./types";
 import { CapError, notVisible } from "./errors";
 import {
-  countScalar, loadProject, loadWorkspace, newId, nowIso, patchOf, reqStr, requireUser, roleAt,
+  countScalar, loadProject, loadWorkspace, newId, nowIso, patchOf, reqStr, requireUser, isDirectOwner,
   type ProjectRow, type WorkspaceRow,
 } from "./common";
 
@@ -102,7 +102,7 @@ export const del: Handler = async (ctx, params, opts) => {
 async function shareAuthority(ctx: Parameters<Handler>[0], wid: string, pid: string, op: "add" | "remove"): Promise<{ w: WorkspaceRow; p: ProjectRow }> {
   const { row: w, role: wRole } = await loadWorkspace(ctx, wid, "member");
   const { row: p } = await loadProject(ctx, pid, "viewer");
-  const directOwner = (await roleAt(ctx, "project", pid)) === "owner";
+  const directOwner = await isDirectOwner(ctx, "project", pid);
   const ok = op === "add" ? directOwner : wRole === "owner" || directOwner;
   if (!ok) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "a direct owner grant on the project is required", "D2: share authority needs a direct project owner grant, not an inherited one");
   return { w, p };

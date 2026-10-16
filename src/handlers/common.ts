@@ -122,6 +122,21 @@ export async function projectRole(ctx: Ctx, projectId: string): Promise<Role | n
 export async function effectiveRoleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<Role | null> {
   return scopeType === "project" ? projectRole(ctx, scopeId) : roleAt(ctx, scopeType, scopeId);
 }
+/** Direct-role authority (HOLD #483 c6204865181): the caller's DIRECT grant at exactly this scope must reach `min`. Used wherever
+ *  an act would create, raise, move or share authority — invite/accept/update_role to owner, transfer_owner, add/remove_project.
+ *  An inherited (workspace-derived) project role never counts here: otherwise it could be laundered into a permanent direct grant.
+ *  Visibility is decided first on the effective role, so a caller who can see the scope gets NOT_AUTHORIZED, never a leak. */
+export async function directRoleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string, min: Role, hint?: string): Promise<Role> {
+  gate(await effectiveRoleAt(ctx, scopeType, scopeId), "viewer", scopeType);
+  const direct = await roleAt(ctx, scopeType, scopeId);
+  if (!atLeast(direct, min))
+    throw new CapError("NOT_AUTHORIZED_AT_SCOPE", `a direct ${min} grant at this ${scopeType} is required`, hint ?? "an inherited workspace role cannot create, raise, move or share authority here — a direct grant holder runs this step");
+  return direct as Role;
+}
+/** True when the caller holds a DIRECT owner grant at exactly this scope. */
+export async function isDirectOwner(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<boolean> {
+  return (await roleAt(ctx, scopeType, scopeId)) === "owner";
+}
 export function maxRole(a: Role | null, b: Role | null): Role | null {
   if (!a) return b;
   if (!b) return a;
