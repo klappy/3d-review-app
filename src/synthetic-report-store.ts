@@ -3,7 +3,7 @@ import type { Ctx } from './handlers/types.js';
 import { REPORT_CAPTURE_CTE, attestPackedCapture, type CapturedAssessment } from './report-capture.js';
 import { canonicalJson, parseBoundedJson, sha256Bytes } from './report-canonical-json.js';
 import { ATTESTATION_TRUST } from './synthetic-attestation-trust.js';
-import { renderSyntheticReport, REPORT_SCHEMA, REPORT_VERSIONS } from './synthetic-report-renderer.js';
+import { renderAttestedCapture, REPORT_SCHEMA, REPORT_VERSIONS } from './synthetic-report-renderer.js';
 import { participantReportsAllowed } from './report-admission.js';
 
 type StoreContext = Pick<Ctx, 'db' | 'principal' | 'now'> & { env?: { ENVIRONMENT?: string; PARTICIPANT_REPORTS?: string } };
@@ -15,7 +15,7 @@ type RendererDescriptor = Readonly<{
   validate:(payload:unknown,capture:CapturedAssessment)=>boolean|Promise<boolean>;
 }>;
 async function renderCaptured(c:CapturedAssessment):Promise<unknown>{
-  const result=await renderSyntheticReport(c.assessmentId,c.rows,c.participant===true);
+  const result=await renderAttestedCapture(c);
   if(!result.eligible||result.captureDigest!==c.captureDigest)invalid();
   return result.payload;
 }
@@ -23,11 +23,12 @@ async function renderCaptured(c:CapturedAssessment):Promise<unknown>{
  * Always over the original attested capture; no tolerance, cache or DB read. */
 async function validateSyntheticReportPayload(payload:unknown,c:CapturedAssessment):Promise<boolean>{
   try{
-    const result=await renderSyntheticReport(c.assessmentId,c.rows,c.participant===true);
+    const result=await renderAttestedCapture(c);
     return result.eligible&&result.captureDigest===c.captureDigest&&canonicalJson(payload,PAYLOAD_LIMIT)===result.payloadJson;
   }catch{return false;}
 }
-const REAL_RENDERER: RendererDescriptor = Object.freeze({
+/** Read-only frozen descriptor; exported for in-process measurement and identity tests only. */
+export const REAL_RENDERER: RendererDescriptor = Object.freeze({
   tuple:Object.freeze({sourcePin:ATTESTATION_TRUST.sourcePin,indexRoot:ATTESTATION_TRUST.indexRoot,
     scorerVersion:REPORT_VERSIONS.scorer,narrativeVersion:REPORT_VERSIONS.narrative,
     policyVersion:REPORT_VERSIONS.policy,outputSchemaVersion:REPORT_SCHEMA}),
