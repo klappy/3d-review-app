@@ -5,13 +5,15 @@
 // a new respondent; storage duplication (e.g. tab duplication) can resume the
 // same respondent, so nothing here claims person uniqueness.
 
-import { RATE_LIMIT_LEAD, isRateLimited, rateLimitText, retryAfterOf } from './rate-limit.js';
+import { RATE_LIMIT_LEAD, isRateLimited, rateLimitText, retryAfterOf, waitWords } from './rate-limit.js';
 // All participant/staff-facing strings below are copy.md rows (cookbook design-system).
+// The shared route's retry words, with the wait the server asked for (one minute unless Retry-After says otherwise).
+const limitedIn = wait => `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. Try again in ${wait}.`;
 export const copy = {
   linkUnavailable: 'This link no longer works. It may have been replaced or the collection may have closed. Ask the person who invited you for a new one. Nothing about the project is shown here.',
   collectionClosed: 'Collection has closed. New answers are not accepted. If you already submitted from this device, your receipt is shown below.',
   cannotResume: 'Your earlier session on this link could not be resumed from this device. Nothing saved on this device was changed. If you already sent answers, that send may have succeeded without a confirmation shown here; the facilitator can confirm whether it arrived.',
-  rateLimited: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. Try again in one minute.`, // one 'nothing changed', one 'one minute' (review 6207996655)
+  rateLimited: limitedIn('one minute'), // one 'nothing changed', one 'one minute' (review 6207996655)
   rateLimitedReady: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. You can try again now.`, // the wait is over (#490 copy nit)
   // /legacy/ shows no Try again control and a reload lands on "link no longer works": tell that person to reopen the link (#490 low 2).
   rateLimitedReopen: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. Open your link again in one minute.`,
@@ -144,6 +146,8 @@ export function saveDraft(store, form, values) {
 // GET /v2/participate/receipt with the same bearer; submitted:true → own receipt; submitted:false →
 // closed; a receipt refusal (NOT_FOUND_OR_NOT_VISIBLE) → link unavailable.
 // Kinds: conflict (STAGE_CONFLICT), rateLimited (RATE_LIMITED / 429), unavailable (refusal), transient (5xx, network, unreadable).
+/** copy.rateLimited with the server's wait in place of "one minute" when Retry-After names another wait (#496 review finding 1). */
+export const rateLimitedCopy = retryAfter => limitedIn(waitWords(retryAfter));
 export function errorKind(error) {
   const code = String(error?.code || '').trim();
   if (code === 'STAGE_CONFLICT') return 'conflict';

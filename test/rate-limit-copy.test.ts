@@ -186,3 +186,21 @@ describe("#495 review lows (terry review495-0441)", () => {
     expect(rateLimitNotice({ phase: "form", busy: true }, hidden, words)).toBe(null);
   });
 });
+describe("#496 review lows (terry review496-0541)", () => {
+  it("(1) shared Recover/Submit copy uses the Retry-After wait; one minute stays the words for 60 s or absent", async () => {
+    // @ts-expect-error plain browser module, no types
+    const shared: any = await import("../ui/shared-link.js");
+    expect(typeof shared.rateLimitedCopy).toBe("function");
+    expect(shared.rateLimitedCopy(undefined)).toBe(sharedCopy.rateLimited);
+    expect(shared.rateLimitedCopy("60")).toBe(sharedCopy.rateLimited);
+    expect(shared.rateLimitedCopy("30")).toBe(sharedCopy.rateLimited.replace("one minute", "30 seconds"));
+    expect(shared.rateLimitedCopy(120)).toBe(sharedCopy.rateLimited.replace("one minute", "2 minutes"));
+    expect(shared.rateLimitedCopy(1)).toMatch(/Try again in 1 second\.$/);
+  });
+  it("nit: the legacy participant footer carries no banned on-screen word (design-lens@1 vocabulary: workspace)", () => {
+    const html = readFileSync(new URL("../ui/legacy/index.html", import.meta.url), "utf8");
+    const footer = html.match(/<p class="participant-footer">([^<]*)<\/p>/)?.[1] ?? "";
+    expect(footer).toMatch(/^Participants never sign in\./);
+    expect(footer).not.toMatch(/workspace/i);
+  });
+});

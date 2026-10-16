@@ -14,7 +14,7 @@ export const isOneMinuteLimit = (message, retryAfter) => {
   if (Number.isFinite(s) && s > 60) return false;
   return !message || message === SERVER_MINUTE_MESSAGE;
 };
-const wait = s => s >= 3600 && s % 3600 === 0 ? `${s / 3600} hour${s === 3600 ? '' : 's'}` : s >= 60 ? `${Math.ceil(s / 60)} minutes` : `${s} seconds`;
+const wait = s => s >= 3600 && s % 3600 === 0 ? `${s / 3600} hour${s === 3600 ? '' : 's'}` : s >= 60 ? `${Math.ceil(s / 60)} minutes` : s === 1 ? '1 second' : `${s} seconds`;
 /** The text a person sees for a rate-limit refusal: the one-minute copy, or the server's message + hint + its retry. */
 export const rateLimitText = (message, hint, retryAfter) => {
   if (isOneMinuteLimit(message, retryAfter)) return RATE_LIMIT_COPY;
@@ -44,6 +44,9 @@ export const retryAfterSeconds = value => {
   const n = Math.ceil(Number(present(value)));
   return Number.isFinite(n) && n > 0 ? Math.min(n, 3600) : RATE_LIMIT_SECONDS;
 };
+/** The wait in words for copy beside a held control: "one minute" for the standard 60 s (or no Retry-After), else the
+ *  server's Retry-After wait ("30 seconds", "2 minutes"), so the words match the countdown (#496 review finding 1). */
+export const waitWords = value => { const s = retryAfterSeconds(value); return s === RATE_LIMIT_SECONDS ? 'one minute' : wait(s); };
 /** true for an Error a page built from a refused envelope (refusalError, or any error carrying .status / .code). */
 export const isRateLimitedError = error => isRateLimited(error?.status, error?.code);
 const left = s => s >= 120 ? `${Math.ceil(s / 60)} min` : `${s} s`;
