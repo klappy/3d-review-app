@@ -20,7 +20,7 @@ function world(respond) {
 const scope={type:'assessment',id:'a1',role:'owner'};
 const list=(s=scope)=>({scope:{type:s.type,id:s.id},grants:[],pending_invitations:[]});
 const confirmResult={confirm_token:'confirmation-secret',impact:{affected:[{scope:{type:'assessment',id:'a1'},role:'member',currently:'owner'}]}};
-async function emailPreview(w){w.input('invite-email').value='recipient@example.invalid';w.button('Preview invitation').click();await flush()}
+async function emailPreview(w){w.input('invite-email').value='recipient@example.invalid';w.button('Invite').click();await flush()}
 async function acceptPreview(w,value='SECRET_TOKEN'){w.api.openAcceptance();w.input('invitation-token').value=value;w.button('Preview acceptance').click();await flush()}
 
 test('role ceilings protect owners and prohibit viewer management',()=>{
@@ -32,7 +32,7 @@ test('signed-out and shared/participant context never requests staff data',async
  for(const c of [{principalId:null},{shared:true},{kind:'participant'}]){const w=world(()=>{throw Error('must notcall')});w.ctx(c);await w.api.setScope(scope);w.api.openAcceptance();assert.equal(w.calls.length,0);assert.equal(w.root.hidden,true)}
 });
 test('viewer has acceptance entry but no manager calls or invite controls',async()=>{
- const w=world(()=>{throw Error('must notcall')});await w.api.setScope({...scope,role:'viewer'});assert.equal(w.calls.length,0);assert.ok(w.buttons().includes('Accept an invitation'));assert.ok(!w.buttons().includes('Preview invitation'));
+ const w=world(()=>{throw Error('must notcall')});await w.api.setScope({...scope,role:'viewer'});assert.equal(w.calls.length,0);assert.ok(w.buttons().includes('Accept an invitation'));assert.ok(!w.buttons().includes('Invite'));
 });
 test('member list does not infer names and owner grants have no remove or edit control',async()=>{
  const w=world(()=>({...list(),grants:[{id:'gowner',principal_id:'powner',role:'owner'},{id:'gmember',principal_id:'p2',role:'member'}]}));await w.api.setScope({...scope,role:'member'});
@@ -45,7 +45,7 @@ test('scope change discards delayed list instead of leaking another context',asy
  const old=deferred();const w=world(u=>u.includes('/a1/')?old.promise:list({type:'assessment',id:'a2'}));const a=w.api.setScope(scope);await w.api.setScope({...scope,id:'a2'});old.resolve({...list(),grants:[{id:'g',principal_id:'stale-person',role:'owner'}]});await a;assert.ok(!text(w.root).includes('stale-person'));assert.match(text(w.root),/a2/);
 });
 test('form edit invalidates pending preview and confirm credential',async()=>{
- const wait=deferred();const w=world((_u,o)=>o.method==='GET'?list():wait.promise);await w.api.setScope(scope);w.input('invite-email').value='first@example.invalid';w.button('Preview invitation').click();w.input('invite-email').value='second@example.invalid';w.input('invite-email').fire('input');wait.resolve(confirmResult);await flush();assert.ok(!w.buttons().includes('Confirm invitation'));assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,0);
+ const wait=deferred();const w=world((_u,o)=>o.method==='GET'?list():wait.promise);await w.api.setScope(scope);w.input('invite-email').value='first@example.invalid';w.button('Invite').click();w.input('invite-email').value='second@example.invalid';w.input('invite-email').fire('input');wait.resolve(confirmResult);await flush();assert.ok(!w.buttons().includes('Confirm invitation'));assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,0);
 });
 test('invite is two step, honest non-delivery, private reveal cleared on context change',async()=>{
  const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'i1',delivered:false,status:'sent',accepted:true,dev_only_link_token:'PRIVATE_HANDOFF'});await w.api.setScope(scope);await emailPreview(w);assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,0);w.button('Confirm invitation').click();await flush();assert.match(text(w.root),/Email delivery could not be confirmed/);assert.match(text(w.root),/awaiting acceptance/);assert.ok(!text(w.root).includes('PRIVATE_HANDOFF'));
@@ -76,7 +76,7 @@ test('destroy makes prior detached controls inert',async()=>{
  const w=world(()=>list());await w.api.setScope(scope);const old=w.button('Refresh access');const count=w.calls.length;w.api.destroy();old.click();await flush();assert.equal(w.calls.length,count);assert.equal(w.root.hidden,true);
 });
 test('support may manage exact grants but cannot impersonate invited user',async()=>{
- const w=world(()=>list());w.ctx({kind:'support'});await w.api.setScope(scope);assert.ok(w.buttons().includes('Preview invitation'));assert.ok(!w.buttons().includes('Accept an invitation'));w.api.openAcceptance();assert.ok(!w.buttons().includes('Preview acceptance'));
+ const w=world(()=>list());w.ctx({kind:'support'});await w.api.setScope(scope);assert.ok(w.buttons().includes('Invite'));assert.ok(!w.buttons().includes('Accept an invitation'));w.api.openAcceptance();assert.ok(!w.buttons().includes('Preview acceptance'));
 });
 
 test('owner role edit requires preview, executes exact grant then refreshes authority',async()=>{
@@ -94,11 +94,11 @@ test('completed invitation requires explicit handoff completion before refresh o
  const w=world((_u,o)=>o.method==='GET'?{...list(),pending_invitations:created?[{id:'created-i',role:'viewer',status:'sent'}]:[]}:o.body.mode==='dry_run'?confirmResult:(created=true,{invitation_id:'created-i',delivered:false,dev_only_link_token:'HANDOFF_SENTINEL'}));
  await w.api.setScope(scope);await emailPreview(w);const oldConfirm=w.button('Confirm invitation');oldConfirm.click();await flush();
  assert.match(text(w.root),/created-i/);
- assert.ok(!w.buttons().includes('Refresh access'));assert.ok(!w.buttons().includes('Preview invitation'));assert.ok(!w.buttons().includes('Accept an invitation'));
+ assert.ok(!w.buttons().includes('Refresh access'));assert.ok(!w.buttons().includes('Invite'));assert.ok(!w.buttons().includes('Accept an invitation'));
  oldConfirm.click();await flush();assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,1);
  w.button('Reveal private invitation token').click();assert.ok(walk(w.root).some(n=>n.value==='HANDOFF_SENTINEL'));
  w.button('Finish handoff and refresh access').click();await flush();
- assert.ok(!walk(w.root).some(n=>n.value==='HANDOFF_SENTINEL'));assert.match(text(w.root),/created-i · viewer · awaiting acceptance/);assert.ok(w.buttons().includes('Preview invitation'));
+ assert.ok(!walk(w.root).some(n=>n.value==='HANDOFF_SENTINEL'));assert.match(text(w.root),/created-i · viewer · awaiting acceptance/);assert.ok(w.buttons().includes('Invite'));
  assert.equal(w.calls.filter(x=>x.method==='GET').length,2);
 });
 
@@ -128,7 +128,7 @@ test('supplied private acceptance token requires explicit preview and is wiped b
 
 test('acceptance confirmation Cancel wipes private entry and ends intent; invitation cancel does not',async()=>{
  const w=world(()=>confirmResult);await acceptPreview(w,'CANCEL_SENTINEL');w.button('Cancel').click();assert.equal(w.ended,1);assert.ok(!walk(w.root).some(n=>n.name==='invitation-token'||n.value==='CANCEL_SENTINEL'));assert.ok(!w.buttons().includes('Confirm acceptance'));assert.equal(w.calls.length,1);
- const inviter=world((_u,o)=>o.method==='GET'?list():confirmResult);await inviter.api.setScope(scope);await emailPreview(inviter);inviter.button('Cancel').click();assert.equal(inviter.ended,0);assert.ok(inviter.buttons().includes('Preview invitation'));assert.ok(!inviter.buttons().includes('Confirm invitation'));
+ const inviter=world((_u,o)=>o.method==='GET'?list():confirmResult);await inviter.api.setScope(scope);await emailPreview(inviter);inviter.button('Cancel').click();assert.equal(inviter.ended,0);assert.ok(inviter.buttons().includes('Invite'));assert.ok(!inviter.buttons().includes('Confirm invitation'));
 });
 
 // M1 backend result shape (cap.grant.invite) against the invitation UI: the presenter must read
@@ -172,4 +172,13 @@ test('M1 mailer result shapes render truthful copy and no unauthorized handoff',
   assert.match(t,/Email delivery could not be confirmed/);assert.match(t,/awaiting acceptance/);
   assert.ok(!t.includes('PRIVATE_D'));assert.ok(w.buttons().includes('Reveal private invitation token'));}
  assert.equal(invitationOutcome({invitation_id:'i-e',delivered:true}).handoff,false);
+});
+test('DoD2: invitation confirm renders inline inside the invite form and names the typed address; no Preview label', async () => {
+ const w=world((_u,o)=>o.method==='GET'?list():confirmResult);await w.api.setScope(scope);
+ assert.ok(!w.buttons().includes('Preview invitation'));await emailPreview(w);
+ const form=walk(w.root).find(x=>x.tag==='form'),inline=walk(form).find(x=>'data-invite-confirm' in x.attributes);
+ assert.ok(inline);assert.ok(walk(inline).some(x=>x.tag==='button'&&x.textContent==='Confirm invitation'),'confirm sits in the form');
+ assert.match(text(inline),/recipient@example\.invalid as viewer/);
+ const bottom=walk(w.root).find(x=>x.className==='scope-invitations-confirmation');assert.equal(bottom.children.length,0,'nothing at the bottom');
+ w.button('Cancel').click();assert.equal(inline.children.length,0);
 });

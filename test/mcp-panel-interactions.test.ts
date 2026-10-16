@@ -239,3 +239,17 @@ it('preserves danger preview during pending connection and executes once after r
   expect(f.calls[0].arguments.mode).toBe('execute');
  }finally{f.dom.window.close();}
 });
+
+it('DoD2: the invitation confirm opens inline inside the invite form, naming the typed address; no Preview label', async () => {
+  const f = fixture();
+  try {
+    await f.go('A');
+    expect(f.w.document.querySelector('[data-invite-preview]').textContent).toBe('Invite');
+    expect(f.w.document.body.textContent).not.toContain('Preview invitation');
+    await f.preview(); f.resolvePreview(); await tick();
+    const sheet = f.w.document.querySelector('[data-invite-form] [data-confirm-sheet]');
+    expect(sheet).not.toBeNull();
+    expect(sheet.querySelector('[data-confirm-sentence]').textContent).toContain('review@example.test');
+    expect(f.w.document.querySelectorAll('[data-confirm-sheet]')).toHaveLength(1);
+  } finally { f.dom.window.close(); }
+});

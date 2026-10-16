@@ -43,7 +43,7 @@ test('N1 viewer: grant.list 403 → placeholder note, no roster in DOM; N2 no ro
 
 test('roster + gating: member sees Invite (viewer|member only), Remove only on ≤member rows, no Change-role, no Transfer; owner has all but never on owner rows; pending lists sent|pending|unconfirmed only', async () => {
   const mem = await mount('member'); const h = mem.root.html;
-  assert.match(h, /data-my-role="member"/); assert.match(h, /data-invite-form/); assert.match(h, /<button type="submit" class="primary"[^>]*>Preview invitation/); /* U42: the one primary on Permissions */ assert.doesNotMatch(h, /<option value="owner">/); assert.doesNotMatch(h, /data-transfer-form|data-change-role/);
+  assert.match(h, /data-my-role="member"/); assert.match(h, /data-invite-form/); assert.match(h, /<button type="submit" class="primary"[^>]*>Invite</); assert.doesNotMatch(h, /Preview invitation/); /* U42: the one primary on Permissions */ assert.doesNotMatch(h, /<option value="owner">/); assert.doesNotMatch(h, /data-transfer-form|data-change-role/);
   assert.match(h, /data-revoke="g_mem"/); assert.match(h, /data-revoke="g_view"/); assert.doesNotMatch(h, /data-revoke="g_own"/); assert.match(h, /Owner — only a transfer changes this/);
   assert.match(h, /data-invitation="inv_p"/); assert.match(h, /data-invitation="inv_u"/); assert.match(h, /Could not be confirmed as sent/); assert.doesNotMatch(h, /inv_acc/, 'accepted invitations are not pending');
   const own = await mount('owner'); const o = own.root.html;
@@ -73,6 +73,20 @@ test('N3 member invites owner → picker never offers owner; forced 403 renders 
 test('N13 duplicate invite: execute 200 delivered:false duplicate_recent → "already invited — nothing sent again", never "sent"', async () => {
   const x = await mount('owner', { 'POST /v2/assessment/a1/invitations': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'c', expires_in: 300, impact: {} } : { invitation_id: 'inv_dup', role: 'viewer', status: 'sent', accepted: true, delivered: false, delivery: { provider: null, state: 'not_sent', reason: 'duplicate_recent' } } }, { email: 'dup@x.y', role: 'viewer' });
   await x.submit('data-invite-form'); await x.click('data-confirm-execute'); assert.ok(x.root.html.includes(DUPLICATE_NOTE)); assert.doesNotMatch(x.root.html, /Invitation sent/);
+});
+
+test('DoD2: the invitation confirm opens inline under Invite, inside the form, naming the address — no Preview label, no bottom sheet', async () => {
+  const t = { 'POST /v2/assessment/a1/invitations': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'cfm_1', expires_in: 300, impact: {} } : { invitation_id: 'inv_new', role: 'member', status: 'sent', delivered: true, delivery: { state: 'accepted' } } };
+  const x = await mount('owner', t, { email: 'new@example.test', role: 'member' });
+  assert.doesNotMatch(x.root.html, /Preview invitation/);
+  await x.submit('data-invite-form'); const h = x.root.html;
+  const form = h.slice(h.indexOf('<form class="line" data-invite-form>'), h.indexOf('</form>', h.indexOf('data-invite-form')));
+  assert.match(form, /data-confirm-sheet data-confirm-kind="invite"/, 'confirm sits inside the invite form');
+  assert.match(form, /data-confirm-sentence>new@example\.test will be able to open this assessment as member/);
+  assert.match(form, /value="new@example\.test"/); assert.match(form, /<option value="member" selected>/);
+  assert.equal(h.match(/data-confirm-sheet/g).length, 1, 'one confirm, not a second at the bottom');
+  assert.ok(h.indexOf('data-confirm-sheet') < h.indexOf('data-transfer'), 'confirm comes before transfer, not at the page bottom');
+  await x.click('data-confirm-cancel'); assert.doesNotMatch(x.root.html, /data-confirm-sheet/);
 });
 
 test('N8/N10 CONFIRM_REQUIRED on execute → dry_run re-run silently once and the sheet re-shown, execute NOT auto-retried; N9 CONFIRM_EXPIRED → "Preview again", no retry', async () => {

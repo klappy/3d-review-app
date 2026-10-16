@@ -1,23 +1,23 @@
 {
-  "version": "0.34.0",
+  "version": "0.34.3",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "f0550f00247250c261d168fe420f2912214d6886",
+  "cookbook_commit": "310bea1c8606113138ea078aff598c320a8e5984",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.0.md",
-      "blob_sha": "45be9612831e8a74501ac487e1473aab633a0606",
-      "sha256": "6cf9329d65d0752145e1d64b32e83b99801ed0a5c8b261d0689f9897d0314dfc"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.3.md",
+      "blob_sha": "a71da257fab463b04a0b798e0a42bd114cba42fa",
+      "sha256": "749fb66fb8e181d95117eb5e98bb3bbf4ad2248c585928e0251ccedb7acb3f91"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "33182b784db44eaa0f3add8fb411c4878afa9148",
-      "sha256": "718608c5508296937ad8ac6a3c03ac48a6a0d37263c1b2884c0f00b41231bcd9"
+      "blob_sha": "9dec60302fb953c775ef84fab6ac7b9421551981",
+      "sha256": "5881eda71a48d89a12b85db8731fc9efb1968f02ed19d051b9f3c10abe3877f7"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Setup step 1 asks \"Location or community\" and \"Facilitator\" (both optional); Review and the assessment's Prepare view (Learn more) show both. Stored on the assessment (migration 0015); cap.assessment.create / update take location and facilitator (string or null). Older clients unchanged."
+      "changed": [
+        "Inviting someone: the button is \"Invite\", and the confirm opens right under it, naming the address you typed and the role, with Confirm and Cancel. The separate \"Preview invitation\" step and the confirm at the bottom of the page are gone (Permissions page, collaborators panel and MCP panel)."
       ]
     }
   }

@@ -29,7 +29,7 @@ export function invitationOutcome(result) {
 export function mountScopeInvitations({document: doc, root, request, getContext, onGrantsChanged = () => {}, onAcceptanceEnded = () => {}}) {
   let scope = null, mode = 'manager', list = null, pending = null, credential = null, completedInvitation = null;
   let message = '', failure = false, busy = false, destroyed = false, epoch = 0, renderId = 0;
-  let status, confirmation, credentialBox, controls = [], confirmButton;
+  let status, confirmation, inviteConfirmation, credentialBox, controls = [], confirmButton;
   const context = () => getContext() || {};
   const staff = c => !!c.principalId && ['user', 'support'].includes(c.kind) && c.shared === false;
   const identity = c => JSON.stringify([c.principalId, c.kind, c.generation, c.shared]);
@@ -40,7 +40,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
   function lock(value) { busy = value; for (const n of controls) n.disabled = value; }
   function clearIntent() {
     epoch++; pending = null; credential = null; completedInvitation = null; lock(false);
-    confirmation?.replaceChildren(); credentialBox?.replaceChildren();
+    confirmation?.replaceChildren(); inviteConfirmation?.replaceChildren(); credentialBox?.replaceChildren();
     if (confirmButton) confirmButton = null;
   }
   function safeFailure(error, write) {
@@ -88,14 +88,17 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     }
     pending = {...intent, token: result.confirm_token, snapshot: snapshot()};
     // Render only locally described intent. Never dump impact, invitee hash or token.
-    confirmation.replaceChildren(el('p', intent.summary, 'scope-invitations-impact'));
+    // DoD2: an invitation confirms inline, right under the Invite button (the address the inviter typed); other intents keep the shared slot.
+    const slot = intent.kind === 'invite' && inviteConfirmation ? inviteConfirmation : confirmation;
+    slot.replaceChildren(el('p', intent.summary, 'scope-invitations-impact'));
     confirmButton = button(intent.confirmLabel, confirm);
-    confirmation.append(confirmButton, button('Cancel', () => {
+    slot.append(confirmButton, button('Cancel', () => {
       clearIntent();
       if (intent.kind === 'accept') { mode = 'manager'; render(); onAcceptanceEnded(); }
       setStatus('Cancelled. Nothing further was sent.');
     }, {secondary:true}));
     setStatus('Review the action, then confirm.');
+    if (slot === inviteConfirmation) confirmButton.focus?.();
   }
   async function preview(intent) {
     clearIntent(); const s = snapshot(); lock(true); setStatus('Preparing confirmation…');
@@ -108,7 +111,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
   async function confirm() {
     const intent = pending;
     if (!intent || !current(intent.snapshot)) { clearIntent(); setStatus('Preview again before confirming.'); return; }
-    pending = null; confirmation.replaceChildren(); const s = snapshot(); lock(true); setStatus('Applying confirmed action…');
+    pending = null; confirmation.replaceChildren(); inviteConfirmation?.replaceChildren(); const s = snapshot(); lock(true); setStatus('Applying confirmed action…');
     try {
       const result = baseResult(await request(intent.url, {method:intent.method, body:{...intent.body, mode:'execute', confirm_token:intent.token}}));
       if (!current(s)) return;
@@ -161,11 +164,13 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     const form = el('form', undefined, 'scope-invitations-form'), email = input('email','invite-email'), role = roleSelect(invitationRoles(scope.role));
     email.maxLength = 320;
     form.append(field('Recipient email', email), field('Role at this scope', role));
-    form.append(button('Preview invitation', () => {
+    form.append(button('Invite', () => {
       if (!form.reportValidity()) return;
       const recipient = email.value.trim(); if (!recipient || !invitationRoles(scope.role).includes(role.value)) return;
-      return preview({kind:'invite',url:`${path()}/invitations`,method:'POST',body:{email:recipient,role:role.value},summary:`Invite this recipient as ${role.value} at this ${scope.type} only. Delivery will be reported after creation.`,confirmLabel:'Confirm invitation'});
+      return preview({kind:'invite',url:`${path()}/invitations`,method:'POST',body:{email:recipient,role:role.value},summary:`Send an invitation to ${recipient} as ${role.value} at this ${scope.type} only? Delivery will be reported after creation.`,confirmLabel:'Confirm invitation'});
     }));
+    inviteConfirmation = el('div', undefined, 'scope-invitations-confirmation scope-invitations-confirmation-inline'); inviteConfirmation.setAttribute('data-invite-confirm', '');
+    form.append(inviteConfirmation);
     form.addEventListener('submit', e => e.preventDefault()); root.append(form);
     if (!list) return;
     const grants = el('ul', undefined, 'scope-invitations-list');
@@ -198,7 +203,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     form.addEventListener('submit',e=>e.preventDefault()); root.append(form);
   }
   function render(suppliedToken) {
-    renderId++; controls=[]; root.replaceChildren(); root.classList.add('scope-invitations');
+    renderId++; controls=[]; inviteConfirmation=null; root.replaceChildren(); root.classList.add('scope-invitations');
     const c=context(); root.hidden=destroyed||!staff(c); if(root.hidden)return;
     const menu=el('div',undefined,'scope-invitations-actions');
     if(c.kind==='user'&&mode!=='accept'&&!completedInvitation)menu.append(button('Accept an invitation',openAcceptance,{secondary:true}));

@@ -1,7 +1,37 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.34.0",
+  "current": "0.34.3",
   "versions": [
+    {
+      "version": "0.34.3",
+      "status": "candidate",
+      "notes_path": "releases/0.34.3.md",
+      "sections": {
+        "changed": [
+          "Inviting someone: the button is \"Invite\", and the confirm opens right under it, naming the address you typed and the role, with Confirm and Cancel. The separate \"Preview invitation\" step and the confirm at the bottom of the page are gone (Permissions page, collaborators panel and MCP panel)."
+        ]
+      }
+    },
+    {
+      "version": "0.34.2",
+      "status": "candidate",
+      "notes_path": "releases/0.34.2.md",
+      "sections": {
+        "fixed": [
+          "Primary navigation: the shell nav (account menu) lists Workspaces ahead of App feedback and Roadmap, so the Workspaces view opens from any page, including with zero projects; before, it was reachable only through the \"Organize projects in a workspace\" link on the Projects page."
+        ]
+      }
+    },
+    {
+      "version": "0.34.1",
+      "status": "candidate",
+      "notes_path": "releases/0.34.1.md",
+      "sections": {
+        "changed": [
+          "Report build: each stage of a dry run and a build (D1 reads and write, attestation, render, canonical JSON, validation, hashing) records one `report.stage` span with only the stage name and milliseconds in the request trace, so the owner can see where build time goes. Report bytes, capture digest, report key and payload hash are unchanged. On Workers, CPU-only stages read near 0 ms (the clock advances only across I/O); the local bench gives the CPU split."
+        ]
+      }
+    },
     {
       "version": "0.34.0",
       "status": "candidate",
