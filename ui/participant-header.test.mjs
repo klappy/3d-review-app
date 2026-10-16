@@ -64,7 +64,7 @@ test('index.html carries the source footer sentence inside #participant',()=>{
   const section=html.slice(html.indexOf('<section id="participant"'));
   const end=section.indexOf('</section>');
   const inner=section.slice(0,end);
-  assert.ok(inner.includes('<p class="participant-footer">Participants never sign in. Nothing here shows a project, a workspace or other people\'s answers.</p>'));
+  assert.ok(inner.includes('<p class="participant-footer">Participants never sign in. Nothing here shows a project or other people\'s answers.</p>'));
 });
 
 test('hiding the aside also collapses the shell grid (Bugbot 4036574263) and the test file is asset-ignored',()=>{
