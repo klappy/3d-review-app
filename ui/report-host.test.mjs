@@ -64,3 +64,24 @@ test('host full-report li margin rule (index.html) does not reach the lenses blo
   for (const el of [...rows, ...scores]) assert.match(dom.window.getComputedStyle(el).marginTop, /^0(px)?$/, 'lenses rows keep the mock 10px grid gap, no extra margin');
   dom.window.close();
 });
+
+test('lenses chip wraps inside the row at 390 (design-lens@1 d484-2341-05) while name+score stay on one line', async () => {
+  const { renderLensesAgree, lensesCss } = await import('./report-lenses.js');
+  const dom = new JSDOM('<!doctype html><main class="rv"><section class="report-full"><div data-report-view></div></section></main>');
+  const doc = dom.window.document;
+  const style = doc.createElement('style'); style.textContent = lensesCss; doc.head.append(style);
+  const report = { payload: { cross_lens_multi: [{ construct_name: 'Appeal', agreement_range: 5.75, lens_scores: [{ lens: 'Church', score: 70.5 }, { lens: 'Translation Team', score: 64.75 }] }, { construct_name: 'Clarity', agreement_range: null, lens_scores: [{ lens: 'Community', score: 66 }] }] } };
+  const lens = renderLensesAgree({ doc, report });
+  doc.querySelector('[data-report-view]').append(lens);
+  const chips = [...lens.querySelectorAll('.lens-agree-chip')];
+  assert.ok(chips.length >= 2, 'chips rendered');
+  for (const chip of chips) {
+    const cs = dom.window.getComputedStyle(chip);
+    assert.notEqual(cs.whiteSpace, 'nowrap', `chip "${chip.textContent}" must wrap, not overrun the row border`);
+    assert.equal(cs.maxWidth, '100%', 'chip is capped to the row width');
+  }
+  const kept = [...lens.querySelectorAll('ul.lens-agree-scores li > :not(.lens-agree-n)')];
+  assert.ok(kept.length >= 4, 'score name and value nodes found');
+  for (const el of kept) assert.equal(dom.window.getComputedStyle(el).whiteSpace, 'nowrap', 'name+score stay on one line');
+  dom.window.close();
+});

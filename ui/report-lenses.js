@@ -89,7 +89,7 @@ export const lensesCss = `.lens-agree{margin:12px 0}.lens-agree h3,.lens-agree h
 .lens-agree-row[data-spread-band=disagree]{border-left-color:var(--band-urgent)}
 .lens-agree-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;align-items:baseline}
 .lens-agree-head strong{overflow-wrap:anywhere}
-.lens-agree-chip{font-size:13px;font-weight:600;padding:1px 8px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
+.lens-agree-chip{font-size:13px;font-weight:600;padding:1px 8px;border-radius:999px;white-space:normal;max-width:100%;border:1px solid transparent}
 .lens-agree-row[data-spread-band=agree] .lens-agree-chip{background:var(--badge-fill);color:var(--badge-ink)}
 .lens-agree-row[data-spread-band=mixed] .lens-agree-chip{background:var(--warning-fill);color:var(--warning-ink)}
 .lens-agree-row[data-spread-band=disagree] .lens-agree-chip{background:var(--paper);color:var(--ink);border-color:var(--band-urgent)}
