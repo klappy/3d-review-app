@@ -1,6 +1,7 @@
 /* UI Next (v4) Button. Status: provisional. Paints only from ui-next/tokens.css.
    Contract: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas/design-system.md section 2, Button row.
    Values: design/2026-10-15-glass-redesign/generator/helmet.html .btn rules (lines 36-47, 102).
+   box-sizing: border-box is the helmet's .app * reset (line 9), set on .btn so the link form sizes like the button form.
    Ported states: default, hover; focus-visible ring from the helmet's .app button/a rule.
    Not ported: disabled (V-41), :active press (not in this slice).
    Differences from the helmet, reported as contract gaps rather than invented here:
@@ -10,6 +11,7 @@
      every primary class string in a file as a page's primary). */
 
 .btn {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;

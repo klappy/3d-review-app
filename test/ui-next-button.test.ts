@@ -98,6 +98,23 @@ describe("button.css", () => {
   it("defines the ported classes and states", () => {
     for (const sel of [/\.btn \{/, /\.btn:hover \{/, /\.btn-primary \{/, /&:hover \{/, /\.btn-quiet \{/, /\.btn-quiet:hover \{/, /\.btn-icon \{/, /\.btn-lg \{/, /\.btn-block \{/, /\.app \.btn:focus-visible \{/]) expect(css).toMatch(sel);
   });
+  it("link form sizes border-box like the button form (the helmet's .app * reset)", () => {
+    expect(css.replace(/\/\*[\s\S]*?\*\//g, "")).toMatch(/\.btn \{[^}]*box-sizing: border-box;/);
+    const style = document.createElement("style");
+    style.textContent = css;
+    document.head.append(style);
+    try {
+      for (const props of [{ label: "Read", href: "/r" }, { label: "Go", href: "/g", block: true }, { icon: icon(), ariaLabel: "Menu", href: "/m" }]) {
+        const a = renderButton(props);
+        document.body.append(a);
+        expect(a.tagName).toBe("A");
+        expect(getComputedStyle(a).boxSizing).toBe("border-box");
+        a.remove();
+      }
+    } finally {
+      style.remove();
+    }
+  });
   it("paints only from tokens: no raw colour literals", () => {
     const noComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
     expect(noComments).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);
