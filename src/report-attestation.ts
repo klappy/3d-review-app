@@ -91,11 +91,20 @@ export async function initializeAttestation(): Promise<void> { await index(); }
 /** Participant path: rows absent from the pinned
  * synthetic index are digested over their real answers/templates. Mixed captures refuse.
  * Store callers pass participant=true only under server-owned report admission. */
+/** Memo scoped to ONE attestCapture call: keyed by the exact raw template bytes, so a row
+ * whose template differs by any byte is parsed and hashed on its own. Rows of one capture
+ * share a handful of templates (decodePackedCapture dictionary), so this hashes each once. */
+function templateDigestOnce(memo: Map<string, Promise<string>>, templateRaw: string): Promise<string> {
+  let digest = memo.get(templateRaw);
+  if (!digest) { digest = domainHash('3d-template-v1', parseBoundedJson(templateRaw, 65536)); memo.set(templateRaw, digest); }
+  return digest;
+}
 async function participantCapture(expectedAssessmentId: string, rows: CaptureRow[]): Promise<AttestationResult> {
   const responses: { responseId: string; responseDigest: string }[] = [];
+  const templates = new Map<string, Promise<string>>();
   for (const row of rows) {
     const answersDigest = await domainHash('3d-answer-v1', parseBoundedJson(row.answersRaw, 8192));
-    const templateDigest = await domainHash('3d-template-v1', parseBoundedJson(row.templateRaw, 65536));
+    const templateDigest = await templateDigestOnce(templates, row.templateRaw);
     const preimage: Record<string, string | number> = { kind: 'participant', answersDigest, templateDigest };
     for (const k of metadata) preimage[k] = row[k];
     responses.push({ responseId: row.responseId, responseDigest: await domainHash('3d-response-v1', preimage) });
@@ -122,12 +131,13 @@ export async function attestCapture(expectedAssessmentId: string, capture: reado
   }
   try {
     const responses: { responseId: string; responseDigest: string }[] = [];
+    const templates = new Map<string, Promise<string>>();
     for (const row of rows) {
       const expected = entries.get(row.responseId);
       if (!expected || metadata.some(k => row[k] !== expected.preimage[k])) return { eligible: false, reason: 'IDENTITY_MISMATCH' };
       const answers = parseBoundedJson(row.answersRaw, 8192);
-      const template = parseBoundedJson(row.templateRaw, 65536);
-      if (await domainHash('3d-answer-v1', answers) !== expected.preimage.answersDigest || await domainHash('3d-template-v1', template) !== expected.preimage.templateDigest) return { eligible: false, reason: 'IDENTITY_MISMATCH' };
+      // Template parse+hash memoized per exact bytes within this call; every row is still compared.
+      if (await domainHash('3d-answer-v1', answers) !== expected.preimage.answersDigest || await templateDigestOnce(templates, row.templateRaw) !== expected.preimage.templateDigest) return { eligible: false, reason: 'IDENTITY_MISMATCH' };
       responses.push({ responseId: row.responseId, responseDigest: expected.responseDigest });
     }
     responses.sort((a, b) => a.responseId < b.responseId ? -1 : a.responseId > b.responseId ? 1 : 0);

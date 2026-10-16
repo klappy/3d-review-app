@@ -1,17 +1,17 @@
 {
   "version": "0.32.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "dad3f0dbb884c2d148e10bc4a307d338dfce57c1",
+  "cookbook_commit": "ffca652bc5a02600814146a64269609bdba43534",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.32.0.md",
-      "blob_sha": "050aed54f41004e221586c4f08e846403c591fca",
-      "sha256": "e0f3516b2ddff79d75619f8e2d0a72c6c2b7e0f3dbf74974e0cbb453500ad011"
+      "blob_sha": "11bda531dc24d32fd6f64d8ffde37a2aae7155e8",
+      "sha256": "fb54fb8e75c411237aa115e97c5bf0ef84896386a40c3c7308bc239aeb3430ea"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "dbbd363e02ff926da269f11f6a2ab2e2676b317b",
-      "sha256": "0ea765d4077273b4da73611d308cd2ee8fd4683199a982f87217cc4bf5c6530b"
+      "blob_sha": "234b332610f4780eedc2465eed9821def32cd0a3",
+      "sha256": "1b63b7af3c60c942b88c57668a79639c9a590cc7923c40747c8a1658d20a7365"
     }
   ],
   "changelog": {

@@ -16,7 +16,8 @@ export const VERSIONS = {
    "version": "0.31.0",
    "added": [],
    "changed": [
-    "Workspace roles now apply to every project grouped in the workspace: a workspace owner, member or viewer opens each grouped project at that role (the higher of the workspace and any direct project grant) without a per-project invite. Viewers still cannot edit; people outside the workspace still see none of its projects; assessments still open only with their own grant. Workspace cards count every grouped project. (#483)"
+    "Workspace roles now apply to every project grouped in the workspace: a workspace owner, member or viewer opens each grouped project at that role (the higher of the workspace and any direct project grant) without a per-project invite. Viewers still cannot edit; people outside the workspace still see none of its projects; assessments still open only with their own grant. Workspace cards count every grouped project. (#483)",
+    "Authority over a project needs a DIRECT project grant, never one inherited from the workspace: grouping a project into a workspace, transferring project ownership, inviting or promoting anyone to project owner, and accepting an owner invitation all require a direct project owner; ungrouping needs the workspace owner or a direct project owner. No one may invite themselves, accept an invitation they created, or invite someone who already has access at that scope (change an existing grant with update_role). The workspace screen offers grouping only on the same rules. (#483)"
    ],
    "fixed": []
   },
