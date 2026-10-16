@@ -49,6 +49,8 @@ export const retryAfterSeconds = value => {
 export const waitWords = value => { const s = retryAfterSeconds(value); return s === RATE_LIMIT_SECONDS ? 'one minute' : wait(s); };
 /** true for an Error a page built from a refused envelope (refusalError, or any error carrying .status / .code). */
 export const isRateLimitedError = error => isRateLimited(error?.status, error?.code);
+/** Participant translation refused by a rate limit (DoD 6): the page stays in English; the words name the wait. */
+export const rateLimitedTranslate = retryAfter => `${RATE_LIMIT_LEAD} Showing English. Try again in ${waitWords(retryAfter)}.`;
 const left = s => s >= 120 ? `${Math.ceil(s / 60)} min` : `${s} s`;
 /** Keep a retry control disabled for the wait, with a visible countdown, then enable it again. While the hold runs the
  *  button carries data-rate-limited, so a page's busy/idle repaint must leave it alone. Returns a cancel function.
