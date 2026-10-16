@@ -38,3 +38,22 @@ describe("rate-limit copy follows the server's retry", () => {
     expect(out).not.toMatch(/Wait one minute/);
   });
 });
+
+describe("assess refusal paints the rate-limit hint once (Bugbot 4290741304)", () => {
+  it("refusalError folds the hint into the message and carries no separate .hint for a rate limit", async () => {
+    // @ts-expect-error plain browser module, no types
+    const { refusalError } = await import("../ui/rate-limit.js");
+    const hint = "this cap resets over the next hour, not the next minute";
+    const e = refusalError(429, { code: "RATE_LIMITED", message: "at most 30 collaborator invitations per hour", hint, data: { retry_after: 3600 } }, undefined);
+    const painted = `${e.message}${e.hint ? ` — ${e.hint}` : ""}`; // ui/assess/permissions.js fail()
+    expect(painted.split(hint).length - 1).toBe(1);
+    expect(e.code).toBe("RATE_LIMITED"); expect(e.status).toBe(429);
+    const other = refusalError(403, { code: "FORBIDDEN", message: "not yours", hint: "ask the owner" }, undefined);
+    expect(other.message).toBe("not yours"); expect(other.hint).toBe("ask the owner"); // non-rate-limit refusals keep their hint
+  });
+  it("both assess.js envelope paths (api, apiFull) build their error with refusalError", () => {
+    const src = readFileSync(new URL("../ui/assess/assess.js", import.meta.url), "utf8");
+    expect(src.match(/throw refusalError\(r\.status, j\?\.error, r\)/g)?.length).toBe(2);
+    expect(src).not.toMatch(/e\.hint = j\?\.error\?\.hint/);
+  });
+});

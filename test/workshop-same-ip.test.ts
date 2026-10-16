@@ -60,15 +60,22 @@ describe("protection that does not rest on the address key (DoD 3)", () => {
     await enforceCapabilityLimit(ctxFor(env, "203.0.113.1"), "cap.auth.request_link", { email: "a@example.org" });
     expect([...env.RL_AUTH.seen.keys()].some((k: string) => k.startsWith("em:"))).toBe(true);
   });
-  it("per link: one shared link is bounded across all addresses on RL_GLOBAL once bound", async () => {
-    const env = sized({ RL_GLOBAL: limiter(5) });
-    const out = [];
-    for (let i = 0; i < 6; i++) out.push(await refusal(enforceCapabilityLimit(ctxFor(env, `203.0.113.${i}`), "cap.participant.open_link", { token: "one-link" })));
-    expect(out[4]).toBeNull(); expect(out[5]?.code).toBe("RATE_LIMITED");
-    expect([...env.RL_REDEEM.seen.keys()].some((k: string) => k.startsWith("link:"))).toBe(false);
+  it("per link: one shared link is refused by its own link: key at RL_PER_LINK, with RL_GLOBAL at full size (Bugbot 4290741302)", async () => {
+    const env = sized(); // every limiter at its RATE_LIMITS number — RL_GLOBAL is NOT shrunk, so g:RL_REDEEM cannot be the refuser
+    const n = RATE_LIMITS.RL_PER_LINK;
+    expect(n).toBeGreaterThanOrEqual(200); expect(n).toBeLessThan(RATE_LIMITS.RL_GLOBAL); // room-sized, and below the global ceiling
+    const ip = (i: number) => `10.1.${i >> 8}.${i & 255}`;
+    for (let i = 0; i < n; i++) expect(await refusal(enforceCapabilityLimit(ctxFor(env, ip(i)), "cap.participant.open_link", { token: "one-link" }))).toBeNull();
+    const e = await refusal(enforceCapabilityLimit(ctxFor(env, ip(n)), "cap.participant.open_link", { token: "one-link" }));
+    expect(e?.code).toBe("RATE_LIMITED"); expect(e?.hint).toMatch(/too many opens of this link/);
+    expect(env.RL_GLOBAL.seen.get("g:RL_REDEEM")).toBe(n + 1); // the global key allowed it; the link key refused
+    expect([...env.RL_PER_LINK.seen.keys()].every((k: string) => k.startsWith("link:") && !k.includes("one-link"))).toBe(true);
+    expect([...env.RL_GLOBAL.seen.keys(), ...env.RL_REDEEM.seen.keys()].some((k: string) => k.startsWith("link:"))).toBe(false);
+    // a second link is its own bucket
+    expect(await refusal(enforceCapabilityLimit(ctxFor(env, ip(n + 1)), "cap.participant.open_link", { token: "other-link" }))).toBeNull();
   });
   it("per link at today's wrangler numbers (RL_REDEEM 60, RL_GLOBAL unbound): 200 opens of one link from 200 addresses are all allowed", async () => {
-    const env = sized({ RL_REDEEM: limiter(60), RL_GLOBAL: undefined, RL_PER_KEY: undefined });
+    const env = sized({ RL_REDEEM: limiter(60), RL_GLOBAL: undefined, RL_PER_KEY: undefined, RL_PER_LINK: undefined });
     for (let i = 0; i < 200; i++)
       expect(await refusal(enforceCapabilityLimit(ctxFor(env, `10.0.${i >> 8}.${i & 255}`), "cap.participant.open_link", { token: "one-link" }))).toBeNull();
   });
@@ -80,8 +87,9 @@ describe("protection that does not rest on the address key (DoD 3)", () => {
     expect([...env.RL_GLOBAL.seen.keys()]).toEqual(["g:RL_REDEEM"]);
   });
   it("optional limiters absent: skipped, never refused (an unbound RL_GLOBAL / RL_PER_KEY does not stop a workshop)", async () => {
-    const env = sized({ RL_GLOBAL: undefined, RL_PER_KEY: undefined });
+    const env = sized({ RL_GLOBAL: undefined, RL_PER_KEY: undefined, RL_PER_LINK: undefined });
     expect(await refusal(enforceCapabilityLimit(ctxFor(env, ROOM), "cap.participant.redeem_code", { code: "ABCD2345" }))).toBeNull();
+    expect(await refusal(enforceCapabilityLimit(ctxFor(env, ROOM), "cap.participant.open_link", { token: "one-link" }))).toBeNull();
   });
   it("per session: writes by one principal are bounded on wr:<kind>:<id>; reads and anonymous callers are not metered there", async () => {
     const env = sized({ RL_MCP_CEILING: limiter(2) });
@@ -120,7 +128,7 @@ describe("every rate-limit refusal says so and offers a retry in one minute (DoD
 describe("one config place: wrangler.toml mirrors RATE_LIMITS", () => {
   // Bindings Otto has not yet re-numbered or added (wrangler.toml is Otto's; see the PR body). When his commit sets them,
   // this test fails until the matching line here is deleted — the mismatch can never go quiet.
-  const AWAITING_WRANGLER: Record<string, number | "unbound"> = { RL_HTTP_ANON: 60, RL_AUTH: 10, RL_REDEEM: 60, RL_PER_KEY: "unbound", RL_GLOBAL: "unbound" };
+  const AWAITING_WRANGLER: Record<string, number | "unbound"> = { RL_HTTP_ANON: 60, RL_AUTH: 10, RL_REDEEM: 60, RL_PER_KEY: "unbound", RL_PER_LINK: "unbound", RL_GLOBAL: "unbound" };
   it("every limiter's bound number equals RATE_LIMITS (top level and production), except the named pending ones", () => {
     const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
     const bound = (section: string) => {

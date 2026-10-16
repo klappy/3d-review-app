@@ -21,3 +21,11 @@ export const rateLimitText = (message, hint, retryAfter) => {
 };
 /** retry_after from the envelope, else the Retry-After header (the mail cap sends only the header). */
 export const retryAfterOf = (error, response) => error?.data?.retry_after ?? response?.headers?.get?.('retry-after') ?? undefined;
+/** The Error a page throws for a refused envelope. A rate-limit refusal already folds the server hint into its text
+ *  (rateLimitText), so it carries no separate .hint — a caller that appends e.hint would paint it twice (Bugbot 4290741304). */
+export const refusalError = (status, error, response) => {
+  const limited = isRateLimited(status, error?.code);
+  const e = new Error(limited ? rateLimitText(error?.message, error?.hint, retryAfterOf(error, response)) : error?.message || `Request failed (${status})`);
+  e.code = error?.code || String(status); e.status = status; e.hint = limited ? undefined : error?.hint;
+  return e;
+};

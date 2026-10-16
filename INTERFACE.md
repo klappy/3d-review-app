@@ -75,7 +75,7 @@ A refused call returns the contract error `RATE_LIMITED` with `error.data.retry_
 | `RL_HTTP_ANON` / `RL_MCP_CEILING` on `POST /v2/translate` | anonymous callers (and unknown bearers) spend `RL_HTTP_ANON` per address; a caller with a live participant bearer or session spends `RL_MCP_CEILING` instead (audit round 1 W2) | address / `tr:<kind>:<principal>` | 60 / 60 s · 600 / 60 s per principal |
 | `RL_HTTP_ANON` on `GET /v2/passages/:pid/file` | only a missing, tampered or expired signature (checked first, one HMAC, no storage); a valid signed link spends nothing (audit round 1 W2) | caller address | 60 / 60 s |
 | `RL_PER_KEY` (optional) | `cap.auth.request_link` per email (`em:`; on `RL_AUTH` while unbound), `cap.participant.redeem_code` per code (`code:<sha256>`) | email / code, any address | `RATE_LIMITS` in src/ratelimit.ts |
-| `RL_REDEEM` `link:` key | `cap.participant.open_link` per shared link (`link:<sha256>`), on top of the address key | link, any address | same number as `RL_REDEEM` |
+| `RL_PER_LINK` (optional) | `cap.participant.open_link` per shared link (`link:<sha256>`), on top of the address key and `g:RL_REDEEM` | link, any address | `RATE_LIMITS` in src/ratelimit.ts (room-sized, below `RL_GLOBAL`) |
 | `RL_GLOBAL` (optional) | every `RL_AUTH` / `RL_REDEEM` capability call, one key per limiter (`g:RL_AUTH`, `g:RL_REDEEM`) | all addresses together | `RATE_LIMITS` in src/ratelimit.ts |
 | `RL_MCP_CEILING` `wr:` key | every write/danger call by a signed-in or link-holding principal | `wr:<kind>:<principal id>` (per session, never per address) | 600 / 60 s |
 

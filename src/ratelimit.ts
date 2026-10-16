@@ -28,8 +28,11 @@
  *                bounds a flood on one secret when an attacker rotates addresses.
  *   RL_GLOBAL    (optional) one key per secret-guessing limiter across ALL addresses   keys g:RL_AUTH, g:RL_REDEEM
  *                a ceiling for code/link guessing and sign-in spam spread over many IPs (workshop 2026-10-15 DoD 3).
- *                Also open_link's per-link key `link:<hash>`: a shared link is opened by a whole room, so it needs a
- *                room-sized number, and RL_REDEEM's bound number is not that until Otto re-numbers it (Bugbot 4290591310).
+ *   RL_PER_LINK  (optional) one shared link, whatever the address            key link:<hash>      see RATE_LIMITS
+ *                a shared link is opened by a whole room, so it needs a room-sized number of its own: not RL_PER_KEY's
+ *                (one secret, too small), not RL_REDEEM's per-address one (Bugbot 4290591310), and not RL_GLOBAL's,
+ *                where g:RL_REDEEM is spent first on the same number so link: could never be the key that refuses
+ *                (Bugbot 4290741302).
  *   RL_MCP_CEILING also meters every write/danger call by a signed-in or link-holding principal    key wr:<kind>:<id>
  *                per session/principal, never per address, so a room behind one NAT never shares a bucket.
  *
@@ -49,7 +52,7 @@ import { normalizeEmail, sha256 } from "./handlers/common";
 export const LIMITER_NAMES = ["RL_MCP_ANON", "RL_HTTP_ANON", "RL_AUTH", "RL_REDEEM", "RL_MCP_CEILING"] as const;
 export type LimiterName = (typeof LIMITER_NAMES)[number];
 /** Limiters that add a non-address key on top of the address limiters above. Absent → skipped, never refused. */
-export const OPTIONAL_LIMITER_NAMES = ["RL_PER_KEY", "RL_GLOBAL"] as const;
+export const OPTIONAL_LIMITER_NAMES = ["RL_PER_KEY", "RL_PER_LINK", "RL_GLOBAL"] as const;
 export type OptionalLimiterName = (typeof OPTIONAL_LIMITER_NAMES)[number];
 export const RATE_LIMIT_WINDOW_SECONDS = 60;
 /** THE one config place for every limit number (requests per RATE_LIMIT_WINDOW_SECONDS per key). Cloudflare reads the
@@ -63,7 +66,8 @@ export const RATE_LIMITS: Record<LimiterName | OptionalLimiterName, number> = {
   RL_AUTH: 100,        // sign-in per address: 20 facilitators × 2 units (request + consume) = 40, ×2.5 headroom
   RL_REDEEM: 500,      // link/code opens per address: 200 opens + 20 × 2 email-link check/open = 240, ×2 headroom
   RL_MCP_CEILING: 600, // per bearer address on /mcp, per principal for translate (tr:) and writes (wr:)
-  RL_PER_KEY: 10,      // per email / per code / per link token, any address
+  RL_PER_KEY: 10,      // per email / per code, any address
+  RL_PER_LINK: 400,    // per shared link, any address: a room of 200 opening one link, ×2 headroom; < RL_GLOBAL
   RL_GLOBAL: 5000,     // all addresses together, per secret-guessing limiter
 };
 /** The plain refusal every rate limit returns, on every face (DoD 6). */
@@ -154,12 +158,13 @@ export async function enforceCapabilityLimit(ctx: Ctx, capabilityId: string, par
     if (!ok) throw limited(capabilityId, "too many sign-in requests for this email");
   }
   // Per-secret keys (DoD 3): one code or one link token is bounded whatever address it comes from. A shared link is
-  // opened by a whole room (200 people), so its key rides optional RL_GLOBAL (skipped while unbound): on RL_REDEEM it
-  // would go live at wrangler.toml's per-address number and refuse a busy link from every address (Bugbot 4290591310).
+  // opened by a whole room (200 people), so its key rides its own optional RL_PER_LINK (skipped while unbound): on RL_REDEEM
+  // it would go live at wrangler.toml's per-address number (Bugbot 4290591310); on RL_GLOBAL it shared g:RL_REDEEM's
+  // number and was always spent after it, so it could never refuse on its own (Bugbot 4290741302).
   if (capabilityId === "cap.participant.redeem_code" && typeof params.code === "string" && params.code
     && !(await allowOptional(ctx.env, "RL_PER_KEY", `code:${await secretHash(params.code.trim().toUpperCase())}`)))
     throw limited(capabilityId, "too many attempts with this code");
   if (capabilityId === "cap.participant.open_link" && typeof params.token === "string" && params.token
-    && !(await allowOptional(ctx.env, "RL_GLOBAL", `link:${await secretHash(params.token)}`)))
+    && !(await allowOptional(ctx.env, "RL_PER_LINK", `link:${await secretHash(params.token)}`)))
     throw limited(capabilityId, "too many opens of this link");
 }
