@@ -8,9 +8,13 @@
      --radius-xl is used, which draws the same stadium on a 28px-high pill (any radius >= 14px does).
    - the 8px dot is gen.py's value; --dot (10) is named for perspective dots only, so no token is used.
    - reduced transparency: section 1.2 turns every glass surface into --field; gen.py/helmet do not apply it
-     to .pill (V-48). The contract rule is ported here. */
+     to .pill (V-48). The contract rule is ported here.
+   - box-sizing: gen.py's 28px height includes the 1px border because the canvas source applies a
+     border-box reset under .app (generator/helmet.html line 9). The contract and tokens.css name no
+     base reset, so it is set on .pill itself (contract gap, reported). */
 
 .pill {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: 7px;
