@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.34.2",
+  "current": "0.34.3",
   "versions": [
+    {
+      "version": "0.34.3",
+      "status": "candidate",
+      "notes_path": "releases/0.34.3.md",
+      "sections": {
+        "changed": [
+          "Inviting someone: the button is \"Invite\", and the confirm opens right under it, naming the address you typed and the role, with Confirm and Cancel. The separate \"Preview invitation\" step and the confirm at the bottom of the page are gone (Permissions page, collaborators panel and MCP panel)."
+        ]
+      }
+    },
     {
       "version": "0.34.2",
       "status": "candidate",
