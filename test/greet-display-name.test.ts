@@ -20,7 +20,7 @@ async function setup(name: "DB" | "OLD", migrate: boolean) {
   const db = await mf.getD1Database(name);
   const stmts = (path: string) => sql(path).split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s));
   await db.batch(stmts("../migrations/0001_init.sql"));
-  if (migrate) await db.batch(stmts("../migrations/0015_display_name.sql"));
+  if (migrate) await db.batch(stmts("../migrations/0016_display_name.sql"));
   await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind("usr_ana", await sha256("ana@example.invalid"), 1, 0, now.toISOString()).run();
   return db;
 }
