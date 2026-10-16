@@ -1,3 +1,4 @@
+import { sandboxToolsEnabled } from './sandbox-tools.js';
 // Scope pages — entry · workspaces · workspace · projects · project (UI overhaul contract, 2026-09-17).
 // Each page = { load(ctx, params) → model, render(ctx, model) → html, bind(ctx, root, model) }.
 // ctx = { api, esc, enc, go, note(msg, alert), state, routes, cards, setToken? }.
@@ -10,6 +11,7 @@ import { learnMore } from '../v3/components/learn-more.js';
 import { mountEditableHeading } from '../v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '../v3/components/saved-status.js';
 import { digestNamespace, rememberCurrent, scopedStorage } from '../shared-link.js';
+import { holdRetry, isOneMinuteLimit, isRateLimitedError, RATE_LIMIT_COPY, retryAfterOf, retryAfterSeconds, underHold } from '../rate-limit.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -94,9 +96,11 @@ export function holdUntilCodeChanges(form, name = 'code') {
   const input = form?.querySelector?.(`input[name="${name}"]`), button = form?.querySelector?.('button[type=submit]');
   let last = null;
   const now = () => String(input?.value ?? '').trim();
-  const sync = () => { if (button) button.disabled = last !== null && now() === last; };
+  // A Submit under a rate-limit countdown (holdRetry) stays disabled whatever the code: editing it never ends the wait early.
+  const sync = () => { if (button) button.disabled = underHold(button) || (last !== null && now() === last); };
   input?.addEventListener?.('input', sync);
-  return { repeat: () => last !== null && now() === last, sent: () => { last = now(); sync(); }, sync };
+  // reset(): the server refused before reading the code (a rate limit), so the same code may be sent again after the wait.
+  return { repeat: () => last !== null && now() === last, sent: () => { last = now(); sync(); }, reset: () => { last = null; }, sync };
 }
 // Gate 0.23.0 (phone): a code form's error sits in the card next to the field — <p role="alert"> under the input, the input marked
 // aria-invalid and described by it — and focus returns to the input (write() disabled the focused Submit, dropping focus to BODY).
@@ -118,13 +122,17 @@ export function inlineCodeError(ctx, form, name = 'code') {
 async function write(ctx, control, label, fn, { refused = 'Not allowed here.', failed = null } = {}) {
   const controls = control ? [control, ...(control.form ? Array.from(control.form.querySelectorAll('button')) : [])] : [];
   for (const c of controls) c.disabled = true;
+  let wait = 0;
   try { const r = await fn(); return r; }
   catch (e) {
+    // DoD 6: a rate limit says so, and the control it came from re-enables after the wait (Retry-After, else one minute).
+    // The refusal's text is already worded by refusalError (one-minute copy, or a non-minute cap's own message and wait).
+    if (isRateLimitedError(e)) { wait = retryAfterSeconds(e.retryAfter); ctx.note(e.message || RATE_LIMIT_COPY, true); return undefined; }
     const kind = classify(e);
     ctx.note(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? refused : (failed || `${label} failed: ${safeMessage(e)}`), true);
     return undefined;
   }
-  finally { for (const c of controls) c.disabled = false; }
+  finally { for (const c of controls) if (!underHold(c)) c.disabled = false; if (wait && control) holdRetry(control, wait); }
 }
 const val = (form, name) => String(form.elements[name]?.value ?? '').trim();
 const storeSession = (key, v) => { try { sessionStorage.setItem(key, v); } catch {} };
@@ -160,13 +168,13 @@ const signupNote = (ctx, margin = '6px 0 0') => `<small class="small muted signu
 function hero(ctx, signedIn) {
   const continueCards = signedIn ? `<section class="panel"><p class="eyebrow">Signed in</p><h2>Continue</h2><div class="project-grid">${ctx.cards.card({ eyebrow: 'Continue', title: 'Workspaces', href: ctx.routes.workspaces, meta: ['Optional groupings of projects you can already open'] })}${ctx.cards.card({ eyebrow: 'Continue', title: 'Projects', href: ctx.routes.projects, meta: ['All projects your account holds a role on'] })}</div><div class="actions"><button type="button" class="quiet" data-act="signout">Sign out</button></div></section>` : '';
   // Public home contract (ui/public-choices.test.mjs, captain-named): exactly these four choices, in this order, above the headline;
-  // Sign in goes straight to the real provider; sandbox sign-in only by explicit choice (#signin). Retired labels never return.
+  // Sign in goes to the real provider. Sandbox controls require an explicit DEV-only query (see sandbox-tools.js).
   // ASK 24: email links ON → the Home Sign in opens #signin (emailed-link form first, "Sign in with a code instead" under it).
   // E6: the href is computed, not string-swapped after the fact (output identical for both flag values).
   const signInHref = ctx.state?.emailLinks === true ? '#signin' : '/v2/auth/access';
   const choices = `<nav class="public-choices actions" aria-label="Choose where to start" style="margin-top:0"><a class="rv-btn" href="#about">Read about it</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/collect">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a>${signedIn ? '' : `<a class="rv-btn primary" href="${signInHref}">Sign in</a>`}</nav>`; // B02: a signed-in home never offers Sign in
   // Captain order 17:05 (lane 9, L9-22) "less text": public home = the four choices, one heading, one short line; everything else behind Learn more.
-  return `<section class="hero panel" id="public-home">${choices}${signedIn ? '' : signupNote(ctx, '8px 0 14px')}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">${LEAD}</p>${learnMore(`<p class="muted">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p>${perspectivesRow(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/collect">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a>${signedIn ? '' : ' · <a href="#signin">Sandbox test identities (dev only) — not a real sign-in</a>'}</p><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p>`)}</section>${continueCards}`;
+  return `<section class="hero panel" id="public-home">${choices}${signedIn ? '' : signupNote(ctx, '8px 0 14px')}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">${LEAD}</p>${learnMore(`<p class="muted">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p>${perspectivesRow(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/collect">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a></p><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p>`)}</section>${continueCards}`;
 }
 function surveyView(ctx) {
   return `<section class="panel narrow"><p class="eyebrow">For participants</p><h1>Your feedback starts with your invitation.</h1><p class="muted">Open the survey link or scan the QR code someone shared with you. If you were given an access code, enter it below.</p><p><a class="button" href="/participate/?demo=1">Try a sample survey — nothing is sent</a></p><form id="code-form"><label class="field">Access code<input name="code" required autocomplete="off" maxlength="64" aria-describedby="code-error"></label><p id="code-error" class="code-error" role="alert" data-code-error></p><div class="actions"><button class="primary" type="submit">Open my survey</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form><p class="small muted">Missing your survey link? Ask the person who invited you or shared the survey to send you the link. You do not need an account to follow a participant link.</p></section>`;
@@ -190,7 +198,7 @@ function signinView(ctx, model, signedIn = false) {
   // v3 prototype frame 1 (design-system-v3 V.signin): centred 420px card, eyebrow, one full-width primary, survey footer (lane 1, L1-7).
   // U28: the new-account line is true on both paths (Access and B38 magic link create the principal on first sign-in); signed-out only.
   const note = signedIn ? '' : signupNote(ctx);
-  return `<section class="glass panel narrow v3-signin" style="max-width:420px;margin:48px auto 0"><p class="eyebrow">Sign in</p><h1 style="font-size:27px">Sign in with your email</h1>${ctx.state?.emailLinks === true ? `<p class="muted">We email you a sign-in link; there is no password.</p><form id="email-link-form" method="post" action="/v2/auth/email"><label class="field">Email<input name="email" type="email" required autocomplete="email" maxlength="254"></label><div class="actions"><button class="button rv-btn primary" type="submit" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Email me a sign-in link</button></div>${note}</form><p id="email-link-status" class="small" role="status"></p>${CODE_SIGNIN}` : `<p class="muted">We email you a one-time code; there is no password.</p><div class="actions"><a class="button rv-btn primary" href="/v2/auth/access" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Sign in with an email code</a></div><p class="small muted" data-code-hint>${ctx.esc(SIGNIN_CODE_HINT)}</p>${note}`}${learnMore('<p class="small muted">Here to take a survey? Open the link you were given; no sign-in is needed. <a href="#survey">Have an access code?</a></p>')}<details class="sandbox-signin" id="sandbox-signin"${codeStep ? ' open' : ''}><summary>Sandbox test identities (dev only) — not a real sign-in</summary><form id="signin-form" data-stage="${codeStep ? 'code' : 'email'}"><label class="field">Email<input name="email" type="email" required autocomplete="email" value="${ctx.esc(s.email)}"${codeStep ? ' readonly' : ''}></label>${codeStep ? `${s.devCode ? `<p class="note small">Sandbox code: <strong>${ctx.esc(s.devCode)}</strong></p>` : '<p class="small muted">Code requested. Enter the code you received.</p>'}<label class="field">Code<input name="code" required autocomplete="one-time-code" inputmode="numeric"></label>` : ''}<div class="actions"><button class="primary" type="submit">${codeStep ? 'Sign in' : 'Send me a code'}</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form></details></section>`;
+  return `<section class="glass panel narrow v3-signin" style="max-width:420px;margin:48px auto 0"><p class="eyebrow">Sign in</p><h1 style="font-size:27px">Sign in with your email</h1>${ctx.state?.emailLinks === true ? `<p class="muted">We email you a sign-in link; there is no password.</p><form id="email-link-form" method="post" action="/v2/auth/email"><label class="field">Email<input name="email" type="email" required autocomplete="email" maxlength="254"></label><div class="actions"><button class="button rv-btn primary" type="submit" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Email me a sign-in link</button></div>${note}</form><p id="email-link-status" class="small" role="status"></p>${CODE_SIGNIN}` : `<p class="muted">We email you a one-time code; there is no password.</p><div class="actions"><a class="button rv-btn primary" href="/v2/auth/access" style="width:100%;justify-content:center;text-align:center;box-sizing:border-box">Sign in with an email code</a></div><p class="small muted" data-code-hint>${ctx.esc(SIGNIN_CODE_HINT)}</p>${note}`}<p class="small muted" data-provenance="human-guidance-2026-10-14">Taking a survey? Open your survey link or <a href="#survey">enter an access code</a>. No sign-in needed.</p>${sandboxToolsEnabled(ctx.location ?? globalThis.location) ? `<details class="sandbox-signin" id="sandbox-signin"${codeStep ? ' open' : ''}><summary>Sandbox test identities (dev only) — not a real sign-in</summary><form id="signin-form" data-stage="${codeStep ? 'code' : 'email'}"><label class="field">Email<input name="email" type="email" required autocomplete="email" value="${ctx.esc(s.email)}"${codeStep ? ' readonly' : ''}></label>${codeStep ? `${s.devCode ? `<p class="note small">Sandbox code: <strong>${ctx.esc(s.devCode)}</strong></p>` : '<p class="small muted">Code requested. Enter the code you received.</p>'}<label class="field">Code<input name="code" required autocomplete="one-time-code" inputmode="numeric"></label>` : ''}<div class="actions"><button class="primary" type="submit">${codeStep ? 'Sign in' : 'Send me a code'}</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form></details>` : ''}</section>`;
 }
 const entry = {
   // Tour/example deep links redirect into the shared fixture-backed assessment shell.
@@ -224,7 +232,8 @@ const entry = {
       // U08 (lanes-1321): a used, unknown or mistyped code gets one plain next step, not "Not allowed here." / a server message.
       // Gate 0.23.0 (phone 375x812): the error shows in the card under the field (role=alert), not in the page note below the fold.
       const r = await write(codeError.ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }), { refused: CODE_REFUSED });
-      codeHold.sync(); // write() re-enabled the buttons; Submit waits for a changed code
+      if (underHold(form.querySelector('button[type=submit]'))) codeHold.reset(); // DoD 6: a 429 never read the code; retry it after the wait
+      codeHold.sync(); // write() re-enabled the buttons; Submit waits for a changed code (or the countdown)
       if (!r) return codeError.focus();
       const token = r.participant_token || r.participant;
       if (!token) { codeError.ctx.note('The server accepted the code but returned no participant token.', true); return codeError.focus(); }
@@ -244,7 +253,11 @@ const entry = {
         const res = await fetch('/v2/auth/email', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ email: val(form, 'email') }), credentials: 'same-origin', redirect: 'manual', cache: 'no-store' });
         if (res.type === 'opaqueredirect') { window.location.assign('/v2/auth/access'); return; } // environment without email links
         if (res.ok) { const b = await res.json().catch(() => null); const min = Number(b?.result?.expires_in_minutes) || 30; form.hidden = true; status.textContent = SIGNIN_LINK_SENT(min); return; }
-        status.textContent = res.status === 429 ? 'Too many sign-in links were requested. Use the newest email, or wait a few minutes.' : res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
+        if (res.status === 429) { // one-minute RL_AUTH refusal vs the 900 s per-address mail cap: tell each the wait it really has
+          const b = await res.json().catch(() => null), retry = retryAfterOf(b?.error, res);
+          status.textContent = isOneMinuteLimit(b?.error?.message, retry) ? RATE_LIMIT_COPY : `Too many sign-in links were requested for this address. Use the newest email, or wait ${Math.max(1, Math.ceil((Number(retry) || 900) / 60))} minutes.`;
+          holdRetry(submit, isOneMinuteLimit(b?.error?.message, retry) ? retry : retry ?? 900); return; // DoD 6: the button counts down the same wait
+        } else status.textContent = res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
       } catch { status.textContent = 'The sign-in link could not be sent. Check your connection and try again.'; }
       submit.disabled = false;
     });
@@ -263,6 +276,7 @@ const entry = {
         return paint();
       }
       const r = await write(ctx, submit, 'Sign in', () => ctx.api('/v2/auth/session', { method: 'POST', body: { email: model.signin.email, code: val(form, 'code') } }));
+      if (underHold(submit)) signinHold?.reset(); // a 429 never read the code: the same code may be retried after the wait
       signinHold?.sync();
       if (!r) return;
       if (!r.session) return ctx.note('The server answered without a session token.', true);
@@ -310,9 +324,8 @@ function pageHead(ctx, r) { return ctx.shellOwnsTitle === true ? '' : `<p class=
 // /assess/ host has no crumb chrome, so the page keeps the way up (← All workspaces / ← All projects).
 function pageBack(ctx, href, label) { return ctx.shellOwnsTitle === true ? '' : `<a class="back" href="${ctx.esc(href)}">← ${ctx.esc(label)}</a>`; }
 // The read head carries role/archived state and the permissions link; the heading itself follows the host contract above.
-// Bincy B30 (lanes-2111): the head shows at most ONE short line (`line`, e.g. the organisation); the role sentence and any page
-// explanation (`more`) sit behind the shared Learn more. The role badge stays visible, so nothing is lost up front.
-function kitHead(ctx, r, extra = '', { line = '', more = '' } = {}) { return `${pageHead(ctx, r)}<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}">${line ? `<p class="muted small" style="margin:0">${ctx.esc(line)}</p>` : '<span></span>'}<div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>${learnMore(`${r.role ? `<p class="muted small">Your role: ${ctx.esc(r.role)}</p>` : ''}${more}`)}`; }
+// Owner feedback 2026-10-14: role is already a badge; do not repeat it in generic help.
+function kitHead(ctx, r, extra = '', { line = '' } = {}) { return `${pageHead(ctx, r)}<div class="row" style="justify-content:space-between;align-items:center" data-read-head="${ctx.esc(r.title)}">${line ? `<p class="muted small" style="margin:0">${ctx.esc(line)}</p>` : '<span></span>'}<div>${r.role ? `<span class="badge">${ctx.esc(r.role)}</span> ` : ''}${r.archived ? '<span class="badge">Archived</span> ' : ''}${extra}</div></div>`; }
 const readRegion = html => `<div data-read-region class="kit-read">${html}</div>`;
 const actionRegion = html => html ? `<section data-action-region class="legacy-actions" aria-label="More actions">${html}</section>` : '';
 
@@ -471,10 +484,10 @@ const project = {
     // settings. Links only, to the existing screens; no new capability, contract unchanged. Access codes (C3) live on the survey Share card (U10).
     // U10: access codes now live on each survey's Share card (v3); the link opens this project's first open assessment.
     const firstA = model.assessments.find(a => !a.archived_at);
-    const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Issue paper codes on a survey\'s Share card and print them once (open an assessment, then its survey)', href: firstA ? ctx.routes.assessment(firstA.id) : ctx.routes.project(p.id), label: 'Open access codes' },
+    const kept = [{ key: 'access-codes', name: 'Access codes', what: 'Open an assessment, then a survey’s Share card to print access codes', href: firstA ? ctx.routes.assessment(firstA.id) : ctx.routes.project(p.id), label: 'Open access codes' },
       // Workspaces (W1): the existing #workspaces screen — create a workspace, add or remove projects, rename.
-      { key: 'workspaces', name: 'Workspaces', what: 'Group projects in a workspace: create one, add or remove projects, rename it', href: ctx.routes.workspaces, label: 'Open workspaces' }];
-    const settings = edit ? `<section class="panel" id="project-settings" aria-labelledby="project-settings-title"><p class="eyebrow" id="project-settings-title">Project settings</p><ul class="manage-rows kept-surfaces" aria-label="Kept tools">${kept.map(k => `<li class="manage-row"><span><strong>${ctx.esc(k.name)}</strong></span><a class="button quiet small" href="${ctx.esc(k.href)}" data-kept="${ctx.esc(k.key)}">${ctx.esc(k.label)}</a></li>`).join('')}</ul>${learnMore(kept.map(k => `<p class="small muted"><strong>${ctx.esc(k.name)}</strong>: ${ctx.esc(k.what)}.</p>`).join(''))}</section>` : '';
+      { key: 'workspaces', name: 'Workspaces', what: 'Group related projects in a workspace', href: ctx.routes.workspaces, label: 'Open workspaces' }];
+    const settings = edit ? `<section class="panel" id="project-settings" data-provenance="human-guidance-2026-10-14" aria-labelledby="project-settings-title"><p class="eyebrow" id="project-settings-title">Project settings</p><ul class="manage-rows kept-surfaces" aria-label="Kept tools">${kept.map(k => `<li class="manage-row"><span><strong>${ctx.esc(k.name)}</strong><span class="small muted" style="display:block">${ctx.esc(k.what)}.</span></span><a class="button quiet small" href="${ctx.esc(k.href)}" data-kept="${ctx.esc(k.key)}">${ctx.esc(k.label)}</a></li>`).join('')}</ul></section>` : '';
     const r = readModel('project', model);
     // Assessments and languages keep their independent settled outcomes; only a 'ready' list renders as cards (never an empty success).
     const assessmentsRead = r.assessments.status === 'ready' ? kitGrid(ctx, r.assessments.items, 'No assessments yet.') : assessmentsBlock;

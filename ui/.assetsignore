@@ -10,6 +10,7 @@ report-view.test.mjs
 context-tree.test.mjs
 public-entry.test.mjs
 report-card.test.mjs
+report-lenses.test.mjs
 stage-screens.test.mjs
 stage-composition.test.mjs
 workspace-overview.test.mjs
@@ -71,3 +72,7 @@ v3/components/active-until.test.mjs
 participant-about.test.mjs
 assess/s12a-complete-owner-badge.test.mjs
 server-files.test.mjs
+
+v3/components/band-visual.test.mjs
+report-host.test.mjs
+rate-limit.test.mjs

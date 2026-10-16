@@ -1,28 +1,27 @@
 {
-  "version": "0.29.0",
+  "version": "0.32.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "241caf5f1c7b733806df668f78f726c6849dd243",
+  "cookbook_commit": "30849451b8f4c399656d544c8cb045edf051f79d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.29.0.md",
-      "blob_sha": "2f957325ccf668c15d07f635da70bd9db0fd4825",
-      "sha256": "b1caabe01603d60e675ee6ddbbc5c0647eff28a8a297ac3765044c9d08db0a4b"
+      "path": "planning/2026-09-16-parity-build/releases/0.32.0.md",
+      "blob_sha": "c50dc0eb78a91384f8950f948c014870221a7423",
+      "sha256": "8513e6e72f9ca1c5b709ddccd85736c3e772ea70a07396e14d99a2804868ca09"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "bec8367181e10742152b282fb7cb8b1fb63079be",
-      "sha256": "0604820c4408f8dbe6a04836ed8a4afce6959719771267c2ff1844c568af3c76"
+      "blob_sha": "cc84efa7af881483e63ac7ed8cb08902a78a0b02",
+      "sha256": "a1bd593a95b4f4ac580896ad722eb7b4f62ae40f978c09bdd894a37053473b7c"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Super admin (the support switch) can read app-wide usage totals with `cap.ops.usage` (counts and dates only: accounts, projects, languages, assessments by stage, surveys, survey links, participant sessions, responses, requests per day and writes by capability). `docs {topic: permissions}` now says plainly what super admin opens, and `scripts/super-admin.mjs` switches it on or off for one account with a receipt. (#455)"
+        "\"Do the perspectives agree?\" leads the results overview and the full report: one barbell per area scored by two or more perspectives (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), then areas only one perspective scored, with response counts beside each perspective score and Consultant responses named inside the Church count."
       ],
       "changed": [
-        "The \"Mid-Level\" survey now shows as **Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)** (it was \"Team leaders & mentors\"), in the Product Owner's own words, in setup, on Collect, on the survey page, on the blank print and in demo mode; the legacy v1 row reads the same with \"v1 (legacy)\". Template ids and the pinned source name (`source_name`) are unchanged. (#457)"
-      ],
-      "fixed": []
+        "The full report no longer shows the cross-lens average; lens scores and their difference only. Payload, scoring and narrative unchanged."
+      ]
     }
   }
 }

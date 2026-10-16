@@ -93,11 +93,11 @@ test('L3-4 next step: flag on; copy from frame 11; the stage move stays on the U
   assert.equal(m.v3GateAction('understand', 'member').action, 'saveAndFinish'); assert.equal(m.V3_SET_STAGE.saveAndFinish, 'improve');
 });
 
-test('L3-5: results legend carries one token colour dot per band word (prototype frame 10)', async () => {
+test('L3-5: results legend carries approved swappable imagery and existing token colours', async () => {
   const m = await import('./v3-assessment.js');
   const html = m.v3BandsMarkup({ status: 'held', reason: 'x' }, ['Translation Team', 'Church', 'Community']);
   const legend = html.slice(html.indexOf('data-v3-legend'));
-  for (const [w, v] of m.V3_LEGEND) assert.ok(legend.includes(`<i class="dot" style="background:var(${v})" aria-hidden="true"></i>${w}`), w);
+  for (const [w, v] of m.V3_LEGEND) assert.ok(legend.includes(`style="color:var(${v})"`) && legend.includes(w), w);
   assert.equal(m.V3_LEGEND.length, 5);
 });
 

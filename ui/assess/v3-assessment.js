@@ -1,3 +1,4 @@
+import { bandImagery, bandVisualCSS } from '../v3/components/band-visual.js';
 // ui/assess/v3-assessment.js — v3 lane 3: state-driven primary, settled + "not yet confirmed" counts, results band layout.
 // Source: klappy/3d-review-cookbook design-system-v3 @66d97f3 (prototype/app.js V.assessment / V.results; ADOPTION.md).
 // Rulings (captain, tier B, 2026-09-24): (a) denominator only when the facilitator entered one; (b) settled count and
@@ -108,7 +109,7 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores
     const b = given.find(x => x && x.perspective === lens);
     const word = sc ? v3ScoreBand(sc.score, n) : !held && b && BAND_WORDS.has(b.band) ? b.band : 'More input needed';
     const suppressed = !sc && b && b.state === 'suppressed';
-    const note = sc ? (sc.subs.length ? `<ul class="v3-band-subs small">${sc.subs.map(x => `<li data-v3-sub="${esc(x.name)}">${esc(x.name)} · <strong>${esc(v3ScoreBand(x.score, n))}</strong></li>`).join('')}</ul>` : '')
+    const note = sc ? (sc.subs.length ? `<ul class="v3-band-subs small">${sc.subs.map(x => `<li data-v3-sub="${esc(x.name)}">${bandImagery(v3ScoreBand(x.score, n))}${esc(x.name)} · <strong>${esc(v3ScoreBand(x.score, n))}</strong></li>`).join('')}</ul>` : '')
       : scored ? '<p class="muted">Not in the latest report.</p>'
       : held ? '' // lane 9 L9-24: the held reason is said once under the cards, not once per card (U05: one plain line, never the server's policy code)
       : suppressed ? '<div class="note">Withheld to protect a small group. This is an evidence gap, not a poor result.</div>'
@@ -119,7 +120,7 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores
   const legend = bandLegend(V3_LEGEND, esc);
   const prov = scored && V3_BAND_CUTOFFS.provisional ? learnMore(`<p class="small muted" data-v3-provisional>${esc(V3_BAND_PROVISIONAL)}</p>`) : ''; // lane 9 L9-24: cut-offs behind Learn more
   const heldLine = held ? `<p class="muted" data-v3-band-held>${esc(v3HeldText(r))}</p>` : '';
-  return `<div class="v3-bands three" data-v3-bands="${scored ? 'provisional' : held ? 'held' : 'shown'}">${cards}</div>${heldLine}${legend}${prov}`;
+  return `<div class="v3-band-imagery" data-band-style="signal" data-provenance="report-imagery-adapter"><style>${bandVisualCSS}</style><label class="band-visual-control">Band visual <select data-band-visual><option value="signal">Signal bars</option><option value="faces">Faces</option><option value="container">Jars</option><option value="plant">Plants</option></select></label><div class="v3-bands three" data-v3-bands="${scored ? 'provisional' : held ? 'held' : 'shown'}">${cards}</div>${heldLine}${legend}${prov}</div>`;
 }
 
 // U2 evidence toggle + table, U3 folded into one footer line (PARITY.md U2/U3; prototype V.results frame 10:

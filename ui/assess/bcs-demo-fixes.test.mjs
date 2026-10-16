@@ -71,3 +71,31 @@ test('both code boxes this app owns use the hold: participant access code and th
   assert.match(src, /signinHold = signinForm\?\.dataset\?\.stage === 'code' \? holdUntilCodeChanges\(signinForm\) : null/);
   assert.match(src, /if \(signinHold\?\.repeat\(\)\) return;/);
 });
+
+// DoD 6 (review of #490, item 3): a 429 on the code form never read the code. After the countdown the same code is
+// retried (the hold resets), and editing the code during the countdown never enables Submit early.
+test('a code box after a 429: Submit stays held through edits, then the same code is sent again', async () => {
+  const { JSDOM } = await import('jsdom');
+  const { window } = new JSDOM('<div id="root"><form id="code-form"><input name="code"><p data-code-error></p><button type="submit">Open my survey</button></form></div>');
+  const saved = { window: globalThis.window, document: globalThis.document, setInterval: globalThis.setInterval, clearInterval: globalThis.clearInterval };
+  const ticks = []; let t = 0;
+  globalThis.setInterval = fn => { ticks.push(fn); return ticks.length; }; globalThis.clearInterval = () => {};
+  const realNow = Date.now; Date.now = () => t;
+  try {
+    const root = window.document.getElementById('root'), form = root.querySelector('form'), input = form.querySelector('input'), button = form.querySelector('button');
+    const calls = [];
+    const limited = Object.assign(new Error('Rate limit: too many requests right now. Nothing was lost. Try again in one minute.'), { code: 'RATE_LIMITED', status: 429, retryAfter: 60 });
+    const ctx = { esc: s => String(s), note() {}, api: async (url, o) => { calls.push(o.body.code); throw limited; } };
+    pages.entry.bind(ctx, root, { mode: 'welcome', step: 0, signin: {} });
+    const type = v => { input.value = v; input.dispatchEvent(new window.Event('input')); };
+    const submit = async () => { form.dispatchEvent(new window.Event('submit', { cancelable: true })); for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r)); };
+    type('ABCD-EFGH'); await submit();
+    assert.deepEqual(calls, ['ABCD-EFGH']); assert.equal(button.disabled, true, 'held for the wait');
+    type('ABCD-EFGJ'); assert.equal(button.disabled, true, 'a changed code does not end the countdown early');
+    type('ABCD-EFGH');
+    t = 61_000; ticks.forEach(fn => fn());
+    assert.equal(button.disabled, false, 'ready after the wait');
+    await submit();
+    assert.deepEqual(calls, ['ABCD-EFGH', 'ABCD-EFGH'], 'the same code is retried, not swallowed');
+  } finally { Date.now = realNow; Object.assign(globalThis, saved); }
+});

@@ -1,6 +1,7 @@
 import { copy, createSharedLinkClient, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, stripFragment, submitFailureKind } from '../shared-link.js';
 import { closedLine } from '../v3/components/active-until.js';
 import { SURVEYOR_EN } from './i18n.js';
+import { retryAfterSeconds } from '../rate-limit.js';
 
 // Only the existing participant client owns transport. No staff identity is read.
 export function createParticipantJourney({ window: win, storage, fetchImpl, onChange = () => {} }) {
@@ -8,9 +9,16 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
   // S29 surveyor mode: the raw link token, in memory only (never storage, URL or log) so "Interview another person"
   // can open the same link again as a new respondent. Gone after a reload.
   let linkToken = null;
+  // #490 Bugbot: set when "Interview another" was refused, so "Try again" retries the NEXT respondent, not the prior session.
+  let retryNext = false;
   let state = { phase: 'opening', notice: copy.labelOpening };
   const show = (phase, extra = {}) => { state = { phase, form, answers, busy, ...extra }; onChange(state); return state; };
-  const unavailable = kind => show('unavailable', { notice: ({ closed: copy.collectionClosed, cannotResume: copy.cannotResume, rateLimited: copy.rateLimited, transient: copy.transient })[kind] || copy.linkUnavailable });
+  // DoD 6: a rate-limit refusal says so and carries its wait, so the page can enable "Try again" after that wait.
+  // A one-minute limiter reads copy.rateLimited; any other cap keeps the server's own message and wait (e.limitText).
+  let limits = 0; // each refusal gets its own id so a repaint of the same state does not restart the wait
+  const limit = (kind, e) => kind === 'rateLimited' ? { rateLimited: true, retryAfter: retryAfterSeconds(e?.retryAfter), limitId: ++limits } : {};
+  const limitedNotice = e => (e?.limitText && retryAfterSeconds(e?.retryAfter) > 60 ? e.limitText : copy.rateLimited);
+  const unavailable = (kind, e) => show('unavailable', { notice: kind === 'rateLimited' ? limitedNotice(e) : ({ closed: copy.collectionClosed, cannotResume: copy.cannotResume, transient: copy.transient })[kind] || copy.linkUnavailable, ...limit(kind, e) });
   function receipt(result) {
     store.remove('draft'); store.remove('submitKey'); uncertain = false;
     // thanks: the notice's inputs, so the page can say it in the participant's language (receiptNotice with its translator).
@@ -36,16 +44,32 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
     try { return await fn(); }
     finally { busy = false; state = { ...state, busy: false }; onChange(state); }
   }
+  // S29: open the link again with no resume credential, so the server starts a new respondent. A rate-limit refusal
+  // keeps retryNext set (and the old session as this tab's), so the page's "Try again" lands back here.
+  async function openNext(previous = store.get('bearer'), drop = () => { store.remove('bearer'); answers = undefined; context = {}; uncertain = false; }) {
+    drop(); client = createSharedLinkClient({ store, fetchImpl });
+    try { await client.open(linkToken); }
+    catch (e) {
+      if (previous) store.set('bearer', previous); client = createSharedLinkClient({ store, fetchImpl }); // the old session stays this tab's
+      const kind = errorKind(e); retryNext = kind === 'rateLimited';
+      return unavailable(kind === 'conflict' ? 'closed' : kind, e);
+    }
+    retryNext = false;
+    try { const next = await loadForm(); return next.phase === 'form' ? show('form', { draft: null, notice: SURVEYOR_EN.nextPerson, fresh: true }) : next; }
+    catch (e) { return unavailable(errorKind(e), e); }
+  }
   return {
     get state() { return state; },
     // S23: the participant token this tab holds (null before the link opens), for the page's translate requests only.
     // It is the shared-link client's own bearer — never a staff token (this journey reads no staff identity).
     get bearer() { return client?.bearer || null; },
-    async start() {
+    // retry: after a rate-limit refusal the fragment is already stripped, so open again with the in-memory link token.
+    async start({ retry = false } = {}) {
+      if (retry && retryNext) return action(openNext);
       return action(async () => {
         // Strip before the first async operation; malformed credentials cannot fall through to staff.
-        const hash = win.location.hash;
-        const token = parseEntryFragment(hash);
+        const hash = retry ? '' : win.location.hash;
+        const token = retry ? linkToken : parseEntryFragment(hash);
         if (hash) stripFragment(win);
         if (hash && token === null) return unavailable('unavailable');
         linkToken = token;
@@ -58,14 +82,14 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
         rememberCurrent(storage, namespace);
         if (token !== null) {
           try { await client.open(token); }
-          catch (e) { const kind = entryFailureKind(e, !!client.bearer); return kind === 'conflict' ? conflict() : unavailable(kind); }
+          catch (e) { const kind = entryFailureKind(e, !!client.bearer); return kind === 'conflict' ? conflict() : unavailable(kind, e); }
         } else if (!client.bearer) return show('unavailable', { notice: 'Open your original survey link to continue. No participant session is available in this tab.' });
         try {
           const result = await client.receipt();
           return result.submitted ? receipt(result) : await loadForm();
         } catch (e) {
           const kind = token === null ? entryFailureKind(e, true) : errorKind(e);
-          return kind === 'conflict' ? conflict() : unavailable(kind);
+          return kind === 'conflict' ? conflict() : unavailable(kind, e);
         }
       });
     },
@@ -105,16 +129,7 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
       const previous = store.get('bearer');
       const drop = () => { store.remove('bearer'); store.remove('draft'); store.remove('submitKey'); answers = undefined; context = {}; uncertain = false; };
       if (!linkToken) { drop(); client = createSharedLinkClient({ store, fetchImpl }); return show('unavailable', { notice: SURVEYOR_EN.openLinkForNext }); }
-      return action(async () => {
-        drop(); client = createSharedLinkClient({ store, fetchImpl });
-        try { await client.open(linkToken); }
-        catch (e) {
-          if (previous) store.set('bearer', previous); client = createSharedLinkClient({ store, fetchImpl }); // the old session stays this tab's
-          const kind = errorKind(e); return unavailable(kind === 'conflict' ? 'closed' : kind);
-        }
-        try { const next = await loadForm(); return next.phase === 'form' ? show('form', { draft: null, notice: SURVEYOR_EN.nextPerson, fresh: true }) : next; }
-        catch (e) { return unavailable(errorKind(e)); }
-      });
+      return action(() => openNext(previous, drop));
     },
     async recover() {
       if (!client || !client.bearer || state.phase === 'receipt') return;
@@ -128,7 +143,7 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
           const kind = errorKind(e);
           if (kind === 'unavailable') return unavailable(uncertain ? 'cannotResume' : 'unavailable');
           if (kind === 'conflict') return conflict();
-          return show(state.phase, { draft: state.draft, notice: uncertain ? copy.submitUncertain : kind === 'rateLimited' ? copy.rateLimited : copy.transient });
+          return show(state.phase, { draft: state.draft, notice: uncertain ? copy.submitUncertain : kind === 'rateLimited' ? limitedNotice(e) : copy.transient, ...(uncertain ? {} : limit(kind, e)) });
         }
       });
     },

@@ -60,30 +60,33 @@ test('R1 full payload renders header, stability line and every section in payloa
   assert.equal(tech.tag, 'details'); assert.equal(tech.open, undefined);
   assert.equal(tech.children[0].tag, 'summary'); assert.equal(tech.children[0].textContent, 'Technical details');
   assert.match(tech.children[1].textContent, /^Synthetic data · source f042cde · scorer steve-f042cde-single-assessment-v1 · narrative steve-f042cde-rule-narrative-v1 · policy synthetic-current-assessment-asof-query-v1/);
-  assert.deepEqual(root.children.slice(2).map(s => s.children[0].textContent), [copy.lenses, copy.crossLens, copy.standalone, copy.translationAgreement, copy.evidence, copy.narrative]);
+  assert.deepEqual(root.children.slice(2).map(s => s.children[0].textContent), [copy.crossLens, copy.lenses, copy.standalone, copy.translationAgreement, copy.evidence, copy.narrative]);
   for (const node of root.children) assert.equal('innerHTML' in node, false);
 });
 
 test('R2 lenses print scores exactly as returned; an empty sub-dimension list adds no rows', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.lenses), ['team', '66.66666', 'process · 70 · 3', 'relationships · 63.3333 · 2', 'church', '0']);
+  assert.deepEqual(sectionRows(root, copy.lenses), ['team', '66.66666', 'Overall score', 'process', 'Score', '70', 'Items included', '3', 'relationships', 'Score', '63.3333', 'Items included', '2', 'church', '0', 'Overall score']);
 });
 
-test('R3 cross-lens: multi before single, null agreement_range prints the fixed label "one lens"', () => {
+test('R3 lenses agree block leads: exact scores and spread as returned, no average, multi before single, counts visible', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.crossLens), [
-    'Shared understanding · 55.5 · 12.25', 'team: 61.75', 'community: 49.5',
-    'Church involvement · 40 · one lens', 'church: 40',
+  const rowsText = sectionRows(root, copy.crossLens);
+  assert.deepEqual(rowsText.slice(0, 15), [
+    'Each line shows one area and the score each perspective gave it, on a 0–100 scale. Biggest difference first; areas only one perspective scored come last.',
+    'Shared understanding', 'Some difference · Difference 12.25', '0', '100', 'Translation team ', '61.75', ' responses not counted', 'Community ', '49.5', ' responses not counted',
+    'Church involvement', 'Only one perspective scored this area', '0', '100',
   ]);
+  assert.doesNotMatch(rowsText.join('\n'), /average|mean/i);
 });
 
 test('R4 standalone indicators, evidence and narrative rows', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.standalone), ['Is the meaning clear? · community · clarity · 82.5 · 9']);
-  assert.deepEqual(sectionRows(root, copy.evidence), ['Team form · 4', 'Church form · 2']);
+  assert.deepEqual(sectionRows(root, copy.standalone), ['Is the meaning clear?', 'community · clarity', 'Score', '82.5', 'Responses', '9']);
+  assert.deepEqual(sectionRows(root, copy.evidence), ['Team form', 'Submissions', '4', 'Church form', 'Submissions', '2']);
   assert.deepEqual(sectionRows(root, copy.narrative), ['Team scores are highest on process.', 'One lens has no comparable data.']);
 });
 

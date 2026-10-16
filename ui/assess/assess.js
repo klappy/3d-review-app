@@ -6,10 +6,10 @@ import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
 // Data: existing /v2 endpoints only, same-origin session (cookie or the legacy facilitatorToken). No fictional model.
 // Anything the showcase draws that this slice does not wire is omitted, never rendered as a working control.
 import { redactDiagnosticPath } from '/diagnostic-path.js';
+import { refusalError } from '/rate-limit.js';
 import { loadBlankPrint, renderBlankPrint, printAllowed, rememberTab, recalledTab, STAGES } from '/stage-screens.js';
 import { printLanguages, printLanguageField, translatePrint, facilitatorFetch, printReadyLine } from './print-lang.js';
 import { openPrintDocument, activeSurveyLink, paperLink, printIdentityFrom } from './print.js';
-import { whatsHere } from '/assess/whats-here.js';
 import * as cards from '/assess/cards.js';
 import { breadcrumbs } from '/v3/components/breadcrumbs.js';
 import { sidebarTree } from '/v3/components/sidebar-tree.js';
@@ -96,7 +96,7 @@ async function api(url, { method = 'GET', body } = {}) {
   let r; try { r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); }
   catch { throw new Error('API unavailable. For a write, its outcome is unknown.'); }
   let j = null; try { j = await r.json(); } catch {}
-  if (!r.ok || !j?.ok) { const e = new Error(j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
+  if (!r.ok || !j?.ok) throw refusalError(r.status, j?.error, r);
   return j.result;
 }
 // Same call, whole envelope (result + receipt + trace_id) — G1 shows receipt/trace on the row after a write.
@@ -105,7 +105,7 @@ async function apiFull(url, { method = 'GET', body } = {}) {
   const headers = { accept: 'application/json' }; if (body !== undefined) headers['content-type'] = 'application/json'; if (token) headers.authorization = `Bearer ${token}`;
   let r; try { r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); } catch { throw new Error('API unavailable. For a write, its outcome is unknown.'); }
   let j = null; try { j = await r.json(); } catch {}
-  if (!r.ok || !j?.ok) { const e = new Error(j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
+  if (!r.ok || !j?.ok) throw refusalError(r.status, j?.error, r);
   return j;
 }
 const redact = m => redactDiagnosticPath(String(m || 'Request could not be completed.'));
@@ -954,7 +954,7 @@ function resetIdentity() {
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
   state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false; state.myInvitations = null; printLangs.clear();
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
-  for (const id of ['legacy-link', 'whats-here-wrap']) { const el = document.getElementById(id); if (el) el.hidden = true; }
+  for (const id of ['legacy-link']) { const el = document.getElementById(id); if (el) el.hidden = true; }
 }
 function syncContextDisclosure(event) {
   if (!event.matches) { const disclosure = app?.querySelector('.context-disclosure'); if (disclosure) disclosure.open = true; }
@@ -1020,9 +1020,8 @@ async function boot() {
     app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p><p><a class="button primary" href="#">Go to sign in</a> <a class="button" href="/v2/auth/access">Sign in with an email code</a></p></div>`;
     return; }
   void loadAccountEmail();
-  // E1: signed-in staff get the real-app way back (same-origin session, no token) and the generated functionality statement.
+  // The retired legacy backlink stays hidden; capability inventory is machine-readable metadata only.
   const back = document.getElementById('legacy-link'); if (back) back.hidden = true;
-  const wh = document.getElementById('whats-here'); if (wh) { wh.textContent = whatsHere(); const wrap = document.getElementById('whats-here-wrap'); if (wrap) wrap.hidden = false; else wh.hidden = false; }
   // A12 (R1/I1): a transient failure here renders a retryable message, never a blank page.
   try { const result = await api('/v2/projects'); if (identity !== identityGeneration) return; state.projects = result.projects || []; }
   catch (e) { if (identity !== identityGeneration) return; // Auth A14: a direct #assessment/<id> still renders under "Granted to you"; the project list failure is a retryable notice, not a dead end.

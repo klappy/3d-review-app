@@ -1,0 +1,59 @@
+{
+  "sources": {
+    "cookbook-signal": {
+      "kind": "repository-file",
+      "url": "https://github.com/klappy/3d-review-cookbook/blob/09cffb623af6f0d8688de9f47c71570430857bdf/design/2026-09-28-glass-redesign/canvas/Results.dc.html",
+      "revision": "09cffb623af6f0d8688de9f47c71570430857bdf",
+      "status": "proposed-design; selected by user as mockup baseline 2026-10-14",
+      "supports": "Four ascending bars + text; dashed evidence gap; per-lens/subdimension layout"
+    },
+    "steve-visual-faces": {
+      "kind": "email-attachment-renderer",
+      "filename": "low-numeracy-mockup-faces.html",
+      "email_date": "2026-08-17",
+      "creation_date": "unknown",
+      "extracted_renderer_utf8_lf_sha256": "26df4a6284de57579d2a18b2a6b6a27f60761c27396170766e09adfaa9d29f50",
+      "scope": "const STATUS through before const LENSES; only SVG functions reused",
+      "adaptations": "IIFE namespace; unique clipPath IDs at callsite; shared word label; missing input uses dashed bars; no original respondent data",
+      "status": "source inspected; original drawing reused; rendered Site browser QA unavailable",
+      "private_source_handle": "email:1a010b807eff4706"
+    },
+    "steve-visual-container": {
+      "kind": "email-attachment-renderer",
+      "filename": "low-numeracy-mockup-container.html",
+      "email_date": "2026-08-17",
+      "creation_date": "unknown",
+      "extracted_renderer_utf8_lf_sha256": "f5ce49d7552693783bc9aea4f5a32cafcecdbc6248e40741d8e9859b4a96a4ca",
+      "scope": "const STATUS through before const LENSES; only SVG functions reused",
+      "adaptations": "IIFE namespace; unique clipPath IDs at callsite; shared word label; missing input uses dashed bars; no original respondent data",
+      "status": "source inspected; original drawing reused; rendered Site browser QA unavailable",
+      "private_source_handle": "email:1a010b807eff4706"
+    },
+    "steve-visual-plant": {
+      "kind": "email-attachment-renderer",
+      "filename": "low-numeracy-mockup-plant.html",
+      "email_date": "2026-08-17",
+      "creation_date": "unknown",
+      "extracted_renderer_utf8_lf_sha256": "acef718e1b5768f0d1d319cc929549ae7d79dec86d5d84edfb0b36389810730e",
+      "scope": "const STATUS through before const LENSES; only SVG functions reused",
+      "adaptations": "IIFE namespace; unique clipPath IDs at callsite; shared word label; missing input uses dashed bars; no original respondent data",
+      "status": "source inspected; original drawing reused; rendered Site browser QA unavailable",
+      "private_source_handle": "email:1a010b807eff4706"
+    },
+    "proposal-missing-visuals": {
+      "kind": "user-request-and-authored-adaptation",
+      "request_date": "2026-10-14T16:41:18-04:00",
+      "request": "Each visual style needs its own More input needed imagery; all empty bars are insufficient.",
+      "status": "proposed visual adaptation; not an original Steve asset",
+      "supports": "Neutral outlined face with question badge; unfilled jar with question mark; upright outlined sprout with question badge. Null remains missing, never zero or low.",
+      "accessibility": "Adjacent persistent text More input needed is the accessible label; decorative SVG hidden to avoid duplicate announcements."
+    },
+    "report-imagery-adapter": {
+      "kind": "implementation-contract",
+      "url": "https://github.com/klappy/3d-review-cookbook/blob/b4d7619711b72540bce044150abe2bfd521cfb18/work/active/2026-10-14-reporting-delivery/IMAGERY-ADAPTER-CONTRACT.md",
+      "preview_source": "54a6b96dd75a00cc1e3736f0067d25a7dff43c90",
+      "scope": "Existing band words rendered with interchangeable imagery. No score/count rule."
+    }
+  },
+  "adaptations": "Original drawing geometry; scored renderer accepts existing app band labels, no preview thresholds. Colors mapped to existing app tokens. App owns scores/count gates."
+}

@@ -148,10 +148,12 @@ describe("self-service creation: provisioned defaults true for every normal user
     expect(pl3.result.projects[0]).toMatchObject({ assessment_count: 1 });
     const wg: any = await call(mila.principal, "cap.workspace.get", { id: ws.result.workspace.id }, "read");
     expect(wg.result.projects[0]).toMatchObject({ assessment_count: 1 });
-    // L1-45 (captain 17:05): a project in the workspace without a grant is not counted on the workspace card.
-    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at) VALUES ('prj_l145_hidden', ?, 'Hidden project', '2026-09-24T00:00:00Z')").bind(ws.result.workspace.id).run();
+    // L1-45 (captain 17:05) counted only projects with a grant. Since workspace roles inherit to every grouped project
+    // (cookbook work/active/2026-10-15-3d-workspace-permissions), a grouped project with no direct grant is reachable
+    // through the workspace grant and IS counted; assessments without their own grant still are not (D9).
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at) VALUES ('prj_l145_grouped', ?, 'Grouped project', '2026-09-24T00:00:00Z')").bind(ws.result.workspace.id).run();
     const wl3: any = await call(mila.principal, "cap.workspace.list", {}, "read");
-    expect(wl3.result.workspaces[0]).toMatchObject({ project_count: 1, assessment_count: 1 });
+    expect(wl3.result.workspaces[0]).toMatchObject({ project_count: 2, assessment_count: 1 });
     // L1-46 (captain 17:05, L1-45 validator advisory): responses on an assessment without a grant are not counted; responses on a visible one are.
     await db.prepare("INSERT INTO assessment (id, project_id, language_id, name, stage, created_at) VALUES ('asm_l146_hidden', ?, 'lang_l130', 'Hidden with responses', 'collect', '2026-09-24T00:00:00Z')").bind(pid).run();
     for (const [sid, aid] of [["srv_l146_hidden", "asm_l146_hidden"], ["srv_l146_seen", "asm_l130_hidden"]]) {
@@ -163,7 +165,7 @@ describe("self-service creation: provisioned defaults true for every normal user
     const pl4: any = await call(mila.principal, "cap.project.list", {}, "read");
     expect(pl4.result.projects[0]).toMatchObject({ assessment_count: 1, response_count: 1 });
     const wl4: any = await call(mila.principal, "cap.workspace.list", {}, "read");
-    expect(wl4.result.workspaces[0]).toMatchObject({ project_count: 1, assessment_count: 1, response_count: 1 });
+    expect(wl4.result.workspaces[0]).toMatchObject({ project_count: 2, assessment_count: 1, response_count: 1 });
     const wg4: any = await call(mila.principal, "cap.workspace.get", { id: ws.result.workspace.id }, "read");
     expect(wg4.result.projects[0]).toMatchObject({ assessment_count: 1, response_count: 1 });
   });

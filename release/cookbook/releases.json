@@ -1,7 +1,116 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.29.0",
+  "current": "0.32.0",
   "versions": [
+    {
+      "version": "0.32.0",
+      "status": "candidate",
+      "notes_path": "releases/0.32.0.md",
+      "sections": {
+        "added": [
+          "\"Do the perspectives agree?\" leads the results overview and the full report: one barbell per area scored by two or more perspectives (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), then areas only one perspective scored, with response counts beside each perspective score and Consultant responses named inside the Church count."
+        ],
+        "changed": [
+          "The full report no longer shows the cross-lens average; lens scores and their difference only. Payload, scoring and narrative unchanged."
+        ]
+      }
+    },
+    {
+      "version": "0.31.0",
+      "status": "candidate",
+      "notes_path": "releases/0.31.0.md",
+      "sections": {
+        "changed": [
+          "Workspace roles now apply to every project grouped in the workspace: a workspace owner, member or viewer opens each grouped project at that role (the higher of the workspace and any direct project grant) without a per-project invite. Viewers still cannot edit; people outside the workspace still see none of its projects; assessments still open only with their own grant. Workspace cards count every grouped project. (#483)",
+          "Authority over a project needs a DIRECT project grant, never one inherited from the workspace: grouping a project into a workspace, transferring project ownership, inviting or promoting anyone to project owner, and accepting an owner invitation all require a direct project owner; ungrouping needs the workspace owner or a direct project owner. No one may invite themselves, accept an invitation they created, or invite someone who already has access at that scope (change an existing grant with update_role). The workspace screen offers grouping only on the same rules. (#483)"
+        ]
+      }
+    },
+    {
+      "version": "0.30.5",
+      "status": "candidate",
+      "notes_path": "releases/0.30.5.md",
+      "sections": {
+        "fixed": [
+          "Full report details use the existing card styling in the assessment host, label scores and evidence counts, and separate narrative observations for easier scanning. Overview bands, values and report content remain unchanged. (#478)",
+          "Facilitator report-detail scenario: 15/15 renderer tests passed; matched automated local fixtures at phone and desktop widths in light and dark were independently inspected. Live DEV/production and full-app navigation remain untested; human satisfaction, confusion and frustration are not measured.",
+          "Recovery correction: independent review found that actual ui/index.html and ui/assess/index.html omit report-cards.css; the earlier fixture supplied it and does not establish real-host styling. The same 0.30.5 correction loads the existing stylesheet only in ui/index.html for the /#assessment route. The direct ui/assess/index.html host remains unrepaired because its .rv wrapper and token gaps are unresolved. Root-host verification, exact-head review and release-pin checks are pending; no DEV or production acceptance is claimed. Aggregation and longitudinal features remain outside this increment."
+        ]
+      }
+    },
+    {
+      "version": "0.30.4",
+      "status": "candidate",
+      "notes_path": "releases/0.30.4.md",
+      "sections": {
+        "fixed": [
+          "Missing participant/print translation strings receive one bounded second batch; successful strings remain unchanged and still-missing strings retain marked English fallback. Local source18/18 and print2/2 scenarios passed; live and language-quality verification pending. (#477)"
+        ]
+      }
+    },
+    {
+      "version": "0.30.3",
+      "status": "candidate",
+      "notes_path": "releases/0.30.3.md",
+      "sections": {
+        "fixed": [
+          "Incomplete printed translations clearly name missing phrases and the existing retry action while preserving marked-English printable fallback. Facilitator local status simulation:4/4 cases passed; no human usability or translation-coverage improvement claim. (#475)"
+        ]
+      }
+    },
+    {
+      "version": "0.30.2",
+      "status": "released",
+      "notes_path": "releases/0.30.2.md",
+      "sections": {
+        "fixed": [
+          "Human-facing pages remove capability inventories and generic help accordions, show essential guidance inline, and keep synthetic sign-in tools off normal login screens. Reporting activation and authentication rules unchanged."
+        ]
+      },
+      "tag": "v0.30.2",
+      "date": "2026-10-15"
+    },
+    {
+      "version": "0.30.1",
+      "status": "released",
+      "notes_path": "releases/0.30.1.md",
+      "sections": {
+        "fixed": [
+          "Understand result bands support swappable signal bars, faces, jars and plants with distinct missing-input visuals; existing labels, scores, thresholds, response gates and permissions unchanged. (#467)"
+        ]
+      },
+      "tag": "v0.30.1",
+      "date": "2026-10-15"
+    },
+    {
+      "version": "0.30.0",
+      "status": "released",
+      "notes_path": "releases/0.30.0.md",
+      "sections": {
+        "added": [
+          "Default-off production participant-report admission, retaining existing scoring, snapshots, access checks and the assessment response minimum. Activation requires explicit disclosure-policy approval; this candidate configures no environment. (#464)"
+        ],
+        "changed": [],
+        "fixed": []
+      },
+      "tag": "v0.30.0",
+      "date": "2026-10-15"
+    },
+    {
+      "version": "0.29.1",
+      "status": "released",
+      "notes_path": "releases/0.29.1.md",
+      "sections": {
+        "added": [],
+        "changed": [],
+        "fixed": [
+          "Assessment setup can add a named language to an existing project or explicitly restore and select an archived language. Optional language codes accept mixed case and store lowercase; duplicate and retry handling preserve the assessment's language identity. Survey translation support stays separate. (#463)",
+          "Local facilitator fixture outcomes: six of six setup runs passed across phone and laptop (existing project, new project, archived restore with failure/retry). No human usability measurement or Bincy exact-input reproduction. DEV and production verification pending."
+        ]
+      },
+      "tag": "v0.29.1",
+      "date": "2026-10-15"
+    },
     {
       "version": "0.29.0",
       "status": "candidate",
