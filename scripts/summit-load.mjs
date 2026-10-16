@@ -131,7 +131,10 @@ async function main() {
     const id = r.body?.trace_id; if (!id) return null;
     const t = await call("GET", `/v2/ops/traces/${encodeURIComponent(id)}`, null, sess);
     if (!t.body?.ok) return { trace_id: id, error: t.body?.error?.code ?? t.status };
-    return { trace_id: id, spans: (t.body.result.spans ?? []).filter((x) => x.span === "report.stage").map((x) => ({ stage: x.data?.stage, ms: x.data?.ms })) };
+    // cap.ops.trace returns the persisted blob (src/receipt.ts persistTrace): result.spans = { capability, transport, ok, ..., spans: [...] }.
+    const blob = t.body.result?.spans;
+    const list = Array.isArray(blob) ? blob : Array.isArray(blob?.spans) ? blob.spans : [];
+    return { trace_id: id, spans: list.filter((x) => x.span === "report.stage").map((x) => ({ stage: x.data?.stage, ms: x.data?.ms })) };
   }
   const reportStages = { dry_run: await stages(dry), execute: await stages(exe) };
 
