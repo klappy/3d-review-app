@@ -89,6 +89,20 @@ test('DoD2: the invitation confirm opens inline under Invite, inside the form, n
   await x.click('data-confirm-cancel'); assert.doesNotMatch(x.root.html, /data-confirm-sheet/);
 });
 
+test('PR #508: editing email or role after the invite preview drops the confirm — Confirm cannot invite the old values; Invite is not primary while the confirm is open', async () => {
+  const t = { 'POST /v2/assessment/a1/invitations': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'cfm_1', expires_in: 300, impact: {} } : { invitation_id: 'inv_new', role: 'member', status: 'sent', delivered: true } };
+  for (const ev of ['input', 'change']) {
+    const x = await mount('owner', t, { email: 'old@example.test', role: 'member' });
+    await x.submit('data-invite-form'); const h = x.root.html;
+    assert.equal((h.match(/class="primary"/g) || []).length, 1, 'one primary while the confirm is open'); assert.match(h, /class="primary" data-confirm-execute/); assert.match(h, /<button type="submit" data-invite-submit[^>]*>Invite</);
+    const execute = x.root.querySelector('[data-confirm-execute]');
+    x.root.querySelector('[data-invite-form]').fire(ev);
+    assert.equal(x.m.sheet, null, `${ev} drops the invite confirm`);
+    await execute.fire('click');
+    assert.equal(x.calls.filter(c => c.body?.mode === 'execute').length, 0, 'the stale confirm never executes');
+  }
+});
+
 test('N8/N10 CONFIRM_REQUIRED on execute → dry_run re-run silently once and the sheet re-shown, execute NOT auto-retried; N9 CONFIRM_EXPIRED → "Preview again", no retry', async () => {
   const seen = []; let n = 0;
   const t = { 'POST /v2/assessment/a1/invitations': ({ body }) => { seen.push(body.mode); if (body.mode === 'dry_run') return { confirm_token: 'cfm_' + (++n), expires_in: 300, impact: { effect: 'external' } }; return err('CONFIRM_REQUIRED', 409, 'confirmation expired or does not match this intent'); } };

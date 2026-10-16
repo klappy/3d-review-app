@@ -29,7 +29,7 @@ export function invitationOutcome(result) {
 export function mountScopeInvitations({document: doc, root, request, getContext, onGrantsChanged = () => {}, onAcceptanceEnded = () => {}}) {
   let scope = null, mode = 'manager', list = null, pending = null, credential = null, completedInvitation = null;
   let message = '', failure = false, busy = false, destroyed = false, epoch = 0, renderId = 0;
-  let status, confirmation, inviteConfirmation, credentialBox, controls = [], confirmButton;
+  let status, confirmation, inviteConfirmation, inviteButton, credentialBox, controls = [], confirmButton;
   const context = () => getContext() || {};
   const staff = c => !!c.principalId && ['user', 'support'].includes(c.kind) && c.shared === false;
   const identity = c => JSON.stringify([c.principalId, c.kind, c.generation, c.shared]);
@@ -42,6 +42,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     epoch++; pending = null; credential = null; completedInvitation = null; lock(false);
     confirmation?.replaceChildren(); inviteConfirmation?.replaceChildren(); credentialBox?.replaceChildren();
     if (confirmButton) confirmButton = null;
+    if (inviteButton) inviteButton.className = ''; // PR #508: Invite is the primary again once no confirm is open
   }
   function safeFailure(error, write) {
     // Never surface a supplied error message/URL: acceptance URLs contain tokens.
@@ -98,7 +99,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
       setStatus('Cancelled. Nothing further was sent.');
     }, {secondary:true}));
     setStatus('Review the action, then confirm.');
-    if (slot === inviteConfirmation) confirmButton.focus?.();
+    if (slot === inviteConfirmation) { if (inviteButton) inviteButton.className = 'quiet'; confirmButton.focus?.(); } // PR #508: Confirm invitation is the single primary
   }
   async function preview(intent) {
     clearIntent(); const s = snapshot(); lock(true); setStatus('Preparing confirmation…');
@@ -111,7 +112,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
   async function confirm() {
     const intent = pending;
     if (!intent || !current(intent.snapshot)) { clearIntent(); setStatus('Preview again before confirming.'); return; }
-    pending = null; confirmation.replaceChildren(); inviteConfirmation?.replaceChildren(); const s = snapshot(); lock(true); setStatus('Applying confirmed action…');
+    pending = null; confirmation.replaceChildren(); inviteConfirmation?.replaceChildren(); if (inviteButton) inviteButton.className = ''; const s = snapshot(); lock(true); setStatus('Applying confirmed action…');
     try {
       const result = baseResult(await request(intent.url, {method:intent.method, body:{...intent.body, mode:'execute', confirm_token:intent.token}}));
       if (!current(s)) return;
@@ -164,7 +165,7 @@ export function mountScopeInvitations({document: doc, root, request, getContext,
     const form = el('form', undefined, 'scope-invitations-form'), email = input('email','invite-email'), role = roleSelect(invitationRoles(scope.role));
     email.maxLength = 320;
     form.append(field('Recipient email', email), field('Role at this scope', role));
-    form.append(button('Invite', () => {
+    form.append(inviteButton = button('Invite', () => {
       if (!form.reportValidity()) return;
       const recipient = email.value.trim(); if (!recipient || !invitationRoles(scope.role).includes(role.value)) return;
       return preview({kind:'invite',url:`${path()}/invitations`,method:'POST',body:{email:recipient,role:role.value},summary:`Send an invitation to ${recipient} as ${role.value} at this ${scope.type} only? Delivery will be reported after creation.`,confirmLabel:'Confirm invitation'});

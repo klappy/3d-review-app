@@ -182,3 +182,12 @@ test('DoD2: invitation confirm renders inline inside the invite form and names t
  const bottom=walk(w.root).find(x=>x.className==='scope-invitations-confirmation');assert.equal(bottom.children.length,0,'nothing at the bottom');
  w.button('Cancel').click();assert.equal(inline.children.length,0);
 });
+test('PR #508: editing email or role after the inline invite preview drops the confirm; Invite is quiet while the confirm is open',async()=>{
+ for(const which of ['email','role']){
+  const w=world((_u,o)=>o.method==='GET'?list():o.body.mode==='dry_run'?confirmResult:{invitation_id:'i1',status:'sent'});await w.api.setScope(scope);await emailPreview(w);
+  assert.ok(w.buttons().includes('Confirm invitation'));assert.equal(w.button('Invite').className,'quiet');const stale=w.button('Confirm invitation');
+  if(which==='email'){w.input('invite-email').value='typo-fixed@example.invalid';w.input('invite-email').fire('input')}else{const sel=walk(w.root).find(x=>x.tag==='select');sel.value='viewer';sel.fire('change')}
+  assert.ok(!w.buttons().includes('Confirm invitation'),`${which} edit drops the confirm`);assert.equal(w.button('Invite').className,'');
+  stale.click();await flush();assert.equal(w.calls.filter(x=>x.body?.mode==='execute').length,0,'stale confirm never executes');
+ }
+});
