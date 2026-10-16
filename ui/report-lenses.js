@@ -84,7 +84,7 @@ export function lensSpreadRows(report, { exact = false } = {}) {
 // tokens (--band-growing / --band-needs-support / --band-urgent), chips the badge and warning pairs, quiet text --secondary.
 export const lensesCss = `.lens-agree{margin:12px 0}.lens-agree h3,.lens-agree h4{margin:0 0 4px}.lens-agree>p{margin:0 0 10px}
 .lens-agree ul.lens-agree-rows{list-style:none;padding:0;margin:0;display:grid;gap:10px}
-.lens-agree-row{padding:10px 12px;border:1px solid var(--line);border-left-width:6px;border-radius:12px;min-width:0}
+.lens-agree-row{padding:10px 12px;border:1px solid var(--line);border-left-width:6px;border-radius:12px;min-width:0;background:var(--perspective-fill)}
 .lens-agree-row[data-spread-band=agree]{border-left-color:var(--band-growing)}.lens-agree-row[data-spread-band=mixed]{border-left-color:var(--band-needs-support)}
 .lens-agree-row[data-spread-band=disagree]{border-left-color:var(--band-urgent)}
 .lens-agree-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;align-items:baseline}
@@ -102,7 +102,8 @@ export const lensesCss = `.lens-agree{margin:12px 0}.lens-agree h3,.lens-agree h
 .lens-agree-dot[data-lens=church i]{background:var(--lens-yellow)}
 .lens-agree-scale{display:flex;justify-content:space-between;font-size:11px;color:var(--secondary);margin:0 0 4px}
 ul.lens-agree-scores{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px}
-.lens-agree-scores li{display:flex;align-items:center;gap:6px;border:0!important;padding:0!important}
+.lens-agree-scores li{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;max-width:100%;border:0!important;padding:0!important}
+.lens-agree-scores li>:not(.lens-agree-n){white-space:nowrap}.lens-agree-scores .lens-agree-n{min-width:0}
 .lens-agree-scores .lens-agree-dot{position:static;margin:0;width:10px;height:10px;border-width:1px}
 .lens-agree-scores b{font-variant-numeric:tabular-nums}.lens-agree-n{color:var(--secondary);font-size:13px}
 .lens-agree-legend{font-size:13px;color:var(--secondary);margin:10px 0 0}`;

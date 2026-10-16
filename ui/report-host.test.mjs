@@ -42,3 +42,25 @@ test('full-report section rules for lists and paragraphs do not reach the lenses
   for (const sel of selectors) assert.equal(inside.filter(el => el.matches(sel)).length, 0, `${sel.trim()} must not match inside the lenses block`);
   dom.window.close();
 });
+
+test('host full-report li margin rule (index.html) does not reach the lenses block rows or score lines', async () => {
+  const { renderLensesAgree } = await import('./report-lenses.js');
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const hostCss = html.match(/s\.textContent = a \+ b \+ c \+ `([^`]*)`/)[1];
+  const dom = new JSDOM('<!doctype html><main class="rv"><section class="report-full"><div data-report-view><ul><li id="other">kept</li></ul></div></section></main>');
+  const doc = dom.window.document;
+  const style = doc.createElement('style'); style.textContent = hostCss; doc.head.append(style);
+  const liRules = [...style.sheet.cssRules].filter(r => r.selectorText && /\[data-report-view\][^,]*\bli\b/.test(r.selectorText) && /margin/.test(r.style.cssText));
+  assert.ok(liRules.length >= 1, 'host li margin rule found');
+  const report = { payload: { cross_lens_multi: [{ construct_name: 'Appeal', agreement_range: 52.5, lens_scores: [{ lens: 'Church', score: 84.75 }, { lens: 'Translation Team', score: 32.25 }] }, { construct_name: 'Clarity', agreement_range: 4, lens_scores: [{ lens: 'Church', score: 70 }, { lens: 'Community', score: 66 }] }] } };
+  const lens = renderLensesAgree({ doc, report });
+  doc.querySelector('[data-report-view]').append(lens);
+  const rows = [...lens.querySelectorAll('li.lens-agree-row')], scores = [...lens.querySelectorAll('ul.lens-agree-scores li')];
+  assert.equal(rows.length, 2); assert.ok(scores.length >= 4);
+  for (const r of liRules) {
+    assert.ok(doc.getElementById('other').matches(r.selectorText), 'other report lists keep the host margin');
+    for (const el of [...rows, ...scores]) assert.ok(!el.matches(r.selectorText), `${r.selectorText} must not match ${el.className || 'score li'} inside the lenses block`);
+  }
+  for (const el of [...rows, ...scores]) assert.match(dom.window.getComputedStyle(el).marginTop, /^0(px)?$/, 'lenses rows keep the mock 10px grid gap, no extra margin');
+  dom.window.close();
+});
