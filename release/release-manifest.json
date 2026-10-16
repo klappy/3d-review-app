@@ -1,24 +1,26 @@
 {
-  "version": "0.31.0",
+  "version": "0.32.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "2dd9d9fd51703f36856962419a5657ed4b979480",
+  "cookbook_commit": "30849451b8f4c399656d544c8cb045edf051f79d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.31.0.md",
-      "blob_sha": "ba6f71df94351f8e281e2e98be44b06aee11fc9e",
-      "sha256": "4b4a34befb2ed0e1dc2a84b19a4756c19caec7b5a896f6b4b3184acbdc47620a"
+      "path": "planning/2026-09-16-parity-build/releases/0.32.0.md",
+      "blob_sha": "c50dc0eb78a91384f8950f948c014870221a7423",
+      "sha256": "8513e6e72f9ca1c5b709ddccd85736c3e772ea70a07396e14d99a2804868ca09"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "c001f6cd9d65836621d04e8c8599bf8f4c5f32a2",
-      "sha256": "5d1506d4425c7665de5b76166fc17ad9ace6361a83fe910d850033c8e8e76bc6"
+      "blob_sha": "cc84efa7af881483e63ac7ed8cb08902a78a0b02",
+      "sha256": "a1bd593a95b4f4ac580896ad722eb7b4f62ae40f978c09bdd894a37053473b7c"
     }
   ],
   "changelog": {
     "sections": {
+      "added": [
+        "\"Do the perspectives agree?\" leads the results overview and the full report: one barbell per area scored by two or more perspectives (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), then areas only one perspective scored, with response counts beside each perspective score and Consultant responses named inside the Church count."
+      ],
       "changed": [
-        "Workspace roles now apply to every project grouped in the workspace: a workspace owner, member or viewer opens each grouped project at that role (the higher of the workspace and any direct project grant) without a per-project invite. Viewers still cannot edit; people outside the workspace still see none of its projects; assessments still open only with their own grant. Workspace cards count every grouped project. (#483)",
-        "Authority over a project needs a DIRECT project grant, never one inherited from the workspace: grouping a project into a workspace, transferring project ownership, inviting or promoting anyone to project owner, and accepting an owner invitation all require a direct project owner; ungrouping needs the workspace owner or a direct project owner. No one may invite themselves, accept an invitation they created, or invite someone who already has access at that scope (change an existing grant with update_role). The workspace screen offers grouping only on the same rules. (#483)"
+        "The full report no longer shows the cross-lens average; lens scores and their difference only. Payload, scoring and narrative unchanged."
       ]
     }
   }

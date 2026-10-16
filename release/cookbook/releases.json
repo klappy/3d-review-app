@@ -1,7 +1,20 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.31.0",
+  "current": "0.32.0",
   "versions": [
+    {
+      "version": "0.32.0",
+      "status": "candidate",
+      "notes_path": "releases/0.32.0.md",
+      "sections": {
+        "added": [
+          "\"Do the perspectives agree?\" leads the results overview and the full report: one barbell per area scored by two or more perspectives (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), then areas only one perspective scored, with response counts beside each perspective score and Consultant responses named inside the Church count."
+        ],
+        "changed": [
+          "The full report no longer shows the cross-lens average; lens scores and their difference only. Payload, scoring and narrative unchanged."
+        ]
+      }
+    },
     {
       "version": "0.31.0",
       "status": "candidate",
