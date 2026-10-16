@@ -126,4 +126,45 @@ describe("anonymous twins with their own capability limiter skip RL_HTTP_ANON", 
     // the batch cap still counts every message, exempt or not
     expect((await call(env, "POST", "/mcp", Array.from({ length: 11 }, (_, i) => openRpc(i + 1)))).status).toBe(400);
   }, 30_000);
+
+  // Bugbot 4289984346: the /mcp exemption keyed on the tools/call shape, so messages that never reach the capability
+  // limiter (wrong tool, write+undo, unknown tool, invalid JSON-RPC, notification, non-object params) skipped RL_MCP_ANON.
+  it("a /mcp message that names an own-limiter capability but is not routed to it still spends RL_MCP_ANON", async () => {
+    const cap = "cap.participant.open_link";
+    const bypasses: Record<string, unknown> = {
+      "wrong tool": rpc("tools/call", { name: "read", arguments: { capability: cap, params: { token } } }),
+      "write + undo": rpc("tools/call", { name: "write", arguments: { capability: cap, params: { token }, undo: "undo_nope" } }),
+      "unknown tool": rpc("tools/call", { name: "bogus", arguments: { capability: cap, params: { token } } }),
+      "invalid JSON-RPC": { jsonrpc: "1.0", id: 1, method: "tools/call", params: { name: "write", arguments: { capability: cap, params: { token } } } },
+      "notification": { jsonrpc: "2.0", method: "tools/call", params: { name: "write", arguments: { capability: cap, params: { token } } } },
+      "non-object params": rpc("tools/call", { name: "write", arguments: { capability: cap, params: [token] } }),
+    };
+    for (const [label, msg] of Object.entries(bypasses)) {
+      const env = mkEnv({ RL_MCP_ANON: limiter(0) });
+      const r = await call(env, "POST", "/mcp", msg);
+      expect([label, r.status]).toEqual([label, 429]);
+      expect([label, env.RL_MCP_ANON.seen.get(`ip:${ROOM_IP}`)]).toEqual([label, 1]);
+      expect([label, env.RL_REDEEM.seen.size]).toEqual([label, 0]);
+    }
+    // the routed open_link itself is still exempt
+    const env = mkEnv({ RL_MCP_ANON: limiter(0) });
+    expect(((await (await call(env, "POST", "/mcp", openRpc())).json()) as any).result.structuredContent.ok).toBe(true);
+    expect(env.RL_MCP_ANON.seen.size).toBe(0);
+  }, 30_000);
+
+  // Bugbot 4289984355: an own-limiter twin whose body fails to parse returned 400 before execute(), so no limiter ran.
+  it("an own-limiter twin whose body fails to parse still spends RL_HTTP_ANON", async () => {
+    for (const raw of ["{not json", "[]", "\"str\""]) for (const path of ["/v2/participate/link", "/v2/participate/code", "/v2/auth/link"]) {
+      const env = mkEnv({ RL_HTTP_ANON: limiter(0) });
+      const r = await app.fetch(new Request("https://t.invalid" + path, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": ROOM_IP }, body: raw }), env);
+      expect([path, raw, r.status]).toEqual([path, raw, 429]);
+      expect([path, raw, env.RL_HTTP_ANON.seen.get(`ip:${ROOM_IP}`)]).toEqual([path, raw, 1]);
+    }
+    // with budget left, the parse failure is still the contract 400, charged once
+    const env = mkEnv({ RL_HTTP_ANON: limiter(5) });
+    const r = await app.fetch(new Request("https://t.invalid/v2/participate/link", { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": ROOM_IP }, body: "{not json" }), env);
+    expect(r.status).toBe(400);
+    expect(env.RL_HTTP_ANON.seen.get(`ip:${ROOM_IP}`)).toBe(1);
+    expect(env.RL_REDEEM.seen.size).toBe(0);
+  }, 30_000);
 });

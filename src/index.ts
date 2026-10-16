@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { resolvePrincipal } from "./auth";
-import { execute } from "./dispatch";
+import { chargesCapabilityLimiter, execute } from "./dispatch";
 import { fail, statusFor } from "./envelope";
 import type { Ctx, Env } from "./handlers/types";
 import { CapError } from "./handlers/types";
 import { capabilities } from "./registry";
 import { newTraceId } from "./receipt";
-import { handleMcp } from "./mcp";
+import { handleMcp, routesToOwnLimiter } from "./mcp";
 import { docs } from "./handlers/docs";
 import { ok } from "./envelope";
 import openapiText from "../contract/openapi.yaml";
@@ -53,12 +53,20 @@ for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?
     // returns the contract error and writes nothing. Credential holders are not counted here. Mirrors /mcp below.
     // Twins whose capability has its own limiter (RL_AUTH, RL_REDEEM — spent in execute() before any storage) are
     // counted there only, once: a room behind one NAT opening its link must not be refused by the generic dampener
-    // before RL_REDEEM is consulted (DEV shared-IP burst 2026-10-16: 142/200 opens refused by RL_HTTP_ANON).
-    if (ctx.principal.kind === "anonymous" && !hasCapabilityLimiter(cap.id) && !(await allow(c.env, "RL_HTTP_ANON", `ip:${ctx.clientIp}`))) {
+    // before RL_REDEEM is consulted (DEV shared-IP burst 2026-10-16: 142/200 opens refused by RL_HTTP_ANON). That
+    // exemption holds only once the request is parsed and routed to execute(): a body that fails to parse, or a call
+    // execute() would refuse before its limiter, spends RL_HTTP_ANON instead (Bugbot 4289984355).
+    const anon = ctx.principal.kind === "anonymous";
+    const ownLimiter = hasCapabilityLimiter(cap.id);
+    const anonRefused = async (): Promise<Response | null> => {
+      if (await allow(c.env, "RL_HTTP_ANON", `ip:${ctx.clientIp}`)) return null;
       const res = json(fail("RATE_LIMITED", `too many anonymous requests — sign in, or wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`, `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again`, cap.id, ctx.traceId, { retry_after: RATE_LIMIT_WINDOW_SECONDS }), 429);
       res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
       return res;
-    }
+    };
+    if (anon && !ownLimiter) { const refused = await anonRefused(); if (refused) return refused; }
+    // An own-limiter twin that leaves before execute() charges its limiter pays the generic dampener on the way out.
+    const unrouted = async (res: Response): Promise<Response> => (anon && ownLimiter ? (await anonRefused()) ?? res : res);
     try {
       let body: Record<string, unknown> = {};
       if (!["GET", "HEAD"].includes(c.req.method)) {
@@ -70,14 +78,14 @@ for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?
             body = parsed as Record<string, unknown>;
           }
         } catch {
-          return json(fail("INVALID_PARAMS", "JSON object body required", undefined, cap.id, ctx.traceId), 400);
+          return unrouted(json(fail("INVALID_PARAMS", "JSON object body required", undefined, cap.id, ctx.traceId), 400));
         }
       }
       const routeParams: Record<string, string> = c.req.param();
       if (typeof routeParams.idVersion === "string") {
         const separator = routeParams.idVersion.lastIndexOf("@");
         if (separator < 1 || separator === routeParams.idVersion.length - 1)
-          return json(fail("INVALID_PARAMS", "template id@version required", undefined, cap.id, ctx.traceId), 400);
+          return unrouted(json(fail("INVALID_PARAMS", "template id@version required", undefined, cap.id, ctx.traceId), 400));
         routeParams.id = routeParams.idVersion.slice(0, separator);
         routeParams.ver = routeParams.idVersion.slice(separator + 1);
         delete routeParams.idVersion;
@@ -91,6 +99,7 @@ for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?
         delete params.mode;
         delete params.confirm_token;
       }
+      if (anon && ownLimiter && !chargesCapabilityLimiter(cap.id, params, cap.tool)) { const refused = await anonRefused(); if (refused) return refused; }
       const result = await execute(ctx, cap.id, params, {
         tool: cap.tool,
         mode: cap.tool === "danger" ? body.mode as "dry_run" | "execute" : undefined,
@@ -119,19 +128,17 @@ app.post("/mcp", async (c) => {
   // MESSAGE (Bugbot 9ea1c79e: one POST must not buy many calls), and no caller may batch more than MCP_MAX_BATCH.
   const rpcError = (status: number, code: number, message: string, data?: Record<string, unknown>, headers: Record<string, string> = {}) =>
     new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code, message, ...(data ? { data } : {}) } }), { status, headers: { "content-type": "application/json", ...headers } });
-  // A tools/call on a capability with its own limiter (RL_REDEEM, RL_AUTH — spent in execute() before any storage) is
-  // not also charged here: like its HTTP twin it is counted once, by that limiter (DEV shared-IP burst 2026-10-16).
-  // Every other message — docs, initialize, tools/list, other capabilities, unparseable bodies — spends one unit.
-  const ownLimiter = (m: unknown) => {
-    const p = (m as any)?.params;
-    return (m as any)?.method === "tools/call" && p?.name !== "docs" && typeof p?.arguments?.capability === "string" && hasCapabilityLimiter(p.arguments.capability);
-  };
+  // A tools/call that handleMcp() routes to a capability with its own limiter (RL_REDEEM, RL_AUTH — spent in execute()
+  // before any storage) is not also charged here: like its HTTP twin it is counted once, by that limiter (DEV shared-IP
+  // burst 2026-10-16). The exemption is decided on the parsed, routed message (routesToOwnLimiter), never on the shape
+  // of its arguments: wrong tool, write+undo, unknown tool, invalid JSON-RPC and unparseable bodies all spend one unit
+  // (Bugbot 4289984346).
   let messages = 1, units = 1;
   try {
     const peek: unknown = await c.req.raw.clone().json();
     const list = Array.isArray(peek) ? peek : [peek];
     messages = Math.max(1, list.length);
-    units = list.length === 0 ? 1 : list.filter((m) => !ownLimiter(m)).length;
+    units = list.length === 0 ? 1 : list.filter((m) => !routesToOwnLimiter(m)).length;
   } catch { /* handleMcp answers the parse error */ }
   if (messages > MCP_MAX_BATCH) return rpcError(400, -32600, `batch too large: at most ${MCP_MAX_BATCH} messages per request`);
   if (ctx.principal.kind === "anonymous") for (let i = 0; i < units; i++)
