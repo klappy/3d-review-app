@@ -1,23 +1,23 @@
 {
-  "version": "0.34.1",
+  "version": "0.34.6",
   "cookbook_repo": "klappy/3d-review-cookbook",
   "cookbook_commit": "d646baae405ea5f012a85950361a3c69e84aba73",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.1.md",
-      "blob_sha": "ad33257d30999d2e0df5926891c018f11be1e319",
-      "sha256": "b561d11f664ca2f73eada8a7ffe03128349dd8369d27de6266b988aa1fefd5fe"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.6.md",
+      "blob_sha": "525327a2c683c0ecaac671a7bf9ecfdd736c4c3d",
+      "sha256": "ab72c6bec2266cc6224ef656f5edf504606f1d69f3a55a6a088c6ef0110cd22f"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "a668d5b8b59d8f26cd1e3342dcffa407ee0da8cf",
-      "sha256": "d6c690668b565c179b0ca9dcf292b7dfa3fc16f267d3171dd7293be9dc438469"
+      "blob_sha": "c0257f7e8285aefab900757303c3449f77ef36fe",
+      "sha256": "fdf849aa98bffcddcdf66f179649c23742c3bb4ed69bcf1a6a7da350b7e08eb5"
     }
   ],
   "changelog": {
     "sections": {
-      "changed": [
-        "Report build: each stage of a dry run and a build (D1 reads and write, attestation, render, canonical JSON, validation, hashing) records one `report.stage` span with only the stage name and milliseconds in the request trace, so the owner can see where build time goes. Report bytes, capture digest, report key and payload hash are unchanged. On Workers, CPU-only stages read near 0 ms (the clock advances only across I/O); the local bench gives the CPU split."
+      "fixed": [
+        "Setup step 1 on a phone: the sticky Cancel/Continue strip is now opaque with a hairline top edge, so the Location, Facilitator and other fields no longer show through it while you scroll. A focused field still scrolls clear of the strip, as before."
       ]
     }
   }

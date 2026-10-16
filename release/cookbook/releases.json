@@ -1,7 +1,57 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.34.1",
+  "current": "0.34.6",
   "versions": [
+    {
+      "version": "0.34.6",
+      "status": "candidate",
+      "notes_path": "releases/0.34.6.md",
+      "sections": {
+        "fixed": [
+          "Setup step 1 on a phone: the sticky Cancel/Continue strip is now opaque with a hairline top edge, so the Location, Facilitator and other fields no longer show through it while you scroll. A focused field still scrolls clear of the strip, as before."
+        ]
+      }
+    },
+    {
+      "version": "0.34.5",
+      "status": "candidate",
+      "notes_path": "releases/0.34.5.md",
+      "sections": {
+        "changed": [
+          "Report build is faster: one build now attests the captured responses once and reuses that result for the commit, the post-write read and the stored-report check, where it used to attest the same bytes four times. Any byte difference between those reads is still attested in full, and every digest, report key, payload hash and validation check still runs. A capture handed in from outside a build is still re-attested from its raw bytes. Report bytes and digests are unchanged."
+        ]
+      }
+    },
+    {
+      "version": "0.34.4",
+      "status": "candidate",
+      "notes_path": "releases/0.34.4.md",
+      "sections": {
+        "fixed": [
+          "The HTTP contract (`contract/openapi.yaml`) now says that starting an assessment (cap.assessment.create) takes the optional location and facilitator (string; omitted or empty stores nothing), as cap.assessment.update and the capability list already did."
+        ]
+      }
+    },
+    {
+      "version": "0.34.3",
+      "status": "candidate",
+      "notes_path": "releases/0.34.3.md",
+      "sections": {
+        "changed": [
+          "Inviting someone: the button is \"Invite\", and the confirm opens right under it, naming the address you typed and the role, with Confirm and Cancel. The separate \"Preview invitation\" step and the confirm at the bottom of the page are gone (Permissions page, collaborators panel and MCP panel)."
+        ]
+      }
+    },
+    {
+      "version": "0.34.2",
+      "status": "candidate",
+      "notes_path": "releases/0.34.2.md",
+      "sections": {
+        "fixed": [
+          "Primary navigation: the shell nav (account menu) lists Workspaces ahead of App feedback and Roadmap, so the Workspaces view opens from any page, including with zero projects; before, it was reachable only through the \"Organize projects in a workspace\" link on the Projects page."
+        ]
+      }
+    },
     {
       "version": "0.34.1",
       "status": "candidate",
