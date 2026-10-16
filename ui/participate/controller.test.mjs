@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createParticipantJourney } from './controller.js';
 import { copy, digestNamespace } from '../shared-link.js';
+import { SURVEYOR_EN } from './i18n.js';
 
 const form = { assessment: 'A', language: 'L', template: { id: 't', version: '1' }, items: [{ id: 'q', type: 'text' }] };
 const response = result => ({ ok: true, status: 200, json: async () => ({ ok: true, result }) });
@@ -195,3 +196,21 @@ for (const [label, enabled, expected] of [['off (default, key absent)', undefine
     assert.deepEqual(sent.context, expected);
   });
 }
+test('#490: "Try again" after a rate-limited "Interview another" opens the next respondent, not the prior session', async () => {
+  let links = 0;
+  const h = harness({ handle: url => {
+    if (!url.endsWith('/link')) return null;
+    links++;
+    if (links === 2) return refused('RATE_LIMITED', 429);
+    return response({ participant_token: links === 1 ? 'participant-secret' : 'next-secret' });
+  } });
+  await h.journey.start(); h.journey.review({ q: 'a' }); await h.journey.submit(); assert.equal(h.journey.state.phase, 'receipt');
+  await h.journey.another();
+  assert.equal(h.journey.state.phase, 'unavailable'); assert.equal(h.journey.state.rateLimited, true);
+  assert.equal(h.journey.bearer, 'participant-secret', 'the refused attempt keeps the old session as this tab\'s');
+  await h.journey.start({ retry: true });
+  const opens = h.requests.filter(r => r.url.endsWith('/link')).map(r => JSON.parse(r.options.body));
+  assert.deepEqual(opens.at(-1), { token: 'link-secret' }, 'retry opens with no resume credential');
+  assert.equal(h.journey.state.phase, 'form'); assert.equal(h.journey.state.fresh, true); assert.equal(h.journey.state.notice, SURVEYOR_EN.nextPerson);
+  assert.equal(h.journey.bearer, 'next-secret');
+});
