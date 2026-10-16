@@ -19,6 +19,19 @@ async function language(ctx: Ctx, pid: string, languageId: string) {
   if (!row) throw notVisible("language");
   if (row.archived_at) throw new CapError("INVALID_PARAMS", "language is archived", "cap.language.unarchive it or pick another");
 }
+// F2 (PR #502 review): on a database before migration 0015 the B19 columns are missing. Fail soft: the caller
+// retries without them so the rest of setup step 1 still saves (no 409 lock); the skip is logged.
+const b19Missing = (e: unknown) => {
+  const hit = /no such column: (location|facilitator)|has no column named (location|facilitator)/i.test(`${(e as Error)?.message ?? e} ${((e as Error)?.cause as Error)?.message ?? ""}`);
+  if (hit) console.warn("B19: location/facilitator not stored; database needs migration 0015");
+  return hit;
+};
+function optText(params: Record<string, unknown>, key: string): string | null {
+  const v = params[key];
+  if (v === undefined || v === null) return null;
+  if (typeof v !== "string") throw new CapError("INVALID_PARAMS", `${key} must be a string or null`, `type:${key}`);
+  return v.trim() || null;
+}
 export const create: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
   await loadProject(ctx, pid, "member");
@@ -29,12 +42,21 @@ export const create: Handler = async (ctx, params) => {
   const purpose = params.purpose === undefined ? null : reqStr(params, "purpose");
   const period = params.period === undefined ? null : reqStr(params, "period");
   const format = params.format === undefined ? null : reqStr(params, "format");
-  await ctx.db.batch([
-    ctx.db.prepare("INSERT INTO assessment (id, project_id, language_id, name, purpose, period, format, stage, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'prepare', ?, ?)").bind(id, pid, language_id, name, purpose, period, format, at, ctx.principal.id),
+  // B19: optional location/community and facilitator (migration 0015); omitted or empty → null.
+  let location = optText(params, "location"), facilitator = optText(params, "facilitator");
+  // The B19 columns are written only when given, so a database before migration 0015 still takes every older create.
+  const insert = (b19: boolean) => ctx.db.batch([
+    b19
+      ? ctx.db.prepare("INSERT INTO assessment (id, project_id, language_id, name, purpose, period, format, location, facilitator, stage, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'prepare', ?, ?)").bind(id, pid, language_id, name, purpose, period, format, location, facilitator, at, ctx.principal.id)
+      : ctx.db.prepare("INSERT INTO assessment (id, project_id, language_id, name, purpose, period, format, stage, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'prepare', ?, ?)").bind(id, pid, language_id, name, purpose, period, format, at, ctx.principal.id),
     ctx.db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(newId("grant"), ctx.principal.id, "assessment", id, "owner", at),
   ]);
+  if (location !== null || facilitator !== null) {
+    // The batch is atomic, so a missing-column failure left no row; retry without the B19 columns.
+    await insert(true).catch(async (e) => { if (!b19Missing(e)) throw e; location = facilitator = null; await insert(false); });
+  } else await insert(false);
   const saved = await saveLwcOnCreate(ctx, "assessment", id, lwc);
-  return { result: { assessment: { id, project_id: pid, language_id, name, purpose, period, format, lwc: saved, stage: "prepare", archived_at: null, created_at: at, role: "owner" } }, scope: { type: "assessment", id } };
+  return { result: { assessment: { id, project_id: pid, language_id, name, purpose, period, format, location, facilitator, lwc: saved, stage: "prepare", archived_at: null, created_at: at, role: "owner" } }, scope: { type: "assessment", id } };
 };
 export const list: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
@@ -78,14 +100,19 @@ export const update: Handler = async (ctx, params) => {
     return { result: { assessment: { ...view(row, role), lwc } }, scope: { type: "assessment", id }, priorState: { lwc: lwcOf(row).join(",") } };
   }
   const onlySwitch = demographicsParam !== undefined && !Object.keys(rest).some((k) => k !== "id");
-  const patch = onlySwitch ? {} as Record<string, string | null> : patchOf(rest, ["name", "purpose", "period", "language_id", "format"]);
+  const patch = onlySwitch ? {} as Record<string, string | null> : patchOf(rest, ["name", "purpose", "period", "language_id", "format", "location", "facilitator"]);
   if (patch.name !== undefined && !patch.name) throw new CapError("INVALID_PARAMS", "name cannot be empty");
   if (patch.language_id !== undefined) { if (!patch.language_id) throw new CapError("INVALID_PARAMS", "language_id cannot be empty"); await language(ctx, row.project_id, patch.language_id); }
-  const next = { name: patch.name ?? row.name, purpose: patch.purpose === undefined ? row.purpose : patch.purpose, period: patch.period === undefined ? row.period : patch.period, language_id: patch.language_id ?? row.language_id, format: patch.format === undefined ? row.format : patch.format };
-  await ctx.db.prepare("UPDATE assessment SET name = ?, purpose = ?, period = ?, language_id = ?, format = ? WHERE id = ?").bind(next.name, next.purpose, next.period, next.language_id, next.format, id).run();
+  const next = { name: patch.name ?? row.name, purpose: patch.purpose === undefined ? row.purpose : patch.purpose, period: patch.period === undefined ? row.period : patch.period, language_id: patch.language_id ?? row.language_id, format: patch.format === undefined ? row.format : patch.format,
+    location: patch.location === undefined ? (row.location ?? null) : (patch.location?.trim() || null), facilitator: patch.facilitator === undefined ? (row.facilitator ?? null) : (patch.facilitator?.trim() || null) };
+  // B19 columns are set only when this patch names them (a database before migration 0015 still takes every older update).
+  let b19 = (["location", "facilitator"] as const).filter((k) => patch[k] !== undefined);
+  const write = () => ctx.db.prepare(`UPDATE assessment SET name = ?, purpose = ?, period = ?, language_id = ?, format = ?${b19.map((k) => `, ${k} = ?`).join("")} WHERE id = ?`).bind(next.name, next.purpose, next.period, next.language_id, next.format, ...b19.map((k) => next[k]), id).run();
+  // Before migration 0015: save the rest, skip the B19 fields (not stored, not in the undo record).
+  await write().catch(async (e) => { if (!b19.length || !b19Missing(e)) throw e; b19 = []; next.location = next.facilitator = null; await write(); });
   if (lwc !== undefined) await saveLwc(ctx, "assessment", id, lwc);
   const demographics_enabled = demographicsParam === undefined ? await readDemographics(ctx, id) : await writeDemographics(ctx, id, demographicsParam);
-  return { result: { assessment: { ...view({...row, ...next}, role), demographics_enabled, ...(lwc !== undefined ? { lwc } : {}) } }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format, ...(lwc !== undefined ? { lwc: lwcOf(row).join(",") } : {})} };
+  return { result: { assessment: { ...view({...row, ...next}, role), demographics_enabled, ...(lwc !== undefined ? { lwc } : {}) } }, scope: { type: "assessment", id }, priorState: {name: row.name, purpose: row.purpose, period: row.period, language_id: row.language_id, format: row.format, ...(b19.includes("location") ? { location: row.location ?? null } : {}), ...(b19.includes("facilitator") ? { facilitator: row.facilitator ?? null } : {}), ...(lwc !== undefined ? { lwc: lwcOf(row).join(",") } : {})} };
 };
 export const set_stage: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id, "member");

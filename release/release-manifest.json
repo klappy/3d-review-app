@@ -1,26 +1,23 @@
 {
-  "version": "0.33.1",
+  "version": "0.34.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "edaf2ca0e8e46dd798166d29f26b110e346bc8a5",
+  "cookbook_commit": "f0550f00247250c261d168fe420f2912214d6886",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.33.1.md",
-      "blob_sha": "13039175dc666d886af7d9e94b1f5264535d2023",
-      "sha256": "88c99babb9237a6149baa2a315e69f6d981056133855d9d56f6e507d6fda3684"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.0.md",
+      "blob_sha": "45be9612831e8a74501ac487e1473aab633a0606",
+      "sha256": "6cf9329d65d0752145e1d64b32e83b99801ed0a5c8b261d0689f9897d0314dfc"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "8a277b611329683d69b7b3ed82f4ca9eedf9cc08",
-      "sha256": "3b6ae3c974426dfc4b21947fd19754c1548b7fa12bdccc9526478aa43b1f6054"
+      "blob_sha": "33182b784db44eaa0f3add8fb411c4878afa9148",
+      "sha256": "718608c5508296937ad8ac6a3c03ac48a6a0d37263c1b2884c0f00b41231bcd9"
     }
   ],
   "changelog": {
     "sections": {
-      "fixed": [
-        "Shared survey link: reopening the link while a rate limit refuses it, or while the limiter refuses the receipt check after a closed-collection answer, now shows the rate-limit words with the server's wait and offers Recover receipt, held for that wait, instead of only \"open your link again\".",
-        "Participant translation: when every translation request is refused by a rate limit, the page says it is a rate limit, keeps English and holds Try again for the server's wait, instead of \"check the internet connection\".",
-        "Shared survey link (PR498): a rate limit on Submit or on opening the survey holds that control for the server's wait, and Recover receipt follows that wait, instead of failing again at once.",
-        "Participant translation: a rate-limited translation request is not resent in the same load, and the wait is read from the server envelope as well as the Retry-After header."
+      "added": [
+        "Setup step 1 asks \"Location or community\" and \"Facilitator\" (both optional); Review and the assessment's Prepare view (Learn more) show both. Stored on the assessment (migration 0015); cap.assessment.create / update take location and facilitator (string or null). Older clients unchanged."
       ]
     }
   }
