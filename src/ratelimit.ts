@@ -7,21 +7,22 @@
  * not a lockout. The secrets it shields are not guessable at these rates (access codes are 8 chars of a 32-symbol
  * alphabet ≈ 1.1e12; sessions are 24 random bytes). Windows are 60 s because the binding only offers 10 s or 60 s.
  *
- *   RL_MCP_ANON  anonymous POST /mcp — one unit per JSON-RPC message        key ip           30 / 60 s
+ *   (numbers per key per 60 s live in RATE_LIMITS below — the one config place; wrangler.toml mirrors them)
+ *   RL_MCP_ANON  anonymous POST /mcp — one unit per JSON-RPC message        key ip           RATE_LIMITS
  *                except a tools/call on one of the four capabilities below with their own limiter (counted there once)
- *   RL_HTTP_ANON anonymous request on any capability HTTP twin (src/index.ts) key ip           60 / 60 s
+ *   RL_HTTP_ANON anonymous request on any capability HTTP twin (src/index.ts) key ip           RATE_LIMITS
  *                spent after credential resolution and before the body is parsed; a refusal writes nothing.
  *                NOT spent on the four twins that have their own capability limiter below (RL_AUTH / RL_REDEEM):
  *                each such call is counted once, by the limiter sized for it (DEV shared-IP burst 2026-10-16:
  *                RL_HTTP_ANON refused 142/200 room opens before RL_REDEEM was consulted)
- *   RL_AUTH      cap.auth.request_link + cap.auth.consume_link             key ip, email    10 / 60 s COMBINED per
+ *   RL_AUTH      cap.auth.request_link + cap.auth.consume_link             key ip, email    RATE_LIMITS, COMBINED per
  *                address (both caps share the `ip:` key on one binding — splitting would double the attacker surface)
- *   RL_MCP_CEILING  every well-shaped bearer on /mcp, and /token (src/worker.ts)  key ip          600 / 60 s
+ *   RL_MCP_CEILING  every well-shaped bearer on /mcp, and /token (src/worker.ts)  key ip          RATE_LIMITS
  *                also POST /v2/translate from a caller with a LIVE participant bearer or session (src/translate.ts)
  *                key tr:<kind>:<principal> — per principal, so a room behind one NAT never shares a bucket (audit W2)
  *   (none)       GET /v2/passages/:pid/file with a VALID signature; a missing/tampered/expired one spends RL_HTTP_ANON
- *   RL_REDEEM    cap.participant.redeem_code + cap.participant.open_link   key ip           limit: see wrangler.toml
- *                (sized for a whole room behind one NAT address; the number lives in wrangler.toml, not here)
+ *   RL_REDEEM    cap.participant.redeem_code + cap.participant.open_link   key ip           RATE_LIMITS
+ *                (sized for a whole room behind one NAT address)
  *
  *   RL_PER_KEY   (optional) one secret or one mailbox, whatever the address   keys em:, code:   see RATE_LIMITS
  *                request_link per email (falls back to RL_AUTH's em: key while unbound), redeem_code per code —
@@ -54,7 +55,7 @@
  */
 import type { Ctx, Env } from "./handlers/types";
 import { CapError } from "./handlers/types";
-import { normalizeEmail, sha256 } from "./handlers/common";
+import { nonEmptyStr as nonEmpty, normalizeEmail, sha256 } from "./handlers/common";
 
 /** Every limiter binding this Worker expects. wrangler.toml must bind each one at top level AND under
  *  [env.production.ratelimits] with its own namespace_id (test/limiter-boundary.test.ts parses the file and checks). */
@@ -81,8 +82,6 @@ export const RATE_LIMITS: Record<LimiterName | OptionalLimiterName, number> = {
 };
 /** The plain refusal every rate limit returns, on every face (DoD 6). */
 export const RATE_LIMIT_MESSAGE = "rate limit — try again in a minute";
-/** Headers every rate-limit 429 carries. */
-export const rateLimitHeaders = (): Record<string, string> => ({ "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
 /** Largest JSON-RPC batch any caller may POST to /mcp; an anonymous batch spends one RL_MCP_ANON unit per message. */
 export const MCP_MAX_BATCH = 10;
 
@@ -181,8 +180,8 @@ export async function enforceCapabilityLimit(ctx: Ctx, capabilityId: string, par
     throw limited(capabilityId, "the service is busy");
 }
 
-const nonEmpty = (v: unknown) => typeof v === "string" && v.trim().length > 0;
-/** The params each limited capability needs before its handler can do any work (handlers refuse the rest). */
+/** The params each limited capability needs before its handler can do any work (handlers refuse the rest, by the same
+ *  nonEmptyStr rule — test/workshop-same-ip.test.ts checks the two agree). */
 const wellFormed = (capabilityId: string, params: Record<string, unknown>): boolean => {
   switch (capabilityId) {
     case "cap.auth.request_link": return nonEmpty(params.email);

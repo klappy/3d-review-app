@@ -47,6 +47,10 @@ export function randomCode(): string {
 
 // ---------------------------------------------------------------- params
 type P = Record<string, unknown>;
+/** The one rule for a usable secret/address param: a string with something besides whitespace. The rate limiter's
+ *  well-formed check (src/ratelimit.ts) and the auth handlers both use it, so a request the limiter treats as
+ *  malformed (no RL_GLOBAL unit spent) is always one the handler refuses (Bugbot 4291079028). */
+export const nonEmptyStr = (v: unknown): v is string => typeof v === "string" && v.trim().length > 0;
 export function reqStr(p: P, key: string): string {
   const v = p[key];
   if (typeof v !== "string" || v.length === 0) throw new CapError("INVALID_PARAMS", `${key} is required`, `missing:${key}`);

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import app from "../src/index";
 import { enforceCapabilityLimit, enforcePrincipalWriteLimit, LIMITER_NAMES, OPTIONAL_LIMITER_NAMES, RATE_LIMIT_MESSAGE, RATE_LIMITS } from "../src/ratelimit";
 import { CapError } from "../src/handlers/types";
+import { authConsumeLink, authRequestLink } from "../src/handlers/platform";
 
 const limiter = (limit: number) => { const seen = new Map<string, number>(); return { seen, limit: async ({ key }: { key: string }) => { const n = (seen.get(key) ?? 0) + 1; seen.set(key, n); return { success: n <= limit }; } }; };
 const sized = (over: Record<string, unknown> = {}) => ({ ENVIRONMENT: "production",
@@ -122,6 +123,25 @@ describe("protection that does not rest on the address key (DoD 3)", () => {
     const env2 = sized({ RL_REDEEM: limiter(0) });
     await refusal(enforceCapabilityLimit(ctxFor(env2, ROOM), "cap.participant.open_link", { token: "room-link" }));
     expect(env2.RL_GLOBAL.seen.size).toBe(0); expect(env2.RL_PER_LINK.seen.size).toBe(0);
+  });
+  it("limiter and auth handlers agree on malformed: a shape that spends no g:RL_AUTH is refused before any lookup (Bugbot 4291079028)", async () => {
+    const touched: string[] = [];
+    const db = { prepare: (sql: string) => { touched.push(sql); throw new Error("handler reached the database"); } };
+    const shapes: [string, Record<string, unknown>][] = [
+      ["cap.auth.consume_link", { email: "a@example.invalid", code: 123456 }], // numeric code: the bypass Bugbot found
+      ["cap.auth.consume_link", { email: "a@example.invalid", code: "   " }],
+      ["cap.auth.consume_link", { email: 7, code: "123456" }],
+      ["cap.auth.request_link", { email: "   " }],
+    ];
+    for (const [cap, params] of shapes) {
+      const env = sized();
+      await refusal(enforceCapabilityLimit(ctxFor(env, ROOM), cap, params));
+      expect(env.RL_GLOBAL.seen.size, `${cap} ${JSON.stringify(params)} spent g:`).toBe(0);
+      const handler = cap === "cap.auth.consume_link" ? authConsumeLink : authRequestLink;
+      const e = await refusal(handler({ env: { ENVIRONMENT: "dev" }, db, log: () => {} } as any, params, undefined as any));
+      expect(e?.code, `${cap} ${JSON.stringify(params)}`).toBe("INVALID_PARAMS");
+    }
+    expect(touched).toEqual([]);
   });
   it("optional limiters absent: skipped, never refused (an unbound RL_GLOBAL / RL_PER_KEY does not stop a workshop)", async () => {
     const env = sized({ RL_GLOBAL: undefined, RL_PER_KEY: undefined, RL_PER_LINK: undefined });
