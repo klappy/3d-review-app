@@ -77,5 +77,7 @@ export const underHold = button => button?.dataset?.rateLimited === 'true';
 /** Set a control's words without ending its countdown: under a hold the new words go to the label the hold paints. */
 export function setControlLabel(node, text) { if (!node) return; if (underHold(node)) node.dataset.retryLabel = text; else node.textContent = text; }
 /** true once a rate-limited "unavailable" screen's wait is over: its retry control exists and no longer counts down.
- *  Reads the state's flag, not the notice text, so a longer cap's own message ("…15 minutes") is replaced too. */
-export const rateLimitWaitOver = (state, button) => state?.phase === 'unavailable' && state?.rateLimited === true && !!button && !underHold(button);
+ *  Reads the state's flag, not the notice text, so a longer cap's own message ("…15 minutes") is replaced too.
+ *  False while a Try again request is in flight (state.busy): the button is hidden then, so "try again now" would
+ *  point at nothing (#490 re-review low). */
+export const rateLimitWaitOver = (state, button) => state?.phase === 'unavailable' && state?.rateLimited === true && !state?.busy && !!button && !underHold(button);
