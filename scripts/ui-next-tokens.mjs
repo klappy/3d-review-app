@@ -3,7 +3,7 @@
 //   node scripts/ui-next-tokens.mjs           write ui-next/tokens.css
 //   node scripts/ui-next-tokens.mjs --check   exit 1 if tokens.css is not what the source generates
 // Node stdlib only. Status: provisional.
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const root = new URL("../", import.meta.url);
@@ -28,7 +28,7 @@ export function generate() {
   return render(JSON.parse(readFileSync(SOURCE, "utf8")));
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   const css = generate();
   if (process.argv.includes("--check")) {
     let current = "";

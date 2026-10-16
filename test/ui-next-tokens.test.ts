@@ -54,6 +54,8 @@ describe("ui-next conformance lint", () => {
     ["inline px type (one space)", "b.html", '<p style="font-size: 13px">x</p>'],
     ["non-token radius", "c.css", ".x{border-radius:12px}"],
     ["raw hex outside .paper", "d.css", ".x{color:#13263a}"],
+    ["raw hex in a .paper-prefixed class", "d.css", ".paper-card{color:#f00}"],
+    ["raw hex in a selector list led by .paper", "d.css", ".paper, .x{color:#f00}"],
     ["raw hex in html", "e.html", '<main><p style="color:#fff">x</p></main>'],
     ["pt by class letter", "f.html", '<span class="pt t"></span>'],
     ["legacy .status", "g.html", '<span class="status">x</span>'],
