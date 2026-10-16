@@ -678,7 +678,16 @@ bindClick('recover', 'Recovering receipt…', async () => {
       throw new HandledFailure(kind === 'rateLimited' ? { retryAfter: error?.retryAfter } : undefined); // a rate-limited Check holds Recover for the wait (#490 re-review prior low 4)
     }
   } else receipt = await api('/v2/participate/receipt', { participant: true });
-  await recoverParticipant(receipt, !!state.form, loadForm, showReceipt);
+  if (state.shared) { // shared route: opening the form after the receipt can be refused too (Bugbot 4293984155) — participant copy, never raw text in #error
+    try { await recoverParticipant(receipt, !!state.form, loadForm, showReceipt); }
+    catch (error) {
+      console.warn('[3dr] recover form', { status: error?.status, code: error?.code, trace_id: error?.trace_id });
+      const kind = errorKind(error);
+      if (kind === 'rateLimited') { showSharedUnavailable(kind, rateLimitedCopy(error?.retryAfter)); $('recover').hidden = false; throw new HandledFailure({ retryAfter: error?.retryAfter }); } // run() holds Recover for the wait
+      if (kind === 'transient') { showSharedUnavailable(kind); $('recover').hidden = false; throw new HandledFailure(); } // a blip: Recover stays offered
+      showSharedUnavailable(kind === 'unavailable' ? 'cannotResume' : kind === 'conflict' ? 'closed' : kind); throw new HandledFailure();
+    }
+  } else await recoverParticipant(receipt, !!state.form, loadForm, showReceipt);
   if (!receipt.submitted && state.shared && submitState === 'uncertain') throw new HandledFailure(); // no "— complete." beside kept uncertainty
   if (!receipt.submitted) return;
   if (state.shared) { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); } // scoped namespace only; globals untouched in shared mode

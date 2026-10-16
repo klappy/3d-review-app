@@ -708,6 +708,20 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     await $("recover").dispatch("click"); await settled($); strict($);
     expect($("answers").hidden).toBe(false); expect($("participant-error").hidden).toBe(true);
   });
+  it("F13b entry 429 → Recover after the wait → GET /form 429: participant rate-limit copy, Recover held again, nothing raw in #error (Bugbot 4293984155)", async () => {
+    const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
+    plan.receipt = refuseAfter("45");
+    let formRefusal: Route = refuseAfter("30");
+    const $ = await boot(storage, link.entry_fragment, async (url: string, init: any) => url.endsWith("/form") && formRefusal ? formRefusal(url, init) : fetcher(url, init)); strict($);
+    plan.receipt = null; // receipt now answers submitted:false, so Recover asks for the form — which the limiter refuses
+    await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.rateLimited.replace("one minute", "30 seconds"));
+    expect($("notice").textContent).toBe(ATTENTION); expect($("answers").hidden).toBe(true);
+    expect($("recover").hidden).toBe(false); expect($("recover").disabled).toBe(true); expect($("recover").dataset.rateLimited).toBe("true");
+    expect($("recover").textContent).toMatch(/\((30|29) s\)$/);
+    formRefusal = null; await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("answers").hidden).toBe(false); expect($("participant-error").hidden).toBe(true);
+  });
   it("F11h fresh open, Recover with GET /receipt → 429 Retry-After 30: the copy says 30 seconds, not a fixed minute (#496 review finding 1)", async () => {
     const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
     const $ = await boot(storage, link.entry_fragment, fetcher); strict($);
