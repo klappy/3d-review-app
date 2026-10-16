@@ -6,6 +6,7 @@ import * as resume from './participant-resume.js';
 import * as visibility from './visibility.js';
 import * as present from './present.js';
 import * as shared from './shared-link.js';
+import * as rateLimit from './rate-limit.js';
 
 // Run the real app's bindings, state and rendering against a minimal DOM, not
 // a duplicate recovery algorithm. Browser validation remains a separate gate.
@@ -20,7 +21,7 @@ function harness(saved = {}) {
     return nodes.get(id);
   }
   let responder = async () => { throw Error('unconfigured request'); };
-  const context = vm.createContext({ ...resume, ...visibility, ...present, ...shared, sharedCopy: shared.copy,
+  const context = vm.createContext({ ...resume, ...visibility, ...present, ...shared, ...rateLimit, sharedCopy: shared.copy,
     initLanguageControls: () => ({refresh: async()=>{}}),
     document: {getElementById:node, createElement: tag => node(`generated-${nodes.size}-${tag}`), querySelectorAll:()=>[]},
     sessionStorage: {getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},

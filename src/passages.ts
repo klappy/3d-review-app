@@ -48,6 +48,7 @@ const VIDEO_HOSTS = /(^|\.)(youtube\.com|youtu\.be|vimeo\.com|youtube-nocookie\.
 
 const env_ = (status: number, body: unknown, extra: Record<string, string> = {}) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra } });
 const ok = (result: unknown, status = 200) => env_(status, { ok: true, result });
+const withRetryAfter = (r: Response) => { r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r; };
 const fail = (status: number, code: string, message: string, hint?: string) => env_(status, { ok: false, error: { code, message, ...(hint ? { hint } : {}) } });
 
 export function extOf(name: string): string { const m = /\.([A-Za-z0-9]{2,5})$/.exec(name.trim()); return m ? m[1].toLowerCase() : ""; }
@@ -220,7 +221,7 @@ export async function handleFile(request: Request, env: PEnv, pid: string): Prom
   // (50 phones seeking in the same MP3 with Range requests) must not share the 60/60 s anonymous address budget.
   const q = new URL(request.url).searchParams;
   if (!(await validSig(env, pid, q.get("exp"), q.get("sig")))) {
-    if (!(await allow(env, "RL_HTTP_ANON", `ip:${clientIp(request)}`))) return fail(429, "RATE_LIMITED", "too many requests", `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`);
+    if (!(await allow(env, "RL_HTTP_ANON", `ip:${clientIp(request)}`))) return withRetryAfter(fail(429, "RATE_LIMITED", "too many requests — this is a rate limit", `try again in ${RATE_LIMIT_WINDOW_SECONDS} seconds`));
     return fail(403, "NOT_AUTHORIZED_AT_SCOPE", "this passage link has expired; reopen the survey");
   }
   const row = await env.DB.prepare("SELECT * FROM assessment_passage WHERE id = ? AND archived_at IS NULL AND kind = 'file'").bind(pid).first<PassageRow>().catch(() => null);

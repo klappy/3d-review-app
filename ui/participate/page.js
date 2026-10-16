@@ -4,6 +4,7 @@ import { mountParticipantView, itemError, drawAbout, aboutValues, setAboutValues
 import { UI_EN, SURVEYOR_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames, translatingSub } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
 import { receiptNotice } from '../shared-link.js';
+import { holdRetry } from '../rate-limit.js';
 
 const $ = id => document.getElementById(id);
 let pager, renderedPhase, renderedForm;
@@ -59,7 +60,23 @@ function values(validate = false) {
   return out;
 }
 const syncOther = () => { if (journey.state.form) syncOtherBoxes($('answers'), journey.state.form.items); };
+// DoD 6: a rate-limit refusal on the link shows one "Try again" control under the notice, enabled after the wait.
+let retryButton = null, retryHold = null, retryFor = null;
+function paintRateLimit(state) {
+  const limited = state.rateLimited === true && state.phase === 'unavailable';
+  if (!limited) { retryHold?.(); retryHold = null; retryFor = null; if (retryButton) retryButton.hidden = true; return; }
+  if (retryFor === state.limitId) return; // same refusal repainted: keep the running countdown
+  retryFor = state.limitId;
+  if (!retryButton) {
+    retryButton = element('button', T('tryAgain')); retryButton.type = 'button'; retryButton.id = 'rate-retry';
+    retryButton.addEventListener('click', () => { retryHold?.(); retryHold = null; retryButton.hidden = true; journey.start({ retry: true }); });
+    $('notice').after(retryButton);
+  }
+  retryButton.hidden = false; retryHold?.();
+  retryHold = holdRetry(retryButton, state.retryAfter, { label: T('tryAgain'), onReady: () => retryButton.focus() });
+}
 function paint(state) {
+  paintRateLimit(state);
   if (state.form) syncPicker(state.form);
   if (state.form) renderPassages(view(state.form) || state.form);
   if (state.form && !isEnglish(lang) && tr.form !== state.form && pendingForm !== state.form) loadTranslations(state.form);

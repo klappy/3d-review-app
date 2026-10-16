@@ -1,6 +1,7 @@
 import { copy, createSharedLinkClient, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, stripFragment, submitFailureKind } from '../shared-link.js';
 import { closedLine } from '../v3/components/active-until.js';
 import { SURVEYOR_EN } from './i18n.js';
+import { retryAfterOf } from '../rate-limit.js';
 
 // Only the existing participant client owns transport. No staff identity is read.
 export function createParticipantJourney({ window: win, storage, fetchImpl, onChange = () => {} }) {
@@ -10,7 +11,10 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
   let linkToken = null;
   let state = { phase: 'opening', notice: copy.labelOpening };
   const show = (phase, extra = {}) => { state = { phase, form, answers, busy, ...extra }; onChange(state); return state; };
-  const unavailable = kind => show('unavailable', { notice: ({ closed: copy.collectionClosed, cannotResume: copy.cannotResume, rateLimited: copy.rateLimited, transient: copy.transient })[kind] || copy.linkUnavailable });
+  // DoD 6: a rate-limit refusal says so and carries its wait, so the page can enable "Try again" after one minute.
+  let limits = 0; // each refusal gets its own id so a repaint of the same state does not restart the wait
+  const limit = (kind, e) => kind === 'rateLimited' ? { rateLimited: true, retryAfter: retryAfterOf(e), limitId: ++limits } : {};
+  const unavailable = (kind, e) => show('unavailable', { notice: ({ closed: copy.collectionClosed, cannotResume: copy.cannotResume, rateLimited: copy.rateLimited, transient: copy.transient })[kind] || copy.linkUnavailable, ...limit(kind, e) });
   function receipt(result) {
     store.remove('draft'); store.remove('submitKey'); uncertain = false;
     // thanks: the notice's inputs, so the page can say it in the participant's language (receiptNotice with its translator).
@@ -41,11 +45,12 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
     // S23: the participant token this tab holds (null before the link opens), for the page's translate requests only.
     // It is the shared-link client's own bearer — never a staff token (this journey reads no staff identity).
     get bearer() { return client?.bearer || null; },
-    async start() {
+    // retry: after a rate-limit refusal the fragment is already stripped, so open again with the in-memory link token.
+    async start({ retry = false } = {}) {
       return action(async () => {
         // Strip before the first async operation; malformed credentials cannot fall through to staff.
-        const hash = win.location.hash;
-        const token = parseEntryFragment(hash);
+        const hash = retry ? '' : win.location.hash;
+        const token = retry ? linkToken : parseEntryFragment(hash);
         if (hash) stripFragment(win);
         if (hash && token === null) return unavailable('unavailable');
         linkToken = token;
@@ -58,14 +63,14 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
         rememberCurrent(storage, namespace);
         if (token !== null) {
           try { await client.open(token); }
-          catch (e) { const kind = entryFailureKind(e, !!client.bearer); return kind === 'conflict' ? conflict() : unavailable(kind); }
+          catch (e) { const kind = entryFailureKind(e, !!client.bearer); return kind === 'conflict' ? conflict() : unavailable(kind, e); }
         } else if (!client.bearer) return show('unavailable', { notice: 'Open your original survey link to continue. No participant session is available in this tab.' });
         try {
           const result = await client.receipt();
           return result.submitted ? receipt(result) : await loadForm();
         } catch (e) {
           const kind = token === null ? entryFailureKind(e, true) : errorKind(e);
-          return kind === 'conflict' ? conflict() : unavailable(kind);
+          return kind === 'conflict' ? conflict() : unavailable(kind, e);
         }
       });
     },
@@ -128,7 +133,7 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
           const kind = errorKind(e);
           if (kind === 'unavailable') return unavailable(uncertain ? 'cannotResume' : 'unavailable');
           if (kind === 'conflict') return conflict();
-          return show(state.phase, { draft: state.draft, notice: uncertain ? copy.submitUncertain : kind === 'rateLimited' ? copy.rateLimited : copy.transient });
+          return show(state.phase, { draft: state.draft, notice: uncertain ? copy.submitUncertain : kind === 'rateLimited' ? copy.rateLimited : copy.transient, ...(uncertain ? {} : limit(kind, e)) });
         }
       });
     },

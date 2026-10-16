@@ -87,6 +87,17 @@ test('429 and transport failure keep honest retry states without creating anothe
     const h = harness({ handle: failure }); await h.journey.start(); assert.equal(h.journey.state.notice, notice); assert.equal(h.requests.length, 1);
   }
 });
+test('DoD 6: a 429 on the link says it is a rate limit, carries the wait, and retry opens the same link again', async () => {
+  let n = 0;
+  const h = harness({ handle: () => (n++ === 0 ? refused('RATE_LIMITED', 429) : refused('RATE_LIMITED', 429)) });
+  await h.journey.start();
+  assert.match(h.journey.state.notice, /this is a rate limit\. .*Try again in one minute\./);
+  assert.equal(h.journey.state.rateLimited, true); assert.equal(h.journey.state.retryAfter, 60);
+  const first = h.journey.state.limitId;
+  await h.journey.start({ retry: true });
+  assert.equal(h.requests.length, 2, 'retry sends one more open with the in-memory link token');
+  assert.equal(h.journey.state.rateLimited, true); assert.notEqual(h.journey.state.limitId, first);
+});
 test('dedicated static page dependencies are in the local server and tests are excluded from deployed assets', async () => {
   const { readFileSync } = await import('node:fs'); const read = file => readFileSync(new URL(file, import.meta.url), 'utf8');
   const server = read('../server.mjs');

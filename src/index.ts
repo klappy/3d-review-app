@@ -16,7 +16,7 @@ import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
 import { allow, clientIp, hasCapabilityLimiter, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { cookieValue, handleAuthorize, handleConsent, oauthPrincipals, PARK_COOKIE, renderConsentIfParked, type OAuthEnv } from "./oauth";
-import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLinkEnabled, magicSessionCookie, mintMagicSession, newNonce, openPage, principalForEmailHash, requestMagicLink, sameOriginPost, signInPage, verifyMagicToken } from "./magic-link";
+import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLinkEnabled, magicSessionCookie, mintMagicSession, newNonce, openPage, principalForEmailHash, RATE_LIMIT_MESSAGE, requestMagicLink, sameOriginPost, signInPage, verifyMagicToken } from "./magic-link";
 
 import { installRoadmapStream } from "./roadmap/stream";
 import { installTranslate } from "./translate";
@@ -225,8 +225,7 @@ app.post("/v2/auth/email", async (c) => {
   if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in request refused", undefined, "auth.email_link", newTraceId()), 403);
   // Per-IP dampener first: a refusal costs no storage access and sends nothing.
   if (!(await allow(env, "RL_AUTH", `ip:${clientIp(req)}`))) {
-    const r = json(fail("RATE_LIMITED", "too many sign-in requests — wait a minute and try again", undefined, "auth.email_link", newTraceId()), 429);
-    r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
+    return signInLimited(req, "too many sign-in requests — this is a rate limit; try again in one minute", nextOf(new URL(req.url).searchParams.get("next")));
   }
   const body = await formOrJson(req);
   if (!body) return json(fail("INVALID_PARAMS", "email required", undefined, "auth.email_link", newTraceId()), 400);
@@ -241,6 +240,14 @@ app.post("/v2/auth/email", async (c) => {
   if (out.state === "unavailable") return json(fail("RESERVED_NOT_BUILT", "email sign-in is not configured here", undefined, "auth.email_link", newTraceId()), 503);
   return body.json ? json({ ok: true, result: { sent: true, expires_in_minutes: out.minutes } }, 200) : checkEmailPage(out.minutes, next);
 });
+// DoD 6: a per-IP sign-in refusal says it is a rate limit. A browser form post gets the sign-in page with the plain
+// message (never raw JSON); a JSON caller gets the RATE_LIMITED envelope. Both carry retry-after: 60.
+const signInLimited = (req: Request, message: string, next?: "oauth") => {
+  const wantsJson = (req.headers.get("accept") || "").includes("application/json") || (req.headers.get("content-type") || "").includes("application/json");
+  const page = wantsJson ? null : signInPage(next, RATE_LIMIT_MESSAGE);
+  const r = page ? new Response(page.body, { status: 429, headers: page.headers }) : json(fail("RATE_LIMITED", message, undefined, "auth.email_link", newTraceId(), { retry_after: RATE_LIMIT_WINDOW_SECONDS }), 429);
+  r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
+};
 const page429 = (next?: "oauth") => { const r = signInPage(next, "Too many links were requested for this address. Use the newest email, or wait 15 minutes."); return new Response(r.body, { status: 429, headers: r.headers }); };
 app.get("/v2/auth/email/open", (c) => {
   if (!magicLinkEnabled(c.env)) return toAccess();
@@ -263,8 +270,7 @@ app.post("/v2/auth/email/open", async (c) => {
   if (!magicLinkEnabled(env)) return toAccess();
   if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in refused", undefined, "auth.email_link", newTraceId()), 403);
   if (!(await allow(env, "RL_REDEEM", `ip:${clientIp(req)}`))) {
-    const r = json(fail("RATE_LIMITED", "too many sign-in attempts — wait a minute and try again", undefined, "auth.email_link", newTraceId()), 429);
-    r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
+    return signInLimited(req, "too many sign-in attempts — this is a rate limit; try again in one minute", nextOf(new URL(req.url).searchParams.get("next")));
   }
   const body = await formOrJson(req);
   const back = nextOf(new URL(req.url).searchParams.get("next"));

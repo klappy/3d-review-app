@@ -1,3 +1,4 @@
+import { holdRetry, isRateLimited, rateLimitMessage, retryAfterFromResponse, retryAfterOf } from './rate-limit.js';
 import { parseInvitationFragment } from './public-entry.js';
 import { mountParticipantView } from './participant-view.js';
 import { redactDiagnosticPath } from './diagnostic-path.js';
@@ -142,15 +143,23 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   catch { throw new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); }
   let data;
   try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
-  if (!response.ok || !data.ok) throw Object.assign(new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
+  if (!response.ok || !data.ok) throw Object.assign(new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status, ...(response.status === 429 || data.error?.code === 'RATE_LIMITED' ? { retryAfter: retryAfterFromResponse(response, data) } : {}) }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
   const li = document.createElement('li'); li.textContent = `${method} ${redactDiagnosticPath(url)} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
   return data.result;
 }
-async function run(label, task) {
+async function run(label, task, control) {
   note(label); const buttons = [...document.querySelectorAll('button')].filter(b => b.id !== 'version' && b.id !== 'changelog-close'); buttons.forEach(b => b.disabled = true);
+  let wait = 0;
   try { await task(); note(`${label} — complete.`); }
-  catch (error) { if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; } else fail(error.message); }
-  finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : b.id === 'build-report' ? !state.reportConfirm : false); }
+  catch (error) {
+    if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; }
+    else if (isRateLimited(error)) { wait = retryAfterOf(error); fail(rateLimitMessage(wait)); } // DoD 6: say it is a rate limit; retry after the wait
+    else fail(error.message);
+  }
+  finally {
+    buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : b.id === 'build-report' ? !state.reportConfirm : false);
+    if (wait && control) holdRetry(control, wait);
+  }
 }
 function showAuthorizedWork(me) {
   const visible = hasProjectWork(me);
@@ -195,8 +204,8 @@ function resetClientIdentity() {
 const languageControls = initLanguageControls({ api, run, getProject: () => state.project, onLanguages: active => {
   if (state.projectView) text($('project-detail'), `${state.projectView.name} · ${state.projectView.role} · ${active.length} active language(s)`);
 } });
-function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget))); }); }
-function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler)); }
+function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget)), e.submitter || e.currentTarget?.querySelector?.('button')); }); }
+function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler, $(id))); }
 async function identity() {
   if (!state.session) { showIdentity(false); return; }
   const result = await api('/v2/me'); state.principal = result.principal;

@@ -1,3 +1,4 @@
+import { holdRetry, rateLimitMessage, retryAfterOf } from '../rate-limit.js';
 // App feedback uses the existing contract. No page contents, answers or credentials are captured.
 const scores = [['satisfaction', 'How satisfied are you?', 'Very dissatisfied', 'Very satisfied'], ['confusion', 'How confused did you feel?', 'Not at all confused', 'Very confused'], ['frustration', 'How frustrated did you feel?', 'Not at all frustrated', 'Very frustrated']];
 export const feedback = {
@@ -28,6 +29,7 @@ export const feedback = {
       }
       if (!Object.keys(body).length) { status.textContent = 'Add a note or choose an answer before sending.'; return; }
       if (new TextEncoder().encode(body.note || '').length > 4096 || (body.sentiment_journey || '').length > 128) { status.textContent = 'Your note or experience description is too long. Shorten it and send again.'; return; }
+      let limitedFor = 0;
       busy = true; status.textContent = uncertain ? 'Sending again. This may create a duplicate if the earlier request arrived.' : 'Sending feedback…';
       const controls = [...form.querySelectorAll('input,textarea,select,button:not([data-feedback-close])')]; controls.forEach(c => { c.disabled = true; });
       try {
@@ -44,12 +46,13 @@ export const feedback = {
           const link = root.ownerDocument.createElement('a'); link.href = '/v2/auth/access'; link.textContent = ' Sign in again'; status.append(link);
         } else if (['403','404','NOT_AUTHORIZED','NOT_AUTHORIZED_AT_SCOPE','NOT_FOUND_OR_NOT_VISIBLE'].includes(code)) status.textContent = 'Feedback was refused for this account. Your text is still here.';
         else if (['400','INVALID_PARAMS'].includes(code)) status.textContent = 'Feedback was not accepted. Check your answers and text length; your draft is still here.';
-        else if (code === '429' || code === 'RATE_LIMITED') status.textContent = 'Too many requests. Wait before trying again; your draft is still here.';
+        else if (code === '429' || code === 'RATE_LIMITED') { limitedFor = retryAfterOf(error); status.textContent = `${rateLimitMessage(limitedFor)} Your draft is still here.`; }
         else { uncertain = true; status.textContent = 'We could not confirm whether your feedback was recorded. Your text is still here. Sending again may create a duplicate; nothing will retry automatically.'; }
         button.textContent = uncertain ? 'Send again (may duplicate)' : 'Send feedback';
       } finally {
         busy = false;
         if (current() && !recorded) controls.forEach(c => { c.disabled = false; });
+        if (current() && limitedFor) holdRetry(button, limitedFor);
       }
     };
   }

@@ -1,4 +1,5 @@
 import { sandboxToolsEnabled } from './sandbox-tools.js';
+import { holdRetry, isRateLimited, rateLimitMessage, retryAfterFromResponse, retryAfterOf } from '../rate-limit.js';
 // Scope pages — entry · workspaces · workspace · projects · project (UI overhaul contract, 2026-09-17).
 // Each page = { load(ctx, params) → model, render(ctx, model) → html, bind(ctx, root, model) }.
 // ctx = { api, esc, enc, go, note(msg, alert), state, routes, cards, setToken? }.
@@ -119,13 +120,16 @@ export function inlineCodeError(ctx, form, name = 'code') {
 async function write(ctx, control, label, fn, { refused = 'Not allowed here.', failed = null } = {}) {
   const controls = control ? [control, ...(control.form ? Array.from(control.form.querySelectorAll('button')) : [])] : [];
   for (const c of controls) c.disabled = true;
+  let wait = 0;
   try { const r = await fn(); return r; }
   catch (e) {
+    // DoD 6: a rate limit says so, and the control it came from re-enables after the wait (Retry-After, else one minute).
+    if (isRateLimited(e)) { wait = retryAfterOf(e); ctx.note(rateLimitMessage(wait), true); return undefined; }
     const kind = classify(e);
     ctx.note(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? refused : (failed || `${label} failed: ${safeMessage(e)}`), true);
     return undefined;
   }
-  finally { for (const c of controls) c.disabled = false; }
+  finally { for (const c of controls) c.disabled = false; if (wait && control) holdRetry(control, wait); }
 }
 const val = (form, name) => String(form.elements[name]?.value ?? '').trim();
 const storeSession = (key, v) => { try { sessionStorage.setItem(key, v); } catch {} };
@@ -245,7 +249,8 @@ const entry = {
         const res = await fetch('/v2/auth/email', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ email: val(form, 'email') }), credentials: 'same-origin', redirect: 'manual', cache: 'no-store' });
         if (res.type === 'opaqueredirect') { window.location.assign('/v2/auth/access'); return; } // environment without email links
         if (res.ok) { const b = await res.json().catch(() => null); const min = Number(b?.result?.expires_in_minutes) || 30; form.hidden = true; status.textContent = SIGNIN_LINK_SENT(min); return; }
-        status.textContent = res.status === 429 ? 'Too many sign-in links were requested. Use the newest email, or wait a few minutes.' : res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
+        if (res.status === 429) { const b = await res.json().catch(() => null), wait = retryAfterFromResponse(res, b); status.textContent = wait > 60 ? `${rateLimitMessage(wait)} Or use the newest sign-in email.` : rateLimitMessage(wait); holdRetry(submit, wait); return; }
+        status.textContent = res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
       } catch { status.textContent = 'The sign-in link could not be sent. Check your connection and try again.'; }
       submit.disabled = false;
     });

@@ -165,15 +165,17 @@ export const checkEmailPage = (minutes: number, next?: "oauth") => page("Check y
  *  POST /v2/auth/email/check (mints nothing) whether the link is live and whether `e` matches it, then shows one button:
  *  "Sign in as <verified address>". A link without a hash-matched address is refused ("incomplete") — never an unnamed
  *  sign-in. A person must click. */
+/** DoD 6 house wording (ui/rate-limit.js RATE_LIMIT_MESSAGE); this page is server-rendered, so the string is repeated here and pinned by test. */
+export const RATE_LIMIT_MESSAGE = "Too many requests right now — this is a rate limit. Try again in one minute.";
 export function openPage(nonce: string, next?: "oauth"): Response {
   const action = `/v2/auth/email/open${next === "oauth" ? "?next=oauth" : ""}`;
   return page("Sign in", `<h1>Sign in to 3D Review</h1><form id="f" method="post" action="${action}"><input type="hidden" name="t" id="t"><input type="hidden" name="e" id="e"><button type="submit" id="b" hidden>Sign in</button></form><button type="button" id="r" hidden>Try again</button><p id="m" class="muted">Checking your link…<noscript> Your browser blocked the script this page needs. Open the link in another browser.</noscript></p>
 <script nonce="${nonce}">(function(){var d=document,m=/^#t=([A-Za-z0-9_-]{43})(?:&e=([^&]{1,762}))?$/.exec(location.hash),msg=d.getElementById("m"),b=d.getElementById("b");try{history.replaceState(null,"",location.pathname+location.search)}catch(x){}
 function bad(t){msg.textContent=t;var a=d.createElement("a");a.href="${emailFormHref(next)}";a.textContent=" Request a new link";msg.appendChild(a)}
 if(!m){bad("This sign-in link is incomplete.");return}var e="";if(m[2]){try{e=decodeURIComponent(m[2])}catch(x){}}
-var r=d.getElementById("r");function retry(t){msg.textContent=t;r.hidden=false;r.focus()}r.onclick=function(){r.hidden=true;check()};
+var r=d.getElementById("r"),rl=r.textContent,rt=null;function retry(t,w){msg.textContent=t;r.hidden=false;if(rt)clearInterval(rt);rt=null;if(!w){r.disabled=false;r.textContent=rl;r.focus();return}var u=Date.now()+w*1e3;function k(){var s=Math.ceil((u-Date.now())/1e3);if(s<=0){clearInterval(rt);rt=null;r.disabled=false;r.textContent=rl;r.focus();return}r.disabled=true;r.textContent=rl+" ("+s+" s)"}k();rt=setInterval(k,1e3)}r.onclick=function(){r.hidden=true;check()};
 function check(){msg.textContent="Checking your link…";fetch("/v2/auth/email/check",{method:"POST",headers:{"content-type":"application/json",accept:"application/json"},body:JSON.stringify({t:m[1],e:e}),credentials:"same-origin",cache:"no-store"}).then(function(x){
-if(x.status===429){retry("Too many sign-ins from this network right now. Wait a minute, then try again.");return null}
+if(x.status===429){var w=Math.ceil(Number(x.headers.get("retry-after")))||60;retry(w===60?"${RATE_LIMIT_MESSAGE}":"Too many requests right now — this is a rate limit. Try again in "+w+" seconds.",w);return null}
 if(!x.ok){retry("Could not check this link right now. Try again.");return null}return x.json()}).then(function(v){if(v===null)return;
 if(!v||!v.valid){bad("This sign-in link is not valid or has expired.");return}
 if(!v.email){bad("This link is incomplete — request a new one.");return}

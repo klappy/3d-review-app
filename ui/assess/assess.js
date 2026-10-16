@@ -1,4 +1,5 @@
 import { mountPassages } from './passages.js';
+import { retryAfterFromResponse } from '../rate-limit.js';
 import { lwcFieldset, lwcFrom, LWC_CSS } from '../v3/lwc.js';
 import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
 // /assess/ — showcase-based assessment screen (cookbook #16 order c5719384228, slice 1).
@@ -95,7 +96,7 @@ async function api(url, { method = 'GET', body } = {}) {
   let r; try { r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); }
   catch { throw new Error('API unavailable. For a write, its outcome is unknown.'); }
   let j = null; try { j = await r.json(); } catch {}
-  if (!r.ok || !j?.ok) { const e = new Error(j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
+  if (!r.ok || !j?.ok) { const e = new Error(j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; if (r.status === 429) e.retryAfter = retryAfterFromResponse(r, j); throw e; }
   return j.result;
 }
 // Same call, whole envelope (result + receipt + trace_id) — G1 shows receipt/trace on the row after a write.
@@ -104,7 +105,7 @@ async function apiFull(url, { method = 'GET', body } = {}) {
   const headers = { accept: 'application/json' }; if (body !== undefined) headers['content-type'] = 'application/json'; if (token) headers.authorization = `Bearer ${token}`;
   let r; try { r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); } catch { throw new Error('API unavailable. For a write, its outcome is unknown.'); }
   let j = null; try { j = await r.json(); } catch {}
-  if (!r.ok || !j?.ok) { const e = new Error(j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
+  if (!r.ok || !j?.ok) { const e = new Error(j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; if (r.status === 429) e.retryAfter = retryAfterFromResponse(r, j); throw e; }
   return j;
 }
 const redact = m => redactDiagnosticPath(String(m || 'Request could not be completed.'));
