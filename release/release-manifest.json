@@ -1,23 +1,23 @@
 {
-  "version": "0.34.5",
+  "version": "0.34.6",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "178ed76c9f786633f816e0e7f6a170923a313853",
+  "cookbook_commit": "2aff7dfefb12e13e98ef225bacd53e805449b15d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.5.md",
-      "blob_sha": "b67e48ea0a8253eb1f9088a13767408aa3d2024c",
-      "sha256": "7021ba92b9443a7b1537c8062b1890078fe4af7e5d35e5e0ab22a1a02e80a086"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.6.md",
+      "blob_sha": "3f223a54d8b9360744a81f5a8bcdc14c17a5af8f",
+      "sha256": "a42b57426256ca74bcf4d2fd34cd8f8d1c7ac9788df9b2a1fa45aff2b06e87b4"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "7a65d52da23b116bb04f927ab67a68999ca24031",
-      "sha256": "99954111ba4d267d14c1b1efc1231e63b77e6d25cacf9c10fa60a31e2d191191"
+      "blob_sha": "c0257f7e8285aefab900757303c3449f77ef36fe",
+      "sha256": "fdf849aa98bffcddcdf66f179649c23742c3bb4ed69bcf1a6a7da350b7e08eb5"
     }
   ],
   "changelog": {
     "sections": {
-      "changed": [
-        "Report build is faster: one build now attests the captured responses once and reuses that result for the commit, the post-write read and the stored-report check, where it used to attest the same bytes four times. Any byte difference between those reads is still attested in full, and every digest, report key, payload hash and validation check still runs. A capture handed in from outside a build is still re-attested from its raw bytes. Report bytes and digests are unchanged."
+      "fixed": [
+        "Setup step 1 on a phone: the sticky Cancel/Continue strip is now opaque with a hairline top edge, so the Location, Facilitator and other fields no longer show through it while you scroll. A focused field still scrolls clear of the strip, as before."
       ]
     }
   }

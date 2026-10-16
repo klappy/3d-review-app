@@ -1117,3 +1117,13 @@ test('B19: step 1 asks for location/community and facilitator; both ride create,
   assert.equal(d.location, 'Ban Na'); assert.equal(saved.snap.facilitator, 'Bincy');
   assert.deepEqual(detailsPatch(saved.snap, { ...d, facilitator: '' }), { facilitator: null });
 });
+
+test('B19 note: the sticky Continue strip on setup details is opaque, so fields never show through it on a phone', async () => {
+  const css = (await import('node:fs')).readFileSync(new URL('./wizard.css', import.meta.url), 'utf8');
+  const rule = css.match(/\.v3-wizard form\[data-wz-form=details\]>\.actions\{([^}]*)\}/);
+  assert.ok(rule, 'details action strip rule present');
+  assert.match(rule[1], /position:sticky/);
+  assert.match(rule[1], /background:var\(--paper\b/);
+  assert.doesNotMatch(rule[1], /--glass|--field/);
+  assert.match(css, /form\[data-wz-form=details\][^{]*\{scroll-margin-block:\d+px\}/);
+});
