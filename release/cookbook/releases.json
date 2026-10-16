@@ -1,15 +1,30 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.32.1",
+  "current": "0.33.1",
   "versions": [
     {
-      "version": "0.32.1",
+      "version": "0.33.1",
       "status": "candidate",
-      "notes_path": "releases/0.32.1.md",
+      "notes_path": "releases/0.33.1.md",
       "sections": {
         "fixed": [
           "Shared survey link: reopening the link while a rate limit refuses it, or while the limiter refuses the receipt check after a closed-collection answer, now shows the rate-limit words with the server's wait and offers Recover receipt, held for that wait, instead of only \"open your link again\".",
-          "Participant translation: when every translation request is refused by a rate limit, the page says it is a rate limit, keeps English and holds Try again for the server's wait, instead of \"check the internet connection\"."
+          "Participant translation: when every translation request is refused by a rate limit, the page says it is a rate limit, keeps English and holds Try again for the server's wait, instead of \"check the internet connection\".",
+          "Shared survey link (PR498): a rate limit on Submit or on opening the survey holds that control for the server's wait, and Recover receipt follows that wait, instead of failing again at once.",
+          "Participant translation: a rate-limited translation request is not resent in the same load, and the wait is read from the server envelope as well as the Retry-After header."
+        ]
+      }
+    },
+    {
+      "version": "0.33.0",
+      "status": "candidate",
+      "notes_path": "releases/0.33.0.md",
+      "sections": {
+        "added": [
+          "\"Perspectives at a glance\" radar in the full report, after \"Do the perspectives agree?\": one spoke per area scored by two or more perspectives (three or more areas), one outline per perspective, rings at 25/50/75/100; a perspective not asked about an area has no point on that spoke."
+        ],
+        "changed": [
+          "Every numeric score in the full report is labelled \"out of 100\". Payload, scoring and narrative unchanged."
         ]
       }
     },

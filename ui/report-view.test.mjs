@@ -67,16 +67,16 @@ test('R1 full payload renders header, stability line and every section in payloa
 test('R2 lenses print scores exactly as returned; an empty sub-dimension list adds no rows', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.lenses), ['team', '66.66666', 'Overall score', 'process', 'Score', '70', 'Items included', '3', 'relationships', 'Score', '63.3333', 'Items included', '2', 'church', '0', 'Overall score']);
+  assert.deepEqual(sectionRows(root, copy.lenses), ['team', '66.66666', 'Overall score (out of 100)', 'process', 'Score (out of 100)', '70', 'Items included', '3', 'relationships', 'Score (out of 100)', '63.3333', 'Items included', '2', 'church', '0', 'Overall score (out of 100)']);
 });
 
 test('R3 lenses agree block leads: exact scores and spread as returned, no average, multi before single, counts visible', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
   const rowsText = sectionRows(root, copy.crossLens);
-  assert.deepEqual(rowsText.slice(0, 15), [
+  assert.deepEqual(rowsText.slice(0, 17), [
     'Each line shows one area and the score each perspective gave it, on a 0–100 scale. Biggest difference first; areas only one perspective scored come last.',
-    'Shared understanding', 'Some difference · Difference 12.25', '0', '100', 'Translation team ', '61.75', ' responses not counted', 'Community ', '49.5', ' responses not counted',
+    'Shared understanding', 'Some difference · Difference 12.25', '0', '100', 'Translation team ', '61.75', ' out of 100', ' responses not counted', 'Community ', '49.5', ' out of 100', ' responses not counted',
     'Church involvement', 'Only one perspective scored this area', '0', '100',
   ]);
   assert.doesNotMatch(rowsText.join('\n'), /average|mean/i);
@@ -85,7 +85,7 @@ test('R3 lenses agree block leads: exact scores and spread as returned, no avera
 test('R4 standalone indicators, evidence and narrative rows', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.standalone), ['Is the meaning clear?', 'community · clarity', 'Score', '82.5', 'Responses', '9']);
+  assert.deepEqual(sectionRows(root, copy.standalone), ['Is the meaning clear?', 'community · clarity', 'Score (out of 100)', '82.5', 'Responses', '9']);
   assert.deepEqual(sectionRows(root, copy.evidence), ['Team form', 'Submissions', '4', 'Church form', 'Submissions', '2']);
   assert.deepEqual(sectionRows(root, copy.narrative), ['Team scores are highest on process.', 'One lens has no comparable data.']);
 });
