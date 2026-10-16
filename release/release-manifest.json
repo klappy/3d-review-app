@@ -1,23 +1,23 @@
 {
-  "version": "0.34.3",
+  "version": "0.34.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "07b4d906cd2878ff1c0451e14d043078beecd477",
+  "cookbook_commit": "397744b4c6ebf12d30f311538b4eefb502b24b1b",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.3.md",
-      "blob_sha": "a71da257fab463b04a0b798e0a42bd114cba42fa",
-      "sha256": "749fb66fb8e181d95117eb5e98bb3bbf4ad2248c585928e0251ccedb7acb3f91"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.4.md",
+      "blob_sha": "584e170012fbb6a33f797c0159d8a86c19d63c42",
+      "sha256": "05d78c16675281daf3aed943a7e241a0043caede0ab82777f5c1db2e523c58cb"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "9dec60302fb953c775ef84fab6ac7b9421551981",
-      "sha256": "5881eda71a48d89a12b85db8731fc9efb1968f02ed19d051b9f3c10abe3877f7"
+      "blob_sha": "53661d22d3281f6a9af1474c750c37561546ee2f",
+      "sha256": "e4eb3cac984f0f145ee0814543714dbf5dbb107f2a94164180445393a6816aec"
     }
   ],
   "changelog": {
     "sections": {
-      "changed": [
-        "Inviting someone: the button is \"Invite\", and the confirm opens right under it, naming the address you typed and the role, with Confirm and Cancel. The separate \"Preview invitation\" step and the confirm at the bottom of the page are gone (Permissions page, collaborators panel and MCP panel)."
+      "fixed": [
+        "The HTTP contract (`contract/openapi.yaml`) now says that starting an assessment (cap.assessment.create) takes the optional location and facilitator (string; omitted or empty stores nothing), as cap.assessment.update and the capability list already did."
       ]
     }
   }
