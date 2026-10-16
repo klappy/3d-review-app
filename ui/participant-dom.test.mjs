@@ -6,6 +6,7 @@ import * as resume from './participant-resume.js';
 import * as visibility from './visibility.js';
 import * as present from './present.js';
 import * as shared from './shared-link.js';
+import * as rateLimit from './rate-limit.js';
 
 // Run the real app's bindings, state and rendering against a minimal DOM, not
 // a duplicate recovery algorithm. Browser validation remains a separate gate.
@@ -20,7 +21,7 @@ function harness(saved = {}) {
     return nodes.get(id);
   }
   let responder = async () => { throw Error('unconfigured request'); };
-  const context = vm.createContext({ ...resume, ...visibility, ...present, ...shared, sharedCopy: shared.copy,
+  const context = vm.createContext({ ...resume, ...visibility, ...present, ...shared, ...rateLimit, sharedCopy: shared.copy,
     initLanguageControls: () => ({refresh: async()=>{}}),
     document: {getElementById:node, createElement: tag => node(`generated-${nodes.size}-${tag}`), querySelectorAll:()=>[]},
     sessionStorage: {getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
@@ -69,4 +70,20 @@ for(const submitted of [false,true])test(`successful ${submitted?'receipt':'form
  assert.equal(h.storage.get('participantToken'),'saved-token');
  assert.equal(h.node(submitted?'receipt':'answers').hidden,false);
  assert.equal(h.requests.some(r=>r.url.endsWith('/code')),false);
+});
+test('DoD 6: a 429 on a confirm control holds its preview step, never the spent confirm button', async () => {
+  const h = harness({ facilitatorToken: 'staff-token' }); await h.settle();
+  const limited = { ok: false, status: 429, headers: { get: k => (k === 'retry-after' ? '30' : null) }, json: async () => ({ ok: false, error: { code: 'RATE_LIMITED', message: 'Rate limit.', data: { retry_after: 30 } } }) };
+  h.setResponder(async (url, options) => ok(url.includes('/links') ? { confirm_token: 'link-token', impact: {}, expires_in: 60 } : { assessments: [], surveys: [] }));
+  h.node('assessments').value = 'a1'; await h.node('assessments').listeners.change?.(); await h.settle();
+  h.node('surveys').value = 's1'; h.node('surveys').listeners.change(); await h.settle();
+  for (const id of ['issue-link-preview', 'issue-link-confirm']) h.node(id).hidden = false;
+  await h.event('issue-link-preview', 'click');
+  assert.equal(h.node('issue-link-confirm').disabled, false, 'preview minted a confirm token');
+  h.setResponder(async () => limited);
+  await h.event('issue-link-confirm', 'click');
+  assert.equal(h.node('issue-link-confirm').disabled, true, 'its token was spent: it stays disabled');
+  assert.equal(rateLimit.underHold(h.node('issue-link-confirm')), false, 'no countdown that would end on a dead control');
+  assert.equal(rateLimit.underHold(h.node('issue-link-preview')), true, 'the countdown runs on the preview step');
+  assert.equal(h.node('issue-link-preview').disabled, true);
 });

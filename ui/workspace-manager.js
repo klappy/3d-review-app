@@ -4,9 +4,12 @@
 // NativeDesign resets this controller on identity/route changes; shared/participant never mount.
 // No token storage, implicit grants, project-content requests, or automatic retries.
 const enc = encodeURIComponent;
-export function mayGroup(workspaceRole, projectRole) {
-  return (workspaceRole === 'owner' && ['owner', 'member'].includes(projectRole)) ||
-    (workspaceRole === 'member' && projectRole === 'owner');
+// Mirrors src/handlers/workspace.ts shareAuthority: directProjectRole is the caller's DIRECT project grant (never the
+// inherited/effective role). Group: workspace member+ AND direct project owner. Ungroup: workspace owner OR direct project owner.
+export function mayGroup(workspaceRole, directProjectRole, op = 'group') {
+  const wsMember = workspaceRole === 'owner' || workspaceRole === 'member';
+  if (op === 'ungroup') return wsMember && (workspaceRole === 'owner' || directProjectRole === 'owner');
+  return wsMember && directProjectRole === 'owner';
 }
 export function mountWorkspaceManager({ document: doc, root, request, getContext, onWorkspaceSelected = () => {}, onMutation = () => {} }) {
   let revision = 0, destroyed = false, busy = false, selected = null, workspaces = [], detail = null, pending = null, message = '';
@@ -126,17 +129,17 @@ export function mountWorkspaceManager({ document: doc, root, request, getContext
     for (const p of projects) {
       const row = node('div', undefined, 'wm-project'); row.append(node('span', p.name));
       const independent = authorized.find(a => a.id === p.id);
-      if (independent && mayGroup(w.role, independent.role)) row.append(button('Remove from workspace', () => mutation(`/v2/workspaces/${enc(w.id)}/projects/${enc(p.id)}`, 'DELETE')));
+      if (mayGroup(w.role, independent?.direct_role, 'ungroup')) row.append(button('Remove from workspace', () => mutation(`/v2/workspaces/${enc(w.id)}/projects/${enc(p.id)}`, 'DELETE')));
       section.append(row);
     }
     if (!projects.length) section.append(node('p', 'No projects grouped here.'));
-    const candidates = authorized.filter(p => mayGroup(w.role, p.role) && !projects.some(row => row.id === p.id));
+    const candidates = authorized.filter(p => mayGroup(w.role, p.direct_role) && !projects.some(row => row.id === p.id));
     if (candidates.length) {
       const label = node('label', 'Group an authorized project'); const picker = node('select'); picker.disabled = busy;
       for (const p of candidates) { const option = node('option', p.name); option.value = p.id; picker.append(option); }
       picker.value = candidates[0].id; label.append(picker); section.append(label, button('Add project to workspace', () => {
         const p = (context().authorizedProjects || []).find(a => a.id === picker.value);
-        if (p && mayGroup(w.role, p.role)) return mutation(`/v2/workspaces/${enc(w.id)}/projects/${enc(p.id)}`, 'POST');
+        if (p && mayGroup(w.role, p.direct_role)) return mutation(`/v2/workspaces/${enc(w.id)}/projects/${enc(p.id)}`, 'POST');
       }));
     }
     if (w.role === 'owner') section.append(button('Preview deletion', previewDelete));

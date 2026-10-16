@@ -195,6 +195,7 @@ describe("[real-API] participant client against the worker", () => {
     expect(await resolveConflict(fail("NOT_FOUND_OR_NOT_VISIBLE"))).toEqual({ state: "unavailable" });
     expect(await resolveConflict(fail("RATE_LIMITED"))).toEqual({ state: "rateLimited" });
     expect(await resolveConflict(fail("429"))).toEqual({ state: "rateLimited" });
+    expect(await resolveConflict({ bearer: "pt_x", receipt: async () => { throw Object.assign(new Error("x"), { code: "RATE_LIMITED", retryAfter: "30" }); } })).toEqual({ state: "rateLimited", retryAfter: "30" }); // the wait travels to the held control
     expect(await resolveConflict(fail())).toEqual({ state: "transient" });
     expect(await resolveConflict(fail("503"))).toEqual({ state: "transient" });
     expect(await resolveConflict({ bearer: "pt_x", receipt: async () => ({ submitted: false }) })).toEqual({ state: "closed" });
@@ -656,6 +657,109 @@ describe("[fake-DOM] shared submit failure feedback (S2-A)", () => {
     expect($("answers").hidden).toBe(false); expect($("review").hidden).toBe(true); expect($("recover").hidden).toBe(false);
     expect($("notice").textContent).toBe(ATTENTION);
     expect(snapshot(storage)).toBe(snap);
+  });
+  it("F11g fresh open, Recover with GET /receipt → 429: Recover is held for the wait instead of staying clickable (#490 re-review prior low 4)", async () => {
+    const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
+    const $ = await boot(storage, link.entry_fragment, fetcher); strict($);
+    plan.receipt = refuse(429, "RATE_LIMITED");
+    await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("participant-resume").textContent).toBe(copy.rateLimited);
+    expect($("recover").disabled).toBe(true); expect($("recover").dataset.rateLimited).toBe("true");
+    expect($("recover").textContent).toMatch(/\((60|59) s\)$/); // the fake DOM has no button label; the countdown shows
+    expect($("submit").disabled).toBe(false); // only the refused control waits
+  });
+  // #496 review finding (2): the shared Submit and entry paths threw a bare HandledFailure on a 429, so the person saw
+  // no rate-limit words and the refused control stayed clickable. Now: rate-limit copy, the control held for Retry-After.
+  const refuseAfter = (seconds: string) => async () => new Response(JSON.stringify({ ok: false, error: { code: "RATE_LIMITED", message: "rate limit — try again in a minute" } }), { status: 429, headers: { "content-type": "application/json", "retry-after": seconds } });
+  it("F12a Submit → 429 with no earlier uncertainty: rate-limit copy, Submit held for the wait, review stays, no receipt probe spent, nothing committed", async () => {
+    const link = await issue(); const { $, storage, ns, plan } = await openForm(link);
+    const before = await counts(); const snap = await armed(storage, ns);
+    let probes = 0; plan.receipt = async (url: string, init: any) => { probes++; return fetchImpl(url, init); };
+    plan.responses = refuse(429, "RATE_LIMITED"); await submit($);
+    expect($("participant-resume").textContent).toBe(copy.rateLimited);
+    expect($("submit").disabled).toBe(true); expect($("submit").dataset.rateLimited).toBe("true"); expect($("submit").textContent).toMatch(/\((60|59) s\)$/);
+    expect($("review").hidden).toBe(false); expect($("receipt").hidden).toBe(true); expect($("participant-error").hidden).toBe(true);
+    expect($("notice").textContent).toBe(ATTENTION); expect(probes).toBe(0);
+    expect(snapshot(storage)).toBe(snap); expect(await counts()).toBe(before);
+  });
+  it("F12b Submit → 429 with Retry-After 30: the words and the hold both follow the server's wait", async () => {
+    const link = await issue(); const { $, plan } = await openForm(link);
+    plan.responses = refuseAfter("30"); await submit($);
+    expect($("participant-resume").textContent).toBe(copy.rateLimited.replace("one minute", "30 seconds"));
+    expect($("submit").disabled).toBe(true); expect($("submit").textContent).toMatch(/\((30|29) s\)$/);
+  });
+  it("F12c earlier uncertain → edit → Submit 429: the uncertainty is kept (never the rate-limit words alone), Submit still held", async () => {
+    const link = await issue(); const { $, storage, ns, plan } = await openForm(link);
+    plan.responses = refuse(503, "INTERNAL"); await submit($); expect($("participant-resume").textContent).toBe(copy.submitUncertain);
+    plan.responses = null; await edit($, { Q1: "4" });
+    const snap = await armed(storage, ns);
+    plan.responses = refuse(429, "RATE_LIMITED"); await submit($);
+    expectUncertain($, storage, snap);
+    expect($("submit").disabled).toBe(true); expect($("submit").dataset.rateLimited).toBe("true");
+  });
+  it("F13 fragment entry with GET /receipt → 429 after a good open: rate-limit copy, Recover offered and held for the wait; after it the form opens", async () => {
+    const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
+    plan.receipt = refuseAfter("45");
+    const $ = await boot(storage, link.entry_fragment, fetcher); strict($);
+    expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.rateLimited.replace("one minute", "45 seconds"));
+    expect($("answers").hidden).toBe(true); expect($("notice").textContent).toBe(ATTENTION);
+    expect($("recover").hidden).toBe(false); expect($("recover").disabled).toBe(true); expect($("recover").dataset.rateLimited).toBe("true");
+    expect($("recover").textContent).toMatch(/\((45|44) s\)$/);
+    plan.receipt = null; // the wait is over: Recover reopens the live session's form
+    await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("answers").hidden).toBe(false); expect($("participant-error").hidden).toBe(true);
+  });
+  it("F13b entry 429 → Recover after the wait → GET /form 429: participant rate-limit copy, Recover held again, nothing raw in #error (Bugbot 4293984155)", async () => {
+    const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
+    plan.receipt = refuseAfter("45");
+    let formRefusal: Route = refuseAfter("30");
+    const $ = await boot(storage, link.entry_fragment, async (url: string, init: any) => url.endsWith("/form") && formRefusal ? formRefusal(url, init) : fetcher(url, init)); strict($);
+    plan.receipt = null; // receipt now answers submitted:false, so Recover asks for the form — which the limiter refuses
+    await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.rateLimited.replace("one minute", "30 seconds"));
+    expect($("notice").textContent).toBe(ATTENTION); expect($("answers").hidden).toBe(true);
+    expect($("recover").hidden).toBe(false); expect($("recover").disabled).toBe(true); expect($("recover").dataset.rateLimited).toBe("true");
+    expect($("recover").textContent).toMatch(/\((30|29) s\)$/);
+    formRefusal = null; await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("answers").hidden).toBe(false); expect($("participant-error").hidden).toBe(true);
+  });
+  // DoD 6 remaining shared-route paths (runner 0741 note): a 429 on the resume open, and a 429 on the receipt probe after an
+  // entry STAGE_CONFLICT, both happen while this device holds a live session — offer Recover held for the wait, as F13 does.
+  it("F13c resume open → 429 (Retry-After 45) with a stored session: rate-limit copy with the wait, Recover offered and held; after it the form opens", async () => {
+    const link = await issue(); const storage = memoryStorage();
+    await boot(storage, link.entry_fragment); // first open stores the participant bearer
+    let openRefusal: Route = refuseAfter("45");
+    const $ = await boot(storage, link.entry_fragment, async (url: string, init: any) => url.endsWith("/v2/participate/link") && openRefusal ? openRefusal(url, init) : fetchImpl(url, init)); strict($);
+    expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.rateLimited.replace("one minute", "45 seconds"));
+    expect($("notice").textContent).toBe(ATTENTION); expect($("answers").hidden).toBe(true);
+    expect($("recover").hidden).toBe(false); expect($("recover").disabled).toBe(true); expect($("recover").dataset.rateLimited).toBe("true");
+    expect($("recover").textContent).toMatch(/\((45|44) s\)$/);
+    openRefusal = null; await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("answers").hidden).toBe(false); expect($("participant-error").hidden).toBe(true);
+  });
+  it("F13d entry open → 409 STAGE_CONFLICT, receipt probe → 429 (Retry-After 30) with a stored session: rate-limit copy with the wait, Recover held", async () => {
+    const link = await issue(); const storage = memoryStorage();
+    await boot(storage, link.entry_fragment);
+    let open: Route = refuse(409, "STAGE_CONFLICT"), probe: Route = refuseAfter("30");
+    const $ = await boot(storage, link.entry_fragment, async (url: string, init: any) => url.endsWith("/v2/participate/link") && open ? open(url, init) : url.endsWith("/receipt") && probe ? probe(url, init) : fetchImpl(url, init)); strict($);
+    expect($("participant-error").hidden).toBe(false); expect($("participant-error").textContent).toBe(copy.rateLimited.replace("one minute", "30 seconds"));
+    expect($("recover").hidden).toBe(false); expect($("recover").disabled).toBe(true); expect($("recover").dataset.rateLimited).toBe("true");
+    expect($("recover").textContent).toMatch(/\((30|29) s\)$/);
+    open = null; probe = null; await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("answers").hidden).toBe(false); expect($("participant-error").hidden).toBe(true);
+  });
+  it("F13e fresh open → 429 with no stored session: nothing to hold, the reopen copy stays (one-minute words)", async () => {
+    const link = await issue(); const storage = memoryStorage();
+    const $ = await boot(storage, link.entry_fragment, async (url: string, init: any) => url.endsWith("/v2/participate/link") ? refuse(429, "RATE_LIMITED")() : fetchImpl(url, init)); strict($);
+    expect($("participant-error").textContent).toBe(copy.rateLimitedReopen); expect($("recover").hidden).toBe(true);
+  });
+  it("F11h fresh open, Recover with GET /receipt → 429 Retry-After 30: the copy says 30 seconds, not a fixed minute (#496 review finding 1)", async () => {
+    const link = await issue(); const storage = memoryStorage(); const { plan, fetcher } = router();
+    const $ = await boot(storage, link.entry_fragment, fetcher); strict($);
+    plan.receipt = refuseAfter("30");
+    await $("recover").dispatch("click"); await settled($); strict($);
+    expect($("participant-resume").textContent).toBe(copy.rateLimited.replace("one minute", "30 seconds"));
+    expect($("recover").textContent).toMatch(/\((30|29) s\)$/);
   });
   const unreadable = async () => new Response("<html>gateway</html>", { status: 502 });
   const conflictProbes: [string, string, Route][] = [

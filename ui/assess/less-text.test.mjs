@@ -58,11 +58,11 @@ test('L9-24 next step: one line (who can read the notes) + Learn more holds the 
   assert.match(lessText(viewer, 'improve viewer', /<h2\b/g), /editing needs a member or owner role/);
 });
 
-test('L9-24 sign-in: one heading, one sentence, one primary; survey help behind Learn more', () => {
+test('L9-24 sign-in: one heading, one sentence, one primary; survey guidance inline without generic disclosure', () => {
   const h = pages.entry.render({ esc, state: {} }, { mode: 'signin', signin: { stage: 'email', email: '' } });
-  const body = lessText(h, 'sign-in', /<h1\b/g);
+  assert.equal(count(h, /<h1\b/g), 1); assert.ok(!h.includes(LM));
   const line = h.slice(h.indexOf('</h1>') + 5).match(/^<p class="muted">([^<]*)<\/p>/); assert.ok(line); assert.equal(sentences(line[1]), 1, 'one sentence under the heading');
-  assert.match(body, /Open the link you were given; no sign-in is needed\. <a href="#survey">Have an access code\?<\/a>/);
+  assert.match(h, /Taking a survey\? Open your survey link or <a href="#survey">enter an access code<\/a>/);
   // U28: the new-account line sits under the one primary (not a second line under the heading); still one heading, one primary.
   assert.equal(count(upFront(h), /New here\? Signing in with your email creates your account\./g), 1);
 });
@@ -92,8 +92,8 @@ async function assessPage() {
     document: new JSDOM('<!doctype html><head></head><body></body>').window.document, location: { hash: '', pathname: '/' }, history: { replaceState() {} }, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} }, localStorage: { getItem: () => null, setItem() {} }, matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }), addEventListener() {}, setTimeout, clearTimeout, console, URL, URLSearchParams };
   box.globalThis = box;
   const api = vm.runInNewContext(source + '\n({screen,state,surveyScreen})', box); surveyScreen = api.surveyScreen; assessState = api.state;
-  return (role, stage = 'prepare', view = 'prepare', projects = [{ id: 'p1', name: 'Coast' }], period = '2026') => { api.state.projects = projects;
-    return api.screen({ assessment: { id: 'a1', name: 'Oct', project_id: 'p1', role, stage, language_id: 'lang1', period }, surveys: [{ id: 's1', state: 'selected' }, { id: 's2', state: 'selected' }] }, view); };
+  return (role, stage = 'prepare', view = 'prepare', projects = [{ id: 'p1', name: 'Coast' }], period = '2026', extra = {}) => { api.state.projects = projects;
+    return api.screen({ assessment: { id: 'a1', name: 'Oct', project_id: 'p1', role, stage, language_id: 'lang1', period, ...extra }, surveys: [{ id: 's1', state: 'selected' }, { id: 's2', state: 'selected' }] }, view); };
 }
 
 test('L9-24 assessment page, Prepare view (validator #282): one view heading, no stray lines, one primary; stage notes behind Learn more', async () => {
@@ -240,7 +240,7 @@ test('U45 Collect: a survey whose link already exists shows its QR inline (no QR
 // Bincy B30 (lanes-2111, persona on DEV 0.21.5): the PROJECT page showed 3 lines under its heading and the assessment stage
 // headers 2. Shared fix: kitHead keeps one optional short line (the organisation); the role sentence and the kept-tool
 // explanations sit behind the shared Learn more; the assessment head's role line joins its one Learn more.
-test('B30 project page (owner + viewer, kit and non-kit hosts): one heading, at most one short line, one primary; the rest behind Learn more', async () => {
+test('B30 project page (owner + viewer, kit and non-kit hosts): one heading, at most one short line, one primary; role badge and action-specific help', async () => {
   const cardsNs = await import('./cards.js');
   for (const role of ['owner', 'viewer']) for (const shellOwnsTitle of [false, true]) {
     const map = { 'GET /v2/projects/p1': { project: { id: 'p1', name: 'Coast', role, organization: 'Lake Org' }, languages: [] }, 'GET /v2/projects/p1/assessments': { assessments: [{ id: 'a1', name: 'Oct', stage: 'collect' }] }, 'GET /v2/projects/p1/languages': { languages: [{ id: 'l1', name: 'Lake' }] } };
@@ -253,9 +253,9 @@ test('B30 project page (owner + viewer, kit and non-kit hosts): one heading, at 
     assert.match(v, />Lake Org<\/p>/, name + ': the organisation is the one line');
     assert.ok(count(v, /class="(?:[^"]* )?primary(?: [^"]*)?"/g) <= 1, name + ': at most one primary');
     if (role === 'owner') assert.equal(count(v, /class="(?:[^"]* )?primary(?: [^"]*)?"/g), 1, name + ': Start is the one primary');
-    const more = [...h.matchAll(closed)].map(x => x[0]).join('');
-    assert.ok(h.includes(LM) && more.includes(`Your role: ${role}`), name + ': role sentence moved, not removed');
-    if (role === 'owner') for (const moved of ['Issue paper codes on a survey', 'Group projects in a workspace']) assert.ok(more.includes(moved) && !v.includes(moved), `${name}: moved, not removed: ${moved}`);
+    assert.ok(!h.includes(LM), name + ': no generic help disclosure');
+    assert.ok(!h.includes('Your role:'), name + ': no repeated role sentence');
+    if (role === 'owner') for (const guidance of ['Share card to print access codes', 'Group related projects']) assert.ok(v.includes(guidance), name + ': help beside its action');
     assert.match(v, /class="badge">\s*/, name + ': role badge stays visible');
   }
 });
@@ -270,4 +270,12 @@ test('B30 assessment stage headers (Prepare / Collect / Understand / Improve, ow
     const more = [...head.matchAll(closed)].map(x => x[0]).join('');
     assert.ok(head.includes(LM) && more.includes(`Coast · your role: ${role}`), name + ': role line moved, not removed');
   }
+});
+
+test('B19: the assessment (Prepare) shows location/community and facilitator behind Learn more, beside language and period', async () => {
+  const page = await assessPage();
+  const h = page('owner', 'prepare', 'prepare', undefined, '2026', { location: 'Ban Na', facilitator: 'Bincy' });
+  const more = [...h.slice(h.indexOf('<div class="grid">')).matchAll(closed)].map(x => x[0]).join('');
+  assert.ok(more.includes('Location or community: Ban Na'), 'location shown'); assert.ok(more.includes('Facilitator: Bincy'), 'facilitator shown');
+  assert.doesNotMatch(page('owner', 'prepare'), /Location or community:|Facilitator:/, 'nothing when not set');
 });

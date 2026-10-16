@@ -2,7 +2,7 @@
 import { feedbackExperience, feedbackProvenance, projectFeedbackProvenance } from './feedback-provenance';
 import type { Handler } from "./types";
 import { CapError, id, sha256, notVisible } from "./types";
-import { normalizeEmail } from "./common";
+import { nonEmptyStr, normalizeEmail } from "./common";
 import { mintSession, revokeSessionByHash } from "../auth";
 import { revokeOAuthGrants, type OAuthEnv } from "../oauth";
 import contract from "../../contract/capabilities.json";
@@ -25,7 +25,7 @@ export const entryExample: Handler = async () => ({ result: { fixture: true, ass
  */
 const SYNTHETIC_DOMAIN = /\.invalid$/i;
 export const authRequestLink: Handler = async (ctx, p, o) => {
-  if (!p.email || typeof p.email !== "string") throw new CapError("INVALID_PARAMS", "email required");
+  if (!nonEmptyStr(p.email)) throw new CapError("INVALID_PARAMS", "email required");
   // Fail CLOSED: only an explicit ENVIRONMENT="dev" is the synthetic sandbox; a missing variable is treated as production.
   const dev = ctx.env.ENVIRONMENT === "dev";
   const email = normalizeEmail(p.email); // same normaliser as the limiter's em: key (review #12-11)
@@ -41,9 +41,11 @@ export const authRequestLink: Handler = async (ctx, p, o) => {
 };
 
 export const authConsumeLink: Handler = async (ctx, p) => {
-  if (!p.email || !p.code) throw new CapError("INVALID_PARAMS", "email and code required");
-  const eh = await sha256(normalizeEmail(String(p.email)));
-  const row = await ctx.db.prepare("SELECT id, expires_at, redeemed_at AS used_at FROM login_code WHERE email_hash = ? AND code_hash = ? AND id NOT LIKE 'ml\\_%' ESCAPE '\\' ORDER BY created_at DESC LIMIT 1").bind(eh, await sha256(String(p.code))).first<any>();
+  // Strings only, by the limiter's own well-formed rule: a numeric code used to reach the lookup here via String(p.code)
+  // while the limiter counted it as malformed and skipped g:RL_AUTH (Bugbot 4291079028).
+  if (!nonEmptyStr(p.email) || !nonEmptyStr(p.code)) throw new CapError("INVALID_PARAMS", "email and code required");
+  const eh = await sha256(normalizeEmail(p.email));
+  const row = await ctx.db.prepare("SELECT id, expires_at, redeemed_at AS used_at FROM login_code WHERE email_hash = ? AND code_hash = ? AND id NOT LIKE 'ml\\_%' ESCAPE '\\' ORDER BY created_at DESC LIMIT 1").bind(eh, await sha256(p.code)).first<any>();
   if (!row) throw new CapError("INVALID_PARAMS", "code invalid", "request a new code", "cap.auth.request_link");
   if (row.used_at) throw new CapError("INVALID_PARAMS", "code_used", "codes are single-use; request a new one");
   if (row.expires_at < Date.now()) throw new CapError("INVALID_PARAMS", "code_expired", "request a new code");

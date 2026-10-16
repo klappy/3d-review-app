@@ -106,5 +106,6 @@ export function printReadyLine(model) {
   if (!model?.lang) return `${model.items.length} questions ready. Use Print below.`;
   const english = model.english ? ` ${model.english} of ${model.phrases} phrases have no translation yet and stay in English, marked EN on the paper.` : '';
   const machine = model.english === model.phrases ? '' : model.review ? ' Machine translation, not yet checked by a speaker of this language.' : ' Machine translation.';
+  if (model.english > 0) return `Translation incomplete for ${model.language}.${english}${machine} Use Print below to print with these English fallbacks, or choose Print survey again to retry.`;
   return `${model.items.length} questions ready in ${model.language}.${english}${machine} Use Print below.`;
 }

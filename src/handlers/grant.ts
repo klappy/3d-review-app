@@ -1,9 +1,9 @@
 // cap.grant.* — invitations and grants at exactly one scope. D3: members invite ≤ member; owners are never removed or demoted;
-// the last owner is protected; transfer is dangerous. No inheritance (D2). Existence never leaks. Lane B (Fable) — owner per #14 c5704577820.
+// the last owner is protected; transfer is dangerous. Grants are stored at one scope; a workspace grant applies to its grouped projects (common.projectRole). Existence never leaks. Lane B (Fable) — owner per #14 c5704577820.
 import { magicLinkEnabled } from "../magic-link";
 import type { Ctx, Handler, Role, ScopeType } from "./types";
 import { CapError, notVisible } from "./errors";
-import { ROLE_RANK, atLeast, countScalar, gate, newId, nowIso, randomToken, reqRole, reqScope, reqStr, roleAt, sha256 } from "./common";
+import { ROLE_RANK, atLeast, countScalar, gate, newId, nowIso, randomToken, reqRole, reqScope, reqStr, roleAt, effectiveRoleAt, directRoleAt, sha256 } from "./common";
 import { invitationMessage, normalizeAddress, publicOrigin, sendMail, type MailEnv, type MailResult } from "../mail";
 
 type Scope = { type: "workspace" | "project" | "assessment"; id: string };
@@ -22,12 +22,26 @@ const INVITES_PER_INVITER_HOUR = 30;  // outbound mail from the captain's domain
 
 /** The caller's role at the scope; hidden when none. */
 async function callerAt(ctx: Ctx, scope: Scope, min: Role): Promise<Role> {
-  return gate(await roleAt(ctx, scope.type, scope.id), min, scope.type);
+  return gate(await effectiveRoleAt(ctx, scope.type, scope.id), min, scope.type);
 }
 /** D3: a member may act only up to member. */
 function ceiling(caller: Role, target: Role, what: string) {
   if (caller !== "owner" && ROLE_RANK[target] > ROLE_RANK["member"])
     throw new CapError("NOT_AUTHORIZED_AT_SCOPE", `members ${what} up to member only`, "D3 — ask an owner, or invite as member");
+}
+/** HOLD #483 c6204865181 #1: an invitation may not reach a person who already has access at the scope — the caller
+ *  themselves, or any principal whose email already holds a role there (direct, or inherited from the grouping workspace).
+ *  Otherwise an inherited role is laundered into a permanent direct grant by inviting oneself and accepting. Changing an
+ *  existing direct grant is cap.grant.update_role's job, under its own rules. */
+async function refuseExistingAccess(ctx: Ctx, scope: Scope, inviteeHash: string) {
+  const me = await ctx.db.prepare("SELECT email_hash FROM principal WHERE id = ?").bind(ctx.principal.id).first<{ email_hash: string | null }>();
+  if (me?.email_hash && me.email_hash === inviteeHash)
+    throw new CapError("INVALID_PARAMS", "cannot invite yourself", "your access here comes from an existing grant; ask a direct owner if it should change", "cap.grant.invite");
+  const held = await ctx.db.prepare(`SELECT 1 FROM "grant" g JOIN principal pr ON pr.id = g.principal_id WHERE pr.email_hash = ?1 AND (
+      (g.scope_type = ?2 AND g.scope_id = ?3)
+      OR (?2 = 'project' AND g.scope_type = 'workspace' AND g.scope_id = (SELECT p.workspace_id FROM project p WHERE p.id = ?3))) LIMIT 1`)
+    .bind(inviteeHash, scope.type, scope.id).first();
+  if (held) throw new CapError("INVALID_PARAMS", "this person already has access at this scope", "change a direct grant with cap.grant.update_role; inherited access follows the workspace", "cap.grant.update_role");
 }
 async function owners(ctx: Ctx, scope: Scope): Promise<string[]> {
   const r = await ctx.db.prepare('SELECT principal_id FROM "grant" WHERE scope_type = ? AND scope_id = ? AND role = ?').bind(scope.type, scope.id, "owner").all<{ principal_id: string }>();
@@ -76,7 +90,10 @@ export const invite: Handler = async (ctx, p, o) => {
   if (!email) throw new CapError("INVALID_PARAMS", "email must be one plain ASCII address", "letters, digits and . _ % + - before the @; no display names, lists, quotes or spaces", "cap.grant.invite");
   const caller = await callerAt(ctx, scope, "member");
   ceiling(caller, role, "invite");
+  // Creating an owner needs a DIRECT owner at this scope; an inherited workspace owner cannot mint project owners.
+  if (role === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
   const inviteeHash = await sha256(email);
+  await refuseExistingAccess(ctx, scope, inviteeHash);
   const impact = { affected: [{ scope, role, invitee: inviteeHash.slice(0, 12), will_see: `${scope.type} contents at role ${role}` }], irreversible: true, effect: "external" as const, compensating_control: "cap.grant.revoke_invitation (does not unsend)" };
   if (o?.dryRun) return { result: {}, scope, impact };
   // Intent de-duplication + inviter cap, decided and written in ONE statement so concurrent replays cannot both pass a
@@ -96,7 +113,7 @@ export const invite: Handler = async (ctx, p, o) => {
   if ((ins.meta.changes ?? 0) !== 1) {
     const dup = await ctx.db.prepare(`SELECT id, role, status FROM invitation WHERE ${dupWhere("?1", "?2", "?3", "?4", "?5", "?6")} ORDER BY created_at DESC LIMIT 1`)
       .bind(scope.type, scope.id, inviteeHash, sentSince, pendingSince, nowStr).first<{ id: string; role: string; status: string }>();
-    if (!dup) throw new CapError("RATE_LIMITED", `at most ${INVITES_PER_INVITER_HOUR} collaborator invitations per hour`, "this cap resets over the next hour, not the next minute", "cap.grant.invite");
+    if (!dup) throw new CapError("RATE_LIMITED", `at most ${INVITES_PER_INVITER_HOUR} collaborator invitations per hour`, "this cap resets over the next hour, not the next minute", "cap.grant.invite", 3600);
     if (dup.role !== role) throw new CapError("INVALID_PARAMS", `already invited as ${dup.role} a moment ago`, "revoke that invitation first, then invite with the new role", "cap.grant.revoke_invitation");
     // No token was minted into this row, no new idempotency key exists and no fetch was made. An 'unconfirmed' twin is reported
     // as what it is — uncertain, not "not sent" — so a surface cannot render it as "email not delivered".
@@ -166,8 +183,8 @@ export const accept: Handler = async (ctx, p, o) => {
   const byId = typeof p.invitation_id === "string" && p.invitation_id.length > 0;
   if (byId && p.token !== undefined) throw new CapError("INVALID_PARAMS", "name the invitation by token or by invitation_id, not both", "the link path uses token; the signed-in path (cap.me.invitations) uses invitation_id", "cap.grant.accept");
   const inv = byId
-    ? await ctx.db.prepare(`SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash FROM invitation WHERE id = ? AND scope_type IN (${GRANT_SCOPES.map(() => "?").join(",")})`).bind(p.invitation_id as string, ...GRANT_SCOPES).first<any>()
-    : await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash FROM invitation WHERE token_hash = ?").bind(await sha256(reqStr(p, "token"))).first<any>();
+    ? await ctx.db.prepare(`SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash, created_by FROM invitation WHERE id = ? AND scope_type IN (${GRANT_SCOPES.map(() => "?").join(",")})`).bind(p.invitation_id as string, ...GRANT_SCOPES).first<any>()
+    : await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash, created_by FROM invitation WHERE token_hash = ?").bind(await sha256(reqStr(p, "token"))).first<any>();
   // 'unconfirmed' is accepted like 'sent'. Acceptance is permitted by token possession PLUS the authenticated principal's
   // email matching the invitee (checked below) — possession does not establish the delivery channel or inbox arrival
   // (a DEV manual handoff path exists), so it is never treated as proof that mail was delivered.
@@ -178,6 +195,13 @@ export const accept: Handler = async (ctx, p, o) => {
   if (inv.status === "accepted") throw new CapError("INVALID_PARAMS", "invitation_used", "ask for a new invitation");
   if (inv.expires_at && inv.expires_at < nowIso(ctx)) throw new CapError("INVALID_PARAMS", "invitation_expired", "ask for a new invitation");
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
+  // HOLD #483 c6204865181 #1: no one accepts their own invitation (closes the self-invite path for rows minted before the
+  // invite-side check), and an owner invitation is honoured only while its inviter still holds a DIRECT owner grant here.
+  if (inv.created_by === ctx.principal.id) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "cannot accept an invitation you created", "ask a direct owner of this scope");
+  if (inv.role === "owner") {
+    const inviter = await ctx.db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind(inv.created_by, scope.type, scope.id).first<{ role: string }>();
+    if (inviter?.role !== "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this owner invitation was not issued by a direct owner of this scope", "ask a direct owner for a new invitation");
+  }
   const existing = await roleAt(ctx, scope.type, scope.id);
   const impact = { affected: [{ scope, role: inv.role, currently: existing ?? "none" }], irreversible: true, effect: "disclosure" as const, compensating_control: "cap.grant.revoke (what was seen stays seen)" };
   if (o?.dryRun) return { result: {}, scope, impact };
@@ -250,6 +274,8 @@ export const update_role: Handler = async (ctx, p, o) => {
   const g = await ctx.db.prepare('SELECT id, principal_id, role FROM "grant" WHERE id = ? AND scope_type = ? AND scope_id = ?').bind(gid, scope.type, scope.id).first<any>();
   if (!g) throw notVisible("grant");
   if (g.role === "owner" && role !== "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be demoted", "D3 — transfer ownership instead (cap.grant.transfer_owner)");
+  // HOLD #483 c6204865181 #2: raising anyone to owner needs a DIRECT owner — an inherited owner cannot mint an undemotable owner.
+  if (role === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
   const impact = { affected: [{ grant: gid, from: g.role, to: role }], irreversible: ROLE_RANK[role] > ROLE_RANK[g.role as Role], effect: "disclosure" as const, compensating_control: "demotion via this capability (what was seen stays seen)" };
   if (o?.dryRun) return { result: {}, scope, impact };
   await ctx.db.prepare('UPDATE "grant" SET role = ? WHERE id = ?').bind(role, gid).run();
@@ -273,6 +299,9 @@ export const transfer_owner: Handler = async (ctx, p, o) => {
   if (ctx.principal.kind === "support" && (await roleAt(ctx, scope.type, scope.id)) !== "owner")
     throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "transfer by support without the owner's consent is not ruled", "proposed, pending source — the owner runs this step");
   await callerAt(ctx, scope, "owner");
+  // Ownership moves only from a DIRECT owner grant at this scope. An owner inherited from the grouping workspace cannot
+  // transfer or step down here: step_down rewrites only the direct grant, so the inherited powers would silently remain.
+  await directRoleAt(ctx, scope.type, scope.id, "owner", "your owner role is inherited from the workspace — a direct project owner runs this step");
   if (to === ctx.principal.id) throw new CapError("INVALID_PARAMS", "cannot transfer ownership to yourself", "name another principal");
   if (!(await ctx.db.prepare("SELECT id FROM principal WHERE id = ?").bind(to).first())) throw new CapError("INVALID_PARAMS", "unknown principal", "to must be a signed-up principal id");
   const current = await owners(ctx, scope);

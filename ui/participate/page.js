@@ -3,7 +3,8 @@ import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError, drawAbout, aboutValues, setAboutValues, aboutFields, welcomeCopy } from '../participant-view.js';
 import { UI_EN, SURVEYOR_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames, translatingSub } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
-import { receiptNotice } from '../shared-link.js';
+import { receiptNotice, copy as linkCopy } from '../shared-link.js';
+import { holdRetry, underHold, setControlLabel, rateLimitNotice, isRateLimitedError, rateLimitedTranslate } from '../rate-limit.js';
 
 const $ = id => document.getElementById(id);
 let pager, renderedPhase, renderedForm;
@@ -59,13 +60,47 @@ function values(validate = false) {
   return out;
 }
 const syncOther = () => { if (journey.state.form) syncOtherBoxes($('answers'), journey.state.form.items); };
+// DoD 6: a rate-limit refusal on the link shows one "Try again" control under the notice, enabled after the wait.
+// A refusal while the form shows (the "Check" / recover path) holds that control for the same wait instead.
+let retryButton = null, retryHeading = null, retryHold = null, retryFor = null, recoverFor = null, recoverHold = null;
+function paintRateLimit(state) {
+  if (state.rateLimited === true && state.phase !== 'unavailable' && recoverFor !== state.limitId) {
+    recoverFor = state.limitId; recoverHold = holdRetry($('recover'), state.retryAfter); // replaces any earlier hold on #recover
+  } else if (state.rateLimited !== true && recoverHold && !['form', 'review'].includes(state.phase)) { recoverHold(); recoverHold = null; recoverFor = null; } // leaving form/review ends it; review()/edit() inside the wait do not (#490 review low 1)
+  const limited = state.rateLimited === true && state.phase === 'unavailable';
+  if (!limited) { retryHold?.(); retryHold = null; retryFor = null; if (retryButton) retryButton.hidden = true; if (retryHeading) retryHeading.hidden = true; return; }
+  if (retryFor === state.limitId) { // same refusal repainted: keep the running countdown, but follow a language switch (#490 review low 4)
+    retryHeading.textContent = T('rateLimitHeading');
+    setControlLabel(retryButton, T('tryAgain'));
+    return;
+  }
+  retryFor = state.limitId;
+  if (!retryButton) {
+    // Design lens (PProblemBusy): a heading names the problem; the retry is the one primary block button under the notice.
+    retryHeading = element('h2', T('rateLimitHeading')); retryHeading.id = 'rate-heading';
+    retryButton = element('button', T('tryAgain')); retryButton.type = 'button'; retryButton.id = 'rate-retry'; retryButton.className = 'rv-btn primary participant-primary';
+    retryButton.addEventListener('click', () => { retryHold?.(); retryHold = null; retryButton.hidden = true; retryHeading.hidden = true; journey.start({ retry: true }).then(() => { if (journey.state.phase === 'form' && journey.state.fresh) startNextPerson(); }).catch(() => { $('notice').textContent = 'The survey could not be opened. Open your survey link again in a moment.'; }); }); // a retried Interview another gets its setup (Bugbot 4292184464)
+    $('notice').before(retryHeading); $('notice').after(retryButton);
+  }
+  retryHeading.textContent = T('rateLimitHeading'); retryHeading.hidden = false;
+  retryButton.hidden = false; retryHold?.();
+  retryHold = holdRetry(retryButton, state.retryAfter, { label: T('tryAgain'), onReady: () => { paintReadyNotice(journey.state); retryButton.focus(); } });
+}
+// Once the wait is over, the notice stops naming a wait — one minute or a longer cap's own (#490 review copy nit; re-review low 2).
+// While a Try again is in flight it says the survey is opening, not the wait that already ran out (#495 review low).
+function paintReadyNotice(state) {
+  const text = rateLimitNotice(state, retryButton, { retrying: linkCopy.labelOpening, ready: linkCopy.rateLimitedReady });
+  if (text) $('notice').textContent = text;
+}
 function paint(state) {
+  paintRateLimit(state);
   if (state.form) syncPicker(state.form);
   if (state.form) renderPassages(view(state.form) || state.form);
   if (state.form && !isEnglish(lang) && tr.form !== state.form && pendingForm !== state.form) loadTranslations(state.form);
   const shown = view(state.form);
   // Gate 0.24.0: the thank-you is said in the participant's language (the controller's notice is its English form).
   $('notice').textContent = demo && state.phase === 'receipt' ? 'Practice only. No response was sent or saved.' : state.phase === 'receipt' && state.thanks ? receiptNotice(state.thanks.perspective, { code: state.thanks.code, t: T }) : state.notice || '';
+  paintReadyNotice(state);
   if (state.phase !== renderedPhase || (state.form && state.form !== renderedForm)) {
     for (const id of ['answers', 'review', 'receipt']) $(id).hidden = true;
     if (state.phase === 'form') {
@@ -101,6 +136,8 @@ function paint(state) {
   $('recover').hidden = !['form', 'review'].includes(state.phase);
   for (const button of document.querySelectorAll('button')) {
     if (button.id === 'version' || button.id === 'changelog-close') continue;
+    // A control under holdRetry keeps its countdown: restoring the pre-request "enabled" would undo the wait (Bugbot 4290666357).
+    if (underHold(button)) { disabledBeforeRequest.delete(button); continue; }
     if (state.busy) { if (!disabledBeforeRequest.has(button)) disabledBeforeRequest.set(button, button.disabled); button.disabled = true; }
     else if (disabledBeforeRequest.has(button)) { button.disabled = disabledBeforeRequest.get(button); disabledBeforeRequest.delete(button); }
   }
@@ -112,7 +149,7 @@ if (demo) { $('submit').textContent = 'Finish practice — nothing sent'; $('rec
 // Static page words (captured after the demo wording is set) and the language picker.
 const STATIC = [['.intro-title', 'static.title'], ['.intro-lead', 'static.lead'], ['#review-button', 'static.reviewButton'], ['#review > h2', 'static.reviewTitle'], ['#edit', 'static.edit'], ['#submit', 'static.submit'], ['#recover', 'static.recover']];
 const staticEn = {}; for (const [sel, key] of STATIC) { const n = document.querySelector(sel); if (n) staticEn[key] = n.textContent; }
-function applyStatic() { for (const [sel, key] of STATIC) { const n = document.querySelector(sel); if (n) n.textContent = T(key, staticEn[key]); } }
+function applyStatic() { for (const [sel, key] of STATIC) setControlLabel(document.querySelector(sel), T(key, staticEn[key])); } // a Check countdown follows a language switch (re-review low 1)
 const langSelect = element('select'); langSelect.id = 'participant-lang';
 let offered = null; // the survey's languages once known (form.languages); the picker is hidden while there are none
 function syncPicker(form) {
@@ -153,9 +190,13 @@ function showTranslating(entry, { done = 0, total = 0 } = {}, onScreen = null) {
   trFill.style.width = `${Math.max(4, pct)}%`; trBar.setAttribute('aria-valuenow', String(pct));
   trCount.textContent = total ? `${done} / ${total} ${UI_EN.phrases}` : '';
 }
-function showTranslateFailed() {
+let trHold = null;
+function showTranslateFailed(error) {
   trBanner.hidden = false; trBanner.classList.add('failed'); trSpin.hidden = true; trBar.hidden = true; trCount.textContent = '';
   trTitle.textContent = UI_EN.translateFailed; trSub.textContent = UI_EN.translateFailedHint; trRetry.hidden = false;
+  trHold?.(); trHold = null;
+  // DoD 6: a rate-limited translation says so (not "check the internet connection") and Try again waits out Retry-After.
+  if (isRateLimitedError(error)) { trSub.textContent = rateLimitedTranslate(error.retryAfter); trHold = holdRetry(trRetry, error.retryAfter, { label: UI_EN.tryAgain }); }
 }
 function hideTranslating() { trBanner.hidden = true; }
 trRetry.addEventListener('click', () => loadTranslations());
@@ -243,10 +284,10 @@ async function loadTranslations(form = journey?.state?.form || null) {
     tr = { lang, form, ui: u.map, items: it.map, view: form ? translateForm(form, it.map) : null }; T = makeT(u.map);
     hideTranslating();
     langStatus.textContent = entry?.review ? T('machineNoteReview') : T('machineNote');
-  } catch {
+  } catch (error) {
     if (seq !== loadSeq) return;
     tr = { lang, form, ui: {}, items: {}, view: null }; T = makeT({});
-    showTranslateFailed();
+    showTranslateFailed(error);
   } finally {
     clearTimeout(reveal);
     if (seq === loadSeq) main?.removeAttribute('aria-busy');
@@ -262,11 +303,13 @@ $('answers').addEventListener('submit', event => { event.preventDefault(); try {
 $('edit').addEventListener('click', () => journey.edit());
 $('submit').addEventListener('click', () => { journey.setContext(aboutValues(about)); journey.submit(); });
 $('recover').addEventListener('click', () => journey.recover());
-async function interviewAnother() {
-  await journey.another();
-  if (journey.state.phase !== 'form') return;
+function startNextPerson() {
   if (passageDetails) passageDetails.open = true; // the next person starts at the passage, like a first open
   document.querySelector('main')?.scrollIntoView?.();
+}
+async function interviewAnother() {
+  await journey.another();
+  if (journey.state.phase === 'form') startNextPerson();
 }
 // A newly pasted link selects a fresh controller; a participant page never changes into a staff surface.
 window.addEventListener('hashchange', () => location.reload());

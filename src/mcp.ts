@@ -9,6 +9,7 @@ import type { Ctx } from "./handlers/types";
 import { tools as toolNames } from "./registry";
 import { newTraceId } from "./receipt";
 import { APP_VERSION } from "./version";
+import { chargesCapabilityLimiter } from "./dispatch";
 import panelHtml from "./mcp-panel.html";
 
 // MCP Apps (ext-apps) panel: ONE resource, served with the app profile MIME; read/write/danger carry its uri in _meta so a UI-capable host
@@ -33,6 +34,16 @@ const TOOL_DEFS = [
 
 const rpc = (id: any, result?: any, error?: { code: number; message: string; data?: any }) =>
   ({ jsonrpc: "2.0", id, ...(error ? { error } : { result }) });
+
+/** true only when handleMcp() routes this one message to execute() on a capability that charges its own limiter there
+ *  (RL_REDEEM / RL_AUTH). Mirrors the routing below: invalid JSON-RPC, notifications, other methods, unknown tools,
+ *  docs, write+undo, wrong tool and non-object params are NOT exempt (Bugbot 4289984346). Keep in step with handleMcp(). */
+export function routesToOwnLimiter(m: any): boolean {
+  if (!m || m.jsonrpc !== "2.0" || typeof m.method !== "string" || m.id === undefined || m.method !== "tools/call") return false;
+  const name = m.params?.name; const a = m.params?.arguments ?? {};
+  if (!toolNames.includes(name) || name === "docs" || (name === "write" && a.undo)) return false;
+  return chargesCapabilityLimiter(a.capability, a.params ?? {}, name);
+}
 
 export async function handleMcp(req: Request, ctx: Ctx, execute: Execute, docs: Docs): Promise<Response> {
   let msg: any;

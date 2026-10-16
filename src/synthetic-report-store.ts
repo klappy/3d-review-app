@@ -3,11 +3,16 @@ import type { Ctx } from './handlers/types.js';
 import { REPORT_CAPTURE_CTE, attestPackedCapture, type CapturedAssessment } from './report-capture.js';
 import { canonicalJson, parseBoundedJson, sha256Bytes } from './report-canonical-json.js';
 import { ATTESTATION_TRUST } from './synthetic-attestation-trust.js';
-import { renderSyntheticReport, REPORT_SCHEMA, REPORT_VERSIONS } from './synthetic-report-renderer.js';
+import { renderAttestedCapture, REPORT_SCHEMA, REPORT_VERSIONS } from './synthetic-report-renderer.js';
+import { participantReportsAllowed } from './report-admission.js';
 
-type StoreContext = Pick<Ctx, 'db' | 'principal' | 'now'> & { env?: { ENVIRONMENT?: string } };
-/** Fail closed: only an explicit ENVIRONMENT='dev' admits participant-source captures (captain 2026-09-24 15:03). */
-function dev(ctx:StoreContext):boolean{return ctx.env?.ENVIRONMENT==='dev';}
+type StoreContext = Pick<Ctx, 'db' | 'principal' | 'now'> & Partial<Pick<Ctx, 'log'>> & { env?: { ENVIRONMENT?: string; PARTICIPANT_REPORTS?: string } };
+/** Observe-only build timing: one `report.stage` span per stage, data {stage, ms} only (no ids, no bytes;
+ * keys stay clear of REDACT_KEYS in receipt.ts). Workers clocks advance only across I/O, so on a Worker
+ * CPU-only stages read ~0 ms and their cost lands on the next I/O stage; the local bench gives the CPU split. */
+const clock=():number=>(globalThis as {performance?:{now():number}}).performance?.now()??Date.now();
+function stageSpan(ctx:StoreContext,stage:string,t0:number):number{const t=clock();try{ctx.log?.('report.stage',{stage,ms:Math.round((t-t0)*1000)/1000});}catch{}return t;}
+function participantAdmission(ctx:StoreContext):boolean{return participantReportsAllowed(ctx.env);}
 type VersionTuple = Readonly<{sourcePin:string;indexRoot:string;scorerVersion:string;narrativeVersion:string;policyVersion:string;outputSchemaVersion:string}>;
 type RendererDescriptor = Readonly<{
   tuple:VersionTuple;
@@ -15,7 +20,7 @@ type RendererDescriptor = Readonly<{
   validate:(payload:unknown,capture:CapturedAssessment)=>boolean|Promise<boolean>;
 }>;
 async function renderCaptured(c:CapturedAssessment):Promise<unknown>{
-  const result=await renderSyntheticReport(c.assessmentId,c.rows,c.participant===true);
+  const result=await renderAttestedCapture(c);
   if(!result.eligible||result.captureDigest!==c.captureDigest)invalid();
   return result.payload;
 }
@@ -23,11 +28,12 @@ async function renderCaptured(c:CapturedAssessment):Promise<unknown>{
  * Always over the original attested capture; no tolerance, cache or DB read. */
 async function validateSyntheticReportPayload(payload:unknown,c:CapturedAssessment):Promise<boolean>{
   try{
-    const result=await renderSyntheticReport(c.assessmentId,c.rows,c.participant===true);
+    const result=await renderAttestedCapture(c);
     return result.eligible&&result.captureDigest===c.captureDigest&&canonicalJson(payload,PAYLOAD_LIMIT)===result.payloadJson;
   }catch{return false;}
 }
-const REAL_RENDERER: RendererDescriptor = Object.freeze({
+/** Read-only frozen descriptor; exported for in-process measurement and identity tests only. */
+export const REAL_RENDERER: RendererDescriptor = Object.freeze({
   tuple:Object.freeze({sourcePin:ATTESTATION_TRUST.sourcePin,indexRoot:ATTESTATION_TRUST.indexRoot,
     scorerVersion:REPORT_VERSIONS.scorer,narrativeVersion:REPORT_VERSIONS.narrative,
     policyVersion:REPORT_VERSIONS.policy,outputSchemaVersion:REPORT_SCHEMA}),
@@ -136,18 +142,22 @@ async function observeBuild(ctx:StoreContext,assessmentId:string):Promise<BuildO
   const who=principal(ctx);if(!who)return NOT_VISIBLE;
   let aid:string;try{aid=text(assessmentId);approved(descriptor());}catch{return NOT_VISIBLE;}
   let row:Observation|null;
+  let t=clock();
   try{row=await ctx.db.prepare(REPORT_OBSERVE_SQL).bind(who[0],null,aid,who[1],'member').first<Observation>();}catch{return UNAVAILABLE;}
+  t=stageSpan(ctx,'observe_sql',t);
   if(!row)return NOT_VISIBLE;
   if(row.assessment_id!==aid)return UNAVAILABLE;
-  const current=await attestPackedCapture(aid,row.current_capture??'',dev(ctx));
+  const current=await attestPackedCapture(aid,row.current_capture??'',participantAdmission(ctx));
+  stageSpan(ctx,'attest_observe',t);
   return {ok:true,aid,capture:current.eligible?current.capture:null};
 }
 /** Preview exposes no captured token, count, digest or report identity. */
 export async function observeBuildEligibility(ctx:StoreContext,assessmentId:string):Promise<EligibilityResult>{
   const observation=await observeBuild(ctx,assessmentId);if(!observation.ok)return observation;
   if(!observation.capture)return {ok:true,marker:marker(observation.aid,false)};
-  try{await descriptor().render(observation.capture);return {ok:true,marker:marker(observation.aid,true)};}
-  catch{return {ok:true,marker:marker(observation.aid,false)};}
+  const t=clock();
+  try{await descriptor().render(observation.capture);stageSpan(ctx,'render_preview',t);return {ok:true,marker:marker(observation.aid,true)};}
+  catch{stageSpan(ctx,'render_preview',t);return {ok:true,marker:marker(observation.aid,false)};}
 }
 export async function buildMaterialized(ctx:StoreContext,assessmentId:string):Promise<StoreResult<Report>>{
   const observation=await observeBuild(ctx,assessmentId);if(!observation.ok)return observation;
@@ -162,27 +172,31 @@ export async function commitMaterialized(ctx:StoreContext,assessmentId:string,ca
   try{
     approved(r);aid=text(assessmentId);
     // Reattest the raw token, ignoring any caller assertion of its digest/rows/eligibility.
-    const capture=await attestPackedCapture(aid,captured.packedCapture,dev(ctx));if(!capture.eligible)return UNAVAILABLE;c=capture.capture;
-    const rendered=await r.render(c);payloadBytes=canonicalJson(rendered,PAYLOAD_LIMIT);
-    const parsed=parseBoundedJson(payloadBytes,PAYLOAD_LIMIT);if(!await r.validate(parsed,c))return UNAVAILABLE;
-    key=await reportKey(c,r.tuple);payloadHash=await sha256Bytes(encoder.encode(payloadBytes));
+    let t=clock();
+    const capture=await attestPackedCapture(aid,captured.packedCapture,participantAdmission(ctx));t=stageSpan(ctx,'attest_commit',t);if(!capture.eligible)return UNAVAILABLE;c=capture.capture;
+    const rendered=await r.render(c);t=stageSpan(ctx,'render',t);payloadBytes=canonicalJson(rendered,PAYLOAD_LIMIT);t=stageSpan(ctx,'canonicalize',t);
+    const parsed=parseBoundedJson(payloadBytes,PAYLOAD_LIMIT);const ok=await r.validate(parsed,c);t=stageSpan(ctx,'validate',t);if(!ok)return UNAVAILABLE;
+    key=await reportKey(c,r.tuple);payloadHash=await sha256Bytes(encoder.encode(payloadBytes));stageSpan(ctx,'hash',t);
     id='sreport_'+crypto.randomUUID();createdAt=text(ctx.now().toISOString(),128);
   }catch{return UNAVAILABLE;}
-  const t=r.tuple;
+  const t=r.tuple;let ts=clock();
   try{
     const written=await ctx.db.prepare(REPORT_COMMIT_SQL).bind(who[0],null,aid,who[1],'member',id,key,c.captureDigest,t.indexRoot,t.sourcePin,t.scorerVersion,t.narrativeVersion,t.policyVersion,t.outputSchemaVersion,payloadBytes,payloadHash,createdAt,c.packedCapture).run();
+    ts=stageSpan(ctx,'commit_sql',ts);
     if(!written.success)return UNAVAILABLE;
   }catch{return UNAVAILABLE;}
   // A fresh secure read is mandatory even for a successful or duplicate INSERT.
   let row:StoredRow|null;
   try{row=await ctx.db.prepare(REPORT_BUILD_RESULT_SQL).bind(who[0],null,aid,who[1],'member',key).first<StoredRow>();}catch{return UNAVAILABLE;}
+  ts=stageSpan(ctx,'result_sql',ts);
   if(!row)return NOT_VISIBLE;
   if(row.assessment_id!==aid)return UNAVAILABLE;
-  const current=await attestPackedCapture(aid,row.current_capture??'',dev(ctx));
+  const current=await attestPackedCapture(aid,row.current_capture??'',participantAdmission(ctx));
+  ts=stageSpan(ctx,'attest_current',ts);
   if(!current.eligible)return held(aid);
   if(row.id===null)return {ok:false,reason:'CONFLICT'};
   try{
-    const valid=await validateStored(row,r,current.capture,dev(ctx));
+    const valid=await validateStored(row,r,current.capture,participantAdmission(ctx));stageSpan(ctx,'validate_stored',ts);
     if(valid.report.assessmentId!==aid||valid.report.reportKey!==key||valid.report.captureDigest!==c.captureDigest||valid.payloadHash!==payloadHash||valid.payloadBytes!==payloadBytes)return {ok:false,reason:'DETERMINISM'};
     return {ok:true,value:valid.report};
   }catch{return held(aid);}
@@ -195,7 +209,7 @@ export async function readMaterialized(ctx:StoreContext,reportId:string):Promise
   try{row=await ctx.db.prepare(REPORT_GET_SQL).bind(who[0],rid,null,who[1],'viewer').first<StoredRow>();}catch{return UNAVAILABLE;}
   if(!row)return NOT_VISIBLE;
   let aid:string;try{aid=text(row.assessment_id);}catch{return UNAVAILABLE;}
-  try{return {ok:true,value:(await validateStored(row,r,undefined,dev(ctx))).report};}catch{return held(aid);}
+  try{return {ok:true,value:(await validateStored(row,r,undefined,participantAdmission(ctx))).report};}catch{return held(aid);}
 }
 export async function listMaterialized(ctx:StoreContext,assessmentId:string,afterId:string|null=null,pageSize=5):Promise<StoreResult<ReportPage>>{
   const r=descriptor();
@@ -206,12 +220,12 @@ export async function listMaterialized(ctx:StoreContext,assessmentId:string,afte
   if(rows.length===0)return NOT_VISIBLE;
   if(rows.length>pageSize+1||rows.some(row=>row.assessment_id!==aid))return UNAVAILABLE;
   try{
-    const current=await attestPackedCapture(aid,rows[0].current_capture??'',dev(ctx));if(!current.eligible)return held(aid);
+    const current=await attestPackedCapture(aid,rows[0].current_capture??'',participantAdmission(ctx));if(!current.eligible)return held(aid);
     if(rows.some(row=>row.current_capture!==current.capture.packedCapture))return held(aid);
     if(rows.length===1&&rows[0].id===null)return {ok:true,value:{reports:[],afterId:null}};
     const validated:ReportSummary[]=[];let previous=afterId??'';
     for(const row of rows){
-      const result=await validateStored(row,r,current.capture,dev(ctx));if(result.report.id<=previous)invalid();previous=result.report.id;
+      const result=await validateStored(row,r,current.capture,participantAdmission(ctx));if(result.report.id<=previous)invalid();previous=result.report.id;
       const {payload,...summary}=result.report;validated.push(Object.freeze(summary));
     }
     const reports=Object.freeze(validated.slice(0,pageSize));

@@ -1,0 +1,67 @@
+{
+ "_note": "Two clearly-synthetic demo stories remixed from seed/synthetic/answer-sets.json (persona generator @ f042cde). No real participant data. Consumed by tools/story_seed_sql.py. Church lens = pastor rows only: the product files the Consultant form under the Church perspective, so consultant rows are left out to keep the split clean. Each perspective carries at least 3 responses (the band cards' minimum, ui/assess/v3-assessment.js V3_BAND_CUTOFFS.minResponses): a third pastor source per story, its scored answers moved to the story's extreme (transform), keeps the Church score where the story needs it.",
+ "synthetic": true,
+ "scenarios": [
+  {
+   "id": "church-high-team-low",
+   "name": "Demo Story A: church high, translation team low (SYNTHETIC)",
+   "language": "Story A language (invented, synthetic)",
+   "period": "2026-09",
+   "weakness": {
+    "item": "TR-Q1",
+    "label": "no documented translation brief (team still defining its translation type and goals)"
+   },
+   "notes_next_steps": "SYNTHETIC DEMO. Highlighted weakness: no documented translation brief (team still defining its translation type and goals). Next step: watch the short video on writing a translation brief. Link: PLACEHOLDER (video link not yet provided).",
+   "sources": [
+    {
+     "project": "model-project",
+     "form": "Involved-Pastor",
+     "cycle": "model-project-2026-09"
+    },
+    {
+     "project": "under-resourced-loved",
+     "form": "Involved-Pastor",
+     "transform": "ceiling",
+     "cycle": "under-resourced-loved-2026-09"
+    },
+    {
+     "project": "struggling-project",
+     "form": "Validation",
+     "set": {
+      "TR-Q1": "working-on"
+     },
+     "cycle": "struggling-project-2026-09"
+    }
+   ]
+  },
+  {
+   "id": "team-high-church-low",
+   "name": "Demo Story B: translation team high, church low (SYNTHETIC)",
+   "language": "Story B language (invented, synthetic)",
+   "period": "2026-09",
+   "weakness": null,
+   "notes_next_steps": null,
+   "sources": [
+    {
+     "project": "struggling-project",
+     "form": "Involved-Pastor",
+     "cycle": "struggling-project-2026-09"
+    },
+    {
+     "project": "strong-team-unconvinced-community",
+     "form": "Involved-Pastor",
+     "transform": "floor",
+     "cycle": "strong-team-unconvinced-community-2026-09"
+    },
+    {
+     "project": "model-project",
+     "form": "Validation",
+     "set": {
+      "TR-Q1": "documented"
+     },
+     "cycle": "model-project-2026-09"
+    }
+   ]
+  }
+ ]
+}

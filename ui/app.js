@@ -1,6 +1,7 @@
 import { parseInvitationFragment } from './public-entry.js';
 import { mountParticipantView } from './participant-view.js';
 import { redactDiagnosticPath } from './diagnostic-path.js';
+import { holdRetry, isRateLimited, isRateLimitedError, rateLimitText, retryAfterOf, retryAfterSeconds, underHold } from './rate-limit.js';
 import { createCollabHooks } from './collab-mount.js';
 import { mountEntityScreen } from './entity-screen.js';
 import { mountLensSurveys } from './lens-surveys.js';
@@ -10,10 +11,12 @@ import { reviewAnswer, templateChoices, receiptLine, isOtherOption, otherBox, co
 import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
 import { renderList, renderReport, upsertRow } from './report-view.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
-import { copy as sharedCopy, createSharedLinkClient, fill, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
+import { copy as sharedCopy, createSharedLinkClient, fill, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rateLimitedCopy, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
 // Thrown by shared-link paths that already showed the participant copy: run() marks the action as
 // needing attention without painting raw server text into #error.
-class HandledFailure extends Error { constructor() { super('handled'); this.name = 'HandledFailure'; } }
+// limit: set when the handled refusal was a rate limit, so run() still holds the control for the wait ({ retryAfter }, and
+// { control } when the control to hold is not the one that started the run, e.g. Recover after a refused shared entry).
+class HandledFailure extends Error { constructor(limit) { super('handled'); this.name = 'HandledFailure'; this.limit = limit; } }
 // In-memory only (per page): whether an earlier submit on this page had an unknown outcome.
 let participantView = null;
 let submitState = 'none'; // 'none' | 'uncertain'
@@ -142,15 +145,32 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   catch { throw new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); }
   let data;
   try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
-  if (!response.ok || !data.ok) throw Object.assign(new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
+  if (!response.ok || !data.ok) throw Object.assign(new Error(isRateLimited(response.status, data.error?.code) ? rateLimitText(data.error?.message, data.error?.hint, retryAfterOf(data.error, response)) : `${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status, ...(isRateLimited(response.status, data.error?.code) ? { retryAfter: retryAfterOf(data.error, response) } : {}) }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
   const li = document.createElement('li'); li.textContent = `${method} ${redactDiagnosticPath(url)} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
   return data.result;
 }
-async function run(label, task) {
+// A confirm control spends its token before the request, so after a refusal it can only fail ("Preview … again"). A rate
+// limit on one of these holds its preview step instead: the countdown ends on the step that mints a fresh token.
+const CONFIRM_STEP = { 'release-codes': ['preview-export', () => state.confirmToken], 'issue-link-confirm': ['issue-link-preview', () => state.linkConfirm], 'build-report': ['preview-report', () => state.reportConfirm] };
+function retryControl(control) {
+  const step = control && CONFIRM_STEP[control.id];
+  if (!step || step[1]()) return control;
+  control.disabled = true; return $(step[0]);
+}
+async function run(label, task, control) {
   note(label); const buttons = [...document.querySelectorAll('button')].filter(b => b.id !== 'version' && b.id !== 'changelog-close'); buttons.forEach(b => b.disabled = true);
+  let wait = 0;
   try { await task(); note(`${label} — complete.`); }
-  catch (error) { if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; } else fail(error.message); }
-  finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : b.id === 'build-report' ? !state.reportConfirm : false); }
+  catch (error) {
+    if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; if (error.limit) { wait = retryAfterSeconds(error.limit.retryAfter); control = error.limit.control || control; } }
+    else if (isRateLimitedError(error)) { wait = retryAfterSeconds(error.retryAfter); fail(error.message); } // DoD 6: api() already worded it (rateLimitText); retry after the wait
+    else fail(error.message);
+  }
+  finally {
+    // A control still under an earlier holdRetry keeps its countdown (review 6207520971 item 1).
+    buttons.forEach(b => { if (!underHold(b)) b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : b.id === 'build-report' ? !state.reportConfirm : false; });
+    if (wait && control) holdRetry(retryControl(control), wait);
+  }
 }
 function showAuthorizedWork(me) {
   const visible = hasProjectWork(me);
@@ -195,8 +215,8 @@ function resetClientIdentity() {
 const languageControls = initLanguageControls({ api, run, getProject: () => state.project, onLanguages: active => {
   if (state.projectView) text($('project-detail'), `${state.projectView.name} · ${state.projectView.role} · ${active.length} active language(s)`);
 } });
-function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget))); }); }
-function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler)); }
+function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget)), e.submitter || e.currentTarget?.querySelector?.('button')); }); }
+function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler, $(id))); }
 async function identity() {
   if (!state.session) { showIdentity(false); return; }
   const result = await api('/v2/me'); state.principal = result.principal;
@@ -601,6 +621,11 @@ bindClick('submit', 'Submitting response…', async () => {
       console.warn('[3dr] submit', { status: error?.status, code: error?.code, trace_id: error?.trace_id });
       const kind = submitFailureKind(error);
       const uncertain = () => { submitState = 'uncertain'; text($('participant-resume'), sharedCopy.submitUncertain); };
+      if (errorKind(error) === 'rateLimited') { // the limiter refused before the handler: nothing committed by THIS request; a retry
+        // with the same key after the wait replays any earlier commit, so no receipt probe is spent against the limiter (#496 review finding 2)
+        if (submitState === 'uncertain') uncertain(); else text($('participant-resume'), rateLimitedCopy(error?.retryAfter));
+        throw new HandledFailure({ retryAfter: error?.retryAfter }); // run() holds Submit for the wait
+      }
       if (kind === 'uncertain') uncertain();
       else if (kind === 'conflict') {
         const resolved = await resolveConflict(state.shared);
@@ -649,11 +674,20 @@ bindClick('recover', 'Recovering receipt…', async () => {
       const kind = errorKind(error);
       if (kind === 'unavailable') showSharedUnavailable(submitState === 'uncertain' ? 'cannotResume' : 'unavailable');
       else if (submitState === 'uncertain') text($('participant-resume'), sharedCopy.submitUncertain); // keep the uncertainty; the form stays
-      else text($('participant-resume'), kind === 'rateLimited' ? sharedCopy.rateLimited : sharedCopy.transient); // live form: a probe blip is not a revoked session
-      throw new HandledFailure();
+      else text($('participant-resume'), kind === 'rateLimited' ? rateLimitedCopy(error?.retryAfter) : sharedCopy.transient); // live form: a probe blip is not a revoked session
+      throw new HandledFailure(kind === 'rateLimited' ? { retryAfter: error?.retryAfter } : undefined); // a rate-limited Check holds Recover for the wait (#490 re-review prior low 4)
     }
   } else receipt = await api('/v2/participate/receipt', { participant: true });
-  await recoverParticipant(receipt, !!state.form, loadForm, showReceipt);
+  if (state.shared) { // shared route: opening the form after the receipt can be refused too (Bugbot 4293984155) — participant copy, never raw text in #error
+    try { await recoverParticipant(receipt, !!state.form, loadForm, showReceipt); }
+    catch (error) {
+      console.warn('[3dr] recover form', { status: error?.status, code: error?.code, trace_id: error?.trace_id });
+      const kind = errorKind(error);
+      if (kind === 'rateLimited') { showSharedUnavailable(kind, rateLimitedCopy(error?.retryAfter)); $('recover').hidden = false; throw new HandledFailure({ retryAfter: error?.retryAfter }); } // run() holds Recover for the wait
+      if (kind === 'transient') { showSharedUnavailable(kind); $('recover').hidden = false; throw new HandledFailure(); } // a blip: Recover stays offered
+      showSharedUnavailable(kind === 'unavailable' ? 'cannotResume' : kind === 'conflict' ? 'closed' : kind); throw new HandledFailure();
+    }
+  } else await recoverParticipant(receipt, !!state.form, loadForm, showReceipt);
   if (!receipt.submitted && state.shared && submitState === 'uncertain') throw new HandledFailure(); // no "— complete." beside kept uncertainty
   if (!receipt.submitted) return;
   if (state.shared) { state.sharedStore.remove('draft'); state.sharedStore.remove('submitKey'); } // scoped namespace only; globals untouched in shared mode
@@ -661,8 +695,8 @@ bindClick('recover', 'Recovering receipt…', async () => {
 });
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
 { const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); text($('identity'), 'Checking session…'); } }
-function showSharedUnavailable(kind) {
-  const message = { closed: sharedCopy.collectionClosed, cannotResume: sharedCopy.cannotResume, rateLimited: sharedCopy.rateLimited, transient: sharedCopy.transient }[kind] || sharedCopy.linkUnavailable;
+function showSharedUnavailable(kind, override) {
+  const message = override || { closed: sharedCopy.collectionClosed, cannotResume: sharedCopy.cannotResume, rateLimited: sharedCopy.rateLimitedReopen, transient: sharedCopy.transient }[kind] || sharedCopy.linkUnavailable;
   text($('participant-error'), message); $('participant-error').hidden = false;
   text($('participant-resume'), ''); // terminal copy replaces any sticky retry instruction
   $('answers').hidden = true; $('review').hidden = true; $('recover').hidden = true; participantView?.showReceipt();
@@ -680,7 +714,7 @@ async function sharedLinkEntry(token, namespace) {
     const resuming = !!state.shared.bearer; // a stored bearer means open() sends resume_token
     if (token !== null) {
       try { await state.shared.open(token); }
-      catch (error) { const kind = entryFailureKind(error, resuming); if (kind !== 'conflict') { showSharedUnavailable(kind); return; } throw error; } // no automatic fresh open; scoped storage untouched
+      catch (error) { const kind = entryFailureKind(error, resuming); if (kind !== 'conflict' && !(kind === 'rateLimited' && resuming)) { showSharedUnavailable(kind); return; } throw error; } // no automatic fresh open; scoped storage untouched; a rate-limited resume keeps its live session for Recover (below)
     } else if (!state.shared.bearer) { showSharedUnavailable('unavailable'); return; }
     let receipt;
     try { receipt = await state.shared.receipt(); } // receipt is checked before any editable form
@@ -691,8 +725,17 @@ async function sharedLinkEntry(token, namespace) {
     $('recover').hidden = false;
     if (resumeTarget(receipt) === 'receipt') showReceipt(receipt); else await loadForm();
   } catch (error) {
-    const kind = errorKind(error);
-    if (kind === 'conflict') { const resolved = await resolveConflict(state.shared); if (resolved.state === 'receipt') { $('recover').hidden = false; showReceipt(resolved.receipt); return; } showSharedUnavailable(resolved.state); return; }
+    let kind = errorKind(error);
+    if (kind === 'conflict') {
+      const resolved = await resolveConflict(state.shared);
+      if (resolved.state === 'receipt') { $('recover').hidden = false; showReceipt(resolved.receipt); return; }
+      if (resolved.state !== 'rateLimited') { showSharedUnavailable(resolved.state); return; }
+      kind = 'rateLimited'; error = { retryAfter: resolved.retryAfter }; // the probe was limited: the same held Recover as below (DoD 6)
+    }
+    if (kind === 'rateLimited' && state.shared.bearer) { // the session is live: offer Recover, held for the wait, instead of a bare refusal (#496 review finding 2)
+      showSharedUnavailable(kind, rateLimitedCopy(error?.retryAfter)); $('recover').hidden = false;
+      throw new HandledFailure({ retryAfter: error?.retryAfter, control: $('recover') });
+    }
     showSharedUnavailable(kind);
     throw new HandledFailure(); // participant copy already shown; run() must not paint the raw error
   }

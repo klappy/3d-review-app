@@ -16,7 +16,9 @@ test('subdimension fields retain exact source values and text-only rendering', (
   const section=render([{lens:'<img onerror=bad>',score:12.1234567,sub_dimensions:[{sub_dimension:'<script>',score:null,n_items_included:0}]}]);
   const card=section.children[1].children[0];
   assert.equal(card.children[0].textContent,'<img onerror=bad>');
-  assert.equal(card.children[2].children[0].textContent,'<script> · null · 0');
+  assert.equal(card.children[3].children[0].children[0].textContent,'<script>');
+  const metrics=card.children[3].children[0].children[1];
+  assert.deepEqual(metrics.children.map(p=>p.children.map(n=>n.textContent)),[['Score (out of 100)','null'],['Items included','0']]);
   assert.equal(card.className,'report-lens-card glass panel');
   assert.doesNotMatch(text(section),/Strong|Growing|invited|suppressed/);
 });
@@ -34,5 +36,5 @@ test('input stays immutable and standalone/cross-lens values do not become cards
   const section=renderReportCards({doc,report:r});
   assert.equal(JSON.stringify(r),before);
   assert.equal(section.children[1].children.length,1);
-  assert.doesNotMatch(text(section),/100|99/);
+  assert.doesNotMatch(text(section).replaceAll('out of 100',''),/100|99/); // DEC-0014 label is not a value
 });
