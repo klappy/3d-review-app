@@ -29,8 +29,15 @@ function fixture({role='owner',kind='user',provisioned=true,projects=[],grouped=
   const open=async()=>{await api.refresh();await click('Open workspace');};
   return{api,root,calls,click,open,selected,get changes(){return changes;},setContext:patch=>{ctx={...ctx,...patch};},override:fn=>{override=fn;}};
 }
-test('grouping requires both exact independent roles',()=>{
- for(const w of ['owner','member','viewer'])for(const p of ['owner','member','viewer',undefined])assert.equal(mayGroup(w,p),(w==='owner'&&['owner','member'].includes(p))||(w==='member'&&p==='owner'));
+test('grouping mirrors the server: group = ws member+ and DIRECT project owner; ungroup = ws owner or DIRECT project owner',()=>{
+ for(const w of ['owner','member','viewer',undefined])for(const p of ['owner','member','viewer',null,undefined]){
+  const wsMember=w==='owner'||w==='member';
+  assert.equal(mayGroup(w,p),wsMember&&p==='owner',`group ${w}/${p}`);
+  assert.equal(mayGroup(w,p,'group'),wsMember&&p==='owner');
+  assert.equal(mayGroup(w,p,'ungroup'),wsMember&&(w==='owner'||p==='owner'),`ungroup ${w}/${p}`);
+ }
+ // Bugbot 4289479043: ws owner + direct project member, or an inherited (non-direct) owner, may NOT group
+ assert.equal(mayGroup('owner','member'),false);assert.equal(mayGroup('owner',null),false);
 });
 test('signed out, shared, participant and unsupported identity perform no reads',async()=>{
  for(const patch of [{principalId:null},{shared:true},{participant:true},{kind:'participant'}]){const f=fixture();f.setContext(patch);await f.api.refresh();assert.equal(f.calls.length,0);assert.equal(f.root.hidden,true);}
@@ -43,7 +50,7 @@ test('unprovisioned user and support do not see create; viewer sees no owner act
  for(const options of [{provisioned:false},{kind:'support',provisioned:true},{role:'viewer',provisioned:false}]){const f=fixture(options);await f.open();assert.doesNotMatch(text(f.root),/Create workspace/);if(options.role==='viewer')assert.doesNotMatch(text(f.root),/Rename workspace|Archive workspace|Preview deletion/);}
 });
 test('grouped names never confer access or group removal; authorized role enables actual endpoint',async()=>{
- const f=fixture({role:'member',projects:[{id:'p2',name:'Owned',role:'owner'},{id:'p3',name:'Member',role:'member'}],grouped:[{id:'p1',name:'Listing only'}]});await f.open();assert.match(text(f.root),/Listing only/);assert.doesNotMatch(text(f.root),/Remove from workspace/);const options=walk(f.root).filter(n=>n.tagName==='option');assert.deepEqual(options.map(n=>n.value),['p2']);await f.click('Add project to workspace');assert.ok(f.calls.some(c=>c.path==='/v2/workspaces/ws1/projects/p2'&&c.method==='POST'));assert.equal(f.calls.filter(c=>c.path.startsWith('/v2/projects')).length,0);
+ const f=fixture({role:'member',projects:[{id:'p2',name:'Owned',role:'owner',direct_role:'owner'},{id:'p3',name:'Member',role:'member',direct_role:'member'},{id:'p4',name:'Inherited owner',role:'owner',direct_role:null}],grouped:[{id:'p1',name:'Listing only'}]});await f.open();assert.match(text(f.root),/Listing only/);assert.doesNotMatch(text(f.root),/Remove from workspace/);const options=walk(f.root).filter(n=>n.tagName==='option');assert.deepEqual(options.map(n=>n.value),['p2']);await f.click('Add project to workspace');assert.ok(f.calls.some(c=>c.path==='/v2/workspaces/ws1/projects/p2'&&c.method==='POST'));assert.equal(f.calls.filter(c=>c.path.startsWith('/v2/projects')).length,0);
 });
 test('delete is explicit preview/confirm; token never rendered; cancellation cannot execute',async()=>{
  const f=fixture();await f.open();await f.click('Preview deletion');assert.doesNotMatch(text(f.root),/secret-confirm/);assert.match(text(f.root),/grants: 1/);await f.click('Cancel');assert.equal(f.calls.some(c=>c.body?.mode==='execute'),false);await f.click('Preview deletion');await f.click('Confirm deletion');assert.deepEqual(f.calls.find(c=>c.body?.mode==='execute').body,{mode:'execute',confirm_token:'secret-confirm'});assert.equal(f.selected.at(-1),null);
