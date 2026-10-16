@@ -75,4 +75,88 @@ describe("one-minute copy names no source the page cannot know (review 620799665
     expect(t.match(/nothing/gi)?.length).toBe(1);
     expect(t).toMatch(/^Rate limit/); expect(t).toMatch(/one minute/);
   });
+  it("design lens (#490): the participant notice gives the same instruction as its Try again button", () => {
+    expect(sharedCopy.rateLimited).not.toMatch(/open your link again/i); expect(sharedCopy.rateLimited).toMatch(/Try again in one minute\.$/);
+  });
+  it("design lens (#490): the participant retry is the primary block button under a heading", () => {
+    const src = readFileSync(new URL("../ui/participate/page.js", import.meta.url), "utf8");
+    expect(src).toMatch(/retryButton\.id = 'rate-retry'; retryButton\.className = 'rv-btn primary participant-primary'/);
+    expect(src).toMatch(/retryHeading = element\('h2', T\('rateLimitHeading'\)\)/); expect(src).toMatch(/\$\('notice'\)\.before\(retryHeading\)/);
+  });
+});
+
+describe("#490 review follow-ups (Bugbot 4292184464, HOLD lows 1–4, ready copy)", () => {
+  const page = readFileSync(new URL("../ui/participate/page.js", import.meta.url), "utf8");
+  it("Bugbot 4292184464: Try again after a refused Interview another runs the next-person setup", () => {
+    expect(page).toMatch(/journey\.start\(\{ retry: true \}\)\.then\(\(\) => \{ if \(journey\.state\.phase === 'form' && journey\.state\.fresh\) startNextPerson\(\); \}\)/);
+    expect(page).toMatch(/async function interviewAnother\(\) \{\s*await journey\.another\(\);\s*if \(journey\.state\.phase === 'form'\) startNextPerson\(\);/);
+    expect(page).toMatch(/function startNextPerson\(\) \{\s*if \(passageDetails\) passageDetails\.open = true;[^\n]*\n\s*document\.querySelector\('main'\)\?\.scrollIntoView\?\.\(\);/);
+  });
+  it("low 1: the Check countdown ends only when the phase leaves form/review", () => {
+    expect(page).toMatch(/state\.rateLimited !== true && recoverHold && !\['form', 'review'\]\.includes\(state\.phase\)/);
+  });
+  it("low 2: /legacy/ (no Try again control) tells the person to open the link again", () => {
+    const app = readFileSync(new URL("../ui/app.js", import.meta.url), "utf8");
+    expect(app).toMatch(/rateLimited: sharedCopy\.rateLimitedReopen/);
+    expect(sharedCopy.rateLimitedReopen).toMatch(/^Rate limit.*Open your link again in one minute\.$/);
+  });
+  it("low 3: the /v2/auth/email comment no longer says the dampener runs first", () => {
+    const src = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+    expect(src).not.toMatch(/Per-IP dampener first/);
+  });
+  it("low 4: a label swapped mid-wait shows in the countdown and after it", async () => {
+    const { holdRetry } = await import("../ui/rate-limit.js");
+    let t = 0, tick: () => void = () => {};
+    const button = { disabled: false, textContent: "Try again", dataset: {} as Record<string, string> };
+    holdRetry(button as unknown as HTMLButtonElement, 60, { label: "Try again", setTimer: (fn: () => void) => { tick = fn; return 1; }, clearTimer: () => {}, now: () => t });
+    expect(button.textContent).toBe("Try again (60 s)");
+    button.dataset.retryLabel = "Réessayer"; t = 30_000; tick();
+    expect(button.textContent).toBe("Réessayer (30 s)");
+    t = 60_000; tick();
+    expect(button.textContent).toBe("Réessayer"); expect(button.disabled).toBe(false);
+    expect(page).toMatch(/setControlLabel\(retryButton, T\('tryAgain'\)\);/);
+  });
+  it("ready copy: once the wait is over the notice no longer says 'in one minute'", () => {
+    expect(sharedCopy.rateLimitedReady).not.toMatch(/minute/); expect(sharedCopy.rateLimitedReady).toMatch(/^Rate limit/);
+    expect(page).toMatch(/onReady: \(\) => \{ paintReadyNotice\(journey\.state\); retryButton\.focus\(\); \}/);
+  });
+});
+
+describe("#490 re-review lows (terry-rereview490-0341)", () => {
+  const page = readFileSync(new URL("../ui/participate/page.js", import.meta.url), "utf8");
+  const held = async (label: string) => {
+    const { holdRetry } = await import("../ui/rate-limit.js");
+    let t = 0, tick: () => void = () => {};
+    const button = { disabled: false, textContent: label, dataset: {} as Record<string, string> };
+    holdRetry(button as unknown as HTMLButtonElement, 60, { setTimer: (fn: () => void) => { tick = fn; return 1; }, clearTimer: () => {}, now: () => t });
+    return { button, advance: (ms: number) => { t += ms; tick(); } };
+  };
+  it("low 1: a language switch mid-wait relabels the Check countdown and the control after it", async () => {
+    const { setControlLabel } = await import("../ui/rate-limit.js");
+    const { button, advance } = await held("Check my answers");
+    setControlLabel(button as unknown as HTMLButtonElement, "Vérifier mes réponses");
+    advance(30_000);
+    expect(button.textContent).toBe("Vérifier mes réponses (30 s)");
+    advance(30_000);
+    expect(button.textContent).toBe("Vérifier mes réponses"); expect(button.disabled).toBe(false);
+    setControlLabel(button as unknown as HTMLButtonElement, "Check my answers");
+    expect(button.textContent).toBe("Check my answers");
+    expect(page).toMatch(/function applyStatic\(\) \{ for \(const \[sel, key\] of STATIC\) setControlLabel\(document\.querySelector\(sel\), T\(key, staticEn\[key\]\)\);/);
+  });
+  it("low 2: once a longer cap's wait ends, its own '15 minutes' notice is replaced too", async () => {
+    const { rateLimitWaitOver } = await import("../ui/rate-limit.js");
+    const state = { phase: "unavailable", rateLimited: true, notice: "Rate limit reached. Retry after 15 minutes.", retryAfter: 900 };
+    const { button, advance } = await held("Try again");
+    expect(rateLimitWaitOver(state, button)).toBe(false);
+    advance(60_000);
+    expect(rateLimitWaitOver(state, button)).toBe(true);
+    expect(rateLimitWaitOver({ ...state, rateLimited: false }, button)).toBe(false);
+    expect(rateLimitWaitOver({ ...state, phase: "form" }, button)).toBe(false);
+    expect(rateLimitWaitOver(state, null)).toBe(false);
+    expect(page).toMatch(/function paintReadyNotice\(state\) \{\s*if \(rateLimitWaitOver\(state, retryButton\)\) \$\('notice'\)\.textContent = linkCopy\.rateLimitedReady;/);
+    expect(page).not.toMatch(/state\.notice === linkCopy\.rateLimited/);
+  });
+  it("prior low 3: a failed Try again start says so instead of an unhandled rejection", () => {
+    expect(page).toMatch(/journey\.start\(\{ retry: true \}\)\.then\([^\n]*\)\.catch\(\(\) => \{ \$\('notice'\)\.textContent = /);
+  });
 });

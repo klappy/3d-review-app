@@ -1,7 +1,7 @@
 import { parseInvitationFragment } from './public-entry.js';
 import { mountParticipantView } from './participant-view.js';
 import { redactDiagnosticPath } from './diagnostic-path.js';
-import { isRateLimited, rateLimitText, retryAfterOf } from './rate-limit.js';
+import { holdRetry, isRateLimited, isRateLimitedError, rateLimitText, retryAfterOf, retryAfterSeconds, underHold } from './rate-limit.js';
 import { createCollabHooks } from './collab-mount.js';
 import { mountEntityScreen } from './entity-screen.js';
 import { mountLensSurveys } from './lens-surveys.js';
@@ -143,15 +143,32 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   catch { throw new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); }
   let data;
   try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
-  if (!response.ok || !data.ok) throw Object.assign(new Error(isRateLimited(response.status, data.error?.code) ? rateLimitText(data.error?.message, data.error?.hint, retryAfterOf(data.error, response)) : `${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
+  if (!response.ok || !data.ok) throw Object.assign(new Error(isRateLimited(response.status, data.error?.code) ? rateLimitText(data.error?.message, data.error?.hint, retryAfterOf(data.error, response)) : `${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status, ...(isRateLimited(response.status, data.error?.code) ? { retryAfter: retryAfterOf(data.error, response) } : {}) }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
   const li = document.createElement('li'); li.textContent = `${method} ${redactDiagnosticPath(url)} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
   return data.result;
 }
-async function run(label, task) {
+// A confirm control spends its token before the request, so after a refusal it can only fail ("Preview … again"). A rate
+// limit on one of these holds its preview step instead: the countdown ends on the step that mints a fresh token.
+const CONFIRM_STEP = { 'release-codes': ['preview-export', () => state.confirmToken], 'issue-link-confirm': ['issue-link-preview', () => state.linkConfirm], 'build-report': ['preview-report', () => state.reportConfirm] };
+function retryControl(control) {
+  const step = control && CONFIRM_STEP[control.id];
+  if (!step || step[1]()) return control;
+  control.disabled = true; return $(step[0]);
+}
+async function run(label, task, control) {
   note(label); const buttons = [...document.querySelectorAll('button')].filter(b => b.id !== 'version' && b.id !== 'changelog-close'); buttons.forEach(b => b.disabled = true);
+  let wait = 0;
   try { await task(); note(`${label} — complete.`); }
-  catch (error) { if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; } else fail(error.message); }
-  finally { buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : b.id === 'build-report' ? !state.reportConfirm : false); }
+  catch (error) {
+    if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; }
+    else if (isRateLimitedError(error)) { wait = retryAfterSeconds(error.retryAfter); fail(error.message); } // DoD 6: api() already worded it (rateLimitText); retry after the wait
+    else fail(error.message);
+  }
+  finally {
+    // A control still under an earlier holdRetry keeps its countdown (review 6207520971 item 1).
+    buttons.forEach(b => { if (!underHold(b)) b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : b.id === 'build-report' ? !state.reportConfirm : false; });
+    if (wait && control) holdRetry(retryControl(control), wait);
+  }
 }
 function showAuthorizedWork(me) {
   const visible = hasProjectWork(me);
@@ -196,8 +213,8 @@ function resetClientIdentity() {
 const languageControls = initLanguageControls({ api, run, getProject: () => state.project, onLanguages: active => {
   if (state.projectView) text($('project-detail'), `${state.projectView.name} · ${state.projectView.role} · ${active.length} active language(s)`);
 } });
-function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget))); }); }
-function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler)); }
+function bindForm(id, label, handler) { $(id).addEventListener('submit', e => { e.preventDefault(); run(label, () => handler(new FormData(e.currentTarget)), e.submitter || e.currentTarget?.querySelector?.('button')); }); }
+function bindClick(id, label, handler) { $(id).addEventListener('click', () => run(label, handler, $(id))); }
 async function identity() {
   if (!state.session) { showIdentity(false); return; }
   const result = await api('/v2/me'); state.principal = result.principal;
@@ -663,7 +680,7 @@ bindClick('recover', 'Recovering receipt…', async () => {
 // Return leg of Cloudflare email-code sign-in: /v2/auth/access hands the session back in the URL fragment.
 { const m = location.hash.match(/^#session=([A-Za-z0-9_]+)$/); if (m) { resetClientIdentity(); state.session = m[1]; sessionStorage.setItem('facilitatorToken', m[1]); history.replaceState(null, '', location.pathname); text($('identity'), 'Checking session…'); } }
 function showSharedUnavailable(kind) {
-  const message = { closed: sharedCopy.collectionClosed, cannotResume: sharedCopy.cannotResume, rateLimited: sharedCopy.rateLimited, transient: sharedCopy.transient }[kind] || sharedCopy.linkUnavailable;
+  const message = { closed: sharedCopy.collectionClosed, cannotResume: sharedCopy.cannotResume, rateLimited: sharedCopy.rateLimitedReopen, transient: sharedCopy.transient }[kind] || sharedCopy.linkUnavailable;
   text($('participant-error'), message); $('participant-error').hidden = false;
   text($('participant-resume'), ''); // terminal copy replaces any sticky retry instruction
   $('answers').hidden = true; $('review').hidden = true; $('recover').hidden = true; participantView?.showReceipt();

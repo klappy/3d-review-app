@@ -5,13 +5,16 @@
 // a new respondent; storage duplication (e.g. tab duplication) can resume the
 // same respondent, so nothing here claims person uniqueness.
 
-import { RATE_LIMIT_LEAD } from './rate-limit.js';
+import { RATE_LIMIT_LEAD, isRateLimited, rateLimitText, retryAfterOf } from './rate-limit.js';
 // All participant/staff-facing strings below are copy.md rows (cookbook design-system).
 export const copy = {
   linkUnavailable: 'This link no longer works. It may have been replaced or the collection may have closed. Ask the person who invited you for a new one. Nothing about the project is shown here.',
   collectionClosed: 'Collection has closed. New answers are not accepted. If you already submitted from this device, your receipt is shown below.',
   cannotResume: 'Your earlier session on this link could not be resumed from this device. Nothing saved on this device was changed. If you already sent answers, that send may have succeeded without a confirmation shown here; the facilitator can confirm whether it arrived.',
-  rateLimited: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. Open your link again in one minute.`, // one 'nothing changed', one 'one minute' (review 6207996655)
+  rateLimited: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. Try again in one minute.`, // one 'nothing changed', one 'one minute' (review 6207996655)
+  rateLimitedReady: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. You can try again now.`, // the wait is over (#490 copy nit)
+  // /legacy/ shows no Try again control and a reload lands on "link no longer works": tell that person to reopen the link (#490 low 2).
+  rateLimitedReopen: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. Open your link again in one minute.`,
   transient: 'The server could not be reached or did not answer. Nothing saved on this device was changed; open your link again in a moment.',
   draftMismatch: 'Your saved answers were for a different version of this survey and were not restored. Please answer again.',
   draftRestored: 'Your unsent answers were restored on this device.',
@@ -208,7 +211,7 @@ export function createSharedLinkClient({ fetchImpl = globalThis.fetch, store, on
     catch { const error = new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); error.status = 0; throw error; }
     let data;
     try { data = await response.json(); } catch { const error = new Error(`Unreadable API response (${response.status}).`); error.status = 0; throw error; }
-    if (!response.ok || !data.ok) { const error = new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`); error.code = data.error?.code || String(response.status); error.status = response.status; error.trace_id = data.trace_id ?? data.error?.trace_id; throw error; }
+    if (!response.ok || !data.ok) { const error = new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`); error.code = data.error?.code || String(response.status); error.status = response.status; error.trace_id = data.trace_id ?? data.error?.trace_id; if (isRateLimited(response.status, error.code)) { error.retryAfter = retryAfterOf(data.error, response); error.limitText = rateLimitText(data.error?.message, data.error?.hint, error.retryAfter); } throw error; }
     onEvent?.({ method, url, capability: data.capability, receipt: data.receipt, trace_id: data.trace_id });
     return data.result;
   }

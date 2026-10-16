@@ -11,7 +11,7 @@ import { learnMore } from '../v3/components/learn-more.js';
 import { mountEditableHeading } from '../v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '../v3/components/saved-status.js';
 import { digestNamespace, rememberCurrent, scopedStorage } from '../shared-link.js';
-import { isOneMinuteLimit, RATE_LIMIT_COPY, retryAfterOf } from '../rate-limit.js';
+import { holdRetry, isOneMinuteLimit, isRateLimitedError, RATE_LIMIT_COPY, retryAfterOf, retryAfterSeconds, underHold } from '../rate-limit.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -96,9 +96,11 @@ export function holdUntilCodeChanges(form, name = 'code') {
   const input = form?.querySelector?.(`input[name="${name}"]`), button = form?.querySelector?.('button[type=submit]');
   let last = null;
   const now = () => String(input?.value ?? '').trim();
-  const sync = () => { if (button) button.disabled = last !== null && now() === last; };
+  // A Submit under a rate-limit countdown (holdRetry) stays disabled whatever the code: editing it never ends the wait early.
+  const sync = () => { if (button) button.disabled = underHold(button) || (last !== null && now() === last); };
   input?.addEventListener?.('input', sync);
-  return { repeat: () => last !== null && now() === last, sent: () => { last = now(); sync(); }, sync };
+  // reset(): the server refused before reading the code (a rate limit), so the same code may be sent again after the wait.
+  return { repeat: () => last !== null && now() === last, sent: () => { last = now(); sync(); }, reset: () => { last = null; }, sync };
 }
 // Gate 0.23.0 (phone): a code form's error sits in the card next to the field — <p role="alert"> under the input, the input marked
 // aria-invalid and described by it — and focus returns to the input (write() disabled the focused Submit, dropping focus to BODY).
@@ -120,13 +122,17 @@ export function inlineCodeError(ctx, form, name = 'code') {
 async function write(ctx, control, label, fn, { refused = 'Not allowed here.', failed = null } = {}) {
   const controls = control ? [control, ...(control.form ? Array.from(control.form.querySelectorAll('button')) : [])] : [];
   for (const c of controls) c.disabled = true;
+  let wait = 0;
   try { const r = await fn(); return r; }
   catch (e) {
+    // DoD 6: a rate limit says so, and the control it came from re-enables after the wait (Retry-After, else one minute).
+    // The refusal's text is already worded by refusalError (one-minute copy, or a non-minute cap's own message and wait).
+    if (isRateLimitedError(e)) { wait = retryAfterSeconds(e.retryAfter); ctx.note(e.message || RATE_LIMIT_COPY, true); return undefined; }
     const kind = classify(e);
     ctx.note(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? refused : (failed || `${label} failed: ${safeMessage(e)}`), true);
     return undefined;
   }
-  finally { for (const c of controls) c.disabled = false; }
+  finally { for (const c of controls) if (!underHold(c)) c.disabled = false; if (wait && control) holdRetry(control, wait); }
 }
 const val = (form, name) => String(form.elements[name]?.value ?? '').trim();
 const storeSession = (key, v) => { try { sessionStorage.setItem(key, v); } catch {} };
@@ -226,7 +232,8 @@ const entry = {
       // U08 (lanes-1321): a used, unknown or mistyped code gets one plain next step, not "Not allowed here." / a server message.
       // Gate 0.23.0 (phone 375x812): the error shows in the card under the field (role=alert), not in the page note below the fold.
       const r = await write(codeError.ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }), { refused: CODE_REFUSED });
-      codeHold.sync(); // write() re-enabled the buttons; Submit waits for a changed code
+      if (underHold(form.querySelector('button[type=submit]'))) codeHold.reset(); // DoD 6: a 429 never read the code; retry it after the wait
+      codeHold.sync(); // write() re-enabled the buttons; Submit waits for a changed code (or the countdown)
       if (!r) return codeError.focus();
       const token = r.participant_token || r.participant;
       if (!token) { codeError.ctx.note('The server accepted the code but returned no participant token.', true); return codeError.focus(); }
@@ -249,6 +256,7 @@ const entry = {
         if (res.status === 429) { // one-minute RL_AUTH refusal vs the 900 s per-address mail cap: tell each the wait it really has
           const b = await res.json().catch(() => null), retry = retryAfterOf(b?.error, res);
           status.textContent = isOneMinuteLimit(b?.error?.message, retry) ? RATE_LIMIT_COPY : `Too many sign-in links were requested for this address. Use the newest email, or wait ${Math.max(1, Math.ceil((Number(retry) || 900) / 60))} minutes.`;
+          holdRetry(submit, isOneMinuteLimit(b?.error?.message, retry) ? retry : retry ?? 900); return; // DoD 6: the button counts down the same wait
         } else status.textContent = res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
       } catch { status.textContent = 'The sign-in link could not be sent. Check your connection and try again.'; }
       submit.disabled = false;
@@ -268,6 +276,7 @@ const entry = {
         return paint();
       }
       const r = await write(ctx, submit, 'Sign in', () => ctx.api('/v2/auth/session', { method: 'POST', body: { email: model.signin.email, code: val(form, 'code') } }));
+      if (underHold(submit)) signinHold?.reset(); // a 429 never read the code: the same code may be retried after the wait
       signinHold?.sync();
       if (!r) return;
       if (!r.session) return ctx.note('The server answered without a session token.', true);

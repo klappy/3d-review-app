@@ -31,6 +31,7 @@ export const UI_EN = Object.freeze({
   translatingKeep: 'The first time can take up to a minute. After that it opens straight away. You can keep reading in {language} meanwhile.',
   phrases: 'phrases',
   tryAgain: 'Try again',
+  rateLimitHeading: 'Too many requests at once',
   translateFailedHint: 'Showing English. Check the internet connection, then try again.',
   translateFailed: 'Translation is not available right now. Showing English.',
   machineNote: 'Machine translation. If anything is unclear, ask the person who shared the survey.',

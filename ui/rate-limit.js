@@ -22,13 +22,60 @@ export const rateLimitText = (message, hint, retryAfter) => {
   const parts = [message || 'Rate limit.', hint].filter(Boolean).join(' — ');
   return Number.isFinite(s) && s > 60 ? `${parts} (retry after ${wait(s)})` : parts;
 };
-/** retry_after from the envelope, else the Retry-After header (the mail cap sends only the header). */
-export const retryAfterOf = (error, response) => error?.data?.retry_after ?? response?.headers?.get?.('retry-after') ?? undefined;
+/** retry_after from the envelope, else the Retry-After header (the mail cap sends only the header). An empty header
+ *  counts as absent, so it never hides the envelope's value (review 6207520971 item 5). */
+const present = v => v == null || String(v).trim() === '' ? undefined : v;
+export const retryAfterOf = (error, response) => present(error?.data?.retry_after) ?? present(response?.headers?.get?.('retry-after'));
 /** The Error a page throws for a refused envelope. A rate-limit refusal already folds the server hint into its text
  *  (rateLimitText), so it carries no separate .hint — a caller that appends e.hint would paint it twice (Bugbot 4290741304). */
 export const refusalError = (status, error, response) => {
   const limited = isRateLimited(status, error?.code);
   const e = new Error(limited ? rateLimitText(error?.message, error?.hint, retryAfterOf(error, response)) : error?.message || `Request failed (${status})`);
   e.code = error?.code || String(status); e.status = status; e.hint = limited ? undefined : error?.hint;
+  if (limited) e.retryAfter = retryAfterOf(error, response);
   return e;
 };
+
+// ---- The timed retry control (DoD 6: "let them retry in one minute"). The wording above says how long; this keeps the
+// control that was refused disabled for exactly that wait, with a visible countdown, then enables it again.
+export const RATE_LIMIT_SECONDS = 60;
+/** Seconds to wait: a positive Retry-After (header or envelope), else one minute. Clamped to 1..3600. */
+export const retryAfterSeconds = value => {
+  const n = Math.ceil(Number(present(value)));
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 3600) : RATE_LIMIT_SECONDS;
+};
+/** true for an Error a page built from a refused envelope (refusalError, or any error carrying .status / .code). */
+export const isRateLimitedError = error => isRateLimited(error?.status, error?.code);
+const left = s => s >= 120 ? `${Math.ceil(s / 60)} min` : `${s} s`;
+/** Keep a retry control disabled for the wait, with a visible countdown, then enable it again. While the hold runs the
+ *  button carries data-rate-limited, so a page's busy/idle repaint must leave it alone. Returns a cancel function.
+ *  Timer and clock are injectable for tests. */
+const holds = new WeakMap(); // button → cancel of its running hold: a second hold replaces the first, never stacks
+export function holdRetry(button, seconds, { label, setTimer = setInterval, clearTimer = clearInterval, now = Date.now, onReady } = {}) {
+  if (!button) return () => {};
+  const base = label ?? button.dataset.retryLabel ?? button.textContent;
+  holds.get(button)?.();
+  button.dataset.retryLabel = base;
+  const until = now() + retryAfterSeconds(seconds) * 1000;
+  let id = null;
+  let over = false;
+  const label_ = () => button.dataset.retryLabel || base; // a page may swap dataset.retryLabel mid-wait (language switch)
+  const done = () => { if (over) return; over = true; if (id !== null) clearTimer(id); id = null; if (holds.get(button) === done) holds.delete(button); button.disabled = false; button.textContent = label_(); delete button.dataset.rateLimited; delete button.dataset.retryLabel; };
+  holds.set(button, done);
+  const tick = () => {
+    const s = Math.ceil((until - now()) / 1000);
+    if (s <= 0) { done(); onReady?.(); return; }
+    button.disabled = true; button.dataset.rateLimited = 'true'; button.textContent = `${label_()} (${left(s)})`;
+  };
+  tick();
+  id = setTimer(tick, 1000);
+  id?.unref?.(); // Node test runs: a pending countdown never holds the process open (browsers return a number)
+  return done;
+}
+/** A repaint that restores controls after a request skips any control still under holdRetry (Bugbot 4290666357). */
+export const underHold = button => button?.dataset?.rateLimited === 'true';
+/** Set a control's words without ending its countdown: under a hold the new words go to the label the hold paints. */
+export function setControlLabel(node, text) { if (!node) return; if (underHold(node)) node.dataset.retryLabel = text; else node.textContent = text; }
+/** true once a rate-limited "unavailable" screen's wait is over: its retry control exists and no longer counts down.
+ *  Reads the state's flag, not the notice text, so a longer cap's own message ("…15 minutes") is replaced too. */
+export const rateLimitWaitOver = (state, button) => state?.phase === 'unavailable' && state?.rateLimited === true && !!button && !underHold(button);
