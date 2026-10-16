@@ -31,14 +31,14 @@
 .rv :is(#report-view, [data-report-view]) .report-lens-grid { margin:0; }
 .rv :is(#report-view, [data-report-view]) .report-lens-score { margin:var(--gap-row) 0; color:var(--ink); overflow-wrap:anywhere; }
 .rv :is(#report-view, [data-report-view]) .report-lens-card > ul,
-.rv :is(#report-view, [data-report-view]) .report-detail-section > ul { list-style:none; padding:0; margin:0; }
+.rv :is(#report-view, [data-report-view]) .report-detail-section:not(.lens-agree) > ul { list-style:none; padding:0; margin:0; }
 .rv :is(#report-view, [data-report-view]) .report-lens-card > ul > li,
-.rv :is(#report-view, [data-report-view]) .report-detail-section > ul > li { padding:var(--gap-row) 0; line-height:1.5; overflow-wrap:anywhere; }
+.rv :is(#report-view, [data-report-view]) .report-detail-section:not(.lens-agree) > ul > li { padding:var(--gap-row) 0; line-height:1.5; overflow-wrap:anywhere; }
 .rv :is(#report-view, [data-report-view]) li + li { border-top:1px solid var(--line); }
-.rv :is(#report-view, [data-report-view]) .report-detail-section > ul > li > ul { display:flex; flex-wrap:wrap; gap:var(--gap-pip) var(--gap-grid); list-style:none; padding:0; margin:var(--gap-pip) 0 0; color:var(--secondary); font-size:.875rem; }
-.rv :is(#report-view, [data-report-view]) .report-detail-section > ul > li > ul > li { border:0; }
-.rv :is(#report-view, [data-report-view]) .report-detail-section > p { line-height:1.65; max-width:65ch; margin:0; }
-.rv :is(#report-view, [data-report-view]) .report-detail-section > p + p { margin-top:var(--gap-grid); }
+.rv :is(#report-view, [data-report-view]) .report-detail-section:not(.lens-agree) > ul > li > ul { display:flex; flex-wrap:wrap; gap:var(--gap-pip) var(--gap-grid); list-style:none; padding:0; margin:var(--gap-pip) 0 0; color:var(--secondary); font-size:.875rem; }
+.rv :is(#report-view, [data-report-view]) .report-detail-section:not(.lens-agree) > ul > li > ul > li { border:0; }
+.rv :is(#report-view, [data-report-view]) .report-detail-section:not(.lens-agree) > p { line-height:1.65; max-width:65ch; margin:0; }
+.rv :is(#report-view, [data-report-view]) .report-detail-section:not(.lens-agree) > p + p { margin-top:var(--gap-grid); }
 .rv :is(#report-view, [data-report-view]) .report-detail-section { margin:0; min-width:0; padding:var(--panel-pad); }
 .rv :is(#report-view, [data-report-view]) .report-metrics { display:flex; flex-wrap:wrap; gap:var(--gap-row) var(--panel-pad); margin:var(--gap-row) 0 0; }
 .rv :is(#report-view, [data-report-view]) .report-metrics > div { display:flex; flex-direction:column; gap:var(--gap-pip); }
