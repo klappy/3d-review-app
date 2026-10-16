@@ -55,7 +55,7 @@ describe("rate limits", () => {
   }, 30_000);
 
   it("sign-in is limited per address AND per email (hashed key, never the address itself)", async () => {
-    const env = mkEnv({ RL_AUTH: limiter(2) });
+    const env = mkEnv({ RL_AUTH: limiter(2), RL_HTTP_ANON: limiter(2) }); // per address: au: on RL_HTTP_ANON (workshop-same-ip)
     const email = "demo.owner@example.invalid";
     for (let i = 0; i < 2; i++) expect((await post(env, "/v2/auth/link", { email }, `192.0.2.${i + 1}`)).status).toBe(200);
     // third attempt from a FRESH address: the ip key passes, the email key refuses

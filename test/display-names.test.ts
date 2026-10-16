@@ -19,7 +19,7 @@ beforeAll(async()=>{
     const sql=readFileSync(new URL("../"+file,import.meta.url),"utf8").split("\n").filter(l=>!l.trimStart().startsWith("--")).join("\n");
     await db.batch(sql.split(";\n").map(x=>x.trim()).filter(Boolean).map(x=>db.prepare(x)));
   }
-  env={DB:db,SESSION_SECRET:"synthetic-display",ENVIRONMENT:"production"};
+  env={DB:db,SESSION_SECRET:"synthetic-display",ENVIRONMENT:"production",RL_MCP_CEILING:{limit:async()=>({success:true})}};
   owner=await mintSession(env,"person_mara","user");
 },60000);
 afterAll(()=>mf.dispose());

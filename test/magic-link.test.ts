@@ -133,13 +133,13 @@ describe("rate limits", () => {
     expect(outs.filter((o) => o.out.state === "limited").every((o) => o.sent.length === 0)).toBe(true);
     expect(await db.prepare("SELECT COUNT(*) AS n FROM login_code WHERE email_hash = ?").bind(await sha256("race@example.invalid")).first("n")).toBe(MAGIC_LINK_PER_EMAIL);
   });
-  it("per IP: the RL_AUTH ip: key refuses before any storage access or mail", async () => {
+  it("per IP: the sign-in au: key refuses before any storage access or mail", async () => {
     const keys: string[] = [];
-    env.RL_AUTH = { limit: async ({ key }: { key: string }) => { keys.push(key); return { success: false }; } };
+    env.RL_HTTP_ANON = { limit: async ({ key }: { key: string }) => { keys.push(key); return { success: false }; } };
     const spy = vi.spyOn(env.DB, "prepare");
     const res = await postJson("/v2/auth/email", { email: "ip@example.invalid" }, { "cf-connecting-ip": "192.0.2.7" });
     expect(res.status).toBe(429); expect(res.headers.get("retry-after")).toBe("60");
-    expect(keys).toEqual(["ip:192.0.2.7"]); expect(spy).not.toHaveBeenCalled();
+    expect(keys).toEqual(["au:192.0.2.7"]); expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });
   it("per IP on opening a link: RL_REDEEM ip: key refuses before any storage access", async () => {

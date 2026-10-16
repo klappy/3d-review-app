@@ -14,7 +14,7 @@ import { verifyAccessJwt } from "./access";
 import synthResponsesSql from "../seed/synthetic-responses.sql";
 import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
-import { allow, clientIp, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { allow, allowSignInAddress, allowSignInGlobal, clientIp, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { cookieValue, handleAuthorize, handleConsent, oauthPrincipals, PARK_COOKIE, renderConsentIfParked, type OAuthEnv } from "./oauth";
 import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLinkEnabled, magicSessionCookie, mintMagicSession, newNonce, openPage, principalForEmailHash, requestMagicLink, sameOriginPost, signInPage, verifyMagicToken } from "./magic-link";
 
@@ -202,8 +202,8 @@ app.post("/v2/auth/email", async (c) => {
   if (!magicLinkEnabled(env)) return toAccess();
   if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in request refused", undefined, "auth.email_link", newTraceId()), 403);
   // Per-IP dampener first: a refusal costs no storage access and sends nothing.
-  if (!(await allow(env, "RL_AUTH", `ip:${clientIp(req)}`))) {
-    const r = json(fail("RATE_LIMITED", "too many sign-in requests — wait a minute and try again", undefined, "auth.email_link", newTraceId()), 429);
+  if (!(await allowSignInAddress(env, clientIp(req))) || !(await allowSignInGlobal(env))) {
+    const r = json(fail("RATE_LIMITED", "rate limit reached — too many sign-in requests; try again in one minute", undefined, "auth.email_link", newTraceId()), 429);
     r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
   }
   const body = await formOrJson(req);

@@ -17,7 +17,7 @@ beforeAll(async()=>{
   const sql=readFileSync(new URL("../"+file,import.meta.url),"utf8").split("\n").filter(l=>!l.trimStart().startsWith("--")).join("\n");
   await db.batch(sql.split(";\n").map(x=>x.trim()).filter(Boolean).map(x=>db.prepare(x)));
  }
- prod={DB:db,SESSION_SECRET:"synthetic-legacy",ENVIRONMENT:"production"};
+ prod={DB:db,SESSION_SECRET:"synthetic-legacy",ENVIRONMENT:"production",RL_MCP_CEILING:{limit:async()=>({success:true})}};
  dev={DB:db,SESSION_SECRET:"synthetic-legacy",ENVIRONMENT:"dev"};
  owner=await mintSession(dev,"person_mara","user");
 },60000);

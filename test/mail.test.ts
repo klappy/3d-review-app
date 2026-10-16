@@ -4,7 +4,7 @@ import { invitationMessage, parseMailAllowlist, sendMail } from "../src/mail";
 import { sha256 } from "../src/handlers/common";
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
-const prod: any = { ENVIRONMENT: "production", EMAIL: { send: async (_message: any): Promise<any> => { throw new Error("unstubbed provider"); } }, MAIL_FROM: "noreply@3dreview.app", PUBLIC_ORIGIN: "https://3d-review.klappy.dev" };
+const prod: any = { ENVIRONMENT: "production", RL_MCP_CEILING:{limit:async()=>({success:true})}, EMAIL: { send: async (_message: any): Promise<any> => { throw new Error("unstubbed provider"); } }, MAIL_FROM: "noreply@3dreview.app", PUBLIC_ORIGIN: "https://3d-review.klappy.dev" };
 const msg = { to: "person@real-domain.dev", subject: "s", text: "t", idempotencyKey: "invite/inv_1" };
 const ok = () => ({ messageId: "cf_x" });
 const rejected = (code = "E_SENDER_NOT_VERIFIED") => Object.assign(new Error("provider message must not escape"), { code });

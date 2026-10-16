@@ -35,6 +35,9 @@ beforeAll(async () => {
   await raw.batch(statements(raw, "../seed/synthetic.sql"));
   counted = countingDb(raw);
 }, 60_000);
+/** RL_HTTP_ANON carries two keys since workshop-same-ip: the twin's anonymous `ip:` and sign-in's `au:`. This fake
+ *  refuses only the `au:` sign-in key once it passes `auLimit`, and counts every key. */
+const signIn = (auLimit: number) => { const l = limiter(1000); return { seen: l.seen, limit: async ({ key }: { key: string }) => key.startsWith("au:") && (l.seen.get(key) ?? 0) >= auLimit ? (l.seen.set(key, (l.seen.get(key) ?? 0) + 1), { success: false }) : l.limit({ key }) }; };
 const mkEnv = (over: Record<string, unknown> = {}) => ({ DB: counted.db, SESSION_SECRET: "synthetic-test-secret", ENVIRONMENT: "dev",
   RL_MCP_ANON: limiter(1000), RL_HTTP_ANON: limiter(1000), RL_AUTH: limiter(1000), RL_REDEEM: limiter(1000), RL_MCP_CEILING: limiter(1000), ...over }) as any;
 const req = (env: any, method: string, path: string, body?: unknown, ip = "203.0.113.7", headers: Record<string, string> = {}) => app.fetch(new Request("https://t.invalid" + path, { method,
@@ -50,7 +53,7 @@ describe("B1 — the address unit is spent BEFORE the email shape check (Bugbot 
   const shapes = [123, { a: 1 }, ["x"], null, true];
   for (const path of ["/v2/auth/link", "/v2/auth/session"]) {
     it(`${path}: limiter refusing + non-string email → 429, 0 trace rows, 0 writes; limiter open → 400 with the ip key spent`, async () => {
-      const refusing = mkEnv({ RL_AUTH: limiter(0) });
+      const refusing = mkEnv({ RL_HTTP_ANON: signIn(0) });
       const before = await traces(); counted.reset();
       for (const email of shapes) {
         const r = await post(refusing, path, { email, code: "000000" }, "192.0.2.10");
@@ -59,15 +62,16 @@ describe("B1 — the address unit is spent BEFORE the email shape check (Bugbot 
       }
       expect(await traces()).toBe(before);
       expect(counted.counts.writes).toBe(0);
-      expect(refusing.RL_AUTH.seen.get("ip:192.0.2.10")).toBe(shapes.length); // one unit per attempt, whatever the shape
+      expect(refusing.RL_HTTP_ANON.seen.get("au:192.0.2.10")).toBe(shapes.length); // one unit per attempt, whatever the shape
       const open = mkEnv({ RL_AUTH: limiter(100) });
       const r = await post(open, path, { email: 123, code: "000000" }, "192.0.2.11");
       expect(r.status).toBe(400); expect(((await r.json()) as any).error.code).toBe("INVALID_PARAMS");
-      expect([...open.RL_AUTH.seen.keys()]).toEqual(["ip:192.0.2.11"]); // spent, and no em: key for a non-string
+      expect(open.RL_HTTP_ANON.seen.get("au:192.0.2.11")).toBe(1); // spent…
+      expect([...open.RL_AUTH.seen.keys()]).toEqual([]); // …and no em: key for a non-string
     }, 30_000);
   }
   it("flood: 20 malformed sign-ins alternating both twins with the limiter refusing → 0 writes, 0 trace rows", async () => {
-    const env = mkEnv({ RL_AUTH: limiter(0) });
+    const env = mkEnv({ RL_HTTP_ANON: signIn(0) });
     const before = await traces(); counted.reset();
     for (let i = 0; i < 20; i++) {
       const r = await post(env, i % 2 ? "/v2/auth/session" : "/v2/auth/link", { email: shapes[i % shapes.length], code: "1" }, "192.0.2.12");
@@ -76,8 +80,8 @@ describe("B1 — the address unit is spent BEFORE the email shape check (Bugbot 
     expect(counted.counts.writes).toBe(0);
     expect(await traces()).toBe(before);
   }, 30_000);
-  it("MCP twin: anonymous tools/call cap.auth.request_link with a non-string email spends RL_AUTH first; refused → envelope RATE_LIMITED + retry_after, no trace row", async () => {
-    const refusing = mkEnv({ RL_AUTH: limiter(0) });
+  it("MCP twin: anonymous tools/call cap.auth.request_link with a non-string email spends the sign-in address key first; refused → envelope RATE_LIMITED + retry_after, no trace row", async () => {
+    const refusing = mkEnv({ RL_HTTP_ANON: signIn(0) });
     const before = await traces(); counted.reset();
     const r = await post(refusing, "/mcp", call("cap.auth.request_link", { email: 5 }), "192.0.2.13");
     expect(r.status).toBe(200);
@@ -86,11 +90,12 @@ describe("B1 — the address unit is spent BEFORE the email shape check (Bugbot 
     expect(j.result.structuredContent.error.data.retry_after).toBe(60); // review #12-6: one shape to back off from
     expect(await traces()).toBe(before);
     expect(counted.counts.writes).toBe(0);
-    expect(refusing.RL_AUTH.seen.get("ip:192.0.2.13")).toBe(1);
+    expect(refusing.RL_HTTP_ANON.seen.get("au:192.0.2.13")).toBe(1);
     const open = mkEnv({ RL_AUTH: limiter(100) });
     const k: any = await (await post(open, "/mcp", call("cap.auth.request_link", { email: 5 }), "192.0.2.14")).json();
     expect(k.result.structuredContent.error.code).toBe("INVALID_PARAMS");
-    expect([...open.RL_AUTH.seen.keys()]).toEqual(["ip:192.0.2.14"]);
+    expect(open.RL_HTTP_ANON.seen.get("au:192.0.2.14")).toBe(1);
+    expect([...open.RL_AUTH.seen.keys()]).toEqual([]);
   }, 30_000);
 });
 
@@ -176,7 +181,7 @@ describe("B2 — RL_HTTP_ANON meters every anonymous HTTP twin per address (audi
 
 describe("B3 — token-shape gate in resolvePrincipal (Otto P1 5706955103 / auditor #3)", () => {
   it("Bearer garbage → 0 D1 reads, anonymous; provider-shaped a:b:c → 0 D1; cookie garbage → 0 D1", async () => {
-    const env = mkEnv({ RL_AUTH: limiter(0), RL_HTTP_ANON: limiter(100) });
+    const env = mkEnv({ RL_HTTP_ANON: signIn(0) });
     counted.reset();
     expect((await post(env, "/v2/auth/link", { email: "x@example.invalid" }, "192.0.2.20", { authorization: "Bearer garbage" })).status).toBe(429);
     expect((await post(env, "/v2/auth/link", { email: "x@example.invalid" }, "192.0.2.20", { authorization: "Bearer a:b:c" })).status).toBe(429);
@@ -187,7 +192,7 @@ describe("B3 — token-shape gate in resolvePrincipal (Otto P1 5706955103 / audi
     expect(env.RL_MCP_ANON.seen.get("ip:192.0.2.20")).toBe(1);
   }, 30_000);
   it("flood: 50 rotating bogus bearers → 0 reads (before: 100)", async () => {
-    const env = mkEnv({ RL_AUTH: limiter(0), RL_HTTP_ANON: limiter(100) });
+    const env = mkEnv({ RL_HTTP_ANON: signIn(0) });
     counted.reset();
     for (let i = 0; i < 50; i++) expect((await post(env, "/v2/auth/link", { email: "x@example.invalid" }, "192.0.2.21", { authorization: `Bearer bogus-${i}-${"x".repeat(i % 40)}` })).status).toBe(429);
     expect(counted.counts).toEqual({ reads: 0, writes: 0 });
@@ -216,14 +221,15 @@ describe("B3 — token-shape gate in resolvePrincipal (Otto P1 5706955103 / audi
   }, 30_000);
 });
 
-describe("B4 — sign-in budget is 10/60s COMBINED per address (auditor #4; doc-corrected, key kept)", () => {
-  it("request_link and consume_link spend the same ip: key on RL_AUTH", async () => {
-    const env = mkEnv({ RL_AUTH: limiter(2) });
+describe("B4 — sign-in steps are counted per address on ONE au: key, both caps combined (auditor #4; workshop-same-ip moved it off RL_AUTH)", () => {
+  it("request_link and consume_link spend the same au: key; RL_AUTH keeps only the per-email key", async () => {
+    const env = mkEnv({ RL_HTTP_ANON: signIn(2) });
     expect((await post(env, "/v2/auth/link", { email: "demo.owner@example.invalid" }, "192.0.2.30")).status).toBe(200);
     expect((await post(env, "/v2/auth/session", { email: "demo.owner@example.invalid", code: "000000" }, "192.0.2.30")).status).toBe(400);
     expect((await post(env, "/v2/auth/session", { email: "demo.owner@example.invalid", code: "000000" }, "192.0.2.30")).status).toBe(429);
     expect((await post(env, "/v2/auth/link", { email: "demo.owner@example.invalid" }, "192.0.2.30")).status).toBe(429);
-    expect(env.RL_AUTH.seen.get("ip:192.0.2.30")).toBe(4);
+    expect(env.RL_HTTP_ANON.seen.get("au:192.0.2.30")).toBe(4);
+    expect([...env.RL_AUTH.seen.keys()].every((k) => k.startsWith("em:"))).toBe(true);
   }, 30_000);
 });
 
@@ -252,11 +258,11 @@ describe("promoted nits — each has its own falsifier (#12-6, #12-8, #12-11)", 
     const h = await post(env, "/v2/participate/code", { code: "NOPE-0001" }, "192.0.2.71");
     expect(h.status).toBe(429); expect(((await h.json()) as any).error.data.retry_after).toBe(60); // HTTP twin: header AND envelope
   }, 30_000);
-  it("#12-8: an absent RL_AUTH binding outside dev refuses (already true) AND logs ratelimit.binding_absent naming the binding (new)", async () => {
+  it("#12-8: an absent sign-in binding outside dev refuses (already true) AND logs ratelimit.binding_absent naming the binding (new)", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      expect((await post(mkEnv({ RL_AUTH: undefined, ENVIRONMENT: "production" }), "/v2/auth/link", { email: "x@example.invalid" }, "192.0.2.72")).status).toBe(429);
-      expect(err.mock.calls.filter((c) => c[0] === "ratelimit.binding_absent").map((c) => c[1])).toEqual(["RL_AUTH"]);
+      expect((await post(mkEnv({ RL_AUTH: undefined, RL_HTTP_ANON: undefined, ENVIRONMENT: "production" }), "/v2/auth/link", { email: "x@example.invalid" }, "192.0.2.72")).status).toBe(429);
+      expect(err.mock.calls.filter((c) => c[0] === "ratelimit.binding_absent").map((c) => c[1])).toEqual(["RL_HTTP_ANON"]); // the twin's anonymous meter is the first binding asked
     } finally { err.mockRestore(); }
   }, 30_000);
   it("#12-11: normalizeEmail is trim + lowercase and is what both the em: key and the handler hash", () => {

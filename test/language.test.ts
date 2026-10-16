@@ -17,7 +17,7 @@ describe("cap.language.* — a fresh project can host an assessment (D9 gap)",()
     for(const m of ["0001_init.sql","0002_code_escrow.sql","0003_language_archive.sql"]) await db.batch(statements(db,`../migrations/${m}`));
     await db.batch(statements(db,"../seed/synthetic.sql"));
     let n=0; const at=new Date("2026-09-16T22:00:00.000Z");
-    const ctx=(actor="person_mara"):Ctx=>({env:{DB:db,SESSION_SECRET:"s"},db,principal:{kind:"user",id:actor},traceId:`tr_lang_${++n}`,now:()=>at,log:()=>{}});
+    const ctx=(actor="person_mara"):Ctx=>({env:{DB:db,SESSION_SECRET:"s",RL_MCP_CEILING:{limit:async()=>({success:true})}} as any,db,principal:{kind:"user",id:actor},traceId:`tr_lang_${++n}`,now:()=>at,log:()=>{}});
     const created=await execute(ctx(),"cap.language.create",{pid:"proj_rill",name:"Kelo (invented)",code:"qak"},{tool:"write"});
     expect(created.ok).toBe(true); if(!created.ok) throw new Error(created.error.message);
     const lid=(created.result.language as any).id; expect(created.receipt?.inverse).toBe("cap.language.archive");

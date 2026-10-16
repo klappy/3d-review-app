@@ -22,7 +22,7 @@ describe("cap.ops.undo on cap.survey.issue_codes revokes the whole batch or noth
     await db.batch(statements(db,"../migrations/0003_language_archive.sql"));
     await db.batch(statements(db,"../seed/synthetic.sql"));
     let serial=0;
-    const ctx=():Ctx=>({env:{DB:db,SESSION_SECRET:"synthetic-secret",CODE_ESCROW_SECRET:secret},db,principal:{kind:"user",id:"person_mara"},traceId:`tr_undo_${++serial}`,now:()=>at,log:()=>{}});
+    const ctx=():Ctx=>({env:{DB:db,SESSION_SECRET:"synthetic-secret",CODE_ESCROW_SECRET:secret,RL_MCP_CEILING:{limit:async()=>({success:true})}} as any,db,principal:{kind:"user",id:"person_mara"},traceId:`tr_undo_${++serial}`,now:()=>at,log:()=>{}});
     const survey={aid:"assess_tavo_collect",sid:"survey_tavo"};
     const issue=await execute(ctx(),"cap.survey.issue_codes",{...survey,count:3},{tool:"write"});
     expect(issue.ok).toBe(true); if(!issue.ok) throw new Error("issue failed");
