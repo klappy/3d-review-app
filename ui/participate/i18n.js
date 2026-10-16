@@ -227,7 +227,7 @@ export async function fetchTranslationsProgressive({ lang, context, sourceTexts,
           const res = await fetchImpl(endpoint, translateInit({ targetLang: lang, context, sourceTexts: part }, bearer));
           if (!res || !res.ok) {
             if (res && [400, 401, 403, 404].includes(res.status)) mayRetry = false;
-            if (res && res.status === 429) { mayRetry = false; const b = await res.json?.().catch(() => null); limited = retryAfterOf(b?.error, res) ?? '60'; } // PR501 6216474718: no immediate resend; envelope wait first
+            if (res && res.status === 429) { mayRetry = false; const b = await res.json?.().catch(() => null); const w = retryAfterOf(b?.error?.data ? b.error : { data: b }, res); limited = w == null ? '60' : String(w); } // PR501 6216474718/6217581828: no immediate resend; body wait (envelope data or /v2/translate top-level retry_after) before header
             throw new Error(`translate ${res ? res.status : 'failed'}`);
           }
           const data = await res.json();

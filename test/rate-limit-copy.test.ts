@@ -212,16 +212,16 @@ describe("translation refused by a rate limit (DoD 6)", () => {
   it("fetchTranslationsProgressive rejects with RATE_LIMITED and the server's wait when nothing came back and a 429 did", async () => {
     // @ts-expect-error plain browser module, no types
     const { fetchTranslationsProgressive } = await import("../ui/participate/i18n.js");
-    const fetchImpl = async () => new Response(JSON.stringify({ error: "rate_limited", message: RATE_LIMIT_MESSAGE, retry_after: 60 }), { status: 429, headers: { "retry-after": "45" } });
+    const fetchImpl = async () => new Response(JSON.stringify({ error: "rate_limited", hint: "translation is busy — try again shortly" }), { status: 429, headers: { "retry-after": "45" } }); // upstream-429 body (src/translate.ts:240): no retry_after, so the header is read
     const err: any = await fetchTranslationsProgressive({ lang: "es", context: "participant-ui", sourceTexts: { a: "Hello" }, fetchImpl }).catch((e: any) => e);
     expect(err).toBeInstanceOf(Error); expect(err.code).toBe("RATE_LIMITED"); expect(err.status).toBe(429); expect(err.retryAfter).toBe("45");
     const other: any = await fetchTranslationsProgressive({ lang: "es", context: "participant-ui", sourceTexts: { a: "Hello" }, fetchImpl: async () => new Response("{}", { status: 502 }) }).catch((e: any) => e);
     expect(other.code).toBeUndefined(); // a non-limit failure keeps the existing "not available" path
   });
-  it("PR501 6216474718: a 429 is not resent in the second round, and the envelope's retry_after is read (not only the header)", async () => {
+  it("PR501 6216474718: a 429 is not resent in the second round, and the body's top-level retry_after is read (not only the header)", async () => {
     const { fetchTranslationsProgressive } = await import("../ui/participate/i18n.js");
     let calls = 0;
-    const fetchImpl = async () => { calls++; return new Response(JSON.stringify({ ok: false, error: { code: "RATE_LIMITED", message: RATE_LIMIT_MESSAGE, data: { retry_after: 120 } } }), { status: 429 }); };
+    const fetchImpl = async () => { calls++; return new Response(JSON.stringify({ error: "rate_limited", message: RATE_LIMIT_MESSAGE, retry_after: 120 }), { status: 429 }); }; // the body /v2/translate sends (src/translate.ts), no header
     const err: any = await fetchTranslationsProgressive({ lang: "es", context: "participant-ui", sourceTexts: { a: "Hello" }, fetchImpl }).catch((e: any) => e);
     expect(calls).toBe(1);
     expect(err.code).toBe("RATE_LIMITED"); expect(String(err.retryAfter)).toBe("120");
