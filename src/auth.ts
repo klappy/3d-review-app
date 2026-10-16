@@ -45,9 +45,10 @@ export async function resolvePrincipal(req: Request, env: Env): Promise<Principa
 
 export async function mintSession(env: Env, principalId: string, kind: "user" | "participant" | "support", extra: Record<string, unknown> = {}, ttlMs = 12 * 3600e3): Promise<string> {
   const token = `${kind === "participant" ? "pt" : "st"}_${crypto.randomUUID().replace(/-/g, "")}`;
+  const now = Date.now(); // one clock read: expires_at - created_at is exactly ttlMs
   await env.DB.prepare(
     "INSERT INTO session (token_hash, principal_id, kind, delegated_by, participant_survey_id, respondent_id, expires_at, created_at) VALUES (?,?,?,?,?,?,?,?)"
-  ).bind(await sha256(token), principalId, kind, (extra.delegated_by as string) ?? null, (extra.participant_survey_id as string) ?? null, (extra.respondent_id as string) ?? null, Date.now() + ttlMs, Date.now()).run();
+  ).bind(await sha256(token), principalId, kind, (extra.delegated_by as string) ?? null, (extra.participant_survey_id as string) ?? null, (extra.respondent_id as string) ?? null, now + ttlMs, now).run();
   return token;
 }
 
