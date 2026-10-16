@@ -74,14 +74,17 @@ export const permissions = {
     const roster = memberList(esc, m.grants, { me: m.me, myEmail: m.myEmail, actions, rowAttr: g => `data-grant-row="${esc(g.id)}"`, empty: 'No grants listed.', note: false });
     const namesNote = membersHidden(m.grants, { me: m.me, myEmail: m.myEmail }) ? `<p class="small muted" data-member-note>${esc(NO_EMAIL_NOTE)}</p>` : '';
     const pending = m.pending.length ? `<p class="eyebrow" style="margin-top:18px">Pending invitations</p><ul class="small" data-pending>${m.pending.map(i => `<li data-invitation="${esc(i.id)}">${esc(i.role)}${i.created_at ? ` · invited ${esc(shortDate(i.created_at))}` : ''}${m.invitees?.[i.id] ? ` · ${esc(m.invitees[i.id])}` : ''}${i.status === 'unconfirmed' ? ` · ${esc(UNCONFIRMED_NOTE)}` : ''}${member && (owner || RANK[i.role] <= RANK.member) ? ` ${m.askRevoke === i.id ? `<span data-revoke-ask="${esc(i.id)}">${esc(REVOKE_ASK)} <button type="button" class="small" data-revoke-invitation-confirm="${esc(i.id)}" ${busy}>Revoke</button> <button type="button" class="quiet small" data-revoke-invitation-cancel ${busy}>Cancel</button></span>` : `<button type="button" class="quiet small" data-revoke-invitation="${esc(i.id)}" ${busy}>Revoke invitation</button>`}` : ''}</li>`).join('')}</ul>` : ''; // B30: no pending → nothing (not another line)
+    // DoD2 (2026-10-15 workspace-permissions): the invitation confirm opens inline, right under the Invite button, naming the
+    // address typed — never a separate "preview" step at the bottom of the page. Same dry_run → execute twin underneath.
+    const inviteSheet = m.sheet?.kind === 'invite' ? m.sheet : null;
     const roleOptions = (owner ? ROLES : ROLES.filter(r => r !== 'owner')).map(r => `<option value="${r}">${r}</option>`).join('');
-    const invite = member ? `<form class="line" data-invite-form><p class="eyebrow">Invite someone</p><label class="field">Email<input name="email" type="email" required autocomplete="off" ${busy}></label><label class="field">Role<select name="role" ${busy}>${roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit" class="primary" ${busy}>Preview invitation</button></div></form>` : '';
+    const invite = member ? `<form class="line" data-invite-form><p class="eyebrow">Invite someone</p><label class="field">Email<input name="email" type="email" required autocomplete="off" ${inviteSheet ? `value="${esc(inviteSheet.params.email || '')}"` : ''} ${busy}></label><label class="field">Role<select name="role" ${busy}>${inviteSheet ? roleOptions.replace(`value="${inviteSheet.params.role}"`, `value="${inviteSheet.params.role}" selected`) : roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit"${inviteSheet ? '' : ' class="primary"'} data-invite-submit ${busy}>Invite</button></div>${inviteSheet ? renderSheet(ctx, inviteSheet, m.busy, m.scope) : ''}</form>` : '';
     // B30 (lane 9, less text 3): transfer is rare and destructive — a closed disclosure whose first line, once opened, is the warning.
     // U18: pick the new owner from people who already have access (shared member picker) — never a typed principal id.
     const picker = owner ? memberPicker(esc, m.grants, { me: m.me, myEmail: m.myEmail, name: 'to', label: 'New owner', attrs: busy, empty: NO_TRANSFER_TARGET }) : '';
     const transferForm = /data-member-picker-empty/.test(picker) ? picker : `<form data-transfer-form><p class="small muted">Destructive: it cannot be undone from here.</p>${picker}<label class="small"><input type="checkbox" name="step_down"> Step down to member after the transfer</label><div class="actions"><button type="submit" ${busy}>Preview transfer</button></div></form>`;
     const transfer = owner ? `<details class="line" data-transfer${m.transferOpen || m.sheet?.kind === 'transfer_owner' ? ' open' : ''}><summary>Transfer ownership</summary>${transferForm}</details>` : '';
-    const sheet = m.sheet ? renderSheet(ctx, m.sheet, m.busy, m.scope) : '';
+    const sheet = m.sheet && !inviteSheet ? renderSheet(ctx, m.sheet, m.busy, m.scope) : '';
     return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}${roster}${pending}${invite}${transfer}${sheet}${status}${learnMore(`${namesNote}${member ? '<p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p>' : ''}<p class="small muted">Accepting an invitation happens from the mailed link; it is never done from this page.</p>`)}</section>`;
   },
   bind(ctx, root, m) {
@@ -105,7 +108,7 @@ export const permissions = {
     const preview = async (kind, url, params, label, extra = {}) => { m.busy = true; paint();
       try { const env = await call(url, { method: extra.method || 'POST', body: { params, mode: 'dry_run' } }); const r = env.result;
         m.sheet = { kind, url, method: extra.method || 'POST', params: Object.freeze(JSON.parse(JSON.stringify(params))), token: r.confirm_token, expiresIn: r.expires_in, impact: r.impact || {}, label, ...extra.display }; m.notice = null; m.noticeRef = ''; m.alert = false;
-      } catch (e) { m.sheet = null; fail(e, label); } finally { m.busy = false; paint(); } };
+      } catch (e) { m.sheet = null; fail(e, label); } finally { m.busy = false; paint(); if (m.sheet?.kind === 'invite') root.querySelector('[data-confirm-execute]')?.focus?.(); } };
     const execute = async () => { const s = m.sheet; if (!s || m.busy) return; if (!s.token) { say(PREVIEW_AGAIN, true); return; }
       const token = s.token; s.token = null; // single-use, cleared before the call
       m.busy = true; paint();
@@ -125,6 +128,12 @@ export const permissions = {
         if (code === 'CONFIRM_EXPIRED' || code === 'CONFIRM_REQUIRED') { s.token = null; say(`The confirmation expired. ${PREVIEW_AGAIN}`, true); return; }
         m.sheet = null; fail(e, s.label);
       } };
+    // PR #508 fix: an edit to email or role while the invite confirm is open drops the confirm (the frozen dry-run params would
+    // otherwise invite the old values). No repaint, so the typed text and caret stay; Invite becomes the primary again.
+    const dropInvite = e => { if (m.sheet?.kind !== 'invite' || m.busy) return; m.sheet = null; const f = e?.currentTarget || root.querySelector('[data-invite-form]');
+      f?.querySelector?.('[data-confirm-sheet]')?.remove?.(); f?.querySelector?.('[data-invite-submit]')?.classList?.add?.('primary');
+      const st = root.querySelector('[data-permissions-status]'); if (st) st.textContent = 'Details changed. Invite again to preview.'; };
+    for (const ev of ['input', 'change']) root.querySelector('[data-invite-form]')?.addEventListener(ev, dropInvite);
     root.querySelector('[data-invite-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const email = f.querySelector('[name=email]').value.trim(), role = f.querySelector('[name=role]').value; return preview('invite', `${base}/invitations`, { email, role }, 'Invitation', { display: { who: email } }); });
     root.querySelectorAll('[data-change-role]').forEach(b => b.addEventListener('click', () => { const gid = b.dataset.changeRole; const role = root.querySelector(`[data-role-for="${CSS.escape(gid)}"]`)?.value; const g = m.grants.find(x => x.id === gid); if (!g || !role || role === g.role) { say('That is already the role.'); return; } const who = labelMembers(m.grants, { me: m.me, myEmail: m.myEmail }).find(x => x.row === g)?.person; return preview('update_role', `${base}/grants/${ctx.enc(gid)}`, { role }, 'Role change', { method: 'PATCH', display: { who: who ? [who.name, who.email].filter(Boolean).join(' · ') : '', gid } }); }));
     root.querySelector('[data-transfer]')?.addEventListener('toggle', e => { if (e.currentTarget.isConnected) m.transferOpen = e.currentTarget.open; }); // Bugbot 4108609584: a replaced node's stale toggle is ignored // keep it open across repaints

@@ -11,6 +11,22 @@ export const VERSIONS = {
    "fixed": []
   },
   {
+   "version": "0.34.4",
+   "added": [],
+   "changed": [],
+   "fixed": [
+    "The HTTP contract (`contract/openapi.yaml`) now says that starting an assessment (cap.assessment.create) takes the optional location and facilitator (string; omitted or empty stores nothing), as cap.assessment.update and the capability list already did."
+   ]
+  },
+  {
+   "version": "0.34.3",
+   "added": [],
+   "changed": [
+    "Inviting someone: the button is \"Invite\", and the confirm opens right under it, naming the address you typed and the role, with Confirm and Cancel. The separate \"Preview invitation\" step and the confirm at the bottom of the page are gone (Permissions page, collaborators panel and MCP panel)."
+   ],
+   "fixed": []
+  },
+  {
    "version": "0.34.2",
    "added": [],
    "changed": [],
@@ -32,27 +48,6 @@ export const VERSIONS = {
     "Setup step 1 asks \"Location or community\" and \"Facilitator\" (both optional); Review and the assessment's Prepare view (Learn more) show both. Stored on the assessment (migration 0015); cap.assessment.create / update take location and facilitator (string or null). Older clients unchanged."
    ],
    "changed": [],
-   "fixed": []
-  },
-  {
-   "version": "0.33.1",
-   "added": [],
-   "changed": [],
-   "fixed": [
-    "Shared survey link: reopening the link while a rate limit refuses it, or while the limiter refuses the receipt check after a closed-collection answer, now shows the rate-limit words with the server's wait and offers Recover receipt, held for that wait, instead of only \"open your link again\".",
-    "Participant translation: when every translation request is refused by a rate limit, the page says it is a rate limit, keeps English and holds Try again for the server's wait, instead of \"check the internet connection\".",
-    "Shared survey link (PR498): a rate limit on Submit or on opening the survey holds that control for the server's wait, and Recover receipt follows that wait, instead of failing again at once.",
-    "Participant translation: a rate-limited translation request is not resent in the same load, and the wait is read from the server envelope as well as the Retry-After header."
-   ]
-  },
-  {
-   "version": "0.33.0",
-   "added": [
-    "\"Perspectives at a glance\" radar in the full report, after \"Do the perspectives agree?\": one spoke per area scored by two or more perspectives (three or more areas), one outline per perspective, rings at 25/50/75/100; a perspective not asked about an area has no point on that spoke."
-   ],
-   "changed": [
-    "Every numeric score in the full report is labelled \"out of 100\". Payload, scoring and narrative unchanged."
-   ],
    "fixed": []
   }
  ],
