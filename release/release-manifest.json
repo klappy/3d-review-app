@@ -1,23 +1,23 @@
 {
   "version": "0.34.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "01a8436f087dcef95fb3295d78ba18850d907978",
+  "cookbook_commit": "f0550f00247250c261d168fe420f2912214d6886",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.34.0.md",
-      "blob_sha": "6b1cd2e7a1b8f8872035bc82e4457ad0fc22e353",
-      "sha256": "0c66ee75a3a34ba3236f3c1afe3ac4e0dee6df32ab80758eae228a3df1dcfc50"
+      "blob_sha": "45be9612831e8a74501ac487e1473aab633a0606",
+      "sha256": "6cf9329d65d0752145e1d64b32e83b99801ed0a5c8b261d0689f9897d0314dfc"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "87852a018545e38ab215a2d1ea751ce050b5d70d",
-      "sha256": "fdf370a304e09313d02ff1b5604c87f358f1edc9ed946de226c3485c0b1162ac"
+      "blob_sha": "33182b784db44eaa0f3add8fb411c4878afa9148",
+      "sha256": "718608c5508296937ad8ac6a3c03ac48a6a0d37263c1b2884c0f00b41231bcd9"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Setup step 1 asks \"Location or community\" and \"Facilitator\" (both optional); Review shows both. Stored on the assessment (migration 0015); cap.assessment.create / update take location and facilitator (string or null). Older clients unchanged."
+        "Setup step 1 asks \"Location or community\" and \"Facilitator\" (both optional); Review and the assessment's Prepare view (Learn more) show both. Stored on the assessment (migration 0015); cap.assessment.create / update take location and facilitator (string or null). Older clients unchanged."
       ]
     }
   }

@@ -5,7 +5,7 @@ export const VERSIONS = {
   {
    "version": "0.34.0",
    "added": [
-    "Setup step 1 asks \"Location or community\" and \"Facilitator\" (both optional); Review shows both. Stored on the assessment (migration 0015); cap.assessment.create / update take location and facilitator (string or null). Older clients unchanged."
+    "Setup step 1 asks \"Location or community\" and \"Facilitator\" (both optional); Review and the assessment's Prepare view (Learn more) show both. Stored on the assessment (migration 0015); cap.assessment.create / update take location and facilitator (string or null). Older clients unchanged."
    ],
    "changed": [],
    "fixed": []

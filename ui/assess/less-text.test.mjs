@@ -92,8 +92,8 @@ async function assessPage() {
     document: new JSDOM('<!doctype html><head></head><body></body>').window.document, location: { hash: '', pathname: '/' }, history: { replaceState() {} }, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} }, localStorage: { getItem: () => null, setItem() {} }, matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }), addEventListener() {}, setTimeout, clearTimeout, console, URL, URLSearchParams };
   box.globalThis = box;
   const api = vm.runInNewContext(source + '\n({screen,state,surveyScreen})', box); surveyScreen = api.surveyScreen; assessState = api.state;
-  return (role, stage = 'prepare', view = 'prepare', projects = [{ id: 'p1', name: 'Coast' }], period = '2026') => { api.state.projects = projects;
-    return api.screen({ assessment: { id: 'a1', name: 'Oct', project_id: 'p1', role, stage, language_id: 'lang1', period }, surveys: [{ id: 's1', state: 'selected' }, { id: 's2', state: 'selected' }] }, view); };
+  return (role, stage = 'prepare', view = 'prepare', projects = [{ id: 'p1', name: 'Coast' }], period = '2026', extra = {}) => { api.state.projects = projects;
+    return api.screen({ assessment: { id: 'a1', name: 'Oct', project_id: 'p1', role, stage, language_id: 'lang1', period, ...extra }, surveys: [{ id: 's1', state: 'selected' }, { id: 's2', state: 'selected' }] }, view); };
 }
 
 test('L9-24 assessment page, Prepare view (validator #282): one view heading, no stray lines, one primary; stage notes behind Learn more', async () => {
@@ -270,4 +270,12 @@ test('B30 assessment stage headers (Prepare / Collect / Understand / Improve, ow
     const more = [...head.matchAll(closed)].map(x => x[0]).join('');
     assert.ok(head.includes(LM) && more.includes(`Coast · your role: ${role}`), name + ': role line moved, not removed');
   }
+});
+
+test('B19: the assessment (Prepare) shows location/community and facilitator behind Learn more, beside language and period', async () => {
+  const page = await assessPage();
+  const h = page('owner', 'prepare', 'prepare', undefined, '2026', { location: 'Ban Na', facilitator: 'Bincy' });
+  const more = [...h.slice(h.indexOf('<div class="grid">')).matchAll(closed)].map(x => x[0]).join('');
+  assert.ok(more.includes('Location or community: Ban Na'), 'location shown'); assert.ok(more.includes('Facilitator: Bincy'), 'facilitator shown');
+  assert.doesNotMatch(page('owner', 'prepare'), /Location or community:|Facilitator:/, 'nothing when not set');
 });
