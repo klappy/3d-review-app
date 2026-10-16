@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { permissions, NO_TRANSFER_TARGET, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, REVOKE_ASK, TEST_ADDRESS_NOTE, inviteOutcome } from './permissions.js';
+import { permissions, APPLIES, CHANGE_TO, PICK_ROLE, NO_TRANSFER_TARGET, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, REVOKE_ASK, TEST_ADDRESS_NOTE, inviteOutcome } from './permissions.js';
 import { shortDate } from './cards.js';
 
 const read = n => readFileSync(fileURLToPath(new URL(n, import.meta.url)), 'utf8');
@@ -360,4 +360,21 @@ test('U18 transfer picker: people with access by name/email, no raw ids anywhere
   const alone = await mount('owner', { [G]: { grants: [{ id: 'g_me', principal_id: 'me', role: 'owner' }], pending_invitations: [] } });
   assert.match(alone.root.html, new RegExp(`data-member-picker-empty>${NO_TRANSFER_TARGET.replace(/[.;]/g, '\\$&')}</p></details>`)); assert.doesNotMatch(alone.root.html, /data-transfer-form|data-member-picker /);
   assert.equal(NO_TRANSFER_TARGET, 'Invite someone first; you can transfer to people who already have access.');
+});
+
+test('DoD 4 (workspace-permissions): the scope line is true per scope — never "nothing is inherited"', () => {
+  const m = { status: 'loaded', grants: [], pending: [], myRole: 'owner', me: 'me', receipts: {}, invitees: {} };
+  for (const scope of ['workspaces', 'projects', 'assessments']) {
+    const html = permissions.render({ esc }, { ...m, scope }); assert.ok(html.includes(esc(APPLIES[scope])), scope); assert.doesNotMatch(html, /nothing is inherited/);
+  }
+  assert.match(APPLIES.workspaces, /every project in this workspace/); assert.match(APPLIES.projects, /workspace/); assert.match(APPLIES.assessments, /project and workspace roles do not/);
+  assert.doesNotMatch(read('../mcp/panel-src.html'), /nothing is inherited/);
+});
+
+test('DoD 4 polish (k0021): change-role select starts on "Change to…", lists only the other roles; no choice → a sentence, no PATCH', async () => {
+  const x = await mount('owner', {});
+  const sel = /<select data-role-for="g_mem"[^>]*>(.*?)<\/select>/.exec(x.root.html)[1];
+  assert.ok(sel.startsWith(`<option value="" selected disabled>${CHANGE_TO}</option>`)); assert.doesNotMatch(sel, /value="member"/); assert.match(sel, /value="viewer"/); assert.match(sel, /value="owner"/);
+  x.root.els['data-role-for=g_mem'] = { value: '' }; await x.click('data-change-role="g_mem"');
+  assert.ok(x.root.html.includes(PICK_ROLE)); assert.equal(x.calls.filter(c => c.method === 'PATCH').length, 0);
 });
