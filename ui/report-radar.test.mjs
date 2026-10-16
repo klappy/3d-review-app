@@ -75,3 +75,31 @@ test('R6 every numeric score in the full report is labelled "out of 100"', () =>
   for (const t of overall) assert.match(t, /out of 100/);
   for (const li of root.querySelectorAll('[data-lens-score]')) assert.match(li.textContent, /out of 100/);
 });
+
+// Review #499 A/B: the ?demo=1 shape — 5 spokes; one perspective on all 5, one on 2 non-adjacent spokes, one on 3.
+const GAPS = { payload: { ...SYNTH.payload, cross_lens_multi: [
+  { construct_name: 'Brief Process', lens_scores: [{ lens: 'Church', score: 50 }, { lens: 'Translation Team', score: 75 }] },
+  { construct_name: 'Trust', lens_scores: [{ lens: 'Church', score: 25 }, { lens: 'Community', score: 45 }] },
+  { construct_name: 'Understanding', lens_scores: [{ lens: 'Church', score: 50 }, { lens: 'Translation Team', score: 67 }] },
+  { construct_name: 'Clarity', lens_scores: [{ lens: 'Church', score: 50 }, { lens: 'Community', score: 44 }] },
+  { construct_name: 'Appeal', lens_scores: [{ lens: 'Church', score: 40 }, { lens: 'Community', score: 42 }] },
+] } };
+const pointsOf = el => el.getAttribute('points').trim().split(/\s+/);
+test('R7 a perspective with every spoke is one closed outline; a skipped spoke breaks the outline (5/2/3)', () => {
+  const d = doc(); const radar = renderLensRadar({ doc: d, report: GAPS });
+  const church = radar.querySelector('[data-radar-lens="Church"]');
+  assert.equal(church.querySelectorAll('polygon').length, 1);
+  assert.equal(pointsOf(church.querySelector('polygon')).length, 5);
+  assert.equal(church.querySelectorAll('circle').length, 5);
+  // Translation team: spokes 0 and 2 only, not adjacent → two markers, no line drawn across the skipped spoke 1.
+  const team = radar.querySelector('[data-radar-lens="Translation Team"]');
+  assert.equal(team.querySelectorAll('polygon').length, 0);
+  assert.equal(team.querySelectorAll('polyline').length, 0);
+  assert.equal(team.querySelectorAll('circle').length, 2);
+  // Community: spokes 1, 3, 4 → one segment 3–4 only; nothing joins across spoke 2 or spoke 0.
+  const community = radar.querySelector('[data-radar-lens="Community"]');
+  assert.equal(community.querySelectorAll('polygon').length, 0);
+  const lines = [...community.querySelectorAll('polyline')];
+  assert.deepEqual(lines.map(l => pointsOf(l).length), [2]);
+  assert.equal(community.querySelectorAll('circle').length, 3);
+});

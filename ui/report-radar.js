@@ -3,7 +3,7 @@
 // Canvas rules followed (cookbook design/2026-10-15-glass-redesign/canvas/design-system.md, Radar row): inline SVG, one
 // polygon per perspective, 2px strokes, markers of 8px or more, legend plus wrapping labels, spokes are the areas two or more
 // perspectives scored, and a spoke is skipped where a perspective was not asked. Rules the canvas has not yet written
-// (parity-loop R18) use the simplest choice: at least 3 spokes or no radar; a skipped spoke joins its neighbours directly;
+// (parity-loop R18) use the simplest choice: at least 3 spokes or no radar; a skipped spoke breaks the outline (closed only when every spoke is scored);
 // labels wrap at words; rings at 25/50/75/100; same chart at every width (it scales with the viewBox).
 // Presentation only: reads cross_lens_multi exactly as returned, never re-scores, no mean.
 import { lensLabel } from './report-lenses.js';
@@ -63,14 +63,14 @@ function svgEl(doc, tag, attrs = {}, text) {
 export const radarCss = `.lens-radar figure{margin:8px 0 0}.lens-radar svg{display:block;width:100%;max-width:460px;height:auto;margin:0 auto;overflow:visible}
 .lens-radar .ring{fill:none;stroke:var(--line);stroke-width:1}.lens-radar .spoke{stroke:var(--line);stroke-width:1}
 .lens-radar .ring-label{font-size:13px;fill:var(--secondary)}.lens-radar .spoke-label{font-size:20px;fill:var(--ink)}
-.lens-radar [data-radar-lens] polygon{fill-opacity:.12;stroke-width:2;fill:var(--secondary);stroke:var(--secondary)}
+.lens-radar [data-radar-lens] polygon{fill-opacity:.12;stroke-width:2;fill:var(--secondary);stroke:var(--secondary)}.lens-radar [data-radar-lens] polyline{fill:none;stroke-width:2;stroke:var(--secondary)}
 .lens-radar [data-radar-lens] circle{stroke:var(--paper);stroke-width:1.5;fill:var(--secondary)}
 .lens-radar [data-radar-lens]:is([data-radar-lens="Translation Team" i],[data-radar-lens=team i]) :is(polygon,circle){fill:var(--lens-green)}
-.lens-radar [data-radar-lens]:is([data-radar-lens="Translation Team" i],[data-radar-lens=team i]) polygon{stroke:var(--lens-green)}
-.lens-radar [data-radar-lens=community i] :is(polygon,circle){fill:var(--lens-blue)}.lens-radar [data-radar-lens=community i] polygon{stroke:var(--lens-blue)}
-.lens-radar [data-radar-lens=church i] :is(polygon,circle){fill:var(--lens-yellow)}.lens-radar [data-radar-lens=church i] polygon{stroke:var(--lens-yellow)}
-.lens-radar ul.lens-radar-legend{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px}
-.lens-radar-legend li{display:flex;align-items:center;gap:6px;border:0!important;padding:0!important}
+.lens-radar [data-radar-lens]:is([data-radar-lens="Translation Team" i],[data-radar-lens=team i]) :is(polygon,polyline){stroke:var(--lens-green)}
+.lens-radar [data-radar-lens=community i] :is(polygon,circle){fill:var(--lens-blue)}.lens-radar [data-radar-lens=community i] :is(polygon,polyline){stroke:var(--lens-blue)}
+.lens-radar [data-radar-lens=church i] :is(polygon,circle){fill:var(--lens-yellow)}.lens-radar [data-radar-lens=church i] :is(polygon,polyline){stroke:var(--lens-yellow)}
+.lens-radar ul.lens-radar-legend{list-style:none;padding:0;margin:8px 0 0!important;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px}
+.lens-radar-legend li{display:flex;align-items:center;gap:6px;border:0!important;padding:0!important;margin:0!important}
 .lens-radar-legend .lens-agree-dot{position:static;margin:0;width:10px;height:10px;border-width:1px}`;
 
 /** Full report: detached DOM section, or null when fewer than three areas were scored by two or more perspectives. */
@@ -97,8 +97,20 @@ export function renderLensRadar({ doc, report }) {
   });
   for (const { lens, scores } of model.lenses) {
     const g = svgEl(doc, 'g', { 'data-radar-lens': lens });
-    const pts = scores.map((s, i) => (s === null ? null : point(i, count, clamp(s)))).filter(Boolean);
-    g.append(svgEl(doc, 'polygon', { points: pts.map(p => p.map(fmt).join(',')).join(' ') }));
+    // Review #499 A/B: one closed outline only when every spoke has a value; otherwise one open line per run of adjacent
+    // scored spokes (wrapping past the last spoke), so nothing is drawn across a skipped spoke and lone points stay markers.
+    const pts = scores.map((s, i) => (s === null ? null : point(i, count, clamp(s))));
+    const join = run => run.map(p => p.map(fmt).join(',')).join(' ');
+    if (pts.every(Boolean)) g.append(svgEl(doc, 'polygon', { points: join(pts) }));
+    else {
+      const start = pts.findIndex(p => p === null), runs = [];
+      let run = [];
+      for (let k = 1; k <= count; k++) {
+        const p = pts[(start + k) % count];
+        if (p) run.push(p); else { if (run.length >= 2) runs.push(run); run = []; }
+      }
+      for (const r of runs) g.append(svgEl(doc, 'polyline', { points: join(r) }));
+    }
     scores.forEach((s, i) => {
       if (s === null) return;
       const [x, y] = point(i, count, clamp(s));
