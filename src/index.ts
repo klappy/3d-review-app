@@ -108,7 +108,7 @@ for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?
       });
       const res = json(result, result.ok ? 200 : statusFor(result.error.code));
       if (cap.id.startsWith("cap.ops.roadmap_")) res.headers.set("cache-control", "no-store");
-      if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
+      if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String((result.error as { data?: { retry_after?: number } }).data?.retry_after ?? RATE_LIMIT_WINDOW_SECONDS));
       if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Secure; Path=/; SameSite=Lax`);
       if (cap.id === "cap.auth.logout") res.headers.append("set-cookie", "session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
       return res;

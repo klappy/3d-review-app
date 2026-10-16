@@ -6,7 +6,7 @@ import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
 // Data: existing /v2 endpoints only, same-origin session (cookie or the legacy facilitatorToken). No fictional model.
 // Anything the showcase draws that this slice does not wire is omitted, never rendered as a working control.
 import { redactDiagnosticPath } from '/diagnostic-path.js';
-import { RATE_LIMIT_COPY, isRateLimited } from '/rate-limit.js';
+import { isRateLimited, rateLimitText, retryAfterOf } from '/rate-limit.js';
 import { loadBlankPrint, renderBlankPrint, printAllowed, rememberTab, recalledTab, STAGES } from '/stage-screens.js';
 import { printLanguages, printLanguageField, translatePrint, facilitatorFetch, printReadyLine } from './print-lang.js';
 import { openPrintDocument, activeSurveyLink, paperLink, printIdentityFrom } from './print.js';
@@ -96,7 +96,7 @@ async function api(url, { method = 'GET', body } = {}) {
   let r; try { r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); }
   catch { throw new Error('API unavailable. For a write, its outcome is unknown.'); }
   let j = null; try { j = await r.json(); } catch {}
-  if (!r.ok || !j?.ok) { const e = new Error(isRateLimited(r.status, j?.error?.code) ? RATE_LIMIT_COPY : j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
+  if (!r.ok || !j?.ok) { const e = new Error(isRateLimited(r.status, j?.error?.code) ? rateLimitText(j?.error?.message, j?.error?.hint, retryAfterOf(j?.error, r)) : j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
   return j.result;
 }
 // Same call, whole envelope (result + receipt + trace_id) — G1 shows receipt/trace on the row after a write.
@@ -105,7 +105,7 @@ async function apiFull(url, { method = 'GET', body } = {}) {
   const headers = { accept: 'application/json' }; if (body !== undefined) headers['content-type'] = 'application/json'; if (token) headers.authorization = `Bearer ${token}`;
   let r; try { r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); } catch { throw new Error('API unavailable. For a write, its outcome is unknown.'); }
   let j = null; try { j = await r.json(); } catch {}
-  if (!r.ok || !j?.ok) { const e = new Error(isRateLimited(r.status, j?.error?.code) ? RATE_LIMIT_COPY : j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
+  if (!r.ok || !j?.ok) { const e = new Error(isRateLimited(r.status, j?.error?.code) ? rateLimitText(j?.error?.message, j?.error?.hint, retryAfterOf(j?.error, r)) : j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
   return j;
 }
 const redact = m => redactDiagnosticPath(String(m || 'Request could not be completed.'));

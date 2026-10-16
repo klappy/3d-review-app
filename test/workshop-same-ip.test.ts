@@ -60,11 +60,17 @@ describe("protection that does not rest on the address key (DoD 3)", () => {
     await enforceCapabilityLimit(ctxFor(env, "203.0.113.1"), "cap.auth.request_link", { email: "a@example.org" });
     expect([...env.RL_AUTH.seen.keys()].some((k: string) => k.startsWith("em:"))).toBe(true);
   });
-  it("per link: one shared link is bounded across all addresses at the room number", async () => {
-    const env = sized({ RL_REDEEM: limiter(5) });
+  it("per link: one shared link is bounded across all addresses on RL_GLOBAL once bound", async () => {
+    const env = sized({ RL_GLOBAL: limiter(5) });
     const out = [];
     for (let i = 0; i < 6; i++) out.push(await refusal(enforceCapabilityLimit(ctxFor(env, `203.0.113.${i}`), "cap.participant.open_link", { token: "one-link" })));
     expect(out[4]).toBeNull(); expect(out[5]?.code).toBe("RATE_LIMITED");
+    expect([...env.RL_REDEEM.seen.keys()].some((k: string) => k.startsWith("link:"))).toBe(false);
+  });
+  it("per link at today's wrangler numbers (RL_REDEEM 60, RL_GLOBAL unbound): 200 opens of one link from 200 addresses are all allowed", async () => {
+    const env = sized({ RL_REDEEM: limiter(60), RL_GLOBAL: undefined, RL_PER_KEY: undefined });
+    for (let i = 0; i < 200; i++)
+      expect(await refusal(enforceCapabilityLimit(ctxFor(env, `10.0.${i >> 8}.${i & 255}`), "cap.participant.open_link", { token: "one-link" }))).toBeNull();
   });
   it("global ceiling: guessing spread over many addresses stops at RL_GLOBAL", async () => {
     const env = sized({ RL_GLOBAL: limiter(3) });

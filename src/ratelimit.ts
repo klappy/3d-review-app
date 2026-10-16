@@ -25,10 +25,11 @@
  *
  *   RL_PER_KEY   (optional) one secret or one mailbox, whatever the address   keys em:, code:   see RATE_LIMITS
  *                request_link per email (falls back to RL_AUTH's em: key while unbound), redeem_code per code —
- *                bounds a flood on one secret when an attacker rotates addresses. open_link's per-link key is
- *                `link:<hash>` on RL_REDEEM (a shared link is opened by a whole room, so it needs the room number).
+ *                bounds a flood on one secret when an attacker rotates addresses.
  *   RL_GLOBAL    (optional) one key per secret-guessing limiter across ALL addresses   keys g:RL_AUTH, g:RL_REDEEM
  *                a ceiling for code/link guessing and sign-in spam spread over many IPs (workshop 2026-10-15 DoD 3).
+ *                Also open_link's per-link key `link:<hash>`: a shared link is opened by a whole room, so it needs a
+ *                room-sized number, and RL_REDEEM's bound number is not that until Otto re-numbers it (Bugbot 4290591310).
  *   RL_MCP_CEILING also meters every write/danger call by a signed-in or link-holding principal    key wr:<kind>:<id>
  *                per session/principal, never per address, so a room behind one NAT never shares a bucket.
  *
@@ -153,11 +154,12 @@ export async function enforceCapabilityLimit(ctx: Ctx, capabilityId: string, par
     if (!ok) throw limited(capabilityId, "too many sign-in requests for this email");
   }
   // Per-secret keys (DoD 3): one code or one link token is bounded whatever address it comes from. A shared link is
-  // opened by a whole room (200 people), so its key rides RL_REDEEM's room-sized number; a code is one person's.
+  // opened by a whole room (200 people), so its key rides optional RL_GLOBAL (skipped while unbound): on RL_REDEEM it
+  // would go live at wrangler.toml's per-address number and refuse a busy link from every address (Bugbot 4290591310).
   if (capabilityId === "cap.participant.redeem_code" && typeof params.code === "string" && params.code
     && !(await allowOptional(ctx.env, "RL_PER_KEY", `code:${await secretHash(params.code.trim().toUpperCase())}`)))
     throw limited(capabilityId, "too many attempts with this code");
   if (capabilityId === "cap.participant.open_link" && typeof params.token === "string" && params.token
-    && !(await allow(ctx.env, "RL_REDEEM", `link:${await secretHash(params.token)}`)))
+    && !(await allowOptional(ctx.env, "RL_GLOBAL", `link:${await secretHash(params.token)}`)))
     throw limited(capabilityId, "too many opens of this link");
 }

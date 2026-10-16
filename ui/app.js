@@ -1,7 +1,7 @@
 import { parseInvitationFragment } from './public-entry.js';
 import { mountParticipantView } from './participant-view.js';
 import { redactDiagnosticPath } from './diagnostic-path.js';
-import { RATE_LIMIT_COPY, isRateLimited } from './rate-limit.js';
+import { isRateLimited, rateLimitText, retryAfterOf } from './rate-limit.js';
 import { createCollabHooks } from './collab-mount.js';
 import { mountEntityScreen } from './entity-screen.js';
 import { mountLensSurveys } from './lens-surveys.js';
@@ -143,7 +143,7 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   catch { throw new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); }
   let data;
   try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
-  if (!response.ok || !data.ok) throw Object.assign(new Error(isRateLimited(response.status, data.error?.code) ? RATE_LIMIT_COPY : `${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
+  if (!response.ok || !data.ok) throw Object.assign(new Error(isRateLimited(response.status, data.error?.code) ? rateLimitText(data.error?.message, data.error?.hint, retryAfterOf(data.error, response)) : `${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
   const li = document.createElement('li'); li.textContent = `${method} ${redactDiagnosticPath(url)} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
   return data.result;
 }

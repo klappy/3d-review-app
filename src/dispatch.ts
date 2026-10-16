@@ -103,7 +103,7 @@ export async function execute(
     // RATE_LIMITED carries retry_after in the envelope so an MCP client (HTTP 200 + envelope, no header) can back off
     // without parsing a second shape (review #12-6). The HTTP twin also sends the retry-after header.
     return (outcome = fail(e.code, e.message, e.hint, e instanceof CapError ? e.docs : undefined, ctx.traceId,
-      e.code === "RATE_LIMITED" ? { retry_after: RATE_LIMIT_WINDOW_SECONDS } : undefined));
+      e.code === "RATE_LIMITED" ? { retry_after: e.retryAfter ?? RATE_LIMIT_WINDOW_SECONDS } : undefined));
   } finally {
     ctx.log = log;
     // A refused flood must not become a storage flood: rate-limited calls are not written to the trace table.
