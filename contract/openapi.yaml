@@ -1838,6 +1838,7 @@ paths:
     post:
       operationId: cap.assessment.create
       summary: 'cap.assessment.create — write.reversible — roles: O, M'
+      description: 'creates in `prepare`; optional location, facilitator (string, B19, migration 0015; omitted or empty stores null)'
       x-capability: cap.assessment.create
       x-class: write.reversible
       x-tool: write

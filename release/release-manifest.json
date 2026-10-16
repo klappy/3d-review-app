@@ -1,23 +1,23 @@
 {
-  "version": "0.34.0",
+  "version": "0.34.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "f0550f00247250c261d168fe420f2912214d6886",
+  "cookbook_commit": "993b0c6f33dc7236034cb0b8a4262557362f3058",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.0.md",
-      "blob_sha": "45be9612831e8a74501ac487e1473aab633a0606",
-      "sha256": "6cf9329d65d0752145e1d64b32e83b99801ed0a5c8b261d0689f9897d0314dfc"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.4.md",
+      "blob_sha": "5687c6c5fe78778757290bbc267f679f83d0bcb4",
+      "sha256": "cef8042f044dda919cce08f630e2609afe8e2577c72ee0377d22582465734ae9"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "33182b784db44eaa0f3add8fb411c4878afa9148",
-      "sha256": "718608c5508296937ad8ac6a3c03ac48a6a0d37263c1b2884c0f00b41231bcd9"
+      "blob_sha": "53661d22d3281f6a9af1474c750c37561546ee2f",
+      "sha256": "e4eb3cac984f0f145ee0814543714dbf5dbb107f2a94164180445393a6816aec"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Setup step 1 asks \"Location or community\" and \"Facilitator\" (both optional); Review and the assessment's Prepare view (Learn more) show both. Stored on the assessment (migration 0015); cap.assessment.create / update take location and facilitator (string or null). Older clients unchanged."
+      "fixed": [
+        "The HTTP contract (`contract/openapi.yaml`) now says that starting an assessment (cap.assessment.create) takes the optional location and facilitator (string; omitted or empty stores nothing), as cap.assessment.update and the capability list already did."
       ]
     }
   }
