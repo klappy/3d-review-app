@@ -1,6 +1,9 @@
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {beforeAll,beforeEach,afterEach,afterAll,describe,it,expect} from 'vitest';
+import {beforeAll,beforeEach,afterEach,afterAll,describe,it,expect,vi} from 'vitest';
+// Pass-through counter: the store's attestations are counted, never altered.
+const attestCalls=vi.hoisted(()=>({n:0}));
+vi.mock('../src/report-capture',async(importOriginal)=>{const m:any=await importOriginal();return {...m,attestPackedCapture:(...a:any[])=>{attestCalls.n++;return m.attestPackedCapture(...a);}};});
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import * as store from '../src/synthetic-report-store';
 import {captureForBuild} from '../src/report-capture';
@@ -101,6 +104,14 @@ describe('real compiled renderer with local D1',()=>{
   expect(r.value.reportKey).toBe(plain.reportKey);expect(r.value.captureDigest).toBe(plain.captureDigest);
   expect(spans.every(s=>s.span==='report.stage'&&Object.keys(s.data??{}).join()==='stage,ms'&&typeof s.data?.ms==='number'&&(s.data.ms as number)>=0)).toBe(true);
   expect(spans.map(s=>s.data?.stage)).toEqual(['observe_sql','attest_observe','render_preview','observe_sql','attest_observe','attest_commit','render','canonicalize','validate','hash','commit_sql','result_sql','attest_current','validate_stored']);
+ });
+ it('one build attests the observed capture once; an external token is re-attested; bytes unchanged',async()=>{
+  attestCalls.n=0;const r=await store.buildMaterialized(context(),aid);expect(r.ok).toBe(true);if(!r.ok)return;
+  expect(attestCalls.n).toBe(1);
+  const c=await capture();attestCalls.n=0;
+  const again=await store.commitMaterialized(context(),aid,c);expect(again.ok).toBe(true);if(!again.ok)return;
+  expect(attestCalls.n).toBe(1);
+  expect(again.value.reportKey).toBe(r.value.reportKey);expect(again.value.captureDigest).toBe(r.value.captureDigest);expect(again.value.payload).toEqual(r.value.payload);
  });
  it('refuses rehashed well-typed semantic forgery, not just malformed schema',async()=>{
   const r=await report(),original=await db.prepare('SELECT payload_json,payload_sha256 FROM synthetic_report WHERE id=?').bind(r.id).first<any>();
