@@ -7,6 +7,7 @@ import app from "../src/index";
 import { enforceCapabilityLimit, enforcePrincipalWriteLimit, LIMITER_NAMES, OPTIONAL_LIMITER_NAMES, RATE_LIMIT_MESSAGE, RATE_LIMITS } from "../src/ratelimit";
 import { CapError } from "../src/handlers/types";
 import { authConsumeLink, authRequestLink } from "../src/handlers/platform";
+import { open_link, redeem_code } from "../src/handlers/participant";
 
 const limiter = (limit: number) => { const seen = new Map<string, number>(); return { seen, limit: async ({ key }: { key: string }) => { const n = (seen.get(key) ?? 0) + 1; seen.set(key, n); return { success: n <= limit }; } }; };
 const sized = (over: Record<string, unknown> = {}) => ({ ENVIRONMENT: "production",
@@ -139,6 +140,25 @@ describe("protection that does not rest on the address key (DoD 3)", () => {
       expect(env.RL_GLOBAL.seen.size, `${cap} ${JSON.stringify(params)} spent g:`).toBe(0);
       const handler = cap === "cap.auth.consume_link" ? authConsumeLink : authRequestLink;
       const e = await refusal(handler({ env: { ENVIRONMENT: "dev" }, db, log: () => {} } as any, params, undefined as any));
+      expect(e?.code, `${cap} ${JSON.stringify(params)}`).toBe("INVALID_PARAMS");
+    }
+    expect(touched).toEqual([]);
+  });
+  it("limiter and participant handlers agree on malformed: a whitespace-only code or token is refused before any lookup (PR 489 low)", async () => {
+    const touched: string[] = [];
+    const db = { prepare: (sql: string) => { touched.push(sql); throw new Error("handler reached the database"); } };
+    const shapes: [string, Record<string, unknown>][] = [
+      ["cap.participant.redeem_code", { code: "   " }],
+      ["cap.participant.redeem_code", { code: "\t\n" }],
+      ["cap.participant.open_link", { token: "   " }],
+      ["cap.participant.open_link", { token: " \t" }],
+    ];
+    for (const [cap, params] of shapes) {
+      const env = sized();
+      await refusal(enforceCapabilityLimit(ctxFor(env, ROOM), cap, params));
+      expect(env.RL_GLOBAL.seen.size, `${cap} ${JSON.stringify(params)} spent g:`).toBe(0);
+      const handler = cap === "cap.participant.redeem_code" ? redeem_code : open_link;
+      const e = await refusal(handler({ env: { ENVIRONMENT: "dev" }, db, log: () => {}, now: () => new Date(0) } as any, params, undefined as any));
       expect(e?.code, `${cap} ${JSON.stringify(params)}`).toBe("INVALID_PARAMS");
     }
     expect(touched).toEqual([]);
