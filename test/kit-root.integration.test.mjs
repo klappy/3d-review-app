@@ -77,6 +77,16 @@ test('normal root: single kit header hosts the REAL account/version/link control
   assert.equal(p.q('[role=main].content [data-content]'), p.api.app, 'controller app root IS the stable shell content element');
 });
 
+test('DoD3: Workspaces is in the primary shell nav and opens with zero projects (cookbook work/active/2026-10-15-3d-workspace-permissions)', async () => {
+  const p = await bootPage('direct', '#projects');
+  const link = p.q('[data-header-host] #account-menu #shell-links a[href="#workspaces"]');
+  assert.ok(link, 'Workspaces link in the shell nav'); assert.equal(link.textContent.trim(), 'Workspaces');
+  assert.deepEqual(p.qa('#shell-links a').map(a => a.getAttribute('href')), ['#workspaces', '#feedback', '/roadmap/'], 'Workspaces leads the existing nav items');
+  assert.equal(p.api.state.projects.length, 0, 'zero-project account');
+  await p.go('#workspaces');
+  assert.equal(p.api.route(p.w.location.hash).kind, 'workspaces'); assert.equal(p.text('[role=main].content h1'), 'Workspaces');
+});
+
 test('journey: Workspaces → workspace → project (two distinct assessments, language state) → assessment → back; route/title/crumb agree', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: #195' }, async () => {
   const p = await bootPage('owner', '#workspaces');
   assert.equal(p.text('[role=main].content h1'), 'Workspaces'); assert.deepEqual(crumbs(p), ['Workspaces']);

@@ -1,23 +1,23 @@
 {
-  "version": "0.34.0",
+  "version": "0.34.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "f0550f00247250c261d168fe420f2912214d6886",
+  "cookbook_commit": "5d39d5b3abb3c9ac8d982053695b80d9be63e1cb",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.0.md",
-      "blob_sha": "45be9612831e8a74501ac487e1473aab633a0606",
-      "sha256": "6cf9329d65d0752145e1d64b32e83b99801ed0a5c8b261d0689f9897d0314dfc"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.2.md",
+      "blob_sha": "ee6d01fbb6008165806784ac84061649d233e404",
+      "sha256": "d9f9bc74e2ae1e6209e5483ec8545103ed23986e4ef32f57e7bc77ba08b588df"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "33182b784db44eaa0f3add8fb411c4878afa9148",
-      "sha256": "718608c5508296937ad8ac6a3c03ac48a6a0d37263c1b2884c0f00b41231bcd9"
+      "blob_sha": "7ce4dcdb03179c83298a956f9e9243d142c98758",
+      "sha256": "f32e37cbed3f5aba4c27b8a57508f52f2dfbd0fa988c175a38c107cbae888fd7"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Setup step 1 asks \"Location or community\" and \"Facilitator\" (both optional); Review and the assessment's Prepare view (Learn more) show both. Stored on the assessment (migration 0015); cap.assessment.create / update take location and facilitator (string or null). Older clients unchanged."
+      "fixed": [
+        "Primary navigation: the shell nav (account menu) lists Workspaces ahead of App feedback and Roadmap, so the Workspaces view opens from any page, including with zero projects; before, it was reachable only through the \"Organize projects in a workspace\" link on the Projects page."
       ]
     }
   }
