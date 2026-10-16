@@ -79,13 +79,16 @@ export function shellModel({ route, routes, principal, known = {}, current = nul
 }
 
 // Account utility menu (compact chrome): the toggle shows the real verified email node (#who); the disclosure holds the existing
-// sign-out/switch/version/feedback/roadmap controls. Nodes and their listeners are untouched; this only opens/closes the menu.
+// sign-out/switch/version/feedback/roadmap controls. Nodes and their listeners are untouched; this only opens/closes the menu
+// (activating any a[href] inside it closes it).
 export function bindAccountMenu(doc) {
   const toggle = doc.getElementById('account-menu-toggle'), menu = doc.getElementById('account-menu');
   if (!toggle || !menu) return null;
   const items = () => [...menu.querySelectorAll('button:not([disabled]):not([hidden]), a[href]')].filter(el => !el.closest('[hidden]'));
   const set = (open, focus = false) => { menu.hidden = !open; toggle.setAttribute('aria-expanded', String(open)); if (open) items()[0]?.focus(); else if (focus) toggle.focus(); };
   toggle.addEventListener('click', () => set(menu.hidden));
+  // Any link in the menu (Workspaces, App feedback, Roadmap, …) is a navigation: activating it closes the menu (no one-off handlers).
+  menu.addEventListener('click', e => { if (e.target.closest?.('a[href]') && menu.contains(e.target)) set(false); });
   menu.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.preventDefault(); set(false, true); return; }
     if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) { const list = items(), i = list.indexOf(doc.activeElement); const next = e.key === 'Home' ? 0 : e.key === 'End' ? list.length - 1 : (i + (e.key === 'ArrowUp' ? -1 : 1) + list.length) % list.length; e.preventDefault(); list[next]?.focus(); }
