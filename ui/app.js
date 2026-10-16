@@ -1,7 +1,7 @@
-import { holdRetry, isRateLimited, rateLimitMessage, retryAfterFromResponse, retryAfterOf } from './rate-limit.js';
 import { parseInvitationFragment } from './public-entry.js';
 import { mountParticipantView } from './participant-view.js';
 import { redactDiagnosticPath } from './diagnostic-path.js';
+import { holdRetry, isRateLimited, isRateLimitedError, rateLimitText, retryAfterOf, retryAfterSeconds, underHold } from './rate-limit.js';
 import { createCollabHooks } from './collab-mount.js';
 import { mountEntityScreen } from './entity-screen.js';
 import { mountLensSurveys } from './lens-surveys.js';
@@ -143,7 +143,7 @@ async function api(url, { method = 'GET', body, participant = false } = {}) {
   catch { throw new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); }
   let data;
   try { data = await response.json(); } catch { throw new Error(`Unreadable API response (${response.status}).`); }
-  if (!response.ok || !data.ok) throw Object.assign(new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status, ...(response.status === 429 || data.error?.code === 'RATE_LIMITED' ? { retryAfter: retryAfterFromResponse(response, data) } : {}) }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
+  if (!response.ok || !data.ok) throw Object.assign(new Error(isRateLimited(response.status, data.error?.code) ? rateLimitText(data.error?.message, data.error?.hint, retryAfterOf(data.error, response)) : `${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`), { code: data.error?.code || String(response.status), status: response.status, ...(isRateLimited(response.status, data.error?.code) ? { retryAfter: retryAfterOf(data.error, response) } : {}) }); // .code lets mounted modules classify refusals (Auditor R-A); message unchanged
   const li = document.createElement('li'); li.textContent = `${method} ${redactDiagnosticPath(url)} · ${data.capability || 'v2'} · ${data.receipt?.id || data.receipt?.receipt_id || 'read'} · ${data.trace_id || 'no trace'}`; $('events').prepend(li);
   return data.result;
 }
@@ -153,11 +153,12 @@ async function run(label, task, control) {
   try { await task(); note(`${label} — complete.`); }
   catch (error) {
     if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; }
-    else if (isRateLimited(error)) { wait = retryAfterOf(error); fail(rateLimitMessage(wait)); } // DoD 6: say it is a rate limit; retry after the wait
+    else if (isRateLimitedError(error)) { wait = retryAfterSeconds(error.retryAfter); fail(error.message); } // DoD 6: api() already worded it (rateLimitText); retry after the wait
     else fail(error.message);
   }
   finally {
-    buttons.forEach(b => b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : b.id === 'build-report' ? !state.reportConfirm : false);
+    // A control still under an earlier holdRetry keeps its countdown (review 6207520971 item 1).
+    buttons.forEach(b => { if (!underHold(b)) b.disabled = b.id === 'release-codes' ? !state.confirmToken : b.id === 'issue-link-confirm' ? !state.linkConfirm : b.id === 'build-report' ? !state.reportConfirm : false; });
     if (wait && control) holdRetry(control, wait);
   }
 }

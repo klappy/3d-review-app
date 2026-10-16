@@ -17,8 +17,11 @@ export class CapError extends Error {
   readonly code: CapErrorCode;
   readonly hint?: string;
   readonly docs?: string;
-  constructor(code: CapErrorCode, message: string, hint?: string, docs?: string) {
+  /** RATE_LIMITED only: seconds until a retry can work, when it is not the one-minute limiter window. */
+  readonly retryAfter?: number;
+  constructor(code: CapErrorCode, message: string, hint?: string, docs?: string, retryAfter?: number) {
     super(message);
+    this.retryAfter = retryAfter;
     this.name = "CapError";
     this.code = code;
     this.hint = hint;

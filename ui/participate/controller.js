@@ -1,7 +1,7 @@
 import { copy, createSharedLinkClient, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, stripFragment, submitFailureKind } from '../shared-link.js';
 import { closedLine } from '../v3/components/active-until.js';
 import { SURVEYOR_EN } from './i18n.js';
-import { retryAfterOf } from '../rate-limit.js';
+import { retryAfterSeconds } from '../rate-limit.js';
 
 // Only the existing participant client owns transport. No staff identity is read.
 export function createParticipantJourney({ window: win, storage, fetchImpl, onChange = () => {} }) {
@@ -11,10 +11,12 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
   let linkToken = null;
   let state = { phase: 'opening', notice: copy.labelOpening };
   const show = (phase, extra = {}) => { state = { phase, form, answers, busy, ...extra }; onChange(state); return state; };
-  // DoD 6: a rate-limit refusal says so and carries its wait, so the page can enable "Try again" after one minute.
+  // DoD 6: a rate-limit refusal says so and carries its wait, so the page can enable "Try again" after that wait.
+  // A one-minute limiter reads copy.rateLimited; any other cap keeps the server's own message and wait (e.limitText).
   let limits = 0; // each refusal gets its own id so a repaint of the same state does not restart the wait
-  const limit = (kind, e) => kind === 'rateLimited' ? { rateLimited: true, retryAfter: retryAfterOf(e), limitId: ++limits } : {};
-  const unavailable = (kind, e) => show('unavailable', { notice: ({ closed: copy.collectionClosed, cannotResume: copy.cannotResume, rateLimited: copy.rateLimited, transient: copy.transient })[kind] || copy.linkUnavailable, ...limit(kind, e) });
+  const limit = (kind, e) => kind === 'rateLimited' ? { rateLimited: true, retryAfter: retryAfterSeconds(e?.retryAfter), limitId: ++limits } : {};
+  const limitedNotice = e => (e?.limitText && retryAfterSeconds(e?.retryAfter) > 60 ? e.limitText : copy.rateLimited);
+  const unavailable = (kind, e) => show('unavailable', { notice: kind === 'rateLimited' ? limitedNotice(e) : ({ closed: copy.collectionClosed, cannotResume: copy.cannotResume, transient: copy.transient })[kind] || copy.linkUnavailable, ...limit(kind, e) });
   function receipt(result) {
     store.remove('draft'); store.remove('submitKey'); uncertain = false;
     // thanks: the notice's inputs, so the page can say it in the participant's language (receiptNotice with its translator).
@@ -133,7 +135,7 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
           const kind = errorKind(e);
           if (kind === 'unavailable') return unavailable(uncertain ? 'cannotResume' : 'unavailable');
           if (kind === 'conflict') return conflict();
-          return show(state.phase, { draft: state.draft, notice: uncertain ? copy.submitUncertain : kind === 'rateLimited' ? copy.rateLimited : copy.transient, ...(uncertain ? {} : limit(kind, e)) });
+          return show(state.phase, { draft: state.draft, notice: uncertain ? copy.submitUncertain : kind === 'rateLimited' ? limitedNotice(e) : copy.transient, ...(uncertain ? {} : limit(kind, e)) });
         }
       });
     },

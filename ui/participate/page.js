@@ -4,7 +4,7 @@ import { mountParticipantView, itemError, drawAbout, aboutValues, setAboutValues
 import { UI_EN, SURVEYOR_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames, translatingSub } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
 import { receiptNotice } from '../shared-link.js';
-import { holdRetry } from '../rate-limit.js';
+import { holdRetry, underHold } from '../rate-limit.js';
 
 const $ = id => document.getElementById(id);
 let pager, renderedPhase, renderedForm;
@@ -61,8 +61,12 @@ function values(validate = false) {
 }
 const syncOther = () => { if (journey.state.form) syncOtherBoxes($('answers'), journey.state.form.items); };
 // DoD 6: a rate-limit refusal on the link shows one "Try again" control under the notice, enabled after the wait.
-let retryButton = null, retryHold = null, retryFor = null;
+// A refusal while the form shows (the "Check" / recover path) holds that control for the same wait instead.
+let retryButton = null, retryHold = null, retryFor = null, recoverFor = null;
 function paintRateLimit(state) {
+  if (state.rateLimited === true && state.phase !== 'unavailable' && recoverFor !== state.limitId) {
+    recoverFor = state.limitId; holdRetry($('recover'), state.retryAfter);
+  }
   const limited = state.rateLimited === true && state.phase === 'unavailable';
   if (!limited) { retryHold?.(); retryHold = null; retryFor = null; if (retryButton) retryButton.hidden = true; return; }
   if (retryFor === state.limitId) return; // same refusal repainted: keep the running countdown
@@ -118,6 +122,8 @@ function paint(state) {
   $('recover').hidden = !['form', 'review'].includes(state.phase);
   for (const button of document.querySelectorAll('button')) {
     if (button.id === 'version' || button.id === 'changelog-close') continue;
+    // A control under holdRetry keeps its countdown: restoring the pre-request "enabled" would undo the wait (Bugbot 4290666357).
+    if (underHold(button)) { disabledBeforeRequest.delete(button); continue; }
     if (state.busy) { if (!disabledBeforeRequest.has(button)) disabledBeforeRequest.set(button, button.disabled); button.disabled = true; }
     else if (disabledBeforeRequest.has(button)) { button.disabled = disabledBeforeRequest.get(button); disabledBeforeRequest.delete(button); }
   }

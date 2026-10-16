@@ -1,5 +1,4 @@
 import { sandboxToolsEnabled } from './sandbox-tools.js';
-import { holdRetry, isRateLimited, rateLimitMessage, retryAfterFromResponse, retryAfterOf } from '../rate-limit.js';
 // Scope pages — entry · workspaces · workspace · projects · project (UI overhaul contract, 2026-09-17).
 // Each page = { load(ctx, params) → model, render(ctx, model) → html, bind(ctx, root, model) }.
 // ctx = { api, esc, enc, go, note(msg, alert), state, routes, cards, setToken? }.
@@ -12,6 +11,7 @@ import { learnMore } from '../v3/components/learn-more.js';
 import { mountEditableHeading } from '../v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '../v3/components/saved-status.js';
 import { digestNamespace, rememberCurrent, scopedStorage } from '../shared-link.js';
+import { holdRetry, isOneMinuteLimit, isRateLimitedError, RATE_LIMIT_COPY, retryAfterOf, retryAfterSeconds, underHold } from '../rate-limit.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -124,12 +124,13 @@ async function write(ctx, control, label, fn, { refused = 'Not allowed here.', f
   try { const r = await fn(); return r; }
   catch (e) {
     // DoD 6: a rate limit says so, and the control it came from re-enables after the wait (Retry-After, else one minute).
-    if (isRateLimited(e)) { wait = retryAfterOf(e); ctx.note(rateLimitMessage(wait), true); return undefined; }
+    // The refusal's text is already worded by refusalError (one-minute copy, or a non-minute cap's own message and wait).
+    if (isRateLimitedError(e)) { wait = retryAfterSeconds(e.retryAfter); ctx.note(e.message || RATE_LIMIT_COPY, true); return undefined; }
     const kind = classify(e);
     ctx.note(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? refused : (failed || `${label} failed: ${safeMessage(e)}`), true);
     return undefined;
   }
-  finally { for (const c of controls) c.disabled = false; if (wait && control) holdRetry(control, wait); }
+  finally { for (const c of controls) if (!underHold(c)) c.disabled = false; if (wait && control) holdRetry(control, wait); }
 }
 const val = (form, name) => String(form.elements[name]?.value ?? '').trim();
 const storeSession = (key, v) => { try { sessionStorage.setItem(key, v); } catch {} };
@@ -249,8 +250,11 @@ const entry = {
         const res = await fetch('/v2/auth/email', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ email: val(form, 'email') }), credentials: 'same-origin', redirect: 'manual', cache: 'no-store' });
         if (res.type === 'opaqueredirect') { window.location.assign('/v2/auth/access'); return; } // environment without email links
         if (res.ok) { const b = await res.json().catch(() => null); const min = Number(b?.result?.expires_in_minutes) || 30; form.hidden = true; status.textContent = SIGNIN_LINK_SENT(min); return; }
-        if (res.status === 429) { const b = await res.json().catch(() => null), wait = retryAfterFromResponse(res, b); status.textContent = wait > 60 ? `${rateLimitMessage(wait)} Or use the newest sign-in email.` : rateLimitMessage(wait); holdRetry(submit, wait); return; }
-        status.textContent = res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
+        if (res.status === 429) { // one-minute RL_AUTH refusal vs the 900 s per-address mail cap: tell each the wait it really has
+          const b = await res.json().catch(() => null), retry = retryAfterOf(b?.error, res);
+          status.textContent = isOneMinuteLimit(b?.error?.message, retry) ? RATE_LIMIT_COPY : `Too many sign-in links were requested for this address. Use the newest email, or wait ${Math.max(1, Math.ceil((Number(retry) || 900) / 60))} minutes.`;
+          holdRetry(submit, isOneMinuteLimit(b?.error?.message, retry) ? retry : retry ?? 900); return; // DoD 6: the button counts down the same wait
+        } else status.textContent = res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
       } catch { status.textContent = 'The sign-in link could not be sent. Check your connection and try again.'; }
       submit.disabled = false;
     });

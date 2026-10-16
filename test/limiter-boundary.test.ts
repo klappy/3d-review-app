@@ -8,7 +8,7 @@ import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import app from "../src/index";
 import { mintSession, FIRST_PARTY_TOKEN } from "../src/auth";
 import { normalizeEmail, randomToken, sha256 } from "../src/handlers/common";
-import { LIMITER_NAMES } from "../src/ratelimit";
+import { LIMITER_NAMES, OPTIONAL_LIMITER_NAMES } from "../src/ratelimit";
 
 const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "lb", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "lb-test-db" } }] }));
 afterAll(() => mf.dispose());
@@ -169,8 +169,8 @@ describe("B2 — RL_HTTP_ANON meters every anonymous HTTP twin per address (audi
     }
     const ids = [...dev, ...prod].map((b) => b.namespace_id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(dev.map((b) => b.name).sort()).toEqual([...LIMITER_NAMES].sort()); // no binding the code does not know
-    expect(dev.find((b) => b.name === "RL_HTTP_ANON")!.limit).toBe(60);
+    for (const b of dev) expect([...LIMITER_NAMES, ...OPTIONAL_LIMITER_NAMES], `${b.name} is a binding the code knows`).toContain(b.name); // no binding the code does not know
+    // Numbers: test/workshop-same-ip.test.ts checks every bound limit against RATE_LIMITS (the one config place).
   });
 });
 

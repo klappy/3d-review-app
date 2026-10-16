@@ -26,7 +26,7 @@
  * receives a context the server builds from the verified scope, never the caller's text.
  */
 import type { Env } from "./handlers/types";
-import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { allow, clientIp, RATE_LIMIT_MESSAGE, RATE_LIMIT_WINDOW_SECONDS, rateLimitHint } from "./ratelimit";
 import { resolvePrincipal } from "./auth";
 import { inScript, lwcLanguage, type LwcLanguage } from "./languages";
 import { allowedScope, parseScope, upstreamContext } from "./translate-allowlist";
@@ -180,7 +180,7 @@ export async function translateLimiter(request: Request, env: Env): Promise<{ na
 export async function handleTranslate(request: Request, env: Env, deps: Deps = {}): Promise<Response> {
   const limiter = await translateLimiter(request, env);
   if (!(await allow(env, limiter.name, limiter.key)))
-    return reply({ error: "rate_limited", hint: `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again` }, 429, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
+    return reply({ error: "rate_limited", message: RATE_LIMIT_MESSAGE, hint: rateLimitHint("too many translation requests"), retry_after: RATE_LIMIT_WINDOW_SECONDS }, 429, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
   const raw = await readCappedBody(request).catch(() => ""); // a broken stream is a bad body (400 below), not an oversized one
   if (raw === null) return reply({ error: "invalid_params", message: "request is too large" }, 413);
   let body: unknown;

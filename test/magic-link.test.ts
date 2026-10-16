@@ -13,7 +13,7 @@ import { resolvePrincipal } from "../src/auth";
 import { sha256 } from "../src/handlers/common";
 import { execute } from "../src/dispatch";
 import {
-  MAGIC_LINK_PER_EMAIL, MAGIC_TOKEN, RATE_LIMIT_MESSAGE, openPage, checkEmailPage, magicLinkMessage, newMagicToken, requestMagicLink, signInPage, timingSafeEqual, verifyMagicToken,
+  MAGIC_LINK_PER_EMAIL, MAGIC_TOKEN, RATE_LIMIT_COPY, openPage, checkEmailPage, magicLinkMessage, newMagicToken, requestMagicLink, signInPage, timingSafeEqual, verifyMagicToken,
 } from "../src/magic-link";
 
 const MIGRATIONS = ["0001_init.sql", "0002_code_escrow.sql", "0003_language_archive.sql", "0004_pinned_instruments.sql", "0006_oauth_code_redemption.sql"];
@@ -147,9 +147,10 @@ describe("rate limits", () => {
     const spy = vi.spyOn(env.DB, "prepare");
     const res = await post("/v2/auth/email/open", { t: newMagicToken() });
     expect(res.status).toBe(429); expect(spy).not.toHaveBeenCalled();
-    // DoD 6: a browser form post gets the sign-in page saying plainly it is a rate limit, with retry-after 60.
+    // DoD 6: a browser form post gets the sign-in page saying plainly it is a rate limit, with retry-after 60,
+    // and tells the person to reopen the same link (it still works) rather than request a new one.
     expect(res.headers.get("retry-after")).toBe("60");
-    expect(await res.text()).toContain("this is a rate limit. Try again in one minute.");
+    expect(await res.text()).toContain("Rate limit: too many requests right now. Nothing was lost. Open the link in your email again in one minute.");
     spy.mockRestore();
   });
   it("DoD 6: a JSON sign-in request refused per IP carries RATE_LIMITED, retry_after 60 and retry-after: 60", async () => {
@@ -160,9 +161,12 @@ describe("rate limits", () => {
     expect(body.error.code).toBe("RATE_LIMITED"); expect(body.error.message).toContain("rate limit"); expect(body.error.data?.retry_after).toBe(60);
   });
   it("DoD 6: the link landing page says it is a rate limit and holds Try again for Retry-After", async () => {
-    expect(RATE_LIMIT_MESSAGE).toBe("Too many requests right now — this is a rate limit. Try again in one minute.");
+    const { RATE_LIMIT_COPY: UI_COPY } = await import("../ui/rate-limit.js");
+    expect(RATE_LIMIT_COPY).toBe(UI_COPY); // one wording: the server-rendered pages repeat ui/rate-limit.js
     const html = await openPage("n0nce").text();
-    expect(html).toContain(RATE_LIMIT_MESSAGE); expect(html).toContain('x.headers.get("retry-after")'); expect(html).toContain("r.disabled=true");
+    expect(html).toContain(RATE_LIMIT_COPY); expect(html).toContain('x.headers.get("retry-after")'); expect(html).toContain("r.disabled=true");
+    // Retry-After is clamped to 1..3600 like ui/rate-limit.js retryAfterSeconds: a negative or empty header waits one minute.
+    expect(html).toContain("w=w>0?Math.min(w,3600):60");
   });
 });
 
