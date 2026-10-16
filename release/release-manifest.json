@@ -1,23 +1,23 @@
 {
-  "version": "0.34.1",
+  "version": "0.34.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "d646baae405ea5f012a85950361a3c69e84aba73",
+  "cookbook_commit": "d0c6ede6c802615a0ed2ec77c780969f1effac94",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.1.md",
-      "blob_sha": "ad33257d30999d2e0df5926891c018f11be1e319",
-      "sha256": "b561d11f664ca2f73eada8a7ffe03128349dd8369d27de6266b988aa1fefd5fe"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.2.md",
+      "blob_sha": "8eaff7cf364984ab59fad060c61cdba1c11a8708",
+      "sha256": "a2aa90267ce9ab9170d32d3354ee38106d41a30e9ddb1282b03421be6f37f8b2"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "a668d5b8b59d8f26cd1e3342dcffa407ee0da8cf",
-      "sha256": "d6c690668b565c179b0ca9dcf292b7dfa3fc16f267d3171dd7293be9dc438469"
+      "blob_sha": "7ce4dcdb03179c83298a956f9e9243d142c98758",
+      "sha256": "f32e37cbed3f5aba4c27b8a57508f52f2dfbd0fa988c175a38c107cbae888fd7"
     }
   ],
   "changelog": {
     "sections": {
-      "changed": [
-        "Report build: each stage of a dry run and a build (D1 reads and write, attestation, render, canonical JSON, validation, hashing) records one `report.stage` span with only the stage name and milliseconds in the request trace, so the owner can see where build time goes. Report bytes, capture digest, report key and payload hash are unchanged. On Workers, CPU-only stages read near 0 ms (the clock advances only across I/O); the local bench gives the CPU split."
+      "fixed": [
+        "Primary navigation: the shell nav (account menu) lists Workspaces ahead of App feedback and Roadmap, so the Workspaces view opens from any page, including with zero projects; before, it was reachable only through the \"Organize projects in a workspace\" link on the Projects page."
       ]
     }
   }
