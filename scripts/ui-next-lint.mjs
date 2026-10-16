@@ -12,7 +12,7 @@ import { join, relative, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const LINTED = /\.(html|css|js|mjs|svg)$/;
-export const SKIPPED = new Set(["tokens.css"]);
+export const SKIPPED = new Set(["tokens.css"]); // paths relative to the linted dir
 
 const findAll = (re, s) => [...s.matchAll(re)];
 
@@ -20,7 +20,7 @@ export function lintText(name, text) {
   const v = [];
   const body = text.includes("</helmet>") ? text.split("</helmet>")[1] : text;
   let bodyNoPaper = body.replace(/<div class="paper".*?<\/div>\s*(?=<div class="paper"|<\/main>)/gs, "");
-  if (name.endsWith(".css")) bodyNoPaper = bodyNoPaper.replace(/(?<=^|[};])\s*\.paper(?:[\s>+~][^{},]*)?(?:,\s*\.paper(?:[\s>+~][^{},]*)?)*\{[^{}]*\}/g, "");
+  if (name.endsWith(".css")) bodyNoPaper = bodyNoPaper.replace(/(?<=^|[};])\s*\.paper(?:[\s>][^{},+~]*)?(?:,\s*\.paper(?:[\s>][^{},+~]*)?)*\{[^{}]*\}/g, "");
   for (const m of findAll(/font-size: ?(\d+)px/g, body)) v.push(`font-size ${m[1]}px (use --t-*)`);
   for (const m of findAll(/border-radius: ?(\d+)px/g, body)) if (m[1] !== "50") v.push(`border-radius ${m[1]}px (use --radius-*)`);
   for (const m of findAll(/#[0-9a-fA-F]{3,6}\b/g, bodyNoPaper)) v.push(`raw colour ${m[0]} (use a token)`);
@@ -33,12 +33,12 @@ export function lintText(name, text) {
   return v;
 }
 
-function walk(dir) {
+function walk(dir, root = dir) {
   const out = [];
   for (const e of readdirSync(dir).sort()) {
     const p = join(dir, e);
-    if (statSync(p).isDirectory()) out.push(...walk(p));
-    else if (LINTED.test(e) && !SKIPPED.has(e)) out.push(p);
+    if (statSync(p).isDirectory()) out.push(...walk(p, root));
+    else if (LINTED.test(e) && !SKIPPED.has(relative(root, p))) out.push(p);
   }
   return out;
 }

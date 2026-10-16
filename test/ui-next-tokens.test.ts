@@ -56,6 +56,8 @@ describe("ui-next conformance lint", () => {
     ["raw hex outside .paper", "d.css", ".x{color:#13263a}"],
     ["raw hex in a .paper-prefixed class", "d.css", ".paper-card{color:#f00}"],
     ["raw hex in a selector list led by .paper", "d.css", ".paper, .x{color:#f00}"],
+    ["raw hex in a sibling of .paper (+)", "d.css", ".paper + .card{color:#f00}"],
+    ["raw hex in a sibling of .paper (~)", "d.css", ".paper~.x{color:#f00}"],
     ["raw hex in html", "e.html", '<main><p style="color:#fff">x</p></main>'],
     ["pt by class letter", "f.html", '<span class="pt t"></span>'],
     ["legacy .status", "g.html", '<span class="status">x</span>'],
@@ -80,11 +82,12 @@ describe("ui-next conformance lint", () => {
     mkdirSync(join(dir, "nested"), { recursive: true });
     writeFileSync(join(dir, "tokens.css"), ".app{--ground:#edf2f5}");
     writeFileSync(join(dir, "nested", "bad.css"), ".x{color:#ff0000;font-size:12px;border-radius:7px}");
+    writeFileSync(join(dir, "nested", "tokens.css"), ".x{color:#00ff00}");
     const result = lintDir(dir);
-    expect([...result.keys()]).toEqual([join("nested", "bad.css")]);
+    expect([...result.keys()]).toEqual([join("nested", "bad.css"), join("nested", "tokens.css")]);
     expect(result.get(join("nested", "bad.css"))).toHaveLength(3);
     const r = run("ui-next-lint.mjs", [dir]);
     expect(r.status).toBe(1);
-    expect(r.stdout).toContain("3 violations in 1 files");
+    expect(r.stdout).toContain("4 violations in 2 files");
   });
 });
