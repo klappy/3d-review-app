@@ -1,0 +1,58 @@
+/* UI Next (v4) Button. Status: provisional. Paints only from ui-next/tokens.css.
+   Contract: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas/design-system.md section 2, Button row.
+   Values: design/2026-10-15-glass-redesign/generator/helmet.html .btn rules (lines 36-47, 102).
+   Ported states: default, hover; focus-visible ring from the helmet's .app button/a rule.
+   Not ported: disabled (V-41), :active press (not in this slice).
+   Differences from the helmet, reported as contract gaps rather than invented here:
+   - the primary's inset highlight rgba(255,255,255,.2) has no token; omitted.
+   - .btn-lg radius 14px is off the radius scale; the contract's buttons = --radius-m is used.
+   - the primary hover rule is nested so the selector is written once (the ui-next lint counts
+     every primary class string in a file as a page's primary). */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--target);
+  padding: 0 18px;
+  border-radius: var(--radius-m);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: var(--t-15);
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid var(--line-2);
+  background: var(--glass-hi);
+  color: var(--ink);
+  white-space: nowrap;
+  transition: transform .12s cubic-bezier(.2,.8,.2,1), box-shadow .2s ease, background-color .2s ease, color .2s ease;
+}
+.btn:hover { background: var(--field); color: var(--ink); }
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: transparent;
+  box-shadow: 0 10px 24px -12px var(--primary);
+  &:hover {
+    background: var(--primary-hi);
+    color: var(--on-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px -12px var(--primary);
+  }
+}
+
+.btn-quiet { background: transparent; border-color: transparent; color: var(--ink-2); }
+.btn-quiet:hover { background: var(--line); color: var(--ink); }
+
+.btn-icon { width: var(--target); padding: 0; }
+.btn-lg { min-height: 52px; padding: 0 24px; font-size: var(--t-16); border-radius: var(--radius-m); }
+.btn-block { width: 100%; }
+
+.app .btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+}
