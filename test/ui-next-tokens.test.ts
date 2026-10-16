@@ -77,6 +77,23 @@ describe("ui-next conformance lint", () => {
     expect(lintText("ok.html", '<style>.x{}</style></helmet><main><p class="small">x</p></main>')).toEqual([]);
   });
 
+  // R27 (3d-review-cookbook work/queued/2026-10-16-glass-redesign-parity-loop/r27-ui-next-lint-cases.mjs):
+  // btn-primary counts only in page class attributes; .paper is stripped by balanced <div> blocks.
+  const r27: Array<[string, string, string, string, number]> = [
+    ["component CSS defines the class, no page primary", "button.css", ".btn-primary{background:var(--accent)}.btn-primary:hover{filter:none}", "primary", 0],
+    ["component JS names the class twice", "button.js", 'const A="btn-primary"; el.classList.add("btn-primary");', "primary", 0],
+    ["page with two primaries (mixed quotes)", "page.html", "<a class=\"btn btn-primary\">a</a><a class='btn-primary'>b</a>", "primary", 1],
+    ["btn-primary-ghost is not a primary", "page.html", '<a class="btn btn-primary">a</a><a class="btn-primary-ghost">b</a>', "primary", 0],
+    ["a non-paper div after a paper block keeps its raw hex", "page.html", '<main><div class="paper">a</div><div><p style="color:#abcdef">x</p></div></main>', "raw colour", 1],
+    ["a nested div inside paper stays paper", "page.html", '<main><div class="paper"><div>x</div><p style="color:#111">y</p></div></main>', "raw colour", 0],
+    ["an unclosed paper block fails closed", "page.html", '<main><div class="paper"><p style="color:#abcdef">x</p></main>', "unclosed .paper", 1],
+    ["a paper opener inside a comment opens nothing", "page.html", '<!-- <div class="paper" --><p style="color:#abcdef">x</p></main>', "raw colour", 1],
+  ];
+
+  it.each(r27)("R27: %s", (_what, file, text, key, want) => {
+    expect(lintText(file, text).filter((x: string) => x.includes(key))).toHaveLength(want);
+  });
+
   it("fails the CLI on a seeded directory and skips tokens.css", () => {
     const dir = join(tmp, "seeded");
     mkdirSync(join(dir, "nested"), { recursive: true });

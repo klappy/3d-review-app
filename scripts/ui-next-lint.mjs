@@ -16,17 +16,41 @@ export const SKIPPED = new Set(["tokens.css"]); // paths relative to the linted 
 
 const findAll = (re, s) => [...s.matchAll(re)];
 
+// lint.py paper_blocks(): balance <div>/</div> from each <div class="paper">; an unclosed one fails closed.
+export function paperBlocks(body) {
+  const out = [];
+  let i = 0, unclosed = 0;
+  for (const m of body.matchAll(/<div class="paper"/g)) {
+    if (m.index < i) continue;
+    let depth = 0, j = -1;
+    for (const t of body.slice(m.index).matchAll(/<div\b|<\/div>/g)) {
+      depth += t[0] === "</div>" ? -1 : 1;
+      if (depth === 0) { j = m.index + t.index + t[0].length; break; }
+    }
+    if (j < 0) { unclosed++; continue; }
+    out.push(body.slice(i, m.index)); i = j;
+  }
+  out.push(body.slice(i));
+  return { outside: out.join(""), unclosed };
+}
+
+// lint.py primaries(): exact token btn-primary inside class attributes of markup pages only.
+const CLASS_ATTR = /(?<![\w-])class\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi;
+export const primaries = (body) => findAll(CLASS_ATTR, body).reduce((n, m) => n + (m[1] ?? m[2] ?? m[3]).split(/\s+/).filter((c) => c === "btn-primary").length, 0);
+
 export function lintText(name, text) {
   const v = [];
   const body = text.includes("</helmet>") ? text.split("</helmet>")[1] : text;
-  let bodyNoPaper = body.replace(/<div class="paper".*?<\/div>\s*(?=<div class="paper"|<\/main>)/gs, "");
+  const { outside, unclosed } = paperBlocks(body.replace(/<!--[\s\S]*?-->/g, ""));
+  for (let k = 0; k < unclosed; k++) v.push("unclosed .paper block (balance its <div>s)");
+  let bodyNoPaper = outside;
   if (name.endsWith(".css")) bodyNoPaper = bodyNoPaper.replace(/(?<=^|[};])\s*\.paper(?:[\s>][^{},+~]*)?(?:,\s*\.paper(?:[\s>][^{},+~]*)?)*\{[^{}]*\}/g, "");
   for (const m of findAll(/font-size: ?(\d+)px/g, body)) v.push(`font-size ${m[1]}px (use --t-*)`);
   for (const m of findAll(/border-radius: ?(\d+)px/g, body)) if (m[1] !== "50") v.push(`border-radius ${m[1]}px (use --radius-*)`);
   for (const m of findAll(/#[0-9a-fA-F]{3,6}\b/g, bodyNoPaper)) v.push(`raw colour ${m[0]} (use a token)`);
   for (const _ of findAll(/class="pt [tch]"/g, body)) v.push("pt colour by class letter (use data-lens)");
   for (const _ of findAll(/<span class="status"/g, body)) v.push("legacy .status (use .pill[data-stage] or .tag)");
-  const n = findAll(/btn-primary/g, body).length;
+  const n = /\.(html|svg)$/.test(name) ? primaries(body) : 0; // component CSS/JS define the class; pages use it
   if (n > 1) v.push(`${n} primary buttons (rule 1: exactly one)`);
   if (/<label[^>]*>(?:(?!<\/label>).)*<label/s.test(body)) v.push("nested <label>");
   if (body.includes("[CONTACT")) v.push("placeholder text on screen");
