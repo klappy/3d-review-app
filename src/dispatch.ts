@@ -5,7 +5,7 @@ import { CapError as HandlerCapError } from "./handlers/errors";
 import { handlers } from "./handlers";
 import { authorize, targetScope } from "./policy";
 import { byId, sourceSha, toolForClass, type Tool } from "./registry";
-import { enforceCapabilityLimit, hasCapabilityLimiter, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { enforceCapabilityLimit, enforcePrincipalWriteLimit, hasCapabilityLimiter, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { checkConfirmToken, mintConfirmToken, mintReceipt, paramsHash, persistTrace, type Span } from "./receipt";
 
 export interface ExecuteOptions {
@@ -57,6 +57,7 @@ export async function execute(
       throw new CapError("WRONG_TOOL_FOR_CLASS", `${capabilityId} requires the ${expectedTool} tool`, `Use ${expectedTool}.`, capabilityId);
     if (cap.slice === "v2.1-oct" || !handlers[capabilityId]) return (outcome = reserved(capabilityId, ctx.traceId));
     await enforceCapabilityLimit(ctx, capabilityId, params); // both faces; before authorize and before the handler touches storage
+    await enforcePrincipalWriteLimit(ctx, capabilityId, expectedTool); // per session/principal, never per address (workshop DoD 3)
     await authorize(ctx, cap, params);
 
     const danger = expectedTool === "danger";
@@ -102,7 +103,7 @@ export async function execute(
     // RATE_LIMITED carries retry_after in the envelope so an MCP client (HTTP 200 + envelope, no header) can back off
     // without parsing a second shape (review #12-6). The HTTP twin also sends the retry-after header.
     return (outcome = fail(e.code, e.message, e.hint, e instanceof CapError ? e.docs : undefined, ctx.traceId,
-      e.code === "RATE_LIMITED" ? { retry_after: RATE_LIMIT_WINDOW_SECONDS } : undefined));
+      e.code === "RATE_LIMITED" ? { retry_after: e.retryAfter ?? RATE_LIMIT_WINDOW_SECONDS } : undefined));
   } finally {
     ctx.log = log;
     // A refused flood must not become a storage flood: rate-limited calls are not written to the trace table.

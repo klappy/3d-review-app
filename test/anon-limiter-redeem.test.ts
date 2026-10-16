@@ -56,7 +56,8 @@ describe("anonymous twins with their own capability limiter skip RL_HTTP_ANON", 
     expect(r.status).toBe(429); expect(r.headers.get("retry-after")).toBe("60");
     const j: any = await r.json();
     expect(j.error.code).toBe("RATE_LIMITED");
-    expect(j.error.message).toBe("too many attempts — slow down"); // RL_REDEEM's refusal, not "too many anonymous requests"
+    expect(j.error.message).toBe("rate limit — try again in a minute");
+    expect(j.error.hint).toMatch(/too many attempts from this network/); // RL_REDEEM's refusal, not the anonymous dampener's
     expect(env.RL_REDEEM.seen.get(`ip:${ROOM_IP}`)).toBe(4);
     expect(env.RL_HTTP_ANON.seen.get(`ip:${ROOM_IP}`) ?? 0).toBe(0);
   }, 30_000);
@@ -78,7 +79,8 @@ describe("anonymous twins with their own capability limiter skip RL_HTTP_ANON", 
     expect(r.status).toBe(429); expect(r.headers.get("retry-after")).toBe("60");
     const j: any = await r.json();
     expect(j.error.code).toBe("RATE_LIMITED");
-    expect(j.error.message).toMatch(/^too many anonymous requests/);
+    expect(j.error.message).toBe("rate limit — try again in a minute");
+    expect(j.error.hint).toMatch(/before sign-in/);
     // a protected twin called anonymously spends the same bucket (refused before the 401)
     expect((await call(env, "POST", base, { params: {}, mode: "dry_run" })).status).toBe(429);
     expect(env.RL_HTTP_ANON.seen.get(`ip:${ROOM_IP}`)).toBe(5);

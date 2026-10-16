@@ -44,7 +44,7 @@ export const feedback = {
           const link = root.ownerDocument.createElement('a'); link.href = '/v2/auth/access'; link.textContent = ' Sign in again'; status.append(link);
         } else if (['403','404','NOT_AUTHORIZED','NOT_AUTHORIZED_AT_SCOPE','NOT_FOUND_OR_NOT_VISIBLE'].includes(code)) status.textContent = 'Feedback was refused for this account. Your text is still here.';
         else if (['400','INVALID_PARAMS'].includes(code)) status.textContent = 'Feedback was not accepted. Check your answers and text length; your draft is still here.';
-        else if (code === '429' || code === 'RATE_LIMITED') status.textContent = 'Too many requests. Wait before trying again; your draft is still here.';
+        else if (code === '429' || code === 'RATE_LIMITED') status.textContent = 'Rate limit: too many requests right now. Your draft is still here. Try again in one minute.';
         else { uncertain = true; status.textContent = 'We could not confirm whether your feedback was recorded. Your text is still here. Sending again may create a duplicate; nothing will retry automatically.'; }
         button.textContent = uncertain ? 'Send again (may duplicate)' : 'Send feedback';
       } finally {

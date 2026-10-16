@@ -25,7 +25,7 @@ import type { Ctx, Env, Principal, Role } from "./handlers/types";
 import { resolvePrincipal } from "./auth";
 import { atLeast, auditRow, newId, roleAt } from "./handlers/common";
 import { newTraceId } from "./receipt";
-import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { allow, clientIp, RATE_LIMIT_MESSAGE, RATE_LIMIT_WINDOW_SECONDS, rateLimitHint } from "./ratelimit";
 import { linkTitle } from "./link-title";
 import { bookOf, renderPassagePdf } from "./ptxprint";
 import { hmacSha256Base64Url as hmac, sha256HexBytes } from "./crypto";
@@ -220,7 +220,7 @@ export async function handleFile(request: Request, env: PEnv, pid: string): Prom
   // (50 phones seeking in the same MP3 with Range requests) must not share the 60/60 s anonymous address budget.
   const q = new URL(request.url).searchParams;
   if (!(await validSig(env, pid, q.get("exp"), q.get("sig")))) {
-    if (!(await allow(env, "RL_HTTP_ANON", `ip:${clientIp(request)}`))) return fail(429, "RATE_LIMITED", "too many requests", `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`);
+    if (!(await allow(env, "RL_HTTP_ANON", `ip:${clientIp(request)}`))) return env_(429, { ok: false, error: { code: "RATE_LIMITED", message: RATE_LIMIT_MESSAGE, hint: rateLimitHint("too many file requests from this network"), retry_after: RATE_LIMIT_WINDOW_SECONDS } }, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
     return fail(403, "NOT_AUTHORIZED_AT_SCOPE", "this passage link has expired; reopen the survey");
   }
   const row = await env.DB.prepare("SELECT * FROM assessment_passage WHERE id = ? AND archived_at IS NULL AND kind = 'file'").bind(pid).first<PassageRow>().catch(() => null);

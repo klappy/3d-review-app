@@ -11,6 +11,7 @@ import { learnMore } from '../v3/components/learn-more.js';
 import { mountEditableHeading } from '../v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '../v3/components/saved-status.js';
 import { digestNamespace, rememberCurrent, scopedStorage } from '../shared-link.js';
+import { isOneMinuteLimit, RATE_LIMIT_COPY, retryAfterOf } from '../rate-limit.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -245,7 +246,10 @@ const entry = {
         const res = await fetch('/v2/auth/email', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ email: val(form, 'email') }), credentials: 'same-origin', redirect: 'manual', cache: 'no-store' });
         if (res.type === 'opaqueredirect') { window.location.assign('/v2/auth/access'); return; } // environment without email links
         if (res.ok) { const b = await res.json().catch(() => null); const min = Number(b?.result?.expires_in_minutes) || 30; form.hidden = true; status.textContent = SIGNIN_LINK_SENT(min); return; }
-        status.textContent = res.status === 429 ? 'Too many sign-in links were requested. Use the newest email, or wait a few minutes.' : res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
+        if (res.status === 429) { // one-minute RL_AUTH refusal vs the 900 s per-address mail cap: tell each the wait it really has
+          const b = await res.json().catch(() => null), retry = retryAfterOf(b?.error, res);
+          status.textContent = isOneMinuteLimit(b?.error?.message, retry) ? RATE_LIMIT_COPY : `Too many sign-in links were requested for this address. Use the newest email, or wait ${Math.max(1, Math.ceil((Number(retry) || 900) / 60))} minutes.`;
+        } else status.textContent = res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
       } catch { status.textContent = 'The sign-in link could not be sent. Check your connection and try again.'; }
       submit.disabled = false;
     });

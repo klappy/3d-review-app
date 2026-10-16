@@ -113,7 +113,7 @@ export const invite: Handler = async (ctx, p, o) => {
   if ((ins.meta.changes ?? 0) !== 1) {
     const dup = await ctx.db.prepare(`SELECT id, role, status FROM invitation WHERE ${dupWhere("?1", "?2", "?3", "?4", "?5", "?6")} ORDER BY created_at DESC LIMIT 1`)
       .bind(scope.type, scope.id, inviteeHash, sentSince, pendingSince, nowStr).first<{ id: string; role: string; status: string }>();
-    if (!dup) throw new CapError("RATE_LIMITED", `at most ${INVITES_PER_INVITER_HOUR} collaborator invitations per hour`, "this cap resets over the next hour, not the next minute", "cap.grant.invite");
+    if (!dup) throw new CapError("RATE_LIMITED", `at most ${INVITES_PER_INVITER_HOUR} collaborator invitations per hour`, "this cap resets over the next hour, not the next minute", "cap.grant.invite", 3600);
     if (dup.role !== role) throw new CapError("INVALID_PARAMS", `already invited as ${dup.role} a moment ago`, "revoke that invitation first, then invite with the new role", "cap.grant.revoke_invitation");
     // No token was minted into this row, no new idempotency key exists and no fetch was made. An 'unconfirmed' twin is reported
     // as what it is — uncertain, not "not sent" — so a surface cannot render it as "email not delivered".

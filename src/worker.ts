@@ -12,7 +12,7 @@
 import OAuthProvider, { OAuthError, type OAuthProviderOptions } from "@cloudflare/workers-oauth-provider";
 import app from "./index";
 import { resolvePrincipal } from "./auth";
-import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { allow, clientIp, RATE_LIMIT_MESSAGE, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { OAUTH_SCOPE, oauthPrincipals, principalFromProps, type OAuthEnv, type OAuthProps, type ExternalProps } from "./oauth";
 
 const apiHandler = {
@@ -96,7 +96,7 @@ const invalidToken = (request: Request) => {
   return new Response(JSON.stringify({ error: "invalid_token", error_description: "Invalid access token" }), { status: 401,
     headers: { "content-type": "application/json", "www-authenticate": `Bearer realm="OAuth", resource_metadata="${url.origin}/.well-known/oauth-protected-resource${url.pathname}", error="invalid_token", scope="${OAUTH_SCOPE}"` } });
 };
-const tooMany = () => new Response(JSON.stringify({ error: "rate_limited", error_description: "too many requests — wait up to 60 seconds" }),
+const tooMany = () => new Response(JSON.stringify({ error: "rate_limited", error_description: RATE_LIMIT_MESSAGE, retry_after: RATE_LIMIT_WINDOW_SECONDS }),
   { status: 429, headers: { "content-type": "application/json", "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) } });
 /** Mis-deploy without OAUTH_KV: a clean refusal instead of the provider's TypeError (review #15-8). */
 const notConfigured = () => new Response(JSON.stringify({ error: "temporarily_unavailable", error_description: "authorization storage is not configured" }),

@@ -14,7 +14,7 @@ import { verifyAccessJwt } from "./access";
 import synthResponsesSql from "../seed/synthetic-responses.sql";
 import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
-import { allow, clientIp, hasCapabilityLimiter, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { allow, clientIp, hasCapabilityLimiter, MCP_MAX_BATCH, RATE_LIMIT_MESSAGE, RATE_LIMIT_WINDOW_SECONDS, rateLimitHint } from "./ratelimit";
 import { cookieValue, handleAuthorize, handleConsent, oauthPrincipals, PARK_COOKIE, renderConsentIfParked, type OAuthEnv } from "./oauth";
 import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLinkEnabled, magicSessionCookie, mintMagicSession, newNonce, openPage, principalForEmailHash, requestMagicLink, sameOriginPost, signInPage, verifyMagicToken } from "./magic-link";
 
@@ -60,7 +60,7 @@ for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?
     const ownLimiter = hasCapabilityLimiter(cap.id);
     const anonRefused = async (): Promise<Response | null> => {
       if (await allow(c.env, "RL_HTTP_ANON", `ip:${ctx.clientIp}`)) return null;
-      const res = json(fail("RATE_LIMITED", `too many anonymous requests — sign in, or wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`, `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again`, cap.id, ctx.traceId, { retry_after: RATE_LIMIT_WINDOW_SECONDS }), 429);
+      const res = json(fail("RATE_LIMITED", RATE_LIMIT_MESSAGE, rateLimitHint("too many requests from this network before sign-in"), cap.id, ctx.traceId, { retry_after: RATE_LIMIT_WINDOW_SECONDS }), 429);
       res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
       return res;
     };
@@ -108,7 +108,7 @@ for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?
       });
       const res = json(result, result.ok ? 200 : statusFor(result.error.code));
       if (cap.id.startsWith("cap.ops.roadmap_")) res.headers.set("cache-control", "no-store");
-      if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
+      if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String((result.error as { data?: { retry_after?: number } }).data?.retry_after ?? RATE_LIMIT_WINDOW_SECONDS));
       if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Secure; Path=/; SameSite=Lax`);
       if (cap.id === "cap.auth.logout") res.headers.append("set-cookie", "session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
       return res;
@@ -143,7 +143,7 @@ app.post("/mcp", async (c) => {
   if (messages > MCP_MAX_BATCH) return rpcError(400, -32600, `batch too large: at most ${MCP_MAX_BATCH} messages per request`);
   if (ctx.principal.kind === "anonymous") for (let i = 0; i < units; i++)
     if (!(await allow(c.env, "RL_MCP_ANON", `ip:${ctx.clientIp}`)))
-      return rpcError(429, -32029, `rate limited — sign in, or wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`, { code: "RATE_LIMITED", retry_after: RATE_LIMIT_WINDOW_SECONDS, trace_id: ctx.traceId }, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
+      return rpcError(429, -32029, RATE_LIMIT_MESSAGE, { code: "RATE_LIMITED", hint: rateLimitHint("too many requests from this network before sign-in"), retry_after: RATE_LIMIT_WINDOW_SECONDS, trace_id: ctx.traceId }, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
   return handleMcp(c.req.raw, ctx, execute as any, async (cx, a) => {
     try { const r = await docs(cx, a); return ok("cap.docs.get", r.result, cx.traceId); }
     catch (e: any) { return fail(e.code ?? "INVALID_PARAMS", e.message, e.hint, "cap.docs.get", cx.traceId); }
@@ -225,7 +225,7 @@ app.post("/v2/auth/email", async (c) => {
   if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in request refused", undefined, "auth.email_link", newTraceId()), 403);
   // Per-IP dampener first: a refusal costs no storage access and sends nothing.
   if (!(await allow(env, "RL_AUTH", `ip:${clientIp(req)}`))) {
-    const r = json(fail("RATE_LIMITED", "too many sign-in requests — wait a minute and try again", undefined, "auth.email_link", newTraceId()), 429);
+    const r = json(fail("RATE_LIMITED", RATE_LIMIT_MESSAGE, rateLimitHint("too many sign-in requests from this network"), "auth.email_link", newTraceId(), { retry_after: RATE_LIMIT_WINDOW_SECONDS }), 429);
     r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
   }
   const body = await formOrJson(req);
@@ -252,7 +252,7 @@ app.post("/v2/auth/email/check", async (c) => {
   const headers = { "cache-control": "no-store" };
   if (!magicLinkEnabled(env)) return c.json({ valid: false }, 404, headers);
   if (!sameOriginPost(req)) return c.json({ valid: false }, 403, headers);
-  if (!(await allow(env, "RL_REDEEM", `ip:${clientIp(req)}`))) return c.json({ valid: false }, 429, { ...headers, "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
+  if (!(await allow(env, "RL_REDEEM", `ip:${clientIp(req)}`))) return c.json({ valid: false, error: { code: "RATE_LIMITED", message: RATE_LIMIT_MESSAGE, retry_after: RATE_LIMIT_WINDOW_SECONDS } }, 429, { ...headers, "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
   const body = await formOrJson(req);
   const link = body ? await verifyMagicToken(env, body.fields.t) : null;
   if (!link) return c.json({ valid: false }, 200, headers);
@@ -263,7 +263,7 @@ app.post("/v2/auth/email/open", async (c) => {
   if (!magicLinkEnabled(env)) return toAccess();
   if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in refused", undefined, "auth.email_link", newTraceId()), 403);
   if (!(await allow(env, "RL_REDEEM", `ip:${clientIp(req)}`))) {
-    const r = json(fail("RATE_LIMITED", "too many sign-in attempts — wait a minute and try again", undefined, "auth.email_link", newTraceId()), 429);
+    const r = json(fail("RATE_LIMITED", RATE_LIMIT_MESSAGE, rateLimitHint("too many sign-in attempts from this network"), "auth.email_link", newTraceId(), { retry_after: RATE_LIMIT_WINDOW_SECONDS }), 429);
     r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
   }
   const body = await formOrJson(req);
