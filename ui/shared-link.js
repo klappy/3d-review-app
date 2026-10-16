@@ -5,12 +5,13 @@
 // a new respondent; storage duplication (e.g. tab duplication) can resume the
 // same respondent, so nothing here claims person uniqueness.
 
+import { RATE_LIMIT_COPY } from './rate-limit.js';
 // All participant/staff-facing strings below are copy.md rows (cookbook design-system).
 export const copy = {
   linkUnavailable: 'This link no longer works. It may have been replaced or the collection may have closed. Ask the person who invited you for a new one. Nothing about the project is shown here.',
   collectionClosed: 'Collection has closed. New answers are not accepted. If you already submitted from this device, your receipt is shown below.',
   cannotResume: 'Your earlier session on this link could not be resumed from this device. Nothing saved on this device was changed. If you already sent answers, that send may have succeeded without a confirmation shown here; the facilitator can confirm whether it arrived.',
-  rateLimited: 'Too many requests right now. Nothing saved on this device was changed; wait a moment and open your link again.',
+  rateLimited: `${RATE_LIMIT_COPY} Nothing saved on this device was changed; open your link again after a minute.`,
   transient: 'The server could not be reached or did not answer. Nothing saved on this device was changed; open your link again in a moment.',
   draftMismatch: 'Your saved answers were for a different version of this survey and were not restored. Please answer again.',
   draftRestored: 'Your unsent answers were restored on this device.',

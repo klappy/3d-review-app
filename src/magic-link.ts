@@ -173,7 +173,7 @@ function bad(t){msg.textContent=t;var a=d.createElement("a");a.href="${emailForm
 if(!m){bad("This sign-in link is incomplete.");return}var e="";if(m[2]){try{e=decodeURIComponent(m[2])}catch(x){}}
 var r=d.getElementById("r");function retry(t){msg.textContent=t;r.hidden=false;r.focus()}r.onclick=function(){r.hidden=true;check()};
 function check(){msg.textContent="Checking your link…";fetch("/v2/auth/email/check",{method:"POST",headers:{"content-type":"application/json",accept:"application/json"},body:JSON.stringify({t:m[1],e:e}),credentials:"same-origin",cache:"no-store"}).then(function(x){
-if(x.status===429){retry("Too many sign-ins from this network right now. Wait a minute, then try again.");return null}
+if(x.status===429){retry("Rate limit: too many sign-ins from this network right now. Try again in one minute.");return null}
 if(!x.ok){retry("Could not check this link right now. Try again.");return null}return x.json()}).then(function(v){if(v===null)return;
 if(!v||!v.valid){bad("This sign-in link is not valid or has expired.");return}
 if(!v.email){bad("This link is incomplete — request a new one.");return}

@@ -5,7 +5,7 @@ import { CapError as HandlerCapError } from "./handlers/errors";
 import { handlers } from "./handlers";
 import { authorize, targetScope } from "./policy";
 import { byId, sourceSha, toolForClass, type Tool } from "./registry";
-import { enforceCapabilityLimit, hasCapabilityLimiter, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { enforceCapabilityLimit, enforcePrincipalWriteLimit, hasCapabilityLimiter, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { checkConfirmToken, mintConfirmToken, mintReceipt, paramsHash, persistTrace, type Span } from "./receipt";
 
 export interface ExecuteOptions {
@@ -57,6 +57,7 @@ export async function execute(
       throw new CapError("WRONG_TOOL_FOR_CLASS", `${capabilityId} requires the ${expectedTool} tool`, `Use ${expectedTool}.`, capabilityId);
     if (cap.slice === "v2.1-oct" || !handlers[capabilityId]) return (outcome = reserved(capabilityId, ctx.traceId));
     await enforceCapabilityLimit(ctx, capabilityId, params); // both faces; before authorize and before the handler touches storage
+    await enforcePrincipalWriteLimit(ctx, capabilityId, expectedTool); // per session/principal, never per address (workshop DoD 3)
     await authorize(ctx, cap, params);
 
     const danger = expectedTool === "danger";

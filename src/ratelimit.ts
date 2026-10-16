@@ -23,6 +23,18 @@
  *   RL_REDEEM    cap.participant.redeem_code + cap.participant.open_link   key ip           limit: see wrangler.toml
  *                (sized for a whole room behind one NAT address; the number lives in wrangler.toml, not here)
  *
+ *   RL_PER_KEY   (optional) one secret or one mailbox, whatever the address   keys em:, code:   see RATE_LIMITS
+ *                request_link per email (falls back to RL_AUTH's em: key while unbound), redeem_code per code —
+ *                bounds a flood on one secret when an attacker rotates addresses. open_link's per-link key is
+ *                `link:<hash>` on RL_REDEEM (a shared link is opened by a whole room, so it needs the room number).
+ *   RL_GLOBAL    (optional) one key per secret-guessing limiter across ALL addresses   keys g:RL_AUTH, g:RL_REDEEM
+ *                a ceiling for code/link guessing and sign-in spam spread over many IPs (workshop 2026-10-15 DoD 3).
+ *   RL_MCP_CEILING also meters every write/danger call by a signed-in or link-holding principal    key wr:<kind>:<id>
+ *                per session/principal, never per address, so a room behind one NAT never shares a bucket.
+ *
+ * Optional limiters: absent → skipped (logged once per isolate). They add protection on top of the address key; an
+ * unbound optional limiter must not refuse a whole workshop before Otto binds it.
+ *
  * Failure posture: binding absent → allowed ONLY when ENVIRONMENT is exactly "dev" (local + unit tests); anywhere
  * else an absent binding refuses (fail closed — a production Worker without its limiter is a misdeploy, not a pass).
  * A binding that throws at runtime is allowed through and logged: availability of the survey beats a dampener outage.
@@ -35,7 +47,28 @@ import { normalizeEmail, sha256 } from "./handlers/common";
  *  [env.production.ratelimits] with its own namespace_id (test/limiter-boundary.test.ts parses the file and checks). */
 export const LIMITER_NAMES = ["RL_MCP_ANON", "RL_HTTP_ANON", "RL_AUTH", "RL_REDEEM", "RL_MCP_CEILING"] as const;
 export type LimiterName = (typeof LIMITER_NAMES)[number];
+/** Limiters that add a non-address key on top of the address limiters above. Absent → skipped, never refused. */
+export const OPTIONAL_LIMITER_NAMES = ["RL_PER_KEY", "RL_GLOBAL"] as const;
+export type OptionalLimiterName = (typeof OPTIONAL_LIMITER_NAMES)[number];
 export const RATE_LIMIT_WINDOW_SECONDS = 60;
+/** THE one config place for every limit number (requests per RATE_LIMIT_WINDOW_SECONDS per key). Cloudflare reads the
+ *  number from wrangler.toml, so wrangler.toml must mirror this table at top level AND under [env.production]
+ *  (test/workshop-same-ip.test.ts checks; binding numbers are Otto's to set). Sized for one workshop on ONE address:
+ *  200 participants + 20 facilitators, 3+ assessments, everyone in the same minute (captain 2026-10-15 22:36 ET).
+ *  If the summit lets everyone sign in, raise RL_AUTH here (and in wrangler.toml) — one line. */
+export const RATE_LIMITS: Record<LimiterName | OptionalLimiterName, number> = {
+  RL_MCP_ANON: 30,     // anonymous /mcp per address; participants never use /mcp anonymously
+  RL_HTTP_ANON: 200,   // anonymous twin calls per address: 20 facilitators' pre-sign-in /v2/me + reloads (×2.5 headroom)
+  RL_AUTH: 100,        // sign-in per address: 20 facilitators × 2 units (request + consume) = 40, ×2.5 headroom
+  RL_REDEEM: 500,      // link/code opens per address: 200 opens + 20 × 2 email-link check/open = 240, ×2 headroom
+  RL_MCP_CEILING: 600, // per bearer address on /mcp, per principal for translate (tr:) and writes (wr:)
+  RL_PER_KEY: 10,      // per email / per code / per link token, any address
+  RL_GLOBAL: 5000,     // all addresses together, per secret-guessing limiter
+};
+/** The plain refusal every rate limit returns, on every face (DoD 6). */
+export const RATE_LIMIT_MESSAGE = "rate limit — try again in a minute";
+/** Headers every rate-limit 429 carries. */
+export const rateLimitHeaders = (): Record<string, string> => ({ "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
 /** Largest JSON-RPC batch any caller may POST to /mcp; an anonymous batch spends one RL_MCP_ANON unit per message. */
 export const MCP_MAX_BATCH = 10;
 
@@ -65,8 +98,31 @@ export async function allow(env: Env, name: LimiterName, key: string): Promise<b
   catch (e) { console.error("ratelimit.binding_failed", name, String(e)); return true; }
 }
 
-const limited = (capabilityId: string) => new CapError("RATE_LIMITED", "too many attempts — slow down",
-  `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again`, capabilityId);
+const absentLogged = new Set<string>();
+/** An optional limiter: absent → allowed (logged once per isolate); bound → the same posture as allow(). */
+export async function allowOptional(env: Env, name: OptionalLimiterName, key: string): Promise<boolean> {
+  const binding = env[name];
+  if (!binding) {
+    if (!absentLogged.has(name)) { absentLogged.add(name); console.warn("ratelimit.optional_absent", name, "skipped — bind it in wrangler.toml"); }
+    return true;
+  }
+  try { return (await binding.limit({ key })).success; }
+  catch (e) { console.error("ratelimit.binding_failed", name, String(e)); return true; }
+}
+
+export const rateLimitHint = (what: string) => `this is a rate limit (${what}), not a problem with your request — try again in one minute`;
+const limited = (capabilityId: string, what = "too many attempts") => new CapError("RATE_LIMITED", RATE_LIMIT_MESSAGE, rateLimitHint(what), capabilityId);
+const secretHash = async (v: string) => (await sha256(v)).slice(0, 32);
+
+/** Per-principal write meter (DoD 3: per-session keys). Every write/danger call by a non-anonymous principal spends one
+ *  RL_MCP_CEILING unit on `wr:<kind>:<id>` — never the address, so a room behind one NAT never shares a bucket. */
+export async function enforcePrincipalWriteLimit(ctx: Ctx, capabilityId: string, tool: string): Promise<void> {
+  if (tool === "read" || ctx.principal.kind === "anonymous") return;
+  // An added layer, not a gate: an env without RL_MCP_CEILING (unit fixtures) is not refused here; the /mcp and /token
+  // paths that need it still fail closed through allow(), and limiter-boundary.test.ts checks wrangler.toml binds it.
+  if (!ctx.env.RL_MCP_CEILING) return;
+  if (!(await allow(ctx.env, "RL_MCP_CEILING", `wr:${ctx.principal.kind}:${ctx.principal.id}`))) throw limited(capabilityId, "too many changes from this session");
+}
 
 /** Called by execute() for both faces, before authorization and before the capability's handler runs.
  *  (Credential resolution happens earlier: 0 D1 reads for a malformed credential, up to two indexed reads for a
@@ -78,7 +134,9 @@ export async function enforceCapabilityLimit(ctx: Ctx, capabilityId: string, par
   // The address unit is spent FIRST — before any parameter validation. Validating before spending (review #12-2's
   // first fix) let a non-string email be INVALID_PARAMS with no unit spent and a trace row written per request:
   // an unlimited D1 write path (Bugbot 4032246360, auditor 5707673911 #1). One unit per attempt, whatever its shape.
-  if (!(await allow(ctx.env, name, `ip:${ip}`))) throw limited(capabilityId);
+  if (!(await allow(ctx.env, name, `ip:${ip}`))) throw limited(capabilityId, "too many attempts from this network");
+  // Global ceiling across every address (DoD 3): rotating addresses cannot multiply the guessing rate past it.
+  if (!(await allowOptional(ctx.env, "RL_GLOBAL", `g:${name}`))) throw limited(capabilityId, "the service is busy");
   if (name === "RL_AUTH" && params.email !== undefined && typeof params.email !== "string")
     throw new CapError("INVALID_PARAMS", "email must be a string", undefined, capabilityId); // a non-string must not dodge the email key (review #12-2)
   // Per-email key on request_link only: stops code-issuance spam at one mailbox from rotating addresses.
@@ -89,6 +147,17 @@ export async function enforceCapabilityLimit(ctx: Ctx, capabilityId: string, par
   // in-band anyway; production sign-in is Cloudflare Access. The durable fix is an attempts counter on login_code (migration).
   if (capabilityId === "cap.auth.request_link" && typeof params.email === "string" && params.email) {
     const eh = (await sha256(normalizeEmail(params.email))).slice(0, 32); // same normaliser as the handler's email_hash (review #12-11)
-    if (!(await allow(ctx.env, name, `em:${eh}`))) throw limited(capabilityId);
+    // Own binding once Otto binds RL_PER_KEY (RL_AUTH's per-address number is sized for a room, too loose for one
+    // mailbox); until then the em: key stays on RL_AUTH exactly as before.
+    const ok = ctx.env.RL_PER_KEY ? await allowOptional(ctx.env, "RL_PER_KEY", `em:${eh}`) : await allow(ctx.env, name, `em:${eh}`);
+    if (!ok) throw limited(capabilityId, "too many sign-in requests for this email");
   }
+  // Per-secret keys (DoD 3): one code or one link token is bounded whatever address it comes from. A shared link is
+  // opened by a whole room (200 people), so its key rides RL_REDEEM's room-sized number; a code is one person's.
+  if (capabilityId === "cap.participant.redeem_code" && typeof params.code === "string" && params.code
+    && !(await allowOptional(ctx.env, "RL_PER_KEY", `code:${await secretHash(params.code.trim().toUpperCase())}`)))
+    throw limited(capabilityId, "too many attempts with this code");
+  if (capabilityId === "cap.participant.open_link" && typeof params.token === "string" && params.token
+    && !(await allow(ctx.env, "RL_REDEEM", `link:${await secretHash(params.token)}`)))
+    throw limited(capabilityId, "too many opens of this link");
 }
