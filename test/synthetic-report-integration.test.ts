@@ -1,6 +1,9 @@
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {beforeAll,beforeEach,afterEach,afterAll,describe,it,expect} from 'vitest';
+import {beforeAll,beforeEach,afterEach,afterAll,describe,it,expect,vi} from 'vitest';
+// Pass-through counter: the store's attestations are counted, never altered.
+const attestCalls=vi.hoisted(()=>({n:0,raws:[] as string[],digests:[] as (string|null)[]}));
+vi.mock('../src/report-capture',async(importOriginal)=>{const m:any=await importOriginal();return {...m,attestPackedCapture:async(...a:any[])=>{attestCalls.n++;attestCalls.raws.push(a[1]);const r=await m.attestPackedCapture(...a);attestCalls.digests.push(r.eligible?r.capture.captureDigest:null);return r;}};});
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import * as store from '../src/synthetic-report-store';
 import {captureForBuild} from '../src/report-capture';
@@ -101,6 +104,41 @@ describe('real compiled renderer with local D1',()=>{
   expect(r.value.reportKey).toBe(plain.reportKey);expect(r.value.captureDigest).toBe(plain.captureDigest);
   expect(spans.every(s=>s.span==='report.stage'&&Object.keys(s.data??{}).join()==='stage,ms'&&typeof s.data?.ms==='number'&&(s.data.ms as number)>=0)).toBe(true);
   expect(spans.map(s=>s.data?.stage)).toEqual(['observe_sql','attest_observe','render_preview','observe_sql','attest_observe','attest_commit','render','canonicalize','validate','hash','commit_sql','result_sql','attest_current','validate_stored']);
+ });
+ it('one build attests the observed capture once; an external token is re-attested; bytes unchanged',async()=>{
+  attestCalls.n=0;const r=await store.buildMaterialized(context(),aid);expect(r.ok).toBe(true);if(!r.ok)return;
+  expect(attestCalls.n).toBe(1);
+  const c=await capture();attestCalls.n=0;
+  const again=await store.commitMaterialized(context(),aid,c);expect(again.ok).toBe(true);if(!again.ok)return;
+  expect(attestCalls.n).toBe(1);
+  expect(again.value.reportKey).toBe(r.value.reportKey);expect(again.value.captureDigest).toBe(r.value.captureDigest);expect(again.value.payload).toEqual(r.value.payload);
+ });
+ it('one build re-attests when captured bytes differ between uses (same length, still eligible): no reuse',async()=>{
+  const c=await capture(),response=c.rows[0];
+  // Same byte length, same answers, different bytes: only an exact-bytes memo key misses.
+  const moved=response.answersRaw.replace(', "',' ,"');expect(moved).not.toBe(response.answersRaw);expect(moved.length).toBe(response.answersRaw.length);
+  let changed=false;const raced=intercept(async(sql,args,method,next)=>{const result=await next();if(sql===store.REPORT_COMMIT_SQL&&!changed){changed=true;await exec('UPDATE response SET answers_json=? WHERE id=?',moved,response.responseId);}return result;});
+  attestCalls.n=0;attestCalls.raws.length=0;attestCalls.digests.length=0;
+  try{await store.buildMaterialized(context(raced),aid);}finally{await exec('UPDATE response SET answers_json=? WHERE id=?',response.answersRaw,response.responseId);}
+  expect(changed).toBe(true);
+  expect(attestCalls.n).toBeGreaterThanOrEqual(2);
+  expect(new Set(attestCalls.raws).size).toBe(2);expect(attestCalls.raws[0].length).toBe(attestCalls.raws[1].length);
+  // Semantically equal bytes attest to one digest: the memo must not key on that either.
+  expect(attestCalls.digests.every(d=>typeof d==='string')).toBe(true);expect(new Set(attestCalls.digests).size).toBe(1);
+ });
+ it('one build re-attests when an answer changes at the same byte length: the moved capture is held, never reused',async()=>{
+  // Swap two answers of equal length: same byte length, different answers, so the pinned index refuses it.
+  const [q8,q9]=['"CHIP-Q8": "most"','"CHIP-Q9": "some"'];
+  const c=await capture(),response=c.rows.find(x=>x.answersRaw.includes(q8)&&x.answersRaw.includes(q9))!;expect(response).toBeTruthy();
+  const moved=response.answersRaw.replace(q8,'"CHIP-Q8": "some"').replace(q9,'"CHIP-Q9": "most"');expect(moved).not.toBe(response.answersRaw);expect(moved.length).toBe(response.answersRaw.length);
+  let changed=false;const raced=intercept(async(sql,args,method,next)=>{const result=await next();if(sql===store.REPORT_COMMIT_SQL&&!changed){changed=true;await exec('UPDATE response SET answers_json=? WHERE id=?',moved,response.responseId);}return result;});
+  attestCalls.n=0;attestCalls.raws.length=0;attestCalls.digests.length=0;
+  let result;try{result=await store.buildMaterialized(context(raced),aid);}finally{await exec('UPDATE response SET answers_json=? WHERE id=?',response.answersRaw,response.responseId);}
+  expect(changed).toBe(true);expect(result).toEqual(held());
+  expect(attestCalls.n).toBeGreaterThanOrEqual(2);
+  expect(new Set(attestCalls.raws).size).toBe(2);expect(attestCalls.raws[0].length).toBe(attestCalls.raws[1].length);
+  // Two attestations, two outcomes: the observed bytes attest eligible, the moved bytes are refused.
+  expect(typeof attestCalls.digests[0]).toBe('string');expect(attestCalls.digests.at(-1)).toBeNull();
  });
  it('refuses rehashed well-typed semantic forgery, not just malformed schema',async()=>{
   const r=await report(),original=await db.prepare('SELECT payload_json,payload_sha256 FROM synthetic_report WHERE id=?').bind(r.id).first<any>();

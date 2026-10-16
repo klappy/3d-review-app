@@ -1,23 +1,23 @@
 {
-  "version": "0.34.4",
+  "version": "0.34.5",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "397744b4c6ebf12d30f311538b4eefb502b24b1b",
+  "cookbook_commit": "178ed76c9f786633f816e0e7f6a170923a313853",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.4.md",
-      "blob_sha": "584e170012fbb6a33f797c0159d8a86c19d63c42",
-      "sha256": "05d78c16675281daf3aed943a7e241a0043caede0ab82777f5c1db2e523c58cb"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.5.md",
+      "blob_sha": "b67e48ea0a8253eb1f9088a13767408aa3d2024c",
+      "sha256": "7021ba92b9443a7b1537c8062b1890078fe4af7e5d35e5e0ab22a1a02e80a086"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "53661d22d3281f6a9af1474c750c37561546ee2f",
-      "sha256": "e4eb3cac984f0f145ee0814543714dbf5dbb107f2a94164180445393a6816aec"
+      "blob_sha": "7a65d52da23b116bb04f927ab67a68999ca24031",
+      "sha256": "99954111ba4d267d14c1b1efc1231e63b77e6d25cacf9c10fa60a31e2d191191"
     }
   ],
   "changelog": {
     "sections": {
-      "fixed": [
-        "The HTTP contract (`contract/openapi.yaml`) now says that starting an assessment (cap.assessment.create) takes the optional location and facilitator (string; omitted or empty stores nothing), as cap.assessment.update and the capability list already did."
+      "changed": [
+        "Report build is faster: one build now attests the captured responses once and reuses that result for the commit, the post-write read and the stored-report check, where it used to attest the same bytes four times. Any byte difference between those reads is still attested in full, and every digest, report key, payload hash and validation check still runs. A capture handed in from outside a build is still re-attested from its raw bytes. Report bytes and digests are unchanged."
       ]
     }
   }
