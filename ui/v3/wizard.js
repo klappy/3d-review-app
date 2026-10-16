@@ -55,7 +55,7 @@ const enc = encodeURIComponent;
 const LANG_CODE = /^[a-z]{2,3}(-[a-z0-9]{1,8})*$/i; // mirrors src/handlers/language.ts CODE (cap.language.create `code`)
 
 export function freshDraft() {
-  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', starts: todayIso(), until: '', format: 'Written', purpose: '', lwc: [], groups: {}, context: {}, demographics: false };
+  return { name: '', project: '', language: '', newProject: '', newOrg: '', newLanguage: '', newLangCode: '', starts: todayIso(), until: '', format: 'Written', purpose: '', location: '', facilitator: '', lwc: [], groups: {}, context: {}, demographics: false };
 }
 
 // Ruling (a): a denominator appears only when the facilitator entered one.
@@ -111,6 +111,8 @@ export function launchPlan(d, pre = [], saved = false) {
     if (d.purpose.trim()) b.purpose = d.purpose.trim();
     const period = packPeriod(d.starts, d.until); if (period) b.period = period; // B41: existing field, no migration
     if (d.format) b.format = d.format;
+    if ((d.location || '').trim()) b.location = d.location.trim(); // B19 (migration 0015)
+    if ((d.facilitator || '').trim()) b.facilitator = d.facilitator.trim();
     if (lwcText(d)) b.lwc = lwcText(d); // dynamic translation: languages participants may switch to
     return b;
   }, keep: (r, ctx) => { ctx.aid = r.assessment.id; } });
@@ -137,7 +139,7 @@ export const SAVE_CAPS = ['cap.project.create', 'cap.language.create', 'cap.asse
 export const savePlan = d => launchPlan(d).filter(step => SAVE_CAPS.includes(step.cap));
 // What the saved row holds for step 1, as cap.assessment.create sent it (nulls where nothing was given).
 export function detailsOf(d) {
-  return { name: d.name.trim(), purpose: d.purpose.trim() || null, period: packPeriod(d.starts, d.until) || null, format: d.format || null, language_id: d.language || null, lwc: lwcText(d) };
+  return { name: d.name.trim(), purpose: d.purpose.trim() || null, period: packPeriod(d.starts, d.until) || null, format: d.format || null, location: (d.location || '').trim() || null, facilitator: (d.facilitator || '').trim() || null, language_id: d.language || null, lwc: lwcText(d) };
 }
 // Step-1 edits after the save: only the changed fields, for cap.assessment.update (PATCH). null when nothing changed.
 export function detailsPatch(snap, d) {
@@ -149,7 +151,7 @@ export function detailsPatch(snap, d) {
 // unfinished step (step 2 once step 1 is complete).
 export function draftFromSaved(a, surveys = [], store) {
   const p = parsePeriod(a.period) || { starts: '', until: '' };
-  const d = { ...freshDraft(), name: a.name || '', project: a.project_id || '', language: a.language_id || '', purpose: a.purpose || '', format: a.format || 'Written', starts: p.starts || '', until: p.until || '', lwc: Array.isArray(a.lwc) ? [...a.lwc] : [] };
+  const d = { ...freshDraft(), name: a.name || '', project: a.project_id || '', language: a.language_id || '', purpose: a.purpose || '', location: a.location || '', facilitator: a.facilitator || '', format: a.format || 'Written', starts: p.starts || '', until: p.until || '', lwc: Array.isArray(a.lwc) ? [...a.lwc] : [] };
   const pre = [];
   for (const x of surveys) {
     if (x.archived_at || (x.state && x.state !== 'selected') || d.groups[x.template_id]) continue;
@@ -157,7 +159,7 @@ export function draftFromSaved(a, surveys = [], store) {
     d.groups[x.template_id] = { version: String(x.template_version), expected: N ? String(N) : '' };
     pre.push({ id: x.id, template: x.template_id, version: Number(x.template_version) });
   }
-  const snap = { name: a.name || '', purpose: a.purpose ?? null, period: a.period ?? null, format: a.format ?? null, language_id: a.language_id || null, lwc: lwcText(d), demographics_enabled: a.demographics_enabled === true };
+  const snap = { name: a.name || '', purpose: a.purpose ?? null, period: a.period ?? null, format: a.format ?? null, location: a.location ?? null, facilitator: a.facilitator ?? null, language_id: a.language_id || null, lwc: lwcText(d), demographics_enabled: a.demographics_enabled === true };
   d.demographics = a.demographics_enabled === true; // S15b: resume shows the switch as the server holds it
   return { d, step: validateStep('details', d).length ? 'details' : 'participants', saved: { aid: a.id, pid: a.project_id, role: a.role || '', snap, pre } };
 }
@@ -386,6 +388,10 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
       <div class="grid">
         <label>Translation format<select name="format">${['Written', 'Audio', 'Sign'].map(f => `<option${f === d.format ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
       </div>
+      <div class="grid">
+        <label>Location or community<input name="location" value="${esc(d.location || '')}" placeholder="e.g. Ban Na village, Luang Prabang"></label>
+        <label>Facilitator<input name="facilitator" value="${esc(d.facilitator || '')}" placeholder="Who leads the sessions"></label>
+      </div>
       <label>What will participants consider?<input name="purpose" value="${esc(d.purpose)}" placeholder="e.g. The Genesis 1 to 3 draft"></label>
       <p class="small muted">English is always available for participants.</p>${languagePicker({name:'lwc',label:'Participant survey languages',options:LWC_LANGUAGES.map(l=>({id:l.code,name:l.name+(l.mt===false?' (interpreter or video)':''),native:l.endonym===l.name?'':l.endonym,code:l.code})),selected:d.lwc||[],multiple:true,max:MAX_LWC})}
       ${act(false, '<button class="primary" type="submit">Continue</button>')}
@@ -411,7 +417,7 @@ export function renderStep(step, d, data, errs = [], locked = false, origin = ''
   // review
   return `${head(n, 'Ready to launch', 'Check the details, then launch.', '<p class="muted">Launching opens the survey links; nothing is sent to anyone.</p>')}${errBox(errs)}
     <div class="wz-sec"><h3>Details</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="details">Edit</button>'}</div>
-    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}${addingLanguage(d) && (d.newLangCode || '').trim() ? ' · ' + esc(d.newLangCode.trim().toLowerCase()) : ''}</dd>${dates(d)}<dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
+    <dl class="kv"><dt>Name</dt><dd>${esc(d.name)}</dd><dt>Project</dt><dd>${esc(proj.name || '')}${isNew ? ' (new)' : ''}</dd>${isNew && (d.newOrg || '').trim() ? `<dt>Lead organisation</dt><dd>${esc(d.newOrg.trim())}</dd>` : ''}<dt>Language</dt><dd>${esc(lang.name || '')}${addingLanguage(d) && (d.newLangCode || '').trim() ? ' · ' + esc(d.newLangCode.trim().toLowerCase()) : ''}</dd>${dates(d)}<dt>Location or community</dt><dd>${esc((d.location || '').trim() || 'Not set')}</dd><dt>Facilitator</dt><dd>${esc((d.facilitator || '').trim() || 'Not set')}</dd><dt>Material</dt><dd>${esc(d.purpose || 'Not set')}</dd></dl>
     <div class="wz-sec"><h3>Who will participate</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="participants">Edit</button>'}</div>
     <dl class="kv">${chosen.map(t => { const N = expectedValue(d.groups[t.id].expected); return `<dt><span class="pdot wz-kvdot ${pdot(t.perspective)}" aria-hidden="true"></span>${esc(t.perspective)} <span aria-hidden="true">·</span> <span data-wz-review-survey>${esc(t.name)}</span></dt><dd>${N ? `${N} expected` : 'no number given'}</dd>`; }).join('')}</dl>
     <div class="wz-sec"><h3>Participant information</h3>${locked ? '' : '<button type="button" class="rv-btn quiet" data-wz="edit" data-step="information">Edit</button>'}</div>
@@ -474,7 +480,7 @@ export function mountWizard(root, deps) {
   const read = (form) => {
     if (s.saveCtx?.pending && !s.saved) return; // uncertain first-save writes must be reconciled before changing their identity
     const fd = new FormData(form), d = s.d;
-    if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'starts', 'until', 'format', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
+    if (form.dataset.wzForm === 'details') for (const k of ['name', 'newProject', 'newOrg', 'newLanguage', 'newLangCode', 'starts', 'until', 'format', 'location', 'facilitator', 'purpose']) { if (fd.has(k)) d[k] = String(fd.get(k)); }
     if (form.dataset.wzForm === 'details') d.lwc = lwcFrom(fd);
     if (form.dataset.wzForm === 'details' && fd.has('newOrgPick')) { const v = String(fd.get('newOrgPick')); d.newOrgOther = v === ORG_OTHER; if (!d.newOrgOther) d.newOrg = v; else if (!fd.has('newOrg')) d.newOrg = ''; }
     if (form.dataset.wzForm === 'details') { if (fd.get('project')) d.project = String(fd.get('project')); if (fd.has('language')) { const v = String(fd.get('language')); d.language = ((!s.saved && v === NEW_LANGUAGE) || s.data.languages.some(l => l.id === v)) ? v : ''; } }

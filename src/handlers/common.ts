@@ -162,6 +162,7 @@ export interface ProjectRow { id: string; workspace_id: string | null; name: str
 export interface LanguageRow { id: string; project_id: string; code: string | null; name: string }
 export interface AssessmentRow {
   id: string; project_id: string; language_id: string; name: string; purpose: string | null; period: string | null; format: string | null;
+  location?: string | null; facilitator?: string | null; // B19, migration 0015 (absent before it runs)
   stage: Stage; notes_reflection: string | null; notes_next_steps: string | null; archived_at: string | null; created_at: string;
 }
 export interface TemplateRow { id: string; name: string; version: number; perspective: string; source_ref: string | null; items_json: string; scoring_json: string; published_at: string | null }
