@@ -76,8 +76,13 @@ export function holdRetry(button, seconds, { label, setTimer = setInterval, clea
 export const underHold = button => button?.dataset?.rateLimited === 'true';
 /** Set a control's words without ending its countdown: under a hold the new words go to the label the hold paints. */
 export function setControlLabel(node, text) { if (!node) return; if (underHold(node)) node.dataset.retryLabel = text; else node.textContent = text; }
-/** true once a rate-limited "unavailable" screen's wait is over: its retry control exists and no longer counts down.
+/** true once a rate-limited "unavailable" screen's wait is over: its retry control shows and no longer counts down.
  *  Reads the state's flag, not the notice text, so a longer cap's own message ("…15 minutes") is replaced too.
- *  False while a Try again request is in flight (state.busy): the button is hidden then, so "try again now" would
- *  point at nothing (#490 re-review low). */
-export const rateLimitWaitOver = (state, button) => state?.phase === 'unavailable' && state?.rateLimited === true && !state?.busy && !!button && !underHold(button);
+ *  Tests the button itself: the page hides it while a Try again request is in flight and leaves it hidden if that
+ *  request rejects, so "try again now" never points at nothing (#490 re-review low; #495 review nit). */
+export const rateLimitWaitOver = (state, button) => state?.phase === 'unavailable' && state?.rateLimited === true && !!button && !button.hidden && !underHold(button);
+/** true while a Try again request is in flight: the controller is busy and the page hid the retry control. */
+export const rateLimitRetrying = (state, button) => state?.phase === 'unavailable' && state?.rateLimited === true && state?.busy === true && !!button && button.hidden === true;
+/** The notice a rate-limited screen shows instead of the controller's, or null to keep it: neutral words while a Try
+ *  again is in flight (the wait copy has already run out, #495 review low), the ready words once the wait is over. */
+export const rateLimitNotice = (state, button, { retrying, ready }) => rateLimitRetrying(state, button) ? retrying : rateLimitWaitOver(state, button) ? ready : null;

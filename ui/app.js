@@ -14,7 +14,8 @@ import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarg
 import { copy as sharedCopy, createSharedLinkClient, fill, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
 // Thrown by shared-link paths that already showed the participant copy: run() marks the action as
 // needing attention without painting raw server text into #error.
-class HandledFailure extends Error { constructor() { super('handled'); this.name = 'HandledFailure'; } }
+// limit: set when the handled refusal was a rate limit, so run() still holds the control for the wait ({ retryAfter }).
+class HandledFailure extends Error { constructor(limit) { super('handled'); this.name = 'HandledFailure'; this.limit = limit; } }
 // In-memory only (per page): whether an earlier submit on this page had an unknown outcome.
 let participantView = null;
 let submitState = 'none'; // 'none' | 'uncertain'
@@ -160,7 +161,7 @@ async function run(label, task, control) {
   let wait = 0;
   try { await task(); note(`${label} — complete.`); }
   catch (error) {
-    if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; }
+    if (error instanceof HandledFailure) { $('notice').textContent = 'Action needs attention. No completion is assumed.'; $('error').textContent = ''; $('error').hidden = true; if (error.limit) wait = retryAfterSeconds(error.limit.retryAfter); }
     else if (isRateLimitedError(error)) { wait = retryAfterSeconds(error.retryAfter); fail(error.message); } // DoD 6: api() already worded it (rateLimitText); retry after the wait
     else fail(error.message);
   }
@@ -668,7 +669,7 @@ bindClick('recover', 'Recovering receipt…', async () => {
       if (kind === 'unavailable') showSharedUnavailable(submitState === 'uncertain' ? 'cannotResume' : 'unavailable');
       else if (submitState === 'uncertain') text($('participant-resume'), sharedCopy.submitUncertain); // keep the uncertainty; the form stays
       else text($('participant-resume'), kind === 'rateLimited' ? sharedCopy.rateLimited : sharedCopy.transient); // live form: a probe blip is not a revoked session
-      throw new HandledFailure();
+      throw new HandledFailure(kind === 'rateLimited' ? { retryAfter: error?.retryAfter } : undefined); // a rate-limited Check holds Recover for the wait (#490 re-review prior low 4)
     }
   } else receipt = await api('/v2/participate/receipt', { participant: true });
   await recoverParticipant(receipt, !!state.form, loadForm, showReceipt);
