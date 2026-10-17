@@ -1,23 +1,23 @@
 {
-  "version": "0.34.9",
+  "version": "0.34.10",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "7c7bfefd5f985a212f496b87d1593a709149ded5",
+  "cookbook_commit": "9121d137fe60131802dd220b3dcebdeb19989d1c",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.9.md",
-      "blob_sha": "152b9385c4f8a2525064cec07e295228ea9a42c6",
-      "sha256": "fd5ab080a8412cac3a5ef2c8b20c5fab4b693d27c87cbfc9cbd8ab96e53c9b48"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.10.md",
+      "blob_sha": "59d00ca85a107cf0fb6ef228feb79e8f3b1c85c4",
+      "sha256": "4ff787dd27753419fa51900dae5b7ea8ca978d536eb282e2b9d323ad6ce60cb3"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "6d4aae23c4737a92fb50900d12e36ad76f9da804",
-      "sha256": "fdfbfaeb86ac65708a37be424ea6612ea409a4ace6df8143dfadd18d3990aad1"
+      "blob_sha": "2b977dd42496c9452558c493307bd389d133305b",
+      "sha256": "aa8c8577848b35448253f2cf189024d2a169f44c330901e4042b4ba856163d65"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Permissions page for a project: the scope line now reads \"If this project is in a workspace, roles on that workspace also apply here.\" so it stays true for a new project that is not in a workspace yet."
+        "Docs search: plain-language phrases such as \"invite someone to my assessment\" and \"undo the last thing\" now find their capability instead of returning no results; a query made mostly of words the docs never use (such as \"xyzzy flurble create\" or a guessed parameter name like \"feedback inventedparam\") still returns no results."
       ]
     }
   }

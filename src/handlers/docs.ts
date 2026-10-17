@@ -81,21 +81,72 @@ function proseTokens(c: Capability): Set<string> {
   return bag;
 }
 
-/** AND overlap: every query token must hit id or prose. Id matches weighted higher for rank. */
-function scoreCapability(c: Capability, tokens: string[]): number {
+type SearchIndex = {
+  n: number;
+  df: Map<string, number>;
+  vocab: Set<string>;
+  bags: Map<string, { id: Set<string>; prose: Set<string> }>;
+};
+let searchIndex: SearchIndex | null = null;
+const wordsOf = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter(Boolean);
+/**
+ * Built once from the static registry: per-capability id/prose bags, document frequency, and the docs
+ * vocabulary — every word the registry rows (all fields, schemas included), TOPICS and INTENTS use.
+ */
+function docsSearchIndex(): SearchIndex {
+  if (searchIndex) return searchIndex;
+  const df = new Map<string, number>();
+  const bags = new Map<string, { id: Set<string>; prose: Set<string> }>();
+  const vocab = new Set<string>([...Object.values(TOPICS), ...INTENTS].flatMap(wordsOf));
+  for (const c of capabilities) {
+    const bag = { id: idTokens(c), prose: proseTokens(c) };
+    bags.set(c.id, bag);
+    for (const t of new Set([...bag.id, ...bag.prose])) df.set(t, (df.get(t) ?? 0) + 1);
+    for (const t of wordsOf(JSON.stringify(c))) vocab.add(t);
+  }
+  return (searchIndex = { n: capabilities.length, df, vocab, bags });
+}
+
+/**
+ * Query tokens that can tell capabilities apart: drops 1-char and numeric tokens, and tokens every
+ * capability carries (the shared `cap` id prefix), which match everything and so mean nothing.
+ */
+function informativeTokens(tokens: string[], idx: SearchIndex): string[] {
+  return tokens.filter((t) => t.length > 1 && !/^[0-9]+$/.test(t) && (idx.df.get(t) ?? 0) < idx.n);
+}
+
+/**
+ * Partial overlap (NLX-MCP-001 phrases): plain phrases carry filler words ("someone", "last thing"),
+ * so one non-matching token no longer zeroes a capability. A capability qualifies when a query token
+ * hits its id, or when its prose covers at least half the query tokens (rounded up). Hits are weighted
+ * by rarity (rare "invite" outranks common "assessment"); id hits weigh 10x prose hits. The honest-miss
+ * gate is query-level, in `docs` below: see `mostlyUnknown`.
+ */
+function scoreCapability(c: Capability, tokens: string[], idx: SearchIndex): number {
   if (tokens.length === 0) return 0;
-  const idBag = idTokens(c);
-  const proseBag = proseTokens(c);
+  const bag = idx.bags.get(c.id)!;
   let idHits = 0;
   let proseHits = 0;
+  let score = 0;
   for (const t of tokens) {
-    const inId = idBag.has(t);
-    const inProse = proseBag.has(t);
-    if (!inId && !inProse) return 0; // unknown token vs this capability
-    if (inId) idHits += 1;
-    else proseHits += 1;
+    const weight = Math.log((idx.n + 1) / ((idx.df.get(t) ?? 0) + 1)) + 1;
+    if (bag.id.has(t)) { idHits += 1; score += 10 * weight; }
+    else if (bag.prose.has(t)) { proseHits += 1; score += weight; }
   }
-  return idHits * 10 + proseHits;
+  if (idHits === 0 && proseHits < Math.ceil(tokens.length / 2)) return 0;
+  return score;
+}
+
+/**
+ * Honest miss: a query in which at least half the tokens are words the docs never use anywhere
+ * (registry rows, schemas, topics) reads as guessed names or noise — "feedback inventedparam",
+ * "xyzzy flurble create" — and returns no hits rather than a guess (TOPICS: check the schema instead
+ * of guessing names). A real phrase with one stray word ("invite someone to my assessment",
+ * "invite authentication") is mostly vocabulary and still ranks.
+ */
+function mostlyUnknown(tokens: string[], idx: SearchIndex): boolean {
+  const unknown = tokens.filter((t) => !idx.vocab.has(t)).length;
+  return unknown * 2 >= tokens.length;
 }
 
 const DOCS_SEARCH_HIT_CAP = 5;
@@ -118,9 +169,10 @@ export const docs: Handler = async (ctx, a) => {
   if (a.q) {
     const raw = String(a.q);
     const q = raw.toLowerCase();
-    const tokens = tokenizeDocsQuery(raw);
-    const ranked = capabilities
-      .map((c) => ({ c, score: scoreCapability(c, tokens) }))
+    const idx = docsSearchIndex();
+    const tokens = informativeTokens(tokenizeDocsQuery(raw), idx);
+    const ranked = (mostlyUnknown(tokens, idx) ? [] : capabilities)
+      .map((c) => ({ c, score: scoreCapability(c, tokens, idx) }))
       .filter((row) => row.score > 0)
       .sort((a, b) => b.score - a.score || a.c.id.localeCompare(b.c.id))
       .slice(0, DOCS_SEARCH_HIT_CAP)
