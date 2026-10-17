@@ -7,7 +7,7 @@ export const VERSIONS = {
    "added": [],
    "changed": [],
    "fixed": [
-    "Docs: the rules text for archiving an assessment (`cap.assessment.archive`) no longer says \"no inheritance\"; it says the project-scope check uses the effective project role, which a workspace role reaches for its grouped projects."
+    "Docs: the rules text for archiving an assessment (`cap.assessment.archive`) no longer says \"no inheritance\"; it says archiving needs a direct assessment grant (member+) and then member+ at the assessment's project (effective project role), so a workspace role alone never reaches it."
    ]
   },
   {

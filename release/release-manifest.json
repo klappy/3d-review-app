@@ -1,23 +1,23 @@
 {
   "version": "0.35.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "26066e34e846d9c3d772bb327d4137e5a77bc93f",
+  "cookbook_commit": "6f7f2b763046f90325e34a903b06cf11d068827d",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.35.1.md",
-      "blob_sha": "adc4f2d43ba580b246784aa1e9fedf52cd8d7b2d",
-      "sha256": "28a6d5c73ef82e41ffb98beaccd28a72f1a2931905dace610401d10e2831208c"
+      "blob_sha": "9c9fb3e1fce03dd79a8dfcaf0d6fc8643b9f93f1",
+      "sha256": "fe999cb4c10337c84c00e623960745bf09fea7fa42c6db1c936803790f05913b"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "9d5cc8d1b0215c0304fd7bcfdd187b61676e0da0",
-      "sha256": "b76396f5452e2210df6901e7a3d962ffe0ff36063c56bb5088a29f9415ec5d08"
+      "blob_sha": "352f01189c9321598a00f2c8db154c8849694ece",
+      "sha256": "818dcec91cb17cb75eeff4ac01f266765bcd998b54ea6cdeed4a1e9518d57a3c"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Docs: the rules text for archiving an assessment (`cap.assessment.archive`) no longer says \"no inheritance\"; it says the project-scope check uses the effective project role, which a workspace role reaches for its grouped projects."
+        "Docs: the rules text for archiving an assessment (`cap.assessment.archive`) no longer says \"no inheritance\"; it says archiving needs a direct assessment grant (member+) and then member+ at the assessment's project (effective project role), so a workspace role alone never reaches it."
       ]
     }
   }
