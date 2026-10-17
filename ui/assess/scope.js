@@ -253,7 +253,7 @@ const entry = {
         const res = await fetch('/v2/auth/email', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ email: val(form, 'email') }), credentials: 'same-origin', redirect: 'manual', cache: 'no-store' });
         if (res.type === 'opaqueredirect') { window.location.assign('/v2/auth/access'); return; } // environment without email links
         if (res.ok) { const b = await res.json().catch(() => null); const min = Number(b?.result?.expires_in_minutes) || 30; form.hidden = true; status.textContent = SIGNIN_LINK_SENT(min); return; }
-        if (res.status === 429) { // one-minute RL_AUTH refusal vs the 900 s per-address mail cap: tell each the wait it really has
+        if (res.status === 429) { // the 900 s per-address mail cap (or a one-minute refusal from upstream): tell each the wait it really has
           const b = await res.json().catch(() => null), retry = retryAfterOf(b?.error, res);
           status.textContent = isOneMinuteLimit(b?.error?.message, retry) ? RATE_LIMIT_COPY : `Too many sign-in links were requested for this address. Use the newest email, or wait ${Math.max(1, Math.ceil((Number(retry) || 900) / 60))} minutes.`;
           holdRetry(submit, isOneMinuteLimit(b?.error?.message, retry) ? retry : retry ?? 900); return; // DoD 6: the button counts down the same wait

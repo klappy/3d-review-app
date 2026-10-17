@@ -96,13 +96,12 @@ describe("generated ui/changelog.json", () => {
 describe("runtime surfaces: health and MCP serverInfo", () => {
   const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "vs", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "vs-test-db" } }] }));
   afterAll(() => mf.dispose());
-  const limiter = () => ({ limit: async () => ({ success: true }) });
   let env: any;
   beforeAll(async () => {
     const db = await mf.getD1Database("DB");
     const sql = readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
     await db.batch(sql.split(";\n").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)));
-    env = { DB: db, SESSION_SECRET: "synthetic-test-secret", ENVIRONMENT: "dev", RL_MCP_ANON: limiter(), RL_HTTP_ANON: limiter(), RL_AUTH: limiter(), RL_REDEEM: limiter(), RL_MCP_CEILING: limiter() };
+    env = { DB: db, SESSION_SECRET: "synthetic-test-secret", ENVIRONMENT: "dev" };
   }, 60_000);
   const req = (method: string, path: string, body?: unknown) => app.fetch(new Request("https://t.invalid" + path, { method, headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.77" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }), env);
 

@@ -6,13 +6,11 @@ import { describe, expect, it } from "vitest";
 import { RATE_LIMIT_COPY, SERVER_MINUTE_MESSAGE, rateLimitText, retryAfterOf } from "../ui/rate-limit.js";
 // @ts-expect-error plain browser module, no types
 import { copy as sharedCopy } from "../ui/shared-link.js";
-import { RATE_LIMIT_MESSAGE } from "../src/ratelimit";
 
 describe("rate-limit copy follows the server's retry", () => {
-  it("the client knows the server's one-minute message", () => { expect(SERVER_MINUTE_MESSAGE).toBe(RATE_LIMIT_MESSAGE); });
   it("one-minute limiter (plain message, retry 60 or absent) → the one-minute copy", () => {
-    expect(rateLimitText(RATE_LIMIT_MESSAGE, "this is a rate limit (x) — try again in one minute", 60)).toBe(RATE_LIMIT_COPY);
-    expect(rateLimitText(RATE_LIMIT_MESSAGE, undefined, undefined)).toBe(RATE_LIMIT_COPY);
+    expect(rateLimitText(SERVER_MINUTE_MESSAGE, "this is a rate limit (x) — try again in one minute", 60)).toBe(RATE_LIMIT_COPY);
+    expect(rateLimitText(SERVER_MINUTE_MESSAGE, undefined, undefined)).toBe(RATE_LIMIT_COPY);
   });
   it("hourly invite cap keeps its message, hint and hour — even if a retry of 60 came with it", () => {
     for (const retry of [3600, 60, undefined]) {
@@ -32,7 +30,7 @@ describe("rate-limit copy follows the server's retry", () => {
     const pick = (name: string) => { const m = new RegExp(`^const ${name} = .*$`, "m").exec(html); if (!m) throw new Error(name); return m[0]; };
     const fn = new Function("REFUSED", "esc", `${pick("oneMinute")}\n${pick("retryNote")}\n${pick("kindOf")}\n${html.match(/^function refusal\(e, what\) .*$/m)![0]}\nreturn { kindOf, refusal };`);
     const { kindOf, refusal } = fn(new Set(), (s: string) => String(s));
-    expect(kindOf({ code: "RATE_LIMITED", message: RATE_LIMIT_MESSAGE, retry_after: 60 })).toBe("rate_limited");
+    expect(kindOf({ code: "RATE_LIMITED", message: SERVER_MINUTE_MESSAGE, retry_after: 60 })).toBe("rate_limited");
     const hourly = { code: "RATE_LIMITED", message: "at most 30 collaborator invitations per hour", hint: "this cap resets over the next hour, not the next minute", retry_after: 3600 };
     expect(kindOf(hourly)).toBe("failed");
     const out = refusal(hourly, "invitations");
@@ -221,7 +219,7 @@ describe("translation refused by a rate limit (DoD 6)", () => {
   it("PR501 6216474718: a 429 is not resent in the second round, and the body's top-level retry_after is read (not only the header)", async () => {
     const { fetchTranslationsProgressive } = await import("../ui/participate/i18n.js");
     let calls = 0;
-    const fetchImpl = async () => { calls++; return new Response(JSON.stringify({ error: "rate_limited", message: RATE_LIMIT_MESSAGE, retry_after: 120 }), { status: 429 }); }; // the body /v2/translate sends (src/translate.ts), no header
+    const fetchImpl = async () => { calls++; return new Response(JSON.stringify({ error: "rate_limited", message: SERVER_MINUTE_MESSAGE, retry_after: 120 }), { status: 429 }); }; // the body /v2/translate sends (src/translate.ts), no header
     const err: any = await fetchTranslationsProgressive({ lang: "es", context: "participant-ui", sourceTexts: { a: "Hello" }, fetchImpl }).catch((e: any) => e);
     expect(calls).toBe(1);
     expect(err.code).toBe("RATE_LIMITED"); expect(String(err.retryAfter)).toBe("120");

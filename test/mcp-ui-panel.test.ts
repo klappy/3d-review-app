@@ -13,13 +13,12 @@ const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "mcp-ui",
 afterAll(() => mf.dispose());
 const ORIGIN = "https://3dr.test";
 const ectx = () => ({ waitUntil() {}, passThroughOnException() {}, props: undefined }) as any;
-const limiter = () => ({ limit: async () => ({ success: true }) });
 let env: any; let bearer: string;
 function statements(db: D1Database, path: string) { const sql = readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n"); return sql.split(";\n").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)); }
 beforeAll(async () => {
   const db = await mf.getD1Database("DB");
   for (const f of ["../migrations/0001_init.sql", "../migrations/0002_code_escrow.sql", "../migrations/0003_language_archive.sql", "../migrations/0004_pinned_instruments.sql", "../migrations/0006_oauth_code_redemption.sql", "../migrations/0007_shared_link_context.sql", "../migrations/0008_synthetic_report.sql", "../seed/synthetic.sql"]) await db.batch(statements(db, f));
-  env = { DB: db, OAUTH_KV: await mf.getKVNamespace("OAUTH_KV"), SESSION_SECRET: "synthetic-test-secret", ENVIRONMENT: "dev", RL_MCP_ANON: limiter(), RL_HTTP_ANON: limiter(), RL_AUTH: limiter(), RL_REDEEM: limiter(), RL_MCP_CEILING: limiter() };
+  env = { DB: db, OAUTH_KV: await mf.getKVNamespace("OAUTH_KV"), SESSION_SECRET: "synthetic-test-secret", ENVIRONMENT: "dev" };
   bearer = "Bearer " + (await mintSession(env, "person_mara", "user"));
 });
 const rpc = (body: unknown, token: string | undefined = bearer) => worker.fetch(new Request(ORIGIN + "/mcp", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: token } : {}) }, body: JSON.stringify(body) }), env, ectx()).then((r) => r.json() as any);

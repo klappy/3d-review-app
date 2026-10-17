@@ -31,8 +31,6 @@ async function accessJwt(email: string) {
 const stubJwks = () => { const real = globalThis.fetch; vi.spyOn(globalThis, "fetch").mockImplementation(async (input: any, init?: any) => String(input?.url ?? input).includes("/cdn-cgi/access/certs") ? new Response(JSON.stringify(jwks)) : real(input, init)); };
 const mcpCall = (e: any, token: string | undefined, body: unknown = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "read", arguments: { capability: "cap.auth.me", params: {} } } }, path = "/mcp", extra: Record<string, string> = {}) =>
   callIn(e, path, { method: "POST", headers: { "content-type": "application/json", ...(token !== undefined ? { authorization: token } : {}), ...extra }, body: JSON.stringify(body) });
-/** In-memory limiter with the same shape as a Workers Rate Limiting binding. */
-const limiter = (limit: number) => { const seen = new Map<string, number>(); return { seen, limit: async ({ key }: { key: string }) => { const n = (seen.get(key) ?? 0) + 1; seen.set(key, n); return { success: n <= limit }; } }; };
 /** Counting proxies: every D1 prepare (with its SQL) and every KV get/put/delete/list. */
 function counting(base: any) {
   const sqls: string[] = []; const kv: string[] = [];
@@ -230,7 +228,7 @@ describe("A3 PKCE S256 is required for every client", () => {
 });
 
 describe("A4 minors (review #15 findings 5–9, 11)", () => {
-  const e2 = () => { const c = counting(env); return { ...c, e: { ...c.e, RL_MCP_ANON: limiter(100), RL_MCP_CEILING: limiter(100), RL_AUTH: limiter(100), RL_REDEEM: limiter(100) } }; };
+  const e2 = () => { const c = counting(env); return { ...c, e: { ...c.e } }; };
   it("(5)(6) non-token shapes and provider-divergent Bearer spellings → 401 with 0 D1 and 0 KV", async () => {
     const { e, sqls, kv } = e2();
     const s32 = "a".repeat(32), g16 = "g".repeat(16);

@@ -12,7 +12,6 @@
 import OAuthProvider, { OAuthError, type OAuthProviderOptions } from "@cloudflare/workers-oauth-provider";
 import app from "./index";
 import { resolvePrincipal } from "./auth";
-import { allow, clientIp, RATE_LIMIT_MESSAGE, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { OAUTH_SCOPE, oauthPrincipals, principalFromProps, type OAuthEnv, type OAuthProps, type ExternalProps } from "./oauth";
 
 const apiHandler = {
@@ -78,16 +77,11 @@ function providerFor(env: OAuthEnv): OAuthProvider<OAuthEnv> {
   return p;
 }
 
-// Pre-auth metering (src/ratelimit.ts). Review #15-1: a junk bearer must not dodge the dampener and still buy storage reads.
-//   - no credential, or a bearer that cannot be ours BY SHAPE  → RL_MCP_ANON (30/60 s per address), refused before any storage
-//   - a well-shaped bearer (may still be unknown)              → RL_MCP_CEILING (600/60 s per address) — a ceiling, not a
-//     dampener: hosted connectors reach us from a few shared addresses, so it is generous; it bounds a well-shaped-junk
-//     flood at 10 lookups/s per address per location. /token rides the same ceiling (legitimate refresh traffic is shared too).
-//   - /register, /authorize, /oauth/consent are rare human-paced steps → RL_MCP_ANON.
+// Pre-auth shape check (review #15-1): a bearer that cannot be ours BY SHAPE is refused before any storage read. No
+// rate limiter here (app-level rate limiting removed, captain 2026-10-16).
 const FIRST_PARTY = /^(st|pt)_[A-Za-z0-9_-]{32}$/;                       // src/auth.ts mintSession, handlers/common.ts randomToken
 // workers-oauth-provider: userId:grantId:secret — grantId = generateRandomString(16), secret = TOKEN_LENGTH 32, both [A-Za-z0-9_-]
 const PROVIDER_TOKEN = /^[^:\s]{1,128}:[A-Za-z0-9_-]{16}:[A-Za-z0-9_-]{32}$/;
-const ANON_PATHS = new Set(["/register", "/authorize", "/oauth/consent"]);
 /** Exactly the provider's own parse (dist handleApiRequest): `Bearer ` + token, case-sensitive, one space, no trimming. */
 const bearerOf = (authorization: string) => authorization.startsWith("Bearer ") ? authorization.substring(7) : "";
 /** 401 carrying the RFC 9728 discovery pointer, byte-compatible with what the provider itself answers for this path. */
@@ -96,8 +90,6 @@ const invalidToken = (request: Request) => {
   return new Response(JSON.stringify({ error: "invalid_token", error_description: "Invalid access token" }), { status: 401,
     headers: { "content-type": "application/json", "www-authenticate": `Bearer realm="OAuth", resource_metadata="${url.origin}/.well-known/oauth-protected-resource${url.pathname}", error="invalid_token", scope="${OAUTH_SCOPE}"` } });
 };
-const tooMany = () => new Response(JSON.stringify({ error: "rate_limited", error_description: RATE_LIMIT_MESSAGE, retry_after: RATE_LIMIT_WINDOW_SECONDS }),
-  { status: 429, headers: { "content-type": "application/json", "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) } });
 /** Mis-deploy without OAUTH_KV: a clean refusal instead of the provider's TypeError (review #15-8). */
 const notConfigured = () => new Response(JSON.stringify({ error: "temporarily_unavailable", error_description: "authorization storage is not configured" }),
   { status: 503, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -106,21 +98,17 @@ export default {
   async fetch(request: Request, env: OAuthEnv, ctx: ExecutionContext): Promise<Response> {
     const path = new URL(request.url).pathname;
     if (request.method !== "OPTIONS") {
-      const key = `ip:${clientIp(request)}`;
       const isMcp = path.startsWith("/mcp"); // EXACTLY the provider's apiRoute match (prefix) — /mcpx, /mcp.json must not slip past (re-review #15)
       if (isMcp) {
         const authorization = request.headers.get("authorization");
         const credential = authorization ? bearerOf(authorization) : "";
         const providerShaped = PROVIDER_TOKEN.test(credential);
         const plausible = !!authorization && (FIRST_PARTY.test(credential) || providerShaped);
-        if (!(await allow(env, plausible ? "RL_MCP_CEILING" : "RL_MCP_ANON", key))) return tooMany();
         // ANY Authorization header that is not exactly one plausible token (junk, two tokens, another scheme) stops here:
         // no storage lookup, and the same discovery pointer the provider would send.
         if (authorization && !plausible) return invalidToken(request);
         if (providerShaped && !env.OAUTH_KV) return notConfigured();
-      } else if (path === "/token") { if (!(await allow(env, "RL_MCP_CEILING", key))) return tooMany(); if (!env.OAUTH_KV) return notConfigured(); }
-      else if (path === "/register") { if (!(await allow(env, "RL_MCP_ANON", key))) return tooMany(); if (!env.OAUTH_KV) return notConfigured(); }
-      else if (ANON_PATHS.has(path) && !(await allow(env, "RL_MCP_ANON", key))) return tooMany();
+      } else if ((path === "/token" || path === "/register") && !env.OAUTH_KV) return notConfigured();
     }
     return providerFor(env).fetch(request, env, ctx);
   },

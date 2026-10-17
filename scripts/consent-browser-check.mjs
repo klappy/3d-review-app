@@ -64,7 +64,7 @@ async function accessJwt(email) {
   return `${head}.${body}.${b64u(sig)}`;
 }
 
-// Node http → worker.fetch bridge (the cf-connecting-ip header is what src/ratelimit.ts keys on).
+// Node http → worker.fetch bridge.
 const ectx = () => ({ waitUntil() {}, passThroughOnException() {}, props: undefined });
 let origin = "";
 const app = http.createServer(async (req, res) => {
