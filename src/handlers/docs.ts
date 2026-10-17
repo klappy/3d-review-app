@@ -89,9 +89,18 @@ function proseTokens(c: Capability): Set<string> {
   return new Set(wordsOf(`${c.notes ?? ""} ${c.ui_surface ?? ""}`));
 }
 
-/** Words a schema documents: property names and descriptions, never JSON Schema keywords or types. */
+/**
+ * Words a schema documents: property names and descriptions, never JSON Schema keywords or types.
+ * Walks every place a subschema can sit: properties, items, additionalProperties (when a schema) and
+ * the oneOf/anyOf/allOf branches, so a field under a composed schema (cap.survey.issue_link's
+ * `entry_fragment`) is docs vocabulary like any other.
+ */
 function schemaWords(schema: unknown, out: string[] = []): string[] {
   if (!schema || typeof schema !== "object") return out;
+  if (Array.isArray(schema)) {
+    for (const sub of schema) schemaWords(sub, out);
+    return out;
+  }
   const s = schema as Record<string, unknown>;
   if (typeof s.description === "string") out.push(...wordsOf(s.description));
   if (s.properties && typeof s.properties === "object") {
@@ -101,6 +110,8 @@ function schemaWords(schema: unknown, out: string[] = []): string[] {
     }
   }
   if (s.items) schemaWords(s.items, out);
+  if (s.additionalProperties && typeof s.additionalProperties === "object") schemaWords(s.additionalProperties, out);
+  for (const k of ["oneOf", "anyOf", "allOf"] as const) if (Array.isArray(s[k])) schemaWords(s[k], out);
   return out;
 }
 
@@ -113,8 +124,8 @@ type SearchIndex = {
 let searchIndex: SearchIndex | null = null;
 /**
  * Built once from the static registry: per-capability id/prose bags, document frequency, and the docs
- * vocabulary — the words the registry rows use (id, notes, UI surface, section, schema property names
- * and descriptions), TOPICS and INTENTS. JSON Schema keywords ("minProperties", "additionalProperties",
+ * vocabulary — the words the registry rows use (id, notes, UI surface, section, roles, schema property
+ * names and descriptions), TOPICS and INTENTS. JSON Schema keywords ("minProperties", "additionalProperties",
  * "maxLength") are not docs vocabulary.
  */
 function docsSearchIndex(): SearchIndex {
@@ -126,7 +137,7 @@ function docsSearchIndex(): SearchIndex {
     const bag = { id: idTokens(c), prose: proseTokens(c) };
     bags.set(c.id, bag);
     for (const t of new Set([...bag.id, ...bag.prose])) df.set(t, (df.get(t) ?? 0) + 1);
-    for (const t of [...bag.id, ...bag.prose, ...wordsOf(c.section ?? ""), ...schemaWords(c.params_schema), ...schemaWords(c.result_schema)]) vocab.add(t);
+    for (const t of [...bag.id, ...bag.prose, ...wordsOf(c.section ?? ""), ...wordsOf(c.roles ?? ""), ...schemaWords(c.params_schema), ...schemaWords(c.result_schema)]) vocab.add(t);
   }
   return (searchIndex = { n: capabilities.length, df, vocab, bags });
 }

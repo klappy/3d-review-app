@@ -148,6 +148,18 @@ describe("docs search Slice0 — tokenize / stopword / overlap rank (NLX-MCP-001
     expect((await search("feedback experience")).hits[0]?.id).toBe("cap.ops.feedback");
   });
 
+  it("#517 review: field names under oneOf/anyOf/allOf and additionalProperties are docs vocabulary", async () => {
+    // entry_fragment sits only under the oneOf branches of cap.survey.issue_link's result schema
+    const ids = (await search("link fragment")).hits.map((h) => h.id);
+    expect(ids.slice(0, 5), `link fragment → ${ids.join(",")}`).toContain("cap.survey.issue_link");
+  });
+
+  it("#517 review: words from a capability's roles text are docs vocabulary", async () => {
+    // "share" appears only in roles text ("O, M with share authority (D2)")
+    const ids = (await search("share results")).hits.map((h) => h.id);
+    expect(ids, `share results → ${ids.join(",")}`).toContain("cap.results.summary");
+  });
+
   it("#516 follow-up: a plural matches its singular capability word without outranking an id hit", async () => {
     expect((await search("list all workspaces")).hits[0]?.id).toBe("cap.workspace.list");
     expect((await search("list workspaces")).hits[0]?.id).toBe("cap.workspace.list");
