@@ -1,5 +1,5 @@
 /* v3 lane 9 L9-1: home / dashboard per Bincy screen 02. Uses lane 1's tokens when present, Bincy's teal/green as fallback. */
-.v3h { max-width: 760px; margin: 0 auto; display: grid; gap: 16px; }
+.v3h { max-width: 760px; margin: 0; /* CONTRACT § 5 (rev461 item 2): the welcome H1 starts at the page edge, no 40px indent */ display: grid; gap: 16px; }
 .v3h-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
 .v3h-head h1 { margin: 0; font-size: 1.75rem; font-weight: 700; }
 .v3h-sub { margin: 4px 0 0; color: var(--muted, #475569); }
