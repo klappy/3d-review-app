@@ -7,6 +7,7 @@ import * as resume from './participant-resume.js';
 import * as visibility from './visibility.js';
 import * as present from './present.js';
 import * as shared from './shared-link.js';
+import * as rateLimit from './rate-limit.js';
 
 // Minimal fake DOM: real-ish nodes with attributes, children and listeners. No innerHTML exists
 // on these nodes, so any HTML-string rendering in changelog.js would fail here.
@@ -174,7 +175,7 @@ function appHarness() {
   }
   const buttons = ['version', 'changelog-close', 'signout'].map(node);
   for (const b of buttons) { b.disabledLog = []; let d = false; Object.defineProperty(b, 'disabled', { get() { return d; }, set(v) { d = v; b.disabledLog.push(v); } }); }
-  const context = vm.createContext({ ...resume, ...visibility, ...present, ...shared, sharedCopy: shared.copy,
+  const context = vm.createContext({ ...resume, ...visibility, ...present, ...shared, ...rateLimit, sharedCopy: shared.copy, // app.js imports underHold & co. from rate-limit.js
     initLanguageControls: () => ({ refresh: async () => {} }),
     document: { getElementById: node, createElement: tag => node(`generated-${nodes.size}-${tag}`), querySelectorAll: sel => sel === 'button' ? [...buttons] : [] },
     sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
