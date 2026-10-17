@@ -30,7 +30,8 @@ export const NO_TRANSFER_TARGET = 'Invite someone first; you can transfer to peo
 // DoD 4: one true line per scope — roles flow workspace → grouped project only; an assessment opens only by its own grant (D9).
 export const APPLIES = {
   workspaces: 'Roles here also apply to every project in this workspace. Assessments are shared one by one.',
-  projects: 'Roles on the workspace that holds this project also apply here. Assessments are shared one by one.',
+  // A new project starts ungrouped (src/handlers/project.ts create: workspace_id null), so the line holds with or without a workspace.
+  projects: 'If this project is in a workspace, roles on that workspace also apply here. Assessments are shared one by one.',
   assessments: 'Only the people listed here can open this assessment; project and workspace roles do not.',
 };
 // DoD 4 polish (k0021): the change-role select no longer repeats the Role column — it starts on "Change to…" and lists only the other roles.
