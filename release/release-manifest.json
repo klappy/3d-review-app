@@ -1,23 +1,24 @@
 {
   "version": "0.34.11",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "805de918a543c275d99654b94c3da33d7b91655d",
+  "cookbook_commit": "776eb8022234cf91587e8abbe02eff1b2d5a0727",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.34.11.md",
-      "blob_sha": "d619af44b43e7e34a2b6a0ea1b99b3587ba746dc",
-      "sha256": "3c2365ca62caf4e0365c906ee81188489e8cf7e47d7d4bf893a24ece13a9011f"
+      "blob_sha": "765ee33d86e097946df1e76a9b2cca0ffca9069b",
+      "sha256": "f8a1a535bed8e196ce763e6dffa957a5588a68f5bc9778e8b295d58eeb960067"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "397616b6a39a2c76544d8456163c3823e3c3a90e",
-      "sha256": "cb6e4dfefc2d3a4762898bb81de12ffdcbde980dd1cdd6722cf9e44130161310"
+      "blob_sha": "e956c57cda889d29a59dc2015608ab4631b2ddd9",
+      "sha256": "be5575189c6864ce3e8e1d414c193118c44927fa3e906e48444ba2e51fec94b2"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first."
+        "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first.",
+        "Docs search: field names that sit under a composed or open-ended schema (\"link fragment\" finds cap.survey.issue_link) and the words in a capability's roles text (\"share results\" finds cap.results.summary) count as docs words, so those phrases find their capabilities as they did in 0.34.10."
       ]
     }
   }

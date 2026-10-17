@@ -7,7 +7,8 @@ export const VERSIONS = {
    "added": [],
    "changed": [],
    "fixed": [
-    "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first."
+    "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first.",
+    "Docs search: field names that sit under a composed or open-ended schema (\"link fragment\" finds cap.survey.issue_link) and the words in a capability's roles text (\"share results\" finds cap.results.summary) count as docs words, so those phrases find their capabilities as they did in 0.34.10."
    ]
   },
   {
