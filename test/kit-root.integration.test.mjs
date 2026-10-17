@@ -9,7 +9,7 @@ import { JSDOM } from 'jsdom';
 import { dataset, createTransport } from './fixtures/kit-root-transport.js';
 import * as demo from '../ui/demo.js';
 import * as v3 from '../ui/v3-shell.js';
-import { assessGlobals, bindWindowFetch } from './helpers/assess-globals.mjs';
+import { assessGlobals, bindWindowFetch, windowFetchProbe } from './helpers/assess-globals.mjs';
 
 const ASSESS_GLOBALS = await assessGlobals(); // every binding assess.js imports, derived from its own import lines (one source)
 
@@ -556,4 +556,9 @@ test('S11d: completed review — Delete assessment shows the dry-run refusal on 
   }
   assert.deepEqual(bodies.map(b => b.mode), ['dry_run', 'dry_run'], 'dry run only; no execute');
   assert.ok(!p.q('dialog[open]'), 'no confirm is offered for a refused delete');
+});
+
+test('bootPage: every Node-realm fetch path (bare fetch, mountPassages, facilitatorFetch) reaches w.fetch, never Node fetch', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  assert.deepEqual(await windowFetchProbe(p.w), ['/v2/auth/email', '/v2/assessments/probe/passages', '/v2/translate']);
 });

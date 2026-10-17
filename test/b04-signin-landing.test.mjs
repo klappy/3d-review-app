@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { JSDOM } from 'jsdom';
 import { dataset, createTransport } from './fixtures/kit-root-transport.js';
-import { assessGlobals, bindWindowFetch } from './helpers/assess-globals.mjs';
+import { assessGlobals, bindWindowFetch, windowFetchProbe } from './helpers/assess-globals.mjs';
 
 const ASSESS_GLOBALS = await assessGlobals(); // every binding assess.js imports, derived from its own import lines (one source)
 
@@ -158,4 +158,9 @@ test('S19 B04 (c): the last invitation failing and dropping out → its notice s
   const panel = p.q('[data-invite]');
   assert.equal(panel.querySelector('[data-invite-line]').textContent, 'The invitation to the project "River Valley" is no longer available: it was withdrawn, or it is not for the account you are signed in with.');
   const go = panel.querySelector('[data-invite-continue]'); assert.equal(go.getAttribute('href'), '#project/p1'); assert.ok(go.classList.contains('primary'));
+});
+
+test('bootPage: every Node-realm fetch path (bare fetch, mountPassages, facilitatorFetch) reaches w.fetch, never Node fetch', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  assert.deepEqual(await windowFetchProbe(p.w), ['/v2/auth/email', '/v2/assessments/probe/passages', '/v2/translate']);
 });
