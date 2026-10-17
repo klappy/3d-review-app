@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.0",
+  "current": "0.35.1",
   "versions": [
+    {
+      "version": "0.35.1",
+      "status": "candidate",
+      "notes_path": "releases/0.35.1.md",
+      "sections": {
+        "fixed": [
+          "Docs: the rules text for archiving an assessment (`cap.assessment.archive`) no longer says \"no inheritance\"; it says archiving needs a direct assessment grant (member+) and then member+ at the assessment's project (effective project role), so a workspace role alone never reaches it."
+        ]
+      }
+    },
     {
       "version": "0.35.0",
       "status": "candidate",
