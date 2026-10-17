@@ -1,21 +1,24 @@
 {
-  "version": "0.34.11",
+  "version": "0.35.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "776eb8022234cf91587e8abbe02eff1b2d5a0727",
+  "cookbook_commit": "e2e11758a2f3698c9b310d30a1a561d6edcd1890",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.11.md",
-      "blob_sha": "765ee33d86e097946df1e76a9b2cca0ffca9069b",
-      "sha256": "f8a1a535bed8e196ce763e6dffa957a5588a68f5bc9778e8b295d58eeb960067"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.0.md",
+      "blob_sha": "5b0b88b97bf3ef26dee5c4f44fa01374204c0c29",
+      "sha256": "113061969c778862872b3888aa4ecd57934f5d8ce54fbcdc845d0b2b184f9a82"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "e956c57cda889d29a59dc2015608ab4631b2ddd9",
-      "sha256": "be5575189c6864ce3e8e1d414c193118c44927fa3e906e48444ba2e51fec94b2"
+      "blob_sha": "3a01f47fb91449a5bd09fff0a4964b06203f5245",
+      "sha256": "f04b5968b36bce1154e903b7e4b4ce8a82d3ed6b9cce586eff468f7c534e52e4"
     }
   ],
   "changelog": {
     "sections": {
+      "added": [
+        "Your account can carry an optional **display name**: asked once after you sign in (skippable with \"Not now\", Escape or a click outside), changeable any time from the account menu (\"Your name…\"). Following the design contract (`design/CONTRACT.md` § 4–5), the home page title greets you once, \"Welcome, Ana\", replacing the separate \"Projects\" title, and the header shows just your name as the account-menu trigger; with no name set the title reads \"Welcome, <your email>\". The question never opens over the invitation screen. `GET /v2/me` returns it as `principal.display_name` and the new `PATCH /v2/me` (`cap.auth.me_update`, undoable) sets or clears it (at most 80 characters, no `<` `>`, control, zero-width or direction-override characters). Production promotion step 0: apply D1 migration `0016_display_name.sql` (additive nullable column; until it is applied `/v2/me` answers `display_name: null`)."
+      ],
       "fixed": [
         "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first.",
         "Docs search: field names that sit under a composed or open-ended schema (\"link fragment\" finds cap.survey.issue_link) and the words in a capability's roles text (\"share results\" finds cap.results.summary) count as docs words, so those phrases find their capabilities as they did in 0.34.10."
