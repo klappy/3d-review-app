@@ -141,10 +141,14 @@ test('S9 B04 (c) control: the invitations read failing never blocks sign-in — 
   await tick(30);
   assert.equal(p.w.location.hash, '#project/p1');
 });
-test('S9: a plain visit (no sign-in just happened) never asks for invitations and never redirects', async () => {
+// S40 (71b4f11, merged as #424 6c6d78e) made Home read GET /v2/me/invitations on purpose to show a quiet count line
+// (ui/assess/scope.js:426-429, ui/v3/home.js invitationsHint). The S9 rule that stands is: a plain visit never redirects to #invite.
+test('S9: a plain visit (no sign-in just happened) never redirects; the only invitations read is S40\'s Home hint', async () => {
   const p = await bootPage('owner', '#projects', { install: (t, data) => { data.routes.set('GET /v2/me/invitations', MINE); } });
   await tick(30);
-  assert.equal(p.w.location.hash, '#projects'); assert.ok(!p.served().includes('GET /v2/me/invitations'));
+  assert.equal(p.w.location.hash, '#projects');
+  assert.equal(p.served().filter(k => k === 'GET /v2/me/invitations').length, 1, 'one read, from the S40 Home hint');
+  assert.ok(!p.served().some(k => k.startsWith('POST /v2/me/invitations/')), 'nothing accepted');
 });
 test('S19 B04 (c): "Accept all" stops at the first failure — later ones untouched, the notice names the failed one, the rest stay offered', async () => {
   const evil = '<img src=x onerror="alert(1)">';

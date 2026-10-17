@@ -310,14 +310,21 @@ test('account menu is clamped to the viewport inline-size (rule guard; measured 
 
 // ---------- Bugbot 4073693743: page titles are owned by exactly one host ----------
 // Kit shell titles are the route names; page-owned titles are the pages' own (readModel) titles. Both must exist in their host, never both at once.
-const FOUR_ROUTES = [['#workspaces', 'Workspaces', 'Your workspaces'], ['#workspace/w1', 'Field team', 'Field team'], ['#projects', 'Projects', 'Choose a project'], ['#project/p1', 'River Valley', 'River Valley']];
+// #projects: #461 (03d2be2, c5d8a46; design/CONTRACT.md § 4–5) made the Home title the welcome — "Welcome, <name>", else
+// "Welcome, <email>" (ui/assess/assess.js:797, ui/v3/home.js:32) — replacing "Choose a project". The kit shell still renders its
+// "Projects" h1 (ui/kit/tree.js:36), and kit.css:92 hides it whenever the page renders its own h1; jsdom loads no linked CSS,
+// so the kit test applies that rule's selector itself and counts only the h1s it leaves visible.
+const WELCOME = 'Welcome, synthetic-owner@example.invalid';
+const KIT_SHELL_H1_HIDDEN = '.rv .content:has(> [data-content] h1) > .row > h1';
+const FOUR_ROUTES = [['#workspaces', 'Workspaces', 'Your workspaces'], ['#workspace/w1', 'Field team', 'Field team'], ['#projects', WELCOME, WELCOME], ['#project/p1', 'River Valley', 'River Valley']];
 test('non-kit host (real /assess/index.html, no #rv): each of the four loaded pages shows exactly one visible heading with its title', async () => {
   const p = await bootPage('owner', '#workspaces', { host: 'legacy' });
   assert.equal(p.q('#rv'), null, 'legacy host has no kit root'); assert.equal(p.api.kit, null, 'controller mounted no kit');
   for (const [hash, , title] of FOUR_ROUTES) {
     await p.go(hash);
     const heads = p.qa('#app h1'); assert.equal(heads.length, 1, `${hash}: one h1 in the non-kit host`); assert.equal(heads[0].textContent.trim(), title, `${hash}: title text`);
-    assert.ok(p.qa('#app .eyebrow').length >= 1, `${hash}: eyebrow present`);
+    // #461 HOLD fix 54b4714 ("no eyebrow over welcome"; ui/assess/scope.js render drops pageHead when greeting): none on #projects.
+    if (hash === '#projects') assert.equal(p.qa('#app .eyebrow').length, 0, `${hash}: no eyebrow over the welcome`); else assert.ok(p.qa('#app .eyebrow').length >= 1, `${hash}: eyebrow present`);
     assert.equal(p.text('#who'), 'synthetic-owner@example.invalid', `${hash}: existing account control unchanged`);
     if (hash === '#workspace/w1') assert.equal(p.q('#page-root a.back')?.getAttribute('href'), '#workspaces', 'non-kit workspace keeps ← All workspaces');
     if (hash === '#project/p1') assert.equal(p.q('#page-root a.back')?.getAttribute('href'), '#projects', 'non-kit project keeps ← All projects');
@@ -327,10 +334,12 @@ test('non-kit host (real /assess/index.html, no #rv): each of the four loaded pa
 });
 test('kit host (real ui/index.html): each of the four loaded pages keeps exactly ONE page heading (the shell’s), current context and controls', async () => {
   const p = await bootPage('owner', '#workspaces');
+  assert.ok(readFileSync(new URL('../ui/kit/kit.css', import.meta.url), 'utf8').includes(`${KIT_SHELL_H1_HIDDEN}{display:none}`), 'kit.css hides the shell h1 when the page owns one');
   for (const [hash, title] of FOUR_ROUTES) {
     await p.go(hash);
-    const heads = p.qa('[role=main].content h1'); assert.equal(heads.length, 1, `${hash}: exactly one h1 under the kit shell`); assert.equal(heads[0].textContent.trim(), title);
-    assert.equal(p.qa('[data-read-region] h1').length, 0, `${hash}: the page renders no second heading inside the read region`);
+    const heads = p.qa('[role=main].content h1').filter(h => !h.matches(KIT_SHELL_H1_HIDDEN)); assert.equal(heads.length, 1, `${hash}: exactly one visible h1 under the kit shell`); assert.equal(heads[0].textContent.trim(), title);
+    // #461: on #projects the welcome is the page-owned title (read region), the shell's is hidden; elsewhere the shell owns it.
+    assert.equal(p.qa('[data-read-region] h1').length, hash === '#projects' ? 1 : 0, `${hash}: the read region holds the title only where the page owns it`);
     if (hash === '#workspace/w1' || hash === '#project/p1') assert.equal(p.q('[data-content] a.back'), null, `${hash}: kit crumbs are the parent link`);
   }
   assert.deepEqual(crumbs(p), ['Home', 'Field team']); assert.equal(p.text('header.top nav.crumbs[data-component="breadcrumbs"] [aria-current="page"]'), 'River Valley'); assert.ok(p.q('[data-action-region] [data-v3-start]'));
