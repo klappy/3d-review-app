@@ -1,7 +1,18 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.34.7",
+  "current": "0.34.8",
   "versions": [
+    {
+      "version": "0.34.8",
+      "status": "candidate",
+      "notes_path": "releases/0.34.8.md",
+      "sections": {
+        "fixed": [
+          "Permissions page and MCP panel Permissions view: the scope line now says what is true since workspace roles inherit (a workspace role reaches its grouped projects; assessments are shared one by one) instead of \"nothing is inherited\". The permissions docs topic no longer says \"No inheritance\".",
+          "Permissions page: the change-role select starts on \"Change to…\" and lists only the other roles, so each row no longer shows its role twice."
+        ]
+      }
+    },
     {
       "version": "0.34.7",
       "status": "candidate",
