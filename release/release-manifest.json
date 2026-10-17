@@ -1,23 +1,23 @@
 {
-  "version": "0.35.1",
+  "version": "0.35.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "26066e34e846d9c3d772bb327d4137e5a77bc93f",
+  "cookbook_commit": "b36f417c6bdf0a36b366dfc268f52ad5d09d8f9a",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.1.md",
-      "blob_sha": "adc4f2d43ba580b246784aa1e9fedf52cd8d7b2d",
-      "sha256": "28a6d5c73ef82e41ffb98beaccd28a72f1a2931905dace610401d10e2831208c"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.2.md",
+      "blob_sha": "a5c1051a2ce6bbebe13e3651c7f4e446378a33fe",
+      "sha256": "b907df1b978182b6e829107550720c79fd051df9719c8cb4d71c8d977d63c255"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "9d5cc8d1b0215c0304fd7bcfdd187b61676e0da0",
-      "sha256": "b76396f5452e2210df6901e7a3d962ffe0ff36063c56bb5088a29f9415ec5d08"
+      "blob_sha": "26b89ea544f48e66a870e5b581951b76eb6efc59",
+      "sha256": "ed0fca177a4e056dab7df16bb3f643f21e64a584fd90e6f5c4c312796164b7b9"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Docs: the rules text for archiving an assessment (`cap.assessment.archive`) no longer says \"no inheritance\"; it says the project-scope check uses the effective project role, which a workspace role reaches for its grouped projects."
+        "Sign-in sessions: a new session's expiry is now exactly its lifetime after its creation time. Both timestamps came from two separate clock reads, so they could differ by 1 ms, which made the 30-day sign-in-link session test fail intermittently on CI."
       ]
     }
   }
