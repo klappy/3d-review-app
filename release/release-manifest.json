@@ -1,7 +1,7 @@
 {
   "version": "0.35.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "b36f417c6bdf0a36b366dfc268f52ad5d09d8f9a",
+  "cookbook_commit": "b43ec132390216dd603e34d0e5e98228364b719b",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.35.2.md",

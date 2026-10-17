@@ -16,7 +16,7 @@ afterAll(() => mf.dispose());
 const code = (e: any) => e?.code ?? e?.message;
 const escrowSecret = b64url(Uint8Array.from({ length: 32 }, (_, i) => i + 1)); // synthetic test-only key
 
-describe("Lane B: grant / request / support.unlock (D3, no inheritance, existence hidden)", () => {
+describe("Lane B: grant / request / support.unlock (D3, direct assessment grants, existence hidden)", () => {
   it("runs the D3 rules end to end on a fresh D1", async () => {
     const db = await mf.getD1Database("DB");
     const sql = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
