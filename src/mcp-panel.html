@@ -4,6 +4,8 @@
 /* stage indicator (AMEND 2): same look as the showcase tabs, but spans — not controls */
 .tabs span{flex:1;text-align:center;padding:11px 12px;color:var(--muted);border-radius:11px;font-weight:600}.tabs span[aria-current=step]{color:var(--ink);background:#ffffffd0;box-shadow:0 4px 14px #2543630d}
 .shell-nav{display:flex;align-items:center;gap:14px;flex-wrap:wrap}@media (max-width:650px){.shell-nav{gap:10px;font-size:14px}}.shell-nav a{font-weight:600}
+/* confirm Details: the Affected JSON wraps inside the sheet instead of widening the page at 390 (same rule as .rv pre in ui/style.css) */
+[data-confirm-sheet] code{white-space:pre-wrap;overflow-wrap:anywhere}
 .panel-head{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--edge)}body{padding:0 16px 32px;max-width:1120px;margin:auto}.crumbs{display:flex;flex-wrap:wrap;gap:6px;font-size:13px;margin:10px 0}.view-tabs a{flex:1;text-align:center;padding:9px 8px;color:var(--muted);border-radius:11px;font-weight:600;text-decoration:none}.view-tabs a[aria-current=page]{color:var(--ink);background:#ffffffd0}@media (max-width:650px){.view-tabs{flex-wrap:wrap}.view-tabs a{flex:1 1 30%;padding:8px 6px;font-size:14px;min-width:0}}.grid.start{align-items:start}#status.alert{color:#8a2a1c}.grants{width:100%;border-collapse:collapse}.grants td,.grants th{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}.entity-card{display:block;text-decoration:none;color:inherit}/* GENERATED from tokens.json — do not edit. 3D Review glass 2 */
 :root, [data-theme="light"] {
   --ink: #172e40;

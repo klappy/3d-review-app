@@ -1,23 +1,23 @@
 {
-  "version": "0.34.3",
+  "version": "0.34.7",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "07b4d906cd2878ff1c0451e14d043078beecd477",
+  "cookbook_commit": "5d594e45838864175c4feb6e697e3585736799ca",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.3.md",
-      "blob_sha": "a71da257fab463b04a0b798e0a42bd114cba42fa",
-      "sha256": "749fb66fb8e181d95117eb5e98bb3bbf4ad2248c585928e0251ccedb7acb3f91"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.7.md",
+      "blob_sha": "c15a6854e3614e8d74331630dcc3e780fc343cad",
+      "sha256": "c0bfcd6071c12ba32ebd2ba6a1139f54517d760a83ef5d8160899c343c7d58b4"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "9dec60302fb953c775ef84fab6ac7b9421551981",
-      "sha256": "5881eda71a48d89a12b85db8731fc9efb1968f02ed19d051b9f3c10abe3877f7"
+      "blob_sha": "aa3ce16934aac6ac4ec9de81842045900e54ef1b",
+      "sha256": "a752528c79ba970c12df3c07a202e27f07dbcdd2e5c6e325b6bae9b9488dbf3b"
     }
   ],
   "changelog": {
     "sections": {
-      "changed": [
-        "Inviting someone: the button is \"Invite\", and the confirm opens right under it, naming the address you typed and the role, with Confirm and Cancel. The separate \"Preview invitation\" step and the confirm at the bottom of the page are gone (Permissions page, collaborators panel and MCP panel)."
+      "fixed": [
+        "Permissions confirm on a phone: opening Details no longer widens the page. The Affected list now wraps inside the confirm, so the page stays 390 wide with no sideways scroll (Permissions page and MCP panel Permissions view)."
       ]
     }
   }
