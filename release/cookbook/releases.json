@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.34.10",
+  "current": "0.34.11",
   "versions": [
+    {
+      "version": "0.34.11",
+      "status": "candidate",
+      "notes_path": "releases/0.34.11.md",
+      "sections": {
+        "fixed": [
+          "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first."
+        ]
+      }
+    },
     {
       "version": "0.34.10",
       "status": "candidate",

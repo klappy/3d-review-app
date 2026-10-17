@@ -1,23 +1,23 @@
 {
-  "version": "0.34.10",
+  "version": "0.34.11",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "9121d137fe60131802dd220b3dcebdeb19989d1c",
+  "cookbook_commit": "805de918a543c275d99654b94c3da33d7b91655d",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.10.md",
-      "blob_sha": "59d00ca85a107cf0fb6ef228feb79e8f3b1c85c4",
-      "sha256": "4ff787dd27753419fa51900dae5b7ea8ca978d536eb282e2b9d323ad6ce60cb3"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.11.md",
+      "blob_sha": "d619af44b43e7e34a2b6a0ea1b99b3587ba746dc",
+      "sha256": "3c2365ca62caf4e0365c906ee81188489e8cf7e47d7d4bf893a24ece13a9011f"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "2b977dd42496c9452558c493307bd389d133305b",
-      "sha256": "aa8c8577848b35448253f2cf189024d2a169f44c330901e4042b4ba856163d65"
+      "blob_sha": "397616b6a39a2c76544d8456163c3823e3c3a90e",
+      "sha256": "cb6e4dfefc2d3a4762898bb81de12ffdcbde980dd1cdd6722cf9e44130161310"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Docs search: plain-language phrases such as \"invite someone to my assessment\" and \"undo the last thing\" now find their capability instead of returning no results; a query made mostly of words the docs never use (such as \"xyzzy flurble create\" or a guessed parameter name like \"feedback inventedparam\") still returns no results."
+        "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first."
       ]
     }
   }
