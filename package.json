@@ -3,6 +3,9 @@
   "version": "0.35.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=21"
+  },
   "scripts": {
     "stamp": "node scripts/stamp-version.mjs",
     "build:mcp-panel": "node scripts/build-mcp-panel.mjs",
@@ -13,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:ui": "node --test 'ui/**/*.test.mjs'",
+    "test:mjs": "node --test 'test/*.test.mjs'",
     "migrate:local": "wrangler d1 execute 3d-review-dev --local --file=migrations/0001_init.sql",
     "migrate:escrow:local": "wrangler d1 execute 3d-review-dev --local --file=migrations/0002_code_escrow.sql",
     "seed:local": "wrangler d1 execute 3d-review-dev --local --file=seed/synthetic.sql && wrangler d1 execute 3d-review-dev --local --file=seed/synthetic-responses.sql",

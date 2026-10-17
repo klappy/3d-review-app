@@ -9,6 +9,7 @@ import { JSDOM } from 'jsdom';
 import { dataset, createTransport } from './fixtures/kit-root-transport.js';
 import * as demo from '../ui/demo.js';
 import { redactDiagnosticPath } from '../ui/diagnostic-path.js';
+import { refusalError } from '../ui/rate-limit.js';
 import * as stage from '../ui/stage-screens.js';
 import { whatsHere } from '../ui/assess/whats-here.js';
 import * as cards from '../ui/assess/cards.js';
@@ -18,7 +19,7 @@ import * as share from '../ui/assess/share.js';
 import { feedback } from '../ui/assess/feedback.js';
 import { mountKitRoot, shellModel, bindAccountMenu } from '../ui/kit/app-adapter.js';
 import * as v3 from '../ui/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock, v3SettingsRole, V3_SUGGEST } from '../ui/assess/v3-assessment.js';
+import { demographicsSetting, demographicsBody, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock, v3SettingsRole, V3_SUGGEST } from '../ui/assess/v3-assessment.js';
 import { learnMore } from '../ui/v3/components/learn-more.js';
 import { activeUntilLine, periodText, collectLine } from '../ui/v3/components/active-until.js';
 import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
@@ -48,7 +49,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, settingsRole: v3SettingsRole, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, refusalError, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, demographicsSetting, demographicsBody, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, settingsRole: v3SettingsRole, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf }); // v3 shell imports (assess.js lines 15–16); #190
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -71,7 +72,7 @@ test('normal root: single kit header hosts the REAL account/version/link control
   assert.ok(p.q('[data-header-host] #account-menu #version')); assert.ok(p.q('[data-header-host] #account-menu #shell-links a[href="#feedback"]')); assert.ok(p.q('[data-header-host] #account-menu #account-signout'));
   assert.equal(p.q('#account-menu').hidden, true, 'secondary controls disclosed on demand'); assert.equal(p.q('header.top .me'), null, 'no identity pill: email is the identity');
   assert.equal(p.q('#shell-controls'), null, 'adoption wrapper removed');
-  assert.equal(p.text('#who'), 'Account: synthetic-owner@example.invalid');
+  assert.equal(p.text('#who'), 'synthetic-owner@example.invalid');
   assert.deepEqual(p.qa('header.top *').filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.includes('@'))).map(e => e.id), ['who'], 'private email appears exactly once (the #who node)');
   assert.equal(p.q('#account-actions').hidden, false);
   assert.equal(p.q('[role=main].content [data-content]'), p.api.app, 'controller app root IS the stable shell content element');
@@ -172,7 +173,7 @@ test('read states are distinct: refused assessments + failed languages are not e
   assert.deepEqual(treeLabels(d), ['Granted assessment']);
   assert.equal(d.q('nav[aria-label="Scopes"] a[href^="#project"]'), null); assert.equal(d.q('nav[aria-label="Scopes"] a[href^="#workspace"]'), null);
   assert.ok(!d.served().includes('GET /v2/projects/p9'), 'no discovery read of the unreadable parent');
-  assert.equal(d.text('#who'), 'Account: synthetic-direct@example.invalid');
+  assert.equal(d.text('#who'), 'synthetic-direct@example.invalid');
 });
 
 test('retained forms invoke the exact existing commands and fail closed; version dialog opens from the hosted control', async () => {
@@ -244,7 +245,7 @@ test('role contract end-to-end: Owner/Member/Viewer each display as themselves a
   for (const [identity, label, forms] of [['owner', 'Owner', []], ['member', 'Member', []], ['viewer', 'Viewer', []]]) {
     const p = await bootPage(identity, '#project/p1');
     assert.equal(p.text('header.top nav.crumbs .tree-role'), label, identity);
-    assert.equal(p.text('#who'), 'Account: synthetic-' + identity + '@example.invalid', identity + ' identity is the email, not a role');
+    assert.equal(p.text('#who'), 'synthetic-' + identity + '@example.invalid', identity + ' identity is the email, not a role');
     assert.equal(p.q('nav[aria-label="Scopes"] [aria-current="page"]').closest('.tree-row').querySelector('.tree-role').textContent, label, identity);
     assert.deepEqual(p.qa('[data-action-region] form').map(f => f.id), forms, identity + ' write forms come only from the controller role');
     assert.equal(p.qa('[data-menu-toggle]').length, 0, 'kit level menu never synthesized');
@@ -255,9 +256,9 @@ test('role contract end-to-end: Owner/Member/Viewer each display as themselves a
 test('account menu: verified email is the visible control; disclosure opens/closes by pointer and keyboard with focus return; controls keep identity across routes and reset', async () => {
   const p = await bootPage('owner', '#workspaces');
   const toggle = p.q('#account-menu-toggle'), menu = p.q('#account-menu'), who = p.q('#who'), version = p.q('#version'), signout = p.q('#account-signout');
-  assert.equal(p.text('#who'), 'Account: synthetic-owner@example.invalid'); assert.equal(menu.hidden, true);
+  assert.equal(p.text('#who'), 'synthetic-owner@example.invalid'); assert.equal(menu.hidden, true);
   toggle.click(); assert.equal(menu.hidden, false); assert.equal(toggle.getAttribute('aria-expanded'), 'true'); assert.equal(p.d.activeElement, signout, 'first enabled item focused');
-  signout.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); assert.equal(p.d.activeElement, p.q('#account-switch'));
+  signout.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); assert.equal(p.d.activeElement, p.q('#account-name'));
   p.d.activeElement.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); assert.equal(menu.hidden, true); assert.equal(p.d.activeElement, toggle, 'Escape returns focus to the toggle');
   toggle.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); assert.equal(menu.hidden, false);
   p.q('[role=main]').click(); assert.equal(menu.hidden, true, 'outside click closes');
@@ -317,7 +318,7 @@ test('non-kit host (real /assess/index.html, no #rv): each of the four loaded pa
     await p.go(hash);
     const heads = p.qa('#app h1'); assert.equal(heads.length, 1, `${hash}: one h1 in the non-kit host`); assert.equal(heads[0].textContent.trim(), title, `${hash}: title text`);
     assert.ok(p.qa('#app .eyebrow').length >= 1, `${hash}: eyebrow present`);
-    assert.equal(p.text('#who'), 'Account: synthetic-owner@example.invalid', `${hash}: existing account control unchanged`);
+    assert.equal(p.text('#who'), 'synthetic-owner@example.invalid', `${hash}: existing account control unchanged`);
     if (hash === '#workspace/w1') assert.equal(p.q('#page-root a.back')?.getAttribute('href'), '#workspaces', 'non-kit workspace keeps ← All workspaces');
     if (hash === '#project/p1') assert.equal(p.q('#page-root a.back')?.getAttribute('href'), '#projects', 'non-kit project keeps ← All projects');
   }
@@ -477,7 +478,7 @@ test('B07: a Prepare save from a rebuilt view waits for the in-flight rename (no
   assert.equal(patches.length, 1, 'Prepare waits while the rename PATCH is in flight');
   release(); await tick(24);
   assert.equal(maxInflight, 1, 'never two assessment updates at once'); assert.ok('name' in patches[0]);
-  assert.equal(patches.length, 2, 'the waiting Prepare save runs after the rename, not dropped'); assert.deepEqual(patches[1], { purpose: 'p' });
+  assert.equal(patches.length, 2, 'the waiting Prepare save runs after the rename, not dropped'); assert.deepEqual(patches[1], { purpose: 'p', demographics_enabled: false });
   assert.ok(!(p.api.state.message?.alert), 'no stale not-refreshed message');
 });
 test('B07: a write queued behind the rename is dropped when the identity resets meanwhile', async () => {
