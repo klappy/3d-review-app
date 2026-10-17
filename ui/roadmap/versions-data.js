@@ -7,7 +7,7 @@ export const VERSIONS = {
    "added": [],
    "changed": [],
    "fixed": [
-    "Docs search: plain-language phrases such as \"invite someone to my assessment\" and \"undo the last thing\" now find their capability instead of returning no results; nonsense queries still return no results."
+    "Docs search: plain-language phrases such as \"invite someone to my assessment\" and \"undo the last thing\" now find their capability instead of returning no results; a query made mostly of words the docs never use (such as \"xyzzy flurble create\" or a guessed parameter name like \"feedback inventedparam\") still returns no results."
    ]
   },
   {

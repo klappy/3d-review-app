@@ -89,6 +89,39 @@ describe("docs search Slice0 — tokenize / stopword / overlap rank (NLX-MCP-001
     expect((await search("xyzzy flurble quantum")).hits).toEqual([]);
   });
 
+  it("mixed known + unknown: mostly-unknown queries stay an honest miss (no id-token or guessed-name hit)", async () => {
+    for (const q of [
+      "xyzzy flurble create", // one generic id token among noise
+      "secretmethod unknownthing set",
+      "feedback foobar", // guessed name next to a real capability word
+      "feedback inventedparam",
+      "feedback inventedparameter",
+      "xyzzy 1", // numeric / 1-char tokens carry no coverage
+    ]) {
+      const { hits } = await search(q);
+      expect(hits, `${q} → ${hits.map((h) => h.id).join(",")}`).toEqual([]);
+    }
+  });
+
+  it("the shared cap id prefix matches nothing on its own", async () => {
+    expect((await search("cap")).hits).toEqual([]);
+    expect((await search("cap xyzzy")).hits).toEqual([]);
+    expect((await search("cap invite")).hits[0]?.id).toBe("cap.grant.invite");
+  });
+
+  it("a real word that matches no capability does not zero a strong match", async () => {
+    const cases: { q: string; expectId: string }[] = [
+      { q: "invite authentication", expectId: "cap.grant.invite" },
+      { q: "invite participants troubleshooting", expectId: "cap.grant.invite" },
+      { q: "undo recommendations", expectId: "cap.ops.undo" },
+      { q: "invite collaborators", expectId: "cap.grant.invite" },
+    ];
+    for (const { q, expectId } of cases) {
+      const ids = (await search(q)).hits.map((h) => h.id);
+      expect(ids[0], `${q} → ${ids.join(",")}`).toBe(expectId);
+    }
+  });
+
   it("does not invent params schema on search hits", async () => {
     const { hits } = await search("create assessment");
     for (const h of hits) {

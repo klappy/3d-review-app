@@ -1,23 +1,23 @@
 {
   "version": "0.34.10",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "eb8fa6b7027e3364bbeb29ddd88fa8c30e583d3b",
+  "cookbook_commit": "9121d137fe60131802dd220b3dcebdeb19989d1c",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.34.10.md",
-      "blob_sha": "25b3907e3e3e1720254ca714be295982459708e4",
-      "sha256": "2982a1d2680575be8a0092f74c5c73610ac653e27752bdce2f5208c02b122e25"
+      "blob_sha": "59d00ca85a107cf0fb6ef228feb79e8f3b1c85c4",
+      "sha256": "4ff787dd27753419fa51900dae5b7ea8ca978d536eb282e2b9d323ad6ce60cb3"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "1841c12f401cf6f5ec7cb48c083b8a6c5335adeb",
-      "sha256": "af7450b8491c556e2f99c12e342bd8dc8b6dad77e1654377aa13a1170b9945c7"
+      "blob_sha": "2b977dd42496c9452558c493307bd389d133305b",
+      "sha256": "aa8c8577848b35448253f2cf189024d2a169f44c330901e4042b4ba856163d65"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Docs search: plain-language phrases such as \"invite someone to my assessment\" and \"undo the last thing\" now find their capability instead of returning no results; nonsense queries still return no results."
+        "Docs search: plain-language phrases such as \"invite someone to my assessment\" and \"undo the last thing\" now find their capability instead of returning no results; a query made mostly of words the docs never use (such as \"xyzzy flurble create\" or a guessed parameter name like \"feedback inventedparam\") still returns no results."
       ]
     }
   }
