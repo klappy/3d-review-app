@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.34.6",
+  "current": "0.34.7",
   "versions": [
+    {
+      "version": "0.34.7",
+      "status": "candidate",
+      "notes_path": "releases/0.34.7.md",
+      "sections": {
+        "fixed": [
+          "Permissions confirm on a phone: opening Details no longer widens the page. The Affected list now wraps inside the confirm, so the page stays 390 wide with no sideways scroll (Permissions page and MCP panel Permissions view)."
+        ]
+      }
+    },
     {
       "version": "0.34.6",
       "status": "candidate",

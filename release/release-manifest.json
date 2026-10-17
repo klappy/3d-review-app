@@ -1,23 +1,23 @@
 {
-  "version": "0.34.6",
+  "version": "0.34.7",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "2aff7dfefb12e13e98ef225bacd53e805449b15d",
+  "cookbook_commit": "5d594e45838864175c4feb6e697e3585736799ca",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.6.md",
-      "blob_sha": "3f223a54d8b9360744a81f5a8bcdc14c17a5af8f",
-      "sha256": "a42b57426256ca74bcf4d2fd34cd8f8d1c7ac9788df9b2a1fa45aff2b06e87b4"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.7.md",
+      "blob_sha": "c15a6854e3614e8d74331630dcc3e780fc343cad",
+      "sha256": "c0bfcd6071c12ba32ebd2ba6a1139f54517d760a83ef5d8160899c343c7d58b4"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "c0257f7e8285aefab900757303c3449f77ef36fe",
-      "sha256": "fdf849aa98bffcddcdf66f179649c23742c3bb4ed69bcf1a6a7da350b7e08eb5"
+      "blob_sha": "aa3ce16934aac6ac4ec9de81842045900e54ef1b",
+      "sha256": "a752528c79ba970c12df3c07a202e27f07dbcdd2e5c6e325b6bae9b9488dbf3b"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Setup step 1 on a phone: the sticky Cancel/Continue strip is now opaque with a hairline top edge, so the Location, Facilitator and other fields no longer show through it while you scroll. A focused field still scrolls clear of the strip, as before."
+        "Permissions confirm on a phone: opening Details no longer widens the page. The Affected list now wraps inside the confirm, so the page stays 390 wide with no sideways scroll (Permissions page and MCP panel Permissions view)."
       ]
     }
   }
