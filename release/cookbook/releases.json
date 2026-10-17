@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.1",
+  "current": "0.35.2",
   "versions": [
+    {
+      "version": "0.35.2",
+      "status": "candidate",
+      "notes_path": "releases/0.35.2.md",
+      "sections": {
+        "fixed": [
+          "Sign-in sessions: a new session's expiry is now exactly its lifetime after its creation time. Both timestamps came from two separate clock reads, so they could differ by 1 ms, which made the 30-day sign-in-link session test fail intermittently on CI."
+        ]
+      }
+    },
     {
       "version": "0.35.1",
       "status": "candidate",
