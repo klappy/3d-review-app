@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.34.9",
+  "current": "0.34.10",
   "versions": [
+    {
+      "version": "0.34.10",
+      "status": "candidate",
+      "notes_path": "releases/0.34.10.md",
+      "sections": {
+        "fixed": [
+          "Docs search: plain-language phrases such as \"invite someone to my assessment\" and \"undo the last thing\" now find their capability instead of returning no results; nonsense queries still return no results."
+        ]
+      }
+    },
     {
       "version": "0.34.9",
       "status": "candidate",
