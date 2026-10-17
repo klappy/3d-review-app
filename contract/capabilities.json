@@ -8,12 +8,12 @@
     "sha": "0f4413768c4365054372d917619311d7c2a00e96"
   },
   "counts": {
-    "total": 92,
+    "total": 93,
     "read": 34,
     "write.effect": 12,
-    "write.reversible": 39,
+    "write.reversible": 40,
     "write.dangerous": 7,
-    "v2.0-bcs": 87,
+    "v2.0-bcs": 88,
     "v2.1-oct": 5,
     "paths_inferred": 37,
     "inverse_unassessed": 0
@@ -167,12 +167,109 @@
       "slice": "v2.0-bcs",
       "section": "A. Entry, identity, session",
       "ui_surface": "header/scope badge",
-      "notes": "grants + roles per scope",
+      "notes": "grants + roles per scope; principal.display_name is the account's optional display name (string or null; null for participants and when none is set) \u2014 screens greet by it with the email as fallback (captain ruling a1, 2026-10-02)",
       "status": "target",
       "inverse": {
         "kind": "n/a"
       },
-      "public": false
+      "public": false,
+      "result_schema": {
+        "type": "object",
+        "required": [
+          "principal",
+          "grants"
+        ],
+        "properties": {
+          "principal": {
+            "type": "object",
+            "required": [
+              "id",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "grants": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    {
+      "id": "cap.auth.me_update",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "PATCH",
+        "path": "/v2/me",
+        "path_inferred": false
+      },
+      "roles": "any signed-in account (own account only)",
+      "slice": "v2.0-bcs",
+      "section": "A. Entry, identity, session",
+      "ui_surface": "sign-up name prompt (skippable) + account menu \"Your name\u2026\"",
+      "notes": "set or clear the signed-in account's optional display_name (captain ruling a1, 2026-10-02): trimmed, inner whitespace collapsed, at most 80 characters, no < > or control characters; \"\" or null clears it. Participants have no account (NOT_AUTHORIZED_AT_SCOPE). Undo restores the prior name",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "self:restore-prior",
+        "provenance": "receipt carries the prior display_name"
+      },
+      "undo_token": true,
+      "public": false,
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80
+          }
+        }
+      },
+      "result_schema": {
+        "type": "object",
+        "required": [
+          "principal"
+        ],
+        "properties": {
+          "principal": {
+            "type": "object",
+            "required": [
+              "id",
+              "display_name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
     },
     {
       "id": "cap.participant.redeem_code",

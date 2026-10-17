@@ -872,6 +872,51 @@ paths:
       - session: []
       - bearer: []
       - participant: []
+    patch:
+      operationId: cap.auth.me_update
+      summary: 'cap.auth.me_update — write.reversible — roles: any signed-in account (own account only)'
+      description: Set or clear the signed-in account's optional display_name (captain ruling a1, 2026-10-02). Trimmed, inner whitespace collapsed, at most 80 characters, no < > or control characters; an empty string or null clears it. GET /v2/me returns it as principal.display_name, and screens greet by it with the email as fallback. Participants have no account. Undo restores the prior name.
+      x-capability: cap.auth.me_update
+      x-class: write.reversible
+      x-tool: write
+      x-slice: v2.0-bcs
+      x-inverse:
+        kind: 'true'
+        via: self:restore-prior
+      x-roles: any signed-in account (own account only)
+      x-path-inferred: false
+      tags:
+      - A. Entry, identity, session
+      responses:
+        '200':
+          description: ok envelope; result is {principal {id, display_name}}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        4XX:
+          description: error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      security:
+      - session: []
+      - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - display_name
+              properties:
+                display_name:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 80
   /v2/me/invitations:
     get:
       operationId: cap.me.invitations

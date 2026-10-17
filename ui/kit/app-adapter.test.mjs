@@ -98,3 +98,8 @@ test('role labels: owner/member/viewer display as themselves in shell and tree; 
   const unknown = shellModel({ route: { kind: 'project', id: 'p1' }, routes, principal: { id: 'x' }, known: { projects: [{ id: 'p1', name: 'P', role: 'admin' }], workspaces: new Map(), lists: new Map() } });
   assert.equal(unknown.role, '', 'unknown role is not promoted to any label'); assert.equal(unknown.nodes[0].role, undefined);
 });
+
+test('rev461 design-lens § 5: the projects home has no eyebrow above the welcome H1', () => {
+  assert.equal(shellModel({ route: { kind: 'projects' }, routes, principal: { id: 'u' }, welcome: true }).eyebrow, '');
+  assert.equal(shellModel({ route: { kind: 'projects' }, routes, principal: { id: 'u' } }).eyebrow, 'Your projects', 'with no welcome line the old head keeps its label');
+});
