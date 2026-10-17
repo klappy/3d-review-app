@@ -774,7 +774,7 @@ const NAME_MAX = 80;
 function displayName(v) {
   if (typeof v !== 'string') return '';
   const s = v.normalize('NFC').replace(/\s+/g, ' ').trim();
-  return s && [...s].length <= NAME_MAX && !/[<>\u0000-\u001f\u007f-\u009f]/.test(s) ? s : '';
+  return s && [...s].length <= NAME_MAX && !/[<>\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/.test(s) ? s : '';
 }
 let accountSeq = 0; // rev461 W1: only the latest greeting call may write the header
 async function loadAccountEmail() {
@@ -782,7 +782,8 @@ async function loadAccountEmail() {
   if (demo) { who.textContent = 'Sample account'; accountControls(false); return; }
   const identity = identityGeneration, credential = token;
   const name = displayName(state.principal?.display_name);
-  if (name) { who.textContent = `Hi, ${name}`; accountControls(true, accountBusy); return; }
+  // CONTRACT § 4: the header shows the name only (the account-menu trigger); the greeting is the home H1, never a second "Hi".
+  if (name) { who.textContent = name; accountControls(true, accountBusy); return; }
   who.textContent = 'Checking account…'; accountControls(true, accountBusy);
   try {
     const headers = { accept: 'application/json' }; if (credential) headers.authorization = `Bearer ${credential}`;
@@ -790,7 +791,10 @@ async function loadAccountEmail() {
     const value = response.ok ? await response.json() : null;
     if (identity !== identityGeneration || credential !== token || seq !== accountSeq || displayName(state.principal?.display_name)) return; // W1: a later call or a saved name wins
     // U03 (lanes-1321): sandbox and cookie sessions have no account view; say "Signed in", never a failure sentence.
-    who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Signed in';
+    const email = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? value.email.trim() : '';
+    who.textContent = email ? `Account: ${email}` : 'Signed in';
+    // CONTRACT § 4 fallback: with no saved name the home title reads "Welcome, <email>".
+    if (email && state.accountEmail !== email) { state.accountEmail = email; if (route(location.hash).kind === 'projects') void render(); }
   } catch { if (identity === identityGeneration && credential === token && seq === accountSeq && !displayName(state.principal?.display_name)) who.textContent = 'Signed in'; }
 }
 // B44 (captain report 20:39): ONE sign-out for Sign out, Use another account and every caller (ctx.signOut). It never sends the
@@ -849,13 +853,15 @@ function maybeAskName() {
   try { if (localStorage.getItem(NAME_SKIP_KEY(pr.id))) return; } catch {}
   openNameDialog();
 }
+let nameSaving = false; // rev461 W2: one PATCH at a time; Save is disabled while it runs
 async function saveName(event) {
   event?.preventDefault?.();
   const dialog = document.getElementById('account-name-dialog'), input = document.getElementById('account-name-input'), status = document.getElementById('account-name-status');
-  if (!state.principal || !input) return;
+  if (!state.principal || !input || nameSaving) return;
   const raw = input.value.replace(/\s+/g, ' ').trim(), name = displayName(raw);
   if (raw && !name) { if (status) status.textContent = `Use up to ${NAME_MAX} characters, without < or >.`; return; }
-  const identity = identityGeneration;
+  const identity = identityGeneration, save = document.getElementById('account-name-save');
+  nameSaving = true; if (save) save.disabled = true;
   try {
     const r = await api('/v2/me', { method: 'PATCH', body: { display_name: name || null } });
     if (identity !== identityGeneration) return;
@@ -863,6 +869,7 @@ async function saveName(event) {
     dialog?.close(); void loadAccountEmail();
     if (route(location.hash).kind === 'projects') void render(); // rev461 W2: the home "Welcome, <name>" line follows the save
   } catch { if (status) status.textContent = 'Your name could not be saved. Try again.'; }
+  finally { nameSaving = false; if (save) save.disabled = false; }
 }
 function skipName() {
   const pr = state.principal; if (pr) { try { localStorage.setItem(NAME_SKIP_KEY(pr.id), '1'); } catch {} }
@@ -873,6 +880,10 @@ function bindAccountControls() {
   document.getElementById('account-name')?.addEventListener('click', () => { if (!accountBusy && state.principal) openNameDialog(); });
   document.getElementById('account-name-form')?.addEventListener('submit', saveName);
   document.getElementById('account-name-skip')?.addEventListener('click', skipName);
+  // CONTRACT § 5: Escape and the backdrop mean "Not now" (rev461 N4).
+  const nameDialog = document.getElementById('account-name-dialog');
+  nameDialog?.addEventListener('cancel', event => { event.preventDefault(); skipName(); });
+  nameDialog?.addEventListener('click', event => { if (event.target === nameDialog) skipName(); });
   const dialog = document.getElementById('account-switch-dialog');
   document.getElementById('account-switch')?.addEventListener('click', () => { if (!accountBusy && state.principal) dialog?.showModal(); });
   document.getElementById('account-switch-cancel')?.addEventListener('click', () => dialog?.close());
@@ -902,7 +913,7 @@ function ctxFor(extra = {}) {
   const stale = () => Promise.reject(Object.assign(new Error('This view is no longer current.'), { code: 'STALE_VIEW' }));
   // shellOwnsTitle (Bugbot 4073693743): explicit host contract — only a mounted kit root shows the page title in its header, so only
   // then do scope pages omit their own heading. The non-kit /assess/index.html host keeps page-owned headings.
-  return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, shellOwnsTitle: !!kit, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
+  return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, displayName, shellOwnsTitle: !!kit, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
     // Review F2: a completion arriving after the view was replaced must not navigate the newer route (it cannot undo a dispatched write).
     go: (hash, { reload = false } = {}) => { if (!live()) return; if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
 }
@@ -1001,7 +1012,7 @@ function resetIdentity() {
   accountBusy = false; accountControls(false); accountStatus();
   document.getElementById('account-switch-dialog')?.close(); document.getElementById('account-name-dialog')?.close();
   document.getElementById('feedback-dialog')?.remove(); // S54/rev444: the in-place feedback dialog belongs to the old identity
-  state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
+  state.share = null; state.collectLinks.clear(); state.principal = null; state.accountEmail = ''; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
   state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false; state.myInvitations = null; printLangs.clear();
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
@@ -1071,7 +1082,6 @@ async function boot() {
     app.innerHTML = `<div class="narrow panel"><h1>Sign in to open this page</h1><p class="muted">Sign in first, then open this address again:</p><p><code>${esc(here)}</code></p><p><a class="button primary" href="#">Go to sign in</a> <a class="button" href="/v2/auth/access">Sign in with an email code</a></p></div>`;
     return; }
   void loadAccountEmail();
-  maybeAskName(); // captain a1: asked at sign-up, skippable
   // The retired legacy backlink stays hidden; capability inventory is machine-readable metadata only.
   const back = document.getElementById('legacy-link'); if (back) back.hidden = true;
   // A12 (R1/I1): a transient failure here renders a retryable message, never a blank page.
@@ -1085,6 +1095,8 @@ async function boot() {
     const linkInvite = !!(pendingInvite || storedInvite());
     const mine = linkInvite ? [] : await loadMyInvitations(); if (mine === null || identity !== identityGeneration) return;
     try { history.replaceState(null, '', location.pathname + location.search + signInLanding({ invite: linkInvite || mine.length > 0, projects: state.projects })); } catch {} } }
+  // rev461 W1: asked after the landing, and never over the invitation or entry screens (a first sign-in from an invitation lands on #invite).
+  if (identity === identityGeneration && !['invite', 'entry'].includes(route(location.hash).kind)) maybeAskName(); // captain a1: asked at sign-up, skippable
   listen();
   await render();
 }

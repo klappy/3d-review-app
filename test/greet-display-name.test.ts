@@ -1,4 +1,4 @@
-// Greet by name (captain ruling a1, 2026-10-02): an optional display_name on the account (migration 0015), set or cleared by
+// Greet by name (captain ruling a1, 2026-10-02): an optional display_name on the account (migration 0016), set or cleared by
 // PATCH /v2/me (cap.auth.me_update, undoable), returned by GET /v2/me (cap.auth.me) as principal.display_name; null = email greeting.
 import { readFileSync } from "node:fs";
 import { afterAll, describe, expect, it } from "vitest";
@@ -81,7 +81,7 @@ describe("greet by display name (captain a1)", () => {
     expect((await authMe(ana(), {})).result.principal.display_name).toBe("Ana");
   });
 
-  it("before migration 0015 is applied, GET /v2/me still answers with display_name null (production promotes the migration as step 0)", async () => {
+  it("before migration 0016 is applied, GET /v2/me still answers with display_name null (production promotes the migration as step 0)", async () => {
     const db = await setup("OLD", false);
     expect((await authMe(mk(db, { kind: "user", id: "usr_ana" }), {})).result.principal).toMatchObject({ id: "usr_ana", display_name: null });
   });

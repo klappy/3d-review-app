@@ -447,8 +447,11 @@ const projects = {
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('projects', model);
-    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW, invitations: (model.invitations || []).length, name: ctx.state?.principal?.display_name || '' }); // captain a1: greet by name, email greeting otherwise
-    return readRegion(`${pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`);
+    // CONTRACT § 4–5: the welcome is the page title, by saved name (same cleaner as the header, rev461 N2), else the email; with
+    // neither, the existing "Projects" head stays.
+    const greet = (ctx.displayName ? ctx.displayName(ctx.state?.principal?.display_name) : '') || ctx.state?.accountEmail || '';
+    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW, invitations: (model.invitations || []).length, name: greet });
+    return readRegion(`${greet ? '' : pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, projects, model);

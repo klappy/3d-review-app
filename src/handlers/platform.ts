@@ -81,14 +81,17 @@ export function cleanDisplayName(v: unknown): string | null {
   const s = v.normalize("NFC").replace(/\s+/g, " ").trim();
   if (!s) return null;
   if ([...s].length > DISPLAY_NAME_MAX) throw new CapError("INVALID_PARAMS", `display_name is at most ${DISPLAY_NAME_MAX} characters`);
-  if (/[<>]/.test(s) || /[\u0000-\u001f\u007f-\u009f]/.test(s)) throw new CapError("INVALID_PARAMS", "display_name may not contain < > or control characters");
+  if (/[<>]/.test(s) || /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/.test(s)) throw new CapError("INVALID_PARAMS", "display_name may not contain < >, control, zero-width or direction-override characters"); // rev461 N1
   return s;
 }
-async function readDisplayName(ctx: Parameters<Handler>[0], principalId: string): Promise<string | null> {
+const missingColumn = (e: unknown) => /no such column/i.test(String((e as { message?: unknown })?.message ?? e));
+/** rev461 W3: only a not-yet-migrated column (0016) reads as "no name" on GET /v2/me; any other read failure is thrown. The update
+ *  path passes strict = true so a failed prior-value read never becomes a receipt whose undo would clear the name. */
+async function readDisplayName(ctx: Parameters<Handler>[0], principalId: string, strict = false): Promise<string | null> {
   try {
     const row = await ctx.db.prepare("SELECT display_name FROM principal WHERE id = ?").bind(principalId).first<{ display_name: string | null }>();
     return typeof row?.display_name === "string" && row.display_name ? row.display_name : null;
-  } catch { return null; } // column not migrated yet (0015): no name, the email greeting stands
+  } catch (e) { if (!strict && missingColumn(e)) return null; throw e; } // column not migrated yet (0016): no name, the email greeting stands
 }
 
 export const authMe: Handler = async (ctx) => {
@@ -110,7 +113,7 @@ export const authMeUpdate: Handler = async (ctx, p) => {
   // not that account (support redeeming someone else's token) is refused instead of renaming itself.
   if (p.id !== undefined && p.id !== pr.id) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "a display name can only be changed by its own account");
   const next = cleanDisplayName(p.display_name);
-  const prior = await readDisplayName(ctx, pr.id);
+  const prior = await readDisplayName(ctx, pr.id, true);
   await ctx.db.prepare("UPDATE principal SET display_name = ? WHERE id = ?").bind(next, pr.id).run();
   return { result: { principal: { id: pr.id, display_name: next } }, scope: { type: "platform", id: "account" }, priorState: { id: pr.id, display_name: prior } };
 };

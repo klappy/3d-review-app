@@ -26,8 +26,11 @@ export function invitationsHint(n) {
   return `<p class="v3h-meta v3h-invites" data-v3h-invitations>You have ${n} invitation${n === 1 ? '' : 's'} waiting. <a href="#invite/list" data-v3h-invitations-link>See ${n === 1 ? 'the invitation' : 'invitations'}</a></p>`;
 }
 export function homeView({ projects = [], shared = [], listFor, stageLabel = s => ESC(s), start = '', title = '', invitations = 0, name = '' }) {
-  const welcome = typeof name === 'string' && name.trim() ? `<p class="v3h-welcome" data-v3h-welcome>Welcome, ${ESC(name.trim())}</p>` : '';
-  const head = `<link rel="stylesheet" href="${HOME_CSS}"><div class="v3h-head"><div>${welcome}${title ? `<h1>${ESC(title)}</h1>` : ''}<p class="v3h-sub">Your 3D Reviews, newest first.</p>${invitationsHint(invitations)}</div>${start}</div>`;
+  // Design contract § 4–5 (design/CONTRACT.md, adopted 2026-10-16): greet once, as the page title. With a name (or, failing that,
+  // the email) the welcome IS the H1 and replaces the separate title; the primary sits on the H1's row (1280) or under the subline (390).
+  const who = typeof name === 'string' ? name.trim() : '';
+  const h1 = who ? `<h1 class="fs-h1" data-v3h-welcome>Welcome, ${ESC(who)}</h1>` : title ? `<h1>${ESC(title)}</h1>` : '';
+  const head = `<link rel="stylesheet" href="${HOME_CSS}"><div class="v3h-head"><div class="v3h-title">${h1}<p class="v3h-sub">Your 3D Reviews, newest first.</p>${invitationsHint(invitations)}</div>${start}</div>`;
   // B28: one card per review across all projects (+ B03 shared ones, sub-line "Shared with you"), newest first; then one card per
   // project that has no review to show (empty, not loaded, or archived) so nothing is hidden.
   const reviews = projects.filter(p => !p.archived_at).flatMap(p => { const l = listFor(p.id) || {}; return l.status === 'loaded' ? l.list.map(a => ({ a, sub: p.name })) : []; })

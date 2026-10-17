@@ -10,7 +10,7 @@
 /* stage indicator (AMEND 2): same look as the showcase tabs, but spans — not controls */
 .tabs span{flex:1;text-align:center;padding:11px 12px;color:var(--muted);border-radius:11px;font-weight:600}.tabs span[aria-current=step]{color:var(--ink);background:#ffffffd0;box-shadow:0 4px 14px #2543630d}
 .shell-nav{display:flex;align-items:center;gap:14px;flex-wrap:wrap}@media (max-width:650px){.shell-nav{gap:10px;font-size:14px}}.shell-nav a{font-weight:600}
-.account{display:flex;flex-wrap:wrap;align-items:center;gap:6px;max-width:100%;min-width:0}.account #who{overflow-wrap:anywhere;white-space:normal;max-width:100%}.account [hidden]{display:none}#account-status{flex-basis:100%;font-size:13px}#account-switch-dialog,#account-name-dialog{max-width:min(520px,calc(100vw - 32px))}
+.account{display:flex;flex-wrap:wrap;align-items:center;gap:6px;max-width:100%;min-width:0}.account #who{display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;min-width:0;vertical-align:bottom}.account [hidden]{display:none}#account-status{flex-basis:100%;font-size:13px}#account-switch-dialog{max-width:min(520px,calc(100vw - 32px))}#account-name-dialog{width:min(560px,calc(100% - 32px));max-width:min(560px,calc(100% - 32px))}
 </style>
 <link rel="stylesheet" href="/stage-screens.css">
 <link rel="stylesheet" href="/report-cards.css">
