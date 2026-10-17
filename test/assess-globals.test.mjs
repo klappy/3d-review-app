@@ -24,12 +24,14 @@ test('bindWindowFetch: mountPassages and facilitatorFetch use w.fetch, never Nod
   const w = dom.window, seen = [];
   w.fetch = async (url, init = {}) => { seen.push([String(url), init.headers?.authorization || null]); return { ok: false, status: 404, json: async () => ({ ok: false, error: { message: 'synthetic' } }) }; };
   const nodeFetch = globalThis.fetch;
-  globalThis.fetch = () => { throw new Error('Node fetch reached'); };
   try {
     bindWindowFetch(w, G);
+    await globalThis.fetch('/v2/auth/email'); // a bare fetch in a Node-realm module (scope.js) reaches w.fetch
+    globalThis.fetch = () => { throw new Error('Node fetch reached'); }; // from here, any default to globalThis.fetch fails
     w.mountPassages({ root: w.document.getElementById('r'), aid: 'a1', mayEdit: false, esc: s => String(s), token: () => 't1' });
+    w.mountPassages({ root: w.document.getElementById('r'), aid: 'a2', mayEdit: false, esc: s => String(s), token: () => 't3', fetchImpl: undefined });
     await new Promise(r => setTimeout(r, 0));
     await w.facilitatorFetch('t2')('/v2/translate', {});
   } finally { globalThis.fetch = nodeFetch; }
-  assert.deepEqual(seen, [['/v2/assessments/a1/passages', 'Bearer t1'], ['/v2/translate', 'Bearer t2']]);
+  assert.deepEqual(seen, [['/v2/auth/email', null], ['/v2/assessments/a1/passages', 'Bearer t1'], ['/v2/assessments/a2/passages', 'Bearer t3'], ['/v2/translate', 'Bearer t2']]);
 });
