@@ -58,7 +58,7 @@ function syncShell(page = null) {
   // A workspace page has already loaded its workspace: keep it in the same identity-scoped cache workspaceFor() uses (cleared by
   // resetIdentity) so later crumbs can name it without a discovery read. Data only; never a new request.
   if (page?.kind === 'workspace' && page.model?.status === 'loaded' && page.model.workspace?.id) state.workspaces.set(page.model.workspace.id, { id: page.model.workspace.id, name: page.model.workspace.name, role: page.model.workspace.role, projects: (page.model.projects || []).map(x => x.id) });
-  kit.update(v3Model(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() })));
+  kit.update(v3Model(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow(), welcome: !!(displayName(state.principal?.display_name) || state.accountEmail) })));
   placeDemoNotice(); // Bugbot 4073693755: the shell repaint preserves only its content/header hosts; the disclosure is restored by the controller
 }
 // Demo disclosure (Bugbot 4073693755): ONE controller-owned node, built once, placed before the content element and re-placed by the
@@ -663,6 +663,7 @@ async function render() {
   // B02: signed in, "/" is the current work (#projects), never the public welcome with its Sign in choice.
   if (landsOnWork(route(location.hash), state.principal)) { try { history.replaceState(null, '', location.pathname + location.search + '#projects'); } catch {} }
   const gen = ++generation, r = route(location.hash);
+  askDeferredName(r.kind); // rev461 B1: the invitee who accepted and left #invite is asked now, once
   if (wizardHandle) { try { wizardHandle.destroy(); } catch {} wizardHandle = null; }
   currentShareRoute();
   // K3a root lifecycle (kit only): the shell reflects the new route from data already held, and the previous view is destroyed
@@ -853,6 +854,18 @@ function maybeAskName() {
   try { if (localStorage.getItem(NAME_SKIP_KEY(pr.id))) return; } catch {}
   openNameDialog();
 }
+// rev461 B1: a first sign-in that lands on #invite or #entry is not asked there (W1); the ask waits for the first later render on a
+// work route (accepting lands on #projects through hashchange → render, never boot). Once per identity; resetIdentity clears it.
+let nameAskDeferred = false;
+function askNameAfterLanding(kind) { if (['invite', 'entry'].includes(kind)) { nameAskDeferred = true; return; } nameAskDeferred = false; maybeAskName(); }
+function askDeferredName(kind) { if (nameAskDeferred && !['invite', 'entry'].includes(kind)) askNameAfterLanding(kind); }
+// rev461 F1: only a click outside the dialog's box is the backdrop. A click in the dialog's own padding also targets the dialog
+// element, so the target alone is not enough (CONTRACT § 5: the backdrop means "Not now", the panel does not).
+function isBackdropClick(dialog, event) {
+  if (!dialog || event?.target !== dialog || typeof dialog.getBoundingClientRect !== 'function') return false;
+  const r = dialog.getBoundingClientRect(), x = event.clientX, y = event.clientY;
+  return x < r.left || x > r.right || y < r.top || y > r.bottom;
+}
 let nameSaving = false; // rev461 W2: one PATCH at a time; Save is disabled while it runs
 async function saveName(event) {
   event?.preventDefault?.();
@@ -883,7 +896,7 @@ function bindAccountControls() {
   // CONTRACT § 5: Escape and the backdrop mean "Not now" (rev461 N4).
   const nameDialog = document.getElementById('account-name-dialog');
   nameDialog?.addEventListener('cancel', event => { event.preventDefault(); skipName(); });
-  nameDialog?.addEventListener('click', event => { if (event.target === nameDialog) skipName(); });
+  nameDialog?.addEventListener('click', event => { if (isBackdropClick(nameDialog, event)) skipName(); }); // rev461 F1
   const dialog = document.getElementById('account-switch-dialog');
   document.getElementById('account-switch')?.addEventListener('click', () => { if (!accountBusy && state.principal) dialog?.showModal(); });
   document.getElementById('account-switch-cancel')?.addEventListener('click', () => dialog?.close());
@@ -1008,7 +1021,7 @@ function scrubCredentialHash() {
 }
 function resetIdentity() {
   identityGeneration += 1; generation += 1; epoch += 1;
-  pendingRename = null; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
+  pendingRename = null; nameAskDeferred = false; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
   accountBusy = false; accountControls(false); accountStatus();
   document.getElementById('account-switch-dialog')?.close(); document.getElementById('account-name-dialog')?.close();
   document.getElementById('feedback-dialog')?.remove(); // S54/rev444: the in-place feedback dialog belongs to the old identity
@@ -1096,7 +1109,7 @@ async function boot() {
     const mine = linkInvite ? [] : await loadMyInvitations(); if (mine === null || identity !== identityGeneration) return;
     try { history.replaceState(null, '', location.pathname + location.search + signInLanding({ invite: linkInvite || mine.length > 0, projects: state.projects })); } catch {} } }
   // rev461 W1: asked after the landing, and never over the invitation or entry screens (a first sign-in from an invitation lands on #invite).
-  if (identity === identityGeneration && !['invite', 'entry'].includes(route(location.hash).kind)) maybeAskName(); // captain a1: asked at sign-up, skippable
+  if (identity === identityGeneration) askNameAfterLanding(route(location.hash).kind); // captain a1: asked at sign-up, skippable; B1: deferred past #invite
   listen();
   await render();
 }
