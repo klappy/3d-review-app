@@ -7,10 +7,24 @@ import { readFileSync } from 'node:fs';
 const ASSESS_URL = new URL('../../ui/assess/assess.js', import.meta.url);
 const UI_ROOT = new URL('../../ui/', import.meta.url);
 const IMPORT = /^import\s+(.+?)\s+from\s+'([^']+)';$/gm;
+const IMPORT_LINE = /^import\b.*$/gm;
+
+// Every `^import` line must match IMPORT. The harnesses' strip removes each one, so a line the regex skips (double
+// quotes, side-effect `import '/x'`, a multi-line clause) would vanish without its bindings being injected.
+export function importsOf(src) {
+  const lines = src.match(IMPORT_LINE) || [];
+  const matched = [...src.matchAll(IMPORT)];
+  if (matched.length !== lines.length) {
+    const seen = new Set(matched.map(m => m[0]));
+    const missed = lines.filter(l => !seen.has(l)).map(l => JSON.stringify(l)).join(', ');
+    throw new Error(`assess-globals: ${lines.length} import lines but ${matched.length} matched; unmatched: ${missed}`);
+  }
+  return matched.map(([, clause, spec]) => ({ clause, spec }));
+}
 
 export async function assessGlobals() {
   const out = {};
-  for (const [, clause, spec] of readFileSync(ASSESS_URL, 'utf8').matchAll(IMPORT)) {
+  for (const { clause, spec } of importsOf(readFileSync(ASSESS_URL, 'utf8'))) {
     const mod = await import(new URL(spec.startsWith('/') ? spec.slice(1) : spec, spec.startsWith('/') ? UI_ROOT : ASSESS_URL).href);
     const ns = clause.match(/^\*\s+as\s+(\w+)$/);
     if (ns) { out[ns[1]] = mod; continue; }
@@ -23,4 +37,13 @@ export async function assessGlobals() {
     }
   }
   return out;
+}
+
+// The imported modules live in Node's realm, so a `fetchImpl = globalThis.fetch` default is Node's real fetch, not the
+// window's synthetic transport. Bind the two that assess.js calls without a fetchImpl (passages.js mountPassages,
+// print-lang.js facilitatorFetch) to `w.fetch`, read at call time, so they can never reach Node's fetch.
+export function bindWindowFetch(w, globals) {
+  const viaWindow = (...a) => w.fetch(...a);
+  w.mountPassages = deps => globals.mountPassages({ fetchImpl: viaWindow, ...deps });
+  w.facilitatorFetch = (token, fetchImpl = viaWindow) => globals.facilitatorFetch(token, fetchImpl);
 }
