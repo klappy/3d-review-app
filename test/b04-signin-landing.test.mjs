@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { JSDOM } from 'jsdom';
 import { dataset, createTransport } from './fixtures/kit-root-transport.js';
-import { assessGlobals } from './helpers/assess-globals.mjs';
+import { assessGlobals, bindWindowFetch } from './helpers/assess-globals.mjs';
 
 const ASSESS_GLOBALS = await assessGlobals(); // every binding assess.js imports, derived from its own import lines (one source)
 
@@ -34,6 +34,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
   Object.assign(w, ASSESS_GLOBALS); // assess.js runs as a classic script with its imports stripped, so each import is a window global
+  bindWindowFetch(w, ASSESS_GLOBALS); // mountPassages / facilitatorFetch default to Node's fetch; route them through w.fetch
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
