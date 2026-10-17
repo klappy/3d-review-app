@@ -1,27 +1,23 @@
 {
-  "version": "0.35.0",
+  "version": "0.35.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "de4e1ba8191f0a141c83b694ddc496f20bab9cd7",
+  "cookbook_commit": "26066e34e846d9c3d772bb327d4137e5a77bc93f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.0.md",
-      "blob_sha": "daecc98923a1bcc1182682331622780f0377a724",
-      "sha256": "da4c81cd1a6a8b9b801e438d645def9e2ec1cbacdc7ed4398709dabe8359eaf3"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.1.md",
+      "blob_sha": "adc4f2d43ba580b246784aa1e9fedf52cd8d7b2d",
+      "sha256": "28a6d5c73ef82e41ffb98beaccd28a72f1a2931905dace610401d10e2831208c"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "4a58a942b315c8f3b3890f02dc7f44411dbc3392",
-      "sha256": "efe9a7dba34e791824aa337fbe3836e713a91421f177c2d89a445e1090265b60"
+      "blob_sha": "9d5cc8d1b0215c0304fd7bcfdd187b61676e0da0",
+      "sha256": "b76396f5452e2210df6901e7a3d962ffe0ff36063c56bb5088a29f9415ec5d08"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Your account can carry an optional **display name**: asked once after you sign in (skippable with \"Not now\", Escape or a click outside), changeable any time from the account menu (\"Your name…\"). Following the design contract (`design/CONTRACT.md` § 4–5), the home page title greets you once, \"Welcome, Ana\", replacing the separate \"Projects\" title, and the header shows just your name as the account-menu trigger; with no name set the title reads \"Welcome, <your email>\". The question never opens over the invitation screen. `GET /v2/me` returns it as `principal.display_name` and the new `PATCH /v2/me` (`cap.auth.me_update`, undoable) sets or clears it (at most 80 characters, no `<` `>`, control, zero-width or direction-override characters). Production promotion step 0: apply D1 migration `0016_display_name.sql` (additive nullable column; until it is applied `/v2/me` answers `display_name: null`)."
-      ],
       "fixed": [
-        "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first.",
-        "Docs search: every word a capability row carries still counts as a docs word except JSON Schema keyword names and types — including field names under a composed or open-ended schema (\"link fragment\" finds cap.survey.issue_link), roles text (\"share results\" finds cap.results.summary) and the other capability fields (\"withdraw invitation\" finds cap.grant.revoke_invitation) — so those phrases find their capabilities as they did in 0.34.10."
+        "Docs: the rules text for archiving an assessment (`cap.assessment.archive`) no longer says \"no inheritance\"; it says the project-scope check uses the effective project role, which a workspace role reaches for its grouped projects."
       ]
     }
   }
