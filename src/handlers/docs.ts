@@ -81,6 +81,7 @@ function proseTokens(c: Capability): Set<string> {
   return bag;
 }
 
+const UNKNOWN_NAME_MIN = 14;
 let docFreq: Map<string, number> | null = null;
 /** How many capabilities mention a token in id or prose (computed once from the static registry). */
 function tokenDocFreq(): Map<string, number> {
@@ -97,13 +98,17 @@ function tokenDocFreq(): Map<string, number> {
  * so one unknown token no longer zeroes a capability. A capability qualifies when a query token hits
  * its id, or when its prose covers at least half the query tokens (rounded up). Each hit is weighted
  * by rarity (rare tokens such as "invite" outrank common ones such as "assessment"); id hits weigh
- * 10x prose hits. A query with no known token stays an honest miss.
+ * 10x prose hits. A query with no known token, or with a long token no capability mentions, stays
+ * an honest miss.
  */
 function scoreCapability(c: Capability, tokens: string[]): number {
   if (tokens.length === 0) return 0;
   const idBag = idTokens(c);
   const proseBag = proseTokens(c);
   const df = tokenDocFreq();
+  // A long token no capability mentions reads as a named thing that does not exist
+  // ("feedback inventedparameter"): an honest miss beats a guessed answer.
+  if (tokens.some((t) => t.length >= UNKNOWN_NAME_MIN && !df.has(t))) return 0;
   const n = capabilities.length;
   let idHits = 0;
   let proseHits = 0;
