@@ -145,7 +145,7 @@ test('account email read forbids redirect, does not repaint work and ignores sta
 test('greet by name (captain a1): the header shows the display_name only (CONTRACT § 4, no second greeting), the email stays the fallback',async()=>{
   const h=harness();let fetched=0;h.setFetch(async()=>{fetched++;return {ok:true,json:async()=>({email:'ana@example.invalid'})};});
   h.state.principal={id:'usr_ana',kind:'user',display_name:'  Ana   Ruiz '};await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Ana Ruiz');assert.equal(fetched,0);
-  for(const display_name of [null,'','   ','<b>x</b>','x'.repeat(81)]){h.state.principal={id:'usr_ana',kind:'user',display_name};await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Account: ana@example.invalid');}
+  for(const display_name of [null,'','   ','<b>x</b>','x'.repeat(81)]){h.state.principal={id:'usr_ana',kind:'user',display_name};await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'ana@example.invalid');} // design/CONTRACT.md:68 (§ 4): the header shows who is signed in, no label
   assert.equal(fetched,5);
 });
 test('rev461 W1: an email lookup still in flight never overwrites the name greeting',async()=>{
@@ -155,7 +155,7 @@ test('rev461 W1: an email lookup still in flight never overwrites the name greet
   release();await pending;assert.equal(h.nodes.get('who').textContent,'Ana');
 });
 test('account email is text only and failures remove previous email',async()=>{
-  const h=harness();h.setFetch(async()=>({ok:true,json:async()=>({email:'<synthetic>@example.invalid'})}));await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Account: <synthetic>@example.invalid');
+  const h=harness();h.setFetch(async()=>({ok:true,json:async()=>({email:'<synthetic>@example.invalid'})}));await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'<synthetic>@example.invalid'); // design/CONTRACT.md:68: who is signed in, no label
   h.setFetch(async()=>{throw Error('redirect');});await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Signed in');
 });
 

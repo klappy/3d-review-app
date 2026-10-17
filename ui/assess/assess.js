@@ -792,7 +792,7 @@ async function loadAccountEmail() {
     if (identity !== identityGeneration || credential !== token || seq !== accountSeq || displayName(state.principal?.display_name)) return; // W1: a later call or a saved name wins
     // U03 (lanes-1321): sandbox and cookie sessions have no account view; say "Signed in", never a failure sentence.
     const email = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? value.email.trim() : '';
-    who.textContent = email ? `Account: ${email}` : 'Signed in';
+    who.textContent = email || 'Signed in'; // design/CONTRACT.md:68 (§ 4): the header shows who is signed in, no "Account:" label
     // CONTRACT § 4 fallback: with no saved name the home title reads "Welcome, <email>".
     if (email && state.accountEmail !== email) { state.accountEmail = email; if (route(location.hash).kind === 'projects') void render(); }
   } catch { if (identity === identityGeneration && credential === token && seq === accountSeq && !displayName(state.principal?.display_name)) who.textContent = 'Signed in'; }
