@@ -62,23 +62,46 @@ export const DOCS_SEARCH_STOPWORDS = Object.freeze([
 
 const STOPWORD_SET = new Set<string>(DOCS_SEARCH_STOPWORDS);
 
+/** The one docs-search normalization: lowercase, every non-alphanumeric run → a word break. */
+const wordsOf = (text: string) => String(text).toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter(Boolean);
+
 /** Normalize + tokenize a docs `q`; drops frozen stopwords. Empty ⇒ truthful miss. */
 export function tokenizeDocsQuery(q: string): string[] {
-  const normalized = String(q).toLowerCase().trim().replace(/[^a-z0-9]+/g, " ");
-  return normalized.split(/\s+/).filter((t) => t.length > 0 && !STOPWORD_SET.has(t));
+  return wordsOf(q).filter((t) => !STOPWORD_SET.has(t));
 }
 
+/**
+ * Glue words the honest-miss gate does not count (they are kept for ranking). Plain English joins a
+ * guessed name to a real word with them ("feedback with inventedparam", "create xyzzy and the"); the
+ * docs prose uses them too, so as "known" words they would carry a guess past the gate. Not the
+ * frozen stopword list above, which still governs tokenization.
+ */
+const GATE_FILLER = new Set<string>([
+  "and", "or", "with", "without", "is", "are", "was", "be", "it", "its", "this", "that", "these", "those",
+  "of", "in", "on", "at", "by", "from", "into", "as", "so", "but", "not", "no", "all", "any", "some",
+]);
+
 function idTokens(c: Capability): Set<string> {
-  const bag = new Set<string>();
-  for (const part of c.id.toLowerCase().split(/[._]/)) if (part) bag.add(part);
-  return bag;
+  return new Set(wordsOf(c.id));
 }
 
 function proseTokens(c: Capability): Set<string> {
-  const bag = new Set<string>();
-  const prose = `${c.notes ?? ""} ${c.ui_surface ?? ""}`.toLowerCase().replace(/[^a-z0-9]+/g, " ");
-  for (const t of prose.split(/\s+/)) if (t) bag.add(t);
-  return bag;
+  return new Set(wordsOf(`${c.notes ?? ""} ${c.ui_surface ?? ""}`));
+}
+
+/** Words a schema documents: property names and descriptions, never JSON Schema keywords or types. */
+function schemaWords(schema: unknown, out: string[] = []): string[] {
+  if (!schema || typeof schema !== "object") return out;
+  const s = schema as Record<string, unknown>;
+  if (typeof s.description === "string") out.push(...wordsOf(s.description));
+  if (s.properties && typeof s.properties === "object") {
+    for (const [name, sub] of Object.entries(s.properties as Record<string, unknown>)) {
+      out.push(...wordsOf(name));
+      schemaWords(sub, out);
+    }
+  }
+  if (s.items) schemaWords(s.items, out);
+  return out;
 }
 
 type SearchIndex = {
@@ -88,10 +111,11 @@ type SearchIndex = {
   bags: Map<string, { id: Set<string>; prose: Set<string> }>;
 };
 let searchIndex: SearchIndex | null = null;
-const wordsOf = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter(Boolean);
 /**
  * Built once from the static registry: per-capability id/prose bags, document frequency, and the docs
- * vocabulary — every word the registry rows (all fields, schemas included), TOPICS and INTENTS use.
+ * vocabulary — the words the registry rows use (id, notes, UI surface, section, schema property names
+ * and descriptions), TOPICS and INTENTS. JSON Schema keywords ("minProperties", "additionalProperties",
+ * "maxLength") are not docs vocabulary.
  */
 function docsSearchIndex(): SearchIndex {
   if (searchIndex) return searchIndex;
@@ -102,18 +126,22 @@ function docsSearchIndex(): SearchIndex {
     const bag = { id: idTokens(c), prose: proseTokens(c) };
     bags.set(c.id, bag);
     for (const t of new Set([...bag.id, ...bag.prose])) df.set(t, (df.get(t) ?? 0) + 1);
-    for (const t of wordsOf(JSON.stringify(c))) vocab.add(t);
+    for (const t of [...bag.id, ...bag.prose, ...wordsOf(c.section ?? ""), ...schemaWords(c.params_schema), ...schemaWords(c.result_schema)]) vocab.add(t);
   }
   return (searchIndex = { n: capabilities.length, df, vocab, bags });
 }
 
 /**
- * Query tokens that can tell capabilities apart: drops 1-char and numeric tokens, and tokens every
- * capability carries (the shared `cap` id prefix), which match everything and so mean nothing.
+ * Query tokens that can tell capabilities apart, each counted once: drops repeats, 1-char and numeric
+ * tokens, and tokens every capability carries (the shared `cap` id prefix), which match everything
+ * and so mean nothing.
  */
 function informativeTokens(tokens: string[], idx: SearchIndex): string[] {
-  return tokens.filter((t) => t.length > 1 && !/^[0-9]+$/.test(t) && (idx.df.get(t) ?? 0) < idx.n);
+  return [...new Set(tokens)].filter((t) => t.length > 1 && !/^[0-9]+$/.test(t) && (idx.df.get(t) ?? 0) < idx.n);
 }
+
+/** Singular of a plural query word ("workspaces" → "workspace"), or null. */
+const singular = (t: string) => (t.length > 3 && t.endsWith("s") && !t.endsWith("ss") ? t.slice(0, -1) : null);
 
 /**
  * Partial overlap (NLX-MCP-001 phrases): plain phrases carry filler words ("someone", "last thing"),
@@ -125,28 +153,35 @@ function informativeTokens(tokens: string[], idx: SearchIndex): string[] {
 function scoreCapability(c: Capability, tokens: string[], idx: SearchIndex): number {
   if (tokens.length === 0) return 0;
   const bag = idx.bags.get(c.id)!;
-  let idHits = 0;
+  let idHit = false;
   let proseHits = 0;
   let score = 0;
   for (const t of tokens) {
     const weight = Math.log((idx.n + 1) / ((idx.df.get(t) ?? 0) + 1)) + 1;
-    if (bag.id.has(t)) { idHits += 1; score += 10 * weight; }
-    else if (bag.prose.has(t)) { proseHits += 1; score += weight; }
+    const one = singular(t);
+    if (bag.id.has(t)) { idHit = true; score += 10 * weight; }
+    else if (bag.prose.has(t) || (one && (bag.id.has(one) || bag.prose.has(one)))) {
+      // A plural that only matches as its singular ("workspaces" vs cap.workspace.list) weighs like a
+      // prose hit, so it can break a tie between id rows without outranking a real id hit.
+      proseHits += 1; score += weight;
+    }
   }
-  if (idHits === 0 && proseHits < Math.ceil(tokens.length / 2)) return 0;
+  if (!idHit && proseHits < Math.ceil(tokens.length / 2)) return 0;
   return score;
 }
 
 /**
- * Honest miss: a query in which at least half the tokens are words the docs never use anywhere
- * (registry rows, schemas, topics) reads as guessed names or noise — "feedback inventedparam",
- * "xyzzy flurble create" — and returns no hits rather than a guess (TOPICS: check the schema instead
- * of guessing names). A real phrase with one stray word ("invite someone to my assessment",
- * "invite authentication") is mostly vocabulary and still ranks.
+ * Honest miss: a query in which at least half the tokens (glue words not counted) are words the docs
+ * never use anywhere (registry rows, schema fields, topics) reads as guessed names or noise —
+ * "feedback inventedparam", "feedback with inventedparam", "xyzzy flurble create" — and returns no hits
+ * rather than a guess (TOPICS: check the schema instead of guessing names). A real phrase with one
+ * stray word ("invite someone to my assessment", "invite authentication") is mostly vocabulary and
+ * still ranks.
  */
 function mostlyUnknown(tokens: string[], idx: SearchIndex): boolean {
-  const unknown = tokens.filter((t) => !idx.vocab.has(t)).length;
-  return unknown * 2 >= tokens.length;
+  const counted = tokens.filter((t) => !GATE_FILLER.has(t));
+  const unknown = counted.filter((t) => !idx.vocab.has(t) && !idx.vocab.has(singular(t) ?? "")).length;
+  return unknown * 2 >= counted.length;
 }
 
 const DOCS_SEARCH_HIT_CAP = 5;

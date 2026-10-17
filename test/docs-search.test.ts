@@ -122,6 +122,38 @@ describe("docs search Slice0 — tokenize / stopword / overlap rank (NLX-MCP-001
     }
   });
 
+  it("#516 follow-up: a glue word does not carry a guessed name past the gate", async () => {
+    for (const q of ["feedback with inventedparam", "feedback inventedparam is the", "create xyzzy and the"]) {
+      const { hits } = await search(q);
+      expect(hits, `${q} → ${hits.map((h) => h.id).join(",")}`).toEqual([]);
+    }
+    // glue words still rank when the rest of the phrase is real
+    expect((await search("feedback with note")).hits[0]?.id).toBe("cap.ops.feedback");
+  });
+
+  it("#516 follow-up: a repeated word counts once (gate and weight)", async () => {
+    for (const q of ["invite invite xyzzy", "feedback feedback inventedparam"]) {
+      const { hits } = await search(q);
+      expect(hits, `${q} → ${hits.map((h) => h.id).join(",")}`).toEqual([]);
+    }
+    expect((await search("invite invite")).hits).toEqual((await search("invite")).hits);
+    expect((await search("undo undo the last thing")).hits).toEqual((await search("undo the last thing")).hits);
+  });
+
+  it("#516 follow-up: JSON Schema keywords are not docs vocabulary; schema field names are", async () => {
+    for (const q of ["feedback minproperties", "feedback maxlength", "feedback additionalproperties"]) {
+      const { hits } = await search(q);
+      expect(hits, `${q} → ${hits.map((h) => h.id).join(",")}`).toEqual([]);
+    }
+    expect((await search("feedback experience")).hits[0]?.id).toBe("cap.ops.feedback");
+  });
+
+  it("#516 follow-up: a plural matches its singular capability word without outranking an id hit", async () => {
+    expect((await search("list all workspaces")).hits[0]?.id).toBe("cap.workspace.list");
+    expect((await search("list workspaces")).hits[0]?.id).toBe("cap.workspace.list");
+    expect((await search("invite participants troubleshooting")).hits[0]?.id).toBe("cap.grant.invite");
+  });
+
   it("does not invent params schema on search hits", async () => {
     const { hits } = await search("create assessment");
     for (const h of hits) {
