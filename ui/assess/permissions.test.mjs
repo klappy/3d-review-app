@@ -367,8 +367,13 @@ test('DoD 4 (workspace-permissions): the scope line is true per scope — never 
   for (const scope of ['workspaces', 'projects', 'assessments']) {
     const html = permissions.render({ esc }, { ...m, scope }); assert.ok(html.includes(esc(APPLIES[scope])), scope); assert.doesNotMatch(html, /nothing is inherited/);
   }
-  assert.match(APPLIES.workspaces, /every project in this workspace/); assert.match(APPLIES.projects, /workspace/); assert.match(APPLIES.assessments, /project and workspace roles do not/);
-  assert.doesNotMatch(read('../mcp/panel-src.html'), /nothing is inherited/);
+  assert.match(APPLIES.workspaces, /every project in this workspace/); assert.match(APPLIES.assessments, /project and workspace roles do not/);
+  // #514 low (a): a new project starts ungrouped, so the project line is conditional — true with or without a workspace.
+  assert.match(APPLIES.projects, /^If this project is in a workspace, /); assert.doesNotMatch(APPLIES.projects, /workspace that holds this project/);
+  // #514 low (c): no permissions surface carries the retired copy — MCP panel source + build, assess page + its modules, docs topic.
+  for (const f of ['../mcp/panel-src.html', '../../src/mcp-panel.html', './index.html', './permissions.js', './scope.js', '../scope-invitations.js', '../../src/handlers/docs.ts']) {
+    assert.doesNotMatch(read(f), /nothing is inherited|no inheritance|workspace that holds this project/i, f);
+  }
 });
 
 test('DoD 4 polish (k0021): change-role select starts on "Change to…", lists only the other roles; no choice → a sentence, no PATCH', async () => {

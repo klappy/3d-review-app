@@ -1,24 +1,23 @@
 {
-  "version": "0.34.8",
+  "version": "0.34.9",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "a5f4e6e43939abdf5543c1346475d4f0b909aefd",
+  "cookbook_commit": "7c7bfefd5f985a212f496b87d1593a709149ded5",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.8.md",
-      "blob_sha": "f30c82fe469d99c4063478f51d27fcd58e0ad853",
-      "sha256": "42b61de9eae240c1c8c6b052fdde89a37f6f7292ff048ffcbefb39e8cb6360ec"
+      "path": "planning/2026-09-16-parity-build/releases/0.34.9.md",
+      "blob_sha": "152b9385c4f8a2525064cec07e295228ea9a42c6",
+      "sha256": "fd5ab080a8412cac3a5ef2c8b20c5fab4b693d27c87cbfc9cbd8ab96e53c9b48"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "807bd880ddaa38ee6ef1b2083e92bdc81fbfed41",
-      "sha256": "f8423439d690c525e28d92accafcddfc55fc6cad8c3ecc4e8fd0c3bb4b41c242"
+      "blob_sha": "6d4aae23c4737a92fb50900d12e36ad76f9da804",
+      "sha256": "fdfbfaeb86ac65708a37be424ea6612ea409a4ace6df8143dfadd18d3990aad1"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Permissions page and MCP panel Permissions view: the scope line now says what is true since workspace roles inherit (a workspace role reaches its grouped projects; assessments are shared one by one) instead of \"nothing is inherited\". The permissions docs topic no longer says \"No inheritance\".",
-        "Permissions page: the change-role select starts on \"Change to…\" and lists only the other roles, so each row no longer shows its role twice."
+        "Permissions page for a project: the scope line now reads \"If this project is in a workspace, roles on that workspace also apply here.\" so it stays true for a new project that is not in a workspace yet."
       ]
     }
   }

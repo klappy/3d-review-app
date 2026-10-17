@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { del } from "../src/handlers/assessment";
 import { execute } from "../src/dispatch";
-import { sha256 } from "../src/handlers/common";
+import { loadProject, sha256 } from "../src/handlers/common";
 import type { Ctx } from "../src/handlers/types";
 
 // Delete assessment stays protected now that workspace roles inherit to grouped projects (eb72ea5): a workspace or
@@ -34,6 +34,10 @@ describe("delete assessment stays protected under workspace inheritance", () => 
     await grant("g4", "u_aown", "assessment", "asm_empty", "owner");
     await grant("g5", "u_aown", "assessment", "asm_full", "owner");
 
+    // Precondition: u_wsown holds no project grant yet is project owner of prj_1 by inheritance (max of project and grouping
+    // workspace grant), the same role as the direct project owner — so the D9 refusal below is not a missing-role artifact.
+    expect(await db.prepare('SELECT id FROM "grant" WHERE principal_id = ? AND scope_type = \'project\'').bind("u_wsown").first()).toBeNull();
+    for (const who of ["u_wsown", "u_pown"]) expect((await loadProject(mk(who), "prj_1", "owner")).role).toBe("owner");
     // A workspace owner (inherited project owner) and a direct project owner see nothing: D9, unauthorized == nonexistent.
     for (const who of ["u_wsown", "u_pown"]) {
       await expect(del(mk(who), { id: "asm_empty" }, { dryRun: true })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
