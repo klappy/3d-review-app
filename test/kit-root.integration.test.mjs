@@ -8,24 +8,10 @@ import vm from 'node:vm';
 import { JSDOM } from 'jsdom';
 import { dataset, createTransport } from './fixtures/kit-root-transport.js';
 import * as demo from '../ui/demo.js';
-import { redactDiagnosticPath } from '../ui/diagnostic-path.js';
-import { refusalError } from '../ui/rate-limit.js';
-import * as stage from '../ui/stage-screens.js';
-import { whatsHere } from '../ui/assess/whats-here.js';
-import * as cards from '../ui/assess/cards.js';
-import { pages, css as scopeCss, landsOnWork } from '../ui/assess/scope.js';
-import { views, css as viewsCss } from '../ui/assess/views.js';
-import * as share from '../ui/assess/share.js';
-import { feedback } from '../ui/assess/feedback.js';
-import { mountKitRoot, shellModel, bindAccountMenu } from '../ui/kit/app-adapter.js';
 import * as v3 from '../ui/v3-shell.js';
-import { demographicsSetting, demographicsBody, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock, v3SettingsRole, V3_SUGGEST } from '../ui/assess/v3-assessment.js';
-import { learnMore } from '../ui/v3/components/learn-more.js';
-import { activeUntilLine, periodText, collectLine } from '../ui/v3/components/active-until.js';
-import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
-import { sidebarTree } from '../ui/v3/components/sidebar-tree.js';
-import { mountEditableHeading } from '../ui/v3/components/editable-heading.js';
-import { showSavedStatus, undoTokenOf } from '../ui/v3/components/saved-status.js';
+import { assessGlobals } from './helpers/assess-globals.mjs';
+
+const ASSESS_GLOBALS = await assessGlobals(); // every binding assess.js imports, derived from its own import lines (one source)
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const HTML = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
@@ -49,7 +35,7 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, refusalError, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, demographicsSetting, demographicsBody, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, settingsRole: v3SettingsRole, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, ASSESS_GLOBALS); // assess.js runs as a classic script with its imports stripped, so each import is a window global
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -487,7 +473,7 @@ test('B07: a Prepare save from a rebuilt view waits for the in-flight rename (no
   assert.equal(patches.length, 1, 'Prepare waits while the rename PATCH is in flight');
   release(); await tick(24);
   assert.equal(maxInflight, 1, 'never two assessment updates at once'); assert.ok('name' in patches[0]);
-  assert.equal(patches.length, 2, 'the waiting Prepare save runs after the rename, not dropped'); assert.deepEqual(patches[1], { purpose: 'p', demographics_enabled: false });
+  assert.equal(patches.length, 2, 'the waiting Prepare save runs after the rename, not dropped'); assert.deepEqual(patches[1], { purpose: 'p', lwc: null, demographics_enabled: false }); // the real page imports lwcFrom (assess.js:2, used at :574), so the body carries lwc
   assert.ok(!(p.api.state.message?.alert), 'no stale not-refreshed message');
 });
 test('B07: a write queued behind the rename is dropped when the identity resets meanwhile', async () => {
