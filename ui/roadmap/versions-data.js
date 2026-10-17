@@ -10,7 +10,7 @@ export const VERSIONS = {
    "changed": [],
    "fixed": [
     "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first.",
-    "Docs search: field names that sit under a composed or open-ended schema (\"link fragment\" finds cap.survey.issue_link) and the words in a capability's roles text (\"share results\" finds cap.results.summary) count as docs words, so those phrases find their capabilities as they did in 0.34.10."
+    "Docs search: every word a capability row carries still counts as a docs word except JSON Schema keyword names and types — including field names under a composed or open-ended schema (\"link fragment\" finds cap.survey.issue_link), roles text (\"share results\" finds cap.results.summary) and the other capability fields (\"withdraw invitation\" finds cap.grant.revoke_invitation) — so those phrases find their capabilities as they did in 0.34.10."
    ]
   },
   {

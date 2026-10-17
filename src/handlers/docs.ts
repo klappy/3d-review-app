@@ -90,28 +90,39 @@ function proseTokens(c: Capability): Set<string> {
 }
 
 /**
- * Words a schema documents: property names and descriptions, never JSON Schema keywords or types.
- * Walks every place a subschema can sit: properties, items, additionalProperties (when a schema) and
- * the oneOf/anyOf/allOf branches, so a field under a composed schema (cap.survey.issue_link's
- * `entry_fragment`) is docs vocabulary like any other.
+ * JSON Schema keywords (and `x-` extension keys, matched below): structure, not docs vocabulary. Their
+ * values still are — an `enum`/`const` value, a `$ref` target, a `description` — only the key names drop.
  */
-function schemaWords(schema: unknown, out: string[] = []): string[] {
-  if (!schema || typeof schema !== "object") return out;
-  if (Array.isArray(schema)) {
-    for (const sub of schema) schemaWords(sub, out);
+const SCHEMA_KEYWORDS = new Set<string>([
+  "type", "required", "properties", "patternProperties", "additionalProperties", "items", "prefixItems",
+  "oneOf", "anyOf", "allOf", "not", "enum", "const", "$ref", "$defs", "definitions", "$schema", "$id",
+  "description", "format", "pattern", "default", "examples", "minLength", "maxLength", "minItems",
+  "maxItems", "uniqueItems", "minProperties", "maxProperties", "minimum", "maximum", "exclusiveMinimum",
+  "exclusiveMaximum", "multipleOf", "nullable", "readOnly", "writeOnly",
+]);
+/** Keys whose children are names (property / definition names), never keywords. */
+const NAME_MAPS = new Set<string>(["properties", "patternProperties", "$defs", "definitions"]);
+
+/**
+ * Every word a capability row carries — all fields (id, notes, inverse, http, error codes,
+ * shared_link_contract, schemas …) as 0.34.10's `JSON.stringify(c)` vocabulary did — minus JSON Schema
+ * keyword key names and `type` values ("string", "object"). Property names, descriptions, enum/const
+ * values and $ref targets stay docs words.
+ */
+function rowWords(v: unknown, out: string[] = [], key = "", names = false): string[] {
+  if (v === null || v === undefined) return out;
+  if (typeof v !== "object") {
+    if (key !== "type" || names) out.push(...wordsOf(String(v)));
     return out;
   }
-  const s = schema as Record<string, unknown>;
-  if (typeof s.description === "string") out.push(...wordsOf(s.description));
-  if (s.properties && typeof s.properties === "object") {
-    for (const [name, sub] of Object.entries(s.properties as Record<string, unknown>)) {
-      out.push(...wordsOf(name));
-      schemaWords(sub, out);
-    }
+  if (Array.isArray(v)) {
+    for (const sub of v) rowWords(sub, out, key, false);
+    return out;
   }
-  if (s.items) schemaWords(s.items, out);
-  if (s.additionalProperties && typeof s.additionalProperties === "object") schemaWords(s.additionalProperties, out);
-  for (const k of ["oneOf", "anyOf", "allOf"] as const) if (Array.isArray(s[k])) schemaWords(s[k], out);
+  for (const [k, sub] of Object.entries(v as Record<string, unknown>)) {
+    if (names || (!SCHEMA_KEYWORDS.has(k) && !k.startsWith("x-"))) out.push(...wordsOf(k));
+    rowWords(sub, out, names ? "" : k, !names && NAME_MAPS.has(k));
+  }
   return out;
 }
 
@@ -124,9 +135,9 @@ type SearchIndex = {
 let searchIndex: SearchIndex | null = null;
 /**
  * Built once from the static registry: per-capability id/prose bags, document frequency, and the docs
- * vocabulary — the words the registry rows use (id, notes, UI surface, section, roles, schema property
- * names and descriptions), TOPICS and INTENTS. JSON Schema keywords ("minProperties", "additionalProperties",
- * "maxLength") are not docs vocabulary.
+ * vocabulary — every word the registry rows use (all fields, schemas included: see `rowWords`), TOPICS
+ * and INTENTS. JSON Schema keyword names ("minProperties", "additionalProperties", "maxLength") and
+ * `type` values are not docs vocabulary.
  */
 function docsSearchIndex(): SearchIndex {
   if (searchIndex) return searchIndex;
@@ -137,7 +148,7 @@ function docsSearchIndex(): SearchIndex {
     const bag = { id: idTokens(c), prose: proseTokens(c) };
     bags.set(c.id, bag);
     for (const t of new Set([...bag.id, ...bag.prose])) df.set(t, (df.get(t) ?? 0) + 1);
-    for (const t of [...bag.id, ...bag.prose, ...wordsOf(c.section ?? ""), ...wordsOf(c.roles ?? ""), ...schemaWords(c.params_schema), ...schemaWords(c.result_schema)]) vocab.add(t);
+    for (const t of [...bag.id, ...bag.prose, ...rowWords(c)]) vocab.add(t);
   }
   return (searchIndex = { n: capabilities.length, df, vocab, bags });
 }
@@ -161,6 +172,8 @@ const singular = (t: string) => (t.length > 3 && t.endsWith("s") && !t.endsWith(
  * by rarity (rare "invite" outranks common "assessment"); id hits weigh 10x prose hits. The honest-miss
  * gate is query-level, in `docs` below: see `mostlyUnknown`.
  */
+const rarity = (t: string, idx: SearchIndex) => Math.log((idx.n + 1) / ((idx.df.get(t) ?? 0) + 1)) + 1;
+
 function scoreCapability(c: Capability, tokens: string[], idx: SearchIndex): number {
   if (tokens.length === 0) return 0;
   const bag = idx.bags.get(c.id)!;
@@ -168,13 +181,16 @@ function scoreCapability(c: Capability, tokens: string[], idx: SearchIndex): num
   let proseHits = 0;
   let score = 0;
   for (const t of tokens) {
-    const weight = Math.log((idx.n + 1) / ((idx.df.get(t) ?? 0) + 1)) + 1;
+    const weight = rarity(t, idx);
     const one = singular(t);
     if (bag.id.has(t)) { idHit = true; score += 10 * weight; }
-    else if (bag.prose.has(t) || (one && (bag.id.has(one) || bag.prose.has(one)))) {
-      // A plural that only matches as its singular ("workspaces" vs cap.workspace.list) weighs like a
-      // prose hit, so it can break a tie between id rows without outranking a real id hit.
-      proseHits += 1; score += weight;
+    else if (bag.prose.has(t)) { proseHits += 1; score += weight; }
+    else if (one && bag.id.has(one)) {
+      // A plural that only matches as its singular id word ("workspaces" vs cap.workspace.list) weighs
+      // just under a prose hit on the plural itself, so it can break a tie between id rows without
+      // outranking a real id hit, or a row whose own text uses the plural ("links" keeps
+      // cap.survey.revoke_link). Id words only: "news" is not a plural of "new".
+      proseHits += 1; score += 0.9 * weight;
     }
   }
   if (!idHit && proseHits < Math.ceil(tokens.length / 2)) return 0;

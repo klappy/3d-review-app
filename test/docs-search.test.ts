@@ -166,6 +166,33 @@ describe("docs search Slice0 — tokenize / stopword / overlap rank (NLX-MCP-001
     expect((await search("invite participants troubleshooting")).hits[0]?.id).toBe("cap.grant.invite");
   });
 
+  it("#517 review 6230471956: every capability field is docs vocabulary again (0.34.10 parity)", async () => {
+    // Words that live only in inverse, http, error codes, shared_link_contract or enum/const/$ref values.
+    // Expected first hits are what origin/main (0.34.10) ranks for the same phrase.
+    const cases: [string, string][] = [
+      ["withdraw invitation", "cap.grant.revoke_invitation"],
+      ["patch me", "cap.auth.me"],
+      ["trace redaction", "cap.ops.trace"],
+      ["sole owner", "cap.grant.transfer_owner"],
+      ["revocation link", "cap.auth.consume_link"],
+      ["status active", "cap.survey.get_status"],
+      ["unsent links", "cap.survey.send_links"],
+    ];
+    for (const [q, first] of cases) {
+      const ids = (await search(q)).hits.map((h) => h.id);
+      expect(ids[0], `${q} → ${ids.join(",")}`).toBe(first);
+    }
+    expect((await search("patch me")).hits.map((h) => h.id)).toContain("cap.auth.me_update");
+  });
+
+  it("#517 review 6230471956: plurals — own-text plural keeps its rank; a singular match is id-only", async () => {
+    for (const q of ["links", "unsent links"]) {
+      const ids = (await search(q)).hits.map((h) => h.id);
+      expect(ids.slice(0, 2), `${q} → ${ids.join(",")}`).toEqual(["cap.survey.send_links", "cap.survey.revoke_link"]);
+    }
+    expect((await search("news")).hits).toEqual([]);
+  });
+
   it("does not invent params schema on search hits", async () => {
     const { hits } = await search("create assessment");
     for (const h of hits) {

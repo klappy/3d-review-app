@@ -1,17 +1,17 @@
 {
   "version": "0.35.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "3b603217213d2285437705dcd6c244fcc77d9427",
+  "cookbook_commit": "f822fe5b7dc38ec2aa6cd58645befb153a17b52e",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.35.0.md",
-      "blob_sha": "5b0b88b97bf3ef26dee5c4f44fa01374204c0c29",
-      "sha256": "113061969c778862872b3888aa4ecd57934f5d8ce54fbcdc845d0b2b184f9a82"
+      "blob_sha": "daecc98923a1bcc1182682331622780f0377a724",
+      "sha256": "da4c81cd1a6a8b9b801e438d645def9e2ec1cbacdc7ed4398709dabe8359eaf3"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "3a01f47fb91449a5bd09fff0a4964b06203f5245",
-      "sha256": "f04b5968b36bce1154e903b7e4b4ce8a82d3ed6b9cce586eff468f7c534e52e4"
+      "blob_sha": "4a58a942b315c8f3b3890f02dc7f44411dbc3392",
+      "sha256": "efe9a7dba34e791824aa337fbe3836e713a91421f177c2d89a445e1090265b60"
     }
   ],
   "changelog": {
@@ -21,7 +21,7 @@
       ],
       "fixed": [
         "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first.",
-        "Docs search: field names that sit under a composed or open-ended schema (\"link fragment\" finds cap.survey.issue_link) and the words in a capability's roles text (\"share results\" finds cap.results.summary) count as docs words, so those phrases find their capabilities as they did in 0.34.10."
+        "Docs search: every word a capability row carries still counts as a docs word except JSON Schema keyword names and types — including field names under a composed or open-ended schema (\"link fragment\" finds cap.survey.issue_link), roles text (\"share results\" finds cap.results.summary) and the other capability fields (\"withdraw invitation\" finds cap.grant.revoke_invitation) — so those phrases find their capabilities as they did in 0.34.10."
       ]
     }
   }
