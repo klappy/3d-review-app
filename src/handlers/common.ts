@@ -180,8 +180,7 @@ export async function loadProject(ctx: Ctx, id: string, min: Role = "viewer"): P
   if (!row) throw notVisible("project");
   return { row, role: gate(role, min, "project") };
 }
-/** Role at an assessment = direct grant, or the project grant (project members see assessments; 03 matrix). */
-/** D2/D9 (settled): NO inheritance — only an explicit assessment grant opens an assessment. A project grant lists, it does not open (Astra #14 c5704047932). */
+/** Role at an assessment = the direct assessment grant only (D9, settled): project and workspace roles never reach an assessment. A project grant lists, it does not open (Astra #14 c5704047932). */
 export async function assessmentRole(ctx: Ctx, a: { id: string; project_id: string }): Promise<Role | null> {
   return roleAt(ctx, "assessment", a.id);
 }

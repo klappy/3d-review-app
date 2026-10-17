@@ -962,7 +962,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "menu",
-      "notes": "03 project add/remove assessments; grant checked at project scope (D2: no inheritance); undo=cap.assessment.unarchive",
+      "notes": "03 project add/remove assessments; grant checked at project scope (effective project role: a workspace role reaches its grouped projects); undo=cap.assessment.unarchive",
       "status": "target",
       "inverse": {
         "kind": "true",
