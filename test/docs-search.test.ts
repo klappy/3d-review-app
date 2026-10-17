@@ -71,6 +71,24 @@ describe("docs search Slice0 — tokenize / stopword / overlap rank (NLX-MCP-001
     expect((await search("zzzz-no-such-capability-phrase")).hits).toEqual([]);
   });
 
+  it("plain-language phrases rank their capability (NLX-MCP-001 phrase residual, J-10)", async () => {
+    const top3: { q: string; expectId: string }[] = [
+      { q: "invite someone to my assessment", expectId: "cap.grant.invite" },
+      { q: "undo the last thing", expectId: "cap.ops.undo" },
+      { q: "print the survey", expectId: "cap.survey.print" },
+    ];
+    for (const { q, expectId } of top3) {
+      const ids = (await search(q)).hits.map((h) => h.id);
+      expect(ids.slice(0, 3), q).toContain(expectId);
+    }
+    const multi = (await search("set up an assessment and send links to participants")).hits.map((h) => h.id).slice(0, 5);
+    expect(multi.some((id) => ["cap.assessment.create", "cap.survey.issue_link", "cap.survey.send_links"].includes(id)), multi.join(",")).toBe(true);
+  });
+
+  it("nonsense phrase stays an honest miss", async () => {
+    expect((await search("xyzzy flurble quantum")).hits).toEqual([]);
+  });
+
   it("does not invent params schema on search hits", async () => {
     const { hits } = await search("create assessment");
     for (const h of hits) {

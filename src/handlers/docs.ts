@@ -81,21 +81,40 @@ function proseTokens(c: Capability): Set<string> {
   return bag;
 }
 
-/** AND overlap: every query token must hit id or prose. Id matches weighted higher for rank. */
+let docFreq: Map<string, number> | null = null;
+/** How many capabilities mention a token in id or prose (computed once from the static registry). */
+function tokenDocFreq(): Map<string, number> {
+  if (docFreq) return docFreq;
+  const df = new Map<string, number>();
+  for (const c of capabilities) {
+    for (const t of new Set([...idTokens(c), ...proseTokens(c)])) df.set(t, (df.get(t) ?? 0) + 1);
+  }
+  return (docFreq = df);
+}
+
+/**
+ * Partial overlap (NLX-MCP-001 phrases): plain phrases carry filler words ("someone", "last thing"),
+ * so one unknown token no longer zeroes a capability. A capability qualifies when a query token hits
+ * its id, or when its prose covers at least half the query tokens (rounded up). Each hit is weighted
+ * by rarity (rare tokens such as "invite" outrank common ones such as "assessment"); id hits weigh
+ * 10x prose hits. A query with no known token stays an honest miss.
+ */
 function scoreCapability(c: Capability, tokens: string[]): number {
   if (tokens.length === 0) return 0;
   const idBag = idTokens(c);
   const proseBag = proseTokens(c);
+  const df = tokenDocFreq();
+  const n = capabilities.length;
   let idHits = 0;
   let proseHits = 0;
+  let score = 0;
   for (const t of tokens) {
-    const inId = idBag.has(t);
-    const inProse = proseBag.has(t);
-    if (!inId && !inProse) return 0; // unknown token vs this capability
-    if (inId) idHits += 1;
-    else proseHits += 1;
+    const weight = Math.log((n + 1) / ((df.get(t) ?? 0) + 1)) + 1;
+    if (idBag.has(t)) { idHits += 1; score += 10 * weight; }
+    else if (proseBag.has(t)) { proseHits += 1; score += weight; }
   }
-  return idHits * 10 + proseHits;
+  if (idHits === 0 && proseHits < Math.ceil(tokens.length / 2)) return 0;
+  return score;
 }
 
 const DOCS_SEARCH_HIT_CAP = 5;
