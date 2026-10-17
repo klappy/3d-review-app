@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { permissions, NO_TRANSFER_TARGET, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, REVOKE_ASK, TEST_ADDRESS_NOTE, inviteOutcome } from './permissions.js';
+import { permissions, APPLIES, CHANGE_TO, PICK_ROLE, NO_TRANSFER_TARGET, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, REVOKE_ASK, TEST_ADDRESS_NOTE, inviteOutcome } from './permissions.js';
 import { shortDate } from './cards.js';
 
 const read = n => readFileSync(fileURLToPath(new URL(n, import.meta.url)), 'utf8');
@@ -43,7 +43,7 @@ test('N1 viewer: grant.list 403 → placeholder note, no roster in DOM; N2 no ro
 
 test('roster + gating: member sees Invite (viewer|member only), Remove only on ≤member rows, no Change-role, no Transfer; owner has all but never on owner rows; pending lists sent|pending|unconfirmed only', async () => {
   const mem = await mount('member'); const h = mem.root.html;
-  assert.match(h, /data-my-role="member"/); assert.match(h, /data-invite-form/); assert.match(h, /<button type="submit" class="primary"[^>]*>Preview invitation/); /* U42: the one primary on Permissions */ assert.doesNotMatch(h, /<option value="owner">/); assert.doesNotMatch(h, /data-transfer-form|data-change-role/);
+  assert.match(h, /data-my-role="member"/); assert.match(h, /data-invite-form/); assert.match(h, /<button type="submit" class="primary"[^>]*>Invite</); assert.doesNotMatch(h, /Preview invitation/); /* U42: the one primary on Permissions */ assert.doesNotMatch(h, /<option value="owner">/); assert.doesNotMatch(h, /data-transfer-form|data-change-role/);
   assert.match(h, /data-revoke="g_mem"/); assert.match(h, /data-revoke="g_view"/); assert.doesNotMatch(h, /data-revoke="g_own"/); assert.match(h, /Owner — only a transfer changes this/);
   assert.match(h, /data-invitation="inv_p"/); assert.match(h, /data-invitation="inv_u"/); assert.match(h, /Could not be confirmed as sent/); assert.doesNotMatch(h, /inv_acc/, 'accepted invitations are not pending');
   const own = await mount('owner'); const o = own.root.html;
@@ -73,6 +73,34 @@ test('N3 member invites owner → picker never offers owner; forced 403 renders 
 test('N13 duplicate invite: execute 200 delivered:false duplicate_recent → "already invited — nothing sent again", never "sent"', async () => {
   const x = await mount('owner', { 'POST /v2/assessment/a1/invitations': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'c', expires_in: 300, impact: {} } : { invitation_id: 'inv_dup', role: 'viewer', status: 'sent', accepted: true, delivered: false, delivery: { provider: null, state: 'not_sent', reason: 'duplicate_recent' } } }, { email: 'dup@x.y', role: 'viewer' });
   await x.submit('data-invite-form'); await x.click('data-confirm-execute'); assert.ok(x.root.html.includes(DUPLICATE_NOTE)); assert.doesNotMatch(x.root.html, /Invitation sent/);
+});
+
+test('DoD2: the invitation confirm opens inline under Invite, inside the form, naming the address — no Preview label, no bottom sheet', async () => {
+  const t = { 'POST /v2/assessment/a1/invitations': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'cfm_1', expires_in: 300, impact: {} } : { invitation_id: 'inv_new', role: 'member', status: 'sent', delivered: true, delivery: { state: 'accepted' } } };
+  const x = await mount('owner', t, { email: 'new@example.test', role: 'member' });
+  assert.doesNotMatch(x.root.html, /Preview invitation/);
+  await x.submit('data-invite-form'); const h = x.root.html;
+  const form = h.slice(h.indexOf('<form class="line" data-invite-form>'), h.indexOf('</form>', h.indexOf('data-invite-form')));
+  assert.match(form, /data-confirm-sheet data-confirm-kind="invite"/, 'confirm sits inside the invite form');
+  assert.match(form, /data-confirm-sentence>new@example\.test will be able to open this assessment as member/);
+  assert.match(form, /value="new@example\.test"/); assert.match(form, /<option value="member" selected>/);
+  assert.equal(h.match(/data-confirm-sheet/g).length, 1, 'one confirm, not a second at the bottom');
+  assert.ok(h.indexOf('data-confirm-sheet') < h.indexOf('data-transfer'), 'confirm comes before transfer, not at the page bottom');
+  await x.click('data-confirm-cancel'); assert.doesNotMatch(x.root.html, /data-confirm-sheet/);
+});
+
+test('PR #508: editing email or role after the invite preview drops the confirm — Confirm cannot invite the old values; Invite is not primary while the confirm is open', async () => {
+  const t = { 'POST /v2/assessment/a1/invitations': ({ body }) => body.mode === 'dry_run' ? { confirm_token: 'cfm_1', expires_in: 300, impact: {} } : { invitation_id: 'inv_new', role: 'member', status: 'sent', delivered: true } };
+  for (const ev of ['input', 'change']) {
+    const x = await mount('owner', t, { email: 'old@example.test', role: 'member' });
+    await x.submit('data-invite-form'); const h = x.root.html;
+    assert.equal((h.match(/class="primary"/g) || []).length, 1, 'one primary while the confirm is open'); assert.match(h, /class="primary" data-confirm-execute/); assert.match(h, /<button type="submit" data-invite-submit[^>]*>Invite</);
+    const execute = x.root.querySelector('[data-confirm-execute]');
+    x.root.querySelector('[data-invite-form]').fire(ev);
+    assert.equal(x.m.sheet, null, `${ev} drops the invite confirm`);
+    await execute.fire('click');
+    assert.equal(x.calls.filter(c => c.body?.mode === 'execute').length, 0, 'the stale confirm never executes');
+  }
 });
 
 test('N8/N10 CONFIRM_REQUIRED on execute → dry_run re-run silently once and the sheet re-shown, execute NOT auto-retried; N9 CONFIRM_EXPIRED → "Preview again", no retry', async () => {
@@ -332,4 +360,26 @@ test('U18 transfer picker: people with access by name/email, no raw ids anywhere
   const alone = await mount('owner', { [G]: { grants: [{ id: 'g_me', principal_id: 'me', role: 'owner' }], pending_invitations: [] } });
   assert.match(alone.root.html, new RegExp(`data-member-picker-empty>${NO_TRANSFER_TARGET.replace(/[.;]/g, '\\$&')}</p></details>`)); assert.doesNotMatch(alone.root.html, /data-transfer-form|data-member-picker /);
   assert.equal(NO_TRANSFER_TARGET, 'Invite someone first; you can transfer to people who already have access.');
+});
+
+test('DoD 4 (workspace-permissions): the scope line is true per scope — never "nothing is inherited"', () => {
+  const m = { status: 'loaded', grants: [], pending: [], myRole: 'owner', me: 'me', receipts: {}, invitees: {} };
+  for (const scope of ['workspaces', 'projects', 'assessments']) {
+    const html = permissions.render({ esc }, { ...m, scope }); assert.ok(html.includes(esc(APPLIES[scope])), scope); assert.doesNotMatch(html, /nothing is inherited/);
+  }
+  assert.match(APPLIES.workspaces, /every project in this workspace/); assert.match(APPLIES.assessments, /project and workspace roles do not/);
+  // #514 low (a): a new project starts ungrouped, so the project line is conditional — true with or without a workspace.
+  assert.match(APPLIES.projects, /^If this project is in a workspace, /); assert.doesNotMatch(APPLIES.projects, /workspace that holds this project/);
+  // #514 low (c): no permissions surface carries the retired copy — MCP panel source + build, assess page + its modules, docs topic.
+  for (const f of ['../mcp/panel-src.html', '../../src/mcp-panel.html', './index.html', './permissions.js', './scope.js', '../scope-invitations.js', '../../src/handlers/docs.ts']) {
+    assert.doesNotMatch(read(f), /nothing is inherited|no inheritance|workspace that holds this project/i, f);
+  }
+});
+
+test('DoD 4 polish (k0021): change-role select starts on "Change to…", lists only the other roles; no choice → a sentence, no PATCH', async () => {
+  const x = await mount('owner', {});
+  const sel = /<select data-role-for="g_mem"[^>]*>(.*?)<\/select>/.exec(x.root.html)[1];
+  assert.ok(sel.startsWith(`<option value="" selected disabled>${CHANGE_TO}</option>`)); assert.doesNotMatch(sel, /value="member"/); assert.match(sel, /value="viewer"/); assert.match(sel, /value="owner"/);
+  x.root.els['data-role-for=g_mem'] = { value: '' }; await x.click('data-change-role="g_mem"');
+  assert.ok(x.root.html.includes(PICK_ROLE)); assert.equal(x.calls.filter(c => c.method === 'PATCH').length, 0);
 });

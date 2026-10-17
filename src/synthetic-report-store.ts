@@ -13,6 +13,21 @@ type StoreContext = Pick<Ctx, 'db' | 'principal' | 'now'> & Partial<Pick<Ctx, 'l
 const clock=():number=>(globalThis as {performance?:{now():number}}).performance?.now()??Date.now();
 function stageSpan(ctx:StoreContext,stage:string,t0:number):number{const t=clock();try{ctx.log?.('report.stage',{stage,ms:Math.round((t-t0)*1000)/1000});}catch{}return t;}
 function participantAdmission(ctx:StoreContext):boolean{return participantReportsAllowed(ctx.env);}
+type Attest=typeof attestPackedCapture;
+/** Memo scoped to ONE build call: keyed by the exact (assessment id, packed bytes, participant flag).
+ * attestPackedCapture is a pure function of those inputs and the compiled trust, so a hit returns the
+ * same frozen result a re-run would. Every check that consumes the result (digest, report key,
+ * payload hash, validate) still runs; only the repeated attestation of identical bytes is skipped.
+ * Any byte difference (a stored or current capture that moved) misses and attests in full. */
+function attestOnce():Attest{
+  const memo=new Map<string,ReturnType<Attest>>();
+  return (aid,raw,participant=false)=>{
+    const key=aid+'\0'+(participant===true?'1':'0')+'\0'+raw;
+    let result=memo.get(key);
+    if(!result){result=attestPackedCapture(aid,raw,participant);memo.set(key,result);}
+    return result;
+  };
+}
 type VersionTuple = Readonly<{sourcePin:string;indexRoot:string;scorerVersion:string;narrativeVersion:string;policyVersion:string;outputSchemaVersion:string}>;
 type RendererDescriptor = Readonly<{
   tuple:VersionTuple;
@@ -117,11 +132,11 @@ ORDER BY p.id COLLATE BINARY;`;
 type StoredRow={id:string|null;assessment_id:string;report_key:string;capture_digest:string;index_root:string;source_pin:string;scorer_version:string;narrative_version:string;policy_version:string;output_schema_version:string;stored_capture:string;current_capture:string|null;payload_json:string;payload_sha256:string;created_at:string};
 type Validated={report:Report;payloadBytes:string;payloadHash:string};
 /** No queries here: both captures and metadata came from the same authorized SELECT. */
-async function validateStored(row:StoredRow,r:RendererDescriptor,current?:CapturedAssessment,pd=false):Promise<Validated>{
+async function validateStored(row:StoredRow,r:RendererDescriptor,current?:CapturedAssessment,pd=false,attest:Attest=attestPackedCapture):Promise<Validated>{
   const aid=text(row.assessment_id);
-  if(!current){const c=await attestPackedCapture(aid,row.current_capture??'',pd);if(!c.eligible)invalid();current=c.capture;}
+  if(!current){const c=await attest(aid,row.current_capture??'',pd);if(!c.eligible)invalid();current=c.capture;}
   else if(current.assessmentId!==aid||current.packedCapture!==row.current_capture)invalid();
-  const original=await attestPackedCapture(aid,row.stored_capture,pd);if(!original.eligible)invalid();
+  const original=await attest(aid,row.stored_capture,pd);if(!original.eligible)invalid();
   if(!DIGEST.test(row.capture_digest)||original.capture.captureDigest!==row.capture_digest)invalid();
   const tuple:VersionTuple={sourcePin:row.source_pin,indexRoot:row.index_root,scorerVersion:row.scorer_version,narrativeVersion:row.narrative_version,policyVersion:row.policy_version,outputSchemaVersion:row.output_schema_version};
   for(const key of versionKeys)if(tuple[key]!==r.tuple[key])invalid();
@@ -138,7 +153,7 @@ FROM target t LEFT JOIN captured c ON c.assessment_id=t.id;`;
 type Observation={assessment_id:string;current_capture:string|null};
 type BuildObservation={ok:true;aid:string;capture:CapturedAssessment|null}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'};
 /** One authorized SELECT; subsequent attestation uses only its immutable bytes. */
-async function observeBuild(ctx:StoreContext,assessmentId:string):Promise<BuildObservation>{
+async function observeBuild(ctx:StoreContext,assessmentId:string,attest:Attest=attestPackedCapture):Promise<BuildObservation>{
   const who=principal(ctx);if(!who)return NOT_VISIBLE;
   let aid:string;try{aid=text(assessmentId);approved(descriptor());}catch{return NOT_VISIBLE;}
   let row:Observation|null;
@@ -147,7 +162,7 @@ async function observeBuild(ctx:StoreContext,assessmentId:string):Promise<BuildO
   t=stageSpan(ctx,'observe_sql',t);
   if(!row)return NOT_VISIBLE;
   if(row.assessment_id!==aid)return UNAVAILABLE;
-  const current=await attestPackedCapture(aid,row.current_capture??'',participantAdmission(ctx));
+  const current=await attest(aid,row.current_capture??'',participantAdmission(ctx));
   stageSpan(ctx,'attest_observe',t);
   return {ok:true,aid,capture:current.eligible?current.capture:null};
 }
@@ -160,20 +175,26 @@ export async function observeBuildEligibility(ctx:StoreContext,assessmentId:stri
   catch{stageSpan(ctx,'render_preview',t);return {ok:true,marker:marker(observation.aid,false)};}
 }
 export async function buildMaterialized(ctx:StoreContext,assessmentId:string):Promise<StoreResult<Report>>{
-  const observation=await observeBuild(ctx,assessmentId);if(!observation.ok)return observation;
+  // One memo for the whole build: observe, commit, current and stored attest the same packed bytes once.
+  const attest=attestOnce();
+  const observation=await observeBuild(ctx,assessmentId,attest);if(!observation.ok)return observation;
   if(!observation.capture)return held(observation.aid);
-  return commitMaterialized(ctx,assessmentId,observation.capture);
+  return commitWith(ctx,assessmentId,observation.capture,attest);
 }
 /** Internal captured token only: rendering is compiled, never accepted from an operation argument. */
 export async function commitMaterialized(ctx:StoreContext,assessmentId:string,captured:CapturedAssessment):Promise<StoreResult<Report>>{
+  // A fresh memo: a caller's token is always re-attested from its raw bytes here.
+  return commitWith(ctx,assessmentId,captured,attestOnce());
+}
+async function commitWith(ctx:StoreContext,assessmentId:string,captured:CapturedAssessment,attest:Attest):Promise<StoreResult<Report>>{
   const r=descriptor();
   const who=principal(ctx);if(!who)return NOT_VISIBLE;
   let aid:string,key:string,payloadBytes:string,payloadHash:string,c:CapturedAssessment,id:string,createdAt:string;
   try{
     approved(r);aid=text(assessmentId);
-    // Reattest the raw token, ignoring any caller assertion of its digest/rows/eligibility.
+    // Attest the raw token via the per-build memo (a hit only for identical bytes), ignoring any caller assertion of its digest/rows/eligibility.
     let t=clock();
-    const capture=await attestPackedCapture(aid,captured.packedCapture,participantAdmission(ctx));t=stageSpan(ctx,'attest_commit',t);if(!capture.eligible)return UNAVAILABLE;c=capture.capture;
+    const capture=await attest(aid,captured.packedCapture,participantAdmission(ctx));t=stageSpan(ctx,'attest_commit',t);if(!capture.eligible)return UNAVAILABLE;c=capture.capture;
     const rendered=await r.render(c);t=stageSpan(ctx,'render',t);payloadBytes=canonicalJson(rendered,PAYLOAD_LIMIT);t=stageSpan(ctx,'canonicalize',t);
     const parsed=parseBoundedJson(payloadBytes,PAYLOAD_LIMIT);const ok=await r.validate(parsed,c);t=stageSpan(ctx,'validate',t);if(!ok)return UNAVAILABLE;
     key=await reportKey(c,r.tuple);payloadHash=await sha256Bytes(encoder.encode(payloadBytes));stageSpan(ctx,'hash',t);
@@ -191,12 +212,12 @@ export async function commitMaterialized(ctx:StoreContext,assessmentId:string,ca
   ts=stageSpan(ctx,'result_sql',ts);
   if(!row)return NOT_VISIBLE;
   if(row.assessment_id!==aid)return UNAVAILABLE;
-  const current=await attestPackedCapture(aid,row.current_capture??'',participantAdmission(ctx));
+  const current=await attest(aid,row.current_capture??'',participantAdmission(ctx));
   ts=stageSpan(ctx,'attest_current',ts);
   if(!current.eligible)return held(aid);
   if(row.id===null)return {ok:false,reason:'CONFLICT'};
   try{
-    const valid=await validateStored(row,r,current.capture,participantAdmission(ctx));stageSpan(ctx,'validate_stored',ts);
+    const valid=await validateStored(row,r,current.capture,participantAdmission(ctx),attest);stageSpan(ctx,'validate_stored',ts);
     if(valid.report.assessmentId!==aid||valid.report.reportKey!==key||valid.report.captureDigest!==c.captureDigest||valid.payloadHash!==payloadHash||valid.payloadBytes!==payloadBytes)return {ok:false,reason:'DETERMINISM'};
     return {ok:true,value:valid.report};
   }catch{return held(aid);}

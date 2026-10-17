@@ -239,3 +239,36 @@ it('preserves danger preview during pending connection and executes once after r
   expect(f.calls[0].arguments.mode).toBe('execute');
  }finally{f.dom.window.close();}
 });
+
+it('DoD2: the invitation confirm opens inline inside the invite form, naming the typed address; no Preview label', async () => {
+  const f = fixture();
+  try {
+    await f.go('A');
+    expect(f.w.document.querySelector('[data-invite-preview]').textContent).toBe('Invite');
+    expect(f.w.document.body.textContent).not.toContain('Preview invitation');
+    await f.preview(); f.resolvePreview(); await tick();
+    const sheet = f.w.document.querySelector('[data-invite-form] [data-confirm-sheet]');
+    expect(sheet).not.toBeNull();
+    expect(sheet.querySelector('[data-confirm-sentence]').textContent).toContain('review@example.test');
+    expect(f.w.document.querySelectorAll('[data-confirm-sheet]')).toHaveLength(1);
+  } finally { f.dom.window.close(); }
+});
+
+it.each(['email', 'role'])('PR #508: editing %s after the inline invite preview drops the confirm — the stale Confirm never invites the old values; fields keep the previewed values', async which => {
+  const f = fixture();
+  try {
+    await f.go('A'); await f.preview(); f.resolvePreview(); await tick();
+    const d = f.w.document, form = d.querySelector('[data-invite-form]');
+    expect(form.querySelector('[data-confirm-sheet]')).not.toBeNull();
+    expect((form.querySelector('[name=email]') as any).value).toBe('review@example.test');
+    expect((form.querySelector('[name=role]') as any).value).toBe('viewer');
+    const stale = d.querySelector('[data-confirm-execute]');
+    if (which === 'email') { const e = form.querySelector('[name=email]') as any; e.value = 'typo-fixed@example.test'; e.dispatchEvent(new f.w.Event('input', { bubbles: true })); }
+    else { const s = form.querySelector('[name=role]') as any; s.value = 'member'; s.dispatchEvent(new f.w.Event('change', { bubbles: true })); }
+    expect(f.r.state.sheet).toBeNull();
+    expect(d.querySelector('[data-confirm-sheet]')).toBeNull();
+    expect(d.getElementById('status').textContent).toContain('Invite again');
+    stale.click(); await tick();
+    expect(f.calls.filter(x => x.name === 'danger' && x.arguments?.mode === 'execute')).toHaveLength(0);
+  } finally { f.dom.window.close(); }
+});
