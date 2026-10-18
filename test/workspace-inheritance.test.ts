@@ -764,32 +764,6 @@ describe("workspace grouping cannot mint project ownership", () => {
     await expect(update_role(mk("fu_po", racing(`UPDATE "grant" SET role = 'member' WHERE id = 'fug_t'`)), { ...at_, gid: "fug_t", role: "viewer" }))
       .rejects.toMatchObject({ code: "STAGE_CONFLICT" });
   });
-  // 0.35.15 (cookbook work/active/2026-10-18-3d-grant-noop-receipt-followups DoD (a)).
-  it("an update_role whose target another writer already set to the requested role replies as a no-op, crediting this caller with no change", async () => {
-    const db = await mf.getD1Database("DB");
-    const now = new Date("2026-10-18T15:20:00.000Z"); const at = now.toISOString();
-    const racing = (change: string) => ({ prepare: (q: string) => db.prepare(q), batch: async (st: any[]) => { await db.prepare(change).run(); return db.batch(st); } });
-    const logs: [string, any][] = [];
-    const mk = (id: string, d: any = db): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db: d, principal: { kind: "user", id, provisioned: true } as any, traceId: "tr_np", now: () => now, log: (s: string, x?: any) => logs.push([s, x]) } as any);
-    for (const id of ["np_po", "np_t", "np_u"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
-    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_np", null, "prj_np", at, "np_po").run();
-    const grant = (id: string, p: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", "prj_np", r, at).run();
-    await grant("npg_po", "np_po", "owner"); await grant("npg_t", "np_t", "viewer"); await grant("npg_u", "np_u", "member");
-    const at_ = { scope: "project", id: "prj_np" };
-    // viewer → member read, someone else raises the target to member in the window: this caller wrote nothing, so the reply's
-    // priorState and impact carry the live role (an undo from them changes nothing) and the log line says noop.
-    const r = await update_role(mk("np_po", racing(`UPDATE "grant" SET role = 'member' WHERE id = 'npg_t'`)), { ...at_, gid: "npg_t", role: "member" });
-    expect(r.result).toEqual({ grant: "npg_t", role: "member", noop: true });
-    expect(r.priorState).toEqual({ role: "member" });
-    expect(r.impact).toMatchObject({ affected: [{ grant: "npg_t", from: "member", to: "member" }], irreversible: false, revoked_invitations: 0 });
-    expect(logs.find(([s]) => s === "grant.update_role")?.[1]).toMatchObject({ noop: true, revoked_invitations: 0 });
-    // control: a write this caller made keeps its receipt (priorState is the role it replaced), and no noop flag
-    logs.length = 0;
-    const w = await update_role(mk("np_po"), { ...at_, gid: "npg_u", role: "viewer" });
-    expect(w.result).toEqual({ grant: "npg_u", role: "viewer" });
-    expect(w.priorState).toEqual({ role: "member" });
-    expect(logs.find(([s]) => s === "grant.update_role")?.[1]).not.toHaveProperty("noop");
-  });
   // Dead invitations DoD (8): policy answers a participant session on the invitation link before the handler runs. That is
   // "sign in as the invited person" (retryable, the UI keeps the token), not the invitation's durable refusal.
   it("a participant session opening an invitation link gets NOT_AUTHENTICATED (retryable), not NOT_AUTHORIZED_AT_SCOPE", async () => {
@@ -798,5 +772,88 @@ describe("workspace grouping cannot mint project ownership", () => {
     await expect(authorize(participant, byId.get("cap.grant.accept")!, { token: "tok_inv_dd_live" })).rejects.toMatchObject({ code: "NOT_AUTHENTICATED" });
     // other non-public rows still refuse a participant as before
     await expect(authorize(participant, byId.get("cap.me.invitations")!, {})).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+  });
+});
+
+// 0.35.15 (cookbook work/active/2026-10-18-3d-grant-noop-receipt-followups DoD (a)) and 0.35.16 (cookbook
+// work/active/2026-10-18-3d-grant-noop-dispatch-receipt DoD (a)-(e)): an update_role that changes nothing is a no-op end to
+// end, through dispatch: the reply, the impact, the log line and the receipt. Synthetic principals and ids only.
+describe("update_role no-op through dispatch", () => {
+  const now = new Date("2026-10-18T16:20:00.000Z"); const at = now.toISOString();
+  const at_ = { scope: "project", id: "prj_nd" };
+  let trace = 0;
+  // `change` runs once, just before the first batch in the call: another writer landing between update_role's read and its write.
+  const racing = (db: any, change: string) => { let fired = false; return { prepare: (q: string) => db.prepare(q),
+    batch: async (st: any[]) => { if (!fired) { fired = true; await db.prepare(change).run(); } return db.batch(st); } }; };
+  const mk = (db: any, id: string, logs: [string, any][], d: any = db): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db: d,
+    principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_nd_${++trace}`, now: () => now, log: (s: string, x?: any) => logs.push([s, x]) } as any);
+  const setup = async () => {
+    const db = await mf.getD1Database("DB");
+    const sql = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
+    // the file's earlier describes may already have applied the schema to this shared database
+    if (!(await db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'principal'").first()))
+      await db.batch(sql("../migrations/0001_init.sql").split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)));
+    for (const id of ["nd_po", "nd_t", "nd_u", "nd_d", "nd_s"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_nd", null, "prj_nd", at, "nd_po").run();
+    const grant = (id: string, p: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", "prj_nd", r, at).run();
+    await grant("ndg_po", "nd_po", "owner"); await grant("ndg_t", "nd_t", "viewer"); await grant("ndg_u", "nd_u", "member");
+    await grant("ndg_d", "nd_d", "member"); await grant("ndg_s", "nd_s", "member");
+    return db;
+  };
+  let db: any;
+  const run = async (actor: Ctx, params: Record<string, unknown>, d: any = db) => {
+    const dry: any = await execute(actor, "cap.grant.update_role", params, { tool: "danger", mode: "dry_run" });
+    expect(dry.ok).toBe(true);
+    const ctx = { ...actor, db: d, traceId: `tr_nd_${++trace}` } as Ctx;
+    const env: any = await execute(ctx, "cap.grant.update_role", params, { tool: "danger", mode: "execute", confirm_token: dry.result.confirm_token });
+    const stored = await db.prepare("SELECT actor, undo_token, prior_state_json FROM receipt WHERE id = ?").bind(env.receipt?.id ?? "").first();
+    return { dry, env, stored: stored && { ...stored, prior: JSON.parse(stored.prior_state_json) } };
+  };
+
+  it("a target raised to the requested role by another writer in the window: the receipt is marked no-op and credits no change (DoD (a), (c))", async () => {
+    db = await setup();
+    const logs: [string, any][] = [];
+    const { env, stored } = await run(mk(db, "nd_po", logs), { ...at_, gid: "ndg_t", role: "member" }, racing(db, `UPDATE "grant" SET role = 'member' WHERE id = 'ndg_t'`));
+    expect(env.ok).toBe(true);
+    expect(env.result).toEqual({ grant: "ndg_t", role: "member", noop: true });
+    expect(env.receipt).toMatchObject({ actor: "nd_po", inverse: "none", noop: true });
+    expect(env.receipt).not.toHaveProperty("compensating_control");
+    expect(env.receipt).not.toHaveProperty("undo_token");
+    expect(stored.prior).toMatchObject({ prior: { role: "member" }, noop: true });
+    expect(logs.find(([s]) => s === "grant.update_role")?.[1]).toMatchObject({ noop: true, downgrade: false, revoked_invitations: 0 });
+  });
+
+  it("the no-op handler impact names no disclosure and no compensating control; the log keeps the requested downgrade (DoD (c))", async () => {
+    const logs: [string, any][] = [];
+    // member → viewer requested (a downgrade); another writer lowers the target to viewer first
+    const r = await update_role(mk(db, "nd_po", logs, racing(db, `UPDATE "grant" SET role = 'viewer' WHERE id = 'ndg_d'`)), { ...at_, gid: "ndg_d", role: "viewer" });
+    expect(r.result).toEqual({ grant: "ndg_d", role: "viewer", noop: true });
+    expect(r.priorState).toEqual({ role: "viewer" });
+    expect(r.impact).toEqual({ affected: [{ grant: "ndg_d", from: "viewer", to: "viewer" }], irreversible: false, revoked_invitations: 0, noop: true });
+    expect(logs.find(([s]) => s === "grant.update_role")?.[1]).toEqual({ noop: true, downgrade: true, revoked_invitations: 0 });
+  });
+
+  it("a target already at the requested role when first read carries the same noop flag, in dry_run and execute (DoD (b))", async () => {
+    const logs: [string, any][] = [];
+    const { dry, env, stored } = await run(mk(db, "nd_po", logs), { ...at_, gid: "ndg_s", role: "member" });
+    expect(dry.result).toMatchObject({ noop: true, impact: { affected: [{ grant: "ndg_s", from: "member", to: "member" }], irreversible: false, noop: true } });
+    expect(dry.result.impact).not.toHaveProperty("effect");
+    expect(dry.result.impact).not.toHaveProperty("compensating_control");
+    expect(env.result).toEqual({ grant: "ndg_s", role: "member", noop: true });
+    expect(env.receipt).toMatchObject({ noop: true });
+    expect(stored.prior).toMatchObject({ prior: { role: "member" }, noop: true });
+    expect(logs.find(([s]) => s === "grant.update_role")?.[1]).toMatchObject({ noop: true, downgrade: false });
+  });
+
+  it("control: a change this caller made keeps its receipt (prior role, compensating control) and no noop flag", async () => {
+    const logs: [string, any][] = [];
+    const { dry, env, stored } = await run(mk(db, "nd_po", logs), { ...at_, gid: "ndg_u", role: "viewer" });
+    expect(dry.result).not.toHaveProperty("noop");
+    expect(dry.result.impact).toMatchObject({ effect: "disclosure", compensating_control: expect.any(String) });
+    expect(env.result).toEqual({ grant: "ndg_u", role: "viewer" });
+    expect(env.receipt).not.toHaveProperty("noop");
+    expect(env.receipt.compensating_control).toEqual(expect.any(String));
+    expect(stored.prior).toEqual({ prior: { role: "member" }, params: expect.anything(), result_ids: expect.anything() });
+    expect(logs.find(([s]) => s === "grant.update_role")?.[1]).not.toHaveProperty("noop");
   });
 });

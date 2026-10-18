@@ -1627,7 +1627,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "impact preview → confirm",
-      "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed)",
+      "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed); noop (0.35.16): when the grant already holds the requested role (at first read, or set there by another writer before this write), the result, the dry_run result and impact, and the receipt carry noop: true; the impact then names no effect and no compensating control, and the receipt credits the caller with no change (no undo token, no compensating control)",
       "status": "target",
       "inverse": {
         "kind": "none",
