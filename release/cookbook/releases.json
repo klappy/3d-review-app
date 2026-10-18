@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.13",
+  "current": "0.35.14",
   "versions": [
+    {
+      "version": "0.35.14",
+      "status": "candidate",
+      "notes_path": "releases/0.35.14.md",
+      "sections": {
+        "fixed": [
+          "Roles: a role change or removal that is refused because something changed at the same moment no longer cancels any of that person's open invitations. Setting a person to the role they were already given at the same moment by someone else now succeeds instead of reporting a conflict, and a refusal that finds the person still listed reports a conflict to retry instead of \"not found\"."
+        ]
+      }
+    },
     {
       "version": "0.35.13",
       "status": "candidate",

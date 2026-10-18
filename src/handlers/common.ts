@@ -113,12 +113,19 @@ export async function roleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): P
     .first<{ role: Role }>();
   return row?.role ?? null;
 }
+/** THE inheritance rule as SQL (0.35.14, cookbook work/active/2026-10-18-3d-grant-write-guard-followups DoD (c)): grant row
+ *  `g` (an alias) applies at scope (`scopeT`, `scopeI`, SQL expressions) when it is AT that scope, or, for a project, when it is
+ *  on the workspace that groups it. projectRole (read time) and grant.ts callerHolds (inside a write) both use it, so the
+ *  effective-role rule has one source. `scopeI` is evaluated twice: pass a column, a literal or a numbered parameter. */
+export const grantApplies = (g: string, scopeT: string, scopeI: string) =>
+  `((${g}.scope_type = ${scopeT} AND ${g}.scope_id = ${scopeI}) OR (${scopeT} = 'project' AND ${g}.scope_type = 'workspace'`
+  + ` AND ${g}.scope_id = (SELECT p.workspace_id FROM project p WHERE p.id = ${scopeI})))`;
 /** Effective project role: max(direct project grant, grant on the workspace that groups it). One query; null when neither. */
 export async function projectRole(ctx: Ctx, projectId: string): Promise<Role | null> {
   if (ctx.principal.kind !== "user" && ctx.principal.kind !== "support") return null;
   const { results } = await ctx.db
-    .prepare(`SELECT g.role AS role FROM "grant" g WHERE g.principal_id = ? AND ((g.scope_type = 'project' AND g.scope_id = ?) OR (g.scope_type = 'workspace' AND g.scope_id = (SELECT p.workspace_id FROM project p WHERE p.id = ?)))`)
-    .bind(ctx.principal.id, projectId, projectId)
+    .prepare(`SELECT g.role AS role FROM "grant" g WHERE g.principal_id = ?1 AND ${grantApplies("g", "'project'", "?2")}`)
+    .bind(ctx.principal.id, projectId)
     .all<{ role: Role }>();
   return (results ?? []).reduce<Role | null>((acc, r) => maxRole(acc, r.role), null);
 }

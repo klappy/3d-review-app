@@ -711,6 +711,59 @@ describe("workspace grouping cannot mint project ownership", () => {
     await expect(grantRevoke(mk("wg_po", racing("SELECT 1")), { ...at_, gid: "wgg_u" })).resolves.toMatchObject({ result: { grant: "wgg_u", revoked: true } });
     expect(await roleOf("wgg_u")).toBe(null);
   });
+  // 0.35.14 (cookbook work/active/2026-10-18-3d-grant-write-guard-followups DoD (a), (b), (d)).
+  it("a refused grant write sweeps no invitation, refuses an inherited-only owner raising to owner, and reports a still-visible grant as a conflict", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-18T14:20:00.000Z"); const at = now.toISOString();
+    let trace = 0;
+    const racing = (change: string, after?: string) => ({ prepare: (q: string) => db.prepare(q), batch: async (st: any[]) => {
+      await db.prepare(change).run(); const r = await db.batch(st); if (after) await db.prepare(after).run(); return r; } });
+    const mk = (id: string, d: any = db): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db: d, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_fu_${++trace}`, now: () => now, log: () => {} } as any);
+    for (const id of ["fu_po", "fu_wo", "fu_m", "fu_h", "fu_k", "fu_t"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_fu", "ws_fu", at, "fu_wo").run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_fu", "ws_fu", "prj_fu", at, "fu_po").run();
+    const grant = (id: string, p: string, r: string, t = "project", s = "prj_fu") => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, t, s, r, at).run();
+    await grant("fug_po", "fu_po", "owner"); await grant("fug_wo_ws", "fu_wo", "owner", "workspace", "ws_fu"); await grant("fug_wo", "fu_wo", "owner");
+    await grant("fug_m", "fu_m", "member"); await grant("fug_h", "fu_h", "member"); await grant("fug_k", "fu_k", "viewer"); await grant("fug_t", "fu_t", "viewer");
+    const roleOf = async (gid: string) => (await db.prepare('SELECT role FROM "grant" WHERE id = ?').bind(gid).first<{ role: string }>())?.role ?? null;
+    const invite_ = async (id: string, by: string) => db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
+      .bind(id, "project", "prj_fu", await sha256(id + "@example.invalid"), await sha256("tok_" + id), "member", "sent", by, at, "2026-10-24T00:00:00.000Z").run();
+    const statusOf = async (id: string) => (await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status;
+    const at_ = { scope: "project", id: "prj_fu" };
+    // (a) update_role: fu_h (member) holds a live member invitation; demoted to viewer by someone else in the window, the
+    // owner's member→viewer UPDATE changes no row, its batch sweeps nothing — the invitation is untouched.
+    await invite_("fui_h", "fu_h");
+    await expect(update_role(mk("fu_po", racing(`UPDATE "grant" SET role = 'viewer' WHERE id = 'fug_h'`)), { ...at_, gid: "fug_h", role: "viewer" }))
+      .resolves.toMatchObject({ result: { grant: "fug_h", role: "viewer" } }); // (d) target already holds the requested role: no conflict
+    expect(await statusOf("fui_h")).toBe("sent");
+    // (a) revoke: fu_k (viewer) holds an orphaned member invitation; the calling member is demoted in the window, the removal
+    // is refused, and the refused batch sweeps nothing.
+    await invite_("fui_k", "fu_k");
+    await expect(grantRevoke(mk("fu_m", racing(`UPDATE "grant" SET role = 'viewer' WHERE id = 'fug_m'`)), { ...at_, gid: "fug_k" }))
+      .rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    expect(await roleOf("fug_k")).toBe("viewer");
+    expect(await statusOf("fui_k")).toBe("sent");
+    await db.prepare(`UPDATE "grant" SET role = 'member' WHERE id = 'fug_m'`).run();
+    // (b) grant.ts direct-owner clause: fu_wo keeps the inherited workspace owner role but loses the direct project owner grant
+    // in the window; raising fu_t to owner is refused (directRoleAt), fu_t stays viewer.
+    await expect(update_role(mk("fu_wo", racing(`UPDATE "grant" SET role = 'member' WHERE id = 'fug_wo'`)), { ...at_, gid: "fug_t", role: "owner" }))
+      .rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    expect(await roleOf("fug_t")).toBe("viewer");
+    expect(await roleOf("fug_wo_ws")).toBe("owner");
+    await db.prepare(`UPDATE "grant" SET role = 'owner' WHERE id = 'fug_wo'`).run();
+    // (d) the caller is demoted for the write and restored before the re-read: nothing on re-read explains the refusal, the
+    // grant is still visible → STAGE_CONFLICT (0.35.13 said not found), for update_role and for revoke.
+    const blip = (gid: string, r: string, back: string) => racing(`UPDATE "grant" SET role = '${r}' WHERE id = '${gid}'`, `UPDATE "grant" SET role = '${back}' WHERE id = '${gid}'`);
+    await expect(update_role(mk("fu_po", blip("fug_po", "member", "owner")), { ...at_, gid: "fug_t", role: "member" }))
+      .rejects.toMatchObject({ code: "STAGE_CONFLICT" });
+    expect(await roleOf("fug_t")).toBe("viewer");
+    await expect(grantRevoke(mk("fu_m", blip("fug_m", "viewer", "member")), { ...at_, gid: "fug_t" }))
+      .rejects.toMatchObject({ code: "STAGE_CONFLICT" });
+    expect(await roleOf("fug_t")).toBe("viewer");
+    // (d) control: target raised by someone else to a role other than the one requested is still STAGE_CONFLICT
+    await expect(update_role(mk("fu_po", racing(`UPDATE "grant" SET role = 'member' WHERE id = 'fug_t'`)), { ...at_, gid: "fug_t", role: "viewer" }))
+      .rejects.toMatchObject({ code: "STAGE_CONFLICT" });
+  });
   // Dead invitations DoD (8): policy answers a participant session on the invitation link before the handler runs. That is
   // "sign in as the invited person" (retryable, the UI keeps the token), not the invitation's durable refusal.
   it("a participant session opening an invitation link gets NOT_AUTHENTICATED (retryable), not NOT_AUTHORIZED_AT_SCOPE", async () => {
