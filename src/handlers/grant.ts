@@ -408,12 +408,17 @@ export const update_role: Handler = async (ctx, p, o) => {
   if (o?.dryRun) return { result: {}, scope, impact };
   // 0.35.12 (cookbook work/active/2026-10-18-3d-grant-owner-guard-race DoD (a)): the owner check above read the row before
   // this batch, so the UPDATE re-checks it in its own WHERE: a target raised to owner in between (an accept landing) is not
-  // demoted. Refused → no row changed (the orphan sweep reads the grant live, and an owner still stands behind every row it
-  // issued) and the same typed refusal the read-time check gives.
-  const stmts = [ctx.db.prepare(`UPDATE "grant" SET role = ?1 WHERE id = ?2 AND (role <> 'owner' OR ?1 = 'owner')`).bind(role, gid)];
+  // demoted. 0.35.13 (cookbook work/active/2026-10-18-3d-grant-update-role-write-guard DoD (a)-(b)): the UPDATE also writes
+  // only against the role it read (role = ?3), and re-checks the caller's own authority (owner here; a DIRECT owner to raise
+  // to owner) in the same WHERE, so a role changed in between, or a caller demoted in between, changes no row. Refused → no
+  // row changed (the orphan sweep reads the grant live, and the holder's unchanged grant still stands behind every row it
+  // issued) and the typed refusal for the state the re-read finds (refuseGrantWrite).
+  const stmts = [ctx.db.prepare(`UPDATE "grant" SET role = ?1 WHERE id = ?2 AND role = ?3 AND (role <> 'owner' OR ?1 = 'owner')`
+    + ` AND ${callerHolds("?4", "?5", "?6", "'owner'")} AND (?1 <> 'owner' OR ${callerHolds("?4", "?5", "?6", "'owner'", true)})`)
+    .bind(role, gid, g.role, ctx.principal.id, scope.type, scope.id)];
   if (downgrade) stmts.push(revokeOrphaned(ctx, g.principal_id, scope));
   const res = await ctx.db.batch(stmts);
-  if ((res[0].meta.changes ?? 0) !== 1) await refuseOwnerGuard(ctx, gid, "owners cannot be demoted", "D3 — transfer ownership instead (cap.grant.transfer_owner)");
+  if ((res[0].meta.changes ?? 0) !== 1) await refuseGrantWrite(ctx, scope, gid, "update_role", role, g.role as Role);
   impact.revoked_invitations = downgrade ? res[1].meta.changes ?? 0 : 0;
   ctx.log("grant.update_role", { downgrade, revoked_invitations: impact.revoked_invitations });
   return { result: { grant: gid, role }, scope, impact, priorState: { role: g.role } };
@@ -429,21 +434,46 @@ export const revoke: Handler = async (ctx, p) => {
   // The grant goes and, in the same batch, the invitations its holder could no longer issue (orphanedWhere). This capability
   // is a plain write (no dry-run, no impact), so the count is reported in its result and its log line.
   // 0.35.12 (cookbook work/active/2026-10-18-3d-grant-owner-guard-race DoD (a)): the DELETE re-checks the owner guard in its own
-  // WHERE, so a target raised to owner after the read above is not removed (D3); refused → no row changed, same typed error.
-  const [del, rev] = await ctx.db.batch([ctx.db.prepare(`DELETE FROM "grant" WHERE id = ? AND role <> 'owner'`).bind(gid), revokeOrphaned(ctx, g.principal_id, scope)]);
-  if ((del.meta.changes ?? 0) !== 1) await refuseOwnerGuard(ctx, gid, "owners cannot be removed", "D3 — last owner is protected; transfer ownership first");
+  // WHERE, so a target raised to owner after the read above is not removed (D3). 0.35.13 (cookbook
+  // work/active/2026-10-18-3d-grant-update-role-write-guard DoD (b)): it also re-checks the caller's own authority there (member
+  // or above, and the ceiling against the target's live role), so a caller demoted or removed after the read removes no one.
+  // Refused → no row changed, and the typed refusal for the state the re-read finds (refuseGrantWrite).
+  const [del, rev] = await ctx.db.batch([ctx.db.prepare(`DELETE FROM "grant" WHERE id = ?1 AND role <> 'owner'`
+    + ` AND ${callerHolds("?2", "?3", "?4", `(CASE WHEN ${roleRank('"grant".role')} > ${ROLE_RANK.member} THEN 'owner' ELSE 'member' END)`)}`)
+    .bind(gid, ctx.principal.id, scope.type, scope.id), revokeOrphaned(ctx, g.principal_id, scope)]);
+  if ((del.meta.changes ?? 0) !== 1) await refuseGrantWrite(ctx, scope, gid, "revoke");
   const revoked_invitations = rev.meta.changes ?? 0;
   ctx.log("grant.revoke", { revoked_invitations });
   return { result: { grant: gid, revoked: true, revoked_invitations }, scope };
 };
 
-/** update_role's and revoke's write refused inside its batch (0.35.12 DoD (a)): re-read the grant and give the refusal the
- *  read-time checks give for that state — gone is NOT_FOUND_OR_NOT_VISIBLE, an owner is the D3 refusal. Never a success. */
-async function refuseOwnerGuard(ctx: Ctx, gid: string, msg: string, hint: string): Promise<never> {
-  const now = await ctx.db.prepare('SELECT role FROM "grant" WHERE id = ?').bind(gid).first<{ role: string }>();
+/** update_role's and revoke's write refused inside its batch (0.35.12 DoD (a); 0.35.13 DoD (a), (b), (d)): re-run the
+ *  read-time checks against the state as it is now and give the refusal they give, in the order the handler applies them —
+ *  the caller's own authority first (no role → NOT_FOUND_OR_NOT_VISIBLE, too low → NOT_AUTHORIZED_AT_SCOPE, as callerAt /
+ *  directRoleAt / ceiling say), then the target (gone → NOT_FOUND_OR_NOT_VISIBLE, an owner → the D3 refusal, a role other
+ *  than the one update_role read → STAGE_CONFLICT). The D3 owner refusal is named only when the target IS an owner now.
+ *  Never a success: if nothing explains the refusal, the grant is reported not visible. */
+async function refuseGrantWrite(ctx: Ctx, scope: Scope, gid: string, op: "update_role" | "revoke", to?: Role, read?: Role): Promise<never> {
+  const caller = await callerAt(ctx, scope, op === "update_role" ? "owner" : "member");
+  if (op === "update_role" && to === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
+  const now = await ctx.db.prepare('SELECT role FROM "grant" WHERE id = ? AND scope_type = ? AND scope_id = ?').bind(gid, scope.type, scope.id).first<{ role: Role }>();
   if (!now) throw notVisible("grant");
-  throw new CapError("NOT_AUTHORIZED_AT_SCOPE", msg, hint);
+  if (op === "update_role") {
+    if (now.role === "owner" && to !== "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be demoted", "D3 — transfer ownership instead (cap.grant.transfer_owner)");
+    if (now.role !== read) throw new CapError("STAGE_CONFLICT", `this grant's role changed from ${read} to ${now.role} while the change was being made`, "re-read the roster (cap.grant.list) and try again");
+  } else {
+    if (now.role === "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be removed", "D3 — last owner is protected; transfer ownership first");
+    ceiling(caller, now.role, "revoke grants");
+  }
+  throw notVisible("grant");
 }
+/** The caller (bound `caller`) holds at least `min` (a SQL role expression) at the scope, read live inside a write (0.35.13
+ *  DoD (b)): the same rule callerAt applies (a project inherits its grouping workspace's grant), or, with `direct`, only a grant
+ *  at exactly this scope (directRoleAt). `cg` aliases the caller's grant row; `min` may name the outer row as "grant".role. */
+const callerHolds = (caller: string, scopeT: string, scopeI: string, min: string, direct = false) =>
+  `EXISTS (SELECT 1 FROM "grant" cg WHERE cg.principal_id = ${caller} AND ((cg.scope_type = ${scopeT} AND cg.scope_id = ${scopeI})`
+  + (direct ? "" : ` OR (${scopeT} = 'project' AND cg.scope_type = 'workspace' AND cg.scope_id = (SELECT p.workspace_id FROM project p WHERE p.id = ${scopeI}))`)
+  + `) AND ${roleRank("cg.role")} >= ${roleRank(min)})`;
 
 /** D: ownership moves. Owner only; support-without-owner-consent is PROPOSED pending source (Astra 5703469487) → refused here. */
 export const transfer_owner: Handler = async (ctx, p, o) => {
