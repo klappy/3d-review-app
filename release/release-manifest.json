@@ -1,23 +1,23 @@
 {
   "version": "0.35.5",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "83270a84527beb2b8ac618993533356f80f6adc5",
+  "cookbook_commit": "f08abbdc25061bbbd58cef4a79db5bce44efc0b2",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.35.5.md",
-      "blob_sha": "faafb7e31faa76b19cfafd2b9ca9774ed0f05208",
-      "sha256": "c095e7fae7fe0138b4449101fe2845b8c95b1c5195ef6ac029d5576f9c6f9903"
+      "blob_sha": "ddab6f04c25631ae49303133eeb15a734a35f4ce",
+      "sha256": "04f042fe8e466b41e7c040022ea625442b6fa88a7ddbd2cdbb91c468ae253a2a"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "4074ddcaa7bfdaa8c45b1182b5edb1c26416c0c4",
-      "sha256": "fabda2a6fc15cc087f350f56d2f0ac9856927bfa291b1ed25fa171afa9df991b"
+      "blob_sha": "70fe064b62e4d0cd2b0e86a20b7ae2e637dfdc5f",
+      "sha256": "4d6229ad6f7fd3f003167362c21e94cca35e3221991f488d1bba6f47dac2e45d"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Invitations: an invitation that can no longer be accepted (its sender no longer has their own role on that project, an owner invitation not sent by a direct owner, or your own invitation) no longer shows in your invitations list or in a project's pending invitations, and inviting that person again now sends a fresh invitation instead of \"nothing was sent again\".",
+        "Invitations: an invitation that can no longer be accepted (its sender no longer has their own role on that project, or an owner invitation not sent by a direct owner) no longer shows in your invitations list or in a project's pending invitations, and inviting that person again now sends a fresh invitation instead of \"nothing was sent again\". An older invitation you sent to yourself no longer shows in your invitations list and cannot be accepted, but it can still show in pending invitations and still counts as already sent when that address is invited again.",
         "Permissions page for a project: the line saying your role comes from the workspace now shows only when the project is in a workspace; the page also reads the project and its people at the same time instead of one after the other.",
         "Invitation link opened in a survey participant's session: it now asks you to sign in with the invited address and keeps the link, instead of saying the invitation is not available."
       ]
