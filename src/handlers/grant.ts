@@ -24,6 +24,15 @@ const INVITES_PER_INVITER_HOUR = 30;  // outbound mail from the captain's domain
 async function callerAt(ctx: Ctx, scope: Scope, min: Role): Promise<Role> {
   return gate(await effectiveRoleAt(ctx, scope.type, scope.id), min, scope.type);
 }
+/** ASK L1 default 1 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK.md): inviting at, or revoking an invitation
+ *  at, ONE project needs the caller's own DIRECT project grant (member or above). An inherited workspace role no longer
+ *  suffices, so removing a workspace grant ends every line of access that grant handed on. A caller with no role at all
+ *  still gets NOT_FOUND_OR_NOT_VISIBLE (directRoleAt decides visibility on the effective role first). Workspace-scope
+ *  invitations are unchanged. */
+const PROJECT_INVITE_HINT = "your role here comes from the workspace — invite them at the workspace instead (cap.grant.invite with scope workspace), or ask a direct project member";
+async function directAtProject(ctx: Ctx, scope: Scope) {
+  if (scope.type === "project") await directRoleAt(ctx, "project", scope.id, "member", PROJECT_INVITE_HINT);
+}
 /** D3: a member may act only up to member. */
 function ceiling(caller: Role, target: Role, what: string) {
   if (caller !== "owner" && ROLE_RANK[target] > ROLE_RANK["member"])
@@ -90,6 +99,7 @@ export const invite: Handler = async (ctx, p, o) => {
   if (!email) throw new CapError("INVALID_PARAMS", "email must be one plain ASCII address", "letters, digits and . _ % + - before the @; no display names, lists, quotes or spaces", "cap.grant.invite");
   const caller = await callerAt(ctx, scope, "member");
   ceiling(caller, role, "invite");
+  await directAtProject(ctx, scope);
   // Creating an owner needs a DIRECT owner at this scope; an inherited workspace owner cannot mint project owners.
   if (role === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
   const inviteeHash = await sha256(email);
@@ -162,6 +172,7 @@ export const revoke_invitation: Handler = async (ctx, p) => {
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
   const caller = await callerAt(ctx, scope, "member");
   ceiling(caller, inv.role as Role, "revoke invitations");
+  await directAtProject(ctx, scope);
   // 'unconfirmed' is revocable: it is the explicit human path out of an uncertain send (revoke, then invite anew).
   if (inv.status === "accepted") throw new CapError("INVALID_PARAMS", "already accepted — revoke the grant instead", undefined, "cap.grant.revoke");
   await ctx.db.prepare("UPDATE invitation SET status = 'revoked' WHERE id = ?").bind(id).run();

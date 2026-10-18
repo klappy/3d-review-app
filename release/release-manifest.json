@@ -1,23 +1,23 @@
 {
-  "version": "0.35.2",
+  "version": "0.35.3",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "96624beabf531a2def519137dc6d1a5465664f9e",
+  "cookbook_commit": "aeb78c2ccd2f82332f565edab9d0970face8ae2c",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.2.md",
-      "blob_sha": "a5c1051a2ce6bbebe13e3651c7f4e446378a33fe",
-      "sha256": "b907df1b978182b6e829107550720c79fd051df9719c8cb4d71c8d977d63c255"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.3.md",
+      "blob_sha": "51867e371b501e30ef8ff096b0b22ef7b697bdf2",
+      "sha256": "a4056596dfac870da7922e97c44ba8900a5b873409c45ebac2706c46394a81e7"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "26b89ea544f48e66a870e5b581951b76eb6efc59",
-      "sha256": "ed0fca177a4e056dab7df16bb3f643f21e64a584fd90e6f5c4c312796164b7b9"
+      "blob_sha": "9c9dd6effeede4f55f8a2cc4366984151ef3d278",
+      "sha256": "a0455aec379fe8cd3a245b056020a6d76609282d0ef5a2c7976e20f0fc75d776"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Sign-in sessions: a new session's expiry is now exactly its lifetime after its creation time. Both timestamps came from two separate clock reads, so they could differ by 1 ms, which made the 30-day sign-in-link session test fail intermittently on CI."
+        "Permissions: inviting someone to one project, or revoking an invitation there, now needs your own role on that project. A role that comes only from the project's workspace is refused with a hint to invite at the workspace instead, so removing someone from a workspace also ends any project access they handed on. People with no role at the project still see \"not found\"; workspace invitations are unchanged."
       ]
     }
   }

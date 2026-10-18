@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { get as projectGet, list as projectList, update as projectUpdate } from "../src/handlers/project";
 import { list as workspaceList, add_project, remove_project } from "../src/handlers/workspace";
-import { list as grantList, invite, transfer_owner, accept, update_role } from "../src/handlers/grant";
+import { list as grantList, invite, transfer_owner, accept, update_role, revoke_invitation } from "../src/handlers/grant";
 import { get as assessmentGet } from "../src/handlers/assessment";
 import { execute } from "../src/dispatch";
 import { sha256 } from "../src/handlers/common";
@@ -163,9 +163,10 @@ describe("workspace grouping cannot mint project ownership", () => {
 
     // #1 NEGATIVE: inherited owner self-invites as owner (old code: OK, then accept → permanent direct owner)
     await expect(invite(wo, { scope: "project", id: "prj_l", email: "l_wo@example.invalid", role: "owner" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
-    // inherited owner / member may not self-invite at member either (access would outlive ungrouping)
-    await expect(invite(wo, { scope: "project", id: "prj_l", email: "l_wo@example.invalid", role: "member" })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
-    await expect(invite(wm, { scope: "project", id: "prj_l", email: "l_wm@example.invalid", role: "member" })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
+    // inherited owner / member may not self-invite at member either (access would outlive ungrouping); since ASK L1 default 1
+    // an inherited role cannot invite at the project at all, so the refusal comes from the direct-grant check first
+    await expect(invite(wo, { scope: "project", id: "prj_l", email: "l_wo@example.invalid", role: "member" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await expect(invite(wm, { scope: "project", id: "prj_l", email: "l_wm@example.invalid", role: "member" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
     // nor invite anyone else who already holds a role there (inherited or direct)
     await expect(invite(po, { scope: "project", id: "prj_l", email: "l_wm@example.invalid", role: "member" })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
     await expect(invite(po, { scope: "project", id: "prj_l", email: "l_pm@example.invalid", role: "owner" })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
@@ -192,5 +193,51 @@ describe("workspace grouping cannot mint project ownership", () => {
     await expect(accept(mk("l_new"), { invitation_id: inv.result.invitation_id })).resolves.toMatchObject({ result: { granted: true, role: "owner" } });
     expect(await direct("l_new")).toBe("owner");
     await expect(update_role(po, { scope: "project", id: "prj_l", gid: "l4", role: "owner" })).resolves.toMatchObject({ result: { role: "owner" } });
+  });
+  // ASK L1 default 1 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK.md, SECURITY-REVIEW-eb72ea5-1841.md § L1):
+  // project-scope invite and revoke_invitation need the caller's own DIRECT project grant; an inherited workspace role is not enough.
+  it("project-scope invite/revoke_invitation need a direct project grant; workspace invite is unchanged", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-17T23:50:00.000Z"); const at = now.toISOString();
+    let trace = 0;
+    const mk = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_l1_${++trace}`, now: () => now, log: () => {} });
+    for (const id of ["d_wo", "d_wm", "d_po", "d_pm", "d_pv", "d_out"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_d", "Direct WS", at, "d_wo").run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_d", "ws_d", "prj_d", at, "d_po").run();
+    const grant = (id: string, p: string, t: string, s: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, t, s, r, at).run();
+    await grant("d1", "d_wo", "workspace", "ws_d", "owner");
+    await grant("d2", "d_wm", "workspace", "ws_d", "member");
+    await grant("d3", "d_po", "project", "prj_d", "owner");
+    await grant("d4", "d_pm", "project", "prj_d", "member");
+    await grant("d5", "d_pv", "project", "prj_d", "viewer");
+    await grant("d6", "d_pv", "workspace", "ws_d", "member"); // direct viewer + inherited member: effective member, direct viewer
+    const wo = mk("d_wo"), wm = mk("d_wm"), pm = mk("d_pm"), pv = mk("d_pv"), out = mk("d_out");
+    const P = { scope: "project", id: "prj_d" } as const;
+
+    // NEGATIVE: the L1 path — an inherited workspace member invites a second address straight onto the project
+    const refused = invite(wm, { ...P, email: "d_alt@example.invalid", role: "member" });
+    await expect(refused).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await expect(refused).rejects.toHaveProperty("hint", expect.stringContaining("invite them at the workspace instead"));
+    await expect(invite(wm, { ...P, email: "d_alt@example.invalid", role: "viewer" }, { dryRun: true })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    // an inherited workspace OWNER is refused at the project too, and so is a direct viewer whose member role is inherited
+    await expect(invite(wo, { ...P, email: "d_alt@example.invalid", role: "member" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await expect(invite(pv, { ...P, email: "d_alt@example.invalid", role: "viewer" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    // no existence leak: a caller with no role at all still sees NOT_FOUND_OR_NOT_VISIBLE
+    await expect(invite(out, { ...P, email: "d_alt@example.invalid", role: "viewer" })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
+    expect((await db.prepare("SELECT COUNT(*) AS n FROM invitation WHERE scope_id = ?").bind("prj_d").first<{ n: number }>())?.n).toBe(0);
+
+    // POSITIVE: a direct project member still invites (D3: up to member)
+    const ok: any = await invite(pm, { ...P, email: "d_alt@example.invalid", role: "member" });
+    expect(ok.result.invitation_id).toMatch(/^inv/);
+    // revoke_invitation at the project: inherited roles refused, outsider hidden, the direct member may revoke
+    await expect(revoke_invitation(wm, { id: ok.result.invitation_id })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await expect(revoke_invitation(wo, { id: ok.result.invitation_id })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await expect(revoke_invitation(out, { id: ok.result.invitation_id })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
+    await expect(revoke_invitation(pm, { id: ok.result.invitation_id })).resolves.toMatchObject({ result: { status: "revoked" } });
+
+    // UNCHANGED: a workspace member invites at the workspace, and may revoke that workspace invitation
+    const w: any = await invite(wm, { scope: "workspace", id: "ws_d", email: "d_alt@example.invalid", role: "member" });
+    expect(w.result.invitation_id).toMatch(/^inv/);
+    await expect(revoke_invitation(wm, { id: w.result.invitation_id })).resolves.toMatchObject({ result: { status: "revoked" } });
   });
 });
