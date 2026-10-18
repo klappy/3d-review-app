@@ -1,23 +1,23 @@
 {
-  "version": "0.35.12",
+  "version": "0.35.13",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "f4b6b51fc955277e4465026b433c04f60859dc70",
+  "cookbook_commit": "0a77dc852edd3f7545d25fc9b88f569ab0c6679f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.12.md",
-      "blob_sha": "08662f375b75846a4716bcfb6fd9c08083f48cd8",
-      "sha256": "baa46647cdb11a383ba7024fdf88717a58bd572e11df44f5b1c286fd46326592"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.13.md",
+      "blob_sha": "014eb97d8fafddf13d713e83f11fc5b1f325f909",
+      "sha256": "ed1df09700b30b93ea893c59551e796c298cf1d48e69f289a9c934c8ddac865c"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "e68624007f30d72c460ab42fa519d31f3f064df4",
-      "sha256": "84798c0af6c9c246083d5e8fc545d3216c366362a5dbdc63962a626295a06636"
+      "blob_sha": "1156f28f4e53be321d76ca96b175cedd4bce902b",
+      "sha256": "0b6f01618424805b5319f766524bf3d409238722f990f6dfcb6cb7e117252589"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Roles: if a person becomes an owner at the same moment another owner lowers their role or removes them, the change is refused as for any owner, and the new owner keeps their role and their open invitations."
+        "Roles: changing a person's role is refused if their role changed since you looked, or if your own role was lowered or removed in the meantime; removing a person is refused if your own role was lowered or removed in the meantime. Removing a person who was removed at the same moment by someone else now reports that the access was not found, instead of reporting it removed."
       ]
     }
   }

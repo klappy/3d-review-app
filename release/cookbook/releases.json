@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.12",
+  "current": "0.35.13",
   "versions": [
+    {
+      "version": "0.35.13",
+      "status": "candidate",
+      "notes_path": "releases/0.35.13.md",
+      "sections": {
+        "fixed": [
+          "Roles: changing a person's role is refused if their role changed since you looked, or if your own role was lowered or removed in the meantime; removing a person is refused if your own role was lowered or removed in the meantime. Removing a person who was removed at the same moment by someone else now reports that the access was not found, instead of reporting it removed."
+        ]
+      }
+    },
     {
       "version": "0.35.12",
       "status": "candidate",
