@@ -1083,6 +1083,23 @@ describe("confirm binds hold to the write; stale refusals; publish conflict (0.3
     await expect(publishVersion(ctx, params, { dryRun: false })).rejects.toMatchObject({ code: "STAGE_CONFLICT" });
   });
 
+  it("template.publish_version: a lost race whose D1 error carries the constraint only in `cause` or as SQLITE_CONSTRAINT is still STAGE_CONFLICT (Bugbot 4308744033)", async () => {
+    const params = { id: "tpl_n4c", name: "T", perspective: "translator", items: [], scoring: {}, source_ref: "s", rubric_ref: "r" };
+    const thrown = [
+      new Error("D1_ERROR: insert failed", { cause: new Error("UNIQUE constraint failed: survey_template.id, survey_template.version") }),
+      new Error("D1_ERROR: SQLITE_CONSTRAINT"),
+    ];
+    for (const err of thrown) {
+      const failing = { batch: (s: any[]) => db.batch(s), prepare: (s: string) => {
+        const st = db.prepare(s);
+        if (!/^INSERT INTO survey_template/.test(s)) return st;
+        return { bind: () => ({ run: async () => { throw err; } }) };
+      } };
+      const ctx = { ...mk(failing, "n4_sup", "support") } as any;
+      await expect(publishVersion(ctx, params, { dryRun: false })).rejects.toMatchObject({ code: "STAGE_CONFLICT" });
+    }
+  });
+
   it("workspace.delete: a stale preview is refused; a confirmed execute through dispatch deletes (DoD (c))", async () => {
     const po = mk(db, "n4_po"); const params = { id: "ws_n4" };
     const d = await dry(po, "cap.workspace.delete", params); expect(d.ok).toBe(true);

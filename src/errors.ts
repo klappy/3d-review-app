@@ -33,3 +33,10 @@ export class CapError extends Error {
 export function notVisible(what = "resource"): CapError {
   return new CapError("NOT_FOUND_OR_NOT_VISIBLE", `${what} not found or not visible`);
 }
+
+/** SQLite constraint failure as D1 reports it (miniflare and production both surface the SQLite text, sometimes only on `cause`). */
+const CONSTRAINT = /UNIQUE constraint failed|PRIMARY KEY constraint failed|SQLITE_CONSTRAINT/i;
+export function isConstraintError(e: unknown): boolean {
+  const msg = `${e instanceof Error ? e.message : String(e)} ${e instanceof Error && e.cause instanceof Error ? e.cause.message : ""}`;
+  return CONSTRAINT.test(msg);
+}

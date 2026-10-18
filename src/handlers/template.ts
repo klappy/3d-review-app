@@ -1,5 +1,5 @@
 import type { Handler } from "./types";
-import { CapError } from "./errors";
+import { CapError, isConstraintError } from "./errors";
 import { requireConfirmedState } from "../receipt";
 import { LEGACY_TEMPLATE_IDS } from "../legacy-templates";
 import { withDisplayName } from "../display-names";
@@ -44,7 +44,7 @@ export const publish_version: Handler = async (ctx,params,opts) => {
   try {
     await ctx.db.prepare("INSERT INTO survey_template (id, version, name, perspective, source_ref, items_json, scoring_json, rubric_ref, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id,version,name,perspective,source_ref,JSON.stringify(items),JSON.stringify(scoring),rubric_ref,at).run();
   } catch(e) {
-    if(/UNIQUE constraint failed|PRIMARY KEY/i.test(String((e as Error)?.message ?? e))) throw new CapError("STAGE_CONFLICT",`version ${version} of this template was published at the same moment`,"call dry_run again to preview the next version");
+    if(isConstraintError(e)) throw new CapError("STAGE_CONFLICT",`version ${version} of this template was published at the same moment`,"call dry_run again to preview the next version");
     throw e;
   }
   return {result:{template:{id,version,name,perspective,source_ref,rubric_ref,published_at:at}},scope:{type:"platform",id},impact};
