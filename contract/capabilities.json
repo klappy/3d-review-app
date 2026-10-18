@@ -1627,7 +1627,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "impact preview → confirm",
-      "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed); noop (0.35.16): when the grant already holds the requested role (at first read, or set there by another writer before this write), the result, the dry_run result and impact, and the receipt carry noop: true; the impact then names no effect and no compensating control, and the receipt credits the caller with no change (no undo token, no compensating control); confirm (0.35.17): the dry_run binds the role it read into the confirm token, and an execute that reads another role is refused with CONFIRM_REQUIRED (dry_run again)",
+      "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed); noop (0.35.16): when the grant already holds the requested role (at first read, or set there by another writer before this write), the result, the dry_run result and impact, and the receipt carry noop: true; the impact then names no effect and no compensating control, and the receipt credits the caller with no change (no undo token, no compensating control); confirm (0.35.17): the dry_run binds the role it read into the confirm token, and an execute that reads another role is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count a downgrade preview showed; 0.35.20: it binds the swept invitation id set (not only the count), and the UPDATE re-checks that set in its own WHERE (a same-count swap of the holder's open invitations between preview, token check and write is refused with CONFIRM_REQUIRED and changes nothing)",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1680,7 +1680,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "danger",
-      "notes": "D3; confirm (0.35.18): the dry_run binds the owner set and the recipient's direct role it read into the confirm token, and an execute that reads either changed is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count, and the write re-checks the bound state in its own WHERE (a change between token check and write is refused the same way)",
+      "notes": "D3; confirm (0.35.18): the dry_run binds the owner set and the recipient's direct role it read into the confirm token, and an execute that reads either changed is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count, and the write re-checks the bound state in its own WHERE (a change between token check and write is refused the same way); 0.35.20: the owner set is compared as group_concat ordered in the aggregate itself; the step-down preview binds the swept invitation id set (not only the count) and the INSERT re-checks it; a write refused because the caller lost the direct owner grant in the window is NOT_AUTHORIZED_AT_SCOPE, otherwise CONFIRM_REQUIRED",
       "status": "target",
       "inverse": {
         "kind": "none",
