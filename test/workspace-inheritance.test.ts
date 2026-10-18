@@ -489,6 +489,68 @@ describe("workspace grouping cannot mint project ownership", () => {
     await update_role(own, { scope: "project", id: "prj_rv", gid: "rvg_po2", role: "owner" });
     await expect(accept(mk("rv_z"), { token: "tok_inv_rv_po2_z_owner" })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
   });
+  // 0.35.9 (cookbook work/active/2026-10-18-3d-invite-guard-race DoD (a)): invite re-checks the inviter's standing inside its
+  // INSERT, so a grant removed or lowered between the handler's checks and the write leaves no fresh row. The race is simulated
+  // by a db whose batch() first applies the grant change, i.e. after every check has already passed.
+  it("a grant removed or lowered between invite's checks and its INSERT leaves no fresh invitation and revokes nothing", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-18T08:00:00.000Z"); const at = now.toISOString();
+    let trace = 0;
+    const racing = (change: string) => ({ prepare: (q: string) => db.prepare(q), batch: async (st: any[]) => { await db.prepare(change).run(); return db.batch(st); } });
+    const mk = (id: string, d: any = db): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db: d, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_gr_${++trace}`, now: () => now, log: () => {} } as any);
+    for (const id of ["gr_po", "gr_po2", "gr_pm", "gr_pm2", "gr_gone", "gr_x", "gr_y", "gr_z"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_gr", "GR WS", at, "gr_po").run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_gr", "ws_gr", "prj_gr", at, "gr_po").run();
+    const grant = (id: string, p: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", "prj_gr", r, at).run();
+    await grant("grg_po", "gr_po", "owner"); await grant("grg_po2", "gr_po2", "owner");
+    await grant("grg_pm", "gr_pm", "member"); await grant("grg_pm2", "gr_pm2", "member");
+    const rowsFor = async (to: string) => (await db.prepare("SELECT id, status FROM invitation WHERE scope_id = 'prj_gr' AND invitee_hash = ?").bind(await sha256(to + "@example.invalid")).all<{ id: string; status: string }>()).results;
+    // a dead row for gr_x (its inviter holds no grant) that a LANDED invite would supersede and revoke
+    await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind("inv_gr_dead", "project", "prj_gr", await sha256("gr_x@example.invalid"), await sha256("tok_inv_gr_dead"), "member", "sent", "gr_gone", at, "2026-10-24T00:00:00.000Z").run();
+
+    // removal lands in the window: refused as a role change, no row, and the dead row is not revoked (the batch revoke is gated on the INSERT)
+    await expect(invite(mk("gr_pm", racing(`DELETE FROM "grant" WHERE id = 'grg_pm'`)), { scope: "project", id: "prj_gr", email: "gr_x@example.invalid", role: "member" }))
+      .rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE", message: expect.stringContaining("changed while the invitation was being written") });
+    expect(await rowsFor("gr_x")).toEqual([{ id: "inv_gr_dead", status: "sent" }]);
+    // downgrade member -> viewer lands in the window: no row
+    await expect(invite(mk("gr_pm2", racing(`UPDATE "grant" SET role = 'viewer' WHERE id = 'grg_pm2'`)), { scope: "project", id: "prj_gr", email: "gr_y@example.invalid", role: "member" }))
+      .rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    expect(await rowsFor("gr_y")).toEqual([]);
+    // an owner steps down to member in the window: no owner row
+    await expect(invite(mk("gr_po2", racing(`UPDATE "grant" SET role = 'member' WHERE id = 'grg_po2'`)), { scope: "project", id: "prj_gr", email: "gr_z@example.invalid", role: "owner" }))
+      .rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    expect(await rowsFor("gr_z")).toEqual([]);
+    // ... while a member invitation from that same (now member) holder still lands: the guard is the inviterStands rule, no stricter
+    const ok = await invite(mk("gr_po2"), { scope: "project", id: "prj_gr", email: "gr_z@example.invalid", role: "member" });
+    expect((await rowsFor("gr_z")).map((r) => r.id)).toEqual([ok.result.invitation_id]);
+    // control: with standing intact the same invite lands and supersedes the dead row in the same batch
+    const landed = await invite(mk("gr_po"), { scope: "project", id: "prj_gr", email: "gr_x@example.invalid", role: "member" });
+    expect(landed.impact.revoked_superseded).toBe(1);
+    expect(Object.fromEntries((await rowsFor("gr_x")).map((r) => [r.id, r.status]))).toEqual({ inv_gr_dead: "revoked", [landed.result.invitation_id]: "pending" });
+  });
+  // 0.35.9 (cookbook work/active/2026-10-18-3d-invite-guard-race DoD (b)): ONE expiry boundary. A row is live while
+  // expires_at > now; at expires_at == now it is expired for accept AND for the grant-removal sweep (which leaves it as it was).
+  it("expiry boundary: at expires_at == now accept refuses and the revoke sweep skips; one millisecond later both treat it as live", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-18T09:00:00.000Z"); const at = now.toISOString(); const later = new Date(now.getTime() + 1).toISOString();
+    let trace = 0;
+    const mk = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_eb_${++trace}`, now: () => now, log: () => {} } as any);
+    for (const id of ["eb_po", "eb_pm", "eb_x", "eb_y"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_eb", "EB WS", at, "eb_po").run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_eb", "ws_eb", "prj_eb", at, "eb_po").run();
+    const grant = (id: string, p: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", "prj_eb", r, at).run();
+    await grant("ebg_po", "eb_po", "owner"); await grant("ebg_pm", "eb_pm", "member");
+    const row = async (id: string, to: string, expires: string) => { await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id, "project", "prj_eb", await sha256(to + "@example.invalid"), await sha256("tok_" + id), "member", "sent", "eb_pm", at, expires).run(); };
+    const status = async (id: string) => (await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status;
+    await row("inv_eb_edge", "eb_x", at); // expires_at == now
+    await row("inv_eb_live", "eb_y", later); // expires_at == now + 1 ms
+    await expect(accept(mk("eb_x"), { token: "tok_inv_eb_edge" }, { dryRun: true })).rejects.toMatchObject({ code: "INVALID_PARAMS", message: "invitation_expired" });
+    await expect(accept(mk("eb_y"), { token: "tok_inv_eb_live" }, { dryRun: true })).resolves.toBeTruthy();
+    const removed = await grantRevoke(mk("eb_po"), { scope: "project", id: "prj_eb", gid: "ebg_pm" });
+    expect(removed.result).toMatchObject({ revoked_invitations: 1 });
+    expect(await status("inv_eb_edge")).toBe("sent"); // expired: left as it was, same as accept saw it
+    expect(await status("inv_eb_live")).toBe("revoked"); // live: swept, same as accept saw it
+  });
   // Dead invitations DoD (8): policy answers a participant session on the invitation link before the handler runs. That is
   // "sign in as the invited person" (retryable, the UI keeps the token), not the invitation's durable refusal.
   it("a participant session opening an invitation link gets NOT_AUTHENTICATED (retryable), not NOT_AUTHORIZED_AT_SCOPE", async () => {

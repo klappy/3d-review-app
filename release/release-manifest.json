@@ -1,23 +1,23 @@
 {
-  "version": "0.35.8",
+  "version": "0.35.9",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "a920021243ae23cbfe40d7156a9d36c8315f902b",
+  "cookbook_commit": "6dd9736a9da2764a5ed6b8158336ccb00acc3709",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.8.md",
-      "blob_sha": "56b00639ddc45dd631ffc9e807843d7da5ad98fe",
-      "sha256": "bae5cbc732cf46591876eb6c527f76e04a001cb76e0b566a1ed30812f17d1bc8"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.9.md",
+      "blob_sha": "97d5419aa4225f4980c6ffb948877a33e4f3faa9",
+      "sha256": "2ea07d197d0388fe5d2e457d12cba73db3778e7cad0aaf445c88dbc7ef79704a"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "6750b1053fc822f56b909dcedfe138d0202e396d",
-      "sha256": "9964ca7585d3087d1242f003439e4440ecc68fc09016320bb93767ad08659e6c"
+      "blob_sha": "e93b37b8e63e8d298e4011fe6ab9765d21d544fd",
+      "sha256": "9e65dd499622b227107cab9526ebf1c625bdc40d517c5ce8ee35aae3defcb9ca"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Invitations: removing or lowering someone's role, or stepping down as owner, now also cancels the open invitations that person sent at that workspace, project or assessment and could no longer send, so those invitations cannot become valid again if the role comes back. The 0.35.6 promise that a cancelled invitation cannot become valid again now holds in general, not only after a re-invite. The result (a dry run too, where the action has one) and its log report how many invitations were cancelled."
+        "Invitations: an owner invitation, or an invitation to a project, is no longer created when the sender's role is removed or lowered at the same moment it is sent; an invitation counts as expired from its exact expiry time on, the same way when it is accepted and when a role change cancels open invitations; and, to state the 0.35.8 change precisely, it cancels only the invitations whose standing depends on the sender's own role at that place (owner invitations, and any invitation to a project), so a member's or viewer's workspace or assessment invitation is left as it was while that question stays on hold."
       ]
     }
   }

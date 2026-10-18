@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.8",
+  "current": "0.35.9",
   "versions": [
+    {
+      "version": "0.35.9",
+      "status": "candidate",
+      "notes_path": "releases/0.35.9.md",
+      "sections": {
+        "fixed": [
+          "Invitations: an owner invitation, or an invitation to a project, is no longer created when the sender's role is removed or lowered at the same moment it is sent; an invitation counts as expired from its exact expiry time on, the same way when it is accepted and when a role change cancels open invitations; and, to state the 0.35.8 change precisely, it cancels only the invitations whose standing depends on the sender's own role at that place (owner invitations, and any invitation to a project), so a member's or viewer's workspace or assessment invitation is left as it was while that question stays on hold."
+        ]
+      }
+    },
     {
       "version": "0.35.8",
       "status": "candidate",
