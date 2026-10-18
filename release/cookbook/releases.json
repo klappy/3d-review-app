@@ -1,14 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.6",
+  "current": "0.35.7",
   "versions": [
+    {
+      "version": "0.35.7",
+      "status": "candidate",
+      "notes_path": "releases/0.35.7.md",
+      "sections": {
+        "fixed": [
+          "Invitations: a re-invite cancels an earlier owner invitation only when the new invitation is also for owner, leaves expired invitations as expired instead of marking them cancelled, and the invite result (including a dry run) and its log now report how many earlier invitations it cancelled."
+        ]
+      }
+    },
     {
       "version": "0.35.6",
       "status": "candidate",
       "notes_path": "releases/0.35.6.md",
       "sections": {
         "fixed": [
-          "Invitations: inviting someone again after their earlier invitation could no longer be accepted now cancels that earlier invitation, so it cannot become valid again if its sender later gets their own role on the project back."
+          "Invitations: a re-invite that sends a new invitation now cancels the person's earlier invitation that could no longer be accepted, so that earlier invitation cannot become valid again if its sender later gets their own role on the project back."
         ]
       }
     },
