@@ -3,6 +3,7 @@ import type { Ctx, ScopeType } from "./handlers/types";
 import type { Capability } from "./registry";
 import type { Receipt } from "./envelope";
 import { hmacSha256Base64Url, hmacSha256Key, sha256Hex } from "./crypto";
+import { CapError } from "./handlers/errors";
 
 export const CONFIRM_TTL_SECONDS = 300; // inherited from 05 sketch; 18-D open item D-2 (18-C rules the final value)
 
@@ -47,7 +48,9 @@ export async function verify(secret: string, payload: string, sig: string): Prom
 }
 
 // ---------- confirm tokens (danger two-step) ----------
-export interface ConfirmIntent { capability: string; params_hash: string; actor: string; scope: string; revision: string; exp: number }
+export interface ConfirmIntent { capability: string; params_hash: string; actor: string; scope: string; revision: string; exp: number;
+  /** Hash of the state the dry_run preview read (HandlerResult.confirmState), when the handler binds one (0.35.17). */
+  state?: string }
 
 /** Bound to intent: capability + params hash + actor + scope + revision (contract sha). TTL 300 s, labeled inherited (D-2). */
 export async function mintConfirmToken(secret: string, intent: Omit<ConfirmIntent, "exp">, now: Date): Promise<{ token: string; expires_in: number }> {
@@ -70,6 +73,24 @@ export async function checkConfirmToken(secret: string, token: string, intent: O
   return "ok";
 }
 
+/** The state hash a valid confirm token carries (call after checkConfirmToken says ok); null when it carries none. */
+export function confirmTokenState(token: string): string | null {
+  try {
+    const body = JSON.parse(new TextDecoder().decode(b64urlDecode(token.slice(4).split(".")[0]))) as ConfirmIntent;
+    return typeof body.state === "string" ? body.state : null;
+  } catch { return null; }
+}
+export const stateHash = (state: Record<string, unknown>): Promise<string> => paramsHash(state);
+
+/** 0.35.17 (cookbook work/active/2026-10-18-3d-grant-noop-followups-2 DoD (a)): on a confirmed execute, refuse when the state
+ *  this call read is not the state its dry_run preview was computed from, so a confirmed preview never executes a different
+ *  change (a no-op preview becoming an elevation). A direct handler call (no dispatch confirm) is not checked. */
+export async function requireConfirmedState(opts: { confirmedState?: string | null } | undefined, state: Record<string, unknown>, capability: string): Promise<void> {
+  if (opts?.confirmedState === undefined) return;
+  if (opts.confirmedState !== (await stateHash(state)))
+    throw new CapError("CONFIRM_REQUIRED", "the target changed since the dry_run preview", "Call dry_run again and confirm the new preview.", capability);
+}
+
 export async function paramsHash(params: Record<string, unknown>): Promise<string> {
   return (await sha256Hex(canonical(params))).slice(0, 32);
 }
@@ -83,7 +104,7 @@ export interface MintInput {
   result: Record<string, unknown>;
   mode?: "dry_run" | "execute";
   confirmToken?: string;
-  /** The handler changed nothing (result.noop): the receipt is marked noop, carries no undo token and no compensating control. */
+  /** The handler changed nothing (HandlerResult.noop): the receipt is marked noop, carries no undo token and no compensating control. */
   noop?: boolean;
 }
 

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { get as projectGet, list as projectList, update as projectUpdate } from "../src/handlers/project";
 import { list as workspaceList, add_project, remove_project } from "../src/handlers/workspace";
@@ -8,6 +8,8 @@ import { authorize } from "../src/policy";
 import { byId } from "../src/registry";
 import { get as assessmentGet } from "../src/handlers/assessment";
 import { execute } from "../src/dispatch";
+import { handlers } from "../src/handlers";
+import { opsUsage } from "../src/handlers/usage";
 import { sha256 } from "../src/handlers/common";
 import type { Ctx } from "../src/handlers/types";
 
@@ -793,14 +795,21 @@ describe("update_role no-op through dispatch", () => {
     // the file's earlier describes may already have applied the schema to this shared database
     if (!(await db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'principal'").first()))
       await db.batch(sql("../migrations/0001_init.sql").split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)));
-    for (const id of ["nd_po", "nd_t", "nd_u", "nd_d", "nd_s"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    // cap.ops.usage (0.35.17 DoD (e)) reads participant_session.invitation_id (migration 0007)
+    if (!(await db.prepare("SELECT 1 FROM pragma_table_info('participant_session') WHERE name = 'invitation_id'").first()))
+      await db.batch(sql("../migrations/0007_shared_link_context.sql").split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)));
+    for (const id of ["nd_po", "nd_t", "nd_u", "nd_d", "nd_s", "nd_a", "nd_e", "nd_f", "nd_c"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
     await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_nd", null, "prj_nd", at, "nd_po").run();
     const grant = (id: string, p: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", "prj_nd", r, at).run();
     await grant("ndg_po", "nd_po", "owner"); await grant("ndg_t", "nd_t", "viewer"); await grant("ndg_u", "nd_u", "member");
     await grant("ndg_d", "nd_d", "member"); await grant("ndg_s", "nd_s", "member");
+    await grant("ndg_a", "nd_a", "member"); await grant("ndg_e", "nd_e", "member"); await grant("ndg_f", "nd_f", "member"); await grant("ndg_c", "nd_c", "member");
     return db;
   };
   let db: any;
+  // 0.35.17 (cookbook work/active/2026-10-18-3d-grant-noop-followups-2 DoD (f)): set up once for the describe, so each test
+  // also passes when run alone (-t); every test uses its own grant.
+  beforeAll(async () => { db = await setup(); });
   const run = async (actor: Ctx, params: Record<string, unknown>, d: any = db) => {
     const dry: any = await execute(actor, "cap.grant.update_role", params, { tool: "danger", mode: "dry_run" });
     expect(dry.ok).toBe(true);
@@ -811,7 +820,6 @@ describe("update_role no-op through dispatch", () => {
   };
 
   it("a target raised to the requested role by another writer in the window: the receipt is marked no-op and credits no change (DoD (a), (c))", async () => {
-    db = await setup();
     const logs: [string, any][] = [];
     const { env, stored } = await run(mk(db, "nd_po", logs), { ...at_, gid: "ndg_t", role: "member" }, racing(db, `UPDATE "grant" SET role = 'member' WHERE id = 'ndg_t'`));
     expect(env.ok).toBe(true);
@@ -855,5 +863,51 @@ describe("update_role no-op through dispatch", () => {
     expect(env.receipt.compensating_control).toEqual(expect.any(String));
     expect(stored.prior).toEqual({ prior: { role: "member" }, params: expect.anything(), result_ids: expect.anything() });
     expect(logs.find(([s]) => s === "grant.update_role")?.[1]).not.toHaveProperty("noop");
+  });
+  // 0.35.17 (cookbook work/active/2026-10-18-3d-grant-noop-followups-2): the 540 review follow-ups.
+  it("a no-op preview cannot execute as an elevation after the target is lowered: execute asks for a new dry_run (0.35.17 DoD (a))", async () => {
+    const owner = mk(db, "nd_po", []);
+    const params = { ...at_, gid: "ndg_a", role: "member" };
+    const dry: any = await execute(owner, "cap.grant.update_role", params, { tool: "danger", mode: "dry_run" });
+    expect(dry.result).toMatchObject({ noop: true });
+    await db.prepare(`UPDATE "grant" SET role = 'viewer' WHERE id = 'ndg_a'`).run(); // another owner lowers the target after the preview
+    const env: any = await execute({ ...owner, traceId: `tr_nd_${++trace}` } as Ctx, "cap.grant.update_role", params, { tool: "danger", mode: "execute", confirm_token: dry.result.confirm_token });
+    expect(env.ok).toBe(false);
+    expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect((await db.prepare(`SELECT role FROM "grant" WHERE id = 'ndg_a'`).first()).role).toBe("viewer");
+    // a new dry_run previews the elevation it would be, and that preview executes
+    const again = await run(mk(db, "nd_po", []), params);
+    expect(again.dry.result).not.toHaveProperty("noop");
+    expect(again.dry.result.impact).toMatchObject({ affected: [{ grant: "ndg_a", from: "viewer", to: "member" }], effect: "disclosure" });
+    expect(again.env.ok).toBe(true);
+    expect(again.env.receipt).not.toHaveProperty("noop");
+  });
+
+  it("the receipt's noop comes from HandlerResult.noop, not from the user-facing result (0.35.17 DoD (c))", async () => {
+    const real = handlers["cap.grant.update_role"];
+    try {
+      handlers["cap.grant.update_role"] = async (_c, _p, o) => o?.dryRun ? { result: {}, impact: { affected: [], irreversible: false, effect: "disclosure" } }
+        : { result: { grant: "ndg_c", noop: true } };
+      const shown = await run(mk(db, "nd_po", []), { ...at_, gid: "ndg_c", role: "viewer" });
+      expect(shown.env.receipt).not.toHaveProperty("noop");
+      handlers["cap.grant.update_role"] = async (_c, _p, o) => o?.dryRun ? { result: {}, impact: { affected: [], irreversible: false, noop: true } }
+        : { result: { grant: "ndg_c" }, noop: true };
+      const marked = await run(mk(db, "nd_po", []), { ...at_, gid: "ndg_c", role: "viewer" });
+      expect(marked.env.receipt).toMatchObject({ noop: true });
+      expect(marked.env.result).toEqual({ grant: "ndg_c" });
+    } finally { handlers["cap.grant.update_role"] = real; }
+  });
+
+  it("usage writes_by_capability does not count a no-op update_role; a real change still counts (0.35.17 DoD (e))", async () => {
+    const support = { ...mk(db, "nd_po", []), principal: { kind: "user", id: "nd_po", provisioned: true, support: true } } as any;
+    const writes = async () => ((await opsUsage(support, { from: "2026-10-18", to: "2026-10-18" })).result.writes_by_capability as any[])
+      .find((w) => w.capability === "cap.grant.update_role")?.count ?? 0;
+    const before = await writes();
+    const noop = await run(mk(db, "nd_po", []), { ...at_, gid: "ndg_e", role: "member" });
+    expect(noop.env.receipt).toMatchObject({ noop: true });
+    expect(await writes()).toBe(before);
+    const real = await run(mk(db, "nd_po", []), { ...at_, gid: "ndg_f", role: "viewer" });
+    expect(real.env.receipt).not.toHaveProperty("noop");
+    expect(await writes()).toBe(before + 1);
   });
 });
