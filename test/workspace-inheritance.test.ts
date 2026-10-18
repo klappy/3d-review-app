@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { get as projectGet, list as projectList, update as projectUpdate } from "../src/handlers/project";
 import { list as workspaceList, add_project, remove_project } from "../src/handlers/workspace";
-import { list as grantList, invite, transfer_owner, accept, update_role, revoke_invitation, mine } from "../src/handlers/grant";
+import { list as grantList, invite, transfer_owner, accept, update_role, revoke_invitation, mine, revoke as grantRevoke } from "../src/handlers/grant";
 import { authorize } from "../src/policy";
 import { byId } from "../src/registry";
 import { get as assessmentGet } from "../src/handlers/assessment";
@@ -418,6 +418,76 @@ describe("workspace grouping cannot mint project ownership", () => {
     for (let i = 0; i < 30; i++) await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(`inv_f2_rl_${i}`, "project", "prj_f2", await sha256(`rl${i}@example.invalid`), await sha256(`tok_rl_${i}`), "member", "revoked", "f2_pm", at, "2026-10-24T00:00:00.000Z").run();
     await expect(invite(mk("f2_pm"), { scope: "project", id: "prj_f2", email: "f2_r@example.invalid", role: "member" })).rejects.toMatchObject({ code: "RATE_LIMITED" });
     expect(await status("inv_f2_r_dead")).toBe("sent");
+  });
+  // 0.35.8 (cookbook work/active/2026-10-18-3d-invite-revoke-on-grant-removal DoD (a)-(c)): removing a grant, downgrading it,
+  // or stepping down from owner revokes the open, unexpired invitations its holder could no longer issue, in the same batch;
+  // the count is reported (impact incl. dry-run, or the result where the call has no dry-run, and the log); and a regained
+  // grant cannot revive them: the old link is refused by accept.
+  it("grant removal or downgrade revokes the holder's orphaned invitations, is reported, and a regained grant cannot revive them", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-18T07:00:00.000Z"); const at = now.toISOString(); const past = "2026-10-18T06:00:00.000Z";
+    let trace = 0; const logs: [string, any][] = [];
+    const mk = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_rv_${++trace}`, now: () => now, log: (e: string, d: any) => { logs.push([e, d]); } } as any);
+    for (const id of ["rv_po", "rv_po2", "rv_pm", "rv_pm2", "rv_x", "rv_y", "rv_z", "rv_w"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_rv", "RV WS", at, "rv_po").run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_rv", "ws_rv", "prj_rv", at, "rv_po").run();
+    const grant = (id: string, p: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", "prj_rv", r, at).run();
+    await grant("rvg_po", "rv_po", "owner"); await grant("rvg_po2", "rv_po2", "owner");
+    await grant("rvg_pm", "rv_pm", "member"); await grant("rvg_pm2", "rv_pm2", "member");
+    const row = async (id: string, by: string, to: string, role: string, status = "sent", expires = "2026-10-24T00:00:00.000Z") => { await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id, "project", "prj_rv", await sha256(to + "@example.invalid"), await sha256("tok_" + id), role, status, by, at, expires).run(); };
+    const status = async (id: string) => (await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status;
+    const own = mk("rv_po");
+
+    // (a) removal: rv_pm's fresh invitation is revoked with the grant; its expired row and another inviter's row are untouched
+    const sent = await invite(mk("rv_pm"), { scope: "project", id: "prj_rv", email: "rv_x@example.invalid", role: "member" });
+    const xToken = sent.result.dev_only_link_token as string;
+    await expect(accept(mk("rv_x"), { token: xToken }, { dryRun: true })).resolves.toBeTruthy(); // the link works before the removal
+    await row("inv_rv_pm_expired", "rv_pm", "rv_w", "member", "sent", past);
+    await row("inv_rv_po_live", "rv_po", "rv_w", "member");
+    logs.length = 0;
+    const removed = await grantRevoke(own, { scope: "project", id: "prj_rv", gid: "rvg_pm" });
+    expect(removed.result).toMatchObject({ revoked: true, revoked_invitations: 1 }); // (c) no dry-run here: the result carries it
+    expect(logs.find(([e]) => e === "grant.revoke")?.[1]).toMatchObject({ revoked_invitations: 1 });
+    expect(await status(sent.result.invitation_id)).toBe("revoked");
+    expect(await status("inv_rv_pm_expired")).toBe("sent");
+    expect(await status("inv_rv_po_live")).toBe("sent");
+    // (b) remove -> re-grant: the old link is refused
+    await grant("rvg_pm_again", "rv_pm", "member");
+    await expect(accept(mk("rv_x"), { token: xToken })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
+
+    // (a) downgrade member -> viewer: an 'unconfirmed' row is open too; (c) dry-run counts it and revokes nothing
+    await row("inv_rv_pm2_y", "rv_pm2", "rv_y", "member", "unconfirmed");
+    const dDry = await update_role(own, { scope: "project", id: "prj_rv", gid: "rvg_pm2", role: "viewer" }, { dryRun: true });
+    expect(dDry.impact!.revoked_invitations).toBe(1);
+    expect(await status("inv_rv_pm2_y")).toBe("unconfirmed");
+    logs.length = 0;
+    const down = await update_role(own, { scope: "project", id: "prj_rv", gid: "rvg_pm2", role: "viewer" });
+    expect(down.impact!.revoked_invitations).toBe(1);
+    expect(logs.find(([e]) => e === "grant.update_role")?.[1]).toMatchObject({ downgrade: true, revoked_invitations: 1 });
+    expect(await status("inv_rv_pm2_y")).toBe("revoked");
+    // (b) raise back: revokes nothing, revives nothing
+    const up = await update_role(own, { scope: "project", id: "prj_rv", gid: "rvg_pm2", role: "member" });
+    expect(up.impact!.revoked_invitations).toBe(0);
+    await expect(accept(mk("rv_y"), { token: "tok_inv_rv_pm2_y" })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
+
+    // (a) owner steps down (owner -> member): the owner invitation goes, the member one stays (a member may still issue it)
+    await row("inv_rv_po2_z_owner", "rv_po2", "rv_z", "owner");
+    await row("inv_rv_po2_w_member", "rv_po2", "rv_w", "member");
+    const tDry = await transfer_owner(mk("rv_po2"), { scope: "project", id: "prj_rv", to: "rv_po", step_down: true }, { dryRun: true });
+    expect(tDry.impact!.revoked_invitations).toBe(1);
+    expect(await status("inv_rv_po2_z_owner")).toBe("sent");
+    logs.length = 0;
+    const t = await transfer_owner(mk("rv_po2"), { scope: "project", id: "prj_rv", to: "rv_po", step_down: true });
+    expect(t.impact!.revoked_invitations).toBe(1);
+    expect(logs.find(([e]) => e === "grant.transfer_owner")?.[1]).toMatchObject({ step_down: true, revoked_invitations: 1 });
+    expect(await status("inv_rv_po2_z_owner")).toBe("revoked");
+    expect(await status("inv_rv_po2_w_member")).toBe("sent");
+    // a member re-invite of the same person leaves no dead owner row behind to revive (531 not-blocking 1) ...
+    const re = await invite(mk("rv_po2"), { scope: "project", id: "prj_rv", email: "rv_z@example.invalid", role: "member" });
+    expect(re.impact.revoked_superseded).toBe(0);
+    // ... and (b) the regained direct owner grant cannot revive the old owner link
+    await update_role(own, { scope: "project", id: "prj_rv", gid: "rvg_po2", role: "owner" });
+    await expect(accept(mk("rv_z"), { token: "tok_inv_rv_po2_z_owner" })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
   });
   // Dead invitations DoD (8): policy answers a participant session on the invitation link before the handler runs. That is
   // "sign in as the invited person" (retryable, the UI keeps the token), not the invitation's durable refusal.
