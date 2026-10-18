@@ -1,6 +1,7 @@
 // cap.workspace.* — optional invite-only grouping of projects (03). A workspace grant inherits to every grouped project
 // (cookbook work/active/2026-10-15-3d-workspace-permissions); assessments still need their own grant (D9).
 import type { Handler, Role } from "./types";
+import { requireConfirmedState } from "../receipt";
 import { CapError, notVisible } from "./errors";
 import {
   countScalar, loadProject, loadWorkspace, newId, nowIso, patchOf, reqStr, requireUser, isDirectOwner,
@@ -82,7 +83,9 @@ export const del: Handler = async (ctx, params, opts) => {
     effect: "destructive" as const,
     retention: "D5 held: phase 0 deletes only an empty workspace; remove projects first (they keep their own grants)",
   };
-  if (opts?.dryRun) return { result: { workspace: view(row, "owner") }, scope: { type: "workspace", id }, impact };
+  // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (a)): the counts the preview shows are bound into the token.
+  if (opts?.dryRun) return { result: { workspace: view(row, "owner") }, scope: { type: "workspace", id }, impact, confirmState: impact.affected[0] };
+  await requireConfirmedState(opts, impact.affected[0], "cap.workspace.delete");
   if (projects > 0) throw new CapError("INVALID_PARAMS", "workspace still groups projects", "has_projects");
   await ctx.db.batch([
     ctx.db.prepare('DELETE FROM "grant" WHERE scope_type = ? AND scope_id = ?').bind("workspace", id),

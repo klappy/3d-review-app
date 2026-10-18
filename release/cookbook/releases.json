@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.17",
+  "current": "0.35.18",
   "versions": [
+    {
+      "version": "0.35.18",
+      "status": "candidate",
+      "notes_path": "releases/0.35.18.md",
+      "sections": {
+        "fixed": [
+          "Ownership, roles and deletions: if what an owner or support person previewed changes before they confirm (another owner appears, the person's role changes, a template gets a newer version, or something is added to what is being deleted), confirming no longer applies the stale preview; they are asked to preview again. Support audit entries are no longer counted as changes in the usage totals."
+        ]
+      }
+    },
     {
       "version": "0.35.17",
       "status": "candidate",

@@ -51,7 +51,9 @@ export const opsUsage: Handler = async (ctx, p) => {
       WHERE t.at >= ?1 AND t.at < ?2 GROUP BY day ORDER BY day`).bind(lo, hi),
     // 0.35.17 (cookbook work/active/2026-10-18-3d-grant-noop-followups-2 DoD (e)): a no-op receipt (marked noop in
     // prior_state_json by persistReceipt) changed nothing, so it is not counted as a write.
-    db.prepare(`SELECT capability, COUNT(*) AS c FROM receipt WHERE at >= ?1 AND at < ?2
+    // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (d)): audit rows (auditRow, class 'audit') share the
+    // receipt table but are not writes, and their prior_state_json is an audit detail, not a receipt blob: excluded here.
+    db.prepare(`SELECT capability, COUNT(*) AS c FROM receipt WHERE at >= ?1 AND at < ?2 AND class <> 'audit'
       AND json_extract(prior_state_json, '$.noop') IS NOT 1 GROUP BY capability ORDER BY c DESC, capability`).bind(lo, hi),
   ]);
   const t = (totals.results[0] ?? {}) as Record<string, unknown>;

@@ -291,7 +291,9 @@ export const accept: Handler = async (ctx, p, o) => {
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
   const existing = await roleAt(ctx, scope.type, scope.id);
   const impact = { affected: [{ scope, role: inv.role, currently: existing ?? "none" }], irreversible: true, effect: "disclosure" as const, compensating_control: "cap.grant.revoke (what was seen stays seen)" };
-  if (o?.dryRun) return { result: {}, scope, impact };
+  // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (a)): the preview's `currently` is bound into the token.
+  if (o?.dryRun) return { result: {}, scope, impact, confirmState: { currently: existing ?? "none" } };
+  await requireConfirmedState(o, { currently: existing ?? "none" }, "cap.grant.accept");
   // 0.35.10 (cookbook work/active/2026-10-18-3d-invite-accept-race DoD (a)-(c)): the checks above ran before this batch, so
   // both statements re-check the invitation inside it (ACCEPTABLE: open, unexpired, inviter still stands). A revoke, an expiry
   // or a grant removal landing in between mints no grant and leaves the row as that change left it ('revoked' stays
@@ -532,7 +534,12 @@ export const transfer_owner: Handler = async (ctx, p, o) => {
   // Stepping down is a downgrade (owner → member): the caller's owner invitations here are revoked with it (orphanedWhere).
   const impact = { affected: [{ scope, current_owners: current.length, to, to_becomes: "owner", caller_becomes: stepDown ? "member" : "owner" }], irreversible: true, effect: "disclosure" as const, compensating_control: "transfer back (requires the new owner)",
     revoked_invitations: o?.dryRun && stepDown ? await countOrphaned(ctx, ctx.principal.id, scope, "member") : 0 };
-  if (o?.dryRun) return { result: {}, scope, impact };
+  // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (a)): the preview binds the owner set it read and the
+  // recipient's direct role here into the confirm token; an execute that reads either changed is refused (CONFIRM_REQUIRED).
+  const to_role = (await ctx.db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind(to, scope.type, scope.id).first<{ role: Role }>())?.role ?? null;
+  const read = { owners: [...current].sort(), to_role };
+  if (o?.dryRun) return { result: {}, scope, impact, confirmState: read };
+  await requireConfirmedState(o, read, "cap.grant.transfer_owner");
   const stmts = [ctx.db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?) ON CONFLICT(principal_id, scope_type, scope_id) DO UPDATE SET role = ?')
     .bind(newId("grant"), to, scope.type, scope.id, "owner", nowIso(ctx), "owner")];
   if (stepDown) stmts.push(ctx.db.prepare('UPDATE "grant" SET role = ? WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind("member", ctx.principal.id, scope.type, scope.id), // an owner remains (to), so the last-owner rule holds
