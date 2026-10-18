@@ -1,23 +1,23 @@
 {
-  "version": "0.35.10",
+  "version": "0.35.11",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "a25955e751db617a3e8a1be13700203a46ef2505",
+  "cookbook_commit": "48f191fa37bbee8a527002f12ae5eeaa4fefac25",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.10.md",
-      "blob_sha": "d016a8bf8310ad59a7e7c328d88ba9d87afad915",
-      "sha256": "0563bc7e67bfb8ece35253960d31036561a8034f02faf4fb5037844011664cdd"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.11.md",
+      "blob_sha": "b00ac5231f0eaecd4aaaa89f4a695a2f5d573e9c",
+      "sha256": "0c379c6f935afc3c57f02c97c856005eb036f81f3006b72ce1406fc46362e5f0"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "d3d23b8fc08e96ed1b83334fbd9a373d0aea0acb",
-      "sha256": "ceb141d5e123e86586a64599153dfa29cc3b4945483106ea66327eecc23576da"
+      "blob_sha": "099dad32270a892b517a03613b25679f63be8196",
+      "sha256": "ab297a5393995c35fc648c35006677cda466eb8ec2302a7efd414fb5923e24fe"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Invitations: accepting an invitation no longer grants access when the invitation is revoked, expires or loses its sender's standing at the same moment it is accepted; a revoked invitation stays revoked and the person gets the same refusal as for an invitation that was already revoked, expired or unbacked; and accepting an invitation never lowers a higher role the person already holds or was given at that same moment."
+        "Invitations: if a person's role at a place is lowered or removed at the same moment they accept an invitation there, accepting no longer gives them back the higher role they just lost; they get the invitation's role, or keep a higher role they still hold."
       ]
     }
   }
