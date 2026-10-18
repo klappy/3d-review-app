@@ -65,11 +65,20 @@ async function owners(ctx: Ctx, scope: Scope): Promise<string[]> {
  *  row it supersedes. An invitation the caller sent to themselves is NOT covered by this predicate: accept refuses it and
  *  cap.me.invitations omits it by their own created_by checks, but the roster still lists it and de-duplication still
  *  counts it while it is live. */
-const inviterStands = (i: string) =>
-  `((${i}.role <> 'owner' AND ${i}.scope_type <> 'project') OR EXISTS (SELECT 1 FROM "grant" ig WHERE ig.principal_id = ${i}.created_by`
-  + ` AND ig.scope_type = ${i}.scope_type AND ig.scope_id = ${i}.scope_id AND ${roleBacks(i, "ig.role")}))`;
-/** The role half of inviterStands: whether a direct grant at role `r` (SQL expression) backs invitation `i`. */
-const roleBacks = (i: string, r: string) => `(${r} = 'owner' OR (${i}.role <> 'owner' AND ${r} = 'member'))`;
+const inviterStands = (i: string) => standsFor(`${i}.role`, `${i}.scope_type`, `${i}.scope_id`, `${i}.created_by`);
+/** inviterStands over plain SQL expressions instead of a row alias, so invite can apply the SAME rule to the row it is about
+ *  to write, inside its INSERT (0.35.9, cookbook work/active/2026-10-18-3d-invite-guard-race DoD (a)). */
+const standsFor = (role: string, scopeT: string, scopeI: string, by: string) =>
+  `((${role} <> 'owner' AND ${scopeT} <> 'project') OR EXISTS (SELECT 1 FROM "grant" ig WHERE ig.principal_id = ${by}`
+  + ` AND ig.scope_type = ${scopeT} AND ig.scope_id = ${scopeI} AND ${roleBacks(role, "ig.role")}))`;
+/** The role half of inviterStands: whether a direct grant at role `r` backs an invitation for role `role` (SQL expressions). */
+const roleBacks = (role: string, r: string) => `(${r} = 'owner' OR (${role} <> 'owner' AND ${r} = 'member'))`;
+/** ONE expiry rule (0.35.9, cookbook work/active/2026-10-18-3d-invite-guard-race DoD (b)): an invitation is live while
+ *  expires_at > now and expired from expires_at == now on. `unexpired` is the SQL form (row alias `i`, bound `now`);
+ *  `expiredAt` is the same comparison for a row already read (accept). accept, both revoke sweeps, de-duplication and
+ *  cap.me.invitations use one of the two. */
+const unexpired = (i: string, now: string) => `(${i}.expires_at IS NULL OR ${i}.expires_at > ${now})`;
+const expiredAt = (expiresAt: string | null | undefined, now: string) => !!expiresAt && expiresAt <= now;
 
 /** 0.35.8 (cookbook work/active/2026-10-18-3d-invite-revoke-on-grant-removal DoD (a)-(c)): when a holder's DIRECT grant at a
  *  scope is removed or downgraded, the open, unexpired invitations that holder issued at that scope and could no longer issue
@@ -80,8 +89,8 @@ const roleBacks = (i: string, r: string) => `(${r} = 'owner' OR (${i}.role <> 'o
  *  counts with it, and the real call revokes against the grant table as the batch left it (the same predicate, read live). */
 const orphanedWhere = (holder: string, scopeT: string, scopeI: string, now: string, after?: string) =>
   `o.created_by = ${holder} AND o.scope_type = ${scopeT} AND o.scope_id = ${scopeI} AND o.status IN ('sent','pending','unconfirmed')`
-  + ` AND (o.expires_at IS NULL OR o.expires_at > ${now}) AND NOT `
-  + (after === undefined ? inviterStands("o") : `((o.role <> 'owner' AND o.scope_type <> 'project') OR ${roleBacks("o", `COALESCE(${after}, '')`)})`);
+  + ` AND ${unexpired("o", now)} AND NOT `
+  + (after === undefined ? inviterStands("o") : `((o.role <> 'owner' AND o.scope_type <> 'project') OR ${roleBacks("o.role", `COALESCE(${after}, '')`)})`);
 async function countOrphaned(ctx: Ctx, holder: string, scope: Scope, after: Role | null): Promise<number> {
   return (await ctx.db.prepare(`SELECT COUNT(*) AS n FROM invitation o WHERE ${orphanedWhere("?1", "?2", "?3", "?4", "?5")}`)
     .bind(holder, scope.type, scope.id, nowIso(ctx), after).first<{ n: number }>())?.n ?? 0;
@@ -100,7 +109,7 @@ const dupWhere = (scopeT: string, scopeI: string, hash: string, sentSince: strin
   `d.scope_type = ${scopeT} AND d.scope_id = ${scopeI} AND d.invitee_hash = ${hash} AND (`
   + `(d.status = 'sent' AND d.created_at > ${sentSince})`
   + ` OR (d.status = 'pending' AND d.created_at > ${pendingSince})`
-  + ` OR (d.status = 'unconfirmed' AND (d.expires_at IS NULL OR d.expires_at > ${now}))) AND ${inviterStands("d")}`;
+  + ` OR (d.status = 'unconfirmed' AND ${unexpired("d", now)})) AND ${inviterStands("d")}`;
 
 /** The dead rows a fresh invitation SUPERSEDES, as ONE predicate shared by the re-invite's revoke and its dry-run count; `s`
  *  aliases the invitation row. Only rows that are still open ('sent' / 'pending' / 'unconfirmed'), unexpired, and whose
@@ -109,7 +118,7 @@ const dupWhere = (scopeT: string, scopeI: string, hash: string, sentSince: strin
  *  work/active/2026-10-18-3d-invite-followups-2 DoD (a), (b)). */
 const supersededWhere = (scopeT: string, scopeI: string, hash: string, role: string, now: string) =>
   `s.scope_type = ${scopeT} AND s.scope_id = ${scopeI} AND s.invitee_hash = ${hash} AND s.status IN ('sent','pending','unconfirmed')`
-  + ` AND (s.expires_at IS NULL OR s.expires_at > ${now}) AND (s.role <> 'owner' OR ${role} = 'owner') AND NOT ${inviterStands("s")}`;
+  + ` AND ${unexpired("s", now)} AND (s.role <> 'owner' OR ${role} = 'owner') AND NOT ${inviterStands("s")}`;
 
 async function scopeExists(ctx: Ctx, scope: Scope): Promise<boolean> {
   const t = scope.type === "workspace" ? "workspace" : scope.type === "project" ? "project" : "assessment";
@@ -175,7 +184,8 @@ export const invite: Handler = async (ctx, p, o) => {
     ctx.db.prepare(`INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at)
       SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'pending', ?8, ?9, ?10
       WHERE NOT EXISTS (SELECT 1 FROM invitation d WHERE ${DUP})
-        AND (SELECT COUNT(*) FROM invitation WHERE created_by = ?8 AND scope_type <> 'survey' AND created_at > ?13) < ?7`)
+        AND (SELECT COUNT(*) FROM invitation WHERE created_by = ?8 AND scope_type <> 'survey' AND created_at > ?13) < ?7
+        AND ${standsFor("?6", "?2", "?3", "?8")}`)
       .bind(id, scope.type, scope.id, inviteeHash, await sha256(token), role, INVITES_PER_INVITER_HOUR, ctx.principal.id, nowStr, new Date(now + INVITE_TTL_S * 1000).toISOString(), sentSince, pendingSince, hourAgo, nowStr),
     ctx.db.prepare(`UPDATE invitation SET status = 'revoked' WHERE id IN (SELECT s.id FROM invitation s WHERE s.id <> ?4
         AND ${supersededWhere("?1", "?2", "?3", "?5", "?6")})
@@ -185,6 +195,11 @@ export const invite: Handler = async (ctx, p, o) => {
   const revokedSuperseded = rev.meta.changes ?? 0;
   impact.revoked_superseded = revokedSuperseded;
   if ((ins.meta.changes ?? 0) !== 1) {
+    // The standing checks above ran before this batch; the INSERT re-checks the same rule (standsFor) in its own WHERE, so a
+    // grant removed or lowered in between leaves no row (cookbook work/active/2026-10-18-3d-invite-guard-race DoD (a)). Said
+    // as that, not as a duplicate or a rate limit.
+    const stands = await ctx.db.prepare(`SELECT ${standsFor("?1", "?2", "?3", "?4")} AS ok`).bind(role, scope.type, scope.id, ctx.principal.id).first<{ ok: number }>();
+    if (!stands?.ok) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "your role at this scope changed while the invitation was being written; nothing was sent", "ask a direct owner of this scope", "cap.grant.invite");
     const dup = await ctx.db.prepare(`SELECT d.id, d.role, d.status FROM invitation d WHERE ${dupWhere("?1", "?2", "?3", "?4", "?5", "?6")} ORDER BY d.created_at DESC LIMIT 1`)
       .bind(scope.type, scope.id, inviteeHash, sentSince, pendingSince, nowStr).first<{ id: string; role: string; status: string }>();
     if (!dup) throw new CapError("RATE_LIMITED", `at most ${INVITES_PER_INVITER_HOUR} collaborator invitations per hour`, "this cap resets over the next hour, not the next minute", "cap.grant.invite", 3600);
@@ -268,7 +283,7 @@ export const accept: Handler = async (ctx, p, o) => {
   const me = await ctx.db.prepare("SELECT email_hash FROM principal WHERE id = ?").bind(ctx.principal.id).first<{ email_hash: string | null }>();
   if (!me?.email_hash || me.email_hash !== inv.invitee_hash) throw notVisible("invitation");
   if (inv.status === "accepted") throw new CapError("INVALID_PARAMS", "invitation_used", "ask for a new invitation");
-  if (inv.expires_at && inv.expires_at < nowIso(ctx)) throw new CapError("INVALID_PARAMS", "invitation_expired", "ask for a new invitation");
+  if (expiredAt(inv.expires_at, nowIso(ctx))) throw new CapError("INVALID_PARAMS", "invitation_expired", "ask for a new invitation");
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
   // HOLD #483 c6204865181 #1: no one accepts their own invitation (closes the self-invite path for rows minted before the
   // invite-side check), and an owner invitation is honoured only while its inviter still holds a DIRECT owner grant here.
@@ -315,7 +330,7 @@ export const mine: Handler = async (ctx) => {
         LEFT JOIN project p2 ON p2.id = a2.project_id
         LEFT JOIN workspace w2 ON w2.id = p2.workspace_id
       WHERE i.invitee_hash = ? AND i.scope_type IN (${GRANT_SCOPES.map(() => "?").join(",")}) AND i.status IN (${LIVE_STATUSES.map(() => "?").join(",")})
-        AND (i.expires_at IS NULL OR i.expires_at > ?) AND i.created_by IS NOT ? AND ${inviterStands("i")} ORDER BY i.created_at, i.id`)
+        AND ${unexpired("i", "?")} AND i.created_by IS NOT ? AND ${inviterStands("i")} ORDER BY i.created_at, i.id`)
     .bind(me.email_hash, ...GRANT_SCOPES, ...LIVE_STATUSES, nowIso(ctx), ctx.principal.id).all<InvitationRow>();
   const invitations = r.results.map((i) => {
     const { name, path } = scopeNames(i);
