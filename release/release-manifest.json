@@ -1,23 +1,23 @@
 {
-  "version": "0.35.18",
+  "version": "0.35.19",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "9afb824ea30f305e1343e98a03b3ed04d44f1f37",
+  "cookbook_commit": "3f28c36834eccb95f86fc3e10e97a56eb8ed78d3",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.18.md",
-      "blob_sha": "4f45cff3c8642e213550f40fe4067b4c336475e6",
-      "sha256": "63e19121dc0f8db1ee93f6adaf4b9b5230c45db3eff547f7d4bb90f572b64842"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.19.md",
+      "blob_sha": "40a01166eaa5c2b7b158d75f5ac6491282122dde",
+      "sha256": "f1d98f225fc3b726e51c33b1705eaa2b82de3538a2791472fd937f78c772526f"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "a84c15e77acc4b04693f5bdba61314c17889d330",
-      "sha256": "538ec382103a888fa2866172462da97f6e23b2e11aa83ccb675c0d63f905731e"
+      "blob_sha": "554953154d75764efe574ab53dbaf2d6a641699e",
+      "sha256": "a02fec1bc717bcd9ffd4bfc1b86330cbc02d4d57e6d95d5022eec35f22cc0bd8"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Ownership, roles and deletions: if what an owner or support person previewed changes before they confirm (another owner appears, the person's role changes, a template gets a newer version, or something is added to what is being deleted), confirming no longer applies the stale preview; they are asked to preview again. Support audit entries are no longer counted as changes in the usage totals."
+        "Ownership and template publishing: if the state an owner previewed for an ownership transfer changes in the moment before it is written, or the invitations that stepping down would cancel change after the preview, confirming no longer applies it; they are asked to preview again. Two template versions published at the same moment no longer fail with an internal error; the second is told to preview again."
       ]
     }
   }

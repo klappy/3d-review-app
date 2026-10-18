@@ -1680,7 +1680,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "danger",
-      "notes": "D3; confirm (0.35.18): the dry_run binds the owner set and the recipient's direct role it read into the confirm token, and an execute that reads either changed is refused with CONFIRM_REQUIRED (dry_run again)",
+      "notes": "D3; confirm (0.35.18): the dry_run binds the owner set and the recipient's direct role it read into the confirm token, and an execute that reads either changed is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count, and the write re-checks the bound state in its own WHERE (a change between token check and write is refused the same way)",
       "status": "target",
       "inverse": {
         "kind": "none",

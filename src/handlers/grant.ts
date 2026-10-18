@@ -423,11 +423,14 @@ export const update_role: Handler = async (ctx, p, o) => {
   };
   const firstReadNoop = g.role === role;
   const impact: Impact & { revoked_invitations: number } = firstReadNoop ? noopImpact() : { affected: [{ grant: gid, from: g.role, to: role }], irreversible: ROLE_RANK[role] > ROLE_RANK[g.role as Role], effect: "disclosure" as const, compensating_control: "demotion via this capability (what was seen stays seen)",
-    revoked_invitations: o?.dryRun && downgrade ? await countOrphaned(ctx, g.principal_id, scope, role) : 0 };
+    revoked_invitations: downgrade ? await countOrphaned(ctx, g.principal_id, scope, role) : 0 };
   // 0.35.17 DoD (a): the preview binds the role it read into the confirm token; an execute that reads another role (a no-op
   // preview whose target was lowered in between would otherwise run as an elevation) is refused and asks for a new dry_run.
-  if (o?.dryRun) return { result: firstReadNoop ? { noop: true } : {}, scope, impact, confirmState: { role: g.role } };
-  await requireConfirmedState(o, { role: g.role }, "cap.grant.update_role");
+  // 0.35.19 (cookbook work/active/2026-10-18-3d-grant-noop-followups-4 DoD (b)): the revoked_invitations count the preview
+  // showed is bound too, so an execute after the holder's open invitations changed asks for a new dry_run.
+  const read = { role: g.role, revoked_invitations: impact.revoked_invitations };
+  if (o?.dryRun) return { result: firstReadNoop ? { noop: true } : {}, scope, impact, confirmState: read };
+  await requireConfirmedState(o, read, "cap.grant.update_role");
   // 0.35.12 (cookbook work/active/2026-10-18-3d-grant-owner-guard-race DoD (a)): the owner check above read the row before
   // this batch, so the UPDATE re-checks it in its own WHERE: a target raised to owner in between (an accept landing) is not
   // demoted. 0.35.13 (cookbook work/active/2026-10-18-3d-grant-update-role-write-guard DoD (a)-(b)): the UPDATE also writes
@@ -533,18 +536,29 @@ export const transfer_owner: Handler = async (ctx, p, o) => {
   const stepDown = p.step_down === true;
   // Stepping down is a downgrade (owner → member): the caller's owner invitations here are revoked with it (orphanedWhere).
   const impact = { affected: [{ scope, current_owners: current.length, to, to_becomes: "owner", caller_becomes: stepDown ? "member" : "owner" }], irreversible: true, effect: "disclosure" as const, compensating_control: "transfer back (requires the new owner)",
-    revoked_invitations: o?.dryRun && stepDown ? await countOrphaned(ctx, ctx.principal.id, scope, "member") : 0 };
+    revoked_invitations: stepDown ? await countOrphaned(ctx, ctx.principal.id, scope, "member") : 0 };
   // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (a)): the preview binds the owner set it read and the
   // recipient's direct role here into the confirm token; an execute that reads either changed is refused (CONFIRM_REQUIRED).
+  // 0.35.19 (cookbook work/active/2026-10-18-3d-grant-noop-followups-4 DoD (b)): the revoked_invitations count it showed too.
   const to_role = (await ctx.db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind(to, scope.type, scope.id).first<{ role: Role }>())?.role ?? null;
-  const read = { owners: [...current].sort(), to_role };
+  const ownerSet = [...current].sort();
+  const read = { owners: ownerSet, to_role, revoked_invitations: impact.revoked_invitations };
   if (o?.dryRun) return { result: {}, scope, impact, confirmState: read };
   await requireConfirmedState(o, read, "cap.grant.transfer_owner");
-  const stmts = [ctx.db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?) ON CONFLICT(principal_id, scope_type, scope_id) DO UPDATE SET role = ?')
-    .bind(newId("grant"), to, scope.type, scope.id, "owner", nowIso(ctx), "owner")];
-  if (stepDown) stmts.push(ctx.db.prepare('UPDATE "grant" SET role = ? WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind("member", ctx.principal.id, scope.type, scope.id), // an owner remains (to), so the last-owner rule holds
-    revokeOrphaned(ctx, ctx.principal.id, scope));
+  // 0.35.19 DoD (a): the token check above read the state before this batch, so the write re-checks it in its own WHERE (as
+  // update_role does): the owner set, the recipient's direct role and the caller's DIRECT owner grant must still be what was
+  // read. A changed state writes no row; the step-down and its orphan sweep ride on changes() = 1, so they write nothing either.
+  const ownersNow = `COALESCE((SELECT group_concat(principal_id, ',') FROM (SELECT principal_id FROM "grant" WHERE scope_type = ?3 AND scope_id = ?4 AND role = 'owner' ORDER BY principal_id)), '')`;
+  const toRoleNow = `COALESCE((SELECT role FROM "grant" WHERE principal_id = ?2 AND scope_type = ?3 AND scope_id = ?4), '')`;
+  const stmts = [ctx.db.prepare(`INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) SELECT ?1, ?2, ?3, ?4, 'owner', ?5`
+    + ` WHERE ${ownersNow} = ?6 AND ${toRoleNow} = ?7 AND ${callerHolds("?8", "?3", "?4", "'owner'", true)}`
+    + ` ON CONFLICT(principal_id, scope_type, scope_id) DO UPDATE SET role = 'owner'`)
+    .bind(newId("grant"), to, scope.type, scope.id, nowIso(ctx), ownerSet.join(","), to_role ?? "", ctx.principal.id)];
+  if (stepDown) stmts.push(ctx.db.prepare('UPDATE "grant" SET role = ? WHERE principal_id = ? AND scope_type = ? AND scope_id = ? AND changes() = 1').bind("member", ctx.principal.id, scope.type, scope.id), // an owner remains (to), so the last-owner rule holds
+    revokeOrphaned(ctx, ctx.principal.id, scope, true));
   const res = await ctx.db.batch(stmts);
+  if ((res[0].meta.changes ?? 0) !== 1)
+    throw new CapError("CONFIRM_REQUIRED", "the target changed since the dry_run preview", "Call dry_run again and confirm the new preview.", "cap.grant.transfer_owner");
   impact.revoked_invitations = stepDown ? res[2].meta.changes ?? 0 : 0;
   ctx.log("grant.transfer_owner", { step_down: stepDown, revoked_invitations: impact.revoked_invitations });
   return { result: { transferred: true, scope, new_owner: to, caller_role: stepDown ? "member" : "owner" }, scope, impact };
