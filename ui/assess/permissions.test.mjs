@@ -403,15 +403,36 @@ test('F5 project, role only from the workspace (no direct grant, or a direct vie
     assert.match(x.root.html, /data-grant-row="g_mem"/); assert.match(x.root.html, /data-invitation="inv_p"/); // roster and pending still readable
   }
 });
-test('F5 project, workspace-only caller whose project read fails: the line stays, unlinked; direct project member keeps Invite and Revoke', async () => {
+test('F5 project, caller without a direct member grant whose project read fails: no workspace claim, no controls; direct project member keeps Invite and Revoke', async () => {
   const x = await mountProject(null, null);
-  assert.equal(x.m.workspaceId, null); assert.ok(x.root.html.includes(esc(FROM_WORKSPACE_NOTE))); assert.doesNotMatch(x.root.html, /data-workspace-permissions-link|data-invite-form/);
+  // Dead-invitations (5): the workspace line is a claim; with no project read it cannot be made, so it is not shown.
+  assert.equal(x.m.workspaceId, null); assert.equal(x.m.fromWorkspace, false); assert.equal(x.m.notDirect, true);
+  assert.ok(!x.root.html.includes(esc(FROM_WORKSPACE_NOTE))); assert.doesNotMatch(x.root.html, /data-from-workspace|data-workspace-permissions-link|data-invite-form|data-revoke-invitation|data-revoke=|data-change-role/);
   for (const mine of ['member', 'owner']) {
     const d = await mountProject(mine);
     assert.equal(d.m.fromWorkspace, false); assert.doesNotMatch(d.root.html, /data-from-workspace|data-permissions-from-workspace/);
     assert.match(d.root.html, /data-invite-form/); assert.match(d.root.html, /data-revoke-invitation="inv_p"/);
-    assert.equal(d.calls.filter(c => c.url === '/v2/projects/p1').length, 0, 'no extra read for a direct member');
+    assert.equal(d.calls.filter(c => c.url === '/v2/projects/p1').length, 1, 'one project read, issued alongside the roster read (nit 7)');
   }
+});
+test('Dead-invitations (5): ungrouped project (e.g. a support principal with no direct member grant) shows no workspace line and no controls', async () => {
+  for (const mine of [null, 'viewer']) {
+    const x = await mountProject(mine, { project: { id: 'p1', workspace_id: null } });
+    assert.equal(x.m.fromWorkspace, false, String(mine)); assert.equal(x.m.notDirect, true);
+    assert.ok(!x.root.html.includes(esc(FROM_WORKSPACE_NOTE))); assert.doesNotMatch(x.root.html, /data-from-workspace|data-workspace-permissions-link/);
+    assert.doesNotMatch(x.root.html, /data-invite-form|data-revoke-invitation|data-revoke=|data-change-role|data-transfer/, String(mine));
+    assert.match(x.root.html, /data-grant-row="g_mem"/); // roster still readable
+  }
+});
+test('Nit 7: the project read starts before the roster read resolves (parallel, not sequential)', async () => {
+  const order = []; let release; const gate = new Promise(r => { release = r; });
+  const r = roster(null); r.grants = r.grants.filter(g => g.id !== 'g_me');
+  const api = async (url) => { order.push(url); if (url.endsWith('/grants')) { await gate; return r; } return { project: { id: 'p1', workspace_id: 'w1' } }; };
+  const ctx = { api, esc, enc: encodeURIComponent, state: { principal: { id: 'me' } }, accountEmail: async () => '' };
+  const p = permissions.load(ctx, { scope: 'projects', id: 'p1' });
+  await new Promise(res => setTimeout(res, 0));
+  assert.deepEqual(order.sort(), ['/v2/project/p1/grants', '/v2/projects/p1'].sort(), 'both reads issued while the roster read is still open');
+  release(); const m = await p; assert.equal(m.fromWorkspace, true); assert.equal(m.workspaceId, 'w1');
 });
 test('F5 workspace and assessment scopes never show the workspace pointer', async () => {
   for (const [scope, seg] of [['workspaces', 'workspace'], ['assessments', 'assessment']]) {

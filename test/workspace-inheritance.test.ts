@@ -3,7 +3,9 @@ import { afterAll, describe, expect, it } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { get as projectGet, list as projectList, update as projectUpdate } from "../src/handlers/project";
 import { list as workspaceList, add_project, remove_project } from "../src/handlers/workspace";
-import { list as grantList, invite, transfer_owner, accept, update_role, revoke_invitation } from "../src/handlers/grant";
+import { list as grantList, invite, transfer_owner, accept, update_role, revoke_invitation, mine } from "../src/handlers/grant";
+import { authorize } from "../src/policy";
+import { byId } from "../src/registry";
 import { get as assessmentGet } from "../src/handlers/assessment";
 import { execute } from "../src/dispatch";
 import { sha256 } from "../src/handlers/common";
@@ -275,5 +277,61 @@ describe("workspace grouping cannot mint project ownership", () => {
     await row("inv_f3_ws", "f3_d", "workspace", "ws_f3", "f3_wm");
     await expect(accept(mk("f3_d"), { invitation_id: "inv_f3_ws" })).resolves.toMatchObject({ result: { granted: true, role: "member" } });
     expect(await direct("f3_d", "workspace", "ws_f3")).toBe("member");
+  });
+  // Dead invitations (cookbook work/active/2026-10-17-3d-dead-invitations DoD 2, 3): rows accept refuses (inviter has no
+  // direct member+ project grant; owner invitation without a direct owner inviter; own invitation) are not listed and not
+  // counted by invite de-dup. Workspace invitations below owner are unchanged (finding 4 is a named hold).
+  it("dead invitations are not listed (cap.me.invitations, roster pending) and a re-invite sends a fresh one", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-18T02:00:00.000Z"); const at = now.toISOString();
+    let trace = 0;
+    const mk = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_dd_${++trace}`, now: () => now, log: () => {} });
+    for (const id of ["dd_wm", "dd_pm", "dd_a", "dd_b", "dd_c"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_dd", "DD WS", at, "dd_wm").run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_dd", "ws_dd", "prj_dd", at, "dd_pm").run();
+    const grant = (id: string, p: string, t: string, s: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, t, s, r, at).run();
+    await grant("ddg1", "dd_wm", "workspace", "ws_dd", "member");
+    await grant("ddg2", "dd_pm", "project", "prj_dd", "member");
+    const row = async (id: string, to: string, scopeType: string, scopeId: string, by: string, role = "member") => { await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id, scopeType, scopeId, await sha256(to + "@example.invalid"), await sha256("tok_" + id), role, "sent", by, at, "2026-10-24T00:00:00.000Z").run(); };
+    await row("inv_dd_dead", "dd_a", "project", "prj_dd", "dd_wm");             // inherited inviter → accept refuses
+    await row("inv_dd_live", "dd_b", "project", "prj_dd", "dd_pm");             // direct project member → live
+    await row("inv_dd_owner", "dd_c", "workspace", "ws_dd", "dd_wm", "owner");   // owner invitation, inviter not a direct owner → dead
+    await row("inv_dd_ws", "dd_c", "workspace", "ws_dd", "dd_wm");              // workspace member invitation → unchanged, live
+    await row("inv_dd_self", "dd_c", "workspace", "ws_dd", "dd_c");             // own invitation → accept refuses
+    const ids = (r: any) => (r.result.invitations ?? r.result.pending_invitations).map((i: any) => i.id).sort();
+
+    // (2) cap.me.invitations: dead rows absent; live rows (and the unchanged workspace row) present
+    expect(ids(await mine(mk("dd_a"), {}))).toEqual([]);
+    expect(ids(await mine(mk("dd_b"), {}))).toEqual(["inv_dd_live"]);
+    expect(ids(await mine(mk("dd_c"), {}))).toEqual(["inv_dd_ws"]);
+    // every listed row is one accept honours; every hidden row is one accept refuses
+    await expect(accept(mk("dd_a"), { invitation_id: "inv_dd_dead" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await expect(accept(mk("dd_c"), { invitation_id: "inv_dd_owner" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await expect(accept(mk("dd_c"), { invitation_id: "inv_dd_self" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await expect(accept(mk("dd_b"), { invitation_id: "inv_dd_live" }, { dryRun: true } as any)).resolves.toMatchObject({ result: {} });
+    // (2) roster pending_invitations: same rule
+    expect(ids(await grantList(mk("dd_pm"), { scope: "project", id: "prj_dd" }))).toEqual(["inv_dd_live"]);
+    expect(ids(await grantList(mk("dd_wm"), { scope: "workspace", id: "ws_dd" }))).toEqual(["inv_dd_self", "inv_dd_ws"].sort());
+
+    // (3) de-dup ignores the dead row: a direct member re-inviting dd_a gets a fresh invitation, not "nothing was sent again"
+    const fresh = await invite(mk("dd_pm"), { scope: "project", id: "prj_dd", email: "dd_a@example.invalid", role: "member" });
+    expect(fresh.result.invitation_id).not.toBe("inv_dd_dead");
+    expect(fresh.result.delivery.reason).not.toBe("duplicate_recent");
+    expect(ids(await mine(mk("dd_a"), {}))).toEqual([fresh.result.invitation_id]);
+    // control: a LIVE row inside the cooldown still de-duplicates
+    const twin = await invite(mk("dd_pm"), { scope: "project", id: "prj_dd", email: "dd_b@example.invalid", role: "member" });
+    expect(twin.result).toMatchObject({ invitation_id: "inv_dd_live", delivery: { reason: "duplicate_recent" } });
+    // the dead row turns live again if its inviter gains a direct project grant (the predicate reads current grants)
+    await grant("ddg3", "dd_wm", "project", "prj_dd", "member");
+    expect(ids(await grantList(mk("dd_pm"), { scope: "project", id: "prj_dd" }))).toEqual(["inv_dd_dead", "inv_dd_live", fresh.result.invitation_id].sort());
+  });
+  // Dead invitations DoD (8): policy answers a participant session on the invitation link before the handler runs. That is
+  // "sign in as the invited person" (retryable, the UI keeps the token), not the invitation's durable refusal.
+  it("a participant session opening an invitation link gets NOT_AUTHENTICATED (retryable), not NOT_AUTHORIZED_AT_SCOPE", async () => {
+    const db = await mf.getD1Database("DB");
+    const participant = { env: { DB: db } as any, db, principal: { kind: "participant", id: "rsp_dd", respondentId: "rsp_dd" } as any, traceId: "tr_dd_p", now: () => new Date(), log: () => {} } as Ctx;
+    await expect(authorize(participant, byId.get("cap.grant.accept")!, { token: "tok_inv_dd_live" })).rejects.toMatchObject({ code: "NOT_AUTHENTICATED" });
+    // other non-public rows still refuse a participant as before
+    await expect(authorize(participant, byId.get("cap.me.invitations")!, {})).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
   });
 });

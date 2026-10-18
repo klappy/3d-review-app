@@ -1,7 +1,19 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.4",
+  "current": "0.35.5",
   "versions": [
+    {
+      "version": "0.35.5",
+      "status": "candidate",
+      "notes_path": "releases/0.35.5.md",
+      "sections": {
+        "fixed": [
+          "Invitations: an invitation that can no longer be accepted (its sender no longer has their own role on that project, an owner invitation not sent by a direct owner, or your own invitation) no longer shows in your invitations list or in a project's pending invitations, and inviting that person again now sends a fresh invitation instead of \"nothing was sent again\".",
+          "Permissions page for a project: the line saying your role comes from the workspace now shows only when the project is in a workspace; the page also reads the project and its people at the same time instead of one after the other.",
+          "Invitation link opened in a survey participant's session: it now asks you to sign in with the invited address and keeps the link, instead of saying the invitation is not available."
+        ]
+      }
+    },
     {
       "version": "0.35.4",
       "status": "candidate",
