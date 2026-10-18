@@ -80,6 +80,15 @@ const dupWhere = (scopeT: string, scopeI: string, hash: string, sentSince: strin
   + ` OR (d.status = 'pending' AND d.created_at > ${pendingSince})`
   + ` OR (d.status = 'unconfirmed' AND (d.expires_at IS NULL OR d.expires_at > ${now}))) AND ${inviterStands("d")}`;
 
+/** The dead rows a fresh invitation SUPERSEDES, as ONE predicate shared by the re-invite's revoke and its dry-run count; `s`
+ *  aliases the invitation row. Only rows that are still open ('sent' / 'pending' / 'unconfirmed'), unexpired, and whose
+ *  inviter no longer stands behind them (inviterStands fails) qualify; a live row is never touched. An owner row is touched
+ *  only by an owner re-invite, so this revoke never goes past the ceiling revoke_invitation applies (cookbook
+ *  work/active/2026-10-18-3d-invite-followups-2 DoD (a), (b)). */
+const supersededWhere = (scopeT: string, scopeI: string, hash: string, role: string, now: string) =>
+  `s.scope_type = ${scopeT} AND s.scope_id = ${scopeI} AND s.invitee_hash = ${hash} AND s.status IN ('sent','pending','unconfirmed')`
+  + ` AND (s.expires_at IS NULL OR s.expires_at > ${now}) AND (s.role <> 'owner' OR ${role} = 'owner') AND NOT ${inviterStands("s")}`;
+
 async function scopeExists(ctx: Ctx, scope: Scope): Promise<boolean> {
   const t = scope.type === "workspace" ? "workspace" : scope.type === "project" ? "project" : "assessment";
   return !!(await ctx.db.prepare(`SELECT id FROM ${t} WHERE id = ?`).bind(scope.id).first());
@@ -118,31 +127,43 @@ export const invite: Handler = async (ctx, p, o) => {
   if (role === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
   const inviteeHash = await sha256(email);
   await refuseExistingAccess(ctx, scope, inviteeHash);
-  const impact = { affected: [{ scope, role, invitee: inviteeHash.slice(0, 12), will_see: `${scope.type} contents at role ${role}` }], irreversible: true, effect: "external" as const, compensating_control: "cap.grant.revoke_invitation (does not unsend)" };
+  const nowIsoStr = nowIso(ctx);
+  // revoked_superseded: how many dead invitations for this invitee at this scope the fresh invitation revokes. A dry-run counts
+  // what a landed INSERT would revoke; a real call reports what the batch actually revoked (0 when it de-duplicated).
+  const wouldRevoke = o?.dryRun
+    ? (await ctx.db.prepare(`SELECT COUNT(*) AS n FROM invitation s WHERE ${supersededWhere("?1", "?2", "?3", "?4", "?5")}`)
+        .bind(scope.type, scope.id, inviteeHash, role, nowIsoStr).first<{ n: number }>())?.n ?? 0
+    : 0;
+  const impact = { affected: [{ scope, role, invitee: inviteeHash.slice(0, 12), will_see: `${scope.type} contents at role ${role}` }], irreversible: true, effect: "external" as const, compensating_control: "cap.grant.revoke_invitation (does not unsend)", revoked_superseded: wouldRevoke };
   if (o?.dryRun) return { result: {}, scope, impact };
   // Intent de-duplication + inviter cap, decided and written in ONE statement so concurrent replays cannot both pass a
   // check-then-insert gap (re-review #16). A live duplicate is: a row already 'sent' inside the cooldown, a 'pending' row
   // younger than PENDING_DEDUPE_S (an in-flight twin), or an unexpired 'unconfirmed' row (the mail may have gone out —
   // no cooldown expiry may re-open it; the human path out is revoke_invitation, then invite anew).
   const now = ctx.now().getTime();
-  const nowStr = nowIso(ctx);
+  const nowStr = nowIsoStr;
   const sentSince = new Date(now - INVITE_COOLDOWN_S * 1000).toISOString(), pendingSince = new Date(now - PENDING_DEDUPE_S * 1000).toISOString(), hourAgo = new Date(now - 3600_000).toISOString();
   const DUP = dupWhere("?2", "?3", "?4", "?11", "?12", "?14");
   const id = newId("inv"); const token = randomToken("il");
-  // The fresh row SUPERSEDES any dead row (inviterStands fails) for the same scope+invitee: it is revoked in the same batch,
-  // only when the INSERT landed, so it cannot come back alive if its inviter later regains a direct grant and two live rows
-  // never stand for one invitee at one scope (cookbook work/active/2026-10-18-3d-invite-followups DoD (a)).
-  const [ins] = await ctx.db.batch([
+  // The fresh row SUPERSEDES the DEAD rows (supersededWhere: open, unexpired, inviterStands fails, owner rows only for an owner
+  // re-invite) for the same scope+invitee. They are revoked in the same batch, only when the INSERT landed (a de-duplicated or
+  // rate-limited call revokes nothing), so they cannot come back alive if their inviter later regains a direct grant. Live
+  // rows are never touched: a live row from outside the cooldown can still stand beside the fresh one. Expired rows stay
+  // 'sent'/'unconfirmed' so history keeps expired apart from revoked (cookbook work/done/2026-10-18-3d-invite-followups DoD (a);
+  // work/active/2026-10-18-3d-invite-followups-2 DoD (a)-(e)).
+  const [ins, rev] = await ctx.db.batch([
     ctx.db.prepare(`INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at)
       SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'pending', ?8, ?9, ?10
       WHERE NOT EXISTS (SELECT 1 FROM invitation d WHERE ${DUP})
         AND (SELECT COUNT(*) FROM invitation WHERE created_by = ?8 AND scope_type <> 'survey' AND created_at > ?13) < ?7`)
       .bind(id, scope.type, scope.id, inviteeHash, await sha256(token), role, INVITES_PER_INVITER_HOUR, ctx.principal.id, nowStr, new Date(now + INVITE_TTL_S * 1000).toISOString(), sentSince, pendingSince, hourAgo, nowStr),
-    ctx.db.prepare(`UPDATE invitation SET status = 'revoked' WHERE id IN (SELECT s.id FROM invitation s WHERE s.scope_type = ?1 AND s.scope_id = ?2
-        AND s.invitee_hash = ?3 AND s.id <> ?4 AND s.status IN ('sent','pending','unconfirmed') AND NOT ${inviterStands("s")})
+    ctx.db.prepare(`UPDATE invitation SET status = 'revoked' WHERE id IN (SELECT s.id FROM invitation s WHERE s.id <> ?4
+        AND ${supersededWhere("?1", "?2", "?3", "?5", "?6")})
       AND EXISTS (SELECT 1 FROM invitation n WHERE n.id = ?4)`)
-      .bind(scope.type, scope.id, inviteeHash, id),
+      .bind(scope.type, scope.id, inviteeHash, id, role, nowStr),
   ]);
+  const revokedSuperseded = rev.meta.changes ?? 0;
+  impact.revoked_superseded = revokedSuperseded;
   if ((ins.meta.changes ?? 0) !== 1) {
     const dup = await ctx.db.prepare(`SELECT d.id, d.role, d.status FROM invitation d WHERE ${dupWhere("?1", "?2", "?3", "?4", "?5", "?6")} ORDER BY d.created_at DESC LIMIT 1`)
       .bind(scope.type, scope.id, inviteeHash, sentSince, pendingSince, nowStr).first<{ id: string; role: string; status: string }>();
@@ -175,7 +196,7 @@ export const invite: Handler = async (ctx, p, o) => {
   const target = delivery.delivered ? "sent" : delivery.state === "unconfirmed" ? "unconfirmed" : null;
   const read = await transitionOrRead(ctx, id, target);
   const stored = read ?? "deleted";
-  ctx.log("grant.invite.mail", { delivered: delivery.delivered, state: delivery.state, reason: delivery.reason ?? null, provider_status: delivery.provider_status ?? null, stored_status: stored }); // never the address, nor a hash of it
+  ctx.log("grant.invite.mail", { delivered: delivery.delivered, state: delivery.state, reason: delivery.reason ?? null, provider_status: delivery.provider_status ?? null, stored_status: stored, revoked_superseded: revokedSuperseded }); // never the address, nor a hash of it
   const note = read === null
     ? "the invitation no longer exists: the scope was removed while the message was being sent, and the invitation was deleted with it. delivery.state reports only what the provider said — a message that was accepted may still arrive, but its link can no longer be accepted."
     : stored !== (target ?? "pending")

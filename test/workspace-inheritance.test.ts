@@ -367,6 +367,58 @@ describe("workspace grouping cannot mint project ownership", () => {
     expect(twin.result).toMatchObject({ invitation_id: "inv_sd_live_c", delivery: { reason: "duplicate_recent" } });
     expect(await status("inv_sd_dead_c")).toBe("sent");
   });
+  // Follow-ups 2 (cookbook work/active/2026-10-18-3d-invite-followups-2 DoD (a)-(d)): the re-invite's revoke never goes past the
+  // owner ceiling (a dead owner row is revoked only by an owner re-invite), leaves expired rows as they were, revokes nothing
+  // when the invite is rate-limited, and reports how many superseded rows it revoked in `impact` (dry-run too) and the log.
+  it("a re-invite's revoke respects the owner ceiling, skips expired rows, is reported, and a rate-limited invite revokes nothing", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-18T05:00:00.000Z"); const at = now.toISOString(); const past = "2026-10-18T04:00:00.000Z";
+    let trace = 0; const logs: [string, any][] = [];
+    const mk = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_f2_${++trace}`, now: () => now, log: (e: string, d: any) => { logs.push([e, d]); } } as any);
+    for (const id of ["f2_wm", "f2_pm", "f2_po", "f2_x", "f2_y", "f2_z", "f2_r"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_f2", "F2 WS", at, "f2_wm").run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_f2", "ws_f2", "prj_f2", at, "f2_po").run();
+    const grant = (id: string, p: string, t: string, s: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, t, s, r, at).run();
+    await grant("f2g1", "f2_wm", "workspace", "ws_f2", "member");
+    await grant("f2g2", "f2_pm", "project", "prj_f2", "member");
+    await grant("f2g3", "f2_po", "project", "prj_f2", "owner");
+    const row = async (id: string, to: string, role: string, expires = "2026-10-24T00:00:00.000Z") => { await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id, "project", "prj_f2", await sha256(to + "@example.invalid"), await sha256("tok_" + id), role, "sent", "f2_wm", at, expires).run(); };
+    const status = async (id: string) => (await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status;
+    // all of these are dead: f2_wm holds no direct project grant
+    await row("inv_f2_x_owner", "f2_x", "owner");          // (a) dead OWNER row: a member re-invite must not revoke it
+    await row("inv_f2_x_member", "f2_x", "member");        // dead member row: superseded
+    await row("inv_f2_x_expired", "f2_x", "member", past); // (b) expired dead row: left as it was
+    await row("inv_f2_y_owner", "f2_y", "owner");          // (a) other way: an owner re-invite as owner revokes it
+    await row("inv_f2_r_dead", "f2_r", "member");          // (c) the rate-limited re-invite must leave it alone
+
+    // (d) dry-run reports what the re-invite would revoke, and revokes nothing
+    const dry = await invite(mk("f2_pm"), { scope: "project", id: "prj_f2", email: "f2_x@example.invalid", role: "member" }, { dryRun: true } as any);
+    expect(dry.impact.revoked_superseded).toBe(1);
+    expect(await status("inv_f2_x_member")).toBe("sent");
+    // (a) a member re-invite as member revokes the dead member row only; (b) the expired row stays 'sent'; (d) reported
+    logs.length = 0;
+    const x = await invite(mk("f2_pm"), { scope: "project", id: "prj_f2", email: "f2_x@example.invalid", role: "member" });
+    expect(x.result.delivery.reason).not.toBe("duplicate_recent");
+    expect(await status("inv_f2_x_member")).toBe("revoked");
+    expect(await status("inv_f2_x_owner")).toBe("sent");
+    expect(await status("inv_f2_x_expired")).toBe("sent");
+    expect(x.impact.revoked_superseded).toBe(1);
+    expect(logs.find(([e]) => e === "grant.invite.mail")?.[1]).toMatchObject({ revoked_superseded: 1 });
+    // a de-duplicated re-invite reports 0
+    const twin = await invite(mk("f2_pm"), { scope: "project", id: "prj_f2", email: "f2_x@example.invalid", role: "member" });
+    expect(twin.result.delivery.reason).toBe("duplicate_recent");
+    expect(twin.impact.revoked_superseded).toBe(0);
+    // (a) the other way: an owner re-invite as owner revokes the dead owner row
+    const yDry = await invite(mk("f2_po"), { scope: "project", id: "prj_f2", email: "f2_y@example.invalid", role: "owner" }, { dryRun: true } as any);
+    expect(yDry.impact.revoked_superseded).toBe(1);
+    const y = await invite(mk("f2_po"), { scope: "project", id: "prj_f2", email: "f2_y@example.invalid", role: "owner" });
+    expect(await status("inv_f2_y_owner")).toBe("revoked");
+    expect(y.impact.revoked_superseded).toBe(1);
+    // (c) a rate-limited re-invite inserts nothing and revokes nothing
+    for (let i = 0; i < 30; i++) await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(`inv_f2_rl_${i}`, "project", "prj_f2", await sha256(`rl${i}@example.invalid`), await sha256(`tok_rl_${i}`), "member", "revoked", "f2_pm", at, "2026-10-24T00:00:00.000Z").run();
+    await expect(invite(mk("f2_pm"), { scope: "project", id: "prj_f2", email: "f2_r@example.invalid", role: "member" })).rejects.toMatchObject({ code: "RATE_LIMITED" });
+    expect(await status("inv_f2_r_dead")).toBe("sent");
+  });
   // Dead invitations DoD (8): policy answers a participant session on the invitation link before the handler runs. That is
   // "sign in as the invited person" (retryable, the UI keeps the token), not the invitation's durable refusal.
   it("a participant session opening an invitation link gets NOT_AUTHENTICATED (retryable), not NOT_AUTHORIZED_AT_SCOPE", async () => {

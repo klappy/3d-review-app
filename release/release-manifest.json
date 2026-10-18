@@ -1,23 +1,23 @@
 {
-  "version": "0.35.6",
+  "version": "0.35.7",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "ca91a71ab14aaeeae7ba97b281d71829bda2fd36",
+  "cookbook_commit": "9b07b6d23b6eb2dd626d2e59f1c0e73c7437affb",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.6.md",
-      "blob_sha": "6df7ee71d1dc923bd5caab8711be769b4364d255",
-      "sha256": "9fc92ce18e61af27d193997ac01cbd6f15c7b1b93754630d322ee3f50e535e18"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.7.md",
+      "blob_sha": "a7099c12797927594d69c934b276280a2828ca68",
+      "sha256": "1034080627f3b31f48f177c6c837c92defbd2cfa085ad035da81c922b402db78"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "025f706a8f02c8cc6330b2582ee88d03f44fcbca",
-      "sha256": "6b9a73a4b86c9a481c8b6de51d6c1b52e8ad6925f52485c09aed4aabcec6eed4"
+      "blob_sha": "aa422d799377e572667fe5bf943a6a667ccc748c",
+      "sha256": "931d066dc80b5d7fa5f6ac7816621c4f70a26b79c4688e670ca55ca70cabee3d"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Invitations: inviting someone again after their earlier invitation could no longer be accepted now cancels that earlier invitation, so it cannot become valid again if its sender later gets their own role on the project back."
+        "Invitations: a re-invite cancels an earlier owner invitation only when the new invitation is also for owner, leaves expired invitations as expired instead of marking them cancelled, and the invite result (including a dry run) and its log now report how many earlier invitations it cancelled."
       ]
     }
   }
