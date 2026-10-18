@@ -278,9 +278,11 @@ describe("workspace grouping cannot mint project ownership", () => {
     await expect(accept(mk("f3_d"), { invitation_id: "inv_f3_ws" })).resolves.toMatchObject({ result: { granted: true, role: "member" } });
     expect(await direct("f3_d", "workspace", "ws_f3")).toBe("member");
   });
-  // Dead invitations (cookbook work/active/2026-10-17-3d-dead-invitations DoD 2, 3): rows accept refuses (inviter has no
-  // direct member+ project grant; owner invitation without a direct owner inviter; own invitation) are not listed and not
-  // counted by invite de-dup. Workspace invitations below owner are unchanged (finding 4 is a named hold).
+  // Dead invitations (cookbook work/active/2026-10-17-3d-dead-invitations DoD 2, 3): rows whose inviter no longer stands
+  // behind them (no direct member+ project grant; owner invitation without a direct owner inviter) are refused at accept,
+  // not listed and not counted by invite de-dup; a re-invite revokes the dead row it supersedes (cookbook
+  // work/active/2026-10-18-3d-invite-followups DoD (a)). An own invitation is refused at accept and left out of
+  // cap.me.invitations, but the roster still lists it. Workspace invitations below owner are unchanged (finding 4 is a named hold).
   it("dead invitations are not listed (cap.me.invitations, roster pending) and a re-invite sends a fresh one", async () => {
     const db = await mf.getD1Database("DB");
     const now = new Date("2026-10-18T02:00:00.000Z"); const at = now.toISOString();
@@ -321,9 +323,49 @@ describe("workspace grouping cannot mint project ownership", () => {
     // control: a LIVE row inside the cooldown still de-duplicates
     const twin = await invite(mk("dd_pm"), { scope: "project", id: "prj_dd", email: "dd_b@example.invalid", role: "member" });
     expect(twin.result).toMatchObject({ invitation_id: "inv_dd_live", delivery: { reason: "duplicate_recent" } });
-    // the dead row turns live again if its inviter gains a direct project grant (the predicate reads current grants)
+    // the re-invite revoked the dead row it superseded, so it stays dead when its inviter gains a direct project grant:
+    // one live row for dd_a at prj_dd, never two
+    const status = async (id: string) => (await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status;
+    expect(await status("inv_dd_dead")).toBe("revoked");
+    expect(await status("inv_dd_live")).toBe("sent"); // the de-duplicated twin revoked nothing
     await grant("ddg3", "dd_wm", "project", "prj_dd", "member");
-    expect(ids(await grantList(mk("dd_pm"), { scope: "project", id: "prj_dd" }))).toEqual(["inv_dd_dead", "inv_dd_live", fresh.result.invitation_id].sort());
+    expect(ids(await grantList(mk("dd_pm"), { scope: "project", id: "prj_dd" }))).toEqual(["inv_dd_live", fresh.result.invitation_id].sort());
+    expect(ids(await mine(mk("dd_a"), {}))).toEqual([fresh.result.invitation_id]);
+    await expect(accept(mk("dd_a"), { invitation_id: "inv_dd_dead" })).rejects.toBeTruthy();
+  });
+  // Follow-ups DoD (a), the other way: a re-invite revokes ONLY a dead row for the same invitee at the same scope. A live
+  // row outside the de-dup cooldown, a dead row for another invitee, and a dead row at another scope are left as they were;
+  // a de-duplicated or rate-limited invite (no INSERT) revokes nothing.
+  it("a re-invite revokes only the superseded dead row (same invitee, same scope)", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-18T03:00:00.000Z"); const at = now.toISOString(); const old = "2026-10-17T03:00:00.000Z";
+    let trace = 0;
+    const mk = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_sd_${++trace}`, now: () => now, log: () => {} });
+    for (const id of ["sd_wm", "sd_pm", "sd_a", "sd_b", "sd_c"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_sd", "SD WS", at, "sd_wm").run();
+    for (const pid of ["prj_sd", "prj_sd2"]) await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind(pid, "ws_sd", pid, at, "sd_pm").run();
+    const grant = (id: string, p: string, t: string, s: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, t, s, r, at).run();
+    await grant("sdg1", "sd_wm", "workspace", "ws_sd", "member");
+    await grant("sdg2", "sd_pm", "project", "prj_sd", "member");
+    await grant("sdg3", "sd_pm", "project", "prj_sd2", "member");
+    const row = async (id: string, to: string, scopeId: string, by: string, created = at) => { await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id, "project", scopeId, await sha256(to + "@example.invalid"), await sha256("tok_" + id), "member", "sent", by, created, "2026-10-24T00:00:00.000Z").run(); };
+    await row("inv_sd_old_live", "sd_a", "prj_sd", "sd_pm", old);   // live, outside the cooldown → not a de-dup twin, not dead
+    await row("inv_sd_dead_a", "sd_a", "prj_sd", "sd_wm");          // dead, same invitee + scope → superseded
+    await row("inv_sd_dead_b", "sd_b", "prj_sd", "sd_wm");          // dead, other invitee → untouched
+    await row("inv_sd_dead_a2", "sd_a", "prj_sd2", "sd_wm");        // dead, same invitee, other scope → untouched
+    await row("inv_sd_live_c", "sd_c", "prj_sd", "sd_pm");          // live twin inside the cooldown for sd_c
+    await row("inv_sd_dead_c", "sd_c", "prj_sd", "sd_wm");          // dead, but the sd_c re-invite de-duplicates (no INSERT)
+    const status = async (id: string) => (await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status;
+
+    const fresh = await invite(mk("sd_pm"), { scope: "project", id: "prj_sd", email: "sd_a@example.invalid", role: "member" });
+    expect(fresh.result.delivery.reason).not.toBe("duplicate_recent");
+    expect(await status("inv_sd_dead_a")).toBe("revoked");
+    expect(await status("inv_sd_old_live")).toBe("sent");
+    expect(await status("inv_sd_dead_b")).toBe("sent");
+    expect(await status("inv_sd_dead_a2")).toBe("sent");
+    const twin = await invite(mk("sd_pm"), { scope: "project", id: "prj_sd", email: "sd_c@example.invalid", role: "member" });
+    expect(twin.result).toMatchObject({ invitation_id: "inv_sd_live_c", delivery: { reason: "duplicate_recent" } });
+    expect(await status("inv_sd_dead_c")).toBe("sent");
   });
   // Dead invitations DoD (8): policy answers a participant session on the invitation link before the handler runs. That is
   // "sign in as the invited person" (retryable, the UI keeps the token), not the invitation's durable refusal.
