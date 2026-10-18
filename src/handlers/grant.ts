@@ -428,7 +428,9 @@ export const update_role: Handler = async (ctx, p, o) => {
     return { result: { grant: gid, role, noop: true }, noop: true as const, scope, priorState: { role }, impact: noopImpact() };
   };
   const firstReadNoop = g.role === role;
-  const sweptIds = downgrade && !firstReadNoop ? await orphanedIds(ctx, g.principal_id, scope, role) : [];
+  // 0.35.21 (cookbook work/active/2026-10-18-3d-grant-noop-followups-6 DoD (b)): `downgrade` is the one sweep condition (the
+  // preview's swept set, the write guard, the sweep and the refusal); it already implies the role moves (not firstReadNoop).
+  const sweptIds = downgrade ? await orphanedIds(ctx, g.principal_id, scope, role) : [];
   const impact: Impact & { revoked_invitations: number } = firstReadNoop ? noopImpact() : { affected: [{ grant: gid, from: g.role, to: role }], irreversible: ROLE_RANK[role] > ROLE_RANK[g.role as Role], effect: "disclosure" as const, compensating_control: "demotion via this capability (what was seen stays seen)",
     revoked_invitations: sweptIds.length };
   // 0.35.17 DoD (a): the preview binds the role it read into the confirm token; an execute that reads another role (a no-op
@@ -447,19 +449,18 @@ export const update_role: Handler = async (ctx, p, o) => {
   // to owner) in the same WHERE, so a role changed in between, or a caller demoted in between, changes no row. Refused → no
   // row changed: the orphan sweep runs only when this UPDATE wrote its row (revokeOrphaned afterWrite, 0.35.14 DoD (a)), and
   // the typed refusal for the state the re-read finds (refuseGrantWrite).
-  const sweepCheck = downgrade && !firstReadNoop;
   const binds: unknown[] = [role, gid, g.role, ctx.principal.id, scope.type, scope.id];
-  if (sweepCheck) binds.push(g.principal_id, nowIso(ctx), sweptIds.join(","));
+  if (downgrade) binds.push(g.principal_id, nowIso(ctx), sweptIds.join(","));
   const stmts = [ctx.db.prepare(`UPDATE "grant" SET role = ?1 WHERE id = ?2 AND role = ?3 AND (role <> 'owner' OR ?1 = 'owner')`
     + ` AND ${callerHolds("?4", "?5", "?6", "'owner'")} AND (?1 <> 'owner' OR ${callerHolds("?4", "?5", "?6", "'owner'", true)})`
-    + (sweepCheck ? ` AND ${orphanedNow("?7", "?5", "?6", "?8", "?1")} = ?9` : ""))
+    + (downgrade ? ` AND ${orphanedNow("?7", "?5", "?6", "?8", "?1")} = ?9` : ""))
     .bind(...binds)];
   if (downgrade) stmts.push(revokeOrphaned(ctx, g.principal_id, scope, true));
   const res = await ctx.db.batch(stmts);
   if ((res[0].meta.changes ?? 0) !== 1) {
     const live = await reReadGrantWrite(ctx, scope, gid, "update_role", role);
     // 0.35.20 DoD (b): the role still reads as previewed and the caller still holds it, so the swept invitation set moved.
-    if (sweepCheck && live.now === g.role && (await orphanedIds(ctx, g.principal_id, scope, role)).join(",") !== sweptIds.join(","))
+    if (downgrade && live.now === g.role && (await orphanedIds(ctx, g.principal_id, scope, role)).join(",") !== sweptIds.join(","))
       throw new CapError("CONFIRM_REQUIRED", "the invitations this change would revoke changed since the dry_run preview", "Call dry_run again and confirm the new preview.", "cap.grant.update_role");
     if (live.now !== role) refuseGrantWrite(live, "update_role", role, g.role as Role);
     // 0.35.14 DoD (d): the grant already holds the requested role, so the end state stands and there is no conflict. 0.35.15
@@ -537,24 +538,30 @@ const callerHolds = (caller: string, scopeT: string, scopeI: string, min: string
   + (direct ? `cg.scope_type = ${scopeT} AND cg.scope_id = ${scopeI}` : grantApplies("cg", scopeT, scopeI)) // DoD (c): one rule (common.grantApplies)
   + ` AND ${roleRank("cg.role")} >= ${roleRank(min)})`;
 
+/** Ownership moves only from a DIRECT owner grant at this scope. An owner inherited from the grouping workspace cannot
+ *  transfer or step down here: step_down rewrites only the direct grant, so the inherited powers would silently remain.
+ *  0.35.21 (cookbook work/active/2026-10-18-3d-grant-noop-followups-6 DoD (c)): one preamble for transfer_owner's read-time
+ *  check and its 0-row re-read, so the two cannot drift. */
+async function requireDirectOwner(ctx: Ctx, scope: Scope): Promise<void> {
+  await callerAt(ctx, scope, "owner");
+  await directRoleAt(ctx, scope.type, scope.id, "owner", "your owner role is inherited from the workspace — a direct project owner runs this step");
+}
+
 /** D: ownership moves. Owner only; support-without-owner-consent is PROPOSED pending source (Astra 5703469487) → refused here. */
 export const transfer_owner: Handler = async (ctx, p, o) => {
   const scope = reqScope(p); const to = reqStr(p, "to");
   if (ctx.principal.kind === "support" && (await roleAt(ctx, scope.type, scope.id)) !== "owner")
     throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "transfer by support without the owner's consent is not ruled", "proposed, pending source — the owner runs this step");
-  await callerAt(ctx, scope, "owner");
-  // Ownership moves only from a DIRECT owner grant at this scope. An owner inherited from the grouping workspace cannot
-  // transfer or step down here: step_down rewrites only the direct grant, so the inherited powers would silently remain.
-  await directRoleAt(ctx, scope.type, scope.id, "owner", "your owner role is inherited from the workspace — a direct project owner runs this step");
+  await requireDirectOwner(ctx, scope);
   if (to === ctx.principal.id) throw new CapError("INVALID_PARAMS", "cannot transfer ownership to yourself", "name another principal");
   if (!(await ctx.db.prepare("SELECT id FROM principal WHERE id = ?").bind(to).first())) throw new CapError("INVALID_PARAMS", "unknown principal", "to must be a signed-up principal id");
   const current = await owners(ctx, scope);
   const stepDown = p.step_down === true;
   // Stepping down is a downgrade (owner → member): the caller's owner invitations here are revoked with it (orphanedWhere).
-  const impact = { affected: [{ scope, current_owners: current.length, to, to_becomes: "owner", caller_becomes: stepDown ? "member" : "owner" }], irreversible: true, effect: "disclosure" as const, compensating_control: "transfer back (requires the new owner)",
-    revoked_invitations: 0 };
   const sweptIds = stepDown ? await orphanedIds(ctx, ctx.principal.id, scope, "member") : [];
-  impact.revoked_invitations = sweptIds.length;
+  // 0.35.21 DoD (b): the impact literal is built once, after the swept set it reports.
+  const impact = { affected: [{ scope, current_owners: current.length, to, to_becomes: "owner", caller_becomes: stepDown ? "member" : "owner" }], irreversible: true, effect: "disclosure" as const, compensating_control: "transfer back (requires the new owner)",
+    revoked_invitations: sweptIds.length };
   // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (a)): the preview binds the owner set it read and the
   // recipient's direct role here into the confirm token; an execute that reads either changed is refused (CONFIRM_REQUIRED).
   // 0.35.19 (cookbook work/active/2026-10-18-3d-grant-noop-followups-4 DoD (b)): the revoked_invitations count it showed too.
@@ -581,8 +588,11 @@ export const transfer_owner: Handler = async (ctx, p, o) => {
   if ((res[0].meta.changes ?? 0) !== 1) {
     // 0.35.20 (cookbook work/active/2026-10-18-3d-grant-noop-followups-5 DoD (c)): re-read the caller first: one who lost the
     // DIRECT owner grant in the window is refused for that (as the read-time check says), not asked for a new preview.
-    await callerAt(ctx, scope, "owner");
-    await directRoleAt(ctx, scope.type, scope.id, "owner", "your owner role is inherited from the workspace — a direct project owner runs this step");
+    await requireDirectOwner(ctx, scope);
+    // 0.35.21 (cookbook work/active/2026-10-18-3d-grant-noop-followups-6 DoD (a)): a step-down whose swept invitation set moved
+    // in the window names the invitations, as update_role's refusal does.
+    if (stepDown && (await orphanedIds(ctx, ctx.principal.id, scope, "member")).join(",") !== sweptIds.join(","))
+      throw new CapError("CONFIRM_REQUIRED", "the invitations this change would revoke changed since the dry_run preview", "Call dry_run again and confirm the new preview.", "cap.grant.transfer_owner");
     throw new CapError("CONFIRM_REQUIRED", "the target changed since the dry_run preview", "Call dry_run again and confirm the new preview.", "cap.grant.transfer_owner");
   }
   impact.revoked_invitations = stepDown ? res[2].meta.changes ?? 0 : 0;
