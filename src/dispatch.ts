@@ -1,7 +1,6 @@
 import { fail, ok } from "./envelope";
 import type { Ctx, ScopeType } from "./handlers/types";
-import { CapError } from "./handlers/types";
-import { CapError as HandlerCapError } from "./errors";
+import { CapError } from "./errors";
 import { handlers } from "./handlers";
 import { authorize, targetScope } from "./policy";
 import { byId, sourceSha, toolForClass, type Tool } from "./registry";
@@ -109,10 +108,10 @@ export async function execute(
     });
     return (outcome = ok(capabilityId, handled.result, ctx.traceId, receipt));
   } catch (e) {
-    if (!(e instanceof CapError || e instanceof HandlerCapError)) throw e;
+    if (!(e instanceof CapError)) throw e; // 0.35.19 DoD (e): one class (src/errors.ts); handlers/types re-exports it
     // RATE_LIMITED carries retry_after in the envelope so an MCP client (HTTP 200 + envelope, no header) can back off
     // without parsing a second shape (review #12-6). The HTTP twin also sends the retry-after header.
-    return (outcome = fail(e.code, e.message, e.hint, e instanceof CapError ? e.docs : undefined, ctx.traceId,
+    return (outcome = fail(e.code, e.message, e.hint, e.docs, ctx.traceId,
       e.code === "RATE_LIMITED" ? { retry_after: e.retryAfter ?? RATE_LIMIT_WINDOW_SECONDS } : undefined));
   } finally {
     ctx.log = log;

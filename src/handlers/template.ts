@@ -1,5 +1,5 @@
 import type { Handler } from "./types";
-import { CapError } from "./errors";
+import { CapError, isConstraintError } from "./errors";
 import { requireConfirmedState } from "../receipt";
 import { LEGACY_TEMPLATE_IDS } from "../legacy-templates";
 import { withDisplayName } from "../display-names";
@@ -39,7 +39,14 @@ export const publish_version: Handler = async (ctx,params,opts) => {
   if(opts?.dryRun) return {result:{template_id:id,version},scope:{type:"platform",id},impact,confirmState:{version}};
   await requireConfirmedState(opts,{version},"cap.template.publish_version");
   const at=nowIso(ctx);
-  await ctx.db.prepare("INSERT INTO survey_template (id, version, name, perspective, source_ref, items_json, scoring_json, rubric_ref, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id,version,name,perspective,source_ref,JSON.stringify(items),JSON.stringify(scoring),rubric_ref,at).run();
+  // 0.35.19 (cookbook work/active/2026-10-18-3d-grant-noop-followups-4 DoD (d)): two publishes racing for the same next version
+  // meet the (id, version) primary key; the loser gets a typed conflict, never the raw D1 error.
+  try {
+    await ctx.db.prepare("INSERT INTO survey_template (id, version, name, perspective, source_ref, items_json, scoring_json, rubric_ref, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id,version,name,perspective,source_ref,JSON.stringify(items),JSON.stringify(scoring),rubric_ref,at).run();
+  } catch(e) {
+    if(isConstraintError(e)) throw new CapError("STAGE_CONFLICT",`version ${version} of this template was published at the same moment`,"call dry_run again to preview the next version");
+    throw e;
+  }
   return {result:{template:{id,version,name,perspective,source_ref,rubric_ref,published_at:at}},scope:{type:"platform",id},impact};
 };
 export const handlers:Record<string,Handler>={"cap.template.list":list,"cap.template.get":get,"cap.template.render":render,"cap.template.publish_version":publish_version};

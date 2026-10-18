@@ -1,5 +1,5 @@
 /** Confidential live-keyset cursor. A cursor never supplies assessment authority. */
-import { CapError } from './handlers/errors';
+import { CapError } from './errors';
 import { canonicalJson } from './report-canonical-json';
 import { ATTESTATION_TRUST } from './synthetic-attestation-trust';
 import { REPORT_SCHEMA, REPORT_VERSIONS } from './synthetic-report-renderer';

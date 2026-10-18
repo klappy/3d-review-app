@@ -12,7 +12,8 @@ import { handlers } from "../src/handlers";
 import { opsUsage } from "../src/handlers/usage";
 import { auditRow, sha256 } from "../src/handlers/common";
 import { opsUndo } from "../src/handlers/undo";
-import { checkConfirmToken, mintConfirmToken } from "../src/receipt";
+import { checkConfirmToken, mintConfirmToken, paramsHash } from "../src/receipt";
+import { publish_version as publishVersion } from "../src/handlers/template";
 import type { Ctx } from "../src/handlers/types";
 
 // Workspace roles inherit to every grouped project (cookbook work/active/2026-10-15-3d-workspace-permissions).
@@ -980,5 +981,156 @@ describe("danger previews bind their read state; verified confirm state; usage a
     const before = await roleOf("n3_x");
     await expect(opsUndo(mk(db, "n3_po"), { token: "undo_n3" })).rejects.toMatchObject({ code: "NO_INVERSE" });
     expect(await roleOf("n3_x")).toBe(before);
+  });
+});
+
+// 0.35.19 (cookbook work/active/2026-10-18-3d-grant-noop-followups-4): the 542 review follow-ups.
+describe("confirm binds hold to the write; stale refusals; publish conflict (0.35.19)", () => {
+  const now = new Date("2026-10-18T20:50:00.000Z"); const at = now.toISOString();
+  let trace = 0;
+  const mk = (db: any, id: string, kind = "user"): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db,
+    principal: { kind, id, provisioned: true } as any, traceId: `tr_n4_${++trace}`, now: () => now, log: () => {} } as any);
+  let db: any;
+  const grant = (id: string, p: string, t: string, s: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, t, s, r, at).run();
+  const invite = (id: string, scopeId: string, by: string, role: string, invitee = "n4_nobody", token = id) => db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+    .bind(id, "project", scopeId, invitee, token, role, "sent", by, at).run();
+  const roleOf = async (p: string, s: string) => (await db.prepare(`SELECT role FROM "grant" WHERE principal_id = ? AND scope_id = ?`).bind(p, s).first())?.role;
+  const dry = (ctx: Ctx, cap: string, params: any) => execute(ctx, cap, params, { tool: "danger", mode: "dry_run" }) as Promise<any>;
+  const exec = (ctx: Ctx, cap: string, params: any, d: any) => execute(ctx, cap, params, { tool: "danger", mode: "execute", confirm_token: d.result.confirm_token }) as Promise<any>;
+  beforeAll(async () => {
+    db = await mf.getD1Database("DB");
+    const sql = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
+    if (!(await db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'principal'").first()))
+      await db.batch(sql("../migrations/0001_init.sql").split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)));
+    if (!(await db.prepare("SELECT 1 FROM pragma_table_info('participant_session') WHERE name = 'invitation_id'").first()))
+      await db.batch(sql("../migrations/0007_shared_link_context.sql").split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)));
+    for (const id of ["n4_po", "n4_t", "n4_x", "n4_inv", "n4_sup"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, id === "n4_sup" ? 1 : 0, at).run();
+    for (const p of ["prj_n4a", "prj_n4b", "prj_n4d", "prj_n4s"]) {
+      await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind(p, null, p, at, "n4_po").run();
+      await grant(`n4g_po_${p}`, "n4_po", "project", p, "owner");
+    }
+    await grant("n4g_t_a", "n4_t", "project", "prj_n4a", "member"); await grant("n4g_t_b", "n4_t", "project", "prj_n4b", "member");
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_n4", "ws_n4", at, "n4_po").run();
+    await grant("n4g_po_ws", "n4_po", "workspace", "ws_n4", "owner");
+    await db.prepare("INSERT INTO language (id, project_id, code, name, created_at) VALUES (?,?,?,?,?)").bind("lang_n4", "prj_n4s", "syn", "Synthetic", at).run();
+    await db.prepare("INSERT INTO assessment (id, project_id, language_id, name, stage, created_at) VALUES (?,?,?,?,?,?)").bind("asm_n4", "prj_n4s", "lang_n4", "A", "prepare", at).run();
+    await grant("n4g_po_asm", "n4_po", "assessment", "asm_n4", "owner");
+  });
+
+  it("transfer_owner re-checks the bound state inside its write: a change between token check and write is refused and writes nothing (DoD (a))", async () => {
+    const po = mk(db, "n4_po"); const params = { scope: "project", id: "prj_n4a", to: "n4_t", step_down: true };
+    const d = await dry(po, "cap.grant.transfer_owner", params); expect(d.ok).toBe(true);
+    // the race: another owner lands after the token check (dispatch → requireConfirmedState) and before the batch
+    let raced = false;
+    const racing = { prepare: (s: string) => db.prepare(s), batch: async (stmts: any[]) => {
+      if (!raced) { raced = true; await grant("n4g_x_a", "n4_x", "project", "prj_n4a", "owner"); } return db.batch(stmts); } };
+    const env = await exec({ ...mk(racing, "n4_po"), env: { DB: racing, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } } as any, "cap.grant.transfer_owner", params, d);
+    expect(raced).toBe(true);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect(await roleOf("n4_t", "prj_n4a")).toBe("member");
+    expect(await roleOf("n4_po", "prj_n4a")).toBe("owner"); // the step-down rode on the refused write and did not run
+  });
+
+  it("transfer_owner binds the revoked_invitations count its preview showed (DoD (b))", async () => {
+    const po = mk(db, "n4_po"); const params = { scope: "project", id: "prj_n4b", to: "n4_t", step_down: true };
+    await invite("n4i_b1", "prj_n4b", "n4_po", "owner");
+    const d = await dry(po, "cap.grant.transfer_owner", params);
+    expect(d.result.impact.revoked_invitations).toBe(1);
+    await invite("n4i_b2", "prj_n4b", "n4_po", "owner");
+    const env = await exec(po, "cap.grant.transfer_owner", params, d);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect(await roleOf("n4_t", "prj_n4b")).toBe("member");
+    const again = await dry(po, "cap.grant.transfer_owner", params);
+    expect(again.result.impact.revoked_invitations).toBe(2);
+    const ok = await exec(po, "cap.grant.transfer_owner", params, again);
+    expect(ok.ok).toBe(true);
+    expect(await roleOf("n4_t", "prj_n4b")).toBe("owner"); expect(await roleOf("n4_po", "prj_n4b")).toBe("member");
+  });
+
+  it("grant.accept refuses an execute whose `currently` changed since the preview (DoD (c))", async () => {
+    await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+      .bind("n4i_acc", "project", "prj_n4d", await sha256("n4_inv@example.invalid"), await sha256("tok_n4"), "member", "sent", "n4_po", at).run();
+    const inv = mk(db, "n4_inv");
+    const d: any = await accept(inv, { token: "tok_n4" }, { dryRun: true });
+    await grant("n4g_inv_d", "n4_inv", "project", "prj_n4d", "viewer");
+    await expect(accept(inv, { token: "tok_n4" }, { dryRun: false, confirmedState: await paramsHash(d.confirmState) })).rejects.toMatchObject({ code: "CONFIRM_REQUIRED" });
+    expect(await roleOf("n4_inv", "prj_n4d")).toBe("viewer");
+    await db.prepare('DELETE FROM "grant" WHERE id = ?').bind("n4g_inv_d").run();
+  });
+
+  it("template.publish_version: a stale preview is refused; a confirmed execute through dispatch publishes (DoD (c))", async () => {
+    const sup = mk(db, "n4_sup", "support");
+    const params = { id: "tpl_n4", name: "T", perspective: "translator", items: [], scoring: {}, source_ref: "s", rubric_ref: "r" };
+    const d = await dry(sup, "cap.template.publish_version", params); expect(d.ok).toBe(true);
+    await db.prepare("INSERT INTO survey_template (id, version, name, perspective, items_json, scoring_json, published_at) VALUES (?,?,?,?,?,?,?)").bind("tpl_n4", 1, "T", "translator", "[]", "{}", at).run();
+    const env = await exec(sup, "cap.template.publish_version", params, d);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    const again = await dry(sup, "cap.template.publish_version", params);
+    const ok = await exec(sup, "cap.template.publish_version", params, again);
+    expect(ok.ok).toBe(true); expect(ok.result.template.version).toBe(2);
+  });
+
+  it("template.publish_version: two publishes racing for the same next version give a typed conflict, not a raw D1 error (DoD (d))", async () => {
+    const params = { id: "tpl_n4r", name: "T", perspective: "translator", items: [], scoring: {}, source_ref: "s", rubric_ref: "r" };
+    // the race: the other publish lands its row after this one read MAX(version)
+    const racing = { batch: (s: any[]) => db.batch(s), prepare: (s: string) => {
+      const st = db.prepare(s);
+      if (!/MAX\(version\)/.test(s)) return st;
+      return { bind: (...a: any[]) => { const b = st.bind(...a); return { first: async () => { const r = await b.first();
+        await db.prepare("INSERT INTO survey_template (id, version, name, perspective, items_json, scoring_json, published_at) VALUES (?,?,?,?,?,?,?)").bind("tpl_n4r", 1, "T", "translator", "[]", "{}", at).run(); return r; } }; } };
+    } };
+    const ctx = { ...mk(racing, "n4_sup", "support") } as any;
+    await expect(publishVersion(ctx, params, { dryRun: false })).rejects.toMatchObject({ code: "STAGE_CONFLICT" });
+  });
+
+  it("template.publish_version: a lost race whose D1 error carries the constraint only in `cause` or as SQLITE_CONSTRAINT is still STAGE_CONFLICT (Bugbot 4308744033)", async () => {
+    const params = { id: "tpl_n4c", name: "T", perspective: "translator", items: [], scoring: {}, source_ref: "s", rubric_ref: "r" };
+    const thrown = [
+      new Error("D1_ERROR: insert failed", { cause: new Error("UNIQUE constraint failed: survey_template.id, survey_template.version") }),
+      new Error("D1_ERROR: SQLITE_CONSTRAINT"),
+    ];
+    for (const err of thrown) {
+      const failing = { batch: (s: any[]) => db.batch(s), prepare: (s: string) => {
+        const st = db.prepare(s);
+        if (!/^INSERT INTO survey_template/.test(s)) return st;
+        return { bind: () => ({ run: async () => { throw err; } }) };
+      } };
+      const ctx = { ...mk(failing, "n4_sup", "support") } as any;
+      await expect(publishVersion(ctx, params, { dryRun: false })).rejects.toMatchObject({ code: "STAGE_CONFLICT" });
+    }
+  });
+
+  it("workspace.delete: a stale preview is refused; a confirmed execute through dispatch deletes (DoD (c))", async () => {
+    const po = mk(db, "n4_po"); const params = { id: "ws_n4" };
+    const d = await dry(po, "cap.workspace.delete", params); expect(d.ok).toBe(true);
+    await grant("n4g_x_ws", "n4_x", "workspace", "ws_n4", "viewer");
+    const env = await exec(po, "cap.workspace.delete", params, d);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect(await db.prepare("SELECT id FROM workspace WHERE id = 'ws_n4'").first()).toBeTruthy();
+    const ok = await exec(po, "cap.workspace.delete", params, await dry(po, "cap.workspace.delete", params));
+    expect(ok.ok).toBe(true);
+    expect(await db.prepare("SELECT id FROM workspace WHERE id = 'ws_n4'").first()).toBeNull();
+  });
+
+  it("project.delete: a stale preview is refused; a confirmed execute through dispatch deletes (DoD (c))", async () => {
+    const po = mk(db, "n4_po"); const params = { id: "prj_n4d" };
+    await db.prepare("DELETE FROM invitation WHERE scope_id = 'prj_n4d'").run();
+    const d = await dry(po, "cap.project.delete", params); expect(d.ok).toBe(true);
+    await db.prepare("INSERT INTO language (id, project_id, code, name, created_at) VALUES (?,?,?,?,?)").bind("lang_n4d", "prj_n4d", "syd", "Synthetic", at).run();
+    const env = await exec(po, "cap.project.delete", params, d);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    await db.prepare("DELETE FROM language WHERE id = 'lang_n4d'").run();
+    const ok = await exec(po, "cap.project.delete", params, await dry(po, "cap.project.delete", params));
+    expect(ok.ok).toBe(true);
+    expect(await db.prepare("SELECT id FROM project WHERE id = 'prj_n4d'").first()).toBeNull();
+  });
+
+  it("assessment.delete: a stale preview is refused (DoD (c))", async () => {
+    const po = mk(db, "n4_po"); const params = { id: "asm_n4" };
+    const d = await dry(po, "cap.assessment.delete", params); expect(d.error).toBeUndefined();
+    await db.prepare("INSERT INTO assessment_survey (id, assessment_id, template_id, template_version, created_at) VALUES (?,?,?,?,?)").bind("as_n4", "asm_n4", "tpl_n4", 1, at).run();
+    const env = await exec(po, "cap.assessment.delete", params, d);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect(await db.prepare("SELECT id FROM assessment WHERE id = 'asm_n4'").first()).toBeTruthy();
   });
 });

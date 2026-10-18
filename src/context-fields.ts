@@ -3,7 +3,7 @@
 // name field (facilitator_name, team_members_present, leader_name are never asked or stored). Respondent fields are
 // the optional age range and gender on the participant form. Every field is optional; unknown keys are refused.
 // Mirrored for the browser in ui/v3/context-fields.js (test/b09-context.test.ts keeps the two identical).
-import { CapError } from "./handlers/errors";
+import { CapError } from "./errors";
 
 export interface ContextOption { code: string; label: string }
 export interface ContextField { key: string; label: string; type: "text" | "count" | "select"; options?: ContextOption[] }
