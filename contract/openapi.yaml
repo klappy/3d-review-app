@@ -2907,7 +2907,7 @@ paths:
   /v2/{scope}/{id}/invitations:
     post:
       operationId: cap.grant.invite
-      summary: 'cap.grant.invite — write.effect — roles: O, M(≤M)'
+      summary: 'cap.grant.invite — write.effect — roles: O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)'
       x-capability: cap.grant.invite
       x-class: write.effect
       x-tool: danger
@@ -2915,7 +2915,7 @@ paths:
       x-inverse:
         kind: none
         compensating_control: cap.grant.revoke_invitation
-      x-roles: O, M(≤M)
+      x-roles: 'O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)'
       x-path-inferred: false
       tags:
       - F. Invitations, codes, collaborators
@@ -2956,7 +2956,7 @@ paths:
   /v2/invitations/{id}:
     delete:
       operationId: cap.grant.revoke_invitation
-      summary: 'cap.grant.revoke_invitation — write.reversible — roles: O, M(≤M)'
+      summary: 'cap.grant.revoke_invitation — write.reversible — roles: O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)'
       x-capability: cap.grant.revoke_invitation
       x-class: write.reversible
       x-tool: write
@@ -2964,7 +2964,7 @@ paths:
       x-inverse:
         kind: none
         compensating_control: 're-invite (04: does not unsend)'
-      x-roles: O, M(≤M)
+      x-roles: 'O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)'
       x-path-inferred: false
       tags:
       - F. Invitations, codes, collaborators

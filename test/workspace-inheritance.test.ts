@@ -240,4 +240,40 @@ describe("workspace grouping cannot mint project ownership", () => {
     expect(w.result.invitation_id).toMatch(/^inv/);
     await expect(revoke_invitation(wm, { id: w.result.invitation_id })).resolves.toMatchObject({ result: { status: "revoked" } });
   });
+  // ASK L1 follow-up F3: accept re-checks a non-owner project invitation's inviter — honoured only while the inviter still
+  // holds a DIRECT project grant (member or above). Legacy rows minted from an inherited role stop being acceptable.
+  it("project invitation from an inviter without a direct project grant is not honoured at accept; workspace invitations unchanged", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-18T01:00:00.000Z"); const at = now.toISOString();
+    let trace = 0;
+    const mk = (id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_f3_${++trace}`, now: () => now, log: () => {} });
+    for (const id of ["f3_wm", "f3_pm", "f3_a", "f3_b", "f3_c", "f3_d"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO workspace (id, name, created_at, created_by) VALUES (?,?,?,?)").bind("ws_f3", "F3 WS", at, "f3_wm").run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_f3", "ws_f3", "prj_f3", at, "f3_pm").run();
+    const grant = (id: string, p: string, t: string, s: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, t, s, r, at).run();
+    await grant("f3g1", "f3_wm", "workspace", "ws_f3", "member");
+    await grant("f3g2", "f3_pm", "project", "prj_f3", "member");
+    const row = async (id: string, to: string, scopeType: string, scopeId: string, by: string) => { await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id, scopeType, scopeId, await sha256(to + "@example.invalid"), await sha256("tok_" + id), "member", "sent", by, at, "2026-10-24T00:00:00.000Z").run(); };
+    const direct = async (pid: string, t = "project", s = "prj_f3") => (await db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind(pid, t, s).first<{ role: string }>())?.role ?? null;
+
+    // NEGATIVE: a member invitation minted at the project by an inherited workspace member (before #526) is refused, by id and by token
+    await row("inv_f3_inh", "f3_a", "project", "prj_f3", "f3_wm");
+    await expect(accept(mk("f3_a"), { invitation_id: "inv_f3_inh" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    await expect(accept(mk("f3_a"), { token: "tok_inv_f3_inh" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    expect(await direct("f3_a")).toBeNull();
+    // NEGATIVE: a direct project member's invitation stops being honoured once that member's project grant is gone
+    await row("inv_f3_gone", "f3_b", "project", "prj_f3", "f3_pm");
+    await db.prepare('DELETE FROM "grant" WHERE id = ?').bind("f3g2").run();
+    await expect(accept(mk("f3_b"), { invitation_id: "inv_f3_gone" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    expect(await direct("f3_b")).toBeNull();
+    // POSITIVE: a direct project member's invitation is accepted
+    await grant("f3g3", "f3_pm", "project", "prj_f3", "member");
+    await row("inv_f3_ok", "f3_c", "project", "prj_f3", "f3_pm");
+    await expect(accept(mk("f3_c"), { invitation_id: "inv_f3_ok" })).resolves.toMatchObject({ result: { granted: true, role: "member" } });
+    expect(await direct("f3_c")).toBe("member");
+    // UNCHANGED: a workspace invitation from the workspace member is still accepted
+    await row("inv_f3_ws", "f3_d", "workspace", "ws_f3", "f3_wm");
+    await expect(accept(mk("f3_d"), { invitation_id: "inv_f3_ws" })).resolves.toMatchObject({ result: { granted: true, role: "member" } });
+    expect(await direct("f3_d", "workspace", "ws_f3")).toBe("member");
+  });
 });

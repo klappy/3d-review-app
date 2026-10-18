@@ -1501,7 +1501,7 @@
         "path": "/v2/{scope}/{id}/invitations",
         "path_inferred": false
       },
-      "roles": "O, M(≤M)",
+      "roles": "O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "\"Invite collaborator\" + impact preview → confirm",
@@ -1532,7 +1532,7 @@
         "path": "/v2/invitations/{id}",
         "path_inferred": false
       },
-      "roles": "O, M(≤M)",
+      "roles": "O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "collaborators panel",

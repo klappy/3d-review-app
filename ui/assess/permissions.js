@@ -27,6 +27,11 @@ export const UNCONFIRMED_NOTE = 'Could not be confirmed as sent; the invitation 
 export const PREVIEW_AGAIN = 'Preview again.';
 export const REVOKE_ASK = 'Revoke this invitation so its link stops working?'; // U37: one sentence, in the row
 export const NO_TRANSFER_TARGET = 'Invite someone first; you can transfer to people who already have access.'; // U18: one sentence
+// F5 (ASK L1 option 1, cookbook work/active/2026-10-15-3d-workspace-permissions): at a project, inviting and revoking an
+// invitation need the caller's own direct project grant (src/handlers/grant.ts directAtProject). A caller who can read this
+// roster only through the project's workspace is offered neither; this one line points them to the workspace instead.
+export const FROM_WORKSPACE_NOTE = 'Your role here comes from the workspace. To add someone, invite them to the workspace.';
+export const FROM_WORKSPACE_LINK = 'Open workspace permissions';
 // DoD 4: one true line per scope — roles flow workspace → grouped project only; an assessment opens only by its own grant (D9).
 export const APPLIES = {
   workspaces: 'Roles here also apply to every project in this workspace. Assessments are shared one by one.',
@@ -51,7 +56,7 @@ export function inviteOutcome(r = {}) {
 const classify = e => { const c = String(e?.code || e?.status || ''); if (c === 'NOT_AUTHENTICATED' || c === '401') return 'unauthenticated'; if (c === 'NOT_AUTHORIZED_AT_SCOPE' || c === '403') return 'forbidden'; if (c === 'NOT_FOUND_OR_NOT_VISIBLE' || c === '404') return 'not_found'; if (c === 'RESERVED_NOT_BUILT' || c === '501') return 'not_built'; return 'failed'; };
 export { classify };
 
-export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myEmail: '', myRole: null, sheet: null, notice: null, alert: false, busy: false, receipts: {}, invitees: {}, askRevoke: null }; }
+export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myEmail: '', myRole: null, fromWorkspace: false, workspaceId: null, sheet: null, notice: null, alert: false, busy: false, receipts: {}, invitees: {}, askRevoke: null }; }
 
 export const permissions = {
   async load(ctx, { scope, id }) {
@@ -61,6 +66,12 @@ export const permissions = {
       const r = await ctx.api(`/v2/${SCOPE_SEG[scope]}/${ctx.enc(id)}/grants`);
       m.status = 'loaded'; m.grants = r.grants || []; m.pending = (r.pending_invitations || []).filter(i => ['sent', 'pending', 'unconfirmed'].includes(i.status));
       m.myRole = m.grants.find(g => g.principal_id === m.me)?.role || null;
+      // F5: the roster read needs member+ (grant.ts list); at a project, a direct grant below member means that reach came
+      // from the workspace. The workspace id only builds the pointer link; a failed project read leaves the line unlinked.
+      if (scope === 'projects' && !(RANK[m.myRole] >= RANK.member)) {
+        m.fromWorkspace = true;
+        try { m.workspaceId = (await ctx.api(`/v2/projects/${ctx.enc(id)}`))?.project?.workspace_id || null; } catch { m.workspaceId = null; }
+      }
       // P0 12:30: people, not ids — the signed-in account's own email (the only one the service exposes today).
       m.myEmail = ctx.accountEmail ? await ctx.accountEmail().catch(() => '') || '' : await readAccountEmail({ demo: !!ctx.demo });
     } catch (e) { m.status = classify(e); m.error = e; }
@@ -78,10 +89,12 @@ export const permissions = {
     if (m.status === 'not_found') return `<section class="panel narrow" data-permissions data-permissions-state="not-found"><p class="eyebrow">Permissions</p><h2>${esc(NOT_AVAILABLE)}</h2><p class="muted">Nothing to show here.</p>${status}</section>`;
     if (m.status === 'unauthenticated') return `<section class="panel narrow" data-permissions data-permissions-state="unauthenticated">${head}<p class="small muted" role="alert">Your sign-in is no longer active. <a href="/v2/auth/access">Sign in again</a></p>${status}</section>`;
     if (m.status !== 'loaded') return `<section class="panel narrow" data-permissions data-permissions-state="failed">${head}<p class="small muted" role="alert">Could not load permissions. <a href="#" data-retry="grants">Retry</a></p>${status}</section>`;
-    const owner = m.myRole === 'owner', member = m.myRole === 'member' || owner, busy = m.busy ? 'disabled' : '';
+    // F5: a workspace-only caller at a project is never offered Invite, Revoke invitation, Remove or role changes here.
+    const owner = !m.fromWorkspace && m.myRole === 'owner', member = !m.fromWorkspace && (m.myRole === 'member' || owner), busy = m.busy ? 'disabled' : '';
+    const fromWorkspace = m.fromWorkspace ? `<p class="small" data-permissions-from-workspace>${esc(FROM_WORKSPACE_NOTE)}${m.workspaceId ? ` <a href="#permissions/workspaces/${esc(ctx.enc ? ctx.enc(m.workspaceId) : encodeURIComponent(m.workspaceId))}" data-workspace-permissions-link>${esc(FROM_WORKSPACE_LINK)}</a>` : ''}</p>` : '';
     const canTouch = g => g.role !== 'owner' && (owner || RANK[g.role] <= RANK.member); // D3 ceiling; owners never removed/demoted
     // Member list component (ui/v3/components/member-list.js): name + email, "You" for self, never the principal id.
-    const actions = g => { const rc = m.receipts[g.id]; return `${g.role === 'owner' ? '<span class="muted">Owner — only a transfer changes this</span>' : member && canTouch(g) ? `${owner ? `<select data-role-for="${esc(g.id)}" aria-label="New role" ${busy}><option value="" selected disabled>${esc(CHANGE_TO)}</option>${ROLES.filter(r => r !== g.role).map(r => `<option value="${r}">${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}" ${busy}>Preview role change</button> ` : ''}<button type="button" class="quiet" data-revoke="${esc(g.id)}" ${busy}>Remove</button>` : `<span class="muted">Members manage viewers and members only</span>`}${rc ? learnMore(`<p class="small muted">receipt ${esc(rc.receipt)} · trace ${esc(rc.trace)}</p>`, { summary: 'Details' }) : ''}`; };
+    const actions = g => { const rc = m.receipts[g.id]; return `${g.role === 'owner' ? '<span class="muted">Owner — only a transfer changes this</span>' : member && canTouch(g) ? `${owner ? `<select data-role-for="${esc(g.id)}" aria-label="New role" ${busy}><option value="" selected disabled>${esc(CHANGE_TO)}</option>${ROLES.filter(r => r !== g.role).map(r => `<option value="${r}">${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}" ${busy}>Preview role change</button> ` : ''}<button type="button" class="quiet" data-revoke="${esc(g.id)}" ${busy}>Remove</button>` : m.fromWorkspace ? '' : `<span class="muted">Members manage viewers and members only</span>`}${rc ? learnMore(`<p class="small muted">receipt ${esc(rc.receipt)} · trace ${esc(rc.trace)}</p>`, { summary: 'Details' }) : ''}`; };
     const roster = memberList(esc, m.grants, { me: m.me, myEmail: m.myEmail, actions, rowAttr: g => `data-grant-row="${esc(g.id)}"`, empty: 'No grants listed.', note: false });
     const namesNote = membersHidden(m.grants, { me: m.me, myEmail: m.myEmail }) ? `<p class="small muted" data-member-note>${esc(NO_EMAIL_NOTE)}</p>` : '';
     const pending = m.pending.length ? `<p class="eyebrow" style="margin-top:18px">Pending invitations</p><ul class="small" data-pending>${m.pending.map(i => `<li data-invitation="${esc(i.id)}">${esc(i.role)}${i.created_at ? ` · invited ${esc(shortDate(i.created_at))}` : ''}${m.invitees?.[i.id] ? ` · ${esc(m.invitees[i.id])}` : ''}${i.status === 'unconfirmed' ? ` · ${esc(UNCONFIRMED_NOTE)}` : ''}${member && (owner || RANK[i.role] <= RANK.member) ? ` ${m.askRevoke === i.id ? `<span data-revoke-ask="${esc(i.id)}">${esc(REVOKE_ASK)} <button type="button" class="small" data-revoke-invitation-confirm="${esc(i.id)}" ${busy}>Revoke</button> <button type="button" class="quiet small" data-revoke-invitation-cancel ${busy}>Cancel</button></span>` : `<button type="button" class="quiet small" data-revoke-invitation="${esc(i.id)}" ${busy}>Revoke invitation</button>`}` : ''}</li>`).join('')}</ul>` : ''; // B30: no pending → nothing (not another line)
@@ -96,7 +109,7 @@ export const permissions = {
     const transferForm = /data-member-picker-empty/.test(picker) ? picker : `<form data-transfer-form><p class="small muted">Destructive: it cannot be undone from here.</p>${picker}<label class="small"><input type="checkbox" name="step_down"> Step down to member after the transfer</label><div class="actions"><button type="submit" ${busy}>Preview transfer</button></div></form>`;
     const transfer = owner ? `<details class="line" data-transfer${m.transferOpen || m.sheet?.kind === 'transfer_owner' ? ' open' : ''}><summary>Transfer ownership</summary>${transferForm}</details>` : '';
     const sheet = m.sheet && !inviteSheet ? renderSheet(ctx, m.sheet, m.busy, m.scope) : '';
-    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}${roster}${pending}${invite}${transfer}${sheet}${status}${learnMore(`${namesNote}${member ? '<p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p>' : ''}<p class="small muted">Accepting an invitation happens from the mailed link; it is never done from this page.</p>`)}</section>`;
+    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}"${m.fromWorkspace ? ' data-from-workspace' : ''}>${head}${fromWorkspace}${roster}${pending}${invite}${transfer}${sheet}${status}${learnMore(`${namesNote}${member ? '<p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p>' : ''}<p class="small muted">Accepting an invitation happens from the mailed link; it is never done from this page.</p>`)}</section>`;
   },
   bind(ctx, root, m) {
     const base = `/v2/${SCOPE_SEG[m.scope]}/${ctx.enc(m.id)}`;
@@ -108,7 +121,7 @@ export const permissions = {
     const refresh = async () => {
       const fresh = await permissions.load(ctx, { scope: m.scope, id: m.id });
       Object.assign(m, { status: fresh.status, grants: fresh.grants, pending: fresh.pending,
-        me: fresh.me, myEmail: fresh.myEmail, myRole: fresh.myRole, error: fresh.error, busy: false });
+        me: fresh.me, myEmail: fresh.myEmail, myRole: fresh.myRole, fromWorkspace: fresh.fromWorkspace, workspaceId: fresh.workspaceId, error: fresh.error, busy: false });
       paint();
     };
     const receiptText = env => [env.receipt?.id ? `receipt ${env.receipt.id}` : '', env.trace_id ? `trace ${env.trace_id}` : ''].filter(Boolean).join(' · '); // B31: shown only behind Details

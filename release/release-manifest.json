@@ -1,23 +1,25 @@
 {
-  "version": "0.35.3",
+  "version": "0.35.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "aeb78c2ccd2f82332f565edab9d0970face8ae2c",
+  "cookbook_commit": "b23cc0275710721574b8d4e4b2c83d201fc8c6d9",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.3.md",
-      "blob_sha": "51867e371b501e30ef8ff096b0b22ef7b697bdf2",
-      "sha256": "a4056596dfac870da7922e97c44ba8900a5b873409c45ebac2706c46394a81e7"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.4.md",
+      "blob_sha": "3bcb18f630ffcd2dfbb870f963d891cdc68e0cd0",
+      "sha256": "05bbf4d08f4f30de5b4f625825f8081a153affc07d3edb7133a187f0ec9b3982"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "9c9dd6effeede4f55f8a2cc4366984151ef3d278",
-      "sha256": "a0455aec379fe8cd3a245b056020a6d76609282d0ef5a2c7976e20f0fc75d776"
+      "blob_sha": "e1f123c808179d12cdf5daa8f4058c800da220da",
+      "sha256": "0dfed73302dd123d81f0b11b598cd8b44fe95958c8f14f6043ccaf1bdaa252c2"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Permissions: inviting someone to one project, or revoking an invitation there, now needs your own role on that project. A role that comes only from the project's workspace is refused with a hint to invite at the workspace instead, so removing someone from a workspace also ends any project access they handed on. People with no role at the project still see \"not found\"; workspace invitations are unchanged."
+        "Permissions page for a project: if your role there comes only from the workspace, the page no longer offers Invite or Revoke invitation (the server refuses both since 0.35.3) and one line points you to the workspace's permissions instead.",
+        "Invitations: a project invitation can be accepted only while the person who sent it still has their own role on that project (member or above). Invitations sent from a workspace-only role before 0.35.3, or by someone since removed from the project, are no longer honoured; workspace invitations are unchanged.",
+        "API contract: the roles text for cap.grant.invite and cap.grant.revoke_invitation now says project scope needs a direct project grant."
       ]
     }
   }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { permissions, APPLIES, CHANGE_TO, PICK_ROLE, NO_TRANSFER_TARGET, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, REVOKE_ASK, TEST_ADDRESS_NOTE, inviteOutcome } from './permissions.js';
+import { permissions, APPLIES, CHANGE_TO, PICK_ROLE, NO_TRANSFER_TARGET, NOT_AVAILABLE, VIEWER_NOTE, DUPLICATE_NOTE, PREVIEW_AGAIN, REVOKE_ASK, TEST_ADDRESS_NOTE, FROM_WORKSPACE_NOTE, FROM_WORKSPACE_LINK, inviteOutcome } from './permissions.js';
 import { shortDate } from './cards.js';
 
 const read = n => readFileSync(fileURLToPath(new URL(n, import.meta.url)), 'utf8');
@@ -382,4 +382,42 @@ test('DoD 4 polish (k0021): change-role select starts on "Change to…", lists o
   assert.ok(sel.startsWith(`<option value="" selected disabled>${CHANGE_TO}</option>`)); assert.doesNotMatch(sel, /value="member"/); assert.match(sel, /value="viewer"/); assert.match(sel, /value="owner"/);
   x.root.els['data-role-for=g_mem'] = { value: '' }; await x.click('data-change-role="g_mem"');
   assert.ok(x.root.html.includes(PICK_ROLE)); assert.equal(x.calls.filter(c => c.method === 'PATCH').length, 0);
+});
+
+// F5 (ASK L1 option 1): at a project, invite / revoke_invitation need a direct project grant; a workspace-only caller sees why.
+async function mountProject(mine, project = { project: { id: 'p1', workspace_id: 'w 1' } }) {
+  const r = roster(mine); if (mine === null) r.grants = r.grants.filter(g => g.id !== 'g_me');
+  const { api, apiFull, calls } = fakeApi({ 'GET /v2/project/p1/grants': r, ...(project ? { 'GET /v2/projects/p1': project } : {}) });
+  const ctx = { api, apiFull, esc, enc: encodeURIComponent, state: { principal: { id: 'me' } } };
+  const m = await permissions.load(ctx, { scope: 'projects', id: 'p1' }); const root = makeRoot(permissions.render(ctx, m)); permissions.bind(ctx, root, m);
+  return { ctx, m, root, calls };
+}
+test('F5 project, role only from the workspace (no direct grant, or a direct viewer): no Invite, Revoke invitation, Remove or role change; one line points to the workspace', async () => {
+  for (const mine of [null, 'viewer']) {
+    const x = await mountProject(mine);
+    assert.equal(x.m.fromWorkspace, true, String(mine)); assert.equal(x.m.workspaceId, 'w 1');
+    assert.match(x.root.html, /data-from-workspace/);
+    assert.ok(x.root.html.includes(esc(FROM_WORKSPACE_NOTE)));
+    assert.match(x.root.html, new RegExp(`href="#permissions/workspaces/w%201" data-workspace-permissions-link>${FROM_WORKSPACE_LINK}<`));
+    assert.doesNotMatch(x.root.html, /data-invite-form|data-revoke-invitation|data-revoke=|data-change-role|data-transfer|Members manage viewers/, String(mine));
+    assert.match(x.root.html, /data-grant-row="g_mem"/); assert.match(x.root.html, /data-invitation="inv_p"/); // roster and pending still readable
+  }
+});
+test('F5 project, workspace-only caller whose project read fails: the line stays, unlinked; direct project member keeps Invite and Revoke', async () => {
+  const x = await mountProject(null, null);
+  assert.equal(x.m.workspaceId, null); assert.ok(x.root.html.includes(esc(FROM_WORKSPACE_NOTE))); assert.doesNotMatch(x.root.html, /data-workspace-permissions-link|data-invite-form/);
+  for (const mine of ['member', 'owner']) {
+    const d = await mountProject(mine);
+    assert.equal(d.m.fromWorkspace, false); assert.doesNotMatch(d.root.html, /data-from-workspace|data-permissions-from-workspace/);
+    assert.match(d.root.html, /data-invite-form/); assert.match(d.root.html, /data-revoke-invitation="inv_p"/);
+    assert.equal(d.calls.filter(c => c.url === '/v2/projects/p1').length, 0, 'no extra read for a direct member');
+  }
+});
+test('F5 workspace and assessment scopes never show the workspace pointer', async () => {
+  for (const [scope, seg] of [['workspaces', 'workspace'], ['assessments', 'assessment']]) {
+    const { api, apiFull } = fakeApi({ [`GET /v2/${seg}/s1/grants`]: { grants: [], pending_invitations: [] } });
+    const ctx = { api, apiFull, esc, enc: encodeURIComponent, state: { principal: { id: 'me' } } };
+    const m = await permissions.load(ctx, { scope, id: 's1' });
+    assert.equal(m.fromWorkspace, false, scope); assert.doesNotMatch(permissions.render(ctx, m), /data-permissions-from-workspace/);
+  }
 });
