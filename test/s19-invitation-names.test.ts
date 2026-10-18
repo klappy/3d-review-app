@@ -81,6 +81,8 @@ describe("S19: cap.me.invitations names what you accept", () => {
     expect((await mine(mk("usr_o"), {})).result.invitations).toEqual([]);
 
     // Token path unchanged: the link's dry run still discloses no name (possibly signed out on arrival; no email-matched list).
+    // The inviter holds a direct grant on the project, as cap.grant.invite requires (accept re-checks it since 0.35.4, F3).
+    await run('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)', "g_s19_lone", "usr_o", "project", "proj_lone", "owner", at);
     await inv("inv_11_tok", "project", "proj_lone", me, "member", "sent", later, await sha256("tok_s19_link"));
     const dry = await accept(mk("usr_i"), { token: "tok_s19_link" }, { dryRun: true });
     expect(dry.impact!.affected[0]).toMatchObject({ scope: { type: "project", id: "proj_lone" }, role: "member" });

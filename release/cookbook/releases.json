@@ -1,7 +1,19 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.3",
+  "current": "0.35.4",
   "versions": [
+    {
+      "version": "0.35.4",
+      "status": "candidate",
+      "notes_path": "releases/0.35.4.md",
+      "sections": {
+        "fixed": [
+          "Permissions page for a project: if your role there comes only from the workspace, the page no longer offers Invite or Revoke invitation (the server refuses both since 0.35.3) and one line points you to the workspace's permissions instead.",
+          "Invitations: a project invitation can be accepted only while the person who sent it still has their own role on that project (member or above). Invitations sent from a workspace-only role before 0.35.3, or by someone since removed from the project, are no longer honoured; workspace invitations are unchanged.",
+          "API contract: the roles text for cap.grant.invite and cap.grant.revoke_invitation now says project scope needs a direct project grant."
+        ]
+      }
+    },
     {
       "version": "0.35.3",
       "status": "candidate",

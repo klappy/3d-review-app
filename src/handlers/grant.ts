@@ -212,6 +212,12 @@ export const accept: Handler = async (ctx, p, o) => {
   if (inv.role === "owner") {
     const inviter = await ctx.db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind(inv.created_by, scope.type, scope.id).first<{ role: string }>();
     if (inviter?.role !== "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this owner invitation was not issued by a direct owner of this scope", "ask a direct owner for a new invitation");
+  } else if (scope.type === "project") {
+    // ASK L1 default 1, follow-up F3: a project invitation is honoured only while its inviter still holds a DIRECT project
+    // grant (member or above) — the same rule invite applies (directAtProject). Rows minted from an inherited workspace role
+    // before that rule, or by someone since removed from the project, stop being acceptable instead of waiting out the TTL.
+    const inviter = await ctx.db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind(inv.created_by, scope.type, scope.id).first<{ role: string }>();
+    if (!atLeast((inviter?.role as Role) ?? null, "member")) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this project invitation was not issued by a direct member of this project", "ask a direct project member for a new invitation, or ask to be invited to the workspace");
   }
   const existing = await roleAt(ctx, scope.type, scope.id);
   const impact = { affected: [{ scope, role: inv.role, currently: existing ?? "none" }], irreversible: true, effect: "disclosure" as const, compensating_control: "cap.grant.revoke (what was seen stays seen)" };
