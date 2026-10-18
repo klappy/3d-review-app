@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.19",
+  "current": "0.35.20",
   "versions": [
+    {
+      "version": "0.35.20",
+      "status": "candidate",
+      "notes_path": "releases/0.35.20.md",
+      "sections": {
+        "fixed": [
+          "Ownership and roles: if the invitations that stepping down or lowering someone's role would cancel are swapped for others after the preview (same number, different invitations), confirming no longer applies it; the owner is asked to preview again. An owner who loses their owner role at the moment they confirm a transfer is told they are no longer authorized, instead of being asked to preview again."
+        ]
+      }
+    },
     {
       "version": "0.35.19",
       "status": "candidate",

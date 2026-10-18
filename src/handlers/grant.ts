@@ -92,10 +92,16 @@ const orphanedWhere = (holder: string, scopeT: string, scopeI: string, now: stri
   `o.created_by = ${holder} AND o.scope_type = ${scopeT} AND o.scope_id = ${scopeI} AND o.status IN ('sent','pending','unconfirmed')`
   + ` AND ${unexpired("o", now)} AND NOT `
   + (after === undefined ? inviterStands("o") : `((o.role <> 'owner' AND o.scope_type <> 'project') OR ${roleBacks("o.role", `COALESCE(${after}, '')`)})`);
-async function countOrphaned(ctx: Ctx, holder: string, scope: Scope, after: Role | null): Promise<number> {
-  return (await ctx.db.prepare(`SELECT COUNT(*) AS n FROM invitation o WHERE ${orphanedWhere("?1", "?2", "?3", "?4", "?5")}`)
-    .bind(holder, scope.type, scope.id, nowIso(ctx), after).first<{ n: number }>())?.n ?? 0;
+/** 0.35.20 (cookbook work/active/2026-10-18-3d-grant-noop-followups-5 DoD (b)): the ids (sorted) of the invitations a change
+ *  to `after` would revoke, so a preview binds the id set, not only its count. `orphanedNow` is the same set as one SQL string,
+ *  read inside the guarded write, so a same-count swap between the token check and the write changes no row. */
+async function orphanedIds(ctx: Ctx, holder: string, scope: Scope, after: Role | null): Promise<string[]> {
+  const r = await ctx.db.prepare(`SELECT o.id FROM invitation o WHERE ${orphanedWhere("?1", "?2", "?3", "?4", "?5")} ORDER BY o.id`)
+    .bind(holder, scope.type, scope.id, nowIso(ctx), after).all<{ id: string }>();
+  return (r.results ?? []).map((x) => x.id);
 }
+const orphanedNow = (holder: string, scopeT: string, scopeI: string, now: string, after: string) =>
+  `COALESCE((SELECT group_concat(o.id, ',' ORDER BY o.id) FROM invitation o WHERE ${orphanedWhere(holder, scopeT, scopeI, now, after)}), '')`;
 /** `afterWrite`: the sweep rides a guarded grant write as the next statement of its batch, and runs only when that write
  *  changed a row (SQLite changes() = the statement just before it in the batch; 0.35.14, cookbook
  *  work/active/2026-10-18-3d-grant-write-guard-followups DoD (a)). A refused write therefore sweeps no invitation either. */
@@ -422,13 +428,16 @@ export const update_role: Handler = async (ctx, p, o) => {
     return { result: { grant: gid, role, noop: true }, noop: true as const, scope, priorState: { role }, impact: noopImpact() };
   };
   const firstReadNoop = g.role === role;
+  const sweptIds = downgrade && !firstReadNoop ? await orphanedIds(ctx, g.principal_id, scope, role) : [];
   const impact: Impact & { revoked_invitations: number } = firstReadNoop ? noopImpact() : { affected: [{ grant: gid, from: g.role, to: role }], irreversible: ROLE_RANK[role] > ROLE_RANK[g.role as Role], effect: "disclosure" as const, compensating_control: "demotion via this capability (what was seen stays seen)",
-    revoked_invitations: downgrade ? await countOrphaned(ctx, g.principal_id, scope, role) : 0 };
+    revoked_invitations: sweptIds.length };
   // 0.35.17 DoD (a): the preview binds the role it read into the confirm token; an execute that reads another role (a no-op
   // preview whose target was lowered in between would otherwise run as an elevation) is refused and asks for a new dry_run.
   // 0.35.19 (cookbook work/active/2026-10-18-3d-grant-noop-followups-4 DoD (b)): the revoked_invitations count the preview
   // showed is bound too, so an execute after the holder's open invitations changed asks for a new dry_run.
-  const read = { role: g.role, revoked_invitations: impact.revoked_invitations };
+  // 0.35.20 (cookbook work/active/2026-10-18-3d-grant-noop-followups-5 DoD (b)): the swept invitation id set is bound, not
+  // only its count (a same-count swap is refused), and re-checked inside the UPDATE below.
+  const read = { role: g.role, revoked_invitations: impact.revoked_invitations, revoked_invitation_ids: sweptIds };
   if (o?.dryRun) return { result: firstReadNoop ? { noop: true } : {}, scope, impact, confirmState: read };
   await requireConfirmedState(o, read, "cap.grant.update_role");
   // 0.35.12 (cookbook work/active/2026-10-18-3d-grant-owner-guard-race DoD (a)): the owner check above read the row before
@@ -438,13 +447,20 @@ export const update_role: Handler = async (ctx, p, o) => {
   // to owner) in the same WHERE, so a role changed in between, or a caller demoted in between, changes no row. Refused → no
   // row changed: the orphan sweep runs only when this UPDATE wrote its row (revokeOrphaned afterWrite, 0.35.14 DoD (a)), and
   // the typed refusal for the state the re-read finds (refuseGrantWrite).
+  const sweepCheck = downgrade && !firstReadNoop;
+  const binds: unknown[] = [role, gid, g.role, ctx.principal.id, scope.type, scope.id];
+  if (sweepCheck) binds.push(g.principal_id, nowIso(ctx), sweptIds.join(","));
   const stmts = [ctx.db.prepare(`UPDATE "grant" SET role = ?1 WHERE id = ?2 AND role = ?3 AND (role <> 'owner' OR ?1 = 'owner')`
-    + ` AND ${callerHolds("?4", "?5", "?6", "'owner'")} AND (?1 <> 'owner' OR ${callerHolds("?4", "?5", "?6", "'owner'", true)})`)
-    .bind(role, gid, g.role, ctx.principal.id, scope.type, scope.id)];
+    + ` AND ${callerHolds("?4", "?5", "?6", "'owner'")} AND (?1 <> 'owner' OR ${callerHolds("?4", "?5", "?6", "'owner'", true)})`
+    + (sweepCheck ? ` AND ${orphanedNow("?7", "?5", "?6", "?8", "?1")} = ?9` : ""))
+    .bind(...binds)];
   if (downgrade) stmts.push(revokeOrphaned(ctx, g.principal_id, scope, true));
   const res = await ctx.db.batch(stmts);
   if ((res[0].meta.changes ?? 0) !== 1) {
     const live = await reReadGrantWrite(ctx, scope, gid, "update_role", role);
+    // 0.35.20 DoD (b): the role still reads as previewed and the caller still holds it, so the swept invitation set moved.
+    if (sweepCheck && live.now === g.role && (await orphanedIds(ctx, g.principal_id, scope, role)).join(",") !== sweptIds.join(","))
+      throw new CapError("CONFIRM_REQUIRED", "the invitations this change would revoke changed since the dry_run preview", "Call dry_run again and confirm the new preview.", "cap.grant.update_role");
     if (live.now !== role) refuseGrantWrite(live, "update_role", role, g.role as Role);
     // 0.35.14 DoD (d): the grant already holds the requested role, so the end state stands and there is no conflict. 0.35.15
     // (cookbook work/active/2026-10-18-3d-grant-noop-receipt-followups DoD (a)): this caller changed nothing, so the reply is a
@@ -536,29 +552,39 @@ export const transfer_owner: Handler = async (ctx, p, o) => {
   const stepDown = p.step_down === true;
   // Stepping down is a downgrade (owner → member): the caller's owner invitations here are revoked with it (orphanedWhere).
   const impact = { affected: [{ scope, current_owners: current.length, to, to_becomes: "owner", caller_becomes: stepDown ? "member" : "owner" }], irreversible: true, effect: "disclosure" as const, compensating_control: "transfer back (requires the new owner)",
-    revoked_invitations: stepDown ? await countOrphaned(ctx, ctx.principal.id, scope, "member") : 0 };
+    revoked_invitations: 0 };
+  const sweptIds = stepDown ? await orphanedIds(ctx, ctx.principal.id, scope, "member") : [];
+  impact.revoked_invitations = sweptIds.length;
   // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (a)): the preview binds the owner set it read and the
   // recipient's direct role here into the confirm token; an execute that reads either changed is refused (CONFIRM_REQUIRED).
   // 0.35.19 (cookbook work/active/2026-10-18-3d-grant-noop-followups-4 DoD (b)): the revoked_invitations count it showed too.
   const to_role = (await ctx.db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind(to, scope.type, scope.id).first<{ role: Role }>())?.role ?? null;
   const ownerSet = [...current].sort();
-  const read = { owners: ownerSet, to_role, revoked_invitations: impact.revoked_invitations };
+  // 0.35.20 (cookbook work/active/2026-10-18-3d-grant-noop-followups-5 DoD (b)): the swept invitation id set, not only its count.
+  const read = { owners: ownerSet, to_role, revoked_invitations: impact.revoked_invitations, revoked_invitation_ids: sweptIds };
   if (o?.dryRun) return { result: {}, scope, impact, confirmState: read };
   await requireConfirmedState(o, read, "cap.grant.transfer_owner");
   // 0.35.19 DoD (a): the token check above read the state before this batch, so the write re-checks it in its own WHERE (as
   // update_role does): the owner set, the recipient's direct role and the caller's DIRECT owner grant must still be what was
   // read. A changed state writes no row; the step-down and its orphan sweep ride on changes() = 1, so they write nothing either.
-  const ownersNow = `COALESCE((SELECT group_concat(principal_id, ',') FROM (SELECT principal_id FROM "grant" WHERE scope_type = ?3 AND scope_id = ?4 AND role = 'owner' ORDER BY principal_id)), '')`;
+  // 0.35.20 DoD (a): the aggregate orders its own input (SQLite ≥ 3.44), so the string never rests on a subquery's order.
+  const ownersNow = `COALESCE((SELECT group_concat(principal_id, ',' ORDER BY principal_id) FROM "grant" WHERE scope_type = ?3 AND scope_id = ?4 AND role = 'owner'), '')`;
   const toRoleNow = `COALESCE((SELECT role FROM "grant" WHERE principal_id = ?2 AND scope_type = ?3 AND scope_id = ?4), '')`;
   const stmts = [ctx.db.prepare(`INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) SELECT ?1, ?2, ?3, ?4, 'owner', ?5`
     + ` WHERE ${ownersNow} = ?6 AND ${toRoleNow} = ?7 AND ${callerHolds("?8", "?3", "?4", "'owner'", true)}`
+    + (stepDown ? ` AND ${orphanedNow("?8", "?3", "?4", "?5", "'member'")} = ?9` : "")
     + ` ON CONFLICT(principal_id, scope_type, scope_id) DO UPDATE SET role = 'owner'`)
-    .bind(newId("grant"), to, scope.type, scope.id, nowIso(ctx), ownerSet.join(","), to_role ?? "", ctx.principal.id)];
+    .bind(...[newId("grant"), to, scope.type, scope.id, nowIso(ctx), ownerSet.join(","), to_role ?? "", ctx.principal.id, ...(stepDown ? [sweptIds.join(",")] : [])])];
   if (stepDown) stmts.push(ctx.db.prepare('UPDATE "grant" SET role = ? WHERE principal_id = ? AND scope_type = ? AND scope_id = ? AND changes() = 1').bind("member", ctx.principal.id, scope.type, scope.id), // an owner remains (to), so the last-owner rule holds
     revokeOrphaned(ctx, ctx.principal.id, scope, true));
   const res = await ctx.db.batch(stmts);
-  if ((res[0].meta.changes ?? 0) !== 1)
+  if ((res[0].meta.changes ?? 0) !== 1) {
+    // 0.35.20 (cookbook work/active/2026-10-18-3d-grant-noop-followups-5 DoD (c)): re-read the caller first: one who lost the
+    // DIRECT owner grant in the window is refused for that (as the read-time check says), not asked for a new preview.
+    await callerAt(ctx, scope, "owner");
+    await directRoleAt(ctx, scope.type, scope.id, "owner", "your owner role is inherited from the workspace — a direct project owner runs this step");
     throw new CapError("CONFIRM_REQUIRED", "the target changed since the dry_run preview", "Call dry_run again and confirm the new preview.", "cap.grant.transfer_owner");
+  }
   impact.revoked_invitations = stepDown ? res[2].meta.changes ?? 0 : 0;
   ctx.log("grant.transfer_owner", { step_down: stepDown, revoked_invitations: impact.revoked_invitations });
   return { result: { transferred: true, scope, new_owner: to, caller_role: stepDown ? "member" : "owner" }, scope, impact };

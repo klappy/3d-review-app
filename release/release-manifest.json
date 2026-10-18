@@ -1,23 +1,23 @@
 {
-  "version": "0.35.19",
+  "version": "0.35.20",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "3f28c36834eccb95f86fc3e10e97a56eb8ed78d3",
+  "cookbook_commit": "c73f74fc8ce42b0f66d3b4e3c62294f8c1c66f74",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.19.md",
-      "blob_sha": "40a01166eaa5c2b7b158d75f5ac6491282122dde",
-      "sha256": "f1d98f225fc3b726e51c33b1705eaa2b82de3538a2791472fd937f78c772526f"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.20.md",
+      "blob_sha": "59c46ea45e4ce2a81d5acbb2efdd3098ce8e97a9",
+      "sha256": "458346895fc63258c66fb5b3d342af3734a1d05478bd8c7ec930c8a8c8f68b1c"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "554953154d75764efe574ab53dbaf2d6a641699e",
-      "sha256": "a02fec1bc717bcd9ffd4bfc1b86330cbc02d4d57e6d95d5022eec35f22cc0bd8"
+      "blob_sha": "5adef5856cbe35414a37a763975b5ab490be7bca",
+      "sha256": "ffafed362e4a272a89df50810b05aebc3e9dde4431f557abaaaffc3910937608"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Ownership and template publishing: if the state an owner previewed for an ownership transfer changes in the moment before it is written, or the invitations that stepping down would cancel change after the preview, confirming no longer applies it; they are asked to preview again. Two template versions published at the same moment no longer fail with an internal error; the second is told to preview again."
+        "Ownership and roles: if the invitations that stepping down or lowering someone's role would cancel are swapped for others after the preview (same number, different invitations), confirming no longer applies it; the owner is asked to preview again. An owner who loses their owner role at the moment they confirm a transfer is told they are no longer authorized, instead of being asked to preview again."
       ]
     }
   }

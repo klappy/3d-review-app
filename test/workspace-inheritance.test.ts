@@ -1080,7 +1080,8 @@ describe("confirm binds hold to the write; stale refusals; publish conflict (0.3
         await db.prepare("INSERT INTO survey_template (id, version, name, perspective, items_json, scoring_json, published_at) VALUES (?,?,?,?,?,?,?)").bind("tpl_n4r", 1, "T", "translator", "[]", "{}", at).run(); return r; } }; } };
     } };
     const ctx = { ...mk(racing, "n4_sup", "support") } as any;
-    await expect(publishVersion(ctx, params, { dryRun: false })).rejects.toMatchObject({ code: "STAGE_CONFLICT" });
+    // 0.35.20 (cookbook work/active/2026-10-18-3d-grant-noop-followups-5 DoD (d)): the conflict names its docs topic
+    await expect(publishVersion(ctx, params, { dryRun: false })).rejects.toMatchObject({ code: "STAGE_CONFLICT", docs: "cap.template.publish_version" });
   });
 
   it("template.publish_version: a lost race whose D1 error carries the constraint only in `cause` or as SQLITE_CONSTRAINT is still STAGE_CONFLICT (Bugbot 4308744033)", async () => {
@@ -1128,9 +1129,112 @@ describe("confirm binds hold to the write; stale refusals; publish conflict (0.3
   it("assessment.delete: a stale preview is refused (DoD (c))", async () => {
     const po = mk(db, "n4_po"); const params = { id: "asm_n4" };
     const d = await dry(po, "cap.assessment.delete", params); expect(d.error).toBeUndefined();
-    await db.prepare("INSERT INTO assessment_survey (id, assessment_id, template_id, template_version, created_at) VALUES (?,?,?,?,?)").bind("as_n4", "asm_n4", "tpl_n4", 1, at).run();
+    // 0.35.20 (cookbook work/active/2026-10-18-3d-grant-noop-followups-5 DoD (f)): seeds its own template row, so this test
+    // does not rest on the publish test having run first
+    await db.prepare("INSERT OR IGNORE INTO survey_template (id, version, name, perspective, items_json, scoring_json, published_at) VALUES (?,?,?,?,?,?,?)").bind("tpl_n4asm", 1, "T", "translator", "[]", "{}", at).run();
+    await db.prepare("INSERT INTO assessment_survey (id, assessment_id, template_id, template_version, created_at) VALUES (?,?,?,?,?)").bind("as_n4", "asm_n4", "tpl_n4asm", 1, at).run();
     const env = await exec(po, "cap.assessment.delete", params, d);
     expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
     expect(await db.prepare("SELECT id FROM assessment WHERE id = 'asm_n4'").first()).toBeTruthy();
+  });
+});
+
+// 0.35.20 (cookbook work/active/2026-10-18-3d-grant-noop-followups-5): the 543 review follow-ups.
+describe("owner set ordered in the aggregate; swept invitation ids bound; lost owner in the window (0.35.20)", () => {
+  const now = new Date("2026-10-18T22:00:00.000Z"); const at = now.toISOString();
+  let trace = 0;
+  const mk = (db: any, id: string, kind = "user"): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db,
+    principal: { kind, id, provisioned: true } as any, traceId: `tr_n5_${++trace}`, now: () => now, log: () => {} } as any);
+  let db: any;
+  const grant = (id: string, p: string, s: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", s, r, at).run();
+  const invite = (id: string, scopeId: string, by: string, role: string) => db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+    .bind(id, "project", scopeId, `n5_nobody_${id}`, id, role, "sent", by, at).run();
+  const revokeInv = (id: string) => db.prepare("UPDATE invitation SET status = 'revoked' WHERE id = ?").bind(id).run();
+  const roleOf = async (p: string, s: string) => (await db.prepare(`SELECT role FROM "grant" WHERE principal_id = ? AND scope_id = ?`).bind(p, s).first())?.role;
+  const statusOf = async (id: string) => (await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first())?.status;
+  const dry = (ctx: Ctx, cap: string, params: any) => execute(ctx, cap, params, { tool: "danger", mode: "dry_run" }) as Promise<any>;
+  const exec = (ctx: Ctx, cap: string, params: any, d: any) => execute(ctx, cap, params, { tool: "danger", mode: "execute", confirm_token: d.result.confirm_token }) as Promise<any>;
+  /** A ctx whose first db.batch runs `race` first: the window between the token check (dispatch) and the write. */
+  const racingCtx = (id: string, race: () => Promise<unknown>) => {
+    let raced = false;
+    const r = { prepare: (s: string) => db.prepare(s), batch: async (stmts: any[]) => { if (!raced) { raced = true; await race(); } return db.batch(stmts); } };
+    return { ctx: { ...mk(r, id), env: { DB: r, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } } as any, raced: () => raced };
+  };
+  beforeAll(async () => {
+    db = await mf.getD1Database("DB");
+    const sql = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
+    if (!(await db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'principal'").first()))
+      await db.batch(sql("../migrations/0001_init.sql").split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)));
+    for (const id of ["n5_po", "n5_zo", "n5_ao", "n5_t", "n5_m"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    for (const p of ["prj_n5a", "prj_n5b", "prj_n5c", "prj_n5d", "prj_n5e", "prj_n5f"]) {
+      await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind(p, null, p, at, "n5_po").run();
+    }
+    // prj_n5a: two other direct owners inserted out of id order before the caller (rowid order ≠ sorted order)
+    await grant("n5g_zo_a", "n5_zo", "prj_n5a", "owner"); await grant("n5g_po_a", "n5_po", "prj_n5a", "owner"); await grant("n5g_ao_a", "n5_ao", "prj_n5a", "owner");
+    await grant("n5g_t_a", "n5_t", "prj_n5a", "member");
+    for (const p of ["prj_n5b", "prj_n5c", "prj_n5d", "prj_n5e", "prj_n5f"]) { await grant(`n5g_po_${p}`, "n5_po", p, "owner"); await grant(`n5g_t_${p}`, "n5_t", p, "member"); }
+  });
+
+  it("transfer_owner: dry_run → execute succeeds with three direct owners inserted out of order (DoD (a))", async () => {
+    const po = mk(db, "n5_po"); const params = { scope: "project", id: "prj_n5a", to: "n5_t" };
+    const d = await dry(po, "cap.grant.transfer_owner", params); expect(d.ok).toBe(true);
+    const ok = await exec(po, "cap.grant.transfer_owner", params, d);
+    expect(ok.ok).toBe(true);
+    expect(await roleOf("n5_t", "prj_n5a")).toBe("owner");
+  });
+
+  it("transfer_owner: a same-count swap of the swept invitations after the preview is refused (DoD (b))", async () => {
+    const po = mk(db, "n5_po"); const params = { scope: "project", id: "prj_n5b", to: "n5_t", step_down: true };
+    await invite("n5i_b1", "prj_n5b", "n5_po", "owner");
+    const d = await dry(po, "cap.grant.transfer_owner", params); expect(d.result.impact.revoked_invitations).toBe(1);
+    await revokeInv("n5i_b1"); await invite("n5i_b2", "prj_n5b", "n5_po", "owner");
+    const env = await exec(po, "cap.grant.transfer_owner", params, d);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect(await roleOf("n5_t", "prj_n5b")).toBe("member"); expect(await statusOf("n5i_b2")).toBe("sent");
+  });
+
+  it("transfer_owner: a same-count swap inside the write window writes nothing (DoD (b), in-write re-check)", async () => {
+    const params = { scope: "project", id: "prj_n5e", to: "n5_t", step_down: true };
+    await invite("n5i_e1", "prj_n5e", "n5_po", "owner");
+    const d = await dry(mk(db, "n5_po"), "cap.grant.transfer_owner", params); expect(d.result.impact.revoked_invitations).toBe(1);
+    const r = racingCtx("n5_po", async () => { await revokeInv("n5i_e1"); await invite("n5i_e2", "prj_n5e", "n5_po", "owner"); });
+    const env = await exec(r.ctx, "cap.grant.transfer_owner", params, d);
+    expect(r.raced()).toBe(true);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect(await roleOf("n5_t", "prj_n5e")).toBe("member"); expect(await roleOf("n5_po", "prj_n5e")).toBe("owner"); expect(await statusOf("n5i_e2")).toBe("sent");
+  });
+
+  it("update_role: a same-count swap of the swept invitations after the preview is refused (DoD (b))", async () => {
+    const po = mk(db, "n5_po"); const params = { scope: "project", id: "prj_n5c", gid: "n5g_t_prj_n5c", role: "viewer" };
+    await invite("n5i_c1", "prj_n5c", "n5_t", "viewer");
+    const d = await dry(po, "cap.grant.update_role", params); expect(d.result.impact.revoked_invitations).toBe(1);
+    await revokeInv("n5i_c1"); await invite("n5i_c2", "prj_n5c", "n5_t", "viewer");
+    const env = await exec(po, "cap.grant.update_role", params, d);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect(await roleOf("n5_t", "prj_n5c")).toBe("member"); expect(await statusOf("n5i_c2")).toBe("sent");
+  });
+
+  it("update_role: a same-count swap inside the write window writes nothing (DoD (b), in-write re-check)", async () => {
+    const params = { scope: "project", id: "prj_n5f", gid: "n5g_t_prj_n5f", role: "viewer" };
+    await invite("n5i_f1", "prj_n5f", "n5_t", "viewer");
+    const d = await dry(mk(db, "n5_po"), "cap.grant.update_role", params); expect(d.result.impact.revoked_invitations).toBe(1);
+    const r = racingCtx("n5_po", async () => { await revokeInv("n5i_f1"); await invite("n5i_f2", "prj_n5f", "n5_t", "viewer"); });
+    const env = await exec(r.ctx, "cap.grant.update_role", params, d);
+    expect(r.raced()).toBe(true);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect(await roleOf("n5_t", "prj_n5f")).toBe("member"); expect(await statusOf("n5i_f2")).toBe("sent");
+  });
+
+  it("transfer_owner: a caller demoted between the token check and the write gets NOT_AUTHORIZED_AT_SCOPE (DoD (c))", async () => {
+    const params = { scope: "project", id: "prj_n5d", to: "n5_t" };
+    const d = await dry(mk(db, "n5_po"), "cap.grant.transfer_owner", params); expect(d.ok).toBe(true);
+    const r = racingCtx("n5_po", async () => {
+      await grant("n5g_zo_d", "n5_zo", "prj_n5d", "owner");
+      await db.prepare(`UPDATE "grant" SET role = 'member' WHERE id = 'n5g_po_prj_n5d'`).run();
+    });
+    const env = await exec(r.ctx, "cap.grant.transfer_owner", params, d);
+    expect(r.raced()).toBe(true);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("NOT_AUTHORIZED_AT_SCOPE");
+    expect(await roleOf("n5_t", "prj_n5d")).toBe("member");
   });
 });

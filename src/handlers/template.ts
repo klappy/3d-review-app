@@ -44,7 +44,7 @@ export const publish_version: Handler = async (ctx,params,opts) => {
   try {
     await ctx.db.prepare("INSERT INTO survey_template (id, version, name, perspective, source_ref, items_json, scoring_json, rubric_ref, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id,version,name,perspective,source_ref,JSON.stringify(items),JSON.stringify(scoring),rubric_ref,at).run();
   } catch(e) {
-    if(isConstraintError(e)) throw new CapError("STAGE_CONFLICT",`version ${version} of this template was published at the same moment`,"call dry_run again to preview the next version");
+    if(isConstraintError(e)) throw new CapError("STAGE_CONFLICT",`version ${version} of this template was published at the same moment`,"call dry_run again to preview the next version","cap.template.publish_version");
     throw e;
   }
   return {result:{template:{id,version,name,perspective,source_ref,rubric_ref,published_at:at}},scope:{type:"platform",id},impact};
