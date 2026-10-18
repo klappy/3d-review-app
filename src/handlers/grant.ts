@@ -422,8 +422,17 @@ export const update_role: Handler = async (ctx, p, o) => {
     .bind(role, gid, g.role, ctx.principal.id, scope.type, scope.id)];
   if (downgrade) stmts.push(revokeOrphaned(ctx, g.principal_id, scope, true));
   const res = await ctx.db.batch(stmts);
-  // 0.35.14 DoD (d): refuseGrantWrite returns (no conflict) only when the grant already holds the requested role.
-  if ((res[0].meta.changes ?? 0) !== 1) await refuseGrantWrite(ctx, scope, gid, "update_role", role, g.role as Role);
+  if ((res[0].meta.changes ?? 0) !== 1) {
+    const live = await reReadGrantWrite(ctx, scope, gid, "update_role", role);
+    if (live.now !== role) refuseGrantWrite(live, "update_role", role, g.role as Role);
+    // 0.35.14 DoD (d): the grant already holds the requested role, so the end state stands and there is no conflict. 0.35.15
+    // (cookbook work/active/2026-10-18-3d-grant-noop-receipt-followups DoD (a)): this caller changed nothing, so the reply is a
+    // no-op: priorState and impact carry the live role (an undo built from them changes nothing) and the log line says noop,
+    // never crediting this caller with the other writer's change.
+    ctx.log("grant.update_role", { noop: true, downgrade: false, revoked_invitations: 0 });
+    return { result: { grant: gid, role, noop: true }, scope, priorState: { role },
+      impact: { ...impact, affected: [{ grant: gid, from: role, to: role }], irreversible: false, revoked_invitations: 0 } };
+  }
   impact.revoked_invitations = downgrade ? res[1].meta.changes ?? 0 : 0;
   ctx.log("grant.update_role", { downgrade, revoked_invitations: impact.revoked_invitations });
   return { result: { grant: gid, role }, scope, impact, priorState: { role: g.role } };
@@ -447,35 +456,40 @@ export const revoke: Handler = async (ctx, p) => {
   const [del, rev] = await ctx.db.batch([ctx.db.prepare(`DELETE FROM "grant" WHERE id = ?1 AND role <> 'owner'`
     + ` AND ${callerHolds("?2", "?3", "?4", `(CASE WHEN ${roleRank('"grant".role')} > ${ROLE_RANK.member} THEN 'owner' ELSE 'member' END)`)}`)
     .bind(gid, ctx.principal.id, scope.type, scope.id), revokeOrphaned(ctx, g.principal_id, scope, true)]);
-  if ((del.meta.changes ?? 0) !== 1) await refuseGrantWrite(ctx, scope, gid, "revoke");
+  if ((del.meta.changes ?? 0) !== 1) refuseGrantWrite(await reReadGrantWrite(ctx, scope, gid, "revoke"), "revoke");
   const revoked_invitations = rev.meta.changes ?? 0;
   ctx.log("grant.revoke", { revoked_invitations });
   return { result: { grant: gid, revoked: true, revoked_invitations }, scope };
 };
 
 /** update_role's and revoke's write refused inside its batch (0.35.12 DoD (a); 0.35.13 DoD (a), (b), (d)): re-run the
- *  read-time checks against the state as it is now and give the refusal they give, in the order the handler applies them —
- *  the caller's own authority first (no role → NOT_FOUND_OR_NOT_VISIBLE, too low → NOT_AUTHORIZED_AT_SCOPE, as callerAt /
- *  directRoleAt / ceiling say), then the target (gone → NOT_FOUND_OR_NOT_VISIBLE, an owner → the D3 refusal, a role other
- *  than the one update_role read → STAGE_CONFLICT). The D3 owner refusal is named only when the target IS an owner now.
- *  0.35.14 (cookbook work/active/2026-10-18-3d-grant-write-guard-followups DoD (d)): update_role's target already holding the
- *  requested role is no conflict (returns, the handler reports the role); a grant still visible that nothing above explains is
- *  STAGE_CONFLICT, never not-visible. Every other path throws. */
-async function refuseGrantWrite(ctx: Ctx, scope: Scope, gid: string, op: "update_role" | "revoke", to?: Role, read?: Role): Promise<void> {
+ *  read-time checks against the state as it is now, in the order the handler applies them — the caller's own authority first
+ *  (no role → NOT_FOUND_OR_NOT_VISIBLE, too low → NOT_AUTHORIZED_AT_SCOPE, as callerAt / directRoleAt say), then the target
+ *  (gone → NOT_FOUND_OR_NOT_VISIBLE). Returns the caller's role and the target's live role for refuseGrantWrite, or, for
+ *  update_role, for the no-op check (target already at the requested role, 0.35.14 DoD (d) / 0.35.15 DoD (a)). */
+async function reReadGrantWrite(ctx: Ctx, scope: Scope, gid: string, op: "update_role" | "revoke", to?: Role): Promise<{ caller: Role; now: Role }> {
   const caller = await callerAt(ctx, scope, op === "update_role" ? "owner" : "member");
   if (op === "update_role" && to === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
   const now = await ctx.db.prepare('SELECT role FROM "grant" WHERE id = ? AND scope_type = ? AND scope_id = ?').bind(gid, scope.type, scope.id).first<{ role: Role }>();
   if (!now) throw notVisible("grant");
+  return { caller, now: now.role };
+}
+/** The typed refusal for the state reReadGrantWrite found: an owner → the D3 refusal (named only when the target IS an owner
+ *  now), revoke's ceiling against the live role, update_role's target at a role other than the one it read → STAGE_CONFLICT;
+ *  a grant still visible that nothing above explains is STAGE_CONFLICT, never not-visible (0.35.14 DoD (d)). Always throws:
+ *  `never`, so the compiler proves both callers stop here (0.35.15 DoD (b)). update_role's no-op (already at `to`) is decided
+ *  by update_role before it calls this. */
+function refuseGrantWrite(live: { caller: Role; now: Role }, op: "update_role" | "revoke", to?: Role, read?: Role): never {
+  const { caller, now } = live;
   if (op === "update_role") {
-    if (now.role === "owner" && to !== "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be demoted", "D3 — transfer ownership instead (cap.grant.transfer_owner)");
-    if (now.role === to) return; // 0.35.14 DoD (d): the grant already holds the requested role — the end state stands, no conflict
-    if (now.role !== read) throw new CapError("STAGE_CONFLICT", `this grant's role changed from ${read} to ${now.role} while the change was being made`, "re-read the roster (cap.grant.list) and try again");
+    if (now === "owner" && to !== "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be demoted", "D3 — transfer ownership instead (cap.grant.transfer_owner)");
+    if (now !== read) throw new CapError("STAGE_CONFLICT", `this grant's role changed from ${read} to ${now} while the change was being made`, "re-read the roster (cap.grant.list) and try again");
   } else {
-    if (now.role === "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be removed", "D3 — last owner is protected; transfer ownership first");
-    ceiling(caller, now.role, "revoke grants");
+    if (now === "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be removed", "D3 — last owner is protected; transfer ownership first");
+    ceiling(caller, now, "revoke grants");
   }
   // 0.35.14 DoD (d): the grant is still visible and nothing above explains the refusal (the state moved and moved back between
-  // the write and this re-read): a conflict to retry, never "not found" for a grant the caller can see.
+  // the write and the re-read): a conflict to retry, never "not found" for a grant the caller can see.
   throw new CapError("STAGE_CONFLICT", "this grant changed while the change was being made", "re-read the roster (cap.grant.list) and try again");
 }
 /** The caller (bound `caller`) holds at least `min` (a SQL role expression) at the scope, read live inside a write (0.35.13
