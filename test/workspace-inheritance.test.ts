@@ -609,6 +609,34 @@ describe("workspace grouping cannot mint project ownership", () => {
     expect(await roleOf("ac_w")).toBe("member");
     expect(raised.result).toMatchObject({ granted: true, role: "member" });
   });
+  // 0.35.11 (cookbook work/active/2026-10-18-3d-invite-accept-stale-role DoD (a)-(b)): accept binds the offered role and the
+  // SQL keeps the max against the row at batch time, so a grant lowered or removed after accept's role read is not re-raised.
+  it("a demotion or removal between accept's role read and its batch is not re-raised by the upsert", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-18T10:50:00.000Z"); const at = now.toISOString();
+    let trace = 0;
+    const racing = (change: string) => ({ prepare: (q: string) => db.prepare(q), batch: async (st: any[]) => { await db.prepare(change).run(); return db.batch(st); } });
+    const mk = (id: string, d: any = db): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db: d, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_sr_${++trace}`, now: () => now, log: () => {} } as any);
+    for (const id of ["sr_po", "sr_d", "sr_r", "sr_k"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_sr", null, "prj_sr", at, "sr_po").run();
+    const grant = (id: string, p: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", "prj_sr", r, at).run();
+    await grant("srg_po", "sr_po", "owner"); await grant("srg_d", "sr_d", "owner"); await grant("srg_r", "sr_r", "owner"); await grant("srg_k", "sr_k", "owner");
+    const row = async (id: string, to: string) => { await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id, "project", "prj_sr", await sha256(to + "@example.invalid"), await sha256("tok_" + id), "member", "sent", "sr_po", at, "2026-10-24T00:00:00.000Z").run(); };
+    const rolesOf = async (p: string) => (await db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_id = ?').bind(p, "prj_sr").all<{ role: string }>()).results;
+    await row("inv_sr_d", "sr_d"); await row("inv_sr_r", "sr_r"); await row("inv_sr_k", "sr_k");
+    // owner demoted to viewer in the window; accepting a member invitation gives member, not owner again
+    const demoted = await accept(mk("sr_d", racing(`UPDATE "grant" SET role = 'viewer' WHERE id = 'srg_d'`)), { token: "tok_inv_sr_d" });
+    expect(await rolesOf("sr_d")).toEqual([{ role: "member" }]);
+    expect(demoted.result).toMatchObject({ granted: true, role: "member" });
+    // owner grant removed in the window; the accept mints the offered member role, not the stale owner
+    const removed = await accept(mk("sr_r", racing(`DELETE FROM "grant" WHERE id = 'srg_r'`)), { invitation_id: "inv_sr_r" });
+    expect(await rolesOf("sr_r")).toEqual([{ role: "member" }]);
+    expect(removed.result).toMatchObject({ granted: true, role: "member" });
+    // control: nothing lands in the window, an existing owner keeps owner and the result reports it
+    const kept = await accept(mk("sr_k", racing("SELECT 1")), { token: "tok_inv_sr_k" });
+    expect(await rolesOf("sr_k")).toEqual([{ role: "owner" }]);
+    expect(kept.result).toMatchObject({ granted: true, role: "owner" });
+  });
   // Dead invitations DoD (8): policy answers a participant session on the invitation link before the handler runs. That is
   // "sign in as the invited person" (retryable, the UI keeps the token), not the invitation's durable refusal.
   it("a participant session opening an invitation link gets NOT_AUTHENTICATED (retryable), not NOT_AUTHORIZED_AT_SCOPE", async () => {

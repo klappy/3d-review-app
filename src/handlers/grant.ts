@@ -287,18 +287,20 @@ export const accept: Handler = async (ctx, p, o) => {
   const existing = await roleAt(ctx, scope.type, scope.id);
   const impact = { affected: [{ scope, role: inv.role, currently: existing ?? "none" }], irreversible: true, effect: "disclosure" as const, compensating_control: "cap.grant.revoke (what was seen stays seen)" };
   if (o?.dryRun) return { result: {}, scope, impact };
-  const role: Role = existing && ROLE_RANK[existing] > ROLE_RANK[inv.role as Role] ? existing : inv.role; // never downgrade on accept
   // 0.35.10 (cookbook work/active/2026-10-18-3d-invite-accept-race DoD (a)-(c)): the checks above ran before this batch, so
   // both statements re-check the invitation inside it (ACCEPTABLE: open, unexpired, inviter still stands). A revoke, an expiry
   // or a grant removal landing in between mints no grant and leaves the row as that change left it ('revoked' stays
   // 'revoked'). The upsert keeps the higher of the existing and the offered role, so a role raised concurrently is not lowered.
+  // 0.35.11 (cookbook work/active/2026-10-18-3d-invite-accept-stale-role DoD (a)-(b)): the upsert binds the OFFERED role and
+  // the SQL takes the max against the row as it stands at batch time (never downgrade on accept). A JS max over `existing`
+  // (read above, before the batch) would re-raise a grant lowered or removed in between; RETURNING role reports what is held.
   const nowStr = nowIso(ctx);
   const [granted, used] = await ctx.db.batch([
     ctx.db.prepare(`INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6
         WHERE ${acceptable("?7", "?6")}
       ON CONFLICT(principal_id, scope_type, scope_id) DO UPDATE SET role = CASE WHEN ${roleRank("excluded.role")} > ${roleRank('"grant".role')} THEN excluded.role ELSE "grant".role END
       RETURNING role`)
-      .bind(newId("grant"), ctx.principal.id, scope.type, scope.id, role, nowStr, inv.id),
+      .bind(newId("grant"), ctx.principal.id, scope.type, scope.id, inv.role, nowStr, inv.id),
     ctx.db.prepare(`UPDATE invitation SET status = 'accepted', accepted_at = ?2 WHERE id = ?1 AND ${acceptable("?1", "?2")}`).bind(inv.id, nowStr),
   ]);
   if ((used.meta.changes ?? 0) !== 1) {
@@ -309,7 +311,7 @@ export const accept: Handler = async (ctx, p, o) => {
     await refuseDeadInvitation(ctx, row);
     throw notVisible("invitation");
   }
-  const held = ((granted.results?.[0] as { role?: Role } | undefined)?.role) ?? role;
+  const held = ((granted.results?.[0] as { role?: Role } | undefined)?.role) ?? (inv.role as Role);
   return { result: { granted: true, scope, role: held }, scope, impact };
 };
 
