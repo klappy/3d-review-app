@@ -96,6 +96,9 @@ export async function execute(
       result: handled.result,
       mode,
       confirmToken: options.confirm_token,
+      // 0.35.16 (cookbook work/active/2026-10-18-3d-grant-noop-dispatch-receipt DoD (a)): a handler that changed nothing says
+      // so with result.noop; the receipt is then marked no-op, with no undo token and no compensating control.
+      noop: handled.result.noop === true,
     });
     return (outcome = ok(capabilityId, handled.result, ctx.traceId, receipt));
   } catch (e) {

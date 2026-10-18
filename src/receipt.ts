@@ -83,6 +83,8 @@ export interface MintInput {
   result: Record<string, unknown>;
   mode?: "dry_run" | "execute";
   confirmToken?: string;
+  /** The handler changed nothing (result.noop): the receipt is marked noop, carries no undo token and no compensating control. */
+  noop?: boolean;
 }
 
 export function inverseLabel(cap: Capability): string {
@@ -106,8 +108,11 @@ export async function mintReceipt(ctx: Ctx, input: MintInput): Promise<Receipt> 
     trace_id: ctx.traceId,
     at,
   };
-  if (trueInverse) receipt.undo_token = newUndoToken();
-  if (cap.inverse.compensating_control) receipt.compensating_control = cap.inverse.compensating_control.trim();
+  if (input.noop) receipt.noop = true; // 0.35.16 DoD (a): this caller changed nothing — no undo, nothing to compensate
+  else {
+    if (trueInverse) receipt.undo_token = newUndoToken();
+    if (cap.inverse.compensating_control) receipt.compensating_control = cap.inverse.compensating_control.trim();
+  }
   if (input.mode) receipt.mode = input.mode;
   await persistReceipt(ctx, receipt, cap.id, input);
   return receipt;
@@ -121,6 +126,7 @@ async function persistReceipt(ctx: Ctx, r: Receipt, capabilityId: string, input:
     prior: receiptFields(input.priorState, PRIOR_FIELDS[capabilityId] ?? []),
     params: receiptFields(input.params, PARAM_FIELDS[capabilityId] ?? []),
     result_ids: capabilityId === "cap.report.build" ? {} : pickIds(input.result),
+    ...(input.noop ? { noop: true } : {}),
   });
   try {
     await ctx.db
@@ -160,6 +166,9 @@ const PRIOR_FIELDS: Record<string, readonly string[]> = {
   "cap.assessment.notes.update": ["notes_reflection","notes_next_steps"],
   "cap.survey.select": ["state","archived_at"], "cap.survey.deselect": ["state","archived_at"],
   "cap.language.archive": ["archived_at"], "cap.language.unarchive": ["archived_at"],
+  // 0.35.16 (cookbook work/active/2026-10-18-3d-grant-noop-dispatch-receipt DoD (a)): the role the grant held before this call
+  // (on a no-op, the live role it already held), so the receipt records what this caller found, not another writer's change.
+  "cap.grant.update_role": ["role"],
 };
 function receiptFields(source: Record<string,unknown> | undefined, allowed: readonly string[]): Record<string,unknown> | null {
   if(!source) return null;

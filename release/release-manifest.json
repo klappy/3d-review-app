@@ -1,23 +1,23 @@
 {
-  "version": "0.35.15",
+  "version": "0.35.16",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "ed6b55ce9717a9d06ecd300d2bb81a7c4e8fa781",
+  "cookbook_commit": "3910d55e2b7dbf0410edcd8058588264770b63ed",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.15.md",
-      "blob_sha": "ee2fdc2f19ea6a08c75e9d8feb7de2f2d9c5d0c6",
-      "sha256": "d33238430ef6eb264707f07ba1a2f7cb5476500598d3b02dcbd868a8c3804643"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.16.md",
+      "blob_sha": "fc2aa1a8e4279d2e0b86bbc6f923ceb2595b5b46",
+      "sha256": "571bd116644781b35e9482b443a277e4ef8cd17f4801eb84c4b911233063150d"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "fbabb93e56039e8a5471be9fbf8da74d500f6f5b",
-      "sha256": "249902c7eb973f9da0a12b5cae06fcf482093624ca9316cceea35981233d6756"
+      "blob_sha": "020c489db4440368f01b803782d3936f8b75f52e",
+      "sha256": "1dfa07055e5cbf8ae7074e30699007842779a2c4da236124c37671b05d94d3b8"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Roles: when someone else gives a person the role an owner is setting at the same moment, the owner's change now reports that nothing changed, and its record no longer shows the owner as having made the other person's change or offer to undo it."
+        "Roles: when an owner sets a person to the role they already hold, or that someone else gave them at the same moment, the owner's change is now recorded as making no change, and its confirmation no longer describes access being granted."
       ]
     }
   }

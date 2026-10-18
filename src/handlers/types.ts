@@ -42,9 +42,11 @@ export interface Ctx {
 export interface Impact {
   affected: unknown[];
   irreversible: boolean;
-  effect: "external" | "disclosure" | "destructive";
+  /** Absent only on a no-op impact (noop: true): nothing is released, so no effect and no compensating control (0.35.16). */
+  effect?: "external" | "disclosure" | "destructive";
   retention?: string;
   compensating_control?: string;
+  noop?: true;
 }
 export interface HandlerResult {
   result: Record<string, unknown>;
