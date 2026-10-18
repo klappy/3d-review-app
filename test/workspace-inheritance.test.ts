@@ -10,7 +10,9 @@ import { get as assessmentGet } from "../src/handlers/assessment";
 import { execute } from "../src/dispatch";
 import { handlers } from "../src/handlers";
 import { opsUsage } from "../src/handlers/usage";
-import { sha256 } from "../src/handlers/common";
+import { auditRow, sha256 } from "../src/handlers/common";
+import { opsUndo } from "../src/handlers/undo";
+import { checkConfirmToken, mintConfirmToken } from "../src/receipt";
 import type { Ctx } from "../src/handlers/types";
 
 // Workspace roles inherit to every grouped project (cookbook work/active/2026-10-15-3d-workspace-permissions).
@@ -909,5 +911,74 @@ describe("update_role no-op through dispatch", () => {
     const real = await run(mk(db, "nd_po", []), { ...at_, gid: "ndg_f", role: "viewer" });
     expect(real.env.receipt).not.toHaveProperty("noop");
     expect(await writes()).toBe(before + 1);
+  });
+});
+
+// 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3): the 541 review follow-ups.
+describe("danger previews bind their read state; verified confirm state; usage and undo pins (0.35.18)", () => {
+  const now = new Date("2026-10-18T19:50:00.000Z"); const at = now.toISOString();
+  const at_ = { scope: "project", id: "prj_n3" };
+  let trace = 0;
+  const mk = (db: any, id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db,
+    principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_n3_${++trace}`, now: () => now, log: () => {} } as any);
+  let db: any;
+  beforeAll(async () => {
+    db = await mf.getD1Database("DB");
+    const sql = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
+    if (!(await db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'principal'").first()))
+      await db.batch(sql("../migrations/0001_init.sql").split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)));
+    if (!(await db.prepare("SELECT 1 FROM pragma_table_info('participant_session') WHERE name = 'invitation_id'").first()))
+      await db.batch(sql("../migrations/0007_shared_link_context.sql").split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)));
+    for (const id of ["n3_po", "n3_t", "n3_x"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_n3", null, "prj_n3", at, "n3_po").run();
+    const grant = (id: string, p: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", "prj_n3", r, at).run();
+    await grant("n3g_po", "n3_po", "owner"); await grant("n3g_t", "n3_t", "member");
+  });
+  const roleOf = async (p: string) => (await db.prepare(`SELECT role FROM "grant" WHERE principal_id = ? AND scope_id = 'prj_n3'`).bind(p).first())?.role;
+
+  it("a transfer_owner execute after the owner set changed since its dry_run is refused; a new preview executes (DoD (a))", async () => {
+    const params = { ...at_, to: "n3_t" };
+    const dry: any = await execute(mk(db, "n3_po"), "cap.grant.transfer_owner", params, { tool: "danger", mode: "dry_run" });
+    expect(dry.ok).toBe(true);
+    expect(dry.result.impact).toMatchObject({ affected: [{ current_owners: 1, to: "n3_t" }] });
+    await db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind("n3g_x", "n3_x", "project", "prj_n3", "owner", at).run();
+    const env: any = await execute(mk(db, "n3_po"), "cap.grant.transfer_owner", params, { tool: "danger", mode: "execute", confirm_token: dry.result.confirm_token });
+    expect(env.ok).toBe(false);
+    expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect(await roleOf("n3_t")).toBe("member");
+    const again: any = await execute(mk(db, "n3_po"), "cap.grant.transfer_owner", params, { tool: "danger", mode: "dry_run" });
+    expect(again.result.impact).toMatchObject({ affected: [{ current_owners: 2 }] });
+    const ok2: any = await execute(mk(db, "n3_po"), "cap.grant.transfer_owner", params, { tool: "danger", mode: "execute", confirm_token: again.result.confirm_token });
+    expect(ok2.ok).toBe(true);
+    expect(await roleOf("n3_t")).toBe("owner");
+  });
+
+  it("checkConfirmToken hands back the state from the verified payload only (DoD (b))", async () => {
+    const intent = { capability: "cap.grant.update_role", params_hash: "p", actor: "a", scope: "project:x", revision: "r" };
+    const { token } = await mintConfirmToken("synthetic-only", { ...intent, state: "s1" }, now);
+    expect(await checkConfirmToken("synthetic-only", token, intent, now)).toEqual({ check: "ok", state: "s1" });
+    const plain = (await mintConfirmToken("synthetic-only", intent, now)).token;
+    expect(await checkConfirmToken("synthetic-only", plain, intent, now)).toEqual({ check: "ok", state: null });
+    expect(await checkConfirmToken("synthetic-only", token, { ...intent, actor: "b" }, now)).toEqual({ check: "mismatch", state: null });
+    expect(await checkConfirmToken("other-secret", token, intent, now)).toEqual({ check: "malformed", state: null });
+  });
+
+  it("usage writes_by_capability does not count audit rows (auditRow, class 'audit') (DoD (d))", async () => {
+    const support = { ...mk(db, "n3_po"), principal: { kind: "user", id: "n3_po", provisioned: true, support: true } } as any;
+    const count = async () => ((await opsUsage(support, { from: "2026-10-18", to: "2026-10-18" })).result.writes_by_capability as any[])
+      .find((w) => w.capability === "cap.support.unlock_participant")?.count ?? 0;
+    const before = await count();
+    await auditRow(mk(db, "n3_po"), "cap.support.unlock_participant", { type: "project", id: "prj_n3" }, { old_code: "c1" });
+    expect(await count()).toBe(before);
+  });
+
+  it("undo never reaches update_role: its inverse is none and opsUndo refuses NO_INVERSE before any handler runs (DoD (f))", async () => {
+    expect(byId.get("cap.grant.update_role")!.inverse.kind).toBe("none");
+    // a receipt carrying an undo token (mintReceipt never gives update_role one) still cannot drive the handler
+    await db.prepare(`INSERT INTO receipt (id, actor, capability, scope_type, scope_id, class, inverse, undo_token, confirm_token, trace_id, prior_state_json, at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).bind("rcpt_n3", "n3_po", "cap.grant.update_role", "project", "prj_n3", "write.effect", "none", "undo_n3", null, "tr_n3", JSON.stringify({ prior: { role: "viewer" }, params: { scope: "project", id: "prj_n3", gid: "n3g_x" } }), at).run();
+    const before = await roleOf("n3_x");
+    await expect(opsUndo(mk(db, "n3_po"), { token: "undo_n3" })).rejects.toMatchObject({ code: "NO_INVERSE" });
+    expect(await roleOf("n3_x")).toBe(before);
   });
 });

@@ -1,23 +1,23 @@
 {
-  "version": "0.35.17",
+  "version": "0.35.18",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "6e7b13fffea2e53ee6bdc3c13e1ab7de6c54ea21",
+  "cookbook_commit": "9afb824ea30f305e1343e98a03b3ed04d44f1f37",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.17.md",
-      "blob_sha": "2a8785698a792b8a1d16561d96ae38097de8853a",
-      "sha256": "fa1502d136e068a819f9be4be77149e55c7a40a13338bb2b4910708b18a15ae3"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.18.md",
+      "blob_sha": "4f45cff3c8642e213550f40fe4067b4c336475e6",
+      "sha256": "63e19121dc0f8db1ee93f6adaf4b9b5230c45db3eff547f7d4bb90f572b64842"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "7e138e4868de8b6963611edeff3056534720a0d3",
-      "sha256": "8a6e162c608fd8f556c3a9ee9ad7285207003bae8851dbf50c193f1036a1583b"
+      "blob_sha": "a84c15e77acc4b04693f5bdba61314c17889d330",
+      "sha256": "538ec382103a888fa2866172462da97f6e23b2e11aa83ccb675c0d63f905731e"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Roles: if a person's role changes after an owner previews a role change for them, confirming that preview no longer applies it; the owner is asked to preview again, and changes that made no difference are no longer counted as changes in the usage totals."
+        "Ownership, roles and deletions: if what an owner or support person previewed changes before they confirm (another owner appears, the person's role changes, a template gets a newer version, or something is added to what is being deleted), confirming no longer applies the stale preview; they are asked to preview again. Support audit entries are no longer counted as changes in the usage totals."
       ]
     }
   }

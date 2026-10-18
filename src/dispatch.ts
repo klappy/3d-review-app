@@ -1,12 +1,12 @@
 import { fail, ok } from "./envelope";
 import type { Ctx, ScopeType } from "./handlers/types";
 import { CapError } from "./handlers/types";
-import { CapError as HandlerCapError } from "./handlers/errors";
+import { CapError as HandlerCapError } from "./errors";
 import { handlers } from "./handlers";
 import { authorize, targetScope } from "./policy";
 import { byId, sourceSha, toolForClass, type Tool } from "./registry";
 import { enforceCapabilityLimit, enforcePrincipalWriteLimit, hasCapabilityLimiter, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
-import { checkConfirmToken, confirmTokenState, mintConfirmToken, mintReceipt, paramsHash, persistTrace, stateHash, type Span } from "./receipt";
+import { checkConfirmToken, mintConfirmToken, mintReceipt, paramsHash, persistTrace, type Span } from "./receipt";
 
 export interface ExecuteOptions {
   tool?: Tool | "docs";
@@ -79,9 +79,10 @@ export async function execute(
     let confirmedState: string | null | undefined;
     if (danger && mode === "execute") {
       if (!options.confirm_token) throw new CapError("CONFIRM_REQUIRED", "confirmation token required", "Call dry_run with the same params first.", capabilityId);
-      const check = await checkConfirmToken(ctx.env.SESSION_SECRET, options.confirm_token, intent!, ctx.now());
+      const { check, state } = await checkConfirmToken(ctx.env.SESSION_SECRET, options.confirm_token, intent!, ctx.now());
       if (check !== "ok") throw new CapError(check === "expired" ? "CONFIRM_EXPIRED" : "CONFIRM_REQUIRED", "confirmation expired or does not match this intent", "Call dry_run again.", capabilityId);
-      confirmedState = confirmTokenState(options.confirm_token);
+      // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (b)): the state comes from the verified payload.
+      confirmedState = state;
     }
 
     // 0.35.17 (cookbook work/active/2026-10-18-3d-grant-noop-followups-2 DoD (a)): a confirmed execute hands the handler the state
@@ -89,7 +90,7 @@ export async function execute(
     const handled = await handlers[capabilityId](ctx, params, danger ? (mode === "dry_run" ? { dryRun: true } : { dryRun: false, confirmedState }) : undefined);
     if (danger && mode === "dry_run") {
       if (!handled.impact) throw new Error(`dry_run missing impact: ${capabilityId}`);
-      const bound = handled.confirmState ? { ...intent!, state: await stateHash(handled.confirmState) } : intent!;
+      const bound = handled.confirmState ? { ...intent!, state: await paramsHash(handled.confirmState) } : intent!;
       const { token, expires_in } = await mintConfirmToken(ctx.env.SESSION_SECRET, bound, ctx.now());
       return (outcome = ok(capabilityId, { ...handled.result, impact: handled.impact, confirm_token: token, expires_in }, ctx.traceId));
     }

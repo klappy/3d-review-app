@@ -3,7 +3,7 @@ import type { Ctx, ScopeType } from "./handlers/types";
 import type { Capability } from "./registry";
 import type { Receipt } from "./envelope";
 import { hmacSha256Base64Url, hmacSha256Key, sha256Hex } from "./crypto";
-import { CapError } from "./handlers/errors";
+import { CapError } from "./errors";
 
 export const CONFIRM_TTL_SECONDS = 300; // inherited from 05 sketch; 18-D open item D-2 (18-C rules the final value)
 
@@ -61,33 +61,33 @@ export async function mintConfirmToken(secret: string, intent: Omit<ConfirmInten
 }
 
 export type ConfirmCheck = "ok" | "expired" | "mismatch" | "malformed";
-export async function checkConfirmToken(secret: string, token: string, intent: Omit<ConfirmIntent, "exp">, now: Date): Promise<ConfirmCheck> {
-  if (typeof token !== "string" || !token.startsWith("cfm_")) return "malformed";
+/** A checked confirm token: `state` is the state hash the token carries (ConfirmIntent.state), read from the payload whose
+ *  signature was verified here, and only when `check` is "ok"; null otherwise or when the token carries none (0.35.18). */
+export interface ConfirmVerdict { check: ConfirmCheck; state: string | null }
+export async function checkConfirmToken(secret: string, token: string, intent: Omit<ConfirmIntent, "exp">, now: Date): Promise<ConfirmVerdict> {
+  const no = (check: Exclude<ConfirmCheck, "ok">): ConfirmVerdict => ({ check, state: null });
+  if (typeof token !== "string" || !token.startsWith("cfm_")) return no("malformed");
   const [payload, sig] = token.slice(4).split(".");
-  if (!payload || !sig) return "malformed";
-  if (!(await verify(secret, payload, sig))) return "malformed";
+  if (!payload || !sig) return no("malformed");
+  if (!(await verify(secret, payload, sig))) return no("malformed");
   let body: ConfirmIntent;
-  try { body = JSON.parse(new TextDecoder().decode(b64urlDecode(payload))); } catch { return "malformed"; }
-  if (body.exp < Math.floor(now.getTime() / 1000)) return "expired";
-  for (const k of ["capability", "params_hash", "actor", "scope", "revision"] as const) if (body[k] !== intent[k]) return "mismatch";
-  return "ok";
+  try { body = JSON.parse(new TextDecoder().decode(b64urlDecode(payload))); } catch { return no("malformed"); }
+  if (body.exp < Math.floor(now.getTime() / 1000)) return no("expired");
+  for (const k of ["capability", "params_hash", "actor", "scope", "revision"] as const) if (body[k] !== intent[k]) return no("mismatch");
+  return { check: "ok", state: typeof body.state === "string" ? body.state : null };
 }
-
-/** The state hash a valid confirm token carries (call after checkConfirmToken says ok); null when it carries none. */
-export function confirmTokenState(token: string): string | null {
-  try {
-    const body = JSON.parse(new TextDecoder().decode(b64urlDecode(token.slice(4).split(".")[0]))) as ConfirmIntent;
-    return typeof body.state === "string" ? body.state : null;
-  } catch { return null; }
-}
-export const stateHash = (state: Record<string, unknown>): Promise<string> => paramsHash(state);
 
 /** 0.35.17 (cookbook work/active/2026-10-18-3d-grant-noop-followups-2 DoD (a)): on a confirmed execute, refuse when the state
  *  this call read is not the state its dry_run preview was computed from, so a confirmed preview never executes a different
- *  change (a no-op preview becoming an elevation). A direct handler call (no dispatch confirm) is not checked. */
+ *  change (a no-op preview becoming an elevation). The state is hashed like params (paramsHash): dispatch binds
+ *  paramsHash(HandlerResult.confirmState) into the token at dry_run.
+ *  A direct handler call (no dispatch confirm, so `confirmedState` undefined) is not checked, and that is safe: dispatch is
+ *  the only path from a transport or from cap.ops.undo to a danger handler with a confirm, and undo never reaches a
+ *  capability that binds state — they all declare `inverse.kind: "none"`, so opsUndo throws NO_INVERSE before any handler
+ *  runs (pinned in test/workspace-inheritance.test.ts, 0.35.18 DoD (f)). */
 export async function requireConfirmedState(opts: { confirmedState?: string | null } | undefined, state: Record<string, unknown>, capability: string): Promise<void> {
   if (opts?.confirmedState === undefined) return;
-  if (opts.confirmedState !== (await stateHash(state)))
+  if (opts.confirmedState !== (await paramsHash(state)))
     throw new CapError("CONFIRM_REQUIRED", "the target changed since the dry_run preview", "Call dry_run again and confirm the new preview.", capability);
 }
 
