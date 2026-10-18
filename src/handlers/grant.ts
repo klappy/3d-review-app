@@ -406,9 +406,14 @@ export const update_role: Handler = async (ctx, p, o) => {
   const impact = { affected: [{ grant: gid, from: g.role, to: role }], irreversible: ROLE_RANK[role] > ROLE_RANK[g.role as Role], effect: "disclosure" as const, compensating_control: "demotion via this capability (what was seen stays seen)",
     revoked_invitations: o?.dryRun && downgrade ? await countOrphaned(ctx, g.principal_id, scope, role) : 0 };
   if (o?.dryRun) return { result: {}, scope, impact };
-  const stmts = [ctx.db.prepare('UPDATE "grant" SET role = ? WHERE id = ?').bind(role, gid)];
+  // 0.35.12 (cookbook work/active/2026-10-18-3d-grant-owner-guard-race DoD (a)): the owner check above read the row before
+  // this batch, so the UPDATE re-checks it in its own WHERE: a target raised to owner in between (an accept landing) is not
+  // demoted. Refused → no row changed (the orphan sweep reads the grant live, and an owner still stands behind every row it
+  // issued) and the same typed refusal the read-time check gives.
+  const stmts = [ctx.db.prepare(`UPDATE "grant" SET role = ?1 WHERE id = ?2 AND (role <> 'owner' OR ?1 = 'owner')`).bind(role, gid)];
   if (downgrade) stmts.push(revokeOrphaned(ctx, g.principal_id, scope));
   const res = await ctx.db.batch(stmts);
+  if ((res[0].meta.changes ?? 0) !== 1) await refuseOwnerGuard(ctx, gid, "owners cannot be demoted", "D3 — transfer ownership instead (cap.grant.transfer_owner)");
   impact.revoked_invitations = downgrade ? res[1].meta.changes ?? 0 : 0;
   ctx.log("grant.update_role", { downgrade, revoked_invitations: impact.revoked_invitations });
   return { result: { grant: gid, role }, scope, impact, priorState: { role: g.role } };
@@ -423,11 +428,22 @@ export const revoke: Handler = async (ctx, p) => {
   ceiling(caller, g.role as Role, "revoke grants");
   // The grant goes and, in the same batch, the invitations its holder could no longer issue (orphanedWhere). This capability
   // is a plain write (no dry-run, no impact), so the count is reported in its result and its log line.
-  const [, rev] = await ctx.db.batch([ctx.db.prepare('DELETE FROM "grant" WHERE id = ?').bind(gid), revokeOrphaned(ctx, g.principal_id, scope)]);
+  // 0.35.12 (cookbook work/active/2026-10-18-3d-grant-owner-guard-race DoD (a)): the DELETE re-checks the owner guard in its own
+  // WHERE, so a target raised to owner after the read above is not removed (D3); refused → no row changed, same typed error.
+  const [del, rev] = await ctx.db.batch([ctx.db.prepare(`DELETE FROM "grant" WHERE id = ? AND role <> 'owner'`).bind(gid), revokeOrphaned(ctx, g.principal_id, scope)]);
+  if ((del.meta.changes ?? 0) !== 1) await refuseOwnerGuard(ctx, gid, "owners cannot be removed", "D3 — last owner is protected; transfer ownership first");
   const revoked_invitations = rev.meta.changes ?? 0;
   ctx.log("grant.revoke", { revoked_invitations });
   return { result: { grant: gid, revoked: true, revoked_invitations }, scope };
 };
+
+/** update_role's and revoke's write refused inside its batch (0.35.12 DoD (a)): re-read the grant and give the refusal the
+ *  read-time checks give for that state — gone is NOT_FOUND_OR_NOT_VISIBLE, an owner is the D3 refusal. Never a success. */
+async function refuseOwnerGuard(ctx: Ctx, gid: string, msg: string, hint: string): Promise<never> {
+  const now = await ctx.db.prepare('SELECT role FROM "grant" WHERE id = ?').bind(gid).first<{ role: string }>();
+  if (!now) throw notVisible("grant");
+  throw new CapError("NOT_AUTHORIZED_AT_SCOPE", msg, hint);
+}
 
 /** D: ownership moves. Owner only; support-without-owner-consent is PROPOSED pending source (Astra 5703469487) → refused here. */
 export const transfer_owner: Handler = async (ctx, p, o) => {

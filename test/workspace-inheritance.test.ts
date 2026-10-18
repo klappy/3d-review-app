@@ -637,6 +637,38 @@ describe("workspace grouping cannot mint project ownership", () => {
     expect(await rolesOf("sr_k")).toEqual([{ role: "owner" }]);
     expect(kept.result).toMatchObject({ granted: true, role: "owner" });
   });
+  // 0.35.12 (cookbook work/active/2026-10-18-3d-grant-owner-guard-race DoD (a)-(b)): update_role and revoke re-check the owner
+  // guard inside their write, so a target raised to owner after the handler's read is neither demoted nor removed (D3).
+  it("a target raised to owner between update_role's or revoke's read and its batch is not demoted or removed", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-18T12:20:00.000Z"); const at = now.toISOString();
+    let trace = 0;
+    const racing = (change: string) => ({ prepare: (q: string) => db.prepare(q), batch: async (st: any[]) => { await db.prepare(change).run(); return db.batch(st); } });
+    const mk = (id: string, d: any = db): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db: d, principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_og_${++trace}`, now: () => now, log: () => {} } as any);
+    for (const id of ["og_po", "og_d", "og_r", "og_c"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_og", null, "prj_og", at, "og_po").run();
+    const grant = (id: string, p: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", "prj_og", r, at).run();
+    await grant("ogg_po", "og_po", "owner"); await grant("ogg_d", "og_d", "member"); await grant("ogg_r", "og_r", "member"); await grant("ogg_c", "og_c", "member");
+    // each target issued one open member invitation here: a refused write must not revoke it either
+    for (const by of ["og_d", "og_r"]) await db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(`inv_og_${by}`, "project", "prj_og", await sha256(`x_${by}@example.invalid`), await sha256(`tok_og_${by}`), "member", "sent", by, at, "2026-10-24T00:00:00.000Z").run();
+    const roleOf = async (gid: string) => (await db.prepare('SELECT role FROM "grant" WHERE id = ?').bind(gid).first<{ role: string }>())?.role ?? null;
+    const statusOf = async (id: string) => (await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<{ status: string }>())?.status;
+    // update_role: the member read as member is raised to owner in the window; the demotion to viewer is refused with D3
+    await expect(update_role(mk("og_po", racing(`UPDATE "grant" SET role = 'owner' WHERE id = 'ogg_d'`)), { scope: "project", id: "prj_og", gid: "ogg_d", role: "viewer" }))
+      .rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE", message: "owners cannot be demoted" });
+    expect(await roleOf("ogg_d")).toBe("owner");
+    expect(await statusOf("inv_og_og_d")).toBe("sent");
+    // revoke: the member read as member is raised to owner in the window; the removal is refused with D3
+    await expect(grantRevoke(mk("og_po", racing(`UPDATE "grant" SET role = 'owner' WHERE id = 'ogg_r'`)), { scope: "project", id: "prj_og", gid: "ogg_r" }))
+      .rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE", message: "owners cannot be removed" });
+    expect(await roleOf("ogg_r")).toBe("owner");
+    expect(await statusOf("inv_og_og_r")).toBe("sent");
+    // control: nothing lands in the window, the member is demoted, then removed
+    await expect(update_role(mk("og_po", racing("SELECT 1")), { scope: "project", id: "prj_og", gid: "ogg_c", role: "viewer" })).resolves.toMatchObject({ result: { grant: "ogg_c", role: "viewer" } });
+    expect(await roleOf("ogg_c")).toBe("viewer");
+    await expect(grantRevoke(mk("og_po", racing("SELECT 1")), { scope: "project", id: "prj_og", gid: "ogg_c" })).resolves.toMatchObject({ result: { grant: "ogg_c", revoked: true } });
+    expect(await roleOf("ogg_c")).toBe(null);
+  });
   // Dead invitations DoD (8): policy answers a participant session on the invitation link before the handler runs. That is
   // "sign in as the invited person" (retryable, the UI keeps the token), not the invitation's durable refusal.
   it("a participant session opening an invitation link gets NOT_AUTHENTICATED (retryable), not NOT_AUTHORIZED_AT_SCOPE", async () => {
