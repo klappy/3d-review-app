@@ -1,23 +1,23 @@
 {
-  "version": "0.35.7",
+  "version": "0.35.8",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "9b07b6d23b6eb2dd626d2e59f1c0e73c7437affb",
+  "cookbook_commit": "a920021243ae23cbfe40d7156a9d36c8315f902b",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.7.md",
-      "blob_sha": "a7099c12797927594d69c934b276280a2828ca68",
-      "sha256": "1034080627f3b31f48f177c6c837c92defbd2cfa085ad035da81c922b402db78"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.8.md",
+      "blob_sha": "56b00639ddc45dd631ffc9e807843d7da5ad98fe",
+      "sha256": "bae5cbc732cf46591876eb6c527f76e04a001cb76e0b566a1ed30812f17d1bc8"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "aa422d799377e572667fe5bf943a6a667ccc748c",
-      "sha256": "931d066dc80b5d7fa5f6ac7816621c4f70a26b79c4688e670ca55ca70cabee3d"
+      "blob_sha": "6750b1053fc822f56b909dcedfe138d0202e396d",
+      "sha256": "9964ca7585d3087d1242f003439e4440ecc68fc09016320bb93767ad08659e6c"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Invitations: a re-invite cancels an earlier owner invitation only when the new invitation is also for owner, leaves expired invitations as expired instead of marking them cancelled, and the invite result (including a dry run) and its log now report how many earlier invitations it cancelled."
+        "Invitations: removing or lowering someone's role, or stepping down as owner, now also cancels the open invitations that person sent at that workspace, project or assessment and could no longer send, so those invitations cannot become valid again if the role comes back. The 0.35.6 promise that a cancelled invitation cannot become valid again now holds in general, not only after a re-invite. The result (a dry run too, where the action has one) and its log report how many invitations were cancelled."
       ]
     }
   }

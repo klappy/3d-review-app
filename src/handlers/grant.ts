@@ -67,7 +67,29 @@ async function owners(ctx: Ctx, scope: Scope): Promise<string[]> {
  *  counts it while it is live. */
 const inviterStands = (i: string) =>
   `((${i}.role <> 'owner' AND ${i}.scope_type <> 'project') OR EXISTS (SELECT 1 FROM "grant" ig WHERE ig.principal_id = ${i}.created_by`
-  + ` AND ig.scope_type = ${i}.scope_type AND ig.scope_id = ${i}.scope_id AND (ig.role = 'owner' OR (${i}.role <> 'owner' AND ig.role = 'member'))))`;
+  + ` AND ig.scope_type = ${i}.scope_type AND ig.scope_id = ${i}.scope_id AND ${roleBacks(i, "ig.role")}))`;
+/** The role half of inviterStands: whether a direct grant at role `r` (SQL expression) backs invitation `i`. */
+const roleBacks = (i: string, r: string) => `(${r} = 'owner' OR (${i}.role <> 'owner' AND ${r} = 'member'))`;
+
+/** 0.35.8 (cookbook work/active/2026-10-18-3d-invite-revoke-on-grant-removal DoD (a)-(c)): when a holder's DIRECT grant at a
+ *  scope is removed or downgraded, the open, unexpired invitations that holder issued at that scope and could no longer issue
+ *  (inviterStands fails) are revoked in the same batch as the grant change, so a regained grant cannot revive them. Expired
+ *  rows are left as they were (history keeps expired apart from revoked). Rows that inviterStands does not tie to a direct
+ *  grant (workspace and assessment invitations below owner) are untouched: that is the finding 4 hold. `o` aliases the row.
+ *  `after` is the holder's role at the scope once the change lands, as a bound SQL expression (null = no grant); the dry-run
+ *  counts with it, and the real call revokes against the grant table as the batch left it (the same predicate, read live). */
+const orphanedWhere = (holder: string, scopeT: string, scopeI: string, now: string, after?: string) =>
+  `o.created_by = ${holder} AND o.scope_type = ${scopeT} AND o.scope_id = ${scopeI} AND o.status IN ('sent','pending','unconfirmed')`
+  + ` AND (o.expires_at IS NULL OR o.expires_at > ${now}) AND NOT `
+  + (after === undefined ? inviterStands("o") : `((o.role <> 'owner' AND o.scope_type <> 'project') OR ${roleBacks("o", `COALESCE(${after}, '')`)})`);
+async function countOrphaned(ctx: Ctx, holder: string, scope: Scope, after: Role | null): Promise<number> {
+  return (await ctx.db.prepare(`SELECT COUNT(*) AS n FROM invitation o WHERE ${orphanedWhere("?1", "?2", "?3", "?4", "?5")}`)
+    .bind(holder, scope.type, scope.id, nowIso(ctx), after).first<{ n: number }>())?.n ?? 0;
+}
+function revokeOrphaned(ctx: Ctx, holder: string, scope: Scope) {
+  return ctx.db.prepare(`UPDATE invitation SET status = 'revoked' WHERE id IN (SELECT o.id FROM invitation o WHERE ${orphanedWhere("?1", "?2", "?3", "?4")})`)
+    .bind(holder, scope.type, scope.id, nowIso(ctx));
+}
 
 /** A LIVE invitation for the same scope+invitee, as ONE predicate shared by the de-duplicating INSERT and the read-back.
  *  Three shapes are live: a 'sent' row inside the cooldown, a 'pending' row younger than PENDING_DEDUPE_S (an in-flight twin),
@@ -127,12 +149,12 @@ export const invite: Handler = async (ctx, p, o) => {
   if (role === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
   const inviteeHash = await sha256(email);
   await refuseExistingAccess(ctx, scope, inviteeHash);
-  const nowIsoStr = nowIso(ctx);
+  const now = ctx.now().getTime(); const nowStr = new Date(now).toISOString(); // one clock read for the whole call (531 not-blocking 5-6)
   // revoked_superseded: how many dead invitations for this invitee at this scope the fresh invitation revokes. A dry-run counts
   // what a landed INSERT would revoke; a real call reports what the batch actually revoked (0 when it de-duplicated).
   const wouldRevoke = o?.dryRun
     ? (await ctx.db.prepare(`SELECT COUNT(*) AS n FROM invitation s WHERE ${supersededWhere("?1", "?2", "?3", "?4", "?5")}`)
-        .bind(scope.type, scope.id, inviteeHash, role, nowIsoStr).first<{ n: number }>())?.n ?? 0
+        .bind(scope.type, scope.id, inviteeHash, role, nowStr).first<{ n: number }>())?.n ?? 0
     : 0;
   const impact = { affected: [{ scope, role, invitee: inviteeHash.slice(0, 12), will_see: `${scope.type} contents at role ${role}` }], irreversible: true, effect: "external" as const, compensating_control: "cap.grant.revoke_invitation (does not unsend)", revoked_superseded: wouldRevoke };
   if (o?.dryRun) return { result: {}, scope, impact };
@@ -140,8 +162,6 @@ export const invite: Handler = async (ctx, p, o) => {
   // check-then-insert gap (re-review #16). A live duplicate is: a row already 'sent' inside the cooldown, a 'pending' row
   // younger than PENDING_DEDUPE_S (an in-flight twin), or an unexpired 'unconfirmed' row (the mail may have gone out —
   // no cooldown expiry may re-open it; the human path out is revoke_invitation, then invite anew).
-  const now = ctx.now().getTime();
-  const nowStr = nowIsoStr;
   const sentSince = new Date(now - INVITE_COOLDOWN_S * 1000).toISOString(), pendingSince = new Date(now - PENDING_DEDUPE_S * 1000).toISOString(), hourAgo = new Date(now - 3600_000).toISOString();
   const DUP = dupWhere("?2", "?3", "?4", "?11", "?12", "?14");
   const id = newId("inv"); const token = randomToken("il");
@@ -334,9 +354,16 @@ export const update_role: Handler = async (ctx, p, o) => {
   if (g.role === "owner" && role !== "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be demoted", "D3 — transfer ownership instead (cap.grant.transfer_owner)");
   // HOLD #483 c6204865181 #2: raising anyone to owner needs a DIRECT owner — an inherited owner cannot mint an undemotable owner.
   if (role === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
-  const impact = { affected: [{ grant: gid, from: g.role, to: role }], irreversible: ROLE_RANK[role] > ROLE_RANK[g.role as Role], effect: "disclosure" as const, compensating_control: "demotion via this capability (what was seen stays seen)" };
+  // A downgrade revokes the invitations the holder could no longer issue (orphanedWhere); a raise or no-op revokes nothing.
+  const downgrade = ROLE_RANK[role] < ROLE_RANK[g.role as Role];
+  const impact = { affected: [{ grant: gid, from: g.role, to: role }], irreversible: ROLE_RANK[role] > ROLE_RANK[g.role as Role], effect: "disclosure" as const, compensating_control: "demotion via this capability (what was seen stays seen)",
+    revoked_invitations: o?.dryRun && downgrade ? await countOrphaned(ctx, g.principal_id, scope, role) : 0 };
   if (o?.dryRun) return { result: {}, scope, impact };
-  await ctx.db.prepare('UPDATE "grant" SET role = ? WHERE id = ?').bind(role, gid).run();
+  const stmts = [ctx.db.prepare('UPDATE "grant" SET role = ? WHERE id = ?').bind(role, gid)];
+  if (downgrade) stmts.push(revokeOrphaned(ctx, g.principal_id, scope));
+  const res = await ctx.db.batch(stmts);
+  impact.revoked_invitations = downgrade ? res[1].meta.changes ?? 0 : 0;
+  ctx.log("grant.update_role", { downgrade, revoked_invitations: impact.revoked_invitations });
   return { result: { grant: gid, role }, scope, impact, priorState: { role: g.role } };
 };
 
@@ -347,8 +374,12 @@ export const revoke: Handler = async (ctx, p) => {
   if (!g) throw notVisible("grant");
   if (g.role === "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be removed", "D3 — last owner is protected; transfer ownership first");
   ceiling(caller, g.role as Role, "revoke grants");
-  await ctx.db.prepare('DELETE FROM "grant" WHERE id = ?').bind(gid).run();
-  return { result: { grant: gid, revoked: true }, scope };
+  // The grant goes and, in the same batch, the invitations its holder could no longer issue (orphanedWhere). This capability
+  // is a plain write (no dry-run, no impact), so the count is reported in its result and its log line.
+  const [, rev] = await ctx.db.batch([ctx.db.prepare('DELETE FROM "grant" WHERE id = ?').bind(gid), revokeOrphaned(ctx, g.principal_id, scope)]);
+  const revoked_invitations = rev.meta.changes ?? 0;
+  ctx.log("grant.revoke", { revoked_invitations });
+  return { result: { grant: gid, revoked: true, revoked_invitations }, scope };
 };
 
 /** D: ownership moves. Owner only; support-without-owner-consent is PROPOSED pending source (Astra 5703469487) → refused here. */
@@ -364,12 +395,17 @@ export const transfer_owner: Handler = async (ctx, p, o) => {
   if (!(await ctx.db.prepare("SELECT id FROM principal WHERE id = ?").bind(to).first())) throw new CapError("INVALID_PARAMS", "unknown principal", "to must be a signed-up principal id");
   const current = await owners(ctx, scope);
   const stepDown = p.step_down === true;
-  const impact = { affected: [{ scope, current_owners: current.length, to, to_becomes: "owner", caller_becomes: stepDown ? "member" : "owner" }], irreversible: true, effect: "disclosure" as const, compensating_control: "transfer back (requires the new owner)" };
+  // Stepping down is a downgrade (owner → member): the caller's owner invitations here are revoked with it (orphanedWhere).
+  const impact = { affected: [{ scope, current_owners: current.length, to, to_becomes: "owner", caller_becomes: stepDown ? "member" : "owner" }], irreversible: true, effect: "disclosure" as const, compensating_control: "transfer back (requires the new owner)",
+    revoked_invitations: o?.dryRun && stepDown ? await countOrphaned(ctx, ctx.principal.id, scope, "member") : 0 };
   if (o?.dryRun) return { result: {}, scope, impact };
   const stmts = [ctx.db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?) ON CONFLICT(principal_id, scope_type, scope_id) DO UPDATE SET role = ?')
     .bind(newId("grant"), to, scope.type, scope.id, "owner", nowIso(ctx), "owner")];
-  if (stepDown) stmts.push(ctx.db.prepare('UPDATE "grant" SET role = ? WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind("member", ctx.principal.id, scope.type, scope.id)); // an owner remains (to), so the last-owner rule holds
-  await ctx.db.batch(stmts);
+  if (stepDown) stmts.push(ctx.db.prepare('UPDATE "grant" SET role = ? WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind("member", ctx.principal.id, scope.type, scope.id), // an owner remains (to), so the last-owner rule holds
+    revokeOrphaned(ctx, ctx.principal.id, scope));
+  const res = await ctx.db.batch(stmts);
+  impact.revoked_invitations = stepDown ? res[2].meta.changes ?? 0 : 0;
+  ctx.log("grant.transfer_owner", { step_down: stepDown, revoked_invitations: impact.revoked_invitations });
   return { result: { transferred: true, scope, new_owner: to, caller_role: stepDown ? "member" : "owner" }, scope, impact };
 };
 
