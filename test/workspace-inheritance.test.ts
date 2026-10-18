@@ -764,6 +764,32 @@ describe("workspace grouping cannot mint project ownership", () => {
     await expect(update_role(mk("fu_po", racing(`UPDATE "grant" SET role = 'member' WHERE id = 'fug_t'`)), { ...at_, gid: "fug_t", role: "viewer" }))
       .rejects.toMatchObject({ code: "STAGE_CONFLICT" });
   });
+  // 0.35.15 (cookbook work/active/2026-10-18-3d-grant-noop-receipt-followups DoD (a)).
+  it("an update_role whose target another writer already set to the requested role replies as a no-op, crediting this caller with no change", async () => {
+    const db = await mf.getD1Database("DB");
+    const now = new Date("2026-10-18T15:20:00.000Z"); const at = now.toISOString();
+    const racing = (change: string) => ({ prepare: (q: string) => db.prepare(q), batch: async (st: any[]) => { await db.prepare(change).run(); return db.batch(st); } });
+    const logs: [string, any][] = [];
+    const mk = (id: string, d: any = db): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db: d, principal: { kind: "user", id, provisioned: true } as any, traceId: "tr_np", now: () => now, log: (s: string, x?: any) => logs.push([s, x]) } as any);
+    for (const id of ["np_po", "np_t", "np_u"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind("prj_np", null, "prj_np", at, "np_po").run();
+    const grant = (id: string, p: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", "prj_np", r, at).run();
+    await grant("npg_po", "np_po", "owner"); await grant("npg_t", "np_t", "viewer"); await grant("npg_u", "np_u", "member");
+    const at_ = { scope: "project", id: "prj_np" };
+    // viewer → member read, someone else raises the target to member in the window: this caller wrote nothing, so the reply's
+    // priorState and impact carry the live role (an undo from them changes nothing) and the log line says noop.
+    const r = await update_role(mk("np_po", racing(`UPDATE "grant" SET role = 'member' WHERE id = 'npg_t'`)), { ...at_, gid: "npg_t", role: "member" });
+    expect(r.result).toEqual({ grant: "npg_t", role: "member", noop: true });
+    expect(r.priorState).toEqual({ role: "member" });
+    expect(r.impact).toMatchObject({ affected: [{ grant: "npg_t", from: "member", to: "member" }], irreversible: false, revoked_invitations: 0 });
+    expect(logs.find(([s]) => s === "grant.update_role")?.[1]).toMatchObject({ noop: true, revoked_invitations: 0 });
+    // control: a write this caller made keeps its receipt (priorState is the role it replaced), and no noop flag
+    logs.length = 0;
+    const w = await update_role(mk("np_po"), { ...at_, gid: "npg_u", role: "viewer" });
+    expect(w.result).toEqual({ grant: "npg_u", role: "viewer" });
+    expect(w.priorState).toEqual({ role: "member" });
+    expect(logs.find(([s]) => s === "grant.update_role")?.[1]).not.toHaveProperty("noop");
+  });
   // Dead invitations DoD (8): policy answers a participant session on the invitation link before the handler runs. That is
   // "sign in as the invited person" (retryable, the UI keeps the token), not the invitation's durable refusal.
   it("a participant session opening an invitation link gets NOT_AUTHENTICATED (retryable), not NOT_AUTHORIZED_AT_SCOPE", async () => {
