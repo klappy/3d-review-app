@@ -1,23 +1,23 @@
 {
-  "version": "0.35.9",
+  "version": "0.35.10",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "6dd9736a9da2764a5ed6b8158336ccb00acc3709",
+  "cookbook_commit": "a25955e751db617a3e8a1be13700203a46ef2505",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.9.md",
-      "blob_sha": "97d5419aa4225f4980c6ffb948877a33e4f3faa9",
-      "sha256": "2ea07d197d0388fe5d2e457d12cba73db3778e7cad0aaf445c88dbc7ef79704a"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.10.md",
+      "blob_sha": "d016a8bf8310ad59a7e7c328d88ba9d87afad915",
+      "sha256": "0563bc7e67bfb8ece35253960d31036561a8034f02faf4fb5037844011664cdd"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "e93b37b8e63e8d298e4011fe6ab9765d21d544fd",
-      "sha256": "9e65dd499622b227107cab9526ebf1c625bdc40d517c5ce8ee35aae3defcb9ca"
+      "blob_sha": "d3d23b8fc08e96ed1b83334fbd9a373d0aea0acb",
+      "sha256": "ceb141d5e123e86586a64599153dfa29cc3b4945483106ea66327eecc23576da"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Invitations: an owner invitation, or an invitation to a project, is no longer created when the sender's role is removed or lowered at the same moment it is sent; an invitation counts as expired from its exact expiry time on, the same way when it is accepted and when a role change cancels open invitations; and, to state the 0.35.8 change precisely, it cancels only the invitations whose standing depends on the sender's own role at that place (owner invitations, and any invitation to a project), so a member's or viewer's workspace or assessment invitation is left as it was while that question stays on hold."
+        "Invitations: accepting an invitation no longer grants access when the invitation is revoked, expires or loses its sender's standing at the same moment it is accepted; a revoked invitation stays revoked and the person gets the same refusal as for an invitation that was already revoked, expired or unbacked; and accepting an invitation never lowers a higher role the person already holds or was given at that same moment."
       ]
     }
   }

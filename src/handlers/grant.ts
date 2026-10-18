@@ -282,29 +282,59 @@ export const accept: Handler = async (ctx, p, o) => {
   // Invitations are NOT transferable bearer tokens: the invited email must be the signed-in principal's (Astra c5704773599). Mismatch is hidden, never explained.
   const me = await ctx.db.prepare("SELECT email_hash FROM principal WHERE id = ?").bind(ctx.principal.id).first<{ email_hash: string | null }>();
   if (!me?.email_hash || me.email_hash !== inv.invitee_hash) throw notVisible("invitation");
-  if (inv.status === "accepted") throw new CapError("INVALID_PARAMS", "invitation_used", "ask for a new invitation");
-  if (expiredAt(inv.expires_at, nowIso(ctx))) throw new CapError("INVALID_PARAMS", "invitation_expired", "ask for a new invitation");
+  await refuseDeadInvitation(ctx, inv);
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
-  // HOLD #483 c6204865181 #1: no one accepts their own invitation (closes the self-invite path for rows minted before the
-  // invite-side check), and an owner invitation is honoured only while its inviter still holds a DIRECT owner grant here.
-  if (inv.created_by === ctx.principal.id) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "cannot accept an invitation you created", "ask a direct owner of this scope");
-  // ASK L1 F3 + nit 7: one read decides both inviter rules, through the same predicate the listings and de-dup use.
-  if (inv.role === "owner" || scope.type === "project") {
-    const stands = await ctx.db.prepare(`SELECT 1 AS ok FROM invitation i WHERE i.id = ? AND ${inviterStands("i")}`).bind(inv.id).first();
-    if (!stands && inv.role === "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this owner invitation was not issued by a direct owner of this scope", "ask a direct owner for a new invitation");
-    if (!stands) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this project invitation was not issued by a direct member of this project", "ask a direct project member for a new invitation, or ask to be invited to the workspace");
-  }
   const existing = await roleAt(ctx, scope.type, scope.id);
   const impact = { affected: [{ scope, role: inv.role, currently: existing ?? "none" }], irreversible: true, effect: "disclosure" as const, compensating_control: "cap.grant.revoke (what was seen stays seen)" };
   if (o?.dryRun) return { result: {}, scope, impact };
   const role: Role = existing && ROLE_RANK[existing] > ROLE_RANK[inv.role as Role] ? existing : inv.role; // never downgrade on accept
-  await ctx.db.batch([
-    ctx.db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?) ON CONFLICT(principal_id, scope_type, scope_id) DO UPDATE SET role = excluded.role')
-      .bind(newId("grant"), ctx.principal.id, scope.type, scope.id, role, nowIso(ctx)),
-    ctx.db.prepare("UPDATE invitation SET status = 'accepted', accepted_at = ? WHERE id = ?").bind(nowIso(ctx), inv.id),
+  // 0.35.10 (cookbook work/active/2026-10-18-3d-invite-accept-race DoD (a)-(c)): the checks above ran before this batch, so
+  // both statements re-check the invitation inside it (ACCEPTABLE: open, unexpired, inviter still stands). A revoke, an expiry
+  // or a grant removal landing in between mints no grant and leaves the row as that change left it ('revoked' stays
+  // 'revoked'). The upsert keeps the higher of the existing and the offered role, so a role raised concurrently is not lowered.
+  const nowStr = nowIso(ctx);
+  const [granted, used] = await ctx.db.batch([
+    ctx.db.prepare(`INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6
+        WHERE ${acceptable("?7", "?6")}
+      ON CONFLICT(principal_id, scope_type, scope_id) DO UPDATE SET role = CASE WHEN ${roleRank("excluded.role")} > ${roleRank('"grant".role')} THEN excluded.role ELSE "grant".role END
+      RETURNING role`)
+      .bind(newId("grant"), ctx.principal.id, scope.type, scope.id, role, nowStr, inv.id),
+    ctx.db.prepare(`UPDATE invitation SET status = 'accepted', accepted_at = ?2 WHERE id = ?1 AND ${acceptable("?1", "?2")}`).bind(inv.id, nowStr),
   ]);
-  return { result: { granted: true, scope, role }, scope, impact };
+  if ((used.meta.changes ?? 0) !== 1) {
+    // Refused inside the batch: report it with the same typed refusal the checks above give for that state (a revoked row is
+    // NOT_FOUND_OR_NOT_VISIBLE, an expired one invitation_expired, a fallen inviter NOT_AUTHORIZED_AT_SCOPE), never a success.
+    const row = await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash, created_by FROM invitation WHERE id = ?").bind(inv.id).first<any>();
+    if (!row || row.status === "revoked") throw notVisible("invitation");
+    await refuseDeadInvitation(ctx, row);
+    throw notVisible("invitation");
+  }
+  const held = ((granted.results?.[0] as { role?: Role } | undefined)?.role) ?? role;
+  return { result: { granted: true, scope, role: held }, scope, impact };
 };
+
+/** accept's refusals for an invitation that is no longer acceptable, in the order accept has always applied them. Run before
+ *  the write and again, on a re-read row, when the write batch refuses (0.35.10 DoD (b)), so both report the same typed error. */
+async function refuseDeadInvitation(ctx: Ctx, inv: any): Promise<void> {
+  if (inv.status === "accepted") throw new CapError("INVALID_PARAMS", "invitation_used", "ask for a new invitation");
+  if (expiredAt(inv.expires_at, nowIso(ctx))) throw new CapError("INVALID_PARAMS", "invitation_expired", "ask for a new invitation");
+  // HOLD #483 c6204865181 #1: no one accepts their own invitation (closes the self-invite path for rows minted before the
+  // invite-side check), and an owner invitation is honoured only while its inviter still holds a DIRECT owner grant here.
+  if (inv.created_by === ctx.principal.id) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "cannot accept an invitation you created", "ask a direct owner of this scope");
+  // ASK L1 F3 + nit 7: one read decides both inviter rules, through the same predicate the listings and de-dup use.
+  if (inv.role === "owner" || inv.scope_type === "project") {
+    const stands = await ctx.db.prepare(`SELECT 1 AS ok FROM invitation i WHERE i.id = ? AND ${inviterStands("i")}`).bind(inv.id).first();
+    if (!stands && inv.role === "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this owner invitation was not issued by a direct owner of this scope", "ask a direct owner for a new invitation");
+    if (!stands) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this project invitation was not issued by a direct member of this project", "ask a direct project member for a new invitation, or ask to be invited to the workspace");
+  }
+}
+/** The invitation `id` can still be accepted at `now` (bound SQL expressions): open, unexpired by the one expiry rule, and its
+ *  inviter still stands behind it (inviterStands). accept's write batch gates both statements on it (0.35.10 DoD (a)). */
+const acceptable = (id: string, now: string) =>
+  `EXISTS (SELECT 1 FROM invitation i WHERE i.id = ${id} AND i.status IN (${LIVE_STATUSES.map((st) => `'${st}'`).join(",")})`
+  + ` AND ${unexpired("i", now)} AND ${inviterStands("i")})`;
+/** ROLE_RANK as a SQL expression over a role expression `r` (unknown roles rank 0). */
+const roleRank = (r: string) => `(CASE ${r} ${(Object.keys(ROLE_RANK) as Role[]).map((k) => `WHEN '${k}' THEN ${ROLE_RANK[k]}`).join(" ")} ELSE 0 END)`;
 
 /** cap.me.invitations (B04 step c): the signed-in person's pending collaborator invitations, matched by their hashed email.
  *  Returns what the invitee may know before accepting — scope (type + id), role, expiry, inviter display name — never the
