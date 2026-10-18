@@ -61,7 +61,10 @@ async function owners(ctx: Ctx, scope: Scope): Promise<string[]> {
  *  other project invitation needs the inviter's DIRECT project grant at member or above (the rule invite applies,
  *  directAtProject). Workspace and assessment invitations below owner are unchanged (finding 4 is a named hold). accept refuses
  *  a row that fails it; cap.me.invitations and the roster's pending_invitations do not list it; invite de-duplication does not
- *  count it, so a re-invite sends a fresh invitation instead of "nothing was sent again". */
+ *  count it, so a re-invite sends a fresh invitation instead of "nothing was sent again", and that re-invite revokes the dead
+ *  row it supersedes. An invitation the caller sent to themselves is NOT covered by this predicate: accept refuses it and
+ *  cap.me.invitations omits it by their own created_by checks, but the roster still lists it and de-duplication still
+ *  counts it while it is live. */
 const inviterStands = (i: string) =>
   `((${i}.role <> 'owner' AND ${i}.scope_type <> 'project') OR EXISTS (SELECT 1 FROM "grant" ig WHERE ig.principal_id = ${i}.created_by`
   + ` AND ig.scope_type = ${i}.scope_type AND ig.scope_id = ${i}.scope_id AND (ig.role = 'owner' OR (${i}.role <> 'owner' AND ig.role = 'member'))))`;
@@ -126,11 +129,20 @@ export const invite: Handler = async (ctx, p, o) => {
   const sentSince = new Date(now - INVITE_COOLDOWN_S * 1000).toISOString(), pendingSince = new Date(now - PENDING_DEDUPE_S * 1000).toISOString(), hourAgo = new Date(now - 3600_000).toISOString();
   const DUP = dupWhere("?2", "?3", "?4", "?11", "?12", "?14");
   const id = newId("inv"); const token = randomToken("il");
-  const ins = await ctx.db.prepare(`INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at)
+  // The fresh row SUPERSEDES any dead row (inviterStands fails) for the same scope+invitee: it is revoked in the same batch,
+  // only when the INSERT landed, so it cannot come back alive if its inviter later regains a direct grant and two live rows
+  // never stand for one invitee at one scope (cookbook work/active/2026-10-18-3d-invite-followups DoD (a)).
+  const [ins] = await ctx.db.batch([
+    ctx.db.prepare(`INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at)
       SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'pending', ?8, ?9, ?10
       WHERE NOT EXISTS (SELECT 1 FROM invitation d WHERE ${DUP})
         AND (SELECT COUNT(*) FROM invitation WHERE created_by = ?8 AND scope_type <> 'survey' AND created_at > ?13) < ?7`)
-    .bind(id, scope.type, scope.id, inviteeHash, await sha256(token), role, INVITES_PER_INVITER_HOUR, ctx.principal.id, nowStr, new Date(now + INVITE_TTL_S * 1000).toISOString(), sentSince, pendingSince, hourAgo, nowStr).run();
+      .bind(id, scope.type, scope.id, inviteeHash, await sha256(token), role, INVITES_PER_INVITER_HOUR, ctx.principal.id, nowStr, new Date(now + INVITE_TTL_S * 1000).toISOString(), sentSince, pendingSince, hourAgo, nowStr),
+    ctx.db.prepare(`UPDATE invitation SET status = 'revoked' WHERE id IN (SELECT s.id FROM invitation s WHERE s.scope_type = ?1 AND s.scope_id = ?2
+        AND s.invitee_hash = ?3 AND s.id <> ?4 AND s.status IN ('sent','pending','unconfirmed') AND NOT ${inviterStands("s")})
+      AND EXISTS (SELECT 1 FROM invitation n WHERE n.id = ?4)`)
+      .bind(scope.type, scope.id, inviteeHash, id),
+  ]);
   if ((ins.meta.changes ?? 0) !== 1) {
     const dup = await ctx.db.prepare(`SELECT d.id, d.role, d.status FROM invitation d WHERE ${dupWhere("?1", "?2", "?3", "?4", "?5", "?6")} ORDER BY d.created_at DESC LIMIT 1`)
       .bind(scope.type, scope.id, inviteeHash, sentSince, pendingSince, nowStr).first<{ id: string; role: string; status: string }>();
