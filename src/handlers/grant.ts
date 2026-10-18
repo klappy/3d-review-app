@@ -1,6 +1,7 @@
 // cap.grant.* — invitations and grants at exactly one scope. D3: members invite ≤ member; owners are never removed or demoted;
 // the last owner is protected; transfer is dangerous. Grants are stored at one scope; a workspace grant applies to its grouped projects (common.projectRole). Existence never leaks. Lane B (Fable) — owner per #14 c5704577820.
 import { magicLinkEnabled } from "../magic-link";
+import { requireConfirmedState } from "../receipt";
 import type { Ctx, Handler, Impact, Role, ScopeType } from "./types";
 import { CapError, notVisible } from "./errors";
 import { ROLE_RANK, atLeast, countScalar, gate, newId, nowIso, randomToken, reqRole, reqScope, reqStr, roleAt, effectiveRoleAt, directRoleAt, grantApplies, sha256 } from "./common";
@@ -410,12 +411,21 @@ export const update_role: Handler = async (ctx, p, o) => {
   // 0.35.16 (cookbook work/active/2026-10-18-3d-grant-noop-dispatch-receipt DoD (b)-(c)): a target already at the requested
   // role when first read is the same no-op as one raised there by another writer in the window: the reply carries noop, and a
   // no-op impact names no disclosure and no compensating control (nothing is released, nothing to compensate).
-  const noopImpact = (): Impact & { revoked_invitations: number; noop: true } =>
+  const noopImpact = (): Impact & { revoked_invitations: number } =>
     ({ affected: [{ grant: gid, from: role, to: role }], irreversible: false, revoked_invitations: 0, noop: true });
+  // 0.35.17 (cookbook work/active/2026-10-18-3d-grant-noop-followups-2 DoD (c)-(d)): one no-op reply for both paths (first read,
+  // or another writer in the window): the log line keeps the requested downgrade, HandlerResult.noop marks the receipt.
+  const noopReply = () => {
+    ctx.log("grant.update_role", { noop: true, downgrade, revoked_invitations: 0 });
+    return { result: { grant: gid, role, noop: true }, noop: true as const, scope, priorState: { role }, impact: noopImpact() };
+  };
   const firstReadNoop = g.role === role;
-  const impact = firstReadNoop ? noopImpact() : { affected: [{ grant: gid, from: g.role, to: role }], irreversible: ROLE_RANK[role] > ROLE_RANK[g.role as Role], effect: "disclosure" as const, compensating_control: "demotion via this capability (what was seen stays seen)",
+  const impact: Impact & { revoked_invitations: number } = firstReadNoop ? noopImpact() : { affected: [{ grant: gid, from: g.role, to: role }], irreversible: ROLE_RANK[role] > ROLE_RANK[g.role as Role], effect: "disclosure" as const, compensating_control: "demotion via this capability (what was seen stays seen)",
     revoked_invitations: o?.dryRun && downgrade ? await countOrphaned(ctx, g.principal_id, scope, role) : 0 };
-  if (o?.dryRun) return { result: firstReadNoop ? { noop: true } : {}, scope, impact };
+  // 0.35.17 DoD (a): the preview binds the role it read into the confirm token; an execute that reads another role (a no-op
+  // preview whose target was lowered in between would otherwise run as an elevation) is refused and asks for a new dry_run.
+  if (o?.dryRun) return { result: firstReadNoop ? { noop: true } : {}, scope, impact, confirmState: { role: g.role } };
+  await requireConfirmedState(o, { role: g.role }, "cap.grant.update_role");
   // 0.35.12 (cookbook work/active/2026-10-18-3d-grant-owner-guard-race DoD (a)): the owner check above read the row before
   // this batch, so the UPDATE re-checks it in its own WHERE: a target raised to owner in between (an accept landing) is not
   // demoted. 0.35.13 (cookbook work/active/2026-10-18-3d-grant-update-role-write-guard DoD (a)-(b)): the UPDATE also writes
@@ -436,14 +446,10 @@ export const update_role: Handler = async (ctx, p, o) => {
     // no-op: priorState and impact carry the live role and the result and log line say noop. 0.35.16 (DoD (a), (c)): dispatch
     // marks the receipt for a noop result as a no-op (mintReceipt), so the receipt credits this caller with no change; the
     // impact names no disclosure or compensating control; the log line keeps the downgrade this caller requested.
-    ctx.log("grant.update_role", { noop: true, downgrade, revoked_invitations: 0 });
-    return { result: { grant: gid, role, noop: true }, scope, priorState: { role }, impact: noopImpact() };
+    return noopReply();
   }
   impact.revoked_invitations = downgrade ? res[1].meta.changes ?? 0 : 0;
-  if (firstReadNoop) {
-    ctx.log("grant.update_role", { noop: true, downgrade, revoked_invitations: 0 });
-    return { result: { grant: gid, role, noop: true }, scope, impact, priorState: { role } };
-  }
+  if (firstReadNoop) return noopReply();
   ctx.log("grant.update_role", { downgrade, revoked_invitations: impact.revoked_invitations });
   return { result: { grant: gid, role }, scope, impact, priorState: { role: g.role } };
 };
