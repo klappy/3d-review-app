@@ -46,6 +46,10 @@ export async function authorize(ctx: Ctx, cap: Capability, params: Record<string
     if (p.kind !== "participant") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "participant token required", "redeem a code or open an invitation link", "cap.participant.redeem_code");
     return;
   }
+  // Dead-invitations (8): a participant session opening a mailed invitation link is not signed in as a person, which is
+  // retryable (sign in with the invited address), not a refusal of the invitation. NOT_AUTHENTICATED keeps the link's token
+  // in the UI (ui/v3/components/invite.js inviteFailure → 'signin'); the accept handler answers every non-user the same way.
+  if (p.kind === "participant" && roles === "invitee") throw new CapError("NOT_AUTHENTICATED", "sign in with the invited address to accept an invitation", "a participant session cannot accept a collaborator invitation", cap.id);
   if (p.kind === "participant") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "participants cannot call this", undefined, cap.id);
   if (roles.startsWith("provisioned creator")) {
     if (!p.provisioned) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "not provisioned to create", "request one: cap.request.create", "cap.request.create");

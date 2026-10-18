@@ -56,15 +56,26 @@ async function owners(ctx: Ctx, scope: Scope): Promise<string[]> {
   const r = await ctx.db.prepare('SELECT principal_id FROM "grant" WHERE scope_type = ? AND scope_id = ? AND role = ?').bind(scope.type, scope.id, "owner").all<{ principal_id: string }>();
   return r.results.map((x) => x.principal_id);
 }
+/** ASK L1 default 1 (follow-ups F3 and dead-invitations (2)/(3)): ONE predicate for "this invitation's inviter still stands
+ *  behind it", over an invitation row aliased `i`. An owner invitation needs its inviter's DIRECT owner grant at the scope; any
+ *  other project invitation needs the inviter's DIRECT project grant at member or above (the rule invite applies,
+ *  directAtProject). Workspace and assessment invitations below owner are unchanged (finding 4 is a named hold). accept refuses
+ *  a row that fails it; cap.me.invitations and the roster's pending_invitations do not list it; invite de-duplication does not
+ *  count it, so a re-invite sends a fresh invitation instead of "nothing was sent again". */
+const inviterStands = (i: string) =>
+  `((${i}.role <> 'owner' AND ${i}.scope_type <> 'project') OR EXISTS (SELECT 1 FROM "grant" ig WHERE ig.principal_id = ${i}.created_by`
+  + ` AND ig.scope_type = ${i}.scope_type AND ig.scope_id = ${i}.scope_id AND (ig.role = 'owner' OR (${i}.role <> 'owner' AND ig.role = 'member'))))`;
+
 /** A LIVE invitation for the same scope+invitee, as ONE predicate shared by the de-duplicating INSERT and the read-back.
  *  Three shapes are live: a 'sent' row inside the cooldown, a 'pending' row younger than PENDING_DEDUPE_S (an in-flight twin),
  *  and an 'unconfirmed' row for as long as it is unexpired — the mail MAY have gone out, so no cooldown expiry may re-open it
- *  (independent review AMEND P2). Placeholders are passed in so both statements can number their binds independently. */
+ *  (independent review AMEND P2). A row whose inviter no longer stands behind it (inviterStands) is dead, not live.
+ *  Placeholders are passed in so both statements can number their binds independently; `d` aliases the invitation row. */
 const dupWhere = (scopeT: string, scopeI: string, hash: string, sentSince: string, pendingSince: string, now: string) =>
-  `scope_type = ${scopeT} AND scope_id = ${scopeI} AND invitee_hash = ${hash} AND (`
-  + `(status = 'sent' AND created_at > ${sentSince})`
-  + ` OR (status = 'pending' AND created_at > ${pendingSince})`
-  + ` OR (status = 'unconfirmed' AND (expires_at IS NULL OR expires_at > ${now})))`;
+  `d.scope_type = ${scopeT} AND d.scope_id = ${scopeI} AND d.invitee_hash = ${hash} AND (`
+  + `(d.status = 'sent' AND d.created_at > ${sentSince})`
+  + ` OR (d.status = 'pending' AND d.created_at > ${pendingSince})`
+  + ` OR (d.status = 'unconfirmed' AND (d.expires_at IS NULL OR d.expires_at > ${now}))) AND ${inviterStands("d")}`;
 
 async function scopeExists(ctx: Ctx, scope: Scope): Promise<boolean> {
   const t = scope.type === "workspace" ? "workspace" : scope.type === "project" ? "project" : "assessment";
@@ -117,11 +128,11 @@ export const invite: Handler = async (ctx, p, o) => {
   const id = newId("inv"); const token = randomToken("il");
   const ins = await ctx.db.prepare(`INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at)
       SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'pending', ?8, ?9, ?10
-      WHERE NOT EXISTS (SELECT 1 FROM invitation WHERE ${DUP})
+      WHERE NOT EXISTS (SELECT 1 FROM invitation d WHERE ${DUP})
         AND (SELECT COUNT(*) FROM invitation WHERE created_by = ?8 AND scope_type <> 'survey' AND created_at > ?13) < ?7`)
     .bind(id, scope.type, scope.id, inviteeHash, await sha256(token), role, INVITES_PER_INVITER_HOUR, ctx.principal.id, nowStr, new Date(now + INVITE_TTL_S * 1000).toISOString(), sentSince, pendingSince, hourAgo, nowStr).run();
   if ((ins.meta.changes ?? 0) !== 1) {
-    const dup = await ctx.db.prepare(`SELECT id, role, status FROM invitation WHERE ${dupWhere("?1", "?2", "?3", "?4", "?5", "?6")} ORDER BY created_at DESC LIMIT 1`)
+    const dup = await ctx.db.prepare(`SELECT d.id, d.role, d.status FROM invitation d WHERE ${dupWhere("?1", "?2", "?3", "?4", "?5", "?6")} ORDER BY d.created_at DESC LIMIT 1`)
       .bind(scope.type, scope.id, inviteeHash, sentSince, pendingSince, nowStr).first<{ id: string; role: string; status: string }>();
     if (!dup) throw new CapError("RATE_LIMITED", `at most ${INVITES_PER_INVITER_HOUR} collaborator invitations per hour`, "this cap resets over the next hour, not the next minute", "cap.grant.invite", 3600);
     if (dup.role !== role) throw new CapError("INVALID_PARAMS", `already invited as ${dup.role} a moment ago`, "revoke that invitation first, then invite with the new role", "cap.grant.revoke_invitation");
@@ -209,15 +220,11 @@ export const accept: Handler = async (ctx, p, o) => {
   // HOLD #483 c6204865181 #1: no one accepts their own invitation (closes the self-invite path for rows minted before the
   // invite-side check), and an owner invitation is honoured only while its inviter still holds a DIRECT owner grant here.
   if (inv.created_by === ctx.principal.id) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "cannot accept an invitation you created", "ask a direct owner of this scope");
-  if (inv.role === "owner") {
-    const inviter = await ctx.db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind(inv.created_by, scope.type, scope.id).first<{ role: string }>();
-    if (inviter?.role !== "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this owner invitation was not issued by a direct owner of this scope", "ask a direct owner for a new invitation");
-  } else if (scope.type === "project") {
-    // ASK L1 default 1, follow-up F3: a project invitation is honoured only while its inviter still holds a DIRECT project
-    // grant (member or above) — the same rule invite applies (directAtProject). Rows minted from an inherited workspace role
-    // before that rule, or by someone since removed from the project, stop being acceptable instead of waiting out the TTL.
-    const inviter = await ctx.db.prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?').bind(inv.created_by, scope.type, scope.id).first<{ role: string }>();
-    if (!atLeast((inviter?.role as Role) ?? null, "member")) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this project invitation was not issued by a direct member of this project", "ask a direct project member for a new invitation, or ask to be invited to the workspace");
+  // ASK L1 F3 + nit 7: one read decides both inviter rules, through the same predicate the listings and de-dup use.
+  if (inv.role === "owner" || scope.type === "project") {
+    const stands = await ctx.db.prepare(`SELECT 1 AS ok FROM invitation i WHERE i.id = ? AND ${inviterStands("i")}`).bind(inv.id).first();
+    if (!stands && inv.role === "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this owner invitation was not issued by a direct owner of this scope", "ask a direct owner for a new invitation");
+    if (!stands) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this project invitation was not issued by a direct member of this project", "ask a direct project member for a new invitation, or ask to be invited to the workspace");
   }
   const existing = await roleAt(ctx, scope.type, scope.id);
   const impact = { affected: [{ scope, role: inv.role, currently: existing ?? "none" }], irreversible: true, effect: "disclosure" as const, compensating_control: "cap.grant.revoke (what was seen stays seen)" };
@@ -255,8 +262,8 @@ export const mine: Handler = async (ctx) => {
         LEFT JOIN project p2 ON p2.id = a2.project_id
         LEFT JOIN workspace w2 ON w2.id = p2.workspace_id
       WHERE i.invitee_hash = ? AND i.scope_type IN (${GRANT_SCOPES.map(() => "?").join(",")}) AND i.status IN (${LIVE_STATUSES.map(() => "?").join(",")})
-        AND (i.expires_at IS NULL OR i.expires_at > ?) ORDER BY i.created_at, i.id`)
-    .bind(me.email_hash, ...GRANT_SCOPES, ...LIVE_STATUSES, nowIso(ctx)).all<InvitationRow>();
+        AND (i.expires_at IS NULL OR i.expires_at > ?) AND i.created_by IS NOT ? AND ${inviterStands("i")} ORDER BY i.created_at, i.id`)
+    .bind(me.email_hash, ...GRANT_SCOPES, ...LIVE_STATUSES, nowIso(ctx), ctx.principal.id).all<InvitationRow>();
   const invitations = r.results.map((i) => {
     const { name, path } = scopeNames(i);
     return { id: i.id, scope: { type: i.scope_type, id: i.scope_id, name, path }, role: i.role, inviter_display_name: null, invited_at: i.created_at, expires_at: i.expires_at };
@@ -280,7 +287,8 @@ export const list: Handler = async (ctx, p) => {
   const scope = reqScope(p);
   await callerAt(ctx, scope, "member");
   const r = await ctx.db.prepare('SELECT id, principal_id, role, created_at FROM "grant" WHERE scope_type = ? AND scope_id = ? ORDER BY created_at').bind(scope.type, scope.id).all();
-  const inv = await ctx.db.prepare("SELECT id, role, status, created_at, expires_at FROM invitation WHERE scope_type = ? AND scope_id = ? AND status IN ('sent','pending','unconfirmed') ORDER BY created_at").bind(scope.type, scope.id).all();
+  // Dead rows (inviter no longer stands behind them; accept refuses them) are not pending: inviterStands, one predicate.
+  const inv = await ctx.db.prepare(`SELECT i.id, i.role, i.status, i.created_at, i.expires_at FROM invitation i WHERE i.scope_type = ? AND i.scope_id = ? AND i.status IN ('sent','pending','unconfirmed') AND ${inviterStands("i")} ORDER BY i.created_at`).bind(scope.type, scope.id).all();
   return { result: { scope, grants: r.results, pending_invitations: inv.results }, scope };
 };
 

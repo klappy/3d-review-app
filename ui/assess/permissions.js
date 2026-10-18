@@ -56,21 +56,25 @@ export function inviteOutcome(r = {}) {
 const classify = e => { const c = String(e?.code || e?.status || ''); if (c === 'NOT_AUTHENTICATED' || c === '401') return 'unauthenticated'; if (c === 'NOT_AUTHORIZED_AT_SCOPE' || c === '403') return 'forbidden'; if (c === 'NOT_FOUND_OR_NOT_VISIBLE' || c === '404') return 'not_found'; if (c === 'RESERVED_NOT_BUILT' || c === '501') return 'not_built'; return 'failed'; };
 export { classify };
 
-export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myEmail: '', myRole: null, fromWorkspace: false, workspaceId: null, sheet: null, notice: null, alert: false, busy: false, receipts: {}, invitees: {}, askRevoke: null }; }
+export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myEmail: '', myRole: null, fromWorkspace: false, notDirect: false, workspaceId: null, sheet: null, notice: null, alert: false, busy: false, receipts: {}, invitees: {}, askRevoke: null }; }
 
 export const permissions = {
   async load(ctx, { scope, id }) {
     const m = blankModel(scope, id); m.me = ctx.state?.principal?.id || null;
     if (!SCOPE_SEG[scope]) { m.status = 'not_found'; return m; }
     try {
+      // Nit 7 (#527 review): at a project the project read (its workspace id) runs alongside the roster read, not after it.
+      const projectRead = scope === 'projects' ? Promise.resolve().then(() => ctx.api(`/v2/projects/${ctx.enc(id)}`)).then(x => x?.project?.workspace_id || null, () => null) : null;
       const r = await ctx.api(`/v2/${SCOPE_SEG[scope]}/${ctx.enc(id)}/grants`);
       m.status = 'loaded'; m.grants = r.grants || []; m.pending = (r.pending_invitations || []).filter(i => ['sent', 'pending', 'unconfirmed'].includes(i.status));
       m.myRole = m.grants.find(g => g.principal_id === m.me)?.role || null;
-      // F5: the roster read needs member+ (grant.ts list); at a project, a direct grant below member means that reach came
-      // from the workspace. The workspace id only builds the pointer link; a failed project read leaves the line unlinked.
-      if (scope === 'projects' && !(RANK[m.myRole] >= RANK.member)) {
-        m.fromWorkspace = true;
-        try { m.workspaceId = (await ctx.api(`/v2/projects/${ctx.enc(id)}`))?.project?.workspace_id || null; } catch { m.workspaceId = null; }
+      // F5: the roster read needs member+ (grant.ts list); at a project, a direct grant below member means Invite, Revoke
+      // invitation, Remove and role change are refused (notDirect hides them). Dead-invitations (5): the workspace line is a
+      // claim, so it shows only when the project read names a workspace — an ungrouped project (e.g. a support principal's
+      // reach) or a failed read shows no line.
+      if (projectRead) {
+        const workspaceId = await projectRead;
+        if (!(RANK[m.myRole] >= RANK.member)) { m.notDirect = true; m.workspaceId = workspaceId; m.fromWorkspace = !!workspaceId; }
       }
       // P0 12:30: people, not ids — the signed-in account's own email (the only one the service exposes today).
       m.myEmail = ctx.accountEmail ? await ctx.accountEmail().catch(() => '') || '' : await readAccountEmail({ demo: !!ctx.demo });
@@ -90,11 +94,11 @@ export const permissions = {
     if (m.status === 'unauthenticated') return `<section class="panel narrow" data-permissions data-permissions-state="unauthenticated">${head}<p class="small muted" role="alert">Your sign-in is no longer active. <a href="/v2/auth/access">Sign in again</a></p>${status}</section>`;
     if (m.status !== 'loaded') return `<section class="panel narrow" data-permissions data-permissions-state="failed">${head}<p class="small muted" role="alert">Could not load permissions. <a href="#" data-retry="grants">Retry</a></p>${status}</section>`;
     // F5: a workspace-only caller at a project is never offered Invite, Revoke invitation, Remove or role changes here.
-    const owner = !m.fromWorkspace && m.myRole === 'owner', member = !m.fromWorkspace && (m.myRole === 'member' || owner), busy = m.busy ? 'disabled' : '';
-    const fromWorkspace = m.fromWorkspace ? `<p class="small" data-permissions-from-workspace>${esc(FROM_WORKSPACE_NOTE)}${m.workspaceId ? ` <a href="#permissions/workspaces/${esc(ctx.enc ? ctx.enc(m.workspaceId) : encodeURIComponent(m.workspaceId))}" data-workspace-permissions-link>${esc(FROM_WORKSPACE_LINK)}</a>` : ''}</p>` : '';
+    const owner = !m.notDirect && m.myRole === 'owner', member = !m.notDirect && (m.myRole === 'member' || owner), busy = m.busy ? 'disabled' : '';
+    const fromWorkspace = m.fromWorkspace && m.workspaceId ? `<p class="small" data-permissions-from-workspace>${esc(FROM_WORKSPACE_NOTE)} <a href="#permissions/workspaces/${esc(ctx.enc ? ctx.enc(m.workspaceId) : encodeURIComponent(m.workspaceId))}" data-workspace-permissions-link>${esc(FROM_WORKSPACE_LINK)}</a></p>` : '';
     const canTouch = g => g.role !== 'owner' && (owner || RANK[g.role] <= RANK.member); // D3 ceiling; owners never removed/demoted
     // Member list component (ui/v3/components/member-list.js): name + email, "You" for self, never the principal id.
-    const actions = g => { const rc = m.receipts[g.id]; return `${g.role === 'owner' ? '<span class="muted">Owner — only a transfer changes this</span>' : member && canTouch(g) ? `${owner ? `<select data-role-for="${esc(g.id)}" aria-label="New role" ${busy}><option value="" selected disabled>${esc(CHANGE_TO)}</option>${ROLES.filter(r => r !== g.role).map(r => `<option value="${r}">${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}" ${busy}>Preview role change</button> ` : ''}<button type="button" class="quiet" data-revoke="${esc(g.id)}" ${busy}>Remove</button>` : m.fromWorkspace ? '' : `<span class="muted">Members manage viewers and members only</span>`}${rc ? learnMore(`<p class="small muted">receipt ${esc(rc.receipt)} · trace ${esc(rc.trace)}</p>`, { summary: 'Details' }) : ''}`; };
+    const actions = g => { const rc = m.receipts[g.id]; return `${g.role === 'owner' ? '<span class="muted">Owner — only a transfer changes this</span>' : member && canTouch(g) ? `${owner ? `<select data-role-for="${esc(g.id)}" aria-label="New role" ${busy}><option value="" selected disabled>${esc(CHANGE_TO)}</option>${ROLES.filter(r => r !== g.role).map(r => `<option value="${r}">${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}" ${busy}>Preview role change</button> ` : ''}<button type="button" class="quiet" data-revoke="${esc(g.id)}" ${busy}>Remove</button>` : m.notDirect ? '' : `<span class="muted">Members manage viewers and members only</span>`}${rc ? learnMore(`<p class="small muted">receipt ${esc(rc.receipt)} · trace ${esc(rc.trace)}</p>`, { summary: 'Details' }) : ''}`; };
     const roster = memberList(esc, m.grants, { me: m.me, myEmail: m.myEmail, actions, rowAttr: g => `data-grant-row="${esc(g.id)}"`, empty: 'No grants listed.', note: false });
     const namesNote = membersHidden(m.grants, { me: m.me, myEmail: m.myEmail }) ? `<p class="small muted" data-member-note>${esc(NO_EMAIL_NOTE)}</p>` : '';
     const pending = m.pending.length ? `<p class="eyebrow" style="margin-top:18px">Pending invitations</p><ul class="small" data-pending>${m.pending.map(i => `<li data-invitation="${esc(i.id)}">${esc(i.role)}${i.created_at ? ` · invited ${esc(shortDate(i.created_at))}` : ''}${m.invitees?.[i.id] ? ` · ${esc(m.invitees[i.id])}` : ''}${i.status === 'unconfirmed' ? ` · ${esc(UNCONFIRMED_NOTE)}` : ''}${member && (owner || RANK[i.role] <= RANK.member) ? ` ${m.askRevoke === i.id ? `<span data-revoke-ask="${esc(i.id)}">${esc(REVOKE_ASK)} <button type="button" class="small" data-revoke-invitation-confirm="${esc(i.id)}" ${busy}>Revoke</button> <button type="button" class="quiet small" data-revoke-invitation-cancel ${busy}>Cancel</button></span>` : `<button type="button" class="quiet small" data-revoke-invitation="${esc(i.id)}" ${busy}>Revoke invitation</button>`}` : ''}</li>`).join('')}</ul>` : ''; // B30: no pending → nothing (not another line)
@@ -121,7 +125,7 @@ export const permissions = {
     const refresh = async () => {
       const fresh = await permissions.load(ctx, { scope: m.scope, id: m.id });
       Object.assign(m, { status: fresh.status, grants: fresh.grants, pending: fresh.pending,
-        me: fresh.me, myEmail: fresh.myEmail, myRole: fresh.myRole, fromWorkspace: fresh.fromWorkspace, workspaceId: fresh.workspaceId, error: fresh.error, busy: false });
+        me: fresh.me, myEmail: fresh.myEmail, myRole: fresh.myRole, fromWorkspace: fresh.fromWorkspace, notDirect: fresh.notDirect, workspaceId: fresh.workspaceId, error: fresh.error, busy: false });
       paint();
     };
     const receiptText = env => [env.receipt?.id ? `receipt ${env.receipt.id}` : '', env.trace_id ? `trace ${env.trace_id}` : ''].filter(Boolean).join(' · '); // B31: shown only behind Details

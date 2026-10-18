@@ -44,6 +44,10 @@ describe("S19: cap.me.invitations names what you accept", () => {
     const inv = async (id: string, type: string, scopeId: string, email: string | null, role: string, status: string, expires: string | null, token = `th_${id}`) =>
       run("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
         id, type, scopeId, email === null ? null : await sha256(email), token, role, status, "usr_o", at, expires);
+    // The inviter holds the direct grants cap.grant.invite requires; accept re-checks them (F3, 0.35.4) and, since 0.35.5, the
+    // list hides rows whose inviter no longer does (cookbook work/active/2026-10-17-3d-dead-invitations DoD 2).
+    for (const [gid, scopeType, scopeId, role] of [["g_s19_ws", "workspace", "ws_n", "owner"], ["g_s19_n", "project", "proj_n", "member"], ["g_s19_lone", "project", "proj_lone", "owner"], ["g_s19_gone", "project", "proj_deleted", "member"], ["g_s19_other", "project", "proj_other", "member"]])
+      await run('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)', gid, "usr_o", scopeType, scopeId, role, at);
     const me = "invitee@example.invalid";
     await inv("inv_1_ws", "workspace", "ws_n", me, "owner", "sent", later);
     await inv("inv_2_proj", "project", "proj_n", me, "member", "pending", later);
@@ -82,7 +86,6 @@ describe("S19: cap.me.invitations names what you accept", () => {
 
     // Token path unchanged: the link's dry run still discloses no name (possibly signed out on arrival; no email-matched list).
     // The inviter holds a direct grant on the project, as cap.grant.invite requires (accept re-checks it since 0.35.4, F3).
-    await run('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)', "g_s19_lone", "usr_o", "project", "proj_lone", "owner", at);
     await inv("inv_11_tok", "project", "proj_lone", me, "member", "sent", later, await sha256("tok_s19_link"));
     const dry = await accept(mk("usr_i"), { token: "tok_s19_link" }, { dryRun: true });
     expect(dry.impact!.affected[0]).toMatchObject({ scope: { type: "project", id: "proj_lone" }, role: "member" });
