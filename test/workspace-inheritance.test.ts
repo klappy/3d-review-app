@@ -1238,3 +1238,58 @@ describe("owner set ordered in the aggregate; swept invitation ids bound; lost o
     expect(await roleOf("n5_t", "prj_n5d")).toBe("member");
   });
 });
+
+// 0.35.21 (cookbook work/active/2026-10-18-3d-grant-noop-followups-6): the 544 review follow-ups.
+describe("transfer_owner step-down refusal names a moved invitation set (0.35.21)", () => {
+  const now = new Date("2026-10-18T23:00:00.000Z"); const at = now.toISOString();
+  let trace = 0;
+  const mk = (db: any, id: string): Ctx => ({ env: { DB: db, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } as any, db,
+    principal: { kind: "user", id, provisioned: true } as any, traceId: `tr_n6_${++trace}`, now: () => now, log: () => {} } as any);
+  let db: any;
+  const grant = (id: string, p: string, s: string, r: string) => db.prepare('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)').bind(id, p, "project", s, r, at).run();
+  const invite = (id: string, scopeId: string, by: string, role: string) => db.prepare("INSERT INTO invitation (id, scope_type, scope_id, invitee_hash, token_hash, role, status, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+    .bind(id, "project", scopeId, `n6_nobody_${id}`, id, role, "sent", by, at).run();
+  const roleOf = async (p: string, s: string) => (await db.prepare(`SELECT role FROM "grant" WHERE principal_id = ? AND scope_id = ?`).bind(p, s).first())?.role;
+  const statusOf = async (id: string) => (await db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first())?.status;
+  const dry = (ctx: Ctx, cap: string, params: any) => execute(ctx, cap, params, { tool: "danger", mode: "dry_run" }) as Promise<any>;
+  const exec = (ctx: Ctx, cap: string, params: any, d: any) => execute(ctx, cap, params, { tool: "danger", mode: "execute", confirm_token: d.result.confirm_token }) as Promise<any>;
+  /** A ctx whose first db.batch runs `race` first: the window between the token check (dispatch) and the write. */
+  const racingCtx = (id: string, race: () => Promise<unknown>) => {
+    let raced = false;
+    const r = { prepare: (s: string) => db.prepare(s), batch: async (stmts: any[]) => { if (!raced) { raced = true; await race(); } return db.batch(stmts); } };
+    return { ctx: { ...mk(r, id), env: { DB: r, SESSION_SECRET: "synthetic-only", ENVIRONMENT: "dev" } } as any, raced: () => raced };
+  };
+  beforeAll(async () => {
+    db = await mf.getD1Database("DB");
+    const sql = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
+    if (!(await db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'principal'").first()))
+      await db.batch(sql("../migrations/0001_init.sql").split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s)));
+    for (const id of ["n6_po", "n6_t"]) await db.prepare("INSERT INTO principal (id, email_hash, provisioned, support, created_at) VALUES (?,?,?,?,?)").bind(id, await sha256(id + "@example.invalid"), 1, 0, at).run();
+    for (const p of ["prj_n6a", "prj_n6b"]) {
+      await db.prepare("INSERT INTO project (id, workspace_id, name, created_at, created_by) VALUES (?,?,?,?,?)").bind(p, null, p, at, "n6_po").run();
+      await grant(`n6g_po_${p}`, "n6_po", p, "owner"); await grant(`n6g_t_${p}`, "n6_t", p, "member");
+    }
+  });
+
+  it("step_down: an owner invitation added in the write window → CONFIRM_REQUIRED naming the invitations (DoD (a))", async () => {
+    const params = { scope: "project", id: "prj_n6a", to: "n6_t", step_down: true };
+    const d = await dry(mk(db, "n6_po"), "cap.grant.transfer_owner", params); expect(d.result.impact.revoked_invitations).toBe(0);
+    const r = racingCtx("n6_po", () => invite("n6i_a1", "prj_n6a", "n6_po", "owner"));
+    const env = await exec(r.ctx, "cap.grant.transfer_owner", params, d);
+    expect(r.raced()).toBe(true);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect(env.error.message).toBe("the invitations this change would revoke changed since the dry_run preview");
+    expect(await roleOf("n6_t", "prj_n6a")).toBe("member"); expect(await roleOf("n6_po", "prj_n6a")).toBe("owner"); expect(await statusOf("n6i_a1")).toBe("sent");
+  });
+
+  it("step_down: the recipient changed in the window with the invitation set unchanged → still 'the target changed' (DoD (a))", async () => {
+    const params = { scope: "project", id: "prj_n6b", to: "n6_t", step_down: true };
+    const d = await dry(mk(db, "n6_po"), "cap.grant.transfer_owner", params); expect(d.ok).toBe(true);
+    const r = racingCtx("n6_po", () => db.prepare(`UPDATE "grant" SET role = 'viewer' WHERE id = 'n6g_t_prj_n6b'`).run());
+    const env = await exec(r.ctx, "cap.grant.transfer_owner", params, d);
+    expect(r.raced()).toBe(true);
+    expect(env.ok).toBe(false); expect(env.error.code).toBe("CONFIRM_REQUIRED");
+    expect(env.error.message).toBe("the target changed since the dry_run preview");
+    expect(await roleOf("n6_t", "prj_n6b")).toBe("viewer"); expect(await roleOf("n6_po", "prj_n6b")).toBe("owner");
+  });
+});

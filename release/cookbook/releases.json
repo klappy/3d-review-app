@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.20",
+  "current": "0.35.21",
   "versions": [
+    {
+      "version": "0.35.21",
+      "status": "candidate",
+      "notes_path": "releases/0.35.21.md",
+      "sections": {
+        "fixed": [
+          "Ownership: when an owner steps down and the invitations that stepping down would cancel change at the moment they confirm, the refusal now says the invitations changed, instead of only saying something changed; they are asked to preview again."
+        ]
+      }
+    },
     {
       "version": "0.35.20",
       "status": "candidate",
