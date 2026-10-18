@@ -1,23 +1,23 @@
 {
-  "version": "0.35.13",
+  "version": "0.35.14",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "0a77dc852edd3f7545d25fc9b88f569ab0c6679f",
+  "cookbook_commit": "98e691e809dc445869894674afc0d436d1fbfa08",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.13.md",
-      "blob_sha": "014eb97d8fafddf13d713e83f11fc5b1f325f909",
-      "sha256": "ed1df09700b30b93ea893c59551e796c298cf1d48e69f289a9c934c8ddac865c"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.14.md",
+      "blob_sha": "be2be1c0f8168041ebe3891f62528ce00365bbcf",
+      "sha256": "0d54a80c8e15fd02d3987cae4021b0be73deaddebb9d28223d39f2d5c7ed741b"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "1156f28f4e53be321d76ca96b175cedd4bce902b",
-      "sha256": "0b6f01618424805b5319f766524bf3d409238722f990f6dfcb6cb7e117252589"
+      "blob_sha": "861db9a71b1dc89cad025679e1c918ca83515ee8",
+      "sha256": "691b015a3366b40faba6e6e93a17b19ddb027da6c1953bfd77042373cf4c5622"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Roles: changing a person's role is refused if their role changed since you looked, or if your own role was lowered or removed in the meantime; removing a person is refused if your own role was lowered or removed in the meantime. Removing a person who was removed at the same moment by someone else now reports that the access was not found, instead of reporting it removed."
+        "Roles: a role change or removal that is refused because something changed at the same moment no longer cancels any of that person's open invitations. Setting a person to the role they were already given at the same moment by someone else now succeeds instead of reporting a conflict, and a refusal that finds the person still listed reports a conflict to retry instead of \"not found\"."
       ]
     }
   }
