@@ -46,7 +46,7 @@ describe("S19: cap.me.invitations names what you accept", () => {
         id, type, scopeId, email === null ? null : await sha256(email), token, role, status, "usr_o", at, expires);
     // The inviter holds the direct grants cap.grant.invite requires; accept re-checks them (F3, 0.35.4) and, since 0.35.5, the
     // list hides rows whose inviter no longer does (cookbook work/active/2026-10-17-3d-dead-invitations DoD 2).
-    for (const [gid, scopeType, scopeId, role] of [["g_s19_ws", "workspace", "ws_n", "owner"], ["g_s19_n", "project", "proj_n", "member"], ["g_s19_lone", "project", "proj_lone", "owner"], ["g_s19_gone", "project", "proj_deleted", "member"], ["g_s19_other", "project", "proj_other", "member"]])
+    for (const [gid, scopeType, scopeId, role] of [["g_s19_ws", "workspace", "ws_n", "owner"], ["g_s19_asm", "assessment", "asm_n", "member"], ["g_s19_n", "project", "proj_n", "member"], ["g_s19_lone", "project", "proj_lone", "owner"], ["g_s19_gone", "project", "proj_deleted", "member"], ["g_s19_other", "project", "proj_other", "member"]])
       await run('INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) VALUES (?,?,?,?,?,?)', gid, "usr_o", scopeType, scopeId, role, at);
     const me = "invitee@example.invalid";
     await inv("inv_1_ws", "workspace", "ws_n", me, "owner", "sent", later);
