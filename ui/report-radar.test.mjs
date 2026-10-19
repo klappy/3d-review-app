@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { JSDOM } from 'jsdom';
-import { radarModel, renderLensRadar, radarCopy, labelExtents } from './report-radar.js';
+import { radarModel, renderLensRadar, radarCopy, labelExtents, wrap } from './report-radar.js';
+import { lensSpreadRows } from './report-lenses.js';
 import { renderReport } from './report-view.js';
 
 // Synthetic payload: three perspectives, one area not asked of Community (the skipped spoke), one single-lens area.
@@ -152,9 +153,54 @@ test('R10 a blank construct name (empty or whitespace-only) gives a finite viewB
     assert.ok(!section.outerHTML.includes('NaN'), `no NaN for ${JSON.stringify(blank)}`);
     for (const variant of ['wide', 'narrow']) {
       const svg = section.querySelector(`svg.radar-${variant}`);
-      assert.ok(svg.getAttribute('viewBox').split(/\s+/).map(Number).every(Number.isFinite), `${variant} viewBox is finite`);
+      const vb = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+      assert.ok(vb.every(Number.isFinite), `${variant} viewBox is finite`);
       const label = [...svg.querySelectorAll('.spoke-label')][1];
       assert.deepEqual([...label.querySelectorAll('tspan')].map(s => s.textContent), ['—']);
+      // Every spoke label (the dash included) is laid out at finite coordinates and sits inside its viewBox.
+      for (const el of svg.querySelectorAll('.spoke-label')) {
+        const parts = [...el.querySelectorAll('tspan')].map(s => s.textContent);
+        const fs = variant === 'wide' ? 20 : 11 * 500 / 240;
+        const e = labelExtents({ lx: Number(el.getAttribute('x')), y: Number(el.getAttribute('y')), anchor: el.getAttribute('text-anchor'), parts }, fs);
+        assert.ok([e.left, e.right, e.top, e.bottom].every(Number.isFinite), `${variant} label extents finite`);
+        // Narrow grows its box to hold every label; wide keeps main's fixed box (labels may overhang it, as on main).
+        if (variant === 'narrow') assert.ok(e.left >= vb[0] && e.right <= vb[0] + vb[2] && e.top >= vb[1] && e.bottom <= vb[1] + vb[3], `narrow label ${JSON.stringify(parts)} inside the box`);
+      }
     }
+    // Wide keeps main's fixed box exactly, and the named spokes are laid out as they are with all three named.
+    const wide = section.querySelector('svg.radar-wide');
+    assert.equal(wide.getAttribute('viewBox'), '-70 -40 500 440');
+    const named = renderLensRadar({ doc: doc(), report: { payload: { cross_lens_multi: rep.payload.cross_lens_multi.map((e, k) => (k === 1 ? { ...e, construct_name: 'Middle' } : e)) } } }).querySelector('svg.radar-wide');
+    for (const k of [0, 2]) assert.equal([...wide.querySelectorAll('.spoke-label')][k].outerHTML, [...named.querySelectorAll('.spoke-label')][k].outerHTML);
   }
+});
+
+test('R11 a missing or null construct name shows the em dash in the spoke label, the marker tooltip and the agreement row', () => {
+  for (const missing of [undefined, null, '', '  ']) {
+    const entries = ['Trust / Readiness', missing, 'Clarity / Naturalness'].map((n, k) => ({ ...(n === undefined ? {} : { construct_name: n }), lens_scores: [{ lens: 'Church', score: 50 + k }, { lens: 'Community', score: 60 }] }));
+    const rep = { payload: { cross_lens_multi: entries } };
+    assert.deepEqual(radarModel(rep).spokes, ['Trust / Readiness', '—', 'Clarity / Naturalness']);
+    const section = renderLensRadar({ doc: doc(), report: rep });
+    const html = section.outerHTML;
+    assert.ok(!/undefined|null|NaN/.test(html), `no raw ${JSON.stringify(missing)} in the radar`);
+    for (const variant of ['wide', 'narrow']) {
+      const svg = section.querySelector(`svg.radar-${variant}`);
+      assert.deepEqual([...[...svg.querySelectorAll('.spoke-label')][1].querySelectorAll('tspan')].map(s => s.textContent), ['—']);
+      const tips = [...svg.querySelectorAll('[data-radar-lens] circle title')].map(t => t.textContent);
+      assert.ok(tips.includes('Church · —: 51 out of 100'), `${variant} tooltip ${JSON.stringify(tips)}`);
+      assert.ok(tips.includes('Community · —: 60 out of 100'));
+    }
+    const row = lensSpreadRows(rep).find(r => r.lenses.some(l => l.score === 51));
+    assert.equal(row.name, '—');
+  }
+  // Named areas pass through exactly as returned (not trimmed, not rewritten).
+  assert.deepEqual(radarModel({ payload: { cross_lens_multi: [' A ', 'B', 0].map(n => ({ construct_name: n, lens_scores: [{ lens: 'Church', score: 1 }, { lens: 'Community', score: 2 }] })) } }).spokes, [' A ', 'B', '0']);
+});
+
+test('R12 wrap() terminates and hyphenates when hardMax is 1 or 2', () => {
+  for (const hardMax of [1, 2]) {
+    const lines = wrap('abcdef', 1, hardMax);
+    assert.ok(lines.length > 1 && lines.join('').replace(/-/g, '') === 'abcdef', `hardMax ${hardMax}: ${JSON.stringify(lines)}`);
+  }
+  assert.deepEqual(wrap('   '), ['—']);
 });

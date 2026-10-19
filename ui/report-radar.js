@@ -6,7 +6,7 @@
 // (parity-loop R18) use the simplest choice: at least 3 spokes or no radar; a skipped spoke breaks the outline (closed only when every spoke is scored);
 // labels wrap at words; rings at 25/50/75/100; the wide chart scales with main's fixed viewBox, the phone one is sized below.
 // Presentation only: reads cross_lens_multi exactly as returned, never re-scores, no mean.
-import { lensLabel } from './report-lenses.js';
+import { constructName, lensLabel } from './report-lenses.js';
 
 export const radarCopy = Object.freeze({
   heading: 'Perspectives at a glance',
@@ -33,18 +33,18 @@ const NARROW_MIN = 240, WIDE_MIN = 460, BANDS = Array.from({ length: (WIDE_MIN -
 const MARKER_PX = 8, RING_PX = 11, SPOKE_PX = 11;
 // Labels wrap at word boundaries (about 13 characters a line); a lone "/" stays on the line of the word before it.
 // hardMax (narrow only): a word longer than hardMax characters (the whole box line) is broken with a hyphen; shorter words stay whole.
-function wrap(name, width = WRAP, hardMax = 0) {
+export function wrap(name, width = WRAP, hardMax = 0) {
   const lines = [], words = [];
   for (let word of String(name).split(/\s+/).filter(Boolean)) {
     if (word === '/' && words.length) { words[words.length - 1] += ' /'; continue; }
-    while (hardMax && word.length > hardMax) { const cut = hardMax - 1; words.push(`${word.slice(0, cut)}-`); word = word.slice(cut); }
+    while (hardMax && word.length > hardMax) { const cut = Math.max(1, hardMax - 1); words.push(`${word.slice(0, cut)}-`); word = word.slice(cut); }
     words.push(word);
   }
   for (const word of words) {
     const last = lines[lines.length - 1];
     if (last !== undefined && (last + ' ' + word).length <= width) lines[lines.length - 1] = `${last} ${word}`; else lines.push(word);
   }
-  return lines.length ? lines : ['—']; // a blank (empty or whitespace-only) name shows an em dash, never an empty label (NaN box)
+  return lines.length ? lines : ['—']; // backstop: radarModel already maps a blank name to the em dash (constructName)
 }
 const rows = v => (Array.isArray(v) ? v : []);
 const num = v => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
@@ -57,7 +57,7 @@ export function radarModel(report) {
   const areas = rows(payload.cross_lens_multi).map(entry => {
     if (!entry || typeof entry !== 'object') return null;
     const scores = rows(entry.lens_scores).filter(s => s && typeof s.lens === 'string' && Number.isFinite(num(s.score)));
-    return scores.length >= 2 ? { name: String(entry.construct_name), scores } : null;
+    return scores.length >= 2 ? { name: constructName(entry.construct_name), scores } : null;
   }).filter(Boolean);
   if (areas.length < MIN_SPOKES) return null;
   const order = [];
@@ -103,7 +103,7 @@ ${BANDS.slice(1).map(b => `@container (min-width:${b}px){.lens-radar svg.radar-n
 
 /** Estimated extents of one laid-out spoke label in viewBox units at font size fs: { left, right, top, bottom }. */
 export function labelExtents({ lx, y, anchor, parts }, fs = LABEL_FS) {
-  const w = Math.max(...parts.map(p => p.length)) * EM_W * fs, line = LINE * fs / LABEL_FS;
+  const w = Math.max(0, ...parts.map(p => p.length)) * EM_W * fs, line = LINE * fs / LABEL_FS;
   const left = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2;
   return { left, right: left + w, top: y - fs * 0.8, bottom: y + (parts.length - 1) * line + fs * 0.25 };
 }
