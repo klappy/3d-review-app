@@ -1,23 +1,23 @@
 {
-  "version": "0.35.26",
+  "version": "0.35.27",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "4857d913a124ed3dd2bf71a6403c08c30d133337",
+  "cookbook_commit": "faaf5f3070d45c1e70c6a1deac96999a319a188f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.26.md",
-      "blob_sha": "f3f0194742cea631f94f1b034799a9d5dc1ef8c7",
-      "sha256": "e61330a68336c89b57491df3e3528b684ad38b9a204d4910bee4e08ce44b2c57"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.27.md",
+      "blob_sha": "ea1420b2f8731858dcfd14ba29029e3762317f87",
+      "sha256": "3b5617f218d09fc1f77df21aeb70005137cb740b700f805e71c9283d47399b3c"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "5dbed58ecc0c7db9adb1955a38b2d15ce6d1bc1e",
-      "sha256": "c00f34ac5ea266421521d8c78741f2f85fb7e75f18fa5e2b3ebd4f87557a3126"
+      "blob_sha": "4067a177ea16b13122c0c01e45c72bf0f8881de3",
+      "sha256": "428021237851c717a66303928240761da9b2b0b04917d99269294a10c8e6acf6"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Full report: an area with no name now shows a dash everywhere it appears — beside its radar spoke, in the score tooltip and in the \"Do the perspectives agree?\" list — instead of the words \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
+        "Report summary: when perspectives disagree about an area with no name, the summary sentence now names it with a dash instead of the word \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
       ]
     }
   }
