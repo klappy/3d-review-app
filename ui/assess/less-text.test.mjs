@@ -166,8 +166,9 @@ test('B30 About: one heading, one short line, one primary; the explanation and t
   assert.equal(count(h, /<h[1-6]\b/g), 1, 'one heading in the whole page, disclosures included');
 });
 
-// Rachel 2026-10-19 copy (cookbook sources/rachel-copy-2026-10-19/COPY-MAP.md C01–C12): exact source strings on About and the public home.
-test('Rachel copy C01–C12: exact strings on About and home; How it works + facts behind Learn more on both', async () => {
+// Rachel 2026-10-19 copy (cookbook sources/rachel-copy-2026-10-19/COPY-MAP.md C01–C12): exact source sentences and C03 captions on About
+// and the public home. C03 labels keep the app-wide "Translation team" casing (declared conflict), so they are not pinned here.
+test('Rachel copy C01–C12: exact sentences and captions on About and home (C03 labels kept app-wide, not pinned); each sentence under its label behind Learn more', async () => {
   const cards = await import('./cards.js');
   const about = pages.entry.render({ esc, cards, state: {} }, { mode: 'about' });
   const home = pages.entry.render({ esc, cards, state: {} }, { mode: 'welcome' });
@@ -182,7 +183,11 @@ test('Rachel copy C01–C12: exact strings on About and home; How it works + fac
   for (const [name, h] of [['about', about], ['home', home]]) {
     const body = lessText(h, name, /<h[12]\b/g);
     for (const t of exact) assert.ok(h.includes(esc(t)), `${name}: ${t}`);
-    for (const t of ['How it works', 'Set up.', 'Share.', 'Learn.', 'Who it is for', 'When to use it', 'How often']) assert.ok(body.includes(t), `${name}: ${t} behind Learn more`);
+    assert.ok(body.includes('<strong>How it works</strong>'), `${name}: How it works behind Learn more`);
+    // Each sentence pinned to its own label (review 6276186955 F3): a swap between labels fails.
+    const pairs = [['Set up.', exact[5]], ['Share.', exact[6]], ['Learn.', exact[7]]].map(([l, t]) => `<strong>${esc(l)}</strong> ${esc(t)}</p>`);
+    pairs.push(...[['Who it is for', exact[8]], ['When to use it', exact[9]], ['How often', exact[10]]].map(([l, t]) => `<p><strong>${esc(l)}</strong></p><p class="muted">${esc(t)}</p>`));
+    for (const pr of pairs) assert.ok(body.includes(pr), `${name}: label + sentence pair behind Learn more: ${pr}`);
     assert.match(upFront(h), /<p class="muted lead">3D Review visualizes how a Bible translation project is performing so you can decide what to do next\.<\/p>/);
   }
   assert.match(about, /<h1>Three perspectives\. One useful next step\.<\/h1>/);
