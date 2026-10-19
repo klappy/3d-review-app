@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.27",
+  "current": "0.35.28",
   "versions": [
+    {
+      "version": "0.35.28",
+      "status": "candidate",
+      "notes_path": "releases/0.35.28.md",
+      "sections": {
+        "changed": [
+          "Home and About: the welcome line, the three perspective captions and the Learn more text (How it works, who it is for, when to use it, how often) now use the October 19 copy revision. Screens, actions and Learn more placement are unchanged."
+        ]
+      }
+    },
     {
       "version": "0.35.27",
       "status": "candidate",

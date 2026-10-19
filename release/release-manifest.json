@@ -1,23 +1,23 @@
 {
-  "version": "0.35.27",
+  "version": "0.35.28",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "faaf5f3070d45c1e70c6a1deac96999a319a188f",
+  "cookbook_commit": "9e8d611a4f9ab657f570b098a8fdb7c88e7b48c2",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.27.md",
-      "blob_sha": "ea1420b2f8731858dcfd14ba29029e3762317f87",
-      "sha256": "3b5617f218d09fc1f77df21aeb70005137cb740b700f805e71c9283d47399b3c"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.28.md",
+      "blob_sha": "cd9fe44b86416de1f8f638ae0e85a2ea6b29e59f",
+      "sha256": "ecd36c23e24bd7b80844e0f05a0af39c262c09ed040ce2ea66f6c02ae8ef7cf7"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "4067a177ea16b13122c0c01e45c72bf0f8881de3",
-      "sha256": "428021237851c717a66303928240761da9b2b0b04917d99269294a10c8e6acf6"
+      "blob_sha": "f2c07ab59155f2aac4acf972faf1bd8e1020b8ec",
+      "sha256": "7aca6e61a600d6e258e1356ea203ab04022075bd4d9a50e3367e93a53d8029b7"
     }
   ],
   "changelog": {
     "sections": {
-      "fixed": [
-        "Report summary: when perspectives disagree about an area with no name, the summary sentence now names it with a dash instead of the word \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
+      "changed": [
+        "Home and About: the welcome line, the three perspective captions and the Learn more text (How it works, who it is for, when to use it, how often) now use the October 19 copy revision. Screens, actions and Learn more placement are unchanged."
       ]
     }
   }

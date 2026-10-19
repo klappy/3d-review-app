@@ -162,8 +162,31 @@ test('B30 About: one heading, one short line, one primary; the explanation and t
   const body = lessText(h, 'about', /<h[12]\b/g);
   assert.equal(count(upFront(h), /<p class="muted lead">/g), 1);
   const line = upFront(h).match(/<p class="muted lead">([^<]*)<\/p>/)[1]; assert.equal(sentences(line), 1, 'one sentence');
-  for (const moved of ['A facilitator sets up a review.', 'Who it is for', 'When to use it', 'How often']) assert.ok(body.includes(moved), `moved, not removed: ${moved}`);
+  for (const moved of ['How it works', 'A facilitator (usually a project manager or partner) creates the review', 'Who it is for', 'When to use it', 'How often']) assert.ok(body.includes(moved), `moved, not removed: ${moved}`);
   assert.equal(count(h, /<h[1-6]\b/g), 1, 'one heading in the whole page, disclosures included');
+});
+
+// Rachel 2026-10-19 copy (cookbook sources/rachel-copy-2026-10-19/COPY-MAP.md C01–C12): exact source strings on About and the public home.
+test('Rachel copy C01–C12: exact strings on About and home; How it works + facts behind Learn more on both', async () => {
+  const cards = await import('./cards.js');
+  const about = pages.entry.render({ esc, cards, state: {} }, { mode: 'about' });
+  const home = pages.entry.render({ esc, cards, state: {} }, { mode: 'welcome' });
+  const exact = ['3D Review visualizes how a Bible translation project is performing so you can decide what to do next.',
+    'How the work is done', 'How it’s understood', 'How it’s used', 'How it works',
+    'A facilitator (usually a project manager or partner) creates the review and chooses the surveys that fit your project, whether it’s written, oral, or sign language.',
+    'Each group answers a short survey, by link, QR code, or on paper.',
+    'You get a report that shows strengths and areas to grow, side by side, so you know where to focus next.',
+    'Translation teams and their leaders, the communities they serve and the churches they partner with',
+    'When your project would benefit from a pause to reflect and learn from feedback (consider using between books or publishing iterations)',
+    'Repeat when a new assessment would be useful, or over increments of time to create a trajectory'];
+  for (const [name, h] of [['about', about], ['home', home]]) {
+    const body = lessText(h, name, /<h[12]\b/g);
+    for (const t of exact) assert.ok(h.includes(esc(t)), `${name}: ${t}`);
+    for (const t of ['How it works', 'Set up.', 'Share.', 'Learn.', 'Who it is for', 'When to use it', 'How often']) assert.ok(body.includes(t), `${name}: ${t} behind Learn more`);
+    assert.match(upFront(h), /<p class="muted lead">3D Review visualizes how a Bible translation project is performing so you can decide what to do next\.<\/p>/);
+  }
+  assert.match(about, /<h1>Three perspectives\. One useful next step\.<\/h1>/);
+  assert.match(home, /<h1>Three perspectives\.<br>One useful next step\.<\/h1>/);
 });
 
 // Validator FAIL on #292 @2b81817 (lanes-1611): Permissions kept two lines + three headings; notices showed ids and ISO stamps;
