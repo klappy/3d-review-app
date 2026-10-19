@@ -8,7 +8,7 @@
       "notes_path": "releases/0.35.22.md",
       "sections": {
         "fixed": [
-          "Full report radar: on a phone every area name around the chart now shows in full (long names such as \"Understanding of the Source\" are no longer cut off at the edge), and the score markers and the 25/50/75/100 ring numbers are larger so they are easier to read."
+          "Full report radar: on a phone every area name around the chart now shows in full, wrapped at whole words (long names such as \"Understanding of the Source\" are no longer cut off at the edge), and the score markers and the 50 and 100 ring numbers are larger so they are easier to read. The desktop chart is unchanged."
         ]
       }
     },

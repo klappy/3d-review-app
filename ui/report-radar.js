@@ -4,7 +4,7 @@
 // polygon per perspective, 2px strokes, markers of 8px or more, legend plus wrapping labels, spokes are the areas two or more
 // perspectives scored, and a spoke is skipped where a perspective was not asked. Rules the canvas has not yet written
 // (parity-loop R18) use the simplest choice: at least 3 spokes or no radar; a skipped spoke breaks the outline (closed only when every spoke is scored);
-// labels wrap at words; rings at 25/50/75/100; same chart at every width (it scales with the viewBox).
+// labels wrap at words; rings at 25/50/75/100; the wide chart scales with main's fixed viewBox, the phone one is sized below.
 // Presentation only: reads cross_lens_multi exactly as returned, never re-scores, no mean.
 import { lensLabel } from './report-lenses.js';
 
@@ -19,23 +19,25 @@ const SIZE = 360, C = SIZE / 2, R = 120, LABEL_R = R + 24, RINGS = [25, 50, 75, 
 // Phone legibility (cookbook work/active/2026-10-18-3d-radar-phone-legibility; canvas design-system.md Radar row; review
 // #546 HOLD). Two layouts of the same chart, one shown at a time by a container query on the figure:
 // - wide (container 460px or more, the svg at its 460px cap): main's sizes in viewBox units, unchanged (spoke labels 20,
-//   ring labels 13, marker r 5); the box only grows, evenly on both sides, to hold every spoke label.
-// - narrow (under 460px): labels wrap tighter (WRAP_N) and every size is set in CSS from rendered px: unit = px * vbw / wmin,
+//   ring labels 13, marker r 5) in main's fixed box (BASE), so the desktop chart is exactly main's (review #546 HOLD k0005).
+// - narrow (under 460px): labels wrap to the room beside their spoke and every size is set in CSS from rendered px: unit = px * vbw / wmin,
 //   where --vbw is the viewBox width and --wmin the lower edge of the container band, so at any width down to NARROW_MIN
 //   markers are 8px or more across, ring labels 11px or more and spoke labels SPOKE_PX (never smaller than the ring labels).
 //   The narrow box keeps main's width (BASE.w), so the plot is never smaller than main's at the same width (review #546
-//   re-review HOLD: the box grew and the plot shrank); spoke labels wrap to the room beside their spoke instead, breaking a
-//   word too long for the line with a hyphen. Only the 50 and 100 ring labels are drawn (25/50/75/100 stacked under markers),
+//   re-review HOLD: the box grew and the plot shrank); spoke labels wrap at words to the room beside their spoke and a
+//   label still too wide moves inward to stay in the box; a word is broken with a hyphen only when it is longer than the
+//   whole box line, and "/" stays with the word before it ("Appeal /" then "Beauty"). Only the 50 and 100 ring labels are drawn (25/50/75/100 stacked under markers),
 //   and rings, spokes and outlines keep 1px/2px strokes at any scale (vector-effect: non-scaling-stroke).
 const LABEL_FS = 20, EM_W = 0.6, PAD = 6, BASE = { x: -70, y: -40, w: SIZE + 140, h: SIZE + 80 };
 const NARROW_MIN = 240, WIDE_MIN = 460, BANDS = Array.from({ length: (WIDE_MIN - NARROW_MIN) / 20 }, (_, k) => NARROW_MIN + 20 * k), NARROW_RINGS = [50, 100];
 const MARKER_PX = 8, RING_PX = 11, SPOKE_PX = 11;
-// Labels wrap at word boundaries (about 13 characters a line) so they stay legible when the chart scales down on a phone.
-function wrap(name, width = WRAP, hard = false) {
+// Labels wrap at word boundaries (about 13 characters a line); a lone "/" stays on the line of the word before it.
+// hardMax (narrow only): a word longer than hardMax characters (the whole box line) is broken with a hyphen; shorter words stay whole.
+function wrap(name, width = WRAP, hardMax = 0) {
   const lines = [], words = [];
-  for (let word of String(name).split(/\s+/)) {
-    // hard (narrow only): a word longer than the line is broken with a hyphen so the label stays inside the box.
-    while (hard && word.length > width) { const cut = Math.max(3, Math.min(width - 1, word.length - 3)); words.push(`${word.slice(0, cut)}-`); word = word.slice(cut); }
+  for (let word of String(name).split(/\s+/).filter(Boolean)) {
+    if (word === '/' && words.length) { words[words.length - 1] += ' /'; continue; }
+    while (hardMax && word.length > hardMax) { const cut = hardMax - 1; words.push(`${word.slice(0, cut)}-`); word = word.slice(cut); }
     words.push(word);
   }
   for (const word of words) {
@@ -105,7 +107,7 @@ export function labelExtents({ lx, y, anchor, parts }, fs = LABEL_FS) {
   const left = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2;
   return { left, right: left + w, top: y - fs * 0.8, bottom: y + (parts.length - 1) * line + fs * 0.25 };
 }
-/** The old fixed box grown (never shrunk) to hold every label plus PAD, evenly on both sides so the chart stays centred. */
+/** Narrow: main's fixed box grown (never shrunk) to hold every label plus PAD, evenly on both sides so the chart stays centred. */
 export function radarViewBox(labels, fs = LABEL_FS) {
   let x0 = BASE.x, y0 = BASE.y, x1 = BASE.x + BASE.w, y1 = BASE.y + BASE.h;
   for (const l of labels) {
@@ -124,20 +126,27 @@ function layoutLabels(spokes, fs, width, topClear = 0, half = 0) {
     const anchor = Math.abs(px - C) < 8 ? 'middle' : px > C ? 'start' : 'end';
     // half > 0 (narrow): fit each label's line length to the room between its anchor and the box edge.
     const room = anchor === 'middle' ? 2 * half : anchor === 'start' ? C + half - px : px - (C - half);
-    const parts = half ? wrap(name, Math.max(4, Math.floor((room - PAD) / (EM_W * fs))), true) : wrap(name, width);
+    const parts = half ? wrap(name, Math.max(4, Math.floor((room - PAD) / (EM_W * fs))), Math.floor((2 * half - 2 * PAD) / (EM_W * fs))) : wrap(name, width);
     const y = py - (py < C ? (parts.length - 1) * line : 0) + fs / 4;
-    return { name, i, lx: px, y, anchor, parts, line };
+    let lx = px;
+    if (half) {
+      // A whole word wider than the room beside its spoke: move the label inward just enough to stay inside the box.
+      const w = Math.max(...parts.map(p => p.length)) * EM_W * fs;
+      if (anchor === 'start') lx = Math.min(px, C + half - PAD - w);
+      else if (anchor === 'end') lx = Math.max(px, C - half + PAD + w);
+    }
+    return { name, i, lx, y, anchor, parts, line };
   });
 }
 /** Narrow layout: main's box width, spoke labels at their largest unit size (SPOKE_PX at NARROW_MIN) wrapped to fit it. */
 function narrowLayout(spokes) {
   const fs = SPOKE_PX * BASE.w / NARROW_MIN, labels = layoutLabels(spokes, fs, 0, fs * RING_PX / SPOKE_PX, BASE.w / 2);
-  return { labels, box: radarViewBox(labels, fs), fs };
+  return { labels, box: radarViewBox(labels, fs) };
 }
 function radarSvg(doc, model, variant) {
   const count = model.spokes.length;
-  const { labels, box } = variant === 'narrow' ? narrowLayout(model.spokes) : { labels: layoutLabels(model.spokes, LABEL_FS, WRAP) };
-  const vb = box || radarViewBox(labels);
+  // Wide: main 8646a5b's fixed box exactly (review #546 HOLD k0005: growing it shrank the desktop chart).
+  const { labels, box: vb } = variant === 'narrow' ? narrowLayout(model.spokes) : { labels: layoutLabels(model.spokes, LABEL_FS, WRAP), box: BASE };
   const svg = svgEl(doc, 'svg', { class: `radar-${variant}`, viewBox: [vb.x, vb.y, vb.w, vb.h].map(fmt).join(' '), role: 'img', style: `--vbw:${fmt(vb.w)}` });
   svg.append(svgEl(doc, 'title', {}, radarCopy.title));
   for (const ring of RINGS) {

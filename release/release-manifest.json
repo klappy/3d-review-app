@@ -1,23 +1,23 @@
 {
   "version": "0.35.22",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "28451091be06554c91aabf2086ccb332da915862",
+  "cookbook_commit": "a7dd3820adc56b28622a086a8e4a9aae488d3233",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.35.22.md",
-      "blob_sha": "ae92bf0c924362e7552a5e131e59cd94d2f9f54c",
-      "sha256": "f6220e73a848b68323a2e54bbdbd886bc2733f07ed758f07b3918f04cc638634"
+      "blob_sha": "2089950e0dd200e264a60258010b0ffd89a82abd",
+      "sha256": "e1007a0ff52198336ff02c7afa1ae66dc3cfdc33962e44f03646542e04b1799a"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "c648adf324d05e14a6991c0f631635b1e06e3d54",
-      "sha256": "53c455df2dae50ff8adb60d69269f70620fb59eb10c3e118ac29dfe82353fa44"
+      "blob_sha": "ddf0036ad76435080456d17e60b9bdcf4dab4ddd",
+      "sha256": "43d3f6284c97cab77f27ac91a6323af5b19ead00e01ca8d13496170e665c0c83"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Full report radar: on a phone every area name around the chart now shows in full (long names such as \"Understanding of the Source\" are no longer cut off at the edge), and the score markers and the 25/50/75/100 ring numbers are larger so they are easier to read."
+        "Full report radar: on a phone every area name around the chart now shows in full, wrapped at whole words (long names such as \"Understanding of the Source\" are no longer cut off at the edge), and the score markers and the 50 and 100 ring numbers are larger so they are easier to read. The desktop chart is unchanged."
       ]
     }
   }

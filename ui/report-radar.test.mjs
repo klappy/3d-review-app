@@ -120,15 +120,21 @@ test('R9 phone legibility: spoke labels fit both viewBoxes; wide keeps main size
     for (const t of svg.querySelectorAll('.spoke-label')) {
       const tspans = [...t.querySelectorAll('tspan')];
       const label = { lx: Number(t.getAttribute('x')), y: Number(t.getAttribute('y')), anchor: t.getAttribute('text-anchor'), parts: tspans.map(s => s.textContent) };
-      const e = labelExtents(label, variant === 'wide' ? 20 : narrowFs);
+      if (variant === 'wide') continue; // wide keeps main's fixed box exactly (asserted below); labels may overhang it as on main
+      const e = labelExtents(label, narrowFs);
+      // #546 HOLD k0005: whole words on the phone (no hyphen breaks for these names) and "/" stays with the word before it.
+      assert.ok(label.parts.every(p => !p.endsWith('-') && p !== '/' && !p.startsWith('/')), `narrow "${label.parts.join('|')}" keeps words whole`);
       assert.ok(e.left >= vx - 0.1 && e.right <= vx + vw + 0.1 && e.top >= vy - 0.1 && e.bottom <= vy + vh + 0.1, `${variant} "${label.parts.join(' ')}" fits`);
     }
+    if (variant === 'wide') assert.equal(svg.getAttribute('viewBox'), '-70 -40 500 440', 'wide box is main 8646a5b exactly');
     if (variant === 'wide') for (const c of svg.querySelectorAll('circle')) assert.equal(c.getAttribute('r'), '5', 'wide markers as on main');
     // #546 re-review: the narrow plot is never smaller than main's (box width = main's 500) and shows only rings 50 and 100.
     if (variant === 'narrow') assert.equal(vw, 500, 'narrow box keeps main width');
     assert.deepEqual([...svg.querySelectorAll('.ring-label')].map(t => t.textContent), variant === 'wide' ? ['25', '50', '75', '100'] : ['50', '100']);
     for (const r of svg.querySelectorAll('.ring-label')) assert.equal(r.getAttribute('font-size'), null, 'ring size is set in CSS only');
   }
+  const appeal = [...section.querySelectorAll('svg.radar-narrow .spoke-label')].find(t => t.textContent.startsWith('Appeal'));
+  assert.deepEqual([...appeal.querySelectorAll('tspan')].map(s => s.textContent), ['Appeal /', 'Beauty']);
   assert.match(css, /\.ring-label\{font-size:13px/, 'wide ring labels as on main');
   assert.match(css, /\.spoke-label\{font-size:20px/, 'wide spoke labels as on main');
   assert.match(css, /@container \(max-width:459\.98px\)/);
