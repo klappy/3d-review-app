@@ -16,12 +16,20 @@ export interface NarrativeLens {
   sub_dimensions: NarrativeSubdimension[];
 }
 export interface NarrativeCrossLens {
-  construct_name: string;
+  construct_name: string | null | undefined;
   agreement: number | null; // Source name, but value is a raw range.
   lens_scores: { lens: string; score: number }[];
 }
 export interface NarrativeEvidence { n: number; form_type?: string }
 export interface TrendPoint { cycle_date: string; score: number | null }
+
+// Same reading as the UI's constructName() (ui/report-lenses.js): a missing, null or
+// blank (empty or whitespace-only) construct name prints an em dash, never "undefined",
+// "null" or a raw blank; any other name is String(name) exactly as given (not trimmed).
+export const NO_CONSTRUCT_NAME = "\u2014";
+export function narrativeConstructName(name: unknown): string {
+  return name === undefined || name === null || String(name).trim() === "" ? NO_CONSTRUCT_NAME : String(name);
+}
 
 // Python f"{value:.0f}" uses half-even rounding, unlike JS toFixed.
 function whole(value: number): string {
@@ -63,7 +71,7 @@ export function buildReferenceNarrative(
       const low = construct.lens_scores.reduce((best, score) => score.score < best.score ? score : best);
       const high = construct.lens_scores.reduce((best, score) => score.score > best.score ? score : best);
       const tier = construct.agreement! >= 20 ? "high divergence" : "some divergence";
-      notes.push(`For ${construct.construct_name}, ${high.lens} (${whole(high.score)}) and ${low.lens} (${whole(low.score)}) see it differently — ${tier} (${whole(construct.agreement!)}-point gap).`);
+      notes.push(`For ${narrativeConstructName(construct.construct_name)}, ${high.lens} (${whole(high.score)}) and ${low.lens} (${whole(low.score)}) see it differently — ${tier} (${whole(construct.agreement!)}-point gap).`);
     }
   } else if (crossLens.length)
     notes.push("Where lenses overlap, they agree closely on every shared construct this cycle.");

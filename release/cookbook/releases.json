@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.26",
+  "current": "0.35.27",
   "versions": [
+    {
+      "version": "0.35.27",
+      "status": "candidate",
+      "notes_path": "releases/0.35.27.md",
+      "sections": {
+        "fixed": [
+          "Report summary: when perspectives disagree about an area with no name, the summary sentence now names it with a dash instead of the word \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
+        ]
+      }
+    },
     {
       "version": "0.35.26",
       "status": "candidate",
