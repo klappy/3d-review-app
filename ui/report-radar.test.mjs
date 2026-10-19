@@ -116,7 +116,7 @@ test('R9 phone legibility: spoke labels fit both viewBoxes; wide keeps main size
     const [vx, vy, vw, vh] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
     assert.equal(svg.getAttribute('style'), `--vbw:${vw}`);
     assert.ok(Math.abs(vx + vw / 2 - 180) < 0.1, `${variant} box is centred on the chart`);
-    const narrowFs = 11.5 * vw / 240; // largest narrow unit size (the 240px band)
+    const narrowFs = 11 * vw / 240; // largest narrow unit size (the 240px band)
     for (const t of svg.querySelectorAll('.spoke-label')) {
       const tspans = [...t.querySelectorAll('tspan')];
       const label = { lx: Number(t.getAttribute('x')), y: Number(t.getAttribute('y')), anchor: t.getAttribute('text-anchor'), parts: tspans.map(s => s.textContent) };
@@ -124,12 +124,16 @@ test('R9 phone legibility: spoke labels fit both viewBoxes; wide keeps main size
       assert.ok(e.left >= vx - 0.1 && e.right <= vx + vw + 0.1 && e.top >= vy - 0.1 && e.bottom <= vy + vh + 0.1, `${variant} "${label.parts.join(' ')}" fits`);
     }
     if (variant === 'wide') for (const c of svg.querySelectorAll('circle')) assert.equal(c.getAttribute('r'), '5', 'wide markers as on main');
+    // #546 re-review: the narrow plot is never smaller than main's (box width = main's 500) and shows only rings 50 and 100.
+    if (variant === 'narrow') assert.equal(vw, 500, 'narrow box keeps main width');
+    assert.deepEqual([...svg.querySelectorAll('.ring-label')].map(t => t.textContent), variant === 'wide' ? ['25', '50', '75', '100'] : ['50', '100']);
     for (const r of svg.querySelectorAll('.ring-label')) assert.equal(r.getAttribute('font-size'), null, 'ring size is set in CSS only');
   }
   assert.match(css, /\.ring-label\{font-size:13px/, 'wide ring labels as on main');
   assert.match(css, /\.spoke-label\{font-size:20px/, 'wide spoke labels as on main');
   assert.match(css, /@container \(max-width:459\.98px\)/);
   assert.match(css, /\.radar-narrow \.ring-label\{font-size:calc\(11px \* var\(--vbw\) \/ var\(--wmin\)\)\}/);
-  assert.match(css, /\.radar-narrow \.spoke-label\{font-size:calc\(11\.5px \* var\(--vbw\) \/ var\(--wmin\)\)\}/);
+  assert.match(css, /\.radar-narrow \.spoke-label\{font-size:calc\(11px \* var\(--vbw\) \/ var\(--wmin\)\)\}/);
   assert.match(css, /\.radar-narrow circle\{r:calc\(4px \* var\(--vbw\) \/ var\(--wmin\)\)\}/);
+  assert.match(css, /\.radar-narrow :is\(\.ring,\.spoke,polygon,polyline,circle\)\{vector-effect:non-scaling-stroke\}/);
 });

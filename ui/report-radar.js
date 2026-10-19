@@ -23,14 +23,22 @@ const SIZE = 360, C = SIZE / 2, R = 120, LABEL_R = R + 24, RINGS = [25, 50, 75, 
 // - narrow (under 460px): labels wrap tighter (WRAP_N) and every size is set in CSS from rendered px: unit = px * vbw / wmin,
 //   where --vbw is the viewBox width and --wmin the lower edge of the container band, so at any width down to NARROW_MIN
 //   markers are 8px or more across, ring labels 11px or more and spoke labels SPOKE_PX (never smaller than the ring labels).
-//   The narrow box is fitted to the spoke labels at their largest unit size (the NARROW_MIN band).
+//   The narrow box keeps main's width (BASE.w), so the plot is never smaller than main's at the same width (review #546
+//   re-review HOLD: the box grew and the plot shrank); spoke labels wrap to the room beside their spoke instead, breaking a
+//   word too long for the line with a hyphen. Only the 50 and 100 ring labels are drawn (25/50/75/100 stacked under markers),
+//   and rings, spokes and outlines keep 1px/2px strokes at any scale (vector-effect: non-scaling-stroke).
 const LABEL_FS = 20, EM_W = 0.6, PAD = 6, BASE = { x: -70, y: -40, w: SIZE + 140, h: SIZE + 80 };
-const WRAP_N = 10, NARROW_MIN = 240, BANDS = [240, 280, 320, 360, 400, 440], WIDE_MIN = 460;
-const MARKER_PX = 8, RING_PX = 11, SPOKE_PX = 11.5;
+const NARROW_MIN = 240, WIDE_MIN = 460, BANDS = Array.from({ length: (WIDE_MIN - NARROW_MIN) / 20 }, (_, k) => NARROW_MIN + 20 * k), NARROW_RINGS = [50, 100];
+const MARKER_PX = 8, RING_PX = 11, SPOKE_PX = 11;
 // Labels wrap at word boundaries (about 13 characters a line) so they stay legible when the chart scales down on a phone.
-function wrap(name, width = WRAP) {
-  const lines = [];
-  for (const word of String(name).split(/\s+/)) {
+function wrap(name, width = WRAP, hard = false) {
+  const lines = [], words = [];
+  for (let word of String(name).split(/\s+/)) {
+    // hard (narrow only): a word longer than the line is broken with a hyphen so the label stays inside the box.
+    while (hard && word.length > width) { const cut = Math.max(3, Math.min(width - 1, word.length - 3)); words.push(`${word.slice(0, cut)}-`); word = word.slice(cut); }
+    words.push(word);
+  }
+  for (const word of words) {
     const last = lines[lines.length - 1];
     if (last !== undefined && (last + ' ' + word).length <= width) lines[lines.length - 1] = `${last} ${word}`; else lines.push(word);
   }
@@ -88,7 +96,8 @@ export const radarCss = `.lens-radar figure{margin:8px 0 0;container-type:inline
 ${BANDS.slice(1).map(b => `@container (min-width:${b}px){.lens-radar svg.radar-narrow{--wmin:${b}}}`).join('')}
 .lens-radar .radar-narrow .ring-label{font-size:calc(${RING_PX}px * var(--vbw) / var(--wmin))}
 .lens-radar .radar-narrow .spoke-label{font-size:calc(${SPOKE_PX}px * var(--vbw) / var(--wmin))}
-.lens-radar .radar-narrow circle{r:calc(${MARKER_PX / 2}px * var(--vbw) / var(--wmin))}`;
+.lens-radar .radar-narrow circle{r:calc(${MARKER_PX / 2}px * var(--vbw) / var(--wmin))}
+.lens-radar .radar-narrow :is(.ring,.spoke,polygon,polyline,circle){vector-effect:non-scaling-stroke}`;
 
 /** Estimated extents of one laid-out spoke label in viewBox units at font size fs: { left, right, top, bottom }. */
 export function labelExtents({ lx, y, anchor, parts }, fs = LABEL_FS) {
@@ -107,26 +116,23 @@ export function radarViewBox(labels, fs = LABEL_FS) {
   return { x: C - half, y: y0, w: 2 * half, h: y1 - y0 };
 }
 /** Spoke labels laid out at font size fs, wrapping at width characters a line. */
-function layoutLabels(spokes, fs, width, topClear = 0) {
+function layoutLabels(spokes, fs, width, topClear = 0, half = 0) {
   const count = spokes.length, line = LINE * fs / LABEL_FS, gap = fs * 0.2;
   return spokes.map((name, i) => {
     // topClear lifts the top spoke label clear of the ring numbers drawn just above that spoke (narrow only).
     const [px, py] = point(i, count, ((LABEL_R - 4 + gap + (i === 0 ? topClear : 0)) / R) * 100);
     const anchor = Math.abs(px - C) < 8 ? 'middle' : px > C ? 'start' : 'end';
-    const parts = wrap(name, width);
+    // half > 0 (narrow): fit each label's line length to the room between its anchor and the box edge.
+    const room = anchor === 'middle' ? 2 * half : anchor === 'start' ? C + half - px : px - (C - half);
+    const parts = half ? wrap(name, Math.max(4, Math.floor((room - PAD) / (EM_W * fs))), true) : wrap(name, width);
     const y = py - (py < C ? (parts.length - 1) * line : 0) + fs / 4;
     return { name, i, lx: px, y, anchor, parts, line };
   });
 }
-/** Narrow layout: spoke labels at their largest unit size (SPOKE_PX at NARROW_MIN), the box fitted around them (fixed point). */
+/** Narrow layout: main's box width, spoke labels at their largest unit size (SPOKE_PX at NARROW_MIN) wrapped to fit it. */
 function narrowLayout(spokes) {
-  let box = radarViewBox(layoutLabels(spokes, LABEL_FS, WRAP_N)), fs = LABEL_FS, labels;
-  for (let k = 0; k < 40; k++) {
-    fs = Math.min(SPOKE_PX * box.w / NARROW_MIN, 80);
-    labels = layoutLabels(spokes, fs, WRAP_N, fs * RING_PX / SPOKE_PX);
-    box = radarViewBox(labels, fs);
-  }
-  return { labels, box, fs };
+  const fs = SPOKE_PX * BASE.w / NARROW_MIN, labels = layoutLabels(spokes, fs, 0, fs * RING_PX / SPOKE_PX, BASE.w / 2);
+  return { labels, box: radarViewBox(labels, fs), fs };
 }
 function radarSvg(doc, model, variant) {
   const count = model.spokes.length;
@@ -136,6 +142,7 @@ function radarSvg(doc, model, variant) {
   svg.append(svgEl(doc, 'title', {}, radarCopy.title));
   for (const ring of RINGS) {
     svg.append(svgEl(doc, 'polygon', { class: 'ring', points: model.spokes.map((_, i) => point(i, count, ring).map(fmt).join(',')).join(' ') }));
+    if (variant === 'narrow' && !NARROW_RINGS.includes(ring)) continue;
     const [x, y] = point(0, count, ring);
     svg.append(svgEl(doc, 'text', { class: 'ring-label', x: fmt(x + 4), y: fmt(y + 3) }, String(ring)));
   }
