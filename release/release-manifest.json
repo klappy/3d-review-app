@@ -1,23 +1,23 @@
 {
-  "version": "0.35.23",
+  "version": "0.35.24",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "62170b92d06187214055444d9b53fa3c222fe9a4",
+  "cookbook_commit": "ccbd08e87c90551e76c5a6385dc6fc28a87dbe34",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.23.md",
-      "blob_sha": "e6553c04475cb32373585535f2d650404ab7a77e",
-      "sha256": "09ae1ecfeba678923de75b084432c916047863142f0b7adf4cc03625416250cc"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.24.md",
+      "blob_sha": "86d9076f72c031ff2f8f11592dd50b4c39441ed0",
+      "sha256": "65b7ed4144af0c858708a970e4459ecc69ac0943f8b562468877542d11329e5e"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "5748f43da6bdbabc95e0c10468fd08d44575b4af",
-      "sha256": "5b5fc683010474a392d14a9ba673242be462c34c635c8748347a0a54fe205bba"
+      "blob_sha": "a56ee63bb10c9a20e156ca2cdacde6bb3f483b96",
+      "sha256": "34631e7c15f416fc42d0b15c37d3d32f86dab17541513a77f591e75bf3e884d7"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Invitations and roles: an invitation to a workspace or an assessment now stops working once the person who sent it no longer has their own role there, as project invitations already did; and changing someone's role on a project now needs the project's own owner — an owner through the workspace changes access at the workspace, or is added to the project."
+        "Full report radar: on a phone every area name around the chart now shows in full, wrapped at whole words (long names such as \"Understanding of the Source\" are no longer cut off at the edge), and the score markers and the 50 and 100 ring numbers are larger so they are easier to read. The desktop chart is unchanged."
       ]
     }
   }

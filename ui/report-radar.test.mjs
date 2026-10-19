@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { JSDOM } from 'jsdom';
-import { radarModel, renderLensRadar, radarCopy } from './report-radar.js';
+import { radarModel, renderLensRadar, radarCopy, labelExtents } from './report-radar.js';
 import { renderReport } from './report-view.js';
 
 // Synthetic payload: three perspectives, one area not asked of Community (the skipped spoke), one single-lens area.
@@ -45,8 +45,9 @@ test('R4 full report renders one inline SVG radar with a polygon per perspective
   assert.equal(renderReport({ doc: d, root, report: SYNTH }), true);
   const radar = root.querySelector('[data-lens-radar]');
   assert.ok(radar, 'radar section present');
-  assert.equal(radar.querySelectorAll('svg').length, 1);
-  assert.equal(radar.querySelectorAll('[data-radar-lens]').length, 3);
+  // One chart in two layouts (wide, narrow), one shown at a time by a container query (#546).
+  assert.deepEqual([...radar.querySelectorAll('svg')].map(s => s.getAttribute('class')), ['radar-wide', 'radar-narrow']);
+  assert.equal(radar.querySelectorAll('svg.radar-wide [data-radar-lens]').length, 3);
   assert.match(radar.textContent, /out of 100/);
   assert.deepEqual([...radar.querySelectorAll('.lens-radar-legend li')].map(li => li.textContent), ['Church', 'Community', 'Translation team']);
   assert.ok(radar.querySelector('svg title'), 'svg has an accessible title');
@@ -102,4 +103,43 @@ test('R7 a perspective with every spoke is one closed outline; a skipped spoke b
   const lines = [...community.querySelectorAll('polyline')];
   assert.deepEqual(lines.map(l => pointsOf(l).length), [2]);
   assert.equal(community.querySelectorAll('circle').length, 3);
+});
+
+test('R9 phone legibility: spoke labels fit both viewBoxes; wide keeps main sizes; narrow sizes are CSS px per band', () => {
+  // Six spokes as on DEV (RESULTS-qaradar-2141): "Understanding of the Source" sat past the right edge of the old fixed box.
+  const names = ['Brief Process & Perceived Fidelity', 'Trust / Readiness', 'Understanding of the Source', 'Clarity / Naturalness', 'Appeal / Beauty', 'Consistency'];
+  const six = { payload: { cross_lens_multi: names.map((n, k) => ({ construct_name: n, lens_scores: [{ lens: 'Church', score: 50 + k }, { lens: 'Community', score: 60 }, { lens: 'Translation Team', score: 70 }] })) } };
+  const section = renderLensRadar({ doc: doc(), report: six });
+  const css = section.querySelector('style').textContent;
+  for (const variant of ['wide', 'narrow']) {
+    const svg = section.querySelector(`svg.radar-${variant}`);
+    const [vx, vy, vw, vh] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+    assert.equal(svg.getAttribute('style'), `--vbw:${vw}`);
+    assert.ok(Math.abs(vx + vw / 2 - 180) < 0.1, `${variant} box is centred on the chart`);
+    const narrowFs = 11 * vw / 240; // largest narrow unit size (the 240px band)
+    for (const t of svg.querySelectorAll('.spoke-label')) {
+      const tspans = [...t.querySelectorAll('tspan')];
+      const label = { lx: Number(t.getAttribute('x')), y: Number(t.getAttribute('y')), anchor: t.getAttribute('text-anchor'), parts: tspans.map(s => s.textContent) };
+      if (variant === 'wide') continue; // wide keeps main's fixed box exactly (asserted below); labels may overhang it as on main
+      const e = labelExtents(label, narrowFs);
+      // #546 HOLD k0005: whole words on the phone (no hyphen breaks for these names) and "/" stays with the word before it.
+      assert.ok(label.parts.every(p => !p.endsWith('-') && p !== '/' && !p.startsWith('/')), `narrow "${label.parts.join('|')}" keeps words whole`);
+      assert.ok(e.left >= vx - 0.1 && e.right <= vx + vw + 0.1 && e.top >= vy - 0.1 && e.bottom <= vy + vh + 0.1, `${variant} "${label.parts.join(' ')}" fits`);
+    }
+    if (variant === 'wide') assert.equal(svg.getAttribute('viewBox'), '-70 -40 500 440', 'wide box is main 8646a5b exactly');
+    if (variant === 'wide') for (const c of svg.querySelectorAll('circle')) assert.equal(c.getAttribute('r'), '5', 'wide markers as on main');
+    // #546 re-review: the narrow plot is never smaller than main's (box width = main's 500) and shows only rings 50 and 100.
+    if (variant === 'narrow') assert.equal(vw, 500, 'narrow box keeps main width');
+    assert.deepEqual([...svg.querySelectorAll('.ring-label')].map(t => t.textContent), variant === 'wide' ? ['25', '50', '75', '100'] : ['50', '100']);
+    for (const r of svg.querySelectorAll('.ring-label')) assert.equal(r.getAttribute('font-size'), null, 'ring size is set in CSS only');
+  }
+  const appeal = [...section.querySelectorAll('svg.radar-narrow .spoke-label')].find(t => t.textContent.startsWith('Appeal'));
+  assert.deepEqual([...appeal.querySelectorAll('tspan')].map(s => s.textContent), ['Appeal /', 'Beauty']);
+  assert.match(css, /\.ring-label\{font-size:13px/, 'wide ring labels as on main');
+  assert.match(css, /\.spoke-label\{font-size:20px/, 'wide spoke labels as on main');
+  assert.match(css, /@container \(max-width:459\.98px\)/);
+  assert.match(css, /\.radar-narrow \.ring-label\{font-size:calc\(11px \* var\(--vbw\) \/ var\(--wmin\)\)\}/);
+  assert.match(css, /\.radar-narrow \.spoke-label\{font-size:calc\(11px \* var\(--vbw\) \/ var\(--wmin\)\)\}/);
+  assert.match(css, /\.radar-narrow circle\{r:calc\(4px \* var\(--vbw\) \/ var\(--wmin\)\)\}/);
+  assert.match(css, /\.radar-narrow :is\(\.ring,\.spoke,polygon,polyline,circle\)\{vector-effect:non-scaling-stroke\}/);
 });
