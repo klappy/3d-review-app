@@ -5,13 +5,13 @@ import { accept, update_role, mine, list as grantList, revoke as grantRevoke, in
 import { sha256 } from "../src/handlers/common";
 import type { Ctx } from "../src/handlers/types";
 
-// 0.35.22 — cookbook work/active/2026-10-15-3d-workspace-permissions/ASK-f4-finding4.md default 1 ("your own direct role, every
+// 0.35.23 — cookbook work/active/2026-10-15-3d-workspace-permissions/ASK-f4-finding4.md default 1 ("your own direct role, every
 // time"): an invitation of any kind is accepted only while its inviter still holds a direct role (member or above) at its scope,
 // and a role change at a project needs a direct project owner. Synthetic principals and ids only; no real addresses.
 const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "w", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "f4-direct-role-db" } }] }));
 afterAll(() => mf.dispose());
 
-describe("ASK-f4-finding4 default 1: your own direct role, every time (0.35.22)", () => {
+describe("ASK-f4-finding4 default 1: your own direct role, every time (0.35.23)", () => {
   it("finding 4 + F4: removed inviters' workspace/assessment invitations refuse; inherited owners cannot change project roles", async () => {
     const db = await mf.getD1Database("DB");
     const sql = readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
@@ -66,6 +66,14 @@ describe("ASK-f4-finding4 default 1: your own direct role, every time (0.35.22)"
     // a direct project owner still can
     await expect(update_role(mk("f_po"), { scope: "project", id: "prj_f", gid: "fg_pm", role: "viewer" })).resolves.toMatchObject({ result: { role: "viewer" } });
     expect(await direct("f_pm", "project", "prj_f")).toBe("viewer");
+    // the write re-checks the direct project owner below owner too: a caller who is a direct project owner AND a workspace
+    // owner, and who steps down at the project after the checks but before the write, changes no row (the race is simulated
+    // as in workspace-inheritance.test.ts: a db whose batch() first applies the step-down, after every check has passed)
+    await grant("fg_wopo", "f_wo", "project", "prj_f", "owner");
+    await grant("fg_pm3", "f_y", "project", "prj_f", "member");
+    const racing = { prepare: (q: string) => db.prepare(q), batch: async (st: any[]) => { await db.prepare('DELETE FROM "grant" WHERE id = ?').bind("fg_wopo").run(); return db.batch(st); } };
+    await expect(update_role({ ...mk("f_wo"), db: racing as any }, { scope: "project", id: "prj_f", gid: "fg_pm3", role: "viewer" })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });
+    expect(await direct("f_y", "project", "prj_f")).toBe("member");
     // and a workspace owner still changes roles at the workspace itself
     await expect(update_role(mk("f_wo"), { scope: "workspace", id: "ws_f", gid: (await db.prepare('SELECT id FROM "grant" WHERE principal_id = ? AND scope_type = ?').bind("f_z", "workspace").first<{ id: string }>())!.id, role: "viewer" })).resolves.toMatchObject({ result: { role: "viewer" } });
   });
