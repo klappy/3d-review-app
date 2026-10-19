@@ -28,11 +28,20 @@ async function callerAt(ctx: Ctx, scope: Scope, min: Role): Promise<Role> {
 /** ASK L1 default 1 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK.md): inviting at, or revoking an invitation
  *  at, ONE project needs the caller's own DIRECT project grant (member or above). An inherited workspace role no longer
  *  suffices, so removing a workspace grant ends every line of access that grant handed on. A caller with no role at all
- *  still gets NOT_FOUND_OR_NOT_VISIBLE (directRoleAt decides visibility on the effective role first). Workspace-scope
- *  invitations are unchanged. */
+ *  still gets NOT_FOUND_OR_NOT_VISIBLE (directRoleAt decides visibility on the effective role first). Workspace and
+ *  assessment roles are exact, so inviting there already needs the caller's own grant at that scope. */
 const PROJECT_INVITE_HINT = "your role here comes from the workspace — invite them at the workspace instead (cap.grant.invite with scope workspace), or ask a direct project member";
 async function directAtProject(ctx: Ctx, scope: Scope) {
   if (scope.type === "project") await directRoleAt(ctx, "project", scope.id, "member", PROJECT_INVITE_HINT);
+}
+/** update_role's direct-owner rule: raising anyone to owner needs a DIRECT owner at the scope (HOLD #483 c6204865181 #2), and
+ *  since 0.35.23 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK-f4-finding4.md default 1, F4) ANY role change at a
+ *  project needs a DIRECT project owner: an owner through the workspace manages project people at the workspace, or is added to
+ *  the project directly. Workspace and assessment roles are direct only, so their callerAt check already is this rule. */
+const PROJECT_ROLE_HINT = "your owner role here comes from the workspace — ask a direct project owner, or get added to the project directly";
+async function directOwnerFor(ctx: Ctx, scope: Scope, to: Role | undefined) {
+  if (scope.type === "project") await directRoleAt(ctx, "project", scope.id, "owner", PROJECT_ROLE_HINT);
+  else if (to === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
 }
 /** D3: a member may act only up to member. */
 function ceiling(caller: Role, target: Role, what: string) {
@@ -60,7 +69,9 @@ async function owners(ctx: Ctx, scope: Scope): Promise<string[]> {
 /** ASK L1 default 1 (follow-ups F3 and dead-invitations (2)/(3)): ONE predicate for "this invitation's inviter still stands
  *  behind it", over an invitation row aliased `i`. An owner invitation needs its inviter's DIRECT owner grant at the scope; any
  *  other project invitation needs the inviter's DIRECT project grant at member or above (the rule invite applies,
- *  directAtProject). Workspace and assessment invitations below owner are unchanged (finding 4 is a named hold). accept refuses
+ *  directAtProject). 0.35.23 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK-f4-finding4.md default 1): the same
+ *  holds for workspace and assessment invitations — every invitation needs its inviter's DIRECT grant at its scope (member or
+ *  above; owner for an owner invitation); there is no longer a scope that skips the check. accept refuses
  *  a row that fails it; cap.me.invitations and the roster's pending_invitations do not list it; invite de-duplication does not
  *  count it, so a re-invite sends a fresh invitation instead of "nothing was sent again", and that re-invite revokes the dead
  *  row it supersedes. An invitation the caller sent to themselves is NOT covered by this predicate: accept refuses it and
@@ -70,8 +81,8 @@ const inviterStands = (i: string) => standsFor(`${i}.role`, `${i}.scope_type`, `
 /** inviterStands over plain SQL expressions instead of a row alias, so invite can apply the SAME rule to the row it is about
  *  to write, inside its INSERT (0.35.9, cookbook work/active/2026-10-18-3d-invite-guard-race DoD (a)). */
 const standsFor = (role: string, scopeT: string, scopeI: string, by: string) =>
-  `((${role} <> 'owner' AND ${scopeT} <> 'project') OR EXISTS (SELECT 1 FROM "grant" ig WHERE ig.principal_id = ${by}`
-  + ` AND ig.scope_type = ${scopeT} AND ig.scope_id = ${scopeI} AND ${roleBacks(role, "ig.role")}))`;
+  `EXISTS (SELECT 1 FROM "grant" ig WHERE ig.principal_id = ${by}`
+  + ` AND ig.scope_type = ${scopeT} AND ig.scope_id = ${scopeI} AND ${roleBacks(role, "ig.role")})`;
 /** The role half of inviterStands: whether a direct grant at role `r` backs an invitation for role `role` (SQL expressions). */
 const roleBacks = (role: string, r: string) => `(${r} = 'owner' OR (${role} <> 'owner' AND ${r} = 'member'))`;
 /** ONE expiry rule (0.35.9, cookbook work/active/2026-10-18-3d-invite-guard-race DoD (b)): an invitation is live while
@@ -84,14 +95,14 @@ const expiredAt = (expiresAt: string | null | undefined, now: string) => !!expir
 /** 0.35.8 (cookbook work/active/2026-10-18-3d-invite-revoke-on-grant-removal DoD (a)-(c)): when a holder's DIRECT grant at a
  *  scope is removed or downgraded, the open, unexpired invitations that holder issued at that scope and could no longer issue
  *  (inviterStands fails) are revoked in the same batch as the grant change, so a regained grant cannot revive them. Expired
- *  rows are left as they were (history keeps expired apart from revoked). Rows that inviterStands does not tie to a direct
- *  grant (workspace and assessment invitations below owner) are untouched: that is the finding 4 hold. `o` aliases the row.
+ *  rows are left as they were (history keeps expired apart from revoked). Since 0.35.23 (ASK-f4-finding4 default 1) this covers
+ *  workspace and assessment invitations too: inviterStands ties every invitation to a direct grant. `o` aliases the row.
  *  `after` is the holder's role at the scope once the change lands, as a bound SQL expression (null = no grant); the dry-run
  *  counts with it, and the real call revokes against the grant table as the batch left it (the same predicate, read live). */
 const orphanedWhere = (holder: string, scopeT: string, scopeI: string, now: string, after?: string) =>
   `o.created_by = ${holder} AND o.scope_type = ${scopeT} AND o.scope_id = ${scopeI} AND o.status IN ('sent','pending','unconfirmed')`
   + ` AND ${unexpired("o", now)} AND NOT `
-  + (after === undefined ? inviterStands("o") : `((o.role <> 'owner' AND o.scope_type <> 'project') OR ${roleBacks("o.role", `COALESCE(${after}, '')`)})`);
+  + (after === undefined ? inviterStands("o") : roleBacks("o.role", `COALESCE(${after}, '')`));
 /** 0.35.20 (cookbook work/active/2026-10-18-3d-grant-noop-followups-5 DoD (b)): the ids (sorted) of the invitations a change
  *  to `after` would revoke, so a preview binds the id set, not only its count. `orphanedNow` is the same set as one SQL string,
  *  read inside the guarded write, so a same-count swap between the token check and the write changes no row. */
@@ -336,12 +347,12 @@ async function refuseDeadInvitation(ctx: Ctx, inv: any): Promise<void> {
   // HOLD #483 c6204865181 #1: no one accepts their own invitation (closes the self-invite path for rows minted before the
   // invite-side check), and an owner invitation is honoured only while its inviter still holds a DIRECT owner grant here.
   if (inv.created_by === ctx.principal.id) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "cannot accept an invitation you created", "ask a direct owner of this scope");
-  // ASK L1 F3 + nit 7: one read decides both inviter rules, through the same predicate the listings and de-dup use.
-  if (inv.role === "owner" || inv.scope_type === "project") {
-    const stands = await ctx.db.prepare(`SELECT 1 AS ok FROM invitation i WHERE i.id = ? AND ${inviterStands("i")}`).bind(inv.id).first();
-    if (!stands && inv.role === "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this owner invitation was not issued by a direct owner of this scope", "ask a direct owner for a new invitation");
-    if (!stands) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this project invitation was not issued by a direct member of this project", "ask a direct project member for a new invitation, or ask to be invited to the workspace");
-  }
+  // ASK L1 F3 + nit 7: one read decides both inviter rules, through the same predicate the listings and de-dup use. Since
+  // 0.35.23 (ASK-f4-finding4 default 1, finding 4) it runs for every invitation: workspace and assessment ones too.
+  const stands = await ctx.db.prepare(`SELECT 1 AS ok FROM invitation i WHERE i.id = ? AND ${inviterStands("i")}`).bind(inv.id).first();
+  if (!stands && inv.role === "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this owner invitation was not issued by a direct owner of this scope", "ask a direct owner for a new invitation");
+  if (!stands && inv.scope_type === "project") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "this project invitation was not issued by a direct member of this project", "ask a direct project member for a new invitation, or ask to be invited to the workspace");
+  if (!stands) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", `the person who sent this invitation no longer has a role at this ${inv.scope_type}`, "ask a current member for a new invitation");
 }
 /** The invitation `id` can still be accepted at `now` (bound SQL expressions): open, unexpired by the one expiry rule, and its
  *  inviter still stands behind it (inviterStands). accept's write batch gates both statements on it (0.35.10 DoD (a)). */
@@ -413,7 +424,8 @@ export const update_role: Handler = async (ctx, p, o) => {
   if (!g) throw notVisible("grant");
   if (g.role === "owner" && role !== "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be demoted", "D3 — transfer ownership instead (cap.grant.transfer_owner)");
   // HOLD #483 c6204865181 #2: raising anyone to owner needs a DIRECT owner — an inherited owner cannot mint an undemotable owner.
-  if (role === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
+  // 0.35.23 (ASK-f4-finding4 default 1, F4): at a project, ANY role change needs a direct project owner (directOwnerFor).
+  await directOwnerFor(ctx, scope, role);
   // A downgrade revokes the invitations the holder could no longer issue (orphanedWhere); a raise or no-op revokes nothing.
   const downgrade = ROLE_RANK[role] < ROLE_RANK[g.role as Role];
   // 0.35.16 (cookbook work/active/2026-10-18-3d-grant-noop-dispatch-receipt DoD (b)-(c)): a target already at the requested
@@ -446,13 +458,13 @@ export const update_role: Handler = async (ctx, p, o) => {
   // this batch, so the UPDATE re-checks it in its own WHERE: a target raised to owner in between (an accept landing) is not
   // demoted. 0.35.13 (cookbook work/active/2026-10-18-3d-grant-update-role-write-guard DoD (a)-(b)): the UPDATE also writes
   // only against the role it read (role = ?3), and re-checks the caller's own authority (owner here; a DIRECT owner to raise
-  // to owner) in the same WHERE, so a role changed in between, or a caller demoted in between, changes no row. Refused → no
+  // to owner, and since 0.35.23 for any role change at a project, as directOwnerFor) in the same WHERE, so a role changed in between, or a caller demoted in between, changes no row. Refused → no
   // row changed: the orphan sweep runs only when this UPDATE wrote its row (revokeOrphaned afterWrite, 0.35.14 DoD (a)), and
   // the typed refusal for the state the re-read finds (refuseGrantWrite).
   const binds: unknown[] = [role, gid, g.role, ctx.principal.id, scope.type, scope.id];
   if (downgrade) binds.push(g.principal_id, nowIso(ctx), sweptIds.join(","));
   const stmts = [ctx.db.prepare(`UPDATE "grant" SET role = ?1 WHERE id = ?2 AND role = ?3 AND (role <> 'owner' OR ?1 = 'owner')`
-    + ` AND ${callerHolds("?4", "?5", "?6", "'owner'")} AND (?1 <> 'owner' OR ${callerHolds("?4", "?5", "?6", "'owner'", true)})`
+    + ` AND ${callerHolds("?4", "?5", "?6", "'owner'")} AND ((?1 <> 'owner' AND ?5 <> 'project') OR ${callerHolds("?4", "?5", "?6", "'owner'", true)})`
     + (downgrade ? ` AND ${orphanedNow("?7", "?5", "?6", "?8", "?1")} = ?9` : ""))
     .bind(...binds)];
   if (downgrade) stmts.push(revokeOrphaned(ctx, g.principal_id, scope, true));
@@ -507,7 +519,7 @@ export const revoke: Handler = async (ctx, p) => {
  *  update_role, for the no-op check (target already at the requested role, 0.35.14 DoD (d) / 0.35.15 DoD (a)). */
 async function reReadGrantWrite(ctx: Ctx, scope: Scope, gid: string, op: "update_role" | "revoke", to?: Role): Promise<{ caller: Role; now: Role }> {
   const caller = await callerAt(ctx, scope, op === "update_role" ? "owner" : "member");
-  if (op === "update_role" && to === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
+  if (op === "update_role") await directOwnerFor(ctx, scope, to);
   const now = await ctx.db.prepare('SELECT role FROM "grant" WHERE id = ? AND scope_type = ? AND scope_id = ?').bind(gid, scope.type, scope.id).first<{ role: Role }>();
   if (!now) throw notVisible("grant");
   return { caller, now: now.role };
