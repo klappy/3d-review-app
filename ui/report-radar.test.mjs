@@ -103,3 +103,22 @@ test('R7 a perspective with every spoke is one closed outline; a skipped spoke b
   assert.deepEqual(lines.map(l => pointsOf(l).length), [2]);
   assert.equal(community.querySelectorAll('circle').length, 3);
 });
+
+test('R9 phone legibility: every spoke label fits inside the viewBox and markers / ring labels meet the canvas minimums at 266px', () => {
+  // Six spokes as on DEV (RESULTS-qaradar-2141): "Understanding of the Source" sat past the right edge of the old fixed box.
+  const names = ['Brief Process & Perceived Fidelity', 'Trust / Readiness', 'Understanding of the Source', 'Clarity / Naturalness', 'Appeal / Beauty', 'Consistency'];
+  const six = { payload: { cross_lens_multi: names.map((n, k) => ({ construct_name: n, lens_scores: [{ lens: 'Church', score: 50 + k }, { lens: 'Community', score: 60 }, { lens: 'Translation Team', score: 70 }] })) } };
+  const svg = renderLensRadar({ doc: doc(), report: six }).querySelector('svg');
+  const [vx, vy, vw, vh] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+  const FS = 20, EM = 0.6, LINE = 21; // spoke label font size (radarCss) and a conservative advance per character
+  for (const t of svg.querySelectorAll('.spoke-label')) {
+    const x = Number(t.getAttribute('x')), y = Number(t.getAttribute('y')), lines = [...t.querySelectorAll('tspan')].map(s => s.textContent);
+    const w = Math.max(...lines.map(l => l.length)) * EM * FS, a = t.getAttribute('text-anchor');
+    const left = a === 'start' ? x : a === 'end' ? x - w : x - w / 2;
+    assert.ok(left >= vx && left + w <= vx + vw, `"${lines.join(' ')}" fits horizontally (${left}..${left + w} in ${vx}..${vx + vw})`);
+    assert.ok(y - FS * 0.8 >= vy && y + (lines.length - 1) * LINE <= vy + vh, `"${lines.join(' ')}" fits vertically`);
+  }
+  const px = 266 / vw; // rendered CSS px per viewBox unit: the radar measured 266px wide at 390×844 (canvas estimate W <= 358)
+  for (const c of svg.querySelectorAll('circle')) assert.ok(2 * Number(c.getAttribute('r')) * px >= 7.95, 'marker never under 8 CSS px across');
+  for (const r of svg.querySelectorAll('.ring-label')) assert.ok(Number(r.getAttribute('font-size')) * px >= 10.95, 'ring label at least 11 CSS px');
+});

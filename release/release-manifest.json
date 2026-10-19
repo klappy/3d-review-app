@@ -1,23 +1,23 @@
 {
-  "version": "0.35.21",
+  "version": "0.35.22",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "d05ed9d32f70ea7eef0cbe3fd7f9739f72eb98c2",
+  "cookbook_commit": "28451091be06554c91aabf2086ccb332da915862",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.21.md",
-      "blob_sha": "7fe09ea6bffc6ea4cbcdf3075a17f737021a377a",
-      "sha256": "483e8168572fbade7bf964c13a26d44d2517debe0e37b120645f68fefe6dfa76"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.22.md",
+      "blob_sha": "ae92bf0c924362e7552a5e131e59cd94d2f9f54c",
+      "sha256": "f6220e73a848b68323a2e54bbdbd886bc2733f07ed758f07b3918f04cc638634"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "78f266a5309b394f65f5168056f8f0912de29a1a",
-      "sha256": "f45152f3f46aa0057b212395773e8a1584c3d5d4c8a71fb0665f943caac0fdac"
+      "blob_sha": "c648adf324d05e14a6991c0f631635b1e06e3d54",
+      "sha256": "53c455df2dae50ff8adb60d69269f70620fb59eb10c3e118ac29dfe82353fa44"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Ownership: when an owner steps down and the invitations that stepping down would cancel change at the moment they confirm, the refusal now says the invitations changed, instead of only saying something changed; they are asked to preview again."
+        "Full report radar: on a phone every area name around the chart now shows in full (long names such as \"Understanding of the Source\" are no longer cut off at the edge), and the score markers and the 25/50/75/100 ring numbers are larger so they are easier to read."
       ]
     }
   }

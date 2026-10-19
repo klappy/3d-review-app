@@ -16,6 +16,12 @@ export const radarCopy = Object.freeze({
 });
 const MIN_SPOKES = 3;
 const SIZE = 360, C = SIZE / 2, R = 120, LABEL_R = R + 24, RINGS = [25, 50, 75, 100], LINE = 21, WRAP = 13;
+// Phone legibility (cookbook work/active/2026-10-18-3d-radar-phone-legibility; canvas design-system.md Radar row): the
+// viewBox grows to hold every spoke label (estimated at EM_W of the font size a character), never smaller than the old
+// box, so a long label such as "Understanding of the Source" is not clipped at 390px. Markers and ring labels are sized in
+// viewBox units so they reach the canvas minimums (markers never under 8 CSS px, ring labels never under 11) at PHONE_W rendered width.
+const BASE = { x: -70, y: -40, w: SIZE + 140, h: SIZE + 80 }, LABEL_FS = 20, EM_W = 0.6, PAD = 6, PHONE_W = 266;
+const MARKER_PX = 8, RING_PX = 11; // PHONE_W: the radar svg measured 266px wide at 390×844 (shots-r18-2141), under the canvas estimate of 358
 // Labels wrap at word boundaries (about 13 characters a line) so they stay legible when the chart scales down on a phone.
 function wrap(name) {
   const lines = [];
@@ -62,7 +68,7 @@ function svgEl(doc, tag, attrs = {}, text) {
 
 export const radarCss = `.lens-radar figure{margin:8px 0 0}.lens-radar svg{display:block;width:100%;max-width:460px;height:auto;margin:0 auto;overflow:visible}
 .lens-radar .ring{fill:none;stroke:var(--line);stroke-width:1}.lens-radar .spoke{stroke:var(--line);stroke-width:1}
-.lens-radar .ring-label{font-size:13px;fill:var(--secondary)}.lens-radar .spoke-label{font-size:20px;fill:var(--ink)}
+.lens-radar .ring-label{fill:var(--secondary)}.lens-radar .spoke-label{font-size:20px;fill:var(--ink)}
 .lens-radar [data-radar-lens] polygon{fill-opacity:.12;stroke-width:2;fill:var(--secondary);stroke:var(--secondary)}.lens-radar [data-radar-lens] polyline{fill:none;stroke-width:2;stroke:var(--secondary)}
 .lens-radar [data-radar-lens] circle{stroke:var(--paper);stroke-width:1.5;fill:var(--secondary)}
 .lens-radar [data-radar-lens]:is([data-radar-lens="Translation Team" i],[data-radar-lens=team i]) :is(polygon,circle){fill:var(--lens-green)}
@@ -73,28 +79,51 @@ export const radarCss = `.lens-radar figure{margin:8px 0 0}.lens-radar svg{displ
 .lens-radar-legend li{display:flex;align-items:center;gap:6px;border:0!important;padding:0!important;margin:0!important}
 .lens-radar-legend .lens-agree-dot{position:static;margin:0;width:10px;height:10px;border-width:1px}`;
 
+/** Estimated extents of one laid-out spoke label in viewBox units: { left, right, top, bottom }. */
+export function labelExtents({ lx, y, anchor, parts }) {
+  const w = Math.max(...parts.map(p => p.length)) * EM_W * LABEL_FS;
+  const left = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2;
+  return { left, right: left + w, top: y - LABEL_FS * 0.8, bottom: y + (parts.length - 1) * LINE + LABEL_FS * 0.25 };
+}
+/** The old fixed box, grown (never shrunk) just enough to hold every spoke label plus PAD. */
+function radarViewBox(labels) {
+  let x0 = BASE.x, y0 = BASE.y, x1 = BASE.x + BASE.w, y1 = BASE.y + BASE.h;
+  for (const l of labels) {
+    const e = labelExtents(l);
+    x0 = Math.min(x0, e.left - PAD); x1 = Math.max(x1, e.right + PAD); y0 = Math.min(y0, e.top - PAD); y1 = Math.max(y1, e.bottom + PAD);
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
 /** Full report: detached DOM section, or null when fewer than three areas were scored by two or more perspectives. */
 export function renderLensRadar({ doc, report }) {
   const model = radarModel(report);
   if (!model || typeof doc.createElementNS !== 'function') return null;
   const count = model.spokes.length;
-  const svg = svgEl(doc, 'svg', { viewBox: `-70 -40 ${SIZE + 140} ${SIZE + 80}`, role: 'img' });
+  // Lay out spoke labels first so the viewBox can be fitted around them.
+  const labels = model.spokes.map((name, i) => {
+    const [lx, ly] = point(i, count, (LABEL_R / R) * 100);
+    const anchor = Math.abs(lx - C) < 8 ? 'middle' : lx > C ? 'start' : 'end';
+    const parts = wrap(name);
+    const y = ly - (ly < C ? (parts.length - 1) * LINE : 0) + 5;
+    return { name, i, lx, y, anchor, parts };
+  });
+  const box = radarViewBox(labels);
+  const scale = box.w / PHONE_W;
+  const svg = svgEl(doc, 'svg', { viewBox: [box.x, box.y, box.w, box.h].map(fmt).join(' '), role: 'img' });
   svg.append(svgEl(doc, 'title', {}, radarCopy.title));
   for (const ring of RINGS) {
     svg.append(svgEl(doc, 'polygon', { class: 'ring', points: model.spokes.map((_, i) => point(i, count, ring).map(fmt).join(',')).join(' ') }));
     const [x, y] = point(0, count, ring);
-    svg.append(svgEl(doc, 'text', { class: 'ring-label', x: fmt(x + 4), y: fmt(y + 3) }, String(ring)));
+    svg.append(svgEl(doc, 'text', { class: 'ring-label', x: fmt(x + 4), y: fmt(y + 3), 'font-size': fmt(RING_PX * scale) }, String(ring)));
   }
-  model.spokes.forEach((name, i) => {
-    const [x, y] = point(i, count, 100);
-    svg.append(svgEl(doc, 'line', { class: 'spoke', x1: C, y1: C, x2: fmt(x), y2: fmt(y) }));
-    const [lx, ly] = point(i, count, (LABEL_R / R) * 100);
-    const anchor = Math.abs(lx - C) < 8 ? 'middle' : lx > C ? 'start' : 'end';
-    const parts = wrap(name);
-    const text = svgEl(doc, 'text', { class: 'spoke-label', x: fmt(lx), y: fmt(ly - (ly < C ? (parts.length - 1) * LINE : 0) + 5), 'text-anchor': anchor });
+  for (const { i, lx, y, anchor, parts } of labels) {
+    const [x2, y2] = point(i, count, 100);
+    svg.append(svgEl(doc, 'line', { class: 'spoke', x1: C, y1: C, x2: fmt(x2), y2: fmt(y2) }));
+    const text = svgEl(doc, 'text', { class: 'spoke-label', x: fmt(lx), y: fmt(y), 'text-anchor': anchor });
     parts.forEach((p, k) => text.append(svgEl(doc, 'tspan', { x: fmt(lx), dy: k ? LINE : 0 }, p)));
     svg.append(text);
-  });
+  }
   for (const { lens, scores } of model.lenses) {
     const g = svgEl(doc, 'g', { 'data-radar-lens': lens });
     // Review #499 A/B: one closed outline only when every spoke has a value; otherwise one open line per run of adjacent
@@ -114,7 +143,7 @@ export function renderLensRadar({ doc, report }) {
     scores.forEach((s, i) => {
       if (s === null) return;
       const [x, y] = point(i, count, clamp(s));
-      g.append(svgEl(doc, 'circle', { cx: fmt(x), cy: fmt(y), r: 5 }, undefined));
+      g.append(svgEl(doc, 'circle', { cx: fmt(x), cy: fmt(y), r: fmt((MARKER_PX / 2) * scale) }, undefined));
       g.lastChild.append(svgEl(doc, 'title', {}, `${lensLabel(lens)} · ${model.spokes[i]}: ${String(s)} out of 100`));
     });
     svg.append(g);

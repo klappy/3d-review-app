@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.21",
+  "current": "0.35.22",
   "versions": [
+    {
+      "version": "0.35.22",
+      "status": "candidate",
+      "notes_path": "releases/0.35.22.md",
+      "sections": {
+        "fixed": [
+          "Full report radar: on a phone every area name around the chart now shows in full (long names such as \"Understanding of the Source\" are no longer cut off at the edge), and the score markers and the 25/50/75/100 ring numbers are larger so they are easier to read."
+        ]
+      }
+    },
     {
       "version": "0.35.21",
       "status": "candidate",
