@@ -1,7 +1,17 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.24",
+  "current": "0.35.25",
   "versions": [
+    {
+      "version": "0.35.25",
+      "status": "candidate",
+      "notes_path": "releases/0.35.25.md",
+      "sections": {
+        "fixed": [
+          "Full report radar: an area with a blank name now shows a dash beside its spoke, and the chart draws normally instead of failing to size itself. Charts whose areas all have names are unchanged."
+        ]
+      }
+    },
     {
       "version": "0.35.24",
       "status": "candidate",

@@ -143,3 +143,18 @@ test('R9 phone legibility: spoke labels fit both viewBoxes; wide keeps main size
   assert.match(css, /\.radar-narrow circle\{r:calc\(4px \* var\(--vbw\) \/ var\(--wmin\)\)\}/);
   assert.match(css, /\.radar-narrow :is\(\.ring,\.spoke,polygon,polyline,circle\)\{vector-effect:non-scaling-stroke\}/);
 });
+
+test('R10 a blank construct name (empty or whitespace-only) gives a finite viewBox, no NaN, and an em dash label', () => {
+  for (const blank of ['', '   ', '\t\n']) {
+    const names = ['Trust / Readiness', blank, 'Clarity / Naturalness'];
+    const rep = { payload: { cross_lens_multi: names.map((n, k) => ({ construct_name: n, lens_scores: [{ lens: 'Church', score: 50 + k }, { lens: 'Community', score: 60 }] })) } };
+    const section = renderLensRadar({ doc: doc(), report: rep });
+    assert.ok(!section.outerHTML.includes('NaN'), `no NaN for ${JSON.stringify(blank)}`);
+    for (const variant of ['wide', 'narrow']) {
+      const svg = section.querySelector(`svg.radar-${variant}`);
+      assert.ok(svg.getAttribute('viewBox').split(/\s+/).map(Number).every(Number.isFinite), `${variant} viewBox is finite`);
+      const label = [...svg.querySelectorAll('.spoke-label')][1];
+      assert.deepEqual([...label.querySelectorAll('tspan')].map(s => s.textContent), ['—']);
+    }
+  }
+});

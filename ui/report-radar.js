@@ -44,7 +44,7 @@ function wrap(name, width = WRAP, hardMax = 0) {
     const last = lines[lines.length - 1];
     if (last !== undefined && (last + ' ' + word).length <= width) lines[lines.length - 1] = `${last} ${word}`; else lines.push(word);
   }
-  return lines;
+  return lines.length ? lines : ['—']; // a blank (empty or whitespace-only) name shows an em dash, never an empty label (NaN box)
 }
 const rows = v => (Array.isArray(v) ? v : []);
 const num = v => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
