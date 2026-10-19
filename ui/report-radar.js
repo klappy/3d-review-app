@@ -16,18 +16,23 @@ export const radarCopy = Object.freeze({
 });
 const MIN_SPOKES = 3;
 const SIZE = 360, C = SIZE / 2, R = 120, LABEL_R = R + 24, RINGS = [25, 50, 75, 100], LINE = 21, WRAP = 13;
-// Phone legibility (cookbook work/active/2026-10-18-3d-radar-phone-legibility; canvas design-system.md Radar row): the
-// viewBox grows to hold every spoke label (estimated at EM_W of the font size a character), never smaller than the old
-// box, so a long label such as "Understanding of the Source" is not clipped at 390px. Markers and ring labels are sized in
-// viewBox units so they reach the canvas minimums (markers never under 8 CSS px, ring labels never under 11) at PHONE_W rendered width.
-const BASE = { x: -70, y: -40, w: SIZE + 140, h: SIZE + 80 }, LABEL_FS = 20, EM_W = 0.6, PAD = 6, PHONE_W = 266;
-const MARKER_PX = 8, RING_PX = 11; // PHONE_W: the radar svg measured 266px wide at 390×844 (shots-r18-2141), under the canvas estimate of 358
+// Phone legibility (cookbook work/active/2026-10-18-3d-radar-phone-legibility; canvas design-system.md Radar row; review
+// #546 HOLD). Two layouts of the same chart, one shown at a time by a container query on the figure:
+// - wide (container 460px or more, the svg at its 460px cap): main's sizes in viewBox units, unchanged (spoke labels 20,
+//   ring labels 13, marker r 5); the box only grows, evenly on both sides, to hold every spoke label.
+// - narrow (under 460px): labels wrap tighter (WRAP_N) and every size is set in CSS from rendered px: unit = px * vbw / wmin,
+//   where --vbw is the viewBox width and --wmin the lower edge of the container band, so at any width down to NARROW_MIN
+//   markers are 8px or more across, ring labels 11px or more and spoke labels SPOKE_PX (never smaller than the ring labels).
+//   The narrow box is fitted to the spoke labels at their largest unit size (the NARROW_MIN band).
+const LABEL_FS = 20, EM_W = 0.6, PAD = 6, BASE = { x: -70, y: -40, w: SIZE + 140, h: SIZE + 80 };
+const WRAP_N = 10, NARROW_MIN = 240, BANDS = [240, 280, 320, 360, 400, 440], WIDE_MIN = 460;
+const MARKER_PX = 8, RING_PX = 11, SPOKE_PX = 11.5;
 // Labels wrap at word boundaries (about 13 characters a line) so they stay legible when the chart scales down on a phone.
-function wrap(name) {
+function wrap(name, width = WRAP) {
   const lines = [];
   for (const word of String(name).split(/\s+/)) {
     const last = lines[lines.length - 1];
-    if (last !== undefined && (last + ' ' + word).length <= WRAP) lines[lines.length - 1] = `${last} ${word}`; else lines.push(word);
+    if (last !== undefined && (last + ' ' + word).length <= width) lines[lines.length - 1] = `${last} ${word}`; else lines.push(word);
   }
   return lines;
 }
@@ -66,9 +71,9 @@ function svgEl(doc, tag, attrs = {}, text) {
   return el;
 }
 
-export const radarCss = `.lens-radar figure{margin:8px 0 0}.lens-radar svg{display:block;width:100%;max-width:460px;height:auto;margin:0 auto;overflow:visible}
+export const radarCss = `.lens-radar figure{margin:8px 0 0;container-type:inline-size}.lens-radar svg{display:block;width:100%;max-width:460px;height:auto;margin:0 auto;overflow:visible}
 .lens-radar .ring{fill:none;stroke:var(--line);stroke-width:1}.lens-radar .spoke{stroke:var(--line);stroke-width:1}
-.lens-radar .ring-label{fill:var(--secondary)}.lens-radar .spoke-label{font-size:20px;fill:var(--ink)}
+.lens-radar .ring-label{font-size:13px;fill:var(--secondary)}.lens-radar .spoke-label{font-size:${LABEL_FS}px;fill:var(--ink)}
 .lens-radar [data-radar-lens] polygon{fill-opacity:.12;stroke-width:2;fill:var(--secondary);stroke:var(--secondary)}.lens-radar [data-radar-lens] polyline{fill:none;stroke-width:2;stroke:var(--secondary)}
 .lens-radar [data-radar-lens] circle{stroke:var(--paper);stroke-width:1.5;fill:var(--secondary)}
 .lens-radar [data-radar-lens]:is([data-radar-lens="Translation Team" i],[data-radar-lens=team i]) :is(polygon,circle){fill:var(--lens-green)}
@@ -77,51 +82,68 @@ export const radarCss = `.lens-radar figure{margin:8px 0 0}.lens-radar svg{displ
 .lens-radar [data-radar-lens=church i] :is(polygon,circle){fill:var(--lens-yellow)}.lens-radar [data-radar-lens=church i] :is(polygon,polyline){stroke:var(--lens-yellow)}
 .lens-radar ul.lens-radar-legend{list-style:none;padding:0;margin:8px 0 0!important;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px}
 .lens-radar-legend li{display:flex;align-items:center;gap:6px;border:0!important;padding:0!important;margin:0!important}
-.lens-radar-legend .lens-agree-dot{position:static;margin:0;width:10px;height:10px;border-width:1px}`;
+.lens-radar-legend .lens-agree-dot{position:static;margin:0;width:10px;height:10px;border-width:1px}
+.lens-radar svg.radar-narrow{display:none;--wmin:${NARROW_MIN}}
+@container (max-width:${WIDE_MIN - 0.02}px){.lens-radar svg.radar-wide{display:none}.lens-radar svg.radar-narrow{display:block}}
+${BANDS.slice(1).map(b => `@container (min-width:${b}px){.lens-radar svg.radar-narrow{--wmin:${b}}}`).join('')}
+.lens-radar .radar-narrow .ring-label{font-size:calc(${RING_PX}px * var(--vbw) / var(--wmin))}
+.lens-radar .radar-narrow .spoke-label{font-size:calc(${SPOKE_PX}px * var(--vbw) / var(--wmin))}
+.lens-radar .radar-narrow circle{r:calc(${MARKER_PX / 2}px * var(--vbw) / var(--wmin))}`;
 
-/** Estimated extents of one laid-out spoke label in viewBox units: { left, right, top, bottom }. */
-export function labelExtents({ lx, y, anchor, parts }) {
-  const w = Math.max(...parts.map(p => p.length)) * EM_W * LABEL_FS;
+/** Estimated extents of one laid-out spoke label in viewBox units at font size fs: { left, right, top, bottom }. */
+export function labelExtents({ lx, y, anchor, parts }, fs = LABEL_FS) {
+  const w = Math.max(...parts.map(p => p.length)) * EM_W * fs, line = LINE * fs / LABEL_FS;
   const left = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2;
-  return { left, right: left + w, top: y - LABEL_FS * 0.8, bottom: y + (parts.length - 1) * LINE + LABEL_FS * 0.25 };
+  return { left, right: left + w, top: y - fs * 0.8, bottom: y + (parts.length - 1) * line + fs * 0.25 };
 }
-/** The old fixed box, grown (never shrunk) just enough to hold every spoke label plus PAD. */
-function radarViewBox(labels) {
+/** The old fixed box grown (never shrunk) to hold every label plus PAD, evenly on both sides so the chart stays centred. */
+export function radarViewBox(labels, fs = LABEL_FS) {
   let x0 = BASE.x, y0 = BASE.y, x1 = BASE.x + BASE.w, y1 = BASE.y + BASE.h;
   for (const l of labels) {
-    const e = labelExtents(l);
+    const e = labelExtents(l, fs);
     x0 = Math.min(x0, e.left - PAD); x1 = Math.max(x1, e.right + PAD); y0 = Math.min(y0, e.top - PAD); y1 = Math.max(y1, e.bottom + PAD);
   }
-  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  const half = Math.max(C - x0, x1 - C);
+  return { x: C - half, y: y0, w: 2 * half, h: y1 - y0 };
 }
-
-/** Full report: detached DOM section, or null when fewer than three areas were scored by two or more perspectives. */
-export function renderLensRadar({ doc, report }) {
-  const model = radarModel(report);
-  if (!model || typeof doc.createElementNS !== 'function') return null;
-  const count = model.spokes.length;
-  // Lay out spoke labels first so the viewBox can be fitted around them.
-  const labels = model.spokes.map((name, i) => {
-    const [lx, ly] = point(i, count, (LABEL_R / R) * 100);
-    const anchor = Math.abs(lx - C) < 8 ? 'middle' : lx > C ? 'start' : 'end';
-    const parts = wrap(name);
-    const y = ly - (ly < C ? (parts.length - 1) * LINE : 0) + 5;
-    return { name, i, lx, y, anchor, parts };
+/** Spoke labels laid out at font size fs, wrapping at width characters a line. */
+function layoutLabels(spokes, fs, width, topClear = 0) {
+  const count = spokes.length, line = LINE * fs / LABEL_FS, gap = fs * 0.2;
+  return spokes.map((name, i) => {
+    // topClear lifts the top spoke label clear of the ring numbers drawn just above that spoke (narrow only).
+    const [px, py] = point(i, count, ((LABEL_R - 4 + gap + (i === 0 ? topClear : 0)) / R) * 100);
+    const anchor = Math.abs(px - C) < 8 ? 'middle' : px > C ? 'start' : 'end';
+    const parts = wrap(name, width);
+    const y = py - (py < C ? (parts.length - 1) * line : 0) + fs / 4;
+    return { name, i, lx: px, y, anchor, parts, line };
   });
-  const box = radarViewBox(labels);
-  const scale = box.w / PHONE_W;
-  const svg = svgEl(doc, 'svg', { viewBox: [box.x, box.y, box.w, box.h].map(fmt).join(' '), role: 'img' });
+}
+/** Narrow layout: spoke labels at their largest unit size (SPOKE_PX at NARROW_MIN), the box fitted around them (fixed point). */
+function narrowLayout(spokes) {
+  let box = radarViewBox(layoutLabels(spokes, LABEL_FS, WRAP_N)), fs = LABEL_FS, labels;
+  for (let k = 0; k < 40; k++) {
+    fs = Math.min(SPOKE_PX * box.w / NARROW_MIN, 80);
+    labels = layoutLabels(spokes, fs, WRAP_N, fs * RING_PX / SPOKE_PX);
+    box = radarViewBox(labels, fs);
+  }
+  return { labels, box, fs };
+}
+function radarSvg(doc, model, variant) {
+  const count = model.spokes.length;
+  const { labels, box } = variant === 'narrow' ? narrowLayout(model.spokes) : { labels: layoutLabels(model.spokes, LABEL_FS, WRAP) };
+  const vb = box || radarViewBox(labels);
+  const svg = svgEl(doc, 'svg', { class: `radar-${variant}`, viewBox: [vb.x, vb.y, vb.w, vb.h].map(fmt).join(' '), role: 'img', style: `--vbw:${fmt(vb.w)}` });
   svg.append(svgEl(doc, 'title', {}, radarCopy.title));
   for (const ring of RINGS) {
     svg.append(svgEl(doc, 'polygon', { class: 'ring', points: model.spokes.map((_, i) => point(i, count, ring).map(fmt).join(',')).join(' ') }));
     const [x, y] = point(0, count, ring);
-    svg.append(svgEl(doc, 'text', { class: 'ring-label', x: fmt(x + 4), y: fmt(y + 3), 'font-size': fmt(RING_PX * scale) }, String(ring)));
+    svg.append(svgEl(doc, 'text', { class: 'ring-label', x: fmt(x + 4), y: fmt(y + 3) }, String(ring)));
   }
-  for (const { i, lx, y, anchor, parts } of labels) {
+  for (const { i, lx, y, anchor, parts, line } of labels) {
     const [x2, y2] = point(i, count, 100);
     svg.append(svgEl(doc, 'line', { class: 'spoke', x1: C, y1: C, x2: fmt(x2), y2: fmt(y2) }));
     const text = svgEl(doc, 'text', { class: 'spoke-label', x: fmt(lx), y: fmt(y), 'text-anchor': anchor });
-    parts.forEach((p, k) => text.append(svgEl(doc, 'tspan', { x: fmt(lx), dy: k ? LINE : 0 }, p)));
+    parts.forEach((p, k) => text.append(svgEl(doc, 'tspan', { x: fmt(lx), dy: k ? fmt(line) : 0 }, p)));
     svg.append(text);
   }
   for (const { lens, scores } of model.lenses) {
@@ -143,14 +165,21 @@ export function renderLensRadar({ doc, report }) {
     scores.forEach((s, i) => {
       if (s === null) return;
       const [x, y] = point(i, count, clamp(s));
-      g.append(svgEl(doc, 'circle', { cx: fmt(x), cy: fmt(y), r: fmt((MARKER_PX / 2) * scale) }, undefined));
+      g.append(svgEl(doc, 'circle', { cx: fmt(x), cy: fmt(y), r: 5 }, undefined));
       g.lastChild.append(svgEl(doc, 'title', {}, `${lensLabel(lens)} · ${model.spokes[i]}: ${String(s)} out of 100`));
     });
     svg.append(g);
   }
+  return svg;
+}
+
+/** Full report: detached DOM section, or null when fewer than three areas were scored by two or more perspectives. */
+export function renderLensRadar({ doc, report }) {
+  const model = radarModel(report);
+  if (!model || typeof doc.createElementNS !== 'function') return null;
   const h = doc.createElement('h4'); h.textContent = radarCopy.heading;
   const p = doc.createElement('p'); p.className = 'small muted'; p.textContent = radarCopy.intro;
-  const fig = doc.createElement('figure'); fig.append(svg);
+  const fig = doc.createElement('figure'); fig.append(radarSvg(doc, model, 'wide'), radarSvg(doc, model, 'narrow'));
   const cap = doc.createElement('figcaption'); cap.className = 'small muted'; cap.textContent = radarCopy.scale; fig.append(cap);
   const legend = doc.createElement('ul'); legend.className = 'lens-radar-legend';
   for (const { lens } of model.lenses) {
