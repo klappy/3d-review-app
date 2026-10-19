@@ -1,23 +1,23 @@
 {
-  "version": "0.35.21",
+  "version": "0.35.23",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "d05ed9d32f70ea7eef0cbe3fd7f9739f72eb98c2",
+  "cookbook_commit": "62170b92d06187214055444d9b53fa3c222fe9a4",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.21.md",
-      "blob_sha": "7fe09ea6bffc6ea4cbcdf3075a17f737021a377a",
-      "sha256": "483e8168572fbade7bf964c13a26d44d2517debe0e37b120645f68fefe6dfa76"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.23.md",
+      "blob_sha": "e6553c04475cb32373585535f2d650404ab7a77e",
+      "sha256": "09ae1ecfeba678923de75b084432c916047863142f0b7adf4cc03625416250cc"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "78f266a5309b394f65f5168056f8f0912de29a1a",
-      "sha256": "f45152f3f46aa0057b212395773e8a1584c3d5d4c8a71fb0665f943caac0fdac"
+      "blob_sha": "5748f43da6bdbabc95e0c10468fd08d44575b4af",
+      "sha256": "5b5fc683010474a392d14a9ba673242be462c34c635c8748347a0a54fe205bba"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Ownership: when an owner steps down and the invitations that stepping down would cancel change at the moment they confirm, the refusal now says the invitations changed, instead of only saying something changed; they are asked to preview again."
+        "Invitations and roles: an invitation to a workspace or an assessment now stops working once the person who sent it no longer has their own role there, as project invitations already did; and changing someone's role on a project now needs the project's own owner — an owner through the workspace changes access at the workspace, or is added to the project."
       ]
     }
   }

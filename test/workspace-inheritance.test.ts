@@ -318,7 +318,8 @@ describe("workspace grouping cannot mint project ownership", () => {
     await expect(accept(mk("dd_b"), { invitation_id: "inv_dd_live" }, { dryRun: true } as any)).resolves.toMatchObject({ result: {} });
     // (2) roster pending_invitations: same rule
     expect(ids(await grantList(mk("dd_pm"), { scope: "project", id: "prj_dd" }))).toEqual(["inv_dd_live"]);
-    expect(ids(await grantList(mk("dd_wm"), { scope: "workspace", id: "ws_dd" }))).toEqual(["inv_dd_self", "inv_dd_ws"].sort());
+    // 0.35.22 (ASK-f4-finding4 default 1): dd_c holds no workspace grant, so its own invitation no longer stands and is not pending
+    expect(ids(await grantList(mk("dd_wm"), { scope: "workspace", id: "ws_dd" }))).toEqual(["inv_dd_ws"]);
 
     // (3) de-dup ignores the dead row: a direct member re-inviting dd_a gets a fresh invitation, not "nothing was sent again"
     const fresh = await invite(mk("dd_pm"), { scope: "project", id: "prj_dd", email: "dd_a@example.invalid", role: "member" });

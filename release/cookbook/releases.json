@@ -1,7 +1,27 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.21",
+  "current": "0.35.23",
   "versions": [
+    {
+      "version": "0.35.23",
+      "status": "candidate",
+      "notes_path": "releases/0.35.23.md",
+      "sections": {
+        "fixed": [
+          "Invitations and roles: an invitation to a workspace or an assessment now stops working once the person who sent it no longer has their own role there, as project invitations already did; and changing someone's role on a project now needs the project's own owner — an owner through the workspace changes access at the workspace, or is added to the project."
+        ]
+      }
+    },
+    {
+      "version": "0.35.22",
+      "status": "candidate",
+      "notes_path": "releases/0.35.22.md",
+      "sections": {
+        "fixed": [
+          "Full report radar: on a phone every area name around the chart now shows in full (long names such as \"Understanding of the Source\" are no longer cut off at the edge), and the score markers and the 25/50/75/100 ring numbers are larger so they are easier to read."
+        ]
+      }
+    },
     {
       "version": "0.35.21",
       "status": "candidate",
