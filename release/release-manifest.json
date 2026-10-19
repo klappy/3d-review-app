@@ -1,23 +1,23 @@
 {
-  "version": "0.35.25",
+  "version": "0.35.26",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "ce7055ac29cd5b08463a61f3a7a17838904217e0",
+  "cookbook_commit": "4857d913a124ed3dd2bf71a6403c08c30d133337",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.25.md",
-      "blob_sha": "a4264a657d87be3b71838c5e8868d34565c6be81",
-      "sha256": "807cd33ec22d8646d29942bf8893127675ced382e7464cfd522fc1e58c85a0ec"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.26.md",
+      "blob_sha": "f3f0194742cea631f94f1b034799a9d5dc1ef8c7",
+      "sha256": "e61330a68336c89b57491df3e3528b684ad38b9a204d4910bee4e08ce44b2c57"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "5105e4db0491bf69504d211ac2ae6032d4877fb0",
-      "sha256": "a9074f887cca06fcc26cc4ab5f90d24f392121fc141a9d5901d10db116d71edd"
+      "blob_sha": "5dbed58ecc0c7db9adb1955a38b2d15ce6d1bc1e",
+      "sha256": "c00f34ac5ea266421521d8c78741f2f85fb7e75f18fa5e2b3ebd4f87557a3126"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "Full report radar: an area with a blank name now shows a dash beside its spoke, and the chart draws normally instead of failing to size itself. Charts whose areas all have names are unchanged."
+        "Full report: an area with no name now shows a dash everywhere it appears — beside its radar spoke, in the score tooltip and in the \"Do the perspectives agree?\" list — instead of the words \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
       ]
     }
   }
