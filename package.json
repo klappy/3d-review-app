@@ -9,8 +9,8 @@
   "scripts": {
     "stamp": "node scripts/stamp-version.mjs",
     "build:mcp-panel": "node scripts/build-mcp-panel.mjs",
-    "pretypecheck": "npm run stamp",
-    "pretest": "npm run stamp && node scripts/build-mcp-panel.mjs --check && npm run build:next",
+    "pretypecheck": "npm run stamp && node scripts/build-next-guarded.mjs",
+    "pretest": "npm run stamp && node scripts/build-mcp-panel.mjs --check && node scripts/build-next-guarded.mjs",
     "predev": "npm run stamp",
     "dev": "wrangler dev --local --port 8787",
     "typecheck": "tsc --noEmit",
