@@ -91,6 +91,7 @@ if (demo && typeof document?.addEventListener === 'function') document.addEventL
 
 // A fresh browser starts with personal access. The server independently verifies super-admin authority.
 if (!demo && !/(?:^|;\s*)review_access=/.test(document.cookie)) document.cookie = 'review_access=my; Path=/; SameSite=Lax';
+let accessObserver = null;
 function syncAccessSwitch(principal) {
   mountAccessSwitch({ app, principal, demo, document, onSwitch(mode) {
     document.cookie = `review_access=${mode}; Path=/; SameSite=Lax`;
@@ -100,6 +101,12 @@ function syncAccessSwitch(principal) {
     location.replace(location.pathname + location.search + '#workspaces');
     location.reload();
   }});
+  if (kitRoot && !accessObserver && typeof MutationObserver === 'function') {
+    accessObserver = new MutationObserver(() => {
+      if (state.principal?.super_admin && !document.getElementById('access-scope') && app.isConnected) syncAccessSwitch(state.principal);
+    });
+    accessObserver.observe(kitRoot, {childList:true,subtree:true});
+  }
 }
 
 // The cookie preference is shared by the browser, so every open app tab must invalidate together.
@@ -841,7 +848,6 @@ function landOnSignIn() {
   listen(); return render();
 }
 async function signOut(switchAccount = false) {
-  document.cookie = 'review_access=my; Path=/; SameSite=Lax';
   if (demo || accountBusy) return;
   if (!state.principal && !token) return landOnSignIn();
   const identity = identityGeneration, credential = token;
@@ -853,6 +859,7 @@ async function signOut(switchAccount = false) {
     catch (e) { if (e?.code !== 'NOT_AUTHENTICATED') throw e; result = { signed_out: true }; } // session already gone: the person is signed out
     if (!current()) return;
     if (result?.signed_out !== true) throw new Error('Logout not confirmed');
+    document.cookie = 'review_access=my; Path=/; SameSite=Lax';
     token = null; try { sessionStorage.removeItem('facilitatorToken'); } catch {}
     import(WIZARD_JS).then(m => m.clearAllWip?.(localStorage, sessionStorage)).catch(() => {}); // val422-2341: no setup copy outlives sign-out
     resetIdentity();

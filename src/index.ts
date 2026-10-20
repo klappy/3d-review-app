@@ -109,8 +109,15 @@ for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?
       const res = json(result, result.ok ? 200 : statusFor(result.error.code));
       if (cap.id.startsWith("cap.ops.roadmap_")) res.headers.set("cache-control", "no-store");
       if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String((result.error as { data?: { retry_after?: number } }).data?.retry_after ?? RATE_LIMIT_WINDOW_SECONDS));
-      if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Secure; Path=/; SameSite=Lax`);
-      if (cap.id === "cap.auth.logout") res.headers.append("set-cookie", "session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+      if (cap.id === "cap.auth.consume_link" && result.ok) {
+        res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Secure; Path=/; SameSite=Lax`);
+        res.headers.append("set-cookie", "review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
+      }
+      if (cap.id === "cap.auth.me" && !result.ok && result.error.code === "NOT_AUTHENTICATED") res.headers.append("set-cookie", "review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
+      if (cap.id === "cap.auth.logout") {
+        res.headers.append("set-cookie", "session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+        res.headers.append("set-cookie", "review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
+      }
       return res;
     } catch (e) {
       if (e instanceof CapError) return json(fail(e.code, e.message, e.hint, e.docs, ctx.traceId), statusFor(e.code));
@@ -195,6 +202,7 @@ app.get("/v2/auth/access", async (c) => {
     const token = await mintSession(env, pr.id, pr.support ? "support" : "user", { via: "cloudflare-access", sub: id.sub });
     const headers = new Headers({ location: `/#session=${token}` });
     headers.append("set-cookie", `session=${token}; HttpOnly; Path=/; SameSite=Lax; Secure`);
+    headers.append("set-cookie", "review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
     return new Response(null, { status: 302, headers });
   } catch (e: any) {
     const code = e instanceof CapError ? e.code : "NOT_AUTHENTICATED";
@@ -294,6 +302,7 @@ app.post("/v2/auth/email/open", async (c) => {
   const token = await mintMagicSession(env, pr);
   const headers = new Headers({ location: `/#session=${token}`, "cache-control": "no-store", "referrer-policy": "no-referrer" });
   headers.append("set-cookie", magicSessionCookie(token));
+  headers.append("set-cookie", "review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
   return new Response(null, { status: 303, headers });
 });
 // DEV BOOTSTRAP — explicitly OUTSIDE capability parity (Astra 5706308285): loads the committed synthetic answer sets

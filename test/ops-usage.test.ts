@@ -40,14 +40,14 @@ beforeAll(async () => {
 
 async function http(bearer?: string, query = "") {
   const res = await app.fetch(new Request(`https://t.invalid/v2/ops/usage${query}`, {
-    headers: bearer ? { authorization: `Bearer ${bearer}` } : {},
+    headers: bearer ? { authorization: `Bearer ${bearer}`, cookie: "review_access=global" } : {},
   }), env);
   return { status: res.status, json: await res.json() as any };
 }
 async function mcp(params: Record<string, unknown>, bearer?: string, tool = "read") {
   const res = await app.fetch(new Request("https://t.invalid/mcp", {
     method: "POST",
-    headers: { "content-type": "application/json", ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) },
+    headers: { "content-type": "application/json", ...(bearer ? { authorization: `Bearer ${bearer}`, cookie: "review_access=global" } : {}) },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: { capability: "cap.ops.usage", params } } }),
   }), env);
   const j: any = await res.json();

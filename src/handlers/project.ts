@@ -25,11 +25,12 @@ export const create: Handler = async (ctx, params) => {
 export const list: Handler = async (ctx) => {
   const actor = requireUser(ctx);
   if (ctx.principal.kind === "support") {
-    const { results } = await ctx.db.prepare(`SELECT p.*, 'viewer' AS role,
+    const { results } = await ctx.db.prepare(`SELECT p.*, COALESCE((SELECT CASE MAX(CASE g.role WHEN 'owner' THEN 3 WHEN 'member' THEN 2 ELSE 1 END) WHEN 3 THEN 'owner' WHEN 2 THEN 'member' WHEN 1 THEN 'viewer' END FROM "grant" g WHERE g.principal_id=?1 AND ((g.scope_type='project' AND g.scope_id=p.id) OR (g.scope_type='workspace' AND g.scope_id=p.workspace_id))),'viewer') AS role,
+      (SELECT g.role FROM "grant" g WHERE g.principal_id=?1 AND g.scope_type='project' AND g.scope_id=p.id) AS direct_role,
       (SELECT COUNT(*) FROM assessment a WHERE a.project_id=p.id) AS assessment_count,
       (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id JOIN assessment a ON a.id=s.assessment_id WHERE a.project_id=p.id) AS response_count
-      FROM project p ORDER BY p.created_at`).all<ProjectRow & {role:Role;assessment_count:number;response_count:number}>();
-    return {result:{projects:results.map(p => ({...view(p,p.role),direct_role:null,assessment_count:p.assessment_count,response_count:p.response_count}))}};
+      FROM project p ORDER BY p.created_at`).bind(actor).all<ProjectRow & {direct_role:Role|null;role:Role;assessment_count:number;response_count:number}>();
+    return {result:{projects:results.map(p => ({...view(p,p.role),direct_role:p.direct_role??null,assessment_count:Number(p.assessment_count)||0,response_count:Number(p.response_count)||0}))}};
   }
 // L1-23 (captain 14:52): read-only child counts for cards, one correlated aggregate per row — no N+1.
   // Effective role = max(project grant, grouping workspace grant) — workspace roles inherit to grouped projects.

@@ -5,6 +5,7 @@ import {resolvePrincipal, mintSession} from '../src/auth';
 import {list as workspaces, get as workspace} from '../src/handlers/workspace';
 import {list as projects, get as project} from '../src/handlers/project';
 import {list as assessments, get as assessment} from '../src/handlers/assessment';
+import {accept} from '../src/handlers/grant';
 import {list as responses} from '../src/handlers/response';
 import type {Ctx} from '../src/handlers/types';
 const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:'global-access',modules:true,script:"export default {fetch(){return new Response('ok')}}",d1Databases:{DB:'global-access'}}]}));
@@ -20,8 +21,15 @@ it('switches a verified super admin between personal grants and all workspace hi
  const admin=await mintSession(env,'global_admin','user'), ordinary=await mintSession(env,'ordinary','user');
  const context=async(token:string,mode:string):Promise<Ctx>=>({env,db,principal:await resolvePrincipal(new Request('https://example.invalid/v2/me',{headers:{cookie:`session=${token}; review_access=${mode}`}}),env),traceId:'tr_test',now:()=>new Date(),log:()=>{}});
  const my=await context(admin,'my'), global=await context(admin,'global');
+ for(const preference of ['', 'invalid', 'GLOBAL']) {
+  const request=new Request('https://example.invalid/v2/me',{headers:{cookie:`session=${admin}${preference ? '; review_access='+preference : ''}`}});
+  expect(await resolvePrincipal(request,env)).toMatchObject({kind:'user',accessMode:'my'});
+ }
+ expect(await resolvePrincipal(new Request('https://example.invalid/v2/me',{headers:{authorization:`Bearer ${admin}`}}),env)).toMatchObject({kind:'user',accessMode:'my'});
  expect(my.principal).toMatchObject({kind:'user',superAdmin:true,accessMode:'my'});
  expect(global.principal).toMatchObject({kind:'support',superAdmin:true,accessMode:'global'});
+ // A global support principal never reaches grant.accept's existing-role preview.
+ await expect(accept(global,{invitation_id:'unused'},{dryRun:true})).rejects.toMatchObject({code:'NOT_AUTHENTICATED'});
  expect((await workspaces(my,{})).result.workspaces).toEqual([]);
  expect((await projects(my,{})).result.projects).toEqual([]);
  const ws=(await workspaces(global,{})).result.workspaces;
@@ -41,6 +49,18 @@ it('switches a verified super admin between personal grants and all workspace hi
  expect(outsider.principal.kind).toBe('user');
  expect(outsider.principal.superAdmin).toBeUndefined();
  expect((await projects(outsider,{})).result.projects).toEqual([]);
+ // Global cards preserve actual direct roles and workspace inheritance rather than relabelling every grant viewer.
+ const stamp=new Date().toISOString(), w=ws[0], p=ps[0];
+ await db.prepare('INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) VALUES (?,?,?,?,?,?)').bind('g_admin_ws','global_admin','workspace',w.id,'owner',stamp).run();
+ await db.prepare('UPDATE project SET workspace_id=? WHERE id=?').bind(w.id,p.id).run();
+ await db.prepare('INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) VALUES (?,?,?,?,?,?)').bind('g_admin_proj','global_admin','project',p.id,'member',stamp).run();
+ expect((await workspaces(global,{})).result.workspaces.find((x:any)=>x.id===w.id).role).toBe('owner');
+ expect((await projects(global,{})).result.projects.find((x:any)=>x.id===p.id)).toMatchObject({role:'owner',direct_role:'member'});
+ for(const a of (await assessments(global,{pid:p.id})).result.assessments){
+  await db.prepare('INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) VALUES (?,?,?,?,?,?)').bind('g_admin_'+a.id,'global_admin','assessment',a.id,'member',stamp).run();
+  expect((await assessments(global,{pid:p.id})).result.assessments.find((x:any)=>x.id===a.id).role).toBe('member');
+ }
+ await db.prepare('DELETE FROM "grant" WHERE principal_id=?').bind('global_admin').run();
  // Switching back restores the ordinary grants without altering the account or grants.
  expect((await workspaces(await context(admin,'my'),{})).result.workspaces).toEqual([]);
  const participant=await mintSession(env,'ordinary','participant');

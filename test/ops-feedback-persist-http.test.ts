@@ -40,7 +40,7 @@ beforeAll(async () => {
 
 const headers = (bearer?: string, extra: Record<string, string> = {}) => ({
   "content-type": "application/json",
-  ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
+  ...(bearer ? { authorization: `Bearer ${bearer}`, cookie: "review_access=global" } : {}),
   ...extra,
 });
 

@@ -13,7 +13,7 @@
 .sidebar-tree li.tree-row{flex-wrap:wrap}
 
 /* Super-admin access selector: uses existing shell tokens at both widths. */
-.access-scope { margin: var(--gap-grid); padding: var(--gap-grid); }
+.access-scope { margin: 0 0 var(--gap-grid); padding: var(--gap-grid); }
 .access-scope [role="group"] { display:flex; flex-wrap:wrap; gap:var(--gap-grid); }
 .access-scope button[aria-pressed="true"] { background:var(--green); color:var(--primary-ink); }
 .access-scope p { color:var(--secondary); }

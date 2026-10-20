@@ -30,7 +30,7 @@ export async function resolvePrincipal(req: Request, env: Env): Promise<Principa
     if (row.kind === "participant") return { kind: "participant", id: row.principal_id, participantSurveyId: row.participant_survey_id, respondentId: row.respondent_id, sessionTokenHash: h };
     if (row.kind === "support" || row.support) {
       // This preference only narrows an authenticated super admin. It never grants authority.
-      const personal = cookie(req, "review_access") === "my";
+      const personal = cookie(req, "review_access") !== "global";
       return { kind: personal ? "user" : "support", id: row.principal_id, superAdmin: true,
         accessMode: personal ? "my" : "global", supportActor: row.delegated_by ?? undefined,
         provisioned: personal ? !!row.provisioned : true, sessionTokenHash: h };

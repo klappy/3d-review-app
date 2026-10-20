@@ -29,12 +29,12 @@ export const create: Handler = async (ctx, params) => {
 export const list: Handler = async (ctx) => {
   const actor = requireUser(ctx);
   if (ctx.principal.kind === "support") {
-    const { results } = await ctx.db.prepare(`SELECT w.*, 'viewer' AS role,
+    const { results } = await ctx.db.prepare(`SELECT w.*, COALESCE((SELECT g.role FROM "grant" g WHERE g.principal_id=? AND g.scope_type='workspace' AND g.scope_id=w.id),'viewer') AS role,
       (SELECT COUNT(*) FROM project p WHERE p.workspace_id=w.id) AS project_count,
       (SELECT COUNT(*) FROM assessment a JOIN project p ON p.id=a.project_id WHERE p.workspace_id=w.id) AS assessment_count,
       (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id JOIN assessment a ON a.id=s.assessment_id JOIN project p ON p.id=a.project_id WHERE p.workspace_id=w.id) AS response_count
-      FROM workspace w ORDER BY w.created_at`).all<WorkspaceRow & {role:Role;project_count:number;assessment_count:number;response_count:number}>();
-    return { result: { workspaces: results.map(w => ({...view(w,w.role), project_count:w.project_count, assessment_count:w.assessment_count, response_count:w.response_count})) } };
+      FROM workspace w ORDER BY w.created_at`).bind(actor).all<WorkspaceRow & {role:Role;project_count:number;assessment_count:number;response_count:number}>();
+    return { result: { workspaces: results.map(w => ({...view(w,w.role), project_count:Number(w.project_count)||0, assessment_count:Number(w.assessment_count)||0, response_count:Number(w.response_count)||0})) } };
   }
   const { results } = await ctx.db
 // L1-23 (captain 14:52): read-only child counts for cards, one correlated aggregate per row — no N+1.
