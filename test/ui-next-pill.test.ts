@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
-// UI Next (v4) Stage pill contract (status: provisional).
+// UI Next (v4) Stage pill contract, Svelte 5 re-expression (status: provisional).
 // Contract: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas/design-system.md section 2, Stage pill row;
 // section 1.2 Stage row (neutral stage tokens, the five labels).
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-// @ts-expect-error -- plain ES module, no type declarations
-import { renderPill, STAGES, STAGE_LABELS } from "../ui-next/components/pill.js";
+import { render } from "@testing-library/svelte";
 // @ts-expect-error -- plain .mjs script, no type declarations
 import { lintText } from "../scripts/ui-next-lint.mjs";
+import Pill, { STAGES, STAGE_LABELS } from "../ui-next/src/Pill.svelte";
+
+const renderPill = (props?: Record<string, unknown>) => render(Pill, { props: props ?? {} }).container.firstElementChild as HTMLElement;
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), "ui-next", p), "utf8");
 const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -86,22 +88,12 @@ describe("pill.css", () => {
   });
 });
 
-describe("pill module and fixture", () => {
-  it("pill.js imports only ./h.js and uses no innerHTML", () => {
-    const js = read("components/pill.js").replace(/^\s*\/\/.*$/gm, "");
-    expect([...js.matchAll(/^\s*import .* from "([^"]+)";/gm)].map((m) => m[1])).toEqual(["./h.js"]);
-    expect(js).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML/);
+describe("Pill.svelte source", () => {
+  it("light DOM only: no <style>, customElement, attachShadow, {@html} or inline style", () => {
+    const src = read("src/Pill.svelte").replace(/<!--[\s\S]*?-->/g, "");
+    expect(src).not.toMatch(/<style|customElement|attachShadow|\{@html|style=|innerHTML/);
   });
-  it("fixture loads the tokens and the pill stylesheet and renders every stage on light and dark .app roots", () => {
-    const html = read("fixtures/pill.html");
-    expect(html).toContain('href="../tokens.css"');
-    expect(html).toContain('href="../components/pill.css"');
-    expect(html).toContain('from "../components/pill.js"');
-    expect(html).toContain("STAGES.map((stage) => renderPill({ stage }))");
-    expect(html).toMatch(/sheet\("light"\), sheet\("dark"\)/);
-    expect(html).toContain('class: "app", "data-theme": theme');
-  });
-  it("the new files pass the ui-next lint", () => {
-    for (const p of ["components/pill.js", "components/pill.css", "fixtures/pill.html"]) expect(lintText(p, read(p))).toEqual([]);
+  it("passes the ui-next lint", () => {
+    for (const p of ["src/Pill.svelte", "components/pill.css"]) expect(lintText(p, read(p))).toEqual([]);
   });
 });
