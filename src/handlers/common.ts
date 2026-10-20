@@ -1,9 +1,11 @@
 import { ensureLegacyTemplates, LEGACY_TEMPLATE_IDS } from "../legacy-templates";
 import { withDisplayName } from "../display-names";
 // Shared helpers for data handlers: ids, hashing, params, visibility/role checks.
-// Roles come from `grant` rows at the exact scope (D2: no inheritance). The one
-// grouping-listing exception (03 matrix): a project grant lets its holder see the
-// project's assessments; a workspace grant lists grouped projects (names only).
+// Roles come from `grant` rows at the exact scope, with ONE inheritance edge
+// (3d-review-cookbook work/active/2026-10-15-3d-workspace-permissions): a workspace
+// grant (owner/member/viewer) applies to every project grouped in that workspace —
+// effective project role = max(project grant, workspace grant). Assessments still
+// open only by an explicit assessment grant (D9 unchanged).
 import type { Ctx, Role, ScopeType } from "./types";
 import { CapError, notVisible } from "./errors";
 
@@ -45,6 +47,8 @@ export function randomCode(): string {
 
 // ---------------------------------------------------------------- params
 type P = Record<string, unknown>;
+/** The one rule for a usable secret/address param: a string with something besides whitespace. */
+export const nonEmptyStr = (v: unknown): v is string => typeof v === "string" && v.trim().length > 0;
 export function reqStr(p: P, key: string): string {
   const v = p[key];
   if (typeof v !== "string" || v.length === 0) throw new CapError("INVALID_PARAMS", `${key} is required`, `missing:${key}`);
@@ -105,7 +109,43 @@ export async function roleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): P
     .prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?')
     .bind(ctx.principal.id, scopeType, scopeId)
     .first<{ role: Role }>();
-  return row?.role ?? null;
+  return row?.role ?? (ctx.principal.kind === "support" ? "viewer" : null);
+}
+/** THE inheritance rule as SQL (0.35.14, cookbook work/active/2026-10-18-3d-grant-write-guard-followups DoD (c)): grant row
+ *  `g` (an alias) applies at scope (`scopeT`, `scopeI`, SQL expressions) when it is AT that scope, or, for a project, when it is
+ *  on the workspace that groups it. projectRole (read time) and grant.ts callerHolds (inside a write) both use it, so the
+ *  effective-role rule has one source. `scopeI` is evaluated twice: pass a column, a literal or a numbered parameter. */
+export const grantApplies = (g: string, scopeT: string, scopeI: string) =>
+  `((${g}.scope_type = ${scopeT} AND ${g}.scope_id = ${scopeI}) OR (${scopeT} = 'project' AND ${g}.scope_type = 'workspace'`
+  + ` AND ${g}.scope_id = (SELECT p.workspace_id FROM project p WHERE p.id = ${scopeI})))`;
+/** Effective project role: max(direct project grant, grant on the workspace that groups it). One query; null when neither. */
+export async function projectRole(ctx: Ctx, projectId: string): Promise<Role | null> {
+  if (ctx.principal.kind !== "user" && ctx.principal.kind !== "support") return null;
+  const { results } = await ctx.db
+    .prepare(`SELECT g.role AS role FROM "grant" g WHERE g.principal_id = ?1 AND ${grantApplies("g", "'project'", "?2")}`)
+    .bind(ctx.principal.id, projectId)
+    .all<{ role: Role }>();
+  return (results ?? []).reduce<Role | null>((acc, r) => maxRole(acc, r.role), ctx.principal.kind === "support" ? "viewer" : null);
+}
+/** Role at a scope as authorization sees it: projects inherit from their workspace; other scopes are exact. */
+export async function effectiveRoleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<Role | null> {
+  return scopeType === "project" ? projectRole(ctx, scopeId) : roleAt(ctx, scopeType, scopeId);
+}
+/** Direct-role authority (HOLD #483 c6204865181): the caller's DIRECT grant at exactly this scope must reach `min`. Used by
+ *  invite, update_role (to owner, and any role change at a project since 0.35.23) and transfer_owner (grant.ts); accept checks the inviter's direct grant inline, and
+ *  add/remove_project use isDirectOwner (workspace.ts).
+ *  An inherited (workspace-derived) project role never counts here: otherwise it could be laundered into a permanent direct grant.
+ *  Visibility is decided first on the effective role, so a caller who can see the scope gets NOT_AUTHORIZED, never a leak. */
+export async function directRoleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string, min: Role, hint?: string): Promise<Role> {
+  gate(await effectiveRoleAt(ctx, scopeType, scopeId), "viewer", scopeType);
+  const direct = await roleAt(ctx, scopeType, scopeId);
+  if (!atLeast(direct, min))
+    throw new CapError("NOT_AUTHORIZED_AT_SCOPE", `a direct ${min} grant at this ${scopeType} is required`, hint ?? "an inherited workspace role cannot create, raise, move or share authority here — a direct grant holder runs this step");
+  return direct as Role;
+}
+/** True when the caller holds a DIRECT owner grant at exactly this scope. */
+export async function isDirectOwner(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<boolean> {
+  return (await roleAt(ctx, scopeType, scopeId)) === "owner";
 }
 export function maxRole(a: Role | null, b: Role | null): Role | null {
   if (!a) return b;
@@ -128,6 +168,7 @@ export interface ProjectRow { id: string; workspace_id: string | null; name: str
 export interface LanguageRow { id: string; project_id: string; code: string | null; name: string }
 export interface AssessmentRow {
   id: string; project_id: string; language_id: string; name: string; purpose: string | null; period: string | null; format: string | null;
+  location?: string | null; facilitator?: string | null; // B19, migration 0015 (absent before it runs)
   stage: Stage; notes_reflection: string | null; notes_next_steps: string | null; archived_at: string | null; created_at: string;
 }
 export interface TemplateRow { id: string; name: string; version: number; perspective: string; source_ref: string | null; items_json: string; scoring_json: string; published_at: string | null }
@@ -141,12 +182,11 @@ export async function loadWorkspace(ctx: Ctx, id: string, min: Role = "viewer"):
 }
 export async function loadProject(ctx: Ctx, id: string, min: Role = "viewer"): Promise<{ row: ProjectRow; role: Role }> {
   const row = await ctx.db.prepare("SELECT * FROM project WHERE id = ?").bind(id).first<ProjectRow>();
-  const role = row ? await roleAt(ctx, "project", id) : null;
+  const role = row ? await projectRole(ctx, id) : null;
   if (!row) throw notVisible("project");
   return { row, role: gate(role, min, "project") };
 }
-/** Role at an assessment = direct grant, or the project grant (project members see assessments; 03 matrix). */
-/** D2/D9 (settled): NO inheritance — only an explicit assessment grant opens an assessment. A project grant lists, it does not open (Astra #14 c5704047932). */
+/** Role at an assessment = the direct assessment grant only (D9, settled): project and workspace roles never reach an assessment. A project grant lists, it does not open (Astra #14 c5704047932). */
 export async function assessmentRole(ctx: Ctx, a: { id: string; project_id: string }): Promise<Role | null> {
   return roleAt(ctx, "assessment", a.id);
 }

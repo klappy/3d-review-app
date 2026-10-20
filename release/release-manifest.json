@@ -1,25 +1,23 @@
 {
-  "version": "0.30.5",
+  "version": "0.37.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "9fd5e1b9e97b050f86720b02a97a702f4c95472a",
+  "cookbook_commit": "be9a0a3a6ddb4efe931776d594e531b8e15c088f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.30.5.md",
-      "blob_sha": "7e46d7cfdbfdf253a7018bef96a9ffbeba942eef",
-      "sha256": "c422d0a539f4e747484dd9b018349c96ad3b9ea44aa99393f04529a8a7a77042"
+      "path": "planning/2026-09-16-parity-build/releases/0.37.0.md",
+      "blob_sha": "e531b509c8bc2e835b30982b8ad74f16400c92af",
+      "sha256": "fdded099db82e77b06fdc452c769631cf80c4695472e1e0c82fe04023a8ceed8"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "153ed4b7600f0c0318e05db366806ce796778592",
-      "sha256": "abdfeaa44d6fdf3d57a110181466e131f98ba61d02ed1b578c9540320bb0ea1f"
+      "blob_sha": "ce2e4e5cf54e25a700ae433b2d4f1c5aeaa48613",
+      "sha256": "49e858525e2faa65dbe96a1811147d4bff7acd9279ad34cc3013cc9e6dd30200"
     }
   ],
   "changelog": {
     "sections": {
-      "fixed": [
-        "Full report details use the existing card styling in the assessment host, label scores and evidence counts, and separate narrative observations for easier scanning. Overview bands, values and report content remain unchanged. (#478)",
-        "Facilitator report-detail scenario: 15/15 renderer tests passed; matched automated local fixtures at phone and desktop widths in light and dark were independently inspected. Live DEV/production and full-app navigation remain untested; human satisfaction, confusion and frustration are not measured.",
-        "Recovery correction: independent review found that actual ui/index.html and ui/assess/index.html omit report-cards.css; the earlier fixture supplied it and does not establish real-host styling. The same 0.30.5 correction loads the existing stylesheet only in ui/index.html for the /#assessment route. The direct ui/assess/index.html host remains unrepaired because its .rv wrapper and token gaps are unresolved. Root-host verification, exact-head review and release-pin checks are pending; no DEV or production acceptance is claimed. Aggregation and longitudinal features remain outside this increment."
+      "changed": [
+        "The app no longer blocks requests because of app-level request-rate limits or missing limiter bindings. This supports workshops where many participants share one connection. The existing per-address sign-in-link and collaborator-invitation product caps remain, along with upstream translation 429 responses and the MCP batch-size limit."
       ]
     }
   }

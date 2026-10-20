@@ -2,7 +2,14 @@ export interface Receipt {
   id: string; actor: string; scope: { type: string; id: string }; class: string;
   inverse: string; undo_token?: string; compensating_control?: string; trace_id: string; at: string;
   mode?: "dry_run" | "execute";
+  /** The call changed nothing: set from HandlerResult.noop (src/handlers/types.ts; 0.35.17), never from the user-facing result.
+   *  The receipt credits the actor with no change (0.35.16). */
+  noop?: true;
 }
+/** Default retry-after (seconds) for a RATE_LIMITED refusal that names no wait of its own. App-level rate limiting
+ *  was removed (captain 2026-10-16); RATE_LIMITED remains for the product caps (invites per hour, sign-in links per
+ *  address) and an upstream translator's 429. */
+export const RETRY_AFTER_SECONDS = 60;
 export const ok = (capability: string, result: Record<string, unknown>, trace_id: string, receipt?: Receipt) =>
   ({ ok: true as const, capability, result, trace_id, ...(receipt ? { receipt } : {}) });
 export const fail = (code: string, message: string, hint?: string, docs?: string, trace_id?: string, data?: Record<string, unknown>) =>

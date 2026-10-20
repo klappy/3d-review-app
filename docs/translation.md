@@ -29,9 +29,8 @@ Captain rulings, 2026-09-28:
 
 ## Server: `POST /v2/translate` (src/translate.ts)
 - Request `{ targetLang: <supported tag or English name>, context, sourceTexts: {key: english} }` →
-  `{ translated, partial, locale, review, stored }`. Anonymous callers spend `RL_HTTP_ANON` per address; a caller with a
-  live participant bearer or session spends its own `RL_MCP_CEILING` unit (key `tr:<kind>:<principal>`, 600 / 60 s) so a
-  workshop room behind one address is not throttled (audit round 1 W2). Size limits (600 strings, 2,000 chars
+  `{ translated, partial, locale, review, stored }`. No app-level rate limit (captain 2026-10-16); an upstream 429 is
+  passed through as 429 + `retry-after`. Size limits (600 strings, 2,000 chars
   each, 150k total). Unsupported language → 400. English returns the input unchanged.
 - **Published strings only** (reviewer FAIL on #377, F1/F2; `src/translate-allowlist.ts`). `context` must be
   `participant-ui` or `participant-form:<template id>`. Only strings whose SHA-256 matches that scope's published set are

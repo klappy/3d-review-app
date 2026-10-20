@@ -1,0 +1,20 @@
+/* UI Next (v4) /next/ gallery layout only (not a contract). Tokens only. Status: provisional. */
+body { margin: 0; background: var(--gx-bg, Canvas); color: CanvasText; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif; }
+.gx-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 16px; border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent); }
+.gx-note { opacity: 0.7; flex: 1 1 240px; }
+.gx-toggle { display: inline-flex; gap: 4px; }
+.gx-tab { font: inherit; text-transform: capitalize; padding: 6px 12px; border: 1px solid color-mix(in srgb, CanvasText 25%, transparent); background: transparent; color: inherit; border-radius: 50px; cursor: pointer; }
+.gx-tab[aria-pressed=true] { background: CanvasText; color: Canvas; }
+.gx-grid { display: grid; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .gx-grid[data-mode=both] { grid-template-columns: 1fr 1fr; } }
+.app.gx-sheet { background: var(--ground); color: var(--ink); font-size: var(--t-16); line-height: 1.5; padding: 24px 16px; min-width: 0; box-sizing: border-box; }
+.app.gx-sheet h2 { font-size: var(--t-20); margin: 0 0 8px; }
+.app .gx-h { font-size: var(--t-16); margin: 24px 0 8px; }
+.app .gx-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 16px; }
+.app .gx-k { flex: 0 0 100%; font-size: var(--t-13); color: var(--ink-3); font-weight: 600; }
+.app .gx-block .btn { flex: 1 1 100%; }
+.app .gx-title { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.app .gx-title strong { font-size: var(--t-24); }
+.app .gx-legend { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-14); }
+/* .pt geometry belongs to the barbell (not ported, V-39); the gallery sizes points only so the colour binding is visible. */
+.app .gx-pts .pt { display: inline-block; width: var(--dot); height: var(--dot); border-radius: 50%; }

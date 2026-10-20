@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createParticipantJourney } from './controller.js';
 import { copy, digestNamespace } from '../shared-link.js';
+import { SURVEYOR_EN } from './i18n.js';
 
 const form = { assessment: 'A', language: 'L', template: { id: 't', version: '1' }, items: [{ id: 'q', type: 'text' }] };
 const response = result => ({ ok: true, status: 200, json: async () => ({ ok: true, result }) });
@@ -86,6 +87,24 @@ test('429 and transport failure keep honest retry states without creating anothe
   for (const [failure, notice] of [[() => refused('RATE_LIMITED', 429), copy.rateLimited], [() => { throw Error('offline'); }, copy.transient]]) {
     const h = harness({ handle: failure }); await h.journey.start(); assert.equal(h.journey.state.notice, notice); assert.equal(h.requests.length, 1);
   }
+});
+test('DoD 6: a 429 on the link says it is a rate limit, carries the wait, and retry opens the same link again', async () => {
+  let n = 0;
+  const h = harness({ handle: () => (n++ === 0 ? refused('RATE_LIMITED', 429) : refused('RATE_LIMITED', 429)) });
+  await h.journey.start();
+  assert.equal(h.journey.state.notice, copy.rateLimited); assert.match(h.journey.state.notice, /^Rate limit: .*in one minute\.$/);
+  assert.equal(h.journey.state.rateLimited, true); assert.equal(h.journey.state.retryAfter, 60);
+  const first = h.journey.state.limitId;
+  await h.journey.start({ retry: true });
+  assert.equal(h.requests.length, 2, 'retry sends one more open with the in-memory link token');
+  assert.equal(h.journey.state.rateLimited, true); assert.notEqual(h.journey.state.limitId, first);
+});
+test('DoD 6: a non-minute cap keeps its own message and wait — never "one minute"; an empty retry-after falls to the envelope', async () => {
+  const hourly = { ok: false, status: 429, headers: { get: k => (k === 'retry-after' ? '' : null) }, json: async () => ({ ok: false, error: { code: 'RATE_LIMITED', message: 'at most 30 collaborator invitations per hour', hint: 'this cap resets over the next hour, not the next minute', data: { retry_after: 3600 } } }) };
+  const h = harness({ handle: () => hourly });
+  await h.journey.start();
+  assert.equal(h.journey.state.rateLimited, true); assert.equal(h.journey.state.retryAfter, 3600);
+  assert.doesNotMatch(h.journey.state.notice, /one minute/); assert.match(h.journey.state.notice, /retry after 1 hour/);
 });
 test('dedicated static page dependencies are in the local server and tests are excluded from deployed assets', async () => {
   const { readFileSync } = await import('node:fs'); const read = file => readFileSync(new URL(file, import.meta.url), 'utf8');
@@ -177,3 +196,21 @@ for (const [label, enabled, expected] of [['off (default, key absent)', undefine
     assert.deepEqual(sent.context, expected);
   });
 }
+test('#490: "Try again" after a rate-limited "Interview another" opens the next respondent, not the prior session', async () => {
+  let links = 0;
+  const h = harness({ handle: url => {
+    if (!url.endsWith('/link')) return null;
+    links++;
+    if (links === 2) return refused('RATE_LIMITED', 429);
+    return response({ participant_token: links === 1 ? 'participant-secret' : 'next-secret' });
+  } });
+  await h.journey.start(); h.journey.review({ q: 'a' }); await h.journey.submit(); assert.equal(h.journey.state.phase, 'receipt');
+  await h.journey.another();
+  assert.equal(h.journey.state.phase, 'unavailable'); assert.equal(h.journey.state.rateLimited, true);
+  assert.equal(h.journey.bearer, 'participant-secret', 'the refused attempt keeps the old session as this tab\'s');
+  await h.journey.start({ retry: true });
+  const opens = h.requests.filter(r => r.url.endsWith('/link')).map(r => JSON.parse(r.options.body));
+  assert.deepEqual(opens.at(-1), { token: 'link-secret' }, 'retry opens with no resume credential');
+  assert.equal(h.journey.state.phase, 'form'); assert.equal(h.journey.state.fresh, true); assert.equal(h.journey.state.notice, SURVEYOR_EN.nextPerson);
+  assert.equal(h.journey.bearer, 'next-secret');
+});

@@ -15,7 +15,7 @@ function harness() {
   const navigations = [], removed = [], fetches = [];
   // K3a: the real adapter is supplied; with no #rv node the kit root is absent and the controller falls back to #app unchanged.
   const box = { ...v3, cards, mountKitRoot, shellModel, history: {replaceState() {}}, sessionStorage: {getItem() {return null;},removeItem:k=>removed.push(k)}, isDemo, memoryStorage, document: { getElementById: id => nodes.get(id) }, location: { hash: '', pathname: '/', assign: path=>navigations.push(path) }, redactDiagnosticPath: x => x, AbortSignal, fetch: (url, options) => { fetches.push({ url, options }); return Promise.resolve({ ok: true }); } };
-  const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn,loadAccountEmail,signOut,setFetch:fn=>fetch=fn,setCredential:t=>token=t,getCredential:()=>token,setListen:fn=>listen=fn,setHistory:o=>{history.replaceState=o.replaceState},clearPageNote,loadEmailLinks})', box);
+  const api = vm.runInNewContext(source + '\n({state,resetIdentity,assessmentsFor,workspaceFor,boot,act,loadCounts,syncContextDisclosure,currentShareRoute,setHash:hash=>location.hash=hash,setApi:fn=>api=fn,setRender:fn=>render=fn,loadAccountEmail,signOut,setFetch:fn=>fetch=fn,askNameAfterLanding,askDeferredName,isBackdropClick,setCredential:t=>token=t,getCredential:()=>token,setListen:fn=>listen=fn,setHistory:o=>{history.replaceState=o.replaceState},clearPageNote,loadEmailLinks})', box);
   return { ...api, nodes, disclosure, navigations, removed, fetches };
 }
 const deferred = () => { let resolve, reject; const promise = new Promise((r,j) => {resolve=r;reject=j;}); return { promise, resolve, reject }; };
@@ -142,8 +142,20 @@ test('account email read forbids redirect, does not repaint work and ignores sta
   const pending=h.loadAccountEmail();assert.equal(options.redirect,'error');assert.equal(options.credentials,'same-origin');assert.equal(options.cache,'no-store');assert.equal(h.nodes.get('app').innerHTML,'unsaved work');
   h.resetIdentity();h.setCredential('new-token');h.nodes.get('who').textContent='Account: next@example.invalid';wait.resolve({ok:true,json:async()=>({email:'prior@example.invalid'})});await pending;assert.equal(h.nodes.get('who').textContent,'Account: next@example.invalid');
 });
+test('greet by name (captain a1): the header shows the display_name only (CONTRACT § 4, no second greeting), the email stays the fallback',async()=>{
+  const h=harness();let fetched=0;h.setFetch(async()=>{fetched++;return {ok:true,json:async()=>({email:'ana@example.invalid'})};});
+  h.state.principal={id:'usr_ana',kind:'user',display_name:'  Ana   Ruiz '};await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Ana Ruiz');assert.equal(fetched,0);
+  for(const display_name of [null,'','   ','<b>x</b>','x'.repeat(81)]){h.state.principal={id:'usr_ana',kind:'user',display_name};await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'ana@example.invalid');} // design/CONTRACT.md:68 (§ 4): the header shows who is signed in, no label
+  assert.equal(fetched,5);
+});
+test('rev461 W1: an email lookup still in flight never overwrites the name greeting',async()=>{
+  const h=harness();let release;h.setFetch(()=>new Promise(r=>{release=()=>r({ok:true,json:async()=>({email:'ana@example.invalid'})});}));
+  h.state.principal={id:'usr_ana',kind:'user',display_name:null};const pending=h.loadAccountEmail();
+  h.state.principal={id:'usr_ana',kind:'user',display_name:'Ana'};await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Ana');
+  release();await pending;assert.equal(h.nodes.get('who').textContent,'Ana');
+});
 test('account email is text only and failures remove previous email',async()=>{
-  const h=harness();h.setFetch(async()=>({ok:true,json:async()=>({email:'<synthetic>@example.invalid'})}));await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Account: <synthetic>@example.invalid');
+  const h=harness();h.setFetch(async()=>({ok:true,json:async()=>({email:'<synthetic>@example.invalid'})}));await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'<synthetic>@example.invalid'); // design/CONTRACT.md:68: who is signed in, no label
   h.setFetch(async()=>{throw Error('redirect');});await h.loadAccountEmail();assert.equal(h.nodes.get('who').textContent,'Signed in');
 });
 
@@ -233,4 +245,38 @@ test('B38: the email-links probe carries a 2 s timeout; a timeout leaves the set
   assert.equal(on, false); assert.equal(h.state.emailLinks, undefined, 'unknown, not false: a later call may ask again');
   h.setFetch(async () => ({ ok: true, json: async () => ({ email_links: true }) }));
   assert.equal(await h.loadEmailLinks(), true); assert.equal(h.state.emailLinks, true);
+});
+
+// rev461 B1/F1 (HOLD 6229554507): the deferred name ask and the backdrop test.
+function nameDialogNodes(h) {
+  const dialog = { opened: 0, closed: 0, showModal() { this.opened++; }, close() { this.closed++; }, addEventListener() {} };
+  h.nodes.set('account-name-dialog', dialog); h.nodes.set('account-name-input', { value: '', focus() {} }); h.nodes.set('account-name-status', { textContent: '' });
+  return dialog;
+}
+test('rev461 B1: a first sign-in that lands on #invite is asked for a name on the first later work route, once', () => {
+  const h = harness(), dialog = nameDialogNodes(h); h.state.principal = { id: 'usr_new', kind: 'user', display_name: null };
+  h.askNameAfterLanding('invite'); assert.equal(dialog.opened, 0, 'never over the invitation (W1)');
+  h.askDeferredName('invite'); h.askDeferredName('entry'); assert.equal(dialog.opened, 0);
+  h.askDeferredName('projects'); assert.equal(dialog.opened, 1, 'asked once the invitee lands on #projects');
+  h.askDeferredName('projects'); h.askDeferredName('project'); assert.equal(dialog.opened, 1, 'once per session, not on every render');
+});
+test('rev461 B1: a landing on a work route asks at once; a deferred ask never crosses an identity change', () => {
+  const h = harness(), dialog = nameDialogNodes(h); h.state.principal = { id: 'usr_new', kind: 'user', display_name: null };
+  h.askNameAfterLanding('projects'); assert.equal(dialog.opened, 1); h.askDeferredName('projects'); assert.equal(dialog.opened, 1);
+  h.askNameAfterLanding('entry'); h.resetIdentity(); h.state.principal = { id: 'usr_other', kind: 'user', display_name: null };
+  h.askDeferredName('projects'); assert.equal(dialog.opened, 1, 'resetIdentity drops the old deferred ask');
+  h.state.principal = { id: 'usr_named', kind: 'user', display_name: 'Ana' }; h.askNameAfterLanding('invite'); h.askDeferredName('projects'); assert.equal(dialog.opened, 1, 'a saved name is never asked');
+});
+test('rev461 B1: render() runs the deferred ask on its route', () => {
+  const source = readFileSync(new URL('./assess.js', import.meta.url), 'utf8');
+  const body = source.slice(source.indexOf('async function render()'), source.indexOf('async function render()') + 600);
+  assert.match(body, /askDeferredName\(r\.kind\)/);
+});
+test('rev461 F1: a click in the dialog padding is not the backdrop; only a click outside the box is', () => {
+  const h = harness(), dialog = { getBoundingClientRect: () => ({ left: 360, top: 200, right: 920, bottom: 480 }) };
+  assert.equal(h.isBackdropClick(dialog, { target: dialog, clientX: 370, clientY: 210 }), false, '10px inside the top-left corner (padding)');
+  assert.equal(h.isBackdropClick(dialog, { target: dialog, clientX: 640, clientY: 340 }), false);
+  assert.equal(h.isBackdropClick(dialog, { target: dialog, clientX: 100, clientY: 340 }), true, 'left of the box');
+  assert.equal(h.isBackdropClick(dialog, { target: dialog, clientX: 640, clientY: 600 }), true, 'below the box');
+  assert.equal(h.isBackdropClick(dialog, { target: {}, clientX: 100, clientY: 100 }), false, 'a click on content inside is never the backdrop');
 });

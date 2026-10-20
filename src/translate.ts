@@ -16,8 +16,7 @@
  * app's `translate-survey` wire shape; it receives only English source strings — never answers, names, codes or tokens.
  * Output checks before storing: non-empty, plausible length, not an English sentence (3+ words) echoed back, and in the
  * target script for non-Latin languages.
- * Rate limit: anonymous callers spend RL_HTTP_ANON per address; a caller with a live participant bearer or session spends
- * its own RL_MCP_CEILING unit instead (translateLimiter below; audit round 1 W2).
+ * No app-level rate limit (captain 2026-10-16). An upstream 429 is passed on as 429 with retry-after.
  * Display only: item ids and option codes never change, so answers, scores and reports are unaffected.
  *
  * Published strings only (reviewer FAIL on #377, F1/F2; src/translate-allowlist.ts): `context` must be `participant-ui`
@@ -26,7 +25,7 @@
  * receives a context the server builds from the verified scope, never the caller's text.
  */
 import type { Env } from "./handlers/types";
-import { allow, clientIp, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { RETRY_AFTER_SECONDS } from "./envelope";
 import { resolvePrincipal } from "./auth";
 import { inScript, lwcLanguage, type LwcLanguage } from "./languages";
 import { allowedScope, parseScope, upstreamContext } from "./translate-allowlist";
@@ -163,24 +162,17 @@ async function askUpstream(env: Env, deps: Deps, lang: LwcLanguage, context: str
   } finally { clearTimeout(timer); }
 }
 
-/** Which limiter a translate request spends (audit round 1 W2). A caller presenting a live credential — the participant
- *  bearer from the survey link, or a signed-in session — spends its OWN unit on RL_MCP_CEILING (600/60 s, keyed by the
- *  principal), never the per-address anonymous bucket: a workshop room of ~50 phones behind one NAT fetches the survey
- *  in 20-string chunks and would exhaust RL_HTTP_ANON (60/60 s per address) in seconds. Everyone else keeps RL_HTTP_ANON
- *  per address. Credential resolution is the shared one (src/auth.ts): 0 D1 reads for a malformed token. */
-export async function translateLimiter(request: Request, env: Env): Promise<{ name: "RL_HTTP_ANON" | "RL_MCP_CEILING"; key: string; participantSurveyId: string | null }> {
+/** The caller's own participant survey, when it presents a live participant bearer (credential resolution is the shared
+ *  one, src/auth.ts: 0 D1 reads for a malformed token). Security W1: it scopes which language name its welcome lead may
+ *  carry (allowedScope). */
+export async function participantSurveyOf(request: Request, env: Env): Promise<string | null> {
   let who: Awaited<ReturnType<typeof resolvePrincipal>> | null = null;
   try { who = env.DB ? await resolvePrincipal(request, env) : null; } catch { who = null; }
-  // Security W1: the participant's own survey scopes which language name its welcome lead may carry (allowedScope).
-  const participantSurveyId = who?.kind === "participant" ? who.participantSurveyId ?? null : null;
-  if (who && who.kind !== "anonymous") return { name: "RL_MCP_CEILING", key: `tr:${who.kind}:${who.id}`, participantSurveyId };
-  return { name: "RL_HTTP_ANON", key: `ip:${clientIp(request)}`, participantSurveyId: null };
+  return who?.kind === "participant" ? who.participantSurveyId ?? null : null;
 }
 
 export async function handleTranslate(request: Request, env: Env, deps: Deps = {}): Promise<Response> {
-  const limiter = await translateLimiter(request, env);
-  if (!(await allow(env, limiter.name, limiter.key)))
-    return reply({ error: "rate_limited", hint: `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again` }, 429, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
+  const participantSurveyId = await participantSurveyOf(request, env);
   const raw = await readCappedBody(request).catch(() => ""); // a broken stream is a bad body (400 below), not an oversized one
   if (raw === null) return reply({ error: "invalid_params", message: "request is too large" }, 413);
   let body: unknown;
@@ -195,7 +187,7 @@ export async function handleTranslate(request: Request, env: Env, deps: Deps = {
 
   // Unique English strings by hash (the same sentence on two screens is one memory row), kept only when the hash is in
   // the scope's published set (F1/F2): anything else is refused before memory, upstream or storage.
-  const { allowed, isolated } = await allowedScope(env.DB, scope, limiter.participantSurveyId);
+  const { allowed, isolated } = await allowedScope(env.DB, scope, participantSurveyId);
   const hashOfKey = new Map<string, string>(), textOfHash = new Map<string, string>();
   let refused = 0;
   for (const [k, text] of Object.entries(parsed.sourceTexts)) {
@@ -237,7 +229,7 @@ export async function handleTranslate(request: Request, env: Env, deps: Deps = {
   const n = Object.keys(translated).length;
   if (!n) {
     if (upstreamStatus === 503) return reply({ error: "translation_unavailable", message: "Translation is not set up on this site. The survey stays in English." }, 503);
-    if (upstreamStatus === 429) return reply({ error: "rate_limited", hint: "translation is busy — try again shortly" }, 429, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
+    if (upstreamStatus === 429) return reply({ error: "rate_limited", hint: "translation is busy — try again shortly" }, 429, { "retry-after": String(RETRY_AFTER_SECONDS) });
     return reply({ error: "translation_failed", message: "No translation came back. The survey stays in English." }, 502);
   }
   return reply({ translated, partial: n < hashOfKey.size + refused, locale: lang.code, review: lang.review, stored: [...hashOfKey.values()].filter((h) => found.has(h)).length, ...(refused ? { refused } : {}) });

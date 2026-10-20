@@ -1,3 +1,4 @@
+import { mountAccessSwitch } from '/v3/components/access-switch.js';
 import { mountPassages } from './passages.js';
 import { lwcFieldset, lwcFrom, LWC_CSS } from '../v3/lwc.js';
 import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
@@ -6,6 +7,7 @@ import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
 // Data: existing /v2 endpoints only, same-origin session (cookie or the legacy facilitatorToken). No fictional model.
 // Anything the showcase draws that this slice does not wire is omitted, never rendered as a working control.
 import { redactDiagnosticPath } from '/diagnostic-path.js';
+import { refusalError } from '/rate-limit.js';
 import { loadBlankPrint, renderBlankPrint, printAllowed, rememberTab, recalledTab, STAGES } from '/stage-screens.js';
 import { printLanguages, printLanguageField, translatePrint, facilitatorFetch, printReadyLine } from './print-lang.js';
 import { openPrintDocument, activeSurveyLink, paperLink, printIdentityFrom } from './print.js';
@@ -57,7 +59,8 @@ function syncShell(page = null) {
   // A workspace page has already loaded its workspace: keep it in the same identity-scoped cache workspaceFor() uses (cleared by
   // resetIdentity) so later crumbs can name it without a discovery read. Data only; never a new request.
   if (page?.kind === 'workspace' && page.model?.status === 'loaded' && page.model.workspace?.id) state.workspaces.set(page.model.workspace.id, { id: page.model.workspace.id, name: page.model.workspace.name, role: page.model.workspace.role, projects: (page.model.projects || []).map(x => x.id) });
-  kit.update(v3Model(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() })));
+  kit.update(v3Model(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow(), welcome: !!(displayName(state.principal?.display_name) || state.accountEmail) })));
+  syncAccessSwitch(state.principal);
   placeDemoNotice(); // Bugbot 4073693755: the shell repaint preserves only its content/header hosts; the disclosure is restored by the controller
 }
 // Demo disclosure (Bugbot 4073693755): ONE controller-owned node, built once, placed before the content element and re-placed by the
@@ -85,6 +88,41 @@ if (V3_SHELL && app && typeof MutationObserver === 'function') { let queued = fa
 const demo = typeof location !== 'undefined' && isDemo(location.search);
 // P0 12:10: a logo tap in demo always leaves demo, even if a kit repaint raced the header rewrite.
 if (demo && typeof document?.addEventListener === 'function') document.addEventListener('click', e => { const b = e.target?.closest?.('header.top a.brand'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); location.assign(DEMO_EXIT_HREF); }, true);
+
+// A fresh browser starts with personal access. The server independently verifies super-admin authority.
+if (!demo && !/(?:^|;\s*)review_access=/.test(document.cookie)) document.cookie = 'review_access=my; Path=/; SameSite=Lax';
+let accessObserver = null;
+function syncAccessSwitch(principal) {
+  mountAccessSwitch({ app, principal, demo, document, onSwitch(mode) {
+    document.cookie = `review_access=${mode}; Path=/; SameSite=Lax`;
+    try { localStorage.setItem('review_access_change', String(Date.now())); } catch {}
+    accessChannel?.postMessage(mode);
+    // Reload destroys cached entities, responses, reports and in-flight reads from the previous mode.
+    location.replace(location.pathname + location.search + '#workspaces');
+    location.reload();
+  }});
+  if (kitRoot && !accessObserver && typeof MutationObserver === 'function') {
+    accessObserver = new MutationObserver(() => {
+      if (state.principal?.super_admin && !document.getElementById('access-scope') && app.isConnected) syncAccessSwitch(state.principal);
+    });
+    accessObserver.observe(kitRoot, {childList:true,subtree:true});
+  }
+}
+
+// The cookie preference is shared by the browser, so every open app tab must invalidate together.
+const accessChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('review-access') : null;
+function reloadChangedAccess() {
+  if (!state.principal?.super_admin) return;
+  const mode = /(?:^|;\s*)review_access=global(?:;|$)/.test(document.cookie) ? 'global' : 'my';
+  if (mode === state.principal.access_mode) return;
+  resetIdentity();
+  app.textContent = 'Access changed. Reloading…';
+  location.reload();
+}
+accessChannel?.addEventListener('message', reloadChangedAccess);
+globalThis.addEventListener?.('storage', event => { if (event.key === 'review_access_change') reloadChangedAccess(); });
+globalThis.addEventListener?.('focus', reloadChangedAccess);
+globalThis.addEventListener?.('pageshow', reloadChangedAccess);
 let tabStorage = memoryStorage(); if (!demo) { try { tabStorage = sessionStorage; } catch {} }
 let token = null; if (!demo) { try { token = sessionStorage.getItem('facilitatorToken'); } catch {} }
 async function api(url, { method = 'GET', body } = {}) {
@@ -95,7 +133,7 @@ async function api(url, { method = 'GET', body } = {}) {
   let r; try { r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); }
   catch { throw new Error('API unavailable. For a write, its outcome is unknown.'); }
   let j = null; try { j = await r.json(); } catch {}
-  if (!r.ok || !j?.ok) { const e = new Error(j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
+  if (!r.ok || !j?.ok) throw refusalError(r.status, j?.error, r);
   return j.result;
 }
 // Same call, whole envelope (result + receipt + trace_id) — G1 shows receipt/trace on the row after a write.
@@ -104,7 +142,7 @@ async function apiFull(url, { method = 'GET', body } = {}) {
   const headers = { accept: 'application/json' }; if (body !== undefined) headers['content-type'] = 'application/json'; if (token) headers.authorization = `Bearer ${token}`;
   let r; try { r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' }); } catch { throw new Error('API unavailable. For a write, its outcome is unknown.'); }
   let j = null; try { j = await r.json(); } catch {}
-  if (!r.ok || !j?.ok) { const e = new Error(j?.error?.message || `Request failed (${r.status})`); e.code = j?.error?.code || String(r.status); e.status = r.status; e.hint = j?.error?.hint; throw e; }
+  if (!r.ok || !j?.ok) throw refusalError(r.status, j?.error, r);
   return j;
 }
 const redact = m => redactDiagnosticPath(String(m || 'Request could not be completed.'));
@@ -479,7 +517,7 @@ function prepareView(current) {
   // Lane 9 L9-24 (validator #282): ONE view heading ("Prepare this assessment"). The stage is an eyebrow + badge, not a second
   // heading; the collect consequence, stage notes, language and period sit behind the shared Learn more. A <section>, not an
   // <aside>: kit.css turns every `.rv aside` into a nav flex row at ≤760px (squashed/clipped at 390px).
-  const more = `${mayEdit ? `<p class="muted">Moving into Collect opens collection; moving out of Collect closes it — for all ${n} included survey${n === 1 ? '' : 's'}.</p><p class="muted">One stage at a time, as the server allows.</p>` : ''}<p class="muted">The stage is the assessment's own state. Browsing these views never changes it.</p>${a.language_name ? `<p class="small muted">Language: ${esc(a.language_name)}</p>` : ''}${a.period ? `<p class="small muted">Period: ${esc(periodText(a.period))}</p>` : ''}`;
+  const more = `${mayEdit ? `<p class="muted">Moving into Collect opens collection; moving out of Collect closes it — for all ${n} included survey${n === 1 ? '' : 's'}.</p><p class="muted">One stage at a time, as the server allows.</p>` : ''}<p class="muted">The stage is the assessment's own state. Browsing these views never changes it.</p>${a.language_name ? `<p class="small muted">Language: ${esc(a.language_name)}</p>` : ''}${a.location ? `<p class="small muted">Location or community: ${esc(a.location)}</p>` : ''}${a.facilitator ? `<p class="small muted">Facilitator: ${esc(a.facilitator)}</p>` : ''}${a.period ? `<p class="small muted">Period: ${esc(periodText(a.period))}</p>` : ''}`;
   const stage = `<section class="panel" data-stage-panel><p class="eyebrow">Stage <span class="badge">${stageLabel(a.stage)}</span></p>${move}${learnMore(more)}</section>`;
   return `<div class="grid"><section class="panel"><h2>Prepare this assessment</h2>${formWithPassages}</section>${stage}</div>`;
 }
@@ -662,6 +700,7 @@ async function render() {
   // B02: signed in, "/" is the current work (#projects), never the public welcome with its Sign in choice.
   if (landsOnWork(route(location.hash), state.principal)) { try { history.replaceState(null, '', location.pathname + location.search + '#projects'); } catch {} }
   const gen = ++generation, r = route(location.hash);
+  askDeferredName(r.kind); // rev461 B1: the invitee who accepted and left #invite is asked now, once
   if (wizardHandle) { try { wizardHandle.destroy(); } catch {} wizardHandle = null; }
   currentShareRoute();
   // K3a root lifecycle (kit only): the shell reflects the new route from data already held, and the previous view is destroyed
@@ -765,20 +804,36 @@ let accountBusy = false;
 function accountStatus(message = '') { const el = document.getElementById('account-status'); if (el) el.textContent = message; }
 function accountControls(visible, busy = false) {
   const actions = document.getElementById('account-actions'); if (actions) actions.hidden = !visible;
-  for (const id of ['account-signout', 'account-switch', 'account-switch-confirm']) { const el = document.getElementById(id); if (el) el.disabled = busy; }
+  for (const id of ['account-signout', 'account-switch', 'account-switch-confirm', 'account-name']) { const el = document.getElementById(id); if (el) el.disabled = busy; }
 }
+// Greet by name (captain ruling a1, 2026-10-02): /v2/me carries the account's optional display_name; the header greets by it,
+// with the email (or "Signed in") as the fallback when none is set. Same rules as the server (src/handlers/platform.ts cleanDisplayName).
+const NAME_MAX = 80;
+function displayName(v) {
+  if (typeof v !== 'string') return '';
+  const s = v.normalize('NFC').replace(/\s+/g, ' ').trim();
+  return s && [...s].length <= NAME_MAX && !/[<>\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/.test(s) ? s : '';
+}
+let accountSeq = 0; // rev461 W1: only the latest greeting call may write the header
 async function loadAccountEmail() {
+  const seq = ++accountSeq;
   if (demo) { who.textContent = 'Sample account'; accountControls(false); return; }
   const identity = identityGeneration, credential = token;
+  const name = displayName(state.principal?.display_name);
+  // CONTRACT § 4: the header shows the name only (the account-menu trigger); the greeting is the home H1, never a second "Hi".
+  if (name) { who.textContent = name; accountControls(true, accountBusy); return; }
   who.textContent = 'Checking account…'; accountControls(true, accountBusy);
   try {
     const headers = { accept: 'application/json' }; if (credential) headers.authorization = `Bearer ${credential}`;
     const response = await fetch('/v2/auth/access?view=account', { headers, credentials: 'same-origin', redirect: 'error', cache: 'no-store' });
     const value = response.ok ? await response.json() : null;
-    if (identity !== identityGeneration || credential !== token) return;
+    if (identity !== identityGeneration || credential !== token || seq !== accountSeq || displayName(state.principal?.display_name)) return; // W1: a later call or a saved name wins
     // U03 (lanes-1321): sandbox and cookie sessions have no account view; say "Signed in", never a failure sentence.
-    who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Signed in';
-  } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Signed in'; }
+    const email = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? value.email.trim() : '';
+    who.textContent = email || 'Signed in'; // design/CONTRACT.md:68 (§ 4): the header shows who is signed in, no "Account:" label
+    // CONTRACT § 4 fallback: with no saved name the home title reads "Welcome, <email>".
+    if (email && state.accountEmail !== email) { state.accountEmail = email; if (route(location.hash).kind === 'projects') void render(); }
+  } catch { if (identity === identityGeneration && credential === token && seq === accountSeq && !displayName(state.principal?.display_name)) who.textContent = 'Signed in'; }
 }
 // B44 (captain report 20:39): ONE sign-out for Sign out, Use another account and every caller (ctx.signOut). It never sends the
 // person to the Access team-domain page: that logout shows only "Failed to log out." when there is no Access session
@@ -804,6 +859,7 @@ async function signOut(switchAccount = false) {
     catch (e) { if (e?.code !== 'NOT_AUTHENTICATED') throw e; result = { signed_out: true }; } // session already gone: the person is signed out
     if (!current()) return;
     if (result?.signed_out !== true) throw new Error('Logout not confirmed');
+    document.cookie = 'review_access=my; Path=/; SameSite=Lax';
     token = null; try { sessionStorage.removeItem('facilitatorToken'); } catch {}
     import(WIZARD_JS).then(m => m.clearAllWip?.(localStorage, sessionStorage)).catch(() => {}); // val422-2341: no setup copy outlives sign-out
     resetIdentity();
@@ -819,8 +875,66 @@ async function signOut(switchAccount = false) {
     if (current()) { accountBusy = false; accountControls(!!state.principal); }
   }
 }
+// Your name (captain a1): asked once after sign-in while the account has none (skippable; "Not now" is remembered on this
+// device per account), and editable any time from the account menu. Saved through PATCH /v2/me (cap.auth.me_update).
+const NAME_SKIP_KEY = id => `3dr.name.skip:${id}`;
+function openNameDialog() {
+  const dialog = document.getElementById('account-name-dialog'), input = document.getElementById('account-name-input');
+  if (!dialog || !input || !state.principal || demo) return;
+  input.value = displayName(state.principal.display_name);
+  const status = document.getElementById('account-name-status'); if (status) status.textContent = '';
+  try { dialog.showModal(); } catch { return; }
+  try { input.focus(); } catch {}
+}
+function maybeAskName() {
+  const pr = state.principal;
+  if (demo || !pr || (pr.kind && pr.kind !== 'user' && pr.kind !== 'support') || displayName(pr.display_name)) return;
+  try { if (localStorage.getItem(NAME_SKIP_KEY(pr.id))) return; } catch {}
+  openNameDialog();
+}
+// rev461 B1: a first sign-in that lands on #invite or #entry is not asked there (W1); the ask waits for the first later render on a
+// work route (accepting lands on #projects through hashchange → render, never boot). Once per identity; resetIdentity clears it.
+let nameAskDeferred = false;
+function askNameAfterLanding(kind) { if (['invite', 'entry'].includes(kind)) { nameAskDeferred = true; return; } nameAskDeferred = false; maybeAskName(); }
+function askDeferredName(kind) { if (nameAskDeferred && !['invite', 'entry'].includes(kind)) askNameAfterLanding(kind); }
+// rev461 F1: only a click outside the dialog's box is the backdrop. A click in the dialog's own padding also targets the dialog
+// element, so the target alone is not enough (CONTRACT § 5: the backdrop means "Not now", the panel does not).
+function isBackdropClick(dialog, event) {
+  if (!dialog || event?.target !== dialog || typeof dialog.getBoundingClientRect !== 'function') return false;
+  const r = dialog.getBoundingClientRect(), x = event.clientX, y = event.clientY;
+  return x < r.left || x > r.right || y < r.top || y > r.bottom;
+}
+let nameSaving = false; // rev461 W2: one PATCH at a time; Save is disabled while it runs
+async function saveName(event) {
+  event?.preventDefault?.();
+  const dialog = document.getElementById('account-name-dialog'), input = document.getElementById('account-name-input'), status = document.getElementById('account-name-status');
+  if (!state.principal || !input || nameSaving) return;
+  const raw = input.value.replace(/\s+/g, ' ').trim(), name = displayName(raw);
+  if (raw && !name) { if (status) status.textContent = `Use up to ${NAME_MAX} characters, without < or >.`; return; }
+  const identity = identityGeneration, save = document.getElementById('account-name-save');
+  nameSaving = true; if (save) save.disabled = true;
+  try {
+    const r = await api('/v2/me', { method: 'PATCH', body: { display_name: name || null } });
+    if (identity !== identityGeneration) return;
+    state.principal = { ...state.principal, display_name: r?.principal?.display_name ?? null };
+    dialog?.close(); void loadAccountEmail();
+    if (route(location.hash).kind === 'projects') void render(); // rev461 W2: the home "Welcome, <name>" line follows the save
+  } catch { if (status) status.textContent = 'Your name could not be saved. Try again.'; }
+  finally { nameSaving = false; if (save) save.disabled = false; }
+}
+function skipName() {
+  const pr = state.principal; if (pr) { try { localStorage.setItem(NAME_SKIP_KEY(pr.id), '1'); } catch {} }
+  document.getElementById('account-name-dialog')?.close();
+}
 function bindAccountControls() {
   document.getElementById('account-signout')?.addEventListener('click', () => signOut());
+  document.getElementById('account-name')?.addEventListener('click', () => { if (!accountBusy && state.principal) openNameDialog(); });
+  document.getElementById('account-name-form')?.addEventListener('submit', saveName);
+  document.getElementById('account-name-skip')?.addEventListener('click', skipName);
+  // CONTRACT § 5: Escape and the backdrop mean "Not now" (rev461 N4).
+  const nameDialog = document.getElementById('account-name-dialog');
+  nameDialog?.addEventListener('cancel', event => { event.preventDefault(); skipName(); });
+  nameDialog?.addEventListener('click', event => { if (isBackdropClick(nameDialog, event)) skipName(); }); // rev461 F1
   const dialog = document.getElementById('account-switch-dialog');
   document.getElementById('account-switch')?.addEventListener('click', () => { if (!accountBusy && state.principal) dialog?.showModal(); });
   document.getElementById('account-switch-cancel')?.addEventListener('click', () => dialog?.close());
@@ -850,7 +964,7 @@ function ctxFor(extra = {}) {
   const stale = () => Promise.reject(Object.assign(new Error('This view is no longer current.'), { code: 'STALE_VIEW' }));
   // shellOwnsTitle (Bugbot 4073693743): explicit host contract — only a mounted kit root shows the page title in its header, so only
   // then do scope pages omit their own heading. The non-kit /assess/index.html host keeps page-owned headings.
-  return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, shellOwnsTitle: !!kit, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
+  return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, displayName, shellOwnsTitle: !!kit, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
     // Review F2: a completion arriving after the view was replaced must not navigate the newer route (it cannot undo a dispatched write).
     go: (hash, { reload = false } = {}) => { if (!live()) return; if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
 }
@@ -944,12 +1058,13 @@ function scrubCredentialHash() {
   return null;
 }
 function resetIdentity() {
+  document.getElementById('access-scope')?.remove();
   identityGeneration += 1; generation += 1; epoch += 1;
-  pendingRename = null; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
+  pendingRename = null; nameAskDeferred = false; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
   accountBusy = false; accountControls(false); accountStatus();
-  document.getElementById('account-switch-dialog')?.close();
+  document.getElementById('account-switch-dialog')?.close(); document.getElementById('account-name-dialog')?.close();
   document.getElementById('feedback-dialog')?.remove(); // S54/rev444: the in-place feedback dialog belongs to the old identity
-  state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
+  state.share = null; state.collectLinks.clear(); state.principal = null; state.accountEmail = ''; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
   state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false; state.myInvitations = null; printLangs.clear();
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
@@ -1000,7 +1115,7 @@ async function boot() {
   placeDemoNotice();
   const identity = identityGeneration;
   const linksKnown = loadEmailLinks();
-  try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; if (!demo) state.collectLinks = share.tabLinks(tabStorage, me.principal?.id, state.collectLinks); } // gate 0.23.0 E: this tab's active links survive a reload
+  try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; syncAccessSwitch(me.principal); if (!demo) state.collectLinks = share.tabLinks(tabStorage, me.principal?.id, state.collectLinks); } // gate 0.23.0 E: this tab's active links survive a reload
   catch {
     if (identity !== identityGeneration) return;
     landAfterSignIn = false; // B04: no session observed, nothing to land
@@ -1032,6 +1147,8 @@ async function boot() {
     const linkInvite = !!(pendingInvite || storedInvite());
     const mine = linkInvite ? [] : await loadMyInvitations(); if (mine === null || identity !== identityGeneration) return;
     try { history.replaceState(null, '', location.pathname + location.search + signInLanding({ invite: linkInvite || mine.length > 0, projects: state.projects })); } catch {} } }
+  // rev461 W1: asked after the landing, and never over the invitation or entry screens (a first sign-in from an invitation lands on #invite).
+  if (identity === identityGeneration) askNameAfterLanding(route(location.hash).kind); // captain a1: asked at sign-up, skippable; B1: deferred past #invite
   listen();
   await render();
 }

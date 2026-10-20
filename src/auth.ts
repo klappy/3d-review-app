@@ -28,7 +28,13 @@ export async function resolvePrincipal(req: Request, env: Env): Promise<Principa
   ).bind(h).first<any>();
   if (row && (!row.expires_at || row.expires_at >= Date.now())) {
     if (row.kind === "participant") return { kind: "participant", id: row.principal_id, participantSurveyId: row.participant_survey_id, respondentId: row.respondent_id, sessionTokenHash: h };
-    if (row.kind === "support" || row.support) return { kind: "support", id: row.principal_id, supportActor: row.delegated_by ?? undefined, provisioned: true, sessionTokenHash: h };
+    if (row.kind === "support" || row.support) {
+      // This preference only narrows an authenticated super admin. It never grants authority.
+      const personal = cookie(req, "review_access") !== "global";
+      return { kind: personal ? "user" : "support", id: row.principal_id, superAdmin: true,
+        accessMode: personal ? "my" : "global", supportActor: row.delegated_by ?? undefined,
+        provisioned: personal ? !!row.provisioned : true, sessionTokenHash: h };
+    }
     return { kind: "user", id: row.principal_id, provisioned: !!row.provisioned, delegatedBy: bearer ? row.delegated_by ?? undefined : undefined, sessionTokenHash: h };
   }
   // Participant tokens are separate, survey-scoped credentials. A user-session
@@ -45,9 +51,10 @@ export async function resolvePrincipal(req: Request, env: Env): Promise<Principa
 
 export async function mintSession(env: Env, principalId: string, kind: "user" | "participant" | "support", extra: Record<string, unknown> = {}, ttlMs = 12 * 3600e3): Promise<string> {
   const token = `${kind === "participant" ? "pt" : "st"}_${crypto.randomUUID().replace(/-/g, "")}`;
+  const now = Date.now(); // one clock read: expires_at - created_at is exactly ttlMs
   await env.DB.prepare(
     "INSERT INTO session (token_hash, principal_id, kind, delegated_by, participant_survey_id, respondent_id, expires_at, created_at) VALUES (?,?,?,?,?,?,?,?)"
-  ).bind(await sha256(token), principalId, kind, (extra.delegated_by as string) ?? null, (extra.participant_survey_id as string) ?? null, (extra.respondent_id as string) ?? null, Date.now() + ttlMs, Date.now()).run();
+  ).bind(await sha256(token), principalId, kind, (extra.delegated_by as string) ?? null, (extra.participant_survey_id as string) ?? null, (extra.respondent_id as string) ?? null, now + ttlMs, now).run();
   return token;
 }
 

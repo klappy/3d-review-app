@@ -11,6 +11,7 @@ import { learnMore } from '../v3/components/learn-more.js';
 import { mountEditableHeading } from '../v3/components/editable-heading.js';
 import { showSavedStatus, undoTokenOf } from '../v3/components/saved-status.js';
 import { digestNamespace, rememberCurrent, scopedStorage } from '../shared-link.js';
+import { holdRetry, isOneMinuteLimit, isRateLimitedError, RATE_LIMIT_COPY, retryAfterOf, retryAfterSeconds, underHold } from '../rate-limit.js';
 
 const UNAUTHENTICATED = new Set(['NOT_AUTHENTICATED', '401']);
 const REFUSED = new Set(['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED_AT_SCOPE', 'NOT_AUTHORIZED', '403', '404']);
@@ -95,9 +96,11 @@ export function holdUntilCodeChanges(form, name = 'code') {
   const input = form?.querySelector?.(`input[name="${name}"]`), button = form?.querySelector?.('button[type=submit]');
   let last = null;
   const now = () => String(input?.value ?? '').trim();
-  const sync = () => { if (button) button.disabled = last !== null && now() === last; };
+  // A Submit under a rate-limit countdown (holdRetry) stays disabled whatever the code: editing it never ends the wait early.
+  const sync = () => { if (button) button.disabled = underHold(button) || (last !== null && now() === last); };
   input?.addEventListener?.('input', sync);
-  return { repeat: () => last !== null && now() === last, sent: () => { last = now(); sync(); }, sync };
+  // reset(): the server refused before reading the code (a rate limit), so the same code may be sent again after the wait.
+  return { repeat: () => last !== null && now() === last, sent: () => { last = now(); sync(); }, reset: () => { last = null; }, sync };
 }
 // Gate 0.23.0 (phone): a code form's error sits in the card next to the field — <p role="alert"> under the input, the input marked
 // aria-invalid and described by it — and focus returns to the input (write() disabled the focused Submit, dropping focus to BODY).
@@ -119,13 +122,17 @@ export function inlineCodeError(ctx, form, name = 'code') {
 async function write(ctx, control, label, fn, { refused = 'Not allowed here.', failed = null } = {}) {
   const controls = control ? [control, ...(control.form ? Array.from(control.form.querySelectorAll('button')) : [])] : [];
   for (const c of controls) c.disabled = true;
+  let wait = 0;
   try { const r = await fn(); return r; }
   catch (e) {
+    // DoD 6: a rate limit says so, and the control it came from re-enables after the wait (Retry-After, else one minute).
+    // The refusal's text is already worded by refusalError (one-minute copy, or a non-minute cap's own message and wait).
+    if (isRateLimitedError(e)) { wait = retryAfterSeconds(e.retryAfter); ctx.note(e.message || RATE_LIMIT_COPY, true); return undefined; }
     const kind = classify(e);
     ctx.note(kind === 'unauthenticated' ? 'Your session has ended. Sign in again.' : kind === 'refused' ? refused : (failed || `${label} failed: ${safeMessage(e)}`), true);
     return undefined;
   }
-  finally { for (const c of controls) c.disabled = false; }
+  finally { for (const c of controls) if (!underHold(c)) c.disabled = false; if (wait && control) holdRetry(control, wait); }
 }
 const val = (form, name) => String(form.elements[name]?.value ?? '').trim();
 const storeSession = (key, v) => { try { sessionStorage.setItem(key, v); } catch {} };
@@ -225,7 +232,8 @@ const entry = {
       // U08 (lanes-1321): a used, unknown or mistyped code gets one plain next step, not "Not allowed here." / a server message.
       // Gate 0.23.0 (phone 375x812): the error shows in the card under the field (role=alert), not in the page note below the fold.
       const r = await write(codeError.ctx, form.querySelector('button[type=submit]'), 'Code', () => ctx.api('/v2/participate/code', { method: 'POST', body: { code: val(form, 'code') } }), { refused: CODE_REFUSED });
-      codeHold.sync(); // write() re-enabled the buttons; Submit waits for a changed code
+      if (underHold(form.querySelector('button[type=submit]'))) codeHold.reset(); // DoD 6: a 429 never read the code; retry it after the wait
+      codeHold.sync(); // write() re-enabled the buttons; Submit waits for a changed code (or the countdown)
       if (!r) return codeError.focus();
       const token = r.participant_token || r.participant;
       if (!token) { codeError.ctx.note('The server accepted the code but returned no participant token.', true); return codeError.focus(); }
@@ -245,7 +253,11 @@ const entry = {
         const res = await fetch('/v2/auth/email', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ email: val(form, 'email') }), credentials: 'same-origin', redirect: 'manual', cache: 'no-store' });
         if (res.type === 'opaqueredirect') { window.location.assign('/v2/auth/access'); return; } // environment without email links
         if (res.ok) { const b = await res.json().catch(() => null); const min = Number(b?.result?.expires_in_minutes) || 30; form.hidden = true; status.textContent = SIGNIN_LINK_SENT(min); return; }
-        status.textContent = res.status === 429 ? 'Too many sign-in links were requested. Use the newest email, or wait a few minutes.' : res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
+        if (res.status === 429) { // the 900 s per-address mail cap (or a one-minute refusal from upstream): tell each the wait it really has
+          const b = await res.json().catch(() => null), retry = retryAfterOf(b?.error, res);
+          status.textContent = isOneMinuteLimit(b?.error?.message, retry) ? RATE_LIMIT_COPY : `Too many sign-in links were requested for this address. Use the newest email, or wait ${Math.max(1, Math.ceil((Number(retry) || 900) / 60))} minutes.`;
+          holdRetry(submit, isOneMinuteLimit(b?.error?.message, retry) ? retry : retry ?? 900); return; // DoD 6: the button counts down the same wait
+        } else status.textContent = res.status === 400 ? 'Enter one email address, like name@example.org.' : 'The sign-in link could not be sent. Try again.';
       } catch { status.textContent = 'The sign-in link could not be sent. Check your connection and try again.'; }
       submit.disabled = false;
     });
@@ -264,6 +276,7 @@ const entry = {
         return paint();
       }
       const r = await write(ctx, submit, 'Sign in', () => ctx.api('/v2/auth/session', { method: 'POST', body: { email: model.signin.email, code: val(form, 'code') } }));
+      if (underHold(submit)) signinHold?.reset(); // a 429 never read the code: the same code may be retried after the wait
       signinHold?.sync();
       if (!r) return;
       if (!r.session) return ctx.note('The server answered without a session token.', true);
@@ -290,7 +303,7 @@ export function readModel(kind, model) {
   const status = READ_STATUS[model?.status] || 'failed';
   const item = (x, href, eyebrow, facts = []) => ({ id: x.id, title: String(x.name ?? x.id ?? ''), href, eyebrow, role: x.role || '', archived: !!x.archived_at, facts });
   if (status !== 'ready') return { kind, status, items: [], error: model?.error || '' };
-  if (kind === 'workspaces') return { kind, status, title: 'Your workspaces', eyebrow: 'Optional grouping', items: (model.workspaces || []).map(w => item(w, `#workspace/${encodeURIComponent(w.id)}`, 'Workspace')) , empty: 'You have no workspaces yet.' };
+  if (kind === 'workspaces') return { kind, status, title: model.globalAccess ? 'All workspaces' : 'Your workspaces', eyebrow: 'Optional grouping', items: (model.workspaces || []).map(w => item(w, `#workspace/${encodeURIComponent(w.id)}`, 'Workspace')) , empty: 'You have no workspaces yet.' };
   if (kind === 'projects') return { kind, status, title: 'Choose a project', eyebrow: 'Your projects', items: (model.projects || []).map(p => item(p, `#project/${encodeURIComponent(p.id)}`, 'Project')), empty: 'You have no projects yet.' };
   if (kind === 'workspace') { const w = model.workspace || {}; return { kind, status, title: String(w.name ?? ''), eyebrow: 'Workspace', role: w.role || '', archived: !!w.archived_at, id: w.id, items: (model.projects || []).map(p => item(p, `#project/${encodeURIComponent(p.id)}`, 'Project')), empty: 'No projects grouped yet. You can still open them from All projects.' }; }
   if (kind === 'project') { const p = model.project || {}; const langName = new Map((model.languages || []).map(l => [l.id, l.name]));
@@ -319,13 +332,13 @@ const actionRegion = html => html ? `<section data-action-region class="legacy-a
 // ---------- workspaces ----------
 const workspaces = {
   async load(ctx, params = {}) {
-    try { const r = await ctx.api('/v2/workspaces'); return { status: 'loaded', params, workspaces: r.workspaces || [] }; }
+    try { const r = await ctx.api('/v2/workspaces'); return { status: 'loaded', params, globalAccess: ctx.state?.principal?.access_mode === 'global', workspaces: r.workspaces || [] }; }
     catch (e) { return { ...fail(e, safeMessage), params }; }
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('workspaces', model);
-    return readRegion(`${pageHead(ctx, r)}<p class="muted">Group projects you can already open. A workspace does not add access to other projects. <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
+    return readRegion(`${pageHead(ctx, r)}<p class="muted">${model.globalAccess ? 'Every workspace is available in Global Access. Open a workspace to browse its projects and assessments.' : 'Workspaces group projects shared with you.'} <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
       + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a workspace</h2><form id="create-workspace"><label class="field">Workspace name<input name="name" maxlength="100" required placeholder="For example, Lake region"></label><div class="actions"><button class="primary" type="submit">Create workspace</button></div></form></section>`);
   },
   bind(ctx, root, model) {
@@ -434,8 +447,11 @@ const projects = {
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('projects', model);
-    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW, invitations: (model.invitations || []).length });
-    return readRegion(`${pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`);
+    // CONTRACT § 4–5: the welcome is the page title, by saved name (same cleaner as the header, rev461 N2), else the email; with
+    // neither, the existing "Projects" head stays.
+    const greet = (ctx.displayName ? ctx.displayName(ctx.state?.principal?.display_name) : '') || ctx.state?.accountEmail || '';
+    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW, invitations: (model.invitations || []).length, name: greet });
+    return readRegion(`${greet ? '' : pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`);
   },
   bind(ctx, root, model) {
     bindRetry(ctx, root, projects, model);

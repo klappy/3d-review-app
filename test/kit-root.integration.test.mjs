@@ -8,23 +8,10 @@ import vm from 'node:vm';
 import { JSDOM } from 'jsdom';
 import { dataset, createTransport } from './fixtures/kit-root-transport.js';
 import * as demo from '../ui/demo.js';
-import { redactDiagnosticPath } from '../ui/diagnostic-path.js';
-import * as stage from '../ui/stage-screens.js';
-import { whatsHere } from '../ui/assess/whats-here.js';
-import * as cards from '../ui/assess/cards.js';
-import { pages, css as scopeCss, landsOnWork } from '../ui/assess/scope.js';
-import { views, css as viewsCss } from '../ui/assess/views.js';
-import * as share from '../ui/assess/share.js';
-import { feedback } from '../ui/assess/feedback.js';
-import { mountKitRoot, shellModel, bindAccountMenu } from '../ui/kit/app-adapter.js';
 import * as v3 from '../ui/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock, v3SettingsRole, V3_SUGGEST } from '../ui/assess/v3-assessment.js';
-import { learnMore } from '../ui/v3/components/learn-more.js';
-import { activeUntilLine, periodText, collectLine } from '../ui/v3/components/active-until.js';
-import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
-import { sidebarTree } from '../ui/v3/components/sidebar-tree.js';
-import { mountEditableHeading } from '../ui/v3/components/editable-heading.js';
-import { showSavedStatus, undoTokenOf } from '../ui/v3/components/saved-status.js';
+import { assessGlobals, bindWindowFetch, windowFetchProbe } from './helpers/assess-globals.mjs';
+
+const ASSESS_GLOBALS = await assessGlobals(); // every binding assess.js imports, derived from its own import lines (one source)
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const HTML = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
@@ -48,7 +35,8 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, settingsRole: v3SettingsRole, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, ASSESS_GLOBALS); // assess.js runs as a classic script with its imports stripped, so each import is a window global
+  bindWindowFetch(w, ASSESS_GLOBALS); // mountPassages / facilitatorFetch default to Node's fetch; route them through w.fetch
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -71,10 +59,24 @@ test('normal root: single kit header hosts the REAL account/version/link control
   assert.ok(p.q('[data-header-host] #account-menu #version')); assert.ok(p.q('[data-header-host] #account-menu #shell-links a[href="#feedback"]')); assert.ok(p.q('[data-header-host] #account-menu #account-signout'));
   assert.equal(p.q('#account-menu').hidden, true, 'secondary controls disclosed on demand'); assert.equal(p.q('header.top .me'), null, 'no identity pill: email is the identity');
   assert.equal(p.q('#shell-controls'), null, 'adoption wrapper removed');
-  assert.equal(p.text('#who'), 'Account: synthetic-owner@example.invalid');
+  assert.equal(p.text('#who'), 'synthetic-owner@example.invalid');
   assert.deepEqual(p.qa('header.top *').filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.includes('@'))).map(e => e.id), ['who'], 'private email appears exactly once (the #who node)');
   assert.equal(p.q('#account-actions').hidden, false);
   assert.equal(p.q('[role=main].content [data-content]'), p.api.app, 'controller app root IS the stable shell content element');
+});
+
+test('DoD3: Workspaces is in the primary shell nav and opens with zero projects (cookbook work/active/2026-10-15-3d-workspace-permissions)', async () => {
+  const p = await bootPage('direct', '#projects');
+  const link = p.q('[data-header-host] #account-menu #shell-links a[href="#workspaces"]');
+  assert.ok(link, 'Workspaces link in the shell nav'); assert.equal(link.textContent.trim(), 'Workspaces');
+  assert.deepEqual(p.qa('#shell-links a').map(a => a.getAttribute('href')), ['#workspaces', '#feedback', '/roadmap/'], 'Workspaces leads the existing nav items');
+  assert.equal(p.api.state.projects.length, 0, 'zero-project account');
+  const toggle = p.q('#account-menu-toggle'), menu = p.q('#account-menu');
+  toggle.click(); assert.equal(menu.hidden, false, 'menu opens'); assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+  link.click(); await tick(16); // a real activation: jsdom follows the fragment link like a browser
+  assert.equal(p.w.location.hash, '#workspaces', 'clicking the shell-nav link navigates');
+  assert.equal(p.api.route(p.w.location.hash).kind, 'workspaces'); assert.equal(p.text('[role=main].content h1'), 'Workspaces');
+  assert.equal(menu.hidden, true, 'menu closes after activating the Workspaces link'); assert.equal(toggle.getAttribute('aria-expanded'), 'false');
 });
 
 test('journey: Workspaces → workspace → project (two distinct assessments, language state) → assessment → back; route/title/crumb agree', { skip: v3.V3_SHELL && 'v3 shell removes the context tree (V3_SHELL); tree assertions run when the flag is off — port to crumbs: #195' }, async () => {
@@ -158,7 +160,7 @@ test('read states are distinct: refused assessments + failed languages are not e
   assert.deepEqual(treeLabels(d), ['Granted assessment']);
   assert.equal(d.q('nav[aria-label="Scopes"] a[href^="#project"]'), null); assert.equal(d.q('nav[aria-label="Scopes"] a[href^="#workspace"]'), null);
   assert.ok(!d.served().includes('GET /v2/projects/p9'), 'no discovery read of the unreadable parent');
-  assert.equal(d.text('#who'), 'Account: synthetic-direct@example.invalid');
+  assert.equal(d.text('#who'), 'synthetic-direct@example.invalid');
 });
 
 test('retained forms invoke the exact existing commands and fail closed; version dialog opens from the hosted control', async () => {
@@ -230,7 +232,7 @@ test('role contract end-to-end: Owner/Member/Viewer each display as themselves a
   for (const [identity, label, forms] of [['owner', 'Owner', []], ['member', 'Member', []], ['viewer', 'Viewer', []]]) {
     const p = await bootPage(identity, '#project/p1');
     assert.equal(p.text('header.top nav.crumbs .tree-role'), label, identity);
-    assert.equal(p.text('#who'), 'Account: synthetic-' + identity + '@example.invalid', identity + ' identity is the email, not a role');
+    assert.equal(p.text('#who'), 'synthetic-' + identity + '@example.invalid', identity + ' identity is the email, not a role');
     assert.equal(p.q('nav[aria-label="Scopes"] [aria-current="page"]').closest('.tree-row').querySelector('.tree-role').textContent, label, identity);
     assert.deepEqual(p.qa('[data-action-region] form').map(f => f.id), forms, identity + ' write forms come only from the controller role');
     assert.equal(p.qa('[data-menu-toggle]').length, 0, 'kit level menu never synthesized');
@@ -241,9 +243,9 @@ test('role contract end-to-end: Owner/Member/Viewer each display as themselves a
 test('account menu: verified email is the visible control; disclosure opens/closes by pointer and keyboard with focus return; controls keep identity across routes and reset', async () => {
   const p = await bootPage('owner', '#workspaces');
   const toggle = p.q('#account-menu-toggle'), menu = p.q('#account-menu'), who = p.q('#who'), version = p.q('#version'), signout = p.q('#account-signout');
-  assert.equal(p.text('#who'), 'Account: synthetic-owner@example.invalid'); assert.equal(menu.hidden, true);
+  assert.equal(p.text('#who'), 'synthetic-owner@example.invalid'); assert.equal(menu.hidden, true);
   toggle.click(); assert.equal(menu.hidden, false); assert.equal(toggle.getAttribute('aria-expanded'), 'true'); assert.equal(p.d.activeElement, signout, 'first enabled item focused');
-  signout.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); assert.equal(p.d.activeElement, p.q('#account-switch'));
+  signout.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); assert.equal(p.d.activeElement, p.q('#account-name'));
   p.d.activeElement.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); assert.equal(menu.hidden, true); assert.equal(p.d.activeElement, toggle, 'Escape returns focus to the toggle');
   toggle.dispatchEvent(new p.w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); assert.equal(menu.hidden, false);
   p.q('[role=main]').click(); assert.equal(menu.hidden, true, 'outside click closes');
@@ -295,15 +297,22 @@ test('account menu is clamped to the viewport inline-size (rule guard; measured 
 
 // ---------- Bugbot 4073693743: page titles are owned by exactly one host ----------
 // Kit shell titles are the route names; page-owned titles are the pages' own (readModel) titles. Both must exist in their host, never both at once.
-const FOUR_ROUTES = [['#workspaces', 'Workspaces', 'Your workspaces'], ['#workspace/w1', 'Field team', 'Field team'], ['#projects', 'Projects', 'Choose a project'], ['#project/p1', 'River Valley', 'River Valley']];
+// #projects: #461 (03d2be2, c5d8a46; design/CONTRACT.md § 4–5) made the Home title the welcome — "Welcome, <name>", else
+// "Welcome, <email>" (ui/assess/assess.js:797, ui/v3/home.js:32) — replacing "Choose a project". The kit shell still renders its
+// "Projects" h1 (ui/kit/tree.js:36), and kit.css:92 hides it whenever the page renders its own h1; jsdom loads no linked CSS,
+// so the kit test applies that rule's selector itself and counts only the h1s it leaves visible.
+const WELCOME = 'Welcome, synthetic-owner@example.invalid';
+const KIT_SHELL_H1_HIDDEN = '.rv .content:has(> [data-content] h1) > .row > h1';
+const FOUR_ROUTES = [['#workspaces', 'Workspaces', 'Your workspaces'], ['#workspace/w1', 'Field team', 'Field team'], ['#projects', WELCOME, WELCOME], ['#project/p1', 'River Valley', 'River Valley']];
 test('non-kit host (real /assess/index.html, no #rv): each of the four loaded pages shows exactly one visible heading with its title', async () => {
   const p = await bootPage('owner', '#workspaces', { host: 'legacy' });
   assert.equal(p.q('#rv'), null, 'legacy host has no kit root'); assert.equal(p.api.kit, null, 'controller mounted no kit');
   for (const [hash, , title] of FOUR_ROUTES) {
     await p.go(hash);
     const heads = p.qa('#app h1'); assert.equal(heads.length, 1, `${hash}: one h1 in the non-kit host`); assert.equal(heads[0].textContent.trim(), title, `${hash}: title text`);
-    assert.ok(p.qa('#app .eyebrow').length >= 1, `${hash}: eyebrow present`);
-    assert.equal(p.text('#who'), 'Account: synthetic-owner@example.invalid', `${hash}: existing account control unchanged`);
+    // #461 HOLD fix 54b4714 ("no eyebrow over welcome"; ui/assess/scope.js render drops pageHead when greeting): none on #projects.
+    if (hash === '#projects') assert.equal(p.qa('#app .eyebrow').length, 0, `${hash}: no eyebrow over the welcome`); else assert.ok(p.qa('#app .eyebrow').length >= 1, `${hash}: eyebrow present`);
+    assert.equal(p.text('#who'), 'synthetic-owner@example.invalid', `${hash}: existing account control unchanged`);
     if (hash === '#workspace/w1') assert.equal(p.q('#page-root a.back')?.getAttribute('href'), '#workspaces', 'non-kit workspace keeps ← All workspaces');
     if (hash === '#project/p1') assert.equal(p.q('#page-root a.back')?.getAttribute('href'), '#projects', 'non-kit project keeps ← All projects');
   }
@@ -312,10 +321,12 @@ test('non-kit host (real /assess/index.html, no #rv): each of the four loaded pa
 });
 test('kit host (real ui/index.html): each of the four loaded pages keeps exactly ONE page heading (the shell’s), current context and controls', async () => {
   const p = await bootPage('owner', '#workspaces');
+  assert.ok(readFileSync(new URL('../ui/kit/kit.css', import.meta.url), 'utf8').includes(`${KIT_SHELL_H1_HIDDEN}{display:none}`), 'kit.css hides the shell h1 when the page owns one');
   for (const [hash, title] of FOUR_ROUTES) {
     await p.go(hash);
-    const heads = p.qa('[role=main].content h1'); assert.equal(heads.length, 1, `${hash}: exactly one h1 under the kit shell`); assert.equal(heads[0].textContent.trim(), title);
-    assert.equal(p.qa('[data-read-region] h1').length, 0, `${hash}: the page renders no second heading inside the read region`);
+    const heads = p.qa('[role=main].content h1').filter(h => !h.matches(KIT_SHELL_H1_HIDDEN)); assert.equal(heads.length, 1, `${hash}: exactly one visible h1 under the kit shell`); assert.equal(heads[0].textContent.trim(), title);
+    // #461: on #projects the welcome is the page-owned title (read region), the shell's is hidden; elsewhere the shell owns it.
+    assert.equal(p.qa('[data-read-region] h1').length, hash === '#projects' ? 1 : 0, `${hash}: the read region holds the title only where the page owns it`);
     if (hash === '#workspace/w1' || hash === '#project/p1') assert.equal(p.q('[data-content] a.back'), null, `${hash}: kit crumbs are the parent link`);
   }
   assert.deepEqual(crumbs(p), ['Home', 'Field team']); assert.equal(p.text('header.top nav.crumbs[data-component="breadcrumbs"] [aria-current="page"]'), 'River Valley'); assert.ok(p.q('[data-action-region] [data-v3-start]'));
@@ -463,7 +474,7 @@ test('B07: a Prepare save from a rebuilt view waits for the in-flight rename (no
   assert.equal(patches.length, 1, 'Prepare waits while the rename PATCH is in flight');
   release(); await tick(24);
   assert.equal(maxInflight, 1, 'never two assessment updates at once'); assert.ok('name' in patches[0]);
-  assert.equal(patches.length, 2, 'the waiting Prepare save runs after the rename, not dropped'); assert.deepEqual(patches[1], { purpose: 'p' });
+  assert.equal(patches.length, 2, 'the waiting Prepare save runs after the rename, not dropped'); assert.deepEqual(patches[1], { purpose: 'p', lwc: null, demographics_enabled: false }); // the real page imports lwcFrom (assess.js:2, used at :574), so the body carries lwc
   assert.ok(!(p.api.state.message?.alert), 'no stale not-refreshed message');
 });
 test('B07: a write queued behind the rename is dropped when the identity resets meanwhile', async () => {
@@ -545,4 +556,9 @@ test('S11d: completed review — Delete assessment shows the dry-run refusal on 
   }
   assert.deepEqual(bodies.map(b => b.mode), ['dry_run', 'dry_run'], 'dry run only; no execute');
   assert.ok(!p.q('dialog[open]'), 'no confirm is offered for a refused delete');
+});
+
+test('bootPage: every Node-realm fetch path (bare fetch, mountPassages, facilitatorFetch) reaches w.fetch, never Node fetch', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  assert.deepEqual(await windowFetchProbe(p.w), ['/v2/auth/email', '/v2/assessments/probe/passages', '/v2/translate']);
 });

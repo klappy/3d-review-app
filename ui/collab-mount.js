@@ -21,7 +21,7 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload, on
   const getContext = () => ({
     principalId: snapshot.principal?.id ?? null, kind: snapshot.principal?.kind ?? null, generation: snapshot.generation,
     shared: false, participant: false, provisioned: !!snapshot.principal?.provisioned,
-    authorizedProjects: snapshot.authorizedProjects.map(p => ({ id: p.id, name: p.name, role: p.role })),
+    authorizedProjects: snapshot.authorizedProjects.map(p => ({ id: p.id, name: p.name, role: p.role, direct_role: p.direct_role ?? null })),
   });
   let invitations = null, workspaces = null, selectedWorkspace = null, currentScope = null, refreshedGeneration = -1;
   // Bugbot 4037957668: an accepted WORKSPACE invitation must reach the list; the W list is re-read after the identity
@@ -63,7 +63,7 @@ export function createCollabHooks({ document: doc, api, sharedMode, onReload, on
     // The W list is read once per identity generation; later identity()/projects() calls (onMutation/onGrantsChanged reloads)
     // update the snapshot only, so a just-created or selected workspace is not thrown back to the list (Bugbot 4037616741).
     identity(me) { snapshot.principal = me?.principal ?? null; const staff = me?.principal?.kind === 'user' || me?.principal?.kind === 'support'; if (acceptButton) acceptButton.hidden = !(staff && me.principal.kind === 'user'); if (staff && refreshedGeneration !== snapshot.generation) { refreshedGeneration = snapshot.generation; if (!currentScope) invitations.setScope(null); workspaceReadFailed = false; readiness = workspaces.refresh(); } },
-    projects(list) { snapshot.authorizedProjects = (list || []).map(p => ({ id: p.id, name: p.name, role: p.role })); },
+    projects(list) { snapshot.authorizedProjects = (list || []).map(p => ({ id: p.id, name: p.name, role: p.role, direct_role: p.direct_role ?? null })); },
     // setScope(null) is a plain reset (prefetch resets in chooseProject/chooseAssessment/chooseGrantedAssessment call it before
     // their await). It never paints a workspace scope: restoring the selected workspace is the explicit job of the
     // empty-project path in chooseProject (Bugbot 4038131213 supersedes the generic fallback of 4037957687).

@@ -137,27 +137,25 @@ describe.each(["https://3dr.test", "https://dev.3dreview.app", "https://3dreview
     expect(r.headers.get("set-cookie")).toContain("Secure");
     expect(r.headers.get("set-cookie")).not.toMatch(/Domain=/i);
   }, 60_000);
-  it("pre-auth metering: a junk bearer cannot dodge the dampener or buy storage reads (review #15-1)", async () => {
-    const limiter = (limit: number) => { const seen = new Map<string, number>(); return { seen, limit: async ({ key }: { key: string }) => { const n = (seen.get(key) ?? 0) + 1; seen.set(key, n); return { success: n <= limit }; } }; };
+  it("pre-auth shape gate: a junk bearer never buys storage reads, and nothing is rate limited (review #15-1; captain 2026-10-16)", async () => {
     let prepares = 0;
     const countingDb = new Proxy(env.DB, { get(t, p) { if (p === "prepare") return (sql: string) => { prepares++; return t.prepare(sql); }; const v = Reflect.get(t, p, t); return typeof v === "function" ? v.bind(t) : v; } });
-    const e2 = { ...env, DB: countingDb, RL_MCP_ANON: limiter(3), RL_MCP_CEILING: limiter(5), RL_AUTH: limiter(100), RL_REDEEM: limiter(100) };
+    const e2 = { ...env, DB: countingDb };
     const hit = (auth?: string, path = "/mcp") => worker.fetch(new Request(ORIGIN + path, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.9", ...(auth ? { authorization: auth } : {}) }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) }), e2, ectx());
-    // malformed bearers share the anonymous bucket and never touch storage
+    // malformed bearers never touch storage and are never 429 — however many arrive from one address
     const codes: number[] = []; for (let i = 0; i < 5; i++) codes.push((await hit(`Bearer junk-${i}`)).status);
-    expect(codes).toEqual([401, 401, 401, 429, 429]); expect(prepares).toBe(0);
-    expect((await hit(undefined, "/mcp/")).status).toBe(429); // trailing slash is metered too (#15-5)
-    // the provider matches its API route by PREFIX; so does the meter (re-review #15): /mcpx with junk never reaches storage
-    const e3 = { ...e2, RL_MCP_ANON: limiter(2) }; const before = prepares;
+    expect(codes).toEqual([401, 401, 401, 401, 401]); expect(prepares).toBe(0);
+    // the provider matches its API route by PREFIX; so does the shape gate (re-review #15): /mcpx with junk never reaches storage
+    const e3 = e2; const before = prepares;
     const hx = (auth: string, path: string) => worker.fetch(new Request(ORIGIN + path, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.77", authorization: auth }, body: "{}" }), e3, ectx());
-    expect([(await hx("Bearer junk", "/mcpx")).status, (await hx("Bearer a:b:c", "/mcp.json")).status, (await hx("Bearer junk", "/mcp-anything")).status]).toEqual([401, 401, 429]);
+    expect([(await hx("Bearer junk", "/mcpx")).status, (await hx("Bearer a:b:c", "/mcp.json")).status, (await hx("Bearer junk", "/mcp-anything")).status]).toEqual([401, 401, 401]);
     const twoTokens = await worker.fetch(new Request(ORIGIN + "/mcp", { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.78", authorization: `Bearer st_${"0".repeat(32)} extra` }, body: "{}" }), e3, ectx());
     expect(twoTokens.status).toBe(401); expect(prepares).toBe(before);
     expect(twoTokens.headers.get("www-authenticate")).toBe(`Bearer realm="OAuth", resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp", error="invalid_token", scope="3dreview"`);
-    // well-shaped but unknown bearers are bounded by the ceiling
+    // well-shaped but unknown bearers are refused 401, never 429
     const shaped: number[] = []; for (let i = 0; i < 7; i++) shaped.push((await hit(`Bearer st_${String(i).padStart(32, "0")}`)).status);
-    expect(shaped).toEqual([401, 401, 401, 401, 401, 429, 429]);
-    // a real session is served under the ceiling from another address
+    expect(shaped).toEqual([401, 401, 401, 401, 401, 401, 401]);
+    // a real session is served
     const session = await mintSession(env, "person_mara", "user");
     const ok = await worker.fetch(new Request(ORIGIN + "/mcp", { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "198.51.100.3", authorization: `Bearer ${session}` }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) }), e2, ectx());
     expect(ok.status).toBe(200);

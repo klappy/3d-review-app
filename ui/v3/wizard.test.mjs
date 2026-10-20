@@ -1104,3 +1104,26 @@ test('archived search bounds visible restores and matches codes beyond first six
  assert.equal(visible().length,1);assert.equal(visible()[0].dataset.languageId,'old14');
  assert.equal(srv.writes().length,0);
 });
+
+test('B19: step 1 asks for location/community and facilitator; both ride create, show on Review, and resume', async () => {
+  const s1 = renderStep('details', freshDraft(), { projects: [{ id: 'p1', name: 'Lake', role: 'owner' }], languages: [], templates: [] });
+  assert.match(s1, /name="location"/); assert.match(s1, /name="facilitator"/);
+  const srv = server(), m = mount(srv);
+  await fillStep1(m); m.set('location', ' Ban Na '); m.set('facilitator', 'Bincy'); m.submit(); await settle();
+  assert.equal(srv.writes()[0].body.location, 'Ban Na'); assert.equal(srv.writes()[0].body.facilitator, 'Bincy');
+  const rv = renderStep('review', { ...freshDraft(), name: 'R', project: 'p1', language: 'l1', until: '2099-10-31', location: 'Ban Na', facilitator: 'Bincy' }, { projects: [{ id: 'p1', name: 'Lake' }], languages: [{ id: 'l1', name: 'Hindi' }], templates: [] });
+  assert.match(rv, /<dt>Location or community<\/dt><dd>Ban Na<\/dd>/); assert.match(rv, /<dt>Facilitator<\/dt><dd>Bincy<\/dd>/);
+  const { d, saved } = draftFromSaved({ id: 'a1', project_id: 'p1', language_id: 'l1', name: 'R', location: 'Ban Na', facilitator: 'Bincy', period: null, format: 'Written' });
+  assert.equal(d.location, 'Ban Na'); assert.equal(saved.snap.facilitator, 'Bincy');
+  assert.deepEqual(detailsPatch(saved.snap, { ...d, facilitator: '' }), { facilitator: null });
+});
+
+test('B19 note: the sticky Continue strip on setup details is opaque, so fields never show through it on a phone', async () => {
+  const css = (await import('node:fs')).readFileSync(new URL('./wizard.css', import.meta.url), 'utf8');
+  const rule = css.match(/\.v3-wizard form\[data-wz-form=details\]>\.actions\{([^}]*)\}/);
+  assert.ok(rule, 'details action strip rule present');
+  assert.match(rule[1], /position:sticky/);
+  assert.match(rule[1], /background:var\(--paper\b/);
+  assert.doesNotMatch(rule[1], /--glass|--field/);
+  assert.match(css, /form\[data-wz-form=details\][^{]*\{scroll-margin-block:\d+px\}/);
+});

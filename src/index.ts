@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { resolvePrincipal } from "./auth";
 import { execute } from "./dispatch";
-import { fail, statusFor } from "./envelope";
+import { fail, RETRY_AFTER_SECONDS, statusFor } from "./envelope";
 import type { Ctx, Env } from "./handlers/types";
 import { CapError } from "./handlers/types";
 import { capabilities } from "./registry";
 import { newTraceId } from "./receipt";
-import { handleMcp } from "./mcp";
+import { handleMcp, MCP_MAX_BATCH } from "./mcp";
 import { docs } from "./handlers/docs";
 import { ok } from "./envelope";
 import openapiText from "../contract/openapi.yaml";
@@ -14,7 +14,6 @@ import { verifyAccessJwt } from "./access";
 import synthResponsesSql from "../seed/synthetic-responses.sql";
 import { mintSession } from "./auth";
 import { sha256 } from "./handlers/common";
-import { allow, clientIp, MCP_MAX_BATCH, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { cookieValue, handleAuthorize, handleConsent, oauthPrincipals, PARK_COOKIE, renderConsentIfParked, type OAuthEnv } from "./oauth";
 import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLinkEnabled, magicSessionCookie, mintMagicSession, newNonce, openPage, principalForEmailHash, requestMagicLink, sameOriginPost, signInPage, verifyMagicToken } from "./magic-link";
 
@@ -29,7 +28,7 @@ const json = (value: unknown, status: number) => new Response(JSON.stringify(val
 
 export async function contextForRequest(req: Request, env: Env): Promise<Ctx> {
   return {
-    env, db: env.DB, principal: oauthPrincipals.get(req) ?? await resolvePrincipal(req, env), clientIp: clientIp(req),
+    env, db: env.DB, principal: oauthPrincipals.get(req) ?? await resolvePrincipal(req, env),
     cookieAuthenticated: !req.headers.has("authorization") && !!req.headers.get("cookie"), requestOrigin:req.headers.get("origin")??undefined, requestUrlOrigin:new URL(req.url).origin,
     traceId: newTraceId(), now: () => new Date(), log: () => {},
   };
@@ -48,14 +47,6 @@ for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?
   const path = twin.path.replace("{id}@{ver}", ":idVersion").replace(/\{([^}]+)\}/g, ":$1");
   app.on(twin.method.toUpperCase(), path, async (c) => {
     const ctx = await contextForRequest(c.req.raw, c.env);
-    // Anonymous HTTP traffic on EVERY twin is dampened per address (auditor 5707673911 #2: ~75 twins wrote a trace row
-    // per anonymous request with no limit). Spent after credential resolution and before the body is parsed; a refusal
-    // returns the contract error and writes nothing. Credential holders are not counted here. Mirrors /mcp below.
-    if (ctx.principal.kind === "anonymous" && !(await allow(c.env, "RL_HTTP_ANON", `ip:${ctx.clientIp}`))) {
-      const res = json(fail("RATE_LIMITED", `too many anonymous requests — sign in, or wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`, `wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds and try again`, cap.id, ctx.traceId, { retry_after: RATE_LIMIT_WINDOW_SECONDS }), 429);
-      res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
-      return res;
-    }
     try {
       let body: Record<string, unknown> = {};
       if (!["GET", "HEAD"].includes(c.req.method)) {
@@ -96,9 +87,16 @@ for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?
       });
       const res = json(result, result.ok ? 200 : statusFor(result.error.code));
       if (cap.id.startsWith("cap.ops.roadmap_")) res.headers.set("cache-control", "no-store");
-      if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS));
-      if (cap.id === "cap.auth.consume_link" && result.ok) res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Secure; Path=/; SameSite=Lax`);
-      if (cap.id === "cap.auth.logout") res.headers.append("set-cookie", "session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+      if (!result.ok && result.error.code === "RATE_LIMITED") res.headers.set("retry-after", String((result.error as { data?: { retry_after?: number } }).data?.retry_after ?? RETRY_AFTER_SECONDS));
+      if (cap.id === "cap.auth.consume_link" && result.ok) {
+        res.headers.append("set-cookie", `session=${(result as any).result.session}; HttpOnly; Secure; Path=/; SameSite=Lax`);
+        res.headers.append("set-cookie", "review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
+      }
+      if (cap.id === "cap.auth.me" && !result.ok && result.error.code === "NOT_AUTHENTICATED") res.headers.append("set-cookie", "review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
+      if (cap.id === "cap.auth.logout") {
+        res.headers.append("set-cookie", "session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+        res.headers.append("set-cookie", "review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
+      }
       return res;
     } catch (e) {
       if (e instanceof CapError) return json(fail(e.code, e.message, e.hint, e.docs, ctx.traceId), statusFor(e.code));
@@ -111,17 +109,16 @@ for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?
 // MCP (Lane B-1): same execute(), four tools.
 app.post("/mcp", async (c) => {
   const ctx = await contextForRequest(c.req.raw, c.env);
-  // Anonymous MCP traffic (initialize, tools/list, docs, public reads) is dampened per address. Signed-in callers are
-  // not counted here; the capability limiters in execute() still apply to them. A JSON-RPC batch spends one unit PER
-  // MESSAGE (Bugbot 9ea1c79e: one POST must not buy many calls), and no caller may batch more than MCP_MAX_BATCH.
+  // No caller may batch more than MCP_MAX_BATCH messages in one POST (input validation; app-level rate limiting was
+  // removed, captain 2026-10-16).
   const rpcError = (status: number, code: number, message: string, data?: Record<string, unknown>, headers: Record<string, string> = {}) =>
     new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code, message, ...(data ? { data } : {}) } }), { status, headers: { "content-type": "application/json", ...headers } });
-  let units = 1;
-  try { const peek: unknown = await c.req.raw.clone().json(); if (Array.isArray(peek)) units = Math.max(1, peek.length); } catch { /* handleMcp answers the parse error */ }
-  if (units > MCP_MAX_BATCH) return rpcError(400, -32600, `batch too large: at most ${MCP_MAX_BATCH} messages per request`);
-  if (ctx.principal.kind === "anonymous") for (let i = 0; i < units; i++)
-    if (!(await allow(c.env, "RL_MCP_ANON", `ip:${ctx.clientIp}`)))
-      return rpcError(429, -32029, `rate limited — sign in, or wait up to ${RATE_LIMIT_WINDOW_SECONDS} seconds`, { code: "RATE_LIMITED", retry_after: RATE_LIMIT_WINDOW_SECONDS, trace_id: ctx.traceId }, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
+  let messages = 1;
+  try {
+    const peek: unknown = await c.req.raw.clone().json();
+    messages = Array.isArray(peek) ? Math.max(1, peek.length) : 1;
+  } catch { /* handleMcp answers the parse error */ }
+  if (messages > MCP_MAX_BATCH) return rpcError(400, -32600, `batch too large: at most ${MCP_MAX_BATCH} messages per request`);
   return handleMcp(c.req.raw, ctx, execute as any, async (cx, a) => {
     try { const r = await docs(cx, a); return ok("cap.docs.get", r.result, cx.traceId); }
     catch (e: any) { return fail(e.code ?? "INVALID_PARAMS", e.message, e.hint, "cap.docs.get", cx.traceId); }
@@ -173,6 +170,7 @@ app.get("/v2/auth/access", async (c) => {
     const token = await mintSession(env, pr.id, pr.support ? "support" : "user", { via: "cloudflare-access", sub: id.sub });
     const headers = new Headers({ location: `/#session=${token}` });
     headers.append("set-cookie", `session=${token}; HttpOnly; Path=/; SameSite=Lax; Secure`);
+    headers.append("set-cookie", "review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
     return new Response(null, { status: 302, headers });
   } catch (e: any) {
     const code = e instanceof CapError ? e.code : "NOT_AUTHENTICATED";
@@ -201,11 +199,6 @@ app.post("/v2/auth/email", async (c) => {
   const env = c.env, req = c.req.raw;
   if (!magicLinkEnabled(env)) return toAccess();
   if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in request refused", undefined, "auth.email_link", newTraceId()), 403);
-  // Per-IP dampener first: a refusal costs no storage access and sends nothing.
-  if (!(await allow(env, "RL_AUTH", `ip:${clientIp(req)}`))) {
-    const r = json(fail("RATE_LIMITED", "too many sign-in requests — wait a minute and try again", undefined, "auth.email_link", newTraceId()), 429);
-    r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
-  }
   const body = await formOrJson(req);
   if (!body) return json(fail("INVALID_PARAMS", "email required", undefined, "auth.email_link", newTraceId()), 400);
   const next = nextOf(body.fields.next);
@@ -230,7 +223,6 @@ app.post("/v2/auth/email/check", async (c) => {
   const headers = { "cache-control": "no-store" };
   if (!magicLinkEnabled(env)) return c.json({ valid: false }, 404, headers);
   if (!sameOriginPost(req)) return c.json({ valid: false }, 403, headers);
-  if (!(await allow(env, "RL_REDEEM", `ip:${clientIp(req)}`))) return c.json({ valid: false }, 429, { ...headers, "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
   const body = await formOrJson(req);
   const link = body ? await verifyMagicToken(env, body.fields.t) : null;
   if (!link) return c.json({ valid: false }, 200, headers);
@@ -240,10 +232,6 @@ app.post("/v2/auth/email/open", async (c) => {
   const env = c.env, req = c.req.raw;
   if (!magicLinkEnabled(env)) return toAccess();
   if (!sameOriginPost(req)) return json(fail("NOT_AUTHORIZED_AT_SCOPE", "cross-site sign-in refused", undefined, "auth.email_link", newTraceId()), 403);
-  if (!(await allow(env, "RL_REDEEM", `ip:${clientIp(req)}`))) {
-    const r = json(fail("RATE_LIMITED", "too many sign-in attempts — wait a minute and try again", undefined, "auth.email_link", newTraceId()), 429);
-    r.headers.set("retry-after", String(RATE_LIMIT_WINDOW_SECONDS)); return r;
-  }
   const body = await formOrJson(req);
   const back = nextOf(new URL(req.url).searchParams.get("next"));
   const link = body ? await verifyMagicToken(env, body.fields.t) : null;
@@ -264,6 +252,7 @@ app.post("/v2/auth/email/open", async (c) => {
   const token = await mintMagicSession(env, pr);
   const headers = new Headers({ location: `/#session=${token}`, "cache-control": "no-store", "referrer-policy": "no-referrer" });
   headers.append("set-cookie", magicSessionCookie(token));
+  headers.append("set-cookie", "review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
   return new Response(null, { status: 303, headers });
 });
 // DEV BOOTSTRAP — explicitly OUTSIDE capability parity (Astra 5706308285): loads the committed synthetic answer sets

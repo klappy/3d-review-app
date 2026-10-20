@@ -1,9 +1,17 @@
 // Participant entry points. A redeemed credential is exchanged for one survey-scoped token.
 import type { Handler, Ctx } from "./types";
 import { CapError, notVisible } from "./errors";
-import { newId, nowIso, randomToken, reqStr, sha256 } from "./common";
+import { newId, nonEmptyStr, nowIso, randomToken, reqStr, sha256 } from "./common";
 import { codeHash } from "../code-escrow";
 import { openSharedLink } from "./shared-link";
+
+/** reqStr plus the shared nonEmptyStr rule : a whitespace-only secret is
+ *  refused as INVALID_PARAMS before any lookup, never hashed and looked up as "". */
+function reqSecret(params: Record<string, unknown>, key: string): string {
+  const v = reqStr(params, key);
+  if (!nonEmptyStr(v)) throw new CapError("INVALID_PARAMS", `${key} is required`, `missing:${key}`);
+  return v;
+}
 
 interface CodeEntry { id: string; assessment_survey_id: string; expires_at: string | null; redeemed_at: string | null; respondent_id: string | null }
 
@@ -23,7 +31,7 @@ async function issue(ctx: Ctx, surveyId: string, respondentId: string, allowClos
 }
 
 export const redeem_code: Handler = async (ctx, params) => {
-  const code = reqStr(params, "code").trim().toUpperCase();
+  const code = reqSecret(params, "code").trim().toUpperCase();
   // New batches use an HKDF-separated keyed digest; the SHA branch is limited
   // to pre-escrow rows (batch_id NULL), including isolated synthetic fixtures.
   // Both lookups run when a key is configured so a miss does not reveal which
@@ -47,7 +55,7 @@ export const redeem_code: Handler = async (ctx, params) => {
 
 export const open_link: Handler = async (ctx, params) => {
   if (Object.keys(params).some(k => k !== "token" && k !== "resume_token")) throw new CapError("INVALID_PARAMS", "unknown link parameter; accepted: token, resume_token");
-  return openSharedLink(ctx, reqStr(params, "token"), params.resume_token);
+  return openSharedLink(ctx, reqSecret(params, "token"), params.resume_token);
 };
 
 export const handlers: Record<string, Handler> = {

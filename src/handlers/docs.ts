@@ -8,7 +8,7 @@ const CEILING = "klappy://canon/constraints/mcp-tool-surface-ceiling";
 const TOPICS: Record<string, string> = {
   feedback: "Feedback is an append-only write without undo. HTTP accepts anonymous feedback; MCP requires connector authentication. Do not include private answers or credentials. Send feedback with write cap.ops.feedback and params {note: 'The feedback instructions were easy to find.'}. Use note for the message; body, message and comment are not accepted parameter names. No feedback fields are required by the API; note is a useful minimal submission. Read docs {capability:'cap.ops.feedback'} for the canonical accepted fields, types and required/optional lists. text is a legacy alias for note; do not send different values for both. HTTP POST /v2/feedback takes these fields directly as its JSON body, while MCP write wraps them in params. This is an append-only write, without undo or a public feedback list; the result contains recorded, stripped and feedback_id, not your text. Do not include private answers or credentials. answers/responses/response are stripped, not stored. HTTP accepts anonymous feedback; MCP requires connector authentication. Add require_authenticated:true when attribution is required: an anonymous resolved caller is refused before persistence. Omitted/false retains public HTTP behavior; the flag is not stored. On NOT_AUTHENTICATED, sign in before retrying. On INVALID_PARAMS, check the schema instead of guessing names. After an uncertain write result, do not resend automatically: the first submission may have succeeded.",
   glossary: "Workspace (optional grouping) › Project › Language › Assessment. An assessment owns the stage Prepare → Collect → Understand → Improve. Survey templates are platform-managed and versioned; an assessment survey is a template@version selected into an assessment. Participants answer by link or short access code and are pseudonymous. Perspective labels follow the instrument: Translator, community, church; four mid-level roles + Other.",
-  permissions: "Grants are (principal, scope, role) with role owner/member/viewer at workspace, project or assessment. No inheritance: a workspace grant lists projects, it does not open them. Members invite ≤ member; owners cannot be removed or demoted; the last owner is protected; transfer is dangerous. Participants are never collaborators. Unauthorized and nonexistent look identical (NOT_FOUND_OR_NOT_VISIBLE). Super admin is the support switch on an account; there is no separate super admin role yet. It opens everything: every workspace, project and assessment, reads and writes, template publishing and participant unlock, plus the app-wide totals read cap.ops.usage (counts and dates only). A signed-in session of that account (web sign-in or a session bearer) holds it; an agent connected through the OAuth MCP connector never does: connectors always act as a plain delegated user. Only a short, recorded list of core 3D Review team accounts holds it, starting with the product owner's. It is switched on or off for one account at a time by a recorded step that leaves a receipt naming who switched it and for whom; writes made with it still leave receipts as usual.",
+  permissions: "Grants are (principal, scope, role) with role owner/member/viewer at workspace, project or assessment. One inheritance edge: a workspace role applies to every project the workspace groups; an assessment opens only by its own grant. Raising anyone to owner, transferring ownership or grouping a project needs a direct grant at that scope. Members invite ≤ member; owners cannot be removed or demoted; the last owner is protected; transfer is dangerous. Participants are never collaborators. Unauthorized and nonexistent look identical (NOT_FOUND_OR_NOT_VISIBLE). Super admin is the support switch on an account; there is no separate super admin role yet. The web app offers My Access (ordinary personal grants) and Global Access (lists every workspace, project and assessment with response counts and report visibility under the existing disclosure rules). Global browsing supplies viewer access where no personal grant exists; it does not create grants. The browser preference cannot elevate an ordinary account. The existing super-admin switch permits platform support capabilities, template publishing and participant unlock, plus the app-wide totals read cap.ops.usage (counts and dates only). A signed-in session of that account (web sign-in or a session bearer) holds it; an agent connected through the OAuth MCP connector never does: connectors always act as a plain delegated user. Only a short, recorded list of core 3D Review team accounts holds it, starting with the product owner's. It is switched on or off for one account at a time by a recorded step that leaves a receipt naming who switched it and for whom; writes made with it still leave receipts as usual.",
   reversibility: "read: no side effect. write.reversible: receipt + undo_token only when a true inverse is declared (archive↔unarchive, rename restores prior). write.effect: sends/grants/releases — dry_run → confirm_token → execute; compensating control (revoke) not undo. write.dangerous: destructive — same two-step; inverse none. Submitting a response is append-only: no undo.",
   telemetry: "Every response carries trace_id. read cap.ops.trace {trace_id} returns your own span log (auth, policy, db timing) scoped and redacted; support sees all. A substituted trace id is NOT_FOUND_OR_NOT_VISIBLE. Telemetry never carries answers, codes or addresses.",
   privacy: "Small-cell suppression is always on for results.summary, response.list and every viewer route. Suppressed is a success: ok:true with suppressed:true — say 'results are hidden because too few people answered', never a number that reconstructs the cell. Threshold value is held (D7). Codes are never returned by issue_codes; export_codes is a confirmed disclosure.",
@@ -31,7 +31,7 @@ function page(c: Capability) {
     ...(c.result_schema ? { result_schema: c.result_schema } : {}),
     ...(c.id === "cap.ops.feedback" ? { guidance: TOPICS.feedback, next: { topic: "feedback" } } : {}),
     how_an_agent_calls_it: c.tool === "danger" ? "danger {capability, params, mode:'dry_run'} → impact + confirm_token → danger {…, mode:'execute', confirm_token}" : `${c.tool} {capability, params}`,
-    errors: ["NOT_AUTHENTICATED", "NOT_AUTHORIZED_AT_SCOPE", "WRONG_TOOL_FOR_CLASS", "INVALID_PARAMS", "NOT_FOUND_OR_NOT_VISIBLE", ...(c.tool === "danger" ? ["CONFIRM_REQUIRED", "CONFIRM_EXPIRED"] : []), ...(c.slice === "v2.1-oct" ? ["RESERVED_NOT_BUILT"] : []), "RATE_LIMITED"], // every row: anonymous callers are metered per address on both faces (RL_HTTP_ANON / RL_MCP_ANON), four rows additionally by capability
+    errors: ["NOT_AUTHENTICATED", "NOT_AUTHORIZED_AT_SCOPE", "WRONG_TOOL_FOR_CLASS", "INVALID_PARAMS", "NOT_FOUND_OR_NOT_VISIBLE", ...(c.tool === "danger" ? ["CONFIRM_REQUIRED", "CONFIRM_EXPIRED"] : []), ...(c.slice === "v2.1-oct" ? ["RESERVED_NOT_BUILT"] : []), ...(c.id === "cap.grant.invite" ? ["RATE_LIMITED"] : [])], // no app-level rate limit (captain 2026-10-16); only the hourly invite cap answers RATE_LIMITED
     examples: { http: `${c.http.method} ${c.http.path}`, mcp: { tool: c.tool, arguments: { capability: c.id, params, ...(c.tool === "danger" ? { mode: "dry_run" } : {}) } } },
     ...(c.id === "cap.ops.feedback" ? { http_request: { method: c.http.method, path: c.http.path, headers: { "content-type": "application/json" }, body: params } } : {}),
     projected_from: `${contractName} @ cookbook ${sourceSha}`,
@@ -62,40 +62,153 @@ export const DOCS_SEARCH_STOPWORDS = Object.freeze([
 
 const STOPWORD_SET = new Set<string>(DOCS_SEARCH_STOPWORDS);
 
+/** The one docs-search normalization: lowercase, every non-alphanumeric run → a word break. */
+const wordsOf = (text: string) => String(text).toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter(Boolean);
+
 /** Normalize + tokenize a docs `q`; drops frozen stopwords. Empty ⇒ truthful miss. */
 export function tokenizeDocsQuery(q: string): string[] {
-  const normalized = String(q).toLowerCase().trim().replace(/[^a-z0-9]+/g, " ");
-  return normalized.split(/\s+/).filter((t) => t.length > 0 && !STOPWORD_SET.has(t));
+  return wordsOf(q).filter((t) => !STOPWORD_SET.has(t));
 }
 
+/**
+ * Glue words the honest-miss gate does not count (they are kept for ranking). Plain English joins a
+ * guessed name to a real word with them ("feedback with inventedparam", "create xyzzy and the"); the
+ * docs prose uses them too, so as "known" words they would carry a guess past the gate. Not the
+ * frozen stopword list above, which still governs tokenization.
+ */
+const GATE_FILLER = new Set<string>([
+  "and", "or", "with", "without", "is", "are", "was", "be", "it", "its", "this", "that", "these", "those",
+  "of", "in", "on", "at", "by", "from", "into", "as", "so", "but", "not", "no", "all", "any", "some",
+]);
+
 function idTokens(c: Capability): Set<string> {
-  const bag = new Set<string>();
-  for (const part of c.id.toLowerCase().split(/[._]/)) if (part) bag.add(part);
-  return bag;
+  return new Set(wordsOf(c.id));
 }
 
 function proseTokens(c: Capability): Set<string> {
-  const bag = new Set<string>();
-  const prose = `${c.notes ?? ""} ${c.ui_surface ?? ""}`.toLowerCase().replace(/[^a-z0-9]+/g, " ");
-  for (const t of prose.split(/\s+/)) if (t) bag.add(t);
-  return bag;
+  return new Set(wordsOf(`${c.notes ?? ""} ${c.ui_surface ?? ""}`));
 }
 
-/** AND overlap: every query token must hit id or prose. Id matches weighted higher for rank. */
-function scoreCapability(c: Capability, tokens: string[]): number {
-  if (tokens.length === 0) return 0;
-  const idBag = idTokens(c);
-  const proseBag = proseTokens(c);
-  let idHits = 0;
-  let proseHits = 0;
-  for (const t of tokens) {
-    const inId = idBag.has(t);
-    const inProse = proseBag.has(t);
-    if (!inId && !inProse) return 0; // unknown token vs this capability
-    if (inId) idHits += 1;
-    else proseHits += 1;
+/**
+ * JSON Schema keywords (and `x-` extension keys, matched below): structure, not docs vocabulary. Their
+ * values still are — an `enum`/`const` value, a `$ref` target, a `description` — only the key names drop.
+ */
+const SCHEMA_KEYWORDS = new Set<string>([
+  "type", "required", "properties", "patternProperties", "additionalProperties", "items", "prefixItems",
+  "oneOf", "anyOf", "allOf", "not", "enum", "const", "$ref", "$defs", "definitions", "$schema", "$id",
+  "description", "format", "pattern", "default", "examples", "minLength", "maxLength", "minItems",
+  "maxItems", "uniqueItems", "minProperties", "maxProperties", "minimum", "maximum", "exclusiveMinimum",
+  "exclusiveMaximum", "multipleOf", "nullable", "readOnly", "writeOnly",
+]);
+/** Keys whose children are names (property / definition names), never keywords. */
+const NAME_MAPS = new Set<string>(["properties", "patternProperties", "$defs", "definitions"]);
+
+/**
+ * Every word a capability row carries — all fields (id, notes, inverse, http, error codes,
+ * shared_link_contract, schemas …) as 0.34.10's `JSON.stringify(c)` vocabulary did — minus JSON Schema
+ * keyword key names and `type` values ("string", "object"). Property names, descriptions, enum/const
+ * values and $ref targets stay docs words.
+ */
+function rowWords(v: unknown, out: string[] = [], key = "", names = false): string[] {
+  if (v === null || v === undefined) return out;
+  if (typeof v !== "object") {
+    if (key !== "type" || names) out.push(...wordsOf(String(v)));
+    return out;
   }
-  return idHits * 10 + proseHits;
+  if (Array.isArray(v)) {
+    for (const sub of v) rowWords(sub, out, key, false);
+    return out;
+  }
+  for (const [k, sub] of Object.entries(v as Record<string, unknown>)) {
+    if (names || (!SCHEMA_KEYWORDS.has(k) && !k.startsWith("x-"))) out.push(...wordsOf(k));
+    rowWords(sub, out, names ? "" : k, !names && NAME_MAPS.has(k));
+  }
+  return out;
+}
+
+type SearchIndex = {
+  n: number;
+  df: Map<string, number>;
+  vocab: Set<string>;
+  bags: Map<string, { id: Set<string>; prose: Set<string> }>;
+};
+let searchIndex: SearchIndex | null = null;
+/**
+ * Built once from the static registry: per-capability id/prose bags, document frequency, and the docs
+ * vocabulary — every word the registry rows use (all fields, schemas included: see `rowWords`), TOPICS
+ * and INTENTS. JSON Schema keyword names ("minProperties", "additionalProperties", "maxLength") and
+ * `type` values are not docs vocabulary.
+ */
+function docsSearchIndex(): SearchIndex {
+  if (searchIndex) return searchIndex;
+  const df = new Map<string, number>();
+  const bags = new Map<string, { id: Set<string>; prose: Set<string> }>();
+  const vocab = new Set<string>([...Object.values(TOPICS), ...INTENTS].flatMap(wordsOf));
+  for (const c of capabilities) {
+    const bag = { id: idTokens(c), prose: proseTokens(c) };
+    bags.set(c.id, bag);
+    for (const t of new Set([...bag.id, ...bag.prose])) df.set(t, (df.get(t) ?? 0) + 1);
+    for (const t of [...bag.id, ...bag.prose, ...rowWords(c)]) vocab.add(t);
+  }
+  return (searchIndex = { n: capabilities.length, df, vocab, bags });
+}
+
+/**
+ * Query tokens that can tell capabilities apart, each counted once: drops repeats, 1-char and numeric
+ * tokens, and tokens every capability carries (the shared `cap` id prefix), which match everything
+ * and so mean nothing.
+ */
+function informativeTokens(tokens: string[], idx: SearchIndex): string[] {
+  return [...new Set(tokens)].filter((t) => t.length > 1 && !/^[0-9]+$/.test(t) && (idx.df.get(t) ?? 0) < idx.n);
+}
+
+/** Singular of a plural query word ("workspaces" → "workspace"), or null. */
+const singular = (t: string) => (t.length > 3 && t.endsWith("s") && !t.endsWith("ss") ? t.slice(0, -1) : null);
+
+/**
+ * Partial overlap (NLX-MCP-001 phrases): plain phrases carry filler words ("someone", "last thing"),
+ * so one non-matching token no longer zeroes a capability. A capability qualifies when a query token
+ * hits its id, or when its prose covers at least half the query tokens (rounded up). Hits are weighted
+ * by rarity (rare "invite" outranks common "assessment"); id hits weigh 10x prose hits. The honest-miss
+ * gate is query-level, in `docs` below: see `mostlyUnknown`.
+ */
+const rarity = (t: string, idx: SearchIndex) => Math.log((idx.n + 1) / ((idx.df.get(t) ?? 0) + 1)) + 1;
+
+function scoreCapability(c: Capability, tokens: string[], idx: SearchIndex): number {
+  if (tokens.length === 0) return 0;
+  const bag = idx.bags.get(c.id)!;
+  let idHit = false;
+  let proseHits = 0;
+  let score = 0;
+  for (const t of tokens) {
+    const weight = rarity(t, idx);
+    const one = singular(t);
+    if (bag.id.has(t)) { idHit = true; score += 10 * weight; }
+    else if (bag.prose.has(t)) { proseHits += 1; score += weight; }
+    else if (one && bag.id.has(one)) {
+      // A plural that only matches as its singular id word ("workspaces" vs cap.workspace.list) weighs
+      // just under a prose hit on the plural itself, so it can break a tie between id rows without
+      // outranking a real id hit, or a row whose own text uses the plural ("links" keeps
+      // cap.survey.revoke_link). Id words only: "news" is not a plural of "new".
+      proseHits += 1; score += 0.9 * weight;
+    }
+  }
+  if (!idHit && proseHits < Math.ceil(tokens.length / 2)) return 0;
+  return score;
+}
+
+/**
+ * Honest miss: a query in which at least half the tokens (glue words not counted) are words the docs
+ * never use anywhere (registry rows, schema fields, topics) reads as guessed names or noise —
+ * "feedback inventedparam", "feedback with inventedparam", "xyzzy flurble create" — and returns no hits
+ * rather than a guess (TOPICS: check the schema instead of guessing names). A real phrase with one
+ * stray word ("invite someone to my assessment", "invite authentication") is mostly vocabulary and
+ * still ranks.
+ */
+function mostlyUnknown(tokens: string[], idx: SearchIndex): boolean {
+  const counted = tokens.filter((t) => !GATE_FILLER.has(t));
+  const unknown = counted.filter((t) => !idx.vocab.has(t) && !idx.vocab.has(singular(t) ?? "")).length;
+  return unknown * 2 >= counted.length;
 }
 
 const DOCS_SEARCH_HIT_CAP = 5;
@@ -118,9 +231,10 @@ export const docs: Handler = async (ctx, a) => {
   if (a.q) {
     const raw = String(a.q);
     const q = raw.toLowerCase();
-    const tokens = tokenizeDocsQuery(raw);
-    const ranked = capabilities
-      .map((c) => ({ c, score: scoreCapability(c, tokens) }))
+    const idx = docsSearchIndex();
+    const tokens = informativeTokens(tokenizeDocsQuery(raw), idx);
+    const ranked = (mostlyUnknown(tokens, idx) ? [] : capabilities)
+      .map((c) => ({ c, score: scoreCapability(c, tokens, idx) }))
       .filter((row) => row.score > 0)
       .sort((a, b) => b.score - a.score || a.c.id.localeCompare(b.c.id))
       .slice(0, DOCS_SEARCH_HIT_CAP)

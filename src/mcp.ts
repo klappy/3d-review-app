@@ -34,6 +34,9 @@ const TOOL_DEFS = [
 const rpc = (id: any, result?: any, error?: { code: number; message: string; data?: any }) =>
   ({ jsonrpc: "2.0", id, ...(error ? { error } : { result }) });
 
+/** Largest JSON-RPC batch any caller may POST to /mcp (input validation, not a rate limit). */
+export const MCP_MAX_BATCH = 10;
+
 export async function handleMcp(req: Request, ctx: Ctx, execute: Execute, docs: Docs): Promise<Response> {
   let msg: any;
   try { msg = await req.json(); } catch { return json(rpc(null, undefined, { code: -32700, message: "parse error" }), 400); }

@@ -8,12 +8,12 @@
     "sha": "0f4413768c4365054372d917619311d7c2a00e96"
   },
   "counts": {
-    "total": 92,
+    "total": 93,
     "read": 34,
     "write.effect": 12,
-    "write.reversible": 39,
+    "write.reversible": 40,
     "write.dangerous": 7,
-    "v2.0-bcs": 87,
+    "v2.0-bcs": 88,
     "v2.1-oct": 5,
     "paths_inferred": 37,
     "inverse_unassessed": 0
@@ -167,12 +167,109 @@
       "slice": "v2.0-bcs",
       "section": "A. Entry, identity, session",
       "ui_surface": "header/scope badge",
-      "notes": "grants + roles per scope",
+      "notes": "grants + roles per scope; principal.display_name is the account's optional display name (string or null; null for participants and when none is set) \u2014 screens greet by it with the email as fallback (captain ruling a1, 2026-10-02)",
       "status": "target",
       "inverse": {
         "kind": "n/a"
       },
-      "public": false
+      "public": false,
+      "result_schema": {
+        "type": "object",
+        "required": [
+          "principal",
+          "grants"
+        ],
+        "properties": {
+          "principal": {
+            "type": "object",
+            "required": [
+              "id",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "grants": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    {
+      "id": "cap.auth.me_update",
+      "class": "write.reversible",
+      "tool": "write",
+      "http": {
+        "method": "PATCH",
+        "path": "/v2/me",
+        "path_inferred": false
+      },
+      "roles": "any signed-in account (own account only)",
+      "slice": "v2.0-bcs",
+      "section": "A. Entry, identity, session",
+      "ui_surface": "sign-up name prompt (skippable) + account menu \"Your name\u2026\"",
+      "notes": "set or clear the signed-in account's optional display_name (captain ruling a1, 2026-10-02): trimmed, inner whitespace collapsed, at most 80 characters, no < > or control characters; \"\" or null clears it. Participants have no account (NOT_AUTHORIZED_AT_SCOPE). Undo restores the prior name",
+      "status": "target",
+      "inverse": {
+        "kind": "true",
+        "via": "self:restore-prior",
+        "provenance": "receipt carries the prior display_name"
+      },
+      "undo_token": true,
+      "public": false,
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80
+          }
+        }
+      },
+      "result_schema": {
+        "type": "object",
+        "required": [
+          "principal"
+        ],
+        "properties": {
+          "principal": {
+            "type": "object",
+            "required": [
+              "id",
+              "display_name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
     },
     {
       "id": "cap.participant.redeem_code",
@@ -756,7 +853,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "\"Start an assessment\"",
-      "notes": "creates in `prepare`",
+      "notes": "creates in `prepare`; optional location, facilitator (string, B19, migration 0015)",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -819,7 +916,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "Prepare",
-      "notes": "name, purpose, period, language, format; demographics_enabled (boolean, S15a: facilitator switch, off by default, stored per group in assessment_survey.context_json)",
+      "notes": "name, purpose, period, language, format, location, facilitator (B19, migration 0015); demographics_enabled (boolean, S15a: facilitator switch, off by default, stored per group in assessment_survey.context_json)",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -865,7 +962,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "menu",
-      "notes": "03 project add/remove assessments; grant checked at project scope (D2: no inheritance); undo=cap.assessment.unarchive",
+      "notes": "03 project add/remove assessments; needs a direct assessment grant (member+), then member+ at the assessment's project (effective project role), so a workspace role alone never reaches archive; undo=cap.assessment.unarchive",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -1404,7 +1501,7 @@
         "path": "/v2/{scope}/{id}/invitations",
         "path_inferred": false
       },
-      "roles": "O, M(≤M)",
+      "roles": "O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "\"Invite collaborator\" + impact preview → confirm",
@@ -1435,7 +1532,7 @@
         "path": "/v2/invitations/{id}",
         "path_inferred": false
       },
-      "roles": "O, M(≤M)",
+      "roles": "O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "collaborators panel",
@@ -1461,7 +1558,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "",
-      "notes": "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke; name the invitation by `token` (mailed link, unchanged) or by `invitation_id` (signed-in invitee, listed by cap.me.invitations; http_alt POST /v2/me/invitations/{invitation_id}/accept) — both require the caller's email hash == invitee_hash; every miss is NOT_FOUND_OR_NOT_VISIBLE (captain ruling 2026-09-28 15:27 ET, B04 step c)",
+      "notes": "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke; name the invitation by `token` (mailed link, unchanged) or by `invitation_id` (signed-in invitee, listed by cap.me.invitations; http_alt POST /v2/me/invitations/{invitation_id}/accept) — both require the caller's email hash == invitee_hash; every miss is NOT_FOUND_OR_NOT_VISIBLE (captain ruling 2026-09-28 15:27 ET, B04 step c); 0.35.23 (ASK-f4-finding4 default 1): every invitation, workspace and assessment included, is accepted only while its inviter holds a direct grant at its scope (member or above; owner for an owner invitation)",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1530,7 +1627,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "impact preview → confirm",
-      "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed)",
+      "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed); noop (0.35.16): when the grant already holds the requested role (at first read, or set there by another writer before this write), the result, the dry_run result and impact, and the receipt carry noop: true; the impact then names no effect and no compensating control, and the receipt credits the caller with no change (no undo token, no compensating control); confirm (0.35.17): the dry_run binds the role it read into the confirm token, and an execute that reads another role is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count a downgrade preview showed; 0.35.20: it binds the swept invitation id set (not only the count), and the UPDATE re-checks that set in its own WHERE (a same-count swap of the holder's open invitations between preview, token check and write is refused with CONFIRM_REQUIRED and changes nothing); 0.35.23 (ASK-f4-finding4 default 1): at a project any role change needs a direct project owner; an inherited workspace owner is NOT_AUTHORIZED_AT_SCOPE",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1583,7 +1680,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "danger",
-      "notes": "D3",
+      "notes": "D3; confirm (0.35.18): the dry_run binds the owner set and the recipient's direct role it read into the confirm token, and an execute that reads either changed is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count, and the write re-checks the bound state in its own WHERE (a change between token check and write is refused the same way); 0.35.20: the owner set is compared as group_concat ordered in the aggregate itself; the step-down preview binds the swept invitation id set (not only the count) and the INSERT re-checks it; a write refused because the caller lost the direct owner grant in the window is NOT_AUTHORIZED_AT_SCOPE, otherwise CONFIRM_REQUIRED; 0.35.21: a step-down write refused because the swept invitation set moved in the window is CONFIRM_REQUIRED naming the invitations (as update_role), otherwise \"the target changed\"",
       "status": "target",
       "inverse": {
         "kind": "none",

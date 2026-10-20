@@ -1,15 +1,19 @@
 import { renderReportCards } from './report-card.js';
+import { lensesCopy, renderLensesAgree } from './report-lenses.js';
+import { renderLensRadar } from './report-radar.js';
 import { humanDate } from './assess/cards.js'; // one shared local-time formatter (B31)
 // Synthetic report rendering. Dependency-free and importable under node --test with an injected doc.
 // Text nodes only: every value comes from the payload as returned (String(), no rounding, no word
 // mapping except the agreement sentence below, no colour), plus the fixed labels in `copy`. Nothing here fetches or authorizes.
+// The lenses agree / disagree block (report-lenses.js) keeps that rule for values (exact scores and spread) and adds two
+// presentation-only things: perspective display names, and a spread colour that always sits beside its text label.
 export const copy = Object.freeze({
   headerPrefix: 'Synthetic data',
   builtStability: 'from the responses that were captured for it. Its content does not change; it may become unavailable under the current synthetic reporting policy.',
   built: 'Built',
   technical: 'Technical details',
   lenses: 'Lenses',
-  crossLens: 'Cross-lens comparisons',
+  crossLens: lensesCopy.heading, // lenses agree / disagree block (report-lenses.js); no cross-lens mean is shown
   standalone: 'Standalone indicators',
   translationAgreement: 'Translation type agreement',
   evidence: 'Evidence',
@@ -21,6 +25,7 @@ export const copy = Object.freeze({
   matches: 'Matches',
   differs: 'Differs',
   notComparableSentence: 'Not comparable',
+  score: 'Score (out of 100)', // DEC-0014: every numeric score is labelled out of 100
   emptyList: 'No reports have been built for this assessment.',
 });
 const val = value => String(value);
@@ -70,25 +75,20 @@ export function renderReport({ doc, root, report }) {
   const tech = el(doc, 'details');
   tech.append(el(doc, 'summary', copy.technical), el(doc, 'p', `${copy.headerPrefix} · source ${payload.source_commit.slice(0, 7)} · scorer ${val(versions.scorer)} · narrative ${val(versions.narrative)} · policy ${val(versions.policy)}${report.id ? ` · report ${val(report.id)}` : ''} · built ${val(report.created_at)}`));
   out.push(tech);
-  // Sections follow payload order; an absent or empty one is not announced.
+  // Sections follow payload order; an absent or empty one is not announced. One exception: the lenses agree / disagree block
+  // leads (cookbook DEC-0012), one barbell per area scored by two or more lenses, biggest spread first.
+  const agree = renderLensesAgree({ doc, report });
+  if (agree) out.push(agree);
+  // DEC-0014: the radar (high-numeracy view) follows the agree / disagree block; null below three shared areas.
+  const radar = renderLensRadar({ doc, report });
+  if (radar) out.push(radar);
   const cards = renderReportCards({ doc, report });
   if (cards) out.push(cards);
-  const cross = [...rows(payload.cross_lens_multi), ...rows(payload.cross_lens_single)];
-  if (cross.length) {
-    out.push(section(doc, copy.crossLens, [list(doc, cross.map(entry => {
-      const agreement = entry.agreement_range === null || entry.agreement_range === undefined ? copy.oneLens : val(entry.agreement_range);
-      const li = el(doc, 'li');
-      li.append(el(doc, 'h5', val(entry.construct_name)), metrics(doc, [['Average score', entry.triangulated_mean], ['Score spread', agreement]]));
-      const perLens = rows(entry.lens_scores);
-      if (perLens.length) li.append(list(doc, perLens.map(score => el(doc, 'li', `${val(score.lens)}: ${val(score.score)}`))));
-      return li;
-    }))]));
-  }
   const standalone = rows(payload.standalone_indicators);
   if (standalone.length) {
     out.push(section(doc, copy.standalone, [list(doc, standalone.map(ind => {
       const li = el(doc, 'li');
-      li.append(el(doc, 'h5', val(ind.question_text)), el(doc, 'p', `${val(ind.lens)} · ${val(ind.sub_dimension)}`), metrics(doc, [['Score', ind.score], ['Responses', ind.n_responses]]));
+      li.append(el(doc, 'h5', val(ind.question_text)), el(doc, 'p', `${val(ind.lens)} · ${val(ind.sub_dimension)}`), metrics(doc, [[copy.score, ind.score], ['Responses', ind.n_responses]]));
       return li;
     }))]));
   }

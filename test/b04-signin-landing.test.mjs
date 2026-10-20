@@ -7,25 +7,9 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { JSDOM } from 'jsdom';
 import { dataset, createTransport } from './fixtures/kit-root-transport.js';
-import * as demo from '../ui/demo.js';
-import { redactDiagnosticPath } from '../ui/diagnostic-path.js';
-import * as stage from '../ui/stage-screens.js';
-import { whatsHere } from '../ui/assess/whats-here.js';
-import * as cards from '../ui/assess/cards.js';
-import { pages, css as scopeCss, landsOnWork, signInLanding } from '../ui/assess/scope.js';
-import { views, css as viewsCss } from '../ui/assess/views.js';
-import * as share from '../ui/assess/share.js';
-import { feedback } from '../ui/assess/feedback.js';
-import { mountKitRoot, shellModel, bindAccountMenu } from '../ui/kit/app-adapter.js';
-import * as v3 from '../ui/v3-shell.js';
-import { v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, v3CompleteLock, V3_SUGGEST } from '../ui/assess/v3-assessment.js';
-import { learnMore } from '../ui/v3/components/learn-more.js';
-import { activeUntilLine, periodText, collectLine } from '../ui/v3/components/active-until.js';
-import { breadcrumbs } from '../ui/v3/components/breadcrumbs.js';
-import { sidebarTree } from '../ui/v3/components/sidebar-tree.js';
-import { mountEditableHeading } from '../ui/v3/components/editable-heading.js';
-import { showSavedStatus, undoTokenOf } from '../ui/v3/components/saved-status.js';
-import { mountInvite, mountInvitations, failureNotice, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations } from '../ui/v3/components/invite.js';
+import { assessGlobals, bindWindowFetch, windowFetchProbe } from './helpers/assess-globals.mjs';
+
+const ASSESS_GLOBALS = await assessGlobals(); // every binding assess.js imports, derived from its own import lines (one source)
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const HTML = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
@@ -49,7 +33,8 @@ async function bootPage(identity = 'owner', hash = '#workspaces', { install, hos
   w.confirm = () => false;
   w.scrollTo = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; w.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new w.Event('close')); };
-  Object.assign(w, { isDemo: demo.isDemo, demoApi: demo.demoApi, memoryStorage: demo.memoryStorage, sampleResponses: demo.sampleResponses, redactDiagnosticPath, loadBlankPrint: stage.loadBlankPrint, renderBlankPrint: stage.renderBlankPrint, printAllowed: stage.printAllowed, rememberTab: stage.rememberTab, recalledTab: stage.recalledTab, STAGES: stage.STAGES, whatsHere, cards, pages, scopeCss, landsOnWork, signInLanding, views, viewsCss, share, feedback, mountKitRoot, shellModel, bindAccountMenu, ...v3, v3StagePrimary, v3CountLine, v3StageStepper, ensureStepperStyle, v3ExpectedFor, stageMoveButton, askStageMove, deleteAssessmentButton, deleteAssessmentFlow, DELETED_NOTICE, completeLock: v3CompleteLock, V3_SUGGEST, activeUntilLine, periodText, collectLine, learnMore, breadcrumbs, sidebarTree, mountEditableHeading, showSavedStatus, undoTokenOf, mountInvite, mountInvitations, failureNotice, inviteView, INVITE_KEY, parseInvitationFragment, pendingInvitations }); // v3 shell imports (assess.js lines 15–16); #190
+  Object.assign(w, ASSESS_GLOBALS); // assess.js runs as a classic script with its imports stripped, so each import is a window global
+  bindWindowFetch(w, ASSESS_GLOBALS); // mountPassages / facilitatorFetch default to Node's fetch; route them through w.fetch
   const ctx = dom.getInternalVMContext();
   vm.runInContext(CHANGELOG, ctx, { filename: 'changelog.js' });
   const api = vm.runInContext(ASSESS + '\n({ state, resetIdentity, render, boot, route, setHash: h => { location.hash = h; }, kit, app })', ctx, { filename: 'assess.js' });
@@ -140,10 +125,14 @@ test('S9 B04 (c) control: the invitations read failing never blocks sign-in — 
   await tick(30);
   assert.equal(p.w.location.hash, '#project/p1');
 });
-test('S9: a plain visit (no sign-in just happened) never asks for invitations and never redirects', async () => {
+// S40 (71b4f11, merged as #424 6c6d78e) made Home read GET /v2/me/invitations on purpose to show a quiet count line
+// (ui/assess/scope.js:426-429, ui/v3/home.js invitationsHint). The S9 rule that stands is: a plain visit never redirects to #invite.
+test('S9: a plain visit (no sign-in just happened) never redirects; the only invitations read is S40\'s Home hint', async () => {
   const p = await bootPage('owner', '#projects', { install: (t, data) => { data.routes.set('GET /v2/me/invitations', MINE); } });
   await tick(30);
-  assert.equal(p.w.location.hash, '#projects'); assert.ok(!p.served().includes('GET /v2/me/invitations'));
+  assert.equal(p.w.location.hash, '#projects');
+  assert.equal(p.served().filter(k => k === 'GET /v2/me/invitations').length, 1, 'one read, from the S40 Home hint');
+  assert.ok(!p.served().some(k => k.startsWith('POST /v2/me/invitations/')), 'nothing accepted');
 });
 test('S19 B04 (c): "Accept all" stops at the first failure — later ones untouched, the notice names the failed one, the rest stay offered', async () => {
   const evil = '<img src=x onerror="alert(1)">';
@@ -169,4 +158,9 @@ test('S19 B04 (c): the last invitation failing and dropping out → its notice s
   const panel = p.q('[data-invite]');
   assert.equal(panel.querySelector('[data-invite-line]').textContent, 'The invitation to the project "River Valley" is no longer available: it was withdrawn, or it is not for the account you are signed in with.');
   const go = panel.querySelector('[data-invite-continue]'); assert.equal(go.getAttribute('href'), '#project/p1'); assert.ok(go.classList.contains('primary'));
+});
+
+test('bootPage: every Node-realm fetch path (bare fetch, mountPassages, facilitatorFetch) reaches w.fetch, never Node fetch', async () => {
+  const p = await bootPage('owner', '#workspaces');
+  assert.deepEqual(await windowFetchProbe(p.w), ['/v2/auth/email', '/v2/assessments/probe/passages', '/v2/translate']);
 });

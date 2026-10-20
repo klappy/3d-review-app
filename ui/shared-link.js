@@ -5,12 +5,18 @@
 // a new respondent; storage duplication (e.g. tab duplication) can resume the
 // same respondent, so nothing here claims person uniqueness.
 
+import { RATE_LIMIT_LEAD, isRateLimited, rateLimitText, retryAfterOf, waitWords } from './rate-limit.js';
 // All participant/staff-facing strings below are copy.md rows (cookbook design-system).
+// The shared route's retry words, with the wait the server asked for (one minute unless Retry-After says otherwise).
+const limitedIn = wait => `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. Try again in ${wait}.`;
 export const copy = {
   linkUnavailable: 'This link no longer works. It may have been replaced or the collection may have closed. Ask the person who invited you for a new one. Nothing about the project is shown here.',
   collectionClosed: 'Collection has closed. New answers are not accepted. If you already submitted from this device, your receipt is shown below.',
   cannotResume: 'Your earlier session on this link could not be resumed from this device. Nothing saved on this device was changed. If you already sent answers, that send may have succeeded without a confirmation shown here; the facilitator can confirm whether it arrived.',
-  rateLimited: 'Too many requests right now. Nothing saved on this device was changed; wait a moment and open your link again.',
+  rateLimited: limitedIn('one minute'), // one 'nothing changed', one 'one minute' (review 6207996655)
+  rateLimitedReady: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. You can try again now.`, // the wait is over (#490 copy nit)
+  // /legacy/ shows no Try again control and a reload lands on "link no longer works": tell that person to reopen the link (#490 low 2).
+  rateLimitedReopen: `${RATE_LIMIT_LEAD} Nothing saved on this device was changed. Open your link again in one minute.`,
   transient: 'The server could not be reached or did not answer. Nothing saved on this device was changed; open your link again in a moment.',
   draftMismatch: 'Your saved answers were for a different version of this survey and were not restored. Please answer again.',
   draftRestored: 'Your unsent answers were restored on this device.',
@@ -140,6 +146,8 @@ export function saveDraft(store, form, values) {
 // GET /v2/participate/receipt with the same bearer; submitted:true → own receipt; submitted:false →
 // closed; a receipt refusal (NOT_FOUND_OR_NOT_VISIBLE) → link unavailable.
 // Kinds: conflict (STAGE_CONFLICT), rateLimited (RATE_LIMITED / 429), unavailable (refusal), transient (5xx, network, unreadable).
+/** copy.rateLimited with the server's wait in place of "one minute" when Retry-After names another wait (#496 review finding 1). */
+export const rateLimitedCopy = retryAfter => limitedIn(waitWords(retryAfter));
 export function errorKind(error) {
   const code = String(error?.code || '').trim();
   if (code === 'STAGE_CONFLICT') return 'conflict';
@@ -176,7 +184,7 @@ export async function resolveConflict(client) {
   let receipt;
   try { receipt = await client.receipt(); } catch (error) {
     const kind = errorKind(error);
-    return { state: kind === 'unavailable' ? 'unavailable' : kind === 'rateLimited' ? 'rateLimited' : 'transient' };
+    return kind === 'rateLimited' ? { state: 'rateLimited', retryAfter: error?.retryAfter } : { state: kind === 'unavailable' ? 'unavailable' : 'transient' }; // the wait travels to the held control
   }
   return receipt.submitted ? { state: 'receipt', receipt } : { state: 'closed' };
 }
@@ -207,7 +215,7 @@ export function createSharedLinkClient({ fetchImpl = globalThis.fetch, store, on
     catch { const error = new Error('Local API unavailable. For a write, its outcome is unknown; check server state before retrying.'); error.status = 0; throw error; }
     let data;
     try { data = await response.json(); } catch { const error = new Error(`Unreadable API response (${response.status}).`); error.status = 0; throw error; }
-    if (!response.ok || !data.ok) { const error = new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`); error.code = data.error?.code || String(response.status); error.status = response.status; error.trace_id = data.trace_id ?? data.error?.trace_id; throw error; }
+    if (!response.ok || !data.ok) { const error = new Error(`${data.error?.code || response.status}: ${data.error?.message || 'Request failed'}`); error.code = data.error?.code || String(response.status); error.status = response.status; error.trace_id = data.trace_id ?? data.error?.trace_id; if (isRateLimited(response.status, error.code)) { error.retryAfter = retryAfterOf(data.error, response); error.limitText = rateLimitText(data.error?.message, data.error?.hint, error.retryAfter); } throw error; }
     onEvent?.({ method, url, capability: data.capability, receipt: data.receipt, trace_id: data.trace_id });
     return data.result;
   }

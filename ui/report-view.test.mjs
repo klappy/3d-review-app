@@ -1,16 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { copy, createReportState, renderList, renderReport, upsertRow } from './report-view.js';
+import { radarCopy } from './report-radar.js';
 
 // Minimal fake DOM: no innerHTML exists on these nodes, so any HTML-string rendering would fail here.
 function fakeNode(tag) {
-  return { tag, textContent: '', children: [], listeners: {}, dataset: {},
+  return { tag, textContent: '', children: [], listeners: {}, dataset: {}, attrs: {},
+    setAttribute(name, value) { this.attrs[name] = String(value); },
+    get lastChild() { return this.children[this.children.length - 1] ?? null; },
     addEventListener(event, fn) { (this.listeners[event] ||= []).push(fn); },
     fire(event) { for (const fn of this.listeners[event] || []) fn({}); },
     append(...nodes) { this.children.push(...nodes); },
     replaceChildren(...nodes) { this.children = nodes; } };
 }
-const doc = { createElement: tag => fakeNode(tag) };
+const doc = { createElement: tag => fakeNode(tag), createElementNS: (ns, tag) => Object.assign(fakeNode(tag), { ns }),
+  createTextNode: text => Object.assign(fakeNode('#text'), { textContent: String(text) }) };
 const flat = node => [node.textContent, ...node.children.map(flat)].join('\n');
 const lines = node => flat(node).split('\n').filter(Boolean);
 // Sections are keyed by their <h4>; each section's remaining text is its rows, in render order.
@@ -60,29 +64,32 @@ test('R1 full payload renders header, stability line and every section in payloa
   assert.equal(tech.tag, 'details'); assert.equal(tech.open, undefined);
   assert.equal(tech.children[0].tag, 'summary'); assert.equal(tech.children[0].textContent, 'Technical details');
   assert.match(tech.children[1].textContent, /^Synthetic data · source f042cde · scorer steve-f042cde-single-assessment-v1 · narrative steve-f042cde-rule-narrative-v1 · policy synthetic-current-assessment-asof-query-v1/);
-  assert.deepEqual(root.children.slice(2).map(s => s.children[0].textContent), [copy.lenses, copy.crossLens, copy.standalone, copy.translationAgreement, copy.evidence, copy.narrative]);
+  assert.deepEqual(root.children.slice(2).map(s => s.children[0].textContent), [copy.crossLens, copy.lenses, copy.standalone, copy.translationAgreement, copy.evidence, copy.narrative]);
   for (const node of root.children) assert.equal('innerHTML' in node, false);
 });
 
 test('R2 lenses print scores exactly as returned; an empty sub-dimension list adds no rows', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.lenses), ['team', '66.66666', 'Overall score', 'process', 'Score', '70', 'Items included', '3', 'relationships', 'Score', '63.3333', 'Items included', '2', 'church', '0', 'Overall score']);
+  assert.deepEqual(sectionRows(root, copy.lenses), ['team', '66.66666', 'Overall score (out of 100)', 'process', 'Score (out of 100)', '70', 'Items included', '3', 'relationships', 'Score (out of 100)', '63.3333', 'Items included', '2', 'church', '0', 'Overall score (out of 100)']);
 });
 
-test('R3 cross-lens: multi before single, null agreement_range prints the fixed label "one lens"', () => {
+test('R3 lenses agree block leads: exact scores and spread as returned, no average, multi before single, counts visible', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.crossLens), [
-    'Shared understanding', 'Average score', '55.5', 'Score spread', '12.25', 'team: 61.75', 'community: 49.5',
-    'Church involvement', 'Average score', '40', 'Score spread', 'one lens', 'church: 40',
+  const rowsText = sectionRows(root, copy.crossLens);
+  assert.deepEqual(rowsText.slice(0, 17), [
+    'Each line shows one area and the score each perspective gave it, on a 0–100 scale. Biggest difference first; areas only one perspective scored come last.',
+    'Shared understanding', 'Some difference · Difference 12.25', '0', '100', 'Translation team ', '61.75', ' out of 100', ' responses not counted', 'Community ', '49.5', ' out of 100', ' responses not counted',
+    'Church involvement', 'Only one perspective scored this area', '0', '100',
   ]);
+  assert.doesNotMatch(rowsText.join('\n'), /average|mean/i);
 });
 
 test('R4 standalone indicators, evidence and narrative rows', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
-  assert.deepEqual(sectionRows(root, copy.standalone), ['Is the meaning clear?', 'community · clarity', 'Score', '82.5', 'Responses', '9']);
+  assert.deepEqual(sectionRows(root, copy.standalone), ['Is the meaning clear?', 'community · clarity', 'Score (out of 100)', '82.5', 'Responses', '9']);
   assert.deepEqual(sectionRows(root, copy.evidence), ['Team form', 'Submissions', '4', 'Church form', 'Submissions', '2']);
   assert.deepEqual(sectionRows(root, copy.narrative), ['Team scores are highest on process.', 'One lens has no comparable data.']);
 });
@@ -161,4 +168,21 @@ test('R10 createReportState().clear() drops the pending confirmation, its timer 
   assert.equal(state.reportCursor, null);
   clearTimeout(timer); // no-op if clear() already did it; the process must not be held open either way
   assert.equal(cleared, 0);
+});
+
+test('R12 three or more shared areas: renderReport places the radar right after the lenses agree block (DEC-0014)', () => {
+  const area = (name, a, b) => ({ construct_name: name, agreement_range: Math.abs(a - b), n_lenses_included: 2, lens_scores: [{ lens: 'team', score: a }, { lens: 'community', score: b }] });
+  const report = { ...REPORT, payload: { ...REPORT.payload, cross_lens_multi: [area('Shared understanding', 61.75, 49.5), area('Clarity', 70, 64), area('Trust', 40, 72)] } };
+  const root = fakeNode('section');
+  assert.equal(renderReport({ doc, root, report }), true);
+  const headings = root.children.slice(2).map(s => s.children[0].textContent);
+  assert.deepEqual(headings, [copy.crossLens, radarCopy.heading, copy.lenses, copy.standalone, copy.translationAgreement, copy.evidence, copy.narrative]);
+  const radar = root.children[3];
+  assert.equal(radar.className, 'lens-radar report-detail-section glass panel');
+  const svg = radar.children.find(c => c.tag === 'figure').children[0];
+  assert.equal(svg.tag, 'svg'); assert.equal(svg.ns, 'http://www.w3.org/2000/svg');
+  assert.deepEqual(radar.children.find(c => c.tag === 'ul').children.map(li => li.children[1].textContent), ['Translation team', 'Community']);
+  // One shared area (the R1 payload) is below the three-spoke floor: no radar section.
+  const r1 = fakeNode('section'); renderReport({ doc, root: r1, report: REPORT });
+  assert.equal(r1.children.some(s => s.children[0]?.textContent === radarCopy.heading), false);
 });

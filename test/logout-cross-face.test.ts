@@ -34,7 +34,10 @@ describe("logout revokes the presented credential at both faces (Astra 570631075
     expect((await mcp(env,"write","cap.auth.logout",a)).error?.code).toBe("NOT_AUTHENTICATED");
     // HTTP-first
     const b=await mintSession(env,"person_mara","user");
-    expect((await http(env,"DELETE","/v2/auth/session",b)).status).toBe(200);
+    const logout=await http(env,"DELETE","/v2/auth/session",b);
+    expect(logout.status).toBe(200);
+    expect(logout.headers.get('set-cookie')).toContain('review_access=;');
+    expect(logout.headers.get('set-cookie')).toContain('Max-Age=0');
     expect((await http(env,"GET","/v2/me",b)).status).toBe(401);
     expect((await mcp(env,"read","cap.auth.me",b)).error?.code).toBe("NOT_AUTHENTICATED");
     // a caller cannot revoke someone else's session by naming it

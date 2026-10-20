@@ -100,8 +100,12 @@ const REPORT_TARGET = `    AND ((?2 IS NULL AND a.id = ?3)
       OR (?3 IS NULL AND EXISTS (
         SELECT 1 FROM synthetic_report m WHERE m.id = ?2 AND m.assessment_id = a.id)))`;
 function reportCapturePrefix(): string {
-  if (!B1_CAPTURE_SQL.endsWith(CAPTURE_SUFFIX) || B1_CAPTURE_SQL.split(TABLE_FREE_TARGET).length !== 2) throw new Error('CAPTURE_SQL_SHAPE');
+  const grantOpen = '    AND EXISTS (\n      SELECT 1 FROM "grant" g';
+  const grantClose = "(?5 = 'viewer' AND g.role = 'viewer')))";
+  if (!B1_CAPTURE_SQL.endsWith(CAPTURE_SUFFIX) || [TABLE_FREE_TARGET, grantOpen, grantClose].some(part => B1_CAPTURE_SQL.split(part).length !== 2)) throw new Error('CAPTURE_SQL_SHAPE');
   return B1_CAPTURE_SQL.slice(0, -CAPTURE_SUFFIX.length).replace(TABLE_FREE_TARGET, REPORT_TARGET)
+    .replace(grantOpen, "    AND ((?1 = 'support' AND ?5 = 'viewer') OR EXISTS (\n      SELECT 1 FROM \"grant\" g")
+    .replace(grantClose, "(?5 = 'viewer' AND g.role = 'viewer'))))")
     .replace('-- B1 capture only: aid selects assessment; rid must be NULL. No report table reference.', '-- B2: aid selects build/list; rid selects report get. Exactly one is set.');
 }
 export const REPORT_CAPTURE_CTE = reportCapturePrefix();
@@ -167,13 +171,23 @@ export function decodePackedCapture(expectedAssessmentId: string, raw: string): 
   if (used.size !== dictionary.size) refuse();
   return Object.freeze(rows);
 }
+/** Identity of every capture object minted below after a full attestCapture pass. Module-private:
+ * nothing outside this file can add to it, and minted captures (and their rows) are frozen, so a
+ * branded object's rows and digest are exactly what was attested. Lets later stages of the same
+ * request reuse that attestation instead of re-hashing the same frozen rows. */
+const attested = new WeakSet<object>();
+export function isAttestedCapture(c: unknown): boolean {
+  return typeof c === 'object' && c !== null && attested.has(c);
+}
 /** Internal adapter, not authorization: callers must obtain the token in one guarded SELECT. */
 export async function attestPackedCapture(expectedAssessmentId: string, raw: string, participant = false): Promise<CaptureResult> {
   try {
     const rows = decodePackedCapture(expectedAssessmentId, raw);
     const result = await attestCapture(expectedAssessmentId, rows, participant === true);
     if (!result.eligible) return { eligible: false, reason: 'HELD' };
-    return { eligible: true, capture: Object.freeze({ assessmentId: expectedAssessmentId, packedCapture: raw, rows, responseIds: Object.freeze(result.responseIds), captureDigest: result.captureDigest, participant: participant === true }) };
+    const capture: CapturedAssessment = Object.freeze({ assessmentId: expectedAssessmentId, packedCapture: raw, rows, responseIds: Object.freeze(result.responseIds), captureDigest: result.captureDigest, participant: participant === true });
+    attested.add(capture);
+    return { eligible: true, capture };
   } catch { return { eligible: false, reason: 'HELD' }; }
 }
 /** Server-owned member minimum and null report ID; no caller-supplied SQL/role selector.

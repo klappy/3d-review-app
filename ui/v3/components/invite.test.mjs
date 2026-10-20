@@ -22,6 +22,7 @@ test('server codes map to plain screens, never raw text', () => {
   assert.equal(inviteFailure({ code: 'INVALID_PARAMS', message: 'invitation_used' }), 'used');
   assert.equal(inviteFailure({ code: 'INVALID_PARAMS', message: 'invitation_expired' }), 'expired');
   assert.equal(inviteFailure({ code: 'NOT_FOUND_OR_NOT_VISIBLE', message: 'x' }), 'refused');
+  assert.equal(inviteFailure({ code: 'NOT_AUTHORIZED_AT_SCOPE', message: 'this project invitation was not issued by a direct member of this project' }), 'refused'); // F3, durable
   assert.equal(inviteFailure(new Error('boom')), 'failed');
   assert.doesNotMatch(inviteView({ status: 'refused' }), /NOT_FOUND/);
 });
@@ -264,4 +265,9 @@ test('S44: a failed accept mid-run stops there, names the failed one, and clears
   assert.equal(root.querySelector('[data-invite]').getAttribute('aria-busy'), null, 'aria-busy cleared');
   assert.equal(root.querySelector('[data-invite-spinner]'), null, 'spinner gone'); assert.equal(root.querySelector('[data-invite-spin-css]'), null);
   assert.ok([...root.querySelectorAll('button')].every(b => b.disabled), 'buttons stay disabled until the hand-over remounts');
+});
+test('F3: accept refused with NOT_AUTHORIZED_AT_SCOPE is durable — "not available" screen, token cleared, no Try again', async () => {
+  let forgot = 0; const root = fakeRoot();
+  mountInvite(root, { api: async () => { throw Object.assign(new Error('this project invitation was not issued by a direct member of this project'), { code: 'NOT_AUTHORIZED_AT_SCOPE' }); }, token: 't', forget: () => forgot++ });
+  await tick(); assert.match(root.innerHTML, /Invitation not available/); assert.doesNotMatch(root.innerHTML, /data-invite-retry|direct member/); assert.equal(forgot, 1);
 });

@@ -3,6 +3,7 @@ import type { Ctx, ScopeType } from "./handlers/types";
 import type { Capability } from "./registry";
 import type { Receipt } from "./envelope";
 import { hmacSha256Base64Url, hmacSha256Key, sha256Hex } from "./crypto";
+import { CapError } from "./errors";
 
 export const CONFIRM_TTL_SECONDS = 300; // inherited from 05 sketch; 18-D open item D-2 (18-C rules the final value)
 
@@ -47,7 +48,9 @@ export async function verify(secret: string, payload: string, sig: string): Prom
 }
 
 // ---------- confirm tokens (danger two-step) ----------
-export interface ConfirmIntent { capability: string; params_hash: string; actor: string; scope: string; revision: string; exp: number }
+export interface ConfirmIntent { capability: string; params_hash: string; actor: string; scope: string; revision: string; exp: number;
+  /** Hash of the state the dry_run preview read (HandlerResult.confirmState), when the handler binds one (0.35.17). */
+  state?: string }
 
 /** Bound to intent: capability + params hash + actor + scope + revision (contract sha). TTL 300 s, labeled inherited (D-2). */
 export async function mintConfirmToken(secret: string, intent: Omit<ConfirmIntent, "exp">, now: Date): Promise<{ token: string; expires_in: number }> {
@@ -58,16 +61,34 @@ export async function mintConfirmToken(secret: string, intent: Omit<ConfirmInten
 }
 
 export type ConfirmCheck = "ok" | "expired" | "mismatch" | "malformed";
-export async function checkConfirmToken(secret: string, token: string, intent: Omit<ConfirmIntent, "exp">, now: Date): Promise<ConfirmCheck> {
-  if (typeof token !== "string" || !token.startsWith("cfm_")) return "malformed";
+/** A checked confirm token: `state` is the state hash the token carries (ConfirmIntent.state), read from the payload whose
+ *  signature was verified here, and only when `check` is "ok"; null otherwise or when the token carries none (0.35.18). */
+export interface ConfirmVerdict { check: ConfirmCheck; state: string | null }
+export async function checkConfirmToken(secret: string, token: string, intent: Omit<ConfirmIntent, "exp">, now: Date): Promise<ConfirmVerdict> {
+  const no = (check: Exclude<ConfirmCheck, "ok">): ConfirmVerdict => ({ check, state: null });
+  if (typeof token !== "string" || !token.startsWith("cfm_")) return no("malformed");
   const [payload, sig] = token.slice(4).split(".");
-  if (!payload || !sig) return "malformed";
-  if (!(await verify(secret, payload, sig))) return "malformed";
+  if (!payload || !sig) return no("malformed");
+  if (!(await verify(secret, payload, sig))) return no("malformed");
   let body: ConfirmIntent;
-  try { body = JSON.parse(new TextDecoder().decode(b64urlDecode(payload))); } catch { return "malformed"; }
-  if (body.exp < Math.floor(now.getTime() / 1000)) return "expired";
-  for (const k of ["capability", "params_hash", "actor", "scope", "revision"] as const) if (body[k] !== intent[k]) return "mismatch";
-  return "ok";
+  try { body = JSON.parse(new TextDecoder().decode(b64urlDecode(payload))); } catch { return no("malformed"); }
+  if (body.exp < Math.floor(now.getTime() / 1000)) return no("expired");
+  for (const k of ["capability", "params_hash", "actor", "scope", "revision"] as const) if (body[k] !== intent[k]) return no("mismatch");
+  return { check: "ok", state: typeof body.state === "string" ? body.state : null };
+}
+
+/** 0.35.17 (cookbook work/active/2026-10-18-3d-grant-noop-followups-2 DoD (a)): on a confirmed execute, refuse when the state
+ *  this call read is not the state its dry_run preview was computed from, so a confirmed preview never executes a different
+ *  change (a no-op preview becoming an elevation). The state is hashed like params (paramsHash): dispatch binds
+ *  paramsHash(HandlerResult.confirmState) into the token at dry_run.
+ *  A direct handler call (no dispatch confirm, so `confirmedState` undefined) is not checked, and that is safe: dispatch is
+ *  the only path from a transport or from cap.ops.undo to a danger handler with a confirm, and undo never reaches a
+ *  capability that binds state — they all declare `inverse.kind: "none"`, so opsUndo throws NO_INVERSE before any handler
+ *  runs (pinned in test/workspace-inheritance.test.ts, 0.35.18 DoD (f)). */
+export async function requireConfirmedState(opts: { confirmedState?: string | null } | undefined, state: Record<string, unknown>, capability: string): Promise<void> {
+  if (opts?.confirmedState === undefined) return;
+  if (opts.confirmedState !== (await paramsHash(state)))
+    throw new CapError("CONFIRM_REQUIRED", "the target changed since the dry_run preview", "Call dry_run again and confirm the new preview.", capability);
 }
 
 export async function paramsHash(params: Record<string, unknown>): Promise<string> {
@@ -83,6 +104,8 @@ export interface MintInput {
   result: Record<string, unknown>;
   mode?: "dry_run" | "execute";
   confirmToken?: string;
+  /** The handler changed nothing (HandlerResult.noop): the receipt is marked noop, carries no undo token and no compensating control. */
+  noop?: boolean;
 }
 
 export function inverseLabel(cap: Capability): string {
@@ -106,8 +129,11 @@ export async function mintReceipt(ctx: Ctx, input: MintInput): Promise<Receipt> 
     trace_id: ctx.traceId,
     at,
   };
-  if (trueInverse) receipt.undo_token = newUndoToken();
-  if (cap.inverse.compensating_control) receipt.compensating_control = cap.inverse.compensating_control.trim();
+  if (input.noop) receipt.noop = true; // 0.35.16 DoD (a): this caller changed nothing — no undo, nothing to compensate
+  else {
+    if (trueInverse) receipt.undo_token = newUndoToken();
+    if (cap.inverse.compensating_control) receipt.compensating_control = cap.inverse.compensating_control.trim();
+  }
   if (input.mode) receipt.mode = input.mode;
   await persistReceipt(ctx, receipt, cap.id, input);
   return receipt;
@@ -121,6 +147,7 @@ async function persistReceipt(ctx: Ctx, r: Receipt, capabilityId: string, input:
     prior: receiptFields(input.priorState, PRIOR_FIELDS[capabilityId] ?? []),
     params: receiptFields(input.params, PARAM_FIELDS[capabilityId] ?? []),
     result_ids: capabilityId === "cap.report.build" ? {} : pickIds(input.result),
+    ...(input.noop ? { noop: true } : {}),
   });
   try {
     await ctx.db
@@ -147,18 +174,22 @@ const PARAM_FIELDS: Record<string, readonly string[]> = {
   "cap.language.archive": ["id"], "cap.language.unarchive": ["id"],
 };
 const PRIOR_FIELDS: Record<string, readonly string[]> = {
+  "cap.auth.me_update": ["id", "display_name"], // undo restores the prior name (null clears) on that account only (rev461 B1)
   "cap.workspace.update": ["name"], "cap.workspace.archive": ["archived_at"], "cap.workspace.unarchive": ["archived_at"],
   "cap.workspace.add_project": ["workspace_id"], "cap.workspace.remove_project": ["workspace_id"],
   // lwc: the prior translation languages as a "lo,th" string (receiptFields keeps scalars only; takeLwc accepts the
   // comma form), present only when the change touched them — so undo restores them (audit round 1: the token was dead).
   "cap.project.update": ["name","organization","lwc"], "cap.project.archive": ["archived_at"], "cap.project.unarchive": ["archived_at"],
-  "cap.assessment.update": ["name","purpose","period","language_id","format","lwc"],
+  "cap.assessment.update": ["name","purpose","period","language_id","format","location","facilitator","lwc"],
   "cap.assessment.set_stage": ["stage"], "cap.assessment.archive": ["archived_at"], "cap.assessment.unarchive": ["archived_at"],
   // Declared self:restore-prior undo requires the previous notes. This is
   // sensitive application data; receipt access and retention need owner review.
   "cap.assessment.notes.update": ["notes_reflection","notes_next_steps"],
   "cap.survey.select": ["state","archived_at"], "cap.survey.deselect": ["state","archived_at"],
   "cap.language.archive": ["archived_at"], "cap.language.unarchive": ["archived_at"],
+  // 0.35.16 (cookbook work/active/2026-10-18-3d-grant-noop-dispatch-receipt DoD (a)): the role the grant held before this call
+  // (on a no-op, the live role it already held), so the receipt records what this caller found, not another writer's change.
+  "cap.grant.update_role": ["role"],
 };
 function receiptFields(source: Record<string,unknown> | undefined, allowed: readonly string[]): Record<string,unknown> | null {
   if(!source) return null;

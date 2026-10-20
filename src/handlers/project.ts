@@ -1,5 +1,6 @@
-// Project grants are exact-scope; no workspace or assessment grant is inherited.
+// Project role = max(direct project grant, grant on the workspace that groups it); assessment grants are never inherited (D9).
 import type { Handler, Role } from "./types";
+import { requireConfirmedState } from "../receipt";
 import { CapError } from "./errors";
 import { countScalar, loadProject, newId, nowIso, patchOf, reqStr, requireUser, type ProjectRow } from "./common";
 import { lwcOf, saveLwc, saveLwcOnCreate, takeLwc } from "./lwc";
@@ -23,9 +24,19 @@ export const create: Handler = async (ctx, params) => {
 };
 export const list: Handler = async (ctx) => {
   const actor = requireUser(ctx);
+  if (ctx.principal.kind === "support") {
+    const { results } = await ctx.db.prepare(`SELECT p.*, COALESCE((SELECT CASE MAX(CASE g.role WHEN 'owner' THEN 3 WHEN 'member' THEN 2 ELSE 1 END) WHEN 3 THEN 'owner' WHEN 2 THEN 'member' WHEN 1 THEN 'viewer' END FROM "grant" g WHERE g.principal_id=?1 AND ((g.scope_type='project' AND g.scope_id=p.id) OR (g.scope_type='workspace' AND g.scope_id=p.workspace_id))),'viewer') AS role,
+      (SELECT g.role FROM "grant" g WHERE g.principal_id=?1 AND g.scope_type='project' AND g.scope_id=p.id) AS direct_role,
+      (SELECT COUNT(*) FROM assessment a WHERE a.project_id=p.id) AS assessment_count,
+      (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id JOIN assessment a ON a.id=s.assessment_id WHERE a.project_id=p.id) AS response_count
+      FROM project p ORDER BY p.created_at`).bind(actor).all<ProjectRow & {direct_role:Role|null;role:Role;assessment_count:number;response_count:number}>();
+    return {result:{projects:results.map(p => ({...view(p,p.role),direct_role:p.direct_role??null,assessment_count:Number(p.assessment_count)||0,response_count:Number(p.response_count)||0}))}};
+  }
 // L1-23 (captain 14:52): read-only child counts for cards, one correlated aggregate per row — no N+1.
-  const { results } = await ctx.db.prepare('SELECT p.*, g.role, (SELECT COUNT(*) FROM assessment a2 WHERE a2.project_id = p.id AND EXISTS (SELECT 1 FROM "grant" gassessment WHERE gassessment.scope_type = \'assessment\' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?)) AS assessment_count, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id JOIN assessment a2 ON a2.id = s.assessment_id WHERE a2.project_id = p.id AND EXISTS (SELECT 1 FROM "grant" gassessment WHERE gassessment.scope_type = \'assessment\' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?)) AS response_count FROM project p JOIN "grant" g ON g.scope_type = ? AND g.scope_id = p.id WHERE g.principal_id = ? ORDER BY p.created_at').bind(actor, actor, "project", actor).all<ProjectRow & {role:Role; assessment_count:number; response_count:number}>();
-  return { result: { projects: results.map(p => ({ ...view(p, p.role), assessment_count: Number(p.assessment_count) || 0, response_count: Number(p.response_count) || 0 })) } };
+  // Effective role = max(project grant, grouping workspace grant) — workspace roles inherit to grouped projects.
+  // direct_role is the caller's own project grant (or null): grouping/ungrouping UI keys on it, mirroring shareAuthority.
+  const { results } = await ctx.db.prepare('SELECT p.*, CASE eff.rk WHEN 3 THEN \'owner\' WHEN 2 THEN \'member\' ELSE \'viewer\' END AS role, (SELECT gd.role FROM "grant" gd WHERE gd.principal_id = ? AND gd.scope_type = \'project\' AND gd.scope_id = p.id) AS direct_role, (SELECT COUNT(*) FROM assessment a2 WHERE a2.project_id = p.id AND EXISTS (SELECT 1 FROM "grant" gassessment WHERE gassessment.scope_type = \'assessment\' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?)) AS assessment_count, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id JOIN assessment a2 ON a2.id = s.assessment_id WHERE a2.project_id = p.id AND EXISTS (SELECT 1 FROM "grant" gassessment WHERE gassessment.scope_type = \'assessment\' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?)) AS response_count FROM project p JOIN (SELECT p0.id AS pid, MAX(CASE g0.role WHEN \'owner\' THEN 3 WHEN \'member\' THEN 2 ELSE 1 END) AS rk FROM project p0 JOIN "grant" g0 ON g0.principal_id = ? AND ((g0.scope_type = \'project\' AND g0.scope_id = p0.id) OR (g0.scope_type = \'workspace\' AND g0.scope_id = p0.workspace_id)) GROUP BY p0.id) eff ON eff.pid = p.id ORDER BY p.created_at').bind(actor, actor, actor, actor).all<ProjectRow & {role:Role; direct_role:Role|null; assessment_count:number; response_count:number}>();
+  return { result: { projects: results.map(p => ({ ...view(p, p.role), direct_role: p.direct_role ?? null, assessment_count: Number(p.assessment_count) || 0, response_count: Number(p.response_count) || 0 })) } };
 };
 export const get: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), { row, role } = await loadProject(ctx, id);
@@ -63,7 +74,9 @@ export const del: Handler = async (ctx, params, opts) => {
   const assessments = await countScalar(ctx, "SELECT COUNT(*) AS n FROM assessment WHERE project_id = ?", id);
   const languages = await countScalar(ctx, "SELECT COUNT(*) AS n FROM language WHERE project_id = ?", id);
   const impact = { affected: [{ project: id, assessments, languages }], irreversible: true, effect: "destructive" as const, retention: "D5 held: only empty projects can be hard-deleted" };
-  if (opts?.dryRun) return { result: { project: view(row, "owner") }, scope: { type: "project", id }, impact };
+  // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (a)): the counts the preview shows are bound into the token.
+  if (opts?.dryRun) return { result: { project: view(row, "owner") }, scope: { type: "project", id }, impact, confirmState: impact.affected[0] };
+  await requireConfirmedState(opts, impact.affected[0], "cap.project.delete");
   if (assessments || languages) throw new CapError("INVALID_PARAMS", "project is not empty", "remove dependent data first");
   await ctx.db.batch([
     ctx.db.prepare('DELETE FROM "grant" WHERE scope_type = ? AND scope_id = ?').bind("project", id),

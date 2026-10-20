@@ -29,11 +29,10 @@ describe("dev bootstrap + dev sign-in fail closed on environment", () => {
 
 // fix/pr15-auth-hardening A4(8): a mis-deploy without the OAUTH_KV binding is a clean 503, not the provider's TypeError.
 describe("OAuth storage absent fails closed before any storage access", () => {
-  const limiter = { limit: async () => ({ success: true }) };
   const ectx = () => ({ waitUntil() {}, passThroughOnException() {} }) as any;
   for (const ENVIRONMENT of ["dev", "production"]) {
     it(`/token, /register and a provider-shaped bearer on /mcp answer 503 temporarily_unavailable (ENVIRONMENT=${ENVIRONMENT})`, async () => {
-      const env = { DB: tripwireDb, SESSION_SECRET: "synthetic-only", ENVIRONMENT, RL_MCP_ANON: limiter, RL_MCP_CEILING: limiter, RL_AUTH: limiter, RL_REDEEM: limiter };
+      const env = { DB: tripwireDb, SESSION_SECRET: "synthetic-only", ENVIRONMENT };
       const hit = (path: string, headers: Record<string, string>, body: string) => worker.fetch(new Request("https://t.invalid" + path, { method: "POST", headers, body }), env as any, ectx());
       for (const r of [
         await hit("/token", { "content-type": "application/x-www-form-urlencoded" }, "grant_type=authorization_code&code=a:b:c&client_id=x"),
