@@ -1,7 +1,366 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.34.2",
+  "current": "0.35.27",
   "versions": [
+    {
+      "version": "0.35.27",
+      "status": "candidate",
+      "notes_path": "releases/0.35.27.md",
+      "sections": {
+        "fixed": [
+          "Report summary: when perspectives disagree about an area with no name, the summary sentence now names it with a dash instead of the word \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
+        ]
+      }
+    },
+    {
+      "version": "0.35.26",
+      "status": "candidate",
+      "notes_path": "releases/0.35.26.md",
+      "sections": {
+        "fixed": [
+          "Full report: an area with no name now shows a dash everywhere it appears — beside its radar spoke, in the score tooltip and in the \"Do the perspectives agree?\" list — instead of the words \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
+        ]
+      }
+    },
+    {
+      "version": "0.35.25",
+      "status": "candidate",
+      "notes_path": "releases/0.35.25.md",
+      "sections": {
+        "fixed": [
+          "Full report radar: an area with a blank name now shows a dash beside its spoke, and the chart draws normally instead of failing to size itself. Charts whose areas all have names are unchanged."
+        ]
+      }
+    },
+    {
+      "version": "0.35.24",
+      "status": "candidate",
+      "notes_path": "releases/0.35.24.md",
+      "sections": {
+        "fixed": [
+          "Full report radar: on a phone every area name around the chart now shows in full, wrapped at whole words (long names such as \"Understanding of the Source\" are no longer cut off at the edge), and the score markers and the 50 and 100 ring numbers are larger so they are easier to read. The desktop chart is unchanged."
+        ]
+      }
+    },
+    {
+      "version": "0.35.23",
+      "status": "candidate",
+      "notes_path": "releases/0.35.23.md",
+      "sections": {
+        "fixed": [
+          "Invitations and roles: an invitation to a workspace or an assessment now stops working once the person who sent it no longer has their own role there, as project invitations already did; and changing someone's role on a project now needs the project's own owner — an owner through the workspace changes access at the workspace, or is added to the project."
+        ]
+      }
+    },
+    {
+      "version": "0.35.21",
+      "status": "candidate",
+      "notes_path": "releases/0.35.21.md",
+      "sections": {
+        "fixed": [
+          "Ownership: when an owner steps down and the invitations that stepping down would cancel change at the moment they confirm, the refusal now says the invitations changed, instead of only saying something changed; they are asked to preview again."
+        ]
+      }
+    },
+    {
+      "version": "0.35.20",
+      "status": "candidate",
+      "notes_path": "releases/0.35.20.md",
+      "sections": {
+        "fixed": [
+          "Ownership and roles: if the invitations that stepping down or lowering someone's role would cancel are swapped for others after the preview (same number, different invitations), confirming no longer applies it; the owner is asked to preview again. An owner who loses their owner role at the moment they confirm a transfer is told they are no longer authorized, instead of being asked to preview again."
+        ]
+      }
+    },
+    {
+      "version": "0.35.19",
+      "status": "candidate",
+      "notes_path": "releases/0.35.19.md",
+      "sections": {
+        "fixed": [
+          "Ownership and template publishing: if the state an owner previewed for an ownership transfer changes in the moment before it is written, or the invitations that stepping down would cancel change after the preview, confirming no longer applies it; they are asked to preview again. Two template versions published at the same moment no longer fail with an internal error; the second is told to preview again."
+        ]
+      }
+    },
+    {
+      "version": "0.35.18",
+      "status": "candidate",
+      "notes_path": "releases/0.35.18.md",
+      "sections": {
+        "fixed": [
+          "Ownership, roles and deletions: if what an owner or support person previewed changes before they confirm (another owner appears, the person's role changes, a template gets a newer version, or something is added to what is being deleted), confirming no longer applies the stale preview; they are asked to preview again. Support audit entries are no longer counted as changes in the usage totals."
+        ]
+      }
+    },
+    {
+      "version": "0.35.17",
+      "status": "candidate",
+      "notes_path": "releases/0.35.17.md",
+      "sections": {
+        "fixed": [
+          "Roles: if a person's role changes after an owner previews a role change for them, confirming that preview no longer applies it; the owner is asked to preview again, and changes that made no difference are no longer counted as changes in the usage totals."
+        ]
+      }
+    },
+    {
+      "version": "0.35.16",
+      "status": "candidate",
+      "notes_path": "releases/0.35.16.md",
+      "sections": {
+        "fixed": [
+          "Roles: when an owner sets a person to the role they already hold, or that someone else gave them at the same moment, the owner's change is now recorded as making no change, and its confirmation no longer describes access being granted."
+        ]
+      }
+    },
+    {
+      "version": "0.35.15",
+      "status": "candidate",
+      "notes_path": "releases/0.35.15.md",
+      "sections": {
+        "fixed": [
+          "Roles: when someone else gives a person the role an owner is setting at the same moment, the owner's change now reports that nothing changed, and its record no longer shows the owner as having made the other person's change or offer to undo it."
+        ]
+      }
+    },
+    {
+      "version": "0.35.14",
+      "status": "candidate",
+      "notes_path": "releases/0.35.14.md",
+      "sections": {
+        "fixed": [
+          "Roles: a role change or removal that is refused because something changed at the same moment no longer cancels any of that person's open invitations. Setting a person to the role they were already given at the same moment by someone else now succeeds instead of reporting a conflict, and a refusal that finds the person still listed reports a conflict to retry instead of \"not found\"."
+        ]
+      }
+    },
+    {
+      "version": "0.35.13",
+      "status": "candidate",
+      "notes_path": "releases/0.35.13.md",
+      "sections": {
+        "fixed": [
+          "Roles: changing a person's role is refused if their role changed since you looked, or if your own role was lowered or removed in the meantime; removing a person is refused if your own role was lowered or removed in the meantime. Removing a person who was removed at the same moment by someone else now reports that the access was not found, instead of reporting it removed."
+        ]
+      }
+    },
+    {
+      "version": "0.35.12",
+      "status": "candidate",
+      "notes_path": "releases/0.35.12.md",
+      "sections": {
+        "fixed": [
+          "Roles: if a person becomes an owner at the same moment another owner lowers their role or removes them, the change is refused as for any owner, and the new owner keeps their role and their open invitations."
+        ]
+      }
+    },
+    {
+      "version": "0.35.11",
+      "status": "candidate",
+      "notes_path": "releases/0.35.11.md",
+      "sections": {
+        "fixed": [
+          "Invitations: if a person's role at a place is lowered or removed at the same moment they accept an invitation there, accepting no longer gives them back the higher role they just lost; they get the invitation's role, or keep a higher role they still hold."
+        ]
+      }
+    },
+    {
+      "version": "0.35.10",
+      "status": "candidate",
+      "notes_path": "releases/0.35.10.md",
+      "sections": {
+        "fixed": [
+          "Invitations: accepting an invitation no longer grants access when the invitation is revoked, expires or loses its sender's standing at the same moment it is accepted; a revoked invitation stays revoked and the person gets the same refusal as for an invitation that was already revoked, expired or unbacked; and accepting an invitation never lowers a higher role the person already holds or was given at that same moment."
+        ]
+      }
+    },
+    {
+      "version": "0.35.9",
+      "status": "candidate",
+      "notes_path": "releases/0.35.9.md",
+      "sections": {
+        "fixed": [
+          "Invitations: an owner invitation, or an invitation to a project, is no longer created when the sender's role is removed or lowered at the same moment it is sent; an invitation counts as expired from its exact expiry time on, the same way when it is accepted and when a role change cancels open invitations; and, to state the 0.35.8 change precisely, it cancels only the invitations whose standing depends on the sender's own role at that place (owner invitations, and any invitation to a project), so a member's or viewer's workspace or assessment invitation is left as it was while that question stays on hold."
+        ]
+      }
+    },
+    {
+      "version": "0.35.8",
+      "status": "candidate",
+      "notes_path": "releases/0.35.8.md",
+      "sections": {
+        "fixed": [
+          "Invitations: removing or lowering someone's role, or stepping down as owner, now also cancels the open invitations that person sent at that workspace, project or assessment and could no longer send, so those invitations cannot become valid again if the role comes back. The 0.35.6 promise that a cancelled invitation cannot become valid again now holds in general, not only after a re-invite. The result (a dry run too, where the action has one) and its log report how many invitations were cancelled."
+        ]
+      }
+    },
+    {
+      "version": "0.35.7",
+      "status": "candidate",
+      "notes_path": "releases/0.35.7.md",
+      "sections": {
+        "fixed": [
+          "Invitations: a re-invite cancels an earlier owner invitation only when the new invitation is also for owner, leaves expired invitations as expired instead of marking them cancelled, and the invite result (including a dry run) and its log now report how many earlier invitations it cancelled."
+        ]
+      }
+    },
+    {
+      "version": "0.35.6",
+      "status": "candidate",
+      "notes_path": "releases/0.35.6.md",
+      "sections": {
+        "fixed": [
+          "Invitations: a re-invite that sends a new invitation now cancels the person's earlier invitation that could no longer be accepted, so that earlier invitation cannot become valid again if its sender later gets their own role on the project back."
+        ]
+      }
+    },
+    {
+      "version": "0.35.5",
+      "status": "candidate",
+      "notes_path": "releases/0.35.5.md",
+      "sections": {
+        "fixed": [
+          "Invitations: an invitation that can no longer be accepted (its sender no longer has their own role on that project, or an owner invitation not sent by a direct owner) no longer shows in your invitations list or in a project's pending invitations, and inviting that person again now sends a fresh invitation instead of \"nothing was sent again\". An older invitation you sent to yourself no longer shows in your invitations list and cannot be accepted, but it can still show in pending invitations and can still count as already sent when that address is invited again.",
+          "Permissions page for a project: the line saying your role comes from the workspace now shows only when the project is in a workspace; the page also reads the project and its people at the same time instead of one after the other.",
+          "Invitation link opened in a survey participant's session: it now asks you to sign in with the invited address and keeps the link, instead of saying the invitation is not available."
+        ]
+      }
+    },
+    {
+      "version": "0.35.4",
+      "status": "candidate",
+      "notes_path": "releases/0.35.4.md",
+      "sections": {
+        "fixed": [
+          "Permissions page for a project: if your role there comes only from the workspace, the page no longer offers Invite or Revoke invitation (the server refuses both since 0.35.3) and one line points you to the workspace's permissions instead.",
+          "Invitations: a project invitation can be accepted only while the person who sent it still has their own role on that project (member or above). Invitations sent from a workspace-only role before 0.35.3, or by someone since removed from the project, are no longer honoured; workspace invitations are unchanged.",
+          "API contract: the roles text for cap.grant.invite and cap.grant.revoke_invitation now says project scope needs a direct project grant."
+        ]
+      }
+    },
+    {
+      "version": "0.35.3",
+      "status": "candidate",
+      "notes_path": "releases/0.35.3.md",
+      "sections": {
+        "fixed": [
+          "Permissions: inviting someone to one project, or revoking an invitation there, now needs your own role on that project. A role that comes only from the project's workspace is refused with a hint to invite at the workspace instead, so removing someone from a workspace also ends any project access they handed on. People with no role at the project still see \"not found\"; workspace invitations are unchanged."
+        ]
+      }
+    },
+    {
+      "version": "0.35.2",
+      "status": "candidate",
+      "notes_path": "releases/0.35.2.md",
+      "sections": {
+        "fixed": [
+          "Sign-in sessions: a new session's expiry is now exactly its lifetime after its creation time. Both timestamps came from two separate clock reads, so they could differ by 1 ms, which made the 30-day sign-in-link session test fail intermittently on CI."
+        ]
+      }
+    },
+    {
+      "version": "0.35.1",
+      "status": "candidate",
+      "notes_path": "releases/0.35.1.md",
+      "sections": {
+        "fixed": [
+          "Docs: the rules text for archiving an assessment (`cap.assessment.archive`) no longer says \"no inheritance\"; it says archiving needs a direct assessment grant (member+) and then member+ at the assessment's project (effective project role), so a workspace role alone never reaches it."
+        ]
+      }
+    },
+    {
+      "version": "0.35.0",
+      "status": "candidate",
+      "notes_path": "releases/0.35.0.md",
+      "sections": {
+        "added": [
+          "Your account can carry an optional **display name**: asked once after you sign in (skippable with \"Not now\", Escape or a click outside), changeable any time from the account menu (\"Your name…\"). Following the design contract (`design/CONTRACT.md` § 4–5), the home page title greets you once, \"Welcome, Ana\", replacing the separate \"Projects\" title, and the header shows just your name as the account-menu trigger; with no name set the title reads \"Welcome, <your email>\". The question never opens over the invitation screen. `GET /v2/me` returns it as `principal.display_name` and the new `PATCH /v2/me` (`cap.auth.me_update`, undoable) sets or clears it (at most 80 characters, no `<` `>`, control, zero-width or direction-override characters). Production promotion step 0: apply D1 migration `0016_display_name.sql` (additive nullable column; until it is applied `/v2/me` answers `display_name: null`)."
+        ],
+        "fixed": [
+          "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first.",
+          "Docs search: every word a capability row carries still counts as a docs word except JSON Schema keyword names and types — including field names under a composed or open-ended schema (\"link fragment\" finds cap.survey.issue_link), roles text (\"share results\" finds cap.results.summary) and the other capability fields (\"withdraw invitation\" finds cap.grant.revoke_invitation) — so those phrases find their capabilities as they did in 0.34.10."
+        ]
+      }
+    },
+    {
+      "version": "0.34.10",
+      "status": "candidate",
+      "notes_path": "releases/0.34.10.md",
+      "sections": {
+        "fixed": [
+          "Docs search: plain-language phrases such as \"invite someone to my assessment\" and \"undo the last thing\" now find their capability instead of returning no results; a query made mostly of words the docs never use (such as \"xyzzy flurble create\" or a guessed parameter name like \"feedback inventedparam\") still returns no results."
+        ]
+      }
+    },
+    {
+      "version": "0.34.9",
+      "status": "candidate",
+      "notes_path": "releases/0.34.9.md",
+      "sections": {
+        "fixed": [
+          "Permissions page for a project: the scope line now reads \"If this project is in a workspace, roles on that workspace also apply here.\" so it stays true for a new project that is not in a workspace yet."
+        ]
+      }
+    },
+    {
+      "version": "0.34.8",
+      "status": "candidate",
+      "notes_path": "releases/0.34.8.md",
+      "sections": {
+        "fixed": [
+          "Permissions page and MCP panel Permissions view: the scope line now says what is true since workspace roles inherit (a workspace role reaches its grouped projects; assessments are shared one by one) instead of \"nothing is inherited\". The permissions docs topic no longer says \"No inheritance\".",
+          "Permissions page: the change-role select starts on \"Change to…\" and lists only the other roles, so each row no longer shows its role twice."
+        ]
+      }
+    },
+    {
+      "version": "0.34.7",
+      "status": "candidate",
+      "notes_path": "releases/0.34.7.md",
+      "sections": {
+        "fixed": [
+          "Permissions confirm on a phone: opening Details no longer widens the page. The Affected list now wraps inside the confirm, so the page stays 390 wide with no sideways scroll (Permissions page and MCP panel Permissions view)."
+        ]
+      }
+    },
+    {
+      "version": "0.34.6",
+      "status": "candidate",
+      "notes_path": "releases/0.34.6.md",
+      "sections": {
+        "fixed": [
+          "Setup step 1 on a phone: the sticky Cancel/Continue strip is now opaque with a hairline top edge, so the Location, Facilitator and other fields no longer show through it while you scroll. A focused field still scrolls clear of the strip, as before."
+        ]
+      }
+    },
+    {
+      "version": "0.34.5",
+      "status": "candidate",
+      "notes_path": "releases/0.34.5.md",
+      "sections": {
+        "changed": [
+          "Report build is faster: one build now attests the captured responses once and reuses that result for the commit, the post-write read and the stored-report check, where it used to attest the same bytes four times. Any byte difference between those reads is still attested in full, and every digest, report key, payload hash and validation check still runs. A capture handed in from outside a build is still re-attested from its raw bytes. Report bytes and digests are unchanged."
+        ]
+      }
+    },
+    {
+      "version": "0.34.4",
+      "status": "candidate",
+      "notes_path": "releases/0.34.4.md",
+      "sections": {
+        "fixed": [
+          "The HTTP contract (`contract/openapi.yaml`) now says that starting an assessment (cap.assessment.create) takes the optional location and facilitator (string; omitted or empty stores nothing), as cap.assessment.update and the capability list already did."
+        ]
+      }
+    },
+    {
+      "version": "0.34.3",
+      "status": "candidate",
+      "notes_path": "releases/0.34.3.md",
+      "sections": {
+        "changed": [
+          "Inviting someone: the button is \"Invite\", and the confirm opens right under it, naming the address you typed and the role, with Confirm and Cancel. The separate \"Preview invitation\" step and the confirm at the bottom of the page are gone (Permissions page, collaborators panel and MCP panel)."
+        ]
+      }
+    },
     {
       "version": "0.34.2",
       "status": "candidate",

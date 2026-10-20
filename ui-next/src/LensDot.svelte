@@ -10,7 +10,7 @@
   if (typeof lens !== "string" || !Object.hasOwn(LENSES, lens)) throw new TypeError(`LensDot: unknown lens "${lens}" (team | community | church)`);
   if (label !== undefined && !(typeof label === "string" && label.trim())) throw new TypeError("LensDot: label must be non-empty text");
   if (decorative && label !== undefined) throw new TypeError("LensDot: a decorative dot takes no label");
-  const name = decorative ? undefined : label === undefined ? LENSES[lens] : label.trim();
+  const name = $derived(decorative ? undefined : label === undefined ? LENSES[lens] : label.trim());
 </script>
 
 <span class={kind === "pt" ? "pt" : "lensdot"} data-lens={lens} role={decorative ? undefined : "img"} aria-label={name} aria-hidden={decorative ? "true" : undefined}></span>

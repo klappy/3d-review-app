@@ -13,6 +13,7 @@ import OAuthProvider, { OAuthError, type OAuthProviderOptions } from "@cloudflar
 import app from "./index";
 import { resolvePrincipal } from "./auth";
 import { allow, clientIp, RATE_LIMIT_MESSAGE, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
+import { isConstraintError } from "./errors";
 import { OAUTH_SCOPE, oauthPrincipals, principalFromProps, type OAuthEnv, type OAuthProps, type ExternalProps } from "./oauth";
 
 const apiHandler = {
@@ -27,8 +28,6 @@ const apiHandler = {
   },
 };
 
-/** SQLite constraint failure as D1 reports it (miniflare and production both surface the SQLite text). */
-const CONSTRAINT = /UNIQUE constraint failed|PRIMARY KEY constraint failed|SQLITE_CONSTRAINT/i;
 /** Provider options for one env (module-private; the WeakMap factory below is the only builder). */
 function providerOptions(env: OAuthEnv): OAuthProviderOptions<OAuthEnv> {
   const options: OAuthProviderOptions<OAuthEnv> = {
@@ -62,8 +61,7 @@ function providerOptions(env: OAuthEnv): OAuthProviderOptions<OAuthEnv> {
         // bind error) must not look like invalid_grant — a client treats that as terminal and discards a code that was never
         // burnt. The provider has not written the grant yet, so after a 503 the same code is still redeemable (Bugbot
         // 4032844495; review 5708128737).
-        const msg = `${e instanceof Error ? e.message : String(e)} ${e instanceof Error && e.cause instanceof Error ? e.cause.message : ""}`;
-        if (CONSTRAINT.test(msg)) throw new OAuthError("invalid_grant", { description: "Authorization code already used" });
+        if (isConstraintError(e)) throw new OAuthError("invalid_grant", { description: "Authorization code already used" });
         throw new OAuthError("temporarily_unavailable", { description: "authorization storage is temporarily unavailable", statusCode: 503 });
       }
     },

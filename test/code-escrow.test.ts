@@ -48,10 +48,10 @@ describe("one-time code escrow and confirmed release",()=>{
     expect(JSON.stringify(dry)).not.toMatch(/"code":/);
     const token=dry.result.confirm_token as string;
     const intent={capability:"cap.survey.export_codes",params_hash:await paramsHash(params),actor:"person_mara",scope:"assessment:assess_tavo_collect",revision:sourceSha};
-    expect(await checkConfirmToken("synthetic-confirm-secret",token,{...intent,actor:"person_ion"},at)).toBe("mismatch");
-    expect(await checkConfirmToken("synthetic-confirm-secret",token,{...intent,scope:"assessment:other"},at)).toBe("mismatch");
-    expect(await checkConfirmToken("synthetic-confirm-secret",token,{...intent,params_hash:await paramsHash({...params,ids:[ids[0]]})},at)).toBe("mismatch");
-    expect(await checkConfirmToken("synthetic-confirm-secret",token,intent,new Date(at.getTime()+301_000))).toBe("expired");
+    expect((await checkConfirmToken("synthetic-confirm-secret",token,{...intent,actor:"person_ion"},at)).check).toBe("mismatch");
+    expect((await checkConfirmToken("synthetic-confirm-secret",token,{...intent,scope:"assessment:other"},at)).check).toBe("mismatch");
+    expect((await checkConfirmToken("synthetic-confirm-secret",token,{...intent,params_hash:await paramsHash({...params,ids:[ids[0]]})},at)).check).toBe("mismatch");
+    expect((await checkConfirmToken("synthetic-confirm-secret",token,intent,new Date(at.getTime()+301_000))).check).toBe("expired");
     const wrongActor=await execute(context("person_ion"),"cap.survey.export_codes",params,{tool:"danger",mode:"execute",confirm_token:token});
     expect(wrongActor).toMatchObject({ok:false,error:{code:"NOT_AUTHORIZED_AT_SCOPE"}});
     const expired=await execute(context("person_mara",new Date(at.getTime()+301_000)),"cap.survey.export_codes",params,{tool:"danger",mode:"execute",confirm_token:token});

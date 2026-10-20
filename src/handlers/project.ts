@@ -1,5 +1,6 @@
 // Project role = max(direct project grant, grant on the workspace that groups it); assessment grants are never inherited (D9).
 import type { Handler, Role } from "./types";
+import { requireConfirmedState } from "../receipt";
 import { CapError } from "./errors";
 import { countScalar, loadProject, newId, nowIso, patchOf, reqStr, requireUser, type ProjectRow } from "./common";
 import { lwcOf, saveLwc, saveLwcOnCreate, takeLwc } from "./lwc";
@@ -65,7 +66,9 @@ export const del: Handler = async (ctx, params, opts) => {
   const assessments = await countScalar(ctx, "SELECT COUNT(*) AS n FROM assessment WHERE project_id = ?", id);
   const languages = await countScalar(ctx, "SELECT COUNT(*) AS n FROM language WHERE project_id = ?", id);
   const impact = { affected: [{ project: id, assessments, languages }], irreversible: true, effect: "destructive" as const, retention: "D5 held: only empty projects can be hard-deleted" };
-  if (opts?.dryRun) return { result: { project: view(row, "owner") }, scope: { type: "project", id }, impact };
+  // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (a)): the counts the preview shows are bound into the token.
+  if (opts?.dryRun) return { result: { project: view(row, "owner") }, scope: { type: "project", id }, impact, confirmState: impact.affected[0] };
+  await requireConfirmedState(opts, impact.affected[0], "cap.project.delete");
   if (assessments || languages) throw new CapError("INVALID_PARAMS", "project is not empty", "remove dependent data first");
   await ctx.db.batch([
     ctx.db.prepare('DELETE FROM "grant" WHERE scope_type = ? AND scope_id = ?').bind("project", id),

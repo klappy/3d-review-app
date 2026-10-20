@@ -6,15 +6,15 @@
   let { label, variant = "secondary", icon, ariaLabel, lead, trail, lg = false, block = false, href, ...rest } = $props();
   if (!Object.hasOwn(VARIANT_CLASS, variant)) throw new TypeError(`Button: unknown variant "${variant}"`);
   if ("disabled" in rest) throw new TypeError("Button: the disabled state is not in the ported contract yet");
-  const iconOnly = icon !== undefined && icon !== null;
-  const name = typeof ariaLabel === "string" ? ariaLabel.trim() : "";
+  const iconOnly = $derived(icon !== undefined && icon !== null);
+  const name = $derived(typeof ariaLabel === "string" ? ariaLabel.trim() : "");
   if (iconOnly && !name) throw new TypeError("Button: an icon-only button needs an aria-label");
   if (iconOnly && (label || lead || trail)) throw new TypeError("Button: an icon-only button takes no label, lead or trail");
   if (!iconOnly && !(typeof label === "string" && label.trim())) throw new TypeError("Button: a button needs a label");
   // Icons are decorative (the label or aria-label names the button): hide every element child from assistive tech,
   // as button.js decorative() did. Svelte attachment on the button/link itself; no markup is parsed.
   const decorate = (el) => { for (const c of el.children) c.setAttribute("aria-hidden", "true"); };
-  const cls = ["btn", VARIANT_CLASS[variant], iconOnly && "btn-icon", lg && "btn-lg", block && "btn-block"].filter(Boolean).join(" ");
+  const cls = $derived(["btn", VARIANT_CLASS[variant], iconOnly && "btn-icon", lg && "btn-lg", block && "btn-block"].filter(Boolean).join(" "));
 </script>
 
 {#if href}

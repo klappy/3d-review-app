@@ -51,7 +51,7 @@ export function treeNodes(routes, known = {}) {
 }
 
 // Ancestry/title/role for the current route from loaded data only. `current` is state.current (assessment) or null.
-export function shellModel({ route, routes, principal, known = {}, current = null, page = null, identityLabel = '', sectionLabel, contextCollapsible = false }) {
+export function shellModel({ route, routes, principal, known = {}, current = null, page = null, identityLabel = '', sectionLabel, contextCollapsible = false, welcome = false }) {
   const kind = route?.kind || 'entry';
   const nodes = treeNodes(routes, { ...known, page });
   const projects = known.projects || [];
@@ -61,7 +61,7 @@ export function shellModel({ route, routes, principal, known = {}, current = nul
   const anc = (label, href, level) => ({ label: String(label ?? ''), href, visible: true, level });
   const status = page ? mapStatus(page.model?.status) : 'ready';
   if (kind === 'workspaces') { title = 'Workspaces'; eyebrow = 'Optional grouping'; currentHref = routes.workspaces; ancestors = [anc('Workspaces', routes.workspaces, 'page')]; }
-  else if (kind === 'projects') { title = 'Projects'; eyebrow = 'Your projects'; currentHref = routes.projects; ancestors = [anc('Projects', routes.projects, 'page')]; }
+  else if (kind === 'projects') { title = 'Projects'; eyebrow = welcome ? '' : 'Your projects'; /* rev461 design-lens § 5: the welcome H1 is the title; no label above it */ currentHref = routes.projects; ancestors = [anc('Projects', routes.projects, 'page')]; }
   else if (kind === 'workspace') { const w = findWorkspace(route.id); currentHref = routes.workspace(route.id); title = status === 'ready' ? String(w?.name ?? '') : ''; eyebrow = 'Workspace'; role = roleLabel(w?.role); ancestors = [anc('Workspaces', routes.workspaces), ...(w ? [anc(w.name, currentHref, 'workspace')] : [])]; expanded = ['w:' + route.id]; }
   else if (kind === 'project') { const p = findProject(route.id); const w = p?.workspace_id ? findWorkspace(p.workspace_id) : null; currentHref = routes.project(route.id); title = status === 'ready' ? String(p?.name ?? '') : ''; eyebrow = 'Project'; role = roleLabel(p?.role); ancestors = [anc('Projects', routes.projects), ...(w ? [anc(w.name, routes.workspace(w.id), 'workspace')] : []), ...(p ? [anc(p.name, currentHref, 'project')] : [])]; expanded = [...(w ? ['w:' + w.id] : []), 'p:' + route.id]; }
   else if ((kind === 'assessment' || kind === 'survey') && current) { const a = current.assessment; const p = findProject(a.project_id); const w = p?.workspace_id ? findWorkspace(p.workspace_id) : null; currentHref = routes.assessment(a.id); title = String(a.name ?? ''); eyebrow = 'Assessment'; role = roleLabel(a.granted_role || a.role); /* S12a: a completed review renders content locked (a.role viewer); the badge names the role as granted */

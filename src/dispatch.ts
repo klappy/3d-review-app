@@ -1,7 +1,6 @@
 import { fail, ok } from "./envelope";
 import type { Ctx, ScopeType } from "./handlers/types";
-import { CapError } from "./handlers/types";
-import { CapError as HandlerCapError } from "./handlers/errors";
+import { CapError } from "./errors";
 import { handlers } from "./handlers";
 import { authorize, targetScope } from "./policy";
 import { byId, sourceSha, toolForClass, type Tool } from "./registry";
@@ -76,16 +75,22 @@ export async function execute(
       scope: `${scope.type}:${scope.id}`,
       revision: sourceSha,
     } : undefined;
+    let confirmedState: string | null | undefined;
     if (danger && mode === "execute") {
       if (!options.confirm_token) throw new CapError("CONFIRM_REQUIRED", "confirmation token required", "Call dry_run with the same params first.", capabilityId);
-      const check = await checkConfirmToken(ctx.env.SESSION_SECRET, options.confirm_token, intent!, ctx.now());
+      const { check, state } = await checkConfirmToken(ctx.env.SESSION_SECRET, options.confirm_token, intent!, ctx.now());
       if (check !== "ok") throw new CapError(check === "expired" ? "CONFIRM_EXPIRED" : "CONFIRM_REQUIRED", "confirmation expired or does not match this intent", "Call dry_run again.", capabilityId);
+      // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (b)): the state comes from the verified payload.
+      confirmedState = state;
     }
 
-    const handled = await handlers[capabilityId](ctx, params, danger ? { dryRun: mode === "dry_run" } : undefined);
+    // 0.35.17 (cookbook work/active/2026-10-18-3d-grant-noop-followups-2 DoD (a)): a confirmed execute hands the handler the state
+    // hash its dry_run bound into the token; a handler that binds state refuses when its own read differs (requireConfirmedState).
+    const handled = await handlers[capabilityId](ctx, params, danger ? (mode === "dry_run" ? { dryRun: true } : { dryRun: false, confirmedState }) : undefined);
     if (danger && mode === "dry_run") {
       if (!handled.impact) throw new Error(`dry_run missing impact: ${capabilityId}`);
-      const { token, expires_in } = await mintConfirmToken(ctx.env.SESSION_SECRET, intent!, ctx.now());
+      const bound = handled.confirmState ? { ...intent!, state: await paramsHash(handled.confirmState) } : intent!;
+      const { token, expires_in } = await mintConfirmToken(ctx.env.SESSION_SECRET, bound, ctx.now());
       return (outcome = ok(capabilityId, { ...handled.result, impact: handled.impact, confirm_token: token, expires_in }, ctx.traceId));
     }
     const receipt = cap.class === "read" ? undefined : await mintReceipt(ctx, {
@@ -96,13 +101,17 @@ export async function execute(
       result: handled.result,
       mode,
       confirmToken: options.confirm_token,
+      // 0.35.16 (cookbook work/active/2026-10-18-3d-grant-noop-dispatch-receipt DoD (a)): a handler that changed nothing gets a
+      // receipt marked no-op, with no undo token and no compensating control. 0.35.17 (work/active/2026-10-18-3d-grant-noop-followups-2
+      // DoD (c)): read from the dedicated HandlerResult.noop, never from the user-facing result payload.
+      noop: handled.noop === true,
     });
     return (outcome = ok(capabilityId, handled.result, ctx.traceId, receipt));
   } catch (e) {
-    if (!(e instanceof CapError || e instanceof HandlerCapError)) throw e;
+    if (!(e instanceof CapError)) throw e; // 0.35.19 DoD (e): one class (src/errors.ts); handlers/types re-exports it
     // RATE_LIMITED carries retry_after in the envelope so an MCP client (HTTP 200 + envelope, no header) can back off
     // without parsing a second shape (review #12-6). The HTTP twin also sends the retry-after header.
-    return (outcome = fail(e.code, e.message, e.hint, e instanceof CapError ? e.docs : undefined, ctx.traceId,
+    return (outcome = fail(e.code, e.message, e.hint, e.docs, ctx.traceId,
       e.code === "RATE_LIMITED" ? { retry_after: e.retryAfter ?? RATE_LIMIT_WINDOW_SECONDS } : undefined));
   } finally {
     ctx.log = log;

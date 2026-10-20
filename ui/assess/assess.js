@@ -58,7 +58,7 @@ function syncShell(page = null) {
   // A workspace page has already loaded its workspace: keep it in the same identity-scoped cache workspaceFor() uses (cleared by
   // resetIdentity) so later crumbs can name it without a discovery read. Data only; never a new request.
   if (page?.kind === 'workspace' && page.model?.status === 'loaded' && page.model.workspace?.id) state.workspaces.set(page.model.workspace.id, { id: page.model.workspace.id, name: page.model.workspace.name, role: page.model.workspace.role, projects: (page.model.projects || []).map(x => x.id) });
-  kit.update(v3Model(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow() })));
+  kit.update(v3Model(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow(), welcome: !!(displayName(state.principal?.display_name) || state.accountEmail) })));
   placeDemoNotice(); // Bugbot 4073693755: the shell repaint preserves only its content/header hosts; the disclosure is restored by the controller
 }
 // Demo disclosure (Bugbot 4073693755): ONE controller-owned node, built once, placed before the content element and re-placed by the
@@ -663,6 +663,7 @@ async function render() {
   // B02: signed in, "/" is the current work (#projects), never the public welcome with its Sign in choice.
   if (landsOnWork(route(location.hash), state.principal)) { try { history.replaceState(null, '', location.pathname + location.search + '#projects'); } catch {} }
   const gen = ++generation, r = route(location.hash);
+  askDeferredName(r.kind); // rev461 B1: the invitee who accepted and left #invite is asked now, once
   if (wizardHandle) { try { wizardHandle.destroy(); } catch {} wizardHandle = null; }
   currentShareRoute();
   // K3a root lifecycle (kit only): the shell reflects the new route from data already held, and the previous view is destroyed
@@ -766,20 +767,36 @@ let accountBusy = false;
 function accountStatus(message = '') { const el = document.getElementById('account-status'); if (el) el.textContent = message; }
 function accountControls(visible, busy = false) {
   const actions = document.getElementById('account-actions'); if (actions) actions.hidden = !visible;
-  for (const id of ['account-signout', 'account-switch', 'account-switch-confirm']) { const el = document.getElementById(id); if (el) el.disabled = busy; }
+  for (const id of ['account-signout', 'account-switch', 'account-switch-confirm', 'account-name']) { const el = document.getElementById(id); if (el) el.disabled = busy; }
 }
+// Greet by name (captain ruling a1, 2026-10-02): /v2/me carries the account's optional display_name; the header greets by it,
+// with the email (or "Signed in") as the fallback when none is set. Same rules as the server (src/handlers/platform.ts cleanDisplayName).
+const NAME_MAX = 80;
+function displayName(v) {
+  if (typeof v !== 'string') return '';
+  const s = v.normalize('NFC').replace(/\s+/g, ' ').trim();
+  return s && [...s].length <= NAME_MAX && !/[<>\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/.test(s) ? s : '';
+}
+let accountSeq = 0; // rev461 W1: only the latest greeting call may write the header
 async function loadAccountEmail() {
+  const seq = ++accountSeq;
   if (demo) { who.textContent = 'Sample account'; accountControls(false); return; }
   const identity = identityGeneration, credential = token;
+  const name = displayName(state.principal?.display_name);
+  // CONTRACT § 4: the header shows the name only (the account-menu trigger); the greeting is the home H1, never a second "Hi".
+  if (name) { who.textContent = name; accountControls(true, accountBusy); return; }
   who.textContent = 'Checking account…'; accountControls(true, accountBusy);
   try {
     const headers = { accept: 'application/json' }; if (credential) headers.authorization = `Bearer ${credential}`;
     const response = await fetch('/v2/auth/access?view=account', { headers, credentials: 'same-origin', redirect: 'error', cache: 'no-store' });
     const value = response.ok ? await response.json() : null;
-    if (identity !== identityGeneration || credential !== token) return;
+    if (identity !== identityGeneration || credential !== token || seq !== accountSeq || displayName(state.principal?.display_name)) return; // W1: a later call or a saved name wins
     // U03 (lanes-1321): sandbox and cookie sessions have no account view; say "Signed in", never a failure sentence.
-    who.textContent = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? `Account: ${value.email}` : 'Signed in';
-  } catch { if (identity === identityGeneration && credential === token) who.textContent = 'Signed in'; }
+    const email = typeof value?.email === 'string' && value.email.trim() && [...value.email].length <= 254 ? value.email.trim() : '';
+    who.textContent = email || 'Signed in'; // design/CONTRACT.md:68 (§ 4): the header shows who is signed in, no "Account:" label
+    // CONTRACT § 4 fallback: with no saved name the home title reads "Welcome, <email>".
+    if (email && state.accountEmail !== email) { state.accountEmail = email; if (route(location.hash).kind === 'projects') void render(); }
+  } catch { if (identity === identityGeneration && credential === token && seq === accountSeq && !displayName(state.principal?.display_name)) who.textContent = 'Signed in'; }
 }
 // B44 (captain report 20:39): ONE sign-out for Sign out, Use another account and every caller (ctx.signOut). It never sends the
 // person to the Access team-domain page: that logout shows only "Failed to log out." when there is no Access session
@@ -820,8 +837,66 @@ async function signOut(switchAccount = false) {
     if (current()) { accountBusy = false; accountControls(!!state.principal); }
   }
 }
+// Your name (captain a1): asked once after sign-in while the account has none (skippable; "Not now" is remembered on this
+// device per account), and editable any time from the account menu. Saved through PATCH /v2/me (cap.auth.me_update).
+const NAME_SKIP_KEY = id => `3dr.name.skip:${id}`;
+function openNameDialog() {
+  const dialog = document.getElementById('account-name-dialog'), input = document.getElementById('account-name-input');
+  if (!dialog || !input || !state.principal || demo) return;
+  input.value = displayName(state.principal.display_name);
+  const status = document.getElementById('account-name-status'); if (status) status.textContent = '';
+  try { dialog.showModal(); } catch { return; }
+  try { input.focus(); } catch {}
+}
+function maybeAskName() {
+  const pr = state.principal;
+  if (demo || !pr || (pr.kind && pr.kind !== 'user' && pr.kind !== 'support') || displayName(pr.display_name)) return;
+  try { if (localStorage.getItem(NAME_SKIP_KEY(pr.id))) return; } catch {}
+  openNameDialog();
+}
+// rev461 B1: a first sign-in that lands on #invite or #entry is not asked there (W1); the ask waits for the first later render on a
+// work route (accepting lands on #projects through hashchange → render, never boot). Once per identity; resetIdentity clears it.
+let nameAskDeferred = false;
+function askNameAfterLanding(kind) { if (['invite', 'entry'].includes(kind)) { nameAskDeferred = true; return; } nameAskDeferred = false; maybeAskName(); }
+function askDeferredName(kind) { if (nameAskDeferred && !['invite', 'entry'].includes(kind)) askNameAfterLanding(kind); }
+// rev461 F1: only a click outside the dialog's box is the backdrop. A click in the dialog's own padding also targets the dialog
+// element, so the target alone is not enough (CONTRACT § 5: the backdrop means "Not now", the panel does not).
+function isBackdropClick(dialog, event) {
+  if (!dialog || event?.target !== dialog || typeof dialog.getBoundingClientRect !== 'function') return false;
+  const r = dialog.getBoundingClientRect(), x = event.clientX, y = event.clientY;
+  return x < r.left || x > r.right || y < r.top || y > r.bottom;
+}
+let nameSaving = false; // rev461 W2: one PATCH at a time; Save is disabled while it runs
+async function saveName(event) {
+  event?.preventDefault?.();
+  const dialog = document.getElementById('account-name-dialog'), input = document.getElementById('account-name-input'), status = document.getElementById('account-name-status');
+  if (!state.principal || !input || nameSaving) return;
+  const raw = input.value.replace(/\s+/g, ' ').trim(), name = displayName(raw);
+  if (raw && !name) { if (status) status.textContent = `Use up to ${NAME_MAX} characters, without < or >.`; return; }
+  const identity = identityGeneration, save = document.getElementById('account-name-save');
+  nameSaving = true; if (save) save.disabled = true;
+  try {
+    const r = await api('/v2/me', { method: 'PATCH', body: { display_name: name || null } });
+    if (identity !== identityGeneration) return;
+    state.principal = { ...state.principal, display_name: r?.principal?.display_name ?? null };
+    dialog?.close(); void loadAccountEmail();
+    if (route(location.hash).kind === 'projects') void render(); // rev461 W2: the home "Welcome, <name>" line follows the save
+  } catch { if (status) status.textContent = 'Your name could not be saved. Try again.'; }
+  finally { nameSaving = false; if (save) save.disabled = false; }
+}
+function skipName() {
+  const pr = state.principal; if (pr) { try { localStorage.setItem(NAME_SKIP_KEY(pr.id), '1'); } catch {} }
+  document.getElementById('account-name-dialog')?.close();
+}
 function bindAccountControls() {
   document.getElementById('account-signout')?.addEventListener('click', () => signOut());
+  document.getElementById('account-name')?.addEventListener('click', () => { if (!accountBusy && state.principal) openNameDialog(); });
+  document.getElementById('account-name-form')?.addEventListener('submit', saveName);
+  document.getElementById('account-name-skip')?.addEventListener('click', skipName);
+  // CONTRACT § 5: Escape and the backdrop mean "Not now" (rev461 N4).
+  const nameDialog = document.getElementById('account-name-dialog');
+  nameDialog?.addEventListener('cancel', event => { event.preventDefault(); skipName(); });
+  nameDialog?.addEventListener('click', event => { if (isBackdropClick(nameDialog, event)) skipName(); }); // rev461 F1
   const dialog = document.getElementById('account-switch-dialog');
   document.getElementById('account-switch')?.addEventListener('click', () => { if (!accountBusy && state.principal) dialog?.showModal(); });
   document.getElementById('account-switch-cancel')?.addEventListener('click', () => dialog?.close());
@@ -851,7 +926,7 @@ function ctxFor(extra = {}) {
   const stale = () => Promise.reject(Object.assign(new Error('This view is no longer current.'), { code: 'STALE_VIEW' }));
   // shellOwnsTitle (Bugbot 4073693743): explicit host contract — only a mounted kit root shows the page title in its header, so only
   // then do scope pages omit their own heading. The non-kit /assess/index.html host keeps page-owned headings.
-  return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, shellOwnsTitle: !!kit, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
+  return { api: (url, opts) => live() ? api(url, opts) : stale(), apiFull: (url, opts) => live() ? apiFull(url, opts) : stale(), demo, esc, enc: cards.enc, routes: cards.routes, cards, state, setToken, signOut, displayName, shellOwnsTitle: !!kit, note: (text, alert = false) => { if (!live()) return; note.textContent = text || ''; note.classList.toggle('alert', !!alert); },
     // Review F2: a completion arriving after the view was replaced must not navigate the newer route (it cannot undo a dispatched write).
     go: (hash, { reload = false } = {}) => { if (!live()) return; if (location.hash === hash || reload) render(); else location.hash = hash; }, ...extra };
 }
@@ -946,11 +1021,11 @@ function scrubCredentialHash() {
 }
 function resetIdentity() {
   identityGeneration += 1; generation += 1; epoch += 1;
-  pendingRename = null; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
+  pendingRename = null; nameAskDeferred = false; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
   accountBusy = false; accountControls(false); accountStatus();
-  document.getElementById('account-switch-dialog')?.close();
+  document.getElementById('account-switch-dialog')?.close(); document.getElementById('account-name-dialog')?.close();
   document.getElementById('feedback-dialog')?.remove(); // S54/rev444: the in-place feedback dialog belongs to the old identity
-  state.share = null; state.collectLinks.clear(); state.principal = null; state.projects = []; state.current = null; state.templates = null;
+  state.share = null; state.collectLinks.clear(); state.principal = null; state.accountEmail = ''; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
   state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false; state.myInvitations = null; printLangs.clear();
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
@@ -1033,6 +1108,8 @@ async function boot() {
     const linkInvite = !!(pendingInvite || storedInvite());
     const mine = linkInvite ? [] : await loadMyInvitations(); if (mine === null || identity !== identityGeneration) return;
     try { history.replaceState(null, '', location.pathname + location.search + signInLanding({ invite: linkInvite || mine.length > 0, projects: state.projects })); } catch {} } }
+  // rev461 W1: asked after the landing, and never over the invitation or entry screens (a first sign-in from an invitation lands on #invite).
+  if (identity === identityGeneration) askNameAfterLanding(route(location.hash).kind); // captain a1: asked at sign-up, skippable; B1: deferred past #invite
   listen();
   await render();
 }
