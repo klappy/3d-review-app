@@ -1,0 +1,17 @@
+/* UI Next (v4) Level (.lvl meter + name). Status: provisional. Paints only from ui-next/tokens.css.
+   Contract: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas/design-system.md section 2 Level row and
+   ".lvl[data-level]" (R9, V-40): --lvl colours the glyph only, the name stays --ink; meter + name always (rule 3).
+   Values: generator/helmet.html .meter (94-98); generator/gen.py EXTRA .lvl (line 39), .lvl .g / [data-level] / imagery (58-64).
+   Gap: .meter b radius 2px is off scale and the lint refuses px radii; --radius-hair (3) is used. */
+.lvl{display:inline-flex;align-items:center;gap:10px;font-weight:600;font-size:var(--t-15)}
+.lvl-name{color:var(--ink)}
+.meter{display:inline-flex;align-items:flex-end;gap:3px;height:18px}
+.meter b{display:block;width:6px;border-radius:var(--radius-hair);background:var(--line-2)}
+.meter b:nth-child(1){height:7px}.meter b:nth-child(2){height:10px}.meter b:nth-child(3){height:14px}.meter b:nth-child(4){height:18px}
+.meter b.on{background:currentColor}
+.meter.gap b{background:transparent;border:1.5px dashed currentColor}
+.lvl .g{display:none;line-height:0}
+.lvl[data-level=strong]{--lvl:var(--b-strong)}.lvl[data-level=growing]{--lvl:var(--b-growing)}.lvl[data-level=support]{--lvl:var(--b-support)}.lvl[data-level=urgent]{--lvl:var(--b-urgent)}.lvl[data-level=more]{--lvl:var(--b-more)}
+.lvl .g{color:var(--lvl)}
+.app[data-imagery=bars] .g-bars,.app[data-imagery=faces] .g-faces,.app[data-imagery=jars] .g-jars,.app[data-imagery=plants] .g-plants{display:inline-flex}
+.app:not([data-imagery]) .g-bars{display:inline-flex}

@@ -41,3 +41,13 @@ a.gx-tab { text-decoration: none; }
 .app .small { font-size: var(--t-14); color: var(--ink-2); margin: 0; } .app .micro { font-size: var(--t-13); font-weight: 550; color: var(--ink-3); }
 .app .kbd { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: var(--t-14); }
 .gx-lay .l-row { flex-wrap: wrap; } .gx-lay .app * { min-width: 0; overflow-wrap: anywhere; }
+/* Home parts page (?page=home): framing only. Tokens only. Status: provisional. */
+.app .gx-frame { position: relative; margin: 0 0 16px; border: 1px dashed var(--line-2); border-radius: var(--radius-m); overflow: visible; }
+.app .gx-open { margin-bottom: 380px; } .app .gx-open-s { margin-bottom: 160px; }
+.app .gx-menus { align-items: flex-start; min-height: 260px; gap: 24px; }
+.app .gx-menus details.dd { flex: 0 0 auto; } .app .gx-menus details.dd[open] { width: 316px; }
+.app .gx-skin { background: transparent; color: var(--ink); }
+.app .gx-phones { max-width: 390px; }
+.app .gx-phone { max-width: 390px; }
+.app .gx-phone .phone-bar { position: relative; }
+@media (max-width: 700px) { .app .gx-menus { flex-direction: column; min-height: 0; } .app .gx-menus details.dd[open] { margin-bottom: 270px; } }
