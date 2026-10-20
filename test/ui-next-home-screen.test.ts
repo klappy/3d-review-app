@@ -87,18 +87,16 @@ describe("copy rows present verbatim (C01-C12)", () => {
     expect(paras[0]).toBe("Three perspectives. One useful next step.");
     expect(paras.length).toBe(16);
   });
-  it("every carried row is a source paragraph word for word, and renders on first run inside Learn more", () => {
-    const a = home({ state: "first" });
-    const lm = a.querySelector("details.learn-more")!;
-    expect(lm.hasAttribute("open")).toBe(false);
-    expect(lm.querySelector("summary")!.textContent).toBe(COPY.C04);
-    const text = lm.textContent!.replace(/\s+/g, " ");
-    expect(paras).toContain(COPY.C02); expect(text).toContain(COPY.C02);
-    for (const [, name, cap] of COPY.C03) { expect(paras.some((p) => p.endsWith(cap))).toBe(true); expect(text).toContain(name); expect(text).toContain(cap); }
-    for (const k of ["C04", "C05", "C10", "C11"] as const) { expect(paras).toContain(COPY[k]); expect(text).toContain(COPY[k]); }
-    for (const k of ["C06", "C07", "C08"] as const) { expect(paras).toContain(COPY[k].join(" ")); expect(text).toContain(COPY[k].join(" ")); }
-    expect(paras).toContain(COPY.C09[0]); expect(paras).toContain(COPY.C09[1]); expect(text).toContain(COPY.C09[1]);
-    expect(paras).toContain(COPY.C12[0]); expect(text).toContain(COPY.C12[1]);
+  it("every pinned row is a source paragraph word for word; Home draws no Learn more (boards have none; Landing/About carry it)", () => {
+    for (const k of ["C02", "C04", "C05", "C10", "C11"] as const) expect(paras).toContain(COPY[k]);
+    for (const [, , cap] of COPY.C03) expect(paras.some((p) => p.endsWith(cap))).toBe(true);
+    for (const k of ["C06", "C07", "C08"] as const) expect(paras).toContain(COPY[k].join(" "));
+    expect(paras).toContain(COPY.C09[0]); expect(paras).toContain(COPY.C09[1]); expect(paras).toContain(COPY.C12[0]);
+    for (const state of ["first", "reviews"]) {
+      const a = home({ state });
+      expect(a.querySelector("details.learn-more")).toBeNull();
+      expect(a.textContent!).not.toContain(COPY.C02);
+    }
   });
   it("C12 ships without the trajectory clause (current-ui-copy ASK default 1); C01 is Landing's hero, not on Home", () => {
     const t = home({ state: "first" }).textContent!;

@@ -5,7 +5,8 @@
      Rachel's C01-C12 map (sources/rachel-copy-2026-10-19/app-copy-edits.txt), C12 without the trajectory clause (current-ui-copy ASK default 1). -->
 <script module>
   export const STATES = Object.freeze(["first", "reviews"]);
-  // Rachel copy rows Home carries, word for word (app-copy-edits.txt paragraph order). C01 is Landing's hero, not Home's.
+  // Rachel copy rows, word for word (app-copy-edits.txt paragraph order). Not rendered on Home: the boards draw no Learn more here;
+  // Landing/About carry them (VALIDATION-558 fix 1, provisional). Kept verbatim-pinned for those screens. C01 is Landing's hero.
   export const COPY = Object.freeze({
     C02: "3D Review visualizes how a Bible translation project is performing so you can decide what to do next.",
     C03: [["team", "Translation team", "How the work is done"], ["community", "Community", "How it’s understood"], ["church", "Church", "How it’s used"]],
@@ -62,24 +63,6 @@
 {#snippet top()}{#if phone}<PhoneHeader state="root" initials={data.user.initials} />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.workspace} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Start a 3D Review" lead="plus" href="#setup" />{/if}{/snippet}
 
-{#snippet learnMore()}
-  <details class="learn-more">
-    <summary class="link">{COPY.C04}</summary>
-    <Stack gap={4}>
-      <p>{COPY.C02}</p>
-      <Grid cols={phone ? undefined : 3} gap={3}>
-        {#each COPY.C03 as [lens, name, caption]}<Stack gap={1}><span class="lvl-pair"><LensDot {lens} decorative /><strong>{name}</strong></span><p class="small">{caption}</p></Stack>{/each}
-      </Grid>
-      <Stack gap={2}>
-        <h3 class="h3">{COPY.C05}</h3>
-        {#each [COPY.C06, COPY.C07, COPY.C08] as [k, v]}<p class="small"><strong>{k}</strong> {v}</p>{/each}
-      </Stack>
-      <Stack gap={2}><h3 class="h3">{COPY.C09[0]}</h3><p class="small">{COPY.C09[1]}</p></Stack>
-      <Stack gap={2}><h3 class="h3">{COPY.C10}</h3><p class="small">{COPY.C11}</p></Stack>
-      <Stack gap={2}><h3 class="h3">{COPY.C12[0]}</h3><p class="small">{COPY.C12[1]}</p></Stack>
-    </Stack>
-  </details>
-{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
@@ -117,7 +100,6 @@
           <Grid cols={4} gap={4}>
             {#each PHASES as [name, text], i}<Row gap={3}><span class="num">{i + 1}</span><Stack gap={1}><h3 class="h3">{name}</h3><p class="small">{text}</p></Stack></Row>{/each}
           </Grid>
-          {@render learnMore()}
         </Card>
         <Card gap={3} label="Invitations">
           <Row split wrap gap={4}>
