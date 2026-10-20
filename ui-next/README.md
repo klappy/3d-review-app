@@ -50,4 +50,4 @@ Button, Stage pill and Lens dot are Svelte 5 components in `src/` (`Button.svelt
 npm run build:next   # builds ui-next/index.html into ui/next/ (gitignored); wrangler serves ./ui, so /next/ when deployed
 ```
 
-`src/App.svelte` is a fixture gallery: every ported state, light and dark, with a theme toggle (`?theme=light|dark`). Tests: `test/ui-next-*.test.ts` run as the `ui-next` vitest project (@testing-library/svelte under jsdom). The Workers Builds build command does not run `build:next` yet (cookbook `work/queued/2026-10-16-ui-next-vite-build-step/`).
+`src/App.svelte` is a fixture gallery: every ported state, light and dark, with a theme toggle (`?theme=light|dark`). Tests: `test/ui-next-*.test.ts` run as the `ui-next` vitest project (@testing-library/svelte under jsdom). The default Workers Builds command builds `/next/`: the `pretypecheck` and `pretest` hooks run `scripts/build-next-guarded.mjs`, which runs `build:next`. Production-branch builds (`WORKERS_CI_BRANCH=production`) skip it and remove any stale `ui/next/` (guard from #554).
