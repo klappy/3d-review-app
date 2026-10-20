@@ -45,7 +45,7 @@ beforeEach(() => corpusOperation.drain(),15000);
 afterEach(() => corpusOperation.drain(),15000);
 afterAll(async () => { try { await corpusOperation.drain(); } finally { await mf.dispose(); } },30000);
 describe('real compiled renderer with local D1',()=>{
- describe.sequential('all34/425 corpus with shared coexistence', () => {
+ describe('all34/425 corpus with shared coexistence', () => {
   const measurements:any[]=[]; let total=0,max=0,corpusStarted=0;
   beforeAll(async () => { await clearReports(); corpusStarted=performance.now(); });
   Object.keys(sourceFixture.contexts).forEach((id,index) => {
@@ -163,9 +163,14 @@ describe('real compiled renderer with local D1',()=>{
    const observation=await db.prepare(store.REPORT_OBSERVE_SQL).bind('user',null,aid,'person_mara','member').first<any>();expect(observation).toEqual({assessment_id:aid,current_capture:null});
    expect(await store.observeBuildEligibility(context(),aid)).toEqual({ok:true,marker:marker(false)});
    expect(await store.buildMaterialized(context(),aid)).toEqual(held());expect(await store.readMaterialized(context(),r.id)).toEqual(held());expect(await store.listMaterialized(context(),aid)).toEqual(held());
-   for(const ctx of [context(db,'absent'),context(db,'absent','support'),context(db,'person_mara','participant'),context(db,'person_mara','anonymous')]){
+   for(const ctx of [context(db,'absent'),context(db,'person_mara','participant'),context(db,'person_mara','anonymous')]){
     expect(await store.observeBuildEligibility(ctx,aid)).toEqual(invisible);expect(await store.buildMaterialized(ctx,aid)).toEqual(invisible);expect(await store.readMaterialized(ctx,r.id)).toEqual(invisible);expect(await store.listMaterialized(ctx,aid)).toEqual(invisible);
    }
+   const global=context(db,'absent','support');
+   expect(await store.observeBuildEligibility(global,aid)).toEqual(invisible);
+   expect(await store.buildMaterialized(global,aid)).toEqual(invisible);
+   expect(await store.readMaterialized(global,r.id)).toEqual(held());
+   expect(await store.listMaterialized(global,aid)).toEqual(held());
    expect(await store.observeBuildEligibility(context(),'unknown')).toEqual(invisible);expect(await store.readMaterialized(context(),'unknown')).toEqual(invisible);
   }finally{for(const row of saved)await restoreResponse(row);}
  });

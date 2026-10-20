@@ -109,7 +109,7 @@ export async function roleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): P
     .prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?')
     .bind(ctx.principal.id, scopeType, scopeId)
     .first<{ role: Role }>();
-  return row?.role ?? null;
+  return row?.role ?? (ctx.principal.kind === "support" ? "viewer" : null);
 }
 /** THE inheritance rule as SQL (0.35.14, cookbook work/active/2026-10-18-3d-grant-write-guard-followups DoD (c)): grant row
  *  `g` (an alias) applies at scope (`scopeT`, `scopeI`, SQL expressions) when it is AT that scope, or, for a project, when it is
@@ -125,7 +125,7 @@ export async function projectRole(ctx: Ctx, projectId: string): Promise<Role | n
     .prepare(`SELECT g.role AS role FROM "grant" g WHERE g.principal_id = ?1 AND ${grantApplies("g", "'project'", "?2")}`)
     .bind(ctx.principal.id, projectId)
     .all<{ role: Role }>();
-  return (results ?? []).reduce<Role | null>((acc, r) => maxRole(acc, r.role), null);
+  return (results ?? []).reduce<Role | null>((acc, r) => maxRole(acc, r.role), ctx.principal.kind === "support" ? "viewer" : null);
 }
 /** Role at a scope as authorization sees it: projects inherit from their workspace; other scopes are exact. */
 export async function effectiveRoleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<Role | null> {

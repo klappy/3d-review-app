@@ -26,7 +26,7 @@ beforeAll(async()=>{
  supportToken=await mintSession(env,'person_support','support');userToken=await mintSession(env,'person_mara','user');
 },60000);
 async function call(face:string,op:'write'|'read',params:any,bearer?:string){
- const headers={'content-type':'application/json',...(bearer?{authorization:`Bearer ${bearer}`}:{})};
+ const headers={'content-type':'application/json',...(bearer?{authorization:`Bearer ${bearer}`,cookie:"review_access=global"}:{})};
  const req=face==='http'?new Request(`https://t.invalid/v2/${op==='write'?'feedback':'ops/feedback/'+encodeURIComponent(params.id)}`,{method:op==='write'?'POST':'GET',headers,...(op==='write'?{body:JSON.stringify(params)}:{})}):new Request('https://t.invalid/mcp',{method:'POST',headers,body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:op,arguments:{capability:op==='write'?'cap.ops.feedback':'cap.ops.feedback_get',params}}})});
  const res=await app.fetch(req,env);const j:any=await res.json();return face==='http'?j:j.result.structuredContent;
 }

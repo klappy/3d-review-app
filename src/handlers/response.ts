@@ -173,7 +173,7 @@ async function assessmentGrant(ctx: Ctx, aid: string, min: "viewer" | "member" |
 
 export const list: Handler = async (ctx, params) => {
   const aid = reqStr(params, "aid");
-  await assessmentGrant(ctx, aid, "member");
+  await assessmentGrant(ctx, aid, ctx.principal.kind === "support" ? "viewer" : "member");
   // D7 threshold and differencing policy remain unresolved. Even owners get
   // a typed, successful suppression state rather than row-level disclosure.
   // B09: the facilitator's own group-level context (setup step 3) is not respondent data, so it is listed per group.

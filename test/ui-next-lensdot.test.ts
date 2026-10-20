@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
-// UI Next (v4) Lens dot contract (status: provisional).
+// UI Next (v4) Lens dot contract, Svelte 5 re-expression (status: provisional).
 // Contract: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas/design-system.md section 2, Lens dot row.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-// @ts-expect-error -- plain ES module, no type declarations
-import { renderLensDot, renderLensPoint, LENSES } from "../ui-next/components/lensdot.js";
+import { render } from "@testing-library/svelte";
 // @ts-expect-error -- plain .mjs script, no type declarations
 import { lintText } from "../scripts/ui-next-lint.mjs";
+import LensDot, { LENSES } from "../ui-next/src/LensDot.svelte";
+
+const mk = (kind: "dot" | "pt") => (props?: Record<string, unknown>) => render(LensDot, { props: { ...(props ?? {}), kind } }).container.firstElementChild as HTMLElement;
+const renderLensDot = mk("dot"), renderLensPoint = mk("pt");
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), "ui-next", p), "utf8");
 const KEYS = ["team", "community", "church"] as const;
@@ -85,22 +88,12 @@ describe("lensdot.css", () => {
   });
 });
 
-describe("lensdot module and fixture", () => {
-  it("lensdot.js imports only ./h.js and uses no innerHTML", () => {
-    const js = read("components/lensdot.js").replace(/^\s*\/\/.*$/gm, "");
-    expect([...js.matchAll(/^\s*import .* from "([^"]+)";/gm)].map((m) => m[1])).toEqual(["./h.js"]);
-    expect(js).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|\.style\b/);
+describe("LensDot.svelte source", () => {
+  it("light DOM only: no <style>, customElement, attachShadow, {@html} or inline style", () => {
+    const src = read("src/LensDot.svelte").replace(/<!--[\s\S]*?-->/g, "");
+    expect(src).not.toMatch(/<style|customElement|attachShadow|\{@html|style=|innerHTML/);
   });
-  it("fixture loads the tokens and the lensdot stylesheet and renders light and dark .app roots", () => {
-    const html = read("fixtures/lensdot.html");
-    expect(html).toContain('href="../tokens.css"');
-    expect(html).toContain('href="../components/lensdot.css"');
-    expect(html).toContain('from "../components/lensdot.js"');
-    expect(html).toMatch(/sheet\("light"\), sheet\("dark"\)/);
-    expect(html).toContain('class: "app", "data-theme": theme');
-    for (const v of ["renderLensDot({ lens, decorative: true })", "renderLensDot({ lens })", "label:", "renderLensPoint({ lens })"]) expect(html).toContain(v);
-  });
-  it("the new files pass the ui-next lint", () => {
-    for (const p of ["components/lensdot.js", "components/lensdot.css", "fixtures/lensdot.html"]) expect(lintText(p, read(p))).toEqual([]);
+  it("passes the ui-next lint", () => {
+    for (const p of ["src/LensDot.svelte", "components/lensdot.css"]) expect(lintText(p, read(p))).toEqual([]);
   });
 });

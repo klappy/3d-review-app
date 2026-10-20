@@ -11,7 +11,7 @@ import { readFileSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { join, relative, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const LINTED = /\.(html|css|js|mjs|svg)$/;
+export const LINTED = /\.(html|css|js|mjs|svg|svelte)$/;
 export const SKIPPED = new Set(["tokens.css"]); // paths relative to the linted dir
 
 const findAll = (re, s) => [...s.matchAll(re)];
@@ -54,6 +54,12 @@ export function lintText(name, text) {
   if (n > 1) v.push(`${n} primary buttons (rule 1: exactly one)`);
   if (/<label[^>]*>(?:(?!<\/label>).)*<label/s.test(body)) v.push("nested <label>");
   if (body.includes("[CONTACT")) v.push("placeholder text on screen");
+  // Svelte guard (PLAN-6b tripwire T3): light DOM, external CSS, no styles-in-JS.
+  const code = body.replace(/<!--[\s\S]*?-->/g, "");
+  if (name.endsWith(".svelte") && /<style[\s>]/i.test(code)) v.push("<style> block in .svelte (use the external contract CSS)");
+  if (/\bcustomElement\b/.test(code)) v.push("customElement (light DOM only)");
+  if (/\battachShadow\b/.test(code)) v.push("attachShadow (light DOM only)");
+  if (/\.svelte$|\.m?js$/.test(name) && (/(?<![\w-])style\s*=\s*\{|\bstyle:[\w-]+|\.style\b|(?<![\w-])style\s*=\s*["']/.test(code))) v.push("inline style (use classes and tokens)");
   return v;
 }
 
