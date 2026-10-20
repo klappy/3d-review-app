@@ -24,6 +24,13 @@ export const create: Handler = async (ctx, params) => {
 };
 export const list: Handler = async (ctx) => {
   const actor = requireUser(ctx);
+  if (ctx.principal.kind === "support") {
+    const { results } = await ctx.db.prepare(`SELECT p.*, 'viewer' AS role,
+      (SELECT COUNT(*) FROM assessment a WHERE a.project_id=p.id) AS assessment_count,
+      (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id JOIN assessment a ON a.id=s.assessment_id WHERE a.project_id=p.id) AS response_count
+      FROM project p ORDER BY p.created_at`).all<ProjectRow & {role:Role;assessment_count:number;response_count:number}>();
+    return {result:{projects:results.map(p => ({...view(p,p.role),direct_role:null,assessment_count:p.assessment_count,response_count:p.response_count}))}};
+  }
 // L1-23 (captain 14:52): read-only child counts for cards, one correlated aggregate per row — no N+1.
   // Effective role = max(project grant, grouping workspace grant) — workspace roles inherit to grouped projects.
   // direct_role is the caller's own project grant (or null): grouping/ungrouping UI keys on it, mirroring shareAuthority.

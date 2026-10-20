@@ -1,23 +1,23 @@
 {
-  "version": "0.35.27",
+  "version": "0.36.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "faaf5f3070d45c1e70c6a1deac96999a319a188f",
+  "cookbook_commit": "1b8daabf6a1ee149bb554e39a88e46c1faa56c4b",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.27.md",
-      "blob_sha": "ea1420b2f8731858dcfd14ba29029e3762317f87",
-      "sha256": "3b5617f218d09fc1f77df21aeb70005137cb740b700f805e71c9283d47399b3c"
+      "path": "planning/2026-09-16-parity-build/releases/0.36.0.md",
+      "blob_sha": "2f0f58e46cbaaf88120cbe85c1abebf9ea13f0da",
+      "sha256": "880e2f13ceaf920789695febd9d49896f0606440f85df7a7802713f0a2b4b9be"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "4067a177ea16b13122c0c01e45c72bf0f8881de3",
-      "sha256": "428021237851c717a66303928240761da9b2b0b04917d99269294a10c8e6acf6"
+      "blob_sha": "d2611e6cbd14a6caaeffc0ebb97cc93e61d40713",
+      "sha256": "b30f7d221b3cbf551068305921a7628c870478d18af9f8e8732be22079161839"
     }
   ],
   "changelog": {
     "sections": {
-      "fixed": [
-        "Report summary: when perspectives disagree about an area with no name, the summary sentence now names it with a dash instead of the word \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
+      "added": [
+        "Super admins can switch between My Access and Global Access, browse every workspace and its projects and assessments, and inspect response counts and available reports. The selected mode stays visible, and switching refreshes every open app tab. Individual response answers retain the existing disclosure hold."
       ]
     }
   }

@@ -77,3 +77,5 @@ server-files.test.mjs
 v3/components/band-visual.test.mjs
 report-host.test.mjs
 rate-limit.test.mjs
+
+v3/components/access-switch.test.mjs

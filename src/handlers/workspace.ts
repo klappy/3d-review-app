@@ -28,6 +28,14 @@ export const create: Handler = async (ctx, params) => {
 
 export const list: Handler = async (ctx) => {
   const actor = requireUser(ctx);
+  if (ctx.principal.kind === "support") {
+    const { results } = await ctx.db.prepare(`SELECT w.*, 'viewer' AS role,
+      (SELECT COUNT(*) FROM project p WHERE p.workspace_id=w.id) AS project_count,
+      (SELECT COUNT(*) FROM assessment a JOIN project p ON p.id=a.project_id WHERE p.workspace_id=w.id) AS assessment_count,
+      (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id JOIN assessment a ON a.id=s.assessment_id JOIN project p ON p.id=a.project_id WHERE p.workspace_id=w.id) AS response_count
+      FROM workspace w ORDER BY w.created_at`).all<WorkspaceRow & {role:Role;project_count:number;assessment_count:number;response_count:number}>();
+    return { result: { workspaces: results.map(w => ({...view(w,w.role), project_count:w.project_count, assessment_count:w.assessment_count, response_count:w.response_count})) } };
+  }
   const { results } = await ctx.db
 // L1-23 (captain 14:52): read-only child counts for cards, one correlated aggregate per row — no N+1.
 // project_count = every grouped project (each one is reachable through the workspace grant).
@@ -41,7 +49,8 @@ export const get: Handler = async (ctx, params) => {
   const id = reqStr(params, "id");
   const { row, role } = await loadWorkspace(ctx, id);
   // listing of grouped projects only (notes) — names, not contents
-  const { results } = await ctx.db.prepare("SELECT p.id, p.name, p.organization, p.archived_at, (SELECT COUNT(*) FROM assessment a2 WHERE a2.project_id = p.id AND EXISTS (SELECT 1 FROM \"grant\" gassessment WHERE gassessment.scope_type = 'assessment' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?)) AS assessment_count, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id JOIN assessment a2 ON a2.id = s.assessment_id WHERE a2.project_id = p.id AND EXISTS (SELECT 1 FROM \"grant\" gassessment WHERE gassessment.scope_type = 'assessment' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?)) AS response_count FROM project p WHERE p.workspace_id = ? ORDER BY p.created_at").bind(ctx.principal.id, ctx.principal.id, id).all<Pick<ProjectRow, "id" | "name" | "organization" | "archived_at"> & { assessment_count: number; response_count: number }>();
+  const global = ctx.principal.kind === "support";
+  const { results } = await ctx.db.prepare("SELECT p.id, p.name, p.organization, p.archived_at, (SELECT COUNT(*) FROM assessment a2 WHERE a2.project_id = p.id AND (? = 1 OR EXISTS (SELECT 1 FROM \"grant\" gassessment WHERE gassessment.scope_type = 'assessment' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?))) AS assessment_count, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id JOIN assessment a2 ON a2.id = s.assessment_id WHERE a2.project_id = p.id AND (? = 1 OR EXISTS (SELECT 1 FROM \"grant\" gassessment WHERE gassessment.scope_type = 'assessment' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?))) AS response_count FROM project p WHERE p.workspace_id = ? ORDER BY p.created_at").bind(global ? 1 : 0, ctx.principal.id, global ? 1 : 0, ctx.principal.id, id).all<Pick<ProjectRow, "id" | "name" | "organization" | "archived_at"> & { assessment_count: number; response_count: number }>();
   return { result: { workspace: view(row, role), projects: results }, scope: { type: "workspace", id } };
 };
 

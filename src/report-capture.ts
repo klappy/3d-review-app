@@ -102,6 +102,8 @@ const REPORT_TARGET = `    AND ((?2 IS NULL AND a.id = ?3)
 function reportCapturePrefix(): string {
   if (!B1_CAPTURE_SQL.endsWith(CAPTURE_SUFFIX) || B1_CAPTURE_SQL.split(TABLE_FREE_TARGET).length !== 2) throw new Error('CAPTURE_SQL_SHAPE');
   return B1_CAPTURE_SQL.slice(0, -CAPTURE_SUFFIX.length).replace(TABLE_FREE_TARGET, REPORT_TARGET)
+    .replace('    AND EXISTS (\n      SELECT 1 FROM \"grant\" g', "    AND ((?1 = 'support' AND ?5 = 'viewer') OR EXISTS (\n      SELECT 1 FROM \"grant\" g")
+    .replace("(?5 = 'viewer' AND g.role = 'viewer')))", "(?5 = 'viewer' AND g.role = 'viewer'))))")
     .replace('-- B1 capture only: aid selects assessment; rid must be NULL. No report table reference.', '-- B2: aid selects build/list; rid selects report get. Exactly one is set.');
 }
 export const REPORT_CAPTURE_CTE = reportCapturePrefix();

@@ -7,6 +7,8 @@ export interface Principal {
   provisioned?: boolean;
   delegatedBy?: string;
   supportActor?: string;
+  superAdmin?: boolean;
+  accessMode?: "my" | "global";
   participantSurveyId?: string;
   respondentId?: string;
   /** sha256 of the presented session credential (cookie or bearer) — what logout revokes; never client-supplied. */

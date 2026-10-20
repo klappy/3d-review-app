@@ -161,3 +161,7 @@ The captain adopted this contract with the default named in each question below 
 3. **Phone header** (§ 5). Show the full name truncated with an ellipsis, or initials as the v4 canvas does? Default: full name, truncated. **Decided: full name, truncated on phones.**
 4. **Dark mode** (§ 6). Keep it off, or open a unit to turn on the existing dark tokens with dark lens pairs for every screen? Default: off. **Decided: off.**
 5. **Where this file lives.** The design lens expects the contract in the 3D Review cookbook; this draft lives in the app repo beside the code it governs. Keep it here and register this path and sha with the lens, or move it? Default: keep it here and register it. **Decided: it stays in the app repo and is registered with the design lens.**
+
+## Super-admin access selector — October 20 increment
+
+User-authorized extension: a shared panel immediately before the current page content shows the two explicit choices **My Access** and **Global Access**, the selected state (`aria-pressed`), a plain mode description, and workspace/project links. It appears only for a server-verified super admin. It uses existing panel/button/token styling (`ui/v3-shell.css`) and wraps the choices on narrow screens. Existing workspace and project cards remain the navigation surfaces. Scope: the current UI only; this is the requested access control, not a redesign.

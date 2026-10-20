@@ -1,3 +1,4 @@
+import { mountAccessSwitch } from '/v3/components/access-switch.js';
 import { mountPassages } from './passages.js';
 import { lwcFieldset, lwcFrom, LWC_CSS } from '../v3/lwc.js';
 import { isDemo, demoApi, memoryStorage, sampleResponses } from '/demo.js';
@@ -59,6 +60,7 @@ function syncShell(page = null) {
   // resetIdentity) so later crumbs can name it without a discovery read. Data only; never a new request.
   if (page?.kind === 'workspace' && page.model?.status === 'loaded' && page.model.workspace?.id) state.workspaces.set(page.model.workspace.id, { id: page.model.workspace.id, name: page.model.workspace.name, role: page.model.workspace.role, projects: (page.model.projects || []).map(x => x.id) });
   kit.update(v3Model(shellModel({ route: r, routes: cards.routes, principal: state.principal, known: { projects: state.projects, workspaces: state.workspaces, lists: state.lists }, current: state.current, page, contextCollapsible: narrow(), welcome: !!(displayName(state.principal?.display_name) || state.accountEmail) })));
+  syncAccessSwitch(state.principal);
   placeDemoNotice(); // Bugbot 4073693755: the shell repaint preserves only its content/header hosts; the disclosure is restored by the controller
 }
 // Demo disclosure (Bugbot 4073693755): ONE controller-owned node, built once, placed before the content element and re-placed by the
@@ -86,6 +88,34 @@ if (V3_SHELL && app && typeof MutationObserver === 'function') { let queued = fa
 const demo = typeof location !== 'undefined' && isDemo(location.search);
 // P0 12:10: a logo tap in demo always leaves demo, even if a kit repaint raced the header rewrite.
 if (demo && typeof document?.addEventListener === 'function') document.addEventListener('click', e => { const b = e.target?.closest?.('header.top a.brand'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); location.assign(DEMO_EXIT_HREF); }, true);
+
+// A fresh browser starts with personal access. The server independently verifies super-admin authority.
+if (!demo && !/(?:^|;\s*)review_access=/.test(document.cookie)) document.cookie = 'review_access=my; Path=/; SameSite=Lax';
+function syncAccessSwitch(principal) {
+  mountAccessSwitch({ app, principal, demo, document, onSwitch(mode) {
+    document.cookie = `review_access=${mode}; Path=/; SameSite=Lax`;
+    try { localStorage.setItem('review_access_change', String(Date.now())); } catch {}
+    accessChannel?.postMessage(mode);
+    // Reload destroys cached entities, responses, reports and in-flight reads from the previous mode.
+    location.replace(location.pathname + location.search + '#workspaces');
+    location.reload();
+  }});
+}
+
+// The cookie preference is shared by the browser, so every open app tab must invalidate together.
+const accessChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('review-access') : null;
+function reloadChangedAccess() {
+  if (!state.principal?.super_admin) return;
+  const mode = /(?:^|;\s*)review_access=global(?:;|$)/.test(document.cookie) ? 'global' : 'my';
+  if (mode === state.principal.access_mode) return;
+  resetIdentity();
+  app.textContent = 'Access changed. Reloading…';
+  location.reload();
+}
+accessChannel?.addEventListener('message', reloadChangedAccess);
+globalThis.addEventListener?.('storage', event => { if (event.key === 'review_access_change') reloadChangedAccess(); });
+globalThis.addEventListener?.('focus', reloadChangedAccess);
+globalThis.addEventListener?.('pageshow', reloadChangedAccess);
 let tabStorage = memoryStorage(); if (!demo) { try { tabStorage = sessionStorage; } catch {} }
 let token = null; if (!demo) { try { token = sessionStorage.getItem('facilitatorToken'); } catch {} }
 async function api(url, { method = 'GET', body } = {}) {
@@ -811,6 +841,7 @@ function landOnSignIn() {
   listen(); return render();
 }
 async function signOut(switchAccount = false) {
+  document.cookie = 'review_access=my; Path=/; SameSite=Lax';
   if (demo || accountBusy) return;
   if (!state.principal && !token) return landOnSignIn();
   const identity = identityGeneration, credential = token;
@@ -1020,6 +1051,7 @@ function scrubCredentialHash() {
   return null;
 }
 function resetIdentity() {
+  document.getElementById('access-scope')?.remove();
   identityGeneration += 1; generation += 1; epoch += 1;
   pendingRename = null; nameAskDeferred = false; // B07: an in-flight rename belongs to the old principal; its settle() still runs, its outcome is dropped by the identity check
   accountBusy = false; accountControls(false); accountStatus();
@@ -1076,7 +1108,7 @@ async function boot() {
   placeDemoNotice();
   const identity = identityGeneration;
   const linksKnown = loadEmailLinks();
-  try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; if (!demo) state.collectLinks = share.tabLinks(tabStorage, me.principal?.id, state.collectLinks); } // gate 0.23.0 E: this tab's active links survive a reload
+  try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; syncAccessSwitch(me.principal); if (!demo) state.collectLinks = share.tabLinks(tabStorage, me.principal?.id, state.collectLinks); } // gate 0.23.0 E: this tab's active links survive a reload
   catch {
     if (identity !== identityGeneration) return;
     landAfterSignIn = false; // B04: no session observed, nothing to land
