@@ -28,21 +28,15 @@ function upstream() {
   }) as unknown as typeof globalThis.fetch;
   return { fetch, calls };
 }
-function limiters() {
-  const seen: [string, string][] = [];
-  const binding = (name: string) => ({ limit: async ({ key }: { key: string }) => { seen.push([name, key]); return { success: true }; } });
-  return { seen, env: { RL_HTTP_ANON: binding("RL_HTTP_ANON"), RL_MCP_CEILING: binding("RL_MCP_CEILING"), RL_MCP_ANON: binding("RL_MCP_ANON") } };
-}
 
 describe("POST /v2/translate with a participant bearer (header is harmless on the current server)", () => {
-  it("answers exactly as without the header, on the anonymous per-address limiter", async () => {
+  it("answers exactly as without the header", async () => {
     const results = [];
     for (const bearer of [undefined, PT]) {
-      const up = upstream(), rl = limiters();
-      const res = await handleTranslate(post(body, bearer), { ENVIRONMENT: "production", TRANSLATE_UPSTREAM_URL: UP, ...rl.env } as any, { fetch: up.fetch });
+      const up = upstream();
+      const res = await handleTranslate(post(body, bearer), { ENVIRONMENT: "production", TRANSLATE_UPSTREAM_URL: UP } as any, { fetch: up.fetch });
       expect(res.status).toBe(200);
       results.push(await res.json());
-      expect(rl.seen).toEqual([["RL_HTTP_ANON", "ip:203.0.113.7"]]);
       expect(up.calls).toHaveLength(1);
     }
     expect(results[1]).toEqual(results[0]);

@@ -1,10 +1,9 @@
-import { fail, ok } from "./envelope";
+import { fail, ok, RETRY_AFTER_SECONDS } from "./envelope";
 import type { Ctx, ScopeType } from "./handlers/types";
 import { CapError } from "./errors";
 import { handlers } from "./handlers";
 import { authorize, targetScope } from "./policy";
 import { byId, sourceSha, toolForClass, type Tool } from "./registry";
-import { enforceCapabilityLimit, enforcePrincipalWriteLimit, hasCapabilityLimiter, RATE_LIMIT_WINDOW_SECONDS } from "./ratelimit";
 import { checkConfirmToken, mintConfirmToken, mintReceipt, paramsHash, persistTrace, type Span } from "./receipt";
 
 export interface ExecuteOptions {
@@ -18,19 +17,6 @@ export type ExecuteEnvelope = ReturnType<typeof ok> | ReturnType<typeof fail>;
 
 const reserved = (id: string, traceId: string) =>
   fail("RESERVED_NOT_BUILT", "not built yet (phase 0)", "This capability is documented but unavailable in phase 0.", id, traceId);
-
-/** true only when execute(ctx, capabilityId, params, { tool }) will reach enforceCapabilityLimit() — the same checks, in
- *  the same order, that execute() runs before it spends the capability's own limiter. Transports use it to exempt a
- *  parsed, routed call from their generic anonymous dampener; anything that would fail first (unknown capability,
- *  wrong tool, non-object params, reserved) pays that dampener instead (Bugbot 4289984346). Keep in step with execute(). */
-export function chargesCapabilityLimiter(capabilityId: unknown, params: unknown, tool?: string): boolean {
-  if (typeof capabilityId !== "string" || !hasCapabilityLimiter(capabilityId)) return false;
-  if (!params || typeof params !== "object" || Array.isArray(params)) return false;
-  const cap = byId.get(capabilityId);
-  if (!cap) return false;
-  if (tool && tool !== toolForClass(cap.class)) return false;
-  return !(cap.slice === "v2.1-oct" || !handlers[capabilityId]);
-}
 
 /** The single execution path for HTTP and MCP. No transport-specific authorization or handler calls. */
 export async function execute(
@@ -55,8 +41,6 @@ export async function execute(
     if (options.tool && options.tool !== expectedTool)
       throw new CapError("WRONG_TOOL_FOR_CLASS", `${capabilityId} requires the ${expectedTool} tool`, `Use ${expectedTool}.`, capabilityId);
     if (cap.slice === "v2.1-oct" || !handlers[capabilityId]) return (outcome = reserved(capabilityId, ctx.traceId));
-    await enforceCapabilityLimit(ctx, capabilityId, params); // both faces; before authorize and before the handler touches storage
-    await enforcePrincipalWriteLimit(ctx, capabilityId, expectedTool); // per session/principal, never per address (workshop DoD 3)
     await authorize(ctx, cap, params);
 
     const danger = expectedTool === "danger";
@@ -112,11 +96,11 @@ export async function execute(
     // RATE_LIMITED carries retry_after in the envelope so an MCP client (HTTP 200 + envelope, no header) can back off
     // without parsing a second shape (review #12-6). The HTTP twin also sends the retry-after header.
     return (outcome = fail(e.code, e.message, e.hint, e.docs, ctx.traceId,
-      e.code === "RATE_LIMITED" ? { retry_after: e.retryAfter ?? RATE_LIMIT_WINDOW_SECONDS } : undefined));
+      e.code === "RATE_LIMITED" ? { retry_after: e.retryAfter ?? RETRY_AFTER_SECONDS } : undefined));
   } finally {
     ctx.log = log;
     // A refused flood must not become a storage flood: rate-limited calls are not written to the trace table.
-    if (outcome && !outcome.ok && outcome.error.code === "RATE_LIMITED") console.warn("ratelimit.refused", capabilityId, ctx.traceId);
+    if (outcome && !outcome.ok && outcome.error.code === "RATE_LIMITED") console.warn("cap.rate_limited", capabilityId, ctx.traceId);
     else await persistTrace(ctx, spans, {
       capability: capabilityId,
       transport: options.transport ?? "http",

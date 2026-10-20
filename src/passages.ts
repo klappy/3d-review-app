@@ -25,7 +25,6 @@ import type { Ctx, Env, Principal, Role } from "./handlers/types";
 import { resolvePrincipal } from "./auth";
 import { atLeast, auditRow, newId, roleAt } from "./handlers/common";
 import { newTraceId } from "./receipt";
-import { allow, clientIp, RATE_LIMIT_MESSAGE, RATE_LIMIT_WINDOW_SECONDS, rateLimitHint } from "./ratelimit";
 import { linkTitle } from "./link-title";
 import { bookOf, renderPassagePdf } from "./ptxprint";
 import { hmacSha256Base64Url as hmac, sha256HexBytes } from "./crypto";
@@ -215,12 +214,9 @@ export async function handleRemove(request: Request, env: PEnv, aid: string, pid
 
 /** The file itself for a signed link: inline, exact content type, nosniff, Range for audio seeking. */
 export async function handleFile(request: Request, env: PEnv, pid: string): Promise<Response> {
-  // Audit round 1 W2: the signature is checked FIRST (one HMAC, no storage) and only a missing, tampered or expired link
-  // spends RL_HTTP_ANON. A valid link is already a server-issued, short-lived capability; a workshop room behind one NAT
-  // (50 phones seeking in the same MP3 with Range requests) must not share the 60/60 s anonymous address budget.
+  // The signature is checked first (one HMAC, no storage); a missing, tampered or expired link is refused.
   const q = new URL(request.url).searchParams;
   if (!(await validSig(env, pid, q.get("exp"), q.get("sig")))) {
-    if (!(await allow(env, "RL_HTTP_ANON", `ip:${clientIp(request)}`))) return env_(429, { ok: false, error: { code: "RATE_LIMITED", message: RATE_LIMIT_MESSAGE, hint: rateLimitHint("too many file requests from this network"), retry_after: RATE_LIMIT_WINDOW_SECONDS } }, { "retry-after": String(RATE_LIMIT_WINDOW_SECONDS) });
     return fail(403, "NOT_AUTHORIZED_AT_SCOPE", "this passage link has expired; reopen the survey");
   }
   const row = await env.DB.prepare("SELECT * FROM assessment_passage WHERE id = ? AND archived_at IS NULL AND kind = 'file'").bind(pid).first<PassageRow>().catch(() => null);

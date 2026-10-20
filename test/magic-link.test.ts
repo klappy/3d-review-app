@@ -133,39 +133,13 @@ describe("rate limits", () => {
     expect(outs.filter((o) => o.out.state === "limited").every((o) => o.sent.length === 0)).toBe(true);
     expect(await db.prepare("SELECT COUNT(*) AS n FROM login_code WHERE email_hash = ?").bind(await sha256("race@example.invalid")).first("n")).toBe(MAGIC_LINK_PER_EMAIL);
   });
-  it("per IP: the RL_AUTH ip: key refuses before any storage access or mail", async () => {
-    const keys: string[] = [];
-    env.RL_AUTH = { limit: async ({ key }: { key: string }) => { keys.push(key); return { success: false }; } };
-    const spy = vi.spyOn(env.DB, "prepare");
-    const res = await postJson("/v2/auth/email", { email: "ip@example.invalid" }, { "cf-connecting-ip": "192.0.2.7" });
-    expect(res.status).toBe(429); expect(res.headers.get("retry-after")).toBe("60");
-    expect(keys).toEqual(["ip:192.0.2.7"]); expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
-  });
-  it("DoD 6: a per-IP sign-in refusal of the browser form keeps next=oauth from the POST body", async () => {
-    env.RL_AUTH = { limit: async () => ({ success: false }) };
-    const res = await post("/v2/auth/email", { email: "oauth@example.invalid", next: "oauth" });
-    expect(res.status).toBe(429); expect(res.headers.get("retry-after")).toBe("60");
-    const html = await res.text();
-    expect(html).toContain(RATE_LIMIT_COPY); expect(html).toContain('<input type="hidden" name="next" value="oauth">');
-  });
-  it("per IP on opening a link: RL_REDEEM ip: key refuses before any storage access", async () => {
-    env.RL_REDEEM = { limit: async () => ({ success: false }) };
-    const spy = vi.spyOn(env.DB, "prepare");
-    const res = await post("/v2/auth/email/open", { t: newMagicToken() });
-    expect(res.status).toBe(429); expect(spy).not.toHaveBeenCalled();
-    // DoD 6: a browser form post gets the sign-in page saying plainly it is a rate limit, with retry-after 60,
-    // and tells the person to reopen the same link (it still works) rather than request a new one.
-    expect(res.headers.get("retry-after")).toBe("60");
-    expect(await res.text()).toContain("Rate limit: too many requests right now. Nothing was lost. Open the link in your email again in one minute.");
-    spy.mockRestore();
-  });
-  it("DoD 6: a JSON sign-in request refused per IP carries RATE_LIMITED, retry_after 60 and retry-after: 60", async () => {
-    env.RL_AUTH = { limit: async () => ({ success: false }) };
-    const res = await postJson("/v2/auth/email", { email: "rl@example.invalid" });
-    expect(res.status).toBe(429); expect(res.headers.get("retry-after")).toBe("60");
-    const body = await res.json() as { error: { code: string; message: string; data?: { retry_after?: number } } };
-    expect(body.error.code).toBe("RATE_LIMITED"); expect(body.error.message).toContain("rate limit"); expect(body.error.data?.retry_after).toBe(60);
+  it("no per-IP limiter (captain 2026-10-16): sign-in requests and link checks from one address are never 429", async () => {
+    const sent: number[] = [];
+    for (let i = 0; i < 25; i++) sent.push((await postJson("/v2/auth/email", { email: `room${i}@example.invalid` }, { "cf-connecting-ip": "192.0.2.7" })).status);
+    expect(sent.every((s) => s === 200)).toBe(true);
+    const checks: number[] = [];
+    for (let i = 0; i < 25; i++) checks.push((await postJson("/v2/auth/email/check", { t: newMagicToken() }, { "cf-connecting-ip": "192.0.2.7" })).status);
+    expect(checks.every((s) => s === 200)).toBe(true);
   });
   it("DoD 6: the link landing page says it is a rate limit and holds Try again for Retry-After", async () => {
     const { RATE_LIMIT_COPY: UI_COPY } = await import("../ui/rate-limit.js");

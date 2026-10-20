@@ -31,7 +31,7 @@ function page(c: Capability) {
     ...(c.result_schema ? { result_schema: c.result_schema } : {}),
     ...(c.id === "cap.ops.feedback" ? { guidance: TOPICS.feedback, next: { topic: "feedback" } } : {}),
     how_an_agent_calls_it: c.tool === "danger" ? "danger {capability, params, mode:'dry_run'} → impact + confirm_token → danger {…, mode:'execute', confirm_token}" : `${c.tool} {capability, params}`,
-    errors: ["NOT_AUTHENTICATED", "NOT_AUTHORIZED_AT_SCOPE", "WRONG_TOOL_FOR_CLASS", "INVALID_PARAMS", "NOT_FOUND_OR_NOT_VISIBLE", ...(c.tool === "danger" ? ["CONFIRM_REQUIRED", "CONFIRM_EXPIRED"] : []), ...(c.slice === "v2.1-oct" ? ["RESERVED_NOT_BUILT"] : []), "RATE_LIMITED"], // every row: anonymous callers are metered per address on both faces (RL_HTTP_ANON / RL_MCP_ANON), four rows additionally by capability
+    errors: ["NOT_AUTHENTICATED", "NOT_AUTHORIZED_AT_SCOPE", "WRONG_TOOL_FOR_CLASS", "INVALID_PARAMS", "NOT_FOUND_OR_NOT_VISIBLE", ...(c.tool === "danger" ? ["CONFIRM_REQUIRED", "CONFIRM_EXPIRED"] : []), ...(c.slice === "v2.1-oct" ? ["RESERVED_NOT_BUILT"] : []), ...(c.id === "cap.grant.invite" ? ["RATE_LIMITED"] : [])], // no app-level rate limit (captain 2026-10-16); only the hourly invite cap answers RATE_LIMITED
     examples: { http: `${c.http.method} ${c.http.path}`, mcp: { tool: c.tool, arguments: { capability: c.id, params, ...(c.tool === "danger" ? { mode: "dry_run" } : {}) } } },
     ...(c.id === "cap.ops.feedback" ? { http_request: { method: c.http.method, path: c.http.path, headers: { "content-type": "application/json" }, body: params } } : {}),
     projected_from: `${contractName} @ cookbook ${sourceSha}`,

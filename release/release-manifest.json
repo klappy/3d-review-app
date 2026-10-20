@@ -1,23 +1,23 @@
 {
-  "version": "0.36.0",
+  "version": "0.37.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "10a7ba2ed2c70a19832bb2f4ec8e00bdc2de553c",
+  "cookbook_commit": "be9a0a3a6ddb4efe931776d594e531b8e15c088f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.36.0.md",
-      "blob_sha": "2f0f58e46cbaaf88120cbe85c1abebf9ea13f0da",
-      "sha256": "880e2f13ceaf920789695febd9d49896f0606440f85df7a7802713f0a2b4b9be"
+      "path": "planning/2026-09-16-parity-build/releases/0.37.0.md",
+      "blob_sha": "e531b509c8bc2e835b30982b8ad74f16400c92af",
+      "sha256": "fdded099db82e77b06fdc452c769631cf80c4695472e1e0c82fe04023a8ceed8"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "d2611e6cbd14a6caaeffc0ebb97cc93e61d40713",
-      "sha256": "b30f7d221b3cbf551068305921a7628c870478d18af9f8e8732be22079161839"
+      "blob_sha": "ce2e4e5cf54e25a700ae433b2d4f1c5aeaa48613",
+      "sha256": "49e858525e2faa65dbe96a1811147d4bff7acd9279ad34cc3013cc9e6dd30200"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Super admins can switch between My Access and Global Access, browse every workspace and its projects and assessments, and inspect response counts and available reports. The selected mode stays visible, and switching refreshes every open app tab. Individual response answers retain the existing disclosure hold."
+      "changed": [
+        "The app no longer blocks requests because of app-level request-rate limits or missing limiter bindings. This supports workshops where many participants share one connection. The existing per-address sign-in-link and collaborator-invitation product caps remain, along with upstream translation 429 responses and the MCP batch-size limit."
       ]
     }
   }
