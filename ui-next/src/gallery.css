@@ -18,3 +18,26 @@ body { margin: 0; background: var(--gx-bg, Canvas); color: CanvasText; font-fami
 .app .gx-legend { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-14); }
 /* .pt geometry belongs to the barbell (not ported, V-39); the gallery sizes points only so the colour binding is visible. */
 .app .gx-pts .pt { display: inline-block; width: var(--dot); height: var(--dot); border-radius: 50%; }
+/* Layouts page (?page=layouts): drawing classes for the spec-board reproduction. Tokens only. Status: provisional. */
+a.gx-tab { text-decoration: none; }
+.gx-tab[aria-current=page] { background: CanvasText; color: Canvas; }
+.gx-lay { min-width: 0; }
+.gx-lay > .app { background: var(--ground); color: var(--ink); font-size: var(--t-16); line-height: 1.5; min-height: 100%; }
+.gx-lay > .app[data-w=phone] { max-width: 390px; margin: 0 auto; }
+.app .gx-lv { outline: 2px dashed var(--lv); outline-offset: -2px; border-radius: var(--radius-m); padding: var(--sp-3); }
+.app [data-lv=shell] { --lv: var(--ink-3); } .app [data-lv=page] { --lv: var(--primary); } .app [data-lv=section] { --lv: var(--focus); }
+.app [data-lv=card] { --lv: var(--b-growing); } .app [data-lv=axis] { --lv: var(--b-support); }
+.app .gx-lv-k { display: inline-flex; gap: var(--sp-2); color: var(--ink); } .app .gx-lv-k b { color: var(--lv); }
+.app .gx-sw { width: 20px; height: 14px; outline: 2px dashed var(--lv); outline-offset: -2px; border-radius: var(--radius-hair); }
+.app .gx-k8 { min-width: 64px; }
+.app .gx-ruler { height: 12px; background: var(--primary); border-radius: var(--radius-hair); }
+.app .gx-ruler[data-sp="1"] { width: var(--sp-1); } .app .gx-ruler[data-sp="2"] { width: var(--sp-2); } .app .gx-ruler[data-sp="3"] { width: var(--sp-3); }
+.app .gx-ruler[data-sp="4"] { width: var(--sp-4); } .app .gx-ruler[data-sp="5"] { width: var(--sp-5); } .app .gx-ruler[data-sp="6"] { width: var(--sp-6); } .app .gx-ruler[data-sp="7"] { width: var(--sp-7); }
+.app .gx-wbar { display: block; height: 28px; padding: 0 var(--sp-2); background: var(--line-2); border-radius: var(--radius-hair); }
+.app .gx-wbar[data-w=max] { width: 100%; } .app .gx-wbar[data-w=narrow] { width: calc(100% * 880 / 1120); } .app .gx-wbar[data-w=read] { width: calc(100% * 520 / 1120); }
+.app .chip { display: inline-flex; padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line-2); border-radius: var(--radius-s); background: var(--field); }
+/* Type stand-ins for the gallery only (the §3 type classes are not ported yet; helmet.html:30-33, 109 values through --t-* tokens). */
+.app .h2 { font-size: var(--t-20); line-height: 1.4; font-weight: 650; margin: 0; } .app .h3 { font-size: var(--t-16); line-height: 1.5; font-weight: 650; margin: 0; }
+.app .small { font-size: var(--t-14); color: var(--ink-2); margin: 0; } .app .micro { font-size: var(--t-13); font-weight: 550; color: var(--ink-3); }
+.app .kbd { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: var(--t-14); }
+.gx-lay .l-row { flex-wrap: wrap; } .gx-lay .app * { min-width: 0; overflow-wrap: anywhere; }
