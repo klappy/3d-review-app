@@ -1,6 +1,7 @@
 // No grant inheritance: assessment reads/writes require an exact assessment grant.
 // Creation and archive membership are deliberately project-scoped per contract.
 import type { Ctx, Handler, Role } from "./types";
+import { requireConfirmedState } from "../receipt";
 import { templateDisplayName } from "../display-names";
 import { CapError, notVisible } from "./errors";
 import { DEMOGRAPHICS_KEY, demographicsEnabled, parseContextJson } from "../context-fields";
@@ -164,7 +165,9 @@ export const del: Handler = async (ctx, params, opts) => {
   const passages = await passageRows(ctx, id);
   const active = passages.rows.filter((p) => !p.archived_at).length;
   const impact = {affected:[{assessment:id,surveys,responses,passages:active}],irreversible:true,effect:"destructive" as const,retention:"D5 held: only empty assessments can be hard-deleted (no surveys, no responses); its passages and their files are deleted with it"};
-  if(opts?.dryRun) return {result:{assessment:view(row,"owner")},scope:{type:"assessment",id},impact};
+  // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (a)): the counts the preview shows are bound into the token.
+  if(opts?.dryRun) return {result:{assessment:view(row,"owner")},scope:{type:"assessment",id},impact,confirmState:impact.affected[0]};
+  await requireConfirmedState(opts, impact.affected[0], "cap.assessment.delete");
   if(surveys || responses) throw new CapError("INVALID_PARAMS","assessment is not empty","deselect surveys first");
   await ctx.db.batch([
     ...(passages.table ? [ctx.db.prepare("DELETE FROM assessment_passage WHERE assessment_id = ?").bind(id)] : []),

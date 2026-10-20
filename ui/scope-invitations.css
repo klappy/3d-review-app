@@ -11,6 +11,7 @@
 .rv .scope-invitations-list li>span { flex:1;overflow-wrap:anywhere;min-width:0; }
 .rv .scope-invitations-confirmation:not(:empty),.rv .scope-invitations-credential:not(:empty) { padding:12px;border:1px solid var(--glass-edge);border-radius:var(--r-button);margin-top:12px; }
 .rv .scope-invitations-credential input { width:100%; }
+.rv .scope-invitations-confirmation-inline { flex-basis:100%;width:100%;min-width:0; } /* PR #508: full row under Invite, not a flex item beside it */
 @media(max-width:600px) {
  .rv .scope-invitations-form { display:grid;grid-template-columns:minmax(0,1fr); }
  .rv .scope-invitations-list li { align-items:stretch;flex-direction:column; }

@@ -35,20 +35,29 @@ export interface Ctx {
   now: () => Date;
   log: (span: string, data?: Record<string, unknown>) => void;
 }
-export interface Impact {
+interface ImpactBase {
   affected: unknown[];
   irreversible: boolean;
-  effect: "external" | "disclosure" | "destructive";
   retention?: string;
   compensating_control?: string;
 }
+/** A no-op impact (noop: true) names no effect: nothing is released (0.35.16). Every other impact names its effect
+ *  (0.35.17, cookbook work/active/2026-10-18-3d-grant-noop-followups-2 DoD (b)): the union keeps that check at compile time. */
+export type Impact = ImpactBase & ({ noop: true; effect?: never } | { noop?: never; effect: "external" | "disclosure" | "destructive" });
 export interface HandlerResult {
   result: Record<string, unknown>;
   scope?: { type: ScopeType; id: string };
   priorState?: Record<string, unknown>;
   impact?: Impact;
+  /** The call changed nothing; dispatch marks its receipt no-op (0.35.17 DoD (c)). Separate from any user-facing result field. */
+  noop?: true;
+  /** dry_run only: the state the preview was computed from. Dispatch binds its hash into the confirm token, and the handler
+   *  refuses an execute whose own read differs (requireConfirmedState), so a preview never confirms a different change (0.35.17 DoD (a)). */
+  confirmState?: Record<string, unknown>;
 }
-export type Handler = (ctx: Ctx, params: Record<string, any>, opts?: { dryRun?: boolean }) => Promise<HandlerResult>;
+/** confirmedState: set by dispatch on a confirmed execute — the state hash the confirm token carries (null when it carries none). */
+export interface HandlerOpts { dryRun?: boolean; confirmedState?: string | null }
+export type Handler = (ctx: Ctx, params: Record<string, any>, opts?: HandlerOpts) => Promise<HandlerResult>;
 
 export { CapError, notVisible } from "./errors";
 export const id = (p: string) => `${p}_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;

@@ -1,16 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { copy, createReportState, renderList, renderReport, upsertRow } from './report-view.js';
+import { radarCopy } from './report-radar.js';
 
 // Minimal fake DOM: no innerHTML exists on these nodes, so any HTML-string rendering would fail here.
 function fakeNode(tag) {
-  return { tag, textContent: '', children: [], listeners: {}, dataset: {},
+  return { tag, textContent: '', children: [], listeners: {}, dataset: {}, attrs: {},
+    setAttribute(name, value) { this.attrs[name] = String(value); },
+    get lastChild() { return this.children[this.children.length - 1] ?? null; },
     addEventListener(event, fn) { (this.listeners[event] ||= []).push(fn); },
     fire(event) { for (const fn of this.listeners[event] || []) fn({}); },
     append(...nodes) { this.children.push(...nodes); },
     replaceChildren(...nodes) { this.children = nodes; } };
 }
-const doc = { createElement: tag => fakeNode(tag) };
+const doc = { createElement: tag => fakeNode(tag), createElementNS: (ns, tag) => Object.assign(fakeNode(tag), { ns }),
+  createTextNode: text => Object.assign(fakeNode('#text'), { textContent: String(text) }) };
 const flat = node => [node.textContent, ...node.children.map(flat)].join('\n');
 const lines = node => flat(node).split('\n').filter(Boolean);
 // Sections are keyed by their <h4>; each section's remaining text is its rows, in render order.
@@ -164,4 +168,21 @@ test('R10 createReportState().clear() drops the pending confirmation, its timer 
   assert.equal(state.reportCursor, null);
   clearTimeout(timer); // no-op if clear() already did it; the process must not be held open either way
   assert.equal(cleared, 0);
+});
+
+test('R12 three or more shared areas: renderReport places the radar right after the lenses agree block (DEC-0014)', () => {
+  const area = (name, a, b) => ({ construct_name: name, agreement_range: Math.abs(a - b), n_lenses_included: 2, lens_scores: [{ lens: 'team', score: a }, { lens: 'community', score: b }] });
+  const report = { ...REPORT, payload: { ...REPORT.payload, cross_lens_multi: [area('Shared understanding', 61.75, 49.5), area('Clarity', 70, 64), area('Trust', 40, 72)] } };
+  const root = fakeNode('section');
+  assert.equal(renderReport({ doc, root, report }), true);
+  const headings = root.children.slice(2).map(s => s.children[0].textContent);
+  assert.deepEqual(headings, [copy.crossLens, radarCopy.heading, copy.lenses, copy.standalone, copy.translationAgreement, copy.evidence, copy.narrative]);
+  const radar = root.children[3];
+  assert.equal(radar.className, 'lens-radar report-detail-section glass panel');
+  const svg = radar.children.find(c => c.tag === 'figure').children[0];
+  assert.equal(svg.tag, 'svg'); assert.equal(svg.ns, 'http://www.w3.org/2000/svg');
+  assert.deepEqual(radar.children.find(c => c.tag === 'ul').children.map(li => li.children[1].textContent), ['Translation team', 'Community']);
+  // One shared area (the R1 payload) is below the three-spoke floor: no radar section.
+  const r1 = fakeNode('section'); renderReport({ doc, root: r1, report: REPORT });
+  assert.equal(r1.children.some(s => s.children[0]?.textContent === radarCopy.heading), false);
 });

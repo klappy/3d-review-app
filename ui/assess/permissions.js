@@ -27,6 +27,21 @@ export const UNCONFIRMED_NOTE = 'Could not be confirmed as sent; the invitation 
 export const PREVIEW_AGAIN = 'Preview again.';
 export const REVOKE_ASK = 'Revoke this invitation so its link stops working?'; // U37: one sentence, in the row
 export const NO_TRANSFER_TARGET = 'Invite someone first; you can transfer to people who already have access.'; // U18: one sentence
+// F5 (ASK L1 option 1, cookbook work/active/2026-10-15-3d-workspace-permissions): at a project, inviting and revoking an
+// invitation need the caller's own direct project grant (src/handlers/grant.ts directAtProject). A caller who can read this
+// roster only through the project's workspace is offered neither; this one line points them to the workspace instead.
+export const FROM_WORKSPACE_NOTE = 'Your role here comes from the workspace. To add someone, invite them to the workspace.';
+export const FROM_WORKSPACE_LINK = 'Open workspace permissions';
+// DoD 4: one true line per scope — roles flow workspace → grouped project only; an assessment opens only by its own grant (D9).
+export const APPLIES = {
+  workspaces: 'Roles here also apply to every project in this workspace. Assessments are shared one by one.',
+  // A new project starts ungrouped (src/handlers/project.ts create: workspace_id null), so the line holds with or without a workspace.
+  projects: 'If this project is in a workspace, roles on that workspace also apply here. Assessments are shared one by one.',
+  assessments: 'Only the people listed here can open this assessment; project and workspace roles do not.',
+};
+// DoD 4 polish (k0021): the change-role select no longer repeats the Role column — it starts on "Change to…" and lists only the other roles.
+export const CHANGE_TO = 'Change to…';
+export const PICK_ROLE = 'Choose a new role first.';
 export const TEST_ADDRESS_NOTE = 'Invitation recorded; not emailed (test address).';
 // B31/U26: one plain sentence for an invite outcome — never a delivery reason code, receipt or trace id.
 export function inviteOutcome(r = {}) {
@@ -41,16 +56,26 @@ export function inviteOutcome(r = {}) {
 const classify = e => { const c = String(e?.code || e?.status || ''); if (c === 'NOT_AUTHENTICATED' || c === '401') return 'unauthenticated'; if (c === 'NOT_AUTHORIZED_AT_SCOPE' || c === '403') return 'forbidden'; if (c === 'NOT_FOUND_OR_NOT_VISIBLE' || c === '404') return 'not_found'; if (c === 'RESERVED_NOT_BUILT' || c === '501') return 'not_built'; return 'failed'; };
 export { classify };
 
-export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myEmail: '', myRole: null, sheet: null, notice: null, alert: false, busy: false, receipts: {}, invitees: {}, askRevoke: null }; }
+export function blankModel(scope, id) { return { scope, id, status: 'loading', grants: [], pending: [], me: null, myEmail: '', myRole: null, fromWorkspace: false, notDirect: false, workspaceId: null, sheet: null, notice: null, alert: false, busy: false, receipts: {}, invitees: {}, askRevoke: null }; }
 
 export const permissions = {
   async load(ctx, { scope, id }) {
     const m = blankModel(scope, id); m.me = ctx.state?.principal?.id || null;
     if (!SCOPE_SEG[scope]) { m.status = 'not_found'; return m; }
     try {
+      // Nit 7 (#527 review): at a project the project read (its workspace id) runs alongside the roster read, not after it.
+      const projectRead = scope === 'projects' ? Promise.resolve().then(() => ctx.api(`/v2/projects/${ctx.enc(id)}`)).then(x => x?.project?.workspace_id || null, () => null) : null;
       const r = await ctx.api(`/v2/${SCOPE_SEG[scope]}/${ctx.enc(id)}/grants`);
       m.status = 'loaded'; m.grants = r.grants || []; m.pending = (r.pending_invitations || []).filter(i => ['sent', 'pending', 'unconfirmed'].includes(i.status));
       m.myRole = m.grants.find(g => g.principal_id === m.me)?.role || null;
+      // F5: the roster read needs member+ (grant.ts list); at a project, a direct grant below member means Invite, Revoke
+      // invitation, Remove and role change are refused (notDirect hides them). Dead-invitations (5): the workspace line is a
+      // claim, so it shows only when the project read names a workspace — an ungrouped project (e.g. a support principal's
+      // reach) or a failed read shows no line.
+      if (projectRead) {
+        const workspaceId = await projectRead;
+        if (!(RANK[m.myRole] >= RANK.member)) { m.notDirect = true; m.workspaceId = workspaceId; m.fromWorkspace = !!workspaceId; }
+      }
       // P0 12:30: people, not ids — the signed-in account's own email (the only one the service exposes today).
       m.myEmail = ctx.accountEmail ? await ctx.accountEmail().catch(() => '') || '' : await readAccountEmail({ demo: !!ctx.demo });
     } catch (e) { m.status = classify(e); m.error = e; }
@@ -61,28 +86,34 @@ export const permissions = {
     // B31: the notice is one plain sentence; receipt/trace ids live behind a closed "Details" (still in the DOM for audit).
     const status = `<p class="small ${m.alert ? 'alert' : 'muted'}" role="status" data-permissions-status>${esc(m.notice || '')}</p>${m.noticeRef ? learnMore(`<p class="small muted" data-permissions-ref>${esc(m.noticeRef)}</p>`, { summary: 'Details' }) : ''}`;
     // B30 (less text 3): one heading and at most one short line up front; every other note goes behind Learn more.
-    const applies = `<p class="note small">Permissions apply to this ${esc(noun)} only; nothing is inherited.</p>`;
+    // DoD 4 (2026-10-15 workspace-permissions): workspace roles now reach grouped projects (eb72ea5); assessments stay exact (D9).
+    const applies = `<p class="note small" data-permissions-applies>${esc(APPLIES[m.scope] || '')}</p>`;
     const head = `<p class="eyebrow">Permissions</p><h2>Who can open this ${esc(noun)}</h2>${applies}`;
     if (m.status === 'forbidden') return `<section class="panel narrow" data-permissions data-permissions-state="viewer"><p class="eyebrow">Permissions</p><h2>Who can open this ${esc(noun)}</h2><p class="muted">${esc(VIEWER_NOTE)}</p>${status}${learnMore(applies.replace('note small', 'small muted'))}</section>`;
     if (m.status === 'not_found') return `<section class="panel narrow" data-permissions data-permissions-state="not-found"><p class="eyebrow">Permissions</p><h2>${esc(NOT_AVAILABLE)}</h2><p class="muted">Nothing to show here.</p>${status}</section>`;
     if (m.status === 'unauthenticated') return `<section class="panel narrow" data-permissions data-permissions-state="unauthenticated">${head}<p class="small muted" role="alert">Your sign-in is no longer active. <a href="/v2/auth/access">Sign in again</a></p>${status}</section>`;
     if (m.status !== 'loaded') return `<section class="panel narrow" data-permissions data-permissions-state="failed">${head}<p class="small muted" role="alert">Could not load permissions. <a href="#" data-retry="grants">Retry</a></p>${status}</section>`;
-    const owner = m.myRole === 'owner', member = m.myRole === 'member' || owner, busy = m.busy ? 'disabled' : '';
+    // F5: a workspace-only caller at a project is never offered Invite, Revoke invitation, Remove or role changes here.
+    const owner = !m.notDirect && m.myRole === 'owner', member = !m.notDirect && (m.myRole === 'member' || owner), busy = m.busy ? 'disabled' : '';
+    const fromWorkspace = m.fromWorkspace && m.workspaceId ? `<p class="small" data-permissions-from-workspace>${esc(FROM_WORKSPACE_NOTE)} <a href="#permissions/workspaces/${esc(ctx.enc ? ctx.enc(m.workspaceId) : encodeURIComponent(m.workspaceId))}" data-workspace-permissions-link>${esc(FROM_WORKSPACE_LINK)}</a></p>` : '';
     const canTouch = g => g.role !== 'owner' && (owner || RANK[g.role] <= RANK.member); // D3 ceiling; owners never removed/demoted
     // Member list component (ui/v3/components/member-list.js): name + email, "You" for self, never the principal id.
-    const actions = g => { const rc = m.receipts[g.id]; return `${g.role === 'owner' ? '<span class="muted">Owner — only a transfer changes this</span>' : member && canTouch(g) ? `${owner ? `<select data-role-for="${esc(g.id)}" aria-label="New role" ${busy}>${ROLES.map(r => `<option value="${r}" ${r === g.role ? 'selected' : ''}>${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}" ${busy}>Preview role change</button> ` : ''}<button type="button" class="quiet" data-revoke="${esc(g.id)}" ${busy}>Remove</button>` : `<span class="muted">Members manage viewers and members only</span>`}${rc ? learnMore(`<p class="small muted">receipt ${esc(rc.receipt)} · trace ${esc(rc.trace)}</p>`, { summary: 'Details' }) : ''}`; };
+    const actions = g => { const rc = m.receipts[g.id]; return `${g.role === 'owner' ? '<span class="muted">Owner — only a transfer changes this</span>' : member && canTouch(g) ? `${owner ? `<select data-role-for="${esc(g.id)}" aria-label="New role" ${busy}><option value="" selected disabled>${esc(CHANGE_TO)}</option>${ROLES.filter(r => r !== g.role).map(r => `<option value="${r}">${r}</option>`).join('')}</select> <button type="button" data-change-role="${esc(g.id)}" ${busy}>Preview role change</button> ` : ''}<button type="button" class="quiet" data-revoke="${esc(g.id)}" ${busy}>Remove</button>` : m.notDirect ? '' : `<span class="muted">Members manage viewers and members only</span>`}${rc ? learnMore(`<p class="small muted">receipt ${esc(rc.receipt)} · trace ${esc(rc.trace)}</p>`, { summary: 'Details' }) : ''}`; };
     const roster = memberList(esc, m.grants, { me: m.me, myEmail: m.myEmail, actions, rowAttr: g => `data-grant-row="${esc(g.id)}"`, empty: 'No grants listed.', note: false });
     const namesNote = membersHidden(m.grants, { me: m.me, myEmail: m.myEmail }) ? `<p class="small muted" data-member-note>${esc(NO_EMAIL_NOTE)}</p>` : '';
     const pending = m.pending.length ? `<p class="eyebrow" style="margin-top:18px">Pending invitations</p><ul class="small" data-pending>${m.pending.map(i => `<li data-invitation="${esc(i.id)}">${esc(i.role)}${i.created_at ? ` · invited ${esc(shortDate(i.created_at))}` : ''}${m.invitees?.[i.id] ? ` · ${esc(m.invitees[i.id])}` : ''}${i.status === 'unconfirmed' ? ` · ${esc(UNCONFIRMED_NOTE)}` : ''}${member && (owner || RANK[i.role] <= RANK.member) ? ` ${m.askRevoke === i.id ? `<span data-revoke-ask="${esc(i.id)}">${esc(REVOKE_ASK)} <button type="button" class="small" data-revoke-invitation-confirm="${esc(i.id)}" ${busy}>Revoke</button> <button type="button" class="quiet small" data-revoke-invitation-cancel ${busy}>Cancel</button></span>` : `<button type="button" class="quiet small" data-revoke-invitation="${esc(i.id)}" ${busy}>Revoke invitation</button>`}` : ''}</li>`).join('')}</ul>` : ''; // B30: no pending → nothing (not another line)
+    // DoD2 (2026-10-15 workspace-permissions): the invitation confirm opens inline, right under the Invite button, naming the
+    // address typed — never a separate "preview" step at the bottom of the page. Same dry_run → execute twin underneath.
+    const inviteSheet = m.sheet?.kind === 'invite' ? m.sheet : null;
     const roleOptions = (owner ? ROLES : ROLES.filter(r => r !== 'owner')).map(r => `<option value="${r}">${r}</option>`).join('');
-    const invite = member ? `<form class="line" data-invite-form><p class="eyebrow">Invite someone</p><label class="field">Email<input name="email" type="email" required autocomplete="off" ${busy}></label><label class="field">Role<select name="role" ${busy}>${roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit" class="primary" ${busy}>Preview invitation</button></div></form>` : '';
+    const invite = member ? `<form class="line" data-invite-form><p class="eyebrow">Invite someone</p><label class="field">Email<input name="email" type="email" required autocomplete="off" ${inviteSheet ? `value="${esc(inviteSheet.params.email || '')}"` : ''} ${busy}></label><label class="field">Role<select name="role" ${busy}>${inviteSheet ? roleOptions.replace(`value="${inviteSheet.params.role}"`, `value="${inviteSheet.params.role}" selected`) : roleOptions}</select></label>${owner ? '' : '<p class="small muted">Members invite up to member.</p>'}<div class="actions"><button type="submit"${inviteSheet ? '' : ' class="primary"'} data-invite-submit ${busy}>Invite</button></div>${inviteSheet ? renderSheet(ctx, inviteSheet, m.busy, m.scope) : ''}</form>` : '';
     // B30 (lane 9, less text 3): transfer is rare and destructive — a closed disclosure whose first line, once opened, is the warning.
     // U18: pick the new owner from people who already have access (shared member picker) — never a typed principal id.
     const picker = owner ? memberPicker(esc, m.grants, { me: m.me, myEmail: m.myEmail, name: 'to', label: 'New owner', attrs: busy, empty: NO_TRANSFER_TARGET }) : '';
     const transferForm = /data-member-picker-empty/.test(picker) ? picker : `<form data-transfer-form><p class="small muted">Destructive: it cannot be undone from here.</p>${picker}<label class="small"><input type="checkbox" name="step_down"> Step down to member after the transfer</label><div class="actions"><button type="submit" ${busy}>Preview transfer</button></div></form>`;
     const transfer = owner ? `<details class="line" data-transfer${m.transferOpen || m.sheet?.kind === 'transfer_owner' ? ' open' : ''}><summary>Transfer ownership</summary>${transferForm}</details>` : '';
-    const sheet = m.sheet ? renderSheet(ctx, m.sheet, m.busy, m.scope) : '';
-    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}">${head}${roster}${pending}${invite}${transfer}${sheet}${status}${learnMore(`${namesNote}${member ? '<p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p>' : ''}<p class="small muted">Accepting an invitation happens from the mailed link; it is never done from this page.</p>`)}</section>`;
+    const sheet = m.sheet && !inviteSheet ? renderSheet(ctx, m.sheet, m.busy, m.scope) : '';
+    return `<section class="panel" data-permissions data-permissions-state="loaded" data-my-role="${esc(m.myRole || '')}"${m.fromWorkspace ? ' data-from-workspace' : ''}>${head}${fromWorkspace}${roster}${pending}${invite}${transfer}${sheet}${status}${learnMore(`${namesNote}${member ? '<p class="small muted">An invitation sends an email. Nothing is sent until you confirm.</p>' : ''}<p class="small muted">Accepting an invitation happens from the mailed link; it is never done from this page.</p>`)}</section>`;
   },
   bind(ctx, root, m) {
     const base = `/v2/${SCOPE_SEG[m.scope]}/${ctx.enc(m.id)}`;
@@ -94,7 +125,7 @@ export const permissions = {
     const refresh = async () => {
       const fresh = await permissions.load(ctx, { scope: m.scope, id: m.id });
       Object.assign(m, { status: fresh.status, grants: fresh.grants, pending: fresh.pending,
-        me: fresh.me, myEmail: fresh.myEmail, myRole: fresh.myRole, error: fresh.error, busy: false });
+        me: fresh.me, myEmail: fresh.myEmail, myRole: fresh.myRole, fromWorkspace: fresh.fromWorkspace, notDirect: fresh.notDirect, workspaceId: fresh.workspaceId, error: fresh.error, busy: false });
       paint();
     };
     const receiptText = env => [env.receipt?.id ? `receipt ${env.receipt.id}` : '', env.trace_id ? `trace ${env.trace_id}` : ''].filter(Boolean).join(' · '); // B31: shown only behind Details
@@ -105,7 +136,7 @@ export const permissions = {
     const preview = async (kind, url, params, label, extra = {}) => { m.busy = true; paint();
       try { const env = await call(url, { method: extra.method || 'POST', body: { params, mode: 'dry_run' } }); const r = env.result;
         m.sheet = { kind, url, method: extra.method || 'POST', params: Object.freeze(JSON.parse(JSON.stringify(params))), token: r.confirm_token, expiresIn: r.expires_in, impact: r.impact || {}, label, ...extra.display }; m.notice = null; m.noticeRef = ''; m.alert = false;
-      } catch (e) { m.sheet = null; fail(e, label); } finally { m.busy = false; paint(); } };
+      } catch (e) { m.sheet = null; fail(e, label); } finally { m.busy = false; paint(); if (m.sheet?.kind === 'invite') root.querySelector('[data-confirm-execute]')?.focus?.(); } };
     const execute = async () => { const s = m.sheet; if (!s || m.busy) return; if (!s.token) { say(PREVIEW_AGAIN, true); return; }
       const token = s.token; s.token = null; // single-use, cleared before the call
       m.busy = true; paint();
@@ -125,8 +156,14 @@ export const permissions = {
         if (code === 'CONFIRM_EXPIRED' || code === 'CONFIRM_REQUIRED') { s.token = null; say(`The confirmation expired. ${PREVIEW_AGAIN}`, true); return; }
         m.sheet = null; fail(e, s.label);
       } };
+    // PR #508 fix: an edit to email or role while the invite confirm is open drops the confirm (the frozen dry-run params would
+    // otherwise invite the old values). No repaint, so the typed text and caret stay; Invite becomes the primary again.
+    const dropInvite = e => { if (m.sheet?.kind !== 'invite' || m.busy) return; m.sheet = null; const f = e?.currentTarget || root.querySelector('[data-invite-form]');
+      f?.querySelector?.('[data-confirm-sheet]')?.remove?.(); f?.querySelector?.('[data-invite-submit]')?.classList?.add?.('primary');
+      const st = root.querySelector('[data-permissions-status]'); if (st) st.textContent = 'Details changed. Invite again to preview.'; };
+    for (const ev of ['input', 'change']) root.querySelector('[data-invite-form]')?.addEventListener(ev, dropInvite);
     root.querySelector('[data-invite-form]')?.addEventListener('submit', e => { e.preventDefault(); const f = e.currentTarget; const email = f.querySelector('[name=email]').value.trim(), role = f.querySelector('[name=role]').value; return preview('invite', `${base}/invitations`, { email, role }, 'Invitation', { display: { who: email } }); });
-    root.querySelectorAll('[data-change-role]').forEach(b => b.addEventListener('click', () => { const gid = b.dataset.changeRole; const role = root.querySelector(`[data-role-for="${CSS.escape(gid)}"]`)?.value; const g = m.grants.find(x => x.id === gid); if (!g || !role || role === g.role) { say('That is already the role.'); return; } const who = labelMembers(m.grants, { me: m.me, myEmail: m.myEmail }).find(x => x.row === g)?.person; return preview('update_role', `${base}/grants/${ctx.enc(gid)}`, { role }, 'Role change', { method: 'PATCH', display: { who: who ? [who.name, who.email].filter(Boolean).join(' · ') : '', gid } }); }));
+    root.querySelectorAll('[data-change-role]').forEach(b => b.addEventListener('click', () => { const gid = b.dataset.changeRole; const role = root.querySelector(`[data-role-for="${CSS.escape(gid)}"]`)?.value; const g = m.grants.find(x => x.id === gid); if (!g) return; if (!role) { say(PICK_ROLE); return; } if (role === g.role) { say('That is already the role.'); return; } const who = labelMembers(m.grants, { me: m.me, myEmail: m.myEmail }).find(x => x.row === g)?.person; return preview('update_role', `${base}/grants/${ctx.enc(gid)}`, { role }, 'Role change', { method: 'PATCH', display: { who: who ? [who.name, who.email].filter(Boolean).join(' · ') : '', gid } }); }));
     root.querySelector('[data-transfer]')?.addEventListener('toggle', e => { if (e.currentTarget.isConnected) m.transferOpen = e.currentTarget.open; }); // Bugbot 4108609584: a replaced node's stale toggle is ignored // keep it open across repaints
     root.querySelector('[data-transfer-form]')?.addEventListener('submit', e => { e.preventDefault(); m.transferOpen = true; const f = e.currentTarget; const gid = f.querySelector('[name=to]').value; const hit = labelMembers(m.grants, { me: m.me, myEmail: m.myEmail }).find(x => x.row.id === gid && !x.person.you); if (!hit) { say('Choose who becomes the owner.', true); return; } const to = hit.row.principal_id; const step_down = !!f.querySelector('[name=step_down]').checked; return preview('transfer_owner', `${base}/transfer`, step_down ? { to, step_down: true } : { to }, 'Ownership transfer', { display: { who: memberLabel(hit.person), hide: [to] } }); });
     // single-call writes: mode is never sent (contract §3.5)

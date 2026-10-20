@@ -39,7 +39,7 @@ describe("synthetic answer sets (Steve Watters' persona generator @ f042cde) loa
       }
     }
     expect(checked).toBeGreaterThan(4000);
-    // the demo owner can see every synthetic assessment through explicit grants (no inheritance)
+    // the demo owner can see every synthetic assessment through explicit assessment grants (assessment grants are never inherited, D9)
     expect(await n("SELECT COUNT(*) AS n FROM assessment a LEFT JOIN \"grant\" g ON g.scope_type='assessment' AND g.scope_id=a.id AND g.principal_id='person_mara' WHERE a.id LIKE 'assess_syn_%' AND g.id IS NULL")).toBe(0);
   },60_000);
 });

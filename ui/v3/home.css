@@ -1,8 +1,11 @@
 /* v3 lane 9 L9-1: home / dashboard per Bincy screen 02. Uses lane 1's tokens when present, Bincy's teal/green as fallback. */
-.v3h { max-width: 760px; margin: 0 auto; display: grid; gap: 16px; }
+.v3h { max-width: 760px; margin: 0; /* CONTRACT § 5 (rev461 item 2): the welcome H1 starts at the page edge, no 40px indent */ display: grid; gap: 16px; }
 .v3h-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
 .v3h-head h1 { margin: 0; font-size: 1.75rem; font-weight: 700; }
 .v3h-sub { margin: 4px 0 0; color: var(--muted, #475569); }
+.v3h-title { min-width: 0; flex: 1 1 0; } /* CONTRACT § 5: the welcome H1 wraps, never truncated; the primary keeps its row */
+.v3h-head h1 { overflow-wrap: anywhere; }
+@media (max-width: 759px) { .v3h-head { flex-direction: column; align-items: stretch; } .v3h-head .v3-shell-actions, .v3h-head .actions { width: 100%; } .v3h-head .v3-shell-actions .rv-btn { display: block; width: 100%; text-align: center; box-sizing: border-box; } }
 .v3h-head .v3-shell-actions, .v3h-head .actions { margin: 0; }
 .v3h-card { background: #fff; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; padding: 18px 20px; display: grid; gap: 12px; }
 .v3h-card h2 { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--muted, #475569); }

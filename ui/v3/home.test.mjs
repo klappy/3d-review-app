@@ -118,3 +118,12 @@ test('S40: signed out → no hint, even if the invitations read would answer', a
   assert.match(h, /Sign in to continue/); assert.doesNotMatch(h, /data-v3h-invitations|invitation/i);
   assert.deepEqual(ctx.requested, ['/v2/projects'], 'signed out: /v2/me/invitations is never requested');
 });
+
+test('greet by name (CONTRACT § 4–5): "Welcome, <name>" is the one H1 (escaped), replacing the title; nothing otherwise', () => {
+  const named = homeView({ projects: [], listFor: () => ({}), name: ' Ana <Ruiz> ', title: 'Projects', start: '<a data-v3-start href="#new">+</a>' });
+  assert.match(named, /<h1 class="fs-h1" data-v3h-welcome>Welcome, Ana &lt;Ruiz&gt;<\/h1>/);
+  assert.equal((named.match(/<h1/g) || []).length, 1); assert.doesNotMatch(named, />Projects</);
+  assert.match(named, /<\/h1><p class="v3h-sub">Your 3D Reviews, newest first\.<\/p>/);
+  assert.match(homeView({ projects: [], listFor: () => ({}), name: 'ana@example.invalid' }), /<h1 class="fs-h1" data-v3h-welcome>Welcome, ana@example\.invalid<\/h1>/); // § 4 email fallback
+  for (const name of ['', '   ', null, undefined, 42]) assert.doesNotMatch(homeView({ projects: [], listFor: () => ({}), name }), /data-v3h-welcome/);
+});

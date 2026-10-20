@@ -1,23 +1,23 @@
 {
-  "version": "0.34.0",
+  "version": "0.35.27",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "f0550f00247250c261d168fe420f2912214d6886",
+  "cookbook_commit": "faaf5f3070d45c1e70c6a1deac96999a319a188f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.34.0.md",
-      "blob_sha": "45be9612831e8a74501ac487e1473aab633a0606",
-      "sha256": "6cf9329d65d0752145e1d64b32e83b99801ed0a5c8b261d0689f9897d0314dfc"
+      "path": "planning/2026-09-16-parity-build/releases/0.35.27.md",
+      "blob_sha": "ea1420b2f8731858dcfd14ba29029e3762317f87",
+      "sha256": "3b5617f218d09fc1f77df21aeb70005137cb740b700f805e71c9283d47399b3c"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "33182b784db44eaa0f3add8fb411c4878afa9148",
-      "sha256": "718608c5508296937ad8ac6a3c03ac48a6a0d37263c1b2884c0f00b41231bcd9"
+      "blob_sha": "4067a177ea16b13122c0c01e45c72bf0f8881de3",
+      "sha256": "428021237851c717a66303928240761da9b2b0b04917d99269294a10c8e6acf6"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "Setup step 1 asks \"Location or community\" and \"Facilitator\" (both optional); Review and the assessment's Prepare view (Learn more) show both. Stored on the assessment (migration 0015); cap.assessment.create / update take location and facilitator (string or null). Older clients unchanged."
+      "fixed": [
+        "Report summary: when perspectives disagree about an area with no name, the summary sentence now names it with a dash instead of the word \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
       ]
     }
   }

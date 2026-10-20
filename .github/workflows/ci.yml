@@ -31,3 +31,27 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm test
+  ui-test:
+    # The node:test UI suite (ui/**/*.test.mjs). vitest only includes test/**/*.test.ts, so `npm test` never ran it.
+    # Visible, not yet required (ruleset 23571595 unchanged). Separate job so the Workers Builds command stays `npm test`.
+    name: ui-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run test:ui
+  mjs-test:
+    # The node:test files under test/ (test/*.test.mjs). vitest only includes test/**/*.test.ts and ui-test only ui/**/*.test.mjs,
+    # so neither job ran them. Visible, not yet required (ruleset 23571595 unchanged). Same shape as ui-test.
+    name: mjs-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run test:mjs

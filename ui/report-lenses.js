@@ -23,6 +23,11 @@ export const lensesCopy = Object.freeze({
 // Display names for the payload's lens ids (the same words the setup screen uses, scope.js PERSPECTIVES); unknown ids show as returned.
 const LENS_LABELS = Object.freeze({ 'translation team': 'Translation team', team: 'Translation team', community: 'Community', church: 'Church' });
 export const lensLabel = lens => LENS_LABELS[String(lens).toLowerCase()] || String(lens);
+// One construct-name reading for every consumer (radar spokes, marker tooltips, agreement rows): a missing, null or blank
+// (empty or whitespace-only) construct_name shows an em dash, never "undefined", "null" or an empty label; any other
+// name is String(name) exactly as returned (not trimmed), so named areas render as before.
+export const NO_NAME = '—';
+export const constructName = name => (name === undefined || name === null || String(name).trim() === '' ? NO_NAME : String(name));
 
 const rows = value => (Array.isArray(value) ? value : []);
 const num = v => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
@@ -75,7 +80,7 @@ export function lensSpreadRows(report, { exact = false } = {}) {
     const scores = lenses.map(s => s.score);
     const given = num(entry.agreement_range);
     const spread = lenses.length < 2 ? null : Number.isFinite(given) ? given : Math.max(...scores) - Math.min(...scores);
-    return { name: String(entry.construct_name), spread, band: spread === null ? null : spreadBand(exact ? spread : Math.round(spread)), lenses, order }; // band from the value the chip shows
+    return { name: constructName(entry.construct_name), spread, band: spread === null ? null : spreadBand(exact ? spread : Math.round(spread)), lenses, order }; // band from the value the chip shows
   }).filter(Boolean);
   return all.sort((a, b) => (a.spread === null) - (b.spread === null) || (b.spread ?? 0) - (a.spread ?? 0) || a.order - b.order)
     .map(({ order, ...row }) => row);

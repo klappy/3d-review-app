@@ -44,7 +44,8 @@ export function inviteFailure(e) {
   if (code === 'NOT_AUTHENTICATED' || code === '401') return 'signin';
   if (msg.includes('invitation_used')) return 'used';
   if (msg.includes('invitation_expired')) return 'expired';
-  if (['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED', '403', '404'].includes(code)) return 'refused';
+  // NOT_AUTHORIZED_AT_SCOPE is accept's durable refusal (own invitation; inviter no longer holds the direct grant — F3): same screen, token dropped.
+  if (['NOT_FOUND_OR_NOT_VISIBLE', 'NOT_AUTHORIZED', 'NOT_AUTHORIZED_AT_SCOPE', '403', '404'].includes(code)) return 'refused';
   return 'failed';
 }
 // Controller (mailed link): dry run (what was shared) → Accept (execute with the dry run's confirm token) → onAccepted(scope).

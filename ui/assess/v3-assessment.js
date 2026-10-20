@@ -31,7 +31,7 @@ export function v3StageWord(stage) { return V3_STAGES[stage]?.word || 'Setup not
 
 /** One primary action for the assessment page, driven by stage. Viewers get no Share/Continue action.
  *  U42 (Bincy B30): never a link to the page already open (`current` = the open view → no action), and `secondary` renders it
- *  as a plain button where the page owns its own primary (Permissions: "Preview invitation"). */
+ *  as a plain button where the page owns its own primary (Permissions: "Invite"). */
 export function v3StagePrimary(stage, canEdit, href = v => `#${v}`, esc = esc0, { current = null, secondary = false } = {}) {
   const s = V3_STAGES[stage] || V3_STAGES.prepare;
   if (!canEdit && (s.view === 'collect' || s.view === 'prepare')) return '';
