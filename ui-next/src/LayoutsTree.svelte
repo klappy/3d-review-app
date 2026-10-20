@@ -7,7 +7,7 @@
   import Row from "./Row.svelte";
   import Grid from "./Grid.svelte";
   import Button from "./Button.svelte";
-  import Level from "./Level.svelte";
+  import Level from "./LayoutsLevel.svelte";
   let { phone = false } = $props();
 </script>
 

@@ -1,0 +1,18 @@
+/* UI Next (v4) Menu (details.dd disclosure). Status: provisional. Paints only from ui-next/tokens.css.
+   Contract: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas/design-system.md section 2 Menu row and
+   "Disclosure, menu roles and the refused item" (R11, V-13, V-44): disclosure form, no role=menu/menuitem/aria-haspopup.
+   Values: generator/gen.py EXTRA details.dd, .menu, .mi, .mi:hover (lines 5-8); helmet.html .hr (108), .mi.danger:hover (114).
+   Contract over canvas: .mi.danger is --ink 600 (no colour; gen.py:9's --b-urgent is the break, not copied);
+   refused item = .mi[aria-disabled=true] label --ink-3, no hover fill, not-allowed; .mi-why reason --ink-2. */
+details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}details.dd>summary::-webkit-details-marker{display:none}
+.menu{position:absolute;right:0;top:52px;width:300px;border-radius:var(--radius-l);padding:8px;display:flex;flex-direction:column;gap:2px;z-index:5}
+.menu[data-align=start]{left:0;right:auto}
+.mi{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:var(--radius-m);text-decoration:none;color:var(--ink);font-weight:600;font-size:var(--t-15);background:transparent;border:0;font-family:inherit;cursor:pointer;text-align:left;width:100%}
+.mi:hover{background:var(--line);color:var(--ink)}
+.mi.danger{color:var(--ink)}
+.mi.danger:hover{background:var(--field);box-shadow:inset 0 0 0 1px var(--line-2)}
+.mi[aria-disabled=true],.mi[aria-disabled=true]:hover{color:var(--ink-3);background:transparent;box-shadow:none;cursor:not-allowed}
+.mi-why{margin:0;padding:4px 12px 8px;font-size:var(--t-13);line-height:20px;color:var(--ink-2)}
+.mi-head{padding:10px 12px 8px}
+.mi .tag{margin-left:auto}
+.hr{height:1px;background:var(--line);border:0;margin:4px 0}
