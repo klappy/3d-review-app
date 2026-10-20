@@ -40,7 +40,7 @@ beforeAll(async () => {
 async function mcp(tool: string, capability: string, params: Record<string, unknown> = {}, bearer?: string) {
   const res = await app.fetch(new Request("https://t.invalid/mcp", {
     method: "POST",
-    headers: { "content-type": "application/json", ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) },
+    headers: { "content-type": "application/json", ...(bearer ? { authorization: `Bearer ${bearer}`, cookie: "review_access=global" } : {}) },
     body: JSON.stringify({
       jsonrpc: "2.0", id: 1, method: "tools/call",
       params: { name: tool, arguments: { capability, params } },

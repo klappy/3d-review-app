@@ -1,0 +1,28 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {JSDOM} from 'jsdom';
+import {mountAccessSwitch} from './access-switch.js';
+test('only a server-verified super admin gets both modes, correct state and workspace/project navigation',()=>{
+ const {document}=new JSDOM('<main id="app"></main>').window;
+ const app=document.getElementById('app'), switched=[];
+ const mount=principal=>mountAccessSwitch({app,document,principal,onSwitch:m=>switched.push(m)});
+ assert.equal(mount({kind:'user'}),null);
+ let box=mount({id:'admin',super_admin:true,access_mode:'my'});
+ box.querySelector('button').focus();
+ assert.equal(mount({id:'admin',super_admin:true,access_mode:'my'}),box);
+ assert.equal(document.activeElement,box.querySelector('button'));
+ box.remove();
+ assert.equal(mount({id:'admin',super_admin:true,access_mode:'my'}),box);
+ assert.equal(box.nextElementSibling,app);
+ assert.equal(box.querySelector('[aria-pressed="true"]').textContent,'My Access');
+ box.querySelector('[data-access="my"]').click();assert.deepEqual(switched,[]);
+ box.querySelector('[data-access="global"]').click();assert.deepEqual(switched,['global']);
+ assert.ok([...box.querySelectorAll('button')].every(b=>b.disabled));
+ box=mount({super_admin:true,access_mode:'global'});
+ assert.equal(box.querySelector('[aria-pressed="true"]').textContent,'Global Access');
+ assert.equal(box.querySelector('a').textContent,'All workspaces');
+ assert.equal(document.querySelectorAll('#access-scope').length,1);
+ box.querySelector('[data-access="my"]').click();assert.deepEqual(switched,['global','my']);
+ assert.equal(mount({kind:'participant'}),null);
+ assert.equal(document.getElementById('access-scope'),null);
+});

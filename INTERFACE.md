@@ -106,3 +106,11 @@ Known residuals (recorded, not closed here; each names its closer). Each row is 
 - PROPOSED · ACCEPTED by independent review 5708128737 — `oauth_code_redemption` rows are never purged (index on `redeemed_at` exists); purge is a follow-up.
 
 One-way door (17-IRREVERSIBILITY): once real users connect apps in production, deleting `OAUTH_KV` or removing the provider disconnects everyone at once.
+
+## Super-admin access mode
+
+The web app starts in **My Access** and offers verified super admins a persistent **My Access / Global Access** selector. `review_access=my` is a session cookie (`Path=/; SameSite=Lax`) that narrows a first-party super-admin session to an ordinary user for every request. `global` is the only value enabling authenticated support authority. Missing or malformed preferences use My Access, including first-party session-bearer requests. This cookie never elevates an ordinary account, participant, anonymous caller or delegated OAuth connector. `/v2/me` exposes `principal.super_admin` and `principal.access_mode`; the account's stored support flag and grants are unchanged by the selector. Signing out, starting a fresh web session, or observing an expired session clears the preference to My Access.
+
+In Global Access, workspace, project and assessment lists include all records and their aggregate child counts. Workspace/project/assessment loaders provide viewer access when the super admin has no grant; actual personal grants keep their existing roles. Global viewer access also reaches survey status/counts, result summaries, passage reads and collaborator rosters; response lists expose only facilitator group context under their existing suppression rules. Report list/get allow authenticated support viewer reads through the same atomic capture query and retain suppression, integrity, retention and source-admission rules. Report builds still require a grant. Response lists are reachable globally but retain the existing D7 hold: individual answers remain suppressed, as they do for owners. No disclosure-policy change is implied.
+
+Switching modes reloads into Workspaces and discards all previous entity/report state and pending reads. BroadcastChannel, storage notifications and a focus/pageshow check invalidate other open tabs when their observed mode differs from the shared cookie.

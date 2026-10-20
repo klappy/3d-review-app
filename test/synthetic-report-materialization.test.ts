@@ -96,9 +96,9 @@ describe('private marker isolation and exact D1 commands',()=>{
     expect(await refusing.buildMaterialized(context(),aid)).toEqual({ok:false,reason:'UNAVAILABLE'});
     expect((await db.prepare('SELECT count(*) n FROM synthetic_report').first<any>()).n).toBe(1);
   });
-  it('preserves the exact reviewed common CTE predicates through the shared producer',()=>{
+  it('pins the global viewer-read CTE and leaves the original B1 build capture unchanged',()=>{
     const normalized=REPORT_CAPTURE_CTE.split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n').trim();
-    expect(createHash('sha256').update(normalized).digest('hex')).toBe('5acc824832e18930f941d77ca7dda40123f49300879fa3908e0c69f6f4873c69');
+    expect(createHash('sha256').update(normalized).digest('hex')).toBe('645681a3ede9eb28749bec3d398e2fb366b15de0fb704a7a2025e0befefaa56e');
     expect(createHash('sha256').update(B1_CAPTURE_SQL).digest('hex')).toBe('8e3f51e2f5cb7350c2a7824e5a78c91c64fb17a1966d79b9fe3f064c711598c6');
   });
   it('keeps reports immutable under actual D1 triggers and surfaces a forced constraint failure',async()=>{
@@ -152,8 +152,11 @@ describe('guarded identity and immutable content',()=>{
   });
 });
 describe('single-observation disclosure and page suppression',()=>{
-  it('unknown/ungranted/support without grant uniformly stay invisible and viewer cannot build',async()=>{
-    const r=await report();for(const ctx of [context(db,'absent'),context(db,'absent','support'),context(db,'person_mara','participant')]){expect(await marker.readMaterialized(ctx,r.id)).toEqual(invisible);expect(await marker.listMaterialized(ctx,aid)).toEqual(invisible);}
+  it('unknown/ungranted users stay invisible; global support reads reports but cannot build without a grant',async()=>{
+    const r=await report();for(const ctx of [context(db,'absent'),context(db,'person_mara','participant')]){expect(await marker.readMaterialized(ctx,r.id)).toEqual(invisible);expect(await marker.listMaterialized(ctx,aid)).toEqual(invisible);}
+    expect((await marker.readMaterialized(context(db,'absent','support'),r.id)).ok).toBe(true);
+    expect((await marker.listMaterialized(context(db,'absent','support'),aid)).ok).toBe(true);
+    expect(await marker.buildMaterialized(context(db,'absent','support'),aid)).toEqual(invisible);
     expect(await marker.readMaterialized(context(),'unknown')).toEqual(invisible);
     await exec('UPDATE "grant" SET role=? WHERE scope_type=? AND scope_id=? AND principal_id=?','viewer','assessment',aid,'person_mara');
     try{expect((await marker.readMaterialized(context(),r.id)).ok).toBe(true);expect(await marker.buildMaterialized(context(),aid)).toEqual(invisible);}finally{await exec('UPDATE "grant" SET role=? WHERE scope_type=? AND scope_id=? AND principal_id=?','owner','assessment',aid,'person_mara');}

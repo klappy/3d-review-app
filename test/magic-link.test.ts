@@ -232,7 +232,8 @@ describe("routes", () => {
     expect(first.status).toBe(303);
     const cookie = first.headers.get("set-cookie")!;
     const s1 = sessionFrom(first)!;
-    expect(cookie).toBe(`session=${s1}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=2592000`);
+    expect(cookie).toContain(`session=${s1}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=2592000`);
+    expect(cookie).toContain("review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
     const p = await resolvePrincipal(new Request(ORIGIN + "/v2/me", { headers: { cookie: `session=${s1}` } }), env);
     expect(p).toMatchObject({ kind: "user", id: "usr_owner_b38" }); // same row the Access route maps to → existing grants apply
     const row: any = await db.prepare("SELECT expires_at, created_at FROM session WHERE token_hash = ?").bind(await sha256(s1)).first();
@@ -273,13 +274,15 @@ describe("routes", () => {
     const s = sessionFrom(await post("/v2/auth/email/open", { t: token, e: "leaver@example.invalid" }))!;
     const out = await app.fetch(new Request(ORIGIN + "/v2/auth/session", { method: "DELETE", headers: { cookie: `session=${s}`, origin: ORIGIN } }), env);
     expect(out.status).toBe(200);
-    expect(out.headers.get("set-cookie")).toBe("session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+    expect(out.headers.get("set-cookie")).toContain("session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+    expect(out.headers.get("set-cookie")).toContain("review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
     expect(await db.prepare("SELECT COUNT(*) AS n FROM session WHERE token_hash = ?").bind(await sha256(s)).first("n")).toBe(0);
     expect((await resolvePrincipal(new Request(ORIGIN + "/", { headers: { cookie: `session=${s}` } }), env)).kind).toBe("anonymous");
     // B44: a second sign-out with the now-dead cookie (a stale tab) still expires it — the UI treats NOT_AUTHENTICATED as signed out.
     const again = await app.fetch(new Request(ORIGIN + "/v2/auth/session", { method: "DELETE", headers: { cookie: `session=${s}`, origin: ORIGIN } }), env);
     expect(again.status).toBe(401);
-    expect(again.headers.get("set-cookie")).toBe("session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+    expect(again.headers.get("set-cookie")).toContain("session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+    expect(again.headers.get("set-cookie")).toContain("review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
   });
   it("landing page: nonce'd script only, token read from the fragment, same-origin referrer", async () => {
     const res = await app.fetch(new Request(ORIGIN + "/v2/auth/email/open"), env);
