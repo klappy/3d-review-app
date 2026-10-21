@@ -107,7 +107,7 @@ describe("d. Page gap={n} reads the --sp-n step (lane setup; design-system.md 8.
 
 // c and e need no app change: the contract decides them (RESULTS-shared.md).
 describe("c. breadcrumb separator stays the contract's \u203a (design-system.md section 2 R12 .crumb anatomy; boards still draw / until R3)", () => {
-  it("topbar.css draws \u203a in --ink-3 by CSS, never a typed / (the boards' / is the V-38 break R12 replaces)", () => {
+  it("topbar.css draws \u203a in --ink-3 from CSS and no / separator (R12; the boards' / waits on R3)", () => {
     const top = noComments(read("components/topbar.css"));
     expect(top).toContain('.crumb li+li::before{content:"\u203a";color:var(--ink-3)}');
     expect(top).not.toMatch(/content:\s*"\/"/);

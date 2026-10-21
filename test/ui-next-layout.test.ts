@@ -99,7 +99,7 @@ describe("nesting rules (8.1)", () => {
     expect(container.querySelector("[style]")).toBeNull();
     // the CSS never gives a primitive or card a margin other than the Page's auto centring.
     // OPEN (not an app row): the setup lane's contract row `.app .su-revcol>.l-row{margin-top:var(--sp-1)}` (cookbook generator gen.py:238
-    // @a594830, design-system.md §8.10) breaks §8.1 "never a child's margin" (design-system.md:669); the canvas owns its fix. Named here so a
+    // @a594830, design-system.md §8.10) breaks the §8.1 parent-gap spacing rule (design-system.md:669); the canvas owns its fix. Named here so a
     // new margin anywhere else still fails.
     const OPEN_MARGIN_ROWS = [".app .su-revcol>.l-row"];
     for (const m of css.matchAll(/(\.l-[a-z-]+(?:\[[^\]]*\])?)\{([^}]*)\}/g)) {
