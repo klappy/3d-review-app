@@ -62,7 +62,7 @@
 {#snippet check()}<Icon d={I.check} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title={s.phoneTitle} parent={review ? data.review.title : data.workspace.short} {back} initials={data.user.initials} home={HOME} />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.user.workspace} home={HOME} crumbs={review ? [{ label: data.review.project, href: "#project" }, { label: data.review.title }] : []} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Send invitation" />{/if}{/snippet}
-{#snippet person(r)}<Row gap={3}><span class="av" aria-hidden="true">{r.initials}</span><div><div><b>{r.name}</b></div><div class="small">{r.sub}</div></div></Row>{/snippet}
+{#snippet person(r)}<Row gap={3}><span class="av" aria-hidden="true">{r.initials}</span><div><div>{r.name}</div><div class="small">{r.sub}</div></div></Row>{/snippet}
 {#snippet personRow(r)}<span class="av" aria-hidden="true">{r.initials}</span><div class="list-body"><div class="list-title">{r.name}</div><div class="small">{r.sub}</div></div>{/snippet}
 {#snippet roleSelect(id, label, opts, selected)}<label class="sel"><select class="in" {id} aria-label={label}>{#each opts as [value, text]}<option {value} selected={value === selected}>{text}</option>{/each}</select><Icon d={I.chev} /></label>{/snippet}
 

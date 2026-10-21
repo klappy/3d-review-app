@@ -94,7 +94,7 @@ describe("People: roster gating comes from ui/scope-invitations.js", () => {
   it("review scope (owner): role select only where canUpdateGrant, inherited row changes on the project, pending invitation row", () => {
     const a = mount(lane.people);
     const rows = [...a.querySelectorAll("tbody tr")];
-    expect(rows.map((r) => [r.querySelector(".av")!.textContent, r.querySelector("b")!.textContent, r.querySelector("td .small")!.textContent])).toEqual([["BK", "Bincy Kurian (you)", "bincy@example.org"], ["AV", "Andy V.", "andy@example.org"], ["SW", "Steve W.", "steve@example.org"], ["?", "rina@example.org", "Invited 2 Oct · not yet accepted"]]);
+    expect(rows.map((r) => [r.querySelector(".av")!.textContent, r.querySelector("td .l-row > div > div")!.textContent, r.querySelector("td .small")!.textContent])).toEqual([["BK", "Bincy Kurian (you)", "bincy@example.org"], ["AV", "Andy V.", "andy@example.org"], ["SW", "Steve W.", "steve@example.org"], ["?", "rina@example.org", "Invited 2 Oct · not yet accepted"]]);
     expect(rows.map((r) => r.querySelectorAll("td")[1].querySelector("select") !== null)).toEqual([false, true, true, false]);
     expect(rows.map((r) => [...r.querySelectorAll("td")[3].querySelectorAll(".btn, .small")].map((b) => b.textContent))).toEqual([["Transfer ownership"], ["Change on the project"], ["Remove"], ["Resend", "Withdraw"]]);
     expect(text(rows[1])).toContain("from project");
