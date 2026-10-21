@@ -2,8 +2,8 @@
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): PrintQR.dc.html (wide dialog over the review's survey groups: which surveys,
      layout, text language, paper size, Cancel + Print, and the scaled A4 preview), PrintQRPhone.dc.html (adapted page, then the OS print
      sheet: "Dialog and sheet states" phone map, Print → hand-off). Contracts: §2 Option row (R10, .row-opt.compact), Field and button
-     states (R16: a control that cannot act is disabled and says why), Paper (R5: the preview is the 794px sheet scaled down, here by the SVG
-     viewBox so no inline transform is needed), §1.3 paper scope, R14 (title row with Close; focus opens on the title, tabindex -1; Close,
+     states (R16: a control that cannot act is disabled and says why), Paper (R5: the preview is the 794px A4 sheet, .paper[data-sheet=a4],
+     scaled down, here by the SVG viewBox so no inline transform is needed), §1.3 paper scope, R14 (title row with Close; focus opens on the title, tabindex -1; Close,
      Escape and the backdrop go back to Collect).
      Controlled: the ticked surveys, the layout, the text language and the paper size are $state. "Print N pages", each layout's page count,
      the preview caption, the preview's survey (the first ticked) and its "1 of N" footer follow them. Nothing ticked: Print is disabled
@@ -88,12 +88,14 @@
           <span class="micro">Preview · {p.layouts[layout].title.toLowerCase()} · {paper} · {pagesLabel(n)}</span>
           {#if first}
             <svg class="psheet" width="300" viewBox="0 0 794 1123" aria-hidden="true"><foreignObject width="794" height="1123">
-              <div class="paper l-card l-stack" data-gap="5" data-align="center">
-                <span class="t-16">3D Review · {m.review.title}</span>
-                <Qr cells={first.qr} size="page" />
-                <span class="ptitle">{first.name}</span>
-                <span class="kbd">{first.link}</span>
-                <span class="t-16">Scan to answer · or enter code {first.code.slice(0, 3)} {first.code.slice(3)} at {m.linkHost.split("/")[0]} · {p.pageLanguages}</span>
+              <div class="paper" data-sheet="a4">
+                <div class="l-stack" data-gap="5" data-align="center">
+                  <span class="t-16">3D Review · {m.review.title}</span>
+                  <Qr cells={first.qr} size="page" />
+                  <span class="ptitle">{first.name}</span>
+                  <span class="kbd">{first.link}</span>
+                  <span class="t-16">Scan to answer · or enter code {first.code.slice(0, 3)} {first.code.slice(3)} at {m.linkHost.split("/")[0]} · {p.pageLanguages}</span>
+                </div>
                 <div class="pfoot"><span>1 of {n}</span></div>
               </div>
             </foreignObject></svg>
