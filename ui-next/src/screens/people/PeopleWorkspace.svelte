@@ -3,7 +3,7 @@
      The People screen at workspace scope (./People.svelte); the route's props pass through. -->
 <script>
   import People from "./People.svelte";
-  let { phone = false, theme = "light", state } = $props();
+  let { phone = false, theme = "light" } = $props(); // any ?state= renders the default (no board draws one)
 </script>
 
-<People scope="workspace" {phone} {theme} {state} />
+<People scope="workspace" {phone} {theme} />

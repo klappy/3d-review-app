@@ -1,10 +1,14 @@
 <!-- UI Next (v4) People screen ("People with access"). Status: provisional (playbook rule 12).
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): People.dc.html + PeoplePhone.dc.html (scope "review", screen people),
      PeopleWorkspace.dc.html + PeopleWorkspacePhone.dc.html (scope "workspace", screen people-workspace via PeopleWorkspace.svelte).
-     Composed of AppShell > Page > Card / Stack / Row / Grid and the section 2 components; no <style>, no inline style.
+     Composed of AppShell > Page > Card / Row and the section 2 components, plus contract rows the shared components do not take as
+     props yet (.l-row[data-align|justify], [data-grow], .l-card[data-pad=work|form|rows], .l-grid[data-tpl=invite], .tbl, .t-24,
+     .td[data-align=end]: base.css at the PIN); no <style>, no inline style.
      Data: ui-next/fixtures/people/people.json through ./people-data.js (ui/scope-invitations.js gating: role select only where
      canUpdateGrant, Remove only where canRevokeGrant, invite roles from invitationRoles). The boards draw no .btn-primary on desktop;
-     phone: "Send invitation" in the phone-bar. Menus follow the Menu contract: the destructive item is last, after an hr. -->
+     phone: "Send invitation" in the phone-bar. Menus follow the Menu contract: the destructive item is last, after an hr.
+     Links: ../href.js (carries w and theme); cross-lane targets (collect, setup1, close-collection, print, share, results, next-step,
+     project) stay # placeholders until those lanes register them on this branch (test/ui-next-links.test.ts). -->
 <script module>
   export const SCOPES = Object.freeze(["review", "workspace"]);
 </script>
@@ -12,7 +16,6 @@
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
   import Card from "../../Card.svelte";
-  import Stack from "../../Stack.svelte";
   import Row from "../../Row.svelte";
   import TopBar from "../../TopBar.svelte";
   import PhoneHeader from "../../PhoneHeader.svelte";
@@ -22,22 +25,23 @@
   import Menu from "../../Menu.svelte";
   import Icon from "../../Icon.svelte";
   import { I } from "../../icons.js";
+  import { href } from "../href.js";
   import { P } from "./people-icons.js";
   import { rosterRows, inviteOptions, ROLE_ORDER } from "./people-data.js";
   import data from "../../../fixtures/people/people.json";
 
-  let { scope = "review", phone = false, theme = "light", state } = $props();
+  // ?state=: no board draws one, so any value (the route passes it as state) renders the default; the prop is not read.
+  let { scope = "review", phone = false, theme = "light" } = $props();
   if (!SCOPES.includes(scope)) throw new TypeError(`People: unknown scope "${String(scope)}" (review | workspace)`);
-  if (state !== undefined) throw new TypeError(`People: no board draws state "${String(state)}"`);
   const review = scope === "review";
   const s = review ? data.review : data.workspace;
-  const COLLECT = "#collect", WORKSPACE = "?screen=workspace";
+  const COLLECT = "#collect", WORKSPACE = href("workspace"), HOME = href("home");
   const back = review ? COLLECT : WORKSPACE;
   const roster = $derived(rosterRows(phone ? data.phone.roster : s.roster, { me: phone ? data.phone.me : s.me, can: s.can, roles: data.roles }));
   const options = $derived(inviteOptions(roster.myRole, phone ? data.phone.inviteLabels : data.inviteLabels));
   const MORE = [
     { label: "Edit details and dates", href: "#setup", icon: I.pen },
-    { label: "People with access", href: "?screen=people", icon: I.people },
+    { label: "People with access", href: href("people"), icon: I.people },
     { label: "Close collection now", href: "#close-collection", icon: P.lock },
     { label: "Meeting offline? Print and paper", href: "#offline", icon: P.print },
     { kind: "hr" },
@@ -56,9 +60,10 @@
 {#snippet qr()}<Icon d={P.qr} />{/snippet}
 {#snippet mail()}<Icon d={I.mail} />{/snippet}
 {#snippet check()}<Icon d={I.check} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title={s.phoneTitle} parent={review ? data.review.title : data.workspace.short} {back} initials={data.user.initials} />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.user.workspace} crumbs={review ? [{ label: data.review.project, href: "#project" }, { label: data.review.title }] : []} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title={s.phoneTitle} parent={review ? data.review.title : data.workspace.short} {back} initials={data.user.initials} home={HOME} />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.user.workspace} home={HOME} crumbs={review ? [{ label: data.review.project, href: "#project" }, { label: data.review.title }] : []} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Send invitation" />{/if}{/snippet}
 {#snippet person(r)}<Row gap={3}><span class="av" aria-hidden="true">{r.initials}</span><div><div><b>{r.name}</b></div><div class="small">{r.sub}</div></div></Row>{/snippet}
+{#snippet personRow(r)}<span class="av" aria-hidden="true">{r.initials}</span><div class="list-body"><div class="list-title">{r.name}</div><div class="small">{r.sub}</div></div>{/snippet}
 {#snippet roleSelect(id, label, opts, selected)}<label class="sel"><select class="in" {id} aria-label={label}>{#each opts as [value, text]}<option {value} selected={value === selected}>{text}</option>{/each}</select><Icon d={I.chev} /></label>{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
@@ -69,66 +74,63 @@
       <div><label class="lbl" for="pp-inv">Invite by email</label><input class="in" type="email" inputmode="email" placeholder="name@example.org" id="pp-inv" /></div>
       <div><label class="lbl" for="pp-role">Role</label>{@render roleSelect("pp-role", undefined, options, options[0]?.[0])}</div>
     </Card>
-    <Card pad="list" gap={2} label={`People · ${roster.rows.length}`}>
+    <section class="glass l-card" data-pad="rows" aria-label={`People · ${roster.rows.length}`}>
       <span class="micro">People · {roster.rows.length}</span>
       {#each roster.rows as r (r.key)}
-        <hr class="hr" />
-        <Row split gap={3}>
-          {@render person(r)}
+        <div class="list-row">
+          {@render personRow(r)}
           {#if r.actions.length}<Menu id={`pp-${r.key}`} summary={dots} summaryClass="btn btn-quiet" label={`Actions for ${r.name}`} items={menuItems(r.actions)} />{/if}
-        </Row>
+        </div>
       {/each}
-    </Card>
+    </section>
   {:else}
     <Page gap={5}>
       {#if review}
-        <Row split gap={5}>
-          <Stack gap={2}>
+        <div class="l-row" data-gap="5" data-align="start">
+          <div class="l-stack" data-gap="2" data-grow="">
             <Row gap={3}><h1 class="title-page">{data.review.title}</h1><Pill stage={data.review.stage} /></Row>
             <p class="small t-15">{data.review.meta} · {data.review.updated}</p>
-          </Stack>
+          </div>
           <Row gap={2}>
             <Menu id="pp-more" summary={dots} summaryClass="btn btn-icon" label="More actions" title="More actions" items={MORE} />
             <Button label="Share the survey" href="#share" lead={qr} />
           </Row>
-        </Row>
+        </div>
         <nav class="glass tabs" aria-label="Review stages">
           {#each TABS as [name, href, mark], i}
             <a class="tab" {href} aria-current={mark === "now" ? "page" : undefined}>{#if mark === "done"}<span class="dot done"><Icon d={I.check} /></span>{:else}<span class="dot">{i + 1}</span>{/if}{name}{#if mark === "now"} <span class="now">Now</span>{/if}</a>
           {/each}
         </nav>
       {:else}
-        <Stack gap={1}><span class="small"><a class="link" href={WORKSPACE}>{data.workspace.name}</a></span><h1 class="title-page">People</h1></Stack>
+        <div><a class="link small" href={WORKSPACE}>{data.workspace.name}</a><h1 class="title-page">People</h1></div>
       {/if}
-      <Card hi gap={5} label={s.heading}>
-        <Stack gap={1}>
-          <h2 class="h2">{s.heading}</h2>
+      <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label={s.heading}>
+        <div>
+          <h2 class="h2 t-24">{s.heading}</h2>
           {#if review}<p class="small t-15">Access to <strong>{data.review.title}</strong>. People on the whole <strong>{data.review.project}</strong> project see it too.</p>
           {:else}<p class="small t-15">Access to <strong>{data.workspace.name}</strong> and everything in it. Someone invited only to a project or a review does not appear here.</p>{/if}
-        </Stack>
-        <div class="solid l-card l-grid" data-cols="2" data-gap="3">
-          <div><label class="lbl" for="pp-invite">Invite someone</label><input class="in" type="email" placeholder="name@example.org" id="pp-invite" /></div>
-          <Row gap={3}>
-            <div><label class="lbl" for="pp-as">As</label>{@render roleSelect("pp-as", undefined, options, options[0]?.[0])}</div>
-            <Button label="Send invitation" lead={mail} />
-          </Row>
         </div>
-        <table>
-          <thead><tr><th class="th">Person</th><th class="th">Role here</th><th class="th">What they can do</th><th class="th">Actions</th></tr></thead>
+        <div class="solid l-card l-grid" data-pad="form" data-tpl="invite" data-gap="3">
+          <div><label class="lbl" for="pp-invite">Invite someone</label><input class="in" type="email" placeholder="name@example.org" id="pp-invite" /></div>
+          <div><label class="lbl" for="pp-as">As</label>{@render roleSelect("pp-as", undefined, options, options[0]?.[0])}</div>
+          <Button label="Send invitation" lead={mail} />
+        </div>
+        <table class="tbl">
+          <thead><tr><th class="th">Person</th><th class="th">Role here</th><th class="th">What they can do</th><th class="th" data-align="end">Actions</th></tr></thead>
           <tbody>
             {#each roster.rows as r (r.key)}
               <tr>
                 <td class="td">{@render person(r)}</td>
                 <td class="td">{#if r.editable}{@render roleSelect(undefined, `Role for ${r.name}`, ROLE_ORDER.map((role) => [role, data.roles[role]]), r.role)}{:else}{r.roleLabel}{/if}{#if r.via}<div class="micro">from {r.via}</div>{/if}</td>
                 <td class="td"><span class="small">{r.can}</span></td>
-                <td class="td">{#if r.note}<span class="small">{r.note}</span>{:else}<Row gap={1}>{#each r.actions as a}<Button label={a} variant="quiet" />{/each}</Row>{/if}</td>
+                <td class="td" data-align="end">{#if r.note}<span class="small">{r.note}</span>{:else}{#each r.actions as a}<Button label={a} variant="quiet" />{/each}{/if}</td>
               </tr>
             {/each}
           </tbody>
         </table>
         <p class="small">{data.footnote}</p>
-      </Card>
-      <Row split><span aria-hidden="true"></span><Button label="Done" variant="quiet" href={back} trail={check} /></Row>
+      </div>
+      <div class="l-row" data-justify="end"><Button label="Done" variant="quiet" href={back} trail={check} /></div>
     </Page>
   {/if}
 </AppShell>

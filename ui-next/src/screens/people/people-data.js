@@ -4,7 +4,7 @@
 // (which /v2/me/invitations rows are well formed). The fixtures under ui-next/fixtures/people/ use those modules' input shapes.
 import { canManageScope, canRevokeGrant, canUpdateGrant, invitationRoles } from "../../../../ui/scope-invitations.js";
 import { mayGroup } from "../../../../ui/workspace-manager.js";
-import { pendingInvitations } from "../../../../ui/v3/components/invite.js";
+import { invitationParts, pendingInvitations } from "../../../../ui/v3/components/invite.js";
 
 export const ROLE_ORDER = Object.freeze(["owner", "member", "viewer"]);
 const roleOf = (grants, me) => grants.find((g) => g.principal_id === me)?.role ?? null;
@@ -51,11 +51,18 @@ export function groupRows(group) {
   return (group?.candidates ?? []).map((c) => ({ ...c, can: mayGroup(group.workspaceRole, c.directRole) }));
 }
 
-// Own pending invitations, filtered by the current UI's own parser.
+// The current UI's words for an invitation whose scope name the server did not send (ui/v3/components/invite.js mountInvitations).
+export const NO_NAME = "Name not available";
+
+// Own pending invitations, filtered by the current UI's own parser. A missing scope name (pendingInvitations sets null) is
+// detected by invitationParts, as the current UI does, and reads NO_NAME; invitationParts' name is HTML-escaped for innerHTML,
+// so the raw name is used here (Svelte escapes text).
 export function invitationRows(result, { kinds, can, roles }) {
-  return pendingInvitations(result).map((i) => ({
-    key: i.id, name: i.scope.name, kind: kinds[i.scope.type] ?? i.scope.type, role: i.role, from: i.from, when: i.when, expires: i.expires,
-    title: `${i.scope.name} · ${kinds[i.scope.type] ?? i.scope.type}`,
-    line: `From ${i.from} · as a ${roles[i.role]} — ${can[i.role]}${i.expires ? ` · expires ${i.expires}` : ""}`,
-  }));
+  return pendingInvitations(result).map((i) => {
+    const kind = kinds[i.scope.type] ?? i.scope.type, name = invitationParts(i).name === null ? NO_NAME : i.scope.name;
+    return {
+      key: i.id, name, kind, role: i.role, from: i.from, when: i.when, expires: i.expires, title: `${name} · ${kind}`,
+      line: `From ${i.from} · as a ${roles[i.role]} — ${can[i.role]}${i.expires ? ` · expires ${i.expires}` : ""}`,
+    };
+  });
 }

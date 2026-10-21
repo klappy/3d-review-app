@@ -5,7 +5,8 @@
      Composed of AppShell > Page > Card / Row and the section 2 components; no <style>, no inline style. The code fallback is the
      section 2 Disclosure (details.disc): the boards draw a bare <details> with a .link summary and inline list-style/min-height/flex
      (rule 16 debt; not .dd, which means a menu). One .btn-primary per page: desktop
-     inside the card ("Email me a sign-in link" / "I've opened the link"); phone in the phone-bar. Data: ui-next/fixtures/people/sign-in.json. -->
+     inside the card ("Email me a sign-in link" / "I've opened the link"); phone in the phone-bar. Data: ui-next/fixtures/people/sign-in.json.
+     Links: ../href.js (carries w and theme); cross-lane targets (results, p-code) stay # placeholders until registered on this branch. -->
 <script module>
   export const STEPS = Object.freeze(["email", "check"]);
 </script>
@@ -20,13 +21,13 @@
   import Disclosure from "../../Disclosure.svelte";
   import Icon from "../../Icon.svelte";
   import { I } from "../../icons.js";
+  import { href } from "../href.js";
   import d from "../../../fixtures/people/sign-in.json";
 
-  let { step = "email", phone = false, theme = "light", state } = $props();
+  // ?state=: no board draws one, so any value (the route passes it as state) renders the default; the prop is not read.
+  let { step = "email", phone = false, theme = "light" } = $props();
   if (!STEPS.includes(step)) throw new TypeError(`SignIn: unknown step "${String(step)}" (email | check)`);
-  if (state !== undefined) throw new TypeError(`SignIn: no board draws state "${String(state)}"`);
-  const w = phone ? "&w=phone" : "";
-  const HOME = `?screen=home${w}`, AGAIN = `?screen=sign-in${w}`, CHECK = `?screen=sign-in-check${w}`;
+  const HOME = href("home"), AGAIN = href("sign-in"), CHECK = href("sign-in-check"), LANDING = href("landing");
   const email = phone ? d.email.phone : d.email.desktop;
   const check = step === "check";
   const CODE = "Link not working? Use the 6-digit code instead";
@@ -34,9 +35,9 @@
 
 {#snippet mail()}<Icon d={I.mail} />{/snippet}
 {#snippet arrow()}<Icon d={I.arrow} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="public" signIn={false} home="?screen=landing&w=phone" />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="public" signIn={false} home={LANDING} />{/if}{/snippet}
 {#snippet bar()}{#if phone}{#if check}<PhoneBar label="I've opened the link" href={HOME} />{:else}<PhoneBar label="Email me a sign-in link" href={CHECK} />{/if}{/if}{/snippet}
-{#snippet badge()}<span class="icn icn-lens" data-lens="team" aria-hidden="true"><Icon d={I.mail} /></span>{/snippet}
+{#snippet badge()}<span class="icn" data-size={phone ? "56" : "64"} data-lens="team" aria-hidden="true"><Icon d={I.mail} /></span>{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
@@ -57,12 +58,12 @@
         <div><label class="lbl" for="si-email">Email</label><input class="in" id="si-email" type="email" value={email} inputmode="email" autocomplete="email" /></div>
         <p class="small">Answering a survey? <a class="link" href="#survey-code">enter your code</a> instead.</p>
       </Card>
-      <p class="small"><a class="link" href="?screen=landing&w=phone">Read about 3D Review</a> · <a class="link" href="#results">open the sample review</a></p>
+      <p class="small"><a class="link" href={LANDING}>Read about 3D Review</a> · <a class="link" href="#results">open the sample review</a></p>
     {/if}
   {:else}
     <Page width="read">
       {#if check}
-        <Card hi gap={5} label="Check your email">
+        <div class="glass-hi l-card l-stack" data-gap="5" data-align="center" role="group" aria-label="Check your email">
           {@render badge()}
           <h1 class="h1">Check your email</h1>
           <p class="small body-16">We sent a sign-in link to <strong>{email}</strong>. It works for {d.minutes} minutes. Check your spam folder if it is slow.</p>
@@ -72,7 +73,7 @@
             <p class="small">Some browsers submit a pasted code on their own. If you see an error, open the link once more.</p>
           </Disclosure>
           <p class="small">Nothing arrived? <a class="link" href={AGAIN}>Send it again</a> · <a class="link" href={AGAIN}>Use a different email</a></p>
-        </Card>
+        </div>
       {:else}
         <Card hi gap={5} label="Sign in">
           <h1 class="h1">Sign in</h1>
@@ -80,7 +81,7 @@
           <div><label class="lbl" for="si-email">Email</label><input class="in" id="si-email" type="email" value={email} inputmode="email" autocomplete="email" /></div>
           <Row><Button label="Email me a sign-in link" variant="primary" lg href={CHECK} lead={mail} /></Row>
           <p class="small">Answering a survey? <a class="link" href="#survey-code">enter your code</a> instead.</p>
-          <p class="small"><a class="link" href="?screen=landing">Read about 3D Review</a> · <a class="link" href="#results">open the sample review</a></p>
+          <p class="small"><a class="link" href={LANDING}>Read about 3D Review</a> · <a class="link" href="#results">open the sample review</a></p>
         </Card>
       {/if}
     </Page>

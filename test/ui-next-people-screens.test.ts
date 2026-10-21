@@ -13,7 +13,7 @@ import { REGISTRY, LANES } from "../ui-next/src/screens/registry.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { route } from "../ui-next/src/route.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { rosterRows, inviteOptions, groupRows, invitationRows } from "../ui-next/src/screens/people/people-data.js";
+import { rosterRows, inviteOptions, groupRows, invitationRows, NO_NAME } from "../ui-next/src/screens/people/people-data.js";
 // @ts-expect-error -- plain .mjs script, no type declarations
 import { lintDir } from "../scripts/ui-next-lint.mjs";
 import People from "../ui-next/src/screens/people/People.svelte";
@@ -75,8 +75,13 @@ describe("each board renders as a screen", () => {
       expect(mount(lane[name], { phone, theme: "dark" }).getAttribute("data-theme")).toBe("dark");
     });
   }
-  it("a ?state= no board draws, an unknown scope or an unknown step throws", () => {
-    for (const C of Object.values(lane)) expect(() => mount(C, { state: "nope" })).toThrow(/no board draws state "nope"/);
+  it("an unknown ?state= renders the default state with one h1 (no board draws a state); an unknown scope or step throws", () => {
+    for (const [name, C] of Object.entries(lane)) for (const phone of [false, true]) {
+      const plain = mount(C, { phone });
+      const a = mount(C, { phone, state: "nope" });
+      expect(a.querySelectorAll("h1").length, name).toBe(1);
+      expect(text(a), name).toBe(text(plain));
+    }
     expect(() => mount(People, { scope: "project" })).toThrow(/unknown scope/);
     expect(() => mount(SignIn, { step: "code" })).toThrow(/unknown step/);
   });
@@ -119,8 +124,12 @@ describe("People: roster gating comes from ui/scope-invitations.js", () => {
 describe("Workspace and the group dialog", () => {
   it("desktop: five stats, five project cards with stage pills, levels or No results yet, New project is the primary", () => {
     const a = mount(Workspace);
-    expect([...a.querySelectorAll(".num.h1")].map((n) => n.textContent)).toEqual(["12", "9", "3", "2", "7"]);
-    expect([...a.querySelectorAll("a.card-link.glass")].map((c) => c.querySelector("h3")!.textContent)).toEqual(["Hindi New Testament", "Odia New Testament", "Kurubaru Scripture", "ISL Mark", "Lao Old Testament"]);
+    expect([...a.querySelectorAll('.l-grid[data-cols="5"] .num[data-size="36"]')].map((n) => n.textContent)).toEqual(["12", "9", "3", "2", "7"]);
+    const cards = [...a.querySelectorAll("a.card-link.glass")];
+    expect(cards.map((c) => c.querySelector("h3")!.textContent)).toEqual(["Hindi New Testament", "Odia New Testament", "Kurubaru Scripture", "ISL Mark", "Lao Old Testament"]);
+    // F5: no aria-label on the card links, so their content (stage, language, counts, organisations, levels) names them
+    for (const c of cards) expect(c.hasAttribute("aria-label")).toBe(false);
+    expect(a.querySelectorAll('.av[data-size="28"][data-logo]').length).toBeGreaterThan(0);
     expect([...a.querySelectorAll("a.card-link .pill")].map((x) => x.getAttribute("data-stage"))).toEqual(["collecting", "setup", "collecting", "done", "setup"]);
     expect(a.querySelectorAll(".lvl").length).toBe(9);
     expect(a.querySelector(".btn-primary")!.textContent).toBe("New project");
@@ -135,7 +144,27 @@ describe("Workspace and the group dialog", () => {
       expect([...dlg.querySelectorAll("input.rd")].map((r) => (r as HTMLInputElement).disabled)).toEqual([false, false, true]);
       expect(a.querySelectorAll(".btn-primary").length).toBe(1);
       expect(dlg.querySelector(".btn-primary")!.textContent).toBe("Add to workspace");
+      // F1: the dialog.glass-hi rows (opaque --dialog fill, --scrim backdrop); phone = the bottom sheet; no l-card or page wrapper inside
+      expect(dlg.className).toBe(phone ? "glass-hi sheet" : "glass-hi");
+      expect(dlg.querySelector(".l-page, .l-card")).toBeNull();
+      expect(dlg.querySelector('span[aria-hidden="true"]:empty:not(.sheet-handle)')).toBeNull();
+      // F6: the row text grows, so the Direct owner / Inherited tag sits at the row's end (desktop draws tags)
+      for (const row of dlg.querySelectorAll("label.row-opt")) expect(row.querySelector("[data-grow]")).not.toBeNull();
+      expect(dlg.querySelectorAll(".tag").length).toBe(phone ? 0 : 3);
     }
+  });
+  it("phone links keep &w=phone and ?theme= (F4): header back, crumb and 'Your reviews across workspaces'", () => {
+    window.history.replaceState(null, "", "/next/?ui_next=on&screen=people-workspace&w=phone&theme=dark");
+    try {
+      const a = mount(lane["people-workspace"], { phone: true });
+      const hrefs = [...a.querySelectorAll("a[href^='?']")].map((x) => x.getAttribute("href"));
+      expect(hrefs.length).toBeGreaterThan(0);
+      for (const h of hrefs) expect(h, h!).toMatch(/[?&]w=phone(&|$)/);
+      expect(hrefs).toContain("?ui_next=on&screen=workspace&w=phone&theme=dark");
+      window.history.replaceState(null, "", "/next/?ui_next=on&screen=workspace&w=phone");
+      const w = mount(lane.workspace, { phone: true });
+      expect([...w.querySelectorAll("a.link")].find((x) => text(x) === "Your reviews across workspaces")!.getAttribute("href")).toBe("?ui_next=on&screen=home&w=phone");
+    } finally { window.history.replaceState(null, "", "/"); }
   });
 });
 
@@ -177,5 +206,9 @@ describe("people-data.js adapts through the current UI's modules", () => {
     expect(groupRows({ workspaceRole: "member", candidates: [{ title: "A", directRole: "owner" }, { title: "B", directRole: "member" }] }).map((r: { can: boolean }) => r.can)).toEqual([true, false]);
     const rows = invitationRows({ invitations: [...invites.desktop.invitations, { id: "", role: "viewer", scope: { type: "project" } }, { id: "x", scope: { type: "project", name: "No role" } }] }, { kinds: invites.kinds, can: invites.can, roles: invites.roles });
     expect(rows.map((r: { title: string }) => r.title)).toEqual(["Odia New Testament · project", "Psalms reading group · review"]);
+    // F3: a scope name the server did not send (pendingInvitations sets null) reads the current UI's words, never "null"
+    const unnamed = invitationRows({ invitations: [{ id: "n", role: "member", from: "Andy V.", scope: { type: "project", name: null } }, { id: "e", role: "viewer", from: "Steve W.", scope: { type: "assessment", name: "" } }] }, { kinds: invites.kinds, can: invites.can, roles: invites.roles });
+    expect(unnamed.map((r: { name: string; title: string }) => [r.name, r.title])).toEqual([[NO_NAME, `${NO_NAME} · project`], [NO_NAME, `${NO_NAME} · review`]]);
+    expect(unnamed.map((r: { title: string }) => r.title).join(" ")).not.toContain("null");
   });
 });

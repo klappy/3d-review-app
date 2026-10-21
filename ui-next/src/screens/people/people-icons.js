@@ -1,4 +1,4 @@
-// UI Next (v4) people lane icon paths: single-path forms of the board SVGs (canvas People, Workspace, WorkspacePhone, PeoplePhone),
+// UI Next (v4) people lane icon paths: single-path forms of the board SVGs (canvas People, Workspace, WorkspacePhone, PeoplePhone; search: Workspace "Find a project"),
 // for ../../Icon.svelte. Shared paths (mail, people, check, clock, globe, plus, arrow, chev, pen, x) come from ../../icons.js. Status: provisional.
 export const P = Object.freeze({
   dots: "M6 10.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0-3.2M12 10.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0-3.2M18 10.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0-3.2",
@@ -12,4 +12,5 @@ export const P = Object.freeze({
   lock: "M7.5 10.5h9a2.5 2.5 0 0 1 2.5 2.5v4.5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 17.5V13a2.5 2.5 0 0 1 2.5-2.5zM8 10.5V8a4 4 0 0 1 8 0v2.5",
   print: "M7 8V4h10v4M6 8h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2zM7 14h10v6H7z",
   church: "M12 3v4M10 5h4M5 21V12l7-5 7 5v9M10 21v-5h4v5",
+  search: "M17.5 11a6.5 6.5 0 1 1-13 0a6.5 6.5 0 1 1 13 0M20 20l-4.3-4.3",
 });

@@ -3,7 +3,7 @@
      The SignIn screen at step "check" (./SignIn.svelte); the route's props pass through. -->
 <script>
   import SignIn from "./SignIn.svelte";
-  let { phone = false, theme = "light", state } = $props();
+  let { phone = false, theme = "light" } = $props(); // any ?state= renders the default (no board draws one)
 </script>
 
-<SignIn step="check" {phone} {theme} {state} />
+<SignIn step="check" {phone} {theme} />
