@@ -77,8 +77,12 @@
       <ReviewHead {theme} title={R.review.title} stage="collecting" {meta} viewed="collect" live="collect" done={["prepare"]} deleteRefused={R.deleteRefused} action={{ label: "Share the survey", href: href("share", at), lead: "qr" }} />
       <Stack gap={4}><CollectGroups groups={R.groups} surveys={R.surveys} host={R.host} {theme} /></Stack>
       <dialog class="glass-hi" data-w="wide" aria-labelledby="pt" bind:this={dialog} {@attach modal}>
+        <!-- Fit on arrival at 1280x800 (VALIDATION-integration N1): the preview sits on the section 2 Paper preview row (./Paper.svelte,
+             .psheet[data-fit]), the form column steps at --sp-4 (the board's 20), the notice takes the .solid form well (16/18; the board
+             draws 12/14) and the preview column at --sp-2 (the board's 10), so the content is 748px in the 750px box and "Print 2 surveys"
+             shows whole without scrolling (Chromium 1194; was 1102px, then 790px with the scaled preview). -->
         <Grid cols={2} gap={6}>
-          <Stack gap={5}>
+          <Stack gap={4}>
             <!-- R14 Focus on open: long content focuses the title (tabindex -1; ./modal.js focuses [data-autofocus]). -->
             <div><h2 class="h2 t-24" id="pt" tabindex="-1" data-autofocus>Print paper surveys</h2><p class="small t-15">Each paper survey carries its QR code and an access code, so answers can be entered later and still land in the right survey.</p></div>
             <div role="group" aria-labelledby="pt-which">
@@ -93,7 +97,7 @@
               {@render language("pt-lang", "Language on paper")}
               <div><label class="lbl" for="pt-size">Paper size</label><label class="sel"><select class="in" id="pt-size">{#each D.sizes as o, i}<option selected={i === 0}>{o}</option>{/each}</select><Ico d={A.chev} /></label></div>
             </Grid>
-            <div class="solid l-card l-row" data-align="start" data-gap="3">
+            <div class="solid l-card l-row" data-pad="form" data-align="start" data-gap="3">
               <Ico d={A.warn} size={20} />
               <Stack gap={1}><h3 class="h3 t-15">{D.missing.title}</h3><p class="small">{D.missing.text} <a class="link" href={href("print", at)}>Try translating again</a> or print as is.</p></Stack>
             </div>
@@ -101,7 +105,7 @@
                  Disabled, "say why next to it"); the status line is always present (empty), so the reason is announced when it appears. -->
             <div class="l-row" data-justify="end" data-gap="2"><p class="small" role="status" id="pt-why">{#if !count}{NONE}{/if}</p><Button label="Cancel" variant="quiet" href={href("collect", at)} />{#if count}<Button label={printLabel} variant="primary" lg href={href("collect", at)} lead={print} />{:else}<Button label={printLabel} variant="primary" lg disabled ariaDescribedby="pt-why" lead={print} />{/if}</div>
           </Stack>
-          <Stack gap={3}>
+          <Stack gap={2}>
             <Row split gap={2}><span class="micro">{D.preview}</span><IconAction d={A.x} ariaLabel="Close" onclick={() => closeDialog(dialog)} /></Row>
             <Paper paper={R.paper} qr={R.qr.survey} />
           </Stack>
