@@ -59,3 +59,36 @@ describe("B2. the phone bar is pinned to the viewport foot on every phone screen
     document.body.innerHTML = "";
   });
 });
+
+/** Specificity (a, b, c) of one simple selector as these sheets write them; :where(...) counts zero. */
+const spec = (sel: string): [number, number, number] => {
+  const s = sel.replace(/:where\([^)]*\)/g, "").replace(/::[\w-]+/g, "");
+  const a = (s.match(/#[\w-]+/g) ?? []).length;
+  const b = (s.match(/\.[\w-]+|\[[^\]]+\]|:(?!where)[\w-]+(\([^)]*\))?/g) ?? []).length;
+  const c = (s.replace(/\[[^\]]+\]/g, "").match(/(^|[\s>+~])[a-z][\w-]*/gi) ?? []).length;
+  return [a, b, c];
+};
+const cmp = (x: number[], y: number[]) => x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+
+describe("B3. the phone disclosure padding never ties a generated row (setup N2: Setup4Phone inset; design-system.md 8.10)", () => {
+  const disc = rules(read("components/disclosure.css"));
+  const phone = disc.filter(([s]) => s.includes("data-w=phone"));
+  it("the phone padding is written under :where() at (0,2,1), the desktop rule's weight, and comes after it", () => {
+    expect(phone.map(([s]) => s)).toEqual([".app:where([data-w=phone]) details.disc"]);
+    expect(spec(phone[0][0])).toEqual([0, 2, 1]);
+    expect(spec(".app details.disc")).toEqual([0, 2, 1]);
+    expect(disc.findIndex(([s]) => s === ".app details.disc")).toBeLessThan(disc.indexOf(phone[0]));
+  });
+  it("every base.css row that sets a details.disc padding out-weighs it, so the import order (base.css first) no longer decides", () => {
+    const rows = rules(read("components/base.css")).filter(([s, d]) => /details\.disc(?![\w-])/.test(s) && /(^|;)\s*padding\s*:/.test(d)).flatMap(([s]) => s.split(","));
+    expect(rows).toContain(".app .su-ctx details.disc");
+    for (const r of rows) expect(cmp(spec(r.trim()), spec(phone[0][0])), r).toBeGreaterThan(0);
+  });
+  it("in a phone shell both selectors match the setup group disclosure; on desktop the phone rule does not", () => {
+    document.body.innerHTML = `<div class="app" data-w="phone"><div class="su-ctx"><details class="disc"><summary class="disc-sum">x</summary></details></div></div><div class="app"><details class="disc"></details></div>`;
+    const [ph, desk] = [...document.querySelectorAll("details.disc")];
+    expect(ph.matches(phone[0][0]) && ph.matches(".app .su-ctx details.disc")).toBe(true);
+    expect(desk.matches(phone[0][0])).toBe(false);
+    document.body.innerHTML = "";
+  });
+});
