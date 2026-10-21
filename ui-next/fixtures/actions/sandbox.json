@@ -1,0 +1,46 @@
+{
+ "_source": "Mock data for Sandbox / SandboxPhone (cookbook design/2026-10-15-glass-redesign/canvas). Status: provisional.",
+ "title": "Mark 1–4 draft · practice",
+ "phoneTitle": "Mark 1–4 draft (practice)",
+ "about": "A first-draft team of four, two years in, strong exegetical training, little community testing so far. Rural congregations; the pastor involved attends checking sessions; most readers prefer audio.",
+ "howMany": [
+  "Match the expected counts (8 · 15 · 7)",
+  "5 each",
+  "20 each"
+ ],
+ "lean": [
+  "Mixed, realistic",
+  "Optimistic team, confused community",
+  "Everyone agrees",
+  "Church uninvolved"
+ ],
+ "phoneHowMany": [
+  "30 responses",
+  "10 responses",
+  "100 responses"
+ ],
+ "simulated": 0,
+ "expected": 30,
+ "menu": [
+  {
+   "label": "Share the practice survey",
+   "href": "?ui_next=on&screen=share",
+   "icon": "qr"
+  },
+  {
+   "label": "Clear simulated responses",
+   "href": "?ui_next=on&screen=results",
+   "icon": "refresh"
+  },
+  {
+   "kind": "hr"
+  },
+  {
+   "label": "Delete this practice copy",
+   "href": "?ui_next=on&screen=home",
+   "icon": "x",
+   "danger": true
+  }
+ ],
+ "preview": "Practice print · Community, in Hindi · A4 · 3 pages"
+}
