@@ -1,0 +1,30 @@
+{
+ "_source": "Mock data for PaperEntry / PaperEntryPhone (cookbook design/2026-10-15-glass-redesign/canvas). Questions reuse review.json paper.questions. Status: provisional.",
+ "code": "K7Q 4F2",
+ "survey": {
+  "lens": "community",
+  "name": "Community",
+  "line": "· Community survey · 13 questions"
+ },
+ "answers": {
+  "1": "o1",
+  "2": [
+   "o0"
+  ],
+  "3": "o1"
+ },
+ "more": "… 10 more questions",
+ "today": [
+  "Community · 3 papers",
+  "Pastor involved in the work · 1 paper"
+ ],
+ "lastReceipt": {
+  "response_id": "R-2048-732"
+ },
+ "phone": {
+  "progress": "Paper · Community · sheet 7 · question 1 of 13",
+  "pct": 8,
+  "question": 1,
+  "answer": "o1"
+ }
+}

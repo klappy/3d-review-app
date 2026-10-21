@@ -10,5 +10,6 @@ import ActionPlan from "./ActionPlan.svelte";
 import Share from "./Share.svelte";
 import Print from "./Print.svelte";
 import Sandbox from "./Sandbox.svelte";
+import PaperEntry from "./PaperEntry.svelte";
 
-export default { "next-step": NextStep, "action-plan": ActionPlan, share: Share, print: Print, sandbox: Sandbox };
+export default { "next-step": NextStep, "action-plan": ActionPlan, share: Share, print: Print, sandbox: Sandbox, "paper-entry": PaperEntry };
