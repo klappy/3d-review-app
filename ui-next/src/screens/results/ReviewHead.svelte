@@ -4,7 +4,8 @@
      .l-row[data-align=start] (8.7 Collect lane rows): the buttons sit at the top of the title block, as the boards draw them.
      Phone (ResultsPhone and twins): project link, title + pill + quiet More actions (the collect menu sheet), then the stage tabs;
      the primary is the phone-bar's.
-     linkGap: the --sp step under the project link (ResultsPhone draws that link as a 44px target with an inline min-height, so it passes 5).
+     linkGap: the --sp step under the project link: 1 as the nested phone boards draw it (gap 4); ResultsPhone draws that link as a 44px
+     target with an inline min-height and no gap, so it passes 5.
      responses: the count the meta line and the refused delete both say (default review.responses; ResultsHeld passes its closed count). -->
 <script>
   import Row from "../../Row.svelte";
@@ -17,7 +18,7 @@
   import StageTabs from "./StageTabs.svelte";
   import { G } from "./icons.js";
   import { out } from "./links.js";
-  let { review, phone = false, primary, responses, linkGap = 2 } = $props();
+  let { review, phone = false, primary, responses, linkGap = 1 } = $props();
   if (!review || typeof review.title !== "string") throw new TypeError("ReviewHead: review.title is required");
   if (!phone && !(primary && primary.label)) throw new TypeError("ReviewHead: the desktop head holds the page's one primary");
   const n = $derived(responses ?? review.responses);

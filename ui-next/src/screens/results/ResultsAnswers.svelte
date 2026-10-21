@@ -42,6 +42,7 @@
 {#snippet download()}<Glyph d={G.download} />{/snippet}
 {#snippet back()}<Glyph d={G.back} />{/snippet}
 {#snippet people()}<Glyph d={G.people} />{/snippet}
+{#snippet doc()}<Glyph d={G.doc} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="The answers" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<TopBar {crumbs} home={out("workspace")} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Plan the next step" href={out("nextStep")} />{/if}{/snippet}
 {#snippet rows(lensKey, options, n)}
@@ -53,7 +54,7 @@
     <ReviewHead {review} phone />
     <Row gap={2}>
       <Button label={`${A.label} · ${A.answers}`} ariaLabel={`Perspective: ${A.label}, ${A.answers} answers. Show ${lensLabel(next)}`} href={href("results-answers", { state: next })} lead={people} block />
-      <Button label="Download CSV" href="#csv" />
+      <Button label="Download CSV" href="#csv" lead={doc} />
     </Row>
     <Card pad="list" label="Questions">
       {#each A.questions as q, i (q.id)}
