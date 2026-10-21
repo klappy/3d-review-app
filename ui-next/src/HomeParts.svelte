@@ -89,6 +89,10 @@
         <div class="gx-frame gx-phone"><PhoneBar label="Start a 3D Review" lead="plus" href="#setup" /></div>
         <div class="gx-k">primary + quiet Back</div>
         <div class="gx-frame gx-phone"><PhoneBar label="Next" backHref="#back" href="#next" /></div>
+        <div class="gx-k" id={`gx-bar-why-${theme}`}>primary disabled, described by its reason (this line): nothing ticked yet</div>
+        <div class="gx-frame gx-phone"><PhoneBar label="Print surveys" href="#print" disabled ariaDescribedby={`gx-bar-why-${theme}`} /></div>
+        <div class="gx-k">demoted: a dialog or sheet holds the one primary</div>
+        <div class="gx-frame gx-phone"><PhoneBar label="New project" lead="plus" href="#setup" demoted /></div>
       </div>
     </section>
   {/each}
