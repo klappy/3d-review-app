@@ -1,0 +1,13 @@
+{
+  "_note": "UI Next results lane fixture (provisional): one perspective's answers per question (ResultsAnswers, ResultsAnswersPhone boards). Counts only; no person is named.",
+  "lens": "community",
+  "modality": "Written",
+  "answers": 8,
+  "focus": { "area": "Understandable", "level": "urgent" },
+  "questions": [
+    { "q": "As a group, how would we describe how easy or difficult this translation is to understand?", "n": 8, "options": [["Very easy to understand", 1], ["Most of it is easy, but some parts are hard", 4], ["Much of it is difficult to understand", 2], ["We cannot understand it", 0], ["I don't know", 1]] },
+    { "q": "Where we find it difficult, what makes it hard? (choose all that apply)", "n": 8, "options": [["Some words are unfamiliar or strange", 6], ["Some sentences are too long or complicated", 3], ["It is not our dialect", 2], ["It doesn't sound like the way we normally speak", 1], ["Other (please describe)", 1], ["I don't know", 0]],
+      "others": ["\"Some words sound like the neighbouring dialect, not ours.\"", "\"The chapter headings are fine but the verses run together.\""] },
+    { "q": "As a group, how often do we use this translation?", "n": 8, "options": [["We use it every day", 0], ["We use it about 3 times per week", 2], ["We use it occasionally", 3], ["We don't use it", 3], ["I don't know", 0]] }
+  ]
+}
