@@ -7,7 +7,9 @@
      The filters sheet is a native <dialog> opened with showModal() (design-system.md "Dialog and sheet states": one element, .sheet on phone).
      Contract gaps (rule 11, cookbook PR canvas-explore-gaps; RESULTS-explore.md): the 1fr/300px table+aside grid, the in-flow menu panel,
      the table row (width, collapsed borders), the selected filter chip, the phone review list row, the sheet geometry and handle,
-     the segmented control width. Until they land the screen uses the nearest contract primitive (listed in RESULTS).
+     the segmented control width. Until they land the screen uses the nearest contract primitive (listed in RESULTS); the rows that
+     change nothing at the current PIN are already on the markup (.chip[data-on], .seg[data-inline], .sel[data-size=compact], .tbl-wrap/.tbl,
+     .mi-end, .sheet/.sheet-handle/.sheet-title, .mi[data-size=lg]) and take effect when a PIN bump brings cookbook #191's rows into base.css.
      One .btn-primary per page: none on desktop (the board draws none); phone "Open the filters" in the phone-bar. -->
 <script module>
   export const STATES = Object.freeze(["filters"]);
@@ -53,7 +55,7 @@
 {#snippet search()}<Icon d={E.search} />{/snippet}
 {#snippet check()}<Icon d={I.check} />{/snippet}
 {#snippet doc()}<Icon d={E.doc} />{/snippet}
-{#snippet chip(label, aria)}<span class="chip">{label}<button type="button" aria-label={`Remove ${aria} filter`}><Icon d={I.x} /></button></span>{/snippet}
+{#snippet chip(label, aria, on = false)}<span class="chip" data-on={on ? "" : undefined}>{label}<button type="button" aria-label={`Remove ${aria} filter`}><Icon d={I.x} /></button></span>{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="root" initials={data.user.initials} home="?screen=home" />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.workspace} home="?screen=home" />{/if}{/snippet}
 {#snippet bar()}{#if phone}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Open the filters" variant="primary" lg block href={SHEET} lead={list} /></div>{/if}{/snippet}
 
@@ -77,10 +79,11 @@
     </Card>
     <Grid cols={2} gap={2}><Button label="Save this view" href={PHONE} lead={check} block /><Button label="Download CSV" href={PHONE} lead={doc} block /></Grid>
     {#if state === "filters"}
-      <dialog class="glass-hi sheet l-card" aria-labelledby="explore-filters-title" {@attach modal} onclick={dismiss}>
+      <dialog class="glass-hi sheet l-card" data-pad="menu" aria-labelledby="explore-filters-title" {@attach modal} onclick={dismiss}>
         <div class="l-stack" data-gap="1">
-          <p class="micro" id="explore-filters-title">Filters · tap to change, swipe a row left to remove</p>
-          {#each data.phone.sheet as s}<a class="mi" href={PHONE}><Icon d={E[s.icon]} /><span>{s.label}</span></a>{/each}
+          <div class="sheet-handle" aria-hidden="true"></div>
+          <p class="micro sheet-title" id="explore-filters-title">Filters · tap to change, swipe a row left to remove</p>
+          {#each data.phone.sheet as s}<a class="mi" data-size="lg" href={PHONE}><Icon d={E[s.icon]} /><span>{s.label}</span></a>{/each}
         </div>
       </dialog>
     {/if}
@@ -92,7 +95,7 @@
           <p class="small t-15">Every review you can see, as one table. Filter by any cross-section; group or save the view.</p>
         </Stack>
         <Row gap={2}>
-          <div class="seg" role="radiogroup" aria-label="Show reviews as"><label><input type="radio" name="explore-view" value="cards" />Cards</label><label><input type="radio" name="explore-view" value="table" checked />Table</label></div>
+          <div class="seg" data-inline role="radiogroup" aria-label="Show reviews as"><label><input type="radio" name="explore-view" value="cards" />Cards</label><label><input type="radio" name="explore-view" value="table" checked />Table</label></div>
           <Button label="Save this view" lead={pen} />
           <Button label="Download CSV" lead={download} />
         </Row>
@@ -102,17 +105,17 @@
           <Row split wrap gap={3}>
             <Row wrap gap={2}>
               <span class="small">Filters</span>
-              {#each data.filters as f}{@render chip(`${f.key} · ${f.value}`, f.key)}{/each}
+              {#each data.filters as f}{@render chip(`${f.key} · ${f.value}`, f.key, true)}{/each}
               <Button label="Add filter" variant="quiet" lead={plus} />
             </Row>
             <Row gap={2}>
               <span class="small">Group by</span>
-              <label class="sel"><select class="in" aria-label="Group by">{#each data.groupBy.options as o}<option selected={o === data.groupBy.selected}>{o}</option>{/each}</select><Icon d={I.chev} /></label>
+              <label class="sel" data-size="compact"><select class="in" aria-label="Group by">{#each data.groupBy.options as o}<option selected={o === data.groupBy.selected}>{o}</option>{/each}</select><Icon d={I.chev} /></label>
             </Row>
           </Row>
         </Card>
         <Card gap={3} label="Reviews">
-          <table>
+          <div class="tbl-wrap"><table class="tbl">
             <thead><tr>{#each HEADS as h}<th class="th" scope="col">{h}</th>{/each}</tr></thead>
             <tbody>
               {#each rows as r}
@@ -124,7 +127,7 @@
                 </tr>
               {/each}
             </tbody>
-          </table>
+          </table></div>
           <Row split wrap gap={3}>
             <span class="small">{rows.length} of {data.visible} reviews match · {data.match.projects} projects · {data.match.languages} languages</span>
             <span class="small">Nothing here identifies a participant.</span>
@@ -133,7 +136,7 @@
       </Section>
       <Section heading="Add a filter" level={3}>
         <Card hi gap={1} label="Add a filter">
-          {#each data.addFilter as f}<button class="mi" type="button"><span>{f}</span><span class="small">Any</span></button>{/each}
+          {#each data.addFilter as f}<button class="mi" type="button"><span>{f}</span><span class="small mi-end">Any</span></button>{/each}
         </Card>
         <p class="small">Workspace and project are filters like any other. The Workspace and Project pages are the same table with those filters saved.</p>
       </Section>

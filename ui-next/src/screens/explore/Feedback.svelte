@@ -43,9 +43,9 @@
       <label class="row-opt"><input class="cb" type="checkbox" checked /><span class="small">Include the screen name and app version</span></label>
     </Card>
   {:else}
-    <dialog class="glass-hi l-card" aria-labelledby="feedback-title" {@attach modal}>
+    <dialog class="glass-hi dialog l-card" aria-labelledby="feedback-title" {@attach modal}>
       <div class="l-stack" data-gap="4">
-        <Row split gap={3}><h2 class="h2" id="feedback-title">Send app feedback</h2><Button icon={x} ariaLabel="Close" variant="quiet" href={HOME} /></Row>
+        <Row split gap={3}><h2 class="h2 t-24" id="feedback-title">Send app feedback</h2><Button icon={x} ariaLabel="Close" variant="quiet" href={HOME} /></Row>
         <p class="small t-15">Tell us what happened and what would help. It reaches the team with the page you were on.</p>
         <div class="seg" role="radiogroup" aria-label="Kind of feedback">{#each data.kinds as k}<label><input type="radio" name="feedback-kind" value={k} checked={k === data.kind} />{k}</label>{/each}</div>
         <div><label class="lbl" for="feedback-what">What happened?</label><!-- svelte-ignore a11y_autofocus --><textarea class="in" id="feedback-what" placeholder="I tried to … and …" autofocus></textarea></div>

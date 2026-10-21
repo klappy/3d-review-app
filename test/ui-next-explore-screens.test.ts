@@ -245,6 +245,27 @@ describe("Help (Help.dc.html, HelpPhone.dc.html)", () => {
   });
 });
 
+describe("rows from cookbook #191 (design-system.md 8.7) already on the markup, inert until a PIN bump brings them into base.css", () => {
+  it("Explore: applied chips, inline view switch, compact group-by, scrolling table wrapper, trailing menu values; the sheet's menu padding, handle and title", () => {
+    const a = mount(Explore, {});
+    expect(a.querySelectorAll(".chip[data-on]").length).toBe(4);
+    expect(a.querySelector(".seg[data-inline]")).not.toBeNull();
+    expect(a.querySelector(".sel[data-size=compact] select")).not.toBeNull();
+    expect(a.querySelector(".l-card .tbl-wrap > table.tbl")).not.toBeNull();
+    expect(a.querySelectorAll("button.mi > .mi-end").length).toBe(6);
+    const p = mount(Explore, { phone: true, state: "filters" });
+    expect(p.querySelector(".chip[data-on]")).toBeNull();
+    const d = p.querySelector("dialog.sheet[data-pad=menu]")!;
+    expect(d.querySelector(".sheet-handle")!.getAttribute("aria-hidden")).toBe("true");
+    expect(d.querySelector(".sheet-title")!.id).toBe(d.getAttribute("aria-labelledby"));
+    expect(d.querySelectorAll("a.mi[data-size=lg]").length).toBe(10);
+  });
+  it("Feedback and Help: the dialog row and the 24px heading row", () => {
+    expect(mount(Feedback, {}).querySelector("dialog.glass-hi.dialog h2.h2.t-24")).not.toBeNull();
+    expect(mount(Help, {}).querySelectorAll("section.l-section[id] > h2.t-24").length).toBe(8);
+  });
+});
+
 describe("lint: the explore lane's files are clean", () => {
   it("ui-next-lint finds nothing in screens/explore", () => {
     expect([...lintDir(resolve(__dirname, "../ui-next/src/screens/explore"))]).toEqual([]);

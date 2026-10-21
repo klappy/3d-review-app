@@ -62,12 +62,12 @@
       </Section>
       {#each TOPICS as [id, title, runs]}
         <section class="l-section" id={id}>
-          <h2 class="h2">{title}</h2>
+          <h2 class="h2 t-24">{title}</h2>
           <p class="small body-16">{#each runs as run, i}{#if i % 2}<strong>{run}</strong>{:else}{run}{/if}{/each}</p>
         </section>
       {/each}
       <section class="l-section" id={FAQ_ID}>
-        <h2 class="h2">{FAQ_HEAD}</h2>
+        <h2 class="h2 t-24">{FAQ_HEAD}</h2>
         <Stack gap={2}>{#each FAQ as [q, a]}<Disclosure label={q}><p class="small t-15">{a}</p></Disclosure>{/each}</Stack>
       </section>
       <Section>
