@@ -3,7 +3,9 @@
 .app[data-w=phone] .display{font-size:var(--t-36);line-height:40px}
 .app .l-row[data-wrap]{flex-wrap:wrap}
 .app .l-row[data-split]{justify-content:space-between}
-.app details > summary{cursor:pointer;width:max-content}
+.app details > summary{cursor:pointer}
+/* Text summaries shrink to their label; an icon-only summary (.btn-icon) keeps the contract 44x44 target (design-system.md section 2 Button row). */
+.app details > summary:not(.btn-icon){width:max-content}
 .lvl-pair{display:inline-flex;align-items:center;gap:var(--sp-2);font-size:var(--t-14);color:var(--ink-2)}
 .card-link.l-stack{display:flex}
 
