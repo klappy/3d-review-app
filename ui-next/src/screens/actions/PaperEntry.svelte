@@ -50,7 +50,7 @@
     <Card hi pad="hero" gap={3} label={`Question ${D.phone.question}`}>
       <h1 class="h2">{pq.text}</h1>
       <Stack gap={2}>
-        {#each pq.options as o}<label class="row-opt answer"><input class="rd" type="radio" name="pq" checked={o.code === D.phone.answer} /><b>{o.text}</b></label>{/each}
+        {#each pq.options as o}<label class="row-opt"><input class="rd" type="radio" name="pq" checked={o.code === D.phone.answer} /><b>{o.text}</b></label>{/each}
       </Stack>
       <div><label class="lbl" for="pe-words">Their words <span class="opt">(optional)</span></label><textarea class="in" rows="2" placeholder="Copy anything written in the margin" id="pe-words"></textarea></div>
     </Card>
