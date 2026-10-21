@@ -1,5 +1,10 @@
 // UI Next (v4) collect lane view model. Status: provisional. Pure: fixture (or store rows of the same shape) -> what the boards draw.
-// Data: ui-next/fixtures/collect/collect.json (mock; one source per value: one room, one link and one code per survey). Stage tabs read
+// Data: ui-next/fixtures/collect/collect.json (mock; one source per value: one room, one link and one code per survey). Its values are
+// what the boards draw (3d-review-cookbook design/2026-10-15-glass-redesign/canvas Collect*, CloseCollection*, QRRoom*, PrintQR*
+// .dc.html @a594830); where boards disagree (room counts, QRRoomPhone's Community link and code) it keeps the majority value and the
+// cookbook's work/active/2026-10-21-ui-next-screens-fanout/RESULTS-collect.md itemises the board line. qr strings are the boards' 21x21
+// placeholder modules (generator gen.py qr(seed)), row-major, 1 = dark. The provenance lives here, not in the JSON, so the bundle
+// carries none of it. Stage tabs read
 // the current UI's STAGES (ui/stage-screens.js: ids prepare/collect/understand/improve and their labels), so the tab words have one home.
 // Links: the shared screens/href.js (carries ?w= and ?theme=); the screens pass registered names only (test/ui-next-links.test.ts).
 import { STAGES } from "../../../../ui/stage-screens.js";
@@ -41,14 +46,22 @@ export function collectModel(fx) {
 // An unknown or absent ?state= renders the default state (every lane): never throws.
 export const pickState = (state, states, dflt = states[0]) => (states.includes(state) ? state : dflt);
 
-// QRRoomPhone pager: ?state=<n> is the survey number, 1-based; anything else is the default survey (0-based dflt).
-export function pickSurvey(state, total, dflt) {
+// QRRoomPhone pager: ?state=<n> is the survey number, 1-based; anything else is the default survey (0-based dflt), clamped to the
+// surveys there are (a store row may hold fewer than the fixture's default). No surveys: -1 (the screen draws its empty state).
+export function pickSurvey(state, total, dflt = 0) {
+  if (!(Number.isInteger(total) && total > 0)) return -1;
   const k = Number(state);
-  return typeof state === "string" && /^\d+$/.test(state) && k >= 1 && k <= total ? k - 1 : dflt;
+  if (typeof state === "string" && /^\d+$/.test(state) && k >= 1 && k <= total) return k - 1;
+  return Math.min(Math.max(Number.isInteger(dflt) ? dflt : 0, 0), total - 1);
 }
+
+// PrintQR's ticked surveys, keyed by survey code (never by position), in the review's survey order; unknown codes are dropped.
+export const pickedSurveys = (surveys, codes) => surveys.filter((s) => codes.includes(s.code));
 
 // PrintQR pages for the ticked surveys under a layout: per "survey" = one page each, "sheet" = one sheet of cut cards per
 // survey (hand-out cards), "one" = every ticked code on one page. Nothing ticked = 0 pages (the Print button is disabled).
+// The preview draws the first page of the chosen layout: "survey" the first ticked survey's full-page code, "sheet" that survey's
+// cards (layout.cards of them), "one" every ticked code.
 export function printPages(per, ticked) {
   if (!["survey", "sheet", "one"].includes(per)) throw new TypeError(`printPages: unknown layout "${String(per)}"`);
   if (!(ticked > 0)) return 0;

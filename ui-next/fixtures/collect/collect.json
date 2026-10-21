@@ -1,5 +1,4 @@
 {
- "_source": "Mock data for the collect lane screens (provisional). Values are what the boards draw: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas Collect, CollectPhone, CollectMenu, CollectMenuPhone, CloseCollection, CloseCollectionPhone, QRRoom, QRRoomPhone, PrintQR, PrintQRPhone (.dc.html @a594830), one source per value: where boards disagree (room counts, QRRoomPhone's Community link and code) the fixture keeps the majority value and RESULTS-collect.md itemises the board line. qr strings are the boards' 21x21 placeholder modules (generator gen.py qr(seed)), row-major, 1 = dark.",
  "user": {
   "first": "Bincy",
   "initials": "BK"
@@ -87,9 +86,9 @@
  },
  "printQr": {
   "checked": [
-   0,
-   1,
-   2
+   "K7Q4F2",
+   "M3X9A1",
+   "P8L2W4"
   ],
   "layouts": [
    {
@@ -100,7 +99,8 @@
    {
     "title": "Hand-out cards",
     "help": "Six cards per page, cut along the lines, one survey per sheet.",
-    "per": "sheet"
+    "per": "sheet",
+    "cards": 6
    },
    {
     "title": "All on one page",

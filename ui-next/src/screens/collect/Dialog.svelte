@@ -5,7 +5,8 @@
      Dismissal (R14 "Escape and dismissal"): Close, Escape (the cancel event, and a close the browser forces) and a click or tap outside the
      dialog's bounding rect all go to cancel, the href of the page the dialog was opened from, so the URL leaves the open state.
      handle: the sheet's decorative grab handle (.sheet-handle, aria-hidden). pad="menu": the menu-rows sheet padding. titleTop: the close
-     sits at the top of a tall title block (CloseCollection: icon tile over the title), else centred on the title line.
+     sits at the top of a tall title block (CloseCollection: icon tile over the title; PrintQR: title over its intro), else centred on
+     the title line. describedby: the id of a line that says what the dialog is for (PrintQR's intro), set as aria-describedby.
      navigate: how it leaves (default location.assign; tests pass a spy). Where showModal is missing (jsdom) it falls back to the open attribute. -->
 <script>
   import Button from "../../Button.svelte";
@@ -15,7 +16,7 @@
   const assign = (url) => {
     try { globalThis.location?.assign?.(url); } catch { /* no navigation here (jsdom) */ }
   };
-  let { labelledby, cancel, sheet = false, wide = false, handle = false, pad, gap = 4, titleTop = false, navigate = assign, title, children } = $props();
+  let { labelledby, describedby, cancel, sheet = false, wide = false, handle = false, pad, gap = 4, titleTop = false, navigate = assign, title, children } = $props();
   if (!(typeof labelledby === "string" && labelledby)) throw new TypeError("Dialog: aria-labelledby points at the visible title");
   if (!(typeof cancel === "string" && cancel)) throw new TypeError("Dialog: cancel is the href Close, Escape and the backdrop go to (R14)");
   if (!title) throw new TypeError("Dialog: a title snippet is required (R14 title row)");
@@ -47,7 +48,7 @@
 
 {#snippet x()}<Icon d={G.x} />{/snippet}
 
-<dialog {@attach modal} class={sheet ? "glass-hi sheet" : "glass-hi"} data-w={wide ? "wide" : undefined} data-pad={pad} aria-labelledby={labelledby}>
+<dialog {@attach modal} class={sheet ? "glass-hi sheet" : "glass-hi"} data-w={wide ? "wide" : undefined} data-pad={pad} aria-labelledby={labelledby} aria-describedby={describedby}>
   {#if handle}<div class="sheet-handle" aria-hidden="true"></div>{/if}
   <div class="l-stack" data-gap={g}>
     <div class="l-row" data-gap="3" data-split data-align={titleTop ? "start" : undefined}>{@render title()}<Button icon={x} ariaLabel="Close" variant="quiet" href={cancel} /></div>

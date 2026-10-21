@@ -4,7 +4,8 @@
      phone: the CollectPhone list (boards_fphone.py f_collect): lens dot · name over bar · n/N · copy link, QR.
      Row geometry: desktop .l-grid[data-tpl=survey-row], phone [data-grow] (§8.7 rows on the PIN). The phone's two icon buttons sit in their
      own Row (the desktop row's pattern), so the flex row cannot shrink them below 44x44 (R13): the shared .btn-icon has no flex:none
-     (handed back, RESULTS-collect.md Round 2 F2). -->
+     (handed back, RESULTS-collect.md Round 2 F2). Each row's QR link names its survey (?state=<n>, as on phone; the projector shows
+     every code, the phone that one). Print links to the actions lane's Print screen, which takes no survey yet (wiring debt 4). -->
 <script>
   import Card from "../../Card.svelte";
   import Row from "../../Row.svelte";
@@ -49,7 +50,7 @@
           <span class="num tab-n" data-size="20">{s.answered} <span class="small">of {s.expected}</span></span>
           <Row gap={1}>
             <Button icon={copy} ariaLabel={`Copy link for ${s.name}`} variant="quiet" href={href("share")} />
-            <Button icon={qr} ariaLabel={`QR code for ${s.name}`} variant="quiet" href={href("qr-room")} />
+            <Button icon={qr} ariaLabel={`QR code for ${s.name}`} variant="quiet" href={href("qr-room", { state: String(s.n) })} />
             <Button icon={print} ariaLabel={`Print ${s.name} survey`} variant="quiet" href={href("print")} />
           </Row>
         </div>

@@ -7,7 +7,9 @@
      1280x800; each code keeps the §8.7 room size (176) and centres into its tile's hero padding (the board's 18/16/20 projector tile padding
      is a row owed). Phone: the survey name is the page's h1.
      One .btn-primary on phone ("Next survey", the phone bar); the projector draws none (nothing on a projected screen is for the audience
-     to press). Each survey's link and code come from its own row (one source); the room counts from the one room. -->
+     to press). Each survey's link and code come from its own row (one source); the room counts from the one room.
+     The default survey is clamped to the surveys there are (model.js pickSurvey); a review with no surveys draws "No surveys yet" as its
+     h1 and no pager. -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
@@ -27,21 +29,25 @@
   const m = $derived(collectModel(data));
   const total = $derived(m.surveys.length);
   const at = $derived(pickSurvey(state, total, data.qrRoomPhone.survey));
-  const s = $derived(m.surveys[at]);
+  const s = $derived(at < 0 ? undefined : m.surveys[at]);
 </script>
 
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="Show a QR code" parent="Collect" back={href("collect")} initials={m.user.initials} menuHref={href("menu")} home={href("home")} />{:else}<RoomTop {m} />{/if}{/snippet}
 {#snippet back()}<Glyph name="back" />{/snippet}
 {#snippet arrow()}<Glyph name="arrow" />{/snippet}
-{#snippet bar()}{#if phone}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Previous" variant="quiet" href={href("qr-room", { state: String(((at + total - 1) % total) + 1) })} lead={back} /><Button label="Next survey" variant="primary" lg href={href("qr-room", { state: String(((at + 1) % total) + 1) })} trail={arrow} /></div>{/if}{/snippet}
+{#snippet bar()}{#if phone && s}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Previous" variant="quiet" href={href("qr-room", { state: String(((at + total - 1) % total) + 1) })} lead={back} /><Button label="Next survey" variant="primary" lg href={href("qr-room", { state: String(((at + 1) % total) + 1) })} trail={arrow} /></div>{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
-    <Row split gap={3}><span class="micro">Survey {at + 1} of {total}</span><a class="link small" href={`${href("collect")}#offline`}>Meeting offline? Print and paper</a></Row>
+    <Row split gap={3}><span class="micro">{#if s}Survey {at + 1} of {total}{/if}</span><a class="link small" href={`${href("collect")}#offline`}>Meeting offline? Print and paper</a></Row>
     <div class="glass-hi l-card l-stack" data-pad="hero" data-gap="4" data-align="center">
-      <div class="l-row" data-gap="2"><LensDot lens={s.lens} decorative /><h1 class="h2">{s.name}</h1></div>
-      <Qr cells={s.qr} size="phone" />
-      <p class="small">Scan to open the {m.review.language} survey<br /><b>{s.link}</b></p>
+      {#if s}
+        <div class="l-row" data-gap="2"><LensDot lens={s.lens} decorative /><h1 class="h2">{s.name}</h1></div>
+        <Qr cells={s.qr} size="phone" />
+        <p class="small">Scan to open the {m.review.language} survey<br /><b>{s.link}</b></p>
+      {:else}
+        <h1 class="h2">No surveys yet</h1>
+      {/if}
     </div>
     <RoomHealth opened={m.room.opened} refused={m.room.refused} wrap />
   {:else}

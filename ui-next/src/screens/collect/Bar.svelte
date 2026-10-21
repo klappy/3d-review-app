@@ -2,9 +2,10 @@
      survey's perspective colour (--lens, R15). The fill width is data (answered of expected, floored as the boards draw it), so it is an SVG
      rect width, never an inline style. Decorative: the "n of N" text beside it carries the value. -->
 <script>
+  import { LENSES } from "../../LensDot.svelte";
   import { pct } from "./model.js";
   let { value, max, lens } = $props();
-  if (!["team", "community", "church"].includes(lens)) throw new TypeError(`Bar: lens must be team, community or church, got ${String(lens)}`);
+  if (!Object.hasOwn(LENSES, lens)) throw new TypeError(`Bar: lens must be one of ${Object.keys(LENSES).join(", ")}, got ${String(lens)}`);
   const w = $derived(`${pct(value, max)}%`);
 </script>
 

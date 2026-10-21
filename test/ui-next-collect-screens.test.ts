@@ -15,11 +15,14 @@ import CloseCollection from "../ui-next/src/screens/collect/CloseCollection.svel
 import QRRoom from "../ui-next/src/screens/collect/QRRoom.svelte";
 import PrintQR from "../ui-next/src/screens/collect/PrintQR.svelte";
 import Dialog from "../ui-next/src/screens/collect/Dialog.svelte";
+import Bar from "../ui-next/src/screens/collect/Bar.svelte";
 import fixture from "../ui-next/fixtures/collect/collect.json";
 // @ts-expect-error -- plain .js module, no type declarations
 import collect from "../ui-next/src/screens/collect/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { collectModel, stageTabs, pct, pickState, pickSurvey, printPages, pagesLabel } from "../ui-next/src/screens/collect/model.js";
+import { collectModel, stageTabs, pct, pickState, pickSurvey, pickedSurveys, printPages, pagesLabel } from "../ui-next/src/screens/collect/model.js";
+// @ts-expect-error -- Svelte module export, no type declarations
+import { LENSES } from "../ui-next/src/LensDot.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import { REGISTRY } from "../ui-next/src/screens/registry.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -109,7 +112,8 @@ describe("links: the shared href(), registered names, carried ?w= and ?theme=", 
     expect([...a.querySelectorAll("nav.tabs .tab")].map((t) => t.getAttribute("href"))).toEqual(["setup5", "collect", "results", "next-step"].map((s) => `?ui_next=on&screen=${s}&theme=dark`));
     expect(a.querySelector("nav.crumb a")!.getAttribute("href")).toBe("?ui_next=on&screen=project&theme=dark");
     expect(a.querySelector("header.top a.brand")!.getAttribute("href")).toBe("?ui_next=on&screen=home&theme=dark");
-    expect(a.querySelector("[aria-label='QR code for Community']")!.getAttribute("href")).toBe("?ui_next=on&screen=qr-room&theme=dark");
+    expect(a.querySelector("[aria-label='QR code for Community']")!.getAttribute("href")).toBe("?ui_next=on&screen=qr-room&theme=dark&state=3");
+    expect(a.querySelector("[aria-label='Print Community survey']")!.getAttribute("href")).toBe("?ui_next=on&screen=print&theme=dark");
     expect(links(a, "#offline a")).toEqual(["print", "print-qr", "paper-entry"].map((s) => `?ui_next=on&screen=${s}&theme=dark`));
     expect(links(a, "main .menu a.mi")).toEqual(["setup1", "people", "close-collection", "collect"].map((s) => `?ui_next=on&screen=${s}&theme=dark`).map((h, i) => (i === 3 ? `${h}#offline` : h)));
   });
@@ -326,6 +330,27 @@ describe("QRRoom (QRRoom, QRRoomPhone)", () => {
     expect(text(first.querySelector("h1"))).toBe("Translators");
     expect(text(first.querySelector("main .l-card b"))).toBe("3dreview.app/s/K7Q4F2");
   });
+  it("the default survey is clamped to the surveys there are; no surveys draws an empty state with one h1 and no pager", () => {
+    const two = structuredClone(fixture);
+    two.groups = [two.groups[0]];
+    const a = shot(QRRoom, { phone: true, data: two });
+    expect(a.textContent).toContain("Survey 2 of 2");
+    expect(text(a.querySelector("h1"))).toBe("Team leaders & mentors");
+    expect(links(a, ".phone-bar .btn")).toEqual(["?ui_next=on&screen=qr-room&w=phone&state=1", "?ui_next=on&screen=qr-room&w=phone&state=1"]);
+    cleanup();
+    const none = structuredClone(fixture);
+    for (const g of none.groups) g.surveys = [];
+    for (const phone of [true, false]) {
+      const e = shot(QRRoom, { phone, data: none, state: "2" });
+      expect(e.querySelectorAll("h1")).toHaveLength(1);
+      expect(e.innerHTML).not.toMatch(/NaN|undefined/);
+      if (phone) {
+        expect(text(e.querySelector("h1"))).toBe("No surveys yet");
+        expect(e.querySelector(".phone-bar")).toBeNull();
+      } else expect(e.querySelectorAll("main .glass-hi[data-lens]")).toHaveLength(0);
+      cleanup();
+    }
+  });
 });
 
 describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
@@ -339,6 +364,10 @@ describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
     expect(document.activeElement).toBe(h);
     expect(d.querySelector("[aria-label=Close]")!.getAttribute("href")).toBe("?ui_next=on&screen=collect");
     expect(links(d, "a.link")).toEqual(["?ui_next=on&screen=print"]);
+    // The intro sits under the title in the title block (as the board draws it) and describes the dialog.
+    expect(d.getAttribute("aria-describedby")).toBe("print-qr-about");
+    expect(text(d.querySelector("#print-qr-about"))).toBe("Pages people can scan or take away. These are not the surveys — to print the questions themselves, use Print paper surveys.");
+    expect(d.querySelector(":scope > .l-stack > .l-row")!.contains(d.querySelector("#print-qr-about"))).toBe(true);
     expect(all(d, "a.link")).toEqual(["Print paper surveys"]);
     expect(ticks(d)).toEqual([true, true, true, false, false]);
     expect(all(d, "label.row-opt.compact .kbd")).toEqual(["K7Q4F2", "M3X9A1", "P8L2W4", "R5T7N2", "D2C6H9"]);
@@ -355,6 +384,39 @@ describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
     expect([...sheet.querySelectorAll(".qr i")].map((i) => (i.classList.contains("o") ? "0" : "1")).join("")).toBe(fixture.groups[0].surveys[0].qr);
     expect(text(sheet)).toContain("Scan to answer · or enter code K7Q 4F2 at 3dreview.app · Hindi · English · Odia");
     expect(text(sheet.querySelector(".pfoot"))).toBe("1 of 3");
+    expect(d.querySelector("svg.psheet")!.getAttribute("data-layout")).toBe("survey");
+  });
+  it("the preview draws the first page of the chosen layout: hand-out cards (six of the first survey), all on one page (every ticked code)", async () => {
+    const a = shot(PrintQR);
+    const d = a.querySelector("dialog")!;
+    const codes = (root: ParentNode) => [...root.querySelectorAll(".qr")].map((q) => [...q.querySelectorAll("i")].map((i) => (i.classList.contains("o") ? "0" : "1")).join(""));
+    const surveys = fixture.groups.flatMap((g) => g.surveys);
+    await fireEvent.click(d.querySelectorAll("input.rd")[1]);
+    let sheet = d.querySelector("svg.psheet")!;
+    expect(sheet.getAttribute("data-layout")).toBe("sheet");
+    expect(all(sheet, ".ptitle")).toEqual(Array(6).fill("Translators"));
+    expect(codes(sheet)).toEqual(Array(6).fill(surveys[0].qr));
+    expect([...sheet.querySelectorAll(".qr")].every((q) => q.getAttribute("data-size") === "room")).toBe(true);
+    expect(text(sheet.querySelector(".pfoot"))).toBe("1 of 3");
+    await fireEvent.click(d.querySelectorAll("input.rd")[2]);
+    sheet = d.querySelector("svg.psheet")!;
+    expect(sheet.getAttribute("data-layout")).toBe("one");
+    expect(all(sheet, ".ptitle")).toEqual(["Translators", "Team leaders & mentors", "Community"]);
+    expect(all(sheet, ".kbd")).toEqual(["3dreview.app/s/K7Q4F2", "3dreview.app/s/M3X9A1", "3dreview.app/s/P8L2W4"]);
+    expect(codes(sheet)).toEqual(surveys.slice(0, 3).map((s) => s.qr));
+    expect(text(sheet.querySelector(".pfoot"))).toBe("1 of 1");
+  });
+  it("ticks are keyed by survey code, not position; unknown codes are dropped; the choices start from the data, no warnings", () => {
+    const moved = structuredClone(fixture);
+    moved.printQr.checked = ["D2C6H9", "M3X9A1", "ZZZZZZ"];
+    const a = shot(PrintQR, { data: moved });
+    expect(ticks(a.querySelector("dialog")!)).toEqual([false, true, false, false, true]);
+    expect(text(a.querySelector(".btn-primary"))).toBe("Print 2 pages");
+    expect(text(a.querySelector(".ptitle"))).toBe("Team leaders & mentors");
+    expect(pickedSurveys(collectModel(fixture).surveys, ["P8L2W4", "K7Q4F2"]).map((x: { code: string }) => x.code)).toEqual(["K7Q4F2", "P8L2W4"]);
+    const src = readFileSync(resolve(LANE, "PrintQR.svelte"), "utf8");
+    expect(src).not.toMatch(/\$state\([^)]*data\b/);
+    expect(src).not.toMatch(/checked\.includes\(i\)/);
   });
   it("the count, the layouts' pages, the caption, the previewed survey and '1 of N' follow what the user ticks and picks", async () => {
     const a = shot(PrintQR);
@@ -373,6 +435,10 @@ describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
     paper.value = "Letter";
     await fireEvent.change(paper);
     expect(text(d.querySelector(".micro"))).toBe("Preview · all on one page · Letter · 1 page");
+    const lang = d.querySelector("#print-qr-lang") as HTMLSelectElement;
+    lang.value = "Odia";
+    await fireEvent.change(lang);
+    expect(lang.value).toBe("Odia");
   });
   it("nothing ticked: no throw, Print is a disabled button that says why, no preview sheet", async () => {
     const a = shot(PrintQR);
@@ -422,6 +488,11 @@ describe("collect view model and data wiring", () => {
     expect(Object.keys(fixture.room)).toEqual(["opened", "refused"]);
     expect(Object.keys(fixture.qrRoomPhone)).toEqual(["survey"]);
     expect(fixture.printQr).not.toHaveProperty("qr");
+    // Ticks name surveys by code; the provenance lives in model.js, so the /next/ bundle carries none of it.
+    const codes = fixture.groups.flatMap((g) => g.surveys.map((x) => x.code));
+    expect(fixture.printQr.checked.every((c) => codes.includes(c))).toBe(true);
+    expect(fixture).not.toHaveProperty("_source");
+    expect(readFileSync(resolve(LANE, "model.js"), "utf8")).toMatch(/design\/2026-10-15-glass-redesign\/canvas/);
   });
   it("stage tabs read the current UI's STAGES (ui/stage-screens.js) and take the caller's links", () => {
     const t = stageTabs("collect", { prepare: "a", collect: "b", understand: "c", improve: "d" });
@@ -432,9 +503,15 @@ describe("collect view model and data wiring", () => {
   it("state pickers fall back to the default; pages follow the layout", () => {
     expect([pickState("menu", ["default", "menu"]), pickState("busy", ["default", "menu"]), pickState(undefined, ["default", "menu"])]).toEqual(["menu", "default", "default"]);
     expect([pickSurvey("1", 5, 2), pickSurvey("5", 5, 2), pickSurvey("6", 5, 2), pickSurvey("0", 5, 2), pickSurvey("2.5", 5, 2), pickSurvey("", 5, 2), pickSurvey(undefined, 5, 2)]).toEqual([0, 4, 2, 2, 2, 2, 2]);
+    expect([pickSurvey(undefined, 2, 2), pickSurvey("9", 1, 4), pickSurvey(undefined, 3, -1), pickSurvey(undefined, 3, Number.NaN), pickSurvey("1", 0, 2), pickSurvey(undefined, 0, 0)]).toEqual([1, 0, 0, 0, -1, -1]);
     expect([printPages("survey", 3), printPages("sheet", 3), printPages("one", 3), printPages("one", 0), printPages("survey", 0)]).toEqual([3, 3, 1, 0, 0]);
     expect(() => printPages("poster", 1)).toThrow(/unknown layout/);
     expect([pagesLabel(1), pagesLabel(0), pagesLabel(3)]).toEqual(["1 page", "0 pages", "3 pages"]);
+  });
+  it("the bar's perspectives are the shared LENSES (LensDot.svelte), not a second list", () => {
+    for (const lens of Object.keys(LENSES)) { expect(() => render(Bar, { props: { value: 1, max: 2, lens } })).not.toThrow(); cleanup(); }
+    expect(() => render(Bar, { props: { value: 1, max: 2, lens: "elders" } })).toThrow(/team, community, church/);
+    expect(readFileSync(resolve(LANE, "Bar.svelte"), "utf8")).not.toMatch(/\["team", "community", "church"\]/);
   });
   it("no QR encoder ships in the lane (the boards' codes are fixture placeholders; real codes are wiring debt)", () => {
     for (const f of readdirSync(LANE)) expect(readFileSync(resolve(LANE, f), "utf8"), f).not.toMatch(/vendor-qrcode/);
