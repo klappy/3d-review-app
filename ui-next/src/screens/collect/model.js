@@ -67,4 +67,13 @@ export function printPages(per, ticked) {
   if (!(ticked > 0)) return 0;
   return per === "one" ? 1 : ticked;
 }
-export const pagesLabel = (k) => `${k} ${k === 1 ? "page" : "pages"}`;
+// A count and its noun (or noun + verb) for one and for any other number: "1 page" / "3 pages", "1 response is" / "18 responses are".
+export const plural = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+export const pagesLabel = (k) => plural(k, "page", "pages");
+
+// PrintQR's layout choice, keyed by its title (never by position): the chosen layout when the data still has it, else the data's
+// first, so a data row with fewer layouts never leaves the choice pointing at nothing. A data row with no layouts is a data error.
+export function pickLayout(layouts, title) {
+  if (!(Array.isArray(layouts) && layouts.length > 0)) throw new TypeError("pickLayout: the print data has no layouts");
+  return layouts.find((l) => l.title === title) ?? layouts[0];
+}

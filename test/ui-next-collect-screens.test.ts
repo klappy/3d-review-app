@@ -20,7 +20,7 @@ import fixture from "../ui-next/fixtures/collect/collect.json";
 // @ts-expect-error -- plain .js module, no type declarations
 import collect from "../ui-next/src/screens/collect/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { collectModel, stageTabs, pct, pickState, pickSurvey, pickedSurveys, printPages, pagesLabel } from "../ui-next/src/screens/collect/model.js";
+import { collectModel, stageTabs, pct, pickState, pickSurvey, pickedSurveys, pickLayout, printPages, pagesLabel, plural } from "../ui-next/src/screens/collect/model.js";
 // @ts-expect-error -- Svelte module export, no type declarations
 import { LENSES } from "../ui-next/src/LensDot.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -280,6 +280,41 @@ describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
     const a = shot(CloseCollection, { data: thin });
     expect(text(a.querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 2.");
   });
+  it("no perspectives: the 3-answer line is never said vacuously, no stray count line, no throw (desktop and phone)", () => {
+    const none = structuredClone(fixture);
+    none.groups = [];
+    for (const phone of [false, true]) {
+      const a = shot(CloseCollection, { phone, data: none });
+      expect(a.textContent).not.toContain("Every perspective");
+      expect(a.querySelector("dialog .solid")).toBeNull();
+      expect(a.querySelectorAll("h1")).toHaveLength(1);
+      expect(a.innerHTML).not.toMatch(/NaN|undefined/);
+      cleanup();
+    }
+  });
+  it("counts of one read singular: 1 response is in, 1 survey opened, 1 open turned away", () => {
+    const one = structuredClone(fixture);
+    one.groups = [one.groups[0]];
+    one.groups[0].surveys = [{ ...one.groups[0].surveys[0], answered: 1 }];
+    one.room = { opened: 1, refused: 1 };
+    const a = shot(CloseCollection, { data: one });
+    expect(text(a.querySelector("dialog p.small"))).toContain("1 response is in.");
+    expect(a.textContent).not.toMatch(/\b1 (responses|surveys|opens)\b/);
+    cleanup();
+    const c = shot(Collect, { data: one });
+    expect(c.textContent).toContain("1 survey opened in the last minute");
+    expect(all(c, ".tag[data-kind=warn]")).toEqual(["1 open turned away"]);
+    expect(c.textContent).not.toMatch(/\b1 (responses|surveys|opens)\b/);
+    cleanup();
+    const p = shot(Collect, { phone: true, data: one });
+    expect(p.textContent).toContain("of 5 · 1 survey ");
+    expect(p.textContent).not.toMatch(/\b1 (responses|surveys|opens)\b/);
+    cleanup();
+    const q = shot(QRRoom, { data: one });
+    expect(q.textContent).toContain("1 survey opened in the last minute");
+    expect(all(q, ".tag[data-kind=warn]")).toEqual(["1 open turned away"]);
+    expect([plural(1, "page", "pages"), plural(0, "page", "pages"), plural(18, "response is", "responses are")]).toEqual(["1 page", "0 pages", "18 responses are"]);
+  });
   it("phone: the sheet holds the primary; Close in its title row; the phone bar's Share goes secondary; Keep collecting takes focus", () => {
     const a = shot(CloseCollection, { phone: true });
     const d = a.querySelector("dialog.glass-hi.sheet")!;
@@ -329,6 +364,18 @@ describe("QRRoom (QRRoom, QRRoomPhone)", () => {
     const first = shot(QRRoom, { phone: true, state: "1" });
     expect(text(first.querySelector("h1"))).toBe("Translators");
     expect(text(first.querySelector("main .l-card b"))).toBe("3dreview.app/s/K7Q4F2");
+  });
+  it("a data row without the qrRoomPhone default starts on the first survey, desktop and phone, never throws", () => {
+    const bare: Record<string, unknown> = structuredClone(fixture);
+    delete bare.qrRoomPhone;
+    for (const phone of [false, true]) for (const state of [undefined, "4", "bogus"]) {
+      let a: HTMLElement | undefined;
+      expect(() => { a = shot(QRRoom, { phone, data: bare, state }); }).not.toThrow();
+      expect(a!.querySelectorAll("h1")).toHaveLength(1);
+      if (phone) expect(a!.textContent).toContain(state === "4" ? "Survey 4 of 5" : "Survey 1 of 5");
+      else expect(a!.querySelectorAll("main .glass-hi[data-lens]")).toHaveLength(5);
+      cleanup();
+    }
   });
   it("the default survey is clamped to the surveys there are; no surveys draws an empty state with one h1 and no pager", () => {
     const two = structuredClone(fixture);
@@ -449,6 +496,11 @@ describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
     expect(p.tagName).toBe("BUTTON");
     expect(p.disabled).toBe(true);
     expect(text(d.querySelector("[role=status]"))).toBe("Tick at least one survey to print its page.");
+    // Saying why adds no line: the status sits in the action row beside Cancel and the disabled Print (R3-1, the 1280x800 fit).
+    const row = d.querySelector("[role=status]")!.parentElement!;
+    expect(row.matches(".l-row[data-justify=end]")).toBe(true);
+    expect(row.contains(p)).toBe(true);
+    expect(d.querySelectorAll("[role=status]")).toHaveLength(1);
     expect(d.querySelector(".psheet")).toBeNull();
     expect(text(d.querySelector(".micro"))).toBe("Preview · one page per survey · A4 · 0 pages");
     const none = structuredClone(fixture);
@@ -457,6 +509,32 @@ describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
     expect(() => shot(PrintQR, { data: none })).not.toThrow();
     cleanup();
     expect(() => shot(PrintQR, { data: none, phone: true })).not.toThrow();
+  });
+  it("the status line lives in the action row from the start (a polite live region), empty while something is ticked", () => {
+    const d = shot(PrintQR).querySelector("dialog")!;
+    const st = d.querySelectorAll("[role=status]");
+    expect(st).toHaveLength(1);
+    expect(text(st[0])).toBe("");
+    expect(st[0].parentElement!.matches(".l-row[data-justify=end]")).toBe(true);
+  });
+  it("the layout is keyed by title and resets with new data; data with fewer layouts never leaves it pointing at nothing", async () => {
+    const r = (at(), render(PrintQR, { props: {} }));
+    const d = () => r.container.querySelector("dialog")!;
+    await fireEvent.click(d().querySelectorAll("input.rd")[2]);
+    expect(text(d().querySelector(".micro"))).toBe("Preview · all on one page · A4 · 1 page");
+    const fewer = structuredClone(fixture);
+    fewer.printQr.layouts = [fewer.printQr.layouts[0]];
+    await r.rerender({ data: fewer });
+    flushSync();
+    expect([...d().querySelectorAll("input.rd")].map((c) => (c as HTMLInputElement).checked)).toEqual([true]);
+    expect(text(d().querySelector(".micro"))).toBe("Preview · one page per survey · A4 · 3 pages");
+    expect(d().querySelector("svg.psheet")!.getAttribute("data-layout")).toBe("survey");
+    await r.rerender({ data: structuredClone(fixture) });
+    flushSync();
+    expect([...d().querySelectorAll("input.rd")].map((c) => (c as HTMLInputElement).checked)).toEqual([true, false, false]);
+    const L = fixture.printQr.layouts;
+    expect([pickLayout(L, "Hand-out cards").per, pickLayout(L, "Poster").per, pickLayout(L, undefined).per]).toEqual(["sheet", "survey", "survey"]);
+    expect(() => pickLayout([], undefined)).toThrow(/no layouts/);
   });
   it("phone: nested header, the QR code pages list with three ticked, Cancel + Print 3 pages in the bar, following the ticks", async () => {
     const a = shot(PrintQR, { phone: true });

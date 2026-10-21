@@ -7,12 +7,15 @@
      Escape and the backdrop go back to Collect).
      Title block as the board draws it: the title with its intro line under it (the dialog's aria-describedby), Close at the block's top,
      so the form fits the 1280x800 modal with its bottom padding (no inner scroll at that size).
-     Choices: the ticked surveys (keyed by survey code), the layout, the text language and the paper size are the user's; they start
-     from the data (writable deriveds, so new data resets them). "Print N pages", each layout's page count, the preview caption and the
+     Choices: the ticked surveys (keyed by survey code), the layout (keyed by its title), the text language and the paper size are the
+     user's; they start from the data (writable deriveds, so new data resets them), and the layout falls back to the data's first when
+     the data no longer has the chosen one (model.js pickLayout). "Print N pages", each layout's page count, the preview caption and the
      preview follow the ticks and the layout: the preview draws the first page of the chosen layout (one page per survey: the first
      ticked survey's full-page code; hand-out cards: that survey's cards; all on one page: every ticked code) with its "1 of N" footer.
      The text language and the paper size are held but not drawn: the scan line has one (English) source and there is no Letter sheet row
-     (RESULTS-collect.md Round 3, handed back). Nothing ticked: Print is disabled and the reason shows. One .btn-primary: "Print N pages".
+     (RESULTS-collect.md Round 3, handed back). Nothing ticked: Print is disabled and the reason shows in the action row, start-aligned
+     beside Cancel and Print (a polite status kept in the row, so saying why adds no line and the form still fits the 1280x800 modal).
+     One .btn-primary: "Print N pages".
      Print surveys (the questions) is a pointer to the Print screen, never a second print here (R32 one home). The boards draw one state
      (the open form): any ?state= renders it. -->
 <script>
@@ -22,7 +25,7 @@
   import Dialog from "./Dialog.svelte";
   import Glyph from "./Glyph.svelte";
   import Qr from "./Qr.svelte";
-  import { collectModel, pickedSurveys, printPages, pagesLabel } from "./model.js";
+  import { collectModel, pickedSurveys, pickLayout, printPages, pagesLabel } from "./model.js";
   import { href } from "../href.js";
   import fixture from "../../../fixtures/collect/collect.json";
 
@@ -31,12 +34,12 @@
   const p = $derived(m.printQr);
   // The user's choices, initially what the board draws (the data's ticked codes, the first layout, language and paper).
   let picked = $derived(pickedSurveys(m.surveys, p.checked).map((s) => s.code));
-  let layout = $state(0);
+  let layout = $derived(p.layouts[0]?.title);
   let language = $derived(p.languages[0]);
   let paper = $derived(p.papers[0]);
   const tick = (code, on) => { picked = m.surveys.map((s) => s.code).filter((c) => (c === code ? on : picked.includes(c))); };
   const chosen = $derived(pickedSurveys(m.surveys, picked));
-  const lay = $derived(p.layouts[layout]);
+  const lay = $derived(pickLayout(p.layouts, layout));
   const n = $derived(printPages(lay.per, chosen.length));
   const first = $derived(chosen[0]);
   // What the preview's first page holds: one survey's full page, or a grid of codes (that survey's cards, or every ticked code).
@@ -78,7 +81,7 @@
             </div>
             <div class="l-stack" data-gap="2" role="radiogroup" aria-labelledby="print-qr-layout">
               <span class="lbl" id="print-qr-layout">Layout</span>
-              {#each p.layouts as l, i (l.title)}<label class="row-opt" data-align="start"><input class="rd" type="radio" name="print-qr-layout" value={i} bind:group={layout} /><span class="l-stack" data-gap="1"><span class="h3">{l.title}</span><span class="small">{l.help} {pagesLabel(printPages(l.per, chosen.length))}.</span></span></label>{/each}
+              {#each p.layouts as l (l.title)}<label class="row-opt" data-align="start"><input class="rd" type="radio" name="print-qr-layout" value={l.title} checked={l.title === lay.title} onchange={() => (layout = l.title)} /><span class="l-stack" data-gap="1"><span class="h3">{l.title}</span><span class="small">{l.help} {pagesLabel(printPages(l.per, chosen.length))}.</span></span></label>{/each}
             </div>
           </div>
           <div class="l-grid" data-cols="2" data-gap="4">
@@ -92,8 +95,8 @@
               <div class="sel"><select class="in" id="print-qr-paper" value={paper} onchange={(e) => (paper = e.currentTarget.value)}>{#each p.papers as s (s)}<option value={s}>{s}</option>{/each}</select>{@render chev()}</div>
             </div>
           </div>
-          {#if !n}<p class="small field-help" role="status">{WHY}</p>{/if}
           <div class="l-row" data-gap="2" data-justify="end">
+            <p class="small field-help" role="status" data-grow>{#if !n}{WHY}{/if}</p>
             <Button label="Cancel" variant="quiet" href={href("collect")} />
             {#if n}<Button label={`Print ${pagesLabel(n)}`} variant="primary" lg href={href("collect")} lead={print} />{:else}<Button label="Print" variant="primary" lg disabled lead={print} />{/if}
           </div>

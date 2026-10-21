@@ -1,7 +1,7 @@
 <!-- UI Next (v4) QR room screen ("Room view"). Status: provisional (playbook rule 12). Mock data: ui-next/fixtures/collect/collect.json.
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): QRRoom.dc.html (projector: one code per survey, grouped by perspective
      colour), QRRoomPhone.dc.html (phone: one survey at a time, Previous / Next survey; ?state=<n> picks the survey, 1-based; absent or not
-     a survey number, the board's 3 of 5). Contracts: §2 Perspective card (accent bar from [data-lens]), §1.4 QR room pill, Room health row
+     a survey number, the board's 3 of 5; a data row without the qrRoomPhone default starts on the first survey). Contracts: §2 Perspective card (accent bar from [data-lens]), §1.4 QR room pill, Room health row
      (ruling 8: the instruction is addressed to the room under the codes on the projector), §2 Offline actions (one pointer, never its own
      print button). Projector: five tiles across (.l-grid[data-cols="5"], gap --sp-4) so every code and the room lines sit above the fold at
      1280x800; each code keeps the §8.7 room size (176) and centres into its tile's hero padding (the board's 18/16/20 projector tile padding
@@ -28,7 +28,7 @@
   let { phone = false, theme = "light", state, data = fixture } = $props();
   const m = $derived(collectModel(data));
   const total = $derived(m.surveys.length);
-  const at = $derived(pickSurvey(state, total, data.qrRoomPhone.survey));
+  const at = $derived(pickSurvey(state, total, data.qrRoomPhone?.survey));
   const s = $derived(at < 0 ? undefined : m.surveys[at]);
 </script>
 
