@@ -5,8 +5,10 @@
      line .l-stack[data-align=center] (8.7 rows). Any ?state= renders the default.
      Data: ui-next/fixtures/results/report.json through ./data.js. One .btn-primary: desktop "Download this report (PDF)"
      (document bar); phone the phone-bar. Copy: the boards.
-     report: the built report (default the fixture; the route passes none). A payload without a perspective, a gap area or a
-     "look next" area still renders (validator R3-3): cards and rows are iterated, unresolved areas are left out, never thrown. -->
+     report: the built report (default the fixture, REPORT.desktop on the sheet and REPORT.phone on the phone list; the route
+     passes none). Both branches read it (R4-4). A payload without a perspective, a gap area or a "look next" area still renders
+     (validator R3-3): cards and rows are iterated, unresolved areas are left out, never thrown. The detailed report's page count
+     is its sheets for this report (data.js detailedPages, R4-5). -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Card from "../../Card.svelte";
@@ -25,12 +27,12 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, LEVEL_WORD, lensLabel, lensCards, bandRows, withNotes } from "./data.js";
+  import { REPORT, LEVEL_WORD, lensLabel, lensCards, bandRows, withNotes, detailedPages } from "./data.js";
 
-  let { phone = false, theme = "light", report = REPORT.desktop } = $props();
-  const P = REPORT.phone;
-  const D = $derived(report);
+  let { phone = false, theme = "light", report } = $props();
+  const D = $derived(report ?? (phone ? REPORT.phone : REPORT.desktop));
   const cards = $derived(lensCards(D.payload, D.counts));
+  const pages = $derived(detailedPages(cards));
   const rows = $derived(bandRows(D, D.counts, [...(D.gaps?.biggest ?? []), ...(D.gaps?.agree ?? [])]));
   const next = $derived((D.lookNext ?? []).map(([lens, area]) => ({ lens, area, row: cards.find((c) => c.lens === lens)?.rows.find((r) => r.name === area) }))
     .filter((n) => n.row).map((n) => ({ lens: n.lens, area: n.area, level: n.row.level })));
@@ -38,19 +40,19 @@
 
 {#snippet eye()}<Glyph d={G.eye} />{/snippet}
 {#snippet share()}<Glyph d={G.share} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Reports" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<DocBar title={`Overview report · 1 page · ${D.review.title}`} other="Open the detailed report · 4 pages" otherHref={href("report-detailed")} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Reports" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<DocBar title={`Overview report · 1 page · ${D.review.title}`} other={`Open the detailed report · ${pages} pages`} otherHref={href("report-detailed")} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Download the overview (PDF)" href="#download" />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
-    <a class="link small" href={href("results")}>{P.review.title} · results</a>
+    <a class="link small" href={href("results")}>{D.review.title} · results</a>
     <h1 class="title-phone">Reports</h1>
     <Card gap={3} label="Overview · 1 page">
       <div class="l-row" data-gap="3" data-align="start"><span class="icn icn-lens" data-lens="team"><Glyph d={G.doc} /></span><Stack gap={1}><span class="h3">Overview · 1 page</span><span class="small">Levels, the three biggest gaps, the radar.</span></Stack></div>
       <Row gap={2}><Button label="Preview" href={href("report")} lead={eye} block /><Button label="Share PDF" href="#share-pdf" lead={share} block /></Row>
     </Card>
-    <Card gap={3} label="Detailed · 4 pages">
-      <div class="l-row" data-gap="3" data-align="start"><span class="icn icn-lens" data-lens="community"><Glyph d={G.list} /></span><Stack gap={1}><span class="h3">Detailed · 4 pages</span><span class="small">Every area with its numbers. Best read on a bigger screen or on paper.</span></Stack></div>
+    <Card gap={3} label={`Detailed · ${pages} pages`}>
+      <div class="l-row" data-gap="3" data-align="start"><span class="icn icn-lens" data-lens="community"><Glyph d={G.list} /></span><Stack gap={1}><span class="h3">Detailed · {pages} pages</span><span class="small">Every area with its numbers. Best read on a bigger screen or on paper.</span></Stack></div>
       <Row gap={2}><Button label="Share PDF" href="#share-pdf" lead={share} block /></Row>
     </Card>
     <Card pad="list" gap={4} label="Preview · overview">

@@ -8,7 +8,11 @@
      no part in a gap or the tensions order, no radar shape, "—" in its evidence Score cells; an area with fewer than two placed
      perspectives says "too few perspectives to compare", never a gap. The fixture's reading of the radar (shapeReading, board copy)
      shows only when every perspective is drawn. A payload without a perspective or area still renders (R3-3): the evidence sheets
-     iterate the cards (two on page 3, the rest on page 4). report: the built report (default the fixture; the route passes none). -->
+     iterate the cards, two a sheet from page 3, and no sheet is empty: with two perspectives the report has three pages and "In
+     their words" closes page 3 (R4-5). Headings that count say the count drawn ("The two perspectives as one shape", "The two areas
+     where…"), never a fixed three. All areas compared lists every cross_lens_multi area in payload order, malformed entries
+     skipped, blank names as "—" (R4-3). report: the built report (default the fixture; the route passes none; a phone gets the
+     phone list, ./Report.svelte, with the same prop, R4-4). -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Stack from "../../Stack.svelte";
@@ -23,16 +27,19 @@
   import Radar from "./Radar.svelte";
   import Report from "./Report.svelte";
   import { href } from "../href.js";
-  import { REPORT, lensCards, scoreRows, radar, withNotes, gapLead } from "./data.js";
+  import { REPORT, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, responsesText, countWord, evidenceSheets } from "./data.js";
 
-  let { phone = false, theme = "light", report = REPORT.desktop } = $props();
-  const D = $derived(report);
+  let { phone = false, theme = "light", report } = $props();
+  const D = $derived(report ?? REPORT.desktop);
   const cards = $derived(lensCards(D.payload, D.counts));
   const tensions = $derived(scoreRows(D, D.counts).filter((r) => r.spread !== null).slice(0, 3));
-  const all = $derived(scoreRows(D, D.counts, (D.payload.cross_lens_multi || []).map((a) => a?.construct_name)));
+  const all = $derived(comparedRows(D, D.counts));
   const shape = $derived(radar(D, D.radar, D.counts));
+  const sheets = $derived(evidenceSheets(cards));
+  const PAGES = $derived(2 + sheets.length);
   const FOOT = $derived(`Built from ${D.review.responses} responses on ${D.review.builtOn} · Scores are 0–100. Every other page shows levels, which are bands · nothing here identifies a person`);
-  const PAGES = 4;
+  const shapeHeading = $derived(shape ? `The ${countWord(shape.legend.length)} perspectives as one shape` : "The perspectives as one shape");
+  const tensionsLead = $derived(tensions.length === 0 ? "No area has two perspectives to compare yet." : tensions.length === 1 ? "The area where the perspectives are furthest apart." : `The ${countWord(tensions.length)} areas where the perspectives are furthest apart.`);
 </script>
 
 {#snippet top()}<DocBar title={`Detailed report · ${PAGES} pages · ${D.review.title}`} other="Open the overview · 1 page" otherHref={href("report")} />{/snippet}
@@ -49,13 +56,14 @@
 {/snippet}
 {#snippet evidence(c)}
   <div class="solid l-card l-stack" data-lens={c.lens} data-gap="2">
-    <Row gap={3}><strong>{c.label}</strong><span class="small">{c.n} responses</span></Row>
+    <Row gap={3}><strong>{c.label}</strong><span class="small">{responsesText(c.n)}</span></Row>
     <table>
       <thead><tr><th class="th">Area</th><th class="th">Level</th><th class="th">Score</th><th class="th">Evidence</th><th class="th">Observation</th></tr></thead>
       <tbody>{#each c.rows as r}<tr><td class="td">{r.name}</td><td class="td"><Level level={r.level} /></td><td class="td tab-n">{r.level === "more" || r.score === null ? "—" : r.score}</td><td class="td">{r.items} items</td><td class="td">{r.note}</td></tr>{/each}</tbody>
     </table>
   </div>
 {/snippet}
+{#snippet words()}{#if D.theirWords?.length}<Stack gap={2}><h2 class="h3">In their words</h2><p class="small">{D.theirWords.map((w) => `“${w}”`).join(" · ")}</p></Stack>{/if}{/snippet}
 
 {#if phone}
 <Report phone {theme} {report} />
@@ -65,7 +73,7 @@
     <div class="paper" data-sheet="page">
       <PaperHead review={D.review} {cards} kind="detailed report" />
       <Stack gap={1}>
-        <h2 class="h3">The three perspectives as one shape</h2>
+        <h2 class="h3">{shapeHeading}</h2>
         {#if shape}
         <Row gap={4}>
           <Radar model={shape} />
@@ -78,7 +86,7 @@
       </Stack>
       <Stack gap={2}>
         <h2 class="h3">The biggest tensions</h2>
-        <p class="small">The three areas where the perspectives are furthest apart. Every area is compared on the next page.</p>
+        <p class="small">{tensionsLead} Every area is compared on the next page.</p>
         {@render scores(tensions)}
       </Stack>
       {@render foot(1)}
@@ -93,19 +101,17 @@
         <h2 class="h3">How to read the scores</h2>
         <p class="small">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. An area with fewer than three answers shows More input needed and no score. Nothing in this report identifies a person.</p>
       </Stack>
+      {#if !sheets.length}{@render words()}{/if}
       {@render foot(2)}
     </div>
+    {#each sheets as sheet, i}
     <div class="paper" data-sheet="page">
-      <h2 class="h3">Every area, with evidence</h2>
-      {#each cards.slice(0, 2) as c (c.lens)}{@render evidence(c)}{/each}
-      {@render foot(3)}
+      <h2 class="h3">Every area, with evidence{i ? " (continued)" : ""}</h2>
+      {#each sheet as c (c.lens)}{@render evidence(c)}{/each}
+      {#if i === sheets.length - 1}{@render words()}{/if}
+      {@render foot(3 + i)}
     </div>
-    <div class="paper" data-sheet="page">
-      <h2 class="h3">Every area, with evidence (continued)</h2>
-      {#each cards.slice(2) as c (c.lens)}{@render evidence(c)}{/each}
-      {#if D.theirWords?.length}<Stack gap={2}><h2 class="h3">In their words</h2><p class="small">{D.theirWords.map((w) => `“${w}”`).join(" · ")}</p></Stack>{/if}
-      {@render foot(4)}
-    </div>
+    {/each}
   </Stack>
 </AppShell>
 {/if}

@@ -14,7 +14,7 @@ import { OUT } from "../ui-next/src/screens/results/links.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import results from "../ui-next/src/screens/results/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, lensCards, bandRow, bandRows, scoreRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead } from "../ui-next/src/screens/results/data.js";
+import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages } from "../ui-next/src/screens/results/data.js";
 import Results from "../ui-next/src/screens/results/Results.svelte";
 import ResultsAnswers from "../ui-next/src/screens/results/ResultsAnswers.svelte";
 import ResultsGaps from "../ui-next/src/screens/results/ResultsGaps.svelte";
@@ -40,6 +40,36 @@ const withoutChurch = () => {
   return D;
 };
 const heldReport = () => ({ ...REPORT.desktop, counts: REPORT.held.counts }); // church 1 of 3: More input needed
+type Built = { payload: Payload & { cross_lens_multi: unknown[] }; counts?: Record<string, number>; review: Record<string, string> };
+const copy = () => JSON.parse(JSON.stringify(REPORT.desktop)) as Built;
+// R4-1: two areas whose placed perspectives (team, community) are both 20 apart; church (1 of 3, held) differs. Payload order
+// Zeal then Accord, so neither the hidden score nor the alphabet can be what orders them.
+const tieProbe = (zeal: number, accord: number) => {
+  const D = copy();
+  D.counts = { ...REPORT.held.counts };
+  D.payload.cross_lens_multi = [
+    { construct_name: "Zeal", question: "Zeal?", lens_scores: [{ lens: "team", score: 50 }, { lens: "community", score: 70 }, { lens: "church", score: zeal }] },
+    { construct_name: "Accord", question: "Accord?", lens_scores: [{ lens: "team", score: 40 }, { lens: "community", score: 60 }, { lens: "church", score: accord }] },
+  ];
+  return D;
+};
+// R4-2: the live payload carries evidence n and no `counts`; churchN is church's evidence count.
+const noCounts = (churchN: number) => {
+  const D = copy();
+  delete D.counts;
+  D.payload.evidence = D.payload.evidence.map((e) => (e.label.startsWith("church") ? { ...e, n: churchN } : e));
+  return D;
+};
+// R4-3: malformed entries (null, a number, no scored perspective) beside two areas with a blank and a numeric name.
+const oddReport = () => {
+  const D = copy();
+  D.payload.cross_lens_multi = [null, ...D.payload.cross_lens_multi, 7, { construct_name: "No scores", lens_scores: [] },
+    { construct_name: "  ", lens_scores: [{ lens: "team", score: 50 }, { lens: "community", score: 56 }] },
+    { construct_name: 42, lens_scores: [{ lens: "team", score: 60 }, { lens: "church", score: 68 }] }];
+  return D;
+};
+// R4-5: a sheet heading followed by nothing (or only the page foot) is an empty section.
+const emptyHeadings = (a: Element) => [...a.querySelectorAll(".paper h2")].filter((h) => !h.nextElementSibling || h.nextElementSibling.matches(".pfoot")).map(text);
 const attrs = (a: Element) => [...a.querySelectorAll("*")].flatMap((el) => [...el.attributes].map((x) => x.value)).join(" ");
 const store = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }; };
 
@@ -120,9 +150,10 @@ describe("data adapter: levels through the current UI's pure modules (board valu
       const placed = r.dots.map((d) => d.score);
       expect(r.spread, r.name).toBe(placed.length < 2 ? null : Math.max(...placed) - Math.min(...placed));
     }
-    // Biggest tensions: placed spreads only (Brief was "gap 4" and Understanding "gap 14" through church's score); one-score areas last
+    // Biggest tensions: placed spreads only (Brief was "gap 4" and Understanding "gap 14" through church's score); one-score areas
+    // last, in payload order, not in the order church's hidden score gave them (R4-1)
     expect(rows.map((r) => `${r.name} ${r.spread}`)).toEqual(["Clarity / naturalness 58", "Impact / use 54", "Trust / readiness 2",
-      "Understanding of the source null", "Appeal / beauty null", "Brief & perceived fidelity null", "Consistency null"]);
+      "Brief & perceived fidelity null", "Understanding of the source null", "Appeal / beauty null", "Consistency null"]);
     const brief = rows.find((r) => r.name === "Brief & perceived fidelity")!;
     expect(withNotes(gapLead(brief), brief)).toBe("too few perspectives to compare · Church more input needed · Community not asked");
     expect(bandRow(D, H, "Understanding of the source").spread).toBeNull();
@@ -132,6 +163,58 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect([shape.legend.map((l: { lens: string }) => l.lens), shape.notes]).toEqual([["team", "community"], ["Church more input needed"]]);
     const church = lensCards(D.payload, H).find((c: { lens: string }) => c.lens === "church");
     expect(church.rows.map((r: { score: unknown; level: string }) => `${r.level}:${r.score}`)).toEqual(Array(6).fill("more:null"));
+  });
+  it("tensions ties break on payload order, never on a held perspective's score (R4-1)", () => {
+    const names = (D: Built) => scoreRows(D, D.counts).map((r: { name: string; spread: number | null }) => `${r.name} ${r.spread}`);
+    // lensSpreadRows' full spread puts Zeal first in the first probe (50 vs 20) and Accord first in the second (20 vs 50)
+    expect(names(tieProbe(20, 60))).toEqual(["Zeal 20", "Accord 20"]);
+    expect(names(tieProbe(60, 10))).toEqual(["Zeal 20", "Accord 20"]);
+    // and the same held perspective's score in the fixture: swapping church's scores between areas moves nothing
+    const D = heldReport(), E = copy() as Built & { payload: { cross_lens_multi: { lens_scores: { lens: string; score: number }[] }[] } };
+    const church = E.payload.cross_lens_multi.map((a) => a.lens_scores.find((s) => s.lens === "church"));
+    const scores = church.map((s) => s?.score).reverse();
+    church.forEach((s, i) => { if (s) s.score = scores[i] ?? s.score; });
+    E.counts = { ...REPORT.held.counts };
+    expect(names(E)).toEqual(names(D as Built));
+  });
+  it("one response-count resolver: a report without counts places and hides by its evidence n (R4-2)", () => {
+    const D = REPORT.desktop, H = REPORT.held.counts;
+    const r = responsesFor(noCounts(4).payload, undefined);
+    expect(["team", "community", "church", "nobody"].map(r)).toEqual([6, 8, 4, null]);
+    expect(responsesFor(D.payload, { church: 1 })("church")).toBe(1); // counts first, then evidence
+    // evidence n equal to the counts: every helper reads the same as with counts
+    const live = noCounts(4);
+    expect(lensCards(live.payload, live.counts)).toEqual(lensCards(D.payload, D.counts));
+    expect(scoreRows(live, live.counts)).toEqual(scoreRows(D, D.counts));
+    expect(radar(live, D.radar, live.counts)).toEqual(radar(D, D.radar, D.counts));
+    // church at 1 in the evidence, no counts: hidden everywhere exactly as with held counts
+    const held = noCounts(1);
+    expect(lensCards(held.payload, held.counts)).toEqual(lensCards(D.payload, H));
+    expect(scoreRows(held, held.counts)).toEqual(scoreRows(D, H));
+    expect(comparedRows(held, held.counts)).toEqual(comparedRows(D, H));
+    expect(bandRows(held, held.counts, D.gaps.biggest)).toEqual(bandRows(D, H, D.gaps.biggest));
+    expect(radar(held, D.radar, held.counts)).toEqual(radar(D, D.radar, H));
+    expect(lensCards(held.payload, held.counts).find((c: { lens: string }) => c.lens === "church").rows.every((x: { score: unknown }) => x.score === null)).toBe(true);
+    // no count anywhere: More input needed, never a level or a score
+    const none = noCounts(1);
+    none.payload.evidence = [];
+    expect(lensCards(none.payload, none.counts).map((c: { n: unknown; level: string }) => `${c.n}:${c.level}`)).toEqual(["null:more", "null:more", "null:more"]);
+    expect(scoreRows(none, none.counts).every((x: { dots: unknown[] }) => x.dots.length === 0)).toBe(true);
+    expect(radar(none, D.radar, none.counts)).toBeNull();
+  });
+  it("malformed cross-perspective entries are skipped; blank and numeric names still list (R4-3)", () => {
+    const D = oddReport(), F = REPORT.desktop;
+    expect(bandRows(D, D.counts, F.gaps.biggest)).toEqual(bandRows(F, F.counts, F.gaps.biggest));
+    expect(bandRow(D, D.counts, "Clarity / naturalness").question).toBe("Is the text easy to follow?");
+    expect(scoreRows(D, D.counts).slice(0, 3)).toEqual(scoreRows(F, F.counts).slice(0, 3));
+    expect(comparedRows(D, D.counts).map((r: { name: string; spread: number | null }) => `${r.name} ${r.spread}`).slice(-2)).toEqual(["— 6", "42 8"]);
+    expect(comparedRows(D, D.counts).length).toBe(F.payload.cross_lens_multi.length + 2);
+    expect(radar(D, F.radar, D.counts)).toEqual(radar(F, F.radar, F.counts));
+  });
+  it("count words and detailed pages follow the report (R4-5)", () => {
+    expect([countWord(2), countWord(3), countWord(9)]).toEqual(["two", "three", "9"]);
+    const cards = (n: number) => Array.from({ length: n }, (_, i) => ({ lens: String(i) }));
+    expect([0, 1, 2, 3].map((n) => detailedPages(cards(n)))).toEqual([2, 3, 3, 4]);
   });
   it("a payload without a perspective or an area: cards iterate, unknown areas are skipped, never thrown (R3-3)", () => {
     const D = withoutChurch();
@@ -368,13 +451,83 @@ describe("each board renders as a screen", () => {
     expect(r.querySelectorAll("svg[data-part=band-barbell]").length).toBe(4);
     const d = mount(ReportDetailed, { report: D });
     expect(d.querySelectorAll("h1").length).toBe(1);
-    expect(d.querySelectorAll(".paper[data-sheet=page]").length).toBe(4);
+    // two perspectives: three sheets, no empty "(continued)" page; their words close page 3 (R4-5)
+    expect(d.querySelectorAll(".paper[data-sheet=page]").length).toBe(3);
+    expect(all(d, ".pfoot span:last-child")).toEqual(["1 of 3", "2 of 3", "3 of 3"]);
+    expect(text(d.querySelector("header[data-variant=document]"))).toContain("Detailed report · 3 pages");
+    expect(text(d)).not.toContain("(continued)");
+    expect(all(d, ".paper[data-sheet=page]:last-child h2")).toEqual(["Every area, with evidence", "In their words"]);
+    expect(all(d, ".paper h2")[0]).toBe("The two perspectives as one shape");
+    expect(emptyHeadings(d)).toEqual([]);
+    expect(text(r.querySelector("header[data-variant=document]"))).toContain("Open the detailed report · 3 pages");
     expect(all(d, ".solid[data-lens] > .l-row strong")).toEqual(["Translation team", "Community"]);
-    expect(d.querySelectorAll(".paper[data-sheet=page]:last-child table").length).toBe(0);
     expect(text(d)).toContain("Church not asked");
     for (const el of [r, d]) {
       expect(text(el)).not.toMatch(/gap null|undefined|NaN/);
       expect(attrs(el)).not.toMatch(/undefined|NaN/);
+    }
+  });
+  it("ReportDetailed: the tensions order and every sheet are the same whatever the held perspective's score (R4-1)", () => {
+    const a = mount(ReportDetailed, { report: tieProbe(20, 60) }), b = mount(ReportDetailed, { report: tieProbe(60, 10) });
+    const tense = (el: Element) => all(el.querySelectorAll(".paper[data-sheet=page]")[0], ".l-grid > span.small:first-child");
+    expect(tense(a)).toEqual(["Zeal", "Accord"]);
+    expect(tense(b)).toEqual(["Zeal", "Accord"]);
+    expect(a.innerHTML).toBe(b.innerHTML); // nothing on any sheet moves with church's hidden score
+    expect(text(a)).toContain("The two areas where the perspectives are furthest apart.");
+  });
+  it("Report and ReportDetailed without counts hide a perspective under the minimum as held counts do (R4-2)", () => {
+    for (const C of [Report, ReportDetailed]) {
+      expect(mount(C, { report: noCounts(1) }).innerHTML).toBe(mount(C, { report: heldReport() }).innerHTML);
+      expect(mount(C, { report: noCounts(4) }).innerHTML).toBe(mount(C).innerHTML);
+    }
+    const a = mount(ReportDetailed, { report: noCounts(1) });
+    expect(a.querySelectorAll("svg[data-part=score-barbell] g[data-lens=church], svg[aria-label^='Radar'] [data-lens=church]").length).toBe(0);
+    expect([...a.querySelector(".solid[data-lens=church] table")!.querySelectorAll("tbody tr")].map((tr) => text(tr.children[2]))).toEqual(Array(6).fill("—"));
+    const none = noCounts(1);
+    none.payload.evidence = [];
+    const z = mount(ReportDetailed, { report: none });
+    expect(all(z, ".solid[data-lens] > .l-row .small")).toEqual(Array(3).fill("responses not counted"));
+    expect(text(z)).not.toMatch(/null|undefined|NaN/);
+  });
+  it("Report and ReportDetailed render malformed entries; blank and numeric names list in All areas compared (R4-3)", () => {
+    const D = oddReport();
+    const r = mount(Report, { report: D });
+    expect(r.querySelectorAll("h1").length).toBe(1);
+    expect(r.querySelectorAll("svg[data-part=band-barbell]").length).toBe(mount(Report).querySelectorAll("svg[data-part=band-barbell]").length);
+    const d = mount(ReportDetailed, { report: D });
+    expect(d.querySelectorAll("h1").length).toBe(1);
+    const page2 = d.querySelectorAll(".paper[data-sheet=page]")[1];
+    expect(all(page2, ".l-grid > span.small:first-child").slice(-2)).toEqual(["—", "42"]);
+    expect(all(page2, ".l-grid > span.small:last-child").slice(-2)).toEqual(["gap 6 · Church not asked", "gap 8 · Community not asked"]);
+    expect(d.querySelectorAll("svg[data-part=score-barbell]").length).toBe(3 + 9);
+    expect(text(d)).not.toMatch(/gap null|undefined|NaN/);
+  });
+  it("ReportDetailed copy counts what it draws; no sheet has a heading without content (R4-5)", () => {
+    const def = mount(ReportDetailed), held = mount(ReportDetailed, { report: heldReport() });
+    expect(all(def, ".paper h2")[0]).toBe("The three perspectives as one shape");
+    expect(text(def)).toContain("The three areas where the perspectives are furthest apart.");
+    expect(all(held, ".paper h2")[0]).toBe("The two perspectives as one shape");
+    expect(text(held)).toContain("The three areas where the perspectives are furthest apart.");
+    const one = copy();
+    one.payload.cross_lens_multi = one.payload.cross_lens_multi.slice(0, 1);
+    const o = mount(ReportDetailed, { report: one });
+    expect(all(o, ".paper h2")[0]).toBe("The perspectives as one shape");
+    expect(text(o)).toContain("The area where the perspectives are furthest apart. Every area");
+    for (const el of [def, held, o, mount(ReportDetailed, { report: withoutChurch() }), mount(ReportDetailed, { report: noCounts(1) }), mount(ReportDetailed, { report: oddReport() })]) {
+      expect(emptyHeadings(el)).toEqual([]);
+      expect(el.querySelectorAll("h1").length).toBe(1);
+    }
+  });
+  it("ReportPhone reads the report prop; the fixture is only the default (R4-4)", () => {
+    expect(all(mount(Report, { phone: true }), "main > a.link")[0]).toBe("Luke 1–2 · results");
+    const P = JSON.parse(JSON.stringify(REPORT.phone));
+    P.review.title = "Acts 3";
+    P.payload.lenses = P.payload.lenses.filter((l: { lens: string }) => l.lens !== "church");
+    for (const C of [Report, ReportDetailed]) {
+      const a = mount(C, { phone: true, report: P });
+      expect(all(a, "main > a.link")[0]).toBe("Acts 3 · results");
+      expect(all(a, ".glass .h3")).toEqual(["Overview · 1 page", "Detailed · 3 pages"]);
+      expect(a.querySelectorAll("h1").length).toBe(1);
     }
   });
   it("ReportDetailed on a phone renders the phone's reports list (F6: never a blank page)", () => {

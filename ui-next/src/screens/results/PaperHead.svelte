@@ -7,6 +7,7 @@
   import Grid from "../../Grid.svelte";
   import Level from "../../Level.svelte";
   import Mark from "../../Mark.svelte";
+  import { responsesText } from "./data.js";
   let { review, cards, kind } = $props();
 </script>
 
@@ -18,5 +19,5 @@
   <Mark size={40} />
 </div>
 <Grid cols={3} gap={3}>
-  {#each cards as c (c.lens)}<div class="solid l-card l-stack" data-pad="bar" data-lens={c.lens} data-gap="2"><span class="h3">{c.label}</span><span class="small">{c.n} responses</span><Level level={c.level} /></div>{/each}
+  {#each cards as c (c.lens)}<div class="solid l-card l-stack" data-pad="bar" data-lens={c.lens} data-gap="2"><span class="h3">{c.label}</span><span class="small">{responsesText(c.n)}</span><Level level={c.level} /></div>{/each}
 </Grid>
