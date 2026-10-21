@@ -13,7 +13,7 @@ import * as R from "../ui-next/src/copy/rachel.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { route } from "../ui-next/src/route.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { ACCOUNT_ITEMS } from "../ui-next/src/icons.js";
+import { accountItems } from "../ui-next/src/icons.js";
 // @ts-expect-error -- plain .mjs script, no type declarations
 import { parse, emit } from "../scripts/sync-rachel-copy.mjs";
 
@@ -178,8 +178,12 @@ describe("/next/ routes for About and Landing", () => {
     expect(route(p("?screen=about"), undefined).view).toBe("components");
     expect(route(p("?screen=landing"), undefined).view).toBe("components");
   });
-  it("Home's account menu reaches About", () => {
-    expect(ACCOUNT_ITEMS.find((i: { label?: string }) => i.label === "Why 3D Review exists").href).toBe("?screen=about");
+  it("Home's account menu reaches About through href(): ui_next stays on and w/theme carry (setup N8)", () => {
+    const about = (from: string) => accountItems(from).find((i: { label?: string }) => i.label === "Why 3D Review exists").href;
+    expect(about("")).toBe("?ui_next=on&screen=about");
+    expect(about("?ui_next=on&screen=project&theme=dark")).toBe("?ui_next=on&screen=about&theme=dark");
+    expect(about("?ui_next=on&screen=home&w=phone&theme=dark&state=reviews")).toBe("?ui_next=on&screen=about&w=phone&theme=dark");
+    expect(route(p(about("?theme=dark")), on())).toEqual({ view: "about", props: { phone: false, theme: "dark" } });
   });
 });
 
