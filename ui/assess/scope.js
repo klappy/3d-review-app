@@ -259,7 +259,7 @@ const entry = {
         const res = await fetch('/v2/auth/email', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ email: val(form, 'email') }), credentials: 'same-origin', redirect: 'manual', cache: 'no-store' });
         if (res.type === 'opaqueredirect') { window.location.assign('/v2/auth/access'); return; } // environment without email links
         if (res.ok) { const b = await res.json().catch(() => null); const min = Number(b?.result?.expires_in_minutes) || 30; form.hidden = true; status.textContent = SIGNIN_LINK_SENT(min); return; }
-        if (res.status === 429) { // one-minute RL_AUTH refusal vs the 900 s per-address mail cap: tell each the wait it really has
+        if (res.status === 429) { // the 900 s per-address mail cap (or a one-minute refusal from upstream): tell each the wait it really has
           const b = await res.json().catch(() => null), retry = retryAfterOf(b?.error, res);
           status.textContent = isOneMinuteLimit(b?.error?.message, retry) ? RATE_LIMIT_COPY : `Too many sign-in links were requested for this address. Use the newest email, or wait ${Math.max(1, Math.ceil((Number(retry) || 900) / 60))} minutes.`;
           holdRetry(submit, isOneMinuteLimit(b?.error?.message, retry) ? retry : retry ?? 900); return; // DoD 6: the button counts down the same wait
@@ -309,7 +309,7 @@ export function readModel(kind, model) {
   const status = READ_STATUS[model?.status] || 'failed';
   const item = (x, href, eyebrow, facts = []) => ({ id: x.id, title: String(x.name ?? x.id ?? ''), href, eyebrow, role: x.role || '', archived: !!x.archived_at, facts });
   if (status !== 'ready') return { kind, status, items: [], error: model?.error || '' };
-  if (kind === 'workspaces') return { kind, status, title: 'Your workspaces', eyebrow: 'Optional grouping', items: (model.workspaces || []).map(w => item(w, `#workspace/${encodeURIComponent(w.id)}`, 'Workspace')) , empty: 'You have no workspaces yet.' };
+  if (kind === 'workspaces') return { kind, status, title: model.globalAccess ? 'All workspaces' : 'Your workspaces', eyebrow: 'Optional grouping', items: (model.workspaces || []).map(w => item(w, `#workspace/${encodeURIComponent(w.id)}`, 'Workspace')) , empty: 'You have no workspaces yet.' };
   if (kind === 'projects') return { kind, status, title: 'Choose a project', eyebrow: 'Your projects', items: (model.projects || []).map(p => item(p, `#project/${encodeURIComponent(p.id)}`, 'Project')), empty: 'You have no projects yet.' };
   if (kind === 'workspace') { const w = model.workspace || {}; return { kind, status, title: String(w.name ?? ''), eyebrow: 'Workspace', role: w.role || '', archived: !!w.archived_at, id: w.id, items: (model.projects || []).map(p => item(p, `#project/${encodeURIComponent(p.id)}`, 'Project')), empty: 'No projects grouped yet. You can still open them from All projects.' }; }
   if (kind === 'project') { const p = model.project || {}; const langName = new Map((model.languages || []).map(l => [l.id, l.name]));
@@ -338,13 +338,13 @@ const actionRegion = html => html ? `<section data-action-region class="legacy-a
 // ---------- workspaces ----------
 const workspaces = {
   async load(ctx, params = {}) {
-    try { const r = await ctx.api('/v2/workspaces'); return { status: 'loaded', params, workspaces: r.workspaces || [] }; }
+    try { const r = await ctx.api('/v2/workspaces'); return { status: 'loaded', params, globalAccess: ctx.state?.principal?.access_mode === 'global', workspaces: r.workspaces || [] }; }
     catch (e) { return { ...fail(e, safeMessage), params }; }
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('workspaces', model);
-    return readRegion(`${pageHead(ctx, r)}<p class="muted">Group projects you can already open. A workspace does not add access to other projects. <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
+    return readRegion(`${pageHead(ctx, r)}<p class="muted">${model.globalAccess ? 'Every workspace is available in Global Access. Open a workspace to browse its projects and assessments.' : 'Workspaces group projects shared with you.'} <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
       + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a workspace</h2><form id="create-workspace"><label class="field">Workspace name<input name="name" maxlength="100" required placeholder="For example, Lake region"></label><div class="actions"><button class="primary" type="submit">Create workspace</button></div></form></section>`);
   },
   bind(ctx, root, model) {

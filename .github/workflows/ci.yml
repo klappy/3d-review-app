@@ -17,9 +17,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
       - run: npm ci
       - run: npm run typecheck
+      # pretypecheck builds UI Next (scripts/build-next-guarded.mjs) so the default Workers Builds command serves /next/.
+      - name: assert ui/next/index.html built by typecheck
+        run: test -f ui/next/index.html || { echo "ui/next/index.html missing after npm run typecheck"; exit 1; }
   test:
     # Visible, not yet required. Becomes part of the gate once green on main (3D runner unit: fix the suite).
     name: test
@@ -28,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
       - run: npm ci
       - run: npm test
   ui-test:
@@ -40,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
       - run: npm ci
       - run: npm run test:ui
   mjs-test:
@@ -52,6 +55,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
       - run: npm ci
       - run: npm run test:mjs

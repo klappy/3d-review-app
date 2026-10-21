@@ -120,6 +120,33 @@
       }
     },
     {
+      "selector": ".app",
+      "note": "8.2/8.3 layout tokens - spacing scale, gutter, page widths (generator gen.py EXTRA)",
+      "decls": {
+        "--sp-1": "4px",
+        "--sp-2": "8px",
+        "--sp-3": "12px",
+        "--sp-4": "16px",
+        "--sp-5": "24px",
+        "--sp-6": "32px",
+        "--sp-7": "48px",
+        "--gutter": "32px",
+        "--page-max": "1120px",
+        "--page-max-narrow": "880px",
+        "--page-max-read": "520px"
+      }
+    },
+    {
+      "selector": ".app[data-w=phone]",
+      "note": "8.3 phone widths - gutter 16, pages 100%",
+      "decls": {
+        "--gutter": "16px",
+        "--page-max": "100%",
+        "--page-max-narrow": "100%",
+        "--page-max-read": "100%"
+      }
+    },
+    {
       "selector": ".paper",
       "note": "1.3 paper scope - light values re-declared so print renders the same in dark mode",
       "decls": {

@@ -3,11 +3,9 @@ import {streamSSE} from 'hono/streaming';
 import type {Env,Ctx} from '../handlers/types';
 import {execute} from '../dispatch';
 import {newTraceId} from '../receipt';
-import {allow,clientIp,RATE_LIMIT_MESSAGE,RATE_LIMIT_WINDOW_SECONDS} from '../ratelimit';
 /** Read-only event notifications. Payload and actor data are never copied into the stream. */
 export function installRoadmapStream(app:Hono<{Bindings:Env}>,context:(req:Request,env:Env)=>Promise<Ctx>){
  app.get('/v2/roadmap/stream',async c=>{
-  if(!await allow(c.env,'RL_HTTP_ANON',`roadmap:${clientIp(c.req.raw)}`))return c.text(RATE_LIMIT_MESSAGE,429,{'retry-after':String(RATE_LIMIT_WINDOW_SECONDS)});
   const raw=c.req.header('last-event-id')??c.req.query('after')??'0';if(!/^\d{1,16}$/.test(raw)||!Number.isSafeInteger(Number(raw)))return c.text('Invalid cursor.',400);
   const generation=c.req.query('generation');if(generation!==undefined&&!/^\d{1,16}$/.test(generation))return c.text('Invalid generation.',400);
   // EventSource includes same-origin cookies even with withCredentials:false.

@@ -133,39 +133,13 @@ describe("rate limits", () => {
     expect(outs.filter((o) => o.out.state === "limited").every((o) => o.sent.length === 0)).toBe(true);
     expect(await db.prepare("SELECT COUNT(*) AS n FROM login_code WHERE email_hash = ?").bind(await sha256("race@example.invalid")).first("n")).toBe(MAGIC_LINK_PER_EMAIL);
   });
-  it("per IP: the RL_AUTH ip: key refuses before any storage access or mail", async () => {
-    const keys: string[] = [];
-    env.RL_AUTH = { limit: async ({ key }: { key: string }) => { keys.push(key); return { success: false }; } };
-    const spy = vi.spyOn(env.DB, "prepare");
-    const res = await postJson("/v2/auth/email", { email: "ip@example.invalid" }, { "cf-connecting-ip": "192.0.2.7" });
-    expect(res.status).toBe(429); expect(res.headers.get("retry-after")).toBe("60");
-    expect(keys).toEqual(["ip:192.0.2.7"]); expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
-  });
-  it("DoD 6: a per-IP sign-in refusal of the browser form keeps next=oauth from the POST body", async () => {
-    env.RL_AUTH = { limit: async () => ({ success: false }) };
-    const res = await post("/v2/auth/email", { email: "oauth@example.invalid", next: "oauth" });
-    expect(res.status).toBe(429); expect(res.headers.get("retry-after")).toBe("60");
-    const html = await res.text();
-    expect(html).toContain(RATE_LIMIT_COPY); expect(html).toContain('<input type="hidden" name="next" value="oauth">');
-  });
-  it("per IP on opening a link: RL_REDEEM ip: key refuses before any storage access", async () => {
-    env.RL_REDEEM = { limit: async () => ({ success: false }) };
-    const spy = vi.spyOn(env.DB, "prepare");
-    const res = await post("/v2/auth/email/open", { t: newMagicToken() });
-    expect(res.status).toBe(429); expect(spy).not.toHaveBeenCalled();
-    // DoD 6: a browser form post gets the sign-in page saying plainly it is a rate limit, with retry-after 60,
-    // and tells the person to reopen the same link (it still works) rather than request a new one.
-    expect(res.headers.get("retry-after")).toBe("60");
-    expect(await res.text()).toContain("Rate limit: too many requests right now. Nothing was lost. Open the link in your email again in one minute.");
-    spy.mockRestore();
-  });
-  it("DoD 6: a JSON sign-in request refused per IP carries RATE_LIMITED, retry_after 60 and retry-after: 60", async () => {
-    env.RL_AUTH = { limit: async () => ({ success: false }) };
-    const res = await postJson("/v2/auth/email", { email: "rl@example.invalid" });
-    expect(res.status).toBe(429); expect(res.headers.get("retry-after")).toBe("60");
-    const body = await res.json() as { error: { code: string; message: string; data?: { retry_after?: number } } };
-    expect(body.error.code).toBe("RATE_LIMITED"); expect(body.error.message).toContain("rate limit"); expect(body.error.data?.retry_after).toBe(60);
+  it("no per-IP limiter (captain 2026-10-16): sign-in requests and link checks from one address are never 429", async () => {
+    const sent: number[] = [];
+    for (let i = 0; i < 25; i++) sent.push((await postJson("/v2/auth/email", { email: `room${i}@example.invalid` }, { "cf-connecting-ip": "192.0.2.7" })).status);
+    expect(sent.every((s) => s === 200)).toBe(true);
+    const checks: number[] = [];
+    for (let i = 0; i < 25; i++) checks.push((await postJson("/v2/auth/email/check", { t: newMagicToken() }, { "cf-connecting-ip": "192.0.2.7" })).status);
+    expect(checks.every((s) => s === 200)).toBe(true);
   });
   it("DoD 6: the link landing page says it is a rate limit and holds Try again for Retry-After", async () => {
     const { RATE_LIMIT_COPY: UI_COPY } = await import("../ui/rate-limit.js");
@@ -232,7 +206,8 @@ describe("routes", () => {
     expect(first.status).toBe(303);
     const cookie = first.headers.get("set-cookie")!;
     const s1 = sessionFrom(first)!;
-    expect(cookie).toBe(`session=${s1}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=2592000`);
+    expect(cookie).toContain(`session=${s1}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=2592000`);
+    expect(cookie).toContain("review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
     const p = await resolvePrincipal(new Request(ORIGIN + "/v2/me", { headers: { cookie: `session=${s1}` } }), env);
     expect(p).toMatchObject({ kind: "user", id: "usr_owner_b38" }); // same row the Access route maps to → existing grants apply
     const row: any = await db.prepare("SELECT expires_at, created_at FROM session WHERE token_hash = ?").bind(await sha256(s1)).first();
@@ -273,13 +248,15 @@ describe("routes", () => {
     const s = sessionFrom(await post("/v2/auth/email/open", { t: token, e: "leaver@example.invalid" }))!;
     const out = await app.fetch(new Request(ORIGIN + "/v2/auth/session", { method: "DELETE", headers: { cookie: `session=${s}`, origin: ORIGIN } }), env);
     expect(out.status).toBe(200);
-    expect(out.headers.get("set-cookie")).toBe("session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+    expect(out.headers.get("set-cookie")).toContain("session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+    expect(out.headers.get("set-cookie")).toContain("review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
     expect(await db.prepare("SELECT COUNT(*) AS n FROM session WHERE token_hash = ?").bind(await sha256(s)).first("n")).toBe(0);
     expect((await resolvePrincipal(new Request(ORIGIN + "/", { headers: { cookie: `session=${s}` } }), env)).kind).toBe("anonymous");
     // B44: a second sign-out with the now-dead cookie (a stale tab) still expires it — the UI treats NOT_AUTHENTICATED as signed out.
     const again = await app.fetch(new Request(ORIGIN + "/v2/auth/session", { method: "DELETE", headers: { cookie: `session=${s}`, origin: ORIGIN } }), env);
     expect(again.status).toBe(401);
-    expect(again.headers.get("set-cookie")).toBe("session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+    expect(again.headers.get("set-cookie")).toContain("session=; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0");
+    expect(again.headers.get("set-cookie")).toContain("review_access=; Secure; Path=/; SameSite=Lax; Max-Age=0");
   });
   it("landing page: nonce'd script only, token read from the fragment, same-origin referrer", async () => {
     const res = await app.fetch(new Request(ORIGIN + "/v2/auth/email/open"), env);

@@ -17,10 +17,10 @@ const ctx=(database=db,kind:Ctx['principal']['kind']='user',id='person_mara'):Ct
 const schemaSamples:any[]=[];
 const ec=()=>({waitUntil(){},passThroughOnException(){},props:undefined}) as any;
 async function http(path:string,body?:unknown,credential:string|undefined=token){
- const r=await worker.fetch(new Request('https://report.test'+path,{method:body===undefined?'GET':'POST',headers:{...(credential?{authorization:'Bearer '+credential}:{}),'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})}),env,ec());const bodyResult=await r.json() as any;schemaSamples.push({path:path.split('?')[0],method:body===undefined?'get':'post',status:r.status,body:bodyResult});return {status:r.status,body:bodyResult};
+ const r=await worker.fetch(new Request('https://report.test'+path,{method:body===undefined?'GET':'POST',headers:{...(credential?{authorization:'Bearer '+credential,cookie:'review_access=global'}:{}),'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})}),env,ec());const bodyResult=await r.json() as any;schemaSamples.push({path:path.split('?')[0],method:body===undefined?'get':'post',status:r.status,body:bodyResult});return {status:r.status,body:bodyResult};
 }
 async function mcp(capability:string,params:any,opts:any={},credential=token){
- const r=await worker.fetch(new Request('https://report.test/mcp',{method:'POST',headers:{authorization:'Bearer '+credential,'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:capability==='cap.report.build'?'danger':'read',arguments:{capability,params,...opts}}})}),env,ec());const b:any=await r.json();return b.result?.structuredContent??b;
+ const r=await worker.fetch(new Request('https://report.test/mcp',{method:'POST',headers:{authorization:'Bearer '+credential,cookie:'review_access=global','content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:capability==='cap.report.build'?'danger':'read',arguments:{capability,params,...opts}}})}),env,ec());const b:any=await r.json();return b.result?.structuredContent??b;
 }
 const normalized=(b:any)=>{const c=JSON.parse(JSON.stringify(b));delete c.trace_id;if(c.receipt){delete c.receipt.id;delete c.receipt.trace_id;}return c;};
 async function build(a=aid,database=db){const c=ctx(database);const preview:any=await execute(c,'cap.report.build',{aid:a},{tool:'danger',mode:'dry_run'});expect(preview.ok).toBe(true);return execute({...c,traceId:'tr_'+crypto.randomUUID()},'cap.report.build',{aid:a},{tool:'danger',mode:'execute',confirm_token:preview.result.confirm_token}) as Promise<any>;}
@@ -62,14 +62,14 @@ describe('real authenticated report transport and receipt',()=>{
   expect((await http('/v2/assessments/'+aid+'/reports',{mode:'dry_run',params:{minimum:'viewer'}})).body.error.code).toBe('INVALID_PARAMS');
   expect((await http('/v2/assessments/'+aid+'/reports?limit=99')).body.error.code).toBe('INVALID_PARAMS');
  });
- it('unknown, ungranted, participant and grant-free support hide existence; granted support works',async()=>{
+ it('unknown, ungranted users and participants hide existence; global support reads without a grant',async()=>{
   const r=await build();const id=r.result.report.id;const expected={code:'NOT_FOUND_OR_NOT_VISIBLE',message:'report not found or not visible'};
   const unknown=await http('/v2/reports/unknown');expect(unknown.status).toBe(404);expect(unknown.body.error).toEqual(expected);
   const part=await http('/v2/reports/'+id,undefined,participant);expect(part.status).toBe(404);expect(part.body.error).toEqual(expected);
   expect((await http('/v2/reports/'+id,undefined,support)).status).toBe(200);
   const saved=await db.prepare('SELECT * FROM "grant" WHERE principal_id=? AND scope_type=? AND scope_id=?').bind('person_mara','assessment',aid).first<any>();
   await run('DELETE FROM "grant" WHERE id=?',saved.id);
-  try{for(const cred of [token,support])expect((await http('/v2/reports/'+id,undefined,cred)).body.error).toEqual(expected);}finally{await run('INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) VALUES (?,?,?,?,?,?)',saved.id,saved.principal_id,saved.scope_type,saved.scope_id,saved.role,saved.created_at);}
+  try{expect((await http('/v2/reports/'+id,undefined,token)).body.error).toEqual(expected);expect((await http('/v2/reports/'+id,undefined,support)).status).toBe(200);}finally{await run('INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) VALUES (?,?,?,?,?,?)',saved.id,saved.principal_id,saved.scope_type,saved.scope_id,saved.role,saved.created_at);}
   expect((await http('/v2/reports/'+id,undefined,'')).status).toBe(401);
  });
  it('both held dry-run and held execute are fixed success with no report locator',async()=>{

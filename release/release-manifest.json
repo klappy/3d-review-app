@@ -1,23 +1,23 @@
 {
-  "version": "0.35.28",
+  "version": "0.37.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "392cd89b26ddfcb506e479a03288b649cce7c9d7",
+  "cookbook_commit": "be9a0a3a6ddb4efe931776d594e531b8e15c088f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.35.28.md",
-      "blob_sha": "b5afbf165e292817886ff98c404a9d1b31221840",
-      "sha256": "7b8cdca18fbc71ca6841a2a204b354d25c79240d968b3eab13b4081d0dd08de2"
+      "path": "planning/2026-09-16-parity-build/releases/0.37.0.md",
+      "blob_sha": "e531b509c8bc2e835b30982b8ad74f16400c92af",
+      "sha256": "fdded099db82e77b06fdc452c769631cf80c4695472e1e0c82fe04023a8ceed8"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "f2c07ab59155f2aac4acf972faf1bd8e1020b8ec",
-      "sha256": "7aca6e61a600d6e258e1356ea203ab04022075bd4d9a50e3367e93a53d8029b7"
+      "blob_sha": "ce2e4e5cf54e25a700ae433b2d4f1c5aeaa48613",
+      "sha256": "49e858525e2faa65dbe96a1811147d4bff7acd9279ad34cc3013cc9e6dd30200"
     }
   ],
   "changelog": {
     "sections": {
       "changed": [
-        "Home and About: the welcome line, the three perspective captions and the Learn more text (How it works, who it is for, when to use it, how often) now use the October 19 copy revision. Screens, actions and Learn more placement are unchanged."
+        "The app no longer blocks requests because of app-level request-rate limits or missing limiter bindings. This supports workshops where many participants share one connection. The existing per-address sign-in-link and collaborator-invitation product caps remain, along with upstream translation 429 responses and the MCP batch-size limit."
       ]
     }
   }

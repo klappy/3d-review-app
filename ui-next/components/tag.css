@@ -1,0 +1,9 @@
+/* UI Next (v4) Tag. Status: provisional. Paints only from ui-next/tokens.css.
+   Contract: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas/design-system.md section 2 Tag row and
+   "Tag states, the practice slot and .lvl[data-level]" (R9, V-10): neutral chip, state by word + aria-hidden icon, never colour.
+   Values: generator/gen.py EXTRA .tag (line 46), .tag svg and .tag[data-kind=practice] (lines 62-63).
+   Gap: --radius-pill (999) is not in tokens.css; --radius-xl draws the same stadium on a 24px chip (as pill.css does). */
+.tag{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:var(--radius-xl);font-weight:600;font-size:var(--t-12);background:var(--line);color:var(--ink-2);white-space:nowrap}
+.tag svg{flex-shrink:0}
+.tag[data-kind=practice]{border:1px solid var(--line-2);color:var(--ink)}
+.tag .lensdot{width:8px;height:8px;border-radius:50%;background:var(--lens)}

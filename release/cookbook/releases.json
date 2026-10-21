@@ -1,7 +1,27 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.35.28",
+  "current": "0.37.0",
   "versions": [
+    {
+      "version": "0.37.0",
+      "status": "candidate",
+      "notes_path": "releases/0.37.0.md",
+      "sections": {
+        "changed": [
+          "The app no longer blocks requests because of app-level request-rate limits or missing limiter bindings. This supports workshops where many participants share one connection. The existing per-address sign-in-link and collaborator-invitation product caps remain, along with upstream translation 429 responses and the MCP batch-size limit."
+        ]
+      }
+    },
+    {
+      "version": "0.36.0",
+      "status": "candidate",
+      "notes_path": "releases/0.36.0.md",
+      "sections": {
+        "added": [
+          "Super admins can switch between My Access and Global Access, browse every workspace and its projects and assessments, and inspect response counts and available reports. The selected mode stays visible, and switching refreshes every open app tab. Individual response answers retain the existing disclosure hold."
+        ]
+      }
+    },
     {
       "version": "0.35.28",
       "status": "candidate",
@@ -28,7 +48,7 @@
       "notes_path": "releases/0.35.26.md",
       "sections": {
         "fixed": [
-          "Full report: an area with no name now shows a dash everywhere it appears — beside its radar spoke, in the score tooltip and in the \"Do the perspectives agree?\" list — instead of the words \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
+          "Full report: an area with no name now shows a dash everywhere it appears \u2014 beside its radar spoke, in the score tooltip and in the \"Do the perspectives agree?\" list \u2014 instead of the words \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
         ]
       }
     },
@@ -58,7 +78,7 @@
       "notes_path": "releases/0.35.23.md",
       "sections": {
         "fixed": [
-          "Invitations and roles: an invitation to a workspace or an assessment now stops working once the person who sent it no longer has their own role there, as project invitations already did; and changing someone's role on a project now needs the project's own owner — an owner through the workspace changes access at the workspace, or is added to the project."
+          "Invitations and roles: an invitation to a workspace or an assessment now stops working once the person who sent it no longer has their own role there, as project invitations already did; and changing someone's role on a project now needs the project's own owner \u2014 an owner through the workspace changes access at the workspace, or is added to the project."
         ]
       }
     },
@@ -282,11 +302,11 @@
       "notes_path": "releases/0.35.0.md",
       "sections": {
         "added": [
-          "Your account can carry an optional **display name**: asked once after you sign in (skippable with \"Not now\", Escape or a click outside), changeable any time from the account menu (\"Your name…\"). Following the design contract (`design/CONTRACT.md` § 4–5), the home page title greets you once, \"Welcome, Ana\", replacing the separate \"Projects\" title, and the header shows just your name as the account-menu trigger; with no name set the title reads \"Welcome, <your email>\". The question never opens over the invitation screen. `GET /v2/me` returns it as `principal.display_name` and the new `PATCH /v2/me` (`cap.auth.me_update`, undoable) sets or clears it (at most 80 characters, no `<` `>`, control, zero-width or direction-override characters). Production promotion step 0: apply D1 migration `0016_display_name.sql` (additive nullable column; until it is applied `/v2/me` answers `display_name: null`)."
+          "Your account can carry an optional **display name**: asked once after you sign in (skippable with \"Not now\", Escape or a click outside), changeable any time from the account menu (\"Your name\u2026\"). Following the design contract (`design/CONTRACT.md` \u00a7 4\u20135), the home page title greets you once, \"Welcome, Ana\", replacing the separate \"Projects\" title, and the header shows just your name as the account-menu trigger; with no name set the title reads \"Welcome, <your email>\". The question never opens over the invitation screen. `GET /v2/me` returns it as `principal.display_name` and the new `PATCH /v2/me` (`cap.auth.me_update`, undoable) sets or clears it (at most 80 characters, no `<` `>`, control, zero-width or direction-override characters). Production promotion step 0: apply D1 migration `0016_display_name.sql` (additive nullable column; until it is applied `/v2/me` answers `display_name: null`)."
         ],
         "fixed": [
           "Docs search: a guessed name no longer gets results when a common joining word (\"feedback with inventedparam\") or a repeated word (\"feedback feedback inventedparam\") sits beside it, and JSON Schema keywords such as \"maxLength\" no longer count as docs words; \"list all workspaces\" now ranks the workspace list first.",
-          "Docs search: every word a capability row carries still counts as a docs word except JSON Schema keyword names and types — including field names under a composed or open-ended schema (\"link fragment\" finds cap.survey.issue_link), roles text (\"share results\" finds cap.results.summary) and the other capability fields (\"withdraw invitation\" finds cap.grant.revoke_invitation) — so those phrases find their capabilities as they did in 0.34.10."
+          "Docs search: every word a capability row carries still counts as a docs word except JSON Schema keyword names and types \u2014 including field names under a composed or open-ended schema (\"link fragment\" finds cap.survey.issue_link), roles text (\"share results\" finds cap.results.summary) and the other capability fields (\"withdraw invitation\" finds cap.grant.revoke_invitation) \u2014 so those phrases find their capabilities as they did in 0.34.10."
         ]
       }
     },
@@ -317,7 +337,7 @@
       "sections": {
         "fixed": [
           "Permissions page and MCP panel Permissions view: the scope line now says what is true since workspace roles inherit (a workspace role reaches its grouped projects; assessments are shared one by one) instead of \"nothing is inherited\". The permissions docs topic no longer says \"No inheritance\".",
-          "Permissions page: the change-role select starts on \"Change to…\" and lists only the other roles, so each row no longer shows its role twice."
+          "Permissions page: the change-role select starts on \"Change to\u2026\" and lists only the other roles, so each row no longer shows its role twice."
         ]
       }
     },
@@ -433,7 +453,7 @@
       "notes_path": "releases/0.32.0.md",
       "sections": {
         "added": [
-          "\"Do the perspectives agree?\" leads the results overview and the full report: one barbell per area scored by two or more perspectives (0–100), biggest difference first, coloured by spread (≤10 agree, ≥30 disagree), then areas only one perspective scored, with response counts beside each perspective score and Consultant responses named inside the Church count."
+          "\"Do the perspectives agree?\" leads the results overview and the full report: one barbell per area scored by two or more perspectives (0\u2013100), biggest difference first, coloured by spread (\u226410 agree, \u226530 disagree), then areas only one perspective scored, with response counts beside each perspective score and Consultant responses named inside the Church count."
         ],
         "changed": [
           "The full report no longer shows the cross-lens average; lens scores and their difference only. Payload, scoring and narrative unchanged."
@@ -559,7 +579,7 @@
           "Adding or removing a passage on an assessment now leaves a receipt saying who did it and when, like every other change in the app. (#452)"
         ],
         "changed": [
-          "Persona evidence backfill (2026-10-02): Wave AI on DEV 0.28.1+07bb308 — agent simulation over HTTP with synthetic personas (no browser, no human sample). Smoke 4/4 goals; agent rubric sat 3.75 / conf 2.25 / frust 2.00, unchanged from Wave AH (0.28.0); turns 10.00 vs 10.25, a harness gap rather than an app change. The passage receipt (#452) was confirmed by a read-only DEV database read: 6/6 add and remove rows, with no title, link or filename stored; agents cannot read receipts over the API. The wizard's required Language list (#450) and the on-device word cache (#454) are browser-only and NOT MEASURED. Human satisfaction, confusion and frustration NOT MEASURED. See persona-testing/waves/AI-07bb308.md."
+          "Persona evidence backfill (2026-10-02): Wave AI on DEV 0.28.1+07bb308 \u2014 agent simulation over HTTP with synthetic personas (no browser, no human sample). Smoke 4/4 goals; agent rubric sat 3.75 / conf 2.25 / frust 2.00, unchanged from Wave AH (0.28.0); turns 10.00 vs 10.25, a harness gap rather than an app change. The passage receipt (#452) was confirmed by a read-only DEV database read: 6/6 add and remove rows, with no title, link or filename stored; agents cannot read receipts over the API. The wizard's required Language list (#450) and the on-device word cache (#454) are browser-only and NOT MEASURED. Human satisfaction, confusion and frustration NOT MEASURED. See persona-testing/waves/AI-07bb308.md."
         ],
         "fixed": [
           "In the setup wizard, the Language list for an existing project is now a required field to the browser and screen readers too, like Name, Project, New project name and Active until (it was already marked \"(required)\" on screen and checked before Next). (#450)",
@@ -649,7 +669,7 @@
       "sections": {
         "fixed": [
           "The assessment setup now marks every field you must fill in with \"(required)\": Name, Project, New project name and Language, as \"Active until\" already was; the language code stays optional. (#418)",
-          "When you print a survey in another language, the \"Translating the form…\" message stays on screen until the form is ready, even if the page refreshes while it loads. (#418)"
+          "When you print a survey in another language, the \"Translating the form\u2026\" message stays on screen until the form is ready, even if the page refreshes while it loads. (#418)"
         ]
       }
     },
@@ -691,7 +711,7 @@
         "added": [
           "Print survey can be printed in the participants' language. When the assessment or its project has participant languages, a \"Language on paper\" choice sits beside Print survey (English first, then the same languages the participant page offers). The questions, answer choices, the passage line and the form's own words come from the same translations the participant page uses; anything not translated yet stays in English and is marked \"EN\" on the paper. English stays the default, and nothing changes for an assessment without languages. (#405)",
           "A USFM or SFM passage now opens as a readable PDF: when a facilitator uploads the file, the site has PTXprint typeset it once, and participants see the verses on a page instead of backslash codes; the original text stays available, and if the PDF cannot be made the text file is kept and the passage card says \"Text file\". (#403)",
-          "Surveyor mode: after someone submits, the thank-you screen offers \"Interview another person\" — one tap starts a fresh, empty survey from the same link for the next person on the same device (an access-code session goes back to code entry, since a code works once); the earlier answers stay saved. (#406)"
+          "Surveyor mode: after someone submits, the thank-you screen offers \"Interview another person\" \u2014 one tap starts a fresh, empty survey from the same link for the next person on the same device (an access-code session goes back to code entry, since a code works once); the earlier answers stay saved. (#406)"
         ],
         "fixed": [
           "Print survey prints only the questionnaire. Print now opens the form as its own page in a new tab and prints it there, so the app's menus, buttons, survey card and dark bands are no longer on the paper, and every answer choice sits in one column that wraps inside the page instead of being cut off at the right edge (seen on an iPhone print of Community-Pastor). Pages are numbered where the browser supports it. Printing the survey screen itself from the browser menu also prints only the form. (#405)",
@@ -712,8 +732,8 @@
       "sections": {
         "fixed": [
           "Collect no longer makes a new participant link on every visit. Each survey keeps one link: Collect makes a link when it opens only if the survey has no active link here. Otherwise it shows the active link and its QR code. The link is kept in the browser tab, so reloading the page or coming back from the participant page shows the same link and QR code, and \"Print all\" prints the same URLs. It is dropped on sign-out or when you use another account. A new tab still makes its own link. The survey's Share card now says: \"Everyone can use this one link, also after you reload this page. In a new tab, sharing makes a new one.\" (#395)",
-          "Setup step 4 (Ready to launch) names the survey on each \"Who will participate\" row, for example \"Church · Church leaders — no number given\". Before, it showed only the perspective. (#395)",
-          "Prepare: \"Save preparation\" says \"Saved\" beside the button when the save succeeds, and shows the error there when it fails. Before, only \"Saving preparation…\" appeared. Moving to another page clears the message. (#395)",
+          "Setup step 4 (Ready to launch) names the survey on each \"Who will participate\" row, for example \"Church \u00b7 Church leaders \u2014 no number given\". Before, it showed only the perspective. (#395)",
+          "Prepare: \"Save preparation\" says \"Saved\" beside the button when the save succeeds, and shows the error there when it fails. Before, only \"Saving preparation\u2026\" appeared. Moving to another page clears the message. (#395)",
           "Participant survey fixes found on a phone. An access code that is used or not valid now shows its message inside the card, right under the Access code box; screen readers announce it and the cursor stays in the box (it used to appear below the screen with focus lost). The Print survey paper preview fits a phone screen and scrolls sideways if anything is still wider, instead of cutting off the right-hand choices; printed pages are unchanged. People who answer with an access code get a thank-you that says a code works only once, not \"Reopening your link shows this receipt again\". After a language is chosen, the thank-you and its Reference line are translated too, and the question counter (\"Question 3 of 17\") is one sentence that follows the language's word order. Switching from one language to another names the language that stays on screen while the new one loads, not English. Changing the language, or a translation arriving, failing or being retried while someone is answering, no longer erases the answers given so far, the Other text or the About-you choices. (#394)",
           "A workshop room on one network is throttled less: passage files opened through their signed link no longer count against the 60-per-minute anonymous allowance of the room's address (only bad or expired links do), and translation requests that carry a participant's or signed-in person's credential are now counted per person instead of per address (the participant page starts sending its credential in a follow-up; without it, translation is counted per address as before). An assessment that has or had passages can now be deleted: the delete preview counts its passages and the delete removes them and their stored files (before, it failed with a database error). Adding a passage with an empty JSON body is a clear \"JSON object body required\" error instead of a server error. A machine translation that only repeats an English sentence is no longer served or stored as the translation; single words and short phrases that are spelled the same in both languages (French \"Question\", Spanish \"Hospital\") are kept. Undoing a change to an assessment's or project's translation languages now restores the previous languages. (#396)",
           "The participant survey's translation requests now say which participant is asking. When the page holds the participant's own survey session, each request to translate the page sends that participant's token, so the server can count each participant separately instead of counting every phone on the same Wi-Fi as one visitor (the server half is a separate change). A page without a participant session sends nothing extra, exactly as before, and a facilitator's sign-in is never sent with these requests. (#397)",
@@ -732,11 +752,11 @@
         "changed": [
           "Results and the responses listing carry demographic (age range, gender) breakdown columns only when the facilitator turned demographics on for the assessment; off by default, no demographic key at all. (#381)",
           "Sign-in: where email sign-in links are on, every way to sign in (Home \"Sign in\", the sign-in screen, \"Use another account\", \"Sign in to open this page\", \"Sign in to continue\", and the email sign-in and \"Check your email\" pages) shows the \"Email me a sign-in link\" form first, with \"Sign in with a code instead\" under it for a one-time code. If the emailed link never arrives, the code is a way in. Where email links are off, sign-in is unchanged. (#388)",
-          "Invitations say what you are accepting, all on one page. After signing in, a person with pending invitations sees every one of them on one page. Each row shows the kind (workspace, project or assessment), its name with the workspace › project path above it, and the role, and has its own Accept button. \"Accept all\" accepts them together when there are two or more. A single invitation reads, for example, You were invited to the project \"River Valley\" as an owner. cap.me.invitations adds scope.name and scope.path (names only) to the signed-in person's own email-matched pending invitations. The mailed invitation link still names nothing before acceptance. (#392)"
+          "Invitations say what you are accepting, all on one page. After signing in, a person with pending invitations sees every one of them on one page. Each row shows the kind (workspace, project or assessment), its name with the workspace \u203a project path above it, and the role, and has its own Accept button. \"Accept all\" accepts them together when there are two or more. A single invitation reads, for example, You were invited to the project \"River Valley\" as an owner. cap.me.invitations adds scope.name and scope.path (names only) to the signed-in person's own email-matched pending invitations. The mailed invitation link still names nothing before acceptance. (#392)"
         ],
         "added": [
           "Dynamic translation for participants: a Language drop-down limited to the languages of wider communication set on the project and/or assessment (setup step 1 and Prepare; 25 tags in src/languages.ts: 24 machine-translated languages, and Indian Sign Language, which is recorded, not translated), questions/choices/page words machine-translated through POST /v2/translate, stored once per language in a D1 translation memory (migration 0012) and served from storage after that; English stays the fallback and answers, scores and reports are unchanged; multi-answer questions say \"Choose all that apply.\"; only the published survey's questions, choices and page words are translated and stored (other text is refused), and the translation service gets a context fixed by the server; a welcome sentence that carries a language name is allowlisted only for well-shaped names and is sent to the translation service on its own, never in the same request as the page words (#377)",
-          "Each assessment can carry the passage under review — USFM, SFM, USX, PDF or MP3 files, or a link such as a sign-language video — added on Prepare; participants see \"The passage\" at the top of every survey screen (audio plays in the page; files, videos and links open in a new tab) through private, 12-hour signed links. (#385)",
+          "Each assessment can carry the passage under review \u2014 USFM, SFM, USX, PDF or MP3 files, or a link such as a sign-language video \u2014 added on Prepare; participants see \"The passage\" at the top of every survey screen (audio plays in the page; files, videos and links open in a new tab) through private, 12-hour signed links. (#385)",
           "The survey says which passage to read or hear first. A facilitator can name the passage with nothing attached (\"Genesis 1\") on Prepare. Participants then see \"Please read or listen to the passage before you answer: Genesis 1\" at the top of the survey; the line is translated like the rest of the page. The printed form carries \"Before you answer, read or listen to: Genesis 1\" under its title. Collect reminds the facilitator to read or play the passage before sharing links or handing out paper. This follows the BCS training demo of 2026-09-29. (#387)"
         ]
       }
@@ -771,7 +791,7 @@
         ],
         "fixed": [
           "Collect shows one \"Move to Understand\": the in-page confirm that opens under a stage-move button now reads \"Yes, move\" instead of repeating the button's label (applies to every stage move). Setup \"Starts (optional)\" was checked to default to the facilitator's local today (late evening west of UTC included); a test now pins it. (#378)",
-          "Launch → \"Open the review\" now opens Collect with the full crumb row Home › Project › Review: the project list is re-read before the review opens, so a project created during setup is named, as it is after a fresh sign-in. (#379)"
+          "Launch \u2192 \"Open the review\" now opens Collect with the full crumb row Home \u203a Project \u203a Review: the project list is re-read before the review opens, so a project created during setup is named, as it is after a fresh sign-in. (#379)"
         ]
       }
     },
@@ -785,8 +805,8 @@
           "After an owner completes a review, the role badge shows Owner (not Viewer), matching the Permissions and Delete controls still offered; the review content stays read-only. (#374)"
         ],
         "changed": [
-          "Persona evidence backfill (2026-09-28): on DEV 0.22.6+bb6a948, agent simulation with synthetic personas in the Claude in-app browser — live owner-badge-after-Complete persona 1/1 PASS (receipt 13d) and release gate run A 47/47 PASS; a few clauses not run (emailed links, stored-response check, expired link, print layout, request body); satisfaction, confusion and frustration NOT MEASURED. See the Persona outcome scorecard in releases/0.22.6.md.",
-          "Persona evidence backfill (2026-09-28): release gate run B on DEV 0.22.6+bb6a948, agent simulation with synthetic personas in the Claude in-app browser at 390 and 1280 — 39 PASS, 1 FAIL (B14: breadcrumb missing the project crumb when opening the review right after launch), 1 NOT RUN (B32, needs Bincy's own email code), 1 DECIDED with no screen (B33), extras 5/5 PASS; satisfaction, confusion and frustration NOT MEASURED. See the Persona outcome scorecard in releases/0.22.6.md."
+          "Persona evidence backfill (2026-09-28): on DEV 0.22.6+bb6a948, agent simulation with synthetic personas in the Claude in-app browser \u2014 live owner-badge-after-Complete persona 1/1 PASS (receipt 13d) and release gate run A 47/47 PASS; a few clauses not run (emailed links, stored-response check, expired link, print layout, request body); satisfaction, confusion and frustration NOT MEASURED. See the Persona outcome scorecard in releases/0.22.6.md.",
+          "Persona evidence backfill (2026-09-28): release gate run B on DEV 0.22.6+bb6a948, agent simulation with synthetic personas in the Claude in-app browser at 390 and 1280 \u2014 39 PASS, 1 FAIL (B14: breadcrumb missing the project crumb when opening the review right after launch), 1 NOT RUN (B32, needs Bincy's own email code), 1 DECIDED with no screen (B33), extras 5/5 PASS; satisfaction, confusion and frustration NOT MEASURED. See the Persona outcome scorecard in releases/0.22.6.md."
         ]
       }
     },
@@ -826,14 +846,14 @@
       "notes_path": "releases/0.22.2.md",
       "sections": {
         "added": [
-          "`GET /v2/me/invitations` (`cap.me.invitations`, read): the signed-in person's pending invitations, matched by their hashed email — scope, role, expiry and an inviter display name (always empty for now: no names are stored). Never the invitation token. (#365)"
+          "`GET /v2/me/invitations` (`cap.me.invitations`, read): the signed-in person's pending invitations, matched by their hashed email \u2014 scope, role, expiry and an inviter display name (always empty for now: no names are stored). Never the invitation token. (#365)"
         ],
         "changed": [
           "`cap.grant.accept` also accepts `invitation_id` instead of the link token (HTTP: `POST /v2/me/invitations/{invitation_id}/accept`), only when the signed-in person's email is the invited one; anything else answers exactly like a missing invitation. The link-token path is unchanged. (#365)"
         ],
         "fixed": [
-          "Someone an owner invited who simply signs in on the site (without opening the invitation email) now lands on an \"Accept invitation\" screen first — one heading, one line, one \"Accept\" — instead of an empty home. With nothing pending, sign-in lands as before (one project → that project; several → the projects list). Captain ruling 2026-09-28 15:27 ET (k0015) \"Add GET /v2/me/invitations + accept by invitee identity\"; B04 step (c). (#365)",
-          "Survey questions with an \"Other (please describe)\" choice now show a short \"Please describe\" text field while Other is chosen (both the /participate/ page and the shared #survey= link). The text is kept with the device draft, shown beside the Other choice on Review your answers, and saved with the response inside the existing answers JSON under \"_other\" ({ question id: text }, up to 500 characters) — no migration. Text typed under Other and then abandoned for another choice is dropped. Legacy / Lovable items (option code \"other\") get the field too. (#363)"
+          "Someone an owner invited who simply signs in on the site (without opening the invitation email) now lands on an \"Accept invitation\" screen first \u2014 one heading, one line, one \"Accept\" \u2014 instead of an empty home. With nothing pending, sign-in lands as before (one project \u2192 that project; several \u2192 the projects list). Captain ruling 2026-09-28 15:27 ET (k0015) \"Add GET /v2/me/invitations + accept by invitee identity\"; B04 step (c). (#365)",
+          "Survey questions with an \"Other (please describe)\" choice now show a short \"Please describe\" text field while Other is chosen (both the /participate/ page and the shared #survey= link). The text is kept with the device draft, shown beside the Other choice on Review your answers, and saved with the response inside the existing answers JSON under \"_other\" ({ question id: text }, up to 500 characters) \u2014 no migration. Text typed under Other and then abandoned for another choice is dropped. Legacy / Lovable items (option code \"other\") get the field too. (#363)"
         ]
       }
     },
@@ -863,7 +883,7 @@
         "fixed": [
           "\"Take the tour\" opens the sample assessment on Collect, the stage it is actually in, so the first screen no longer says \"Prepare this assessment\" beside \"Collecting responses\". (#345)",
           "Setup wizard survives a reload: once step 1 is saved the page URL names the draft, and a reload reopens it at the same step with what was typed (kept in this tab only). (#346)",
-          "On Collect, a group that reaches or passes its expected number reads \"6 responded · 3 expected\" instead of \"6 of 3 responded\"; below the expected number it still reads \"n of N responded\". (#344)",
+          "On Collect, a group that reaches or passes its expected number reads \"6 responded \u00b7 3 expected\" instead of \"6 of 3 responded\"; below the expected number it still reads \"n of N responded\". (#344)",
           "The participant review screen's final button now reads \"Submit answers\" and uses the shared primary button style. (#348)",
           "The assessment header no longer shows a primary that links to the page you are on, and \"Preview invitation\" is the one primary on Permissions. (#349)",
           "Understand: before any report exists \"Build the results\" is the one primary; \"Choose a next step\" steps back until the results are built. (#350)",
@@ -877,7 +897,7 @@
           "Facilitators issue paper access codes on the survey Share card (count, preview, show once, print), and \"Open access codes\" no longer sends them to the legacy console. (#335)",
           "Owners can delete an empty assessment from its settings: one-sentence dry run, confirmed in the page, then back to the project with \"Assessment deleted.\" (#336)",
           "Asking the docs what a viewer can do no longer suggests survey, code or notes changes a viewer cannot make; next steps now come from the same role table the server enforces. (#334)",
-          "After renaming a workspace or an assessment, the form now says \"Saved · Undo\" right beside it, and Undo puts the old name back and says \"Undone\". (#333)",
+          "After renaming a workspace or an assessment, the form now says \"Saved \u00b7 Undo\" right beside it, and Undo puts the old name back and says \"Undone\". (#333)",
           "On Understand, only one \"Build the results\" button shows at a time: the button hides while its confirm is open and comes back if you choose Not now. (#329)",
           "Setup drafts: a viewer opening a setup link goes to the review, surveys a part-launched draft already added stay ticked (\"Already added.\"), and viewer cards on Home say \"Continue assessment\". (#340)",
           "The root-route test for invitation links now matches how the app handles them (they stay in the app), so the test suite passes again. No change for users. (#343)",
@@ -891,7 +911,7 @@
       "notes_path": "releases/0.21.7.md",
       "sections": {
         "added": [
-          "Every shared survey link now has the same three buttons — Copy link, QR code, Print — and one \"Print all\" puts every survey (title, one line, QR code) on a single printable page. (#324)"
+          "Every shared survey link now has the same three buttons \u2014 Copy link, QR code, Print \u2014 and one \"Print all\" puts every survey (title, one line, QR code) on a single printable page. (#324)"
         ],
         "changed": [
           "sign-in says a new email creates an account (Bincy B32) (#301)",
@@ -899,7 +919,7 @@
           "A viewer on the Improve step now sees one heading with the notes as plain labels; the visibility note sits behind Learn more. (#317)",
           "The participant welcome now shows one heading, the invitation and privacy line, the survey context and a single Start button; the time estimate and sign-in note sit behind \"Learn more\". (#318)",
           "The classic console header now says \"Signed in\" instead of showing an internal account id. (#319)",
-          "The full report's translation type agreement now reads as one plain sentence (e.g. \"Agreed: Resembling · Seen as: Resembling · Matches\") instead of raw values. (#320)",
+          "The full report's translation type agreement now reads as one plain sentence (e.g. \"Agreed: Resembling \u00b7 Seen as: Resembling \u00b7 Matches\") instead of raw values. (#320)",
           "Understand now shows one build action, \"Build the results\"; the older \"Preview report build\" sits behind Technical details in Reports. (#315)",
           "Setup step 1 \"Lead organisation\" is now a drop-down of known organisations with \"Other (type it)\" for anything else. (#322)",
           "Setup asks \"Active until\" (required) and \"Starts\" (optional, default today) instead of \"When\"; Collect shows \"Active until <date>\" and participant links show \"This survey closed on <date>\" after that date. (#323)",
@@ -919,7 +939,7 @@
       "notes_path": "releases/0.21.6.md",
       "sections": {
         "changed": [
-          "Sign in by email link: enter your email, open the link we send (it works for 30 minutes, on any device) — no more one-time PIN; DEV only, behind MAGIC_LINK — production keeps Cloudflare Access. Signing out clears the session cookie with the same protections it was set with (HttpOnly, Secure, SameSite=Lax), in every environment (Bincy B38) (#305)",
+          "Sign in by email link: enter your email, open the link we send (it works for 30 minutes, on any device) \u2014 no more one-time PIN; DEV only, behind MAGIC_LINK \u2014 production keeps Cloudflare Access. Signing out clears the session cookie with the same protections it was set with (HttpOnly, Secure, SameSite=Lax), in every environment (Bincy B38) (#305)",
           "/roadmap shows the versions list only; stale work-item feed removed (captain 18:20) (#307)"
         ]
       }
@@ -935,7 +955,7 @@
           "each group has a plain who-line on setup, launch and Collect (Bincy B08, B20) (#296)",
           "reports show a readable time; ids behind Technical details; scores rounded (Bincy B31) (#302)",
           "project and assessment names are the page heading with a small edit control; the Rename card and the Prepare name field are gone (Bincy B07) (#285)",
-          "Permissions: a pending invitation reads \"member · invited Sep 25 · <email>\"; inviting a test address says \"Invitation recorded; not emailed (test address).\" (B31/U26) (#306)"
+          "Permissions: a pending invitation reads \"member \u00b7 invited Sep 25 \u00b7 <email>\"; inviting a test address says \"Invitation recorded; not emailed (test address).\" (B31/U26) (#306)"
         ],
         "fixed": [
           "Signing in opens your invitation first if you have one, your one project if you have just one, or Home if you have several (#297)",
@@ -955,7 +975,7 @@
       "sections": {
         "fixed": [
           "An invitation link opens in the app: see what was shared, accept it, and find it on your Home page (Bincy B03) (#291)",
-          "The participant welcome shows the shared context setup step 3 promises (project · language · material · format · when) in one line; step 3 no longer offers a note that was never saved (Bincy B10). (#289)"
+          "The participant welcome shows the shared context setup step 3 promises (project \u00b7 language \u00b7 material \u00b7 format \u00b7 when) in one line; step 3 no longer offers a note that was never saved (Bincy B10). (#289)"
         ]
       }
     },
@@ -991,7 +1011,7 @@
       "notes_path": "releases/0.21.2.md",
       "sections": {
         "added": [
-          "DEV only: \"Mid-Level v1 (legacy)\" survey template carrying the old Lovable ML1–ML12 questions verbatim, so legacy mid-level responses import as answered (#270)"
+          "DEV only: \"Mid-Level v1 (legacy)\" survey template carrying the old Lovable ML1\u2013ML12 questions verbatim, so legacy mid-level responses import as answered (#270)"
         ],
         "changed": [
           "work rail moved to the cookbook repo (HYGIENE 35) (#268)"
@@ -1013,9 +1033,9 @@
         ],
         "fixed": [
           "cards: child counts only include assessments and projects you can list (#260)",
-          "card counts only include what you can open — workspace project count covered by a member who sees fewer (#262)",
-          "card counts only include what you can open — responses on an assessment you cannot open are not counted (#263)",
-          "public home: less text — four choices, one heading, one line; the rest behind Learn more (#264)"
+          "card counts only include what you can open \u2014 workspace project count covered by a member who sees fewer (#262)",
+          "card counts only include what you can open \u2014 responses on an assessment you cannot open are not counted (#263)",
+          "public home: less text \u2014 four choices, one heading, one line; the rest behind Learn more (#264)"
         ]
       }
     },
@@ -1025,7 +1045,7 @@
       "notes_path": "releases/0.21.0.md",
       "sections": {
         "added": [
-          "cards show child counts: assessment → responses; project → assessments · responses; workspace → projects · assessments · responses (component: Card) (#255)",
+          "cards show child counts: assessment \u2192 responses; project \u2192 assessments \u00b7 responses; workspace \u2192 projects \u00b7 assessments \u00b7 responses (component: Card) (#255)",
           "reports: build from real participant responses on DEV (attested synthetic path unchanged; held outside dev) (#256)"
         ],
         "changed": [],
@@ -1039,7 +1059,7 @@
       "sections": {
         "added": [],
         "changed": [
-          "component: Card — one v3 import point (ui/v3/components/card.js) for home/workspace/project/assessment cards, re-exporting the shared card (no copy) (#249)",
+          "component: Card \u2014 one v3 import point (ui/v3/components/card.js) for home/workspace/project/assessment cards, re-exporting the shared card (no copy) (#249)",
           "DEV mail: sends to any address when no allowlist is configured (team testing); an allowlist, when set, is still enforced (#252)",
           "Stepper: pending steps carry class \"todo\" instead of an empty class attribute (component: Stepper) (#251)",
           "setup wizard: \"step n of N\" count derives from the step list, not a hard-coded 4 (#253)"
@@ -1054,24 +1074,24 @@
       "sections": {
         "added": [
           "public About page (#about) (#228)",
-          "left sidebar on assessment and scope pages is the shared Sidebar tree (workspace → project → assessment), in step with the breadcrumbs (component: Sidebar tree) (#243)",
-          "component: Sidebar tree — 0.16 left navigation Workspaces → Project → Assessment, current row from the same scope as Breadcrumbs (ui/v3/components/sidebar-tree.js; mounting via NEED 9→1) (#241)"
+          "left sidebar on assessment and scope pages is the shared Sidebar tree (workspace \u2192 project \u2192 assessment), in step with the breadcrumbs (component: Sidebar tree) (#243)",
+          "component: Sidebar tree \u2014 0.16 left navigation Workspaces \u2192 Project \u2192 Assessment, current row from the same scope as Breadcrumbs (ui/v3/components/sidebar-tree.js; mounting via NEED 9\u21921) (#241)"
         ],
         "changed": [
-          "component: Breadcrumbs — assessment context panel crumb row is the shared Breadcrumbs (Home › Workspace › Project › Assessment); v3 components served locally (#232)",
-          "navigation: kit shell header crumb row is the shared Breadcrumbs component (Home › Workspace › Project › Assessment › Page), same as the assessment page (P0 12:32) (#239)",
+          "component: Breadcrumbs \u2014 assessment context panel crumb row is the shared Breadcrumbs (Home \u203a Workspace \u203a Project \u203a Assessment); v3 components served locally (#232)",
+          "navigation: kit shell header crumb row is the shared Breadcrumbs component (Home \u203a Workspace \u203a Project \u203a Assessment \u203a Page), same as the assessment page (P0 12:32) (#239)",
           "demo header Exit demo / Sign in is one shared component (component: Header with Exit demo / Sign in) (#246)",
           "setup wizard: group rows use the glass look (--glass, --glass-edge, blur) instead of flat white cards (ruling 12:22) (#234)",
           "setup wizard: group rows use the design-system glass blur token (--blur-panel) instead of a hard-coded 8px (ruling 12:22) (#238)",
           "Stepper dots blur on the --blur-panel glass token (component: Stepper) (#244)",
-          "component: Stepper — assessment page stage tab bar (Prepare · Collect · Understand · Improve) replaced by the wizard's shared Stepper; server stage = active dot, earlier stages ticked, each step links to its view; Permissions stays a separate link (captain ruling 12:28) (#230)",
+          "component: Stepper \u2014 assessment page stage tab bar (Prepare \u00b7 Collect \u00b7 Understand \u00b7 Improve) replaced by the wizard's shared Stepper; server stage = active dot, earlier stages ticked, each step links to its view; Permissions stays a separate link (captain ruling 12:28) (#230)",
           "results: band card and colour legend are one shared component (ui/v3/components/band-card.js) (#233)",
           "results and collect count line comes from one shared Response count component (#240)",
           "results \"Show evidence and details\" table comes from one shared Evidence table component (component: Evidence table) (#245)",
           "results review gate (state badge + Record my review / Choose a next step) comes from one shared Review gate component (component: Review gate) (#247)"
         ],
         "fixed": [
-          "public links never land on sign-in (Read about it → #about, unknown hashes → home) (#228)",
+          "public links never land on sign-in (Read about it \u2192 #about, unknown hashes \u2192 home) (#228)",
           "look: flat white/teal restyle (#200) removed; design-system-v3 glass tokens govern header, cards and buttons again (ruling 12:22) (#235)",
           "setup review: participant note says plainly it is not sent or saved yet (review line + placeholder), replacing developer copy (#231)",
           "setup wizard: alert note uses the design-system --warning-ink token instead of a hard-coded red, so it stays readable in dark mode (#242)",
@@ -1086,9 +1106,9 @@
       "notes_path": "releases/0.18.0.md",
       "sections": {
         "added": [
-          "component: Stepper — one progress stepper in ui/v3/components/stepper.js (glass dots, done ticks, optional hash links per step); the setup wizard composes it and lane 3 imports it for the assessment page (rulings 12:28, 12:34) (#227)",
-          "results: provisional bands (≥75 Strong · 60–74 Growing · 40–59 Needs support · <40 Needs urgent attention; min 3 responses else More input needed) from the latest report's per-perspective and sub-dimension scores, labelled provisional; numbers behind \"Show evidence and details\" (component: Band card + legend) (#225)",
-          "component: Breadcrumbs — one crumb row in fixed order Home › Workspace › Project › Assessment › Page (ui/v3/components/breadcrumbs.js; mounting via NEED 9→1) (#224)"
+          "component: Stepper \u2014 one progress stepper in ui/v3/components/stepper.js (glass dots, done ticks, optional hash links per step); the setup wizard composes it and lane 3 imports it for the assessment page (rulings 12:28, 12:34) (#227)",
+          "results: provisional bands (\u226575 Strong \u00b7 60\u201374 Growing \u00b7 40\u201359 Needs support \u00b7 <40 Needs urgent attention; min 3 responses else More input needed) from the latest report's per-perspective and sub-dimension scores, labelled provisional; numbers behind \"Show evidence and details\" (component: Band card + legend) (#225)",
+          "component: Breadcrumbs \u2014 one crumb row in fixed order Home \u203a Workspace \u203a Project \u203a Assessment \u203a Page (ui/v3/components/breadcrumbs.js; mounting via NEED 9\u21921) (#224)"
         ],
         "changed": [],
         "fixed": [
@@ -1105,8 +1125,8 @@
         "added": [
           "v3 shell and tokens: no context tree, breadcrumbs, one primary action per page, plain state words; global restyle to the v3 prototype; sign-in per prototype frame 1.",
           "Home dashboard as the prototype card grid (Start a new 3D Review, continue cards).",
-          "Four-step setup wizard following prototype frames 3–6, with safe resume after a dropped connection.",
-          "Assessment page with state-driven primary; Record my review → Choose a next step; Next step page saves notes.",
+          "Four-step setup wizard following prototype frames 3\u20136, with safe resume after a dropped connection.",
+          "Assessment page with state-driven primary; Record my review \u2192 Choose a next step; Next step page saves notes.",
           "Results as bands with legend, per-perspective counts, evidence toggle and table.",
           "Collect: settled + not-yet-confirmed counts, open/closed rows, one-line totals.",
           "Participant welcome and pager per prototype frames 8/9; phone-width fixes.",
@@ -1122,10 +1142,10 @@
       "notes_path": "releases/0.16.0.md",
       "sections": {
         "added": [
-          "Kit shell activated on the real signed-in root and scope-reading routes: Workspaces→workspace→project→assessment navigation, search and expansion, language state and account/version controls through a read adapter over the existing controllers."
+          "Kit shell activated on the real signed-in root and scope-reading routes: Workspaces\u2192workspace\u2192project\u2192assessment navigation, search and expansion, language state and account/version controls through a read adapter over the existing controllers."
         ],
         "changed": [
-          "Persona evidence: 15/15 root integration tests and 71/71 adapter/scope/identity-reset/shell unit tests passed at the exact accepted source; 25/25 synthetic menu hit and click checks across five viewport cases in an independent isolated browser. At the corrected source, 100 affected/anchor tests passed independently with 10 meaningful failures on the uncorrected parent, and 26 real headless Chrome journeys (16 title/route/host/viewport, 4 Retry, 4 delayed completion, 2 demo disclosure) passed at 390×900 and 1440×900. Real provider account journey untested; satisfaction, confusion and frustration NOT MEASURED."
+          "Persona evidence: 15/15 root integration tests and 71/71 adapter/scope/identity-reset/shell unit tests passed at the exact accepted source; 25/25 synthetic menu hit and click checks across five viewport cases in an independent isolated browser. At the corrected source, 100 affected/anchor tests passed independently with 10 meaningful failures on the uncorrected parent, and 26 real headless Chrome journeys (16 title/route/host/viewport, 4 Retry, 4 delayed completion, 2 demo disclosure) passed at 390\u00d7900 and 1440\u00d7900. Real provider account journey untested; satisfaction, confusion and frustration NOT MEASURED."
         ],
         "fixed": [
           "Account menu stacks above the shell context on phone widths so Sign out and Use another account receive pointer input; header keeps its standard heights and no horizontal overflow at 195px.",
@@ -1253,7 +1273,7 @@
           "Persona evidence: nine local feedback DOM tests passed; deployed reporter and real-human outcomes not measured."
         ],
         "fixed": [
-          "Feedback opens with the user’s problem or suggestion; experience ratings remain optional in a secondary disclosure."
+          "Feedback opens with the user\u2019s problem or suggestion; experience ratings remain optional in a secondary disclosure."
         ],
         "security": [
           "Existing authentication, payload privacy, identity isolation and uncertain-send handling remain unchanged."

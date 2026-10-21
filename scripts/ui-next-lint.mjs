@@ -11,7 +11,7 @@ import { readFileSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { join, relative, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const LINTED = /\.(html|css|js|mjs|svg)$/;
+export const LINTED = /\.(html|css|js|mjs|svg|svelte)$/;
 export const SKIPPED = new Set(["tokens.css"]); // paths relative to the linted dir
 
 const findAll = (re, s) => [...s.matchAll(re)];
@@ -38,6 +38,9 @@ export function paperBlocks(body) {
 const CLASS_ATTR = /(?<![\w-])class\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi;
 export const primaries = (body) => findAll(CLASS_ATTR, body).reduce((n, m) => n + (m[1] ?? m[2] ?? m[3]).split(/\s+/).filter((c) => c === "btn-primary").length, 0);
 
+const LAYOUT_PROPS = "gap|row-gap|column-gap|padding(?:-[a-z]+)?|margin(?:-[a-z]+)?|(?:max-|min-)?width|(?:max-|min-)?height|grid-template-columns|grid-template-rows|flex(?:-[a-z]+)?|display";
+export const LAYOUT_STYLE = new RegExp(`(?<![\\w-])style\\s*=\\s*(?:"[^"]*?(?<![\\w-])(${LAYOUT_PROPS})\\s*:|'[^']*?(?<![\\w-])(${LAYOUT_PROPS})\\s*:|\\{[^}]*?(${LAYOUT_PROPS})\\b)|\\bstyle:(${LAYOUT_PROPS})\\b`, "g");
+
 export function lintText(name, text) {
   const v = [];
   const body = text.includes("</helmet>") ? text.split("</helmet>")[1] : text;
@@ -54,6 +57,14 @@ export function lintText(name, text) {
   if (n > 1) v.push(`${n} primary buttons (rule 1: exactly one)`);
   if (/<label[^>]*>(?:(?!<\/label>).)*<label/s.test(body)) v.push("nested <label>");
   if (body.includes("[CONTACT")) v.push("placeholder text on screen");
+  // Svelte guard (PLAN-6b tripwire T3): light DOM, external CSS, no styles-in-JS.
+  const code = body.replace(/<!--[\s\S]*?-->/g, "");
+  if (name.endsWith(".svelte") && /<style[\s>]/i.test(code)) v.push("<style> block in .svelte (use the external contract CSS)");
+  if (/\bcustomElement\b/.test(code)) v.push("customElement (light DOM only)");
+  if (/\battachShadow\b/.test(code)) v.push("attachShadow (light DOM only)");
+  if (/\.svelte$|\.m?js$/.test(name) && (/(?<![\w-])style\s*=\s*\{|\bstyle:[\w-]+|\.style\b|(?<![\w-])style\s*=\s*["']/.test(code))) v.push("inline style (use classes and tokens)");
+  // design-system.md 8.6 L4: in ui-next .svelte, an inline style carrying a layout property is refused (use the layout primitives).
+  if (name.endsWith(".svelte")) for (const m of findAll(LAYOUT_STYLE, code)) v.push(`inline layout style ${m[1] ?? m[2] ?? m[3] ?? m[4]} (8.6 L4: use Page/Section/Card/Stack/Row/Grid and data-gap)`);
   return v;
 }
 

@@ -62,6 +62,12 @@ export const create: Handler = async (ctx, params) => {
 export const list: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
   await loadProject(ctx, pid);
+  if (ctx.principal.kind === "support") {
+    const {results} = await ctx.db.prepare(`SELECT a.*, COALESCE((SELECT g.role FROM "grant" g WHERE g.principal_id=?1 AND g.scope_type='assessment' AND g.scope_id=a.id),'viewer') AS role,
+      (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=a.id) AS response_count
+      FROM assessment a WHERE a.project_id=?2 ORDER BY a.created_at`).bind(ctx.principal.id,pid).all<AssessmentRow & {role:Role;response_count:number}>();
+    return {result:{assessments:results.map(a => ({...view(a,a.role),response_count:Number(a.response_count)||0}))},scope:{type:"project",id:pid}};
+  }
   const {results} = await ctx.db.prepare('SELECT a.*, g.role, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id WHERE s.assessment_id = a.id) AS response_count FROM assessment a JOIN "grant" g ON g.scope_type = ? AND g.scope_id = a.id WHERE a.project_id = ? AND g.principal_id = ? ORDER BY a.created_at').bind("assessment", pid, ctx.principal.id).all<AssessmentRow & {role:Role; response_count:number}>();
   return { result: { assessments: results.map(a => ({ ...view(a, a.role), response_count: Number(a.response_count) || 0 })) }, scope: { type: "project", id: pid } };
 };

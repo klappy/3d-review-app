@@ -1,17 +1,20 @@
 // @vitest-environment jsdom
-// UI Next (v4) Button contract (status: provisional).
+// UI Next (v4) Button contract, Svelte 5 re-expression (status: provisional).
 // Contract: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas/design-system.md section 2, Button row.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-// @ts-expect-error -- plain ES module, no type declarations
-import { renderButton } from "../ui-next/components/button.js";
+import { render } from "@testing-library/svelte";
+import { createRawSnippet } from "svelte";
 // @ts-expect-error -- plain .mjs script, no type declarations
 import { lintText } from "../scripts/ui-next-lint.mjs";
+import Button from "../ui-next/src/Button.svelte";
 
 // jsdom environment: import.meta.url is not a file URL, so resolve from the repo root vitest runs in.
 const read = (p: string) => readFileSync(resolve(process.cwd(), "ui-next", p), "utf8");
-const icon = () => document.createElementNS("http://www.w3.org/2000/svg", "svg");
+const icon = (tag = "i") => createRawSnippet(() => ({ render: () => `<svg data-i="${tag}"></svg>` }));
+const els = (b: Element) => [...b.children];
+const renderButton = (props: Record<string, unknown>) => render(Button, { props }).container.firstElementChild as HTMLElement;
 const classes = (el: Element) => [...el.classList].sort();
 
 describe("renderButton variants", () => {
@@ -48,12 +51,15 @@ describe("renderButton anatomy and labels", () => {
     const b = renderButton({ label: "<b>x</b> & y" });
     expect(b.children.length).toBe(0);
     expect(b.textContent).toBe("<b>x</b> & y");
+    expect(b.hasAttribute("style")).toBe(false);
   });
   it("leading and trailing icons sit around the label and are hidden from assistive tech", () => {
-    const lead = icon(), trail = icon();
-    const b = renderButton({ label: "Continue", lead, trail });
-    expect(b.firstChild).toBe(lead);
-    expect(b.lastChild).toBe(trail);
+    const b = renderButton({ label: "Continue", lead: icon("lead"), trail: icon("trail") });
+    const [lead, trail] = els(b);
+    expect(els(b).map((e) => e.getAttribute("data-i"))).toEqual(["lead", "trail"]);
+    expect(b.firstElementChild).toBe(lead);
+    expect(b.lastElementChild).toBe(trail);
+    expect(lead.compareDocumentPosition([...b.childNodes].find((n) => n.nodeType === 3 && n.textContent)!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(b.textContent).toBe("Continue");
     expect(lead.getAttribute("aria-hidden")).toBe("true");
     expect(trail.getAttribute("aria-hidden")).toBe("true");
@@ -69,13 +75,12 @@ describe("renderButton anatomy and labels", () => {
 
 describe("renderButton icon-only", () => {
   it("renders .btn-icon with the aria-label and only the icon", () => {
-    const i = icon();
-    const b = renderButton({ icon: i, ariaLabel: "Help", variant: "quiet" });
+    const b = renderButton({ icon: icon("help"), ariaLabel: "Help", variant: "quiet" });
     expect(classes(b)).toEqual(["btn", "btn-icon", "btn-quiet"]);
     expect(b.getAttribute("aria-label")).toBe("Help");
-    expect(b.childNodes.length).toBe(1);
-    expect(b.firstChild).toBe(i);
-    expect(i.getAttribute("aria-hidden")).toBe("true");
+    expect(els(b).map((e) => e.getAttribute("data-i"))).toEqual(["help"]);
+    expect(b.textContent).toBe("");
+    expect(els(b)[0].getAttribute("aria-hidden")).toBe("true");
   });
   it("refuses to render without an aria-label", () => {
     expect(() => renderButton({ icon: icon() })).toThrow(/aria-label/);
@@ -132,21 +137,12 @@ describe("button.css", () => {
   });
 });
 
-describe("button module and fixture", () => {
-  it("button.js imports only ./h.js and uses no innerHTML", () => {
-    const js = read("components/button.js").replace(/^\s*\/\/.*$/gm, "");
-    expect([...js.matchAll(/^\s*import .* from "([^"]+)";/gm)].map((m) => m[1])).toEqual(["./h.js"]);
-    expect(js).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML/);
+describe("Button.svelte source", () => {
+  it("light DOM only: no <style>, customElement, attachShadow, {@html} or inline style", () => {
+    const src = read("src/Button.svelte").replace(/<!--[\s\S]*?-->/g, "");
+    expect(src).not.toMatch(/<style|customElement|attachShadow|\{@html|style=|innerHTML/);
   });
-  it("fixture loads the tokens and the button stylesheet and renders light and dark .app roots", () => {
-    const html = read("fixtures/button.html");
-    expect(html).toContain('href="../tokens.css"');
-    expect(html).toContain('href="../components/button.css"');
-    expect(html).toContain('from "../components/button.js"');
-    expect(html).toMatch(/sheet\("light"\), sheet\("dark"\)/);
-    for (const v of ['variant: "primary"', 'variant: "quiet"', "icon: icon(", "lg: true", "block: true", "href:", "lead:", "trail:"]) expect(html).toContain(v);
-  });
-  it("the new files pass the ui-next lint", () => {
-    for (const p of ["components/h.js", "components/button.js", "components/button.css", "fixtures/button.html"]) expect(lintText(p, read(p))).toEqual([]);
+  it("passes the ui-next lint", () => {
+    for (const p of ["src/Button.svelte", "components/button.css"]) expect(lintText(p, read(p))).toEqual([]);
   });
 });

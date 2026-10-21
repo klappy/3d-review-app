@@ -137,6 +137,7 @@ Both sources live in the 3D Review cookbook at the sha shown. The current UI's m
 | Home (your reviews) | v3 `Home` (F2 Home), `PhoneHome` | Bincy 02 home dashboard (welcome as title) |
 | Name dialog | **this file § 5** (none upstream) | — |
 | Account menu | none upstream — gap | — |
+| Super-admin access selector / workspaces | this file § Super-admin access selector — October 20 increment, wireframe `access-selector-20261020` | existing workspace/project cards |
 | Setup step 1 · Details | v3 `Setup1Details` (F3) | Bincy 03 assessment details |
 | Setup step 2 · Who will participate? | v3 `Setup2Participants` (F4), `PhoneSetup2` | Bincy 04 participant groups |
 | Setup step 3 · Participant information | v3 `Setup3Information` (F5) | Bincy 05 participant information |
@@ -162,3 +163,35 @@ The captain adopted this contract with the default named in each question below 
 3. **Phone header** (§ 5). Show the full name truncated with an ellipsis, or initials as the v4 canvas does? Default: full name, truncated. **Decided: full name, truncated on phones.**
 4. **Dark mode** (§ 6). Keep it off, or open a unit to turn on the existing dark tokens with dark lens pairs for every screen? Default: off. **Decided: off.**
 5. **Where this file lives.** The design lens expects the contract in the 3D Review cookbook; this draft lives in the app repo beside the code it governs. Keep it here and register this path and sha with the lens, or move it? Default: keep it here and register it. **Decided: it stays in the app repo and is registered with the design lens.**
+
+## Super-admin access selector — October 20 increment
+
+User-authorized extension: a shared panel immediately before the current page content shows the two explicit choices **My Access** and **Global Access**, the selected state (`aria-pressed`), a plain mode description, and workspace/project links. It appears only for a server-verified super admin. It uses existing panel/button/token styling (`ui/v3-shell.css`) and wraps the choices on narrow screens. Existing workspace and project cards remain the navigation surfaces. Scope: the current UI only; this is the requested access control, not a redesign.
+
+
+### Wireframe `access-selector-20261020` (390×844 and 1280×800)
+
+This additive control inherits the current page's left and right content grid; its outer margin is zero. The panel has the existing panel inset. It stays above page content across shell-internal search/context/tree repaints. This reference is for both My Access and Global Access (the pressed choice and text change, layout stays the same).
+
+```text
+1280×800 (inside existing page grid)
+┌──────────────────────────────────────────────────────────────────┐
+│ [My Access] [Global Access • selected]                             │
+│ Global Access · Browse every workspace and project.               │
+│ All workspaces · All projects                                    │
+└──────────────────────────────────────────────────────────────────┘
+All workspaces
+┌ Workspace card ────────────┐   ┌ Workspace card ────────────┐
+
+390×844 (same page grid as the heading/cards)
+┌────────────────────────────────┐
+│ [My Access] [Global Access •]   │
+│ Global Access · Browse every   │
+│ workspace and project.         │
+│ All workspaces · All projects  │
+└────────────────────────────────┘
+All workspaces
+┌ Workspace card ────────────────┐
+```
+
+Labels wrap at words within the page width; `aria-pressed` carries selection. My Access substitutes “Your workspaces and projects” and “My workspaces · My projects.” No second H1, redesign, new colour or typography is introduced.
