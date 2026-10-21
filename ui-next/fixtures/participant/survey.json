@@ -1,0 +1,376 @@
+{
+ "_source": "Participant lane fixture (UI Next, provisional). items: klappy/3d-review-app migrations/0004_pinned_instruments.sql:12 (tpl_written v2, Community), verbatim; options keep code and text, plus exclusive where src/handlers/common.ts renderItems serves it (flag \"exclusion\": CW-Q8 none). Everything else: the cookbook participant boards (design/2026-10-15-glass-redesign/canvas P*.dc.html).",
+ "survey": {
+  "language": "Hindi",
+  "passages": [
+   {
+    "reference": "Mark 1–4"
+   }
+  ],
+  "medium": "printed draft booklet",
+  "perspective": "Community",
+  "minutes": 5
+ },
+ "form": {
+  "template": {
+   "perspective": "Community"
+  },
+  "demographics_enabled": true,
+  "context_fields": [
+   {
+    "key": "age_range",
+    "label": "Your age",
+    "options": [
+     {
+      "code": "under_18",
+      "label": "Under 18"
+     },
+     {
+      "code": "18_30",
+      "label": "18–30"
+     },
+     {
+      "code": "31_50",
+      "label": "31–50"
+     },
+     {
+      "code": "over_50",
+      "label": "Over 50"
+     },
+     {
+      "code": "prefer_not",
+      "label": "Prefer not to say"
+     }
+    ]
+   }
+  ],
+  "items": [
+   {
+    "id": "CW-Q1",
+    "type": "single",
+    "required": true,
+    "text": "As a group, how would we describe how easy or difficult this translation is to understand?",
+    "options": [
+     {
+      "code": "very-easy",
+      "text": "Very easy to understand"
+     },
+     {
+      "code": "mostly-easy",
+      "text": "Most of it is easy, but some parts are hard"
+     },
+     {
+      "code": "much-difficult",
+      "text": "Much of it is difficult to understand"
+     },
+     {
+      "code": "cannot",
+      "text": "We cannot understand it"
+     }
+    ]
+   },
+   {
+    "id": "CW-Q2",
+    "type": "multi",
+    "required": false,
+    "text": "Where we find it difficult, what makes it hard?",
+    "options": [
+     {
+      "code": "unfamiliar-words",
+      "text": "Some words are unfamiliar or strange"
+     },
+     {
+      "code": "long-sentences",
+      "text": "Some sentences are too long or complicated"
+     },
+     {
+      "code": "wrong-dialect",
+      "text": "It is not our dialect"
+     },
+     {
+      "code": "unnatural-speech",
+      "text": "It doesn't sound like the way we normally speak"
+     },
+     {
+      "code": "other",
+      "text": "Other (please describe)"
+     }
+    ]
+   },
+   {
+    "id": "CW-Q3",
+    "type": "single",
+    "required": true,
+    "text": "How does this translation sound to us?",
+    "options": [
+     {
+      "code": "natural-beautiful",
+      "text": "It sounds like our language — natural and beautiful"
+     },
+     {
+      "code": "mixed",
+      "text": "Some parts sound good, some parts don't sound that good"
+     },
+     {
+      "code": "not-good",
+      "text": "It does not sound very good. This is not how our language sounds."
+     },
+     {
+      "code": "wrong-dialect",
+      "text": "This is not our dialect"
+     }
+    ]
+   },
+   {
+    "id": "CW-Q4",
+    "type": "single",
+    "required": true,
+    "text": "As a group, how would we describe the overall appearance of this translation?",
+    "options": [
+     {
+      "code": "love-it",
+      "text": "We love it — it looks beautiful and represents our language and culture well"
+     },
+     {
+      "code": "mixed",
+      "text": "Some things look good, some things we are not happy with"
+     },
+     {
+      "code": "dislike",
+      "text": "We do not like how it looks at all"
+     },
+     {
+      "code": "other",
+      "text": "Other (please describe)"
+     }
+    ]
+   },
+   {
+    "id": "CW-Q5",
+    "type": "single",
+    "required": true,
+    "text": "Looking inside, at the pages, format, headings, and pictures, what do we think?",
+    "options": [
+     {
+      "code": "love-it",
+      "text": "We love it — it looks beautiful"
+     },
+     {
+      "code": "mixed",
+      "text": "Some things look good, some things we are not happy with"
+     },
+     {
+      "code": "dislike",
+      "text": "We do not like how it looks at all"
+     },
+     {
+      "code": "other",
+      "text": "Other (please describe)"
+     }
+    ]
+   },
+   {
+    "id": "CW-Q6",
+    "type": "text",
+    "required": false,
+    "text": "If you have concerns, what would you improve?"
+   },
+   {
+    "id": "CW-Q7",
+    "type": "single",
+    "required": true,
+    "text": "As a group, how often do we use this translation?",
+    "options": [
+     {
+      "code": "daily",
+      "text": "We use it every day"
+     },
+     {
+      "code": "weekly-3x",
+      "text": "We use it about 3 times per week"
+     },
+     {
+      "code": "occasional",
+      "text": "We use it occasionally"
+     },
+     {
+      "code": "never",
+      "text": "We don't use it"
+     }
+    ]
+   },
+   {
+    "id": "CW-Q8",
+    "type": "multi",
+    "required": true,
+    "text": "Where do we use this translation?",
+    "options": [
+     {
+      "code": "church",
+      "text": "At church"
+     },
+     {
+      "code": "home",
+      "text": "At home"
+     },
+     {
+      "code": "small-groups",
+      "text": "In small groups or Bible studies"
+     },
+     {
+      "code": "personal",
+      "text": "In personal devotions"
+     },
+     {
+      "code": "elsewhere",
+      "text": "Elsewhere"
+     },
+     {
+      "code": "none",
+      "text": "We don't use it",
+      "exclusive": true
+     }
+    ]
+   },
+   {
+    "id": "CW-Q9",
+    "type": "single",
+    "required": true,
+    "text": "For those who use the Scripture regularly, how does it impact our emotions?",
+    "options": [
+     {
+      "code": "deep-impact",
+      "text": "Many of us have felt God's love, care, or conviction deeply through his word"
+     },
+     {
+      "code": "sometimes",
+      "text": "Sometimes we feel God's love, care, or conviction through his word, but not always"
+     },
+     {
+      "code": "no-impact",
+      "text": "It does not affect us very much"
+     }
+    ]
+   },
+   {
+    "id": "CW-Q10",
+    "type": "single",
+    "required": true,
+    "text": "For those who use the Scripture regularly, how does it impact our behavior or activities?",
+    "options": [
+     {
+      "code": "changed-lives",
+      "text": "Many of us have felt convicted and it has changed how we live our lives"
+     },
+     {
+      "code": "sometimes",
+      "text": "Sometimes we feel challenged to change, sometimes not"
+     },
+     {
+      "code": "no-change",
+      "text": "It has not changed our lives"
+     }
+    ]
+   },
+   {
+    "id": "CW-Q11",
+    "type": "single",
+    "required": true,
+    "text": "As a group, do we trust this translation?",
+    "options": [
+     {
+      "code": "trust-completely",
+      "text": "Yes, we trust it completely — it is God's word in our language"
+     },
+     {
+      "code": "mostly-trust",
+      "text": "We mostly trust it, but we have some questions"
+     },
+     {
+      "code": "not-sure",
+      "text": "We are not sure if we trust it"
+     },
+     {
+      "code": "no-trust",
+      "text": "We do not trust it"
+     }
+    ]
+   },
+   {
+    "id": "CW-Q12",
+    "type": "text",
+    "required": false,
+    "text": "If we could improve anything about this translation, what would it be?"
+   },
+   {
+    "id": "CW-Q13",
+    "type": "text",
+    "required": false,
+    "text": "Is there anything else we would like to share about this translation?"
+   }
+  ]
+ },
+ "dontKnow": {
+  "code": "dont-know",
+  "text": "I don't know",
+  "exclusive": true
+ },
+ "passage": {
+  "page": 1,
+  "pages": 6,
+  "verses": [
+   [
+    1,
+    "यीशु मसीह परमेश्वर के पुत्र के सुसमाचार का आरम्भ।"
+   ],
+   [
+    2,
+    "जैसा यशायाह भविष्यद्वक्ता की पुस्तक में लिखा है: “देख, मैं अपने दूत को तेरे आगे भेजता हूँ, जो तेरे लिये मार्ग सुधारेगा।"
+   ],
+   [
+    3,
+    "जंगल में एक पुकारनेवाले का शब्द हो रहा है…"
+   ]
+  ]
+ },
+ "about": {
+  "age_range": "31_50"
+ },
+ "current": "CW-Q3",
+ "answers": {
+  "CW-Q1": "mostly-easy",
+  "CW-Q2": [
+   "unfamiliar-words"
+  ],
+  "CW-Q3": "mixed",
+  "CW-Q7": "occasional"
+ },
+ "reviewShown": [
+  "CW-Q1",
+  "CW-Q2",
+  "CW-Q3",
+  "CW-Q7"
+ ],
+ "receipt": "R-2048-731",
+ "code": {
+  "placeholder": "K7Q 4F2",
+  "entered": "K7Q 4F3"
+ },
+ "problem": {
+  "error": {
+   "status": 0,
+   "code": "NETWORK"
+  },
+  "closedOn": "31 Oct"
+ },
+ "busy": {
+  "error": {
+   "status": 429,
+   "code": "RL_HTTP_ANON",
+   "retryAfter": 12
+  },
+  "attempt": 2,
+  "attempts": 5,
+  "at": "22:41:07"
+ }
+}
