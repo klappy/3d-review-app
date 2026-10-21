@@ -64,8 +64,8 @@
     </Card>
     <Card gap={1} label="Common questions">
       {#each FAQ_PHONE as [q, a]}<Disclosure label={q} solid={false}><p class="small">{a}</p></Disclosure>{/each}
+      <a class="link small" href={HELP}>All questions and the facilitator guide</a>
     </Card>
-    <a class="link small" href={HELP}>All questions and the facilitator guide</a>
     <a class="link small" href={ABOUT}>Why 3D Review exists</a>
     <p class="small">Have a survey code? <a class="link" href={CODE}>Enter it here</a></p>
   {:else}
