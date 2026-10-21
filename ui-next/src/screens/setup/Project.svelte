@@ -47,7 +47,7 @@
       <Row split gap={3}><span class="micro" id="revs-h">Reviews over time</span><span class="small">newest first</span></Row>
       {#each reviews as r}
         <a class="card-link su-revline" href={r.href}>
-          <span class="l-stack" data-gap="1"><span class="small">{r.when}</span><span class="su-clip">{r.title}</span><span class="l-row" data-gap="2"><Pill stage={r.stage} /></span></span>
+          <span class="su-revcol"><span class="small">{r.when}</span><span class="su-clip">{r.title}</span><span class="l-row" data-gap="2"><Pill stage={r.stage} /></span></span>
           {#if r.overall}<Level level={r.overall} />{:else}<span class="small">{r.note}</span>{/if}
         </a>
       {/each}
@@ -79,7 +79,7 @@
             {#each trend.rows as row, i}<text x="8" y={34 + 30 * i} font-size="var(--t-11)" fill="var(--ink-3)">{row}</text>{/each}
             {#each trend.months as m, i}<text x={X(i)} y="178" font-size="var(--t-11)" fill="var(--ink-2)" text-anchor="middle">{m}</text>{/each}
             {#each trend.rows as _, i}<line x1="36" x2="400" y1={30 + 30 * i} y2={30 + 30 * i} stroke="var(--line)"></line>{/each}
-            {#each Object.entries(trend.lines) as [lens, levels]}<polyline data-lens={lens} points={points(levels)} fill="none" stroke="var(--lens)" stroke-width="2.5" stroke-linejoin="round"></polyline>{/each}
+            {#each Object.entries(trend.lines) as [lens, levels]}<polyline data-lens={lens} points={points(levels)} fill="none" stroke="var(--lens)" stroke-width="2.5" stroke-linejoin="round"></polyline>{#each levels as l, i}<circle data-lens={lens} cx={X(i)} cy={Y[l]} r="5" fill="var(--lens)" stroke="var(--field)" stroke-width="2"></circle>{/each}{/each}
           </svg>
           <Row wrap gap={4}>{#each Object.keys(trend.lines) as lens}<span class="lvl-pair"><LensDot {lens} decorative />{{ team: "Translation team", community: "Community", church: "Church" }[lens]}</span>{/each}</Row>
           <p class="small">{trend.read}</p>

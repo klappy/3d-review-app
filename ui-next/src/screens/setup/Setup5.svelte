@@ -12,17 +12,15 @@
   const COLLECT = "?screen=collect";
 </script>
 
-<SetupFrame {phone} {theme} step={5} title="Ready to launch" next={{ label: "Launch the survey", href: `${COLLECT}${phone ? "&w=phone" : ""}` }}>
+<SetupFrame {phone} {theme} step={5} title="Ready to launch" next={{ label: "Launch the survey", href: `${COLLECT}${phone ? "&w=phone" : ""}`, play: true }}>
   {#if phone}
     <p class="small">Check it over. You can change dates and details later.</p>
-    <div class="su-summary">
-      {#each data.phoneSummary as r}
-        <div class="l-row su-line" data-split data-gap="3">
-          <span class="l-stack" data-gap="1"><span class="micro">{r.label}</span>{#if r.value}<span class="h3">{r.value}</span>{:else}<span class="small">Not set</span>{/if}</span>
-          <a class="link" href={stepHref(r.step, true)} aria-label={`Edit ${r.label}`}>Edit</a>
-        </div>
-      {/each}
-    </div>
+    {#each data.phoneSummary as r}
+      <div class="l-row su-line" data-split data-gap="3">
+        <span class="su-kv"><span class="micro">{r.label}</span>{#if r.value}<span class="h3">{r.value}</span>{:else}<span class="small">Not set</span>{/if}</span>
+        <a class="link" href={stepHref(r.step, true)} aria-label={`Edit ${r.label}`}>Edit</a>
+      </div>
+    {/each}
   {:else}
     <div class="su-summary">
       {#each data.summary as r}

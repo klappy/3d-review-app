@@ -52,7 +52,9 @@
 
 /* Group context disclosures (Disclosure contract V-12, details.disc) as rows of a card: flush, ruled */
 .app .su-ctx details.disc{padding:0;border-radius:0;border-top:1px solid var(--line)}
-.app .su-ctx details.disc>summary.disc-sum{min-height:52px;font-weight:400}
+.app .su-ctx details.disc>summary.disc-sum{min-height:52px}.app .su-ctx details.disc>summary.disc-sum:not(.h3){font-weight:400}
+.app .su-groups>details.disc{border-top:0}/* phone: the group sections are not ruled, their survey disclosures are */
+.app .icn.icn-lens.su-icn-s{width:28px;height:28px;border-radius:var(--radius-s)}/* small perspective chip (board 28px; .icn-lens is 40) */
 .app .su-ctx summary.disc-sum>.su-name{flex-grow:1}
 .app .su-ctx .disc-body{padding:var(--sp-1) 0 var(--sp-3)}
 
@@ -61,11 +63,16 @@
 .app .su-summary{display:flex;flex-direction:column}
 .app .su-sumrow>.lbl{margin:0}
 .app .su-line{min-height:48px;border-top:1px solid var(--line)}
+.app .su-kv{display:flex;flex-direction:column;min-width:0}/* label over value, no gap (board) */
 
 /* Project: two-track page (reviews | over time) and the review row inside a card link */
 .app .l-grid[data-tpl=su-project]{grid-template-columns:minmax(0,1fr) 460px;align-items:start}
-.app .card-link.su-rev{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:var(--sp-4);align-items:center;padding:var(--sp-4) var(--sp-5)}
+.app .card-link.su-rev{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:var(--sp-4);align-items:center;padding:var(--sp-4)}/* board 16/20 -> --sp-4 (8.2: 18/20 -> 16) */
 .app .su-rev>.go{color:var(--ink-2)}
 .app .card-link.su-revline{display:flex;align-items:center;gap:var(--sp-3);min-height:64px;border-top:1px solid var(--line);padding:var(--sp-2) 0}
-.app .su-revline>.l-stack{flex-grow:1;min-width:0}
+.app .su-revcol{display:flex;flex-direction:column;flex-grow:1;min-width:0}
+.app .su-revcol>.l-row{margin-top:var(--sp-1)}
 .app .su-clip{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+
+/* section 2 Top bar rule ".link is never recoloured": src/gallery.css `.app .small` (0,2,0) greys a.link.small on screens; the link keeps --primary */
+.app a.link.small{color:var(--primary)}

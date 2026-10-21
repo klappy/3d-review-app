@@ -30,11 +30,11 @@
 <SetupFrame {phone} {theme} step={4} title="About each group">
   {#if phone}
     <p class="small">Optional, once per survey — not per person. No names. Once the draft is saved with a survey, its questions are hidden.</p>
-    <div class="l-stack su-ctx" data-gap="1">
+    <div class="l-stack su-ctx su-groups" data-gap="1">
       {#each data.groups as g}
         {@const mine = SURVEYS.filter((s) => s.g === g)}
         <details class="disc" open={g.perspective === data.context.open}>
-          <summary class="disc-sum h3"><span class="icn icn-lens" data-lens={g.lens} aria-hidden="true"><Glyph name="person" size={14} /></span><span class="su-name">{g.name}</span>{@render chev()}</summary>
+          <summary class="disc-sum h3"><span class="icn icn-lens su-icn-s" data-lens={g.lens} aria-hidden="true"><Glyph name="people" size={14} /></span><span class="su-name">{g.name}</span>{@render chev()}</summary>
           <div class="disc-body l-stack" data-gap="2">
             {#each mine as s}
               <Field label={g.roles ? `${s.name} · How many do you expect?` : "How many do you expect?"} id={`${s.key}-expected`} opt><input class="in" type="number" min="1" inputmode="numeric" id={`${s.key}-expected`} value={s.expected} /></Field>
@@ -57,7 +57,7 @@
         <p class="small">Answer these now, once per survey you chose — not per person. All optional, nothing here asks for a name. Once the draft is saved with a survey, its questions are hidden.</p>
         {#each SURVEYS as s}
           <details class="disc" open={s.g.perspective === data.context.open}>
-            <summary class="disc-sum"><span class="icn icn-lens" data-lens={s.g.lens} aria-hidden="true"><Glyph name="person" size={14} /></span><span class="su-name"><span class="h3">{s.name}</span> <span class="small">· {s.g.name}</span></span><span class="small">About this group <span class="opt">(optional)</span> · {s.fields.length} questions</span>{@render chev()}</summary>
+            <summary class="disc-sum"><span class="icn icn-lens su-icn-s" data-lens={s.g.lens} aria-hidden="true"><Glyph name="people" size={14} /></span><span class="su-name"><span class="h3">{s.name}</span> <span class="small">· {s.g.name}</span></span><span class="small">About this group <span class="opt">(optional)</span> · {s.fields.length} questions</span>{@render chev()}</summary>
             <div class="disc-body"><Grid cols={3} gap={4}>{#each s.fields as f}<Field label={f.label} id={`${s.key}-${f.key}`} opt>{@render control(s, f)}</Field>{/each}</Grid></div>
           </details>
         {/each}
