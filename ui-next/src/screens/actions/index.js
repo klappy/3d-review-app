@@ -7,5 +7,6 @@
 // Print(+Phone) -> print, Share(+Phone) -> share, Sandbox(+Phone) -> sandbox, PaperEntry(+Phone) -> paper-entry, MenuPhone -> menu (phone only).
 import NextStep from "./NextStep.svelte";
 import ActionPlan from "./ActionPlan.svelte";
+import Share from "./Share.svelte";
 
-export default { "next-step": NextStep, "action-plan": ActionPlan };
+export default { "next-step": NextStep, "action-plan": ActionPlan, share: Share };
