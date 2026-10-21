@@ -40,7 +40,7 @@
 {#snippet list()}<Glyph d={G.list} />{/snippet}
 {#snippet doc()}<Glyph d={G.doc} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="root" home={href("home")} menuHref={out("menu")} />{:else}<TopBar {crumbs} home={out("workspace")} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Plan the next step" href={out("nextStep")} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label="Plan the next step" href={out("nextStep")} trail="arrow" />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
