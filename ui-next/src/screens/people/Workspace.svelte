@@ -10,7 +10,7 @@
      "Add to workspace" is the one primary and New project is demoted (Dialog and sheet states: one primary). The dialog is a native
      <dialog class="glass-hi"> opened with showModal() (design-system.md Dialog and sheet states): the dialog.glass-hi rows give the
      opaque --dialog fill, the 560px geometry and the --scrim ::backdrop; on phone dialog.glass-hi.sheet anchors it to the bottom over the
-     demoted phone-bar. Escape (the dialog's close event) does what Cancel does: the dialog goes, New project is the primary again and
+     shared PhoneBar's demoted variant (registry; VALIDATION-people-r4.md C6). Escape (the dialog's close event) does what Cancel does: the dialog goes, New project is the primary again and
      the address becomes the workspace screen's. The search field's size is the placeholder's length, so the field shows all of it
      (the board's 260px has no width row yet). Links: ../href.js (carries w and theme), other lanes' screens by their registered names (project, setup1, menu);
      test/ui-next-links.test.ts passes once those lanes merge. -->
@@ -61,7 +61,7 @@
 {#snippet people()}<Icon d={I.people} />{/snippet}
 {#snippet chev()}<Icon d={I.chev} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="root" initials={d.user.initials} home={HOME} menuHref={MENU} />{:else}<TopBar who={d.user.first} initials={d.user.initials} workspace={d.short} home={HOME} />{/if}{/snippet}
-{#snippet bar()}{#if phone}{#if open}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="New project" lg block href={SETUP} lead={plus} /></div>{:else}<PhoneBar label="New project" lead="plus" href={SETUP} />{/if}{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label="New project" lead="plus" href={SETUP} demoted={open} />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}

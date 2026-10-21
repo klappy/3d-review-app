@@ -4,6 +4,7 @@
 // People, PeoplePhone, PeopleWorkspace, PeopleWorkspacePhone, Workspace, WorkspacePhone, WorkspaceGroup, WorkspaceGroupPhone, Invitations,
 // InvitationsPhone, SignInCheck, SignInCheckPhone, SignInPhone (.dc.html). Data: ui-next/fixtures/people/ through screens/people/people-data.js.
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render } from "@testing-library/svelte";
 import { tick } from "svelte";
@@ -152,7 +153,15 @@ describe("Workspace and the group dialog", () => {
       // F6: the row text grows, so the Direct owner / Inherited tag sits at the row's end (desktop draws tags)
       for (const row of dlg.querySelectorAll("label.row-opt")) expect(row.querySelector("[data-grow]")).not.toBeNull();
       expect(dlg.querySelectorAll(".tag").length).toBe(phone ? 0 : 3);
+      // C6: on phone the bar under the sheet is the shared PhoneBar's demoted variant (no hand-built bar): New project as a block secondary
+      if (phone) {
+        const bars = a.querySelectorAll(".phone-bar");
+        expect(bars.length).toBe(1);
+        expect(bars[0].querySelector(".btn-primary")).toBeNull();
+        expect([...bars[0].querySelectorAll("a.btn")].map((b) => [b.className, b.textContent])).toEqual([["btn btn-lg btn-block", "New project"]]);
+      }
     }
+    expect(readFileSync(resolve(__dirname, "../ui-next/src/screens/people/Workspace.svelte"), "utf8")).not.toMatch(/class="glass phone-bar"/);
   });
   it("N1: Escape (the dialog's close event) does what Cancel does: no dialog, New project is the primary again, the address is workspace's", async () => {
     for (const phone of [false, true]) {
