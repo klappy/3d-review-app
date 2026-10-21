@@ -18,13 +18,13 @@ import Fixture from "../ui-next/src/LayoutFixture.svelte";
 import Layouts from "../ui-next/src/Layouts.svelte";
 
 const root = resolve(process.cwd(), "ui-next");
-const css = readFileSync(resolve(root, "components/layout.css"), "utf8");
+const css = readFileSync(resolve(root, "components/base.css"), "utf8") + readFileSync(resolve(root, "components/layout.css"), "utf8"); // primitives live in the generated helmet
 const tokens = readFileSync(resolve(root, "tokens.css"), "utf8");
 
 describe("layout.css and tokens carry the 8.1-8.3 contract", () => {
   it("defines every primitive class and gap step", () => {
-    for (const c of [".l-shell{", ".l-main{", ".l-page{", ".l-section{", ".l-stack{", ".l-row{", ".l-grid{", ".l-card{", ".glass{", ".glass-hi{"]) expect(css).toContain(c);
-    for (let n = 1; n <= 7; n++) expect(css).toContain(`[data-gap="${n}"]{--g:var(--sp-${n})}`);
+    for (const c of [".l-shell{", ".l-main{", ".l-page{", ".l-section{", ".l-stack{", ".l-row{", ".l-grid{", ".l-card:not([data-pad]){", ".glass{", ".glass-hi{"]) expect(css).toContain(c);
+    for (let n = 1; n <= 8; n++) expect(css).toContain(`[data-gap="${n}"]{--g:var(--sp-${n})}`);
   });
   it("tokens.css carries the spacing scale, gutter and page widths, with the phone override", () => {
     for (const [k, v] of [["--sp-1", "4px"], ["--sp-4", "16px"], ["--sp-7", "48px"], ["--gutter", "32px"], ["--page-max", "1120px"], ["--page-max-narrow", "880px"], ["--page-max-read", "520px"]]) expect(tokens).toMatch(new RegExp(`${k}: ${v};`));
@@ -42,8 +42,8 @@ describe("primitives render the literal contract classes", () => {
     }
     expect(render(Stack).container.firstElementChild!.hasAttribute("data-gap")).toBe(false);
   });
-  it("gap is the --sp step 1..7 only", () => {
-    for (const bad of [0, 8, 2.5, "3"]) expect(() => render(Stack, { gap: bad as never })).toThrow(/gap must be an integer 1\.\.7/);
+  it("gap is the --sp step 1..8 only (--sp-8 72, design-system.md 8.2)", () => {
+    for (const bad of [0, 9, 2.5, "3"]) expect(() => render(Stack, { gap: bad as never })).toThrow(/gap must be an integer 1\.\.8/);
   });
   it("Page widths: default, narrow, read; nothing else", () => {
     expect(render(Page).container.firstElementChild!.hasAttribute("data-w")).toBe(false);
@@ -74,6 +74,9 @@ describe("primitives render the literal contract classes", () => {
   it("Card refuses width, style and margin (the parent sets width; the parent gap spaces it)", () => {
     for (const k of ["width", "style", "margin"]) expect(() => render(Card, { [k]: "1px" })).toThrow(/Card: no/);
     expect(render(Card, { hi: true }).container.firstElementChild!.className).toBe("glass-hi l-card l-stack");
+    expect(render(Card, { lens: "church" }).container.firstElementChild!.getAttribute("data-lens")).toBe("church");
+    expect(render(Card, {}).container.firstElementChild!.hasAttribute("data-lens")).toBe(false);
+    expect(() => render(Card, { lens: "red" })).toThrow(/Card: lens/);
   });
 });
 
@@ -95,7 +98,7 @@ describe("nesting rules (8.1)", () => {
     for (const c of container.querySelectorAll(".l-card")) for (const a of ["style", "width", "data-w", "data-cols"]) expect(c.hasAttribute(a)).toBe(false);
     expect(container.querySelector("[style]")).toBeNull();
     // the CSS never gives a primitive or card a margin other than the Page's auto centring
-    expect(css.replace(/\.l-page\{[^}]*\}/, "")).not.toMatch(/margin/);
+    for (const [, sel, decl] of css.matchAll(/(\.l-[a-z-]+(?:\[[^\]]*\])?)\{([^}]*)\}/g)) if (sel !== ".l-page") expect(decl, sel).not.toMatch(/margin/);
     expect(css).not.toMatch(/\.l-card\{[^}]*width/);
   });
   it("phone fixture flips the shell to the phone page and gutter scope", () => {

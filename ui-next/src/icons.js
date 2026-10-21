@@ -2,6 +2,8 @@
 export const I = Object.freeze({
   help: "M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7M12 17h.01M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18",
   chev: "M6 9l6 6 6-6",
+  arrow: "M5 12h14M13 6l6 6-6 6",
+  play: "M8 5.5v13l10-6.5z",
   back: "M19 12H5M11 6l-6 6 6 6",
   x: "M6 6l12 12M18 6L6 18",
   mail: "M4 7.5l8 6 8-6M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 17V7A1.5 1.5 0 0 1 5 5.5",
@@ -20,7 +22,7 @@ export const ACCOUNT_ITEMS = Object.freeze([
   { kind: "hr" },
   { label: "Invitations", href: "#invitations", icon: I.mail, tag: "1 new" },
   { label: "Help and FAQ", href: "#help", icon: I.help },
-  { label: "Why 3D Review exists", href: "#about", icon: I.sparkle },
+  { label: "Why 3D Review exists", href: "?screen=about", icon: I.sparkle },
   { label: "Send app feedback", href: "#feedback", icon: I.pen },
   { kind: "hr" },
   { label: "Use another account", href: "#main", icon: I.people },

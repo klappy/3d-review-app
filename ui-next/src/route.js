@@ -19,7 +19,9 @@ export function flagOn(params, storage) {
     return false;
   }
 }
-// Returns { view, props }: view is "home" | "components" | "layouts" | "home-parts".
+// Screens under the flag: ?screen=home (default) | about | landing (Landing = the signed-out entry; About from Landing and Home's account menu).
+// Returns { view, props }: view is "home" | "about" | "landing" | "components" | "layouts" | "home-parts".
+export const SCREENS = Object.freeze(["home", "about", "landing"]);
 export function route(params, storage) {
   const page = params.get("page");
   const theme = params.get("theme");
@@ -29,6 +31,16 @@ export function route(params, storage) {
   if (page === "layouts") return { view: "layouts", props: { mode, phone } };
   if (page === "home") return { view: "home-parts", props: { mode, phone } };
   if (page === "components" || !on) return { view: "components", props: { mode } };
+  const screen = params.get("screen");
+  if (screen === "about" || screen === "landing") return { view: screen, props: { phone, theme: theme === "dark" ? "dark" : "light" } };
   const state = params.get("state") === "first" ? "first" : "reviews";
   return { view: "home", props: { state: phone ? "reviews" : state, phone, theme: theme === "dark" ? "dark" : "light" } };
+}
+
+// Links between mounted screens carry their presentation and flag explicitly;
+// they keep working when localStorage is unavailable and survive a full reload.
+export function screenHref(screen, { phone = false, theme = "light" } = {}) {
+  const params = new URLSearchParams({ screen, [FLAG]: "on", theme });
+  if (phone) params.set("w", "phone");
+  return `?${params}`;
 }

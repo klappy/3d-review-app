@@ -75,7 +75,7 @@ describe("nesting rule (8.1) and one primary per page", () => {
       expect(a.querySelector("[style]")).toBeNull();
       expect(a.querySelectorAll(".btn-primary").length).toBe(1);
       expect(a.querySelector(".btn-primary")!.textContent).toBe("Start a 3D Review");
-      expect([...a.querySelectorAll("div")].every((d) => [...d.classList].some((k) => LEVELS.has(k) || /^(app|layer|glass|glass-hi|menu|top-end|mi-head|phone-bar|l-shell)$/.test(k)) || d.closest("header, .menu"))).toBe(true);
+      expect([...a.querySelectorAll("div")].every((d) => [...d.classList].some((k) => LEVELS.has(k) || /^(app|layer|aurora|glass|glass-hi|menu|top-end|mi-head|phone-bar|l-shell)$/.test(k)) || d.closest("header, .menu"))).toBe(true);
     });
   }
 });

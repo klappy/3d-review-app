@@ -100,21 +100,22 @@ describe("renderButton states not in this slice", () => {
 
 describe("button.css", () => {
   const css = read("components/button.css");
+  const skin = (read("components/base.css") + css).replace(/\s*([{};])\s*/g, "$1"); // base.css = the helmet, generated (scripts/ui-next-base.mjs)
   it("defines the ported classes and states", () => {
-    for (const sel of [/\.btn \{/, /\.btn:hover \{/, /\.btn-primary \{/, /&:hover \{/, /\.btn-quiet \{/, /\.btn-quiet:hover \{/, /\.btn-icon \{/, /\.btn-lg \{/, /\.btn-block \{/, /\.app \.btn:focus-visible \{/]) expect(css).toMatch(sel);
+    for (const sel of [".btn{", ".btn:hover{", ".btn-primary{", ".btn-primary:hover{", ".btn-quiet{", ".btn-quiet:hover{", ".btn-icon{", ".btn-lg{", ".btn-block{", ".app .btn:focus-visible{"]) expect(skin).toContain(sel);
   });
   it("link form sizes border-box like the button form (the helmet's .app * reset)", () => {
-    expect(css.replace(/\/\*[\s\S]*?\*\//g, "")).toMatch(/\.btn \{[^}]*box-sizing: border-box;/);
+    expect(skin).toMatch(/\.app \*,\.app \*::before,\.app \*::after\{box-sizing:border-box\}/);
     const style = document.createElement("style");
-    style.textContent = css;
+    style.textContent = ".app *" + read("components/base.css").match(/\.app \*,\.app \*::before,\.app \*::after(\{[^}]*\})/)![1] + css; // jsdom cannot match the pseudo-element list; inject the helmet reset's declarations on .app *
     document.head.append(style);
     try {
       for (const props of [{ label: "Read", href: "/r" }, { label: "Go", href: "/g", block: true }, { icon: icon(), ariaLabel: "Menu", href: "/m" }]) {
         const a = renderButton(props);
-        document.body.append(a);
+        const app = document.createElement("div"); app.className = "app"; app.append(a); document.body.append(app);
         expect(a.tagName).toBe("A");
         expect(getComputedStyle(a).boxSizing).toBe("border-box");
-        a.remove();
+        app.remove();
       }
     } finally {
       style.remove();
@@ -123,7 +124,7 @@ describe("button.css", () => {
   it("paints only from tokens: no raw colour literals", () => {
     const noComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
     expect(noComments).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);
-    for (const t of ["--target", "--radius-m", "--t-15", "--t-16", "--line-2", "--glass-hi", "--ink", "--ink-2", "--field", "--primary", "--primary-hi", "--on-primary", "--line", "--focus"]) expect(noComments).toContain(`var(${t})`);
+    for (const t of ["--edge-control", "--ink", "--primary", "--primary-hi", "--on-primary", "--line", "--focus"]) expect(skin).toContain(`var(${t})`);
   });
   it("uses only tokens that ui-next/tokens.css defines", () => {
     const tokens = read("tokens.css");
