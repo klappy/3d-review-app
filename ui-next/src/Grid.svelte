@@ -1,7 +1,7 @@
 <!-- UI Next (v4) Grid. Status: provisional. Light DOM, literal contract classes (design-system.md section 8.1), no <style>, no inline style.
-     A track template, gap only: cols 2..4 (data-cols) or a named template (data-tpl, barbell = 220px 1fr 220px). -->
+     A track template, gap only: cols 2..4 (data-cols) or a named template (data-tpl, barbell = 220px 1fr 220px; hero-landing = 1fr 440px, hero-about = 1fr 380px, from base.css gen.EXTRA). -->
 <script module>
-  export const TEMPLATES = Object.freeze(["barbell"]);
+  export const TEMPLATES = Object.freeze(["barbell", "hero-landing", "hero-about"]);
 </script>
 <script>
   import { gapAttr } from "./gap.js";

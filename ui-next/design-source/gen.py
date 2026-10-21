@@ -2,8 +2,17 @@ import json, os, html, re
 HELMET = open(os.path.join(os.path.dirname(__file__), 'helmet.html')).read()
 # extra rules shared by the new boards, appended inside the helmet
 EXTRA = """
+/* §1.2 Type scale rows the marketing/read boards use (auggie-next-type-2300, provisional): were board inlines, pixels unchanged */
+.app .lead,.app .small.lead{font-size:var(--t-18);line-height:28px}
+.app .body-16,.app .small.body-16{font-size:var(--t-16);line-height:26px}
+.app .t-15,.app .small.t-15{font-size:var(--t-15)}.app .t-16,.app .small.t-16{font-size:var(--t-16)}
+.app .display-tight,.app .display.display-tight{font-size:var(--t-56);line-height:54px}/* .app-scoped (+ .small/.display compound) so the row wins over the base type classes in any sheet order */
+.cap-row{border-left:var(--accent-bar) solid var(--lens);padding:2px 0 2px 12px}
+.cap-name{font-weight:600;font-size:var(--t-15)}
+/* §2 Perspective card (auggie-next-skin2-2105, provisional): a perspective's own card draws its accent bar from [data-lens]; was a board inline */
+.glass[data-lens],.glass-hi[data-lens],.l-card[data-lens]{border-top:var(--accent-bar) solid var(--lens)}
 /* §8 Layouts primitives (auggie-layouts-s2-1540, provisional): spacing between siblings is the parent's gap */
-.app{--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;--sp-7:48px;--gutter:32px;--page-max:1120px;--page-max-narrow:880px;--page-max-read:520px}
+.app{--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;--sp-7:48px;--sp-8:72px;--gutter:32px;--page-max:1120px;--page-max-narrow:880px;--page-max-read:520px}
 .app[data-w=phone]{--gutter:16px;--page-max:100%;--page-max-narrow:100%;--page-max-read:100%}
 .l-page{width:100%;max-width:var(--page-max);margin:0 auto;display:flex;flex-direction:column;gap:var(--sp-5)}
 .l-page[data-w=narrow]{max-width:var(--page-max-narrow)}.l-page[data-w=read]{max-width:var(--page-max-read)}
@@ -16,7 +25,20 @@ EXTRA = """
 .l-stack{display:flex;flex-direction:column;gap:var(--g)}
 .l-row{display:flex;align-items:center;gap:var(--g)}
 .l-grid{display:grid;gap:var(--g)}
-[data-gap="1"]{--g:var(--sp-1)}[data-gap="2"]{--g:var(--sp-2)}[data-gap="3"]{--g:var(--sp-3)}[data-gap="4"]{--g:var(--sp-4)}[data-gap="5"]{--g:var(--sp-5)}[data-gap="6"]{--g:var(--sp-6)}[data-gap="7"]{--g:var(--sp-7)}
+/* §8 Grid named hero templates (auggie-next-comp-2115, provisional): two-track hero, 64px track gap, centred */
+.l-grid[data-tpl=hero-landing]{grid-template-columns:1fr 440px;gap:64px;align-items:center}.l-grid[data-tpl=hero-about]{grid-template-columns:1fr 380px;gap:64px;align-items:center}
+[data-gap="1"]{--g:var(--sp-1)}[data-gap="2"]{--g:var(--sp-2)}[data-gap="3"]{--g:var(--sp-3)}[data-gap="4"]{--g:var(--sp-4)}[data-gap="5"]{--g:var(--sp-5)}[data-gap="6"]{--g:var(--sp-6)}[data-gap="7"]{--g:var(--sp-7)}[data-gap="8"]{--g:var(--sp-8)}
+/* §8.2 marketing-page rhythm (auggie-next-rhythm-2235, captain 2026-10-20 22:29 ET, provisional): page padding + section gap read --rhythm */
+.l-main[data-rhythm=marketing]{gap:var(--sp-8);padding:var(--sp-8) 0 64px}.l-main[data-rhythm=read]{gap:var(--sp-7);padding:var(--sp-7) 0 64px}
+/* §9 phone hero card + list card paddings (were pcard/glass inlines) */
+.l-card[data-pad=hero]{border-radius:var(--radius-xl);padding:28px 24px;display:flex;flex-direction:column}.l-card[data-pad=list]{border-radius:var(--radius-l);padding:8px 18px;display:flex;flex-direction:column}
+details.dd>summary.dd-row{display:flex;justify-content:space-between;align-items:center;min-height:48px;font-weight:600;font-size:var(--t-15)}
+/* §2 Media card (captain 2026-10-20 22:29 ET, provisional): 16:10 dark frame, play affordance, title · duration line, caption */
+.l-media{border-radius:var(--radius-xl);padding:20px;display:flex;flex-direction:column;gap:14px}
+.l-media-frame{aspect-ratio:16/10;border-radius:var(--radius-l);background:var(--ink);display:grid;place-items:center;color:var(--ground);position:relative;overflow:hidden}
+.l-media-frame>video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.l-media-play{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.14);color:var(--field)}
+.l-media-title{position:absolute;left:16px;bottom:14px;color:rgba(255,255,255,.8)}
 details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}details.dd>summary::-webkit-details-marker{display:none}
 .menu{position:absolute;right:0;top:52px;width:300px;border-radius: var(--radius-l);padding:8px;display:flex;flex-direction:column;gap:2px;z-index:5}
 .mi{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius: var(--radius-m);text-decoration:none;color:var(--ink);font-weight:600;font-size: var(--t-15);background:transparent;border:0;font-family:inherit;cursor:pointer;text-align:left;width:100%}

@@ -1,4 +1,4 @@
 
 /* Additions (not yet in the generator; contract design-system.md 8.1 Card and Grid rows): Card radius + inner padding, Grid data-cols and the named barbell template. */
-.l-card{border-radius:var(--radius-l);padding:var(--sp-5)}.app[data-w=phone] .l-card{padding:var(--sp-4)}
+.l-card:not([data-pad]){border-radius:var(--radius-l);padding:var(--sp-5)}.app[data-w=phone] .l-card:not([data-pad]){padding:var(--sp-4)}
 .l-grid[data-cols="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}.l-grid[data-cols="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}.l-grid[data-cols="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}.l-grid[data-tpl=barbell]{grid-template-columns:220px 1fr 220px}

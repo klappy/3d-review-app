@@ -37,7 +37,7 @@ describe("copy/rachel.js is generated from the cookbook generator, byte for byte
     ].join("\n");
     expect(emit(parse(py))).toBe(readFileSync(resolve(__dirname, "../ui-next/src/copy/rachel.js"), "utf8"));
   });
-  it("C01-C12 are Rachel's paragraphs word for word; C12 in full (cookbook current-ui-copy RULING option 2)", () => {
+  it("C01-C12 are Rachel's paragraphs word for word; C12 in full, trajectory clause included (cookbook current-ui-copy RULING option 2)", () => {
     expect(paras.length).toBe(16);
     for (const s of [R.C01, R.C02, R.LEARN_MORE, R.HOW_IT_WORKS]) expect(paras).toContain(s);
     for (const [k, label] of [["team", "Translation Team"], ["community", "Community"], ["church", "Church"]]) expect(paras).toContain(`${label}: ${R.CAPS[k]}`);
@@ -45,6 +45,8 @@ describe("copy/rachel.js is generated from the cookbook generator, byte for byte
     for (const [t, d] of R.WHO.slice(0, 2)) { expect(paras).toContain(t); expect(paras).toContain(d); }
     expect(paras).toContain(R.WHO[2][0]);
     expect(paras).toContain(R.WHO[2][1]);
+    expect(R.WHO[2][1]).toBe("Repeat when a new assessment would be useful, or over increments of time to create a trajectory");
+    for (const p of [{}, { phone: true }]) expect(text(mount(About, p))).toContain(R.WHO[2][1]);
   });
 });
 
@@ -71,15 +73,22 @@ describe("About renders as the boards draw it", () => {
     expect(a.querySelector("header.top[data-variant=signed-in]")).not.toBeNull();
     expect(text(a.querySelector("h1.display")!)).toBe("How can we know that it's good enough?");
     expect(a.querySelectorAll(".l-grid[data-cols='3'] > .l-card").length).toBe(3);
+    // §2 Perspective card (cookbook @8d741b2): data-lens sits on the card, not on its heading
+    expect([...a.querySelectorAll(".l-grid[data-cols='3'] > .l-card")].map((c) => c.getAttribute("data-lens"))).toEqual(["team", "community", "church"]);
+    expect(a.querySelectorAll(".l-grid[data-cols='3'] .l-card [data-lens]").length).toBe(0);
+    // captain ruling 2026-10-20 21:32 ET: card headings capitalized on every word (About and AboutPhone)
+    const HEADS = ["The Translation Team", "The Community", "The Church"];
+    expect([...a.querySelectorAll(".l-grid[data-cols='3'] > .l-card .h2")].map(text)).toEqual(HEADS);
     const p = mount(About, { phone: true });
     expect(p.querySelector(".phone-top[data-state=nested] .phone-title")!.textContent).toBe("About");
     expect(text(p.querySelector("h1.title-phone")!)).toBe("Why 3D Review exists");
+    expect([...p.querySelectorAll(".cap-row[data-lens] .cap-name")].map(text)).toEqual(HEADS);
     expect(text(p.querySelector(".phone-bar .btn-primary")!)).toBe("Take the tour");
   });
 });
 
 describe("Landing renders as the boards draw it", () => {
-  it("desktop: public top bar, C01 hero, C02 lead, primary sample review, perspectives, four steps, FAQ disclosures closed, About link", () => {
+  it("desktop: public top bar, C01 hero, C02 lead, primary sample review, perspectives, four steps, FAQ disclosures closed, no About link (no board draws one)", () => {
     const a = mount(Landing, {});
     expect(a.querySelector("header.top[data-variant=public]")).not.toBeNull();
     expect(text(a.querySelector("h1.display")!)).toBe(R.C01);
@@ -90,7 +99,7 @@ describe("Landing renders as the boards draw it", () => {
     const faq = [...a.querySelectorAll("details.disc")] as HTMLDetailsElement[];
     expect(faq.length).toBe(4);
     expect(faq.every((d) => !d.open)).toBe(true);
-    expect(a.querySelector("a[href='?screen=about']")).not.toBeNull();
+    expect(a.querySelector("a[href='?screen=about']")).toBeNull();
   });
   it("phone: public phone header with Sign in, C01/C02 hero, FAQ as disclosures (not .dd), sample review in the bar", () => {
     const a = mount(Landing, { phone: true });
@@ -100,7 +109,7 @@ describe("Landing renders as the boards draw it", () => {
     expect(a.querySelectorAll("details.disc").length).toBe(4);
     expect(a.querySelector("details.dd")).toBeNull();
     expect(text(a.querySelector(".phone-bar .btn-primary")!)).toBe("Try the sample review");
-    expect(a.querySelector("a[href='?screen=about']")).not.toBeNull();
+    expect(a.querySelector("a[href='?screen=about']")).toBeNull();
   });
 });
 
@@ -171,5 +180,54 @@ describe("/next/ routes for About and Landing", () => {
   });
   it("Home's account menu reaches About", () => {
     expect(ACCOUNT_ITEMS.find((i: { label?: string }) => i.label === "Why 3D Review exists").href).toBe("?screen=about");
+  });
+});
+
+describe("rhythm and Media card (captain ruling 2026-10-20 22:29 ET; design-system.md 8.2 --sp-8, section 2 Media card)", () => {
+  it("Landing desktop main carries the marketing rhythm; About the read rhythm; phone none", () => {
+    expect(mount(Landing, {}).querySelector("main.l-main")!.getAttribute("data-rhythm")).toBe("marketing");
+    expect(mount(About, {}).querySelector("main.l-main")!.getAttribute("data-rhythm")).toBe("read");
+    expect(mount(Landing, { phone: true }).querySelector("main")!.hasAttribute("data-rhythm")).toBe(false);
+  });
+  it("Landing hero media card: placeholder frame with play + title · duration line + caption when no src", () => {
+    const m = mount(Landing, {}).querySelector(".l-media")!;
+    expect(m.querySelector(".l-media-frame .l-media-play")).not.toBeNull();
+    expect(m.querySelector("video")).toBeNull();
+    expect(text(m.querySelector(".l-media-title")!)).toBe("What 3D Review is · 2:10");
+    expect(text(m.querySelector(".l-media-frame + p.small")!)).toContain("One short video");
+  });
+  it("Landing media card plays a Transcode proxy URL when videoSrc is given", () => {
+    const m = mount(Landing, { videoSrc: "https://transcode.example/v/intro.mp4" }).querySelector(".l-media")!;
+    expect(m.querySelector("video")!.getAttribute("src")).toBe("https://transcode.example/v/intro.mp4");
+    expect(m.querySelector(".l-media-play")).toBeNull();
+  });
+  it("phone twins: hero card pad=hero, LandingPhone FAQ card pad=list, the 44px mark inside the LandingPhone hero card (board is the design)", () => {
+    const lp = mount(Landing, { phone: true });
+    expect(lp.querySelector(".l-card[data-pad=hero] h1.title-phone")).not.toBeNull();
+    const mk = lp.querySelector(".l-card[data-pad=hero] > div:first-child svg") as SVGElement;
+    expect(mk).not.toBeNull();
+    expect(mk.getAttribute("width")).toBe("44");
+    expect(lp.querySelectorAll(".l-card[data-pad=list] details.disc").length).toBe(4);
+    expect(mount(About, { phone: true }).querySelector(".l-card[data-pad=hero]")).not.toBeNull();
+  });
+});
+
+describe("type rows (design-system.md section 1.2, auggie-next-type-2300)", () => {
+  it("About: display-tight h1, lead C02, body-16 read body, t-15 facet captions; AboutPhone: t-16 C02, three cap-row captions", () => {
+    const a = mount(About, {});
+    expect(a.querySelector("h1.display.display-tight")).not.toBeNull();
+    expect(text(a.querySelector("p.lead")!)).toBe(R.C02);
+    expect(a.querySelectorAll("p.small.body-16").length).toBe(3);
+    expect(a.querySelectorAll(".l-card[data-lens] p.small.t-15").length).toBe(3);
+    const p = mount(About, { phone: true });
+    expect(text(p.querySelector("p.t-16")!)).toBe(R.C02);
+    expect([...p.querySelectorAll(".cap-row[data-lens] .cap-name")].map(text)).toEqual(["The Translation Team", "The Community", "The Church"]);
+  });
+  it("Landing: small.lead C02, t-15 perspective captions and FAQ answers; LandingPhone: small.t-15 C02", () => {
+    const a = mount(Landing, {});
+    expect(text(a.querySelector("p.small.lead")!)).toBe(R.C02);
+    expect(a.querySelectorAll(".l-grid[data-cols='3'] p.small.t-15").length).toBe(3);
+    expect(a.querySelectorAll("details.disc p.small.t-15").length).toBe(4);
+    expect(text(mount(Landing, { phone: true }).querySelector("p.small.t-15")!)).toBe(R.C02);
   });
 });
