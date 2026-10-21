@@ -5,6 +5,7 @@
      FAQ rows are Disclosures (design-system.md V-12 moves LandingPhone's .dd accordions to .disc). One .btn-primary: "Try the sample review"
      (desktop hero; phone: the phone-bar). No About link: no Landing board draws one (cook auggie-next-type-2300). Type sizes use the section 1.2 type rows (.lead, .t-15). -->
 <script>
+  import { screenHref } from "../route.js";
   import AppShell from "../AppShell.svelte";
   import Page from "../Page.svelte";
   import Mark from "../Mark.svelte";
@@ -25,7 +26,8 @@
 
   // videoSrc: the intro video through the Transcode proxy (generate_transcode_url) once it exists; absent = placeholder frame (Media card contract).
   let { phone = false, theme = "light", videoSrc } = $props();
-  const SELF = "?screen=landing", SAMPLE = "#results", VIDEO = "#video", CODE = "#survey-code", HELP = "#help";
+  let SELF = $derived(screenHref("landing", { phone, theme }));
+  const SAMPLE = "#results", VIDEO = "#video", CODE = "#survey-code", HELP = "#help";
   const PERSPECTIVES = [
     ["team", "Translation team", "How the team prepares, reviews and decides a passage is ready."],
     ["community", "Community", "Whether people understand, trust and use the translation."],
