@@ -1,11 +1,13 @@
 <!-- UI Next (v4) Button. Status: provisional. Light DOM, literal contract classes, no <style>.
      Contract: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas/design-system.md section 2, Button row.
-     Ported states: default and hover (CSS). disabled waits on V-41. -->
+     Ported states: default and hover (CSS); disabled = the native disabled attribute, styled by the helmet's .btn:disabled / .btn-primary:disabled
+     (design-system.md section 2 "Field and button states", R16 Disabled). A link cannot be disabled. -->
 <script>
   const VARIANT_CLASS = { secondary: "", primary: "btn-primary", quiet: "btn-quiet" };
-  let { label, variant = "secondary", icon, ariaLabel, lead, trail, lg = false, block = false, href, ...rest } = $props();
+  let { label, variant = "secondary", icon, ariaLabel, lead, trail, lg = false, block = false, href, disabled = false } = $props();
   if (!Object.hasOwn(VARIANT_CLASS, variant)) throw new TypeError(`Button: unknown variant "${variant}"`);
-  if ("disabled" in rest) throw new TypeError("Button: the disabled state is not in the ported contract yet");
+  if (typeof disabled !== "boolean") throw new TypeError("Button: disabled is true or false");
+  if (disabled && href) throw new TypeError("Button: a link cannot be disabled (render a button, or leave it enabled)");
   const iconOnly = $derived(icon !== undefined && icon !== null);
   const name = $derived(typeof ariaLabel === "string" ? ariaLabel.trim() : "");
   if (iconOnly && !name) throw new TypeError("Button: an icon-only button needs an aria-label");
@@ -20,5 +22,5 @@
 {#if href}
   <a {@attach decorate} class={cls} {href} aria-label={name || undefined}>{#if iconOnly}{@render icon()}{:else}{@render lead?.()}{label}{@render trail?.()}{/if}</a>
 {:else}
-  <button {@attach decorate} class={cls} type="button" aria-label={name || undefined}>{#if iconOnly}{@render icon()}{:else}{@render lead?.()}{label}{@render trail?.()}{/if}</button>
+  <button {@attach decorate} class={cls} type="button" aria-label={name || undefined} disabled={disabled || undefined}>{#if iconOnly}{@render icon()}{:else}{@render lead?.()}{label}{@render trail?.()}{/if}</button>
 {/if}
