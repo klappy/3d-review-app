@@ -1,0 +1,63 @@
+{
+ "_source": "Mock data for MenuPhone (cookbook design/2026-10-15-glass-redesign/canvas): HomePhone under the account sheet. Status: provisional.",
+ "who": "Bincy K · bincy@bcs.org.in",
+ "invitation": "Seed Company · partners",
+ "chips": [
+  "BCS · India",
+  "Mine"
+ ],
+ "reviews": [
+  {
+   "project": "Hindi New Testament",
+   "title": "Mark 1–4 draft",
+   "stage": "collecting",
+   "meta": "18 of 30 responses · open until 31 Oct",
+   "action": "Share the survey"
+  },
+  {
+   "project": "Lao Old Testament",
+   "title": "Genesis audio check",
+   "stage": "setup",
+   "meta": "Step 3 of 5 · Who will participate?",
+   "action": "Continue setup"
+  },
+  {
+   "project": "Hindi New Testament",
+   "title": "Luke 1–2 community review",
+   "stage": "results",
+   "meta": "24 responses · closed 12 Sep",
+   "action": "Read the results"
+  }
+ ],
+ "completed": 2,
+ "items": [
+  [
+   "people",
+   "BCS · India — switch workspace"
+  ],
+  [
+   "mail",
+   "Invitations · 1 new"
+  ],
+  [
+   "help",
+   "Help and FAQ"
+  ],
+  [
+   "sparkle",
+   "Why 3D Review exists"
+  ],
+  [
+   "pen",
+   "Send app feedback"
+  ],
+  [
+   "people",
+   "Use another account"
+  ],
+  [
+   "out",
+   "Sign out"
+  ]
+ ]
+}
