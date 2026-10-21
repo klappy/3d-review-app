@@ -62,9 +62,9 @@
         <Row split gap={3}>
           {#if backHref}<Button label="Back" variant="quiet" href={backHref} lead={back} />{:else}<span></span>{/if}
           {#if next.blocked}
-            <!-- R16 V-41: a blocked primary says why beside it. The shared Button renders the native disabled attribute and takes no
-                 aria-describedby, so the reason is the text just before it in reading order (handed back, RESULTS-setup.md Round 2). -->
-            <Row gap={3}><span class="small" id="cont-why">{next.blocked}</span><Button {label} variant="primary" lg disabled trail={arrow} /></Row>
+            <!-- R16 V-41: a blocked primary says why beside it: the reason is the text just before it in reading order, and the shared
+                 Button (registry f3c4238) ties it to the disabled Continue with aria-describedby="cont-why" (setup N7). -->
+            <Row gap={3}><span class="small" id="cont-why">{next.blocked}</span><Button {label} variant="primary" lg disabled ariaDescribedby="cont-why" trail={arrow} /></Row>
           {:else}<Button {label} variant="primary" lg href={nextHref} trail={arrow} />{/if}
         </Row>
       </section>

@@ -145,6 +145,8 @@ describe("key copy and data, per board", () => {
     expect(go.disabled).toBe(true);
     expect(go.textContent).toBe("Continue");
     expect(go.previousElementSibling!.textContent).toBe("Name what people will respond to first.");
+    expect(go.getAttribute("aria-describedby")).toBe("cont-why");
+    expect(a.querySelector(`#${go.getAttribute("aria-describedby")}`)).toBe(go.previousElementSibling);
     const file = a.querySelector("input[type=file]") as HTMLInputElement;
     expect(file.accept).toBe(".usfm,.sfm,.usx,.pdf,.mp3");
     // F4: the chooser is a focusable button (helmet .app button:focus-visible ring) that opens the one hidden file input.
