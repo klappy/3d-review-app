@@ -2,19 +2,24 @@
 // UI Next (v4) collect lane screens (status: provisional): collect, close-collection, qr-room, print-qr.
 // Boards: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas Collect, CollectPhone, CollectMenu, CollectMenuPhone, CollectDark,
 // CloseCollection, CloseCollectionPhone, QRRoom, QRRoomPhone, PrintQR, PrintQRPhone (.dc.html); contract canvas/design-system.md
-// (§2 Room health, Offline actions, Dialog and sheet states, Top bar variants); data ui-next/fixtures/collect/collect.json.
-import { describe, expect, it } from "vitest";
+// (§2 Room health, Offline actions, Dialog and sheet states (R14), Field and button states (R16), Top bar variants); data
+// ui-next/fixtures/collect/collect.json (one source per value). Links come from the shared screens/href.js, which carries ?w= and ?theme=
+// from location.search: each render sets the URL the route would have (at()).
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { render } from "@testing-library/svelte";
+import { createRawSnippet, flushSync } from "svelte";
+import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import Collect from "../ui-next/src/screens/collect/Collect.svelte";
 import CloseCollection from "../ui-next/src/screens/collect/CloseCollection.svelte";
 import QRRoom from "../ui-next/src/screens/collect/QRRoom.svelte";
 import PrintQR from "../ui-next/src/screens/collect/PrintQR.svelte";
+import Dialog from "../ui-next/src/screens/collect/Dialog.svelte";
 import fixture from "../ui-next/fixtures/collect/collect.json";
 // @ts-expect-error -- plain .js module, no type declarations
 import collect from "../ui-next/src/screens/collect/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { collectModel, stageTabs, pct, href, qrModules } from "../ui-next/src/screens/collect/model.js";
+import { collectModel, stageTabs, pct, pickState, pickSurvey, printPages, pagesLabel } from "../ui-next/src/screens/collect/model.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { REGISTRY } from "../ui-next/src/screens/registry.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -25,10 +30,21 @@ import { STAGES } from "../ui/stage-screens.js";
 import { lintDir } from "../scripts/ui-next-lint.mjs";
 
 type Props = Record<string, unknown>;
+const LANE = resolve(__dirname, "../ui-next/src/screens/collect");
+// The URL the route would be at for these props (href() reads ?w= and ?theme= from it).
+const at = (props: Props = {}) => {
+  const q = new URLSearchParams({ ui_next: "on", screen: "x" });
+  if (props.phone) q.set("w", "phone");
+  if (props.theme) q.set("theme", String(props.theme));
+  window.history.replaceState(null, "", `/next/?${q}`);
+};
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const shot = (C: any, props: Props = {}) => render(C, { props }).container.querySelector(".app") as HTMLElement;
+const shot = (C: any, props: Props = {}) => { at(props); return render(C, { props }).container.querySelector(".app") as HTMLElement; };
 const text = (el: Element | null) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
 const all = (a: ParentNode, sel: string) => [...a.querySelectorAll(sel)].map(text);
+// The links under sel (jsdom's selector engine misreads [href='…=…&…'] values, so match hrefs in JS).
+const links = (a: ParentNode, sel: string) => [...a.querySelectorAll(sel)].map((e) => e.getAttribute("href"));
+afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); });
 
 // Every board in the lane: [board, component, props, the query that reaches it under the flag]
 const BOARDS: [string, unknown, Props, string][] = [
@@ -62,19 +78,59 @@ describe("collect lane registry and routes", () => {
   }
 });
 
-describe("every board renders: shell, at most one primary, no inline style", () => {
+describe("every board renders: shell, exactly one h1, at most one primary, no inline style", () => {
   for (const [board, C, props] of BOARDS) {
     it(board, () => {
       const a = shot(C, props);
       expect(a.matches(".app")).toBe(true);
       expect(a.getAttribute("data-theme")).toBe((props.theme as string) ?? "light");
       expect(a.getAttribute("data-w")).toBe(props.phone ? "phone" : null);
+      expect(a.querySelectorAll("h1").length).toBe(1);
       expect(a.querySelectorAll(".btn-primary").length).toBeLessThanOrEqual(1);
       expect(a.querySelector("[style]")).toBeNull();
       if (props.phone) { expect(a.querySelector(".phone-top")).not.toBeNull(); expect(a.querySelector("header.top")).toBeNull(); }
       else expect(a.querySelector("header.top")).not.toBeNull();
     });
   }
+  it("an unknown ?state= renders the default state, never throws (every screen, desktop and phone)", () => {
+    for (const C of [Collect, CloseCollection, QRRoom, PrintQR]) for (const phone of [false, true]) for (const state of ["busy", "9", "0", "", "menu-x"]) {
+      expect(() => shot(C, { phone, state })).not.toThrow();
+      cleanup();
+    }
+    expect(shot(Collect, { state: "busy" }).querySelector("details.dd[open]")).toBeNull();
+    cleanup();
+    expect(text(shot(QRRoom, { phone: true, state: "9" }).querySelector("h1"))).toBe("Community");
+  });
+});
+
+describe("links: the shared href(), registered names, carried ?w= and ?theme=", () => {
+  it("desktop: tabs, crumb, menu, aside, offline and survey-row links name the fanout's screens", () => {
+    const a = shot(Collect, { theme: "dark" });
+    expect([...a.querySelectorAll("nav.tabs .tab")].map((t) => t.getAttribute("href"))).toEqual(["setup5", "collect", "results", "next-step"].map((s) => `?ui_next=on&screen=${s}&theme=dark`));
+    expect(a.querySelector("nav.crumb a")!.getAttribute("href")).toBe("?ui_next=on&screen=project&theme=dark");
+    expect(a.querySelector("header.top a.brand")!.getAttribute("href")).toBe("?ui_next=on&screen=home&theme=dark");
+    expect(a.querySelector("[aria-label='QR code for Community']")!.getAttribute("href")).toBe("?ui_next=on&screen=qr-room&theme=dark");
+    expect(links(a, "#offline a")).toEqual(["print", "print-qr", "paper-entry"].map((s) => `?ui_next=on&screen=${s}&theme=dark`));
+    expect(links(a, "main .menu a.mi")).toEqual(["setup1", "people", "close-collection", "collect"].map((s) => `?ui_next=on&screen=${s}&theme=dark`).map((h, i) => (i === 3 ? `${h}#offline` : h)));
+  });
+  it("phone: the avatar opens the actions lane's MenuPhone sheet (menu), ⋯ opens the sheet state, each row's QR opens that survey", () => {
+    const a = shot(Collect, { phone: true });
+    expect(a.querySelector(".phone-top [aria-label='Workspace and account']")!.getAttribute("href")).toBe("?ui_next=on&screen=menu&w=phone");
+    expect(a.querySelector("[aria-label='More actions']")!.getAttribute("href")).toBe("?ui_next=on&screen=collect&w=phone&state=menu");
+    expect(a.querySelector("[aria-label='QR for Community']")!.getAttribute("href")).toBe("?ui_next=on&screen=qr-room&w=phone&state=3");
+    expect(a.querySelector(".phone-bar .btn")!.getAttribute("href")).toBe("?ui_next=on&screen=share&w=phone");
+    cleanup();
+    const q = shot(QRRoom, { phone: true });
+    expect(q.querySelector(".phone-top [aria-label='Workspace and account']")!.getAttribute("href")).toBe("?ui_next=on&screen=menu&w=phone");
+    expect(q.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=qr-room&w=phone&state=4");
+  });
+  it("no lane-local link builder and no menu-phone name left", () => {
+    for (const f of readdirSync(LANE)) {
+      const src = readFileSync(resolve(LANE, f), "utf8");
+      expect(src, f).not.toMatch(/menu-phone/);
+      if (/href\(/.test(src) && f !== "model.js") expect(src, f).toMatch(/from "\.\.\/href\.js"/);
+    }
+  });
 });
 
 describe("Collect (Collect, CollectPhone, CollectMenu, CollectMenuPhone, CollectDark)", () => {
@@ -90,6 +146,7 @@ describe("Collect (Collect, CollectPhone, CollectMenu, CollectMenuPhone, Collect
     expect(text(a.querySelector(".btn-primary"))).toBe("Share the survey");
     expect(all(a, "h2.h2")).toEqual(["Responses"]);
     expect(all(a, ".num[data-size='40']")).toEqual(["18"]);
+    expect(text(a.querySelector(".num[data-size='40'] + .small"))).toBe("of 30 expected · updated just now");
     expect(all(a.querySelector("[role=status]")!, ":scope > *")).toEqual(["38 surveys opened in the last minute", "6 opens turned away"]);
     expect(a.querySelector("[role=status]")!.getAttribute("aria-live")).toBe("polite");
     expect(a.querySelector(".tag[data-kind=warn]")).not.toBeNull();
@@ -100,7 +157,13 @@ describe("Collect (Collect, CollectPhone, CollectMenu, CollectMenuPhone, Collect
     expect(all(a, "[data-tpl=survey-row] .kbd")).toEqual(["3dreview.app/s/K7Q4F2", "3dreview.app/s/M3X9A1", "3dreview.app/s/P8L2W4", "3dreview.app/s/R5T7N2", "3dreview.app/s/D2C6H9"]);
     expect(all(a, ".l-row.l-row > .small.tab-n, .l-row > span.small.tab-n")).toEqual(["6 of 8 expected", "8 of 15 expected", "4 of 7 expected"]);
     expect([...a.querySelectorAll(".bar rect")].map((r) => r.getAttribute("width"))).toEqual(["80%", "66%", "53%", "60%", "50%"]);
-    expect(a.querySelector("[aria-label='QR code for Community']")!.getAttribute("href")).toBe("?screen=qr-room");
+  });
+  it("the updated line has one source: the review's updated value feeds the head and the Responses line", () => {
+    const d = structuredClone(fixture);
+    d.review.updated = "2 min ago";
+    const a = shot(Collect, { data: d });
+    expect(text(a.querySelector("main p.small.t-15"))).toBe("Hindi New Testament · Hindi · Written · Updated 2 min ago");
+    expect(text(a.querySelector(".num[data-size='40'] + .small"))).toBe("of 30 expected · updated 2 min ago");
   });
   it("desktop aside: survey window, the one offline home with three actions, the passage", () => {
     const a = shot(Collect);
@@ -108,11 +171,12 @@ describe("Collect (Collect, CollectPhone, CollectMenu, CollectMenuPhone, Collect
     expect(a.textContent).toContain("28 Sep – 31 Oct · 33 days left");
     expect(a.textContent).toContain("Results open on 31 Oct, or earlier if you close collection from the ⋯ menu.");
     expect(all(a, "#offline .btn")).toEqual(["Print surveys", "Print QR pages", "Enter paper answers"]);
-    expect(a.querySelector("#offline a[href='?screen=print-qr']")).not.toBeNull();
     expect(a.textContent).toContain("Read or play Mark 1–4 to everyone answering. The survey shows it too.");
   });
-  it("the ⋯ menu: closed by default, open in state menu; delete is refused with its reason, last after an hr", () => {
-    expect(shot(Collect).querySelector("details.dd:not([open]) summary[aria-label='More actions']")).not.toBeNull();
+  it("the ⋯ menu: a 44x44 .btn-icon summary, closed by default, open in state menu; delete is refused with its reason, last after an hr", () => {
+    const s = shot(Collect).querySelector("details.dd:not([open]) summary[aria-label='More actions']")!;
+    expect(s.className).toBe("btn btn-icon");
+    cleanup();
     const a = shot(Collect, { state: "menu" });
     const menu = a.querySelector("details.dd[open] .menu")!;
     expect(all(menu, ".mi")).toEqual(["Edit details and dates", "People with access", "Close collection now", "Meeting offline? Print and paper", "Delete this review"]);
@@ -120,45 +184,90 @@ describe("Collect (Collect, CollectPhone, CollectMenu, CollectMenuPhone, Collect
     expect(del.tagName).toBe("BUTTON");
     expect(del.getAttribute("aria-disabled")).toBe("true");
     expect(text(menu.querySelector(".mi-why"))).toBe("Reviews with responses can't be deleted. This one has 18.");
-    expect(menu.querySelector(".mi[href='?screen=close-collection']")).not.toBeNull();
-    expect(() => render(Collect, { props: { state: "busy" } })).toThrow(/unknown state/);
   });
-  it("phone: header root, compact stage words, hero card with 18 of 30 · 5 surveys, quiet room line, list rows, offline block, phone-bar primary", () => {
+  it("phone: header root, compact stage words, hero card with 18 of 30 · 5 surveys, the one room, list rows, offline block, phone-bar primary", () => {
     const a = shot(Collect, { phone: true });
     expect(a.querySelector(".phone-top[data-state=root]")).not.toBeNull();
     expect(text(a.querySelector("h1.title-phone"))).toBe("Mark 1–4 draft");
     expect(all(a, "nav.tabs .tab")).toEqual(["Prepare", "Collect", "Understand", "Improve"]);
     expect(all(a.querySelector(".l-card[data-pad=hero] .l-row")!, ":scope > *")).toEqual(["18", "of 30 · 5 surveys"]);
-    expect(all(a.querySelector("[role=status]")!, ":scope > *")).toEqual(["38 surveys opened in the last minute", "0 opens turned away"]);
-    expect(a.querySelector(".tag[data-kind=warn]")).toBeNull();
-    expect(a.textContent).not.toContain("Ask people on shared Wi-Fi");
+    expect(all(a.querySelector("[role=status]")!, ":scope > *")).toEqual(["38 surveys opened in the last minute", "6 opens turned away"]);
     expect(all(a, ".l-card .small.tab-n")).toEqual(["4/5", "2/3", "8/15", "3/5", "1/2"]);
+    expect([...a.querySelectorAll(".l-card .l-row > .l-row")].map((r) => r.querySelectorAll(".btn-icon").length)).toEqual([2, 2, 2, 2, 2]);
     expect(all(a, "#offline .btn")).toEqual(["Print surveys", "Print QR pages", "Enter paper answers"]);
+    expect([...a.querySelectorAll("#offline .btn")].every((b) => b.classList.contains("btn-block"))).toBe(true);
     expect(text(a.querySelector(".phone-bar .btn-primary"))).toBe("Share the survey");
-    expect(a.querySelector("[aria-label='More actions']")!.getAttribute("href")).toBe("?screen=collect&w=phone&state=menu");
     expect(a.querySelector("dialog")).toBeNull();
   });
-  it("phone menu (CollectMenuPhone): the ⋯ sheet over the card, labelled by the review title, delete refused", () => {
+  it("phone menu (CollectMenuPhone): the ⋯ sheet with handle, title row + Close, 52px rows, first row focused, delete refused", () => {
     const a = shot(Collect, { phone: true, state: "menu" });
-    const d = a.querySelector("dialog.glass-hi.sheet")!;
+    const d = a.querySelector("dialog.glass-hi.sheet[data-pad=menu]")!;
     expect(d.hasAttribute("open")).toBe(true);
+    expect(d.querySelector(".sheet-handle")!.getAttribute("aria-hidden")).toBe("true");
     expect(text(a.querySelector(`#${d.getAttribute("aria-labelledby")}`))).toBe("Mark 1–4 draft");
+    expect(d.querySelector("[aria-label=Close]")!.getAttribute("href")).toBe("?ui_next=on&screen=collect&w=phone");
     expect(all(d, ".mi")).toEqual(["Edit details and dates", "People with access", "Open the passage", "Meeting offline? Print and paper", "Close collection now", "Delete this review"]);
+    expect([...d.querySelectorAll(".mi")].every((r) => r.getAttribute("data-size") === "lg")).toBe(true);
+    expect(document.activeElement?.textContent).toBe("Edit details and dates");
     expect(d.querySelector(".mi.danger")!.getAttribute("aria-disabled")).toBe("true");
   });
 });
 
+describe("Dialog (R14 dismissal): title row + Close, Escape, a forced close and a click outside go to cancel", () => {
+  const title = createRawSnippet(() => ({ render: () => `<h2 id="t">Title</h2>` }));
+  const body = createRawSnippet(() => ({ render: () => `<p class="body">Body</p>` }));
+  const open = () => {
+    const navigate = vi.fn();
+    const { container } = render(Dialog, { props: { labelledby: "t", cancel: "?ui_next=on&screen=collect", title, children: body, navigate } });
+    return { d: container.querySelector("dialog")!, navigate };
+  };
+  it("the visible Close is a 44px .btn-icon link to cancel, at the end of the title row", () => {
+    const { d } = open();
+    const row = d.querySelector(".l-row[data-split]")!;
+    expect(row.firstElementChild!.id).toBe("t");
+    const x = row.lastElementChild!;
+    expect(x.getAttribute("aria-label")).toBe("Close");
+    expect(x.className).toBe("btn btn-quiet btn-icon");
+    expect(x.getAttribute("href")).toBe("?ui_next=on&screen=collect");
+  });
+  it("Escape (cancel) leaves the open state instead of stripping the page; a forced close does too, once", () => {
+    const { d, navigate } = open();
+    const ev = new Event("cancel", { cancelable: true });
+    d.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true);
+    d.dispatchEvent(new Event("close"));
+    expect(navigate.mock.calls).toEqual([["?ui_next=on&screen=collect"]]);
+  });
+  it("a click outside the dialog's rect (the backdrop) cancels; a click on its content does not", () => {
+    const { d, navigate } = open();
+    fireEvent.click(d.querySelector(".body")!);
+    expect(navigate).not.toHaveBeenCalled();
+    d.getBoundingClientRect = () => ({ left: 100, top: 100, right: 300, bottom: 300, width: 200, height: 200, x: 100, y: 100, toJSON: () => ({}) });
+    d.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 150, clientY: 150 }));
+    expect(navigate).not.toHaveBeenCalled();
+    d.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 20, clientY: 400 }));
+    expect(navigate).toHaveBeenCalledWith("?ui_next=on&screen=collect");
+  });
+  it("refuses a dialog without its cancel href or title", () => {
+    expect(() => render(Dialog, { props: { labelledby: "t", title } })).toThrow(/cancel/);
+    expect(() => render(Dialog, { props: { labelledby: "t", cancel: "?x" } })).toThrow(/title/);
+  });
+});
+
 describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
-  it("desktop: modal dialog with title, consequence, per-perspective counts, Keep collecting then the one primary", () => {
+  it("desktop: modal dialog with icon tile + title + Close, consequence, per-perspective counts, Keep collecting (focused) then the one primary", () => {
     const a = shot(CloseCollection);
     const d = a.querySelector("dialog.glass-hi:not(.sheet)")!;
     expect(d.hasAttribute("open")).toBe(true);
     expect(text(a.querySelector(`#${d.getAttribute("aria-labelledby")}`))).toBe("Close collection now?");
+    expect(d.querySelector("[aria-label=Close]")!.getAttribute("href")).toBe("?ui_next=on&screen=collect");
     expect(text(d.querySelector("p.small"))).toBe("Links and codes stop working and the review moves to Understand. 18 responses are in. You can reopen collection later — results refresh when you do.");
     expect(text(d.querySelector(".solid"))).toBe("Translation team 6 · Community 8 · Church 4. Every perspective has at least 3 answers, so results can show.");
-    expect(all(d, ".btn")).toEqual(["Keep collecting", "Yes, close and see results"]);
+    expect(all(d, ".btn:not(.btn-icon)")).toEqual(["Keep collecting", "Yes, close and see results"]);
+    expect(document.activeElement?.textContent).toBe("Keep collecting");
     expect(a.querySelectorAll(".btn-primary").length).toBe(1);
     expect(text(a.querySelector(".btn-primary"))).toBe("Yes, close and see results");
+    expect(a.querySelector(".btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=results");
     expect(text(a.querySelector("main .l-row > .l-row .btn:not(details .btn)"))).toBe("Share the survey");
   });
   it("the 3-answer line is said only when every perspective has 3 answers", () => {
@@ -167,21 +276,21 @@ describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
     const a = shot(CloseCollection, { data: thin });
     expect(text(a.querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 2.");
   });
-  it("phone: the sheet holds the primary; the phone bar's Share goes secondary; Keep collecting takes focus", () => {
+  it("phone: the sheet holds the primary; Close in its title row; the phone bar's Share goes secondary; Keep collecting takes focus", () => {
     const a = shot(CloseCollection, { phone: true });
     const d = a.querySelector("dialog.glass-hi.sheet")!;
     expect(text(d.querySelector("h2"))).toBe("Close collection now?");
+    expect(d.querySelector("[aria-label=Close]")!.getAttribute("href")).toBe("?ui_next=on&screen=collect&w=phone");
     expect(text(d.querySelector("p.small"))).toBe("18 of 30 expected have answered. Links stop working; you can reopen later.");
-    expect(all(d, ".btn")).toEqual(["Yes, close and see results", "Keep collecting"]);
+    expect(all(d, ".btn:not(.btn-icon)")).toEqual(["Yes, close and see results", "Keep collecting"]);
     expect(document.activeElement?.textContent).toBe("Keep collecting");
     expect(a.querySelector(".phone-bar .btn-primary")).toBeNull();
     expect(text(a.querySelector(".phone-bar .btn"))).toBe("Share the survey");
-    expect(() => render(CloseCollection, { props: { state: "busy" } })).toThrow(/one state/);
   });
 });
 
 describe("QRRoom (QRRoom, QRRoomPhone)", () => {
-  it("projector: room top bar (no menus, no help), heading, one perspective card per survey with its code and link, the room instruction", () => {
+  it("projector: room top bar (no menus, no help), heading, five tiles across, each survey's own code and link, the room instruction", () => {
     const a = shot(QRRoom);
     const top = a.querySelector("header.top[data-variant=room]")!;
     expect(top.querySelector("details, [aria-label=Help]")).toBeNull();
@@ -191,39 +300,50 @@ describe("QRRoom (QRRoom, QRRoomPhone)", () => {
     expect(all(top, ".tag:not([data-kind])")).toEqual(["18 answered"]);
     expect(all(top, ".btn")).toEqual(["Meeting offline? Print and paper", "Exit room view"]);
     expect(text(a.querySelector("h1.display"))).toBe("Scan the code for your role");
+    expect(a.querySelector("main .l-grid")!.getAttribute("data-cols")).toBe("5");
     const cards = [...a.querySelectorAll("main .glass-hi[data-lens]")];
     expect(cards.map((c) => c.getAttribute("data-lens"))).toEqual(["team", "team", "community", "church", "church"]);
     expect(cards.map((c) => text(c.querySelector(".h2")))).toEqual(["Translators", "Team leaders & mentors", "Everyone in the community", "Pastor involved in the work", "Denominational leader"]);
-    expect(cards.map((c) => c.querySelectorAll(".qr i").length)).toEqual([441, 441, 441, 441, 441]);
+    expect(cards.map((c) => c.querySelector(".qr")!.getAttribute("data-size"))).toEqual(["room", "room", "room", "room", "room"]);
+    const surveys = fixture.groups.flatMap((g) => g.surveys);
+    expect(cards.map((c) => [...c.querySelectorAll(".qr i")].map((i) => (i.classList.contains("o") ? "0" : "1")).join(""))).toEqual(surveys.map((s) => s.qr));
     expect(a.querySelector(".btn-primary")).toBeNull();
     expect(a.textContent).toContain("Survey not opening? Switch from the shared Wi-Fi to mobile data, or ask for a paper survey.");
   });
-  it("phone: nested header, survey 3 of 5 (Community), its code and short link, room health with the instruction, Previous / Next", () => {
+  it("phone: nested header, the survey name is the h1, survey 3 of 5 (Community) with its own code and link, the one room, Previous / Next", () => {
     const a = shot(QRRoom, { phone: true });
     expect(text(a.querySelector(".phone-top .phone-title"))).toBe("Show a QR code");
     expect(a.textContent).toContain("Survey 3 of 5");
-    expect(text(a.querySelector("main .h2"))).toBe("Community");
-    expect(text(a.querySelector("main .l-card p.small"))).toBe("Scan to open the Hindi survey3dr.app/s/C4K7P");
-    expect(a.querySelector(".qr[data-size=phone]")!.querySelectorAll("i.o").length).toBe([...fixture.qrRoomPhone.qr].filter((c) => c === "0").length);
+    expect(text(a.querySelector("h1.h2"))).toBe("Community");
+    expect(text(a.querySelector("main .l-card p.small"))).toBe("Scan to open the Hindi survey3dreview.app/s/P8L2W4");
+    const community = fixture.groups[1].surveys[0];
+    expect([...a.querySelectorAll(".qr[data-size=phone] i")].map((i) => (i.classList.contains("o") ? "0" : "1")).join("")).toBe(community.qr);
+    expect(all(a.querySelector("[role=status]")!, ":scope > *")).toEqual(["38 surveys opened in the last minute", "6 opens turned away"]);
     expect(a.textContent).toContain("Ask people on shared Wi-Fi to switch to mobile data, or hand out paper surveys.");
     expect(all(a, ".phone-bar .btn")).toEqual(["Previous", "Next survey"]);
-    expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?screen=qr-room&w=phone&state=4");
+    cleanup();
     const first = shot(QRRoom, { phone: true, state: "1" });
-    expect(text(first.querySelector("main .h2"))).toBe("Translators");
+    expect(text(first.querySelector("h1"))).toBe("Translators");
     expect(text(first.querySelector("main .l-card b"))).toBe("3dreview.app/s/K7Q4F2");
-    expect(() => render(QRRoom, { props: { phone: true, state: "9" } })).toThrow(/survey number/);
   });
 });
 
-describe("PrintQR (PrintQR, PrintQRPhone)", () => {
-  it("desktop: wide modal, pointer to Print paper surveys, five survey rows (three ticked), three layouts, language and paper fields, Print 3 pages, preview", () => {
+describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
+  const ticks = (root: ParentNode) => [...root.querySelectorAll("label.row-opt input.cb")].map((c) => (c as HTMLInputElement).checked);
+  it("desktop: wide modal, title focused (tabindex -1) with Close, pointer to Print paper surveys, five rows (three ticked), layouts, fields, Print 3 pages, preview", () => {
     const a = shot(PrintQR);
     const d = a.querySelector("dialog.glass-hi[data-w=wide]")!;
-    expect(text(a.querySelector(`#${d.getAttribute("aria-labelledby")}`))).toBe("Print QR code pages");
-    expect(d.querySelector("a.link[href='?screen=print']")!.textContent).toBe("Print paper surveys");
-    expect([...d.querySelectorAll("label.row-opt input.cb")].map((c) => (c as HTMLInputElement).checked)).toEqual([true, true, true, false, false]);
+    const h = a.querySelector(`#${d.getAttribute("aria-labelledby")}`)!;
+    expect(text(h)).toBe("Print QR code pages");
+    expect(h.getAttribute("tabindex")).toBe("-1");
+    expect(document.activeElement).toBe(h);
+    expect(d.querySelector("[aria-label=Close]")!.getAttribute("href")).toBe("?ui_next=on&screen=collect");
+    expect(links(d, "a.link")).toEqual(["?ui_next=on&screen=print"]);
+    expect(all(d, "a.link")).toEqual(["Print paper surveys"]);
+    expect(ticks(d)).toEqual([true, true, true, false, false]);
     expect(all(d, "label.row-opt.compact .kbd")).toEqual(["K7Q4F2", "M3X9A1", "P8L2W4", "R5T7N2", "D2C6H9"]);
     expect(all(d, "label.row-opt input.rd + span .h3")).toEqual(["One page per survey", "Hand-out cards", "All on one page"]);
+    expect(all(d, "label.row-opt input.rd + span .small")).toEqual(["A full-page code to pin up or hold up. 3 pages.", "Six cards per page, cut along the lines, one survey per sheet. 3 pages.", "Every selected code on one sheet, for the table. 1 page."]);
     expect([...d.querySelectorAll("input.rd")].map((c) => (c as HTMLInputElement).checked)).toEqual([true, false, false]);
     expect(all(d, "label.lbl")).toEqual(["Text on the page", "Paper size"]);
     expect(all(d, "#print-qr-lang option")).toEqual(["English", "Hindi", "Odia"]);
@@ -232,45 +352,98 @@ describe("PrintQR (PrintQR, PrintQRPhone)", () => {
     expect(text(d.querySelector(".micro"))).toBe("Preview · one page per survey · A4 · 3 pages");
     const sheet = d.querySelector("svg.psheet foreignObject .paper")!;
     expect(text(sheet.querySelector(".ptitle"))).toBe("Translators");
+    expect([...sheet.querySelectorAll(".qr i")].map((i) => (i.classList.contains("o") ? "0" : "1")).join("")).toBe(fixture.groups[0].surveys[0].qr);
     expect(text(sheet)).toContain("Scan to answer · or enter code K7Q 4F2 at 3dreview.app · Hindi · English · Odia");
     expect(text(sheet.querySelector(".pfoot"))).toBe("1 of 3");
   });
-  it("phone: nested header, the QR code pages list with three ticked, Cancel + Print 3 pages in the bar", () => {
+  it("the count, the layouts' pages, the caption, the previewed survey and '1 of N' follow what the user ticks and picks", async () => {
+    const a = shot(PrintQR);
+    const d = a.querySelector("dialog")!;
+    const cb = [...d.querySelectorAll("input.cb")] as HTMLInputElement[];
+    await fireEvent.click(cb[0]);
+    expect(text(a.querySelector(".btn-primary"))).toBe("Print 2 pages");
+    expect(text(d.querySelector(".ptitle"))).toBe("Team leaders & mentors");
+    expect(text(d.querySelector(".pfoot"))).toBe("1 of 2");
+    await fireEvent.click(cb[4]);
+    expect(text(d.querySelector(".micro"))).toBe("Preview · one page per survey · A4 · 3 pages");
+    await fireEvent.click(d.querySelectorAll("input.rd")[2]);
+    expect(text(a.querySelector(".btn-primary"))).toBe("Print 1 page");
+    expect(text(d.querySelector(".micro"))).toBe("Preview · all on one page · A4 · 1 page");
+    const paper = d.querySelector("#print-qr-paper") as HTMLSelectElement;
+    paper.value = "Letter";
+    await fireEvent.change(paper);
+    expect(text(d.querySelector(".micro"))).toBe("Preview · all on one page · Letter · 1 page");
+  });
+  it("nothing ticked: no throw, Print is a disabled button that says why, no preview sheet", async () => {
+    const a = shot(PrintQR);
+    const d = a.querySelector("dialog")!;
+    for (const c of [...d.querySelectorAll("input.cb")] as HTMLInputElement[]) if (c.checked) await fireEvent.click(c);
+    flushSync();
+    const p = a.querySelector(".btn-primary") as HTMLButtonElement;
+    expect(p.tagName).toBe("BUTTON");
+    expect(p.disabled).toBe(true);
+    expect(text(d.querySelector("[role=status]"))).toBe("Tick at least one survey to print its page.");
+    expect(d.querySelector(".psheet")).toBeNull();
+    expect(text(d.querySelector(".micro"))).toBe("Preview · one page per survey · A4 · 0 pages");
+    const none = structuredClone(fixture);
+    none.printQr.checked = [];
+    cleanup();
+    expect(() => shot(PrintQR, { data: none })).not.toThrow();
+    cleanup();
+    expect(() => shot(PrintQR, { data: none, phone: true })).not.toThrow();
+  });
+  it("phone: nested header, the QR code pages list with three ticked, Cancel + Print 3 pages in the bar, following the ticks", async () => {
     const a = shot(PrintQR, { phone: true });
     expect(text(a.querySelector(".phone-top .phone-title"))).toBe("Print QR code pages");
     expect(text(a.querySelector("main .micro"))).toBe("QR code pages");
     expect(a.textContent).toContain("One A4 page per survey, with the link printed under the code.");
-    expect([...a.querySelectorAll("label.row-opt input.cb")].map((c) => (c as HTMLInputElement).checked)).toEqual([true, true, true, false, false]);
+    expect(ticks(a)).toEqual([true, true, true, false, false]);
     expect(all(a, ".phone-bar .btn")).toEqual(["Cancel", "Print 3 pages"]);
     expect(a.querySelector("dialog")).toBeNull();
+    const cb = [...a.querySelectorAll("input.cb")] as HTMLInputElement[];
+    await fireEvent.click(cb[3]);
+    expect(all(a, ".phone-bar .btn")).toEqual(["Cancel", "Print 4 pages"]);
+    for (const i of [0, 1, 2, 3]) await fireEvent.click(cb[i]);
+    expect((a.querySelector(".phone-bar .btn-primary") as HTMLButtonElement).disabled).toBe(true);
+    expect(text(a.querySelector("main [role=status]"))).toBe("Tick at least one survey to print its page.");
   });
 });
 
 describe("collect view model and data wiring", () => {
   const m = collectModel(fixture);
-  it("totals and per-perspective counts come from the survey rows", () => {
+  it("totals and per-perspective counts come from the survey rows; surveys are numbered", () => {
     expect([m.answered, m.expected, m.surveys.length]).toEqual([18, 30, 5]);
     expect(m.groups.map((g: { label: string; answered: number; expected: number }) => [g.label, g.answered, g.expected])).toEqual([["Translation team", 6, 8], ["Community", 8, 15], ["Church", 4, 7]]);
     expect(m.byLens).toBe("Translation team 6 · Community 8 · Church 4");
+    expect(m.surveys.map((s: { n: number }) => s.n)).toEqual([1, 2, 3, 4, 5]);
     expect([pct(2, 3), pct(8, 15), pct(1, 0)]).toEqual([66, 53, 0]);
   });
-  it("stage tabs read the current UI's STAGES (ui/stage-screens.js)", () => {
-    const t = stageTabs("collect");
-    expect(t.map((x: { label: string }) => x.label)).toEqual(STAGES.map((s: { label: string }) => s.label));
-    expect(t.map((x: { done: boolean; current: boolean }) => [x.done, x.current])).toEqual([[true, false], [false, true], [false, false], [false, false]]);
-    expect(() => stageTabs("share")).toThrow(/unknown stage/);
-    expect(href("qr-room", { phone: true, state: "2", hash: "x" })).toBe("?screen=qr-room&w=phone&state=2#x");
+  it("one source per value: one room, one link and code per survey", () => {
+    expect(Object.keys(fixture.room)).toEqual(["opened", "refused"]);
+    expect(Object.keys(fixture.qrRoomPhone)).toEqual(["survey"]);
+    expect(fixture.printQr).not.toHaveProperty("qr");
   });
-  it("a short link encodes to a real 21x21 code through ui/assess/vendor-qrcode.js; a long one returns null", () => {
-    const q = qrModules(fixture.qrRoomPhone.link)!;
-    expect(q).toMatch(/^[01]{441}$/);
-    expect(q.slice(0, 7)).toBe("1111111"); // finder pattern, top-left
-    expect(q.slice(14, 21)).toBe("1111111"); // finder pattern, top-right
-    expect(qrModules("https://3dreview.app/#survey=abcdefghijklmnopqrstuvwxyz")).toBeNull();
-    expect(qrModules("")).toBeNull();
+  it("stage tabs read the current UI's STAGES (ui/stage-screens.js) and take the caller's links", () => {
+    const t = stageTabs("collect", { prepare: "a", collect: "b", understand: "c", improve: "d" });
+    expect(t.map((x: { label: string }) => x.label)).toEqual(STAGES.map((s: { label: string }) => s.label));
+    expect(t.map((x: { done: boolean; current: boolean; href: string }) => [x.done, x.current, x.href])).toEqual([[true, false, "a"], [false, true, "b"], [false, false, "c"], [false, false, "d"]]);
+    expect(() => stageTabs("share")).toThrow(/unknown stage/);
+  });
+  it("state pickers fall back to the default; pages follow the layout", () => {
+    expect([pickState("menu", ["default", "menu"]), pickState("busy", ["default", "menu"]), pickState(undefined, ["default", "menu"])]).toEqual(["menu", "default", "default"]);
+    expect([pickSurvey("1", 5, 2), pickSurvey("5", 5, 2), pickSurvey("6", 5, 2), pickSurvey("0", 5, 2), pickSurvey("2.5", 5, 2), pickSurvey("", 5, 2), pickSurvey(undefined, 5, 2)]).toEqual([0, 4, 2, 2, 2, 2, 2]);
+    expect([printPages("survey", 3), printPages("sheet", 3), printPages("one", 3), printPages("one", 0), printPages("survey", 0)]).toEqual([3, 3, 1, 0, 0]);
+    expect(() => printPages("poster", 1)).toThrow(/unknown layout/);
+    expect([pagesLabel(1), pagesLabel(0), pagesLabel(3)]).toEqual(["1 page", "0 pages", "3 pages"]);
+  });
+  it("no QR encoder ships in the lane (the boards' codes are fixture placeholders; real codes are wiring debt)", () => {
+    for (const f of readdirSync(LANE)) expect(readFileSync(resolve(LANE, f), "utf8"), f).not.toMatch(/vendor-qrcode/);
+  });
+  it("20px glyphs use the shared Icon; the lane Glyph draws only the sizes it cannot (13, 16, 18, 26)", () => {
+    for (const f of readdirSync(LANE).filter((x) => x.endsWith(".svelte"))) expect(readFileSync(resolve(LANE, f), "utf8"), f).not.toMatch(/<Glyph[^>]*size=\{20\}/);
   });
   it("the lane passes the ui-next lint (no inline style, tokens only)", () => {
-    expect([...lintDir(resolve(__dirname, "../ui-next/src/screens/collect"))]).toEqual([]);
+    expect([...lintDir(LANE)]).toEqual([]);
     expect([...lintDir(resolve(__dirname, "../ui-next/fixtures/collect"))]).toEqual([]);
   });
 });

@@ -7,6 +7,7 @@
 <script module>
   export const STATES = Object.freeze(["default", "menu"]);
 </script>
+<!-- An unknown ?state= renders the default state (model.js pickState); it never throws. -->
 <script>
   import Card from "../../Card.svelte";
   import Row from "../../Row.svelte";
@@ -17,12 +18,12 @@
   import RoomHealth from "./RoomHealth.svelte";
   import MenuSheet from "./MenuSheet.svelte";
   import Glyph from "./Glyph.svelte";
-  import { collectModel, href } from "./model.js";
+  import { collectModel, pickState } from "./model.js";
+  import { href } from "../href.js";
   import fixture from "../../../fixtures/collect/collect.json";
 
   let { phone = false, theme = "light", state, data = fixture } = $props();
-  const st = $derived(state ?? "default");
-  if (!STATES.includes(state ?? "default")) throw new TypeError(`Collect: unknown state "${String(state)}" (default | menu)`);
+  const st = $derived(pickState(state, STATES));
   const m = $derived(collectModel(data));
   const r = $derived(m.review);
 </script>
@@ -38,8 +39,8 @@
   {:else}
     <div class="l-grid" data-gap="5" data-tpl="aside">
       <div class="l-stack" data-gap="3">
-        <div class="l-row" data-gap="3" data-align="baseline"><h2 class="h2">Responses</h2><span class="num" data-size="40">{m.answered}</span><span class="small">of {m.expected} expected · updated just now</span></div>
-        <RoomHealth opened={m.room.desktop.opened} refused={m.room.desktop.refused} />
+        <div class="l-row" data-gap="3" data-align="baseline"><h2 class="h2">Responses</h2><span class="num" data-size="40">{m.answered}</span><span class="small">of {m.expected} expected · updated {r.updated}</span></div>
+        <RoomHealth opened={m.room.opened} refused={m.room.refused} />
         <SurveyGroups groups={m.groups} />
       </div>
       <aside class="l-stack" data-gap="4">

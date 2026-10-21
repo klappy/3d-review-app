@@ -1,25 +1,16 @@
 // UI Next (v4) collect lane view model. Status: provisional. Pure: fixture (or store rows of the same shape) -> what the boards draw.
-// Data: ui-next/fixtures/collect/collect.json (mock; every value is a board value). Stage tabs read the current UI's STAGES
-// (ui/stage-screens.js: ids prepare/collect/understand/improve and their labels), so the tab words have one home.
+// Data: ui-next/fixtures/collect/collect.json (mock; one source per value: one room, one link and one code per survey). Stage tabs read
+// the current UI's STAGES (ui/stage-screens.js: ids prepare/collect/understand/improve and their labels), so the tab words have one home.
+// Links: the shared screens/href.js (carries ?w= and ?theme=); the screens pass registered names only (test/ui-next-links.test.ts).
 import { STAGES } from "../../../../ui/stage-screens.js";
 import { LENSES } from "../../LensDot.svelte";
-import qrcode from "../../../../ui/assess/vendor-qrcode.js";
-
-// Cross-screen links under the flag: ?screen=<name>[&w=phone][&state=...][#hash]. Names outside this lane are the fanout's
-// kebab names for the boards the canvas links to (setup5, results, next-step, share, print, paper-entry, people, project, setup1, setup2).
-export function href(screen, { phone = false, state, hash } = {}) {
-  const q = new URLSearchParams({ screen });
-  if (phone) q.set("w", "phone");
-  if (state) q.set("state", state);
-  return `?${q}${hash ? `#${hash}` : ""}`;
-}
 
 // Review stage tabs (gen.py review_tabs; design-system.md §2 Stepper / tabs): done before the current stage, "Now" on the current one.
-const TAB_SCREEN = { prepare: "setup5", collect: "collect", understand: "results", improve: "next-step" };
-export function stageTabs(current = "collect", phone = false) {
+// hrefs: { stageId: link } built by the caller with href() (ReviewFrame.svelte), so every screen name stays a literal the links test reads.
+export function stageTabs(current = "collect", hrefs = {}) {
   const at = STAGES.findIndex((s) => s.id === current);
   if (at < 0) throw new TypeError(`stageTabs: unknown stage "${String(current)}"`);
-  return STAGES.map((s, i) => ({ id: s.id, label: s.label, n: i + 1, done: i < at, current: i === at, href: href(TAB_SCREEN[s.id], { phone }) }));
+  return STAGES.map((s, i) => ({ id: s.id, label: s.label, n: i + 1, done: i < at, current: i === at, href: hrefs[s.id] }));
 }
 
 const sum = (xs, k) => xs.reduce((n, x) => n + x[k], 0);
@@ -33,6 +24,7 @@ export function collectModel(fx) {
     return { lens: g.lens, label: LENSES[g.lens], surveys, answered: sum(surveys, "answered"), expected: sum(surveys, "expected") };
   });
   const surveys = groups.flatMap((g) => g.surveys);
+  surveys.forEach((s, i) => { s.n = i + 1; }); // 1-based survey number: QRRoomPhone's ?state=<n>
   const r = fx.review;
   return {
     ...fx,
@@ -46,20 +38,20 @@ export function collectModel(fx) {
   };
 }
 
-// A real code for a short link, through the current UI's vendored qrcode-generator (ui/assess/vendor-qrcode.js, the Share card's own
-// library): version 1 (21x21, the .qr contract grid), error correction L, byte mode (up to 17 bytes). Longer links need a larger version,
-// which the 21-column .qr grid cannot draw yet (wiring debt, RESULTS-collect.md); they return null.
-export function qrModules(text) {
-  if (typeof text !== "string" || !text) return null;
-  try {
-    const q = qrcode(1, "L");
-    q.addData(text);
-    q.make();
-    if (q.getModuleCount() !== 21) return null;
-    let s = "";
-    for (let r = 0; r < 21; r++) for (let c = 0; c < 21; c++) s += q.isDark(r, c) ? "1" : "0";
-    return s;
-  } catch {
-    return null;
-  }
+// An unknown or absent ?state= renders the default state (every lane): never throws.
+export const pickState = (state, states, dflt = states[0]) => (states.includes(state) ? state : dflt);
+
+// QRRoomPhone pager: ?state=<n> is the survey number, 1-based; anything else is the default survey (0-based dflt).
+export function pickSurvey(state, total, dflt) {
+  const k = Number(state);
+  return typeof state === "string" && /^\d+$/.test(state) && k >= 1 && k <= total ? k - 1 : dflt;
 }
+
+// PrintQR pages for the ticked surveys under a layout: per "survey" = one page each, "sheet" = one sheet of cut cards per
+// survey (hand-out cards), "one" = every ticked code on one page. Nothing ticked = 0 pages (the Print button is disabled).
+export function printPages(per, ticked) {
+  if (!["survey", "sheet", "one"].includes(per)) throw new TypeError(`printPages: unknown layout "${String(per)}"`);
+  if (!(ticked > 0)) return 0;
+  return per === "one" ? 1 : ticked;
+}
+export const pagesLabel = (k) => `${k} ${k === 1 ? "page" : "pages"}`;

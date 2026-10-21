@@ -2,20 +2,24 @@
      "each has its own count, link, QR and print; groups are headers"): one glass Card per perspective, a head Row (lens icon, perspective,
      survey count, n of N expected) and one row per survey: name + short link · bar · n of N · copy link, QR, print.
      phone: the CollectPhone list (boards_fphone.py f_collect): lens dot · name over bar · n/N · copy link, QR.
-     Row geometry (desktop data-tpl=survey-row, phone data-grow) is a canvas gap row (canvas-collect-gaps); the markup carries it now. -->
+     Row geometry: desktop .l-grid[data-tpl=survey-row], phone [data-grow] (§8.7 rows on the PIN). The phone's two icon buttons sit in their
+     own Row (the desktop row's pattern), so the flex row cannot shrink them below 44x44 (R13): the shared .btn-icon has no flex:none
+     (handed back, RESULTS-collect.md Round 2 F2). -->
 <script>
   import Card from "../../Card.svelte";
   import Row from "../../Row.svelte";
   import Button from "../../Button.svelte";
+  import Icon from "../../Icon.svelte";
   import Glyph from "./Glyph.svelte";
   import Bar from "./Bar.svelte";
-  import { href } from "./model.js";
+  import { G } from "./glyphs.js";
+  import { href } from "../href.js";
   let { groups, phone = false } = $props();
 </script>
 
-{#snippet copy()}<Glyph name="copy" size={20} />{/snippet}
-{#snippet qr()}<Glyph name="qr" size={20} />{/snippet}
-{#snippet print()}<Glyph name="print" size={20} />{/snippet}
+{#snippet copy()}<Icon d={G.copy} />{/snippet}
+{#snippet qr()}<Icon d={G.qr} />{/snippet}
+{#snippet print()}<Icon d={G.print} />{/snippet}
 
 {#if phone}
   <div class="l-stack" data-gap="2">
@@ -24,8 +28,10 @@
         <span class="lensdot" data-lens={g.lens} aria-hidden="true"></span>
         <div class="l-stack" data-gap="1" data-grow><span class="h3">{s.name}</span><Bar value={s.answered} max={s.expected} lens={g.lens} /></div>
         <span class="small tab-n">{s.answered}/{s.expected}</span>
-        <Button icon={copy} ariaLabel={`Copy link for ${s.name}`} variant="quiet" href={href("share", { phone: true })} />
-        <Button icon={qr} ariaLabel={`QR for ${s.name}`} variant="quiet" href={href("qr-room", { phone: true })} />
+        <Row gap={2}>
+          <Button icon={copy} ariaLabel={`Copy link for ${s.name}`} variant="quiet" href={href("share")} />
+          <Button icon={qr} ariaLabel={`QR for ${s.name}`} variant="quiet" href={href("qr-room", { state: String(s.n) })} />
+        </Row>
       </div>
     {/each}{/each}
   </div>
