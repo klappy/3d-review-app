@@ -75,9 +75,13 @@ describe("About renders as the boards draw it", () => {
     // §2 Perspective card (cookbook @8d741b2): data-lens sits on the card, not on its heading
     expect([...a.querySelectorAll(".l-grid[data-cols='3'] > .l-card")].map((c) => c.getAttribute("data-lens"))).toEqual(["team", "community", "church"]);
     expect(a.querySelectorAll(".l-grid[data-cols='3'] .l-card [data-lens]").length).toBe(0);
+    // captain ruling 2026-10-20 21:32 ET: card headings capitalized on every word (About and AboutPhone)
+    const HEADS = ["The Translation Team", "The Community", "The Church"];
+    expect([...a.querySelectorAll(".l-grid[data-cols='3'] > .l-card .h2")].map(text)).toEqual(HEADS);
     const p = mount(About, { phone: true });
     expect(p.querySelector(".phone-top[data-state=nested] .phone-title")!.textContent).toBe("About");
     expect(text(p.querySelector("h1.title-phone")!)).toBe("Why 3D Review exists");
+    expect([...p.querySelectorAll("span.h3[data-lens]")].map(text)).toEqual(HEADS);
     expect(text(p.querySelector(".phone-bar .btn-primary")!)).toBe("Take the tour");
   });
 });

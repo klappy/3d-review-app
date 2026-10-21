@@ -25,9 +25,9 @@
   const HOME = "?screen=home", TOUR = "#results", SURVEY = "#survey-code";
   // Card labels keep UI Next casing (VALIDATION-186 product yellow 1); captions are Rachel's C03.
   const FACETS = [
-    ["team", "The translation team", "translation brief · understanding the source · process · external review · consistency · governance"],
-    ["community", "The community", "understandable · appealing · impact"],
-    ["church", "The church", "translation brief · church involvement · confidence · affirmation"],
+    ["team", "The Translation Team", "translation brief · understanding the source · process · external review · consistency · governance"],
+    ["community", "The Community", "understandable · appealing · impact"],
+    ["church", "The Church", "translation brief · church involvement · confidence · affirmation"],
   ];
 </script>
 
