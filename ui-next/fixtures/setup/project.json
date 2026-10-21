@@ -15,14 +15,14 @@
       "when": "Oct 2026",
       "title": "Mark 1–4 draft",
       "stage": "collecting",
-      "href": "#collect",
+      "screen": "collect",
       "note": "No results yet"
     },
     {
       "when": "Sep 2026",
       "title": "Luke 1–2 community review",
       "stage": "results",
-      "href": "#results",
+      "screen": "results",
       "levels": [
         [
           "team",
@@ -43,7 +43,7 @@
       "when": "Aug 2026",
       "title": "Acts listening review",
       "stage": "done",
-      "href": "#next-step",
+      "screen": "next-step",
       "levels": [
         [
           "team",
@@ -64,7 +64,7 @@
       "when": "May 2026",
       "title": "Workshop 1 · Mark 1",
       "stage": "done",
-      "href": "#next-step",
+      "screen": "next-step",
       "levels": [
         [
           "team",

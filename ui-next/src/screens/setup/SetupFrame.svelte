@@ -4,14 +4,16 @@
      Phone (Setup1Phone, Setup2Phone, SetupPhone = step 3, Setup4Phone, Setup5Phone; boards_fphone.setup_step): AppShell phone + phone header
      in the setup step state (R13: Close · "Step n of 5", no avatar) > progress bar + "Draft saved" > hero Card > phone-bar (Back + primary).
      R13 note: the phone boards still draw the root header with the step line in the content (boards_fphone.py:108-112); the port follows R13.
-     No <style>, no inline style: lane classes in ./setup.css. -->
+     No <style>, no inline style: the setup rows are base.css (design-system.md 8.10 "Setup lane rows", PIN). Links: screens/href.js. -->
 <script module>
-  // Step n's screen URL (registered in ./index.js); the phone twin keeps &w=phone.
-  export const stepHref = (n, phone = false) => `?screen=setup${n}${phone ? "&w=phone" : ""}`;
+  import { href } from "../href.js";
+  // Step n's screen URL (setup1..setup5, registered in ./index.js), carrying the current ?w= and ?theme= (href.js);
+  // phone pins &w=phone where the caller knows it renders the phone twin.
+  export const stepHref = (n, phone = false) => href(`setup${n}`, phone ? { w: "phone" } : {});
 </script>
 <script>
-  import "./setup.css";
   import AppShell from "../../AppShell.svelte";
+  import Page from "../../Page.svelte";
   import Row from "../../Row.svelte";
   import Button from "../../Button.svelte";
   import PhoneHeader from "../../PhoneHeader.svelte";
@@ -23,15 +25,15 @@
   let { phone = false, theme = "light", step, title, phoneTitle, next = {}, children } = $props();
   if (!(Number.isInteger(step) && step >= 1 && step <= data.steps.length)) throw new TypeError(`SetupFrame: step must be 1..${data.steps.length}`);
   const label = $derived(next.label ?? "Continue");
-  const href = $derived(next.href ?? stepHref(step + 1, phone));
+  const nextHref = $derived(next.href ?? stepHref(step + 1, phone));
   const backHref = $derived(step > 1 ? stepHref(step - 1, phone) : undefined);
-  const HOME = "?screen=home";
+  const HOME = href("home");
 </script>
 
 {#snippet back()}<Glyph name="back" />{/snippet}
 {#snippet arrow()}<Glyph name="arrow" />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="setup-step" {step} steps={data.steps.length} home={HOME} />{:else}<FlowTop flow={data.flow} home={HOME} close={HOME} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<SetupBar {label} {href} {backHref} play={!!next.play} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<SetupBar {label} href={nextHref} {backHref} play={!!next.play} />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
@@ -44,7 +46,7 @@
       {@render children?.()}
     </section>
   {:else}
-    <div class="l-page su-page" data-w="narrow" data-gap="6">
+    <Page width="narrow" gap={6}>
       <ol class="glass tabs steps" aria-label="Setup steps">
         {#each data.steps as name, i}
           <li>
@@ -60,10 +62,12 @@
         <Row split gap={3}>
           {#if backHref}<Button label="Back" variant="quiet" href={backHref} lead={back} />{:else}<span></span>{/if}
           {#if next.blocked}
-            <Row gap={3}><span class="small" id="cont-why">{next.blocked}</span><button class="btn btn-primary btn-lg" type="button" disabled aria-describedby="cont-why">{label}<Glyph name="arrow" /></button></Row>
-          {:else}<Button {label} variant="primary" lg {href} trail={arrow} />{/if}
+            <!-- R16 V-41: a blocked primary says why beside it. The shared Button renders the native disabled attribute and takes no
+                 aria-describedby, so the reason is the text just before it in reading order (handed back, RESULTS-setup.md Round 2). -->
+            <Row gap={3}><span class="small" id="cont-why">{next.blocked}</span><Button {label} variant="primary" lg disabled trail={arrow} /></Row>
+          {:else}<Button {label} variant="primary" lg href={nextHref} trail={arrow} />{/if}
         </Row>
       </section>
-    </div>
+    </Page>
   {/if}
 </AppShell>

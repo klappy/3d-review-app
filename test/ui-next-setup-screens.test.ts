@@ -2,8 +2,10 @@
 // UI Next (v4) setup lane screens (status: provisional): setup1-setup5 and project, desktop and phone (?w=phone).
 // Boards: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas Setup1-5.dc.html, Setup1Phone, Setup2Phone, SetupPhone (step 3),
 // Setup4Phone, Setup5Phone, Project.dc.html, ProjectPhone.dc.html; contracts design-system.md section 2 and 8.
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render } from "@testing-library/svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import { route } from "../ui-next/src/route.js";
@@ -17,10 +19,15 @@ import { lintDir } from "../scripts/ui-next-lint.mjs";
 import { GROUP_FIELDS, RESPONDENT_FIELDS } from "../ui/v3/components/context-fields.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { PERSPECTIVE_WHO } from "../ui/assess/scope.js";
+// @ts-expect-error -- plain .svelte component, rendered on its own for the status-line check
+import LangSearch from "../ui-next/src/screens/setup/LangSearch.svelte";
 
 const NAMES = ["setup1", "setup2", "setup3", "setup4", "setup5", "project"];
 const screen = (name: string, props: Record<string, unknown> = {}) => render(setup[name], { props }).container.querySelector(".app") as HTMLElement;
 const text = (a: Element, sel: string) => [...a.querySelectorAll(sel)].map((e) => e.textContent!.trim());
+const LANE = resolve(__dirname, "../ui-next/src/screens/setup");
+const at = (search: string) => window.history.replaceState(null, "", `/next/${search}`);
+afterEach(() => at(""));
 const on = () => { const m = new Map<string, string>([["ui_next", "on"]]); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }; };
 
 describe("setup lane registry and route", () => {
@@ -56,10 +63,15 @@ describe("every screen, desktop and phone: shell, one primary, no inline style, 
       for (const l of a.querySelectorAll("label[for]")) expect(a.querySelector(`#${l.getAttribute("for")}`), l.getAttribute("for")!).not.toBeNull();
     });
   }
-  it("dark theme sets data-theme; an unknown ?state= throws (each board draws one state)", () => {
-    for (const n of NAMES) {
-      expect(screen(n, { theme: "dark" }).getAttribute("data-theme")).toBe("dark");
-      expect(() => render(setup[n], { props: { state: "busy" } })).toThrow(/one state/);
+  it("dark theme sets data-theme; an unknown ?state= renders the default state and never throws (each board draws one state)", () => {
+    for (const n of NAMES) for (const phone of [false, true]) {
+      expect(screen(n, { theme: "dark", phone }).getAttribute("data-theme")).toBe("dark");
+      const plain = screen(n, { phone }).innerHTML;
+      for (const state of ["busy", "", "menu", "1"]) {
+        const a = screen(n, { phone, state });
+        expect(a.innerHTML, `${n} state=${state}`).toBe(plain);
+        expect(a.querySelectorAll("h1").length).toBe(1);
+      }
     }
   });
 });
@@ -106,19 +118,60 @@ describe("key copy and data, per board", () => {
     expect(p.querySelector("h1")!.textContent).toBe("Details");
     expect(text(p, "#f option")).toEqual(["Written", "Audio", "Video", "Sign"]);
   });
+  it("language search: the match line stays silent until there is a query (F10), then counts", () => {
+    const status = (props: Record<string, unknown>) => render(LangSearch, { props: { id: "q", ...props } }).container.querySelector("[role=status]")!.textContent;
+    expect(status({ query: "", matches: [] })).toBe("");
+    expect(status({ query: "  ", matches: [] })).toBe("");
+    expect(status({ query: "zz", matches: [] })).toBe("No matching languages.");
+    expect(status({ query: "od", matches: [{ name: "Odia", code: "ory" }, { name: "Adivasi Odia", code: "ort" }] })).toBe("2 matches");
+  });
+  it("no setup lane source imports ui/v3/wizard.js (F3: it wired nothing and doubled the /next/ bundle) and the lane has no stylesheet (F1)", () => {
+    for (const f of readdirSync(LANE)) expect(readFileSync(`${LANE}/${f}`, "utf8"), f).not.toMatch(/(?:from\s*|import\s*\(?\s*)["'][^"']*(?:ui\/v3\/wizard\.js|\.css)["']/);
+    expect(existsSync(`${LANE}/setup.css`)).toBe(false);
+  });
   it("setup2 (Setup2): unnamed passage shows its error and a disabled Continue with the reason beside it (R16)", () => {
     const a = screen("setup2");
     expect(a.querySelector("h1")!.textContent).toBe("What will people respond to?");
     expect(a.querySelector("#pass")!.getAttribute("aria-invalid")).toBe("true");
     expect(a.querySelector(".field-error[role=alert]")!.textContent).toContain("Name the passage");
     const go = a.querySelector(".btn-primary") as HTMLButtonElement;
+    expect(go.tagName).toBe("BUTTON");
     expect(go.disabled).toBe(true);
-    expect(a.querySelector(`#${go.getAttribute("aria-describedby")}`)!.textContent).toBe("Name what people will respond to first.");
-    expect((a.querySelector("input[type=file]") as HTMLInputElement).accept).toBe(".usfm,.sfm,.usx,.pdf,.mp3");
+    expect(go.textContent).toBe("Continue");
+    expect(go.previousElementSibling!.textContent).toBe("Name what people will respond to first.");
+    const file = a.querySelector("input[type=file]") as HTMLInputElement;
+    expect(file.accept).toBe(".usfm,.sfm,.usx,.pdf,.mp3");
+    // F4: the chooser is a focusable button (helmet .app button:focus-visible ring) that opens the one hidden file input.
+    expect(a.querySelectorAll("input[type=file]").length).toBe(1);
+    expect(file.hidden).toBe(true);
+    expect(a.querySelector("label.btn")).toBeNull();
+    const choose = [...a.querySelectorAll("button.btn")].find((b) => b.textContent === "Choose file") as HTMLButtonElement;
+    const click = vi.spyOn(file, "click").mockImplementation(() => {});
+    choose.click();
+    expect(click).toHaveBeenCalledTimes(1);
     expect(text(a, ".chip")).toEqual(["English", "Hindi · hin", "Odia · ory"]);
     const p = screen("setup2", { phone: true });
     expect(p.querySelector("h1")!.textContent).toBe("The passage");
-    expect((p.querySelector(".phone-bar .btn-primary") as HTMLAnchorElement).getAttribute("href")).toBe("?screen=setup3&w=phone");
+    expect((p.querySelector(".phone-bar .btn-primary") as HTMLAnchorElement).getAttribute("href")).toBe("?ui_next=on&screen=setup3&w=phone");
+    expect([...p.querySelectorAll("button.btn")].some((b) => b.textContent === "Choose a file")).toBe(true);
+    // F7: a group field is described by its help.
+    const g = p.querySelector("[role=group][aria-labelledby=sl-lbl]")!;
+    expect(p.querySelector(`#${g.getAttribute("aria-describedby")}`)!.textContent).toBe("Participants pick their language on the first screen.");
+  });
+  it("in-flow links carry ?theme= and ?w= through screens/href.js (F8)", () => {
+    at("?ui_next=on&screen=setup2&theme=dark");
+    const a = screen("setup2", { theme: "dark" });
+    expect(a.querySelector("section .btn-quiet[href]")!.getAttribute("href")).toBe("?ui_next=on&screen=setup1&theme=dark");
+    expect(a.querySelector("ol.steps a.tab")!.getAttribute("href")).toBe("?ui_next=on&screen=setup1&theme=dark");
+    expect(a.querySelector("header.top a.brand")!.getAttribute("href")).toBe("?ui_next=on&screen=home&theme=dark");
+    at("?ui_next=on&screen=setup5&w=phone&theme=dark");
+    const p = screen("setup5", { phone: true, theme: "dark" });
+    expect(p.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=collect&w=phone&theme=dark");
+    expect(p.querySelector(".su-line a.link")!.getAttribute("href")).toBe("?ui_next=on&screen=setup1&w=phone&theme=dark");
+    at("?ui_next=on&screen=project&theme=dark");
+    const j = screen("project", { theme: "dark" });
+    expect(j.querySelector(".btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=setup1&theme=dark");
+    expect([...j.querySelectorAll("a.su-rev")].map((r) => r.getAttribute("href"))).toEqual(["collect", "results", "next-step", "next-step"].map((n) => `?ui_next=on&screen=${n}&theme=dark`));
   });
   it("setup3 (Setup3 / SetupPhone): three groups with the current UI's who-lines, roles and expected counts", () => {
     const a = screen("setup3");
@@ -127,11 +180,15 @@ describe("key copy and data, per board", () => {
     expect(text(a, ".su-role > span:first-of-type")).toEqual(["Translators", "Team leaders & mentors", "Pastor involved in the work", "Pastor in the community", "Denominational leader", "Consultant"]);
     expect([...a.querySelectorAll("input.su-count")].map((i) => (i as HTMLInputElement).value)).toEqual(["5", "3", "5", "2"]);
     expect(a.querySelector(".su-num")!.textContent).toBe("15");
+    expect(text(a, ".su-group > .l-row > span.small")).toEqual(["How many? (optional) · per role below", "How many? (optional) · per role below"]);
+    // F6: the group chips draw ic("people") (boards_fac.py), four paths in glyphs.js, not the two-path "person".
+    expect([...a.querySelectorAll(".su-group .icn svg")].map((s) => s.querySelectorAll("path").length)).toEqual([4, 4, 4]);
     const p = screen("setup3", { phone: true });
     expect(p.querySelector("h1")!.textContent).toBe("Who will participate?");
     expect([...p.querySelectorAll("label.row-opt input.cb")].map((c) => (c as HTMLInputElement).checked)).toEqual([true, true, false]);
+    expect([...p.querySelectorAll("label.row-opt .icn svg")].map((s) => s.querySelectorAll("path").length)).toEqual([4, 4, 4]);
   });
-  it("setup4 (Setup4 / Setup4Phone): one disclosure per chosen survey, questions from context-fields.js, Community open", () => {
+  it("setup4 (Setup4 / Setup4Phone): one disclosure per survey step 3 checked (F9), questions from context-fields.js, Community open", () => {
     const a = screen("setup4");
     const sums = [...a.querySelectorAll(".su-ctx > details.disc")];
     expect(sums.map((d) => d.querySelector(".su-name .h3")!.textContent)).toEqual(["Translators", "Team leaders & mentors", "Community", "Pastor involved in the work", "Denominational leader"]);
@@ -142,20 +199,31 @@ describe("key copy and data, per board", () => {
     expect(a.querySelectorAll("details.dd").length).toBe(0);
     expect(text(a, "label.row-opt.compact")).toEqual(RESPONDENT_FIELDS.map((f: { label: string }) => f.label));
     expect(a.querySelector(".tag")!.textContent).toBe("Off by default");
+    // Desktop step 3 checks every group; the unchecked roles (Pastor in the community, Consultant) have no survey.
+    expect(text(a, ".su-ctx .su-name .h3")).not.toContain("Consultant");
+    // Phone step 3 (SetupPhone) leaves Church unchecked, so phone step 4 asks about two groups (Setup4Phone draws three: board line).
     const p = screen("setup4", { phone: true });
-    expect(text(p, ".su-groups > details.disc > summary .su-name")).toEqual(["Translation team", "Community", "Church"]);
+    expect(text(p, ".su-groups > details.disc > summary .su-name")).toEqual(["Translation team", "Community"]);
+    expect([...p.querySelectorAll(".su-groups > details.disc")].map((d) => d.hasAttribute("open"))).toEqual([false, true]);
     expect((p.querySelector("#community-expected") as HTMLInputElement).value).toBe("15");
+    expect((p.querySelector("input[id='community-facilitator_role']") as HTMLInputElement).value).toBe("Facilitator"); // attribute form: the desktop render above holds the same id
+    // Answers are keyed by survey: the Community survey's answers do not leak into the Translators survey of another perspective.
+    const tr = [...p.querySelectorAll("input[id^=translators-]")].filter((i) => i.id !== "translators-expected") as HTMLInputElement[];
+    expect(tr.length).toBe(GROUP_FIELDS["Translation Team"].length);
+    expect(tr.map((i) => i.value).filter(Boolean)).toEqual([]);
   });
   it("setup5 (Setup5 / Setup5Phone): summary rows with Edit back to their step, blank facilitator Not set, Launch the survey", () => {
     const a = screen("setup5");
     expect(text(a, ".su-sumrow > .lbl")).toEqual(["Review", "People respond to", "Answer languages", "Location or community", "Facilitator", "Survey open", "Who will participate", "About each group"]);
-    expect([...a.querySelectorAll(".su-sumrow > a.link")].map((l) => l.getAttribute("href"))).toEqual(["?screen=setup1", "?screen=setup2", "?screen=setup2", "?screen=setup1", "?screen=setup1", "?screen=setup1", "?screen=setup3", "?screen=setup4"]);
+    expect([...a.querySelectorAll(".su-sumrow > a.link")].map((l) => l.getAttribute("href"))).toEqual([1, 2, 2, 1, 1, 1, 3, 4].map((n) => `?ui_next=on&screen=setup${n}`));
     expect(a.querySelectorAll(".su-sumrow")[4].textContent).toContain("Not set");
     expect(a.textContent).toContain("When you launch, the questions are locked so everyone answers the same survey.");
     expect(a.querySelector(".btn-primary")!.textContent).toBe("Launch the survey");
     const p = screen("setup5", { phone: true });
     expect(p.querySelectorAll(".su-line").length).toBe(7);
     expect(p.querySelector(".phone-bar .btn-primary")!.textContent).toBe("Launch the survey");
+    expect(p.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=collect&w=phone");
+    expect(a.querySelector(".btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=collect");
   });
   it("project (Project / ProjectPhone): title, reviews newest first with stage pills and levels, over-time chart", () => {
     const a = screen("project");
@@ -165,11 +233,20 @@ describe("key copy and data, per board", () => {
     expect([...a.querySelectorAll(".su-rev .pill")].map((p) => p.getAttribute("data-stage"))).toEqual(["collecting", "results", "done", "done"]);
     expect(text(a, ".su-rev .lvl-name")).toEqual(["Growing", "Needs support", "Growing", "Growing", "Needs support", "Needs support", "Needs support", "More input needed", "Needs support"]);
     expect(a.querySelectorAll("aside svg[role=img] polyline").length).toBe(3);
+    // F11: the chart takes the aside's width (viewBox 420x190, no fixed px width) and its y labels end before the plot starts.
+    const svg = a.querySelector("aside svg[role=img]")!;
+    expect(svg.getAttribute("width")).toBe("100%");
+    expect(svg.hasAttribute("height")).toBe(false);
+    expect(svg.getAttribute("viewBox")).toBe("0 0 420 190");
+    const firstX = Math.min(...[...svg.querySelectorAll("circle")].map((c) => Number(c.getAttribute("cx"))));
+    for (const t of svg.querySelectorAll("text[text-anchor=end]")) expect(Number(t.getAttribute("x"))).toBeLessThan(firstX - 5 - 8);
+    expect([...a.querySelectorAll("a[href]")].filter((l) => /screen=(people|workspace)/.test(l.getAttribute("href")!)).map((l) => l.getAttribute("href"))).toEqual(["?ui_next=on&screen=workspace", "?ui_next=on&screen=people"]);
     expect(a.querySelector(".btn-primary")!.textContent).toBe("Start a 3D Review");
     const p = screen("project", { phone: true });
     expect(p.querySelector("h1.title-phone")!.textContent).toBe("Hindi New Testament");
     expect(p.querySelectorAll("a.su-revline").length).toBe(4);
-    expect(p.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?screen=setup1&w=phone");
+    expect(p.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=setup1&w=phone");
+    expect([...p.querySelectorAll("a.su-revline")].map((r) => r.getAttribute("href"))).toEqual(["collect", "results", "next-step", "next-step"].map((n) => `?ui_next=on&screen=${n}&w=phone`));
   });
 });
 

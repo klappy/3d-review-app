@@ -6,7 +6,8 @@
   import Mark from "../../Mark.svelte";
   import Button from "../../Button.svelte";
   import Glyph from "./Glyph.svelte";
-  let { flow = "Start a 3D Review", status = "Draft saved", home = "?screen=home", close = "?screen=home" } = $props();
+  import { href } from "../href.js";
+  let { flow = "Start a 3D Review", status = "Draft saved", home = href("home"), close = href("home") } = $props();
   if (!(typeof flow === "string" && flow.trim())) throw new TypeError("FlowTop: the crumb names the flow");
 </script>
 

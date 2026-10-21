@@ -2,7 +2,9 @@
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): Setup2.dc.html (desktop: the passage left unnamed, so the field shows its
      error and Continue is disabled with its reason beside it, R16), Setup2Phone.dc.html (phone, w=phone).
      Wiring: the file input accepts ui/assess/passages.js PASSAGE_ACCEPT (the formats the current passages panel uploads).
-     One .btn-primary: Continue (disabled on desktop, R16 V-41: reason said beside it; phone-bar on phone). -->
+     One .btn-primary: Continue (disabled on desktop through the shared Button, R16 V-41: reason said beside it; phone-bar on phone).
+     "Choose file" is a .btn button that opens one hidden file input, so Tab lands on a visible control with the helmet's
+     .app button:focus-visible ring (a label.btn around an .sr-only input showed no ring, VALIDATION-setup F4). -->
 <script>
   import Stack from "../../Stack.svelte";
   import Button from "../../Button.svelte";
@@ -12,19 +14,21 @@
   import { PASSAGE_ACCEPT } from "../../../../ui/assess/passages.js";
   import data from "../../../fixtures/setup/setup.json";
 
-  let { phone = false, theme = "light", state } = $props();
-  if (state !== undefined) throw new TypeError(`setup2: the board draws one state, got "${String(state)}"`);
+  // The board draws one state; the route's ?state= prop is not read, so any value (unknown included) renders it and never throws.
+  let { phone = false, theme = "light" } = $props();
   const p = data.passage;
   const blocked = p.name.trim() ? undefined : "Name what people will respond to first.";
+  let fileInput = $state();
 </script>
 
 {#snippet link()}<Glyph name="link" />{/snippet}
 {#snippet eye()}<Glyph name="eye" />{/snippet}
 {#snippet x()}<Glyph name="x" />{/snippet}
 {#snippet plus()}<Glyph name="plus" />{/snippet}
-{#snippet choose(label, block)}<label class={block ? "btn btn-block" : "btn"}>{#if block}<Glyph name="upload" />{/if}{label}<input class="sr-only" type="file" accept={PASSAGE_ACCEPT} /></label>{/snippet}
+{#snippet choose(label, block)}<button class={block ? "btn btn-block" : "btn"} type="button" onclick={() => fileInput?.click()}>{#if block}<Glyph name="upload" />{/if}{label}</button>{/snippet}
 
 <SetupFrame {phone} {theme} step={2} title="What will people respond to?" phoneTitle="The passage" next={phone ? {} : { blocked }}>
+  <input type="file" accept={PASSAGE_ACCEPT} hidden bind:this={fileInput} />
   {#if phone}
     <p class="small">What participants will read, hear or watch.</p>
     <div class="dz su-col">{@render choose("Choose a file", true)}<Button label="Paste a link" lead={link} block /></div>

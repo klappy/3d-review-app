@@ -5,14 +5,16 @@
 <script>
   import SetupFrame, { stepHref } from "./SetupFrame.svelte";
   import Glyph from "./Glyph.svelte";
+  import { href } from "../href.js";
   import data from "../../../fixtures/setup/setup.json";
 
-  let { phone = false, theme = "light", state } = $props();
-  if (state !== undefined) throw new TypeError(`setup5: the board draws one state, got "${String(state)}"`);
-  const COLLECT = "?screen=collect";
+  // The board draws one state; the route's ?state= prop is not read, so any value (unknown included) renders it and never throws.
+  let { phone = false, theme = "light" } = $props();
+  // Launch goes to the collect lane's Collect screen (registered as "collect" in screens/collect/index.js).
+  const COLLECT = $derived(href("collect", phone ? { w: "phone" } : {}));
 </script>
 
-<SetupFrame {phone} {theme} step={5} title="Ready to launch" next={{ label: "Launch the survey", href: `${COLLECT}${phone ? "&w=phone" : ""}`, play: true }}>
+<SetupFrame {phone} {theme} step={5} title="Ready to launch" next={{ label: "Launch the survey", href: COLLECT, play: true }}>
   {#if phone}
     <p class="small">Check it over. You can change dates and details later.</p>
     {#each data.phoneSummary as r}

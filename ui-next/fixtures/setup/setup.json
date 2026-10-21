@@ -143,9 +143,10 @@
     }
   ],
   "context": {
-    "open": "Community",
+    "_keys": "open and values are keyed by survey (the slug of a checked role's name, or of a role-less group's name), not by perspective: two surveys of one perspective have their own answers.",
+    "open": "community",
     "values": {
-      "Community": {
+      "community": {
         "facilitator_role": "Facilitator",
         "total_participants": "14",
         "participant_selection": "Church members who read Odia",

@@ -7,7 +7,8 @@
   import Button from "../../Button.svelte";
   let { id, query = "", language, matches = [], describedby } = $props();
   const shown = $derived(matches.slice(0, 6));
-  const status = $derived(matches.length === 0 ? "No matching languages." : matches.length > 6 ? `${matches.length} matches; showing first 6. Refine your search.` : `${matches.length} ${matches.length === 1 ? "match" : "matches"}`);
+  // The [role=status] line stays in the DOM (a live region must exist before it changes) but says nothing until a query exists.
+  const status = $derived(!query.trim() ? "" : matches.length === 0 ? "No matching languages." : matches.length > 6 ? `${matches.length} matches; showing first 6. Refine your search.` : `${matches.length} ${matches.length === 1 ? "match" : "matches"}`);
 </script>
 
 {#snippet plus()}<Glyph name="plus" />{/snippet}

@@ -1,7 +1,8 @@
 <!-- UI Next (v4) Setup step 1 "Details". Status: provisional (playbook rule 12). Mock data: ui-next/fixtures/setup/setup.json (details).
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): Setup1.dc.html (desktop), Setup1Phone.dc.html (phone, w=phone).
      Fields per section 2 Field, Language search and "Setup details: location and facilitator" rows; Translation format is an option-row radio group
-     (R10). One .btn-primary: Continue (desktop card footer; phone-bar). Wiring: the draft shape is ui/v3/wizard.js freshDraft() (format default). -->
+     (R10). One .btn-primary: Continue (desktop card footer; phone-bar). Wiring debt: the draft (ui/v3/wizard.js freshDraft / saveWip) is not
+     imported: it wired nothing here and pulled the whole wizard graph into /next/ (RESULTS-setup.md Round 2, F3). -->
 <script>
   import Stack from "../../Stack.svelte";
   import Grid from "../../Grid.svelte";
@@ -9,12 +10,11 @@
   import Field from "./Field.svelte";
   import Select from "./Select.svelte";
   import LangSearch from "./LangSearch.svelte";
-  import { freshDraft } from "../../../../ui/v3/wizard.js";
   import data from "../../../fixtures/setup/setup.json";
 
-  let { phone = false, theme = "light", state } = $props();
-  if (state !== undefined) throw new TypeError(`setup1: the board draws one state, got "${String(state)}"`);
-  const d = { ...freshDraft(), ...data.details };
+  // The board draws one state; the route's ?state= prop is not read, so any value (unknown included) renders it and never throws.
+  let { phone = false, theme = "light" } = $props();
+  const d = data.details;
 </script>
 
 <SetupFrame {phone} {theme} step={1} title="Tell us about this review" phoneTitle="Details">
