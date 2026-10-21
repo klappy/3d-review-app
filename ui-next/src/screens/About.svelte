@@ -6,6 +6,7 @@
      desktop "Try the sample review" (experimentation card); phone "Take the tour" in the phone-bar (AboutPhone F03).
      C12 "How often" ships in full, trajectory clause included (cookbook work/active/2026-10-19-current-ui-copy/RULING.md option 2, captain 2026-10-21). -->
 <script>
+  import { screenHref } from "../route.js";
   import AppShell from "../AppShell.svelte";
   import Page from "../Page.svelte";
   import Mark from "../Mark.svelte";
@@ -22,7 +23,8 @@
   import { C02, CAPS, HOW, WHO, LEARN_MORE, HOW_IT_WORKS } from "../copy/rachel.js";
 
   let { phone = false, theme = "light" } = $props();
-  const HOME = "?screen=home", TOUR = "#results", SURVEY = "#survey-code";
+  let HOME = $derived(screenHref("home", { phone, theme }));
+  const TOUR = "#results", SURVEY = "#survey-code";
   // Card labels keep UI Next casing (VALIDATION-186 product yellow 1); captions are Rachel's C03.
   const FACETS = [
     ["team", "The Translation Team", "translation brief · understanding the source · process · external review · consistency · governance"],

@@ -194,6 +194,25 @@ describe("PhoneBar", () => {
     expect(() => r(PhoneBar, { label: "Next", disabled: "yes" })).toThrow();
     expect(() => r(PhoneBar, { label: "Next", ariaDescribedby: "#why" })).toThrow();
   });
+  it("trail: a named icon after the label, as Button's trail draws it (integration N3: ResultsPhone \"Plan the next step\" arrow)", () => {
+    const a = first(PhoneBar, { label: "Plan the next step", href: "#next", trail: "arrow" }).querySelector(".btn-primary") as HTMLAnchorElement;
+    expect(a.tagName).toBe("A");
+    expect(a.textContent).toBe("Plan the next step");
+    const nodes = [...a.childNodes].filter((n) => n.nodeType === 1 || (n.textContent ?? "").trim());
+    expect(nodes.map((n) => (n.nodeType === 1 ? (n as Element).tagName.toLowerCase() : "label"))).toEqual(["label", "svg"]);
+    expect(a.querySelector("svg")!.getAttribute("aria-hidden")).toBe("true");
+    expect(a.querySelector("svg path")!.getAttribute("d")).toBe("M5 12h14M13 6l6 6-6 6");
+    const both = first(PhoneBar, { label: "Next", href: "#n", lead: "plus", trail: "arrow" }).querySelector(".btn-primary")!;
+    expect([...both.childNodes].filter((n) => n.nodeType === 1 || (n.textContent ?? "").trim())
+      .map((n) => (n.nodeType === 1 ? (n as Element).tagName.toLowerCase() : "label"))).toEqual(["svg", "label", "svg"]);
+    const off = first(PhoneBar, { label: "Next", href: "#n", trail: "arrow", disabled: true }).querySelector(".btn-primary")!;
+    expect(off.tagName).toBe("BUTTON");
+    expect(off.querySelectorAll("svg").length).toBe(1);
+    expect(first(PhoneBar, { label: "Next", href: "#n", trail: "arrow", demoted: true }).querySelector("a.btn svg")).not.toBeNull();
+    expect(first(PhoneBar, { label: "Next", href: "#n" }).querySelector("svg")).toBeNull();
+    expect(() => r(PhoneBar, { label: "Next", trail: "plus" })).toThrow(/unknown trail icon/);
+    expect(() => r(PhoneBar, { label: "Next", trail: "chevron" })).toThrow(/unknown trail icon/);
+  });
   it("demoted: no primary in the bar while a dialog or sheet holds it; the action stays a block secondary (people C6)", () => {
     const b = first(PhoneBar, { label: "New project", lead: "plus", href: "#setup", demoted: true });
     expect([...b.classList]).toEqual(["glass", "phone-bar"]);

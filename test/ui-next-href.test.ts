@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 // @ts-expect-error -- plain .js module, no type declarations
 import { href, CARRY } from "../ui-next/src/screens/href.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { route } from "../ui-next/src/route.js";
+import { route, screenHref } from "../ui-next/src/route.js";
 
 describe("href(screen, extra, from)", () => {
   it("always sets ui_next=on and screen, first", () => {
@@ -56,5 +56,23 @@ describe("href(screen, extra, from)", () => {
     const m = new Map<string, string>();
     const storage = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) };
     expect(route(new URLSearchParams(link), storage, ["fake-screen"])).toEqual({ view: "fake-screen", props: { phone: true, theme: "dark", state: "busy" } });
+  });
+  it("carries only the w and theme values route() reads (w=phone, theme=dark|light); any other value is dropped", () => {
+    expect(href("results", {}, "?w=tablet&theme=both")).toBe("?ui_next=on&screen=results");
+    expect(href("results", {}, "?w=&theme=")).toBe("?ui_next=on&screen=results");
+    expect(href("results", { w: "desk", theme: "sepia" }, "?w=phone&theme=dark")).toBe("?ui_next=on&screen=results");
+    expect(href("results", {}, "?w=phone&theme=light")).toBe("?ui_next=on&screen=results&w=phone&theme=light");
+  });
+  it("agrees with route.js screenHref (main 638275c): from the same context both land on the same view and props, with no stored opt-in", () => {
+    const stored = { getItem: () => "on", setItem: () => {}, removeItem: () => {} };
+    for (const from of ["", "?theme=dark", "?w=phone", "?w=phone&theme=dark", "?w=phone&theme=light", "?w=tablet&theme=both", "?screen=project&theme=dark&state=x"]) {
+      const { phone, theme } = route(new URLSearchParams(from), stored).props;
+      for (const screen of ["home", "about", "landing"]) {
+        const ours = route(new URLSearchParams(href(screen, {}, from)), undefined);
+        const main = route(new URLSearchParams(screenHref(screen, { phone, theme })), undefined);
+        expect(ours, `${screen} from "${from}"`).toEqual(main);
+        expect(ours.view, `${screen} from "${from}"`).toBe(screen);
+      }
+    }
   });
 });
