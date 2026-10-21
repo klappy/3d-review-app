@@ -7,11 +7,12 @@
   import Menu from "./Menu.svelte";
   import Button from "./Button.svelte";
   import Icon from "./Icon.svelte";
-  import { I, ACCOUNT_ITEMS } from "./icons.js";
+  import { I, accountItems } from "./icons.js";
   const VARIANTS = ["signed-in", "public"];
   let { variant = "signed-in", crumbs = [], who = "Bincy", initials = "BK", workspace = "BCS · India", workspaces = ["BCS · India", "Seed Company · partners"], accountOpen = false, workspaceOpen = false, home = "#home", end = true } = $props();
   if (!VARIANTS.includes(variant)) throw new TypeError(`TopBar: unknown variant "${variant}" (flow, document and room are not ported yet)`);
   if (variant === "public" && crumbs.length) throw new TypeError("TopBar: the public variant has no breadcrumb");
+  const acctItems = accountItems(); // built once per page load from location.search (every screen change reloads)
   const wsItems = $derived([{ kind: "micro", label: "Your workspaces" }, ...workspaces.map((w) => ({ label: w, href: "#workspace" }))]);
 </script>
 
@@ -32,7 +33,7 @@
     {/if}
     {#if end}<div class="top-end">
       <Button icon={help} ariaLabel="Help" variant="quiet" href="#help" />
-      <Menu id="acct" summary={acct} title="Account menu" label={`Account menu, ${who}`} items={ACCOUNT_ITEMS} open={accountOpen} />
+      <Menu id="acct" summary={acct} title="Account menu" label={`Account menu, ${who}`} items={acctItems} open={accountOpen} />
     </div>{/if}
   {:else}
     <div class="top-end">

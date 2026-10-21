@@ -119,6 +119,33 @@ describe("renderButton disabled (design-system.md section 2 Field and button sta
   });
 });
 
+describe("renderButton ariaDescribedby (R16 V-41: a control names its reason; lane setup N7, shared slice 2)", () => {
+  it("passes the id refs through as aria-describedby on a button, a disabled button and a link; none by default", () => {
+    const off = renderButton({ label: "Continue", variant: "primary", disabled: true, ariaDescribedby: "cont-why" });
+    expect(off.tagName).toBe("BUTTON");
+    expect(off.getAttribute("aria-describedby")).toBe("cont-why");
+    expect((off as HTMLButtonElement).disabled).toBe(true); // stays the native disabled form, no aria-disabled
+    expect(off.hasAttribute("aria-disabled")).toBe(false);
+    expect(renderButton({ label: "Next", ariaDescribedby: " help-a   err-b " }).getAttribute("aria-describedby")).toBe("help-a err-b");
+    expect(renderButton({ label: "Open", href: "/x", ariaDescribedby: "why" }).getAttribute("aria-describedby")).toBe("why");
+    expect(renderButton({ icon: icon(), ariaLabel: "More", ariaDescribedby: "tip" }).getAttribute("aria-describedby")).toBe("tip");
+    expect(renderButton({ label: "x" }).hasAttribute("aria-describedby")).toBe(false);
+  });
+  it("names the reason in the accessibility tree: the description resolves to the referenced text", () => {
+    const host = document.createElement("div");
+    host.innerHTML = `<p id="cont-why">Add a passage to continue.</p>`;
+    document.body.append(host);
+    try {
+      const b = render(Button, { target: host, props: { label: "Continue", variant: "primary", disabled: true, ariaDescribedby: "cont-why" } }).container.querySelector("button")!;
+      const ids = b.getAttribute("aria-describedby")!.split(" ");
+      expect(ids.map((id) => document.getElementById(id)?.textContent)).toEqual(["Add a passage to continue."]);
+    } finally { host.remove(); }
+  });
+  it("refuses an empty, #-prefixed or non-string value", () => {
+    for (const bad of ["", "   ", "#cont-why", 7, ["a"]]) expect(() => renderButton({ label: "x", ariaDescribedby: bad }), String(bad)).toThrow(/ariaDescribedby/);
+  });
+});
+
 describe("button.css", () => {
   const css = read("components/button.css");
   const skin = (read("components/base.css") + css).replace(/\s*([{};])\s*/g, "$1"); // base.css = the helmet, generated (scripts/ui-next-base.mjs)
