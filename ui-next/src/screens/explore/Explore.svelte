@@ -9,7 +9,8 @@
      the table row (width, collapsed borders), the selected filter chip, the phone review list row, the sheet geometry and handle,
      the segmented control width. Until they land the screen uses the nearest contract primitive (listed in RESULTS); the rows that
      change nothing at the current PIN are already on the markup (.chip[data-on], .seg[data-inline], .sel[data-size=compact], .tbl-wrap/.tbl,
-     .mi-end, .sheet/.sheet-handle/.sheet-title, .mi[data-size=lg]) and take effect when a PIN bump brings cookbook #191's rows into base.css.
+     .mi-end, .sheet[data-pad=menu]/.sheet-handle/.sheet-title, .mi[data-size=lg]) and take effect when a PIN bump brings cookbook #191's rows
+     into base.css; the modal sheet geometry and ::backdrop are the collect lane's dialog.glass-hi rows (#190), as its dialogs use them.
      One .btn-primary per page: none on desktop (the board draws none); phone "Open the filters" in the phone-bar. -->
 <script module>
   export const STATES = Object.freeze(["filters"]);
@@ -79,7 +80,7 @@
     </Card>
     <Grid cols={2} gap={2}><Button label="Save this view" href={PHONE} lead={check} block /><Button label="Download CSV" href={PHONE} lead={doc} block /></Grid>
     {#if state === "filters"}
-      <dialog class="glass-hi sheet l-card" data-pad="menu" aria-labelledby="explore-filters-title" {@attach modal} onclick={dismiss}>
+      <dialog class="glass-hi sheet" data-pad="menu" aria-labelledby="explore-filters-title" {@attach modal} onclick={dismiss}>
         <div class="l-stack" data-gap="1">
           <div class="sheet-handle" aria-hidden="true"></div>
           <p class="micro sheet-title" id="explore-filters-title">Filters · tap to change, swipe a row left to remove</p>

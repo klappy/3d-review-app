@@ -1,7 +1,8 @@
 <!-- UI Next (v4) Feedback screen ("Send app feedback"). Status: provisional (playbook rule 12). Explore lane of the screens fanout.
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): Feedback.dc.html (desktop: a dialog over the page the user was on),
      FeedbackPhone.dc.html (phone: a full page, design-system.md "Dialog and sheet states" phone map). Mock data: ui-next/fixtures/explore/feedback.json.
-     Desktop is a native <dialog class="glass-hi"> opened with showModal() (top layer, inert page, ::backdrop, Escape = Cancel); focus on
+     Desktop is a native <dialog class="glass-hi"> opened with showModal() (top layer, inert page, ::backdrop, Escape = Cancel; geometry
+     and backdrop from the shared dialog.glass-hi rows, cookbook #190, once a PIN bump brings them); focus on
      the first field (autofocus, contract "Focus on open"). Composed of AppShell > Page / Card > Stack / Row and the section 2 components
      (TopBar, PhoneHeader nested, Button, Segmented .seg, Field .lbl/.in/.sel, Option row); no <style>, no inline style.
      Not wired: the board's fields do not map onto the /v2/feedback contract (ui/assess/feedback.js); itemised in RESULTS-explore.md.
@@ -43,7 +44,7 @@
       <label class="row-opt"><input class="cb" type="checkbox" checked /><span class="small">Include the screen name and app version</span></label>
     </Card>
   {:else}
-    <dialog class="glass-hi dialog l-card" aria-labelledby="feedback-title" {@attach modal}>
+    <dialog class="glass-hi" aria-labelledby="feedback-title" {@attach modal}>
       <div class="l-stack" data-gap="4">
         <Row split gap={3}><h2 class="h2 t-24" id="feedback-title">Send app feedback</h2><Button icon={x} ariaLabel="Close" variant="quiet" href={HOME} /></Row>
         <p class="small t-15">Tell us what happened and what would help. It reaches the team with the page you were on.</p>

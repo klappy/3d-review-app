@@ -260,8 +260,8 @@ describe("rows from cookbook #191 (design-system.md 8.7) already on the markup, 
     expect(d.querySelector(".sheet-title")!.id).toBe(d.getAttribute("aria-labelledby"));
     expect(d.querySelectorAll("a.mi[data-size=lg]").length).toBe(10);
   });
-  it("Feedback and Help: the dialog row and the 24px heading row", () => {
-    expect(mount(Feedback, {}).querySelector("dialog.glass-hi.dialog h2.h2.t-24")).not.toBeNull();
+  it("Feedback and Help: the shared dialog row (collect lane, #190) and the 24px heading row", () => {
+    expect(mount(Feedback, {}).querySelector("dialog.glass-hi h2.h2.t-24")).not.toBeNull();
     expect(mount(Help, {}).querySelectorAll("section.l-section[id] > h2.t-24").length).toBe(8);
   });
 });
