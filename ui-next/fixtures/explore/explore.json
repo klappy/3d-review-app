@@ -8,7 +8,7 @@
     { "key": "Stage", "value": "Collecting, Results ready" },
     { "key": "Date", "value": "Last 12 months" }
   ],
-  "groupBy": { "options": ["None", "Project", "Language", "Region", "Organisation", "Stage"], "selected": "Stage" },
+  "groupBy": { "options": ["None", "Project", "Language", "Region", "Organisation", "Stage"], "selected": "None" },
   "addFilter": ["Project", "Language", "Cluster", "Organisation involved", "Translation format", "Facilitator"],
   "reviews": [
     { "title": "Mark 1–4 draft", "project": "Hindi New Testament", "language": "Hindi", "region": "South Asia", "orgs": "BCS", "stage": "collect", "responses": { "n": 18, "expected": 30 }, "lenses": null, "updated": "today" },

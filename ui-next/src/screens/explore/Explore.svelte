@@ -9,9 +9,12 @@
      .list-row/.icn-row/.list-body/.list-title, .sheet[data-pad=menu]/.sheet-handle/.sheet-title, .mi[data-size=lg]; no <style>, no inline style.
      The filters sheet is a native <dialog class="glass-hi sheet"> opened with showModal() (design-system.md "Dialog and sheet states";
      geometry and ::backdrop from the dialog.glass-hi rows): Escape, or a press that starts and ends on the backdrop (outside the
-     sheet's box), closes it (./dialog.js, shared with Feedback).
+     sheet's box), closes it (./dialog.js, shared with Feedback); on close the address is replaced with the closed state (closeTo),
+     so Reload or Back does not reopen it (validator R3-1).
      Links through ../href.js (carries ?theme=); a phone review row opens the results lane's "results" screen. The desktop rows are
      plain, as the board draws them. The match line counts the rows the table shows (./explore-data.js matchCounts).
+     Group by shows "None": the rows are not grouped, so it does not claim the board's "Stage" (validator R3-4). Not wired yet
+     (RESULTS-explore.md Round 4 debt): chip remove, Add filter, Cards/Table, Save this view, Download CSV, Group by, the aside rows.
      One .btn-primary per page: none on desktop (the board draws none); phone "Open the filters" in the phone-bar. -->
 <script module>
   export const STATES = Object.freeze(["filters"]);
@@ -31,7 +34,7 @@
   import { E } from "./icons.js";
   import { href } from "../href.js";
   import { exploreRows, phoneRows, matchCounts, LENS_KEYS } from "./explore-data.js";
-  import { modal, backdropClose } from "./dialog.js";
+  import { modal, backdropClose, closeTo } from "./dialog.js";
   import data from "../../../fixtures/explore/explore.json";
 
   let { phone = false, theme = "light", state } = $props();
@@ -80,7 +83,7 @@
     </section>
     <Row gap={2}><Button label="Save this view" href={SELF} lead={check} block /><Button label="Download CSV" href={SELF} lead={doc} block /></Row>
     {#if sheet}
-      <dialog class="glass-hi sheet" data-pad="menu" aria-labelledby="explore-filters-title" {@attach modal} onpointerdown={closer.onpointerdown} onclick={closer.onclick}>
+      <dialog class="glass-hi sheet" data-pad="menu" aria-labelledby="explore-filters-title" {@attach modal} onpointerdown={closer.onpointerdown} onclick={closer.onclick} onclose={closeTo(SELF)}>
         <div class="l-stack" data-gap="1">
           <div class="sheet-handle" aria-hidden="true"></div>
           <p class="micro sheet-title" id="explore-filters-title">Filters · tap to change, swipe a row left to remove</p>

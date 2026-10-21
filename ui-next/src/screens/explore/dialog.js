@@ -31,8 +31,20 @@ export function backdropClose() {
       const el = e.currentTarget;
       const out = down && e.target === el && outside(el, e);
       down = false;
-      if (out) { if (typeof el.close === "function") el.close(); else el.removeAttribute("open"); }
+      if (out) {
+        if (typeof el.close === "function") el.close();
+        else { el.removeAttribute("open"); el.dispatchEvent(new Event("close")); } // no native close(): still tell onclose
+      }
       return out;
     },
   };
+}
+
+/**
+ * The <dialog>'s close handler for a dialog the address opened (Explore's ?state=filters sheet): replace the address with url,
+ * the closed state, so Reload or Back does not reopen it and the link that opens it is a real navigation again (validator R3-1).
+ * Escape, the backdrop and close() all fire "close". replace is injectable for tests.
+ */
+export function closeTo(url, replace = (u) => globalThis.history?.replaceState(globalThis.history.state, "", u)) {
+  return () => { replace(url); };
 }

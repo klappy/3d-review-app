@@ -16,7 +16,7 @@ import lane from "../ui-next/src/screens/explore/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { levelOf, stagePill, responsesText, exploreRows, phoneRows, matchCounts, LENS_KEYS, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { modal, backdropClose } from "../ui-next/src/screens/explore/dialog.js";
+import { modal, backdropClose, closeTo } from "../ui-next/src/screens/explore/dialog.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { TOPICS, FAQ, INTRO } from "../ui-next/src/screens/explore/help-copy.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -37,6 +37,9 @@ const text = (el: Element) => (el.textContent ?? "").replace(/\s+/g, " ").trim()
 const store = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }; };
 const p = (q: string) => new URLSearchParams(q);
 const src = (f: string) => readFileSync(resolve(__dirname, "../ui-next/src/screens/explore", f), "utf8");
+
+// Closing the filters sheet replaces the address (R3-1): put it back after every test so no test depends on another's order.
+afterEach(() => window.history.replaceState(null, "", "/"));
 
 // board -> [screen query, component, props, primary label or null (the board draws none)]
 const BOARDS: [string, string, C, P, string | null][] = [
@@ -111,7 +114,10 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect((a.querySelector(".seg input:checked") as HTMLInputElement).value).toBe("table");
     expect([...a.querySelectorAll(".chip")].map(text)).toEqual(["Workspace · BCS India", "Region · South Asia", "Stage · Collecting, Results ready", "Date · Last 12 months"]);
     expect([...a.querySelectorAll(".chip button")].map((b) => b.getAttribute("aria-label"))).toEqual(["Remove Workspace filter", "Remove Region filter", "Remove Stage filter", "Remove Date filter"]);
-    expect((a.querySelector("select[aria-label='Group by']") as HTMLSelectElement).value).toBe("Stage");
+    // R3-4: the rows are not grouped, so Group by says None rather than the board's "Stage"
+    const group = a.querySelector("select[aria-label='Group by']") as HTMLSelectElement;
+    expect(group.value).toBe("None");
+    expect([...group.options].map((o) => o.text)).toEqual(["None", "Project", "Language", "Region", "Organisation", "Stage"]);
     expect([...a.querySelectorAll("th.th")].map(text)).toEqual(["Review", "Project", "Language", "Region", "Organisations", "Stage", "Responses", "Team", "Community", "Church", "Updated"]);
     const rows = [...a.querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map(text));
     expect(rows.map((r) => r[0])).toEqual(["Mark 1–4 draft", "Luke 1–2 community review", "Workshop 2 · Luke 1", "Workshop 2 · Luke 1", "Mark 2 signed", "Genesis audio check"]);
@@ -170,6 +176,29 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect(d.open).toBe(true);
     press(d, 195, 120, 195, 120); // pressed and released on the backdrop above the sheet
     expect(d.open).toBe(false);
+  });
+  it("filters: closing the sheet (backdrop, Escape) replaces the address with the closed state, so Reload or Back does not reopen it (R3-1)", () => {
+    const sheetUrl = "/next/?ui_next=on&screen=explore&w=phone&theme=dark&state=filters";
+    const closed = "?ui_next=on&screen=explore&w=phone&theme=dark";
+    window.history.replaceState(null, "", sheetUrl);
+    try {
+      const a = mount(Explore, { phone: true, state: "filters", theme: "dark" });
+      const d = a.querySelector("dialog.sheet") as HTMLDialogElement;
+      d.getBoundingClientRect = () => ({ left: 0, top: 300, right: 390, bottom: 844, width: 390, height: 544, x: 0, y: 300, toJSON: () => ({}) });
+      const fire = (type: string) => d.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: 195, clientY: 120 }));
+      fire("pointerdown");
+      fire("click"); // a press that starts and ends on the backdrop
+      expect(d.open).toBe(false);
+      expect(window.location.search).toBe(closed);
+      expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe(`${closed}&state=filters`); // a real navigation again
+      window.history.replaceState(null, "", sheetUrl);
+      d.dispatchEvent(new Event("close")); // Escape: the native cancel closes the dialog, which fires close
+      expect(window.location.search).toBe(closed);
+    } finally { window.history.replaceState(null, "", "/"); }
+    const replace = vi.fn();
+    closeTo("?ui_next=on&screen=explore", replace)();
+    expect(replace).toHaveBeenCalledExactlyOnceWith("?ui_next=on&screen=explore");
+    expect(src("Explore.svelte")).toMatch(/onclose=\{closeTo\(SELF\)\}/);
   });
   it("dialog.js: one modal() and one backdrop closer for both screens; neither screen keeps its own copy (N6)", () => {
     const box = { getBoundingClientRect: () => ({ left: 0, top: 0, right: 10, bottom: 10 }), close: vi.fn() };
