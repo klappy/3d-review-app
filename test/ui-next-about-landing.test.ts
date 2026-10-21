@@ -265,3 +265,28 @@ it("live phone CSS overrides fixed-board positioning without creating a sticky s
     expect(getComputedStyle(app).overflow).toBe("clip");
   } finally { style.remove(); }
 });
+
+it("a short phone page fills the viewport so the sticky bar sits at its foot; desktop keeps its block shell (VALIDATION-integration B1)", () => {
+  // .l-shell height:100% cannot resolve against .app's min-height alone; on a page shorter than the viewport the in-flow sticky bar
+  // then sat under the content (sign-in 482-575 at 390x844). The phone screen is a flex column one dynamic viewport tall and the
+  // shell grows, so main.l-phone (flex-grow 1) pushes the bar to the foot. Real Chromium 390x844 numbers: RESULTS-shared.md Final pass.
+  const style = document.createElement("style");
+  style.textContent = ["base.css", "phone.css", "type.css"].map((name) =>
+    readFileSync(resolve(__dirname, "../ui-next/components", name), "utf8")).join("\n");
+  document.head.append(style);
+  try {
+    const app = mount(About, { phone: true });
+    for (const c of [...app.querySelector("main.l-phone")!.children].slice(1)) c.remove(); // a one-row page, shorter than any viewport
+    const shell = app.querySelector(":scope > .l-shell") as HTMLElement;
+    expect(getComputedStyle(app).display).toBe("flex");
+    expect(getComputedStyle(app).flexDirection).toBe("column");
+    expect(getComputedStyle(app).minHeight).toBe("100dvh");
+    expect(getComputedStyle(shell).flexGrow).toBe("1");
+    expect(getComputedStyle(app.querySelector("main.l-phone")!).flexGrow).toBe("1");
+    expect(shell.lastElementChild!.matches(".phone-bar")).toBe(true);
+    expect(getComputedStyle(shell.lastElementChild!).position).toBe("sticky");
+    const desk = mount(About, {});
+    expect(getComputedStyle(desk).display).not.toBe("flex");
+    expect(getComputedStyle(desk).minHeight).toBe("100vh");
+  } finally { style.remove(); }
+});

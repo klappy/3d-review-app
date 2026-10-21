@@ -45,6 +45,22 @@ describe("B2. the phone bar stays in the thumb zone on every phone screen (secti
       document.body.innerHTML = "";
     }
   });
+  it("short pages: the phone screen is a viewport-tall flex column and the shell grows, so the bar lands at the foot (VALIDATION-integration B1)", () => {
+    const phone = rules(read("components/phone.css"));
+    const decl = (sel: string) => phone.filter(([s]) => s === sel).map(([, d]) => d).join(";");
+    expect(decl(".app.l-screen[data-w=phone]")).toMatch(/(^|;)display:flex(;|$)/);
+    expect(decl(".app.l-screen[data-w=phone]")).toMatch(/(^|;)flex-direction:column(;|$)/);
+    expect(decl(".app.l-screen[data-w=phone]")).toMatch(/(^|;)min-height:100dvh(;|$)/);
+    expect(decl(".app.l-screen[data-w=phone]>.l-shell")).toMatch(/(^|;)flex:1 0 auto(;|$)/);
+    // phone only: no phone.css rule gives a desktop screen a flex or min-height shell (desktop pixels unchanged)
+    expect(phone.filter(([s, d]) => /\.app\.l-screen(?!\[data-w=phone\])/.test(s) && /(display|min-height|flex)/.test(d))).toEqual([]);
+    // what the bar's place rests on in the generated helmet: the shell is a column and main.l-phone takes the free space
+    const base = rules(read("components/base.css"));
+    expect(base.find(([s]) => s === ".l-shell")?.[1]).toMatch(/display:flex;flex-direction:column/);
+    expect(base.find(([s]) => s === ".l-phone")?.[1]).toMatch(/flex-grow:1/);
+    // the phone rule (0,3,0) outweighs type.css's .app.l-screen{min-height:100vh} (0,2,0), which loads after it
+    expect(rules(read("components/type.css")).find(([s]) => s === ".app.l-screen")?.[1]).toMatch(/min-height:100vh/);
+  });
   it("desktop screens render no phone bar", () => {
     for (const C of [Landing, Home, About]) {
       render(C, {});
