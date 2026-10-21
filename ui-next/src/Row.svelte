@@ -2,8 +2,8 @@
      One axis, gap only (data-gap 1..7). Never owns padding or surface. -->
 <script>
   import { gapAttr } from "./gap.js";
-  let { gap, children } = $props();
+  let { gap, wrap = false, split = false, children } = $props();
   const g = $derived(gapAttr(gap, "Row"));
 </script>
 
-<div class="l-row" data-gap={g}>{@render children?.()}</div>
+<div class="l-row" data-gap={g} data-wrap={wrap ? "" : undefined} data-split={split ? "" : undefined}>{@render children?.()}</div>

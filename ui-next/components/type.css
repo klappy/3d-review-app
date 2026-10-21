@@ -1,0 +1,27 @@
+/* UI Next (v4) screen type + app ground. Status: provisional. Paints only from ui-next/tokens.css.
+   Values: cookbook design/2026-10-15-glass-redesign/generator/helmet.html .app (line 7), .display (28), .h2 (30), .h3 (31), .small (32), .num (34);
+   generator/gen.py EXTRA .title-page / .title-phone (lines 49-50). px font sizes become --t-* (ui-next lint). .micro lives in topbar.css. */
+.app{background:var(--ground);color:var(--ink);font-family:'Figtree',ui-sans-serif,system-ui,-apple-system,'Segoe UI','Noto Sans',sans-serif;font-size:var(--t-16);line-height:1.5;-webkit-font-smoothing:antialiased}
+.app.l-screen{min-height:100vh}
+.title-page{font-family:'Newsreader',ui-serif,Georgia,serif;font-weight:450;font-size:var(--t-40);line-height:46px;letter-spacing:-.008em;margin:0;text-wrap:balance}
+.title-phone{font-family:'Newsreader',ui-serif,Georgia,serif;font-weight:450;font-size:var(--t-30);line-height:34px;letter-spacing:-.008em;margin:0;text-wrap:balance}
+.display{font-family:'Newsreader',ui-serif,Georgia,'Noto Serif',serif;font-weight:400;font-size:var(--t-56);line-height:60px;letter-spacing:-.012em;margin:0;text-wrap:balance}
+.app[data-w=phone] .display{font-size:var(--t-36);line-height:40px}
+.h2{font-size:var(--t-20);line-height:28px;font-weight:650;letter-spacing:-.006em;margin:0;text-wrap:balance}
+.h3{font-size:var(--t-16);line-height:24px;font-weight:650;margin:0}
+.small{font-size:var(--t-14);line-height:20px;color:var(--ink-2);margin:0}
+.num{font-family:'Newsreader',ui-serif,Georgia,serif;font-size:var(--t-30);font-weight:400;font-variant-numeric:lining-nums tabular-nums;letter-spacing:-.02em;color:var(--primary)}
+.app .l-row[data-wrap]{flex-wrap:wrap}
+.app .l-row[data-split]{justify-content:space-between}
+.app details > summary{cursor:pointer;width:max-content}
+/* Home pieces (provisional): values generator/gen.py EXTRA .chip (line 10), helmet.html .cb (65-71), .icn (101), .card-link (102-105), .solid (23). */
+.chip{display:inline-flex;align-items:center;gap:var(--sp-2);height:36px;padding:0 var(--sp-3) 0 14px;border-radius:var(--radius-xl);background:var(--field);border:1px solid var(--line-2);font-weight:600;font-size:var(--t-14);color:var(--ink)}
+.cb{appearance:none;-webkit-appearance:none;flex:none;width:22px;height:22px;margin:0;border:1.5px solid var(--field-edge);background:var(--field);display:inline-grid;place-content:center;cursor:pointer;border-radius:var(--radius-s)}
+.cb::before{content:"";width:12px;height:12px;background:var(--on-primary);clip-path:polygon(12% 50%,0 64%,40% 100%,100% 22%,86% 9%,39% 74%);transform:scale(0)}
+.cb:checked{background:var(--primary);border-color:var(--primary)}.cb:checked::before{transform:scale(1)}
+.icn{display:inline-grid;place-content:center;flex:none;width:36px;height:36px;border-radius:var(--radius-m);background:var(--lens-soft,var(--team-soft));color:var(--primary)}
+.card-link{display:block;text-decoration:none;color:var(--ink);border-radius:var(--radius-l)}
+.card-link:hover{color:var(--ink);box-shadow:var(--hl),var(--sh-2)}
+.solid{background:var(--field);border:1px solid var(--line)}
+.lvl-pair{display:inline-flex;align-items:center;gap:var(--sp-2);font-size:var(--t-14);color:var(--ink-2)}
+.card-link.l-stack{display:flex}
