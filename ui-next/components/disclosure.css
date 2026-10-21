@@ -10,3 +10,7 @@
 .app .disc-body{border-top:1px solid var(--line);padding:var(--sp-4) 0 var(--sp-5)}
 .app .disc-body ol{margin:0;padding-left:var(--sp-5)}
 @media (prefers-reduced-motion: reduce){.app .disc-chev{transition:none}}
+/* Phone FAQ list card (design-system.md 8.2, data-pad=list): rows 48px flush to the 8/18 card padding, as LandingPhone draws summary.dd-row. */
+.app .l-card[data-pad=list] details.disc{padding:0}
+.app .l-card[data-pad=list] details.disc>summary.disc-sum{min-height:48px;font-size:var(--t-15)}
+.app .l-card[data-pad=list] .disc-body{border-top:0;padding:0 0 10px}

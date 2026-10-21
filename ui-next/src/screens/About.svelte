@@ -43,10 +43,10 @@
   </Disclosure>
 {/snippet}
 
-<AppShell {phone} {theme} screen {top} {bar}>
+<AppShell {phone} {theme} screen rhythm="read" {top} {bar}>
   {#if phone}
     <h1 class="title-phone">Why 3D Review exists</h1>
-    <Card hi gap={2}>
+    <Card hi pad="hero" gap={2}>
       <p>{C02}</p>
       <p class="small">Developed with the Lab · early adopters in India, Laos and the Philippines.</p>
     </Card>
@@ -59,7 +59,7 @@
       <Button label="Back to home" variant="quiet" href={HOME} block />
     </Stack>
   {:else}
-    <Page gap={6}>
+    <Page gap={7}>
       <Section>
         <Grid template="hero-about">
         <Stack gap={5}>

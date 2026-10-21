@@ -10,7 +10,7 @@
   import Section from "../Section.svelte";
   import Card from "../Card.svelte";
   import Icon from "../Icon.svelte";
-  import Mark from "../Mark.svelte";
+  import MediaCard from "../MediaCard.svelte";
   import { I } from "../icons.js";
   import Stack from "../Stack.svelte";
   import Row from "../Row.svelte";
@@ -22,7 +22,8 @@
   import Disclosure from "../Disclosure.svelte";
   import { C01, C02 } from "../copy/rachel.js";
 
-  let { phone = false, theme = "light" } = $props();
+  // videoSrc: the intro video through the Transcode proxy (generate_transcode_url) once it exists; absent = placeholder frame (Media card contract).
+  let { phone = false, theme = "light", videoSrc } = $props();
   const SELF = "?screen=landing", ABOUT = "?screen=about", SAMPLE = "#results", VIDEO = "#video", CODE = "#survey-code", HELP = "#help";
   const PERSPECTIVES = [
     ["team", "Translation team", "How the team prepares, reviews and decides a passage is ready."],
@@ -54,22 +55,21 @@
 {#snippet lead()}<Icon d={I.play} />{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Try the sample review" href={SAMPLE} />{/if}{/snippet}
 
-<AppShell {phone} {theme} screen {top} {bar}>
+<AppShell {phone} {theme} screen rhythm="marketing" {top} {bar}>
   {#if phone}
-    <Card hi gap={3}>
-      <Mark size={44} />
+    <Card hi pad="hero" gap={3}>
       <h1 class="title-phone">{C01}</h1>
       <p class="small">{C02}</p>
       <a class="link" href={VIDEO}>Watch how it works · 2 min</a>
     </Card>
-    <Card gap={1} label="Common questions">
+    <Card pad="list" gap={1} label="Common questions">
       {#each FAQ_PHONE as [q, a]}<Disclosure label={q} solid={false}><p class="small">{a}</p></Disclosure>{/each}
       <a class="link small" href={HELP}>All questions and the facilitator guide</a>
     </Card>
     <a class="link small" href={ABOUT}>Why 3D Review exists</a>
     <p class="small">Have a survey code? <a class="link" href={CODE}>Enter it here</a></p>
   {:else}
-    <Page gap={7}>
+    <Page gap={8}>
       <Section>
         <Grid template="hero-landing">
           <Stack gap={4}>
@@ -78,10 +78,7 @@
             <Row wrap gap={3}><Button label="Try the sample review" variant="primary" lg href={SAMPLE} {trail} /><Button label="Watch how it works · 2 min" lg href={VIDEO} {lead} /></Row>
             <p class="micro">No account needed to explore the sample. Facilitators sign in with an email link.</p>
           </Stack>
-          <Card gap={2} label="Intro video">
-            <span class="micro">What 3D Review is · 2:10</span>
-            <p class="small">One short video explains the three perspectives and what a review gives you.</p>
-          </Card>
+          <MediaCard title="What 3D Review is" duration="2:10" caption="One short video explains the three perspectives and what a review gives you." src={videoSrc} />
         </Grid>
       </Section>
       <Section>

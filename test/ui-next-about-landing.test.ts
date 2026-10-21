@@ -181,3 +181,30 @@ describe("/next/ routes for About and Landing", () => {
     expect(ACCOUNT_ITEMS.find((i: { label?: string }) => i.label === "Why 3D Review exists").href).toBe("?screen=about");
   });
 });
+
+describe("rhythm and Media card (captain ruling 2026-10-20 22:29 ET; design-system.md 8.2 --sp-8, section 2 Media card)", () => {
+  it("Landing desktop main carries the marketing rhythm; About the read rhythm; phone none", () => {
+    expect(mount(Landing, {}).querySelector("main.l-main")!.getAttribute("data-rhythm")).toBe("marketing");
+    expect(mount(About, {}).querySelector("main.l-main")!.getAttribute("data-rhythm")).toBe("read");
+    expect(mount(Landing, { phone: true }).querySelector("main")!.hasAttribute("data-rhythm")).toBe(false);
+  });
+  it("Landing hero media card: placeholder frame with play + title · duration line + caption when no src", () => {
+    const m = mount(Landing, {}).querySelector(".l-media")!;
+    expect(m.querySelector(".l-media-frame .l-media-play")).not.toBeNull();
+    expect(m.querySelector("video")).toBeNull();
+    expect(text(m.querySelector(".l-media-title")!)).toBe("What 3D Review is · 2:10");
+    expect(text(m.querySelector(".l-media-frame + p.small")!)).toContain("One short video");
+  });
+  it("Landing media card plays a Transcode proxy URL when videoSrc is given", () => {
+    const m = mount(Landing, { videoSrc: "https://transcode.example/v/intro.mp4" }).querySelector(".l-media")!;
+    expect(m.querySelector("video")!.getAttribute("src")).toBe("https://transcode.example/v/intro.mp4");
+    expect(m.querySelector(".l-media-play")).toBeNull();
+  });
+  it("phone twins: hero card pad=hero, LandingPhone FAQ card pad=list, no mark inside the LandingPhone hero card", () => {
+    const lp = mount(Landing, { phone: true });
+    expect(lp.querySelector(".l-card[data-pad=hero] h1.title-phone")).not.toBeNull();
+    expect(lp.querySelector(".l-card[data-pad=hero] svg.mk, .l-card[data-pad=hero] .mark")).toBeNull();
+    expect(lp.querySelectorAll(".l-card[data-pad=list] details.disc").length).toBe(4);
+    expect(mount(About, { phone: true }).querySelector(".l-card[data-pad=hero]")).not.toBeNull();
+  });
+});
