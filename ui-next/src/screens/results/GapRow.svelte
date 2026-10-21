@@ -7,14 +7,15 @@
   import Row from "../../Row.svelte";
   import Grid from "../../Grid.svelte";
   import BandBar from "./BandBar.svelte";
-  import { LEVEL_WORD } from "./data.js";
+  import { LEVEL_WORD, withNotes } from "./data.js";
   let { row, phone = false } = $props();
-  const levels = $derived(row.dots.map((d) => `${d.label} ${LEVEL_WORD[d.level]}`).join(" · "));
+  // Levels of the placed dots, then the notes (more input needed, not asked), " · "-joined in data.js so no separator is lost.
+  const levels = $derived(withNotes(row.dots.map((d) => `${d.label} ${LEVEL_WORD[d.level]}`).join(" · "), row));
 </script>
 
 {#snippet verdict()}
   <span class="small"><strong>{row.verdict}</strong></span>
-  <span class="small">{levels}{#each row.notAsked as who} <span class="small">· {who} not asked</span>{/each}</span>
+  <span class="small">{levels}</span>
 {/snippet}
 
 {#if phone}

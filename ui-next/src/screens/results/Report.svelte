@@ -23,7 +23,7 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, LEVEL_WORD, lensLabel, lensCards, bandRow } from "./data.js";
+  import { REPORT, LEVEL_WORD, lensLabel, lensCards, bandRow, withNotes } from "./data.js";
 
   let { phone = false, theme = "light" } = $props();
   const D = REPORT.desktop, P = REPORT.phone;
@@ -64,7 +64,7 @@
           <Grid template="barbell" gap={4}>
             <span class="small"><strong>{row.name}</strong></span>
             <BandBar {row} size="paper" />
-            <span class="small">{row.verdict}{#each row.notAsked as who} · {who} not asked{/each}</span>
+            <span class="small">{withNotes(row.verdict, row)}</span>
           </Grid>
         {/each}
         <PaperLegend />

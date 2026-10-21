@@ -14,13 +14,14 @@ import { OUT } from "../ui-next/src/screens/results/links.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import results from "../ui-next/src/screens/results/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, lensCards, bandRow, scoreRows, radar, heldLines, levelOf, pct, answerView } from "../ui-next/src/screens/results/data.js";
+import { REPORT, lensCards, bandRow, scoreRows, radar, heldLines, levelOf, pct, answerView, withNotes } from "../ui-next/src/screens/results/data.js";
 import Results from "../ui-next/src/screens/results/Results.svelte";
 import ResultsAnswers from "../ui-next/src/screens/results/ResultsAnswers.svelte";
 import ResultsGaps from "../ui-next/src/screens/results/ResultsGaps.svelte";
 import ResultsHeld from "../ui-next/src/screens/results/ResultsHeld.svelte";
 import Report from "../ui-next/src/screens/results/Report.svelte";
 import ReportDetailed from "../ui-next/src/screens/results/ReportDetailed.svelte";
+import BandBar from "../ui-next/src/screens/results/BandBar.svelte";
 
 type Props = Record<string, unknown>;
 const mount = (C: unknown, props: Props = {}) => render(C as never, { props }).container.querySelector(".app") as HTMLElement;
@@ -61,6 +62,31 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect(impact.dots.map((d: { x: number }) => d.x)).toEqual([60, 12.5, 65]);
     const brief = bandRow(D, D.counts, "Brief & perceived fidelity");
     expect([brief.verdict, brief.notAsked, brief.span]).toEqual(["same band", ["Community"], null]);
+    expect(withNotes(brief.verdict, brief)).toBe("same band · Community not asked");
+  });
+  it("band barbell: a perspective under the minimum gets no dot and no part in the verdict; it is named instead (N3)", () => {
+    const D = REPORT.desktop, H = REPORT.held.counts; // church 1 of 3: More input needed
+    const clarity = bandRow(D, H, "Clarity / naturalness");
+    expect(clarity.dots.map((d: { lens: string; x: number }) => `${d.lens}:${d.x}`)).toEqual(["team:87.5", "community:12.5"]);
+    expect(clarity.dots.every((d: { x: unknown }) => typeof d.x === "number")).toBe(true);
+    expect([clarity.verdict, clarity.more, clarity.notes]).toEqual(["3 bands apart — talk about this", ["Church"], ["Church more input needed"]]);
+    const brief = bandRow(D, H, "Brief & perceived fidelity"); // team and church asked; church under the minimum
+    expect([brief.dots.length, brief.verdict, brief.span]).toEqual([1, "too few perspectives to compare", null]);
+    expect(withNotes(brief.verdict, brief)).toBe("too few perspectives to compare · Church more input needed · Community not asked");
+    for (const name of [...D.gaps.biggest, ...D.gaps.agree]) {
+      const row = bandRow(D, H, name);
+      expect(row.dots.some((d: { lens: string }) => d.lens === "church"), name).toBe(false);
+    }
+    const tense = scoreRows(D, H, ["Clarity / naturalness"])[0];
+    expect([tense.dots.map((d: { lens: string }) => d.lens), tense.notes]).toEqual([["community", "team"], ["Church more input needed"]]);
+  });
+  it("band barbell SVG: every point has a numeric cx, held counts included (N3: never cx=undefined%)", () => {
+    const D = REPORT.desktop;
+    const { container } = render(BandBar as never, { props: { row: bandRow(D, REPORT.held.counts, "Clarity / naturalness") } });
+    const cx = [...container.querySelectorAll("circle")].map((c) => c.getAttribute("cx"));
+    expect(cx.length).toBe(4);
+    for (const v of cx) expect(v).toMatch(/^\d+(\.\d+)?%$/);
+    expect(container.querySelector("svg")!.getAttribute("aria-label")).toBe("Clarity / naturalness: 3 bands apart — talk about this · Church more input needed");
   });
   it("numeric barbell and radar (ReportDetailed board): biggest tensions by spread, five shared spokes", () => {
     const D = REPORT.desktop;
@@ -85,14 +111,23 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect(answerView("church").focus).toEqual({ area: "Confidence in the translation", level: "growing" });
     expect(answerView("nobody").lens).toBe("community"); // an unknown perspective is the default
   });
-  it("answers split: groups under the minimum responses are hidden", () => {
-    const g = answerView("community", "gender");
-    expect(g.questions[0].groups.map((x: { label: string; n: number }) => `${x.label} ${x.n}`)).toEqual(["Women 5", "Men 3"]);
-    expect(g.hidden).toEqual([]);
+  it("answers split: a question splits only when every group meets the minimum (complementary suppression, N1)", () => {
+    type Q = { held: boolean; n: number; options: [string, number][]; groups: { label: string; n: number }[] };
+    const g = answerView("community", "gender"); // Women 5, Men 3 on every question: the split shows
+    expect(g.questions.map((q: Q) => q.groups.map((x) => `${x.label} ${x.n}`).join(", "))).toEqual(Array(3).fill("Women 5, Men 3"));
+    expect(g.questions.map((q: Q) => q.held)).toEqual([false, false, false]);
+    // 18–30 and 51+ have 2 each: hiding only them would leave Everyone minus 31–50 = their answers, so no age group shows
     const a = answerView("community", "age");
-    expect(a.questions[0].groups.map((x: { label: string }) => x.label)).toEqual(["31–50"]);
-    expect(a.hidden).toEqual(["18–30", "51+"]);
+    expect(a.questions.map((q: Q) => [q.held, q.groups.length])).toEqual([[true, 0], [true, 0], [true, 0]]);
+    expect(a.questions[0].options.map(([, k]: [string, number]) => k)).toEqual([1, 4, 2, 0, 1]); // Everyone instead
     expect(answerView("community", "shoe-size").split).toBe("everyone");
+  });
+  it("answers split: church by gender gives no way back to the one woman's answers (N1, validator case)", () => {
+    type Q = { held: boolean; n: number; options: [string, number][]; groups: unknown[] };
+    const c = answerView("church", "gender"); // Men 3, Women 1
+    expect(c.questions.map((q: Q) => [q.held, q.groups.length, q.n])).toEqual([[true, 0, 4], [true, 0, 4]]);
+    expect(c.questions[0].options.map(([, k]: [string, number]) => k)).toEqual([3, 1, 0, 0, 0]); // Everyone only, no Men 3,0,0,0,0 beside it
+    expect(answerView("team", "gender").questions.every((q: Q) => q.held)).toBe(true); // Men 4, Women 2
   });
 });
 
@@ -161,12 +196,24 @@ describe("each board renders as a screen", () => {
     sel.value = "age";
     await fireEvent.change(sel);
     expect(text(a.querySelector("main h2.h2"))).toBe("Community · Written · 8 answers · by age range");
-    expect(a.querySelectorAll(".ans").length).toBe(3); // one group (31–50) per question; the others are under 3
-    expect(all(a, ".l-card .micro")[0]).toBe("31–50 · 4 answers");
-    expect(all(a, ".l-card p.small")[0]).toBe("18–30, 51+: fewer than 3 answers, hidden.");
+    expect(a.querySelectorAll(".ans").length).toBe(3); // 18–30 and 51+ are under 3, so every question shows Everyone (N1)
+    expect(all(a, ".l-card .micro").filter((t) => / answers$/.test(t))).toEqual([]);
+    expect(all(a, ".l-card p.small")[0]).toBe("Showing everyone: split by age range, a group has fewer than 3 answers to this question.");
     sel.value = "gender";
     await fireEvent.change(sel);
     expect(a.querySelectorAll(".ans").length).toBe(6);
+    expect(all(a, ".l-card .micro").slice(0, 2)).toEqual(["Women · 5 answers", "Men · 3 answers"]);
+    expect(all(a, ".l-card .l-row > .small").filter((t) => / answers$/.test(t))).toEqual([]); // no question n beside a split
+  });
+  it("ResultsAnswers: church split by gender shows Everyone only, never Men beside the total (N1, browser case)", async () => {
+    const a = mount(ResultsAnswers, { state: "church" });
+    const sel = a.querySelector("select.in") as HTMLSelectElement;
+    sel.value = "gender";
+    await fireEvent.change(sel);
+    expect(text(a)).not.toContain("Men ·");
+    expect(a.querySelectorAll(".ans").length).toBe(2);
+    expect(all(a, ".l-card .l-row > .small")).toEqual(["4 answers", "4 answers"]);
+    expect(all(a, ".l-card p.small")).toEqual(Array(2).fill("Showing everyone: split by gender, a group has fewer than 3 answers to this question."));
   });
   it("ResultsAnswers: ?state= picks the perspective; an unknown value is the default", () => {
     expect(text(mount(ResultsAnswers, { state: "church" }).querySelector("main h2.h2"))).toBe("Church · Written · 4 answers");
@@ -191,6 +238,8 @@ describe("each board renders as a screen", () => {
     expect(all(a, "strong").filter((t) => /band/.test(t))).toEqual(["3 bands apart — talk about this", "2 bands apart — talk about this", "same band", "same band"]);
     expect(a.querySelectorAll("svg[data-part=band-barbell] g[role=img]").length).toBe(11);
     expect(a.querySelector("svg[data-part=band-barbell] g[aria-label='Community · Needs urgent attention'] circle")!.getAttribute("cx")).toBe("12.5%");
+    expect(text(a)).toContain("Translation team Strong · Church Strong · Community not asked"); // N2: space before the middot
+    expect(text(a)).not.toMatch(/\S· /);
   });
   it("ResultsGapsPhone: three gap cards with perspective counts", () => {
     const a = mount(ResultsGaps, { phone: true });
@@ -228,6 +277,9 @@ describe("each board renders as a screen", () => {
     expect(all(a, ".paper .solid[data-lens] .lvl-name")).toEqual(["Growing", "Needs support", "Growing"]);
     expect(all(a, ".paper ol li")).toEqual(["Community · Impactful — Needs urgent attention", "Community · Understandable — Needs urgent attention", "Translation team · External review — Needs support"]);
     expect(text(a.querySelector(".pfoot"))).toContain("1 of 1");
+    // N2: a space on both sides of the middot before "not asked"
+    expect(all(a, ".paper .l-grid > span.small:last-child").filter((t) => /not asked/.test(t))).toEqual(["same band · Community not asked"]);
+    expect(text(a)).not.toMatch(/\S· /);
   });
   it("ReportDetailed: four sheets, radar, numeric barbells, evidence tables", () => {
     const a = mount(ReportDetailed);
@@ -237,6 +289,10 @@ describe("each board renders as a screen", () => {
     expect(a.querySelectorAll("svg[data-part=score-barbell]").length).toBe(3 + 7);
     expect(all(a, "table").length).toBe(3);
     expect(all(a, "th.th")).toContain("Observation");
+    // N2: the notes after "gap n" keep the space before the middot
+    expect(all(a, ".paper .l-grid > span.small:last-child").filter((t) => /not asked/.test(t))).toEqual([
+      "gap 14 · Community not asked", "gap 4 · Community not asked", "gap 14 · Community not asked", "gap 9 · Translation team not asked", "gap 4 · Community not asked"]);
+    expect(text(a)).not.toMatch(/\S· /);
   });
   it("ReportDetailed on a phone renders the phone's reports list (F6: never a blank page)", () => {
     const a = mount(ReportDetailed, { phone: true });
@@ -299,24 +355,25 @@ describe("in-screen links (shared href(); cross-lane names as their lanes regist
   // Links this lane sets: the screen body, the phone bar, the document bar, and the shared headers' brand, crumb, back and menu.
   // (The shared TopBar's own workspace/help/account items are its links, not this lane's.)
   const OWN = "main a[href], .phone-bar a[href], header[data-variant=document] a[href], header.top > a.brand, nav.crumb a, .phone-top a[href]";
-  const names = new Set<string>();
+  // Each test mounts its own boards (no state shared between it() blocks), so any one runs alone (-t) or shuffled (N6).
+  const linksOf = (C: unknown, props: Props) => {
+    const q = props.phone ? "?ui_next=on&screen=x&w=phone&theme=dark" : "?ui_next=on&screen=x&theme=dark";
+    window.history.replaceState(null, "", `/next/${q}`); // href() carries ?w= and ?theme= from location.search
+    try {
+      return [...mount(C, props).querySelectorAll(OWN)].map((el) => ({ h: el.getAttribute("href")!, label: text(el) }));
+    } finally {
+      window.history.replaceState(null, "", "/");
+    }
+  };
+  const screenOf = (h: string) => new URLSearchParams(h.slice(1).split("#")[0]).get("screen")!;
   for (const [board, , C, props] of BOARDS) {
     it(`${board}: every link is a href() screen link or a named placeholder (F8: no #next-step/#share/#people/#setup)`, () => {
-      const q = props.phone ? "?ui_next=on&screen=x&w=phone&theme=dark" : "?ui_next=on&screen=x&theme=dark";
-      window.history.replaceState(null, "", `/next/${q}`); // href() carries ?w= and ?theme= from location.search
-      try {
-        const a = mount(C, props);
-        const links = [...a.querySelectorAll(OWN)];
-        expect(links.length).toBeGreaterThan(2);
-        for (const el of links) {
-          const h = el.getAttribute("href")!;
-          if (PLACEHOLDERS.includes(h)) continue;
-          expect(h, text(el)).toMatch(/^\?ui_next=on&screen=[a-z0-9-]+(&[a-z_]+=[^&#]+)*(#[a-z]+)?$/);
-          expect(h, text(el)).toContain(props.phone ? "&w=phone&theme=dark" : "&theme=dark");
-          names.add(new URLSearchParams(h.slice(1).split("#")[0]).get("screen")!);
-        }
-      } finally {
-        window.history.replaceState(null, "", "/");
+      const links = linksOf(C, props);
+      expect(links.length).toBeGreaterThan(2);
+      for (const { h, label } of links) {
+        if (PLACEHOLDERS.includes(h)) continue;
+        expect(h, label).toMatch(/^\?ui_next=on&screen=[a-z0-9-]+(&[a-z_]+=[^&#]+)*(#[a-z]+)?$/);
+        expect(h, label).toContain(props.phone ? "&w=phone&theme=dark" : "&theme=dark");
       }
     });
   }
@@ -326,9 +383,12 @@ describe("in-screen links (shared href(); cross-lane names as their lanes regist
       if (Object.keys(LANES[lane]).length) expect(REGISTRY[name], `${lane} lane registers ${name}`).toBeDefined();
     }
   });
-  it("in-lane destinations are registered", () => {
-    const own = [...names].filter((n) => !Object.values(OUT as Record<string, [string, string]>).some(([o]) => o === n));
-    expect(own.length).toBeGreaterThan(0);
+  it("in-lane destinations are registered (every board mounted here)", () => {
+    const names = new Set<string>();
+    for (const [, , C, props] of BOARDS) for (const { h } of linksOf(C, props)) if (!PLACEHOLDERS.includes(h)) names.add(screenOf(h));
+    const outNames = Object.values(OUT as Record<string, [string, string]>).map(([o]) => o);
+    const own = [...names].filter((n) => !outNames.includes(n));
+    expect(own.sort()).toEqual(["home", "report", "report-detailed", "results", "results-answers", "results-gaps"]);
     for (const n of own) expect([...Object.keys(results), "home"], n).toContain(n);
   });
 });

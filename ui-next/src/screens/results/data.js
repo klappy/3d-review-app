@@ -41,37 +41,47 @@ export function lensCards(payload, counts) {
   });
 }
 
-/** One band-barbell row per area name: dots placed at band centres, spread 5% apart in lens order when bands are shared. */
+/** One band-barbell row per area name: dots placed at band centres, spread 5% apart in lens order when bands are shared.
+ *  A perspective under the minimum responses (level "more") has no band, so it gets no dot and no part in the verdict or
+ *  span; like a perspective not asked, it is named in notes ("Church more input needed"). notes: the words after the verdict. */
 export function bandRow(report, counts, name) {
   const row = lensSpreadRows(report, { exact: true }).find((r) => r.name === name);
   if (!row) throw new TypeError(`results: no cross-perspective area "${name}" in the report`);
   const asked = LENS_ORDER.filter((lens) => row.lenses.some((s) => s.lens === lens));
-  const dots = asked.map((lens) => {
+  const levelled = asked.map((lens) => {
     const s = row.lenses.find((x) => x.lens === lens);
     return { lens, label: lensLabel(lens), score: s.score, level: levelOf(s.score, counts?.[lens] ?? s.n) };
   });
+  const dots = levelled.filter((d) => BANDS.includes(d.level));
+  const more = levelled.filter((d) => !BANDS.includes(d.level)).map((d) => d.label);
   for (const band of BANDS) {
     const here = dots.filter((d) => d.level === band);
     here.forEach((d, i) => { d.x = bandCentre(band) + 5 * (i - (here.length - 1) / 2); });
   }
-  const idx = dots.map((d) => BANDS.indexOf(d.level)).filter((i) => i >= 0);
+  const idx = dots.map((d) => BANDS.indexOf(d.level));
   const apart = idx.length ? Math.max(...idx) - Math.min(...idx) : 0;
   const span = apart >= 2 ? { from: 12.5 + 25 * Math.min(...idx), to: 12.5 + 25 * Math.max(...idx) } : null;
-  const verdict = apart >= 2 ? `${apart} bands apart — talk about this` : apart === 1 ? "1 band apart" : "same band";
+  const verdict = dots.length < 2 ? "too few perspectives to compare" : apart >= 2 ? `${apart} bands apart — talk about this` : apart === 1 ? "1 band apart" : "same band";
   const notAsked = LENS_ORDER.filter((lens) => !asked.includes(lens)).map(lensLabel);
+  const notes = [...more.map((l) => `${l} more input needed`), ...notAsked.map((l) => `${l} not asked`)];
   const question = (report.payload.cross_lens_multi || []).find((a) => a.construct_name === name)?.question;
-  return { name, question, dots, apart, span, verdict, notAsked, spread: row.spread, perspectives: asked.length };
+  return { name, question, dots, more, apart, span, verdict, notAsked, notes, spread: row.spread, perspectives: asked.length };
 }
 
-/** Numeric barbell rows (detailed report): exact scores on 0-100, red span at two bands apart or more, else a quiet span. */
+/** The words after a row's lead ("same band", "gap 14", the levels): " · "-joined, so no separator is lost in markup. */
+export const withNotes = (lead, row) => [lead, ...row.notes].filter(Boolean).join(" · ");
+
+/** Numeric barbell rows (detailed report): exact scores on 0-100, red span at two bands apart or more, else a quiet span.
+ *  Only the perspectives bandRow places get a dot (under the minimum: no score shown, named in notes). */
 export function scoreRows(report, counts, names) {
   const rows = lensSpreadRows(report, { exact: true });
   const pick = names ? names.map((n) => rows.find((r) => r.name === n)).filter(Boolean) : rows;
   return pick.map((r) => {
     const band = bandRow(report, counts, r.name);
-    const scores = r.lenses.map((s) => s.score);
-    return { name: r.name, spread: r.spread, from: Math.min(...scores), to: Math.max(...scores), alarm: band.apart >= 2, notAsked: band.notAsked,
-      dots: [...r.lenses].sort((a, b) => a.score - b.score).map((s) => ({ lens: s.lens, label: lensLabel(s.lens), score: s.score })) };
+    const placed = r.lenses.filter((s) => band.dots.some((d) => d.lens === s.lens));
+    const scores = placed.map((s) => s.score);
+    return { name: r.name, spread: r.spread, from: scores.length ? Math.min(...scores) : 0, to: scores.length ? Math.max(...scores) : 0, alarm: band.apart >= 2, notes: band.notes,
+      dots: [...placed].sort((a, b) => a.score - b.score).map((s) => ({ lens: s.lens, label: lensLabel(s.lens), score: s.score })) };
   });
 }
 
@@ -109,8 +119,10 @@ export function heldLines(counts) {
 export const pct = (count, n) => (n > 0 ? Math.floor((100 * count) / n) : 0);
 
 // Answers (ResultsAnswers boards): anonymous rows per perspective (fixtures/results/answers.json) aggregated here, as a
-// responses-aggregate read would (wiring debt 6 in the cookbook receipt). A split groups the rows by one attribute; a group
-// under MIN_RESPONSES is hidden (board footer: "splits with fewer than 3 answers are hidden").
+// responses-aggregate read would (wiring debt 6 in the cookbook receipt). A split groups the rows by one attribute. Board footer:
+// "splits with fewer than 3 answers are hidden". Hiding only the small group is not enough: Everyone minus the shown groups gives
+// its answers back. So a question shows its split only when every group, counted by answers to that question, meets
+// MIN_RESPONSES (complementary suppression); otherwise the question shows Everyone and says the split is held.
 export const SPLITS = Object.freeze(ANSWERS.splits.map(([key, label]) => Object.freeze({ key, label })));
 export const ANSWER_LENSES = Object.freeze(LENS_ORDER.filter((lens) => Object.hasOwn(ANSWERS.lenses, lens)));
 /** A known perspective key, else the fixture default (an unknown ?state= renders the default). */
@@ -133,27 +145,27 @@ function tally(q, i, rows) {
   return { n, options: q.options.map((label, k) => [label, counts[k]]) };
 }
 
-/** One perspective's answers, optionally split: { lens, label, answers, modality, focus: { area, level }, split, hidden, questions }. */
+/** One perspective's answers, optionally split: { lens, label, answers, modality, focus: { area, level }, split, questions }.
+ *  Each question: { id, q, others, n, options } for Everyone, plus groups (the split, [] when unsplit or held) and held
+ *  (true when the split is active but a group has fewer than MIN_RESPONSES answers to this question). */
 export function answerView(lens, split = "everyone") {
   const key = answerLens(lens), by = answerSplit(split), L = ANSWERS.lenses[key];
   const card = lensCards(REPORT.desktop.payload, REPORT.desktop.counts).find((c) => c.lens === key);
   const area = card?.rows.find((r) => r.name === L.focus);
   if (!area) throw new TypeError(`results answers: focus area "${L.focus}" is not a ${key} area in the report`);
   const groups = [];
-  if (by === "everyone") groups.push({ label: "Everyone", rows: L.rows });
-  else for (const r of L.rows) {
-    const g = groups.find((x) => x.label === r[by]);
+  if (by !== "everyone") for (const r of L.rows) {
+    const g = groups.find((x) => x.label === String(r[by]));
     if (g) g.rows.push(r); else groups.push({ label: String(r[by]), rows: [r] });
   }
-  const shown = groups.filter((g) => g.rows.length >= MIN_RESPONSES);
   return {
     lens: key, label: lensLabel(key), answers: L.rows.length, modality: ANSWERS.modality,
     focus: { area: area.name, level: area.level }, split: by,
-    hidden: groups.filter((g) => g.rows.length < MIN_RESPONSES).map((g) => g.label),
     questions: L.questions.map((q, i) => {
       const all = tally(q, i, L.rows);
-      return { id: q.id, q: q.q, others: q.others, n: all.n, options: all.options,
-        groups: by === "everyone" ? [] : shown.map((g) => ({ label: g.label, ...tally(q, i, g.rows) })) };
+      const parts = groups.map((g) => ({ label: g.label, ...tally(q, i, g.rows) }));
+      const held = parts.some((g) => g.n < MIN_RESPONSES);
+      return { id: q.id, q: q.q, others: q.others, n: all.n, options: all.options, held, groups: held ? [] : parts };
     }),
   };
 }

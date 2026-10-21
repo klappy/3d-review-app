@@ -1,6 +1,10 @@
 <!-- UI Next (v4) results lane: radar, detailed report only (design-system.md section 2 Radar row + R18: inline SVG, shared areas as
      spokes, one polygon per perspective, 2px strokes, markers >= 8px, wrapping labels; a perspective not asked about an area has no
      point on that spoke). Status: provisional. Board: ReportDetailed.dc.html (420 x 370, rings at 25/50/75/100).
+     Outline: one closed polygon through the points a perspective has, so it cuts across a skipped spoke, as the board draws it
+     (the community polygon has 3 points). The current UI's ui/report-radar.js instead breaks the outline at a skipped spoke
+     (polyline runs, closed only when every spoke is scored); that rule is a canvas R18 CORRECTIONS candidate, and this lane
+     follows the board until the board changes.
      Geometry from ./data.js radar() over ui/report-radar.js radarModel + wrap; colours are tokens (paper scope). -->
 <script>
   let { model } = $props();

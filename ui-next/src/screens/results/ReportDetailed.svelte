@@ -18,7 +18,7 @@
   import Radar from "./Radar.svelte";
   import Report from "./Report.svelte";
   import { href } from "../href.js";
-  import { REPORT, LENS_ORDER, lensLabel, lensCards, scoreRows, radar } from "./data.js";
+  import { REPORT, LENS_ORDER, lensLabel, lensCards, scoreRows, radar, withNotes } from "./data.js";
 
   let { phone = false, theme = "light" } = $props();
   const D = REPORT.desktop;
@@ -37,7 +37,7 @@
     <Grid template="barbell" gap={4}>
       <span class="small"><strong>{row.name}</strong></span>
       <ScoreBar {row} />
-      <span class="small">gap {row.spread}{#each row.notAsked as who} · {who} not asked{/each}</span>
+      <span class="small">{withNotes(`gap ${row.spread}`, row)}</span>
     </Grid>
   {/each}
   <PaperLegend />
