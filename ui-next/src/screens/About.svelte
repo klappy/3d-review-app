@@ -4,7 +4,7 @@
      Button, Disclosure); no <style>, no inline style. Rachel's copy (C02-C12) comes from ../copy/rachel.js only, generated from generator/copy_rachel.py.
      Learn more is a native <details> disclosure, open by default as the boards draw it (F03). One .btn-primary per page:
      desktop "Try the sample review" (experimentation card); phone "Take the tour" in the phone-bar (AboutPhone F03).
-     Deliberate departure: the "What you get back" trajectory sentence is not ported (C12 hold; VALIDATION-186 product yellow 3). -->
+     C12 "How often" ships in full, trajectory clause included (cookbook work/active/2026-10-19-current-ui-copy/RULING.md option 2, captain 2026-10-21). -->
 <script>
   import AppShell from "../AppShell.svelte";
   import Page from "../Page.svelte";

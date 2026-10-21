@@ -37,15 +37,16 @@ describe("copy/rachel.js is generated from the cookbook generator, byte for byte
     ].join("\n");
     expect(emit(parse(py))).toBe(readFileSync(resolve(__dirname, "../ui-next/src/copy/rachel.js"), "utf8"));
   });
-  it("C01-C12 are Rachel's paragraphs word for word; C12 without the trajectory clause", () => {
+  it("C01-C12 are Rachel's paragraphs word for word; C12 in full, trajectory clause included (cookbook current-ui-copy RULING option 2)", () => {
     expect(paras.length).toBe(16);
     for (const s of [R.C01, R.C02, R.LEARN_MORE, R.HOW_IT_WORKS]) expect(paras).toContain(s);
     for (const [k, label] of [["team", "Translation Team"], ["community", "Community"], ["church", "Church"]]) expect(paras).toContain(`${label}: ${R.CAPS[k]}`);
     for (const [t, d] of R.HOW) expect(paras).toContain(`${t} ${d}`);
     for (const [t, d] of R.WHO.slice(0, 2)) { expect(paras).toContain(t); expect(paras).toContain(d); }
     expect(paras).toContain(R.WHO[2][0]);
-    expect(paras).toContain(`${R.WHO[2][1]} to create a trajectory`);
-    for (const v of [About, Landing]) for (const p of [{}, { phone: true }]) expect(text(mount(v, p))).not.toMatch(/trajectory/);
+    expect(paras).toContain(R.WHO[2][1]);
+    expect(R.WHO[2][1]).toBe("Repeat when a new assessment would be useful, or over increments of time to create a trajectory");
+    for (const p of [{}, { phone: true }]) expect(text(mount(About, p))).toContain(R.WHO[2][1]);
   });
 });
 
