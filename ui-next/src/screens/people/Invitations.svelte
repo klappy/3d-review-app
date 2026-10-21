@@ -3,7 +3,8 @@
      Composed of AppShell > Page > Card / Stack / Row and the section 2 components; no <style>, no inline style.
      Data: ui-next/fixtures/people/invitations.json (GET /v2/me/invitations shape) through ui/v3/components/invite.js pendingInvitations()
      (./people-data.js invitationRows). One .btn-primary per page: desktop the first invitation's Accept (the board's), the others secondary;
-     phone "Accept and open the workspace" in the phone-bar. Links: ../href.js (carries w and theme); menu is the actions lane's name. -->
+     phone "Accept and open the workspace" in the phone-bar. Decline is a link to Home on both widths (no decline endpoint is wired yet;
+     the phone board links it Home). Links: ../href.js (carries w and theme); menu is the actions lane's name. -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
@@ -23,7 +24,7 @@
   // ?state=: no board draws one, so any value (the route passes it as state) renders the default; the prop is not read.
   let { phone = false, theme = "light" } = $props();
   const HOME = href("home"), WORKSPACE = href("workspace"), MENU = href("menu");
-  const rows = invitationRows(phone ? d.phone : d.desktop, { kinds: d.kinds, can: d.can, roles: d.roles });
+  const rows = invitationRows(phone ? d.phone : d.desktop, { kinds: d.kinds, can: d.can, roles: d.roles, phoneCan: d.phoneCan });
 </script>
 
 {#snippet check()}<Icon d={I.check} />{/snippet}
@@ -37,7 +38,7 @@
     {#each rows as r (r.key)}
       <Card gap={3} label="New">
         <span class="micro">New</span>
-        <Row gap={3}>{@render tile(I.mail)}<div><div><b>{r.name}</b></div><div class="small">{r.from} invited you to {d.phoneCan[r.role]} in this {r.kind} · {r.when}</div></div></Row>
+        <Row gap={3}>{@render tile(I.mail)}<div><div><b>{r.name}</b></div><div class="small">{r.phoneLine}</div></div></Row>
         <Row><Button label="Decline" href={HOME} block /></Row>
       </Card>
     {/each}
@@ -55,7 +56,7 @@
         {#each rows as r, i (r.key)}
           <div class="solid l-card l-row" data-pad="form" data-gap="4" role="group" aria-labelledby={`inv-${r.key}`}>
             {@render tile(I.mail)}<div data-grow=""><div class="h3" id={`inv-${r.key}`}>{r.title}</div><p class="small">{r.line}</p></div>
-            <Button label="Decline" variant="quiet" />{#if i === 0}<Button label="Accept" variant="primary" href={HOME} />{:else}<Button label="Accept" href={HOME} lead={check} />{/if}
+            <Button label="Decline" variant="quiet" href={HOME} />{#if i === 0}<Button label="Accept" variant="primary" href={HOME} />{:else}<Button label="Accept" href={HOME} lead={check} />{/if}
           </div>
         {/each}
         <a class="link" href={HOME}>Back to your reviews</a>

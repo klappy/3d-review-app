@@ -14,7 +14,7 @@ import { REGISTRY, LANES } from "../ui-next/src/screens/registry.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { route } from "../ui-next/src/route.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { rosterRows, inviteOptions, groupRows, invitationRows, NO_NAME } from "../ui-next/src/screens/people/people-data.js";
+import { rosterRows, inviteOptions, groupRows, invitationRows, NO_NAME, ANY_ROLE } from "../ui-next/src/screens/people/people-data.js";
 // @ts-expect-error -- plain .mjs script, no type declarations
 import { lintDir } from "../scripts/ui-next-lint.mjs";
 import People from "../ui-next/src/screens/people/People.svelte";
@@ -195,6 +195,13 @@ describe("Invitations and sign-in", () => {
     const accepts = [...a.querySelectorAll(".btn")].filter((b) => b.textContent === "Accept");
     expect(accepts.map((b) => b.classList.contains("btn-primary"))).toEqual([true, false]);
   });
+  it("C3: Decline is a link to Home on both widths (desktop no longer a button with no handler)", () => {
+    for (const phone of [false, true]) {
+      const declines = [...mount(lane.invitations, { phone }).querySelectorAll(".btn")].filter((b) => b.textContent === "Decline");
+      expect(declines.length, `phone=${phone}`).toBeGreaterThan(0);
+      for (const b of declines) expect([b.tagName, b.getAttribute("href")], `phone=${phone}`).toEqual(["A", "?ui_next=on&screen=home"]); // href() carries w from the address
+    }
+  });
   it("sign-in: the email field carries the board's address; the check step keeps the 6-digit code fallback", () => {
     // two mounted screens share the id si-email; jsdom resolves "#id" document-first, so query by type inside each .app
     const ph = mount(lane["sign-in"], { phone: true }).querySelector("input[type=email]") as HTMLInputElement;
@@ -231,5 +238,30 @@ describe("people-data.js adapts through the current UI's modules", () => {
     const unnamed = invitationRows({ invitations: [{ id: "n", role: "member", from: "Andy V.", scope: { type: "project", name: null } }, { id: "e", role: "viewer", from: "Steve W.", scope: { type: "assessment", name: "" } }] }, { kinds: invites.kinds, can: invites.can, roles: invites.roles });
     expect(unnamed.map((r: { name: string; title: string }) => [r.name, r.title])).toEqual([[NO_NAME, `${NO_NAME} · project`], [NO_NAME, `${NO_NAME} · review`]]);
     expect(unnamed.map((r: { title: string }) => r.title).join(" ")).not.toContain("null");
+  });
+  it("C1: Resend/Withdraw on a pending invitation follow invitationRoles(caller), as the current UI gates revocation", () => {
+    const roster = (myRole: string) => ({ grants: [{ id: "a", principal_id: "me", role: myRole }], pending_invitations: ["owner", "member", "viewer"].map((role) => ({ id: role, role, status: "pending", email: `${role}@example.org`, invited: "1 Oct" })) });
+    const acts = (myRole: string) => rosterRows(roster(myRole), { me: "me", roles }).rows.filter((r: { pending: boolean }) => r.pending).map((r: { key: string; actions: string[] }) => [r.key, r.actions]);
+    expect(acts("member")).toEqual([["owner", []], ["member", ["Resend", "Withdraw"]], ["viewer", ["Resend", "Withdraw"]]]);
+    expect(acts("owner")).toEqual([["owner", ["Resend", "Withdraw"]], ["member", ["Resend", "Withdraw"]], ["viewer", ["Resend", "Withdraw"]]]);
+    expect(acts("viewer")).toEqual([["owner", []], ["member", []], ["viewer", []]]);
+  });
+  it("C2: the invitation lines take the label's article and fall back for a role with no label, never 'a Owner' or 'undefined'", () => {
+    const opts = { kinds: invites.kinds, can: invites.can, roles: invites.roles, phoneCan: invites.phoneCan };
+    const inv = (role: string) => ({ id: `i-${role}`, role, from: "Andy V.", when: "2 days ago", expires: "24 Oct", scope: { type: "workspace", name: "BCS · India" } });
+    const rows = invitationRows({ invitations: ["member", "owner", "admin"].map(inv) }, opts);
+    expect(rows.map((r: { line: string }) => r.line)).toEqual([
+      "From Andy V. · as a Member — you can start and run reviews · expires 24 Oct",
+      "From Andy V. · as an Owner — you can change everything · expires 24 Oct",
+      `From Andy V. · as ${ANY_ROLE} · expires 24 Oct`,
+    ]);
+    expect(rows.map((r: { phoneLine: string }) => r.phoneLine)).toEqual([
+      "Andy V. invited you to facilitate reviews in this workspace · 2 days ago",
+      "Andy V. invited you to change everything in this workspace · 2 days ago",
+      "Andy V. invited you to join this workspace · 2 days ago",
+    ]);
+    expect(rows.map((r: { line: string; phoneLine: string }) => r.line + r.phoneLine).join(" ")).not.toMatch(/undefined|a Owner/);
+    // the screen renders the fallback too (an unknown role from the server never prints undefined on either width)
+    for (const phone of [false, true]) expect(text(mount(lane.invitations, { phone })), `phone=${phone}`).not.toContain("undefined");
   });
 });

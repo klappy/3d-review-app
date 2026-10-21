@@ -97,8 +97,8 @@
           </Row>
         </div>
         <nav class="glass tabs" aria-label="Review stages">
-          {#each TABS as [name, href, mark], i}
-            <a class="tab" {href} aria-current={mark === "now" ? "page" : undefined}>{#if mark === "done"}<span class="dot done"><Icon d={I.check} /></span>{:else}<span class="dot">{i + 1}</span>{/if}{name}{#if mark === "now"} <span class="now">Now</span>{/if}</a>
+          {#each TABS as [name, to, mark], i}
+            <a class="tab" href={to} aria-current={mark === "now" ? "page" : undefined}>{#if mark === "done"}<span class="dot done"><Icon d={I.check} /></span>{:else}<span class="dot">{i + 1}</span>{/if}{name}{#if mark === "now"} <span class="now">Now</span>{/if}</a>
           {/each}
         </nav>
       {:else}
