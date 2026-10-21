@@ -1,0 +1,78 @@
+{
+  "_note": "UI Next results lane fixture (provisional). Shape: the built report the current UI reads (ui/assess/v3-assessment.js v3ReportScores: payload.lenses[].score + sub_dimensions; ui/report-lenses.js lensSpreadRows: payload.cross_lens_multi/evidence). Values drawn from the boards (cookbook design/2026-10-15-glass-redesign/canvas Results, ResultsGaps, Report, ReportDetailed).",
+  "desktop": {
+    "review": { "project": "Hindi New Testament", "language": "Hindi", "modality": "Written", "title": "Mark 1–4 draft", "stage": "closed", "closed": "31 Oct", "closedLong": "31 October 2026", "builtOn": "31 Oct 2026", "responses": 18 },
+    "counts": { "team": 6, "community": 8, "church": 4 },
+    "payload": {
+      "lenses": [
+        { "lens": "team", "score": 70, "sub_dimensions": [
+          { "sub_dimension": "Translation process & brief", "score": 90, "items": 5, "note": "Brief named by all six; two cite the written document." },
+          { "sub_dimension": "Understanding the source", "score": 72, "items": 5, "note": "Source study happens; exegetical helps used by four of six." },
+          { "sub_dimension": "External review", "score": 48, "items": 3, "note": "No consultant visit since the Mark 1 draft." },
+          { "sub_dimension": "Consistency", "score": 70, "items": 3, "note": "Key-term list exists; not yet checked across chapters." },
+          { "sub_dimension": "Governance", "score": null, "items": 2, "note": "Fewer than 3 answers." } ] },
+        { "lens": "community", "score": 45, "sub_dimensions": [
+          { "sub_dimension": "Understandable", "score": 30, "items": 9, "note": "Five of eight find parts hard; “words not used here”." },
+          { "sub_dimension": "Appealing · written", "score": 62, "items": 6, "note": "Headings liked; verses “run together”." },
+          { "sub_dimension": "Impactful", "score": 18, "items": 8, "note": "Three not yet using it; none daily." },
+          { "sub_dimension": "Trust & open feedback", "score": 74, "items": 3, "note": "People feel free to say what they think." } ] },
+        { "lens": "church", "score": 66, "sub_dimensions": [
+          { "sub_dimension": "Confidence in the translation", "score": 71, "items": 3, "note": "Confident in the team, less in the draft." },
+          { "sub_dimension": "Readiness", "score": 44, "items": 3, "note": "Not yet read in services." },
+          { "sub_dimension": "Translation brief", "score": 86, "items": 3, "note": "Leaders know what kind of translation it is." },
+          { "sub_dimension": "Church involvement", "score": 88, "items": 2, "note": "Pastor involved attends checking sessions." },
+          { "sub_dimension": "Affirmation", "score": 70, "items": 3, "note": "Would recommend with revisions." },
+          { "sub_dimension": "Impact observation", "score": null, "items": 2, "note": "Fewer than 3 answers." } ] }
+      ],
+      "cross_lens_multi": [
+        { "construct_name": "Clarity / naturalness", "question": "Is the text easy to follow?", "lens_scores": [{ "lens": "team", "score": 88 }, { "lens": "community", "score": 30 }, { "lens": "church", "score": 64 }] },
+        { "construct_name": "Impact / use", "question": "Is it part of daily life?", "lens_scores": [{ "lens": "team", "score": 72 }, { "lens": "community", "score": 18 }, { "lens": "church", "score": 70 }] },
+        { "construct_name": "Trust / readiness", "question": "Can people say what they think?", "lens_scores": [{ "lens": "team", "score": 74 }, { "lens": "community", "score": 72 }, { "lens": "church", "score": 70 }] },
+        { "construct_name": "Brief & perceived fidelity", "question": "Does everyone know what kind of translation this is?", "lens_scores": [{ "lens": "team", "score": 90 }, { "lens": "church", "score": 86 }] },
+        { "construct_name": "Understanding of the source", "question": "Do the translators grasp the source text?", "lens_scores": [{ "lens": "team", "score": 72 }, { "lens": "church", "score": 58 }] },
+        { "construct_name": "Appeal / beauty", "question": "Do people like how it reads?", "lens_scores": [{ "lens": "community", "score": 62 }, { "lens": "church", "score": 71 }] },
+        { "construct_name": "Consistency", "question": "Are key terms used the same way?", "lens_scores": [{ "lens": "team", "score": 70 }, { "lens": "church", "score": 66 }] }
+      ],
+      "evidence": [
+        { "label": "team — Translation team survey", "n": 6 },
+        { "label": "community — Community survey", "n": 8 },
+        { "label": "church — Church survey", "n": 4 }
+      ]
+    },
+    "radar": ["Clarity / naturalness", "Impact / use", "Trust / readiness", "Brief & perceived fidelity", "Understanding of the source"],
+    "shapeReading": "The community shape collapses toward the centre on clarity and impact while the team and church stay wide — the same picture as the gaps above, seen whole.",
+    "gaps": { "biggest": ["Clarity / naturalness", "Impact / use", "Brief & perceived fidelity"], "agree": ["Trust / readiness"] },
+    "lookNext": [["community", "Impactful"], ["community", "Understandable"], ["team", "External review"]],
+    "standsOut": "The translation team reports a clear brief and a consistent process. The community finds the text hard to follow in places and does not yet use it in daily life. Church leaders are involved and confident, but say they are not yet ready to use it in services.",
+    "theirWords": ["Some words sound like the neighbouring dialect, not ours.", "The chapter headings are fine but the verses run together.", "We have the brief, we just haven’t had anyone from outside look at it yet."]
+  },
+  "held": {
+    "_note": "ResultsHeld / ResultsHeldPhone: the church survey is below the minimum (V3_BAND_CUTOFFS.minResponses), so every church level is More input needed.",
+    "review": { "closedResponses": 15 },
+    "counts": { "team": 6, "community": 8, "church": 1 },
+    "phoneCounts": { "church": 2 },
+    "preview": 3
+  },
+  "phone": {
+    "review": { "project": "Hindi New Testament", "language": "Hindi", "modality": "Written", "title": "Luke 1–2", "stage": "results" },
+    "counts": { "team": 9, "community": 10, "church": 5 },
+    "payload": {
+      "lenses": [
+        { "lens": "team", "score": 68, "sub_dimensions": [{ "sub_dimension": "Translation process & brief", "score": 84 }, { "sub_dimension": "External review", "score": 52 }] },
+        { "lens": "community", "score": 47, "sub_dimensions": [{ "sub_dimension": "Understandable", "score": 34 }, { "sub_dimension": "Impactful", "score": 22 }] },
+        { "lens": "church", "score": 64, "sub_dimensions": [{ "sub_dimension": "Readiness", "score": 46 }] }
+      ],
+      "cross_lens_multi": [
+        { "construct_name": "Clarity / naturalness", "lens_scores": [{ "lens": "team", "score": 86 }, { "lens": "community", "score": 32 }, { "lens": "church", "score": 66 }] },
+        { "construct_name": "Impact / use", "lens_scores": [{ "lens": "team", "score": 70 }, { "lens": "community", "score": 20 }, { "lens": "church", "score": 68 }] },
+        { "construct_name": "Brief & perceived fidelity", "lens_scores": [{ "lens": "team", "score": 88 }, { "lens": "church", "score": 84 }] }
+      ],
+      "evidence": [
+        { "label": "team — Translation team survey", "n": 9 },
+        { "label": "community — Community survey", "n": 10 },
+        { "label": "church — Church survey", "n": 5 }
+      ]
+    },
+    "gaps": { "biggest": ["Clarity / naturalness", "Impact / use", "Brief & perceived fidelity"], "agree": [] }
+  }
+}
