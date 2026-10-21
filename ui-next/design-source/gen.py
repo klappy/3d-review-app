@@ -93,6 +93,12 @@ details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}d
 .paper .pfoot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:12px;font-size: var(--t-13);color:var(--ink-3)}
 .psheet{overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.1),0 24px 48px -24px rgba(19,38,58,.4)}
 .psheet>.paper{width:794px;transform-origin:top left;box-shadow:none}
+/* §2 Paper preview (V-20, CORRECTIONS 31): .psheet[data-fit=a4|letter] scales the whole sheet to the width of its box (box ÷ sheet, no script, no inline transform);
+   the sheet keeps its own geometry: 794px A4 or 816px Letter, the paper size's aspect, 56/64 padding, a column at --sp-2. Height follows the aspect, never a fixed height.
+   The box fills its column (a port) or takes the board's width; never wider than the sheet. Provisional. */
+.psheet[data-fit]{container-type:inline-size;width:100%;max-width:794px;aspect-ratio:210/297}.psheet[data-fit=letter]{max-width:816px;aspect-ratio:8.5/11}
+.psheet[data-fit]>.paper{aspect-ratio:210/297;padding:56px 64px;display:flex;flex-direction:column;gap:var(--sp-2);transform:scale(tan(atan2(100cqi,794px)))}
+.psheet[data-fit=letter]>.paper{width:816px;aspect-ratio:8.5/11;transform:scale(tan(atan2(100cqi,816px)))}
 .paper .o{display:flex;align-items:center;gap:10px;font-size: var(--t-16);line-height:26px}
 .paper .o i{display:inline-block;width:16px;height:16px;border:1.5px solid var(--ink);border-radius:50%}
 .paper .o i.sq{border-radius: var(--radius-hair)}
@@ -130,8 +136,8 @@ details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}d
 .lensdot{display:inline-block;width:var(--dot);height:var(--dot);border-radius:50%;flex:none}
 [data-lens=team]{--lens:var(--team);--lens-soft:var(--team-soft)}[data-lens=community]{--lens:var(--community);--lens-soft:var(--community-soft)}[data-lens=church]{--lens:var(--church);--lens-soft:var(--church-soft)}/* R15: perspective paint comes from --lens / --lens-soft only */
 .lensdot[data-lens],.pt[data-lens]{background:var(--lens)}
-/* paper is always light: scope the light tokens so print boards read the same in dark mode */
-.paper{--ink:#13263a;--field-edge:#8494a3;--ink-2:#44576a;--ink-3:#566879;--line:rgba(19,38,58,.10);--line-2:rgba(19,38,58,.16);--field:#ffffff;--b-strong:#1d5f73;--b-growing:#3a8a82;--b-support:#b27617;--b-urgent:#b0502a;--b-more:#7a8a99;--team:#268f73;--community:#3a6fc0;--church:#b0770f;color:var(--ink)}
+/* paper is always light: scope the light tokens so print boards read the same in dark mode; --blend too, or dark mode screen-blends the brand mark to white on the white sheet (CORRECTIONS sh-4) */
+.paper{--ink:#13263a;--field-edge:#8494a3;--ink-2:#44576a;--ink-3:#566879;--line:rgba(19,38,58,.10);--line-2:rgba(19,38,58,.16);--field:#ffffff;--b-strong:#1d5f73;--b-growing:#3a8a82;--b-support:#b27617;--b-urgent:#b0502a;--b-more:#7a8a99;--team:#268f73;--community:#3a6fc0;--church:#b0770f;--blend:normal;color:var(--ink)}
 .paper .muted{color:var(--ink-2)}.paper .rule{border-color:var(--line-2)}
 
 .lvl .g{display:none;line-height:0}

@@ -18,6 +18,17 @@ This is a proposed correction, not evidence of applied provider settings. Before
 5. Revalidate the whole baseline and exact head gates before normal protected PR integration into main. The resulting push is the intended DEV build event; never manually start a build or upload/deploy from a seat.
 6. Match accepted main Git SHA to build source `push_event`, branch `main`, exact commit SHA and deployed DEV version. Confirm existing state identities, unchanged production and no stale queues, then release the freeze with an independent receipt. `/v2/health source_sha` is a cookbook contract pin, never the app Git SHA. Runtime version-stamp implementation remains separately owed.
 
+## DEV database migrations (Wrangler)
+
+DEV D1 `3d-review-dev` is tracked by Wrangler's own `d1_migrations` table (default `migrations_dir = ./migrations`, default table name; nothing set in `wrangler.toml`). It was baselined 2026-10-20 with 0001–0016 recorded as applied (no statement replayed; schema verified equal to a replay of `migrations/` first).
+
+The DEV trigger "Dev Deploy (main)" runs `node scripts/deploy-dev.mjs`, which in order:
+1. runs `scripts/prepare-roadmap-deploy.mjs dev` while it exists (retire it in a follow-up now that 0010 is tracked);
+2. runs `wrangler d1 migrations apply DB --remote` (binding `DB` → `3d-review-dev`); a failing migration fails the build and nothing deploys;
+3. runs `wrangler deploy --config wrangler.toml`.
+
+New schema changes land only as a new numbered file in `migrations/`. DEV applies it on the next push to main; production receives it only at promotion step 0, by the captain (HYGIENE 32), after DEV has run it. Never apply schema by hand with `d1 execute`.
+
 ## Failure and rollback
 
 Stop subsequent writes on head, rules, queue, trigger or version drift. A cancellation request is not terminal cancellation. Before main is populated, a reviewed rollback may restore the DEV listener to phase0; retain production on production. After population, use a compatible checked PR into main while keeping the correct filters. Never restore production→main, force-reset shared history, reset data or replay migrations/seeds. Verify the prior version after a failed build rather than assuming health. No manual dispatch, seat deployment or production authorization is supplied here.
