@@ -34,7 +34,7 @@
   {#if phone}
     <p class="small">What participants will read, hear or watch.</p>
     <div class="dz su-col">{@render choose("Choose a file", true)}<Button label="Paste a link" lead={link} block /></div>
-    <div class="l-row small" data-gap="2"><Glyph name="file" size={16} />{p.phoneFile.name} · {p.phoneFile.size} <Button label="Preview" variant="quiet" lead={eye} /></div>
+    <div class="l-row small" data-gap="2"><Glyph name="file" size={16} />{p.phoneFile.name} · {p.phoneFile.size} <Button label="Preview" variant="quiet" /></div>
     <Field label="Survey languages" id="sl" group help="Participants pick their language on the first screen.">
       <div class="l-row" data-wrap data-gap="2">{#each p.languages as [, short]}<span class="chip">{short} <button type="button" aria-label={`Remove ${short}`}><Glyph name="x" size={14} /></button></span>{/each}<Button label="Add" lead={plus} /></div>
     </Field>
