@@ -8,6 +8,12 @@ import { resolve } from "node:path";
 import { render } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 import Menu from "../ui-next/src/Menu.svelte";
+import App from "../ui-next/src/App.svelte";
+import Layouts from "../ui-next/src/Layouts.svelte";
+import HomeParts from "../ui-next/src/HomeParts.svelte";
+import Home from "../ui-next/src/screens/Home.svelte";
+import About from "../ui-next/src/screens/About.svelte";
+import Landing from "../ui-next/src/screens/Landing.svelte";
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), "ui-next", p), "utf8");
 const noComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -33,5 +39,47 @@ describe("a. type.css: an icon-only summary keeps the 44x44 target", () => {
   it("the helmet's .btn-icon width is the --target (44) and stays unbeaten", () => {
     expect(read("components/base.css")).toContain(".btn-icon{width:var(--target);padding:0}");
     expect(read("tokens.css")).toMatch(/--target:\s*44px/);
+  });
+});
+
+describe("b. gallery.css applies to the gallery pages only (lanes explore, setup, results, actions)", () => {
+  const gallery = rules(read("src/gallery.css"));
+  /** Top-level selector list split (commas inside :where()/:has() stay). */
+  const split = (sel: string) => { const out: string[] = []; let depth = 0, cur = ""; for (const ch of sel) { if (ch === "(") depth++; if (ch === ")") depth--; if (ch === "," && !depth) { out.push(cur.trim()); cur = ""; } else cur += ch; } return [...out, cur.trim()]; };
+  const selectors = gallery.flatMap(([s]) => split(s));
+  const SCREENS: [string, () => unknown][] = [
+    ["Home", () => render(Home, { props: { state: "first" } })], ["Home reviews", () => render(Home, { props: { state: "reviews" } })], ["Home phone", () => render(Home, { props: { phone: true } })],
+    ["About", () => render(About, {})], ["About phone", () => render(About, { props: { phone: true } })],
+    ["Landing", () => render(Landing, {})], ["Landing phone", () => render(Landing, { props: { phone: true } })],
+  ];
+  it("no gallery.css selector matches anything on a screen (body included)", () => {
+    expect(selectors.length).toBeGreaterThan(40);
+    for (const [name, mount] of SCREENS) {
+      mount();
+      for (const s of selectors) expect(document.querySelectorAll(s).length, `${name}: ${s}`).toBe(0);
+      document.body.innerHTML = "";
+    }
+  });
+  it("screens get the contract: .small, .chip and .h2 have no gallery override, so a.link.small keeps .link's --primary (helmet order)", () => {
+    for (const [s, d] of gallery) if (/(^|[\s,])\.app \.(chip|small|h2|h3|micro|kbd)\b/.test(s)) throw new Error(`unscoped gallery stand-in: ${s}{${d}}`);
+    const helmet = noComments(read("components/base.css"));
+    expect(helmet.indexOf("\n.small{")).toBeGreaterThan(0);
+    expect(helmet.indexOf("\n.link{")).toBeGreaterThan(helmet.indexOf("\n.small{")); // same specificity, .link later: --primary wins
+  });
+  it("the gallery pages keep every stand-in: each scoped selector matches what the old .app prefix matched there", () => {
+    const scoped = selectors.filter((s) => s.startsWith(".app:where(.gx-sheet, .gx-lay .app) "));
+    expect(scoped.map((s) => s.split(" ").pop())).toEqual([".chip", ".h2", ".h3", ".small", ".micro", ".kbd"]);
+    let hits = 0;
+    for (const C of [App, Layouts, HomeParts]) for (const phone of [false, true]) {
+      render(C, { props: { phone } });
+      expect(document.querySelectorAll("body:has(.gx-bar)").length).toBe(1);
+      for (const s of scoped) {
+        const old = s.replace(".app:where(.gx-sheet, .gx-lay .app) ", ".app ");
+        expect([...document.querySelectorAll(s)], s).toEqual([...document.querySelectorAll(old)]);
+        hits += document.querySelectorAll(s).length;
+      }
+      document.body.innerHTML = "";
+    }
+    expect(hits).toBeGreaterThan(0);
   });
 });
