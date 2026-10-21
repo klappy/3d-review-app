@@ -24,13 +24,13 @@
   import R from "../../../fixtures/actions/review.json";
   import D from "../../../fixtures/actions/share.json";
 
-  let { phone = false, theme = "light" } = $props();
+  let { phone = false, theme = "light", role = R.role } = $props();
   const PROJECT = "?ui_next=on&screen=project", COLLECT = "?ui_next=on&screen=collect", QR = "?ui_next=on&screen=qr-room", PEOPLE = "?ui_next=on&screen=people";
   const w = (href) => (phone ? `${href}&w=phone` : href);
   const links = $derived(Object.fromEntries(Object.entries(R.links).map(([k, v]) => [k, w(v)])));
   const menu = R.menu.map((it) => (it.icon ? { ...it, icon: A[it.icon] } : it));
   const crumbs = [{ label: R.project, href: PROJECT }, { label: R.review.title }];
-  const canShare = CAN_SHARE.has(R.role);
+  const canShare = $derived(CAN_SHARE.has(role));
 </script>
 
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="Share the survey" parent="Collect" back={w(COLLECT)} initials={R.user.initials} menuHref="?ui_next=on&screen=menu&w=phone" />{:else}<TopBar who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
