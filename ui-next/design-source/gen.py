@@ -33,12 +33,49 @@ EXTRA = """
 /* §9 phone hero card + list card paddings (were pcard/glass inlines) */
 .l-card[data-pad=hero]{border-radius:var(--radius-xl);padding:28px 24px;display:flex;flex-direction:column}.l-card[data-pad=list]{border-radius:var(--radius-l);padding:8px 18px;display:flex;flex-direction:column}
 details.dd>summary.dd-row{display:flex;justify-content:space-between;align-items:center;min-height:48px;font-weight:600;font-size:var(--t-15)}
+/* §9 Participant phone rows (auggie-fanout-participant-1133, provisional): were participant-board inlines; pixels unchanged unless a CORRECTIONS row says so */
+.phone-top[data-shell=participant]>.btn{padding:0 10px}/* the language button: brand · language, nothing else (§2 Phone chrome, V-19) */
+.app .lead-16,.app .small.lead-16{font-size:var(--t-16);line-height:24px;color:var(--ink-2)}/* participant lead line (PWelcome, PReceipt, PProblem) */
+.app[data-w=phone] .display.display-hero{font-size:var(--t-40);line-height:44px}/* PWelcome title; the receipt keeps the phone display row 36/40 */
+.facts{list-style:none;margin:0;padding:0}.facts>li{min-height:var(--target)}/* PWelcome facts: each row a 44px target line */
+.icn[data-size],.icn.icn-row{background:var(--lens-soft);color:var(--primary)}.icn[data-size][data-tone=neutral]{background:var(--line);color:var(--ink-2)}
+.icn[data-size="32"]{width:32px;height:32px}.icn[data-size="36"],.icn.icn-row{width:36px;height:36px}.icn[data-size="56"]{width:56px;height:56px;border-radius:var(--radius-l)}.icn[data-size="64"]{width:64px;height:64px;border-radius:var(--radius-l)}
+.row-opt.answer{min-height:60px;font-size:var(--t-16);line-height:22px}/* §2 Option row: participant answer rows 60px (Phone shell row) */
+.app .in.code{font-size:var(--t-24);letter-spacing:.14em;min-height:56px}.app .kbd.receipt{font-size:var(--t-20);letter-spacing:.12em}/* access code in, receipt out (§4 formats) */
+.passage{border-radius:var(--radius-l);overflow:hidden}
+.passage-text{padding:var(--sp-4);font-family:'Newsreader',Georgia,serif;font-size:var(--t-16);line-height:27px;height:300px;overflow:hidden;color:var(--ink)}
+.passage-foot{display:flex;align-items:center;gap:10px;padding:10px var(--sp-4);border-top:1px solid var(--line)}.passage-foot>:first-child{flex-grow:1}
+/* §8.1 Row: cross-axis start for an icon beside a two-line block = .l-row[data-align=start], one copy in the Collect lane rows (fanout reconcile) */
+/* Actions lane rows (auggie-fanout-actions-1133, rules 11 + 16, provisional): were NextStep, Share, PaperEntry, Print, Sandbox(+Phone), ActionPlan inlines; pixels unchanged */
+/* §1.2 type row .t-24: one copy, in the Explore-lane rows (fanout reconcile; same values) */
+.l-card[data-pad=work]{border-radius:var(--radius-xl);padding:32px 36px;display:flex;flex-direction:column}/* §8.2 desktop work card: the review page's one hi card (NextStep, Share, PaperEntry) */
+.l-grid[data-tpl=aside-wide]{grid-template-columns:minmax(0,1fr) 380px;align-items:start}/* §8 Grid: work card + 380px aside (NextStep; the 340px aside is canvas-collect-gaps' aside) */
+.row-opt[data-kind=gap]{min-height:60px;display:grid;grid-template-columns:22px 230px 1fr 130px;gap:14px;align-items:center}/* §2 Option row, gap form: tick · area · mini barbell · bands apart (NextStep) */
+.l-card[data-accent=practice],.glass-hi[data-accent=practice]{border-top:var(--accent-bar) solid var(--b-support)}/* §2 practice copy accent bar (Sandbox simulate card) */
+.qr[data-size=plan]{width:72px}/* §2 QR on the plan's share line (ActionPlan) */
+.link[data-tone=danger]{color:var(--b-urgent)}/* §2 Link, destructive tone (SandboxPhone "Delete this practice copy") */
 /* §2 Media card (captain 2026-10-20 22:29 ET, provisional): 16:10 dark frame, play affordance, title · duration line, caption */
 .l-media{border-radius:var(--radius-xl);padding:20px;display:flex;flex-direction:column;gap:14px}
 .l-media-frame{aspect-ratio:16/10;border-radius:var(--radius-l);background:var(--ink);display:grid;place-items:center;color:var(--ground);position:relative;overflow:hidden}
 .l-media-frame>video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .l-media-play{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.14);color:var(--field)}
 .l-media-title{position:absolute;left:16px;bottom:14px;color:rgba(255,255,255,.8)}
+/* Explore-lane gaps (auggie-fanout-explore-1133, playbook rules 11 + 16, provisional): Explore, Help and Feedback board inlines closed as rows; values as the boards drew them */
+.l-row[data-wrap]{flex-wrap:wrap}.l-row[data-split]{justify-content:space-between}/* §8.1 Row variants the app already ships (ui-next/components/layout.css), generator first now */
+.l-grid[data-tpl=aside-end]{grid-template-columns:minmax(0,1fr) 300px;align-items:start}.l-grid[data-tpl=aside-start]{grid-template-columns:260px minmax(0,1fr);align-items:start}/* §8 Grid: table + filter aside (Explore), section nav + article (Help) */
+.l-measure{max-width:720px}/* §8.3 reading measure inside a track (Help article) */
+.side-nav{position:sticky;top:var(--sp-5);display:flex;flex-direction:column;border-radius:var(--radius-l);padding:12px 18px}.side-nav a{display:flex;align-items:center;min-height:40px;color:var(--ink-2);font-weight:500}.side-nav a[aria-current]{font-weight:700}
+.l-card[data-pad=table]{border-radius:var(--radius-l);padding:8px 4px}.tbl-wrap{overflow-x:auto}.tbl{width:100%;border-collapse:collapse}.tbl td:first-child{font-weight:600}/* §2 Table: the card scrolls sideways, the page never does */
+.chip[data-on]{background:var(--sel);border-color:var(--primary)}/* §2 Field chip: an applied filter */
+.menu[data-flow]{position:static;width:auto}/* §2 Menu drawn open in the page flow (Explore "Add a filter") */
+.sel[data-size=compact]{width:170px}.sel[data-size=compact] .in{min-height:40px;padding:6px 42px 6px 12px}.seg[data-inline]{width:200px}/* §2 Field and Segmented in a toolbar row */
+.app .t-24,.app .h2.t-24{font-size:var(--t-24)}/* §1.2 type row: 24px section and dialog headings */
+.l-media[data-dir=row]{display:grid;grid-template-columns:220px 1fr;align-items:center;gap:20px}.l-media[data-dir=row] .l-media-frame{border-radius:var(--radius-m);color:var(--field)}/* §2 Media card, row form (Help) */
+.l-card[data-pad=rows]{border-radius:var(--radius-l);padding:4px 14px;display:flex;flex-direction:column;gap:0}.list-row{display:flex;align-items:center;gap:12px;min-height:60px;padding:8px 4px;border-top:1px solid var(--line)}.list-body{flex-grow:1;min-width:0}.list-title{font-weight:600;font-size:var(--t-15);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dd-body{padding-bottom:10px}/* §9 phone list card of rows (ExplorePhone, HelpPhone) */
+.dialog:not(dialog){width:600px;max-width:calc(100% - 32px);border-radius:var(--radius-xl);padding:36px;background:var(--dialog);color:var(--ink)}.scrim{position:absolute;inset:0;background:var(--scrim)}/* §2 Dialog drawn on a board (static div, Play has no script): a port renders <dialog class="glass-hi"> + showModal(), whose geometry and ::backdrop are canvas-collect-gaps' dialog.glass-hi rows; a board draws .scrim */
+.sheet:not(dialog){border-radius:var(--radius-xl) var(--radius-xl) 0 0;display:flex;flex-direction:column;gap:2px}.sheet[data-pad=menu],dialog.glass-hi.sheet[data-pad=menu]{padding:8px 12px 28px}.sheet-handle{width:36px;height:4px;border-radius:var(--radius-hair);background:var(--line-2);margin:4px auto 10px}.mi[data-size=lg]{min-height:52px}/* §9 sheet: the modal geometry is canvas-collect-gaps' dialog.glass-hi.sheet row; these add a board-drawn sheet, the menu-rows padding, the handle (decoration) and 52px rows */
+.l-card[data-pad=bar]{border-radius:var(--radius-l);padding:12px 16px}.tbl-foot{padding:12px 12px 4px}.mi-end{margin-left:auto}.l-row>.btn-block{flex-grow:1;width:auto}/* toolbar card, table footer, a menu row's trailing value, a growing button in a row */
+.scrim[data-sheet]{z-index:20;display:flex;flex-direction:column;justify-content:flex-end}.dialog[data-at=board]{position:absolute;left:50%;top:80px;margin-left:-300px}.sheet-title{padding:0 12px 6px}/* board drawing of the modal layer (Play has no script) */
 details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}details.dd>summary::-webkit-details-marker{display:none}
 .menu{position:absolute;right:0;top:52px;width:300px;border-radius: var(--radius-l);padding:8px;display:flex;flex-direction:column;gap:2px;z-index:5}
 .mi{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius: var(--radius-m);text-decoration:none;color:var(--ink);font-weight:600;font-size: var(--t-15);background:transparent;border:0;font-family:inherit;cursor:pointer;text-align:left;width:100%}
@@ -103,6 +140,112 @@ details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}d
 .tag svg{flex-shrink:0}
 .tag[data-kind=practice]{border:1px solid var(--line-2);color:var(--ink)}
 .app[data-imagery=bars] .g-bars,.app[data-imagery=faces] .g-faces,.app[data-imagery=jars] .g-jars,.app[data-imagery=plants] .g-plants{display:inline-flex}
+/* §8.7 Collect lane rows (auggie-fanout-collect-1133, provisional): were board inlines on Collect*, CloseCollection*, QRRoom*, PrintQR* (boards_fac.py, boards_fphone.py, gen.py review_head/room_health/qr) */
+.app [data-grow]{flex-grow:1;min-width:0}
+.l-row[data-align=baseline]{align-items:baseline}.l-row[data-align=start]{align-items:flex-start}.l-row[data-justify=end]{justify-content:flex-end}
+.l-stack[data-align=center]{align-items:center;text-align:center}
+.l-grid[data-tpl=aside]{grid-template-columns:minmax(0,1fr) 340px;align-items:start}
+.l-grid[data-tpl=survey-row]{grid-template-columns:minmax(0,1fr) 180px 100px auto;align-items:center;min-height:56px;border-top:1px solid var(--line)}.l-grid[data-tpl=survey-row]>.num{text-align:right}
+.num[data-size="40"]{font-size:var(--t-40)}.num[data-size="20"]{font-size:var(--t-20)}
+.qr[data-size=room]{width:176px}.qr[data-size=phone]{width:260px}.qr[data-size=page]{width:440px}
+.app[data-w=phone] .tabs{padding:4px}.app[data-w=phone] .tab{min-height:40px;font-size:var(--t-13);padding:0 6px;gap:6px}
+dialog.glass-hi{border-radius:var(--radius-xl);padding:36px;background:var(--dialog);color:var(--ink);width:min(560px,calc(100% - 48px));max-height:calc(100dvh - 48px);overscroll-behavior:contain}
+dialog.glass-hi[data-w=wide]{width:min(1000px,calc(100% - 48px));padding:32px 36px}
+dialog.glass-hi::backdrop{background:var(--scrim)}
+dialog.glass-hi.sheet{margin:auto 0 0;width:100%;max-width:100%;border-radius:var(--radius-xl) var(--radius-xl) 0 0;padding:20px 20px 28px}
+html:has(dialog[open]:modal){overflow:hidden}
+/* People lane rows (auggie-fanout-people-1133, playbook rules 11 + 16, provisional): People*, Workspace*, Invitations*, SignIn* board inlines closed as rows, values as the boards drew them. Dialog/sheet geometry and ::backdrop, .tbl, .list-row, .t-24, [data-grow], .l-stack[data-align=center] and .num[data-size="20"] are the collect/explore lane rows (PRs 190 and the explore gaps PR), not repeated here */
+.l-grid[data-cols="5"]{grid-template-columns:repeat(5,minmax(0,1fr))}/* §8 Grid: the Workspace stat strip, five equal tiles */
+.num[data-size="36"]{font-size:var(--t-36);line-height:40px}/* §1.2 numeral: a stat tile's figure */
+.l-main[data-rhythm=center]{justify-content:center;padding:var(--sp-6) var(--gutter)}/* §8.2 a single-card page centred in the viewport (SignInCheck; Invitations) */
+.icn[data-size="28"],.app .icn.icn-lens.su-icn-s{width:28px;height:28px;border-radius:var(--radius-s)}/* §2 lens chip on a project card (36/56/64 are the participant rows) */
+.av[data-size="28"]{width:28px;height:28px;font-size:var(--t-11);border-radius:var(--radius-s)}.av[data-logo]{border:1.5px dashed var(--field-edge);background:var(--field);color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}/* §2 organisation mark: the logo slot, else the initial */
+.th[data-align=end],.td[data-align=end]{text-align:right}/* §2 Table: the Actions column */
+.l-card[data-pad=form]{border-radius:var(--radius-l);padding:16px 18px}.l-grid[data-tpl=invite]{grid-template-columns:minmax(0,1fr) 200px auto;align-items:end}/* §2 Invite row: email · role · Send invitation, in a .solid well */
+.in-search{position:relative}.in-search>svg{position:absolute;left:12px;top:13px;color:var(--ink-2);pointer-events:none}.in-search>.in{padding-left:40px;min-height:44px}/* §2 Field: search with a leading icon */
+.seg[data-size=wide]{width:320px}/* §2 Segmented in a section head (Workspace: Active · All · Archived) */
+/* 8.10 Setup lane rows (auggie-fanout-setup-1133, provisional): the setup flow and Project inlines as classes; spacing --sp-*, type --t-*, radius --radius-*; px = a component dimension (design-system.md 8.10) */
+/* Rows shared with other lanes' canvas gap PRs (same rule, same name; listed as overlaps in RESULTS-setup.md):
+   [data-grow] = canvas-collect-gaps (cookbook PR 190); .l-row[data-align=start] = canvas-participant-gaps (PR 189) and canvas-collect-gaps. A board's flex-grow:1 / align-items:flex-start inline. */
+/* fanout reconcile: these two rules are kept once, in the Collect lane rows above (same values) */
+
+/* Setup stepper (design-system.md "Tab states and .now-dot", R17): ol.tabs.steps, current aria-current="step", done a link, upcoming --ink-3 */
+.app ol.tabs.steps{margin:0;list-style:none}
+.app .steps>li{flex:1;display:flex;min-width:0}
+.app .steps .tab[aria-current=step]{background:var(--field);color:var(--ink);box-shadow:var(--sh-1)}
+.app .steps .tab[aria-disabled=true]{color:var(--ink-3)}
+.app .steps .tab[aria-current=step] .dot{border-color:var(--primary);color:var(--primary)}
+
+/* Setup page: Page narrow with gap --sp-6 (8.1 Page row: "the setup Page sets --sp-6"; .l-page reads --sp-5 only, so data-gap does not reach it) */
+.app .l-page.su-page{gap:var(--sp-6)}
+
+/* Setup step card (8.1 Card row: desktop inner padding --sp-6; 8.5 setup_shell = Page narrow + one glass-hi Card; board 40/44 -> 32) */
+.app .l-card[data-pad=setup]{border-radius:var(--radius-xl);padding:var(--sp-6)}
+
+/* Phone setup progress (section 9: during setup the stepper is the progress bar; R13 setup step header) */
+.app .bar[data-step]>span{background:var(--primary)}
+.app .bar[data-step="1"]>span{width:20%}.app .bar[data-step="2"]>span{width:40%}.app .bar[data-step="3"]>span{width:60%}.app .bar[data-step="4"]>span{width:80%}.app .bar[data-step="5"]>span{width:100%}
+
+/* Field (section 2 Field row, gen.py field()): label, control, help/error in a column; help 6 -> --sp-2. Phone setup fields draw 52px (board inline; gap row) */
+.app .su-field{display:flex;flex-direction:column;min-width:0}
+.app .su-field>.field-help,.app .su-field>.field-error{margin-top:var(--sp-2)}
+.app[data-w=phone] .su-form .in{min-height:52px}
+
+/* Language search (section 2 Language search row): leading search icon inside .in[type=search] (board 40px indent -> --sp-6) */
+.app .su-search{position:relative;display:block}
+.app .su-search>svg{position:absolute;left:var(--sp-3);top:50%;transform:translateY(-50%);color:var(--ink-2);pointer-events:none}
+.app .su-search>.in{padding-left:var(--sp-6)}
+
+/* Language search result rows are buttons (board: font inherit, --ink, left, full width) */
+.app button.row-opt.su-match{font:inherit;color:var(--ink);text-align:left;width:100%}
+
+/* Drop zone stacked (Setup2Phone): .dz as a column of block buttons */
+.app .dz.su-col{flex-direction:column;align-items:stretch;gap:var(--sp-2)}
+
+/* Inset tile on a setup card (Setup2 attached file, Setup5 lock note): .solid surface, --radius-l */
+.app .su-tile{border-radius:var(--radius-l);padding:var(--sp-3) var(--sp-4)}
+
+
+/* Perspective group row (Option row exception "a div.row-opt holding labelled controls", R10) with its role rows and expected counts (R31) */
+.app .row-opt.su-group{flex-direction:column;align-items:stretch;padding:var(--sp-4);gap:var(--sp-4)}
+.app .su-role{display:flex;align-items:center;gap:var(--sp-2);cursor:pointer}
+.app .su-role>.small{margin-left:auto}
+.app .in.su-count{width:64px;min-height:var(--target);text-align:center;flex:none}
+.app .seg.su-stepper{padding:var(--sp-1)}
+.app .seg .btn-icon.su-step{min-height:36px;width:36px}
+.app .su-num{display:grid;place-content:center;width:40px;font-size:var(--t-20)}
+
+/* Group context disclosures (Disclosure contract V-12, details.disc) as rows of a card: flush, ruled */
+.app .su-ctx details.disc{padding:0;border-radius:0;border-top:1px solid var(--line)}
+.app .su-ctx details.disc>summary.disc-sum{min-height:52px}.app .su-ctx details.disc>summary.disc-sum:not(.h3){font-weight:400}
+.app .su-groups>details.disc{border-top:0}/* phone: the group sections are not ruled, their survey disclosures are */
+/* small perspective chip .su-icn-s (board 28px; .icn-lens is 40): one rule with .icn[data-size="28"] in the People lane rows (fanout reconcile) */
+.app .su-ctx .disc-body{padding:var(--sp-1) 0 var(--sp-3)}
+
+/* Setup5 summary rows (label column, value, Edit) and the phone summary line */
+.app .su-sumrow{display:grid;grid-template-columns:220px 1fr auto;gap:var(--sp-4);align-items:start;padding:var(--sp-3) 0;border-top:1px solid var(--line)}
+.app .su-summary{display:flex;flex-direction:column}
+.app .su-sumrow>.lbl{margin:0}
+.app .su-line{min-height:48px;border-top:1px solid var(--line)}
+.app .su-kv{display:flex;flex-direction:column;min-width:0}/* label over value, no gap (board) */
+
+/* Project: two-track page (reviews | over time) and the review row inside a card link */
+.app .l-grid[data-tpl=su-project]{grid-template-columns:minmax(0,1fr) 460px;align-items:start}
+.app .card-link.su-rev{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:var(--sp-4);align-items:center;padding:var(--sp-4)}/* board 16/20 -> --sp-4 (8.2: 18/20 -> 16) */
+.app .su-rev>.go{color:var(--ink-2)}
+.app .card-link.su-revline{display:flex;align-items:center;gap:var(--sp-3);min-height:64px;border-top:1px solid var(--line);padding:var(--sp-2) 0}
+.app .su-revcol{display:flex;flex-direction:column}
+.app .su-revcol>.l-row{margin-top:var(--sp-1)}
+.app .su-clip{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+/* Results lane rows (auggie-fanout-results-1133, 2026-10-21, provisional; design-system.md 8.11 "Results lane rows"): were board inlines.
+   Phone stage tabs: the collect lane's row (8.7 Collect lane rows, #190) serves the results phone boards too; not repeated here. */
+/* §2 Perspective card area row: one area and its level, 44px over a --line edge, 36px on a phone (lens_card(), f_results() inlines) */
+.lvl-row{display:flex;align-items:center;justify-content:space-between;min-height:44px;border-top:1px solid var(--line)}.app[data-w=phone] .lvl-row{min-height:36px}
+/* §2 Paper sheet: .paper[data-sheet], the 794px report page, 1000px tall; data-sheet=a4 (the overview) 1120px (paper() inline).
+   The class stays exactly "paper" so the §1.3 paper scope and lint.py paper_blocks() still find it. */
+.paper[data-sheet]{width:794px;min-height:1000px;break-inside:avoid;padding:56px 64px;display:flex;flex-direction:column;gap:var(--sp-5);border-radius:var(--radius-s)}.paper[data-sheet=a4]{min-height:1120px}
+/* Held results preview: the perspective cards behind a hold are drawn dimmed (and aria-hidden on the board) (results_held() inline) */
+.l-grid[data-state=held]{opacity:.45}
 """
 H = HELMET.replace('</style>\n</helmet>', EXTRA + '</style>\n</helmet>')
 
@@ -213,15 +356,17 @@ def topbar(crumb=None, menu_open=False, who='Bincy', right=True):
 
 STEPS = ['Details', 'The passage', 'Who will participate?', 'About each group', 'Launch']
 def stepper(cur):
+    # R17 setup stepper (design-system.md "Tab states and .now-dot"; 8.10 Setup lane rows): ol.tabs.steps, done = link back,
+    # current = aria-current="step" (its dot in --primary), upcoming = aria-disabled, --ink-3. Was nav.tabs + inline colours.
     out = []
     for i, s in enumerate(STEPS, 1):
         if i < cur:
-            out.append(f'<a class="tab" href="Setup{i}.dc.html"><span class="dot done">{ic("check",13,2.5)}</span>{s}</a>')
+            out.append(f'<li><a class="tab" href="Setup{i}.dc.html"><span class="dot done">{ic("check",13,2.5)}</span>{s}</a></li>')
         elif i == cur:
-            out.append(f'<a class="tab" href="Setup{i}.dc.html" aria-current="page"><span class="dot" style="border-color: var(--primary); color: var(--primary)">{i}</span>{s}</a>')
+            out.append(f'<li><span class="tab" aria-current="step"><span class="dot">{i}</span>{s}</span></li>')
         else:
-            out.append(f'<span class="tab" style="color: var(--ink-3)"><span class="dot">{i}</span>{s}</span>')
-    return f'<nav class="glass tabs" aria-label="Setup steps" style="width: 100%">{"".join(out)}</nav>'
+            out.append(f'<li><span class="tab" aria-disabled="true"><span class="dot">{i}</span>{s}</span></li>')
+    return f'<ol class="glass tabs steps" aria-label="Setup steps">{"".join(out)}</ol>'
 
 def setup_shell(cur, title, body, foot, h):
     return (f'<div class="app" data-theme="{{{{theme}}}}" style="width: 1440px; height: {h}px">'
@@ -229,9 +374,9 @@ def setup_shell(cur, title, body, foot, h):
             '<div class="layer l-shell">'
             f'<header class="top">{brand()}<span class="small" aria-hidden="true" style="color: var(--ink-3)">/</span><span class="h3">Start a 3D Review</span>'
             f'<div style="margin-left: auto; display: flex; align-items: center; gap: 12px"><span class="micro">Draft saved</span>{btn("Close", "Home.dc.html", "btn-quiet", lead="x")}</div></header>'
-            '<div class="l-main" style="padding: var(--sp-6) 0 var(--sp-7)"><div class="l-page" data-w="narrow" style="gap: var(--sp-6)">'
-            f'<div>{stepper(cur)}</div>'
-            f'<section class="glass-hi enter l-stack" data-gap="6" style="border-radius: var(--radius-xl); padding: 40px 44px">'
+            '<div class="l-main" style="padding: var(--sp-6) 0 var(--sp-7)"><div class="l-page su-page" data-w="narrow" data-gap="6">'
+            f'{stepper(cur)}'
+            f'<section class="glass-hi enter l-card l-stack" data-pad="setup" data-gap="6">'
             f'<h1 class="h1">{title}</h1>{body}'
             f'<div class="l-row" style="justify-content: space-between; padding-top: var(--sp-2)">{foot}</div>'
             '</section></div></div></div></div>')
@@ -393,8 +538,9 @@ def phone(title, h, header, main, bar=None, w=390, hh=844):
     return page(title, body, w, hh)
 
 def phone_header(lang=True, brandlabel=True):
-    lang_btn = f'<button class="btn btn-quiet" type="button" aria-label="Language: English" style="padding: 0 10px">{ic("globe")} English {ic("chev",16)}</button>' if lang else ''
-    return f'<header class="phone-top"><span class="brand" style="font-size: var(--t-16)">{MARK.format(s=26)}{"<span>3D Review</span>" if brandlabel else ""}</span>{lang_btn}</header>'
+    # participant shell (design-system.md §2 Phone chrome, V-19): brand as plain text -> the language button; padding from the §9 participant row
+    lang_btn = f'<button class="btn btn-quiet" type="button" aria-label="Language: English">{ic("globe")} English {ic("chev",16)}</button>' if lang else ''
+    return f'<header class="phone-top" data-shell="participant"><span class="brand">{MARK.format(s=26)}{"<span>3D Review</span>" if brandlabel else ""}</span>{lang_btn}</header>'
 
 def qr(seed=7):
     cells = []
