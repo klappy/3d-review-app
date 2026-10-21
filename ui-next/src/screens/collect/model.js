@@ -71,6 +71,15 @@ export function printPages(per, ticked) {
 export const plural = (k, one, many) => `${k} ${k === 1 ? one : many}`;
 export const pagesLabel = (k) => plural(k, "page", "pages");
 
+// Why "Delete this review" is refused, naming only what blocks it, never "This one has 0." (VALIDATION-collect-r4.md N2). The server
+// deletes an empty review only (ui/v3/components/delete-assessment.js deleteImpact, D5): responses block it, else its surveys do.
+// An empty review could be deleted, but UI Next has no delete flow wired yet, so the row still says why it cannot act here.
+export function deleteRefusal(m) {
+  if (m.answered > 0) return `Reviews with responses can't be deleted. This one has ${m.answered}.`;
+  if (m.surveys.length > 0) return `Reviews with surveys can't be deleted. This one has ${plural(m.surveys.length, "survey", "surveys")}.`;
+  return "Deleting a review isn't available on this screen yet.";
+}
+
 // PrintQR's layout choice, keyed by its title (never by position): the chosen layout when the data still has it, else the data's
 // first, so a data row with fewer layouts never leaves the choice pointing at nothing. A data row with no layouts is a data error.
 export function pickLayout(layouts, title) {

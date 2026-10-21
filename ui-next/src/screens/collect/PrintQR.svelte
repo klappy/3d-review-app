@@ -14,7 +14,9 @@
      ticked survey's full-page code; hand-out cards: that survey's cards; all on one page: every ticked code) with its "1 of N" footer.
      The text language and the paper size are held but not drawn: the scan line has one (English) source and there is no Letter sheet row
      (RESULTS-collect.md Round 3, handed back). Nothing ticked: Print is disabled and the reason shows in the action row, start-aligned
-     beside Cancel and Print (a polite status kept in the row, so saying why adds no line and the form still fits the 1280x800 modal).
+     beside Cancel and Print (a polite status kept in the row, so saying why adds no line and the form still fits the 1280x800 modal);
+     the disabled Print names it with aria-describedby, the phone status is always mounted too (N1), and the preview column says
+     what fills it instead of standing blank (N3, VALIDATION-collect-r4.md).
      One .btn-primary: "Print N pages".
      Print surveys (the questions) is a pointer to the Print screen, never a second print here (R32 one home). The boards draw one state
      (the open form): any ?state= renders it. -->
@@ -45,11 +47,12 @@
   // What the preview's first page holds: one survey's full page, or a grid of codes (that survey's cards, or every ticked code).
   const cells = $derived(!first || lay.per === "survey" ? [] : lay.per === "one" ? chosen : Array.from({ length: lay.cards }, () => first));
   const WHY = "Tick at least one survey to print its page.";
+  const EMPTY = "Tick a survey to preview its page here.";
 </script>
 
 {#snippet print()}<Glyph name="print" />{/snippet}
 {#snippet chev()}<Glyph name="chev" />{/snippet}
-{#snippet phoneBar()}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Cancel" variant="quiet" href={href("collect")} />{#if n}<Button label={`Print ${pagesLabel(n)}`} variant="primary" lg href={href("collect")} lead={print} />{:else}<Button label="Print" variant="primary" lg disabled lead={print} />{/if}</div>{/snippet}
+{#snippet phoneBar()}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Cancel" variant="quiet" href={href("collect")} />{#if n}<Button label={`Print ${pagesLabel(n)}`} variant="primary" lg href={href("collect")} lead={print} />{:else}<Button label="Print" variant="primary" lg disabled ariaDescribedby="print-qr-why" lead={print} />{/if}</div>{/snippet}
 {#snippet title()}
   <div>
     <!-- The title sits in a row so its focus ring hugs the words, not the block's width. -->
@@ -67,7 +70,8 @@
       <span class="micro" id="qr-pages-title">QR code pages</span>
       <p class="small">One {paper} page per survey, with the link printed under the code.</p>
       {#each m.surveys as s (s.code)}<label class="row-opt"><input class="cb" type="checkbox" checked={picked.includes(s.code)} onchange={(e) => tick(s.code, e.currentTarget.checked)} /><span class="h3" data-grow>{s.name}</span><Glyph name="qr" size={16} /></label>{/each}
-      {#if !n}<p class="small field-help" role="status">{WHY}</p>{/if}
+      <!-- N1: the live region is always mounted (as on desktop); only its text changes, so the reason is announced when it appears. -->
+      <p class="small field-help" role="status" id="print-qr-why">{#if !n}{WHY}{/if}</p>
     </div>
   {:else}
     <SurveyGroups groups={m.groups} />
@@ -96,9 +100,9 @@
             </div>
           </div>
           <div class="l-row" data-gap="2" data-justify="end">
-            <p class="small field-help" role="status" data-grow>{#if !n}{WHY}{/if}</p>
+            <p class="small field-help" role="status" id="print-qr-why" data-grow>{#if !n}{WHY}{/if}</p>
             <Button label="Cancel" variant="quiet" href={href("collect")} />
-            {#if n}<Button label={`Print ${pagesLabel(n)}`} variant="primary" lg href={href("collect")} lead={print} />{:else}<Button label="Print" variant="primary" lg disabled lead={print} />{/if}
+            {#if n}<Button label={`Print ${pagesLabel(n)}`} variant="primary" lg href={href("collect")} lead={print} />{:else}<Button label="Print" variant="primary" lg disabled ariaDescribedby="print-qr-why" lead={print} />{/if}
           </div>
         </div>
         <div class="l-stack" data-gap="3" data-align="center">
@@ -123,6 +127,9 @@
                 <div class="pfoot"><span>1 of {n}</span></div>
               </div>
             </foreignObject></svg>
+          {:else}
+            <!-- N3: nothing ticked draws no sheet; one line says what fills the column (no board draws this state). -->
+            <p class="small" id="print-qr-empty">{EMPTY}</p>
           {/if}
         </div>
       </div>

@@ -7,6 +7,7 @@
   import Dialog from "./Dialog.svelte";
   import Glyph from "./Glyph.svelte";
   import { href } from "../href.js";
+  import { deleteRefusal } from "./model.js";
   let { m } = $props();
   const ROWS = $derived([["pen", "Edit details and dates", href("setup1")], ["people", "People with access", href("people")], ["doc", "Open the passage", href("setup2")],
     ["print", "Meeting offline? Print and paper", `${href("collect")}#offline`], ["lock", "Close collection now", href("close-collection")]]);
@@ -20,5 +21,5 @@
     <a class="mi" data-size="lg" href={to} autofocus={i === 0}><Glyph name={icon} /><span>{label}</span></a>
   {/each}
   <button class="mi danger" type="button" data-size="lg" aria-disabled="true" aria-describedby="collect-sheet-delete-why"><Glyph name="x" /><span>Delete this review</span></button>
-  <p class="mi-why small" id="collect-sheet-delete-why">Reviews with responses can't be deleted. This one has {m.answered}.</p>
+  <p class="mi-why small" id="collect-sheet-delete-why">{deleteRefusal(m)}</p>
 </Dialog>

@@ -20,7 +20,7 @@ import fixture from "../ui-next/fixtures/collect/collect.json";
 // @ts-expect-error -- plain .js module, no type declarations
 import collect from "../ui-next/src/screens/collect/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { collectModel, stageTabs, pct, pickState, pickSurvey, pickedSurveys, pickLayout, printPages, pagesLabel, plural } from "../ui-next/src/screens/collect/model.js";
+import { collectModel, stageTabs, pct, pickState, pickSurvey, pickedSurveys, pickLayout, printPages, pagesLabel, plural, deleteRefusal } from "../ui-next/src/screens/collect/model.js";
 // @ts-expect-error -- Svelte module export, no type declarations
 import { LENSES } from "../ui-next/src/LensDot.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -214,6 +214,18 @@ describe("Collect (Collect, CollectPhone, CollectMenu, CollectMenuPhone, Collect
     expect([...d.querySelectorAll(".mi")].every((r) => r.getAttribute("data-size") === "lg")).toBe(true);
     expect(document.activeElement?.textContent).toBe("Edit details and dates");
     expect(d.querySelector(".mi.danger")!.getAttribute("aria-disabled")).toBe("true");
+  });
+  it("N2: with 0 responses the refused delete names what blocks it (its surveys), never 'This one has 0.', on desktop and phone", () => {
+    const quiet = structuredClone(fixture);
+    for (const g of quiet.groups) for (const s of g.surveys) s.answered = 0;
+    const desk = shot(Collect, { state: "menu", data: quiet });
+    expect(text(desk.querySelector("details.dd[open] .mi-why"))).toBe("Reviews with surveys can't be deleted. This one has 5 surveys.");
+    cleanup();
+    const ph = shot(Collect, { phone: true, state: "menu", data: quiet });
+    const why = ph.querySelector("dialog .mi-why")!;
+    expect(text(why)).toBe("Reviews with surveys can't be deleted. This one has 5 surveys.");
+    expect(ph.querySelector("dialog .mi.danger")!.getAttribute("aria-describedby")).toBe(why.id);
+    for (const t of [text(desk), text(ph)]) expect(t).not.toMatch(/has 0\b/);
   });
 });
 
@@ -503,6 +515,14 @@ describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
     expect(d.querySelectorAll("[role=status]")).toHaveLength(1);
     expect(d.querySelector(".psheet")).toBeNull();
     expect(text(d.querySelector(".micro"))).toBe("Preview · one page per survey · A4 · 0 pages");
+    // N3: the preview column says what fills it instead of standing blank; the disabled Print names its reason (R16 V-41).
+    expect(text(d.querySelector("#print-qr-empty"))).toBe("Tick a survey to preview its page here.");
+    expect(d.querySelector("#print-qr-empty")!.parentElement!.contains(d.querySelector(".micro"))).toBe(true);
+    expect(p.getAttribute("aria-describedby")).toBe("print-qr-why");
+    expect(d.querySelector("#print-qr-why")).toBe(d.querySelector("[role=status]"));
+    await fireEvent.click(d.querySelectorAll("input.cb")[0]);
+    expect(d.querySelector("#print-qr-empty")).toBeNull();
+    expect(d.querySelector(".psheet")).not.toBeNull();
     const none = structuredClone(fixture);
     none.printQr.checked = [];
     cleanup();
@@ -551,10 +571,29 @@ describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
     expect((a.querySelector(".phone-bar .btn-primary") as HTMLButtonElement).disabled).toBe(true);
     expect(text(a.querySelector("main [role=status]"))).toBe("Tick at least one survey to print its page.");
   });
+  it("N1: the phone status is one live region mounted from the start (empty), and only its text changes as the ticks do", async () => {
+    const a = shot(PrintQR, { phone: true });
+    const st = a.querySelectorAll("main [role=status]");
+    expect(st).toHaveLength(1);
+    expect(text(st[0])).toBe("");
+    const cb = [...a.querySelectorAll("input.cb")] as HTMLInputElement[];
+    for (const c of cb) if (c.checked) await fireEvent.click(c);
+    expect(a.querySelector("main [role=status]")).toBe(st[0]);
+    expect(text(st[0])).toBe("Tick at least one survey to print its page.");
+    expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("aria-describedby")).toBe(st[0].id);
+    await fireEvent.click(cb[0]);
+    expect(a.querySelector("main [role=status]")).toBe(st[0]);
+    expect(text(st[0])).toBe("");
+  });
 });
 
 describe("collect view model and data wiring", () => {
   const m = collectModel(fixture);
+  it("deleteRefusal names only what blocks the delete (N2): responses, else surveys, never a zero count", () => {
+    expect(deleteRefusal(m)).toBe("Reviews with responses can't be deleted. This one has 18.");
+    expect(deleteRefusal({ answered: 0, surveys: [{}] })).toBe("Reviews with surveys can't be deleted. This one has 1 survey.");
+    expect(deleteRefusal({ answered: 0, surveys: [] })).toBe("Deleting a review isn't available on this screen yet.");
+  });
   it("totals and per-perspective counts come from the survey rows; surveys are numbered", () => {
     expect([m.answered, m.expected, m.surveys.length]).toEqual([18, 30, 5]);
     expect(m.groups.map((g: { label: string; answered: number; expected: number }) => [g.label, g.answered, g.expected])).toEqual([["Translation team", 6, 8], ["Community", 8, 15], ["Church", 4, 7]]);

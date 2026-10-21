@@ -21,7 +21,7 @@
   import Icon from "../../Icon.svelte";
   import Glyph from "./Glyph.svelte";
   import { G } from "./glyphs.js";
-  import { stageTabs } from "./model.js";
+  import { stageTabs, deleteRefusal } from "./model.js";
   import { href } from "../href.js";
 
   let { m, phone = false, theme = "light", shareKind = "primary", menuOpen = false, phoneTitle, phoneBar, children } = $props();
@@ -35,7 +35,7 @@
     { label: "Close collection now", href: href("close-collection"), icon: G.lock },
     { label: "Meeting offline? Print and paper", href: `${href("collect")}#offline`, icon: G.print },
     { kind: "hr" },
-    { label: "Delete this review", danger: true, icon: G.x, refused: `Reviews with responses can't be deleted. This one has ${m.answered}.` },
+    { label: "Delete this review", danger: true, icon: G.x, refused: deleteRefusal(m) },
   ]);
 </script>
 
