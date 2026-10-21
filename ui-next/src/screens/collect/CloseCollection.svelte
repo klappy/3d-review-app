@@ -1,7 +1,7 @@
 <!-- UI Next (v4) Close collection screen. Status: provisional (playbook rule 12). Mock data: ui-next/fixtures/collect/collect.json.
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): CloseCollection.dc.html (desktop dialog over the review's survey groups),
      CloseCollectionPhone.dc.html (phone sheet over the Collect card). Contract: "Dialog and sheet states" (R14): destructive confirm,
-     native modal <dialog>, title row with the visible Close; focus opens on the least destructive action ("Keep collecting", autofocus);
+     native modal <dialog>, title row with the visible Close (desktop title .h2.t-24, the §1.2 dialog-heading row); focus opens on the least destructive action ("Keep collecting", autofocus);
      Close, Escape and the backdrop go back to Collect; the confirm reads "Yes, …" (0.22.7).
      One .btn-primary: the dialog's / sheet's own "Yes, close and see results"; the head Share and the phone bar go secondary behind it.
      "Every perspective has at least 3 answers, so results can show" is said only when it is true (0.27.0 held line).
@@ -24,7 +24,7 @@
 
 {#snippet arrow()}<Glyph name="arrow" />{/snippet}
 {#snippet phoneTitle()}<h2 class="h2" id="close-title">Close collection now?</h2>{/snippet}
-{#snippet deskTitle()}<div class="l-stack" data-gap="4"><span class="icn icn-lens" data-lens="team"><Glyph name="lock" size={26} /></span><h2 class="h2" id="close-title">Close collection now?</h2></div>{/snippet}
+{#snippet deskTitle()}<div class="l-stack" data-gap="4"><span class="icn icn-lens" data-lens="team"><Glyph name="lock" size={26} /></span><h2 class="h2 t-24" id="close-title">Close collection now?</h2></div>{/snippet}
 
 <ReviewFrame {m} {phone} {theme} shareKind="secondary">
   {#if phone}

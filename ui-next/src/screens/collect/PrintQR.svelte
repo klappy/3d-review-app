@@ -40,7 +40,7 @@
 {#snippet phoneBar()}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Cancel" variant="quiet" href={href("collect")} />{#if n}<Button label={`Print ${pagesLabel(n)}`} variant="primary" lg href={href("collect")} lead={print} />{:else}<Button label="Print" variant="primary" lg disabled lead={print} />{/if}</div>{/snippet}
 {#snippet title()}
   <!-- svelte-ignore a11y_autofocus -->
-  <h2 class="h2" id="print-qr-title" tabindex="-1" autofocus>Print QR code pages</h2>
+  <h2 class="h2 t-24" id="print-qr-title" tabindex="-1" autofocus>Print QR code pages</h2>
 {/snippet}
 
 <ReviewFrame {m} {phone} {theme} shareKind="secondary" phoneTitle="Print QR code pages" {phoneBar}>
