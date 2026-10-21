@@ -41,7 +41,7 @@
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     {#if check}
-      <Card hi pad="hero" gap={3} label="Check your email">
+      <Card hi pad="hero" gap={4} label="Check your email">
         {@render badge()}
         <h1 class="title-phone">Check your email</h1>
         <p class="small">We sent a link to <b>{email}</b>. Open it on this phone to sign in.</p>
@@ -51,7 +51,7 @@
         <p class="small"><a class="link" href={AGAIN}>Send it again</a> · <a class="link" href={AGAIN}>Use a different email</a></p>
       </Card>
     {:else}
-      <Card hi pad="hero" gap={3} label="Sign in">
+      <Card hi pad="hero" gap={4} label="Sign in">
         <h1 class="title-phone">Sign in</h1>
         <p class="small">We email you a link. No password to remember.</p>
         <div><label class="lbl" for="si-email">Email</label><input class="in" id="si-email" type="email" value={email} inputmode="email" autocomplete="email" /></div>
