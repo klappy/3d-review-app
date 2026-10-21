@@ -1,4 +1,5 @@
-// UI Next (v4) /next/ entry. Status: provisional. Loads the external contract CSS; mounts Home when the ui_next flag is on, else the gallery (route.js).
+// UI Next (v4) /next/ entry. Status: provisional. Loads the external contract CSS; mounts Home when the ui_next flag is on, else the gallery (route.js);
+// lane screens come from screens/registry.js (one screens/<lane>/index.js per lane).
 import { mount } from "svelte";
 import "../tokens.css";
 import "../components/base.css";
@@ -21,10 +22,11 @@ import HomeParts from "./HomeParts.svelte";
 import Home from "./screens/Home.svelte";
 import About from "./screens/About.svelte";
 import Landing from "./screens/Landing.svelte";
+import { REGISTRY } from "./screens/registry.js";
 import { route } from "./route.js";
 
 let storage;
 try { storage = window.localStorage; } catch { storage = undefined; }
-const { view, props } = route(new URLSearchParams(location.search), storage);
-const VIEWS = { home: Home, about: About, landing: Landing, components: App, layouts: Layouts, "home-parts": HomeParts };
+const { view, props } = route(new URLSearchParams(location.search), storage, Object.keys(REGISTRY));
+const VIEWS = { ...REGISTRY, home: Home, about: About, landing: Landing, components: App, layouts: Layouts, "home-parts": HomeParts };
 mount(VIEWS[view], { target: document.getElementById("next"), props });
