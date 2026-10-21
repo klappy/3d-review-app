@@ -1,0 +1,128 @@
+<!-- UI Next (v4) Workspace screen (one organisation's projects). Status: provisional (playbook rule 12).
+     Boards (cookbook design/2026-10-15-glass-redesign/canvas): Workspace.dc.html + WorkspacePhone.dc.html (screen workspace),
+     WorkspaceGroup.dc.html + WorkspaceGroupPhone.dc.html (group = true, screen workspace-group via WorkspaceGroup.svelte).
+     Composed of AppShell > Page > Card / Stack / Row / Grid and the section 2 components; no <style>, no inline style.
+     Data: ui-next/fixtures/people/workspace.json; the group dialog's rows go through ui/workspace-manager.js mayGroup() (./people-data.js).
+     One .btn-primary per page: "New project" (desktop page head; phone: the phone-bar). With the group dialog open the dialog's
+     "Add to workspace" is the one primary and New project is demoted (Dialog and sheet states: one primary). The dialog is a native
+     <dialog> opened with showModal() (design-system.md Dialog and sheet states). -->
+<script>
+  import AppShell from "../../AppShell.svelte";
+  import Page from "../../Page.svelte";
+  import Card from "../../Card.svelte";
+  import Stack from "../../Stack.svelte";
+  import Row from "../../Row.svelte";
+  import Grid from "../../Grid.svelte";
+  import TopBar from "../../TopBar.svelte";
+  import PhoneHeader from "../../PhoneHeader.svelte";
+  import PhoneBar from "../../PhoneBar.svelte";
+  import Button from "../../Button.svelte";
+  import Pill, { STAGE_LABELS } from "../../Pill.svelte";
+  import Tag from "../../Tag.svelte";
+  import Level from "../../Level.svelte";
+  import { LENSES } from "../../LensDot.svelte";
+  import Icon from "../../Icon.svelte";
+  import { I } from "../../icons.js";
+  import { P } from "./people-icons.js";
+  import { groupRows } from "./people-data.js";
+  import d from "../../../fixtures/people/workspace.json";
+
+  let { group = false, phone = false, theme = "light", state } = $props();
+  if (state !== undefined) throw new TypeError(`Workspace: no board draws state "${String(state)}"`);
+  const LENS_ICON = { team: I.pen, community: I.people, church: P.church };
+  const HOME = "?screen=home", PEOPLE = phone ? "?screen=people-workspace&w=phone" : "?screen=people-workspace", BACK = phone ? "?screen=workspace&w=phone" : "?screen=workspace";
+  const rows = groupRows(d.group);
+  // Native modal dialog (design-system.md Dialog and sheet states): showModal() gives the top layer, the inert page and focus.
+  const modal = (el) => {
+    if (typeof el.showModal === "function" && !el.open) { try { el.showModal(); return; } catch { /* not connected: fall back to open */ } }
+    el.setAttribute("open", "");
+  };
+</script>
+
+{#snippet plus()}<Icon d={I.plus} />{/snippet}
+{#snippet people()}<Icon d={I.people} />{/snippet}
+{#snippet chev()}<Icon d={I.chev} />{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="root" initials={d.user.initials} />{:else}<TopBar who={d.user.first} initials={d.user.initials} workspace={d.short} />{/if}{/snippet}
+{#snippet bar()}{#if phone}{#if group}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="New project" lg block href="#setup" lead={plus} /></div>{:else}<PhoneBar label="New project" lead="plus" href="#setup" />{/if}{/if}{/snippet}
+
+<AppShell {phone} {theme} screen {top} {bar}>
+  {#if phone}
+    <h1 class="title-phone">{d.short}</h1>
+    <Row gap={2}><Button label="People" href={PEOPLE} lead={people} block /><Button label="Switch workspace" href="#menu" lead={chev} block /></Row>
+    <Card pad="list" gap={3} label={`Projects · ${d.projects.length}`}>
+      <span class="micro">Projects · {d.projects.length}</span>
+      {#each d.projects as p}
+        <hr class="hr" />
+        <a class="card-link l-row" data-split="" data-gap="3" href="#project">
+          <Row gap={3}><span class="icn" aria-hidden="true"><Icon d={P.file} /></span><div><div><b class="t-15">{p.title}</b></div><div class="small">{STAGE_LABELS[p.stage]} · {p.phone}</div></div></Row>
+          <Pill stage={p.stage} />
+        </a>
+      {/each}
+    </Card>
+    <a class="link" href={HOME}>Your reviews across workspaces <Icon d={I.arrow} /></a>
+  {:else}
+    <Page gap={5}>
+      <Row split gap={4}>
+        <Stack gap={1}><span class="micro">Workspace</span><h1 class="title-page">{d.name}</h1><p class="small t-15">{d.lead}</p></Stack>
+        <Row gap={2}><Button label="People in this workspace" href={PEOPLE} lead={people} /><Button label="New project" variant={group ? "secondary" : "primary"} href="#setup" lead={plus} /></Row>
+      </Row>
+      <Row gap={3}>
+        {#each d.stats as [label, n]}<Card gap={1} label={label}><span class="small">{label}</span><span class="num h1">{n}</span></Card>{/each}
+      </Row>
+      <Row split gap={3}>
+        <h2 class="h2">Projects</h2>
+        <Grid cols={2} gap={3}>
+          <div class="seg" role="radiogroup" aria-label="Show projects">{#each d.views as v, i}<label><input type="radio" name="ws-view" checked={i === 0} />{v}</label>{/each}</div>
+          <input class="in" type="search" aria-label="Find a project" placeholder="Find a project or language" />
+        </Grid>
+      </Row>
+      <Grid cols={2} gap={4}>
+        {#each d.projects as p}
+          <Card href="#project" gap={4} label={p.title}>
+            <Row split gap={3}><Row gap={3}><h3 class="h2">{p.title}</h3><Pill stage={p.stage} /></Row><span class="go" aria-hidden="true"><Icon d={I.arrow} /></span></Row>
+            <Row split gap={4}>
+              <Row wrap gap={4}><span class="small l-row" data-gap="1" title="Language"><Icon d={I.globe} />{p.language}</span><span class="small l-row" data-gap="1" title="Translation format"><Icon d={P[p.formatIcon]} />{p.format}</span></Row>
+              <span class="l-row" data-gap="1" role="img" aria-label={`Organisations: ${p.orgs.map(([o]) => o).join(", ")}`}>{#each p.orgs as [org]}<span class="av" title={org} aria-hidden="true">{org.slice(0, 1)}</span>{/each}</span>
+            </Row>
+            <Row split gap={4}>
+              <Row gap={6}>
+                <span class="l-row" data-gap="2" title="Reviews" aria-label={`Reviews: ${p.reviews}`}><Icon d={P.reviews} /><span class="num h2">{p.reviews}</span></span>
+                <span class="l-row" data-gap="2" title="Responses" aria-label={`Responses: ${p.responses}`}><Icon d={I.people} /><span class="num h2">{p.responses}</span></span>
+              </Row>
+              <span class="small l-row" data-gap="1" title="Last activity"><Icon d={I.clock} />{p.activity}</span>
+            </Row>
+            <hr class="hr" />
+            {#if p.levels}
+              <Grid cols={3} gap={3}>{#each p.levels as [lens, level]}<Row gap={2}><span class="icn icn-lens" data-lens={lens} role="img" aria-label={LENSES[lens]}><Icon d={LENS_ICON[lens]} /></span><Level {level} /></Row>{/each}</Grid>
+            {:else}
+              <span class="small l-row" data-gap="2"><Icon d={I.clock} />No results yet</span>
+            {/if}
+          </Card>
+        {/each}
+      </Grid>
+      <p class="small">Looking for your own reviews across projects? <a class="link" href={HOME}>Your reviews</a> lists everything you facilitate.</p>
+    </Page>
+  {/if}
+  {#if group}
+    <dialog class="glass-hi l-card" aria-labelledby="ws-group-title" {@attach modal}>
+      <div class="l-page" data-w="read">
+        <Stack gap={phone ? 3 : 4}>
+          {#if phone}<span class="micro" id="ws-group-title">Add a project to this workspace</span>
+            <p class="small">Only a <b>direct project owner</b> can group a project. Everyone in the workspace then opens it at their workspace role.</p>
+          {:else}<h2 class="h2" id="ws-group-title">Add a project to this workspace</h2>
+            <p class="small">Everyone in the workspace opens it at their workspace role, unless they already hold a higher project grant. Only a <b>direct project owner</b> can group it; a role inherited from a workspace is never enough.</p>{/if}
+          <div class="l-stack" data-gap="2" role="radiogroup" aria-label="Projects you own">
+            {#each rows as c, i}
+              <label class="row-opt"><input class="rd" type="radio" name="ws-group" checked={i === 0} disabled={!c.can} /><span class="l-stack" data-gap="1"><b>{c.title}</b><span class="small">{c.can ? "You own this project directly" : phone ? "Cannot group: your access comes from the workspace, not a project grant" : "Your access here comes from the workspace, not a project grant"}</span></span>{#if !phone}<Tag label={c.can ? "Direct owner" : "Inherited · cannot group"} />{/if}</label>
+            {/each}
+          </div>
+          {#if phone}
+            <Row gap={2}><Button label="Cancel" variant="quiet" href={BACK} block /><Button label="Add to workspace" variant="primary" href={BACK} lead={plus} block /></Row>
+          {:else}
+            <Row split><span aria-hidden="true"></span><Row gap={2}><Button label="Cancel" variant="quiet" href={BACK} /><Button label="Add to workspace" variant="primary" href={BACK} lead={plus} /></Row></Row>
+          {/if}
+        </Stack>
+      </div>
+    </dialog>
+  {/if}
+</AppShell>

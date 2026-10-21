@@ -1,0 +1,61 @@
+// UI Next (v4) people lane: fixture → screen rows, through the current UI's pure modules (no backend change). Status: provisional.
+// Gating is the server's, as the current UI mirrors it: ui/scope-invitations.js (who may invite, change a role, remove someone),
+// ui/workspace-manager.js mayGroup() (who may add a project to a workspace), ui/v3/components/invite.js pendingInvitations()
+// (which /v2/me/invitations rows are well formed). The fixtures under ui-next/fixtures/people/ use those modules' input shapes.
+import { canManageScope, canRevokeGrant, canUpdateGrant, invitationRoles } from "../../../../ui/scope-invitations.js";
+import { mayGroup } from "../../../../ui/workspace-manager.js";
+import { pendingInvitations } from "../../../../ui/v3/components/invite.js";
+
+export const ROLE_ORDER = Object.freeze(["owner", "member", "viewer"]);
+const roleOf = (grants, me) => grants.find((g) => g.principal_id === me)?.role ?? null;
+
+// One roster row per grant and pending invitation, in the order the board draws (a pending row may name the grant it follows).
+// Desktop columns: person · role here (plain text, or a role select when canUpdateGrant) · what they can do · actions.
+export function rosterRows(roster, { me, can = {}, roles }) {
+  const grants = roster?.grants ?? [];
+  const myRole = roleOf(grants, me);
+  const rows = grants.map((g) => {
+    const self = g.principal_id === me;
+    const actions = [];
+    if (self && myRole === "owner") actions.push("Transfer ownership");
+    else if (!self && myRole === "owner" && g.role === "member") actions.push("Transfer ownership");
+    if (g.via) actions.length = 0;
+    else if (canRevokeGrant(myRole, g.role)) actions.push("Remove");
+    return {
+      key: g.id, initials: g.initials, name: self && g.email ? `${g.name} (you)` : g.name, sub: g.email ?? roles[g.role], role: g.role,
+      roleLabel: roles[g.role], editable: !self && canUpdateGrant(myRole, g.role), via: g.via ?? null, can: can[g.role] ?? "",
+      actions, note: g.via ? `Change on the ${g.via}` : null, pending: false,
+    };
+  });
+  for (const i of roster?.pending_invitations ?? []) {
+    if (!["sent", "pending", "unconfirmed"].includes(i.status)) continue; // permissions.js keeps only live invitations
+    const row = {
+      key: i.id, initials: i.initials ?? "?", name: i.email, role: i.role, roleLabel: roles[i.role], editable: false, via: null,
+      sub: i.expires ? `Invited ${i.invited} · not yet accepted` : `Invited · ${i.invited}`, can: i.expires ? `Invitation expires ${i.expires}` : "",
+      actions: canManageScope(myRole) ? ["Resend", "Withdraw"] : [], note: null, pending: true,
+    };
+    const at = i.after ? rows.findIndex((r) => r.key === i.after) : -1;
+    if (at === -1) rows.push(row); else rows.splice(at + 1, 0, row);
+  }
+  return { myRole, rows };
+}
+
+// The roles the caller may invite as (scope-invitations.js invitationRoles), each with the board's label; board order kept.
+export function inviteOptions(myRole, labels) {
+  const allowed = invitationRoles(myRole);
+  return Object.entries(labels).filter(([role]) => allowed.includes(role));
+}
+
+// Group dialog rows: a project can be grouped only by a direct project owner who is a workspace member+ (mayGroup).
+export function groupRows(group) {
+  return (group?.candidates ?? []).map((c) => ({ ...c, can: mayGroup(group.workspaceRole, c.directRole) }));
+}
+
+// Own pending invitations, filtered by the current UI's own parser.
+export function invitationRows(result, { kinds, can, roles }) {
+  return pendingInvitations(result).map((i) => ({
+    key: i.id, name: i.scope.name, kind: kinds[i.scope.type] ?? i.scope.type, role: i.role, from: i.from, when: i.when, expires: i.expires,
+    title: `${i.scope.name} · ${kinds[i.scope.type] ?? i.scope.type}`,
+    line: `From ${i.from} · as a ${roles[i.role]} — ${can[i.role]}${i.expires ? ` · expires ${i.expires}` : ""}`,
+  }));
+}

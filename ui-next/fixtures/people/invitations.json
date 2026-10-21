@@ -1,0 +1,77 @@
+{
+  "_source": "3d-review-cookbook design/2026-10-15-glass-redesign/canvas Invitations.dc.html, InvitationsPhone.dc.html. Rows use the GET /v2/me/invitations response shape read by ui/v3/components/invite.js pendingInvitations(); from/expires/when are display fields the boards draw.",
+  "user": {
+    "first": "Bincy",
+    "initials": "BK",
+    "workspace": "BCS · India"
+  },
+  "desktop": {
+    "invitations": [
+      {
+        "id": "inv-odia",
+        "scope": {
+          "type": "project",
+          "name": "Odia New Testament",
+          "path": [
+            "BCS · India"
+          ]
+        },
+        "role": "member",
+        "from": "Andy V.",
+        "expires": "24 Oct"
+      },
+      {
+        "id": "inv-psalms",
+        "scope": {
+          "type": "assessment",
+          "name": "Psalms reading group",
+          "path": []
+        },
+        "role": "viewer",
+        "from": "Steve W.",
+        "expires": "30 Oct"
+      }
+    ]
+  },
+  "phone": {
+    "invitations": [
+      {
+        "id": "inv-seed",
+        "scope": {
+          "type": "workspace",
+          "name": "Seed Company · partners",
+          "path": []
+        },
+        "role": "member",
+        "from": "Steve",
+        "when": "2 days ago"
+      }
+    ],
+    "earlier": [
+      {
+        "name": "BCS · India",
+        "when": "Aug 2026"
+      }
+    ]
+  },
+  "kinds": {
+    "workspace": "workspace",
+    "project": "project",
+    "assessment": "review"
+  },
+  "can": {
+    "owner": "you can change everything",
+    "member": "you can start and run reviews",
+    "viewer": "you can read results"
+  },
+  "phoneCan": {
+    "owner": "own",
+    "member": "facilitate reviews",
+    "viewer": "read results"
+  },
+  "roles": {
+    "owner": "Owner",
+    "member": "Member",
+    "viewer": "Viewer"
+  }
+}
