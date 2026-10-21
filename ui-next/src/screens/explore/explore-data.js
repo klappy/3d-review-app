@@ -1,13 +1,19 @@
-// UI Next (v4) explore lane: data adapters for the Explore and Feedback screens. Status: provisional (playbook rule 12).
+// UI Next (v4) explore lane: data adapters for the Explore screen. Status: provisional (playbook rule 12).
 // Adapts through the current UI's pure modules (import only, no backend change):
 //   - level words: v3ScoreBand() in ui/assess/v3-assessment.js (the one level function design-system.md section 3 names;
-//     captain-ruled provisional cut-offs, at least 3 responses per perspective);
-//   - the app version: package.json "version", the value scripts/stamp-version.mjs validates against release/release-manifest.json
-//     and stamps into src/version.generated.ts (git-ignored, so the /next/ bundle reads the tracked source of the same value).
+//     captain-ruled provisional cut-offs, at least 3 responses per perspective).
 // The feedback gate (ui/assess/feedback.js load: signed in, not the sample tour) is not imported: no board draws its not-allowed state.
-// Fixtures in ui-next/fixtures/explore/ stand in for the capabilities the boards cite but the server lacks (rollups; see RESULTS-explore.md).
+// No version string is shown or imported (design-lens@1 rule 5): the server stamps every feedback submission with the version and
+// the HYGIENE 19 build stamp (src/handlers/feedback-provenance.ts).
+// Fixture provenance (comments are stripped at build, so the public /next/ bundle carries no cookbook paths; the JSON has no notes):
+//   - ui-next/fixtures/explore/explore.json: the words of cookbook design/2026-10-15-glass-redesign/canvas Explore.dc.html (desktop
+//     table), ExplorePhone.dc.html and ExploreFiltersPhone.dc.html (phone list, filters sheet). Stages are app stage ids
+//     (V3_STAGES); levels are each perspective's built-report score and response count, never stored as words. They stand in for
+//     the list/roll-up capabilities the boards cite but the server lacks (cap.rollup.*). The board's match line literal is not kept:
+//     matchCounts() counts the rows.
+//   - ui-next/fixtures/explore/feedback.json: the words of Feedback.dc.html (desktop dialog over the page the user was on) and
+//     FeedbackPhone.dc.html (phone page); "from" is the page and review the dialog names.
 import { v3ScoreBand, V3_STAGES } from "../../../../ui/assess/v3-assessment.js";
-import { version } from "../../../../package.json";
 import { LEVELS } from "../../Level.svelte";
 
 // Band word (v3ScoreBand) -> Level key (Level.svelte, design-system.md section 2 Level row).
@@ -31,9 +37,10 @@ export function stagePill(stage) {
   return STAGE_PILL[stage];
 }
 
-/** "18 / 30" when the facilitator entered an expected count, "24" when not, an em dash before any response (Explore board). */
+/** "18 / 30" when the facilitator entered an expected count, "24" when not, an em dash before any response (Explore board),
+ *  including a count of 0 with or without an expected count. */
 export function responsesText(r) {
-  if (!r || !Number.isInteger(r.n)) return "—";
+  if (!r || !Number.isInteger(r.n) || r.n === 0) return "—";
   return Number.isInteger(r.expected) ? `${r.n} / ${r.expected}` : String(r.n);
 }
 
@@ -47,10 +54,14 @@ export function exploreRows(reviews) {
   }));
 }
 
+/** The match line's counts from the rows the table shows: reviews, distinct projects and distinct languages
+ *  (the board's literal "3 projects · 4 languages" disagrees with its own six rows: 4 projects, 5 languages). */
+export function matchCounts(rows) {
+  const distinct = (k) => new Set(rows.map((r) => r[k])).size;
+  return { reviews: rows.length, projects: distinct("project"), languages: distinct("language") };
+}
+
 /** Phone list rows: one level per row (the boards draw the translation-team level). */
 export function phoneRows(rows) {
   return rows.map((r) => ({ ...r, level: levelOf(r.team) ?? "more" }));
 }
-
-/** The app's stamped version (package.json "version"; scripts/stamp-version.mjs). */
-export const APP_VERSION = version;

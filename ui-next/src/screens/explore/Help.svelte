@@ -5,7 +5,9 @@
      per topic (.h2.t-24) and the FAQ as section 2 Disclosures (V-12). Phone: chip nav, then two .l-card[data-pad=rows] cards (the 8.7 phone
      rows card) of V-12 Disclosures: the board still draws details.dd rows, which design-system.md "Disclosure, menu roles" reserves for menus
      (board pass pending), so the rows are details.disc. No <style>, no inline style. Any ?state= renders the one state the boards draw.
-     Links through ../href.js (carries ?theme=): feedback and about.
+     Links through ../href.js (carries ?theme=): feedback and about. The side nav marks the section the address names
+     (aria-current="location", updated on hashchange); with no section in the address the reader is at the top, the first topic,
+     which is what the board draws.
      One .btn-primary per page: none on desktop (the board draws none); phone "Send app feedback" in the phone-bar. -->
 <script>
   import AppShell from "../../AppShell.svelte";
@@ -26,6 +28,15 @@
   const [FAQ_ID, FAQ_HEAD] = FAQ_TITLE;
   const NAV = [...TOPICS.map(([id, title]) => [id, title]), [FAQ_ID, FAQ_HEAD]];
   const VIDEO_LINE = `${VIDEO.title} · ${VIDEO.duration}`;
+  const hash = () => globalThis.location?.hash?.slice(1) ?? ""; // section ids are plain (h1…h8): no decoding, nothing to throw
+  let here = $state(hash());
+  const current = $derived(NAV.some(([id]) => id === here) ? here : NAV[0][0]);
+  // Attachment on the side nav: follow the address while the nav is on the page.
+  const follow = () => {
+    const on = () => { here = hash(); };
+    globalThis.addEventListener("hashchange", on);
+    return () => globalThis.removeEventListener("hashchange", on);
+  };
 </script>
 
 {#snippet pen()}<Icon d={E.pen} />{/snippet}
@@ -44,7 +55,7 @@
   {:else}
     <Page>
       <div class="l-grid" data-tpl="aside-start" data-gap="7">
-        <nav class="glass side-nav" aria-label="Help sections">{#each NAV as [id, title], i}<a class="link" href={`#${id}`} aria-current={i === 0 ? "location" : undefined}>{title}</a>{/each}</nav>
+        <nav class="glass side-nav" aria-label="Help sections" {@attach follow}>{#each NAV as [id, title]}<a class="link" href={`#${id}`} aria-current={id === current ? "location" : undefined}>{title}</a>{/each}</nav>
         <article class="l-stack l-measure" data-gap="6">
           <div>
             <h1 class="title-page">Help and FAQ</h1>

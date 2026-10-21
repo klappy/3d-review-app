@@ -7,13 +7,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render } from "@testing-library/svelte";
-import Explore, { onBackdrop } from "../ui-next/src/screens/explore/Explore.svelte";
+import { flushSync } from "svelte";
+import Explore from "../ui-next/src/screens/explore/Explore.svelte";
 import Feedback, { cancelTo } from "../ui-next/src/screens/explore/Feedback.svelte";
 import Help from "../ui-next/src/screens/explore/Help.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import lane from "../ui-next/src/screens/explore/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { levelOf, stagePill, responsesText, exploreRows, phoneRows, APP_VERSION, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
+import { levelOf, stagePill, responsesText, exploreRows, phoneRows, matchCounts, LENS_KEYS, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
+// @ts-expect-error -- plain .js module, no type declarations
+import { modal, backdropClose } from "../ui-next/src/screens/explore/dialog.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { TOPICS, FAQ, INTRO } from "../ui-next/src/screens/explore/help-copy.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -26,7 +29,6 @@ import { REGISTRY } from "../ui-next/src/screens/registry.js";
 import { lintDir } from "../scripts/ui-next-lint.mjs";
 import explore from "../ui-next/fixtures/explore/explore.json";
 import feedback from "../ui-next/fixtures/explore/feedback.json";
-import pkg from "../package.json";
 
 type P = Record<string, unknown>;
 type C = typeof Explore;
@@ -34,6 +36,7 @@ const mount = (C: C, props: P) => render(C, { props }).container.querySelector("
 const text = (el: Element) => (el.textContent ?? "").replace(/\s+/g, " ").trim();
 const store = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }; };
 const p = (q: string) => new URLSearchParams(q);
+const src = (f: string) => readFileSync(resolve(__dirname, "../ui-next/src/screens/explore", f), "utf8");
 
 // board -> [screen query, component, props, primary label or null (the board draws none)]
 const BOARDS: [string, string, C, P, string | null][] = [
@@ -116,7 +119,7 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect(rows.map((r) => r[6])).toEqual(["18 / 30", "24", "9 / 24", "11 / 24", "15", "—"]);
     expect(rows.map((r) => r.slice(7, 10))).toEqual([["—", "—", "—"], ["Growing", "Needs support", "Growing"], ["—", "—", "—"], ["—", "—", "—"], ["Strong", "Growing", "More input needed"], ["—", "—", "—"]]);
     expect(rows.map((r) => r[10])).toEqual(["today", "12 Sep", "3 days ago", "3 days ago", "28 Sep", "26 Sep"]);
-    expect(text(a)).toContain("6 of 23 reviews match · 3 projects · 4 languages");
+    expect(text(a)).toContain("6 of 23 reviews match · 4 projects · 5 languages"); // counted from the six rows (N4), not the board's literal
     expect(text(a)).toContain("Nothing here identifies a participant.");
     expect([...a.querySelectorAll("button.mi")].map((b) => text(b.firstElementChild!))).toEqual(["Project", "Language", "Cluster", "Organisation involved", "Translation format", "Facilitator"]);
     expect(text(a.querySelector("aside h2.h3")!)).toBe("Add a filter");
@@ -149,21 +152,43 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect([...d.querySelectorAll("a.mi")].map(text)).toEqual(["Workspace · BCS · India", "Region · South Asia", "Stage · Results ready", "Date · 2026", "Project · any", "Language · any", "Cluster · any", "Organisation involved · any", "Translation format · any", "Facilitator · any"]);
     expect(d.querySelector(".btn-primary")).toBeNull();
   });
-  it("filters: only a click on the backdrop (outside the sheet's box) closes it; a tap on the sheet's own padding does not (F2)", () => {
+  it("filters: only a press that starts and ends on the backdrop closes the sheet; its own padding (F2) and a drag off a row (N3) do not", () => {
     const a = mount(Explore, { phone: true, state: "filters" });
     const d = a.querySelector("dialog.sheet") as HTMLDialogElement;
     d.getBoundingClientRect = () => ({ left: 0, top: 300, right: 390, bottom: 844, width: 390, height: 544, x: 0, y: 300, toJSON: () => ({}) });
-    const click = (x: number, y: number) => d.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: x, clientY: y }));
-    click(195, 302); // the sheet's top padding: the target is the <dialog> itself, but inside its box
+    const fire = (el: Element, type: string, x: number, y: number) => el.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y }));
+    const press = (from: Element, x0: number, y0: number, x1: number, y1: number) => { fire(from, "pointerdown", x0, y0); fire(d, "click", x1, y1); };
+    press(d, 195, 302, 195, 302); // the sheet's top padding: the target is the <dialog> itself, but inside its box
     expect(d.open).toBe(true);
-    d.querySelector("a.mi")!.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 195, clientY: 100 })); // a row: target is not the dialog
+    const row = d.querySelector("a.mi")!;
+    fire(row, "pointerdown", 195, 340);
+    fire(row, "click", 195, 340); // a row: the target is not the dialog
     expect(d.open).toBe(true);
-    click(195, 120); // the backdrop above the sheet
+    press(row, 195, 340, 195, 120); // pressed on a row, released over the backdrop: the click lands on the <dialog> outside its box (N3)
+    expect(d.open).toBe(true);
+    fire(d, "click", 195, 120); // a click with no press on the backdrop before it
+    expect(d.open).toBe(true);
+    press(d, 195, 120, 195, 120); // pressed and released on the backdrop above the sheet
     expect(d.open).toBe(false);
-    const fake = { target: null as unknown, currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0, right: 10, bottom: 10 }), close: vi.fn() }, clientX: 50, clientY: 50 };
-    fake.target = fake.currentTarget;
-    expect(onBackdrop(fake)).toBe(true);
-    expect(fake.currentTarget.close).toHaveBeenCalledOnce();
+  });
+  it("dialog.js: one modal() and one backdrop closer for both screens; neither screen keeps its own copy (N6)", () => {
+    const box = { getBoundingClientRect: () => ({ left: 0, top: 0, right: 10, bottom: 10 }), close: vi.fn() };
+    const c = backdropClose();
+    c.onpointerdown({ target: box, currentTarget: box, clientX: 50, clientY: 50 });
+    expect(c.onclick({ target: box, currentTarget: box, clientX: 50, clientY: 50 })).toBe(true);
+    expect(box.close).toHaveBeenCalledOnce();
+    expect(c.onclick({ target: box, currentTarget: box, clientX: 50, clientY: 50 })).toBe(false); // each close needs its own press
+    const el = document.createElement("dialog");
+    el.showModal = () => { throw new Error("not connected"); };
+    modal(el);
+    expect(el.hasAttribute("open")).toBe(true);
+    for (const f of ["Explore.svelte", "Feedback.svelte"]) {
+      expect(src(f)).toMatch(/import \{[^}]*\bmodal\b[^}]*\} from "\.\/dialog\.js"/);
+      expect(src(f)).not.toMatch(/const modal\s*=|\.showModal\(/);
+    }
+    expect(src("Explore.svelte")).toMatch(/\{#each LENS_KEYS as k\}/);
+    expect(src("Explore.svelte")).not.toMatch(/\["team",\s*"community",\s*"church"\]/);
+    expect(LENS_KEYS).toEqual(["team", "community", "church"]);
   });
   it("links carry the viewer's theme through the shared href() helper (screens/href.js)", () => {
     window.history.replaceState(null, "", "/next/?ui_next=on&screen=explore&w=phone&theme=dark");
@@ -193,8 +218,21 @@ describe("Explore data adapts through the current UI's level function (ui/assess
     expect(STAGE_PILL).toEqual({ prepare: "setup", collect: "collecting", understand: "results", improve: "reviewed" });
     expect(() => stagePill("collecting")).toThrow(/unknown app stage/);
     expect([responsesText({ n: 18, expected: 30 }), responsesText({ n: 24 }), responsesText(null)]).toEqual(["18 / 30", "24", "—"]);
+    expect([responsesText({ n: 0 }), responsesText({ n: 0, expected: 30 }), responsesText({ n: 1, expected: 30 })]).toEqual(["—", "—", "1 / 30"]); // N7: a dash before any response
     expect(exploreRows(explore.reviews).map((r: { pill: string }) => r.pill)).toEqual(["collecting", "results", "collecting", "collecting", "results", "setup"]);
     expect(phoneRows(explore.phone.rows).map((r: { level: string }) => r.level)).toEqual(["growing", "support", "more", "growing", "strong"]);
+  });
+  it("the match line counts the rows the table shows: reviews, distinct projects, distinct languages (N4)", () => {
+    expect(matchCounts(exploreRows(explore.reviews))).toEqual({ reviews: 6, projects: 4, languages: 5 });
+    expect(matchCounts([])).toEqual({ reviews: 0, projects: 0, languages: 0 });
+    expect(explore).not.toHaveProperty("match");
+  });
+  it("the fixtures carry no provenance notes into the public /next/ bundle (N8): provenance lives in explore-data.js comments", () => {
+    for (const f of [explore, feedback]) {
+      expect(f).not.toHaveProperty("_");
+      expect(JSON.stringify(f)).not.toMatch(/cookbook|RESULTS-|\.dc\.html|canvas/);
+    }
+    expect(src("explore-data.js")).toContain("ui-next/fixtures/explore/explore.json");
   });
 });
 
@@ -218,7 +256,7 @@ describe("Feedback (Feedback.dc.html dialog, FeedbackPhone.dc.html page)", () =>
     expect(text(a.querySelector(`#${feel.getAttribute("aria-labelledby")}`)!)).toBe("How did it feel? (optional)");
     expect([...segs[1].querySelectorAll("label")].map(text)).toEqual(["Frustrating", "Confusing", "Fine", "Helpful"]);
     expect((segs[1].querySelector("input:checked") as HTMLInputElement).value).toBe("Confusing");
-    expect(text(d)).toContain(`Collect · Mark 1–4 draft · ${pkg.version}`);
+    expect(text(d)).toContain("Collect · Mark 1–4 draft");
     expect(text(d)).toContain("Cancel");
     expect(text(d.querySelector(".btn-primary")!)).toBe("Send");
   });
@@ -241,16 +279,15 @@ describe("Feedback (Feedback.dc.html dialog, FeedbackPhone.dc.html page)", () =>
     cancelTo("?ui_next=on&screen=home", nav)(e);
     expect(e.defaultPrevented).toBe(true);
     expect(nav).toHaveBeenCalledWith("?ui_next=on&screen=home");
-    const src = readFileSync(resolve(__dirname, "../ui-next/src/screens/explore/Feedback.svelte"), "utf8");
-    expect(src).toMatch(/<dialog class="glass-hi"[^>]*oncancel=\{cancelTo\(HOME\)\}/);
+    expect(src("Feedback.svelte")).toMatch(/<dialog class="glass-hi"[^>]*oncancel=\{cancelTo\(HOME\)\}/);
   });
-  it("the version on the page line is the app's stamped version (package.json, scripts/stamp-version.mjs), not a fixture literal (F5)", () => {
-    expect(APP_VERSION).toBe(pkg.version);
+  it("no version string on screen (design-lens@1 rule 5; N2): the page line names the page and review only, and nothing imports package.json", () => {
+    for (const props of [{}, { phone: true }]) expect(text(mount(Feedback, props))).not.toMatch(/\d+\.\d+\.\d+/);
     expect(JSON.stringify(feedback)).not.toMatch(/\d+\.\d+\.\d+/);
+    for (const f of ["explore-data.js", "Feedback.svelte", "Explore.svelte", "Help.svelte"]) expect(src(f)).not.toMatch(/package\.json"|version\.(generated|ts)|APP_VERSION/);
   });
   it("the feedback gate is not imported into the /next/ bundle until a board draws its not-allowed state (F4)", () => {
-    const src = readFileSync(resolve(__dirname, "../ui-next/src/screens/explore/explore-data.js"), "utf8");
-    expect(src).not.toMatch(/import[^;]*ui\/assess\/feedback\.js/);
+    expect(src("explore-data.js")).not.toMatch(/import[^;]*ui\/assess\/feedback\.js/);
   });
 });
 
@@ -335,10 +372,26 @@ describe("the pinned 8.7 Explore-lane rows (ui-next/design-source/PIN a594830, b
     expect([...grid.children].map((c) => `${c.tagName.toLowerCase()}.${c.className}`)).toEqual(["nav.glass side-nav", "article.l-stack l-measure"]);
     const nav = [...grid.querySelectorAll("nav.side-nav > a.link")];
     expect(nav.length).toBe(8);
-    expect(nav.map((l) => l.getAttribute("aria-current"))).toEqual(["location", null, null, null, null, null, null, null]);
+    expect(nav.map((l) => l.getAttribute("aria-current"))).toEqual(["location", null, null, null, null, null, null, null]); // no hash: the top, the first topic
     expect(a.querySelector("article > .glass-hi.l-media[data-dir=row] > .l-media-frame")).not.toBeNull();
     expect(a.querySelectorAll("article > section.l-section[id] > h2.h2.t-24").length).toBe(8);
     expect(a.querySelector(".chip")).toBeNull();
+  });
+  it("Help desktop: the side nav's aria-current follows the address (hashchange), not the first link for ever (N5)", () => {
+    window.history.replaceState(null, "", "/next/?ui_next=on&screen=help#h3");
+    try {
+      const a = mount(Help, {});
+      const cur = () => [...a.querySelectorAll("nav.side-nav > a[aria-current=location]")].map((l) => l.getAttribute("href"));
+      expect(cur()).toEqual(["#h3"]);
+      window.history.replaceState(null, "", "/next/?ui_next=on&screen=help#h8");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+      flushSync();
+      expect(cur()).toEqual(["#h8"]);
+      window.history.replaceState(null, "", "/next/?ui_next=on&screen=help#not-a-section");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+      flushSync();
+      expect(cur()).toEqual(["#h1"]);
+    } finally { window.history.replaceState(null, "", "/"); }
   });
   it("Help phone: two rows cards of V-12 Disclosures (details.disc, not the menu's .dd)", () => {
     const a = mount(Help, { phone: true });

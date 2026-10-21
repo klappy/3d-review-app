@@ -1,5 +1,4 @@
 {
-  "_": "UI Next (v4) explore lane fixture. Status: provisional. Boards: cookbook design/2026-10-15-glass-redesign/canvas Explore.dc.html (desktop table), ExplorePhone.dc.html and ExploreFiltersPhone.dc.html (phone list, filters sheet). Stages are app stage ids (ui/assess/v3-assessment.js V3_STAGES); levels are derived by v3ScoreBand from each perspective's built-report score and response count, never stored as words. The match line counts are the board's (its rows list 4 projects and 5 languages; parity-loop finding in RESULTS-explore.md).",
   "user": { "first": "Bincy", "initials": "BK" },
   "workspace": "BCS · India",
   "visible": 23,
@@ -11,7 +10,6 @@
   ],
   "groupBy": { "options": ["None", "Project", "Language", "Region", "Organisation", "Stage"], "selected": "Stage" },
   "addFilter": ["Project", "Language", "Cluster", "Organisation involved", "Translation format", "Facilitator"],
-  "match": { "projects": 3, "languages": 4 },
   "reviews": [
     { "title": "Mark 1–4 draft", "project": "Hindi New Testament", "language": "Hindi", "region": "South Asia", "orgs": "BCS", "stage": "collect", "responses": { "n": 18, "expected": 30 }, "lenses": null, "updated": "today" },
     { "title": "Luke 1–2 community review", "project": "Hindi New Testament", "language": "Hindi", "region": "South Asia", "orgs": "BCS", "stage": "understand", "responses": { "n": 24 }, "lenses": { "team": { "score": 68, "responses": 8 }, "community": { "score": 52, "responses": 10 }, "church": { "score": 64, "responses": 6 } }, "updated": "12 Sep" },

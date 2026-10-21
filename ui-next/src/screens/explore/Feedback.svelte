@@ -5,8 +5,9 @@
      dialog.glass-hi rows); focus on the first field (autofocus, contract "Focus on open"). Close, Cancel and Escape all go Home: the dialog's
      cancel event is prevented and routed like Close, so Escape never leaves an empty page under the TopBar. The route's one h1 is the dialog
      title (the page under a desktop dialog draws nothing else), styled by the board's .h2.t-24 row.
-     The version on the page line is the app's stamped version (package.json "version", the value scripts/stamp-version.mjs validates
-     against the release manifest), never a fixture literal. Composed of AppShell > Card > Stack / Row and the section 2 components
+     The page line names the page and review the dialog came from, with no version string (design-lens@1 rule 5: a version string
+     on screen is a NO): the server stamps every submission with the version and the build stamp (src/handlers/feedback-provenance.ts).
+     The board's version literal is handed back to the canvas (RESULTS-explore.md). Composed of AppShell > Card > Stack / Row and the section 2 components
      (TopBar, PhoneHeader nested, Button, Segmented .seg, Field .lbl/.in/.sel, Option row); no <style>, no inline style. Any ?state= renders the open form.
      Not wired: the board's fields do not map onto the /v2/feedback contract (ui/assess/feedback.js), and no board draws the signed-out or
      sample-tour (feedback not allowed) state; both itemised in RESULTS-explore.md.
@@ -28,16 +29,12 @@
   import { I } from "../../icons.js";
   import { E } from "./icons.js";
   import { href } from "../href.js";
-  import { APP_VERSION } from "./explore-data.js";
+  import { modal } from "./dialog.js";
   import data from "../../../fixtures/explore/feedback.json";
 
   let { phone = false, theme = "light" } = $props();
   const HOME = $derived(href("home", { w: phone ? "phone" : null }));
-  const context = `${data.from.page} · ${data.from.review} · ${APP_VERSION}`;
-  const modal = (el) => {
-    if (typeof el.showModal === "function") { try { el.showModal(); return; } catch { /* not connected yet: fall through */ } }
-    el.setAttribute("open", "");
-  };
+  const context = `${data.from.page} · ${data.from.review}`;
 </script>
 
 {#snippet x()}<Icon d={I.x} />{/snippet}

@@ -8,21 +8,13 @@
      the page never does), .tbl-foot, .chip[data-on], .menu[data-flow] + .mi-end, .sel[data-size=compact], .seg[data-inline],
      .list-row/.icn-row/.list-body/.list-title, .sheet[data-pad=menu]/.sheet-handle/.sheet-title, .mi[data-size=lg]; no <style>, no inline style.
      The filters sheet is a native <dialog class="glass-hi sheet"> opened with showModal() (design-system.md "Dialog and sheet states";
-     geometry and ::backdrop from the dialog.glass-hi rows): Escape or a tap on the backdrop (outside the sheet's box) closes it.
-     Links through ../href.js (carries ?theme=); a review row opens the results lane's "results" screen.
+     geometry and ::backdrop from the dialog.glass-hi rows): Escape, or a press that starts and ends on the backdrop (outside the
+     sheet's box), closes it (./dialog.js, shared with Feedback).
+     Links through ../href.js (carries ?theme=); a phone review row opens the results lane's "results" screen. The desktop rows are
+     plain, as the board draws them. The match line counts the rows the table shows (./explore-data.js matchCounts).
      One .btn-primary per page: none on desktop (the board draws none); phone "Open the filters" in the phone-bar. -->
 <script module>
   export const STATES = Object.freeze(["filters"]);
-  // Close a modal only for a click on its ::backdrop: the event target is the <dialog> itself for both its backdrop and its own
-  // padding, so the pointer must also fall outside the dialog's box (validator F2: a tap on the sheet's padding closed it).
-  export function onBackdrop(e) {
-    const el = e.currentTarget;
-    if (e.target !== el) return false;
-    const r = el.getBoundingClientRect();
-    const out = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
-    if (out) { if (typeof el.close === "function") el.close(); else el.removeAttribute("open"); }
-    return out;
-  }
 </script>
 <script>
   import AppShell from "../../AppShell.svelte";
@@ -38,7 +30,8 @@
   import { I } from "../../icons.js";
   import { E } from "./icons.js";
   import { href } from "../href.js";
-  import { exploreRows, phoneRows } from "./explore-data.js";
+  import { exploreRows, phoneRows, matchCounts, LENS_KEYS } from "./explore-data.js";
+  import { modal, backdropClose } from "./dialog.js";
   import data from "../../../fixtures/explore/explore.json";
 
   let { phone = false, theme = "light", state } = $props();
@@ -50,11 +43,9 @@
   const HEADS = ["Review", "Project", "Language", "Region", "Organisations", "Stage", "Responses", "Team", "Community", "Church", "Updated"];
   const rows = exploreRows(data.reviews);
   const prows = phoneRows(data.phone.rows);
-  // The sheet opens as a modal dialog (top layer, inert page, ::backdrop); Escape or a backdrop tap closes it.
-  const modal = (el) => {
-    if (typeof el.showModal === "function") { try { el.showModal(); return; } catch { /* not connected yet: fall through */ } }
-    el.setAttribute("open", "");
-  };
+  const match = matchCounts(rows);
+  const many = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const closer = backdropClose();
 </script>
 
 {#snippet pen()}<Icon d={E.pen} />{/snippet}
@@ -89,7 +80,7 @@
     </section>
     <Row gap={2}><Button label="Save this view" href={SELF} lead={check} block /><Button label="Download CSV" href={SELF} lead={doc} block /></Row>
     {#if sheet}
-      <dialog class="glass-hi sheet" data-pad="menu" aria-labelledby="explore-filters-title" {@attach modal} onclick={onBackdrop}>
+      <dialog class="glass-hi sheet" data-pad="menu" aria-labelledby="explore-filters-title" {@attach modal} onpointerdown={closer.onpointerdown} onclick={closer.onclick}>
         <div class="l-stack" data-gap="1">
           <div class="sheet-handle" aria-hidden="true"></div>
           <p class="micro sheet-title" id="explore-filters-title">Filters · tap to change, swipe a row left to remove</p>
@@ -133,14 +124,14 @@
                   <tr>
                     <td class="td">{r.title}</td><td class="td">{r.project}</td><td class="td">{r.language}</td><td class="td">{r.region}</td><td class="td">{r.orgs}</td>
                     <td class="td"><Pill stage={r.pill} /></td><td class="td">{r.responsesText}</td>
-                    {#each ["team", "community", "church"] as k}<td class="td">{#if r.levels[k]}<Level level={r.levels[k]} />{:else}<span class="micro">—</span>{/if}</td>{/each}
+                    {#each LENS_KEYS as k}<td class="td">{#if r.levels[k]}<Level level={r.levels[k]} />{:else}<span class="micro">—</span>{/if}</td>{/each}
                     <td class="td">{r.updated}</td>
                   </tr>
                 {/each}
               </tbody>
             </table>
             <div class="l-row tbl-foot" data-split data-gap="3">
-              <span class="small">{rows.length} of {data.visible} reviews match · {data.match.projects} projects · {data.match.languages} languages</span>
+              <span class="small">{match.reviews} of {data.visible} reviews match · {many(match.projects, "project")} · {many(match.languages, "language")}</span>
               <span class="small">Nothing here identifies a participant.</span>
             </div>
           </section>

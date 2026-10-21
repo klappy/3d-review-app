@@ -1,5 +1,4 @@
 {
-  "_": "UI Next (v4) explore lane fixture. Status: provisional. Boards: cookbook design/2026-10-15-glass-redesign/canvas Feedback.dc.html (desktop dialog over the page the user was on), FeedbackPhone.dc.html (phone full page). from is the page and review the dialog names; the version beside them is the app's stamped version (package.json), not fixture data. No board draws the feedback gate's not-allowed state (ui/assess/feedback.js load: signed out or the sample tour), so the screen does not read a session yet.",
   "user": { "first": "Bincy", "initials": "BK" },
   "workspace": "BCS · India",
   "from": { "page": "Collect", "review": "Mark 1–4 draft" },
