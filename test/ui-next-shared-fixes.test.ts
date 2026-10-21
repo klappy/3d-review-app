@@ -104,3 +104,17 @@ describe("d. Page gap={n} reads the --sp-n step (lane setup; design-system.md 8.
     }
   });
 });
+
+// c and e need no app change: the contract decides them (RESULTS-shared.md).
+describe("c. breadcrumb separator stays the contract's \u203a (design-system.md section 2 R12 .crumb anatomy; boards still draw / until R3)", () => {
+  it("topbar.css draws \u203a in --ink-3 by CSS, never a typed / (the boards' / is the V-38 break R12 replaces)", () => {
+    const top = noComments(read("components/topbar.css"));
+    expect(top).toContain('.crumb li+li::before{content:"\u203a";color:var(--ink-3)}');
+    expect(top).not.toMatch(/content:\s*"\/"/);
+  });
+});
+describe("e. the shared Pill still leaves closed out: whether closed is a stage is R8, captain-held (design-system.md 1.7 and section 4 R25)", () => {
+  it("pinned in ui-next-pill.test.ts (refuses closed, V-09); the results lane keeps its StagePill until R8 is ruled", () => {
+    expect(read("src/Pill.svelte")).not.toMatch(/closed:/);
+  });
+});
