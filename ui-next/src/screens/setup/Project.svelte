@@ -47,7 +47,7 @@
       <Row split gap={3}><span class="micro" id="revs-h">Reviews over time</span><span class="small">newest first</span></Row>
       {#each reviews as r}
         <a class="card-link su-revline" href={r.href}>
-          <span class="su-revcol"><span class="small">{r.when}</span><span class="su-clip">{r.title}</span><span class="l-row" data-gap="2"><Pill stage={r.stage} /></span></span>
+          <span class="su-revcol" data-grow><span class="small">{r.when}</span><span class="su-clip">{r.title}</span><span class="l-row" data-gap="2"><Pill stage={r.stage} /></span></span>
           {#if r.overall}<Level level={r.overall} />{:else}<span class="small">{r.note}</span>{/if}
         </a>
       {/each}

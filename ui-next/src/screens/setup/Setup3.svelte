@@ -48,7 +48,7 @@
               <Grid cols={2} gap={2}>
                 {#each g.roles as r}
                   <div class="row-opt compact">
-                    <label class="su-role"><input class="cb" type="checkbox" checked={r.checked} /><span>{r.name}</span>{#if r.note}<span class="small">{r.note}</span>{/if}</label>
+                    <label class="su-role" data-grow><input class="cb" type="checkbox" checked={r.checked} /><span>{r.name}</span>{#if r.note}<span class="small">{r.note}</span>{/if}</label>
                     {#if r.checked}<input class="in num tab-n su-count" type="number" min="1" inputmode="numeric" aria-label={`How many ${r.name} do you expect? (optional)`} placeholder="—" value={r.expected} />{/if}
                   </div>
                 {/each}

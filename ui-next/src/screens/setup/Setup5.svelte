@@ -35,9 +35,9 @@
         </div>
       {/each}
     </div>
-    <div class="solid su-tile l-row" data-gap="4">
+    <div class="solid su-tile l-row" data-gap="4" data-align="start">
       <span class="icn icn-lens" data-lens="team" aria-hidden="true"><Glyph name="lock" /></span>
-      <div class="l-stack" data-gap="1"><div class="h3">When you launch, the questions are locked so everyone answers the same survey.</div><p class="small">You can still change the dates, the passage file and the answer languages, and add people who can see results.</p></div>
+      <div class="l-stack" data-gap="1" data-grow><div class="h3">When you launch, the questions are locked so everyone answers the same survey.</div><p class="small">You can still change the dates, the passage file and the answer languages, and add people who can see results.</p></div>
     </div>
   {/if}
 </SetupFrame>

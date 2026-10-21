@@ -42,13 +42,13 @@
         <span class="lbl">Attach the passage <span class="opt">(optional)</span></span>
         <div class="dz">
           <span class="icn icn-lens" data-lens="team" aria-hidden="true"><Glyph name="upload" /></span>
-          <div class="l-stack" data-gap="1"><div class="h3">Drop a file or choose one</div><p class="small">Scripture as USFM, SFM or USX — we typeset it into a readable PDF. Or a PDF, an MP3, or a link to a video (for example a sign-language recording).</p></div>
+          <div class="l-stack" data-gap="1" data-grow><div class="h3">Drop a file or choose one</div><p class="small">Scripture as USFM, SFM or USX — we typeset it into a readable PDF. Or a PDF, an MP3, or a link to a video (for example a sign-language recording).</p></div>
           {@render choose("Choose file", false)}
           <Button label="Paste a link" lead={link} />
         </div>
         <div class="solid su-tile l-row" data-gap="4">
           <span class="icn icn-lens" data-lens="team" aria-hidden="true"><Glyph name="file" /></span>
-          <div class="l-stack" data-gap="1"><div class="h3">{p.file.name} <span class="micro">{p.file.note}</span></div><p class="small">{p.file.shows}</p></div>
+          <div class="l-stack" data-gap="1" data-grow><div class="h3">{p.file.name} <span class="micro">{p.file.note}</span></div><p class="small">{p.file.shows}</p></div>
           <Button label="Preview" lead={eye} />
           <Button icon={x} ariaLabel="Remove file" variant="quiet" />
         </div>
