@@ -3,10 +3,11 @@
      Composed only of AppShell > Page > Section > Card / Stack / Row / Grid and the section 2 components (TopBar public, PhoneHeader public,
      PhoneBar, Button, Disclosure); no <style>, no inline style. Rachel's copy (C01 hero, C02 lead) from ../copy/rachel.js only.
      FAQ rows are Disclosures (design-system.md V-12 moves LandingPhone's .dd accordions to .disc). One .btn-primary: "Try the sample review"
-     (desktop hero; phone: the phone-bar). Deliberate addition: a "Why 3D Review exists" link to About (ticket slice: About reachable from Landing). -->
+     (desktop hero; phone: the phone-bar). No About link: no Landing board draws one (cook auggie-next-type-2300). Type sizes use the section 1.2 type rows (.lead, .t-15). -->
 <script>
   import AppShell from "../AppShell.svelte";
   import Page from "../Page.svelte";
+  import Mark from "../Mark.svelte";
   import Section from "../Section.svelte";
   import Card from "../Card.svelte";
   import Icon from "../Icon.svelte";
@@ -24,7 +25,7 @@
 
   // videoSrc: the intro video through the Transcode proxy (generate_transcode_url) once it exists; absent = placeholder frame (Media card contract).
   let { phone = false, theme = "light", videoSrc } = $props();
-  const SELF = "?screen=landing", ABOUT = "?screen=about", SAMPLE = "#results", VIDEO = "#video", CODE = "#survey-code", HELP = "#help";
+  const SELF = "?screen=landing", SAMPLE = "#results", VIDEO = "#video", CODE = "#survey-code", HELP = "#help";
   const PERSPECTIVES = [
     ["team", "Translation team", "How the team prepares, reviews and decides a passage is ready."],
     ["community", "Community", "Whether people understand, trust and use the translation."],
@@ -58,15 +59,15 @@
 <AppShell {phone} {theme} screen rhythm="marketing" {top} {bar}>
   {#if phone}
     <Card hi pad="hero" gap={3}>
+      <div><Mark size={44} /></div>
       <h1 class="title-phone">{C01}</h1>
-      <p class="small">{C02}</p>
+      <p class="small t-15">{C02}</p>
       <a class="link" href={VIDEO}>Watch how it works · 2 min</a>
     </Card>
     <Card pad="list" gap={1} label="Common questions">
       {#each FAQ_PHONE as [q, a]}<Disclosure label={q} solid={false}><p class="small">{a}</p></Disclosure>{/each}
       <a class="link small" href={HELP}>All questions and the facilitator guide</a>
     </Card>
-    <a class="link small" href={ABOUT}>Why 3D Review exists</a>
     <p class="small">Have a survey code? <a class="link" href={CODE}>Enter it here</a></p>
   {:else}
     <Page gap={8}>
@@ -74,7 +75,7 @@
         <Grid template="hero-landing">
           <Stack gap={4}>
             <h1 class="display">{C01}</h1>
-            <p class="small">{C02}</p>
+            <p class="small lead">{C02}</p>
             <Row wrap gap={3}><Button label="Try the sample review" variant="primary" lg href={SAMPLE} {trail} /><Button label="Watch how it works · 2 min" lg href={VIDEO} {lead} /></Row>
             <p class="micro">No account needed to explore the sample. Facilitators sign in with an email link.</p>
           </Stack>
@@ -84,7 +85,7 @@
       <Section>
         <h2 class="h1">Three perspectives on one translation</h2>
         <Grid cols={3} gap={4}>
-          {#each PERSPECTIVES as [lens, name, text]}<Card gap={2} label={name}><span class="icn icn-lens" data-lens={lens} aria-hidden="true"><Icon d={I.people} /></span><h3 class="h2">{name}</h3><p class="small">{text}</p></Card>{/each}
+          {#each PERSPECTIVES as [lens, name, text]}<Card gap={2} label={name}><span class="icn icn-lens" data-lens={lens} aria-hidden="true"><Icon d={I.people} /></span><h3 class="h2">{name}</h3><p class="small t-15">{text}</p></Card>{/each}
         </Grid>
         <p class="small">The answers are never averaged into one number. A confident team and a confused community is the most useful thing a review can show you.</p>
       </Section>
@@ -96,8 +97,8 @@
       </Section>
       <Section>
         <h2 class="h1">Common questions</h2>
-        <Stack gap={2}>{#each FAQ as [q, a]}<Disclosure label={q}><p class="small">{a}</p></Disclosure>{/each}</Stack>
-        <Row wrap gap={4}><a class="link" href={HELP}>All questions and the facilitator guide</a><a class="link" href={ABOUT}>Why 3D Review exists</a></Row>
+        <Stack gap={2}>{#each FAQ as [q, a]}<Disclosure label={q}><p class="small t-15">{a}</p></Disclosure>{/each}</Stack>
+        <a class="link" href={HELP}>All questions and the facilitator guide</a>
       </Section>
       <Section>
         <Row split wrap gap={3}><span class="small">3D Review · a project of the ETEN Innovation Lab</span><span class="small">Have a survey code? <a class="link" href={CODE}>Enter it here</a></span></Row>

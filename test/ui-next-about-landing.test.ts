@@ -81,13 +81,13 @@ describe("About renders as the boards draw it", () => {
     const p = mount(About, { phone: true });
     expect(p.querySelector(".phone-top[data-state=nested] .phone-title")!.textContent).toBe("About");
     expect(text(p.querySelector("h1.title-phone")!)).toBe("Why 3D Review exists");
-    expect([...p.querySelectorAll("span.h3[data-lens]")].map(text)).toEqual(HEADS);
+    expect([...p.querySelectorAll(".cap-row[data-lens] .cap-name")].map(text)).toEqual(HEADS);
     expect(text(p.querySelector(".phone-bar .btn-primary")!)).toBe("Take the tour");
   });
 });
 
 describe("Landing renders as the boards draw it", () => {
-  it("desktop: public top bar, C01 hero, C02 lead, primary sample review, perspectives, four steps, FAQ disclosures closed, About link", () => {
+  it("desktop: public top bar, C01 hero, C02 lead, primary sample review, perspectives, four steps, FAQ disclosures closed, no About link (no board draws one)", () => {
     const a = mount(Landing, {});
     expect(a.querySelector("header.top[data-variant=public]")).not.toBeNull();
     expect(text(a.querySelector("h1.display")!)).toBe(R.C01);
@@ -98,7 +98,7 @@ describe("Landing renders as the boards draw it", () => {
     const faq = [...a.querySelectorAll("details.disc")] as HTMLDetailsElement[];
     expect(faq.length).toBe(4);
     expect(faq.every((d) => !d.open)).toBe(true);
-    expect(a.querySelector("a[href='?screen=about']")).not.toBeNull();
+    expect(a.querySelector("a[href='?screen=about']")).toBeNull();
   });
   it("phone: public phone header with Sign in, C01/C02 hero, FAQ as disclosures (not .dd), sample review in the bar", () => {
     const a = mount(Landing, { phone: true });
@@ -108,7 +108,7 @@ describe("Landing renders as the boards draw it", () => {
     expect(a.querySelectorAll("details.disc").length).toBe(4);
     expect(a.querySelector("details.dd")).toBeNull();
     expect(text(a.querySelector(".phone-bar .btn-primary")!)).toBe("Try the sample review");
-    expect(a.querySelector("a[href='?screen=about']")).not.toBeNull();
+    expect(a.querySelector("a[href='?screen=about']")).toBeNull();
   });
 });
 
@@ -200,11 +200,33 @@ describe("rhythm and Media card (captain ruling 2026-10-20 22:29 ET; design-syst
     expect(m.querySelector("video")!.getAttribute("src")).toBe("https://transcode.example/v/intro.mp4");
     expect(m.querySelector(".l-media-play")).toBeNull();
   });
-  it("phone twins: hero card pad=hero, LandingPhone FAQ card pad=list, no mark inside the LandingPhone hero card", () => {
+  it("phone twins: hero card pad=hero, LandingPhone FAQ card pad=list, the 44px mark inside the LandingPhone hero card (board is the design)", () => {
     const lp = mount(Landing, { phone: true });
     expect(lp.querySelector(".l-card[data-pad=hero] h1.title-phone")).not.toBeNull();
-    expect(lp.querySelector(".l-card[data-pad=hero] svg.mk, .l-card[data-pad=hero] .mark")).toBeNull();
+    const mk = lp.querySelector(".l-card[data-pad=hero] > div:first-child svg") as SVGElement;
+    expect(mk).not.toBeNull();
+    expect(mk.getAttribute("width")).toBe("44");
     expect(lp.querySelectorAll(".l-card[data-pad=list] details.disc").length).toBe(4);
     expect(mount(About, { phone: true }).querySelector(".l-card[data-pad=hero]")).not.toBeNull();
+  });
+});
+
+describe("type rows (design-system.md section 1.2, auggie-next-type-2300)", () => {
+  it("About: display-tight h1, lead C02, body-16 read body, t-15 facet captions; AboutPhone: t-16 C02, three cap-row captions", () => {
+    const a = mount(About, {});
+    expect(a.querySelector("h1.display.display-tight")).not.toBeNull();
+    expect(text(a.querySelector("p.lead")!)).toBe(R.C02);
+    expect(a.querySelectorAll("p.small.body-16").length).toBe(3);
+    expect(a.querySelectorAll(".l-card[data-lens] p.small.t-15").length).toBe(3);
+    const p = mount(About, { phone: true });
+    expect(text(p.querySelector("p.t-16")!)).toBe(R.C02);
+    expect([...p.querySelectorAll(".cap-row[data-lens] .cap-name")].map(text)).toEqual(["The Translation Team", "The Community", "The Church"]);
+  });
+  it("Landing: small.lead C02, t-15 perspective captions and FAQ answers; LandingPhone: small.t-15 C02", () => {
+    const a = mount(Landing, {});
+    expect(text(a.querySelector("p.small.lead")!)).toBe(R.C02);
+    expect(a.querySelectorAll(".l-grid[data-cols='3'] p.small.t-15").length).toBe(3);
+    expect(a.querySelectorAll("details.disc p.small.t-15").length).toBe(4);
+    expect(text(mount(Landing, { phone: true }).querySelector("p.small.t-15")!)).toBe(R.C02);
   });
 });

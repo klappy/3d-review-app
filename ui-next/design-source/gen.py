@@ -2,6 +2,13 @@ import json, os, html, re
 HELMET = open(os.path.join(os.path.dirname(__file__), 'helmet.html')).read()
 # extra rules shared by the new boards, appended inside the helmet
 EXTRA = """
+/* §1.2 Type scale rows the marketing/read boards use (auggie-next-type-2300, provisional): were board inlines, pixels unchanged */
+.app .lead,.app .small.lead{font-size:var(--t-18);line-height:28px}
+.app .body-16,.app .small.body-16{font-size:var(--t-16);line-height:26px}
+.app .t-15,.app .small.t-15{font-size:var(--t-15)}.app .t-16,.app .small.t-16{font-size:var(--t-16)}
+.app .display-tight,.app .display.display-tight{font-size:var(--t-56);line-height:54px}/* .app-scoped (+ .small/.display compound) so the row wins over the base type classes in any sheet order */
+.cap-row{border-left:var(--accent-bar) solid var(--lens);padding:2px 0 2px 12px}
+.cap-name{font-weight:600;font-size:var(--t-15)}
 /* §2 Perspective card (auggie-next-skin2-2105, provisional): a perspective's own card draws its accent bar from [data-lens]; was a board inline */
 .glass[data-lens],.glass-hi[data-lens],.l-card[data-lens]{border-top:var(--accent-bar) solid var(--lens)}
 /* §8 Layouts primitives (auggie-layouts-s2-1540, provisional): spacing between siblings is the parent's gap */

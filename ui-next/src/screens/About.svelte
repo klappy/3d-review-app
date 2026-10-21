@@ -47,11 +47,11 @@
   {#if phone}
     <h1 class="title-phone">Why 3D Review exists</h1>
     <Card hi pad="hero" gap={2}>
-      <p>{C02}</p>
+      <p class="t-16">{C02}</p>
       <p class="small">Developed with the Lab · early adopters in India, Laos and the Philippines.</p>
     </Card>
     <Card gap={3} label="Three perspectives">
-      {#each FACETS as [lens, name]}<Stack gap={1}><span class="h3" data-lens={lens}>{name}</span><p class="small">{CAPS[lens]}</p></Stack>{/each}
+      {#each FACETS as [lens, name]}<div class="cap-row" data-lens={lens}><div class="cap-name">{name}</div><p class="small">{CAPS[lens]}</p></div>{/each}
     </Card>
     {@render learnMore()}
     <Stack gap={2}>
@@ -64,33 +64,33 @@
         <Grid template="hero-about">
         <Stack gap={5}>
         <span class="micro">Why 3D Review exists</span>
-        <h1 class="display">How can we know that it's good enough?</h1>
-        <p>{C02}</p>
-        <p class="small">Project leaders ask it throughout a translation. Teams using emerging approaches need a way to evaluate their work; partners supporting them need visibility into its impact. 3D Review was built to answer both — not with a single pass/fail check, but with short surveys from three points of view, kept distinct so field realities show up against goals and expectations.</p>
+        <h1 class="display display-tight">How can we know that it's good enough?</h1>
+        <p class="lead">{C02}</p>
+        <p class="small body-16">Project leaders ask it throughout a translation. Teams using emerging approaches need a way to evaluate their work; partners supporting them need visibility into its impact. 3D Review was built to answer both — not with a single pass/fail check, but with short surveys from three points of view, kept distinct so field realities show up against goals and expectations.</p>
         </Stack>
         <Mark size={300} />
         </Grid>
       </Section>
       <Section>
         <h2 class="h1">Three facets of one stone</h2>
-        <p class="small">Think of a gemstone. Each facet offers a different perspective but is only part of the whole; turning the stone throws new light, and the differences between facets are what give you the complete view.</p>
+        <p class="small t-16">Think of a gemstone. Each facet offers a different perspective but is only part of the whole; turning the stone throws new light, and the differences between facets are what give you the complete view.</p>
         <Grid cols={3} gap={4}>
           {#each FACETS as [lens, name, asks]}
-            <Card gap={2} label={name} {lens}><span class="h2">{name}</span><p class="small">{CAPS[lens]}</p><p class="micro">Asks about: {asks}</p></Card>
+            <Card gap={2} label={name} {lens}><span class="h2">{name}</span><p class="small t-15">{CAPS[lens]}</p><p class="micro">Asks about: {asks}</p></Card>
           {/each}
         </Grid>
       </Section>
       <Section>{@render learnMore()}</Section>
       <Section heading="What it is not">
-        <p class="small">It does not replace quality-assurance staff or processes — a consultant can be one of the people completing the survey. It does not analyse the translated text, so it does not replace aQuA, Paratext or other checking tools; it complements them with what they cannot measure: process health, church reception and community impact.</p>
+        <p class="small body-16">It does not replace quality-assurance staff or processes — a consultant can be one of the people completing the survey. It does not analyse the translated text, so it does not replace aQuA, Paratext or other checking tools; it complements them with what they cannot measure: process health, church reception and community impact.</p>
       </Section>
       <Section heading="What you get back">
-        <p class="small">Reports that compare the three perspectives side by side. A team that reports high confidence next to a community that reports low understanding is a valuable insight — it shows exactly where to focus.</p>
+        <p class="small body-16">Reports that compare the three perspectives side by side. A team that reports high confidence next to a community that reports low understanding is a valuable insight — it shows exactly where to focus.</p>
       </Section>
       <Section>
         <Card hi gap={3} label="3D Review is in experimentation">
           <h2 class="h2">3D Review is in experimentation</h2>
-          <p class="small">Early-adopter teams are testing it and shaping what comes next. Testers facilitate a review and work with the developers on the final reports.</p>
+          <p class="small t-15">Early-adopter teams are testing it and shaping what comes next. Testers facilitate a review and work with the developers on the final reports.</p>
           <Row><Button label="Try the sample review" variant="primary" href={TOUR} /></Row>
         </Card>
       </Section>
