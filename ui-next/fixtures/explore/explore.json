@@ -1,0 +1,45 @@
+{
+  "_": "UI Next (v4) explore lane fixture. Status: provisional. Boards: cookbook design/2026-10-15-glass-redesign/canvas Explore.dc.html (desktop table), ExplorePhone.dc.html and ExploreFiltersPhone.dc.html (phone list, filters sheet). Stages are app stage ids (ui/assess/v3-assessment.js V3_STAGES); levels are derived by v3ScoreBand from each perspective's built-report score and response count, never stored as words. The match line counts are the board's (its rows list 4 projects and 5 languages; parity-loop finding in RESULTS-explore.md).",
+  "user": { "first": "Bincy", "initials": "BK" },
+  "workspace": "BCS · India",
+  "visible": 23,
+  "filters": [
+    { "key": "Workspace", "value": "BCS India" },
+    { "key": "Region", "value": "South Asia" },
+    { "key": "Stage", "value": "Collecting, Results ready" },
+    { "key": "Date", "value": "Last 12 months" }
+  ],
+  "groupBy": { "options": ["None", "Project", "Language", "Region", "Organisation", "Stage"], "selected": "Stage" },
+  "addFilter": ["Project", "Language", "Cluster", "Organisation involved", "Translation format", "Facilitator"],
+  "match": { "projects": 3, "languages": 4 },
+  "reviews": [
+    { "title": "Mark 1–4 draft", "project": "Hindi New Testament", "language": "Hindi", "region": "South Asia", "orgs": "BCS", "stage": "collect", "responses": { "n": 18, "expected": 30 }, "lenses": null, "updated": "today" },
+    { "title": "Luke 1–2 community review", "project": "Hindi New Testament", "language": "Hindi", "region": "South Asia", "orgs": "BCS", "stage": "understand", "responses": { "n": 24 }, "lenses": { "team": { "score": 68, "responses": 8 }, "community": { "score": 52, "responses": 10 }, "church": { "score": 64, "responses": 6 } }, "updated": "12 Sep" },
+    { "title": "Workshop 2 · Luke 1", "project": "Kurubaru Scripture", "language": "Kurubaru Yellavaru", "region": "South Asia", "orgs": "BCS · SIL", "stage": "collect", "responses": { "n": 9, "expected": 24 }, "lenses": null, "updated": "3 days ago" },
+    { "title": "Workshop 2 · Luke 1", "project": "Kurubaru Scripture", "language": "Kurubaru Adi Dravida", "region": "South Asia", "orgs": "BCS · SIL", "stage": "collect", "responses": { "n": 11, "expected": 24 }, "lenses": null, "updated": "3 days ago" },
+    { "title": "Mark 2 signed", "project": "ISL Mark", "language": "Indian Sign Language", "region": "South Asia", "orgs": "BCS · Deaf Bible Society", "stage": "understand", "responses": { "n": 15 }, "lenses": { "team": { "score": 81, "responses": 7 }, "community": { "score": 66, "responses": 6 }, "church": { "score": 70, "responses": 2 } }, "updated": "28 Sep" },
+    { "title": "Genesis audio check", "project": "Lao Old Testament", "language": "Lao", "region": "Southeast Asia", "orgs": "Partner · shared", "stage": "prepare", "responses": null, "lenses": null, "updated": "26 Sep" }
+  ],
+  "phone": {
+    "chips": ["BCS · India", "South Asia", "Results ready", "2026"],
+    "rows": [
+      { "title": "Luke 1–2 community review", "meta": "Hindi NT · Sep 2026", "team": { "score": 68, "responses": 8 } },
+      { "title": "Genesis audio check", "meta": "Lao OT · Sep 2026", "team": { "score": 47, "responses": 5 } },
+      { "title": "Mark 1–4 draft", "meta": "Hindi NT · Oct 2026", "team": { "score": null, "responses": 2 } },
+      { "title": "Acts listening review", "meta": "Hindi NT · Aug 2026", "team": { "score": 63, "responses": 9 } },
+      { "title": "Psalms reading group", "meta": "Lao OT · Jul 2026", "team": { "score": 79, "responses": 6 } }
+    ],
+    "sheet": [
+      { "icon": "people", "label": "Workspace · BCS · India" },
+      { "icon": "globe", "label": "Region · South Asia" },
+      { "icon": "clock", "label": "Stage · Results ready" },
+      { "icon": "calendar", "label": "Date · 2026" },
+      { "icon": "doc", "label": "Project · any" },
+      { "icon": "globe", "label": "Language · any" },
+      { "icon": "list", "label": "Cluster · any" },
+      { "icon": "people", "label": "Organisation involved · any" },
+      { "icon": "mic", "label": "Translation format · any" },
+      { "icon": "people", "label": "Facilitator · any" }
+    ]
+  }
+}
