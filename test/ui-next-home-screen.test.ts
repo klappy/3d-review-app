@@ -98,10 +98,10 @@ describe("copy rows present verbatim (C01-C12)", () => {
       expect(a.textContent!).not.toContain(COPY.C02);
     }
   });
-  it("C12 ships without the trajectory clause (current-ui-copy ASK default 1); C01 is Landing's hero, not on Home", () => {
+  it("C12 ships in full with the trajectory sentence (cookbook current-ui-copy RULING option 2); C01 is Landing's hero, not on Home", () => {
     const t = home({ state: "first" }).textContent!;
-    expect(paras).toContain(`${COPY.C12[1]} to create a trajectory`);
-    expect(t).not.toMatch(/trajectory/);
+    expect(paras).toContain(COPY.C12[1]);
+    expect(COPY.C12[1]).toMatch(/to create a trajectory$/);
     expect(t).not.toContain("Three perspectives. One useful next step.");
   });
 });
