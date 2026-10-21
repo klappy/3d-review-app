@@ -2,7 +2,7 @@
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): Home.dc.html (state "reviews"), HomeFirst.dc.html ("first"), HomePhone.dc.html (phone).
      Composed only of AppShell > Page > Section > Card / Stack / Row / Grid and the section 2 components; no <style>, no inline style.
      One .btn-primary per page: "Start a 3D Review" (desktop page head; phone: the phone-bar). Copy: design-system.md section 4 and
-     Rachel's C01-C12 map (sources/rachel-copy-2026-10-19/app-copy-edits.txt), C12 without the trajectory clause (current-ui-copy ASK default 1). -->
+     Rachel's C01-C12 map (sources/rachel-copy-2026-10-19/app-copy-edits.txt), C12 in full, trajectory sentence included (cookbook current-ui-copy RULING option 2). -->
 <script module>
   export const STATES = Object.freeze(["first", "reviews"]);
   // Rachel copy rows, word for word (app-copy-edits.txt paragraph order). Not rendered on Home: the boards draw no Learn more here;
@@ -18,7 +18,7 @@
     C09: ["Who it is for", "Translation teams and their leaders, the communities they serve and the churches they partner with"],
     C10: "When to use it",
     C11: "When your project would benefit from a pause to reflect and learn from feedback (consider using between books or publishing iterations)",
-    C12: ["How often", "Repeat when a new assessment would be useful, or over increments of time"],
+    C12: ["How often", "Repeat when a new assessment would be useful, or over increments of time to create a trajectory"],
   });
 </script>
 <script>
