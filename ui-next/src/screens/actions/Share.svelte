@@ -6,13 +6,12 @@
      share-out icon opens the share sheet, else copies (./ShareOut.svelte). Access codes "Make more codes" / "Download as CSV" (phone
      #codes / #csv) wait on the codes API (cap.survey.issue_codes / export_codes): RESULTS debt.
      Work card: the pinned .glass-hi.l-card[data-pad=work]. Link rows: Grid barbell (220px 1fr 220px) stands in for the board's
-     240px 1fr auto auto (no contract row: generator line). Access codes: §2 Disclosure. Links: ../href.js href() with this screen's w/theme.
+     240px 1fr auto auto (no contract row: generator line); the rows sit in the work card's 20px gap, as drawn. Access codes: §2 Disclosure. Links: ../href.js href() with this screen's w/theme.
      One .btn-primary per page: desktop "Done" (page head), phone "Show QR codes for the room" (phone-bar). -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
   import Card from "../../Card.svelte";
-  import Stack from "../../Stack.svelte";
   import Row from "../../Row.svelte";
   import Grid from "../../Grid.svelte";
   import TopBar from "../../TopBar.svelte";
@@ -71,19 +70,17 @@
       <ReviewHead {theme} title={R.review.title} stage="collecting" {meta} viewed="collect" live="collect" done={["prepare"]} deleteRefused={R.deleteRefused} action={{ label: "Done", variant: "primary", href: href("collect", at), trail: "check" }} />
       <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label="Share the survey">
         <div><h2 class="h2 t-24">Share the survey</h2><p class="small t-15">{D.lead}</p></div>
-        <Stack gap={3}>
-          {#each R.surveys as s, i}
-            <Grid template="barbell" gap={3}>
-              <Row gap={3}><LensDot lens={s.lens} decorative /><b>{s.name}</b></Row>
-              <input class="in kbd" readonly value={`${R.host}${s.code}`} aria-label={`Link for ${s.name}`} />
-              <Row gap={3}>
-                {#if canShare}<CopyButton text={`${R.host}${s.code}`} name={s.name} copied={i === D.copied} />{/if}
-                <Button icon={qr} ariaLabel={`QR code for ${s.name}`} variant="quiet" href={href("qr-room", at)} />
-              </Row>
-            </Grid>
-          {/each}
-          {#if !canShare}<p class="small">{READ_ONLY}</p>{/if}
-        </Stack>
+        {#each R.surveys as s, i}
+          <Grid template="barbell" gap={3}>
+            <Row gap={3}><LensDot lens={s.lens} decorative /><b>{s.name}</b></Row>
+            <input class="in kbd" readonly value={`${R.host}${s.code}`} aria-label={`Link for ${s.name}`} />
+            <Row gap={3}>
+              {#if canShare}<CopyButton text={`${R.host}${s.code}`} name={s.name} copied={i === D.copied} />{/if}
+              <Button icon={qr} ariaLabel={`QR code for ${s.name}`} variant="quiet" href={href("qr-room", at)} />
+            </Row>
+          </Grid>
+        {/each}
+        {#if !canShare}<p class="small">{READ_ONLY}</p>{/if}
         <hr class="hr" />
         <Row wrap gap={3}><Button label="Show QR codes for the room" href={href("qr-room", at)} lead={qr} /><Button label="Email the links to someone" href={href("people", at)} lead={mail} /></Row>
         <p class="small">Meeting offline? Paper surveys and QR pages print from the <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? card on Collect</a>.</p>
