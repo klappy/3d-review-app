@@ -24,7 +24,7 @@ import LangSearch from "../ui-next/src/screens/setup/LangSearch.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import { OUT, out } from "../ui-next/src/screens/setup/links.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { surveys, whoLines, whoShort, aboutLine } from "../ui-next/src/screens/setup/draft.js";
+import { surveys, whoLines, whoShort, aboutLine, chosenGroups } from "../ui-next/src/screens/setup/draft.js";
 import setupData from "../ui-next/fixtures/setup/setup.json";
 import projectData from "../ui-next/fixtures/setup/project.json";
 
@@ -306,6 +306,60 @@ describe("setup lane links and derived lines", () => {
     expect(aboutLine(surveys(g, true), setupData.context.values, true)).toBe("Community described · 2 left blank");
     expect(aboutLine(surveys(g, true).slice(0, 2), {}, false)).toBe("2 surveys left blank");
     expect(aboutLine(surveys(g, true).slice(2), setupData.context.values, false)).toBe("Community described");
+  });
+});
+
+describe("a roles group with no role checked is not chosen, in steps 3, 4 and 5 alike (VALIDATION-setup-r3 N10)", () => {
+  // Church checked on both widths with none of its roles checked: no survey, so no "(0 roles)", no "0 expected", no empty disclosure.
+  const zero = () => {
+    const d = structuredClone(setupData) as typeof setupData & { groups: { phoneChecked?: boolean; roles?: { checked: boolean }[] }[] };
+    const church = d.groups[2];
+    delete church.phoneChecked;
+    for (const r of church.roles!) r.checked = false;
+    return d;
+  };
+  it("draft.js: the group drops out of chosenGroups, surveys and both Who lines", () => {
+    const g = zero().groups;
+    for (const phone of [false, true]) {
+      expect(chosenGroups(g, phone).map((x: { name: string }) => x.name), `phone ${phone}`).toEqual(["Translation team", "Community"]);
+      expect(surveys(g, phone).map((s: { key: string }) => s.key)).toEqual(["translators", "team-leaders-mentors", "community"]);
+      expect(whoShort(g, phone)).toBe("Translation team · Community");
+    }
+    expect(whoLines(g).map(([n]: [string]) => n)).toEqual(["Translation team", "Community"]);
+    expect(JSON.stringify(whoLines(g))).not.toMatch(/0 expected|· {2}·/);
+    // Unchanged for the fixture: a group with some roles checked stays chosen ("Church (2 roles)").
+    expect(whoShort(setupData.groups, false)).toBe("Translation team · Community · Church (2 roles)");
+  });
+  it("the screens: step 3 shows the group unchecked, step 4 has no disclosure for it, step 5 leaves it out", () => {
+    // The screens read the imported fixture object at render time; swap its groups for the zero-roles draft, then restore them.
+    const keep = setupData.groups;
+    setupData.groups = zero().groups;
+    try {
+      const s = (name: string, phone: boolean) => screen(name, { phone });
+      expect([...s("setup3", false).querySelectorAll(".su-group > .l-row input.cb")].map((c) => (c as HTMLInputElement).checked)).toEqual([true, true, false]);
+      expect([...s("setup3", true).querySelectorAll("label.row-opt input.cb")].map((c) => (c as HTMLInputElement).checked)).toEqual([true, true, false]);
+      expect(text(s("setup4", false), ".su-ctx > details.disc .su-name .h3")).toEqual(["Translators", "Team leaders & mentors", "Community"]);
+      const p4 = s("setup4", true);
+      expect(text(p4, ".su-groups > details.disc > summary .su-name")).toEqual(["Translation team", "Community"]);
+      for (const d of p4.querySelectorAll(".su-groups > details.disc")) expect(d.querySelectorAll(".disc-body input").length, d.textContent!).toBeGreaterThan(0);
+      const d5 = s("setup5", false);
+      expect(text(d5, ".su-sumrow:nth-child(7) .t-15 .l-stack > span")).toEqual(["Translation team · Translators, Team leaders & mentors · 8 expected", "Community · Community · 15 expected"]);
+      expect(d5.textContent).not.toMatch(/0 roles|0 expected/);
+      expect(s("setup5", true).textContent).not.toMatch(/0 roles|Church/);
+    } finally {
+      setupData.groups = keep;
+    }
+    expect(text(screen("setup4", { phone: true }), ".su-groups > details.disc > summary .su-name")).toEqual(["Translation team", "Community"]);
+    expect(text(screen("setup4"), ".su-ctx > details.disc .su-name .h3")).toHaveLength(5);
+  });
+});
+
+describe("the fixtures ship only data the screens render (VALIDATION-setup-r3 N11)", () => {
+  // The screens default-import the fixture JSON, so every key ends up in the public /next/ bundle: no developer notes in it.
+  it("no _note keys (status, wiring and validation notes live in the lane comments and RESULTS-setup.md)", () => {
+    const keys = (o: unknown): string[] => (Array.isArray(o) ? o.flatMap(keys) : o && typeof o === "object" ? Object.entries(o).flatMap(([k, v]) => [k, ...keys(v)]) : []);
+    for (const d of [setupData, projectData]) expect(keys(d).filter((k) => k.startsWith("_"))).toEqual([]);
+    expect(JSON.stringify([setupData, projectData])).not.toMatch(/VALIDATION|playbook|cookbook|\.dc\.html/);
   });
 });
 

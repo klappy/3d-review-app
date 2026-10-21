@@ -1,7 +1,4 @@
 {
-  "_status": "provisional (playbook rule 12). Mock draft for the setup lane boards: cookbook design/2026-10-15-glass-redesign/canvas Setup1-5.dc.html, Setup1Phone, Setup2Phone, SetupPhone (step 3), Setup4Phone, Setup5Phone. Group context field lists are not here: they come from ui/v3/components/context-fields.js.",
-  "_who": "groups[].who is the current UI's wording, ui/assess/scope.js PERSPECTIVE_WHO (the lane test pins it equal); imported directly it bundled scope.js's whole graph into /next/ (VALIDATION-setup-r2 N6).",
-  "_derive": "summary rows with derive=who|about are computed from groups and context.values by screens/setup/draft.js, so step 5 says what steps 3 and 4 show (VALIDATION-setup-r2 N3).",
   "flow": "Start a 3D Review",
   "steps": [
     "Details",
@@ -9,13 +6,6 @@
     "Who will participate?",
     "About each group",
     "Launch"
-  ],
-  "phoneSteps": [
-    "Details",
-    "The passage",
-    "Who will participate?",
-    "About each group",
-    "Ready to launch"
   ],
   "details": {
     "name": "Mark 1–4 draft",
@@ -148,7 +138,6 @@
     }
   ],
   "context": {
-    "_keys": "open and values are keyed by survey (the slug of a checked role's name, or of a role-less group's name), not by perspective: two surveys of one perspective have their own answers.",
     "open": "community",
     "values": {
       "community": {

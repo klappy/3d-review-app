@@ -1,13 +1,16 @@
 // UI Next (v4) setup lane: what steps 4 and 5 derive from step 3's checked state. Status: provisional (playbook rule 12).
 // One source for the surveys, so step 4 asks about the surveys step 3 chose and step 5's summary says the same thing
-// (VALIDATION-setup F9, VALIDATION-setup-r2 N3: Setup5Phone named Church while phone steps 3 and 4 leave it out).
+// (VALIDATION-setup F9, VALIDATION-setup-r2 N3: Setup5Phone named Church while phone steps 3 and 4 leave it out). Step 3 draws its
+// group checkboxes from isChecked too, so a group the later steps skip never shows as checked.
 // Plain JS, no Svelte, so the lane test imports it. Input: ui-next/fixtures/setup/setup.json groups and context.values.
 // The phone reads phoneChecked where step 3's phone board (SetupPhone) unchecks a group, else checked.
 
 export const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-export const isChecked = (g, phone = false) => (phone ? (g.phoneChecked ?? g.checked) : g.checked) === true;
-export const chosenGroups = (groups, phone = false) => groups.filter((g) => isChecked(g, phone));
 const chosenRoles = (g) => (g.roles ? g.roles.filter((r) => r.checked) : null);
+/** A group is chosen when it is checked and, if it has roles, at least one of them is: a roles group with none checked has no survey,
+ *  so steps 3, 4 and 5 all treat it as unchecked (VALIDATION-setup-r3 N10: "Church (0 roles)", "0 expected", an empty disclosure). */
+export const isChecked = (g, phone = false) => (phone ? (g.phoneChecked ?? g.checked) : g.checked) === true && (chosenRoles(g)?.length ?? 1) > 0;
+export const chosenGroups = (groups, phone = false) => groups.filter((g) => isChecked(g, phone));
 
 /** One survey per checked role of a checked group, or the group itself when it has no roles; key = slug of the survey name. */
 export function surveys(groups, phone = false) {

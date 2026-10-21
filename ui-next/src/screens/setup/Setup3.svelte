@@ -6,13 +6,15 @@
      (groups[].who) and pinned equal by the lane test: importing scope.js bundled its whole graph (v3/home.js, invite, rate-limit and more,
      ~46 kB minified) into /next/ for three strings (VALIDATION-setup-r2 N6). One .btn-primary: Continue.
      Community stepper: the buttons name their subject ("Fewer Community participants") and the count is a role=status text with an
-     sr-only " expected" (VALIDATION-setup-r2 N4: aria-label on a role-less span is ignored). -->
+     sr-only " expected" (VALIDATION-setup-r2 N4: aria-label on a role-less span is ignored).
+     Group checkboxes read ./draft.js isChecked, the rule steps 4 and 5 use: a roles group with no role checked is not chosen (r3 N10). -->
 <script>
   import Stack from "../../Stack.svelte";
   import Row from "../../Row.svelte";
   import Grid from "../../Grid.svelte";
   import SetupFrame from "./SetupFrame.svelte";
   import Glyph from "./Glyph.svelte";
+  import { isChecked } from "./draft.js";
   import data from "../../../fixtures/setup/setup.json";
 
   // The board draws one state; the route's ?state= prop is not read, so any value (unknown included) renders it and never throws.
@@ -26,7 +28,7 @@
     <p class="small">Each group gets its own link.</p>
     <Stack gap={2}>
       {#each data.groups as g}
-        <label class="row-opt"><input class="cb" type="checkbox" checked={g.phoneChecked ?? g.checked} /><span class="icn icn-lens" data-lens={g.lens} aria-hidden="true"><Glyph name="people" /></span><span class="l-stack" data-gap="1"><span class="h3">{g.name}</span><span class="small">{g.phoneNote}</span></span></label>
+        <label class="row-opt"><input class="cb" type="checkbox" checked={isChecked(g, true)} /><span class="icn icn-lens" data-lens={g.lens} aria-hidden="true"><Glyph name="people" /></span><span class="l-stack" data-gap="1"><span class="h3">{g.name}</span><span class="small">{g.phoneNote}</span></span></label>
       {/each}
     </Stack>
   {:else}
@@ -36,7 +38,7 @@
         <div class="row-opt su-group" role="group" aria-label={g.name}>
           <Row split gap={3}>
             <Row gap={4}>
-              <input class="cb" type="checkbox" checked={g.checked} aria-label={`Invite ${g.name}`} />
+              <input class="cb" type="checkbox" checked={isChecked(g)} aria-label={`Invite ${g.name}`} />
               <span class="icn icn-lens" data-lens={g.lens} aria-hidden="true"><Glyph name="people" /></span>
               <div class="l-stack" data-gap="1"><div class="h3">{g.name}</div><p class="small">{g.who}</p></div>
             </Row>
