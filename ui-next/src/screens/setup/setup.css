@@ -1,0 +1,71 @@
+/* UI Next (v4) setup lane CSS (screens fanout 2026-10-21, setup lane). Status: provisional (playbook rule 12).
+   Lane variants of shared parts for screens/setup/*.svelte only (the shared components/*.css stay untouched). Values: spacing is a
+   --sp-* step (design-system.md 8.2; off-scale board gaps remapped as 8.2 proposes: 6/10 -> 8, 14 -> 16, 18/20 -> 16 or 24, 40/44 -> 32),
+   type is a --t-* row or a base type class (1.2), radius a --radius-* row (1.0). A px value here is a component dimension the
+   contract does not state yet: each is a gap row in RESULTS-setup.md and the cookbook canvas-setup-gaps PR, and this file is
+   deleted once a PIN bump carries those rows into base.css. */
+
+/* Setup stepper (design-system.md "Tab states and .now-dot", R17): ol.tabs.steps, current aria-current="step", done a link, upcoming --ink-3 */
+.app ol.tabs.steps{margin:0;list-style:none}
+.app .steps>li{flex:1;display:flex;min-width:0}
+.app .steps .tab[aria-current=step]{background:var(--field);color:var(--ink);box-shadow:var(--sh-1)}
+.app .steps .tab[aria-disabled=true]{color:var(--ink-3)}
+
+/* Setup page: Page narrow with gap --sp-6 (8.1 Page row: "the setup Page sets --sp-6"; .l-page reads --sp-5 only, so data-gap does not reach it) */
+.app .l-page.su-page{gap:var(--sp-6)}
+
+/* Setup step card (8.1 Card row: desktop inner padding --sp-6; 8.5 setup_shell = Page narrow + one glass-hi Card; board 40/44 -> 32) */
+.app .l-card[data-pad=setup]{border-radius:var(--radius-xl);padding:var(--sp-6)}
+
+/* Phone setup progress (section 9: during setup the stepper is the progress bar; R13 setup step header) */
+.app .bar[data-step]>span{background:var(--primary)}
+.app .bar[data-step="1"]>span{width:20%}.app .bar[data-step="2"]>span{width:40%}.app .bar[data-step="3"]>span{width:60%}.app .bar[data-step="4"]>span{width:80%}.app .bar[data-step="5"]>span{width:100%}
+
+/* Field (section 2 Field row, gen.py field()): label, control, help/error in a column; help 6 -> --sp-2. Phone setup fields draw 52px (board inline; gap row) */
+.app .su-field{display:flex;flex-direction:column;min-width:0}
+.app .su-field>.field-help,.app .su-field>.field-error{margin-top:var(--sp-2)}
+.app[data-w=phone] .su-form .in{min-height:52px}
+
+/* Language search (section 2 Language search row): leading search icon inside .in[type=search] (board 40px indent -> --sp-6) */
+.app .su-search{position:relative;display:block}
+.app .su-search>svg{position:absolute;left:var(--sp-3);top:50%;transform:translateY(-50%);color:var(--ink-2);pointer-events:none}
+.app .su-search>.in{padding-left:var(--sp-6)}
+
+/* Language search result rows are buttons (board: font inherit, --ink, left, full width) */
+.app button.row-opt.su-match{font:inherit;color:var(--ink);text-align:left;width:100%}
+
+/* Drop zone stacked (Setup2Phone): .dz as a column of block buttons */
+.app .dz.su-col{flex-direction:column;align-items:stretch;gap:var(--sp-2)}
+
+/* Inset tile on a setup card (Setup2 attached file, Setup5 lock note): .solid surface, --radius-l */
+.app .su-tile{border-radius:var(--radius-l);padding:var(--sp-3) var(--sp-4)}
+.app .su-tile>.l-stack,.app .dz>.l-stack{flex-grow:1}/* the text column takes the room; the tile's buttons sit at the end (board flex-grow) */
+
+/* Perspective group row (Option row exception "a div.row-opt holding labelled controls", R10) with its role rows and expected counts (R31) */
+.app .row-opt.su-group{flex-direction:column;align-items:stretch;padding:var(--sp-4);gap:var(--sp-4)}
+.app .su-role{display:flex;align-items:center;gap:var(--sp-2);flex-grow:1;min-width:0;cursor:pointer}
+.app .su-role>.small{margin-left:auto}
+.app .in.su-count{width:64px;min-height:var(--target);text-align:center;flex:none}
+.app .seg.su-stepper{padding:var(--sp-1)}
+.app .seg .btn-icon.su-step{min-height:36px;width:36px}
+.app .su-num{display:grid;place-content:center;width:40px;font-size:var(--t-20)}
+
+/* Group context disclosures (Disclosure contract V-12, details.disc) as rows of a card: flush, ruled */
+.app .su-ctx details.disc{padding:0;border-radius:0;border-top:1px solid var(--line)}
+.app .su-ctx details.disc>summary.disc-sum{min-height:52px;font-weight:400}
+.app .su-ctx summary.disc-sum>.su-name{flex-grow:1}
+.app .su-ctx .disc-body{padding:var(--sp-1) 0 var(--sp-3)}
+
+/* Setup5 summary rows (label column, value, Edit) and the phone summary line */
+.app .su-sumrow{display:grid;grid-template-columns:220px 1fr auto;gap:var(--sp-4);align-items:start;padding:var(--sp-3) 0;border-top:1px solid var(--line)}
+.app .su-summary{display:flex;flex-direction:column}
+.app .su-sumrow>.lbl{margin:0}
+.app .su-line{min-height:48px;border-top:1px solid var(--line)}
+
+/* Project: two-track page (reviews | over time) and the review row inside a card link */
+.app .l-grid[data-tpl=su-project]{grid-template-columns:minmax(0,1fr) 460px;align-items:start}
+.app .card-link.su-rev{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:var(--sp-4);align-items:center;padding:var(--sp-4) var(--sp-5)}
+.app .su-rev>.go{color:var(--ink-2)}
+.app .card-link.su-revline{display:flex;align-items:center;gap:var(--sp-3);min-height:64px;border-top:1px solid var(--line);padding:var(--sp-2) 0}
+.app .su-revline>.l-stack{flex-grow:1;min-width:0}
+.app .su-clip{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
