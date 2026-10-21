@@ -4,12 +4,19 @@
 export const FLAG = "ui_next";
 export function flagOn(params, storage) {
   const q = params.get(FLAG);
+  // An explicit query controls this navigation even when persistence is absent,
+  // blocked, or a storage implementation silently declines the write.
+  if (q === "on" || q === "off") {
+    try {
+      if (q === "on") storage?.setItem(FLAG, "on");
+      else storage?.removeItem(FLAG);
+    } catch { /* Persistence is optional for the current URL. */ }
+    return q === "on";
+  }
   try {
-    if (q === "on") storage?.setItem(FLAG, "on");
-    else if (q === "off") storage?.removeItem(FLAG);
     return storage?.getItem(FLAG) === "on";
   } catch {
-    return q === "on";
+    return false;
   }
 }
 // Screens under the flag: ?screen=home (default) | about | landing (Landing = the signed-out entry; About from Landing and Home's account menu).
@@ -32,4 +39,12 @@ export function route(params, storage, screens = []) {
   if (screen === "about" || screen === "landing") return { view: screen, props: { phone, theme: theme === "dark" ? "dark" : "light" } };
   const state = params.get("state") === "first" ? "first" : "reviews";
   return { view: "home", props: { state: phone ? "reviews" : state, phone, theme: theme === "dark" ? "dark" : "light" } };
+}
+
+// Links between mounted screens carry their presentation and flag explicitly;
+// they keep working when localStorage is unavailable and survive a full reload.
+export function screenHref(screen, { phone = false, theme = "light" } = {}) {
+  const params = new URLSearchParams({ screen, [FLAG]: "on", theme });
+  if (phone) params.set("w", "phone");
+  return `?${params}`;
 }

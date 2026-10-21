@@ -7,7 +7,12 @@
 // from: the current query string (or URLSearchParams); defaults to location.search, or "" where there is no location.
 // extra: more params in insertion order; a null/false value drops the key, an undefined value is ignored (w/theme still carry).
 // The ?screen= values in screens/**/*.svelte are checked against the registry by test/ui-next-links.test.ts.
+// Link context agrees with route.js screenHref (main 638275c, "preserve screen context"): ui_next=on is explicit, so a link never
+// depends on stored opt-in; w carries only as "phone" and theme only as "dark" or "light", the values route() reads. Any other value
+// is dropped, and route() reads a dropped w/theme as desktop/light, the defaults screenHref writes, so href(s, {}, from) and
+// screenHref(s, { phone, theme } of from) land on the same view and props (test/ui-next-href.test.ts).
 export const CARRY = Object.freeze(["w", "theme"]);
+const READ = Object.freeze({ w: (v) => v === "phone", theme: (v) => v === "dark" || v === "light" });
 const NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/; // same rule as screens/registry.js NAME
 const OWN = ["ui_next", "screen"];
 
@@ -18,7 +23,7 @@ export function href(screen, extra = {}, from = globalThis.location?.search ?? "
   const out = new URLSearchParams({ ui_next: "on", screen });
   for (const k of CARRY) {
     const v = Object.hasOwn(extra, k) && extra[k] !== undefined ? extra[k] : cur.get(k);
-    if (v != null && v !== false && v !== "") out.set(k, String(v));
+    if (v != null && v !== false && READ[k](String(v))) out.set(k, String(v));
   }
   for (const [k, v] of Object.entries(extra)) {
     if (CARRY.includes(k) || v == null || v === false) continue;
