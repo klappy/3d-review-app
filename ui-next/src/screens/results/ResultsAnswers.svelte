@@ -1,8 +1,11 @@
-<!-- UI Next (v4) Results answers screen ("See the answers"). Status: provisional (playbook rule 12). ?screen=results-answers (&w=phone).
+<!-- UI Next (v4) Results answers screen ("See the answers"). Status: provisional (playbook rule 12). ?screen=results-answers (&w=phone)
+     (&state=team|community|church picks the perspective; any other value renders the default, community).
      Boards: ResultsAnswers.dc.html (desktop: perspective switch, split, CSV, one card per question with .ans rows), ResultsAnswersPhone.dc.html
-     (phone: one list card, a disclosure per question). Data: ui-next/fixtures/results/answers.json (counts only; nobody named).
-     The phone board draws its questions as details.dd; the app uses the Disclosure contract (details.disc in a list card,
-     design-system.md V-12: .dd means a menu). Answer bars: ./AnswerBar.svelte. One .btn-primary: desktop review head; phone the phone-bar. -->
+     (phone: one list card, a disclosure per question). Data: ui-next/fixtures/results/answers.json (anonymous rows per perspective,
+     counted by ./data.js answerView; nobody named). The perspective switch and the split drive the heading, the counts and the bars;
+     a split group under the minimum responses is hidden. The phone board draws its questions as details.dd; the app uses the
+     Disclosure contract (details.disc in a list card, design-system.md V-12: .dd means a menu). The phone perspective button steps to
+     the next perspective (?state=). Answer bars: ./AnswerBar.svelte. One .btn-primary: desktop review head; phone the phone-bar. -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
@@ -20,27 +23,40 @@
   import ReviewHead from "./ReviewHead.svelte";
   import AnswerBar from "./AnswerBar.svelte";
   import { G } from "./icons.js";
-  import { REPORT, ANSWERS as A, LENS_ORDER, lensLabel, pct } from "./data.js";
+  import { href } from "../href.js";
+  import { out } from "./links.js";
+  import { REPORT, ANSWER_LENSES, SPLITS, answerLens, answerView, lensLabel, pct } from "./data.js";
 
-  let { phone = false, theme = "light", state } = $props();
-  if (state !== undefined) throw new TypeError(`ResultsAnswers: no board states (got "${String(state)}")`);
+  // ?state= picks the perspective; renamed here so it never shadows the $state rune.
+  let { phone = false, theme = "light", state: asked } = $props();
+  const initial = answerLens(asked);
+  let lens = $state(initial);
+  let split = $state("everyone");
+  const A = $derived(answerView(lens, phone ? "everyone" : split));
+  const next = $derived(ANSWER_LENSES[(ANSWER_LENSES.indexOf(A.lens) + 1) % ANSWER_LENSES.length]);
   const review = $derived(phone ? REPORT.phone.review : REPORT.desktop.review);
-  const crumbs = $derived([{ label: review.project, href: "#project" }, { label: review.title }]);
-  const SPLITS = ["Everyone", "Split by age range", "Split by gender", "Split by where people met"];
+  const crumbs = $derived([{ label: review.project, href: out("project") }, { label: review.title }]);
+  const splitLabel = $derived(SPLITS.find((s) => s.key === A.split).label.replace(/^Split by /, "by "));
 </script>
 
 {#snippet download()}<Glyph d={G.download} />{/snippet}
 {#snippet back()}<Glyph d={G.back} />{/snippet}
 {#snippet people()}<Glyph d={G.people} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="The answers" parent="Results" back="?screen=results&w=phone" />{:else}<TopBar {crumbs} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Plan the next step" href="#next-step" />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title="The answers" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<TopBar {crumbs} home={out("workspace")} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label="Plan the next step" href={out("nextStep")} />{/if}{/snippet}
+{#snippet rows(lensKey, options, n)}
+  <div class="ans">{#each options as [label, count]}<div class="r"><span>{label}</span><span class="num tab-n">{count}</span><AnswerBar lens={lensKey} pct={pct(count, n)} /></div>{/each}</div>
+{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <ReviewHead {review} phone />
-    <Row gap={2}><Button label={`${lensLabel(A.lens)} · ${A.answers}`} href="#perspective" lead={people} block /><Button label="Download CSV" href="#csv" /></Row>
+    <Row gap={2}>
+      <Button label={`${A.label} · ${A.answers}`} ariaLabel={`Perspective: ${A.label}, ${A.answers} answers. Show ${lensLabel(next)}`} href={href("results-answers", { state: next })} lead={people} block />
+      <Button label="Download CSV" href="#csv" />
+    </Row>
     <Card pad="list" label="Questions">
-      {#each A.questions as q, i}
+      {#each A.questions as q, i (q.id)}
         <Disclosure label={q.q} open={i === 0} solid={false} gap={1}>
           {#each q.options as [label, count]}
             <Stack gap={1}><span class="small">{label}</span><Row gap={2}><AnswerBar lens={A.lens} pct={pct(count, q.n)} /><span class="small tab-n">{count}</span></Row></Stack>
@@ -49,29 +65,35 @@
         </Disclosure>
       {/each}
     </Card>
-    <a class="link" href="?screen=results&w=phone">Back to levels</a>
+    <a class="link" href={href("results")}>Back to levels</a>
   {:else}
     <Page gap={5}>
-      <ReviewHead {review} primary={{ label: "Plan the next step", href: "#next-step", trail: "arrow" }} />
+      <ReviewHead {review} primary={{ label: "Plan the next step", href: out("nextStep"), trail: "arrow" }} />
       <Row split gap={3}>
-        <div class="seg" role="radiogroup" aria-label="Perspective">{#each LENS_ORDER as lens}<label><input type="radio" name="lens" checked={lens === A.lens} />{lensLabel(lens)}</label>{/each}</div>
+        <!-- data-grow (contract row, 8.7): the switch takes the row's free width, so "Translation team" sits on one line (board: 520px inline). -->
+        <div class="seg" role="radiogroup" aria-label="Perspective" data-grow>{#each ANSWER_LENSES as l (l)}<label><input type="radio" name="lens" value={l} bind:group={lens} />{lensLabel(l)}</label>{/each}</div>
         <Row gap={3}>
-          <label class="sel"><select class="in" aria-label="Split by">{#each SPLITS as s}<option>{s}</option>{/each}</select><Glyph d="M6 9l6 6 6-6" /></label>
+          <label class="sel"><select class="in" aria-label="Split by" bind:value={split}>{#each SPLITS as s (s.key)}<option value={s.key}>{s.label}</option>{/each}</select><Glyph d="M6 9l6 6 6-6" /></label>
           <Button label="Download answers (CSV)" href="#csv" lead={download} />
         </Row>
       </Row>
       <Row gap={3}>
-        <h2 class="h2">{lensLabel(A.lens)} · {A.modality} · {A.answers} answers</h2>
+        <h2 class="h2" aria-live="polite">{A.label} · {A.modality} · {A.answers} answers{A.split === "everyone" ? "" : ` · ${splitLabel}`}</h2>
         <Row gap={2}><LensDot lens={A.lens} decorative /><span>{A.focus.area} ·</span><Level level={A.focus.level} /></Row>
       </Row>
-      {#each A.questions as q}
+      {#each A.questions as q (q.id)}
         <Card gap={3} label={q.q}>
           <Row split gap={3}><h3 class="h3">{q.q}</h3><span class="small">{q.n} answers</span></Row>
-          <div class="ans">{#each q.options as [label, count]}<div class="r"><span>{label}</span><span class="num tab-n">{count}</span><AnswerBar lens={A.lens} pct={pct(count, q.n)} /></div>{/each}</div>
+          {#if A.split === "everyone"}
+            {@render rows(A.lens, q.options, q.n)}
+          {:else}
+            {#each q.groups as g (g.label)}<Stack gap={2}><span class="micro">{g.label} · {g.n} answers</span>{@render rows(A.lens, g.options, g.n)}</Stack>{/each}
+            {#if A.hidden.length}<p class="small">{A.hidden.join(", ")}: fewer than 3 answers, hidden.</p>{/if}
+          {/if}
         </Card>
         {#if q.others}<div class="solid l-card l-stack" data-gap="2"><span class="micro">Other, in their words</span>{#each q.others as o}<p class="small t-15">{o}</p>{/each}</div>{/if}
       {/each}
-      <Row split gap={3}><span class="small">Answers are confidential. Nothing here names a person; splits with fewer than 3 answers are hidden.</span><Button label="Back to levels" href="?screen=results" lead={back} /></Row>
+      <Row split gap={3}><span class="small">Answers are confidential. Nothing here names a person; splits with fewer than 3 answers are hidden.</span><Button label="Back to levels" href={href("results")} lead={back} /></Row>
     </Page>
   {/if}
 </AppShell>

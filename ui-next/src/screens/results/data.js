@@ -107,3 +107,53 @@ export function heldLines(counts) {
 
 /** Answer bars: whole-percent widths of the question's answer count (board: floor). */
 export const pct = (count, n) => (n > 0 ? Math.floor((100 * count) / n) : 0);
+
+// Answers (ResultsAnswers boards): anonymous rows per perspective (fixtures/results/answers.json) aggregated here, as a
+// responses-aggregate read would (wiring debt 6 in the cookbook receipt). A split groups the rows by one attribute; a group
+// under MIN_RESPONSES is hidden (board footer: "splits with fewer than 3 answers are hidden").
+export const SPLITS = Object.freeze(ANSWERS.splits.map(([key, label]) => Object.freeze({ key, label })));
+export const ANSWER_LENSES = Object.freeze(LENS_ORDER.filter((lens) => Object.hasOwn(ANSWERS.lenses, lens)));
+/** A known perspective key, else the fixture default (an unknown ?state= renders the default). */
+export const answerLens = (lens) => (ANSWER_LENSES.includes(lens) ? lens : ANSWERS.default);
+/** A known split key, else "everyone". */
+export const answerSplit = (split) => (SPLITS.some((s) => s.key === split) ? split : "everyone");
+
+function tally(q, i, rows) {
+  const counts = q.options.map(() => 0);
+  let n = 0;
+  for (const r of rows) {
+    const a = r.a[i];
+    if (a === null || a === undefined) continue;
+    n += 1;
+    for (const k of Array.isArray(a) ? a : [a]) {
+      if (!Number.isInteger(k) || k < 0 || k >= counts.length) throw new TypeError(`results answers: option ${String(k)} out of range on ${q.id}`);
+      counts[k] += 1;
+    }
+  }
+  return { n, options: q.options.map((label, k) => [label, counts[k]]) };
+}
+
+/** One perspective's answers, optionally split: { lens, label, answers, modality, focus: { area, level }, split, hidden, questions }. */
+export function answerView(lens, split = "everyone") {
+  const key = answerLens(lens), by = answerSplit(split), L = ANSWERS.lenses[key];
+  const card = lensCards(REPORT.desktop.payload, REPORT.desktop.counts).find((c) => c.lens === key);
+  const area = card?.rows.find((r) => r.name === L.focus);
+  if (!area) throw new TypeError(`results answers: focus area "${L.focus}" is not a ${key} area in the report`);
+  const groups = [];
+  if (by === "everyone") groups.push({ label: "Everyone", rows: L.rows });
+  else for (const r of L.rows) {
+    const g = groups.find((x) => x.label === r[by]);
+    if (g) g.rows.push(r); else groups.push({ label: String(r[by]), rows: [r] });
+  }
+  const shown = groups.filter((g) => g.rows.length >= MIN_RESPONSES);
+  return {
+    lens: key, label: lensLabel(key), answers: L.rows.length, modality: ANSWERS.modality,
+    focus: { area: area.name, level: area.level }, split: by,
+    hidden: groups.filter((g) => g.rows.length < MIN_RESPONSES).map((g) => g.label),
+    questions: L.questions.map((q, i) => {
+      const all = tally(q, i, L.rows);
+      return { id: q.id, q: q.q, others: q.others, n: all.n, options: all.options,
+        groups: by === "everyone" ? [] : shown.map((g) => ({ label: g.label, ...tally(q, i, g.rows) })) };
+    }),
+  };
+}

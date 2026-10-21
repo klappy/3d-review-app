@@ -3,16 +3,18 @@
 // Boards: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas Results, ResultsPhone, ResultsAnswers, ResultsAnswersPhone,
 // ResultsGaps, ResultsGapsPhone, ResultsHeld, ResultsHeldPhone, Report, ReportDetailed, ReportPhone; unit
 // work/active/2026-10-21-ui-next-screens-fanout. Data: ui-next/fixtures/results/*.json through screens/results/data.js.
-import { describe, expect, it } from "vitest";
-import { render } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render } from "@testing-library/svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import { route } from "../ui-next/src/route.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REGISTRY } from "../ui-next/src/screens/registry.js";
+import { REGISTRY, LANES } from "../ui-next/src/screens/registry.js";
+// @ts-expect-error -- plain .js module, no type declarations
+import { OUT } from "../ui-next/src/screens/results/links.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import results from "../ui-next/src/screens/results/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, lensCards, bandRow, scoreRows, radar, heldLines, levelOf, pct } from "../ui-next/src/screens/results/data.js";
+import { REPORT, lensCards, bandRow, scoreRows, radar, heldLines, levelOf, pct, answerView } from "../ui-next/src/screens/results/data.js";
 import Results from "../ui-next/src/screens/results/Results.svelte";
 import ResultsAnswers from "../ui-next/src/screens/results/ResultsAnswers.svelte";
 import ResultsGaps from "../ui-next/src/screens/results/ResultsGaps.svelte";
@@ -72,6 +74,26 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect(heldLines(REPORT.held.counts).map((l: { text: string }) => l.text)).toEqual(["Translation team 6 — ready", "Community 8 — ready", "Church 1 — needs 2 more"]);
     expect([pct(1, 8), pct(3, 8), pct(0, 8)]).toEqual([12, 37, 0]);
   });
+  it("answers: counted from the anonymous rows, the community counts are the board's (ResultsAnswers)", () => {
+    type Q = { n: number; options: [string, number][]; groups: { label: string; n: number }[] };
+    const c = answerView("community");
+    expect([c.label, c.answers, c.focus.area, c.focus.level]).toEqual(["Community", 8, "Understandable", "urgent"]);
+    expect(c.questions.map((q: Q) => q.options.map(([, k]) => k))).toEqual([[1, 4, 2, 0, 1], [6, 3, 2, 1, 1, 0], [0, 2, 3, 3, 0]]);
+    expect(c.questions.map((q: Q) => q.n)).toEqual([8, 8, 8]);
+    const t = answerView("team");
+    expect([t.label, t.answers, t.focus.area, t.focus.level, t.questions.length]).toEqual(["Translation team", 6, "Translation process & brief", "strong", 3]);
+    expect(answerView("church").focus).toEqual({ area: "Confidence in the translation", level: "growing" });
+    expect(answerView("nobody").lens).toBe("community"); // an unknown perspective is the default
+  });
+  it("answers split: groups under the minimum responses are hidden", () => {
+    const g = answerView("community", "gender");
+    expect(g.questions[0].groups.map((x: { label: string; n: number }) => `${x.label} ${x.n}`)).toEqual(["Women 5", "Men 3"]);
+    expect(g.hidden).toEqual([]);
+    const a = answerView("community", "age");
+    expect(a.questions[0].groups.map((x: { label: string }) => x.label)).toEqual(["31–50"]);
+    expect(a.hidden).toEqual(["18–30", "51+"]);
+    expect(answerView("community", "shoe-size").split).toBe("everyone");
+  });
 });
 
 describe("each board renders as a screen", () => {
@@ -88,6 +110,20 @@ describe("each board renders as a screen", () => {
     const del = a.querySelector(".menu button.mi.danger")!;
     expect(del.getAttribute("aria-disabled")).toBe("true");
     expect(text(a.querySelector(".mi-why"))).toBe("Reviews with responses can't be deleted. This one has 18.");
+    expect(a.querySelector("summary.btn.btn-icon > svg")).not.toBeNull(); // the shared 44x44 icon summary, no .icn stand-in
+    expect(a.querySelector(".l-page > .l-row[data-split][data-align=start] h1")).not.toBeNull(); // head row top-aligned (8.7)
+    expect(a.querySelector(".seg[data-size=wide][aria-label='Show levels as']")).not.toBeNull(); // F1: contract .seg width
+    expect(a.querySelectorAll(".glass[data-lens=team] .lvl-row").length).toBe(5); // 8.11 area rows
+  });
+  it("Results: Refresh with new answers is a no-op that says so", async () => {
+    const a = mount(Results);
+    const btn = [...a.querySelectorAll("button.btn")].find((b) => text(b) === "Refresh with new answers")!;
+    expect(text(a.querySelector("[role=status]"))).toBe("Report built 31 Oct from 18 responses.");
+    await fireEvent.click(btn);
+    expect(text(a.querySelector("[role=status]"))).toBe("Report built 31 Oct from 18 responses. No new answers since this report was built.");
+    const p = mount(Results, { phone: true });
+    await fireEvent.click(p.querySelector("button[aria-label='Refresh with new answers']")!);
+    expect(text(p.querySelector("[role=status]"))).toBe("No new answers since this report was built.");
   });
   it("ResultsPhone: root phone header, phone review head, three compact perspective cards, phone-bar primary", () => {
     const a = mount(Results, { phone: true });
@@ -100,6 +136,7 @@ describe("each board renders as a screen", () => {
   it("ResultsAnswers: perspective switch, split, one card per question with answer rows and bars, their words", () => {
     const a = mount(ResultsAnswers);
     expect((a.querySelector(".seg input:checked")!.parentElement as HTMLElement).textContent).toBe("Community");
+    expect(a.querySelector(".seg[data-grow][role=radiogroup]")).not.toBeNull(); // F1: the switch takes the row's free width
     expect(all(a, "select.in option")).toEqual(["Everyone", "Split by age range", "Split by gender", "Split by where people met"]);
     expect(text(a.querySelector("main h2.h2"))).toBe("Community · Written · 8 answers");
     expect(a.querySelectorAll(".ans").length).toBe(3);
@@ -108,6 +145,33 @@ describe("each board renders as a screen", () => {
     expect(first.querySelector("svg.bar rect")!.getAttribute("width")).toBe("12%");
     expect(text(a.querySelector(".solid .micro"))).toBe("Other, in their words");
   });
+  it("ResultsAnswers: the perspective switch and the split drive the heading, counts and bars (F2)", async () => {
+    const a = mount(ResultsAnswers);
+    const team = [...a.querySelectorAll(".seg input")].find((i) => text(i.parentElement) === "Translation team") as HTMLInputElement;
+    await fireEvent.click(team);
+    expect(text(a.querySelector("main h2.h2"))).toBe("Translation team · Written · 6 answers");
+    expect(text(a.querySelector("main h2.h2 + .l-row"))).toBe("Translation process & brief · Strong");
+    expect(all(a, "main h3.h3")[0]).toBe("Does your team have a translation brief or plan that defines what kind of translation you are aiming for?");
+    expect(a.querySelector(".ans svg.bar")!.getAttribute("data-lens")).toBe("team");
+    expect(all(a, ".ans")[0]).toBe("Yes, we have a documented brief that defines our translation type and goals2Yes, we have a shared understanding as a team of what we are aiming for, but it is not documented4We are still working on defining our translation type and goals0Other (please describe)0");
+    expect(a.querySelector(".solid .micro")).toBeNull(); // no "in their words" for the team
+    const community = [...a.querySelectorAll(".seg input")].find((i) => text(i.parentElement) === "Community") as HTMLInputElement;
+    await fireEvent.click(community);
+    const sel = a.querySelector("select.in") as HTMLSelectElement;
+    sel.value = "age";
+    await fireEvent.change(sel);
+    expect(text(a.querySelector("main h2.h2"))).toBe("Community · Written · 8 answers · by age range");
+    expect(a.querySelectorAll(".ans").length).toBe(3); // one group (31–50) per question; the others are under 3
+    expect(all(a, ".l-card .micro")[0]).toBe("31–50 · 4 answers");
+    expect(all(a, ".l-card p.small")[0]).toBe("18–30, 51+: fewer than 3 answers, hidden.");
+    sel.value = "gender";
+    await fireEvent.change(sel);
+    expect(a.querySelectorAll(".ans").length).toBe(6);
+  });
+  it("ResultsAnswers: ?state= picks the perspective; an unknown value is the default", () => {
+    expect(text(mount(ResultsAnswers, { state: "church" }).querySelector("main h2.h2"))).toBe("Church · Written · 4 answers");
+    expect(text(mount(ResultsAnswers, { state: "x" }).querySelector("main h2.h2"))).toBe("Community · Written · 8 answers");
+  });
   it("ResultsAnswersPhone: one list card, a native disclosure per question (first open), back to levels", () => {
     const a = mount(ResultsAnswers, { phone: true });
     const ds = [...a.querySelectorAll(".l-card[data-pad=list] details.disc")] as HTMLDetailsElement[];
@@ -115,6 +179,10 @@ describe("each board renders as a screen", () => {
     expect(text(ds[0].querySelector("summary"))).toBe("As a group, how would we describe how easy or difficult this translation is to understand?");
     expect(text(a.querySelector(".phone-title"))).toBe("The answers");
     expect(all(a, "main > a.link")).toEqual(["Back to levels"]);
+    const lens = a.querySelector("main a.btn.btn-block")!;
+    expect(text(lens)).toBe("Community · 8");
+    expect(lens.getAttribute("href")).toBe("?ui_next=on&screen=results-answers&state=church"); // steps to the next perspective
+    expect(text(mount(ResultsAnswers, { phone: true, state: "team" }).querySelector("main a.btn.btn-block"))).toBe("Translation team · 6");
   });
   it("ResultsGaps: who each dot is, three biggest gaps then agreement, band barbells with verdicts", () => {
     const a = mount(ResultsGaps);
@@ -136,6 +204,14 @@ describe("each board renders as a screen", () => {
     expect(all(a, ".glass-hi .small").filter((t) => / — /.test(t))).toEqual(["Translation team 6 — ready", "Community 8 — ready", "Church 1 — needs 2 more"]);
     expect(all(a, ".glass[data-lens=church] .lvl-name")).toEqual(["More input needed", "More input needed", "More input needed", "More input needed"]);
     expect(text(a.querySelector(".btn-primary"))).toBe("Reopen collection");
+    const grid = a.querySelector(".l-grid[data-state=held]")!; // F4: dimmed by the contract row, and inert
+    expect(grid.hasAttribute("inert")).toBe(true);
+    expect(grid.querySelectorAll(".glass[data-lens]").length).toBe(3);
+    expect(a.querySelector(".glass-hi .icn[data-size='64']")).not.toBeNull();
+    expect(text(a.querySelector(".glass-hi h2.h2.t-24"))).toBe("Results are held until every perspective has enough answers");
+    // F5: one source for the count: the meta line and the refused delete both say 15
+    expect(text(a.querySelector(".l-page > .l-row p.small"))).toContain("· 15 responses");
+    expect(text(a.querySelector(".mi-why"))).toBe("Reviews with responses can't be deleted. This one has 15.");
   });
   it("ResultsHeldPhone: nested header, closed pill, held card with the two ways on", () => {
     const a = mount(ResultsHeld, { phone: true });
@@ -147,7 +223,8 @@ describe("each board renders as a screen", () => {
   it("Report: document bar, one paper sheet with levels, gaps, where to look next and the attestation footer", () => {
     const a = mount(Report);
     expect(a.querySelector("header.top[data-variant=document]")).not.toBeNull();
-    expect(a.querySelectorAll(".psheet > .paper").length).toBe(1);
+    expect(a.querySelectorAll("main > .paper[data-sheet=a4]").length).toBe(1); // 8.11 sheet row, no .l-card padding
+    expect(a.querySelector(".paper .l-row[data-split][data-align=start] > svg.mk[width='40']")).not.toBeNull(); // F3: the 40px mark top right
     expect(all(a, ".paper .solid[data-lens] .lvl-name")).toEqual(["Growing", "Needs support", "Growing"]);
     expect(all(a, ".paper ol li")).toEqual(["Community · Impactful — Needs urgent attention", "Community · Understandable — Needs urgent attention", "Translation team · External review — Needs support"]);
     expect(text(a.querySelector(".pfoot"))).toContain("1 of 1");
@@ -155,11 +232,28 @@ describe("each board renders as a screen", () => {
   it("ReportDetailed: four sheets, radar, numeric barbells, evidence tables", () => {
     const a = mount(ReportDetailed);
     expect(all(a, ".pfoot span:last-child")).toEqual(["1 of 4", "2 of 4", "3 of 4", "4 of 4"]);
+    expect(a.querySelectorAll(".paper[data-sheet=page]").length).toBe(4);
     expect(a.querySelector("svg[role=img][aria-label^='Radar']")).not.toBeNull();
     expect(a.querySelectorAll("svg[data-part=score-barbell]").length).toBe(3 + 7);
     expect(all(a, "table").length).toBe(3);
     expect(all(a, "th.th")).toContain("Observation");
-    expect(() => render(ReportDetailed as never, { props: { phone: true } })).toThrow(/desktop only/);
+  });
+  it("ReportDetailed on a phone renders the phone's reports list (F6: never a blank page)", () => {
+    const a = mount(ReportDetailed, { phone: true });
+    expect(text(a.querySelector(".phone-title"))).toBe("Reports");
+    expect(all(a, ".glass .h3")).toEqual(["Overview · 1 page", "Detailed · 4 pages"]);
+  });
+  it("Print prints the report (F7)", async () => {
+    const spy = vi.fn();
+    vi.stubGlobal("print", spy);
+    try {
+      const a = mount(Report);
+      const btn = [...a.querySelectorAll("header.top button.btn")].find((b) => text(b) === "Print")!;
+      await fireEvent.click(btn);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
   it("ReportPhone: two report cards and the preview", () => {
     const a = mount(Report, { phone: true });
@@ -185,8 +279,57 @@ describe("nesting (8.1), no inline style, one .btn-primary, dark theme", () => {
       if (props.phone) expect(p[0].closest(".phone-bar")).not.toBeNull();
     });
   }
-  it("screens refuse an unknown ?state=", () => {
-    for (const C of [Results, ResultsAnswers, ResultsGaps, ResultsHeld, Report, ReportDetailed]) expect(() => render(C as never, { props: { state: "x" } })).toThrow(/no board states/);
+  it("an unknown ?state= renders the default state, never throws (desktop and phone)", () => {
+    for (const C of [Results, ResultsAnswers, ResultsGaps, ResultsHeld, Report, ReportDetailed]) {
+      for (const phone of [false, true]) {
+        const plain = render(C as never, { props: { phone } }).container.innerHTML;
+        expect(render(C as never, { props: { phone, state: "x" } }).container.innerHTML).toBe(plain);
+      }
+    }
+  });
+  it("every route has exactly one h1", () => {
+    for (const [board, , C, props] of BOARDS) expect(mount(C, props).querySelectorAll("h1").length, board).toBe(1);
+    expect(mount(ReportDetailed, { phone: true }).querySelectorAll("h1").length).toBe(1);
+  });
+});
+
+describe("in-screen links (shared href(); cross-lane names as their lanes register them)", () => {
+  // Hash links left on purpose: no screen exists for them yet (cookbook receipt debt 8): CSV, PDF download, PDF share.
+  const PLACEHOLDERS = ["#csv", "#download", "#share-pdf"];
+  // Links this lane sets: the screen body, the phone bar, the document bar, and the shared headers' brand, crumb, back and menu.
+  // (The shared TopBar's own workspace/help/account items are its links, not this lane's.)
+  const OWN = "main a[href], .phone-bar a[href], header[data-variant=document] a[href], header.top > a.brand, nav.crumb a, .phone-top a[href]";
+  const names = new Set<string>();
+  for (const [board, , C, props] of BOARDS) {
+    it(`${board}: every link is a href() screen link or a named placeholder (F8: no #next-step/#share/#people/#setup)`, () => {
+      const q = props.phone ? "?ui_next=on&screen=x&w=phone&theme=dark" : "?ui_next=on&screen=x&theme=dark";
+      window.history.replaceState(null, "", `/next/${q}`); // href() carries ?w= and ?theme= from location.search
+      try {
+        const a = mount(C, props);
+        const links = [...a.querySelectorAll(OWN)];
+        expect(links.length).toBeGreaterThan(2);
+        for (const el of links) {
+          const h = el.getAttribute("href")!;
+          if (PLACEHOLDERS.includes(h)) continue;
+          expect(h, text(el)).toMatch(/^\?ui_next=on&screen=[a-z0-9-]+(&[a-z_]+=[^&#]+)*(#[a-z]+)?$/);
+          expect(h, text(el)).toContain(props.phone ? "&w=phone&theme=dark" : "&theme=dark");
+          names.add(new URLSearchParams(h.slice(1).split("#")[0]).get("screen")!);
+        }
+      } finally {
+        window.history.replaceState(null, "", "/");
+      }
+    });
+  }
+  it("cross-lane destinations: each OUT name is registered once its owning lane is merged", () => {
+    for (const [key, [name, lane]] of Object.entries(OUT as Record<string, [string, string]>)) {
+      expect(Object.keys(LANES), key).toContain(lane);
+      if (Object.keys(LANES[lane]).length) expect(REGISTRY[name], `${lane} lane registers ${name}`).toBeDefined();
+    }
+  });
+  it("in-lane destinations are registered", () => {
+    const own = [...names].filter((n) => !Object.values(OUT as Record<string, [string, string]>).some(([o]) => o === n));
+    expect(own.length).toBeGreaterThan(0);
+    for (const n of own) expect([...Object.keys(results), "home"], n).toContain(n);
   });
 });
 

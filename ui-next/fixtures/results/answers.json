@@ -1,13 +1,56 @@
 {
-  "_note": "UI Next results lane fixture (provisional): one perspective's answers per question (ResultsAnswers, ResultsAnswersPhone boards). Counts only; no person is named.",
-  "lens": "community",
+  "_note": "UI Next results lane fixture (provisional): anonymous answer rows per perspective (no name, no id, no free text but the board's quotes) for the ResultsAnswers and ResultsAnswersPhone boards. Questions and options are the pinned instrument's (seed/source/rubric_csv Items.csv + Options.csv, item ids below; the community options keep the board's added \"I don't know\"). Counts are aggregated from these rows by screens/results/data.js answerView(); the community rows reproduce the board's counts exactly. Split attributes (age, gender, met) are fixture values; a group under the minimum responses is hidden, as the board's footer says.",
   "modality": "Written",
-  "answers": 8,
-  "focus": { "area": "Understandable", "level": "urgent" },
-  "questions": [
-    { "q": "As a group, how would we describe how easy or difficult this translation is to understand?", "n": 8, "options": [["Very easy to understand", 1], ["Most of it is easy, but some parts are hard", 4], ["Much of it is difficult to understand", 2], ["We cannot understand it", 0], ["I don't know", 1]] },
-    { "q": "Where we find it difficult, what makes it hard? (choose all that apply)", "n": 8, "options": [["Some words are unfamiliar or strange", 6], ["Some sentences are too long or complicated", 3], ["It is not our dialect", 2], ["It doesn't sound like the way we normally speak", 1], ["Other (please describe)", 1], ["I don't know", 0]],
-      "others": ["\"Some words sound like the neighbouring dialect, not ours.\"", "\"The chapter headings are fine but the verses run together.\""] },
-    { "q": "As a group, how often do we use this translation?", "n": 8, "options": [["We use it every day", 0], ["We use it about 3 times per week", 2], ["We use it occasionally", 3], ["We don't use it", 3], ["I don't know", 0]] }
-  ]
+  "default": "community",
+  "splits": [["everyone", "Everyone"], ["age", "Split by age range"], ["gender", "Split by gender"], ["met", "Split by where people met"]],
+  "lenses": {
+    "team": {
+      "focus": "Translation process & brief",
+      "questions": [
+        { "id": "TR-Q1", "q": "Does your team have a translation brief or plan that defines what kind of translation you are aiming for?", "options": ["Yes, we have a documented brief that defines our translation type and goals", "Yes, we have a shared understanding as a team of what we are aiming for, but it is not documented", "We are still working on defining our translation type and goals", "Other (please describe)"] },
+        { "id": "TR-Q3", "q": "Before drafting, what does your team do to understand the meaning of the passage?", "options": ["We study the passage using multiple resources (commentaries, original languages, etc.) and discuss as a team", "We study the passage using at least one reference resource", "We read the passage in a language we understand well and discuss it", "We begin drafting based on our existing understanding", "Other (please describe)"] },
+        { "id": "TR-Q5", "q": "How does your team check draft work internally before moving to external review?", "options": ["The full team reviews every draft together", "Every draft is checked by at least one other team member before moving forward", "The lead translator or translation supervisor reviews drafts", "Drafts are checked by another team member when there are questions or concerns", "We move directly to external review without internal cross-checking", "Other (please describe)"] }
+      ],
+      "rows": [
+        { "age": "31–50", "gender": "Men", "met": "Team meeting", "a": [0, 0, 0] },
+        { "age": "31–50", "gender": "Men", "met": "Team meeting", "a": [0, 0, 1] },
+        { "age": "51+", "gender": "Women", "met": "Team meeting", "a": [1, 0, 0] },
+        { "age": "31–50", "gender": "Men", "met": "Team meeting", "a": [1, 0, 0] },
+        { "age": "51+", "gender": "Men", "met": "Team meeting", "a": [1, 1, 1] },
+        { "age": "31–50", "gender": "Women", "met": "Team meeting", "a": [1, 1, 2] }
+      ]
+    },
+    "community": {
+      "focus": "Understandable",
+      "questions": [
+        { "id": "CW-Q1", "q": "As a group, how would we describe how easy or difficult this translation is to understand?", "options": ["Very easy to understand", "Most of it is easy, but some parts are hard", "Much of it is difficult to understand", "We cannot understand it", "I don't know"] },
+        { "id": "CW-Q2", "q": "Where we find it difficult, what makes it hard? (choose all that apply)", "multi": true, "options": ["Some words are unfamiliar or strange", "Some sentences are too long or complicated", "It is not our dialect", "It doesn't sound like the way we normally speak", "Other (please describe)", "I don't know"],
+          "others": ["\"Some words sound like the neighbouring dialect, not ours.\"", "\"The chapter headings are fine but the verses run together.\""] },
+        { "id": "CW-Q7", "q": "As a group, how often do we use this translation?", "options": ["We use it every day", "We use it about 3 times per week", "We use it occasionally", "We don't use it", "I don't know"] }
+      ],
+      "rows": [
+        { "age": "31–50", "gender": "Women", "met": "Sunday gathering", "a": [1, [0, 1], 2] },
+        { "age": "31–50", "gender": "Women", "met": "Sunday gathering", "a": [1, [0], 3] },
+        { "age": "18–30", "gender": "Men", "met": "Home group", "a": [2, [0, 1, 2], 3] },
+        { "age": "51+", "gender": "Women", "met": "Sunday gathering", "a": [1, [0, 2], 2] },
+        { "age": "31–50", "gender": "Men", "met": "Home group", "a": [2, [0, 1], 3] },
+        { "age": "18–30", "gender": "Women", "met": "Sunday gathering", "a": [0, [3], 1] },
+        { "age": "31–50", "gender": "Women", "met": "Home group", "a": [1, [0], 2] },
+        { "age": "51+", "gender": "Men", "met": "Sunday gathering", "a": [4, [4], 1] }
+      ]
+    },
+    "church": {
+      "focus": "Confidence in the translation",
+      "questions": [
+        { "id": "CHIP-Q6", "q": "How confident are you that the translation team followed a sound and robust translation process?", "options": ["Highly confident", "Moderately confident", "Not very confident", "I don't have enough information to say", "Other (please describe)"] },
+        { "id": "CHIP-Q7", "q": "How confident are you in the translation team's understanding of the meaning of the original text?", "options": ["Highly confident", "Moderately confident", "Not very confident", "I don't have enough information to say", "Other (please describe)"] }
+      ],
+      "rows": [
+        { "age": "51+", "gender": "Men", "met": "Pastors' meeting", "a": [0, 0] },
+        { "age": "51+", "gender": "Men", "met": "Pastors' meeting", "a": [0, 1] },
+        { "age": "51+", "gender": "Men", "met": "Pastors' meeting", "a": [0, 0] },
+        { "age": "31–50", "gender": "Women", "met": "Pastors' meeting", "a": [1, 1] }
+      ]
+    }
+  }
 }

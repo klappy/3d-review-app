@@ -1,5 +1,6 @@
 <!-- UI Next (v4) Report detailed screen: the four-page detailed report. Status: provisional (playbook rule 12). ?screen=report-detailed.
-     Board: ReportDetailed.dc.html (desktop only; the phone shares the PDF from ReportPhone). Four .paper sheets in .psheet (Paper contract,
+     Board: ReportDetailed.dc.html (desktop only). On a phone (&w=phone) it renders the phone's reports list (ReportPhone, ./Report.svelte),
+     where the phone shares the PDF; any ?state= renders the default. Four .paper[data-sheet=page] sheets (8.11 contract row; Paper is
      Card level), stacked in the shell's main: 1 head + radar + biggest tensions; 2 all areas compared + how to read; 3-4 every area with
      evidence (.th/.td tables) + their words. Scores are exact as returned (ui/report-lenses.js lensSpreadRows exact); levels v3ScoreBand;
      radar ui/report-radar.js radarModel. One .btn-primary: "Download this report (PDF)" (document bar). Copy: the board. -->
@@ -15,11 +16,11 @@
   import PaperLegend from "./PaperLegend.svelte";
   import ScoreBar from "./ScoreBar.svelte";
   import Radar from "./Radar.svelte";
+  import Report from "./Report.svelte";
+  import { href } from "../href.js";
   import { REPORT, LENS_ORDER, lensLabel, lensCards, scoreRows, radar } from "./data.js";
 
-  let { phone = false, theme = "light", state } = $props();
-  if (state !== undefined) throw new TypeError(`ReportDetailed: no board states (got "${String(state)}")`);
-  if (phone) throw new TypeError("ReportDetailed: desktop only (the phone shares the PDF from ?screen=report&w=phone)");
+  let { phone = false, theme = "light" } = $props();
   const D = REPORT.desktop;
   const cards = lensCards(D.payload, D.counts);
   const tensions = scoreRows(D, D.counts).slice(0, 3);
@@ -29,7 +30,7 @@
   const PAGES = 4;
 </script>
 
-{#snippet top()}<DocBar title={`Detailed report · ${PAGES} pages · ${D.review.title}`} other="Open the overview · 1 page" otherHref="?screen=report" />{/snippet}
+{#snippet top()}<DocBar title={`Detailed report · ${PAGES} pages · ${D.review.title}`} other="Open the overview · 1 page" otherHref={href("report")} />{/snippet}
 {#snippet foot(n)}<div class="pfoot"><span>{FOOT}</span><span>{n} of {PAGES}</span></div>{/snippet}
 {#snippet scores(rows)}
   {#each rows as row}
@@ -51,9 +52,12 @@
   </div>
 {/snippet}
 
+{#if phone}
+<Report phone {theme} />
+{:else}
 <AppShell {theme} screen {top}>
   <Stack gap={6}>
-    <div class="psheet"><div class="paper l-card l-stack" data-gap="5">
+    <div class="paper" data-sheet="page">
       <PaperHead review={D.review} {cards} kind="detailed report" />
       <Stack gap={1}>
         <h2 class="h3">The three perspectives as one shape</h2>
@@ -71,8 +75,8 @@
         {@render scores(tensions)}
       </Stack>
       {@render foot(1)}
-    </div></div>
-    <div class="psheet"><div class="paper l-card l-stack" data-gap="5">
+    </div>
+    <div class="paper" data-sheet="page">
       <Stack gap={2}>
         <h2 class="h3">All areas compared across perspectives</h2>
         <p class="small">0–100 area scores; the band shows the spread between the perspectives asked. Only shared areas can be compared.</p>
@@ -83,18 +87,19 @@
         <p class="small">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. An area with fewer than three answers shows More input needed and no score. Nothing in this report identifies a person.</p>
       </Stack>
       {@render foot(2)}
-    </div></div>
-    <div class="psheet"><div class="paper l-card l-stack" data-gap="5">
+    </div>
+    <div class="paper" data-sheet="page">
       <h2 class="h3">Every area, with evidence</h2>
       {@render evidence(cards[0])}
       {@render evidence(cards[1])}
       {@render foot(3)}
-    </div></div>
-    <div class="psheet"><div class="paper l-card l-stack" data-gap="5">
+    </div>
+    <div class="paper" data-sheet="page">
       <h2 class="h3">Every area, with evidence (continued)</h2>
       {@render evidence(cards[2])}
       <Stack gap={2}><h2 class="h3">In their words</h2><p class="small">{D.theirWords.map((w) => `“${w}”`).join(" · ")}</p></Stack>
       {@render foot(4)}
-    </div></div>
+    </div>
   </Stack>
 </AppShell>
+{/if}

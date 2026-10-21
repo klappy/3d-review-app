@@ -1,7 +1,7 @@
 <!-- UI Next (v4) Results gaps screen ("The three biggest gaps"). Status: provisional (playbook rule 12). ?screen=results-gaps (&w=phone).
      Boards: ResultsGaps.dc.html (desktop), ResultsGapsPhone.dc.html (phone). Rows: the board's areas (fixture gaps.biggest / gaps.agree),
      each perspective's band from ./data.js bandRow over ui/report-lenses.js lensSpreadRows + v3ScoreBand.
-     One .btn-primary: desktop review head; phone the phone-bar. Copy: the boards. -->
+     Any ?state= renders the default. One .btn-primary: desktop review head; phone the phone-bar. Copy: the boards. -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
@@ -17,31 +17,32 @@
   import GapRow from "./GapRow.svelte";
   import PtDot from "./PtDot.svelte";
   import { G } from "./icons.js";
+  import { href } from "../href.js";
+  import { out } from "./links.js";
   import { REPORT, LENS_ORDER, lensLabel, bandRow } from "./data.js";
 
-  let { phone = false, theme = "light", state } = $props();
-  if (state !== undefined) throw new TypeError(`ResultsGaps: no board states (got "${String(state)}")`);
+  let { phone = false, theme = "light" } = $props();
   const src = $derived(phone ? REPORT.phone : REPORT.desktop);
   const biggest = $derived(src.gaps.biggest.map((n) => bandRow(src, src.counts, n)));
   const agree = $derived(src.gaps.agree.map((n) => bandRow(src, src.counts, n)));
   const review = $derived(src.review);
-  const crumbs = $derived([{ label: review.project, href: "#project" }, { label: review.title }]);
+  const crumbs = $derived([{ label: review.project, href: out("project") }, { label: review.title }]);
 </script>
 
 {#snippet arrow()}<Glyph d={G.arrow} />{/snippet}
 {#snippet doc()}<Glyph d={G.doc} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Biggest gaps" parent="Results" back="?screen=results&w=phone" />{:else}<TopBar {crumbs} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Plan the next step" href="#next-step" />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Biggest gaps" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<TopBar {crumbs} home={out("workspace")} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label="Plan the next step" href={out("nextStep")} />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <ReviewHead {review} phone />
     <p class="small">The three biggest gaps between how the perspectives see the same thing.</p>
     {#each biggest as row}<GapRow {row} phone />{/each}
-    <a class="link" href="?screen=report&w=phone">Open the detailed report</a>
+    <a class="link" href={href("report")}>Open the detailed report</a>
   {:else}
     <Page gap={5}>
-      <ReviewHead {review} primary={{ label: "Plan the next step", href: "#next-step", trail: "arrow" }} />
+      <ReviewHead {review} primary={{ label: "Plan the next step", href: out("nextStep"), trail: "arrow" }} />
       <Card pad="list" label="Who each dot is">
         <Row wrap gap={6}>
           <span class="h3">Who each dot is</span>
@@ -58,7 +59,7 @@
             <h2 class="h2">What this does not tell you</h2>
             <p class="small t-15">Who is right. A gap is an invitation to ask, not a verdict. Take the two biggest to the team and the community together. The full report adds every area and a radar of the three shapes.</p>
           </Stack>
-          <Row gap={2}><Button label="Open the detailed report" href="?screen=report-detailed" lead={doc} /><Button label="Plan the next step" href="#next-step" trail={arrow} /></Row>
+          <Row gap={2}><Button label="Open the detailed report" href={href("report-detailed")} lead={doc} /><Button label="Plan the next step" href={out("nextStep")} trail={arrow} /></Row>
         </Row>
       </Card>
     </Page>
