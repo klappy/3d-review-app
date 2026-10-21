@@ -8,6 +8,7 @@ import { resolve } from "node:path";
 import { render } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 import Menu from "../ui-next/src/Menu.svelte";
+import Page from "../ui-next/src/Page.svelte";
 import App from "../ui-next/src/App.svelte";
 import Layouts from "../ui-next/src/Layouts.svelte";
 import HomeParts from "../ui-next/src/HomeParts.svelte";
@@ -81,5 +82,25 @@ describe("b. gallery.css applies to the gallery pages only (lanes explore, setup
       document.body.innerHTML = "";
     }
     expect(hits).toBeGreaterThan(0);
+  });
+});
+
+describe("d. Page gap={n} reads the --sp-n step (lane setup; design-system.md 8.1 Page row, 8.2)", () => {
+  const css = noComments(read("components/base.css")) + noComments(read("components/layout.css"));
+  const pageRules = rules(css).filter(([s]) => /^\.l-page(\[data-gap\])?$/.test(s));
+  it(".l-page keeps --sp-5 by default and reads --g when the Page sets data-gap", () => {
+    expect(pageRules.map(([s, d]) => [s, d.match(/gap:([^;}]+)/)?.[1]])).toEqual([[".l-page", "var(--sp-5)"], [".l-page[data-gap]", "var(--g)"]]);
+    for (let n = 1; n <= 8; n++) expect(css).toContain(`[data-gap="${n}"]{--g:var(--sp-${n})}`);
+  });
+  it("layout.css loads after base.css, so the (0,2,0) data-gap rule is the one that applies", () => {
+    const main = read("src/main.js");
+    expect(main.indexOf(`"../components/layout.css"`)).toBeGreaterThan(main.indexOf(`"../components/base.css"`));
+  });
+  it("Page gap={7} renders data-gap=7 and matches the rule; a Page without gap does not", () => {
+    for (const [props, gap] of [[{ gap: 7 }, "7"], [{ gap: 5 }, "5"], [{}, null]] as const) {
+      const el = render(Page, { props }).container.querySelector(".l-page")!;
+      expect(el.getAttribute("data-gap")).toBe(gap);
+      expect(el.matches(".l-page[data-gap]")).toBe(gap !== null);
+    }
   });
 });
