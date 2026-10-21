@@ -16,7 +16,8 @@
 
   let { groups, surveys, host, phone = false, theme = "light" } = $props();
   const at = $derived(carry(phone, theme));
-  const pct = (s) => Math.round((100 * s.n) / s.of);
+  // Bar takes 0..100: a survey with no expected count draws an empty bar, and more answers than expected draw a full one.
+  const pct = (s) => { const v = s.of > 0 ? Math.round((100 * s.n) / s.of) : 0; return Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0; };
 </script>
 
 {#snippet qr()}<Ico d={A.qr} />{/snippet}

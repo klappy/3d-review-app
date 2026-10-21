@@ -4,6 +4,7 @@
 // Share, SharePhone, Sandbox, SandboxPhone, PaperEntry, PaperEntryPhone, MenuPhone (.dc.html); unit work/active/2026-10-21-ui-next-screens-fanout.
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render } from "@testing-library/svelte";
+import { flushSync } from "svelte";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import NextStep from "../ui-next/src/screens/actions/NextStep.svelte";
@@ -19,6 +20,7 @@ import GapBar from "../ui-next/src/screens/actions/GapBar.svelte";
 import ReviewHead from "../ui-next/src/screens/actions/ReviewHead.svelte";
 import CollectGroups from "../ui-next/src/screens/actions/CollectGroups.svelte";
 import CopyButton from "../ui-next/src/screens/actions/CopyButton.svelte";
+import ShareOut from "../ui-next/src/screens/actions/ShareOut.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import { shareText } from "../ui-next/src/screens/actions/copy.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -30,9 +32,9 @@ import { route } from "../ui-next/src/route.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { CAN_SHARE as LEGACY_CAN_SHARE, copy as SHARE_COPY } from "../ui/assess/share.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { PRINT_IN_LANGUAGE as LEGACY_PRINT_IN_LANGUAGE, printLanguages as legacyPrintLanguages } from "../ui/assess/print-lang.js";
+import { PRINT_IN_LANGUAGE as LEGACY_PRINT_IN_LANGUAGE, printLanguages as legacyPrintLanguages, printLanguageField as legacyPrintLanguageField } from "../ui/assess/print-lang.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { CAN_SHARE, READ_ONLY, PRINT_IN_LANGUAGE, printLanguages } from "../ui-next/src/screens/actions/legacy.js";
+import { CAN_SHARE, READ_ONLY, PRINT_IN_LANGUAGE, printLanguages, showPrintLanguage } from "../ui-next/src/screens/actions/legacy.js";
 import R from "../ui-next/fixtures/actions/review.json";
 import PLAN from "../ui-next/fixtures/actions/action-plan.json";
 
@@ -165,6 +167,12 @@ describe("actions lane wiring through the current UI's modules", () => {
       expect(printLanguages(aLwc, pLwc), JSON.stringify([aLwc, pLwc])).toEqual(legacyPrintLanguages(aLwc, pLwc));
     for (const f of readdirSync(LANE_DIR)) expect(readFileSync(join(LANE_DIR, f), "utf8"), f).not.toMatch(/ui\/assess\/(share|print-lang)\.js["']/);
   });
+  it("print: the language picker shows exactly when legacy printLanguageField draws one (none without a participant language)", () => {
+    const esc = (x: string) => x;
+    for (const [aLwc, pLwc] of [[R.lwc.assessment, R.lwc.project], [[], []], [["hin"], []], [["xx-unknown"], undefined], [["eng"], []]] as [unknown, unknown][])
+      expect(showPrintLanguage(printLanguages(aLwc, pLwc)), JSON.stringify([aLwc, pLwc])).toBe(legacyPrintLanguageField(legacyPrintLanguages(aLwc, pLwc), "en", esc) !== "");
+    expect(showPrintLanguage([])).toBe(false);
+  });
   it("share: copy actions follow CAN_SHARE; another role reads the readOnly line", () => {
     const owner = mount(Share, { role: "owner" });
     expect(owner.querySelectorAll("button.btn").length).toBeGreaterThanOrEqual(5);
@@ -282,8 +290,48 @@ describe("actions lane parts", () => {
     }
     const off = render(CopyButton, { props: { text: "x", name: "Y" } }).container.querySelector("button") as HTMLButtonElement;
     await fireEvent.click(off);
-    await vi.waitFor(() => expect(off.getAttribute("title")).toMatch(/select the link/));
-    expect(text(off)).toBe("Copy");
+    await vi.waitFor(() => expect(text(off)).toBe("Select the link to copy"));
+  });
+  // Validator round 3 R3-5: a refused copy or share showed only as a title tooltip.
+  it("a refused copy or share is visible on the control and announced by its status line", async () => {
+    const live = (root: Element) => root.querySelector(".sr-only[role=status]") as HTMLElement;
+    // Labelled form: the visible label (its accessible name) changes; the status line, empty until then, says what happened.
+    const lab = render(CopyButton, { props: { text: "x", label: "Copy share link", lead: "link" } }).container;
+    expect(text(live(lab))).toBe("");
+    await fireEvent.click(lab.querySelector("button") as HTMLElement);
+    await vi.waitFor(() => expect(text(lab.querySelector("button") as HTMLElement)).toBe("Select the link to copy"));
+    expect(text(live(lab))).toBe("Copy failed: select the link to copy it.");
+    // Default form: visible "Select the link to copy", named with whose link it is (the visible words are in the name).
+    const def = render(CopyButton, { props: { text: "x", name: "Translators" } }).container;
+    await fireEvent.click(def.querySelector("button") as HTMLElement);
+    await vi.waitFor(() => expect(def.querySelector("button")?.getAttribute("aria-label")).toBe("Select the link to copy for Translators"));
+    expect(text(live(def))).toBe("Copy failed for Translators: select the link to copy it.");
+    // Icon form: the warning glyph replaces the copy glyph, and the name says so.
+    const ic = render(CopyButton, { props: { text: "x", name: "Translators", icon: true } }).container;
+    const icb = ic.querySelector("button") as HTMLButtonElement;
+    const glyph = () => icb.querySelector("path")?.getAttribute("d");
+    const before = glyph();
+    await fireEvent.click(icb);
+    await vi.waitFor(() => expect(icb.getAttribute("aria-label")).toBe("Copy failed: select the link for Translators"));
+    expect(glyph()).not.toBe(before);
+    expect(text(live(ic))).toBe("Copy failed for Translators: select the link to copy it.");
+    // Success is announced too.
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    try {
+      const ok = render(CopyButton, { props: { text: "x", name: "Community", icon: true } }).container;
+      await fireEvent.click(ok.querySelector("button") as HTMLElement);
+      await vi.waitFor(() => expect(text(live(ok))).toBe("Link copied for Community."));
+    } finally {
+      Reflect.deleteProperty(navigator, "clipboard");
+    }
+    // Share-out with neither a share sheet nor a clipboard.
+    const so = render(ShareOut, { props: { text: "x", name: "Translators" } }).container;
+    const sob = so.querySelector("button") as HTMLButtonElement;
+    expect(text(live(so))).toBe("");
+    await fireEvent.click(sob);
+    await vi.waitFor(() => expect(sob.getAttribute("aria-label")).toBe("Sharing failed: select the link for Translators"));
+    expect(text(live(so))).toBe("Sharing failed: select the link for Translators.");
   });
 });
 
@@ -355,7 +403,8 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     const found: string[] = [];
     for (const f of readdirSync(LANE_DIR).filter((x) => x.endsWith(".svelte"))) {
       const src = readFileSync(join(LANE_DIR, f), "utf8").replace(/<!--[\s\S]*?-->/g, "");
-      for (const [tag] of src.matchAll(/<Button\b[^>]*>/g)) if (!/\bhref=/.test(tag)) found.push(`${f} ${(tag.match(/\blabel=("[^"]*"|\{[^}]*\})/) ?? tag.match(/ariaLabel=(\{[^}]*\}|"[^"]*")/))?.[1]}`);
+      // A disabled Button is not inert-looking: it shows it is off, with its reason beside it (Print with nothing ticked).
+      for (const [tag] of src.matchAll(/<Button\b[^>]*>/g)) if (!/\bhref=/.test(tag) && !/\sdisabled[\s/>]/.test(tag)) found.push(`${f} ${(tag.match(/\blabel=("[^"]*"|\{[^}]*\})/) ?? tag.match(/ariaLabel=(\{[^}]*\}|"[^"]*")/))?.[1]}`);
       for (const [, hash] of src.matchAll(/href="(#[a-z-]+)"/g)) found.push(`${f} ${hash}`);
     }
     expect(found.sort()).toEqual([
@@ -370,5 +419,109 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
       "Share.svelte #codes",
       "Share.svelte #csv",
     ]);
+  });
+
+  // Validator round 3 R3-2: the guard above only sees a Button with no href; a link that only stands in for an action (Print goes to
+  // Collect, Save reloads the form) passed it. This one renders every view and classifies every link-styled control the lane draws
+  // (a.btn, a.mi, a.link; the shared TopBar and PhoneHeader are not the lane's, and hash-only links are the inert list above) as
+  // "label → screen[state]#hash". NAV: the label names where it goes, or it leaves without acting. STAND_IN: it should act but only
+  // navigates, each named debt in RESULTS-actions round 4. A new control in neither list fails, so no stand-in is silent.
+  const NAV = [
+    "+ filter → explore", "Cancel → collect", "Cancel → sandbox", "Close collection now → close-collection", "Discard → collect", "Done → collect",
+    "Edit details and dates → setup1", "Explore all → explore", "Help and FAQ → help", "Hindi New Testament → project", "Invitations · 1 new → invitations",
+    "Luke 1–2 · improve → next-step", "Mark 1–4 draft → collect", "Meeting offline? Print and paper → collect#offline", "Meeting offline? card on Collect → collect#offline",
+    "More actions → collect[menu]", "People with access → people", "Print or share the plan → action-plan", "Print {survey} survey → print",
+    "QR code for {survey} → qr-room", "QR for {survey} → qr-room", "See all results → results", "Send app feedback → feedback", "Share the practice survey → share",
+    "Share the survey → share", "Show QR codes for the room → qr-room", "Start a 3D Review → setup1", "BCS · India — switch workspace → workspace",
+    "Why 3D Review exists → about",
+  ];
+  const STAND_IN: Record<string, string> = {
+    "Complete the review → home": "debt 3: no review-stage write in UI Next",
+    "Email it → people": "debt 3: no mail seam; People holds the addresses",
+    "Email the links to someone → people": "debt 1: no mail seam; People holds the addresses",
+    "Print surveys → collect": "debt 2: printing not wired (phone bar with none ticked; the shared PhoneBar takes no disabled)",
+    "Print 2 surveys → collect": "debt 2: printing not wired (printDocumentHtml / openPrintDocument)",
+    "Try translating again → print": "debt 2: translatePrint not called",
+    "Save and enter the next paper → paper-entry": "debt 5: saving a paper response not wired",
+    "Next question → paper-entry": "debt 5: one question drawn, no answer state",
+    "Back → paper-entry": "debt 5: one question drawn, no answer state",
+    "Fill with simulated responses → results": "debt 4: no practice-copy store",
+    "Generate 30 responses → results": "debt 4: no practice-copy store",
+    "Clear → sandbox": "debt 4: no practice-copy store",
+    "Clear simulated responses → results": "debt 4: no practice-copy store",
+    "Delete this practice copy → home": "debt 4: no practice-copy store",
+    "Sign out → sign-in": "debt 8: no sign-out seam in UI Next",
+    "Use another account → sign-in": "debt 8: no sign-out seam in UI Next",
+  };
+  const control = (a: HTMLAnchorElement) => {
+    let label = (a.getAttribute("aria-label") ?? text(a)).replace(/\s+/g, " ").trim();
+    for (const sv of R.surveys) label = label.replace(sv.name, "{survey}");
+    const [query, hash] = (a.getAttribute("href") ?? "").split("#");
+    const q = new URLSearchParams(query);
+    return `${label} → ${q.get("screen")}${q.get("state") ? `[${q.get("state")}]` : ""}${hash ? `#${hash}` : ""}`;
+  };
+  const lanesLinks = (root: Element) => [...root.querySelectorAll<HTMLAnchorElement>("a.btn, a.mi, a.link")]
+    .filter((a) => !a.closest("header.top[data-variant=signed-in], header.phone-top") && !(a.getAttribute("href") ?? "").startsWith("#"));
+  it("every link-styled control either goes where its label says or is a named stand-in (no silent stand-ins)", () => {
+    expect(NAV.filter((n) => n in STAND_IN)).toEqual([]);
+    const found = new Set<string>();
+    for (const [, Comp, desk] of SCREENS) for (const props of desk ? [{}, { phone: true }] : [{ phone: true }]) for (const a of lanesLinks(mount(Comp, props))) found.add(control(a));
+    // Print with nothing ticked draws a disabled button on desktop; on the phone the bar reads "Print surveys" (handed back: PhoneBar).
+    const none = mount(Print, { phone: true });
+    for (const cb of none.querySelectorAll<HTMLInputElement>("input.cb")) if (cb.checked) cb.click();
+    flushSync();
+    for (const a of lanesLinks(none)) found.add(control(a));
+    expect([...found].sort()).toEqual([...NAV, ...Object.keys(STAND_IN)].sort());
+  });
+
+  // Validator round 3 R3-1: the count came from the fixture, so unticking left "Print 2 surveys" on the button and the phone bar.
+  it("print: the primary counts the ticked surveys; with none ticked it is disabled and says why", () => {
+    const d = mount(Print);
+    const boxes = [...d.querySelectorAll<HTMLInputElement>("dialog input.cb")];
+    expect(boxes.filter((b) => b.checked).length).toBe(2);
+    const primary = () => d.querySelector("dialog .btn-primary") as HTMLElement;
+    const reason = () => text(d.querySelector("dialog p[role=status]") as HTMLElement);
+    expect(text(primary())).toBe("Print 2 surveys");
+    expect(primary().tagName).toBe("A");
+    expect(reason()).toBe("");
+    const ticked = boxes.filter((b) => b.checked);
+    ticked[0].click();
+    flushSync();
+    expect(text(primary())).toBe("Print 1 survey");
+    ticked[1].click();
+    flushSync();
+    expect(primary().tagName).toBe("BUTTON");
+    expect((primary() as HTMLButtonElement).disabled).toBe(true);
+    expect(text(primary())).toBe("Print surveys");
+    expect(reason()).toBe("Tick at least one survey to print.");
+    expect(d.querySelectorAll(".btn-primary").length).toBe(1);
+    boxes[0].click();
+    boxes[4].click();
+    boxes[1].click();
+    flushSync();
+    expect(text(primary())).toBe("Print 3 surveys");
+    expect(primary().tagName).toBe("A");
+    expect(reason()).toBe("");
+
+    const ph = mount(Print, { phone: true });
+    const bar = () => text(ph.querySelector(".phone-bar .btn-primary") as HTMLElement);
+    const pb = [...ph.querySelectorAll<HTMLInputElement>("input.cb")];
+    expect(bar()).toBe("Print 2 surveys");
+    pb.filter((b) => b.checked)[0].click();
+    flushSync();
+    expect(bar()).toBe("Print 1 survey");
+    pb.filter((b) => b.checked)[0].click();
+    flushSync();
+    expect(bar()).toBe("Print surveys");
+    expect(text(ph.querySelector("[role=status]") as HTMLElement)).toBe("Tick at least one survey to print.");
+  });
+
+  // Validator round 3 R3-3: an unguarded percentage made Bar throw (n > of, or of 0), so Print and Sandbox failed to render.
+  it("collect rows: more answers than expected draw a full bar, no expected count an empty one, and nothing throws", () => {
+    const surveys = R.surveys.map((sv, i) => ({ ...sv, n: [40, 3, 0, 5, 2][i], of: [30, 0, 0, 5, -1][i] }));
+    const rows = render(CollectGroups, { props: { groups: R.groups, surveys, host: R.host } }).container;
+    const widths = [...rows.querySelectorAll(".bar rect")].map((r) => r.getAttribute("width"));
+    const order = R.groups.flatMap((g) => g.surveys);
+    expect(widths).toEqual(order.map((i) => ["100%", "0%", "0%", "100%", "0%"][i]));
   });
 });

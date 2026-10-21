@@ -20,3 +20,8 @@ export function printLanguages(assessmentLwc = [], projectLwc = []) {
   }
   return codes.slice(0, MAX_LWC).map(lwcByCode);
 }
+
+// ui/assess/print-lang.js printLanguageField(): no picker at all ('' there) when PRINT_IN_LANGUAGE is off or the review has no
+// participant language; otherwise English first, then these. (Its option labels are languageLabel's "endonym (name)"; the
+// boards draw the name: a board-vs-legacy line in RESULTS-actions, the board is the design.)
+export const showPrintLanguage = (languages) => PRINT_IN_LANGUAGE && Array.isArray(languages) && languages.length > 0;
