@@ -92,3 +92,20 @@ describe("B3. the phone disclosure padding never ties a generated row (setup N2:
     document.body.innerHTML = "";
   });
 });
+
+describe("B5. the account menu's About link keeps theme and w (setup N8: Project dark lost theme=dark)", () => {
+  it("TopBar renders the About row with href() from location.search", async () => {
+    const { default: TopBar } = await import("../ui-next/src/TopBar.svelte");
+    const before = location.href;
+    history.replaceState(null, "", "?ui_next=on&screen=project&theme=dark");
+    try {
+      const top = render(TopBar, { props: { accountOpen: true } }).container;
+      const about = [...top.querySelectorAll("a")].find((a) => a.textContent!.includes("Why 3D Review exists"))!;
+      expect(about.getAttribute("href")).toBe("?ui_next=on&screen=about&theme=dark");
+      expect(top.querySelector("a[href='?screen=about']")).toBeNull();
+    } finally { history.replaceState(null, "", before); document.body.innerHTML = ""; }
+  });
+  it("no shared (non-lane) file under ui-next/src carries a literal ?screen= link", () => {
+    expect(read("src/icons.js")).not.toMatch(/["'`]\?screen=/);
+  });
+});

@@ -1,4 +1,5 @@
 // UI Next (v4) icon paths used by the Home components (single-path forms of generator/gen.py ICONS). Status: provisional.
+import { href } from "./screens/href.js";
 export const I = Object.freeze({
   help: "M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7M12 17h.01M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18",
   chev: "M6 9l6 6 6-6",
@@ -17,12 +18,14 @@ export const I = Object.freeze({
   plus: "M12 5v14M5 12h14",
   globe: "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3",
 });
-export const ACCOUNT_ITEMS = Object.freeze([
+// The account menu's rows. A screen link is built with href() from the current query, so it keeps ?ui_next=on, w and theme
+// (a literal screen=about query dropped theme=dark: cookbook work/active/2026-10-21-ui-next-screens-fanout/VALIDATION-setup-r3.md N8).
+export const accountItems = (from = globalThis.location?.search ?? "") => Object.freeze([
   { kind: "head", label: "Bincy Kurian", sub: "bincy@example.org" },
   { kind: "hr" },
   { label: "Invitations", href: "#invitations", icon: I.mail, tag: "1 new" },
   { label: "Help and FAQ", href: "#help", icon: I.help },
-  { label: "Why 3D Review exists", href: "?screen=about", icon: I.sparkle },
+  { label: "Why 3D Review exists", href: href("about", {}, from), icon: I.sparkle },
   { label: "Send app feedback", href: "#feedback", icon: I.pen },
   { kind: "hr" },
   { label: "Use another account", href: "#main", icon: I.people },
