@@ -7,8 +7,8 @@
      Data: ui-next/fixtures/people/people.json through ./people-data.js (ui/scope-invitations.js gating: role select only where
      canUpdateGrant, Remove only where canRevokeGrant, invite roles from invitationRoles). The boards draw no .btn-primary on desktop;
      phone: "Send invitation" in the phone-bar. Menus follow the Menu contract: the destructive item is last, after an hr.
-     Links: ../href.js (carries w and theme); cross-lane targets (collect, setup1, close-collection, print, share, results, next-step,
-     project) stay # placeholders until those lanes register them on this branch (test/ui-next-links.test.ts). -->
+     Links: ../href.js (carries w and theme) for every screen link, other lanes' by their registered names (collect, close-collection,
+     share, setup1, setup5, results, next-step, project, menu); test/ui-next-links.test.ts passes once those lanes merge. -->
 <script module>
   export const SCOPES = Object.freeze(["review", "workspace"]);
 </script>
@@ -35,19 +35,19 @@
   if (!SCOPES.includes(scope)) throw new TypeError(`People: unknown scope "${String(scope)}" (review | workspace)`);
   const review = scope === "review";
   const s = review ? data.review : data.workspace;
-  const COLLECT = "#collect", WORKSPACE = href("workspace"), HOME = href("home");
+  const COLLECT = href("collect"), WORKSPACE = href("workspace"), HOME = href("home"), MENU = href("menu");
   const back = review ? COLLECT : WORKSPACE;
   const roster = $derived(rosterRows(phone ? data.phone.roster : s.roster, { me: phone ? data.phone.me : s.me, can: s.can, roles: data.roles }));
   const options = $derived(inviteOptions(roster.myRole, phone ? data.phone.inviteLabels : data.inviteLabels));
   const MORE = [
-    { label: "Edit details and dates", href: "#setup", icon: I.pen },
+    { label: "Edit details and dates", href: href("setup1"), icon: I.pen },
     { label: "People with access", href: href("people"), icon: I.people },
-    { label: "Close collection now", href: "#close-collection", icon: P.lock },
-    { label: "Meeting offline? Print and paper", href: "#offline", icon: P.print },
+    { label: "Close collection now", href: href("close-collection"), icon: P.lock },
+    { label: "Meeting offline? Print and paper", href: COLLECT, icon: P.print }, // the board links Collect#offline
     { kind: "hr" },
     { label: "Delete this review", danger: true, icon: I.x, refused: "Reviews with responses can't be deleted. This one has 18." },
   ];
-  const TABS = [["Prepare", "#setup", "done"], ["Collect", COLLECT, "now"], ["Understand", "#results", ""], ["Improve", "#next-step", ""]];
+  const TABS = [["Prepare", href("setup5"), "done"], ["Collect", COLLECT, "now"], ["Understand", href("results"), ""], ["Improve", href("next-step"), ""]];
   const ACTION = { "Transfer ownership": { href: "#transfer", icon: I.people }, Remove: { href: "#remove", icon: I.x, danger: true }, Resend: { href: "#resend", icon: P.refresh }, Withdraw: { href: "#withdraw", icon: I.x, danger: true } };
   function menuItems(actions) {
     const items = actions.map((a) => ({ label: a, ...ACTION[a] }));
@@ -60,7 +60,7 @@
 {#snippet qr()}<Icon d={P.qr} />{/snippet}
 {#snippet mail()}<Icon d={I.mail} />{/snippet}
 {#snippet check()}<Icon d={I.check} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title={s.phoneTitle} parent={review ? data.review.title : data.workspace.short} {back} initials={data.user.initials} home={HOME} />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.user.workspace} home={HOME} crumbs={review ? [{ label: data.review.project, href: "#project" }, { label: data.review.title }] : []} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title={s.phoneTitle} parent={review ? data.review.title : data.workspace.short} {back} initials={data.user.initials} home={HOME} menuHref={MENU} />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.user.workspace} home={HOME} crumbs={review ? [{ label: data.review.project, href: href("project") }, { label: data.review.title }] : []} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Send invitation" />{/if}{/snippet}
 {#snippet person(r)}<Row gap={3}><span class="av" aria-hidden="true">{r.initials}</span><div><div>{r.name}</div><div class="small">{r.sub}</div></div></Row>{/snippet}
 {#snippet personRow(r)}<span class="av" aria-hidden="true">{r.initials}</span><div class="list-body"><div class="list-title">{r.name}</div><div class="small">{r.sub}</div></div>{/snippet}
@@ -93,7 +93,7 @@
           </div>
           <Row gap={2}>
             <Menu id="pp-more" summary={dots} summaryClass="btn btn-icon" label="More actions" title="More actions" items={MORE} />
-            <Button label="Share the survey" href="#share" lead={qr} />
+            <Button label="Share the survey" href={href("share")} lead={qr} />
           </Row>
         </div>
         <nav class="glass tabs" aria-label="Review stages">

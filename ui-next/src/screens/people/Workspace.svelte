@@ -10,8 +10,8 @@
      "Add to workspace" is the one primary and New project is demoted (Dialog and sheet states: one primary). The dialog is a native
      <dialog class="glass-hi"> opened with showModal() (design-system.md Dialog and sheet states): the dialog.glass-hi rows give the
      opaque --dialog fill, the 560px geometry and the --scrim ::backdrop; on phone dialog.glass-hi.sheet anchors it to the bottom over the
-     demoted phone-bar. Links: ../href.js (carries w and theme); cross-lane targets (project, setup1, menu) stay # placeholders until
-     those lanes register them on this branch (test/ui-next-links.test.ts). -->
+     demoted phone-bar. Links: ../href.js (carries w and theme), other lanes' screens by their registered names (project, setup1, menu);
+     test/ui-next-links.test.ts passes once those lanes merge. -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
@@ -38,7 +38,7 @@
   let { group = false, phone = false, theme = "light" } = $props();
   const LENS_ICON = { team: I.pen, community: I.people, church: P.church };
   const HOME = href("home"), PEOPLE = href("people-workspace"), BACK = href("workspace");
-  const PROJECT = "#project", SETUP = "#setup", MENU = "#menu"; // cross-lane: project, setup1, menu (see header)
+  const PROJECT = href("project"), SETUP = href("setup1"), MENU = href("menu");
   const rows = groupRows(d.group);
   // Native modal dialog (design-system.md Dialog and sheet states): showModal() gives the top layer, the inert page and focus.
   const modal = (el) => {

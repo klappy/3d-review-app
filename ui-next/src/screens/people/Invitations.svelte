@@ -3,7 +3,7 @@
      Composed of AppShell > Page > Card / Stack / Row and the section 2 components; no <style>, no inline style.
      Data: ui-next/fixtures/people/invitations.json (GET /v2/me/invitations shape) through ui/v3/components/invite.js pendingInvitations()
      (./people-data.js invitationRows). One .btn-primary per page: desktop the first invitation's Accept (the board's), the others secondary;
-     phone "Accept and open the workspace" in the phone-bar. Links: ../href.js (carries w and theme). -->
+     phone "Accept and open the workspace" in the phone-bar. Links: ../href.js (carries w and theme); menu is the actions lane's name. -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
@@ -22,12 +22,12 @@
 
   // ?state=: no board draws one, so any value (the route passes it as state) renders the default; the prop is not read.
   let { phone = false, theme = "light" } = $props();
-  const HOME = href("home"), WORKSPACE = href("workspace");
+  const HOME = href("home"), WORKSPACE = href("workspace"), MENU = href("menu");
   const rows = invitationRows(phone ? d.phone : d.desktop, { kinds: d.kinds, can: d.can, roles: d.roles });
 </script>
 
 {#snippet check()}<Icon d={I.check} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="root" initials={d.user.initials} home={HOME} />{:else}<TopBar who={d.user.first} initials={d.user.initials} workspace={d.user.workspace} home={HOME} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="root" initials={d.user.initials} home={HOME} menuHref={MENU} />{:else}<TopBar who={d.user.first} initials={d.user.initials} workspace={d.user.workspace} home={HOME} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Accept and open the workspace" href={WORKSPACE} />{/if}{/snippet}
 {#snippet tile(d)}<span class="icn" data-size="36" data-lens="team" aria-hidden="true"><Icon {d} /></span>{/snippet}
 

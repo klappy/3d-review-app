@@ -6,7 +6,7 @@
      section 2 Disclosure (details.disc): the boards draw a bare <details> with a .link summary and inline list-style/min-height/flex
      (rule 16 debt; not .dd, which means a menu). One .btn-primary per page: desktop
      inside the card ("Email me a sign-in link" / "I've opened the link"); phone in the phone-bar. Data: ui-next/fixtures/people/sign-in.json.
-     Links: ../href.js (carries w and theme); cross-lane targets (results, p-code) stay # placeholders until registered on this branch. -->
+     Links: ../href.js (carries w and theme), other lanes' screens by their registered names (p-code, results). -->
 <script module>
   export const STEPS = Object.freeze(["email", "check"]);
 </script>
@@ -27,7 +27,7 @@
   // ?state=: no board draws one, so any value (the route passes it as state) renders the default; the prop is not read.
   let { step = "email", phone = false, theme = "light" } = $props();
   if (!STEPS.includes(step)) throw new TypeError(`SignIn: unknown step "${String(step)}" (email | check)`);
-  const HOME = href("home"), AGAIN = href("sign-in"), CHECK = href("sign-in-check"), LANDING = href("landing");
+  const HOME = href("home"), AGAIN = href("sign-in"), CHECK = href("sign-in-check"), LANDING = href("landing"), CODE_ENTRY = href("p-code"), SAMPLE = href("results");
   const email = phone ? d.email.phone : d.email.desktop;
   const check = step === "check";
   const CODE = "Link not working? Use the 6-digit code instead";
@@ -56,9 +56,9 @@
         <h1 class="title-phone">Sign in</h1>
         <p class="small">We email you a link. No password to remember.</p>
         <div><label class="lbl" for="si-email">Email</label><input class="in" id="si-email" type="email" value={email} inputmode="email" autocomplete="email" /></div>
-        <p class="small">Answering a survey? <a class="link" href="#survey-code">enter your code</a> instead.</p>
+        <p class="small">Answering a survey? <a class="link" href={CODE_ENTRY}>enter your code</a> instead.</p>
       </Card>
-      <p class="small"><a class="link" href={LANDING}>Read about 3D Review</a> · <a class="link" href="#results">open the sample review</a></p>
+      <p class="small"><a class="link" href={LANDING}>Read about 3D Review</a> · <a class="link" href={SAMPLE}>open the sample review</a></p>
     {/if}
   {:else}
     <Page width="read">
@@ -80,8 +80,8 @@
           <p class="small body-16">We email you a link. No password to remember.</p>
           <div><label class="lbl" for="si-email">Email</label><input class="in" id="si-email" type="email" value={email} inputmode="email" autocomplete="email" /></div>
           <Row><Button label="Email me a sign-in link" variant="primary" lg href={CHECK} lead={mail} /></Row>
-          <p class="small">Answering a survey? <a class="link" href="#survey-code">enter your code</a> instead.</p>
-          <p class="small"><a class="link" href={LANDING}>Read about 3D Review</a> · <a class="link" href="#results">open the sample review</a></p>
+          <p class="small">Answering a survey? <a class="link" href={CODE_ENTRY}>enter your code</a> instead.</p>
+          <p class="small"><a class="link" href={LANDING}>Read about 3D Review</a> · <a class="link" href={SAMPLE}>open the sample review</a></p>
         </Card>
       {/if}
     </Page>
