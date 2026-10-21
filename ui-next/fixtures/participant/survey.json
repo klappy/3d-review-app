@@ -44,7 +44,6 @@
     ]
    }
   ],
-  "about_count": 2,
   "items": [
    {
     "id": "CW-Q1",
@@ -370,7 +369,6 @@
   },
   "attempt": 2,
   "attempts": 5,
-  "at": "22:41:07",
-  "waited": 40
+  "at": "22:41:07"
  }
 }

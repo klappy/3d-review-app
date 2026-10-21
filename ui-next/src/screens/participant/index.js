@@ -6,6 +6,8 @@
 // Boards (cookbook design/2026-10-15-glass-redesign/canvas, all 390x844 phone boards, so each is measured at &w=phone):
 //   PWelcome -> p-welcome · PCode -> p-code · PCodeError -> p-code&state=error · PPassage -> p-passage · PAbout -> p-about
 //   PQuestion -> p-question · PReview -> p-review · PReceipt -> p-receipt · PProblem -> p-problem · PProblemBusy -> p-problem&state=busy
+// Not boards: p-review&state=all (every answer, "Show all 13 answers"), p-question&q=<n> (question n; the review's Change links).
+// An unknown ?state= (or ?q=) renders the default state. Every in-screen link is built with the shared ../href.js href().
 import PWelcome from "./PWelcome.svelte";
 import PCode from "./PCode.svelte";
 import PPassage from "./PPassage.svelte";
