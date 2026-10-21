@@ -3,16 +3,17 @@
 // Unit: 3d-review-cookbook work/active/2026-10-21-ui-next-screens-fanout/TICKET.md (lane explore).
 // Boards: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc.html,
 // Feedback.dc.html, FeedbackPhone.dc.html, Help.dc.html, HelpPhone.dc.html; nesting design-system.md 8.1; dialogs "Dialog and sheet states".
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render } from "@testing-library/svelte";
-import Explore from "../ui-next/src/screens/explore/Explore.svelte";
-import Feedback from "../ui-next/src/screens/explore/Feedback.svelte";
+import Explore, { onBackdrop } from "../ui-next/src/screens/explore/Explore.svelte";
+import Feedback, { cancelTo } from "../ui-next/src/screens/explore/Feedback.svelte";
 import Help from "../ui-next/src/screens/explore/Help.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import lane from "../ui-next/src/screens/explore/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { levelOf, stagePill, responsesText, exploreRows, phoneRows, feedbackAllowed, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
+import { levelOf, stagePill, responsesText, exploreRows, phoneRows, APP_VERSION, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { TOPICS, FAQ, INTRO } from "../ui-next/src/screens/explore/help-copy.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -25,6 +26,7 @@ import { REGISTRY } from "../ui-next/src/screens/registry.js";
 import { lintDir } from "../scripts/ui-next-lint.mjs";
 import explore from "../ui-next/fixtures/explore/explore.json";
 import feedback from "../ui-next/fixtures/explore/feedback.json";
+import pkg from "../package.json";
 
 type P = Record<string, unknown>;
 type C = typeof Explore;
@@ -58,11 +60,18 @@ describe("explore lane registry and /next/ routes", () => {
       expect(route(p(`?ui_next=on&${q}&theme=dark`), store(), Object.keys(REGISTRY)).props.theme).toBe("dark");
     });
   }
-  it("each screen refuses a state its boards do not draw", () => {
-    expect(() => render(Explore, { props: { state: "cards" } })).toThrow(/unknown state/);
-    expect(() => render(Explore, { props: { state: "filters" } })).toThrow(/phone board/);
-    expect(() => render(Feedback, { props: { state: "busy" } })).toThrow(/one state/);
-    expect(() => render(Help, { props: { state: "search" } })).toThrow(/one state/);
+  it("an unknown ?state= renders the default board, never throws; the filters sheet is the phone board's only", () => {
+    const plain = (C: C, props: P) => mount(C, props).innerHTML.replace(/ data-theme="[^"]*"/, "");
+    expect(plain(Explore, { state: "cards" })).toBe(plain(Explore, {}));
+    expect(plain(Explore, { state: "filters" })).toBe(plain(Explore, {}));
+    expect(mount(Explore, { phone: true, state: "nope" }).querySelector("dialog")).toBeNull();
+    expect(mount(Explore, { phone: true, state: "filters" }).querySelector("dialog.sheet")).not.toBeNull();
+    expect(mount(Feedback, { state: "busy" }).querySelector("dialog")).not.toBeNull();
+    expect(mount(Help, { state: "search" }).querySelector("h1.title-page")).not.toBeNull();
+    for (const q of ["screen=explore&state=%3Cx%3E", "screen=feedback&w=phone&state=1", "screen=help&state="]) {
+      const r = route(p(`?ui_next=on&${q}`), store(), Object.keys(REGISTRY));
+      expect(() => render(REGISTRY[r.view], { props: r.props })).not.toThrow();
+    }
   });
 });
 
@@ -72,6 +81,7 @@ describe("every board renders: light DOM, no inline style, one .btn-primary at m
       it(`${board} (${theme})`, () => {
         const a = mount(C, { ...props, theme });
         expect(a.dataset.theme).toBe(theme);
+        expect(a.querySelectorAll("h1").length).toBe(1);
         expect(a.dataset.w).toBe(props.phone ? "phone" : undefined);
         expect(a.querySelector("[style]")).toBeNull();
         expect(a.querySelector(props.phone ? "header.phone-top" : "header.top")).not.toBeNull();
@@ -79,7 +89,8 @@ describe("every board renders: light DOM, no inline style, one .btn-primary at m
         expect(primaries.length).toBe(primary ? 1 : 0);
         if (primary) expect(text(primaries[0])).toBe(primary);
         if (primary && props.phone) expect(primaries[0].closest(".phone-bar")).not.toBeNull();
-        for (const s of a.querySelectorAll("section.l-section")) expect(s.parentElement!.classList.contains("l-page")).toBe(true);
+        // A Section sits in the Page, or in the Help article Stack the Help board composes (.l-grid[data-tpl=aside-start] > article.l-stack).
+        for (const s of a.querySelectorAll("section.l-section")) expect(s.parentElement!.matches(".l-page, article.l-stack.l-measure")).toBe(true);
         for (const c of a.querySelectorAll(".l-card")) expect(c.parentElement!.closest(".l-page, .l-phone, .l-section, .l-grid, .l-stack, main")).not.toBeNull();
         for (const el of a.querySelectorAll(".l-stack, .l-row, .l-grid")) expect(el.closest(".l-card, .l-page, .l-phone, dialog")).not.toBeNull();
         for (const l of a.querySelectorAll("label[for]")) expect(a.querySelector(`#${l.getAttribute("for")}`)).not.toBeNull();
@@ -108,6 +119,7 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect(text(a)).toContain("6 of 23 reviews match · 3 projects · 4 languages");
     expect(text(a)).toContain("Nothing here identifies a participant.");
     expect([...a.querySelectorAll("button.mi")].map((b) => text(b.firstElementChild!))).toEqual(["Project", "Language", "Cluster", "Organisation involved", "Translation format", "Facilitator"]);
+    expect(text(a.querySelector("aside h2.h3")!)).toBe("Add a filter");
     expect(text(a)).toContain("Workspace and project are filters like any other. The Workspace and Project pages are the same table with those filters saved.");
     expect(a.querySelector("dialog")).toBeNull();
   });
@@ -118,14 +130,15 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect([...a.querySelectorAll(".chip")].map(text)).toEqual(["BCS · India", "South Asia", "Results ready", "2026"]);
     expect(text(a)).toContain("Filters · 4");
     expect(a.querySelector("[aria-label='Search reviews']")).not.toBeNull();
-    const rows = [...a.querySelectorAll("a.card-link")];
-    expect(rows.map((r) => text(r.querySelector(".h3")!))).toEqual(["Luke 1–2 community review", "Genesis audio check", "Mark 1–4 draft", "Acts listening review", "Psalms reading group"]);
+    const rows = [...a.querySelectorAll("a.card-link.list-row")];
+    expect(rows.map((r) => text(r.querySelector(".list-title")!))).toEqual(["Luke 1–2 community review", "Genesis audio check", "Mark 1–4 draft", "Acts listening review", "Psalms reading group"]);
     expect(rows.map((r) => text(r.querySelector(".lvl-name")!))).toEqual(["Growing", "Needs support", "More input needed", "Growing", "Strong"]);
     expect(rows.map((r) => text(r.querySelector(".small")!))).toEqual(["Hindi NT · Sep 2026", "Lao OT · Sep 2026", "Hindi NT · Oct 2026", "Hindi NT · Aug 2026", "Lao OT · Jul 2026"]);
     expect(text(a)).toContain("Save this view");
     expect(text(a)).toContain("Download CSV");
     expect(a.querySelector("dialog")).toBeNull();
-    expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?screen=explore&w=phone&state=filters");
+    expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=explore&w=phone&state=filters");
+    expect(rows.map((r) => r.getAttribute("href"))).toEqual(Array(5).fill("?ui_next=on&screen=results&w=phone"));
   });
   it("filters (ExploreFiltersPhone): the sheet is an open native <dialog>, titled by its micro line, with the ten filter rows", () => {
     const a = mount(Explore, { phone: true, state: "filters" });
@@ -135,6 +148,30 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect(text(a.querySelector(`#${d.getAttribute("aria-labelledby")}`)!)).toBe("Filters · tap to change, swipe a row left to remove");
     expect([...d.querySelectorAll("a.mi")].map(text)).toEqual(["Workspace · BCS · India", "Region · South Asia", "Stage · Results ready", "Date · 2026", "Project · any", "Language · any", "Cluster · any", "Organisation involved · any", "Translation format · any", "Facilitator · any"]);
     expect(d.querySelector(".btn-primary")).toBeNull();
+  });
+  it("filters: only a click on the backdrop (outside the sheet's box) closes it; a tap on the sheet's own padding does not (F2)", () => {
+    const a = mount(Explore, { phone: true, state: "filters" });
+    const d = a.querySelector("dialog.sheet") as HTMLDialogElement;
+    d.getBoundingClientRect = () => ({ left: 0, top: 300, right: 390, bottom: 844, width: 390, height: 544, x: 0, y: 300, toJSON: () => ({}) });
+    const click = (x: number, y: number) => d.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: x, clientY: y }));
+    click(195, 302); // the sheet's top padding: the target is the <dialog> itself, but inside its box
+    expect(d.open).toBe(true);
+    d.querySelector("a.mi")!.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 195, clientY: 100 })); // a row: target is not the dialog
+    expect(d.open).toBe(true);
+    click(195, 120); // the backdrop above the sheet
+    expect(d.open).toBe(false);
+    const fake = { target: null as unknown, currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0, right: 10, bottom: 10 }), close: vi.fn() }, clientX: 50, clientY: 50 };
+    fake.target = fake.currentTarget;
+    expect(onBackdrop(fake)).toBe(true);
+    expect(fake.currentTarget.close).toHaveBeenCalledOnce();
+  });
+  it("links carry the viewer's theme through the shared href() helper (screens/href.js)", () => {
+    window.history.replaceState(null, "", "/next/?ui_next=on&screen=explore&w=phone&theme=dark");
+    try {
+      const a = mount(Explore, { phone: true, theme: "dark" });
+      expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=explore&w=phone&theme=dark&state=filters");
+      expect(a.querySelector("a.list-row")!.getAttribute("href")).toBe("?ui_next=on&screen=results&w=phone&theme=dark");
+    } finally { window.history.replaceState(null, "", "/"); }
   });
 });
 
@@ -162,13 +199,14 @@ describe("Explore data adapts through the current UI's level function (ui/assess
 });
 
 describe("Feedback (Feedback.dc.html dialog, FeedbackPhone.dc.html page)", () => {
-  it("desktop: a native <dialog> named by its h2, three kinds, the first field focused, the optional feel group, the page line, Cancel and Send", () => {
+  it("desktop: a native <dialog> named by the route's one h1, three kinds, the first field focused, the optional feel group, the page line, Cancel and Send", () => {
     const a = mount(Feedback, {});
     const d = a.querySelector("dialog") as HTMLDialogElement;
     expect(d.open).toBe(true);
     expect(d.classList.contains("glass-hi")).toBe(true);
     expect(text(a.querySelector(`#${d.getAttribute("aria-labelledby")}`)!)).toBe("Send app feedback");
-    expect(d.querySelector("a[aria-label='Close']")).not.toBeNull();
+    expect(a.querySelector(`#${d.getAttribute("aria-labelledby")}`)!.matches("h1.h2.t-24")).toBe(true);
+    expect(d.querySelector("a[aria-label='Close']")!.getAttribute("href")).toBe("?ui_next=on&screen=home");
     expect(text(d)).toContain("Tell us what happened and what would help. It reaches the team with the page you were on.");
     const segs = [...d.querySelectorAll(".seg")];
     expect([...segs[0].querySelectorAll("label")].map(text)).toEqual(["Something is wrong", "Something is confusing", "An idea"]);
@@ -180,7 +218,7 @@ describe("Feedback (Feedback.dc.html dialog, FeedbackPhone.dc.html page)", () =>
     expect(text(a.querySelector(`#${feel.getAttribute("aria-labelledby")}`)!)).toBe("How did it feel? (optional)");
     expect([...segs[1].querySelectorAll("label")].map(text)).toEqual(["Frustrating", "Confusing", "Fine", "Helpful"]);
     expect((segs[1].querySelector("input:checked") as HTMLInputElement).value).toBe("Confusing");
-    expect(text(d)).toContain("Collect · Mark 1–4 draft · 0.30.5");
+    expect(text(d)).toContain(`Collect · Mark 1–4 draft · ${pkg.version}`);
     expect(text(d)).toContain("Cancel");
     expect(text(d.querySelector(".btn-primary")!)).toBe("Send");
   });
@@ -197,10 +235,22 @@ describe("Feedback (Feedback.dc.html dialog, FeedbackPhone.dc.html page)", () =>
     expect(text(a.querySelector(".row-opt")!)).toBe("Include the screen name and app version");
     expect([...a.querySelectorAll(".phone-bar .btn")].map(text)).toEqual(["Cancel", "Send"]);
   });
-  it("the fixture session passes the current UI's feedback gate (ui/assess/feedback.js load); the sample tour does not", async () => {
-    expect(await feedbackAllowed(feedback.session)).toBe(true);
-    expect(await feedbackAllowed({ ...feedback.session, demo: true })).toBe(false);
-    expect(await feedbackAllowed({ demo: false, state: { principal: { kind: "anonymous" } } })).toBe(false);
+  it("Escape (the dialog's cancel) goes Home like Close and Cancel, instead of leaving an empty page (F3)", () => {
+    const nav = vi.fn();
+    const e = new Event("cancel", { cancelable: true });
+    cancelTo("?ui_next=on&screen=home", nav)(e);
+    expect(e.defaultPrevented).toBe(true);
+    expect(nav).toHaveBeenCalledWith("?ui_next=on&screen=home");
+    const src = readFileSync(resolve(__dirname, "../ui-next/src/screens/explore/Feedback.svelte"), "utf8");
+    expect(src).toMatch(/<dialog class="glass-hi"[^>]*oncancel=\{cancelTo\(HOME\)\}/);
+  });
+  it("the version on the page line is the app's stamped version (package.json, scripts/stamp-version.mjs), not a fixture literal (F5)", () => {
+    expect(APP_VERSION).toBe(pkg.version);
+    expect(JSON.stringify(feedback)).not.toMatch(/\d+\.\d+\.\d+/);
+  });
+  it("the feedback gate is not imported into the /next/ bundle until a board draws its not-allowed state (F4)", () => {
+    const src = readFileSync(resolve(__dirname, "../ui-next/src/screens/explore/explore-data.js"), "utf8");
+    expect(src).not.toMatch(/import[^;]*ui\/assess\/feedback\.js/);
   });
 });
 
@@ -223,8 +273,9 @@ describe("Help (Help.dc.html, HelpPhone.dc.html)", () => {
     expect(qs.map((d) => text(d.querySelector(".disc-body")!))).toEqual(FAQ.map(([, ans]: string[]) => ans));
     expect(qs.every((d) => !(d as HTMLDetailsElement).open)).toBe(true);
     expect(text(a)).toContain("Still stuck? Send app feedback, or read why 3D Review exists.");
-    expect(a.querySelector("a[href='?screen=feedback']")).not.toBeNull();
-    expect(a.querySelector("a[href='?screen=about']")).not.toBeNull();
+    const hrefs = [...a.querySelectorAll("main a.link")].map((l) => l.getAttribute("href"));
+    expect(hrefs).toContain("?ui_next=on&screen=feedback");
+    expect(hrefs).toContain("?ui_next=on&screen=about");
   });
   it("phone: chip nav, seven topic rows (the first open) with the phone words, Common questions · 11, the about link, Send app feedback in the bar", () => {
     const a = mount(Help, { phone: true });
@@ -240,32 +291,63 @@ describe("Help (Help.dc.html, HelpPhone.dc.html)", () => {
     expect(text(a.querySelector("h2#h8.micro")!)).toBe("Common questions · 11");
     expect(a.querySelectorAll("details.disc").length).toBe(7 + 11);
     const about = [...a.querySelectorAll("a.link")].find((l) => text(l) === "Read why 3D Review exists")!;
-    expect(about.getAttribute("href")).toBe("?screen=about&w=phone");
-    expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?screen=feedback&w=phone");
+    expect(about.getAttribute("href")).toBe("?ui_next=on&screen=about&w=phone");
+    expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=feedback&w=phone");
   });
 });
 
-describe("rows from cookbook #191 (design-system.md 8.7) already on the markup, inert until a PIN bump brings them into base.css", () => {
-  it("Explore: applied chips, inline view switch, compact group-by, scrolling table wrapper, trailing menu values; the sheet's menu padding, handle and title", () => {
+describe("the pinned 8.7 Explore-lane rows (ui-next/design-source/PIN a594830, base.css) carry the layout (F1 and the pending #191 rows)", () => {
+  const css = readFileSync(resolve(__dirname, "../ui-next/components/base.css"), "utf8");
+  it("base.css at the PIN has every row the lane composes with", () => {
+    for (const r of [".l-grid[data-tpl=aside-end]{grid-template-columns:minmax(0,1fr) 300px", ".l-grid[data-tpl=aside-start]{grid-template-columns:260px minmax(0,1fr)", ".l-measure{max-width:720px}", ".side-nav{position:sticky", ".l-card[data-pad=table]{", ".tbl-wrap{overflow-x:auto}", ".tbl-foot{", ".l-card[data-pad=bar]{", ".l-card[data-pad=rows]{", ".list-row{", ".list-title{", ".menu[data-flow]{", ".mi-end{margin-left:auto}", ".chip[data-on]{", ".sel[data-size=compact]{", ".seg[data-inline]{", ".l-media[data-dir=row]{", ".app .t-24", "dialog.glass-hi{", "dialog.glass-hi::backdrop{", "dialog.glass-hi.sheet{", ".sheet[data-pad=menu],dialog.glass-hi.sheet[data-pad=menu]{", ".sheet-handle{", ".mi[data-size=lg]{"]) expect(css, r).toContain(r);
+  });
+  it("Explore desktop: table + 300px aside grid; the bar and table cards; the table scrolls inside its card (.tbl-wrap), its foot inside it", () => {
     const a = mount(Explore, {});
-    expect(a.querySelectorAll(".chip[data-on]").length).toBe(4);
-    const grid = a.querySelector(".l-grid[data-tpl=aside-end]")!;
+    const grid = a.querySelector(".l-page > .l-grid[data-tpl=aside-end]")!;
     expect([...grid.children].map((c) => c.tagName.toLowerCase())).toEqual(["div", "aside"]);
-    expect(grid.querySelector("aside .h3")!.textContent).toBe("Add a filter");
+    expect(grid.querySelector(".glass.l-card.l-row[data-pad=bar][data-split][data-wrap]")).not.toBeNull();
+    const card = grid.querySelector("section.glass.l-card.tbl-wrap[data-pad=table]")!;
+    expect(card.getAttribute("tabindex")).toBe("0");
+    expect(card.querySelector(":scope > table.tbl")).not.toBeNull();
+    expect(text(card.querySelector(":scope > .l-row.tbl-foot")!)).toContain("Nothing here identifies a participant.");
+    expect(a.querySelectorAll(".chip[data-on]").length).toBe(4);
     expect(a.querySelector(".seg[data-inline]")).not.toBeNull();
     expect(a.querySelector(".sel[data-size=compact] select")).not.toBeNull();
-    expect(a.querySelector(".l-card .tbl-wrap > table.tbl")).not.toBeNull();
-    expect(a.querySelectorAll("button.mi > .mi-end").length).toBe(6);
-    const p = mount(Explore, { phone: true, state: "filters" });
-    expect(p.querySelector(".chip[data-on]")).toBeNull();
-    const d = p.querySelector("dialog.sheet[data-pad=menu]")!;
+    expect(a.querySelectorAll("aside .glass-hi.menu[data-flow] > button.mi > .mi-end").length).toBe(6);
+    expect(a.querySelector("[role=menu], [role=menuitem]")).toBeNull(); // V-44: an in-page list of buttons, not a menu widget
+    expect(a.querySelector("td > b")).toBeNull(); // the first column's weight is the .tbl row's
+    expect(a.querySelectorAll("td .micro").length).toBe(12);
+  });
+  it("Explore phone: the rows card (.l-card[data-pad=rows]) of list rows; the sheet's menu padding, handle, title and 52px rows", () => {
+    const a = mount(Explore, { phone: true });
+    const rows = [...a.querySelectorAll("section.glass.l-card[data-pad=rows] > a.card-link.list-row")];
+    expect(rows.length).toBe(5);
+    for (const r of rows) expect([...r.children].map((c) => c.className)).toEqual(["icn icn-row", "list-body", "lvl"]);
+    expect(a.querySelectorAll(".l-row > .btn.btn-block").length).toBe(3);
+    const d = mount(Explore, { phone: true, state: "filters" }).querySelector("dialog.glass-hi.sheet[data-pad=menu]")!;
     expect(d.querySelector(".sheet-handle")!.getAttribute("aria-hidden")).toBe("true");
     expect(d.querySelector(".sheet-title")!.id).toBe(d.getAttribute("aria-labelledby"));
     expect(d.querySelectorAll("a.mi[data-size=lg]").length).toBe(10);
   });
-  it("Feedback and Help: the shared dialog row (collect lane, #190) and the 24px heading row", () => {
-    expect(mount(Feedback, {}).querySelector("dialog.glass-hi h2.h2.t-24")).not.toBeNull();
-    expect(mount(Help, {}).querySelectorAll("section.l-section[id] > h2.t-24").length).toBe(8);
+  it("Help desktop: sticky side nav + 720 article on .l-grid[data-tpl=aside-start]; the row-form media card; 24px headings", () => {
+    const a = mount(Help, {});
+    const grid = a.querySelector(".l-page > .l-grid[data-tpl=aside-start][data-gap='7']")!;
+    expect([...grid.children].map((c) => `${c.tagName.toLowerCase()}.${c.className}`)).toEqual(["nav.glass side-nav", "article.l-stack l-measure"]);
+    const nav = [...grid.querySelectorAll("nav.side-nav > a.link")];
+    expect(nav.length).toBe(8);
+    expect(nav.map((l) => l.getAttribute("aria-current"))).toEqual(["location", null, null, null, null, null, null, null]);
+    expect(a.querySelector("article > .glass-hi.l-media[data-dir=row] > .l-media-frame")).not.toBeNull();
+    expect(a.querySelectorAll("article > section.l-section[id] > h2.h2.t-24").length).toBe(8);
+    expect(a.querySelector(".chip")).toBeNull();
+  });
+  it("Help phone: two rows cards of V-12 Disclosures (details.disc, not the menu's .dd)", () => {
+    const a = mount(Help, { phone: true });
+    const cards = [...a.querySelectorAll("section.glass.l-card[data-pad=rows]")];
+    expect(cards.map((c) => c.querySelectorAll("details.disc").length)).toEqual([7, 11]);
+    expect(a.querySelector("details.dd")).toBeNull();
+  });
+  it("Feedback: the shared dialog row and the 24px heading row", () => {
+    expect(mount(Feedback, {}).querySelector("dialog.glass-hi h1.h2.t-24")).not.toBeNull();
   });
 });
 

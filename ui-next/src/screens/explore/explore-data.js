@@ -2,10 +2,12 @@
 // Adapts through the current UI's pure modules (import only, no backend change):
 //   - level words: v3ScoreBand() in ui/assess/v3-assessment.js (the one level function design-system.md section 3 names;
 //     captain-ruled provisional cut-offs, at least 3 responses per perspective);
-//   - the feedback gate: feedback.load() in ui/assess/feedback.js (signed-in, not the sample tour).
+//   - the app version: package.json "version", the value scripts/stamp-version.mjs validates against release/release-manifest.json
+//     and stamps into src/version.generated.ts (git-ignored, so the /next/ bundle reads the tracked source of the same value).
+// The feedback gate (ui/assess/feedback.js load: signed in, not the sample tour) is not imported: no board draws its not-allowed state.
 // Fixtures in ui-next/fixtures/explore/ stand in for the capabilities the boards cite but the server lacks (rollups; see RESULTS-explore.md).
 import { v3ScoreBand, V3_STAGES } from "../../../../ui/assess/v3-assessment.js";
-import { feedback } from "../../../../ui/assess/feedback.js";
+import { version } from "../../../../package.json";
 import { LEVELS } from "../../Level.svelte";
 
 // Band word (v3ScoreBand) -> Level key (Level.svelte, design-system.md section 2 Level row).
@@ -50,8 +52,5 @@ export function phoneRows(rows) {
   return rows.map((r) => ({ ...r, level: levelOf(r.team) ?? "more" }));
 }
 
-/** The feedback gate from the current UI: allowed only for a signed-in, non-sample session. */
-export async function feedbackAllowed(ctx) {
-  const model = await feedback.load(ctx);
-  return model.allowed === true;
-}
+/** The app's stamped version (package.json "version"; scripts/stamp-version.mjs). */
+export const APP_VERSION = version;

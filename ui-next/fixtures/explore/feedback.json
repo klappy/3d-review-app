@@ -1,9 +1,8 @@
 {
-  "_": "UI Next (v4) explore lane fixture. Status: provisional. Boards: cookbook design/2026-10-15-glass-redesign/canvas Feedback.dc.html (desktop dialog over the page the user was on), FeedbackPhone.dc.html (phone full page). session is the ctx ui/assess/feedback.js load() reads (signed-in, not the sample tour); from is the page and version the dialog names.",
+  "_": "UI Next (v4) explore lane fixture. Status: provisional. Boards: cookbook design/2026-10-15-glass-redesign/canvas Feedback.dc.html (desktop dialog over the page the user was on), FeedbackPhone.dc.html (phone full page). from is the page and review the dialog names; the version beside them is the app's stamped version (package.json), not fixture data. No board draws the feedback gate's not-allowed state (ui/assess/feedback.js load: signed out or the sample tour), so the screen does not read a session yet.",
   "user": { "first": "Bincy", "initials": "BK" },
   "workspace": "BCS · India",
-  "session": { "demo": false, "state": { "principal": { "kind": "user" } } },
-  "from": { "page": "Collect", "review": "Mark 1–4 draft", "version": "0.30.5" },
+  "from": { "page": "Collect", "review": "Mark 1–4 draft" },
   "kinds": ["Something is wrong", "Something is confusing", "An idea"],
   "kind": "Something is wrong",
   "feels": ["Frustrating", "Confusing", "Fine", "Helpful"],

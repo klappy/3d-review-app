@@ -2,27 +2,33 @@
      (cookbook work/active/2026-10-21-ui-next-screens-fanout/TICKET.md). Mock data: ui-next/fixtures/explore/explore.json, adapted through
      ./explore-data.js (levels from ui/assess/v3-assessment.js v3ScoreBand; stage ids to the Stage pill).
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): Explore.dc.html (desktop), ExplorePhone.dc.html (phone),
-     ExploreFiltersPhone.dc.html (phone, ?state=filters: the filters sheet open).
-     Composed only of AppShell > Page > Section > Card / Stack / Row / Grid and the section 2 components; no <style>, no inline style.
-     The filters sheet is a native <dialog> opened with showModal() (design-system.md "Dialog and sheet states": one element, .sheet on phone).
-     Contract gaps (rule 11, cookbook PR canvas-explore-gaps; RESULTS-explore.md): the 1fr/300px table+aside grid, the in-flow menu panel,
-     the table row (width, collapsed borders), the selected filter chip, the phone review list row, the sheet geometry and handle,
-     the segmented control width. Until they land the screen uses the nearest contract primitive (listed in RESULTS); the rows that
-     change nothing at the current PIN are already on the markup (.l-grid[data-tpl=aside-end] (one column until then), .chip[data-on], .seg[data-inline], .sel[data-size=compact], .tbl-wrap/.tbl,
-     .mi-end, .sheet[data-pad=menu]/.sheet-handle/.sheet-title, .mi[data-size=lg]) and take effect when a PIN bump brings cookbook #191's rows
-     into base.css; the modal sheet geometry and ::backdrop are the collect lane's dialog.glass-hi rows (#190), as its dialogs use them.
+     ExploreFiltersPhone.dc.html (phone, ?state=filters: the filters sheet open). Any other ?state= renders the default board.
+     Composed of AppShell > Page > Stack / Row / Grid and contract rows (design-system.md 8.1, 8.7 Explore-lane rows at the PIN):
+     .l-grid[data-tpl=aside-end] (table + 300px aside), .l-card[data-pad=bar|table|rows], .tbl-wrap (the table card scrolls sideways,
+     the page never does), .tbl-foot, .chip[data-on], .menu[data-flow] + .mi-end, .sel[data-size=compact], .seg[data-inline],
+     .list-row/.icn-row/.list-body/.list-title, .sheet[data-pad=menu]/.sheet-handle/.sheet-title, .mi[data-size=lg]; no <style>, no inline style.
+     The filters sheet is a native <dialog class="glass-hi sheet"> opened with showModal() (design-system.md "Dialog and sheet states";
+     geometry and ::backdrop from the dialog.glass-hi rows): Escape or a tap on the backdrop (outside the sheet's box) closes it.
+     Links through ../href.js (carries ?theme=); a review row opens the results lane's "results" screen.
      One .btn-primary per page: none on desktop (the board draws none); phone "Open the filters" in the phone-bar. -->
 <script module>
   export const STATES = Object.freeze(["filters"]);
+  // Close a modal only for a click on its ::backdrop: the event target is the <dialog> itself for both its backdrop and its own
+  // padding, so the pointer must also fall outside the dialog's box (validator F2: a tap on the sheet's padding closed it).
+  export function onBackdrop(e) {
+    const el = e.currentTarget;
+    if (e.target !== el) return false;
+    const r = el.getBoundingClientRect();
+    const out = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    if (out) { if (typeof el.close === "function") el.close(); else el.removeAttribute("open"); }
+    return out;
+  }
 </script>
 <script>
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
-  import Section from "../../Section.svelte";
-  import Card from "../../Card.svelte";
   import Stack from "../../Stack.svelte";
   import Row from "../../Row.svelte";
-  import Grid from "../../Grid.svelte";
   import TopBar from "../../TopBar.svelte";
   import PhoneHeader from "../../PhoneHeader.svelte";
   import Button from "../../Button.svelte";
@@ -31,22 +37,24 @@
   import Icon from "../../Icon.svelte";
   import { I } from "../../icons.js";
   import { E } from "./icons.js";
+  import { href } from "../href.js";
   import { exploreRows, phoneRows } from "./explore-data.js";
   import data from "../../../fixtures/explore/explore.json";
 
   let { phone = false, theme = "light", state } = $props();
-  if (state !== undefined && !STATES.includes(state)) throw new TypeError(`Explore: unknown state "${String(state)}" (filters)`);
-  if (state === "filters" && !phone) throw new TypeError("Explore: the filters sheet is the phone board's (ExploreFiltersPhone.dc.html)");
-  const PHONE = "?screen=explore&w=phone", SHEET = "?screen=explore&w=phone&state=filters", RESULTS = "?screen=results&w=phone";
+  // Unknown states, and the phone-only sheet asked for on desktop, render the default board (never throw on a URL value).
+  const sheet = $derived(phone && state === "filters");
+  const W = $derived({ w: phone ? "phone" : null });
+  const HOME = $derived(href("home", W)), SELF = $derived(href("explore", W)), SHEET = $derived(href("explore", { ...W, state: "filters" }));
+  const RESULTS = $derived(href("results", W));
   const HEADS = ["Review", "Project", "Language", "Region", "Organisations", "Stage", "Responses", "Team", "Community", "Church", "Updated"];
   const rows = exploreRows(data.reviews);
   const prows = phoneRows(data.phone.rows);
-  // The sheet opens as a modal dialog (top layer, inert page, ::backdrop); a backdrop click or Escape closes it (design-system.md Dialog and sheet states).
+  // The sheet opens as a modal dialog (top layer, inert page, ::backdrop); Escape or a backdrop tap closes it.
   const modal = (el) => {
     if (typeof el.showModal === "function") { try { el.showModal(); return; } catch { /* not connected yet: fall through */ } }
     el.setAttribute("open", "");
   };
-  const dismiss = (e) => { if (e.target === e.currentTarget && typeof e.currentTarget.close === "function") e.currentTarget.close(); };
 </script>
 
 {#snippet pen()}<Icon d={E.pen} />{/snippet}
@@ -57,7 +65,7 @@
 {#snippet check()}<Icon d={I.check} />{/snippet}
 {#snippet doc()}<Icon d={E.doc} />{/snippet}
 {#snippet chip(label, aria, on = false)}<span class="chip" data-on={on ? "" : undefined}>{label}<button type="button" aria-label={`Remove ${aria} filter`}><Icon d={I.x} /></button></span>{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="root" initials={data.user.initials} home="?screen=home" />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.workspace} home="?screen=home" />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="root" initials={data.user.initials} home={HOME} />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.workspace} home={HOME} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Open the filters" variant="primary" lg block href={SHEET} lead={list} /></div>{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
@@ -67,24 +75,25 @@
     <Row wrap gap={2}>{#each data.phone.chips as c}{@render chip(c, c)}{/each}</Row>
     <Row gap={2}>
       <Button label={`Filters · ${data.phone.chips.length}`} href={SHEET} lead={list} block />
-      <Button label="Sort" href={PHONE} lead={download} />
+      <Button label="Sort" href={SELF} lead={download} />
       <Button icon={search} ariaLabel="Search reviews" variant="quiet" />
     </Row>
-    <Card pad="list" gap={2} label="Reviews">
+    <section class="glass l-card" data-pad="rows" aria-label="Reviews">
       {#each prows as r}
-        <a class="card-link l-row" data-gap="3" data-split href={RESULTS}>
-          <Row gap={3}><span class="icn icn-lens" data-lens="team" aria-hidden="true"><Icon d={E.doc} /></span><Stack gap={1}><span class="h3">{r.title}</span><span class="small">{r.meta}</span></Stack></Row>
+        <a class="card-link list-row" href={RESULTS}>
+          <span class="icn icn-row" data-lens="team" aria-hidden="true"><Icon d={E.doc} /></span>
+          <div class="list-body"><div class="list-title">{r.title}</div><div class="small">{r.meta}</div></div>
           <Level level={r.level} />
         </a>
       {/each}
-    </Card>
-    <Grid cols={2} gap={2}><Button label="Save this view" href={PHONE} lead={check} block /><Button label="Download CSV" href={PHONE} lead={doc} block /></Grid>
-    {#if state === "filters"}
-      <dialog class="glass-hi sheet" data-pad="menu" aria-labelledby="explore-filters-title" {@attach modal} onclick={dismiss}>
+    </section>
+    <Row gap={2}><Button label="Save this view" href={SELF} lead={check} block /><Button label="Download CSV" href={SELF} lead={doc} block /></Row>
+    {#if sheet}
+      <dialog class="glass-hi sheet" data-pad="menu" aria-labelledby="explore-filters-title" {@attach modal} onclick={onBackdrop}>
         <div class="l-stack" data-gap="1">
           <div class="sheet-handle" aria-hidden="true"></div>
           <p class="micro sheet-title" id="explore-filters-title">Filters · tap to change, swipe a row left to remove</p>
-          {#each data.phone.sheet as s}<a class="mi" data-size="lg" href={PHONE}><Icon d={E[s.icon]} /><span>{s.label}</span></a>{/each}
+          {#each data.phone.sheet as s}<a class="mi" data-size="lg" href={SELF}><Icon d={E[s.icon]} /><span>{s.label}</span></a>{/each}
         </div>
       </dialog>
     {/if}
@@ -101,11 +110,9 @@
           <Button label="Download CSV" lead={download} />
         </Row>
       </Row>
-      <Section>
-        <div class="l-grid" data-tpl="aside-end" data-gap="5">
+      <div class="l-grid" data-tpl="aside-end" data-gap="5">
         <Stack gap={4}>
-        <Card gap={3} label="Filters">
-          <Row split wrap gap={3}>
+          <div class="glass l-card l-row" data-pad="bar" data-split data-wrap data-gap="2" role="group" aria-label="Filters">
             <Row wrap gap={2}>
               <span class="small">Filters</span>
               {#each data.filters as f}{@render chip(`${f.key} · ${f.value}`, f.key, true)}{/each}
@@ -115,37 +122,37 @@
               <span class="small">Group by</span>
               <label class="sel" data-size="compact"><select class="in" aria-label="Group by">{#each data.groupBy.options as o}<option selected={o === data.groupBy.selected}>{o}</option>{/each}</select><Icon d={I.chev} /></label>
             </Row>
-          </Row>
-        </Card>
-        <Card gap={3} label="Reviews">
-          <div class="tbl-wrap"><table class="tbl">
-            <thead><tr>{#each HEADS as h}<th class="th" scope="col">{h}</th>{/each}</tr></thead>
-            <tbody>
-              {#each rows as r}
-                <tr>
-                  <td class="td"><b>{r.title}</b></td><td class="td">{r.project}</td><td class="td">{r.language}</td><td class="td">{r.region}</td><td class="td">{r.orgs}</td>
-                  <td class="td"><Pill stage={r.pill} /></td><td class="td">{r.responsesText}</td>
-                  {#each ["team", "community", "church"] as k}<td class="td">{#if r.levels[k]}<Level level={r.levels[k]} />{:else}<span class="small">—</span>{/if}</td>{/each}
-                  <td class="td">{r.updated}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table></div>
-          <Row split wrap gap={3}>
-            <span class="small">{rows.length} of {data.visible} reviews match · {data.match.projects} projects · {data.match.languages} languages</span>
-            <span class="small">Nothing here identifies a participant.</span>
-          </Row>
-        </Card>
+          </div>
+          <!-- The table card scrolls sideways (.tbl-wrap), so it takes keyboard focus to be scrollable without a pointer. -->
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <section class="glass l-card tbl-wrap" data-pad="table" aria-label="Reviews" tabindex="0">
+            <table class="tbl">
+              <thead><tr>{#each HEADS as h}<th class="th" scope="col">{h}</th>{/each}</tr></thead>
+              <tbody>
+                {#each rows as r}
+                  <tr>
+                    <td class="td">{r.title}</td><td class="td">{r.project}</td><td class="td">{r.language}</td><td class="td">{r.region}</td><td class="td">{r.orgs}</td>
+                    <td class="td"><Pill stage={r.pill} /></td><td class="td">{r.responsesText}</td>
+                    {#each ["team", "community", "church"] as k}<td class="td">{#if r.levels[k]}<Level level={r.levels[k]} />{:else}<span class="micro">—</span>{/if}</td>{/each}
+                    <td class="td">{r.updated}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+            <div class="l-row tbl-foot" data-split data-gap="3">
+              <span class="small">{rows.length} of {data.visible} reviews match · {data.match.projects} projects · {data.match.languages} languages</span>
+              <span class="small">Nothing here identifies a participant.</span>
+            </div>
+          </section>
         </Stack>
-        <aside class="l-stack" data-gap="3" aria-label="Add a filter">
-          <h3 class="h3">Add a filter</h3>
-          <Card hi gap={1} label="Add a filter">
+        <aside class="l-stack" data-gap="3" aria-labelledby="explore-add-title">
+          <h2 class="h3" id="explore-add-title">Add a filter</h2>
+          <div class="glass-hi menu" data-flow role="group" aria-labelledby="explore-add-title">
             {#each data.addFilter as f}<button class="mi" type="button"><span>{f}</span><span class="small mi-end">Any</span></button>{/each}
-          </Card>
+          </div>
           <p class="small">Workspace and project are filters like any other. The Workspace and Project pages are the same table with those filters saved.</p>
         </aside>
-        </div>
-      </Section>
+      </div>
     </Page>
   {/if}
 </AppShell>
