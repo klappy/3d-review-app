@@ -29,3 +29,11 @@ export function route(params, storage) {
   const state = params.get("state") === "first" ? "first" : "reviews";
   return { view: "home", props: { state: phone ? "reviews" : state, phone, theme: theme === "dark" ? "dark" : "light" } };
 }
+
+// Links between mounted screens carry their presentation and flag explicitly;
+// they keep working when localStorage is unavailable and survive a full reload.
+export function screenHref(screen, { phone = false, theme = "light" } = {}) {
+  const params = new URLSearchParams({ screen, [FLAG]: "on", theme });
+  if (phone) params.set("w", "phone");
+  return `?${params}`;
+}

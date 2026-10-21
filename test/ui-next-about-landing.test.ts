@@ -231,3 +231,33 @@ describe("type rows (design-system.md section 1.2, auggie-next-type-2300)", () =
     expect(text(mount(Landing, { phone: true }).querySelector("p.small.t-15")!)).toBe(R.C02);
   });
 });
+
+
+describe("screen links retain presentation and UI Next on a full navigation", () => {
+  for (const [Component, screen, selector] of [
+    [About, "home", 'a[aria-label="Back to Home"]'],
+    [Landing, "landing", ".phone-top .brand"],
+  ] as const) {
+    it(`${screen} link keeps phone/dark and does not depend on stored opt-in`, () => {
+      const app = mount(Component, { phone: true, theme: "dark" });
+      const href = app.querySelector(selector)!.getAttribute("href")!;
+      const params = new URLSearchParams(href.slice(1));
+      expect(Object.fromEntries(params)).toEqual({ screen, ui_next: "on", theme: "dark", w: "phone" });
+      expect(route(params, { getItem: () => "on" })).toMatchObject({ view: screen,
+        props: { phone: true, theme: "dark" } });
+    });
+  }
+});
+
+
+it("live phone CSS overrides fixed-board positioning without creating a sticky scroll container", () => {
+  const style = document.createElement("style");
+  style.textContent = ["base.css", "phone.css"].map((name) =>
+    readFileSync(resolve(__dirname, "../ui-next/components", name), "utf8")).join("\n");
+  document.head.append(style);
+  try {
+    const app = mount(About, { phone: true });
+    expect(getComputedStyle(app.querySelector(".phone-bar")!).position).toBe("sticky");
+    expect(getComputedStyle(app).overflow).toBe("clip");
+  } finally { style.remove(); }
+});

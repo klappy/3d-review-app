@@ -1,3 +1,7 @@
+/* The pinned board CSS positions chrome inside a fixed drawing. Live pages
+   scroll: keep phone actions in the viewport and respect the device safe area. */
+.app.l-screen{overflow:clip}
+.phone-bar{position:sticky;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
 
 .phone-top .btn,.phone-top .menu-btn{min-width:44px}
 .phone-top .menu-btn{padding:0;justify-content:center}
