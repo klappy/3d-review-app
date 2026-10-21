@@ -6,5 +6,6 @@
 // Boards (cookbook design/2026-10-15-glass-redesign/canvas): NextStep(+Phone) -> next-step, ActionPlan(+Phone) -> action-plan,
 // Print(+Phone) -> print, Share(+Phone) -> share, Sandbox(+Phone) -> sandbox, PaperEntry(+Phone) -> paper-entry, MenuPhone -> menu (phone only).
 import NextStep from "./NextStep.svelte";
+import ActionPlan from "./ActionPlan.svelte";
 
-export default { "next-step": NextStep };
+export default { "next-step": NextStep, "action-plan": ActionPlan };
