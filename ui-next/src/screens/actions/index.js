@@ -8,5 +8,6 @@
 import NextStep from "./NextStep.svelte";
 import ActionPlan from "./ActionPlan.svelte";
 import Share from "./Share.svelte";
+import Print from "./Print.svelte";
 
-export default { "next-step": NextStep, "action-plan": ActionPlan, share: Share };
+export default { "next-step": NextStep, "action-plan": ActionPlan, share: Share, print: Print };
