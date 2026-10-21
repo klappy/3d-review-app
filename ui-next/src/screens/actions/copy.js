@@ -10,3 +10,18 @@ export async function copyText(text, nav = globalThis.navigator) {
     return false;
   }
 }
+
+// Share a survey link out (SharePhone's share-out icon): the OS share sheet where the browser has one (navigator.share, phones),
+// else the clipboard. The link goes as text, exactly as the row shows it (no URL is made up from the fixture's short host).
+// Resolves "shared", "cancelled" (the person closed the sheet), "copied", or false (neither is available here).
+export async function shareText(text, title, nav = globalThis.navigator) {
+  if (typeof nav?.share === "function") {
+    try {
+      await nav.share({ title, text });
+      return "shared";
+    } catch (e) {
+      if (e?.name === "AbortError") return "cancelled";
+    }
+  }
+  return (await copyText(text, nav)) ? "copied" : false;
+}

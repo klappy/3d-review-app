@@ -3,7 +3,9 @@
      ActionPlan.dc.html (desktop: document top bar + the paper sheet), ActionPlanPhone.dc.html (phone, ?w=phone).
      Desktop paper: the pinned base.css .paper[data-sheet] row (the 794px page, 56/64 padding, --sp-5 gap; the results lane's report
      sheet row) in the paper scope (.pfoot); the board's 36px Newsreader title has no type row (generator line). Links: ../href.js href()
-     with this screen's w/theme. One .btn-primary per page: desktop "Download PDF" (top bar), phone "Share the PDF" (phone-bar). -->
+     with this screen's w/theme. One .btn-primary per page: desktop "Download PDF" (top bar), phone "Share the PDF" (phone-bar).
+     Controls: "Copy share link" / "Copy link" copy the plan link (./CopyButton.svelte); "Email it" goes to people (both widths); "Print"
+     opens the browser's print (./ActButton.svelte). "Download PDF" / "Share the PDF" (#pdf) wait on a PDF of the plan: RESULTS debt. -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Card from "../../Card.svelte";
@@ -16,6 +18,8 @@
   import Button from "../../Button.svelte";
   import DocTop from "./DocTop.svelte";
   import Qr from "./Qr.svelte";
+  import CopyButton from "./CopyButton.svelte";
+  import ActButton from "./ActButton.svelte";
   import Ico from "./Ico.svelte";
   import { A } from "./icons.js";
   import { href } from "../href.js";
@@ -25,15 +29,13 @@
 
   let { phone = false, theme = "light" } = $props();
   const at = $derived(carry(phone, theme));
+  // "Print" prints this page through the browser, as the current UI's print buttons do (ui/stage-screens.js doc.defaultView.print()).
+  const printPage = () => globalThis.print?.();
 </script>
 
-{#snippet link()}<Ico d={A.link} />{/snippet}
 {#snippet mail()}<Ico d={A.mail} />{/snippet}
 {#snippet download()}<Ico d={A.download} />{/snippet}
-{#snippet print()}<Ico d={A.print} />{/snippet}
-{#snippet copy()}<Ico d={A.copy} />{/snippet}
-{#snippet check()}<Ico d={A.check} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Next steps" parent="Luke 1–2" back={href("next-step", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<DocTop title={D.doc} home={href("next-step", at)}><Button label="Copy share link" lead={link} /><Button label="Email it" lead={mail} /><Button label="Download PDF" variant="primary" href="#pdf" lead={download} /><Button label="Print" lead={print} /></DocTop>{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Next steps" parent="Luke 1–2" back={href("next-step", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<DocTop title={D.doc} home={href("next-step", at)}><CopyButton text={D.share.url} label="Copy share link" lead="link" /><Button label="Email it" href={href("people", at)} lead={mail} /><Button label="Download PDF" variant="primary" href="#pdf" lead={download} /><ActButton label="Print" lead="print" onclick={printPage} /></DocTop>{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Share the PDF" href="#pdf" />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
@@ -50,7 +52,7 @@
     <Card gap={2} label="Share">
       <span class="micro">Share</span>
       <p class="small">Read-only link, expires in 90 days.</p>
-      <Row gap={2}><Button label="Copy link" lead={copy} block /><Button label="Email it" href={href("people", at)} lead={mail} block /></Row>
+      <Row gap={2}><CopyButton text={D.share.url} label="Copy link" block /><Button label="Email it" href={href("people", at)} lead={mail} block /></Row>
     </Card>
   {:else}
     <article class="paper" data-sheet="page" aria-label={`Next steps, ${R.review.title}`}>

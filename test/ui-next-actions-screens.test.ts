@@ -20,6 +20,8 @@ import ReviewHead from "../ui-next/src/screens/actions/ReviewHead.svelte";
 import CollectGroups from "../ui-next/src/screens/actions/CollectGroups.svelte";
 import CopyButton from "../ui-next/src/screens/actions/CopyButton.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
+import { shareText } from "../ui-next/src/screens/actions/copy.js";
+// @ts-expect-error -- plain .js module, no type declarations
 import actions from "../ui-next/src/screens/actions/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { REGISTRY, LANES } from "../ui-next/src/screens/registry.js";
@@ -32,6 +34,7 @@ import { PRINT_IN_LANGUAGE as LEGACY_PRINT_IN_LANGUAGE, printLanguages as legacy
 // @ts-expect-error -- plain .js module, no type declarations
 import { CAN_SHARE, READ_ONLY, PRINT_IN_LANGUAGE, printLanguages } from "../ui-next/src/screens/actions/legacy.js";
 import R from "../ui-next/fixtures/actions/review.json";
+import PLAN from "../ui-next/fixtures/actions/action-plan.json";
 
 type P = Record<string, unknown>;
 type C = typeof NextStep;
@@ -278,5 +281,91 @@ describe("actions lane parts", () => {
     await fireEvent.click(off);
     await vi.waitFor(() => expect(off.getAttribute("title")).toMatch(/select the link/));
     expect(text(off)).toBe("Copy");
+  });
+});
+
+// Validator round 2 N2 + N4 (VALIDATION-actions-r2.md): controls that looked live but did nothing.
+describe("actions lane controls act, and the ones that cannot yet are named debt", () => {
+  const byText = (root: Element, sel: string, t: string) => [...root.querySelectorAll(sel)].find((el) => text(el) === t) as HTMLElement;
+  it("action plan: the share-link copies are buttons that copy the plan link; Email it goes to people at both widths; Print prints", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const before = window.print;
+    const print = vi.fn();
+    window.print = print;
+    try {
+      const d = mount(ActionPlan);
+      const copy = byText(d, "button", "Copy share link");
+      expect(copy.getAttribute("type")).toBe("button");
+      expect(copy.hasAttribute("aria-label")).toBe(false); // the visible label is the name
+      await fireEvent.click(copy);
+      await vi.waitFor(() => expect(text(copy)).toBe("Copied"));
+      expect(writeText).toHaveBeenLastCalledWith(PLAN.share.url);
+      expect(p(byText(d, "a", "Email it").getAttribute("href") ?? "").get("screen")).toBe("people");
+      await fireEvent.click(byText(d, "button", "Print"));
+      expect(print).toHaveBeenCalledTimes(1);
+      const ph = mount(ActionPlan, { phone: true });
+      const pc = byText(ph, "button", "Copy link");
+      expect(pc.className).toBe("btn btn-block");
+      await fireEvent.click(pc);
+      await vi.waitFor(() => expect(text(pc)).toBe("Copied"));
+      expect(writeText).toHaveBeenCalledTimes(2);
+      expect(p(byText(ph, "a", "Email it").getAttribute("href") ?? "").get("screen")).toBe("people");
+    } finally {
+      Reflect.deleteProperty(navigator, "clipboard");
+      window.print = before;
+    }
+  });
+  it("share phone: the share-out icon hands the row's link to the share sheet, else copies it", async () => {
+    const s = R.surveys[0];
+    const link = `${R.shortHost}${s.code}`;
+    const share = vi.fn(async () => {});
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+    try {
+      const b = mount(Share, { phone: true }).querySelector(`button[aria-label='Share link for ${s.name}']`) as HTMLButtonElement;
+      expect(b.className).toBe("btn btn-quiet btn-icon");
+      await fireEvent.click(b);
+      await vi.waitFor(() => expect(share).toHaveBeenCalledWith({ title: `${R.review.title}: ${s.name}`, text: link }));
+    } finally {
+      Reflect.deleteProperty(navigator, "share");
+    }
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    try {
+      const b = mount(Share, { phone: true }).querySelector(`button[aria-label='Share link for ${s.name}']`) as HTMLButtonElement;
+      await fireEvent.click(b);
+      await vi.waitFor(() => expect(b.getAttribute("aria-label")).toBe(`Link copied for ${s.name}`));
+      expect(writeText).toHaveBeenCalledWith(link);
+    } finally {
+      Reflect.deleteProperty(navigator, "clipboard");
+    }
+  });
+  it("shareText: a closed share sheet does not fall through to the clipboard; with neither it resolves false", async () => {
+    const writeText = vi.fn(async () => {});
+    const abort = Object.assign(new Error("closed"), { name: "AbortError" });
+    expect(await shareText("x", "t", { share: async () => { throw abort; }, clipboard: { writeText } })).toBe("cancelled");
+    expect(writeText).not.toHaveBeenCalled();
+    expect(await shareText("x", "t", { share: async () => { throw new Error("NotAllowed"); }, clipboard: { writeText } })).toBe("copied");
+    expect(await shareText("x", "t", {})).toBe(false);
+  });
+  it("the only inert controls left are the itemised wiring debt (plan store, codes API, plan PDF)", () => {
+    const found: string[] = [];
+    for (const f of readdirSync(LANE_DIR).filter((x) => x.endsWith(".svelte"))) {
+      const src = readFileSync(join(LANE_DIR, f), "utf8").replace(/<!--[\s\S]*?-->/g, "");
+      for (const [tag] of src.matchAll(/<Button\b[^>]*>/g)) if (!/\bhref=/.test(tag)) found.push(`${f} ${(tag.match(/\blabel=("[^"]*"|\{[^}]*\})/) ?? tag.match(/ariaLabel=(\{[^}]*\}|"[^"]*")/))?.[1]}`);
+      for (const [, hash] of src.matchAll(/href="(#[a-z-]+)"/g)) found.push(`${f} ${hash}`);
+    }
+    expect(found.sort()).toEqual([
+      "ActionPlan.svelte #pdf", // Download PDF (desktop), Share the PDF (phone-bar): no PDF of the plan yet
+      "ActionPlan.svelte #pdf",
+      'NextStep.svelte "Add to plan"', // the plan store (debt 3)
+      'NextStep.svelte "Not this one"',
+      'NextStep.svelte "Not this one"',
+      'NextStep.svelte {it.inPlan ? "In the plan" : "Add to plan"}',
+      'Share.svelte "Download as CSV"', // the codes API (cap.survey.issue_codes / export_codes)
+      'Share.svelte "Make more codes"',
+      "Share.svelte #codes",
+      "Share.svelte #csv",
+    ]);
   });
 });

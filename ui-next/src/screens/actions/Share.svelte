@@ -2,7 +2,9 @@
      Mock data: ui-next/fixtures/actions/share.json + review.json. Boards (cookbook design/2026-10-15-glass-redesign/canvas):
      Share.dc.html (desktop), SharePhone.dc.html (phone, ?w=phone). Who may copy links comes from the current UI's share rules
      (ui/assess/share.js CAN_SHARE, the issue_link roles, and copy.readOnly, through the lane adapter ./legacy.js, which a test holds
-     equal to share.js); a role outside it sees the readOnly line instead of the copy actions. Copy controls copy (./CopyButton.svelte).
+     equal to share.js); a role outside it sees the readOnly line instead of the copy actions. Copy controls copy (./CopyButton.svelte); the phone
+     share-out icon opens the share sheet, else copies (./ShareOut.svelte). Access codes "Make more codes" / "Download as CSV" (phone
+     #codes / #csv) wait on the codes API (cap.survey.issue_codes / export_codes): RESULTS debt.
      Work card: the pinned .glass-hi.l-card[data-pad=work]. Link rows: Grid barbell (220px 1fr 220px) stands in for the board's
      240px 1fr auto auto (no contract row: generator line). Access codes: §2 Disclosure. Links: ../href.js href() with this screen's w/theme.
      One .btn-primary per page: desktop "Done" (page head), phone "Show QR codes for the room" (phone-bar). -->
@@ -23,6 +25,7 @@
   import Ico from "./Ico.svelte";
   import { A } from "./icons.js";
   import CopyButton from "./CopyButton.svelte";
+  import ShareOut from "./ShareOut.svelte";
   import { CAN_SHARE, READ_ONLY } from "./legacy.js";
   import { href } from "../href.js";
   import { carry } from "./links.js";
@@ -39,7 +42,6 @@
 {#snippet bar()}{#if phone}<PhoneBar label="Show QR codes for the room" href={href("qr-room", at)} />{/if}{/snippet}
 {#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Updated just now{/snippet}
 {#snippet qr()}<Ico d={A.qr} />{/snippet}
-{#snippet out()}<Ico d={A.out} />{/snippet}
 {#snippet mail()}<Ico d={A.mail} />{/snippet}
 {#snippet download()}<Ico d={A.download} />{/snippet}
 
@@ -53,7 +55,7 @@
         <Row split gap={2}><Row gap={2}><LensDot lens={s.lens} decorative /><b>{s.name}</b></Row><span class="small">{s.n}/{s.of}</span></Row>
         <Row gap={1}>
           <input class="in small" data-grow readonly value={`${R.shortHost}${s.code}`} aria-label={`Link for ${s.name}`} />
-          {#if canShare}<CopyButton icon text={`${R.shortHost}${s.code}`} name={s.name} /><Button icon={out} ariaLabel={`Share link for ${s.name}`} variant="quiet" />{/if}
+          {#if canShare}<CopyButton icon text={`${R.shortHost}${s.code}`} name={s.name} /><ShareOut text={`${R.shortHost}${s.code}`} name={s.name} title={R.review.title} />{/if}
           <Button icon={qr} ariaLabel={`QR for ${s.name}`} variant="quiet" href={href("qr-room", at)} />
         </Row>
       {/each}
