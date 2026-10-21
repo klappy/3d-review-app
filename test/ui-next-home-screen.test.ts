@@ -98,10 +98,10 @@ describe("copy rows present verbatim (C01-C12)", () => {
       expect(a.textContent!).not.toContain(COPY.C02);
     }
   });
-  it("C12 ships without the trajectory clause (current-ui-copy ASK default 1); C01 is Landing's hero, not on Home", () => {
+  it("C12 ships in full with the trajectory sentence (cookbook current-ui-copy RULING option 2); C01 is Landing's hero, not on Home", () => {
     const t = home({ state: "first" }).textContent!;
-    expect(paras).toContain(`${COPY.C12[1]} to create a trajectory`);
-    expect(t).not.toMatch(/trajectory/);
+    expect(paras).toContain(COPY.C12[1]);
+    expect(COPY.C12[1]).toMatch(/to create a trajectory$/);
     expect(t).not.toContain("Three perspectives. One useful next step.");
   });
 });
@@ -130,6 +130,20 @@ describe("/next/ router and the ui_next flag", () => {
     expect(route(p("?page=home"), s).view).toBe("home-parts");
     expect(route(p("?state=first&theme=dark"), s).props).toEqual({ state: "first", phone: false, theme: "dark" });
     expect(route(p("?w=phone&state=first"), s).props).toEqual({ state: "reviews", phone: true, theme: "light" });
+  });
+  it("explicit queries control this navigation without available persistence", () => {
+    for (const unavailable of [undefined, null]) {
+      expect(route(p("?ui_next=on&w=phone&theme=dark"), unavailable)).toEqual({
+        view: "home", props: { state: "reviews", phone: true, theme: "dark" },
+      });
+      expect(flagOn(p("?ui_next=off"), unavailable)).toBe(false);
+      expect(route(p(""), unavailable).view).toBe("components");
+    }
+    const ignoredWrites = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+    expect(route(p("?ui_next=on"), ignoredWrites).view).toBe("home");
+    expect(route(p(""), ignoredWrites).view).toBe("components");
+    const stale = { getItem: () => "on", setItem: () => {}, removeItem: () => { throw new Error("blocked"); } };
+    expect(flagOn(p("?ui_next=off"), stale)).toBe(false);
   });
   it("a storage that throws falls back to the query alone", () => {
     const bad = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); }, removeItem: () => {} };
