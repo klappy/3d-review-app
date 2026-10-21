@@ -300,6 +300,16 @@ describe("each board renders as a screen", () => {
     expect(all(a, ".glass[data-lens] .h3")).toEqual(["Translation team · 9", "Community · 10", "Church · 5"]);
     expect(all(a, "main > a.link")).toEqual(["See the three biggest gaps", "Share results with someone"]);
   });
+  it("phone-bar 'Plan the next step' draws the boards' trailing arrow (ResultsPhone, ResultsAnswersPhone, ResultsGapsPhone; integration N3)", () => {
+    for (const C of [Results, ResultsAnswers, ResultsGaps]) {
+      const p = mount(C, { phone: true }).querySelector(".phone-bar .btn-primary")!;
+      expect(text(p)).toBe("Plan the next step");
+      const kids = [...p.childNodes].filter((n) => n.nodeType === 1 || (n.textContent ?? "").trim());
+      expect(kids.map((n) => (n.nodeType === 1 ? (n as Element).tagName.toLowerCase() : "label"))).toEqual(["label", "svg"]);
+      expect(p.querySelector("svg path")!.getAttribute("d")).toBe("M5 12h14M13 6l6 6-6 6");
+    }
+    expect(mount(ResultsHeld, { phone: true }).querySelector(".phone-bar .btn-primary svg")).toBeNull(); // Reopen collection: no trail
+  });
   it("ResultsAnswers: perspective switch, split, one card per question with answer rows and bars, their words", () => {
     const a = mount(ResultsAnswers);
     expect((a.querySelector(".seg input:checked")!.parentElement as HTMLElement).textContent).toBe("Community");

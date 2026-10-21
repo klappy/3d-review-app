@@ -45,7 +45,7 @@
 {#snippet people()}<Glyph d={G.people} />{/snippet}
 {#snippet doc()}<Glyph d={G.doc} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="The answers" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<TopBar {crumbs} home={out("workspace")} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Plan the next step" href={out("nextStep")} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label="Plan the next step" href={out("nextStep")} trail="arrow" />{/if}{/snippet}
 {#snippet rows(lensKey, options, n)}
   <div class="ans">{#each options as [label, count]}<div class="r"><span>{label}</span><span class="num tab-n">{count}</span><AnswerBar lens={lensKey} pct={pct(count, n)} /></div>{/each}</div>
 {/snippet}
