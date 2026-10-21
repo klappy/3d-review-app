@@ -31,7 +31,20 @@ export const itemById = (id) => {
   return item;
 };
 // The board's last answer row on every choice question (design row, not yet in the app instrument: cookbook CORRECTIONS R33).
+// It carries the app's own option flag `exclusive` (ui/participant-view.js itemError: an exclusion choice cannot be combined).
 export const choices = (item) => (item.options ? [...item.options, DATA.dontKnow] : []);
+// The item as the participant sees it: its options plus "I don't know", so the app's own functions (reviewAnswer, itemError) know the row.
+const asShown = (item) => (item.options ? { ...item, options: choices(item) } : item);
+
+// A multi answer after one box is ticked (on) or unticked: an exclusive row ("I don't know") stands alone; ticking any other row
+// drops it. Single answers are one code. The result always passes the app's itemError exclusion check.
+export function pick(item, value, code, on) {
+  if (item.type !== "multi") return on ? code : value;
+  const cur = Array.isArray(value) ? value : [];
+  if (!on) return cur.filter((c) => c !== code);
+  const ex = new Set(choices(item).filter((o) => o.exclusive).map((o) => o.code));
+  return ex.has(code) ? [code] : [...cur.filter((c) => c !== code && !ex.has(c)), code];
+}
 
 export function welcome(d = DATA) {
   return {
@@ -45,8 +58,9 @@ export function passage(d = DATA) {
   return { title: `Please read ${passageNames(d.survey.passages)} first`, verses: d.passage.verses, page: `Page ${d.passage.page} of ${d.passage.pages}` };
 }
 
-// The count is the fields drawn (aboutFields), never a stored number; one field reads "1 question, optional".
+// The count is the fields drawn (aboutFields), never a stored number; one field reads "1 question, optional"; no field, no line.
 export function aboutLine(n) {
+  if (!n) return null;
   if (n === 1) return "About you · 1 question, optional";
   return `About you · ${n} questions, ${n === 2 ? "both" : "all"} optional`;
 }
@@ -54,6 +68,11 @@ export function about(d = DATA) {
   const fields = aboutFields(d.form);
   return { fields, eyebrow: aboutLine(fields.length), values: d.about };
 }
+// "About you" is a step only when the form turns demographics on (aboutFields, S15a); otherwise the flow goes passage -> question 1
+// and question 1's Back goes to the passage.
+export const hasAbout = (d = DATA) => aboutFields(d.form).length > 0;
+// Skip leaves the page with nothing chosen (an untouched field sends nothing: ui/participant-view.js); Next keeps the choices.
+export const skipAbout = () => ({});
 
 // Question n (1-based, as "Question 3 of 13"). n comes from ?q=; a missing or unknown n shows the fixture's current question.
 export function questionNumber(q, d = DATA) {
@@ -75,7 +94,7 @@ export const qParam = (from = globalThis.location?.search ?? "") => new URLSearc
 export function review(all = false, d = DATA) {
   const ids = all ? d.form.items.map((i) => i.id) : d.reviewShown;
   const n = (id) => d.form.items.findIndex((i) => i.id === id) + 1;
-  return { rows: ids.map((id) => ({ id, n: n(id), q: itemById(id).text, a: reviewAnswer(itemById(id), d.answers[id]) })), total: d.form.items.length, all };
+  return { rows: ids.map((id) => ({ id, n: n(id), q: itemById(id).text, a: reviewAnswer(asShown(itemById(id)), d.answers[id]) })), total: d.form.items.length, all };
 }
 
 // PProblem vs PProblemBusy: the app's own rate-limit test picks the state from the fixture's error; ?state=busy forces it; any other

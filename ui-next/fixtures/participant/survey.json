@@ -311,7 +311,8 @@
  },
  "dontKnow": {
   "code": "dont-know",
-  "text": "I don't know"
+  "text": "I don't know",
+  "exclusive": true
  },
  "passage": {
   "page": 1,

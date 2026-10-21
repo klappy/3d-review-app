@@ -5,13 +5,16 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { render } from "@testing-library/svelte";
+import { render, fireEvent } from "@testing-library/svelte";
+import { flushSync } from "svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import { route } from "../ui-next/src/route.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { REGISTRY, LANES } from "../ui-next/src/screens/registry.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { DATA, welcome, passage, about, aboutLine, question, qParam, review, problem, choices, pickState, surveyLens, lensOf } from "../ui-next/src/screens/participant/data.js";
+import { DATA, welcome, passage, about, aboutLine, question, qParam, review, problem, choices, pick, hasAbout, skipAbout, pickState, surveyLens, lensOf } from "../ui-next/src/screens/participant/data.js";
+// @ts-expect-error -- plain .js module, no type declarations
+import { itemError } from "../ui/participant-view.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { UI_EN, SURVEYOR_EN } from "../ui/participate/i18n.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -24,6 +27,9 @@ import PQuestion from "../ui-next/src/screens/participant/PQuestion.svelte";
 import PReview from "../ui-next/src/screens/participant/PReview.svelte";
 import PReceipt from "../ui-next/src/screens/participant/PReceipt.svelte";
 import PProblem from "../ui-next/src/screens/participant/PProblem.svelte";
+import Chip from "../ui-next/src/screens/participant/Chip.svelte";
+import ProgressBar from "../ui-next/src/screens/participant/ProgressBar.svelte";
+import ParticipantActions from "../ui-next/src/screens/participant/ParticipantActions.svelte";
 
 type P = Record<string, unknown>;
 type C = typeof PWelcome;
@@ -252,6 +258,98 @@ describe("participant screens: fields, states and data wiring", () => {
     }
     const dir = resolve(__dirname, "../ui-next/src/screens/participant");
     for (const f of readdirSync(dir).filter((x) => x.endsWith(".svelte"))) expect([f, /href=\{?["'`]\?/.test(readFileSync(resolve(dir, f), "utf8"))]).toEqual([f, false]); // no hand-written ?screen= links
+  });
+});
+
+describe("participant screens: round 3 (validator N2-N4, N6; every screen's unknown ?state=)", () => {
+  const item = (id: string) => DATA.form.items.find((i: { id: string }) => i.id === id);
+  const withDemographics = <T,>(on: boolean, f: () => T): T => {
+    const was = DATA.form.demographics_enabled;
+    DATA.form.demographics_enabled = on;
+    try { return f(); } finally { DATA.form.demographics_enabled = was; }
+  };
+  const barLinks = (a: Element) => [...a.querySelectorAll(".phone-bar a.btn")].map((l) => l.getAttribute("href"));
+
+  it("N2: an \"I don't know\" answer reads \"I don't know\" on the review (single and multi), never \"Unrecognized option\"", () => {
+    const answers = { ...DATA.answers, "CW-Q1": "dont-know", "CW-Q2": ["dont-know"] };
+    const r = review(false, { ...DATA, answers });
+    expect(r.rows.slice(0, 2).map((x: { a: string }) => x.a)).toEqual(["I don't know", "I don't know"]);
+    expect(review(true, { ...DATA, answers }).rows.map((x: { a: string }) => x.a)).not.toContain("Unrecognized option");
+  });
+  it("N3: on a multi item \"I don't know\" is exclusive (pick), and the result passes the app's own itemError exclusion check", () => {
+    const q2 = item("CW-Q2");
+    expect(choices(q2).at(-1)).toEqual({ code: "dont-know", text: "I don't know", exclusive: true });
+    expect(pick(q2, ["unfamiliar-words", "long-sentences"], "dont-know", true)).toEqual(["dont-know"]);
+    expect(pick(q2, ["dont-know"], "long-sentences", true)).toEqual(["long-sentences"]);
+    expect(pick(q2, ["unfamiliar-words"], "long-sentences", true)).toEqual(["unfamiliar-words", "long-sentences"]);
+    expect(pick(q2, ["unfamiliar-words", "long-sentences"], "unfamiliar-words", false)).toEqual(["long-sentences"]);
+    expect(pick(item("CW-Q3"), "mixed", "dont-know", true)).toBe("dont-know");
+    const shown = { ...q2, options: choices(q2) };
+    for (const v of [["dont-know"], ["unfamiliar-words", "long-sentences"]]) expect(itemError(shown, new URLSearchParams(v.map((c) => ["CW-Q2", c])))).toBeNull();
+    expect(itemError(shown, new URLSearchParams([["CW-Q2", "dont-know"], ["CW-Q2", "long-sentences"]]))).toMatch(/cannot be combined/); // what pick never produces
+  });
+  it("N3: on the multi screens (q=2, q=8) ticking \"I don't know\" clears the other boxes and ticking a box clears it", () => {
+    for (const n of ["2", "8"]) {
+      const a = mount(PQuestion, { phone: true, q: n });
+      const boxes = () => [...a.querySelectorAll("input.cb[type=checkbox]")] as HTMLInputElement[];
+      const checked = () => boxes().filter((b) => b.checked).map((b) => b.value);
+      const box = (code: string) => boxes().find((b) => b.value === code)!;
+      const first = boxes()[0].value, second = boxes()[1].value;
+      if (!box(first).checked) { fireEvent.click(box(first)); flushSync(); }
+      if (!box(second).checked) { fireEvent.click(box(second)); flushSync(); }
+      expect(checked()).toEqual([first, second]);
+      fireEvent.click(box("dont-know")); flushSync();
+      expect(checked()).toEqual(["dont-know"]);
+      fireEvent.click(box(second)); flushSync();
+      expect(checked()).toEqual([second]);
+    }
+  });
+  it("N4: Skip clears the About choices before it leaves; Next keeps them; both go to question 1", () => {
+    const a = mount(PAbout, { phone: true });
+    expect(barLinks(a)).toEqual(["?ui_next=on&screen=p-question&q=1", "?ui_next=on&screen=p-question&q=1"]);
+    const radio = (code: string) => a.querySelector(`input.rd[value='${code}']`) as HTMLInputElement;
+    fireEvent.click(radio("18_30")); flushSync();
+    expect((a.querySelector("input:checked") as HTMLInputElement).value).toBe("18_30");
+    const stay = (e: Event) => e.preventDefault(); // jsdom does not navigate; keep the page to read it after the click
+    window.addEventListener("click", stay);
+    try {
+      fireEvent.click(a.querySelector(".phone-bar .btn-primary")!); flushSync();
+      expect((a.querySelector("input:checked") as HTMLInputElement).value).toBe("18_30");
+      fireEvent.click(a.querySelector(".phone-bar .btn-quiet")!); flushSync();
+      expect(a.querySelector("input:checked")).toBeNull();
+    } finally { window.removeEventListener("click", stay); }
+    expect(skipAbout()).toEqual({});
+  });
+  it("N4: with demographics off the flow skips About (passage -> question 1 -> back to the passage) and no line says 0 questions", () => {
+    expect(hasAbout()).toBe(true);
+    expect(aboutLine(0)).toBeNull();
+    withDemographics(false, () => {
+      expect(hasAbout()).toBe(false);
+      expect(barLinks(mount(PPassage, { phone: true }))).toEqual(["?ui_next=on&screen=p-welcome", "?ui_next=on&screen=p-question&q=1"]);
+      expect(barLinks(mount(PQuestion, { phone: true, q: "1" }))).toEqual(["?ui_next=on&screen=p-passage", "?ui_next=on&screen=p-question&q=2"]);
+      const a = mount(PAbout, { phone: true });
+      expect(text(a)).not.toMatch(/0 questions/);
+      expect(a.querySelector(".phone-bar .btn-quiet")).toBeNull(); // nothing to skip
+      expect(a.querySelectorAll("h1").length).toBe(1);
+    });
+    expect(barLinks(mount(PPassage, { phone: true }))).toEqual(["?ui_next=on&screen=p-welcome", "?ui_next=on&screen=p-about"]);
+  });
+  it("N6: the prop checks run again when a prop changes after mount (Chip, ProgressBar, ParticipantActions)", async () => {
+    const chip = render(Chip, { props: { icon: "check", size: 36, lens: "community" } });
+    await expect(chip.rerender({ icon: "check", size: 99, lens: "community" })).rejects.toThrow(/size must be/);
+    const bar = render(ProgressBar, { props: { value: 1, max: 4, label: "Question 1 of 4" } });
+    await expect(bar.rerender({ value: 1, max: 0, label: "Question 1 of 4" })).rejects.toThrow(/max > 0/);
+    const acts = render(ParticipantActions, { props: { phone: true, label: "Next", href: "?ui_next=on&screen=p-review" } });
+    await expect(acts.rerender({ phone: true, label: " ", href: "?ui_next=on&screen=p-review" })).rejects.toThrow(/needs a label/);
+  });
+  it("every lane screen: an unknown ?state= renders the default state, never throws, one h1", () => {
+    for (const Comp of [PWelcome, PCode, PPassage, PAbout, PQuestion, PReview, PReceipt, PProblem]) {
+      for (const bogus of ["zzz", "", "ALL", "busy2"]) {
+        const a = mount(Comp, { phone: true, state: bogus });
+        expect(text(a)).toBe(text(mount(Comp, { phone: true })));
+        expect(a.querySelectorAll("h1").length).toBe(1);
+      }
+    }
   });
 });
 

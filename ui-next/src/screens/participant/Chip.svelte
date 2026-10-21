@@ -8,10 +8,13 @@
   import { P } from "./icons.js";
   const GLYPH = Object.freeze({ 32: 16, 36: 18, 56: 28, 64: 30 });
   let { icon, size = 36, lens } = $props();
-  if (!Object.hasOwn(P, icon)) throw new TypeError(`Chip: unknown icon "${String(icon)}"`);
-  if (!Object.hasOwn(GLYPH, size)) throw new TypeError("Chip: size must be 32, 36, 56 or 64 (the §9 .icn[data-size] rows)");
-  if (lens !== null && !["team", "community", "church"].includes(lens)) throw new TypeError("Chip: lens must be team, community, church or null (neutral)");
-  const g = $derived(GLYPH[size]);
+  // Derived checks: they run again whenever a prop changes, not only at mount.
+  const g = $derived.by(() => {
+    if (!Object.hasOwn(P, icon)) throw new TypeError(`Chip: unknown icon "${String(icon)}"`);
+    if (!Object.hasOwn(GLYPH, size)) throw new TypeError("Chip: size must be 32, 36, 56 or 64 (the §9 .icn[data-size] rows)");
+    if (lens !== null && !["team", "community", "church"].includes(lens)) throw new TypeError("Chip: lens must be team, community, church or null (neutral)");
+    return GLYPH[size];
+  });
 </script>
 
 <span class="icn" data-size={String(size)} data-lens={lens ?? undefined} data-tone={lens === null ? "neutral" : undefined} aria-hidden="true"><svg width={g} height={g} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={P[icon]} /></svg></span>

@@ -3,7 +3,7 @@
      error picks the board through the app's own ui/rate-limit.js isRateLimited. Two hero cards: what happened, then the other cases; one
      .btn-primary retry in the phone-bar. Rows: the PIN's §9 participant rows (56px neutral head chip, .lead-16, 32px list chips in the
      survey's lens beside a two-line block, .l-row[data-align=start]). Busy: the bar is decorative (attempt of attempts) and the retry line is
-     the live text (role=status). The diagnostic line (RL_HTTP_ANON · 429 · time) is drawn on purpose; whether it stays is a captain question. -->
+     the live text (role=status). The diagnostic line (RL_HTTP_ANON · 429 · time) is drawn as the board draws it; whether it stays is an open design question. -->
 <script module>
   export const STATES = Object.freeze(["busy"]);
 </script>

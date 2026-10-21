@@ -1,7 +1,8 @@
 <!-- UI Next (v4) participant passage ("read it first"). Status: provisional (playbook rule 12). Board: PPassage.dc.html.
      The passage in the PIN's §9 reading frame: .solid.passage > .passage-text (Newsreader 16/27, 300px window) + .passage-foot (rule above).
      The foot stacks the page line over the Listen / Open as PDF row, so "Page 1 of 6" reads on one line at 390 (the board sets all three in
-     one row and wraps it to three lines). Back (quiet) + "I've read it" (primary) in the phone-bar. -->
+     one row and wraps it to three lines). Back (quiet) + "I've read it" (primary) in the phone-bar: to "About you" when the form turns it on,
+     else straight to question 1. -->
 <script>
   import ParticipantShell from "./ParticipantShell.svelte";
   import ParticipantActions from "./ParticipantActions.svelte";
@@ -12,14 +13,14 @@
   import Icon from "../../Icon.svelte";
   import { href } from "../href.js";
   import { P } from "./icons.js";
-  import { passage, LABELS } from "./data.js";
+  import { passage, hasAbout, LABELS } from "./data.js";
   let { phone = false, theme = "light" } = $props();
   const p = passage();
 </script>
 
 {#snippet audio()}<Icon d={P.audio} />{/snippet}
 {#snippet open()}<Icon d={P.open} />{/snippet}
-{#snippet actions()}<ParticipantActions {phone} back={href("p-welcome")} backLabel={LABELS.back} backLead="back" label="I've read it" href={href("p-about")} trail="arrow" />{/snippet}
+{#snippet actions()}<ParticipantActions {phone} back={href("p-welcome")} backLabel={LABELS.back} backLead="back" label="I've read it" href={hasAbout() ? href("p-about") : href("p-question", { q: 1 })} trail="arrow" />{/snippet}
 
 <ParticipantShell {phone} {theme} {actions}>
   <Card hi pad="hero" gap={4}>
