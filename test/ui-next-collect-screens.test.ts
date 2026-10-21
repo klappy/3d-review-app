@@ -438,12 +438,25 @@ describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
     expect(text(d.querySelector("#print-qr-lang-help"))).toBe('The language of the "scan to answer" line. The survey itself opens in whatever language the person picks.');
     expect(text(a.querySelector(".btn-primary"))).toBe("Print 3 pages");
     expect(text(d.querySelector(".micro"))).toBe("Preview · one page per survey · A4 · 3 pages");
-    const sheet = d.querySelector("svg.psheet foreignObject .paper")!;
+    const sheet = d.querySelector(".psheet[data-fit=a4] > .paper")!; // section 2 Paper preview row (CORRECTIONS 31): CSS scales the sheet, no SVG stand-in
+    expect(d.querySelector("svg.psheet, foreignObject, [style]")).toBeNull();
+    expect(d.querySelector(".psheet")!.getAttribute("aria-hidden")).toBe("true");
     expect(text(sheet.querySelector(".ptitle"))).toBe("Translators");
     expect([...sheet.querySelectorAll(".qr i")].map((i) => (i.classList.contains("o") ? "0" : "1")).join("")).toBe(fixture.groups[0].surveys[0].qr);
     expect(text(sheet)).toContain("Scan to answer · or enter code K7Q 4F2 at 3dreview.app · Hindi · English · Odia");
     expect(text(sheet.querySelector(".pfoot"))).toBe("1 of 3");
-    expect(d.querySelector("svg.psheet")!.getAttribute("data-layout")).toBe("survey");
+    expect(d.querySelector(".psheet")!.getAttribute("data-layout")).toBe("survey");
+  });
+  it("the preview takes the chosen paper size: A4 or Letter on the Paper preview row", async () => {
+    const d = shot(PrintQR).querySelector("dialog")!;
+    const sel = d.querySelector("#print-qr-paper") as HTMLSelectElement;
+    sel.value = "Letter";
+    await fireEvent.change(sel);
+    expect(d.querySelector(".psheet")!.getAttribute("data-fit")).toBe("letter");
+    expect(text(d.querySelector(".micro"))).toBe("Preview · one page per survey · Letter · 3 pages");
+    sel.value = "A4";
+    await fireEvent.change(sel);
+    expect(d.querySelector(".psheet")!.getAttribute("data-fit")).toBe("a4");
   });
   it("the preview draws the first page of the chosen layout: hand-out cards (six of the first survey), all on one page (every ticked code)", async () => {
     const a = shot(PrintQR);
@@ -451,14 +464,14 @@ describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
     const codes = (root: ParentNode) => [...root.querySelectorAll(".qr")].map((q) => [...q.querySelectorAll("i")].map((i) => (i.classList.contains("o") ? "0" : "1")).join(""));
     const surveys = fixture.groups.flatMap((g) => g.surveys);
     await fireEvent.click(d.querySelectorAll("input.rd")[1]);
-    let sheet = d.querySelector("svg.psheet")!;
+    let sheet = d.querySelector(".psheet")!;
     expect(sheet.getAttribute("data-layout")).toBe("sheet");
     expect(all(sheet, ".ptitle")).toEqual(Array(6).fill("Translators"));
     expect(codes(sheet)).toEqual(Array(6).fill(surveys[0].qr));
     expect([...sheet.querySelectorAll(".qr")].every((q) => q.getAttribute("data-size") === "room")).toBe(true);
     expect(text(sheet.querySelector(".pfoot"))).toBe("1 of 3");
     await fireEvent.click(d.querySelectorAll("input.rd")[2]);
-    sheet = d.querySelector("svg.psheet")!;
+    sheet = d.querySelector(".psheet")!;
     expect(sheet.getAttribute("data-layout")).toBe("one");
     expect(all(sheet, ".ptitle")).toEqual(["Translators", "Team leaders & mentors", "Community"]);
     expect(all(sheet, ".kbd")).toEqual(["3dreview.app/s/K7Q4F2", "3dreview.app/s/M3X9A1", "3dreview.app/s/P8L2W4"]);
@@ -548,7 +561,7 @@ describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
     flushSync();
     expect([...d().querySelectorAll("input.rd")].map((c) => (c as HTMLInputElement).checked)).toEqual([true]);
     expect(text(d().querySelector(".micro"))).toBe("Preview · one page per survey · A4 · 3 pages");
-    expect(d().querySelector("svg.psheet")!.getAttribute("data-layout")).toBe("survey");
+    expect(d().querySelector(".psheet")!.getAttribute("data-layout")).toBe("survey");
     await r.rerender({ data: structuredClone(fixture) });
     flushSync();
     expect([...d().querySelectorAll("input.rd")].map((c) => (c as HTMLInputElement).checked)).toEqual([true, false, false]);
