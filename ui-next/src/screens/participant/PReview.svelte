@@ -1,6 +1,6 @@
 <!-- UI Next (v4) participant "Check your answers". Status: provisional (playbook rule 12). Board: PReview.dc.html (four rows), ?state=all (every answer).
      Rows: the question (small) over the answer (ui/present.js reviewAnswer, the app's own review wording) and its Change link to that question
-     (?q=<n>), rules between rows (.hr); the list and its "Show all" share a Stack (--sp-5 = the board's 12px row padding + 12px card gap).
+     (?q=<n>), a rule (.hr) above every row, the first included (the board's border-top on each row); the list and its "Show all" share a Stack (--sp-5 = the board's 12px row padding + 12px card gap).
      "Show all N answers" (quiet link) opens ?state=all, which lists all N; any other ?state= renders the four. One .btn-primary
      "Send my answers" in the phone-bar. The answer line borrows .cap-name (600 / --t-15, the board's inline values; no review-answer row yet). -->
 <script module>

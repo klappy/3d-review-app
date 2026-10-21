@@ -36,8 +36,9 @@ export const choices = (item) => (item.options ? [...item.options, DATA.dontKnow
 // The item as the participant sees it: its options plus "I don't know", so the app's own functions (reviewAnswer, itemError) know the row.
 const asShown = (item) => (item.options ? { ...item, options: choices(item) } : item);
 
-// A multi answer after one box is ticked (on) or unticked: an exclusive row ("I don't know") stands alone; ticking any other row
-// drops it. Single answers are one code. The result always passes the app's itemError exclusion check.
+// A multi answer after one box is ticked (on) or unticked: an exclusive row stands alone ("I don't know", and the instrument's own
+// exclusion options, e.g. CW-Q8 "We don't use it": src/handlers/common.ts renderItems serves flag "exclusion" as exclusive); ticking
+// any other row drops it. Single answers are one code. The result always passes the app's itemError exclusion check.
 export function pick(item, value, code, on) {
   if (item.type !== "multi") return on ? code : value;
   const cur = Array.isArray(value) ? value : [];
@@ -45,6 +46,10 @@ export function pick(item, value, code, on) {
   const ex = new Set(choices(item).filter((o) => o.exclusive).map((o) => o.code));
   return ex.has(code) ? [code] : [...cur.filter((c) => c !== code && !ex.has(c)), code];
 }
+
+// The line under a multi field that holds an exclusive row: the app's own words (UI_EN.exclusionNote), drawn where the v3 page draws
+// it (ui/participate/page.js draw: multi item with an exclusive option); null for any other item, so nothing is drawn.
+export const exclusionNote = (item) => (item.type === "multi" && choices(item).some((o) => o.exclusive) ? UI_EN.exclusionNote : null);
 
 export function welcome(d = DATA) {
   return {

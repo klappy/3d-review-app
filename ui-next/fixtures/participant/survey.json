@@ -1,5 +1,5 @@
 {
- "_source": "Participant lane fixture (UI Next, provisional). items: klappy/3d-review-app migrations/0004_pinned_instruments.sql:12 (tpl_written v2, Community), verbatim. Everything else: the cookbook participant boards (design/2026-10-15-glass-redesign/canvas P*.dc.html).",
+ "_source": "Participant lane fixture (UI Next, provisional). items: klappy/3d-review-app migrations/0004_pinned_instruments.sql:12 (tpl_written v2, Community), verbatim; options keep code and text, plus exclusive where src/handlers/common.ts renderItems serves it (flag \"exclusion\": CW-Q8 none). Everything else: the cookbook participant boards (design/2026-10-15-glass-redesign/canvas P*.dc.html).",
  "survey": {
   "language": "Hindi",
   "passages": [
@@ -227,7 +227,8 @@
      },
      {
       "code": "none",
-      "text": "We don't use it"
+      "text": "We don't use it",
+      "exclusive": true
      }
     ]
    },

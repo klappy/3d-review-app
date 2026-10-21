@@ -12,13 +12,14 @@ import { route } from "../ui-next/src/route.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { REGISTRY, LANES } from "../ui-next/src/screens/registry.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { DATA, welcome, passage, about, aboutLine, question, qParam, review, problem, choices, pick, hasAbout, skipAbout, pickState, surveyLens, lensOf } from "../ui-next/src/screens/participant/data.js";
+import { DATA, welcome, passage, about, aboutLine, question, qParam, review, problem, choices, pick, hasAbout, skipAbout, pickState, surveyLens, lensOf, exclusionNote } from "../ui-next/src/screens/participant/data.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { itemError } from "../ui/participant-view.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { UI_EN, SURVEYOR_EN } from "../ui/participate/i18n.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { lintText } from "../scripts/ui-next-lint.mjs";
+import { renderItems, type TemplateItem } from "../src/handlers/common";
 import PWelcome from "../ui-next/src/screens/participant/PWelcome.svelte";
 import PCode from "../ui-next/src/screens/participant/PCode.svelte";
 import PPassage from "../ui-next/src/screens/participant/PPassage.svelte";
@@ -349,6 +350,67 @@ describe("participant screens: round 3 (validator N2-N4, N6; every screen's unkn
         expect(text(a)).toBe(text(mount(Comp, { phone: true })));
         expect(a.querySelectorAll("h1").length).toBe(1);
       }
+    }
+  });
+});
+
+describe("participant screens: round 4 (validator V3, V5, V6)", () => {
+  const item = (id: string) => DATA.form.items.find((i: { id: string }) => i.id === id);
+  type Opt = { code: string; text: string; exclusive?: boolean };
+  it("V5: the fixture's options are what the app serves the participant (renderItems over migrations/0004 tpl_written v2): CW-Q8 none is exclusive", () => {
+    const line = readFileSync(resolve(__dirname, "../migrations/0004_pinned_instruments.sql"), "utf8").split("\n").find((l) => l.includes("('tpl_written', 2,"))!;
+    const start = line.indexOf("'[{"), end = line.indexOf("]', '", start);
+    const served = renderItems(JSON.parse(line.slice(start + 1, end + 1).replace(/''/g, "'")) as TemplateItem[], "en") as { id: string; options?: Opt[] }[];
+    const ex = (opts: Opt[] = []) => opts.filter((o) => o.exclusive).map((o) => o.code);
+    for (const i of DATA.form.items as { id: string; options?: Opt[] }[]) expect([i.id, ex(i.options)]).toEqual([i.id, ex(served.find((x) => x.id === i.id)!.options)]);
+    expect(item("CW-Q8").options).toEqual(served.find((x) => x.id === "CW-Q8")!.options);
+    expect(ex(item("CW-Q8").options)).toEqual(["none"]);
+  });
+  it("V5: on CW-Q8 \"We don't use it\" stands alone like \"I don't know\", and pick's results pass the app's itemError", () => {
+    const q8 = item("CW-Q8");
+    const shown = { ...q8, options: choices(q8) };
+    expect(pick(q8, ["church", "home"], "none", true)).toEqual(["none"]);
+    expect(pick(q8, ["none"], "church", true)).toEqual(["church"]);
+    expect(pick(q8, ["none"], "dont-know", true)).toEqual(["dont-know"]);
+    expect(pick(q8, ["dont-know"], "none", true)).toEqual(["none"]);
+    for (const v of [["none"], ["church", "home"], ["dont-know"]]) expect(itemError(shown, new URLSearchParams(v.map((c) => ["CW-Q8", c])))).toBeNull();
+    expect(itemError(shown, new URLSearchParams([["CW-Q8", "none"], ["CW-Q8", "church"]]))).toMatch(/cannot be combined/); // what pick never produces
+    const a = mount(PQuestion, { phone: true, q: "8" });
+    const box = (code: string) => a.querySelector(`input.cb[value='${code}']`) as HTMLInputElement;
+    const checked = () => [...a.querySelectorAll("input.cb:checked")].map((b) => (b as HTMLInputElement).value);
+    fireEvent.click(box("church")); flushSync();
+    fireEvent.click(box("none")); flushSync();
+    expect(checked()).toEqual(["none"]);
+    fireEvent.click(box("church")); flushSync();
+    expect(checked()).toEqual(["church"]);
+  });
+  it("V3: a multi field with an exclusive row draws the app's UI_EN.exclusionNote under it, describing each exclusive row; others draw none", () => {
+    for (const [n, ex] of [["2", ["dont-know"]], ["8", ["none", "dont-know"]]] as [string, string[]][]) {
+      const a = mount(PQuestion, { phone: true, q: n });
+      const note = a.querySelector("fieldset.opts > p.small.field-help") as HTMLElement;
+      expect(text(note)).toBe(UI_EN.exclusionNote);
+      expect(note.previousElementSibling?.matches("label.row-opt.answer")).toBe(true); // under the rows, inside the field
+      const described = [...a.querySelectorAll(`input[aria-describedby='${note.id}']`)].map((b) => (b as HTMLInputElement).value);
+      expect(described).toEqual(ex);
+      expect(a.querySelectorAll("h1").length).toBe(1);
+    }
+    for (const n of ["3", "6"]) expect(mount(PQuestion, { phone: true, q: n }).querySelector(".field-help")).toBeNull(); // single, text
+    expect(exclusionNote(item("CW-Q3"))).toBeNull();
+    expect(exclusionNote(item("CW-Q6"))).toBeNull();
+    expect(exclusionNote(item("CW-Q2"))).toBe(UI_EN.exclusionNote);
+  });
+  it("V6: code entry is a GET form; submitting it (Enter in the code box) goes where the bar's link goes; the code is not put in the URL", () => {
+    for (const state of [undefined, "error"]) {
+      const a = mount(PCode, { phone: true, state });
+      const form = a.querySelector("form") as HTMLFormElement;
+      const inp = form.querySelector("input.in.code") as HTMLInputElement;
+      expect(form.method).toBe("get");
+      expect(inp.name).toBe("");
+      expect(form.querySelector("label.lbl[for='p-code']")).not.toBeNull();
+      const link = a.querySelector(".phone-bar a.btn-primary")!.getAttribute("href")!;
+      expect(`?${new URLSearchParams(new FormData(form) as unknown as Record<string, string>)}`).toBe(link);
+      expect(link).toBe(state ? "?ui_next=on&screen=p-code" : "?ui_next=on&screen=p-welcome");
+      expect(form.querySelectorAll("input:not([type=hidden])").length).toBe(1); // one text field: Enter submits it (implicit submission)
     }
   });
 });
