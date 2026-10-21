@@ -249,6 +249,9 @@ describe("rows from cookbook #191 (design-system.md 8.7) already on the markup, 
   it("Explore: applied chips, inline view switch, compact group-by, scrolling table wrapper, trailing menu values; the sheet's menu padding, handle and title", () => {
     const a = mount(Explore, {});
     expect(a.querySelectorAll(".chip[data-on]").length).toBe(4);
+    const grid = a.querySelector(".l-grid[data-tpl=aside-end]")!;
+    expect([...grid.children].map((c) => c.tagName.toLowerCase())).toEqual(["div", "aside"]);
+    expect(grid.querySelector("aside .h3")!.textContent).toBe("Add a filter");
     expect(a.querySelector(".seg[data-inline]")).not.toBeNull();
     expect(a.querySelector(".sel[data-size=compact] select")).not.toBeNull();
     expect(a.querySelector(".l-card .tbl-wrap > table.tbl")).not.toBeNull();

@@ -8,7 +8,7 @@
      Contract gaps (rule 11, cookbook PR canvas-explore-gaps; RESULTS-explore.md): the 1fr/300px table+aside grid, the in-flow menu panel,
      the table row (width, collapsed borders), the selected filter chip, the phone review list row, the sheet geometry and handle,
      the segmented control width. Until they land the screen uses the nearest contract primitive (listed in RESULTS); the rows that
-     change nothing at the current PIN are already on the markup (.chip[data-on], .seg[data-inline], .sel[data-size=compact], .tbl-wrap/.tbl,
+     change nothing at the current PIN are already on the markup (.l-grid[data-tpl=aside-end] (one column until then), .chip[data-on], .seg[data-inline], .sel[data-size=compact], .tbl-wrap/.tbl,
      .mi-end, .sheet[data-pad=menu]/.sheet-handle/.sheet-title, .mi[data-size=lg]) and take effect when a PIN bump brings cookbook #191's rows
      into base.css; the modal sheet geometry and ::backdrop are the collect lane's dialog.glass-hi rows (#190), as its dialogs use them.
      One .btn-primary per page: none on desktop (the board draws none); phone "Open the filters" in the phone-bar. -->
@@ -90,7 +90,7 @@
     {/if}
   {:else}
     <Page gap={5}>
-      <Row split wrap gap={4}>
+      <Row split gap={4}>
         <Stack gap={1}>
           <h1 class="title-page">Explore reviews</h1>
           <p class="small t-15">Every review you can see, as one table. Filter by any cross-section; group or save the view.</p>
@@ -102,6 +102,8 @@
         </Row>
       </Row>
       <Section>
+        <div class="l-grid" data-tpl="aside-end" data-gap="5">
+        <Stack gap={4}>
         <Card gap={3} label="Filters">
           <Row split wrap gap={3}>
             <Row wrap gap={2}>
@@ -134,12 +136,15 @@
             <span class="small">Nothing here identifies a participant.</span>
           </Row>
         </Card>
-      </Section>
-      <Section heading="Add a filter" level={3}>
-        <Card hi gap={1} label="Add a filter">
-          {#each data.addFilter as f}<button class="mi" type="button"><span>{f}</span><span class="small mi-end">Any</span></button>{/each}
-        </Card>
-        <p class="small">Workspace and project are filters like any other. The Workspace and Project pages are the same table with those filters saved.</p>
+        </Stack>
+        <aside class="l-stack" data-gap="3" aria-label="Add a filter">
+          <h3 class="h3">Add a filter</h3>
+          <Card hi gap={1} label="Add a filter">
+            {#each data.addFilter as f}<button class="mi" type="button"><span>{f}</span><span class="small mi-end">Any</span></button>{/each}
+          </Card>
+          <p class="small">Workspace and project are filters like any other. The Workspace and Project pages are the same table with those filters saved.</p>
+        </aside>
+        </div>
       </Section>
     </Page>
   {/if}
