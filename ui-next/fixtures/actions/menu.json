@@ -12,62 +12,52 @@
    "title": "Mark 1–4 draft",
    "stage": "collecting",
    "meta": "18 of 30 responses · open until 31 Oct",
-   "action": "Share the survey",
-   "href": "?ui_next=on&screen=collect&w=phone"
+   "action": "Share the survey"
   },
   {
    "project": "Lao Old Testament",
    "title": "Genesis audio check",
    "stage": "setup",
    "meta": "Step 3 of 5 · Who will participate?",
-   "action": "Continue setup",
-   "href": "?ui_next=on&screen=setup&w=phone"
+   "action": "Continue setup"
   },
   {
    "project": "Hindi New Testament",
    "title": "Luke 1–2 community review",
    "stage": "results",
    "meta": "24 responses · closed 12 Sep",
-   "action": "Read the results",
-   "href": "?ui_next=on&screen=results&w=phone"
+   "action": "Read the results"
   }
  ],
  "completed": 2,
  "items": [
   [
    "people",
-   "BCS · India — switch workspace",
-   "?ui_next=on&screen=workspace&w=phone"
+   "BCS · India — switch workspace"
   ],
   [
    "mail",
-   "Invitations · 1 new",
-   "?ui_next=on&screen=invitations&w=phone"
+   "Invitations · 1 new"
   ],
   [
    "help",
-   "Help and FAQ",
-   "?ui_next=on&screen=help&w=phone"
+   "Help and FAQ"
   ],
   [
    "sparkle",
-   "Why 3D Review exists",
-   "?ui_next=on&screen=about&w=phone"
+   "Why 3D Review exists"
   ],
   [
    "pen",
-   "Send app feedback",
-   "?ui_next=on&screen=feedback&w=phone"
+   "Send app feedback"
   ],
   [
    "people",
-   "Use another account",
-   "?ui_next=on&screen=sign-in&w=phone"
+   "Use another account"
   ],
   [
    "out",
-   "Sign out",
-   "?ui_next=on&screen=sign-in&w=phone"
+   "Sign out"
   ]
  ]
 }

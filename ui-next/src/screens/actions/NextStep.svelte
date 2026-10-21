@@ -1,7 +1,10 @@
 <!-- UI Next (v4) Next step screen (review phase Improve). Status: provisional (playbook rule 12). Mock data: ui-next/fixtures/actions/next-step.json + review.json.
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): NextStep.dc.html (desktop), NextStepPhone.dc.html (phone, ?w=phone).
-     Composed of AppShell > Page > Grid > Card / Stack / Row and the section 2 components (TopBar, PhoneHeader, PhoneBar, Button, Menu, Pill,
-     Tag, Level, LensDot) plus lane parts (ReviewHead, GapBar, Ico); no <style>, no inline style. One .btn-primary per page:
+     Composed of AppShell > Page > Card / Stack / Row and the section 2 components (TopBar, PhoneHeader, PhoneBar, Button, Menu, Pill,
+     Tag, Level, LensDot) plus lane parts (ReviewHead, GapBar, Ico); no <style>, no inline style. Desktop body: the pinned base.css rows the
+     board draws: .l-grid[data-tpl=aside-wide] (work card + 380px aside, top-aligned), the work card .glass-hi.l-card[data-pad=work], the
+     gap rows .row-opt[data-kind=gap] (tick · area · mini barbell · bands apart); the shared Grid/Card do not offer these values yet, so the
+     contract classes are written here. Links: the shared ../href.js href() with this screen's w/theme. One .btn-primary per page:
      desktop "Complete the review" (page head), phone "Complete the review" (phone-bar). Copy is the boards'. -->
 <script>
   import AppShell from "../../AppShell.svelte";
@@ -21,19 +24,18 @@
   import GapBar from "./GapBar.svelte";
   import Ico from "./Ico.svelte";
   import { A } from "./icons.js";
+  import { href } from "../href.js";
+  import { carry } from "./links.js";
   import R from "../../../fixtures/actions/review.json";
   import D from "../../../fixtures/actions/next-step.json";
 
   let { phone = false, theme = "light" } = $props();
-  const PROJECT = "?ui_next=on&screen=project", RESULTS = "?ui_next=on&screen=results", PLAN = "?ui_next=on&screen=action-plan", HOME = "?ui_next=on&screen=home";
-  const menu = R.menu.map((it) => (it.icon ? { ...it, icon: A[it.icon] } : it));
-  const crumbs = [{ label: R.project, href: PROJECT }, { label: R.review.title }];
-  const w = (href) => (phone ? `${href}&w=phone` : href);
-  const links = $derived(Object.fromEntries(Object.entries(R.links).map(([k, v]) => [k, w(v)])));
+  const at = $derived(carry(phone, theme));
+  const crumbs = $derived([{ label: R.project, href: href("project", at) }, { label: R.review.title }]);
 </script>
 
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title={D.phone.title} parent={R.project} back={w(PROJECT)} initials={R.user.initials} menuHref="?ui_next=on&screen=menu&w=phone" />{:else}<TopBar who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Complete the review" href={w(HOME)} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title={D.phone.title} parent={R.project} back={href("project", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<TopBar home={href("home", at)} who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label="Complete the review" href={href("home", at)} />{/if}{/snippet}
 {#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Saved just now{/snippet}
 {#snippet plus()}<Ico d={A.plus} />{/snippet}
 {#snippet check()}<Ico d={A.check} />{/snippet}
@@ -42,7 +44,7 @@
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
-    <ReviewHead phone title={D.phone.title} project={R.project} projectHref={w(PROJECT)} stage={D.phone.stage} viewed="improve" live="improve" {links} menuHref="?ui_next=on&screen=collect-menu&w=phone" />
+    <ReviewHead phone {theme} title={D.phone.title} project={R.project} stage={D.phone.stage} viewed="improve" live="improve" />
     <p class="small">{D.phone.lead}</p>
     {#each D.phone.items as it}
       <Card gap={3} label={it.title}>
@@ -51,17 +53,17 @@
         <Row gap={2}><Button label={it.inPlan ? "In the plan" : "Add to plan"} lead={it.inPlan ? check : plus} block /><Button label="Not this one" variant="quiet" /></Row>
       </Card>
     {/each}
-    <Row wrap gap={2}><Button label="See all results" href={w(RESULTS)} lead={list} block /><Button label="Print or share the plan" href={w(PLAN)} lead={print} block /></Row>
+    <Row wrap gap={2}><Button label="See all results" href={href("results", at)} lead={list} block /><Button label="Print or share the plan" href={href("action-plan", at)} lead={print} block /></Row>
   {:else}
     <Page gap={5}>
-      <ReviewHead title={R.review.title} stage="reviewed" {meta} viewed="improve" live="improve" done={["prepare", "collect", "understand"]} {links} {menu} action={{ label: "Complete the review", variant: "primary", href: HOME, trail: "check" }} />
-      <Grid template="hero-about">
-        <Card hi gap={5} label="What will you talk about?">
-          <div><h2 class="h2">What will you talk about?</h2><p class="small t-15">Suggested from the results. Keep the ones that matter; add your own.</p></div>
+      <ReviewHead {theme} title={R.review.title} stage="reviewed" {meta} viewed="improve" live="improve" done={["prepare", "collect", "understand"]} deleteRefused={R.deleteRefused} action={{ label: "Complete the review", variant: "primary", href: href("home", at), trail: "check" }} />
+      <div class="l-grid" data-tpl="aside-wide" data-gap="5">
+        <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label="What will you talk about?">
+          <div><h2 class="h2 t-24">What will you talk about?</h2><p class="small t-15">Suggested from the results. Keep the ones that matter; add your own.</p></div>
           <Stack gap={2}>
             <Row gap={3}><span class="h3">Where the perspectives disagree</span><span class="small">the three widest gaps</span></Row>
             {#each D.gaps as g}
-              <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" checked={g.checked} /><b>{g.area}</b></span><GapBar pts={g.pts} span={g.span} wide={g.wide} /><strong class="small">{g.apart}</strong></label>
+              <label class="row-opt" data-kind="gap"><input class="cb" type="checkbox" checked={g.checked} /><b>{g.area}</b><GapBar pts={g.pts} span={g.span} wide={g.wide} w="100%" /><strong class="small">{g.apart}</strong></label>
             {/each}
           </Stack>
           <Stack gap={2}>
@@ -81,7 +83,7 @@
             </Stack>
           </Grid>
           <p class="small">Everyone with access to this review can read these notes.</p>
-        </Card>
+        </div>
         <Stack gap={4}>
           <Card gap={3} label="Recommended for this review">
             <Row gap={2}><h2 class="h3">Recommended for this review</h2><span class="small">{D.recs.length}</span></Row>
@@ -98,15 +100,15 @@
           <Card gap={2} label="At a glance">
             <h2 class="h3">At a glance</h2>
             {#each D.glance as [lens, level]}<Row split><span class="small">{LENSES[lens]}</span><Level {level} /></Row>{/each}
-            <a class="link" href={RESULTS}>See all results</a>
+            <a class="link" href={href("results", at)}>See all results</a>
           </Card>
           <Card gap={3} label="Take it out of the room">
             <h2 class="h3">Take it out of the room</h2>
             <p class="small">Print the plan or share a read-only link with people who won't sign in — the same way as the reports.</p>
-            <Row wrap gap={2}><Button label="Print or share the plan" href={PLAN} lead={print} /></Row>
+            <Row wrap gap={2}><Button label="Print or share the plan" href={href("action-plan", at)} lead={print} /></Row>
           </Card>
         </Stack>
-      </Grid>
+      </div>
     </Page>
   {/if}
 </AppShell>

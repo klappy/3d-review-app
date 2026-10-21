@@ -3,8 +3,9 @@
      variant; the shared ../../TopBar.svelte refuses it ("not ported yet"), so this lane-local variant carries it. Desktop only. Status: provisional. -->
 <script>
   import Mark from "../../Mark.svelte";
-  let { title, home = "?ui_next=on&screen=home", children } = $props();
+  let { title, home, children } = $props();
   if (!(typeof title === "string" && title.trim())) throw new TypeError("DocTop: the document title is required");
+  if (!(typeof home === "string" && home)) throw new TypeError("DocTop: home is the brand link (build it with ../href.js)");
 </script>
 
 <header class="top" data-variant="document">

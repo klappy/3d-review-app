@@ -1,5 +1,5 @@
 {
- "_source": "Mock data for the actions lane. Boards: cookbook design/2026-10-15-glass-redesign/canvas NextStep, Print, Share, Sandbox, PaperEntry (+Phone). Status: provisional.",
+ "_source": "Mock data for the actions lane. Boards: cookbook design/2026-10-15-glass-redesign/canvas NextStep, Print, Share, Sandbox, PaperEntry (+Phone). Status: provisional. Links are not data: screens build them with ui-next/src/screens/href.js.",
  "user": {
   "first": "Bincy",
   "initials": "BK"
@@ -13,43 +13,7 @@
   "modality": "Written",
   "responses": 18
  },
- "links": {
-  "prepare": "?ui_next=on&screen=setup5",
-  "collect": "?ui_next=on&screen=collect",
-  "understand": "?ui_next=on&screen=results",
-  "improve": "?ui_next=on&screen=next-step"
- },
- "menu": [
-  {
-   "label": "Edit details and dates",
-   "href": "?ui_next=on&screen=setup1",
-   "icon": "pen"
-  },
-  {
-   "label": "People with access",
-   "href": "?ui_next=on&screen=people",
-   "icon": "people"
-  },
-  {
-   "label": "Close collection now",
-   "href": "?ui_next=on&screen=close-collection",
-   "icon": "lock"
-  },
-  {
-   "label": "Meeting offline? Print and paper",
-   "href": "?ui_next=on&screen=collect#offline",
-   "icon": "print"
-  },
-  {
-   "kind": "hr"
-  },
-  {
-   "label": "Delete this review",
-   "danger": true,
-   "icon": "x",
-   "refused": "Reviews with responses can't be deleted. This one has 18."
-  }
- ],
+ "deleteRefused": "Reviews with responses can't be deleted. This one has 18.",
  "groups": [
   {
    "lens": "team",

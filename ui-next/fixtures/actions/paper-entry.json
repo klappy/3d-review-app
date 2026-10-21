@@ -1,17 +1,104 @@
 {
- "_source": "Mock data for PaperEntry / PaperEntryPhone (cookbook design/2026-10-15-glass-redesign/canvas). Questions reuse review.json paper.questions. Status: provisional.",
+ "_source": "Mock data for PaperEntry / PaperEntryPhone (cookbook design/2026-10-15-glass-redesign/canvas). items: the Written template's first three questions in the shape the current UI renders (migrations/0004_pinned_instruments.sql CW-Q1..Q3 ids and option codes; the write-in option's code is \"other\"; \"I don't know\" is the boards' R33 row). lastReceipt: a server receipt (resp_ id + submitted_at) for ui/present.js receiptLine. Status: provisional.",
  "code": "K7Q 4F2",
  "survey": {
   "lens": "community",
   "name": "Community",
   "line": "· Community survey · 13 questions"
  },
+ "items": [
+  {
+   "id": "CW-Q1",
+   "type": "single",
+   "text": "As a group, how would we describe how easy or difficult this translation is to understand?",
+   "options": [
+    {
+     "code": "very-easy",
+     "text": "Very easy to understand"
+    },
+    {
+     "code": "mostly-easy",
+     "text": "Most of it is easy, but some parts are hard"
+    },
+    {
+     "code": "much-difficult",
+     "text": "Much of it is difficult to understand"
+    },
+    {
+     "code": "cannot",
+     "text": "We cannot understand it"
+    },
+    {
+     "code": "dont-know",
+     "text": "I don't know"
+    }
+   ]
+  },
+  {
+   "id": "CW-Q2",
+   "type": "multi",
+   "text": "Where we find it difficult, what makes it hard?",
+   "options": [
+    {
+     "code": "unfamiliar-words",
+     "text": "Some words are unfamiliar or strange"
+    },
+    {
+     "code": "long-sentences",
+     "text": "Some sentences are too long or complicated"
+    },
+    {
+     "code": "wrong-dialect",
+     "text": "It is not our dialect"
+    },
+    {
+     "code": "unnatural-speech",
+     "text": "It doesn't sound like the way we normally speak"
+    },
+    {
+     "code": "other",
+     "text": "Other (please describe)"
+    },
+    {
+     "code": "dont-know",
+     "text": "I don't know"
+    }
+   ]
+  },
+  {
+   "id": "CW-Q3",
+   "type": "single",
+   "text": "How does this translation sound to us?",
+   "options": [
+    {
+     "code": "natural-beautiful",
+     "text": "It sounds like our language — natural and beautiful"
+    },
+    {
+     "code": "mixed",
+     "text": "Some parts sound good, some parts don't sound that good"
+    },
+    {
+     "code": "not-good",
+     "text": "It does not sound very good. This is not how our language sounds."
+    },
+    {
+     "code": "wrong-dialect",
+     "text": "This is not our dialect"
+    },
+    {
+     "code": "dont-know",
+     "text": "I don't know"
+    }
+   ]
+  }
+ ],
  "answers": {
-  "1": "o1",
-  "2": [
-   "o0"
+  "CW-Q1": "mostly-easy",
+  "CW-Q2": [
+   "unfamiliar-words"
   ],
-  "3": "o1"
+  "CW-Q3": "mixed"
  },
  "more": "… 10 more questions",
  "today": [
@@ -19,12 +106,13 @@
   "Pastor involved in the work · 1 paper"
  ],
  "lastReceipt": {
-  "response_id": "R-2048-732"
+  "response_id": "resp_r2048732e9c41a0",
+  "submitted_at": "2026-10-21T10:42:00"
  },
  "phone": {
   "progress": "Paper · Community · sheet 7 · question 1 of 13",
   "pct": 8,
   "question": 1,
-  "answer": "o1"
+  "answer": "mostly-easy"
  }
 }

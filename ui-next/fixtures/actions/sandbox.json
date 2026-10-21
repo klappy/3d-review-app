@@ -21,26 +21,5 @@
  ],
  "simulated": 0,
  "expected": 30,
- "menu": [
-  {
-   "label": "Share the practice survey",
-   "href": "?ui_next=on&screen=share",
-   "icon": "qr"
-  },
-  {
-   "label": "Clear simulated responses",
-   "href": "?ui_next=on&screen=results",
-   "icon": "refresh"
-  },
-  {
-   "kind": "hr"
-  },
-  {
-   "label": "Delete this practice copy",
-   "href": "?ui_next=on&screen=home",
-   "icon": "x",
-   "danger": true
-  }
- ],
  "preview": "Practice print · Community, in Hindi · A4 · 3 pages"
 }

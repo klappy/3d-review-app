@@ -1,9 +1,12 @@
 <!-- UI Next (v4) Enter a paper answer screen (review phase Collect). Status: provisional (playbook rule 12).
-     Mock data: ui-next/fixtures/actions/paper-entry.json + review.json (paper.questions). Boards (cookbook design/2026-10-15-glass-redesign/canvas):
+     Mock data: ui-next/fixtures/actions/paper-entry.json (items: the Written template's CW-Q1..Q3 in the shape the current UI renders,
+     real option codes, the write-in option's code "other") + review.json. Boards (cookbook design/2026-10-15-glass-redesign/canvas):
      PaperEntry.dc.html (desktop), PaperEntryPhone.dc.html (phone, ?w=phone). Options are §2 option rows (.row-opt with .rd / .cb, R10).
-     Wiring through the current UI's pure presentation module (ui/present.js): isOtherOption marks the write-in choice ("Other (please
-     describe)" carries other: true) and receiptLine formats the last receipt the same way the participant receipt does. Saving answers
-     (POST of a paper response) is not wired: debt in RESULTS-actions. One .btn-primary: "Save and enter the next paper" (desktop form;
+     Wiring through the current UI's pure presentation module (ui/present.js): isOtherOption finds the write-in choice by its code, and
+     receiptLine formats the last receipt (a resp_ id with submitted_at) the same way the participant receipt does. Saving answers (POST of
+     a paper response) and code lookup are not wired: debt in RESULTS-actions. Desktop body: the pinned .l-grid[data-tpl=aside] (work card
+     + 340px aside, top-aligned) and the work card .glass-hi.l-card[data-pad=work]. Phone: the question is the page's h1 (the header title
+     is a span). Links: ../href.js href() with this screen's w/theme. One .btn-primary: "Save and enter the next paper" (desktop form;
      the head's "Share the survey" is secondary as on the board), phone "Next question" (phone-bar). -->
 <script>
   import AppShell from "../../AppShell.svelte";
@@ -21,33 +24,31 @@
   import Bar from "./Bar.svelte";
   import Ico from "./Ico.svelte";
   import { A } from "./icons.js";
+  import { href } from "../href.js";
+  import { carry } from "./links.js";
   import { isOtherOption, receiptLine } from "../../../../ui/present.js";
   import R from "../../../fixtures/actions/review.json";
   import D from "../../../fixtures/actions/paper-entry.json";
 
   let { phone = false, theme = "light" } = $props();
-  const PROJECT = "?ui_next=on&screen=project", COLLECT = "?ui_next=on&screen=collect", SHARE = "?ui_next=on&screen=share", SELF = "?ui_next=on&screen=paper-entry";
-  const w = (href) => (phone ? `${href}&w=phone` : href);
-  const links = $derived(Object.fromEntries(Object.entries(R.links).map(([k, v]) => [k, w(v)])));
-  const menu = R.menu.map((it) => (it.icon ? { ...it, icon: A[it.icon] } : it));
-  const crumbs = [{ label: R.project, href: PROJECT }, { label: R.review.title }];
-  // Survey items in the shape the current UI renders ({ id, type, text, options: [{ code, text, other? }] }).
-  const items = R.paper.questions.map((q) => ({ id: String(q.n), type: q.type, text: q.text, options: q.options.map((t, i) => ({ code: `o${i}`, text: t, other: t.startsWith("Other (") || undefined })) }));
+  const at = $derived(carry(phone, theme));
+  const crumbs = $derived([{ label: R.project, href: href("project", at) }, { label: R.review.title }]);
+  const items = D.items;
   const picked = (item, code) => { const v = D.answers[item.id]; return Array.isArray(v) ? v.includes(code) : v === code; };
   const pq = $derived(items[D.phone.question - 1]);
 </script>
 
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Enter paper answers" parent="Collect" back={w(COLLECT)} initials={R.user.initials} menuHref="?ui_next=on&screen=menu&w=phone" />{:else}<TopBar who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Next question" href={w(SELF)} backHref={w(SELF)} backLabel="Back" />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Enter paper answers" parent="Collect" back={href("collect", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<TopBar home={href("home", at)} who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label="Next question" href={href("paper-entry", at)} backHref={href("paper-entry", at)} backLabel="Back" />{/if}{/snippet}
 {#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Updated just now{/snippet}
 {#snippet arrow()}<Ico d={A.arrow} />{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
-    <Row split gap={2}><span class="micro">{D.phone.progress}</span><a class="link micro" href={w(COLLECT)}>Discard</a></Row>
+    <Row split gap={2}><span class="micro">{D.phone.progress}</span><a class="link micro" href={href("collect", at)}>Discard</a></Row>
     <Bar pct={D.phone.pct} lens={D.survey.lens} label={`Question ${D.phone.question} of 13`} />
     <Card hi pad="hero" gap={3} label={`Question ${D.phone.question}`}>
-      <h2 class="h2">{pq.text}</h2>
+      <h1 class="h2">{pq.text}</h1>
       <Stack gap={2}>
         {#each pq.options as o}<label class="row-opt"><input class="rd" type="radio" name="pq" checked={o.code === D.phone.answer} /><b>{o.text}</b></label>{/each}
       </Stack>
@@ -55,26 +56,26 @@
     </Card>
   {:else}
     <Page gap={5}>
-      <ReviewHead title={R.review.title} stage="collecting" {meta} viewed="collect" live="collect" done={["prepare"]} {links} {menu} action={{ label: "Share the survey", href: SHARE, lead: "qr" }} />
-      <Grid cols={2} gap={5}>
-        <Card hi gap={5} label="Enter a paper answer">
-          <div><h2 class="h2">Enter a paper answer</h2><p class="small t-15">Type the code from the top of the paper, or pick the survey. Enter the answers exactly as written — you are the participant's hands here.</p></div>
+      <ReviewHead {theme} title={R.review.title} stage="collecting" {meta} viewed="collect" live="collect" done={["prepare"]} deleteRefused={R.deleteRefused} action={{ label: "Share the survey", href: href("share", at), lead: "qr" }} />
+      <div class="l-grid" data-tpl="aside" data-gap="5">
+        <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label="Enter a paper answer">
+          <div><h2 class="h2 t-24">Enter a paper answer</h2><p class="small t-15">Type the code from the top of the paper, or pick the survey. Enter the answers exactly as written — you are the participant's hands here.</p></div>
           <Stack gap={3}>
             <div><label class="lbl" for="pe-code">Code on the paper</label><input class="in kbd" value={D.code} id="pe-code" /></div>
             <div class="solid l-card l-row" data-gap="3"><LensDot lens={D.survey.lens} decorative /><b>{D.survey.name}</b><span class="small">{D.survey.line}</span></div>
           </Stack>
           <hr class="hr" />
-          {#each items as it}
+          {#each items as it, i}
             <fieldset class="opts">
-              <legend class="h3">{it.id}. {it.text}</legend>
+              <legend class="h3">{i + 1}. {it.text}</legend>
               <Grid cols={2} gap={2}>
                 {#each it.options as o}<label class="row-opt"><input class={it.type === "multi" ? "cb" : "rd"} type={it.type === "multi" ? "checkbox" : "radio"} name={`q${it.id}`} checked={picked(it, o.code)} data-other={isOtherOption(o) ? "" : undefined} /><span>{o.text}</span></label>{/each}
               </Grid>
             </fieldset>
           {/each}
           <p class="small">{D.more}</p>
-          <Row split wrap gap={3}><span class="small">Left blank on paper? Leave it blank here.</span><Row gap={2}><Button label="Discard" variant="quiet" href={COLLECT} /><Button label="Save and enter the next paper" variant="primary" lg href={SELF} trail={arrow} /></Row></Row>
-        </Card>
+          <Row split wrap gap={3}><span class="small">Left blank on paper? Leave it blank here.</span><Row gap={2}><Button label="Discard" variant="quiet" href={href("collect", at)} /><Button label="Save and enter the next paper" variant="primary" lg href={href("paper-entry", at)} trail={arrow} /></Row></Row>
+        </div>
         <Stack gap={4}>
           <Card gap={3} label="Entered today">
             <h2 class="h3">Entered today</h2>
@@ -84,7 +85,7 @@
             <p class="kbd small">Last receipt · {receiptLine(D.lastReceipt)}</p>
           </Card>
         </Stack>
-      </Grid>
+      </div>
     </Page>
   {/if}
 </AppShell>
