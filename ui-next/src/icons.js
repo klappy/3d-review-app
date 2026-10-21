@@ -20,7 +20,7 @@ export const ACCOUNT_ITEMS = Object.freeze([
   { kind: "hr" },
   { label: "Invitations", href: "#invitations", icon: I.mail, tag: "1 new" },
   { label: "Help and FAQ", href: "#help", icon: I.help },
-  { label: "Why 3D Review exists", href: "#about", icon: I.sparkle },
+  { label: "Why 3D Review exists", href: "?screen=about", icon: I.sparkle },
   { label: "Send app feedback", href: "#feedback", icon: I.pen },
   { kind: "hr" },
   { label: "Use another account", href: "#main", icon: I.people },

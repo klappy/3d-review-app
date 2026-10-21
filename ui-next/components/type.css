@@ -1,12 +1,13 @@
 /* UI Next (v4) screen type + app ground. Status: provisional. Paints only from ui-next/tokens.css.
    Values: cookbook design/2026-10-15-glass-redesign/generator/helmet.html .app (line 7), .display (28), .h2 (30), .h3 (31), .small (32), .num (34);
-   generator/gen.py EXTRA .title-page / .title-phone (lines 49-50). px font sizes become --t-* (ui-next lint). .micro lives in topbar.css. */
+   helmet.html .h1 (29) for About/Landing; generator/gen.py EXTRA .title-page / .title-phone (lines 49-50). px font sizes become --t-* (ui-next lint). .micro lives in topbar.css. */
 .app{background:var(--ground);color:var(--ink);font-family:'Figtree',ui-sans-serif,system-ui,-apple-system,'Segoe UI','Noto Sans',sans-serif;font-size:var(--t-16);line-height:1.5;-webkit-font-smoothing:antialiased}
 .app.l-screen{min-height:100vh}
 .title-page{font-family:'Newsreader',ui-serif,Georgia,serif;font-weight:450;font-size:var(--t-40);line-height:46px;letter-spacing:-.008em;margin:0;text-wrap:balance}
 .title-phone{font-family:'Newsreader',ui-serif,Georgia,serif;font-weight:450;font-size:var(--t-30);line-height:34px;letter-spacing:-.008em;margin:0;text-wrap:balance}
 .display{font-family:'Newsreader',ui-serif,Georgia,'Noto Serif',serif;font-weight:400;font-size:var(--t-56);line-height:60px;letter-spacing:-.012em;margin:0;text-wrap:balance}
 .app[data-w=phone] .display{font-size:var(--t-36);line-height:40px}
+.h1{font-family:'Newsreader',ui-serif,Georgia,'Noto Serif',serif;font-weight:450;font-size:var(--t-30);line-height:36px;letter-spacing:-.008em;margin:0;text-wrap:balance}
 .h2{font-size:var(--t-20);line-height:28px;font-weight:650;letter-spacing:-.006em;margin:0;text-wrap:balance}
 .h3{font-size:var(--t-16);line-height:24px;font-weight:650;margin:0}
 .small{font-size:var(--t-14);line-height:20px;color:var(--ink-2);margin:0}

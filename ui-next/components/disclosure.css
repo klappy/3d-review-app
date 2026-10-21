@@ -1,0 +1,12 @@
+/* UI Next (v4) Disclosure. Status: provisional. Paints only from ui-next/tokens.css.
+   Contract: cookbook design/2026-10-15-glass-redesign/canvas/design-system.md "Disclosure, menu roles and the refused item" (V-12):
+   details.disc > summary.disc-sum (>=48px, full width, --ink 600, chevron at the end rotating 180deg on [open], 200ms, off under reduced motion) + .disc-body under a --line rule. */
+.app details.disc{border-radius:var(--radius-l);padding:0 var(--sp-5)}
+.app[data-w=phone] details.disc{padding:0 var(--sp-4)}
+.app details.disc>summary.disc-sum{list-style:none;cursor:pointer;width:100%;min-height:56px;display:flex;align-items:center;gap:var(--sp-3);color:var(--ink);font-weight:600}
+.app details.disc>summary.disc-sum::-webkit-details-marker{display:none}
+.app .disc-chev{margin-left:auto;display:inline-grid;color:var(--ink-2);transition:transform 200ms}
+.app details.disc[open] .disc-chev{transform:rotate(180deg)}
+.app .disc-body{border-top:1px solid var(--line);padding:var(--sp-4) 0 var(--sp-5)}
+.app .disc-body ol{margin:0;padding-left:var(--sp-5)}
+@media (prefers-reduced-motion: reduce){.app .disc-chev{transition:none}}
