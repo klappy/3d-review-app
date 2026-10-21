@@ -11,5 +11,6 @@ import Share from "./Share.svelte";
 import Print from "./Print.svelte";
 import Sandbox from "./Sandbox.svelte";
 import PaperEntry from "./PaperEntry.svelte";
+import MenuSheet from "./MenuSheet.svelte";
 
-export default { "next-step": NextStep, "action-plan": ActionPlan, share: Share, print: Print, sandbox: Sandbox, "paper-entry": PaperEntry };
+export default { "next-step": NextStep, "action-plan": ActionPlan, share: Share, print: Print, sandbox: Sandbox, "paper-entry": PaperEntry, menu: MenuSheet };
