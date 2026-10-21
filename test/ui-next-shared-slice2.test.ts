@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render } from "@testing-library/svelte";
-import HomeParts from "../ui-next/src/HomeParts.svelte";
 import Home from "../ui-next/src/screens/Home.svelte";
 import About from "../ui-next/src/screens/About.svelte";
 import Landing from "../ui-next/src/screens/Landing.svelte";
@@ -17,14 +16,13 @@ const noComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
 /** Every [selector, declarations] pair of a flat stylesheet (rules inside @media included). */
 const rules = (css: string) => [...noComments(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => [m[1].trim(), m[2]] as const).filter(([s]) => !s.startsWith("@"));
 
-describe("B2. the phone bar is pinned to the viewport foot on every phone screen (section 9 phone-bar; participant N1, explore R3-2, setup DL-8)", () => {
-  const pin = rules(read("components/phone.css")).filter(([, d]) => /position:\s*fixed/.test(d));
-  it("phone.css has exactly one fixed rule, scoped to a phone screen shell's .phone-bar", () => {
-    expect(pin.map(([s]) => s)).toEqual([".app.l-screen[data-w=phone] .phone-bar"]);
-    // the helmet keeps the board's absolute bar (left/right/bottom 0 still apply to the fixed bar) and .l-phone pads 120 under the content
-    const base = noComments(read("components/base.css"));
-    expect(base).toContain(".phone-bar{position:absolute;left:0;right:0;bottom:0;");
-    expect(base).toContain(".l-phone{padding:var(--sp-3) var(--gutter) 120px;");
+describe("B2. the phone bar stays in the thumb zone on every phone screen (section 9 phone-bar; participant N1, explore R3-2, setup DL-8)", () => {
+  // The position rule is main's (638275c: phone.css .phone-bar sticky + .app.l-screen overflow clip, asserted in
+  // test/ui-next-about-landing.test.ts); slice 2's position:fixed rule was dropped in the main sync. Sticky bottom:0 holds the bar
+  // at the viewport foot only while it is the last in-flow child after the scrolling content, so the shell structure is pinned here.
+  it("phone.css carries no position:fixed rule (main's sticky bar is the one live rule)", () => {
+    expect(rules(read("components/phone.css")).filter(([, d]) => /position:\s*fixed/.test(d))).toEqual([]);
+    expect(rules(read("components/phone.css")).filter(([, d]) => /position:\s*sticky/.test(d)).map(([s]) => s)).toEqual([".phone-bar"]);
     const main = read("src/main.js");
     expect(main.indexOf(`"../components/phone.css"`)).toBeGreaterThan(main.indexOf(`"../components/base.css"`));
   });
@@ -34,7 +32,7 @@ describe("B2. the phone bar is pinned to the viewport foot on every phone screen
     ["Home reviews phone", () => render(Home, { props: { phone: true, state: "reviews" } })],
     ["About phone", () => render(About, { props: { phone: true } })],
   ];
-  it("each phone screen renders .app.l-screen[data-w=phone] > .layer.l-shell > main.l-phone + one .phone-bar, and the pin matches it", () => {
+  it("each phone screen renders .app.l-screen[data-w=phone] > .layer.l-shell > main.l-phone + one .phone-bar, the bar last", () => {
     for (const [name, mount] of SCREENS) {
       mount();
       const bars = document.querySelectorAll(".phone-bar");
@@ -42,21 +40,17 @@ describe("B2. the phone bar is pinned to the viewport foot on every phone screen
       const bar = bars[0];
       expect(bar.parentElement!.matches(".app.l-screen[data-w=phone] > .layer.l-shell"), name).toBe(true);
       expect(bar.previousElementSibling!.matches("main.l-page.l-phone"), name).toBe(true);
-      expect(bar.matches(pin[0][0]), name).toBe(true);
+      expect(bar.nextElementSibling, name).toBeNull();
       expect(bar.querySelectorAll(".btn-primary").length, name).toBe(1);
       document.body.innerHTML = "";
     }
   });
-  it("desktop screens and the gallery's phone-bar frames are not pinned", () => {
+  it("desktop screens render no phone bar", () => {
     for (const C of [Landing, Home, About]) {
       render(C, {});
-      expect(document.querySelectorAll(pin[0][0]).length).toBe(0);
+      expect(document.querySelectorAll(".phone-bar").length).toBe(0);
       document.body.innerHTML = "";
     }
-    render(HomeParts, { props: { phone: true } });
-    expect(document.querySelectorAll(".phone-bar").length).toBeGreaterThan(0);
-    expect(document.querySelectorAll(pin[0][0]).length).toBe(0);
-    document.body.innerHTML = "";
   });
 });
 
