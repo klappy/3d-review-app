@@ -8,6 +8,7 @@
 <script>
   import AppShell from "../AppShell.svelte";
   import Page from "../Page.svelte";
+  import Mark from "../Mark.svelte";
   import Section from "../Section.svelte";
   import Card from "../Card.svelte";
   import Stack from "../Stack.svelte";
@@ -58,12 +59,17 @@
       <Button label="Back to home" variant="quiet" href={HOME} block />
     </Stack>
   {:else}
-    <Page width="narrow" gap={6}>
+    <Page gap={6}>
       <Section>
+        <Grid template="hero-about">
+        <Stack gap={5}>
         <span class="micro">Why 3D Review exists</span>
         <h1 class="display">How can we know that it's good enough?</h1>
         <p>{C02}</p>
         <p class="small">Project leaders ask it throughout a translation. Teams using emerging approaches need a way to evaluate their work; partners supporting them need visibility into its impact. 3D Review was built to answer both — not with a single pass/fail check, but with short surveys from three points of view, kept distinct so field realities show up against goals and expectations.</p>
+        </Stack>
+        <Mark size={300} />
+        </Grid>
       </Section>
       <Section>
         <h2 class="h1">Three facets of one stone</h2>

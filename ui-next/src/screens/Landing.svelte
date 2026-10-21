@@ -10,6 +10,7 @@
   import Section from "../Section.svelte";
   import Card from "../Card.svelte";
   import Icon from "../Icon.svelte";
+  import Mark from "../Mark.svelte";
   import { I } from "../icons.js";
   import Stack from "../Stack.svelte";
   import Row from "../Row.svelte";
@@ -49,11 +50,14 @@
 </script>
 
 {#snippet top()}{#if phone}<PhoneHeader state="public" home={SELF} />{:else}<TopBar variant="public" home={SELF} />{/if}{/snippet}
+{#snippet trail()}<Icon d={I.arrow} />{/snippet}
+{#snippet lead()}<Icon d={I.play} />{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Try the sample review" href={SAMPLE} />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <Card hi gap={3}>
+      <Mark size={44} />
       <h1 class="title-phone">{C01}</h1>
       <p class="small">{C02}</p>
       <a class="link" href={VIDEO}>Watch how it works · 2 min</a>
@@ -67,11 +71,11 @@
   {:else}
     <Page gap={7}>
       <Section>
-        <Grid cols={2} gap={6}>
+        <Grid template="hero-landing">
           <Stack gap={4}>
             <h1 class="display">{C01}</h1>
             <p class="small">{C02}</p>
-            <Row wrap gap={3}><Button label="Try the sample review" variant="primary" lg href={SAMPLE} /><Button label="Watch how it works · 2 min" lg href={VIDEO} /></Row>
+            <Row wrap gap={3}><Button label="Try the sample review" variant="primary" lg href={SAMPLE} {trail} /><Button label="Watch how it works · 2 min" lg href={VIDEO} {lead} /></Row>
             <p class="micro">No account needed to explore the sample. Facilitators sign in with an email link.</p>
           </Stack>
           <Card gap={2} label="Intro video">

@@ -18,6 +18,8 @@ EXTRA = """
 .l-stack{display:flex;flex-direction:column;gap:var(--g)}
 .l-row{display:flex;align-items:center;gap:var(--g)}
 .l-grid{display:grid;gap:var(--g)}
+/* §8 Grid named hero templates (auggie-next-comp-2115, provisional): two-track hero, 64px track gap, centred */
+.l-grid[data-tpl=hero-landing]{grid-template-columns:1fr 440px;gap:64px;align-items:center}.l-grid[data-tpl=hero-about]{grid-template-columns:1fr 380px;gap:64px;align-items:center}
 [data-gap="1"]{--g:var(--sp-1)}[data-gap="2"]{--g:var(--sp-2)}[data-gap="3"]{--g:var(--sp-3)}[data-gap="4"]{--g:var(--sp-4)}[data-gap="5"]{--g:var(--sp-5)}[data-gap="6"]{--g:var(--sp-6)}[data-gap="7"]{--g:var(--sp-7)}
 details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}details.dd>summary::-webkit-details-marker{display:none}
 .menu{position:absolute;right:0;top:52px;width:300px;border-radius: var(--radius-l);padding:8px;display:flex;flex-direction:column;gap:2px;z-index:5}
