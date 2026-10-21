@@ -2,8 +2,8 @@
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): PrintQR.dc.html (wide dialog over the review's survey groups: which surveys,
      layout, text language, paper size, Cancel + Print, and the scaled A4 preview), PrintQRPhone.dc.html (adapted page, then the OS print
      sheet: "Dialog and sheet states" phone map, Print → hand-off). Contracts: §2 Option row (R10, .row-opt.compact), Field and button
-     states (R16: a control that cannot act is disabled and says why), Paper (R5: the preview is the 794px A4 sheet, .paper[data-sheet=a4],
-     scaled down, here by the SVG viewBox so no inline transform is needed), §1.3 paper scope, R14 (title row with Close; focus opens on the title, tabindex -1; Close,
+     states (R16: a control that cannot act is disabled and says why), Paper (R5) on the section 2 Paper preview row (V-20, CORRECTIONS 31):
+     .psheet[data-fit=a4|letter] fills the 340px aside and scales the whole 794px A4 or 816px Letter sheet to it in CSS (no script, no inline transform; it replaces the SVG viewBox stand-in), following the Paper size choice, §1.3 paper scope, R14 (title row with Close; focus opens on the title, tabindex -1; Close,
      Escape and the backdrop go back to Collect).
      Title block as the board draws it: the title with its intro line under it (the dialog's aria-describedby), Close at the block's top,
      so the form fits the 1280x800 modal with its bottom padding (no inner scroll at that size).
@@ -12,8 +12,8 @@
      the data no longer has the chosen one (model.js pickLayout). "Print N pages", each layout's page count, the preview caption and the
      preview follow the ticks and the layout: the preview draws the first page of the chosen layout (one page per survey: the first
      ticked survey's full-page code; hand-out cards: that survey's cards; all on one page: every ticked code) with its "1 of N" footer.
-     The text language and the paper size are held but not drawn: the scan line has one (English) source and there is no Letter sheet row
-     (RESULTS-collect.md Round 3, handed back). Nothing ticked: Print is disabled and the reason shows in the action row, start-aligned
+     The text language is held but not drawn: the scan line has one (English) source (RESULTS-collect.md Round 3, handed back); the paper size
+     picks the preview's sheet (A4 or Letter). Nothing ticked: Print is disabled and the reason shows in the action row, start-aligned
      beside Cancel and Print (a polite status kept in the row, so saying why adds no line and the form still fits the 1280x800 modal);
      the disabled Print names it with aria-describedby, the phone status is always mounted too (N1), and the preview column says
      what fills it instead of standing blank (N3, VALIDATION-collect-r4.md).
@@ -48,6 +48,8 @@
   const cells = $derived(!first || lay.per === "survey" ? [] : lay.per === "one" ? chosen : Array.from({ length: lay.cards }, () => first));
   const WHY = "Tick at least one survey to print its page.";
   const EMPTY = "Tick a survey to preview its page here.";
+  // The preview takes the chosen paper size: the section 2 Paper preview row scales the 794px A4 or 816px Letter sheet to its column.
+  const fit = $derived(paper === "Letter" ? "letter" : "a4");
 </script>
 
 {#snippet print()}<Glyph name="print" />{/snippet}
@@ -55,7 +57,8 @@
 {#snippet phoneBar()}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Cancel" variant="quiet" href={href("collect")} />{#if n}<Button label={`Print ${pagesLabel(n)}`} variant="primary" lg href={href("collect")} lead={print} />{:else}<Button label="Print" variant="primary" lg disabled ariaDescribedby="print-qr-why" lead={print} />{/if}</div>{/snippet}
 {#snippet title()}
   <div>
-    <!-- The title sits in a row so its focus ring hugs the words, not the block's width. -->
+    <!-- The title sits in a row so its box hugs the words. Focused by script on open (R14, tabindex -1), it draws no ring:
+         type.css drops the outline on a script-focused heading (VALIDATION-integration N2); every control keeps the kit's ring. -->
     <div class="l-row">
       <!-- svelte-ignore a11y_autofocus -->
       <h2 class="h2 t-24" id="print-qr-title" tabindex="-1" autofocus>Print QR code pages</h2>
@@ -108,8 +111,8 @@
         <div class="l-stack" data-gap="3" data-align="center">
           <span class="micro">Preview · {lay.title.toLowerCase()} · {paper} · {pagesLabel(n)}</span>
           {#if first}
-            <svg class="psheet" width="300" viewBox="0 0 794 1123" aria-hidden="true" data-layout={lay.per}><foreignObject width="794" height="1123">
-              <div class="paper" data-sheet="a4">
+            <div class="psheet" data-fit={fit} aria-hidden="true" data-layout={lay.per}>
+              <div class="paper">
                 {#if lay.per === "survey"}
                   <div class="l-stack" data-gap="5" data-align="center">
                     <span class="t-16">3D Review · {m.review.title}</span>
@@ -126,7 +129,7 @@
                 {/if}
                 <div class="pfoot"><span>1 of {n}</span></div>
               </div>
-            </foreignObject></svg>
+            </div>
           {:else}
             <!-- N3: nothing ticked draws no sheet; one line says what fills the column (no board draws this state). -->
             <p class="small" id="print-qr-empty">{EMPTY}</p>
