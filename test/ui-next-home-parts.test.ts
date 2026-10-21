@@ -177,6 +177,36 @@ describe("PhoneBar", () => {
     expect(first(PhoneBar, { label: "Start a 3D Review", lead: "plus" }).querySelectorAll(".btn").length).toBe(1);
     expect(() => r(PhoneBar, {})).toThrow();
   });
+  it("disabled: the primary is a native disabled button (no link), tied to its reason by aria-describedby (actions R4-2)", () => {
+    const b = first(PhoneBar, { label: "Print surveys", href: "#print", disabled: true, ariaDescribedby: "why" });
+    const p = b.querySelector(".btn-primary") as HTMLButtonElement;
+    expect(p.tagName).toBe("BUTTON");
+    expect(p.disabled).toBe(true);
+    expect(p.getAttribute("aria-describedby")).toBe("why");
+    expect(b.querySelector("a")).toBeNull();
+    const on = first(PhoneBar, { label: "Print surveys", href: "#print", ariaDescribedby: "why" }).querySelector(".btn-primary") as HTMLAnchorElement;
+    expect(on.tagName).toBe("A");
+    expect(on.getAttribute("href")).toBe("#print");
+    expect(on.getAttribute("aria-describedby")).toBe("why");
+    expect(first(PhoneBar, { label: "Next", href: "#n" }).querySelector("[aria-describedby], [disabled]")).toBeNull();
+    const back = first(PhoneBar, { label: "Next", backHref: "#b", href: "#n", disabled: true });
+    expect((back.querySelector(".btn-quiet") as HTMLAnchorElement).getAttribute("href")).toBe("#b");
+    expect(() => r(PhoneBar, { label: "Next", disabled: "yes" })).toThrow();
+    expect(() => r(PhoneBar, { label: "Next", ariaDescribedby: "#why" })).toThrow();
+  });
+  it("demoted: no primary in the bar while a dialog or sheet holds it; the action stays a block secondary (people C6)", () => {
+    const b = first(PhoneBar, { label: "New project", lead: "plus", href: "#setup", demoted: true });
+    expect([...b.classList]).toEqual(["glass", "phone-bar"]);
+    expect(b.getAttribute("role")).toBe("group");
+    expect(b.querySelector(".btn-primary")).toBeNull();
+    const a = b.querySelector("a.btn") as HTMLAnchorElement;
+    expect(a.className).toBe("btn btn-lg btn-block");
+    expect(a.getAttribute("href")).toBe("#setup");
+    expect(a.textContent).toBe("New project");
+    expect(a.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect([...first(PhoneBar, { label: "Next", backHref: "#b", href: "#n", demoted: true }).querySelectorAll(".btn")].map((x) => x.className)).toEqual(["btn btn-quiet", "btn btn-lg btn-block"]);
+    expect(() => r(PhoneBar, { label: "Next", demoted: 1 })).toThrow();
+  });
 });
 
 describe("?page=home states page", () => {
@@ -192,7 +222,10 @@ describe("?page=home states page", () => {
       expect([...s.querySelectorAll("[data-imagery]")].map((e) => e.getAttribute("data-imagery"))).toEqual(SKINS);
       expect(s.querySelectorAll(".lvl").length).toBe(20);
       expect([...s.querySelectorAll(".phone-top")].map((h) => h.getAttribute("data-state"))).toEqual(HEADER_STATES);
-      expect(s.querySelectorAll(".phone-bar").length).toBe(2);
+      expect(s.querySelectorAll(".phone-bar").length).toBe(4);
+      const off = s.querySelector(".phone-bar button.btn-primary[disabled]") as HTMLElement;
+      expect(s.querySelector(`#${off.getAttribute("aria-describedby")}`)?.textContent).toContain("nothing ticked");
+      expect(s.querySelectorAll(".phone-bar .btn-block:not(.btn-primary)").length).toBe(1);
     }
     expect(c.querySelector("[style]")).toBeNull();
     expect(c.querySelector("[role=menu]")).toBeNull();
