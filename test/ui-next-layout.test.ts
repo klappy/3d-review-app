@@ -74,6 +74,9 @@ describe("primitives render the literal contract classes", () => {
   it("Card refuses width, style and margin (the parent sets width; the parent gap spaces it)", () => {
     for (const k of ["width", "style", "margin"]) expect(() => render(Card, { [k]: "1px" })).toThrow(/Card: no/);
     expect(render(Card, { hi: true }).container.firstElementChild!.className).toBe("glass-hi l-card l-stack");
+    expect(render(Card, { lens: "church" }).container.firstElementChild!.getAttribute("data-lens")).toBe("church");
+    expect(render(Card, {}).container.firstElementChild!.hasAttribute("data-lens")).toBe(false);
+    expect(() => render(Card, { lens: "red" })).toThrow(/Card: lens/);
   });
 });
 

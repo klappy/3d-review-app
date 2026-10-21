@@ -72,6 +72,9 @@ describe("About renders as the boards draw it", () => {
     expect(a.querySelector("header.top[data-variant=signed-in]")).not.toBeNull();
     expect(text(a.querySelector("h1.display")!)).toBe("How can we know that it's good enough?");
     expect(a.querySelectorAll(".l-grid[data-cols='3'] > .l-card").length).toBe(3);
+    // §2 Perspective card (cookbook @8d741b2): data-lens sits on the card, not on its heading
+    expect([...a.querySelectorAll(".l-grid[data-cols='3'] > .l-card")].map((c) => c.getAttribute("data-lens"))).toEqual(["team", "community", "church"]);
+    expect(a.querySelectorAll(".l-grid[data-cols='3'] .l-card [data-lens]").length).toBe(0);
     const p = mount(About, { phone: true });
     expect(p.querySelector(".phone-top[data-state=nested] .phone-title")!.textContent).toBe("About");
     expect(text(p.querySelector("h1.title-phone")!)).toBe("Why 3D Review exists");

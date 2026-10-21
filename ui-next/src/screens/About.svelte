@@ -70,7 +70,7 @@
         <p class="small">Think of a gemstone. Each facet offers a different perspective but is only part of the whole; turning the stone throws new light, and the differences between facets are what give you the complete view.</p>
         <Grid cols={3} gap={4}>
           {#each FACETS as [lens, name, asks]}
-            <Card gap={2} label={name}><span class="h2" data-lens={lens}>{name}</span><p class="small">{CAPS[lens]}</p><p class="micro">Asks about: {asks}</p></Card>
+            <Card gap={2} label={name} {lens}><span class="h2">{name}</span><p class="small">{CAPS[lens]}</p><p class="micro">Asks about: {asks}</p></Card>
           {/each}
         </Grid>
       </Section>

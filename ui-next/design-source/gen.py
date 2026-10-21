@@ -2,6 +2,8 @@ import json, os, html, re
 HELMET = open(os.path.join(os.path.dirname(__file__), 'helmet.html')).read()
 # extra rules shared by the new boards, appended inside the helmet
 EXTRA = """
+/* §2 Perspective card (auggie-next-skin2-2105, provisional): a perspective's own card draws its accent bar from [data-lens]; was a board inline */
+.glass[data-lens],.glass-hi[data-lens],.l-card[data-lens]{border-top:var(--accent-bar) solid var(--lens)}
 /* §8 Layouts primitives (auggie-layouts-s2-1540, provisional): spacing between siblings is the parent's gap */
 .app{--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;--sp-7:48px;--gutter:32px;--page-max:1120px;--page-max-narrow:880px;--page-max-read:520px}
 .app[data-w=phone]{--gutter:16px;--page-max:100%;--page-max-narrow:100%;--page-max-read:100%}

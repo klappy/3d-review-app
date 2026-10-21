@@ -7,6 +7,9 @@ describe("base.css", () => {
   it("is exactly what the pinned helmet generates (--check)", () => {
     expect(readFileSync(OUTPUT, "utf8")).toBe(generate());
   });
+  it("carries the §2 Perspective card accent rule (.glass[data-lens] border-top from --accent-bar/--lens)", () => {
+    expect(readFileSync(OUTPUT, "utf8")).toContain(".glass[data-lens],.glass-hi[data-lens],.l-card[data-lens]{border-top:var(--accent-bar) solid var(--lens)}");
+  });
   it("pins the cookbook sha in its header", () => {
     expect(readFileSync(OUTPUT, "utf8")).toMatch(/3d-review-cookbook @[0-9a-f]{40}/);
   });
