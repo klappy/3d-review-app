@@ -47,7 +47,7 @@
         <Row wrap gap={6}>
           <span class="h3">Who each dot is</span>
           {#each LENS_ORDER as lens}<Row gap={2}><PtDot {lens} /><strong>{lensLabel(lens)}</strong></Row>{/each}
-          <span class="small">Each perspective sits in one of four bands. The line between dots is the gap; it turns red at two bands or more.</span>
+          <div class="l-row" data-justify="end" data-grow><span class="small">Each perspective sits in one of four bands. The line between dots is the gap; it turns red at two bands or more.</span></div>
         </Row>
       </Card>
       <Row gap={3}><h2 class="h2">The three biggest gaps</h2><span class="small">Each row is one area; each perspective that was asked lands in a band.</span></Row>
