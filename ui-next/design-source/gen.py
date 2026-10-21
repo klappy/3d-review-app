@@ -38,7 +38,7 @@ details.dd>summary.dd-row{display:flex;justify-content:space-between;align-items
 .app .lead-16,.app .small.lead-16{font-size:var(--t-16);line-height:24px;color:var(--ink-2)}/* participant lead line (PWelcome, PReceipt, PProblem) */
 .app[data-w=phone] .display.display-hero{font-size:var(--t-40);line-height:44px}/* PWelcome title; the receipt keeps the phone display row 36/40 */
 .facts{list-style:none;margin:0;padding:0}.facts>li{min-height:var(--target)}/* PWelcome facts: each row a 44px target line */
-.icn[data-size],.icn.icn-row{background:var(--lens-soft);color:var(--primary)}.icn[data-size][data-tone=neutral]{background:var(--line);color:var(--ink-2)}
+.icn[data-size],.icn.icn-row{background:var(--lens-soft,var(--team-soft));color:var(--primary)}.icn[data-size][data-tone=neutral]{background:var(--line);color:var(--ink-2)}
 .icn[data-size="32"]{width:32px;height:32px}.icn[data-size="36"],.icn.icn-row{width:36px;height:36px}.icn[data-size="56"]{width:56px;height:56px;border-radius:var(--radius-l)}.icn[data-size="64"]{width:64px;height:64px;border-radius:var(--radius-l)}
 .row-opt.answer{min-height:60px;font-size:var(--t-16);line-height:22px}/* §2 Option row: participant answer rows 60px (Phone shell row) */
 .app .in.code{font-size:var(--t-24);letter-spacing:.14em;min-height:56px}.app .kbd.receipt{font-size:var(--t-20);letter-spacing:.12em}/* access code in, receipt out (§4 formats) */
@@ -72,10 +72,10 @@ details.dd>summary.dd-row{display:flex;justify-content:space-between;align-items
 .app .t-24,.app .h2.t-24{font-size:var(--t-24)}/* §1.2 type row: 24px section and dialog headings */
 .l-media[data-dir=row]{display:grid;grid-template-columns:220px 1fr;align-items:center;gap:20px}.l-media[data-dir=row] .l-media-frame{border-radius:var(--radius-m);color:var(--field)}/* §2 Media card, row form (Help) */
 .l-card[data-pad=rows]{border-radius:var(--radius-l);padding:4px 14px;display:flex;flex-direction:column;gap:0}.list-row{display:flex;align-items:center;gap:12px;min-height:60px;padding:8px 4px;border-top:1px solid var(--line)}.list-body{flex-grow:1;min-width:0}.list-title{font-weight:600;font-size:var(--t-15);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dd-body{padding-bottom:10px}/* §9 phone list card of rows (ExplorePhone, HelpPhone) */
-.dialog:not(dialog){width:600px;max-width:calc(100% - 32px);border-radius:var(--radius-xl);padding:36px;background:var(--dialog);color:var(--ink)}.scrim{position:absolute;inset:0;background:var(--scrim)}/* §2 Dialog drawn on a board (static div, Play has no script): a port renders <dialog class="glass-hi"> + showModal(), whose geometry and ::backdrop are canvas-collect-gaps' dialog.glass-hi rows; a board draws .scrim */
+.dialog:not(dialog){width:min(560px,calc(100% - 48px));border-radius:var(--radius-xl);padding:36px;background:var(--dialog);color:var(--ink)}.scrim{position:absolute;inset:0;background:var(--scrim)}/* §2 Dialog drawn on a board (static div, Play has no script): a port renders <dialog class="glass-hi"> + showModal(), whose geometry and ::backdrop are canvas-collect-gaps' dialog.glass-hi rows; a board draws .scrim */
 .sheet:not(dialog){border-radius:var(--radius-xl) var(--radius-xl) 0 0;display:flex;flex-direction:column;gap:2px}.sheet[data-pad=menu],dialog.glass-hi.sheet[data-pad=menu]{padding:8px 12px 28px}.sheet-handle{width:36px;height:4px;border-radius:var(--radius-hair);background:var(--line-2);margin:4px auto 10px}.mi[data-size=lg]{min-height:52px}/* §9 sheet: the modal geometry is canvas-collect-gaps' dialog.glass-hi.sheet row; these add a board-drawn sheet, the menu-rows padding, the handle (decoration) and 52px rows */
 .l-card[data-pad=bar]{border-radius:var(--radius-l);padding:12px 16px}.tbl-foot{padding:12px 12px 4px}.mi-end{margin-left:auto}.l-row>.btn-block{flex-grow:1;width:auto}/* toolbar card, table footer, a menu row's trailing value, a growing button in a row */
-.scrim[data-sheet]{z-index:20;display:flex;flex-direction:column;justify-content:flex-end}.dialog[data-at=board]{position:absolute;left:50%;top:80px;margin-left:-300px}.sheet-title{padding:0 12px 6px}/* board drawing of the modal layer (Play has no script) */
+.scrim[data-sheet]{z-index:20;display:flex;flex-direction:column;justify-content:flex-end}.dialog[data-at=board]{position:absolute;left:50%;top:80px;margin-left:-280px}.sheet-title{padding:0 12px 6px}/* board drawing of the modal layer (Play has no script) */
 details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}details.dd>summary::-webkit-details-marker{display:none}
 .menu{position:absolute;right:0;top:52px;width:300px;border-radius: var(--radius-l);padding:8px;display:flex;flex-direction:column;gap:2px;z-index:5}
 .mi{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius: var(--radius-m);text-decoration:none;color:var(--ink);font-weight:600;font-size: var(--t-15);background:transparent;border:0;font-family:inherit;cursor:pointer;text-align:left;width:100%}
@@ -246,6 +246,8 @@ html:has(dialog[open]:modal){overflow:hidden}
 .paper[data-sheet]{width:794px;min-height:1000px;break-inside:avoid;padding:56px 64px;display:flex;flex-direction:column;gap:var(--sp-5);border-radius:var(--radius-s)}.paper[data-sheet=a4]{min-height:1120px}
 /* Held results preview: the perspective cards behind a hold are drawn dimmed (and aria-hidden on the board) (results_held() inline) */
 .l-grid[data-state=held]{opacity:.45}
+/* Shared slice 2 (auggie-fanout-shared-1133, playbook rule 11, provisional; parity-loop CORRECTIONS sh-1, sh-2) */
+.seg label{white-space:nowrap}/* §2 Segmented: a label is one line; the track shares its width equally and a longer label takes its own width (Feedback kinds at the 560 dialog: 155 · 160 · 155) */
 """
 H = HELMET.replace('</style>\n</helmet>', EXTRA + '</style>\n</helmet>')
 
@@ -301,8 +303,12 @@ def lens_paint(*vals):
     assert len(ks) == 1, f'one element, one lens: {ks}'
     return f' data-lens="{ks.pop()}"', tuple(LENS_VAR.sub(lambda m: f'var(--lens{m.group(2) or ""})', v) for v in vals)
 
-def icn(n, bg='var(--team-soft)', fg='var(--primary)', size=36, r=11, s=18):
+def icn(n, bg=None, fg='var(--primary)', size=36, r=11, s=18, lens=None):
+    """Icon chip. Lens-driven ground (design-system.md §9 Icon chip sizes, CORRECTIONS sh-2): with no bg, the chip wears
+    lens (a survey's perspective: team · community · church) as --lens-soft; team where no lens is given. bg/fg as a
+    var(--k[-soft]) still map to data-lens through lens_paint (R15)."""
     rt = 'var(--radius-m)' if r <= 14 else ('var(--radius-l)' if r <= 20 else 'var(--radius-xl)')
+    if bg is None: bg = f'var(--{lens or "team"}-soft)'
     dl, (bg, fg) = lens_paint(bg, fg)
     return f'<span class="icn"{dl} style="width: {size}px; height: {size}px; border-radius: {rt}; background: {bg}; color: {fg}">{ic(n, s)}</span>'
 
