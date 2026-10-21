@@ -1,13 +1,7 @@
-/* UI Next (v4) phone chrome: .phone-top header and .phone-bar. Status: provisional. Paints only from ui-next/tokens.css.
-   Contract: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas/design-system.md section 2 Phone shell row,
-   "Phone chrome" (R13: 56px = 6px + 44px targets + 6px, data-shell, four header states) and section 9 phone-header / phone-bar.
-   Values: generator/gen.py EXTRA .phone-top, .phone-bar (lines 41-42); 6px padding and 8px gap from boards_phone.py fa_header (R13 drawn).
-   Port: .phone-bar is position:sticky (not absolute) so it rides the bottom of a real scrolling page; safe-area insets per R13. */
-.phone-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:56px;padding:6px 12px 6px 16px;padding-top:calc(6px + env(safe-area-inset-top))}
+
 .phone-top .btn,.phone-top .menu-btn{min-width:44px}
 .phone-top .menu-btn{padding:0;justify-content:center}
 .phone-title{flex-grow:1;min-width:0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);font-size:var(--t-14);line-height:20px}
 .phone-step{color:var(--ink);font-weight:600;font-size:var(--t-14)}
 .phone-top>:last-child:not(:first-child){margin-left:auto}
-.phone-bar{position:sticky;left:0;right:0;bottom:0;padding:12px 16px 28px;padding-bottom:calc(28px + env(safe-area-inset-bottom));border-radius:0;border-width:1px 0 0;display:flex;gap:10px}
 .phone-bar .btn-primary{flex-grow:1}

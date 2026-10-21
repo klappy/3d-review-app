@@ -12,7 +12,7 @@ import { join, relative, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const LINTED = /\.(html|css|js|mjs|svg|svelte)$/;
-export const SKIPPED = new Set(["tokens.css"]); // paths relative to the linted dir
+export const SKIPPED = new Set(["tokens.css", "components/base.css", "design-source/helmet.html", "design-source/gen.py"]); // token homes: generated from the design system (lint.py skips the helmet)
 
 const findAll = (re, s) => [...s.matchAll(re)];
 

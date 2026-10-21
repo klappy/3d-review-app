@@ -1,19 +1,4 @@
-/* UI Next (v4) §8 Layouts primitives. Status: provisional. Rules 1-10 copied literally from klappy/3d-review-cookbook design/2026-10-15-glass-redesign/generator/gen.py EXTRA (branch ui-next-layouts-s2 @7b18086); tokens (--sp-*, --gutter, --page-max*) live in tokens.css. Spacing between siblings is the parent gap. */
-.l-page{width:100%;max-width:var(--page-max);margin:0 auto;display:flex;flex-direction:column;gap:var(--sp-5)}
-.l-page[data-w=narrow]{max-width:var(--page-max-narrow)}.l-page[data-w=read]{max-width:var(--page-max-read)}
-.l-main{flex-grow:1;display:flex;flex-direction:column;align-items:center;padding:var(--sp-6) 0 56px}
-.l-phone{padding:var(--sp-3) var(--gutter) 120px;flex-grow:1;gap:var(--sp-4)}
-.l-shell{height:100%;display:flex;flex-direction:column}
-.l-section{display:flex;flex-direction:column;gap:var(--sp-4)}
-.l-stack{display:flex;flex-direction:column;gap:var(--g,var(--sp-4))}
-.l-row{display:flex;align-items:center;gap:var(--g,var(--sp-3))}
-.l-grid{display:grid;gap:var(--g,var(--sp-4))}
-[data-gap="1"]{--g:var(--sp-1)}[data-gap="2"]{--g:var(--sp-2)}[data-gap="3"]{--g:var(--sp-3)}[data-gap="4"]{--g:var(--sp-4)}[data-gap="5"]{--g:var(--sp-5)}[data-gap="6"]{--g:var(--sp-6)}[data-gap="7"]{--g:var(--sp-7)}
-/* Card surface: helmet.html:21-22 literal. */
-.glass{background:var(--glass);-webkit-backdrop-filter:blur(24px) saturate(170%);backdrop-filter:blur(24px) saturate(170%);border:1px solid var(--glass-edge);box-shadow:var(--hl),var(--sh-1)}
-.glass-hi{background:var(--glass-hi);-webkit-backdrop-filter:blur(32px) saturate(180%);backdrop-filter:blur(32px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:var(--hl),var(--sh-2)}
+
 /* Additions (not yet in the generator; contract design-system.md 8.1 Card and Grid rows): Card radius + inner padding, Grid data-cols and the named barbell template. */
 .l-card{border-radius:var(--radius-l);padding:var(--sp-5)}.app[data-w=phone] .l-card{padding:var(--sp-4)}
 .l-grid[data-cols="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}.l-grid[data-cols="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}.l-grid[data-cols="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}.l-grid[data-tpl=barbell]{grid-template-columns:220px 1fr 220px}
-/* Border-box reset: helmet.html:7,9 literal (design-system.md R23 rule); the l-page/l-phone widths assume it. */
-.app{box-sizing:border-box}.app *,.app *::before,.app *::after{box-sizing:border-box}

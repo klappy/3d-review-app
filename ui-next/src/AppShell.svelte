@@ -6,4 +6,4 @@
   if (theme !== undefined && theme !== "light" && theme !== "dark") throw new TypeError(`AppShell: theme must be light or dark, got ${String(theme)}`);
 </script>
 
-<div class={screen ? "app l-screen" : "app"} data-theme={theme} data-w={phone ? "phone" : undefined}><div class="layer l-shell">{@render top?.()}<main class={phone ? "l-page l-phone" : "l-main"}>{@render children?.()}</main>{@render bar?.()}</div></div>
+<div class={screen ? "app l-screen" : "app"} data-theme={theme} data-w={phone ? "phone" : undefined}><div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div><div class="layer l-shell">{@render top?.()}<main class={phone ? "l-page l-phone" : "l-main"}>{@render children?.()}</main>{@render bar?.()}</div></div>

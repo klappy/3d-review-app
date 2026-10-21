@@ -30,7 +30,7 @@
   ];
 </script>
 
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="About" parent="Home" back={HOME} />{:else}<TopBar home={HOME} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title="About" parent="Home" back={HOME} />{:else}<TopBar home={HOME} end={false} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Take the tour" href={TOUR} />{/if}{/snippet}
 {#snippet learnMore()}
   <Disclosure label={LEARN_MORE} open gap={4}>

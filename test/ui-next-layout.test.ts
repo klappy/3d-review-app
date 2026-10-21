@@ -18,7 +18,7 @@ import Fixture from "../ui-next/src/LayoutFixture.svelte";
 import Layouts from "../ui-next/src/Layouts.svelte";
 
 const root = resolve(process.cwd(), "ui-next");
-const css = readFileSync(resolve(root, "components/layout.css"), "utf8");
+const css = readFileSync(resolve(root, "components/base.css"), "utf8") + readFileSync(resolve(root, "components/layout.css"), "utf8"); // primitives live in the generated helmet
 const tokens = readFileSync(resolve(root, "tokens.css"), "utf8");
 
 describe("layout.css and tokens carry the 8.1-8.3 contract", () => {
@@ -95,7 +95,7 @@ describe("nesting rules (8.1)", () => {
     for (const c of container.querySelectorAll(".l-card")) for (const a of ["style", "width", "data-w", "data-cols"]) expect(c.hasAttribute(a)).toBe(false);
     expect(container.querySelector("[style]")).toBeNull();
     // the CSS never gives a primitive or card a margin other than the Page's auto centring
-    expect(css.replace(/\.l-page\{[^}]*\}/, "")).not.toMatch(/margin/);
+    for (const [, sel, decl] of css.matchAll(/(\.l-[a-z-]+(?:\[[^\]]*\])?)\{([^}]*)\}/g)) if (sel !== ".l-page") expect(decl, sel).not.toMatch(/margin/);
     expect(css).not.toMatch(/\.l-card\{[^}]*width/);
   });
   it("phone fixture flips the shell to the phone page and gutter scope", () => {

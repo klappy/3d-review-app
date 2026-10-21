@@ -1,6 +1,7 @@
 // UI Next (v4) /next/ entry. Status: provisional. Loads the external contract CSS; mounts Home when the ui_next flag is on, else the gallery (route.js).
 import { mount } from "svelte";
 import "../tokens.css";
+import "../components/base.css";
 import "../components/button.css";
 import "../components/pill.css";
 import "../components/lensdot.css";
