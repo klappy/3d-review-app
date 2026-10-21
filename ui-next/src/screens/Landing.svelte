@@ -9,6 +9,8 @@
   import Page from "../Page.svelte";
   import Section from "../Section.svelte";
   import Card from "../Card.svelte";
+  import Icon from "../Icon.svelte";
+  import { I } from "../icons.js";
   import Stack from "../Stack.svelte";
   import Row from "../Row.svelte";
   import Grid from "../Grid.svelte";
@@ -81,7 +83,7 @@
       <Section>
         <h2 class="h1">Three perspectives on one translation</h2>
         <Grid cols={3} gap={4}>
-          {#each PERSPECTIVES as [lens, name, text]}<Card gap={2} label={name}><span class="icn" data-lens={lens} aria-hidden="true"></span><h3 class="h2">{name}</h3><p class="small">{text}</p></Card>{/each}
+          {#each PERSPECTIVES as [lens, name, text]}<Card gap={2} label={name}><span class="icn icn-lens" data-lens={lens} aria-hidden="true"><Icon d={I.people} /></span><h3 class="h2">{name}</h3><p class="small">{text}</p></Card>{/each}
         </Grid>
         <p class="small">The answers are never averaged into one number. A confident team and a confused community is the most useful thing a review can show you.</p>
       </Section>

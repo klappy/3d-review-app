@@ -6,3 +6,6 @@
 .app details > summary{cursor:pointer;width:max-content}
 .lvl-pair{display:inline-flex;align-items:center;gap:var(--sp-2);font-size:var(--t-14);color:var(--ink-2)}
 .card-link.l-stack{display:flex}
+
+/* Landing perspective chip (boards_fac.py landing(), f56a751): 40px, --radius-m, lens-soft ground, lens-coloured icon. */
+.icn.icn-lens{width:40px;height:40px;background:var(--lens-soft);color:var(--lens)}
