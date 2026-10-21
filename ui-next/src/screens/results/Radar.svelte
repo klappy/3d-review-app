@@ -5,12 +5,13 @@
      (the community polygon has 3 points). The current UI's ui/report-radar.js instead breaks the outline at a skipped spoke
      (polyline runs, closed only when every spoke is scored); that rule is a canvas R18 CORRECTIONS candidate, and this lane
      follows the board until the board changes.
-     Geometry from ./data.js radar() over ui/report-radar.js radarModel + wrap; colours are tokens (paper scope). -->
+     Geometry from ./data.js radar() over ui/report-radar.js radarModel + wrap; colours are tokens (paper scope). Only placed
+     scores reach the model: a perspective under the minimum responses has no polygon, point or <title> (validator R3-1). -->
 <script>
   let { model } = $props();
 </script>
 
-<svg width="420" height="370" viewBox="0 0 420 370" overflow="visible" role="img" aria-label={`Radar of the three perspectives across ${model.spokes.length} shared areas`}>
+<svg width="420" height="370" viewBox="0 0 420 370" overflow="visible" role="img" aria-label={`Radar of ${model.legend.map((l) => l.label).join(", ")} across ${model.spokes.length} shared areas`}>
   {#each model.rings as points}<polygon {points} fill="none" stroke="var(--line)" stroke-width="1" />{/each}
   {#each model.spokes as s}<line x1="210" y1="185" x2={s.x} y2={s.y} stroke="var(--line)" />{/each}
   {#each model.lenses as l}

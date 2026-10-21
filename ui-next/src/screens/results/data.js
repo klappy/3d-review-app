@@ -5,7 +5,7 @@
 // ui/report-radar.js radarModel + wrap (radar spokes and label wrapping). Fixtures: ui-next/fixtures/results/*.json.
 // Boards: cookbook design/2026-10-15-glass-redesign/canvas Results*, Report*, ReportDetailed (.dc.html).
 import { v3ScoreBand, V3_BAND_CUTOFFS } from "../../../../ui/assess/v3-assessment.js";
-import { lensSpreadRows, lensLabel } from "../../../../ui/report-lenses.js";
+import { lensSpreadRows, lensLabel, lensRespondents } from "../../../../ui/report-lenses.js";
 import { radarModel, wrap } from "../../../../ui/report-radar.js";
 import REPORT from "../../../fixtures/results/report.json";
 import ANSWERS from "../../../fixtures/results/answers.json";
@@ -29,21 +29,31 @@ export const BANDS = Object.freeze(["urgent", "support", "growing", "strong"]);
 export const BAND_SHORT = Object.freeze({ urgent: "Urgent", support: "Support", growing: "Growing", strong: "Strong" });
 export const bandCentre = (band) => 12.5 + 25 * BANDS.indexOf(band);
 
-/** Per-perspective cards: [{ lens, label, n, level, rows: [{ name, score, level, items, note }] }] in lens order. */
+/** Per-perspective cards: [{ lens, label, n, level, rows: [{ name, score, level, items, note }] }] in lens order; a perspective
+ *  missing from the payload has no card (callers iterate, never index). An area at "more" (under the minimum responses, or no
+ *  score) carries score null, so no table or label can print a score the level hides (R3-1). */
 export function lensCards(payload, counts) {
   const lenses = Array.isArray(payload?.lenses) ? payload.lenses : [];
   return LENS_ORDER.map((lens) => lenses.find((l) => l && l.lens === lens)).filter(Boolean).map((l) => {
     const n = counts?.[l.lens] ?? null;
     return {
       lens: l.lens, label: lensLabel(l.lens), n, level: levelOf(l.score, n),
-      rows: (Array.isArray(l.sub_dimensions) ? l.sub_dimensions : []).map((s) => ({ name: s.sub_dimension, score: s.score ?? null, level: levelOf(s.score, n), items: s.items, note: s.note })),
+      rows: (Array.isArray(l.sub_dimensions) ? l.sub_dimensions : []).filter(Boolean).map((s) => {
+        const level = levelOf(s.score, n);
+        return { name: s.sub_dimension, score: level === "more" ? null : s.score ?? null, level, items: s.items, note: s.note };
+      }),
     };
   });
 }
 
+/** A perspective's score may show on an area only at a band level: asked, scored, and at or over the minimum responses. Under the
+ *  minimum it contributes nothing a reader could work back to its score: no dot, spread, tensions order, radar point or table cell. */
+const placed = (score, n) => BANDS.includes(levelOf(score, n));
+
 /** One band-barbell row per area name: dots placed at band centres, spread 5% apart in lens order when bands are shared.
- *  A perspective under the minimum responses (level "more") has no band, so it gets no dot and no part in the verdict or
- *  span; like a perspective not asked, it is named in notes ("Church more input needed"). notes: the words after the verdict. */
+ *  A perspective under the minimum responses (level "more") has no band, so it gets no dot and no part in the verdict, span or
+ *  spread; like a perspective not asked, it is named in notes ("Church more input needed"). notes: the words after the verdict.
+ *  spread: points between the placed scores only (the payload's own spread when every scored perspective is placed), null under two. */
 export function bandRow(report, counts, name) {
   const row = lensSpreadRows(report, { exact: true }).find((r) => r.name === name);
   if (!row) throw new TypeError(`results: no cross-perspective area "${name}" in the report`);
@@ -53,6 +63,8 @@ export function bandRow(report, counts, name) {
     return { lens, label: lensLabel(lens), score: s.score, level: levelOf(s.score, counts?.[lens] ?? s.n) };
   });
   const dots = levelled.filter((d) => BANDS.includes(d.level));
+  const scores = dots.map((d) => d.score);
+  const spread = scores.length < 2 ? null : dots.length === row.lenses.length ? row.spread : Math.max(...scores) - Math.min(...scores);
   const more = levelled.filter((d) => !BANDS.includes(d.level)).map((d) => d.label);
   for (const band of BANDS) {
     const here = dots.filter((d) => d.level === band);
@@ -65,31 +77,51 @@ export function bandRow(report, counts, name) {
   const notAsked = LENS_ORDER.filter((lens) => !asked.includes(lens)).map(lensLabel);
   const notes = [...more.map((l) => `${l} more input needed`), ...notAsked.map((l) => `${l} not asked`)];
   const question = (report.payload.cross_lens_multi || []).find((a) => a.construct_name === name)?.question;
-  return { name, question, dots, more, apart, span, verdict, notAsked, notes, spread: row.spread, perspectives: asked.length };
+  return { name, question, dots, more, apart, span, verdict, notAsked, notes, spread, perspectives: asked.length };
+}
+
+/** bandRow for each name the report has as a cross-perspective area; a name the payload lacks is skipped, never thrown (R3-3). */
+export function bandRows(report, counts, names) {
+  const known = new Set(lensSpreadRows(report, { exact: true }).map((r) => r.name));
+  return (Array.isArray(names) ? names : []).filter((n) => known.has(n)).map((n) => bandRow(report, counts, n));
 }
 
 /** The words after a row's lead ("same band", "gap 14", the levels): " · "-joined, so no separator is lost in markup. */
 export const withNotes = (lead, row) => [lead, ...row.notes].filter(Boolean).join(" · ");
+/** A numeric row's lead: "gap 14", or, with fewer than two placed perspectives, the band row's words (never "gap null"). */
+export const gapLead = (row) => (row.spread === null || row.spread === undefined ? "too few perspectives to compare" : `gap ${row.spread}`);
 
 /** Numeric barbell rows (detailed report): exact scores on 0-100, red span at two bands apart or more, else a quiet span.
- *  Only the perspectives bandRow places get a dot (under the minimum: no score shown, named in notes). */
+ *  Only the perspectives bandRow places get a dot, a spread or a place in the order (under the minimum: no score shown, named
+ *  in notes). With names: those areas in that order. Without: biggest placed spread first, areas under two placed last (R3-1). */
 export function scoreRows(report, counts, names) {
   const rows = lensSpreadRows(report, { exact: true });
   const pick = names ? names.map((n) => rows.find((r) => r.name === n)).filter(Boolean) : rows;
-  return pick.map((r) => {
+  const out = pick.map((r) => {
     const band = bandRow(report, counts, r.name);
-    const placed = r.lenses.filter((s) => band.dots.some((d) => d.lens === s.lens));
-    const scores = placed.map((s) => s.score);
-    return { name: r.name, spread: r.spread, from: scores.length ? Math.min(...scores) : 0, to: scores.length ? Math.max(...scores) : 0, alarm: band.apart >= 2, notes: band.notes,
-      dots: [...placed].sort((a, b) => a.score - b.score).map((s) => ({ lens: s.lens, label: lensLabel(s.lens), score: s.score })) };
+    const scores = band.dots.map((d) => d.score);
+    return { name: r.name, spread: band.spread, from: scores.length ? Math.min(...scores) : 0, to: scores.length ? Math.max(...scores) : 0, alarm: band.apart >= 2, notes: band.notes,
+      dots: [...band.dots].sort((a, b) => a.score - b.score).map((d) => ({ lens: d.lens, label: d.label, score: d.score })) };
   });
+  return names ? out : out.sort((a, b) => (a.spread === null) - (b.spread === null) || (b.spread ?? 0) - (a.spread ?? 0));
 }
 
-/** Radar geometry from radarModel (spokes = the named shared areas), board scale: centre (210,185), radius 118, rings 25..100. */
-export function radar(report, names) {
-  const multi = (report.payload.cross_lens_multi || []).filter((a) => names.includes(a.construct_name));
+/** Radar geometry from radarModel (spokes = the named shared areas), board scale: centre (210,185), radius 118, rings 25..100.
+ *  Only placed scores reach radarModel (R3-1): a perspective under the minimum has no polygon, point or <title>, and an area
+ *  is a spoke only when two placed perspectives scored it. legend: the drawn perspectives in lens order; notes: the others
+ *  ("Church more input needed", "Church not asked"). null under radarModel's minimum spokes. */
+export function radar(report, names, counts) {
+  const payload = report?.payload ?? {}, n = lensRespondents(payload);
+  const want = Array.isArray(names) ? names : [];
+  const named = (Array.isArray(payload.cross_lens_multi) ? payload.cross_lens_multi : []).filter((a) => a && want.includes(a.construct_name));
+  const num = (v) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN); // as ui/report-lenses.js
+  const scored = (a) => (Array.isArray(a.lens_scores) ? a.lens_scores : []).filter((s) => s && LENS_ORDER.includes(s.lens) && Number.isFinite(num(s.score)));
+  const multi = named.map((a) => ({ ...a, lens_scores: scored(a).filter((s) => placed(s.score, counts?.[s.lens] ?? n.get(s.lens) ?? null)) }));
   const model = radarModel({ payload: { cross_lens_multi: multi } });
   if (!model) return null;
+  const drawn = LENS_ORDER.filter((lens) => model.lenses.some((l) => l.lens === lens));
+  const asked = LENS_ORDER.filter((lens) => named.some((a) => scored(a).some((s) => s.lens === lens)));
+  const notes = LENS_ORDER.filter((lens) => !drawn.includes(lens)).map((lens) => `${lensLabel(lens)} ${asked.includes(lens) ? "more input needed" : "not asked"}`);
   const C = [210, 185], R = 118, L = 141.6, k = model.spokes.length;
   const at = (i, r) => { const a = -Math.PI / 2 + (2 * Math.PI * i) / k; return [C[0] + r * Math.cos(a), C[1] + r * Math.sin(a)]; };
   const pts = (r) => model.spokes.map((_, i) => at(i, r).map((v) => v.toFixed(1)).join(",")).join(" ");
@@ -101,9 +133,11 @@ export function radar(report, names) {
       return { name, x: x.toFixed(1), y: y.toFixed(1), lx: lx.toFixed(1), ly: (ly - ((lines.length - 1) * 13) / 2).toFixed(1), anchor, lines };
     }),
     lenses: model.lenses.map(({ lens, scores }) => {
-      const marks = scores.map((v, i) => (v === null ? null : { area: model.spokes[i], score: v, xy: at(i, (R * v) / 100).map((n) => n.toFixed(1)) })).filter(Boolean);
+      const marks = scores.map((v, i) => (v === null ? null : { area: model.spokes[i], score: v, xy: at(i, (R * v) / 100).map((c) => c.toFixed(1)) })).filter(Boolean);
       return { lens, label: lensLabel(lens), points: marks.map((m) => m.xy.join(",")).join(" "), marks };
     }),
+    legend: drawn.map((lens) => ({ lens, label: lensLabel(lens) })),
+    notes,
   };
 }
 

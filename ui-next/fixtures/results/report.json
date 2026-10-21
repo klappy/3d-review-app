@@ -40,6 +40,7 @@
       ]
     },
     "radar": ["Clarity / naturalness", "Impact / use", "Trust / readiness", "Brief & perceived fidelity", "Understanding of the source"],
+    "shapeReading": "The community shape collapses toward the centre on clarity and impact while the team and church stay wide — the same picture as the gaps above, seen whole.",
     "gaps": { "biggest": ["Clarity / naturalness", "Impact / use", "Brief & perceived fidelity"], "agree": ["Trust / readiness"] },
     "lookNext": [["community", "Impactful"], ["community", "Understandable"], ["team", "External review"]],
     "standsOut": "The translation team reports a clear brief and a consistent process. The community finds the text hard to follow in places and does not yet use it in daily life. Church leaders are involved and confident, but say they are not yet ready to use it in services.",

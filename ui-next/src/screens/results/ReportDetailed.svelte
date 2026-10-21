@@ -3,7 +3,12 @@
      where the phone shares the PDF; any ?state= renders the default. Four .paper[data-sheet=page] sheets (8.11 contract row; Paper is
      Card level), stacked in the shell's main: 1 head + radar + biggest tensions; 2 all areas compared + how to read; 3-4 every area with
      evidence (.th/.td tables) + their words. Scores are exact as returned (ui/report-lenses.js lensSpreadRows exact); levels v3ScoreBand;
-     radar ui/report-radar.js radarModel. One .btn-primary: "Download this report (PDF)" (document bar). Copy: the board. -->
+     radar ui/report-radar.js radarModel. One .btn-primary: "Download this report (PDF)" (document bar). Copy: the board.
+     A perspective under the minimum responses adds nothing a reader could work back to its score (validator R3-1): no barbell dot,
+     no part in a gap or the tensions order, no radar shape, "—" in its evidence Score cells; an area with fewer than two placed
+     perspectives says "too few perspectives to compare", never a gap. The fixture's reading of the radar (shapeReading, board copy)
+     shows only when every perspective is drawn. A payload without a perspective or area still renders (R3-3): the evidence sheets
+     iterate the cards (two on page 3, the rest on page 4). report: the built report (default the fixture; the route passes none). -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Stack from "../../Stack.svelte";
@@ -18,15 +23,15 @@
   import Radar from "./Radar.svelte";
   import Report from "./Report.svelte";
   import { href } from "../href.js";
-  import { REPORT, LENS_ORDER, lensLabel, lensCards, scoreRows, radar, withNotes } from "./data.js";
+  import { REPORT, lensCards, scoreRows, radar, withNotes, gapLead } from "./data.js";
 
-  let { phone = false, theme = "light" } = $props();
-  const D = REPORT.desktop;
-  const cards = lensCards(D.payload, D.counts);
-  const tensions = scoreRows(D, D.counts).slice(0, 3);
-  const all = scoreRows(D, D.counts, D.payload.cross_lens_multi.map((a) => a.construct_name));
-  const shape = radar(D, D.radar);
-  const FOOT = `Built from ${D.review.responses} responses on ${D.review.builtOn} · Scores are 0–100. Every other page shows levels, which are bands · nothing here identifies a person`;
+  let { phone = false, theme = "light", report = REPORT.desktop } = $props();
+  const D = $derived(report);
+  const cards = $derived(lensCards(D.payload, D.counts));
+  const tensions = $derived(scoreRows(D, D.counts).filter((r) => r.spread !== null).slice(0, 3));
+  const all = $derived(scoreRows(D, D.counts, (D.payload.cross_lens_multi || []).map((a) => a?.construct_name)));
+  const shape = $derived(radar(D, D.radar, D.counts));
+  const FOOT = $derived(`Built from ${D.review.responses} responses on ${D.review.builtOn} · Scores are 0–100. Every other page shows levels, which are bands · nothing here identifies a person`);
   const PAGES = 4;
 </script>
 
@@ -37,7 +42,7 @@
     <Grid template="barbell" gap={4}>
       <span class="small"><strong>{row.name}</strong></span>
       <ScoreBar {row} />
-      <span class="small">{withNotes(`gap ${row.spread}`, row)}</span>
+      <span class="small">{withNotes(gapLead(row), row)}</span>
     </Grid>
   {/each}
   <PaperLegend />
@@ -47,13 +52,13 @@
     <Row gap={3}><strong>{c.label}</strong><span class="small">{c.n} responses</span></Row>
     <table>
       <thead><tr><th class="th">Area</th><th class="th">Level</th><th class="th">Score</th><th class="th">Evidence</th><th class="th">Observation</th></tr></thead>
-      <tbody>{#each c.rows as r}<tr><td class="td">{r.name}</td><td class="td"><Level level={r.level} /></td><td class="td tab-n">{r.score ?? "—"}</td><td class="td">{r.items} items</td><td class="td">{r.note}</td></tr>{/each}</tbody>
+      <tbody>{#each c.rows as r}<tr><td class="td">{r.name}</td><td class="td"><Level level={r.level} /></td><td class="td tab-n">{r.level === "more" || r.score === null ? "—" : r.score}</td><td class="td">{r.items} items</td><td class="td">{r.note}</td></tr>{/each}</tbody>
     </table>
   </div>
 {/snippet}
 
 {#if phone}
-<Report phone {theme} />
+<Report phone {theme} {report} />
 {:else}
 <AppShell {theme} screen {top}>
   <Stack gap={6}>
@@ -61,13 +66,15 @@
       <PaperHead review={D.review} {cards} kind="detailed report" />
       <Stack gap={1}>
         <h2 class="h3">The three perspectives as one shape</h2>
+        {#if shape}
         <Row gap={4}>
-          {#if shape}<Radar model={shape} />{/if}
+          <Radar model={shape} />
           <Stack gap={3}>
-            <Row wrap gap={4}>{#each LENS_ORDER as lens}<Row gap={2}><LensDot {lens} decorative /><span class="small">{lensLabel(lens)}</span></Row>{/each}</Row>
-            <p class="small">Each ring is 25 on the 0–100 scale. The community shape collapses toward the centre on clarity and impact while the team and church stay wide — the same picture as the gaps above, seen whole. Where a perspective is not asked about an area, its shape skips that spoke.</p>
+            <Row wrap gap={4}>{#each shape.legend as l}<Row gap={2}><LensDot lens={l.lens} decorative /><span class="small">{l.label}</span></Row>{/each}{#if shape.notes.length}<span class="small">{shape.notes.join(" · ")}</span>{/if}</Row>
+            <p class="small">Each ring is 25 on the 0–100 scale.{!shape.notes.length && D.shapeReading ? ` ${D.shapeReading}` : ""} Where a perspective is not asked about an area, its shape skips that spoke.</p>
           </Stack>
         </Row>
+        {:else}<p class="small">Too few shared areas to draw the shape.</p>{/if}
       </Stack>
       <Stack gap={2}>
         <h2 class="h3">The biggest tensions</h2>
@@ -90,14 +97,13 @@
     </div>
     <div class="paper" data-sheet="page">
       <h2 class="h3">Every area, with evidence</h2>
-      {@render evidence(cards[0])}
-      {@render evidence(cards[1])}
+      {#each cards.slice(0, 2) as c (c.lens)}{@render evidence(c)}{/each}
       {@render foot(3)}
     </div>
     <div class="paper" data-sheet="page">
       <h2 class="h3">Every area, with evidence (continued)</h2>
-      {@render evidence(cards[2])}
-      <Stack gap={2}><h2 class="h3">In their words</h2><p class="small">{D.theirWords.map((w) => `“${w}”`).join(" · ")}</p></Stack>
+      {#each cards.slice(2) as c (c.lens)}{@render evidence(c)}{/each}
+      {#if D.theirWords?.length}<Stack gap={2}><h2 class="h3">In their words</h2><p class="small">{D.theirWords.map((w) => `“${w}”`).join(" · ")}</p></Stack>{/if}
       {@render foot(4)}
     </div>
   </Stack>

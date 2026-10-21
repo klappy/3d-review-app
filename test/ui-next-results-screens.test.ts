@@ -14,7 +14,7 @@ import { OUT } from "../ui-next/src/screens/results/links.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import results from "../ui-next/src/screens/results/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, lensCards, bandRow, scoreRows, radar, heldLines, levelOf, pct, answerView, withNotes } from "../ui-next/src/screens/results/data.js";
+import { REPORT, lensCards, bandRow, bandRows, scoreRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead } from "../ui-next/src/screens/results/data.js";
 import Results from "../ui-next/src/screens/results/Results.svelte";
 import ResultsAnswers from "../ui-next/src/screens/results/ResultsAnswers.svelte";
 import ResultsGaps from "../ui-next/src/screens/results/ResultsGaps.svelte";
@@ -27,6 +27,20 @@ type Props = Record<string, unknown>;
 const mount = (C: unknown, props: Props = {}) => render(C as never, { props }).container.querySelector(".app") as HTMLElement;
 const text = (el: Element | null) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
 const all = (a: Element, s: string) => [...a.querySelectorAll(s)].map(text);
+// A built report without the church perspective at all (R3-3), plus a "look next" and a gap area the payload does not have.
+type Payload = { lenses: { lens: string }[]; cross_lens_multi: { lens_scores: { lens: string }[] }[]; evidence: { label: string }[] };
+const withoutChurch = () => {
+  const D = JSON.parse(JSON.stringify(REPORT.desktop)) as { payload: Payload; counts: Record<string, number>; lookNext: string[][]; gaps: { biggest: string[]; agree: string[] } };
+  D.payload.lenses = D.payload.lenses.filter((l) => l.lens !== "church");
+  for (const a of D.payload.cross_lens_multi) a.lens_scores = a.lens_scores.filter((s) => s.lens !== "church");
+  D.payload.evidence = D.payload.evidence.filter((e) => !e.label.startsWith("church"));
+  delete D.counts.church;
+  D.lookNext = [...D.lookNext, ["church", "Readiness"], ["team", "No such area"]];
+  D.gaps = { biggest: [...D.gaps.biggest, "No such area"], agree: D.gaps.agree };
+  return D;
+};
+const heldReport = () => ({ ...REPORT.desktop, counts: REPORT.held.counts }); // church 1 of 3: More input needed
+const attrs = (a: Element) => [...a.querySelectorAll("*")].flatMap((el) => [...el.attributes].map((x) => x.value)).join(" ");
 const store = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }; };
 
 // [board, screen name, component, props, primary label, document view (paper sheets in the shell's main)]
@@ -91,10 +105,42 @@ describe("data adapter: levels through the current UI's pure modules (board valu
   it("numeric barbell and radar (ReportDetailed board): biggest tensions by spread, five shared spokes", () => {
     const D = REPORT.desktop;
     expect(scoreRows(D, D.counts).slice(0, 3).map((r: { name: string; spread: number }) => `${r.name} ${r.spread}`)).toEqual(["Clarity / naturalness 58", "Impact / use 54", "Understanding of the source 14"]);
-    const shape = radar(D, D.radar);
+    const shape = radar(D, D.radar, D.counts);
     expect(shape.spokes.map((s: { name: string }) => s.name)).toEqual(D.radar);
     expect(shape.lenses.map((l: { lens: string; marks: unknown[] }) => `${l.lens}:${l.marks.length}`)).toEqual(["team:5", "community:3", "church:5"]);
     expect(shape.lenses[0].marks[0].xy).toEqual(["210.0", "81.2"]); // team 88 on Clarity, the board's point
+    expect([shape.legend.map((l: { lens: string }) => l.lens), shape.notes]).toEqual([["team", "community", "church"], []]);
+  });
+  it("held counts: a perspective under the minimum feeds no spread, tensions order, radar point or table score (R3-1)", () => {
+    const D = REPORT.desktop, H = REPORT.held.counts; // church 1 of 3
+    type R = { name: string; spread: number | null; dots: { lens: string; score: number }[]; notes: string[] };
+    const rows: R[] = scoreRows(D, H);
+    for (const r of rows) {
+      expect(r.dots.some((d) => d.lens === "church"), r.name).toBe(false);
+      const placed = r.dots.map((d) => d.score);
+      expect(r.spread, r.name).toBe(placed.length < 2 ? null : Math.max(...placed) - Math.min(...placed));
+    }
+    // Biggest tensions: placed spreads only (Brief was "gap 4" and Understanding "gap 14" through church's score); one-score areas last
+    expect(rows.map((r) => `${r.name} ${r.spread}`)).toEqual(["Clarity / naturalness 58", "Impact / use 54", "Trust / readiness 2",
+      "Understanding of the source null", "Appeal / beauty null", "Brief & perceived fidelity null", "Consistency null"]);
+    const brief = rows.find((r) => r.name === "Brief & perceived fidelity")!;
+    expect(withNotes(gapLead(brief), brief)).toBe("too few perspectives to compare · Church more input needed · Community not asked");
+    expect(bandRow(D, H, "Understanding of the source").spread).toBeNull();
+    const shape = radar(D, D.radar, H); // church has no polygon, point or title; its areas need two placed perspectives to be spokes
+    expect(shape.lenses.map((l: { lens: string }) => l.lens)).toEqual(["team", "community"]);
+    expect(shape.spokes.map((s: { name: string }) => s.name)).toEqual(["Clarity / naturalness", "Impact / use", "Trust / readiness"]);
+    expect([shape.legend.map((l: { lens: string }) => l.lens), shape.notes]).toEqual([["team", "community"], ["Church more input needed"]]);
+    const church = lensCards(D.payload, H).find((c: { lens: string }) => c.lens === "church");
+    expect(church.rows.map((r: { score: unknown; level: string }) => `${r.level}:${r.score}`)).toEqual(Array(6).fill("more:null"));
+  });
+  it("a payload without a perspective or an area: cards iterate, unknown areas are skipped, never thrown (R3-3)", () => {
+    const D = withoutChurch();
+    expect(lensCards(D.payload, D.counts).map((c: { lens: string }) => c.lens)).toEqual(["team", "community"]);
+    expect(bandRows(D, D.counts, D.gaps.biggest).map((r: { name: string }) => r.name)).toEqual(["Clarity / naturalness", "Impact / use", "Brief & perceived fidelity"]);
+    expect(() => bandRow(D, D.counts, "No such area")).toThrow(TypeError);
+    const shape = radar(D, (REPORT.desktop as { radar: string[] }).radar, D.counts);
+    expect([shape.legend.map((l: { lens: string }) => l.lens), shape.notes]).toEqual([["team", "community"], ["Church not asked"]]);
+    expect(radar(D, ["Clarity / naturalness"], D.counts)).toBeNull(); // under radarModel's three spokes: no shape
   });
   it("held lines and answer bars", () => {
     expect(heldLines(REPORT.held.counts).map((l: { text: string }) => l.text)).toEqual(["Translation team 6 — ready", "Community 8 — ready", "Church 1 — needs 2 more"]);
@@ -293,6 +339,43 @@ describe("each board renders as a screen", () => {
     expect(all(a, ".paper .l-grid > span.small:last-child").filter((t) => /not asked/.test(t))).toEqual([
       "gap 14 · Community not asked", "gap 4 · Community not asked", "gap 14 · Community not asked", "gap 9 · Translation team not asked", "gap 4 · Community not asked"]);
     expect(text(a)).not.toMatch(/\S· /);
+  });
+  it("ReportDetailed with held counts: church's score reaches no gap, tensions order, radar or table cell (R3-1)", () => {
+    const a = mount(ReportDetailed, { report: heldReport() });
+    expect(a.querySelectorAll("svg[data-part=score-barbell] g[data-lens=church]").length).toBe(0);
+    const radarSvg = a.querySelector("svg[role=img][aria-label^='Radar']")!;
+    expect(radarSvg.getAttribute("aria-label")).toBe("Radar of Translation team, Community across 3 shared areas");
+    expect(radarSvg.querySelectorAll("[data-lens=church]").length).toBe(0);
+    expect(all(radarSvg, "title").filter((t) => /Church/.test(t))).toEqual([]);
+    expect(text(a)).toContain("Church more input needed");
+    expect(text(a)).not.toContain("church stay wide"); // the fixture's three-shape reading needs every perspective drawn
+    const sheets = [...a.querySelectorAll(".paper[data-sheet=page]")];
+    expect(all(sheets[0], ".l-grid > span.small:first-child")).toEqual(["Clarity / naturalness", "Impact / use", "Trust / readiness"]);
+    const churchTable = a.querySelector(".solid[data-lens=church] table")!;
+    expect([...churchTable.querySelectorAll("tbody tr")].map((tr) => text(tr.children[2]))).toEqual(Array(6).fill("—"));
+    const leads = all(a, ".paper .l-grid > span.small:last-child");
+    expect(leads).toContain("too few perspectives to compare · Church more input needed · Community not asked");
+    expect(text(a)).not.toMatch(/gap null|undefined|NaN/);
+    expect(attrs(a)).not.toMatch(/gap null|undefined|NaN/);
+    expect(a.querySelectorAll("h1").length).toBe(1);
+  });
+  it("Report and ReportDetailed render a payload without a perspective or area (R3-3: never a blank page)", () => {
+    const D = withoutChurch();
+    const r = mount(Report, { report: D });
+    expect(r.querySelectorAll("h1").length).toBe(1);
+    expect(all(r, ".paper .solid[data-lens] .h3")).toEqual(["Translation team", "Community"]);
+    expect(all(r, ".paper ol li")).toEqual(["Community · Impactful — Needs urgent attention", "Community · Understandable — Needs urgent attention", "Translation team · External review — Needs support"]);
+    expect(r.querySelectorAll("svg[data-part=band-barbell]").length).toBe(4);
+    const d = mount(ReportDetailed, { report: D });
+    expect(d.querySelectorAll("h1").length).toBe(1);
+    expect(d.querySelectorAll(".paper[data-sheet=page]").length).toBe(4);
+    expect(all(d, ".solid[data-lens] > .l-row strong")).toEqual(["Translation team", "Community"]);
+    expect(d.querySelectorAll(".paper[data-sheet=page]:last-child table").length).toBe(0);
+    expect(text(d)).toContain("Church not asked");
+    for (const el of [r, d]) {
+      expect(text(el)).not.toMatch(/gap null|undefined|NaN/);
+      expect(attrs(el)).not.toMatch(/undefined|NaN/);
+    }
   });
   it("ReportDetailed on a phone renders the phone's reports list (F6: never a blank page)", () => {
     const a = mount(ReportDetailed, { phone: true });

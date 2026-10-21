@@ -4,7 +4,9 @@
      directly in the shell's main as the board draws it. Phone: the chip rows are .l-row[data-align=start] and the preview mark and
      line .l-stack[data-align=center] (8.7 rows). Any ?state= renders the default.
      Data: ui-next/fixtures/results/report.json through ./data.js. One .btn-primary: desktop "Download this report (PDF)"
-     (document bar); phone the phone-bar. Copy: the boards. -->
+     (document bar); phone the phone-bar. Copy: the boards.
+     report: the built report (default the fixture; the route passes none). A payload without a perspective, a gap area or a
+     "look next" area still renders (validator R3-3): cards and rows are iterated, unresolved areas are left out, never thrown. -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Card from "../../Card.svelte";
@@ -23,13 +25,15 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, LEVEL_WORD, lensLabel, lensCards, bandRow, withNotes } from "./data.js";
+  import { REPORT, LEVEL_WORD, lensLabel, lensCards, bandRows, withNotes } from "./data.js";
 
-  let { phone = false, theme = "light" } = $props();
-  const D = REPORT.desktop, P = REPORT.phone;
-  const cards = lensCards(D.payload, D.counts);
-  const rows = [...D.gaps.biggest, ...D.gaps.agree].map((n) => bandRow(D, D.counts, n));
-  const next = D.lookNext.map(([lens, area]) => ({ lens, area, level: cards.find((c) => c.lens === lens).rows.find((r) => r.name === area).level }));
+  let { phone = false, theme = "light", report = REPORT.desktop } = $props();
+  const P = REPORT.phone;
+  const D = $derived(report);
+  const cards = $derived(lensCards(D.payload, D.counts));
+  const rows = $derived(bandRows(D, D.counts, [...(D.gaps?.biggest ?? []), ...(D.gaps?.agree ?? [])]));
+  const next = $derived((D.lookNext ?? []).map(([lens, area]) => ({ lens, area, row: cards.find((c) => c.lens === lens)?.rows.find((r) => r.name === area) }))
+    .filter((n) => n.row).map((n) => ({ lens: n.lens, area: n.area, level: n.row.level })));
 </script>
 
 {#snippet eye()}<Glyph d={G.eye} />{/snippet}

@@ -19,12 +19,12 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, LENS_ORDER, lensLabel, bandRow } from "./data.js";
+  import { REPORT, LENS_ORDER, lensLabel, bandRows } from "./data.js";
 
   let { phone = false, theme = "light" } = $props();
   const src = $derived(phone ? REPORT.phone : REPORT.desktop);
-  const biggest = $derived(src.gaps.biggest.map((n) => bandRow(src, src.counts, n)));
-  const agree = $derived(src.gaps.agree.map((n) => bandRow(src, src.counts, n)));
+  const biggest = $derived(bandRows(src, src.counts, src.gaps.biggest));
+  const agree = $derived(bandRows(src, src.counts, src.gaps.agree));
   const review = $derived(src.review);
   const crumbs = $derived([{ label: review.project, href: out("project") }, { label: review.title }]);
 </script>
