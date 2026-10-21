@@ -12,6 +12,7 @@ import ActionPlan from "../ui-next/src/screens/actions/ActionPlan.svelte";
 import Print from "../ui-next/src/screens/actions/Print.svelte";
 import Share from "../ui-next/src/screens/actions/Share.svelte";
 import Sandbox from "../ui-next/src/screens/actions/Sandbox.svelte";
+import Paper from "../ui-next/src/screens/actions/Paper.svelte";
 import PaperEntry from "../ui-next/src/screens/actions/PaperEntry.svelte";
 import MenuSheet from "../ui-next/src/screens/actions/MenuSheet.svelte";
 import Qr from "../ui-next/src/screens/actions/Qr.svelte";
@@ -272,6 +273,27 @@ describe("actions lane parts", () => {
     expect(a.querySelectorAll(".l-grid[data-tpl=survey-row]").length).toBe(R.surveys.length);
     await fireEvent.click(d.querySelector("button[aria-label=Close]") as HTMLElement);
     expect(d.hasAttribute("open")).toBe(false);
+  });
+  it("paper preview: Print and Sandbox draw the sheet on the section 2 Paper preview row (.psheet[data-fit]); phone draws none (VALIDATION-integration N1)", () => {
+    for (const C of [Print, Sandbox]) {
+      const s = mount(C).querySelectorAll(".psheet");
+      expect(s.length).toBe(1);
+      expect(s[0].getAttribute("data-fit")).toBe("a4");
+      expect(s[0].getAttribute("aria-hidden")).toBe("true");
+      expect(s[0].querySelector(":scope > .paper")).not.toBeNull();
+      expect(mount(C, { phone: true }).querySelector(".psheet")).toBeNull(); // PrintPhone and SandboxPhone draw no preview, as their boards
+    }
+    const letter = render(Paper, { props: { paper: R.paper, qr: R.qr.survey, fit: "letter" } }).container.querySelector(".psheet")!;
+    expect(letter.getAttribute("data-fit")).toBe("letter");
+    expect(() => render(Paper, { props: { paper: R.paper, qr: R.qr.survey, fit: "preview" } })).toThrow(/fit is "a4" or "letter"/);
+  });
+  it("print: the dialog's columns fit 1280x800 on arrival (16px form column, form-well notice, 8px preview column; Chromium: content 748px in the 750px box)", () => {
+    const d = mount(Print).querySelector("dialog") as HTMLDialogElement;
+    const [form, preview] = [...d.querySelectorAll(":scope > .l-grid > .l-stack")];
+    expect(form.getAttribute("data-gap")).toBe("4");
+    expect(preview.getAttribute("data-gap")).toBe("2");
+    expect(form.querySelector(":scope > .solid.l-card")!.getAttribute("data-pad")).toBe("form");
+    expect(form.lastElementChild!.querySelector(".btn-primary")).not.toBeNull(); // the action row closes the form column
   });
   it("copy controls are buttons that copy the link (not links that navigate)", async () => {
     const rows = render(CollectGroups, { props: { groups: R.groups, surveys: R.surveys, host: R.host } }).container;
