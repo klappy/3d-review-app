@@ -59,10 +59,10 @@
       <Grid cols={2} gap={5}>
         <Card hi gap={5} label="Enter a paper answer">
           <div><h2 class="h2">Enter a paper answer</h2><p class="small t-15">Type the code from the top of the paper, or pick the survey. Enter the answers exactly as written — you are the participant's hands here.</p></div>
-          <Grid template="barbell" gap={4}>
+          <Stack gap={3}>
             <div><label class="lbl" for="pe-code">Code on the paper</label><input class="in kbd" value={D.code} id="pe-code" /></div>
             <div class="solid l-card l-row" data-gap="3"><LensDot lens={D.survey.lens} decorative /><b>{D.survey.name}</b><span class="small">{D.survey.line}</span></div>
-          </Grid>
+          </Stack>
           <hr class="hr" />
           {#each items as it}
             <fieldset class="opts">
