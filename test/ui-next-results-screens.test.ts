@@ -14,13 +14,16 @@ import { OUT } from "../ui-next/src/screens/results/links.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import results from "../ui-next/src/screens/results/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages } from "../ui-next/src/screens/results/data.js";
+import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages, lensKey, canonicalPayload, responsesText, LENS_ORDER } from "../ui-next/src/screens/results/data.js";
+import { LENSES } from "../ui/lens-surveys.js";
+import synthetic from "./fixtures/synthetic-report-renderer-v1.json";
 import Results from "../ui-next/src/screens/results/Results.svelte";
 import ResultsAnswers from "../ui-next/src/screens/results/ResultsAnswers.svelte";
 import ResultsGaps from "../ui-next/src/screens/results/ResultsGaps.svelte";
 import ResultsHeld from "../ui-next/src/screens/results/ResultsHeld.svelte";
 import Report from "../ui-next/src/screens/results/Report.svelte";
 import ReportDetailed from "../ui-next/src/screens/results/ReportDetailed.svelte";
+import LensCard from "../ui-next/src/screens/results/LensCard.svelte";
 import BandBar from "../ui-next/src/screens/results/BandBar.svelte";
 
 type Props = Record<string, unknown>;
@@ -648,3 +651,70 @@ describe("/next/ routes for the results lane", () => {
     expect(route(p("?screen=results"), undefined, Object.keys(REGISTRY)).view).toBe("components");
   });
 });
+
+// Validator round 5 (VALIDATION-results-r5.md): R5-1 the live built report's lens spelling, R5-2 singular counts, R5-3 page
+// counts, R5-5 the phone overview line counts what the sheet draws.
+describe("results round 5: a live payload renders; counts read right", () => {
+  type Ctx = { lenses: { lens: string }[]; cross_lens_multi: { construct_name: string; lens_scores: { lens: string; score: number }[] }[]; evidence: { label: string; n: number }[] };
+  const contexts = (synthetic as unknown as { contexts: Record<string, Ctx> }).contexts;
+  const ctx = contexts["assess_syn_earning-trust-2026-01"];
+  it("lensKey maps every LENSES spelling and the short ids to team | community | church, anything else to null", () => {
+    expect((LENSES as string[]).map((l) => lensKey(l))).toEqual(["team", "church", "community"]);
+    for (const k of LENS_ORDER) expect([lensKey(k), lensKey(k.toUpperCase()), lensKey(` ${k} `)]).toEqual([k, k, k]);
+    expect([lensKey("translation team"), lensKey("Consultant"), lensKey(""), lensKey(undefined), lensKey(3)]).toEqual(["team", null, null, null, null]);
+  });
+  it("R5-1: the synthetic built report (live spelling) gives three cards, counts from its evidence and areas on both sides", () => {
+    expect(ctx.lenses.map((l) => l.lens)).toEqual(["Church", "Community", "Translation Team"]); // the live spelling, not the ids
+    const cards = lensCards(ctx);
+    expect(cards.map((c) => [c.lens, c.label, c.n])).toEqual([["team", "Translation team", 4], ["community", "Community", 6], ["church", "Church", 2]]);
+    expect(cards.every((c) => c.rows.length > 0 && c.rows.every((r) => typeof r.items === "number"))).toBe(true);
+    const n = responsesFor(ctx);
+    expect([n("team"), n("community"), n("church")]).toEqual([4, 6, 2]);
+    const names = ctx.cross_lens_multi.map((a) => a.construct_name);
+    const rows = bandRows({ payload: ctx }, undefined, names);
+    expect(rows.length).toBe(names.length);
+    for (const r of rows) expect(r.perspectives).toBe(2);
+    expect(rows.flatMap((r) => r.notes).filter((x) => x.endsWith("not asked")).length).toBe(names.length); // one lens not asked per area, not all three
+    // Every context in the fixture renders a card for each lens it carries.
+    for (const c of Object.values(contexts)) {
+      const keys = c.lenses.map((l) => lensKey(l.lens)).filter(Boolean);
+      expect(lensCards(c).map((x) => x.lens).sort()).toEqual([...keys].sort());
+    }
+    // The input is not changed; the canonical payload is cached per object.
+    expect(ctx.lenses[0].lens).toBe("Church");
+    expect(canonicalPayload(ctx)).toBe(canonicalPayload(ctx));
+    expect(canonicalPayload(ctx).evidence.map((e: { label: string }) => e.label.split(" — ")[0]).sort()).toEqual(["church", "community", "team"]);
+  });
+  it("R5-1: Report and ReportDetailed render the live payload: three perspective cards with their counts", () => {
+    const names = ctx.cross_lens_multi.map((a) => a.construct_name);
+    const live = { ...REPORT.desktop, payload: ctx, counts: undefined, gaps: { biggest: names.slice(0, 3), agree: [] }, radar: names, lookNext: [] };
+    const d = mount(ReportDetailed, { report: live });
+    expect(all(d, ".paper .solid[data-lens] > .l-row .small")).toEqual(["4 responses", "6 responses", "2 responses"]);
+    expect(text(d)).not.toMatch(/null|undefined|NaN/);
+    const r = mount(Report, { report: live });
+    expect(r.querySelectorAll(".paper .solid[data-lens]").length).toBe(3);
+    expect(r.querySelectorAll("svg[data-part=band-barbell]").length).toBe(3);
+  });
+  it("R5-2: one response, singular, on the cards and the report heads", () => {
+    expect([responsesText(1), responsesText(6), responsesText(null)]).toEqual(["1 response", "6 responses", "responses not counted"]);
+    const D = copy();
+    D.counts = { ...D.counts, church: 1 };
+    const cards = lensCards(D.payload, D.counts);
+    const desk = render(LensCard as never, { props: { card: cards.find((c) => c.lens === "church") } }).container;
+    expect(text(desk)).toContain("1 response");
+    expect(text(desk)).not.toContain("1 responses");
+    const none = render(LensCard as never, { props: { card: { ...cards[0], n: null }, phone: true } }).container;
+    expect(text(none.querySelector(".h3"))).toBe("Translation team · responses not counted");
+  });
+  it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
+    expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);
+    expect(mount(Report, { phone: true }).textContent).toContain("Levels, the three biggest gaps.");
+    const one = { ...REPORT.phone, gaps: { biggest: REPORT.phone.gaps.biggest.slice(0, 1), agree: [] } };
+    expect(mount(Report, { phone: true, report: one }).textContent).toContain("Levels, the biggest gap.");
+    const none = { ...REPORT.phone, gaps: { biggest: [], agree: [] } };
+    const t = mount(Report, { phone: true, report: none }).textContent ?? "";
+    expect(t).toContain("Levels.");
+    expect(t).not.toMatch(/radar/i);
+  });
+});
+

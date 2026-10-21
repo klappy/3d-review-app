@@ -27,7 +27,7 @@
   import Radar from "./Radar.svelte";
   import Report from "./Report.svelte";
   import { href } from "../href.js";
-  import { REPORT, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, responsesText, countWord, evidenceSheets } from "./data.js";
+  import { REPORT, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, responsesText, countWord, evidenceSheets, detailedPages } from "./data.js";
 
   let { phone = false, theme = "light", report } = $props();
   const D = $derived(report ?? REPORT.desktop);
@@ -36,7 +36,7 @@
   const all = $derived(comparedRows(D, D.counts));
   const shape = $derived(radar(D, D.radar, D.counts));
   const sheets = $derived(evidenceSheets(cards));
-  const PAGES = $derived(2 + sheets.length);
+  const PAGES = $derived(detailedPages(cards));
   const FOOT = $derived(`Built from ${D.review.responses} responses on ${D.review.builtOn} · Scores are 0–100. Every other page shows levels, which are bands · nothing here identifies a person`);
   const shapeHeading = $derived(shape ? `The ${countWord(shape.legend.length)} perspectives as one shape` : "The perspectives as one shape");
   const tensionsLead = $derived(tensions.length === 0 ? "No area has two perspectives to compare yet." : tensions.length === 1 ? "The area where the perspectives are furthest apart." : `The ${countWord(tensions.length)} areas where the perspectives are furthest apart.`);

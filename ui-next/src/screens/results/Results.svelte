@@ -23,7 +23,7 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, lensCards } from "./data.js";
+  import { REPORT, lensCards, detailedPages } from "./data.js";
 
   let { phone = false, theme = "light" } = $props();
   const D = REPORT.desktop, P = REPORT.phone;
@@ -75,7 +75,7 @@
         </Row>
         <Row gap={2}>
           <Button label="Overview report · 1 page" href={href("report")} lead={download} />
-          <Button label="Detailed report · 4 pages" href={href("report-detailed")} lead={download} />
+          <Button label={`Detailed report · ${detailedPages(cards)} pages`} href={href("report-detailed")} lead={download} />
           <Button label="Share results with someone" href={out("people")} lead={people} />
         </Row>
       </Row>

@@ -27,13 +27,17 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, LEVEL_WORD, lensLabel, lensCards, bandRows, withNotes, detailedPages } from "./data.js";
+  import { REPORT, LEVEL_WORD, lensLabel, lensCards, bandRows, withNotes, detailedPages, countWord } from "./data.js";
 
   let { phone = false, theme = "light", report } = $props();
   const D = $derived(report ?? (phone ? REPORT.phone : REPORT.desktop));
   const cards = $derived(lensCards(D.payload, D.counts));
   const pages = $derived(detailedPages(cards));
   const rows = $derived(bandRows(D, D.counts, [...(D.gaps?.biggest ?? []), ...(D.gaps?.agree ?? [])]));
+  // The phone list's line names what the overview sheet draws, counted (R5-5): its levels and the biggest gaps it resolves.
+  // The sheet draws no radar (that is the detailed report), so the board's "the radar" is not claimed here.
+  const biggest = $derived(bandRows(D, D.counts, D.gaps?.biggest ?? []).length);
+  const overviewLine = $derived(`Levels${biggest > 1 ? `, the ${countWord(biggest)} biggest gaps` : biggest === 1 ? ", the biggest gap" : ""}.`);
   const next = $derived((D.lookNext ?? []).map(([lens, area]) => ({ lens, area, row: cards.find((c) => c.lens === lens)?.rows.find((r) => r.name === area) }))
     .filter((n) => n.row).map((n) => ({ lens: n.lens, area: n.area, level: n.row.level })));
 </script>
@@ -48,7 +52,7 @@
     <a class="link small" href={href("results")}>{D.review.title} · results</a>
     <h1 class="title-phone">Reports</h1>
     <Card gap={3} label="Overview · 1 page">
-      <div class="l-row" data-gap="3" data-align="start"><span class="icn icn-lens" data-lens="team"><Glyph d={G.doc} /></span><Stack gap={1}><span class="h3">Overview · 1 page</span><span class="small">Levels, the three biggest gaps, the radar.</span></Stack></div>
+      <div class="l-row" data-gap="3" data-align="start"><span class="icn icn-lens" data-lens="team"><Glyph d={G.doc} /></span><Stack gap={1}><span class="h3">Overview · 1 page</span><span class="small">{overviewLine}</span></Stack></div>
       <Row gap={2}><Button label="Preview" href={href("report")} lead={eye} block /><Button label="Share PDF" href="#share-pdf" lead={share} block /></Row>
     </Card>
     <Card gap={3} label={`Detailed · ${pages} pages`}>

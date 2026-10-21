@@ -7,11 +7,43 @@
 import { v3ScoreBand, V3_BAND_CUTOFFS } from "../../../../ui/assess/v3-assessment.js";
 import { lensSpreadRows, lensLabel, lensRespondents, constructName, lensesCopy } from "../../../../ui/report-lenses.js";
 import { radarModel, wrap } from "../../../../ui/report-radar.js";
+import { LENSES } from "../../../../ui/lens-surveys.js";
 import REPORT from "../../../fixtures/results/report.json";
 import ANSWERS from "../../../fixtures/results/answers.json";
 
 export { REPORT, ANSWERS, lensLabel };
 export const LENS_ORDER = Object.freeze(["team", "community", "church"]);
+
+// One lens key for every lens read (R5-1). The live built report spells perspectives the way ui/lens-surveys.js LENSES does
+// ("Translation Team", "Community", "Church": payload.lenses, lens_scores and the evidence label prefixes), the fixtures use the
+// short ids; both, in any case, map through LENSES and lensLabel to team | community | church. Anything else is not a
+// perspective here (null), and LENS_ORDER filters it out as before.
+const KEY_OF = new Map(LENS_ORDER.flatMap((key) => [[key, key], ...LENSES.filter((name) => lensLabel(name) === lensLabel(key)).map((name) => [name.toLowerCase(), key])]));
+export const lensKey = (lens) => (typeof lens === "string" ? KEY_OF.get(lens.trim().toLowerCase()) ?? null : null);
+const keyed = (lens) => lensKey(lens) ?? lens;
+const canon = new WeakMap();
+/** The payload with every lens read on the keys above: payload.lenses[].lens, cross_lens_multi / cross_lens_single
+ *  lens_scores[].lens and the evidence label prefix ("Church — Involved Pastor" -> "church — Involved Pastor"), so the
+ *  adapter's exact matches, ui/report-lenses.js lensRespondents and lensSpreadRows all read one spelling. Live sub-dimensions
+ *  carry n_items_included where the fixtures carry items (lensCards reads either). Pure; cached per payload object. */
+export function canonicalPayload(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+  if (canon.has(payload)) return canon.get(payload);
+  const obj = (v) => v && typeof v === "object";
+  const scores = (entries) => (Array.isArray(entries) ? entries.map((e) => (obj(e) && Array.isArray(e.lens_scores) ? { ...e, lens_scores: e.lens_scores.map((s) => (obj(s) ? { ...s, lens: keyed(s.lens) } : s)) } : e)) : entries);
+  const label = (e) => {
+    if (!obj(e) || typeof e.label !== "string") return e;
+    const [head, ...rest] = e.label.split(" — "), key = lensKey(head);
+    return key ? { ...e, label: [key, ...rest].join(" — ") } : e;
+  };
+  const out = { ...payload };
+  if (Array.isArray(payload.lenses)) out.lenses = payload.lenses.map((l) => (obj(l) ? { ...l, lens: keyed(l.lens) } : l));
+  if ("cross_lens_multi" in payload) out.cross_lens_multi = scores(payload.cross_lens_multi);
+  if ("cross_lens_single" in payload) out.cross_lens_single = scores(payload.cross_lens_single);
+  if (Array.isArray(payload.evidence)) out.evidence = payload.evidence.map(label);
+  canon.set(payload, out);
+  return out;
+}
 export const MIN_RESPONSES = V3_BAND_CUTOFFS.minResponses;
 
 // Band word (v3ScoreBand) -> Level key (ui-next/src/Level.svelte LEVELS; design-system.md section 4 level words).
@@ -29,11 +61,12 @@ export function levelOf(score, responses) {
  *  needed). Cards, evidence tables, band and score barbells, the tensions order and the radar all read it, so a perspective
  *  under the minimum is hidden in every one of them, with or without `counts`. */
 export function responsesFor(payload, counts) {
-  const evidence = lensRespondents(payload);
+  const evidence = lensRespondents(canonicalPayload(payload));
   return (lens) => counts?.[lens] ?? evidence.get(lens) ?? null;
 }
-/** "6 responses"; with no count anywhere, the current UI's words ("responses not counted"), never "null responses". */
-export const responsesText = (n) => (n === null || n === undefined ? lensesCopy.noCount : `${n} responses`);
+/** "6 responses", "1 response" (ui/report-lenses.js lensesCopy.respondents); with no count anywhere, the current UI's words
+ *  ("responses not counted"), never "null responses" (R5-2). */
+export const responsesText = (n) => (n === null || n === undefined ? lensesCopy.noCount : lensesCopy.respondents(n));
 
 // The four bands on the band barbell, low to high (design-system.md Lens dot / barbell row: four-band axis).
 export const BANDS = Object.freeze(["urgent", "support", "growing", "strong"]);
@@ -43,7 +76,8 @@ export const bandCentre = (band) => 12.5 + 25 * BANDS.indexOf(band);
 /** Per-perspective cards: [{ lens, label, n, level, rows: [{ name, score, level, items, note }] }] in lens order; a perspective
  *  missing from the payload has no card (callers iterate, never index). An area at "more" (under the minimum responses, or no
  *  score) carries score null, so no table or label can print a score the level hides (R3-1). */
-export function lensCards(payload, counts) {
+export function lensCards(raw, counts) {
+  const payload = canonicalPayload(raw);
   const lenses = Array.isArray(payload?.lenses) ? payload.lenses : [], responses = responsesFor(payload, counts);
   return LENS_ORDER.map((lens) => lenses.find((l) => l && l.lens === lens)).filter(Boolean).map((l) => {
     const n = responses(l.lens);
@@ -51,7 +85,7 @@ export function lensCards(payload, counts) {
       lens: l.lens, label: lensLabel(l.lens), n, level: levelOf(l.score, n),
       rows: (Array.isArray(l.sub_dimensions) ? l.sub_dimensions : []).filter(Boolean).map((s) => {
         const level = levelOf(s.score, n);
-        return { name: s.sub_dimension, score: level === "more" ? null : s.score ?? null, level, items: s.items, note: s.note };
+        return { name: s.sub_dimension, score: level === "more" ? null : s.score ?? null, level, items: s.items ?? s.n_items_included, note: s.note };
       }),
     };
   });
@@ -66,7 +100,7 @@ const list = (v) => (Array.isArray(v) ? v : []);
  *  { name, spread, lenses, order (cross_lens_multi then cross_lens_single), multi, question }. A malformed entry (null, no
  *  scored perspective) is skipped, never thrown (R4-3); a blank or odd name reads as constructName gives it ("—", "42"). */
 function areas(report) {
-  const payload = report?.payload;
+  const payload = canonicalPayload(report?.payload);
   if (!payload || typeof payload !== "object") return [];
   const entries = [...list(payload.cross_lens_multi).map((e) => [e, true]), ...list(payload.cross_lens_single).map((e) => [e, false])];
   return entries.map(([entry, multi], order) => {
@@ -123,13 +157,13 @@ export const gapLead = (row) => (row.spread === null || row.spread === undefined
 /** Numeric barbell rows (detailed report): exact scores on 0-100, red span at two bands apart or more, else a quiet span.
  *  Only the perspectives band() places get a dot, a spread or a place in the order (under the minimum: no score shown, named
  *  in notes). With names: those areas in that order. Without: biggest placed spread first, areas under two placed last (R3-1);
- *  ties break on payload order, then area name: keys no hidden score can move (R4-1), never lensSpreadRows' full-spread order. */
+ *  ties break on payload order (a unique index, so no further key is needed): a key no hidden score can move (R4-1), never
+ *  lensSpreadRows' full-spread order. */
 export function scoreRows(report, counts, names) {
   const all = areas(report), responses = responsesFor(report?.payload, counts);
   if (names) return byName(all, names).map((a) => scoreRow(a, responses));
-  const cmp = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
   return all.map((a) => ({ a, row: scoreRow(a, responses) }))
-    .sort(({ a: x, row: p }, { a: y, row: q }) => (p.spread === null) - (q.spread === null) || (q.spread ?? 0) - (p.spread ?? 0) || x.order - y.order || cmp(x.name, y.name))
+    .sort(({ a: x, row: p }, { a: y, row: q }) => (p.spread === null) - (q.spread === null) || (q.spread ?? 0) - (p.spread ?? 0) || x.order - y.order)
     .map(({ row }) => row);
 }
 /** Every cross_lens_multi area in payload order (detailed report page 2, "All areas compared"), malformed entries skipped and
@@ -149,7 +183,7 @@ function scoreRow(area, responses) {
  *  is a spoke only when two placed perspectives scored it. legend: the drawn perspectives in lens order; notes: the others
  *  ("Church more input needed", "Church not asked"). null under radarModel's minimum spokes. */
 export function radar(report, names, counts) {
-  const payload = report?.payload ?? {}, responses = responsesFor(payload, counts);
+  const payload = canonicalPayload(report?.payload) ?? {}, responses = responsesFor(payload, counts);
   const want = list(names);
   const named = list(payload.cross_lens_multi).filter((a) => a && typeof a === "object" && want.includes(constructName(a.construct_name)));
   const num = (v) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN); // as ui/report-lenses.js
