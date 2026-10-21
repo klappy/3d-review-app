@@ -5,7 +5,9 @@
      sheet row) in the paper scope (.pfoot); the board's 36px Newsreader title has no type row (generator line). Links: ../href.js href()
      with this screen's w/theme. One .btn-primary per page: desktop "Download PDF" (top bar), phone "Share the PDF" (phone-bar).
      Controls: "Copy share link" / "Copy link" copy the plan link (./CopyButton.svelte); "Email it" goes to people (both widths); "Print"
-     opens the browser's print (./ActButton.svelte). "Download PDF" / "Share the PDF" (#pdf) wait on a PDF of the plan: RESULTS debt. -->
+     opens the browser's print (./ActButton.svelte). A refused copy says "Copy failed" (a short label, so the phone row keeps its width)
+     and its status says to select the link: the desktop page prints the link; the phone card draws none, so it shows the link in a
+     readonly field once the copy is refused, and the row wraps rather than clip at 320 (VALIDATION-actions-r4.md R4-1). "Download PDF" / "Share the PDF" (#pdf) wait on a PDF of the plan: RESULTS debt. -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Card from "../../Card.svelte";
@@ -31,6 +33,7 @@
   const at = $derived(carry(phone, theme));
   // "Print" prints this page through the browser, as the current UI's print buttons do (ui/stage-screens.js doc.defaultView.print()).
   const printPage = () => globalThis.print?.();
+  let refused = $state(false);
 </script>
 
 {#snippet mail()}<Ico d={A.mail} />{/snippet}
@@ -52,7 +55,8 @@
     <Card gap={2} label="Share">
       <span class="micro">Share</span>
       <p class="small">Read-only link, expires in 90 days.</p>
-      <Row gap={2}><CopyButton text={D.share.url} label="Copy link" block /><Button label="Email it" href={href("people", at)} lead={mail} block /></Row>
+      <Row wrap gap={2}><CopyButton text={D.share.url} label="Copy link" block bind:failed={refused} /><Button label="Email it" href={href("people", at)} lead={mail} block /></Row>
+      {#if refused}<input class="in small" readonly value={D.share.url} aria-label="Link to this plan" />{/if}
     </Card>
   {:else}
     <article class="paper" data-sheet="page" aria-label={`Next steps, ${R.review.title}`}>

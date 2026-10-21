@@ -8,8 +8,9 @@
      dialog rows (1000px wide, 32/36, --dialog, ::backdrop --scrim, scroll lock); the title takes focus (tabindex -1, long content); a
      visible "×" Close tops the preview column, Escape and a backdrop tap close it, Cancel goes back to Collect. One .btn-primary per page:
      "Print 2 surveys" (the dialog's; the head's "Share the survey" is secondary as on the board), phone the phone-bar. Its count follows the
-     bound checkboxes; with none ticked the desktop primary is disabled with the reason beside it (the shared PhoneBar takes no disabled:
-     handed back). It is a stand-in link to Collect until printing is wired (RESULTS-actions debt 2). Links: ../href.js. -->
+     bound checkboxes; with none ticked the primary is disabled on both widths and names its reason with aria-describedby (desktop: the
+     status line beside it; phone: the shared PhoneBar's disabled + ariaDescribedby, the reason in the card; VALIDATION-actions-r4.md
+     R4-2, R4-3). It is a stand-in link to Collect until printing is wired (RESULTS-actions debt 2). Links: ../href.js. -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
@@ -53,7 +54,7 @@
 </script>
 
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="Print paper surveys" parent="Collect" back={href("collect", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<TopBar home={href("home", at)} who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label={printLabel} href={href("collect", at)} backHref={href("collect", at)} backLabel="Cancel" />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label={printLabel} href={href("collect", at)} backHref={href("collect", at)} backLabel="Cancel" disabled={!count} ariaDescribedby="pp-why" />{/if}{/snippet}
 {#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Updated just now{/snippet}
 {#snippet print()}<Ico d={A.print} />{/snippet}
 {#snippet language(id, label)}
@@ -65,7 +66,7 @@
     <ReviewHead phone {theme} title={R.review.title} project={R.project} stage="collecting" viewed="collect" live="collect" />
     <Card gap={2} label="Paper surveys">
       <span class="micro">Paper surveys</span>
-      <p class="small">Pick the surveys. Your phone opens its print or share sheet so you can send the PDF to a printer or to someone with one.<span role="status">{#if !count} {NONE}{/if}</span></p>
+      <p class="small">Pick the surveys. Your phone opens its print or share sheet so you can send the PDF to a printer or to someone with one.<span role="status" id="pp-why">{#if !count} {NONE}{/if}</span></p>
       {#each R.surveys as s, i}
         <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" value={i} bind:group={picked} /><b>{s.name}</b></span><span class="small">{D.phoneStatus[i]}</span></label>
       {/each}
@@ -98,7 +99,7 @@
             </div>
             <!-- Nothing ticked: the primary is the shared Button disabled, with the reason beside it (design-system.md section 2
                  Disabled, "say why next to it"); the status line is always present (empty), so the reason is announced when it appears. -->
-            <div class="l-row" data-justify="end" data-gap="2"><p class="small" role="status">{#if !count}{NONE}{/if}</p><Button label="Cancel" variant="quiet" href={href("collect", at)} />{#if count}<Button label={printLabel} variant="primary" lg href={href("collect", at)} lead={print} />{:else}<Button label={printLabel} variant="primary" lg disabled lead={print} />{/if}</div>
+            <div class="l-row" data-justify="end" data-gap="2"><p class="small" role="status" id="pt-why">{#if !count}{NONE}{/if}</p><Button label="Cancel" variant="quiet" href={href("collect", at)} />{#if count}<Button label={printLabel} variant="primary" lg href={href("collect", at)} lead={print} />{:else}<Button label={printLabel} variant="primary" lg disabled ariaDescribedby="pt-why" lead={print} />{/if}</div>
           </Stack>
           <Stack gap={3}>
             <Row split gap={2}><span class="micro">{D.preview}</span><IconAction d={A.x} ariaLabel="Close" onclick={() => closeDialog(dialog)} /></Row>

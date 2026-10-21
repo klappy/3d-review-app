@@ -290,21 +290,22 @@ describe("actions lane parts", () => {
     }
     const off = render(CopyButton, { props: { text: "x", name: "Y" } }).container.querySelector("button") as HTMLButtonElement;
     await fireEvent.click(off);
-    await vi.waitFor(() => expect(text(off)).toBe("Select the link to copy"));
+    await vi.waitFor(() => expect(text(off)).toBe("Copy failed"));
   });
   // Validator round 3 R3-5: a refused copy or share showed only as a title tooltip.
   it("a refused copy or share is visible on the control and announced by its status line", async () => {
     const live = (root: Element) => root.querySelector(".sr-only[role=status]") as HTMLElement;
-    // Labelled form: the visible label (its accessible name) changes; the status line, empty until then, says what happened.
+    // Labelled form: the visible label (its accessible name) changes to the short "Copy failed" (R4-1: the row keeps its width);
+    // the status line, empty until then, carries the guidance.
     const lab = render(CopyButton, { props: { text: "x", label: "Copy share link", lead: "link" } }).container;
     expect(text(live(lab))).toBe("");
     await fireEvent.click(lab.querySelector("button") as HTMLElement);
-    await vi.waitFor(() => expect(text(lab.querySelector("button") as HTMLElement)).toBe("Select the link to copy"));
+    await vi.waitFor(() => expect(text(lab.querySelector("button") as HTMLElement)).toBe("Copy failed"));
     expect(text(live(lab))).toBe("Copy failed: select the link to copy it.");
-    // Default form: visible "Select the link to copy", named with whose link it is (the visible words are in the name).
+    // Default form: visible "Copy failed", named with whose link it is (the visible words are in the name).
     const def = render(CopyButton, { props: { text: "x", name: "Translators" } }).container;
     await fireEvent.click(def.querySelector("button") as HTMLElement);
-    await vi.waitFor(() => expect(def.querySelector("button")?.getAttribute("aria-label")).toBe("Select the link to copy for Translators"));
+    await vi.waitFor(() => expect(def.querySelector("button")?.getAttribute("aria-label")).toBe("Copy failed for Translators"));
     expect(text(live(def))).toBe("Copy failed for Translators: select the link to copy it.");
     // Icon form: the warning glyph replaces the copy glyph, and the name says so.
     const ic = render(CopyButton, { props: { text: "x", name: "Translators", icon: true } }).container;
@@ -331,7 +332,32 @@ describe("actions lane parts", () => {
     expect(text(live(so))).toBe("");
     await fireEvent.click(sob);
     await vi.waitFor(() => expect(sob.getAttribute("aria-label")).toBe("Sharing failed: select the link for Translators"));
-    expect(text(live(so))).toBe("Sharing failed: select the link for Translators.");
+    await vi.waitFor(() => expect(text(live(so))).toBe("Sharing failed: select the link for Translators."));
+  });
+  // Validator round 4 R4-3: a repeated outcome left the status text identical, so the DOM did not change and nothing was re-announced.
+  it("a repeated outcome is announced again: the status line is cleared, then set (copy and share-out)", async () => {
+    const said = async (root: Element) => {
+      const st = root.querySelector(".sr-only[role=status]") as HTMLElement;
+      const seen: string[] = [];
+      const mo = new MutationObserver(() => seen.push(st.textContent ?? ""));
+      mo.observe(st, { childList: true, characterData: true, subtree: true });
+      return { st, seen, stop: () => mo.disconnect() };
+    };
+    for (const [root, want] of [
+      [render(CopyButton, { props: { text: "x", name: "Translators" } }).container, "Copy failed for Translators: select the link to copy it."],
+      [render(ShareOut, { props: { text: "x", name: "Translators" } }).container, "Sharing failed: select the link for Translators."],
+    ] as [HTMLElement, string][]) {
+      const b = root.querySelector("button") as HTMLButtonElement;
+      const s = await said(root);
+      await fireEvent.click(b);
+      await vi.waitFor(() => expect(text(s.st)).toBe(want));
+      s.seen.length = 0;
+      await fireEvent.click(b);
+      await vi.waitFor(() => expect(s.seen.at(-1)).toBe(want));
+      s.stop();
+      expect(s.seen).toContain("");
+      expect(text(s.st)).toBe(want);
+    }
   });
 });
 
@@ -362,10 +388,32 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
       await vi.waitFor(() => expect(text(pc)).toBe("Copied"));
       expect(writeText).toHaveBeenCalledTimes(2);
       expect(p(byText(ph, "a", "Email it").getAttribute("href") ?? "").get("screen")).toBe("people");
+      expect(ph.querySelector("input[readonly]")).toBeNull();
     } finally {
       Reflect.deleteProperty(navigator, "clipboard");
       window.print = before;
     }
+  });
+  // Validator round 4 R4-1: the refused label "Select the link to copy" widened the button past the card at 390 and pointed at a
+  // link ActionPlanPhone does not draw.
+  it("action plan phone: a refused copy keeps a short label, the row may wrap, and the link to select appears", async () => {
+    const ph = mount(ActionPlan, { phone: true });
+    const pc = [...ph.querySelectorAll("button")].find((b) => text(b) === "Copy link") as HTMLButtonElement;
+    expect(pc.parentElement!.hasAttribute("data-wrap")).toBe(true);
+    expect(ph.querySelector("input[readonly]")).toBeNull();
+    await fireEvent.click(pc);
+    await vi.waitFor(() => expect(text(pc)).toBe("Copy failed"));
+    const link = ph.querySelector("input.in[readonly]") as HTMLInputElement;
+    expect(link.value).toBe(PLAN.share.url);
+    expect(link.getAttribute("aria-label")).toBe("Link to this plan");
+    expect(text(ph.querySelector(".sr-only[role=status]") as HTMLElement)).toBe("Copy failed: select the link to copy it.");
+    // Desktop prints the link on the page, so it adds no field.
+    const d = mount(ActionPlan);
+    const dc = [...d.querySelectorAll("button")].find((b) => text(b) === "Copy share link") as HTMLButtonElement;
+    await fireEvent.click(dc);
+    await vi.waitFor(() => expect(text(dc)).toBe("Copy failed"));
+    expect(d.querySelector("input[readonly]")).toBeNull();
+    expect(text(d.querySelector(".paper .kbd") as HTMLElement)).toBe(PLAN.share.url);
   });
   it("share phone: the share-out icon hands the row's link to the share sheet, else copies it", async () => {
     const s = R.surveys[0];
@@ -439,7 +487,6 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     "Complete the review → home": "debt 3: no review-stage write in UI Next",
     "Email it → people": "debt 3: no mail seam; People holds the addresses",
     "Email the links to someone → people": "debt 1: no mail seam; People holds the addresses",
-    "Print surveys → collect": "debt 2: printing not wired (phone bar with none ticked; the shared PhoneBar takes no disabled)",
     "Print 2 surveys → collect": "debt 2: printing not wired (printDocumentHtml / openPrintDocument)",
     "Try translating again → print": "debt 2: translatePrint not called",
     "Save and enter the next paper → paper-entry": "debt 5: saving a paper response not wired",
@@ -466,10 +513,11 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     expect(NAV.filter((n) => n in STAND_IN)).toEqual([]);
     const found = new Set<string>();
     for (const [, Comp, desk] of SCREENS) for (const props of desk ? [{}, { phone: true }] : [{ phone: true }]) for (const a of lanesLinks(mount(Comp, props))) found.add(control(a));
-    // Print with nothing ticked draws a disabled button on desktop; on the phone the bar reads "Print surveys" (handed back: PhoneBar).
+    // Print with nothing ticked draws a disabled button at both widths (phone: the shared PhoneBar's disabled, R4-2), so no link appears.
     const none = mount(Print, { phone: true });
     for (const cb of none.querySelectorAll<HTMLInputElement>("input.cb")) if (cb.checked) cb.click();
     flushSync();
+    expect(lanesLinks(none).map(control)).not.toContain("Print surveys → collect");
     for (const a of lanesLinks(none)) found.add(control(a));
     expect([...found].sort()).toEqual([...NAV, ...Object.keys(STAND_IN)].sort());
   });
@@ -494,6 +542,7 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     expect((primary() as HTMLButtonElement).disabled).toBe(true);
     expect(text(primary())).toBe("Print surveys");
     expect(reason()).toBe("Tick at least one survey to print.");
+    expect(primary().getAttribute("aria-describedby")).toBe(d.querySelector("dialog p[role=status]")!.id);
     expect(d.querySelectorAll(".btn-primary").length).toBe(1);
     boxes[0].click();
     boxes[4].click();
@@ -514,6 +563,17 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     flushSync();
     expect(bar()).toBe("Print surveys");
     expect(text(ph.querySelector("[role=status]") as HTMLElement)).toBe("Tick at least one survey to print.");
+    // R4-2: the phone-bar primary is the shared PhoneBar's disabled button (no link), tied to the reason in the card.
+    const pp = ph.querySelector(".phone-bar .btn-primary") as HTMLButtonElement;
+    expect(pp.tagName).toBe("BUTTON");
+    expect(pp.disabled).toBe(true);
+    expect(pp.hasAttribute("href")).toBe(false);
+    expect(ph.querySelector(`#${pp.getAttribute("aria-describedby")}`)).toBe(ph.querySelector("[role=status]"));
+    expect(text(ph.querySelector(".phone-bar .btn-quiet") as HTMLElement)).toBe("Cancel");
+    pb[0].click();
+    flushSync();
+    expect(bar()).toBe("Print 1 survey");
+    expect(ph.querySelector(".phone-bar .btn-primary")!.tagName).toBe("A");
   });
 
   // Validator round 3 R3-3: an unguarded percentage made Bar throw (n > of, or of 0), so Print and Sandbox failed to render.
