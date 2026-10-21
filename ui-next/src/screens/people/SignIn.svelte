@@ -1,7 +1,8 @@
 <!-- UI Next (v4) facilitator sign-in: magic link, one field (step "email"), then "Check your email" with the code fallback (step "check").
      Status: provisional (playbook rule 12). Boards (cookbook design/2026-10-15-glass-redesign/canvas): SignInPhone.dc.html (email, phone),
      SignInCheck.dc.html + SignInCheckPhone.dc.html (check; screen sign-in-check via SignInCheck.svelte). No desktop board draws the email
-     step (SignInPhone's provenance names the Main board); the desktop email step reuses SignInCheck's card shape, flagged in RESULTS-people.
+     step (SignInPhone's provenance names the Main board); the desktop email step reuses SignInCheck's card shape (3d-review-cookbook
+     work/active/2026-10-21-ui-next-screens-fanout/RESULTS-people.md, P4).
      Composed of AppShell > Page > Card / Row and the section 2 components; no <style>, no inline style. The code fallback is the
      section 2 Disclosure (details.disc): the boards draw a bare <details> with a .link summary and inline list-style/min-height/flex
      (rule 16 debt; not .dd, which means a menu). One .btn-primary per page: desktop

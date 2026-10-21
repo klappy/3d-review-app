@@ -10,7 +10,9 @@
      "Add to workspace" is the one primary and New project is demoted (Dialog and sheet states: one primary). The dialog is a native
      <dialog class="glass-hi"> opened with showModal() (design-system.md Dialog and sheet states): the dialog.glass-hi rows give the
      opaque --dialog fill, the 560px geometry and the --scrim ::backdrop; on phone dialog.glass-hi.sheet anchors it to the bottom over the
-     demoted phone-bar. Links: ../href.js (carries w and theme), other lanes' screens by their registered names (project, setup1, menu);
+     demoted phone-bar. Escape (the dialog's close event) does what Cancel does: the dialog goes, New project is the primary again and
+     the address becomes the workspace screen's. The search field's size is the placeholder's length, so the field shows all of it
+     (the board's 260px has no width row yet). Links: ../href.js (carries w and theme), other lanes' screens by their registered names (project, setup1, menu);
      test/ui-next-links.test.ts passes once those lanes merge. -->
 <script>
   import AppShell from "../../AppShell.svelte";
@@ -40,6 +42,14 @@
   const HOME = href("home"), PEOPLE = href("people-workspace"), BACK = href("workspace");
   const PROJECT = href("project"), SETUP = href("setup1"), MENU = href("menu");
   const rows = groupRows(d.group);
+  const FIND = "Find a project or language";
+  // Escape closes the native modal (close event): drop the dialog and restore New project as the primary, at the Cancel target's address.
+  let closed = $state(false);
+  const open = $derived(group && !closed);
+  const onclose = () => {
+    closed = true;
+    try { globalThis.history?.replaceState(globalThis.history.state, "", BACK); } catch { /* no history: the page state alone changes */ }
+  };
   // Native modal dialog (design-system.md Dialog and sheet states): showModal() gives the top layer, the inert page and focus.
   const modal = (el) => {
     if (typeof el.showModal === "function" && !el.open) { try { el.showModal(); return; } catch { /* not connected: fall back to open */ } }
@@ -51,7 +61,7 @@
 {#snippet people()}<Icon d={I.people} />{/snippet}
 {#snippet chev()}<Icon d={I.chev} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="root" initials={d.user.initials} home={HOME} menuHref={MENU} />{:else}<TopBar who={d.user.first} initials={d.user.initials} workspace={d.short} home={HOME} />{/if}{/snippet}
-{#snippet bar()}{#if phone}{#if group}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="New project" lg block href={SETUP} lead={plus} /></div>{:else}<PhoneBar label="New project" lead="plus" href={SETUP} />{/if}{/if}{/snippet}
+{#snippet bar()}{#if phone}{#if open}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="New project" lg block href={SETUP} lead={plus} /></div>{:else}<PhoneBar label="New project" lead="plus" href={SETUP} />{/if}{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
@@ -72,7 +82,7 @@
     <Page gap={5}>
       <Row split gap={4}>
         <div><span class="micro">Workspace</span><h1 class="title-page">{d.name}</h1><p class="small t-15">{d.lead}</p></div>
-        <Row gap={2}><Button label="People in this workspace" href={PEOPLE} lead={people} /><Button label="New project" variant={group ? "secondary" : "primary"} href={SETUP} lead={plus} /></Row>
+        <Row gap={2}><Button label="People in this workspace" href={PEOPLE} lead={people} /><Button label="New project" variant={open ? "secondary" : "primary"} href={SETUP} lead={plus} /></Row>
       </Row>
       <div class="l-grid" data-cols="5" data-gap="3">
         {#each d.stats as [label, n]}<Card gap={1} {label}><span class="small">{label}</span><span class="num" data-size="36">{n}</span></Card>{/each}
@@ -81,7 +91,7 @@
         <h2 class="h2">Projects</h2>
         <Row gap={3}>
           <div class="seg" data-size="wide" role="radiogroup" aria-label="Show projects">{#each d.views as v, i}<label><input type="radio" name="ws-view" checked={i === 0} />{v}</label>{/each}</div>
-          <span class="in-search"><Icon d={P.search} /><input class="in" type="search" aria-label="Find a project" placeholder="Find a project or language" /></span>
+          <span class="in-search"><Icon d={P.search} /><input class="in" type="search" aria-label="Find a project" placeholder={FIND} size={FIND.length} /></span>
         </Row>
       </Row>
       <Grid cols={2} gap={4}>
@@ -111,8 +121,8 @@
       <p class="small">Looking for your own reviews across projects? <a class="link" href={HOME}>Your reviews</a> lists everything you facilitate.</p>
     </Page>
   {/if}
-  {#if group}
-    <dialog class={phone ? "glass-hi sheet" : "glass-hi"} aria-labelledby="ws-group-title" {@attach modal}>
+  {#if open}
+    <dialog class={phone ? "glass-hi sheet" : "glass-hi"} aria-labelledby="ws-group-title" {onclose} {@attach modal}>
       <Stack gap={phone ? 3 : 4}>
         {#if phone}<span class="sheet-handle" aria-hidden="true"></span><span class="micro" id="ws-group-title">Add a project to this workspace</span>
           <p class="small">Only a <b>direct project owner</b> can group a project. Everyone in the workspace then opens it at their workspace role.</p>

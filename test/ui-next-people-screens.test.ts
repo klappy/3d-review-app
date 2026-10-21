@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { resolve } from "node:path";
 import { render } from "@testing-library/svelte";
+import { tick } from "svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import lane from "../ui-next/src/screens/people/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -152,6 +153,26 @@ describe("Workspace and the group dialog", () => {
       for (const row of dlg.querySelectorAll("label.row-opt")) expect(row.querySelector("[data-grow]")).not.toBeNull();
       expect(dlg.querySelectorAll(".tag").length).toBe(phone ? 0 : 3);
     }
+  });
+  it("N1: Escape (the dialog's close event) does what Cancel does: no dialog, New project is the primary again, the address is workspace's", async () => {
+    for (const phone of [false, true]) {
+      window.history.replaceState(null, "", `/next/?ui_next=on&screen=workspace-group${phone ? "&w=phone" : ""}&theme=dark`);
+      try {
+        const a = mount(Workspace, { group: true, phone });
+        const dlg = a.querySelector("dialog")!;
+        expect(dlg.querySelector(".btn-primary")!.textContent).toBe("Add to workspace");
+        dlg.dispatchEvent(new Event("close"));
+        await tick();
+        expect(a.querySelector("dialog")).toBeNull();
+        expect([...a.querySelectorAll(".btn-primary")].map((b) => b.textContent)).toEqual(["New project"]);
+        expect(window.location.search).toBe(`?ui_next=on&screen=workspace${phone ? "&w=phone" : ""}&theme=dark`);
+      } finally { window.history.replaceState(null, "", "/"); }
+    }
+  });
+  it("N2: the project search field is sized to its whole placeholder (no clipped words; the board's 260px has no width row)", () => {
+    const f = mount(Workspace).querySelector(".in-search input") as HTMLInputElement;
+    expect(f.size).toBe(f.placeholder.length);
+    expect(f.placeholder).toBe("Find a project or language");
   });
   it("phone links keep &w=phone and ?theme= (F4): header back, crumb and 'Your reviews across workspaces'", () => {
     window.history.replaceState(null, "", "/next/?ui_next=on&screen=people-workspace&w=phone&theme=dark");
