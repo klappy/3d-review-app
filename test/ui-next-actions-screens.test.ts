@@ -205,6 +205,9 @@ describe("actions lane parts", () => {
   it("qr, bar and gap bar draw from attributes only and refuse bad input", () => {
     const q = render(Qr, { props: { bits: R.qr.plan, size: 72 } }).container.querySelector("svg.qr") as SVGElement;
     expect(q.getAttribute("width")).toBe("72");
+    // A bare svg flex item shrank beside ActionPlan's long share line (43px wide in Chromium); the plain wrapper's minimum is the svg's width.
+    expect(q.parentElement?.tagName).toBe("DIV");
+    expect(q.parentElement?.attributes.length).toBe(0);
     expect(() => render(Qr, { props: { bits: "101" } })).toThrow(/441/);
     const b = render(Bar, { props: { pct: 80, lens: "team", w: 180 } }).container.querySelector(".bar rect") as SVGElement;
     expect(b.getAttribute("width")).toBe("80%");
