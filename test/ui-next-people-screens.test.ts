@@ -151,7 +151,7 @@ describe("Invitations and sign-in", () => {
     const dt = mount(lane["sign-in"]).querySelector("input[type=email]") as HTMLInputElement;
     expect([ph?.value, dt?.value]).toEqual(["bincy@bcs.org.in", "bincy@example.org"]);
     const c = mount(lane["sign-in-check"]);
-    expect(c.querySelector("details > summary.link")!.textContent).toBe("Link not working? Use the 6-digit code instead");
+    expect(c.querySelector("details.disc > summary.disc-sum")!.textContent).toBe("Link not working? Use the 6-digit code instead");
     expect(c.querySelector("#si-code")!.getAttribute("autocomplete")).toBe("one-time-code");
   });
 });

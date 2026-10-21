@@ -69,7 +69,7 @@
       <div><label class="lbl" for="pp-inv">Invite by email</label><input class="in" type="email" inputmode="email" placeholder="name@example.org" id="pp-inv" /></div>
       <div><label class="lbl" for="pp-role">Role</label>{@render roleSelect("pp-role", undefined, options, options[0]?.[0])}</div>
     </Card>
-    <Card pad="list" gap={3} label={`People · ${roster.rows.length}`}>
+    <Card pad="list" gap={2} label={`People · ${roster.rows.length}`}>
       <span class="micro">People · {roster.rows.length}</span>
       {#each roster.rows as r (r.key)}
         <hr class="hr" />
