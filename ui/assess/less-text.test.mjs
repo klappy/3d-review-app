@@ -179,12 +179,11 @@ test('Rachel copy C01–C12: exact sentences and captions on About and home (C03
     'You get a report that shows strengths and areas to grow, side by side, so you know where to focus next.',
     'Translation teams and their leaders, the communities they serve and the churches they partner with',
     'When your project would benefit from a pause to reflect and learn from feedback (consider using between books or publishing iterations)',
-    'Repeat when a new assessment would be useful, or over increments of time'];
+    'Repeat when a new assessment would be useful, or over increments of time to create a trajectory'];
   for (const [name, h] of [['about', about], ['home', home]]) {
     const body = lessText(h, name, /<h[12]\b/g);
     for (const t of exact) assert.ok(h.includes(esc(t)), `${name}: ${t}`);
-    // C12 trajectory clause left out until an over-time view ships (cookbook work/active/2026-10-19-current-ui-copy/DISPOSITIONS.md).
-    assert.ok(!/trajectory/i.test(h), `${name}: no trajectory claim`);
+    // C12 ships in full, trajectory clause included (cookbook work/active/2026-10-19-current-ui-copy/RULING.md option 2).
     assert.ok(body.includes('<strong>How it works</strong>'), `${name}: How it works behind Learn more`);
     // Each sentence pinned to its own label (review 6276186955 F3): a swap between labels fails.
     const pairs = [['Set up.', exact[5]], ['Share.', exact[6]], ['Learn.', exact[7]]].map(([l, t]) => `<strong>${esc(l)}</strong> ${esc(t)}</p>`);
