@@ -4,12 +4,19 @@
 export const FLAG = "ui_next";
 export function flagOn(params, storage) {
   const q = params.get(FLAG);
+  // An explicit query controls this navigation even when persistence is absent,
+  // blocked, or a storage implementation silently declines the write.
+  if (q === "on" || q === "off") {
+    try {
+      if (q === "on") storage?.setItem(FLAG, "on");
+      else storage?.removeItem(FLAG);
+    } catch { /* Persistence is optional for the current URL. */ }
+    return q === "on";
+  }
   try {
-    if (q === "on") storage?.setItem(FLAG, "on");
-    else if (q === "off") storage?.removeItem(FLAG);
     return storage?.getItem(FLAG) === "on";
   } catch {
-    return q === "on";
+    return false;
   }
 }
 // Returns { view, props }: view is "home" | "components" | "layouts" | "home-parts".
