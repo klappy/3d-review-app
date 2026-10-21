@@ -99,6 +99,34 @@ export function scopedStorage(storage, namespace) {
   };
 }
 
+// Per-device participant memory (captain ruling 2026-10-21, cookbook work/active/2026-09-29-3d-gate-0230-participant-fixes/RULING.md):
+// a submitted participant's session for a link is remembered on this device, so any tab that reopens the link resumes it
+// and shows the same receipt instead of a fresh start. Keys stay link-scoped (scopedStorage's digest namespace).
+// tab (sessionStorage) is read first, so a code session handed over in this tab (ui/assess/scope.js) keeps its own link;
+// device (localStorage) is the fallback while unexpired, so a new tab finds the link's session. Every write goes to both;
+// every remove clears both, so "Interview another person" forgets the remembered receipt on this device too.
+// The memory lasts no longer than the server's participant session (12 hours, or less when the link expires —
+// src/handlers/shared-link.ts openSharedLink), so a remembered session is never older than one the server would resume.
+export const DEVICE_MEMORY_MS = 43_200_000;
+export function deviceStorage({ device, tab, ttlMs = DEVICE_MEMORY_MS, now = Date.now } = {}) {
+  const fromDevice = key => {
+    let raw; try { raw = device?.getItem(key); } catch { return null; }
+    if (raw == null) return null;
+    let entry; try { entry = JSON.parse(raw); } catch { entry = null; }
+    if (entry && typeof entry.v === 'string' && Number.isFinite(entry.exp) && entry.exp > now()) return entry.v;
+    try { device.removeItem(key); } catch { /* ignore */ }
+    return null;
+  };
+  return {
+    getItem: key => { let own = null; try { own = tab?.getItem(key) ?? null; } catch { /* fall back to the device */ } return own !== null ? own : fromDevice(key); },
+    setItem: (key, value) => {
+      try { device?.setItem(key, JSON.stringify({ v: String(value), exp: now() + ttlMs })); } catch { /* storage loss: the tab copy still holds it */ }
+      try { tab?.setItem(key, value); } catch { /* ignore */ }
+    },
+    removeItem: key => { try { device?.removeItem(key); } catch { /* ignore */ } try { tab?.removeItem(key); } catch { /* ignore */ } },
+  };
+}
+
 // Draft carries only known item ids plus the exact template identity it was written against.
 export function draftFor(form, values) {
   const answers = {};
