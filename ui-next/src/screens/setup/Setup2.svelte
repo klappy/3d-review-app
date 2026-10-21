@@ -4,7 +4,9 @@
      Wiring: the file input accepts ui/assess/passages.js PASSAGE_ACCEPT (the formats the current passages panel uploads).
      One .btn-primary: Continue (disabled on desktop through the shared Button, R16 V-41: reason said beside it; phone-bar on phone).
      "Choose file" is a .btn button that opens one hidden file input, so Tab lands on a visible control with the helmet's
-     .app button:focus-visible ring (a label.btn around an .sr-only input showed no ring, VALIDATION-setup F4). -->
+     .app button:focus-visible ring (a label.btn around an .sr-only input showed no ring, VALIDATION-setup F4).
+     Preview is the shared Button on both widths (the phone board draws a.link href="#", which goes nowhere: VALIDATION-setup-r2 N5);
+     still a mock, wiring debt 3. -->
 <script>
   import Stack from "../../Stack.svelte";
   import Button from "../../Button.svelte";
@@ -32,7 +34,7 @@
   {#if phone}
     <p class="small">What participants will read, hear or watch.</p>
     <div class="dz su-col">{@render choose("Choose a file", true)}<Button label="Paste a link" lead={link} block /></div>
-    <div class="l-row small" data-gap="2"><Glyph name="file" size={16} />{p.phoneFile.name} · {p.phoneFile.size} <a class="link" href="#preview">Preview</a></div>
+    <div class="l-row small" data-gap="2"><Glyph name="file" size={16} />{p.phoneFile.name} · {p.phoneFile.size} <Button label="Preview" variant="quiet" lead={eye} /></div>
     <Field label="Survey languages" id="sl" group help="Participants pick their language on the first screen.">
       <div class="l-row" data-wrap data-gap="2">{#each p.languages as [, short]}<span class="chip">{short} <button type="button" aria-label={`Remove ${short}`}><Glyph name="x" size={14} /></button></span>{/each}<Button label="Add" lead={plus} /></div>
     </Field>

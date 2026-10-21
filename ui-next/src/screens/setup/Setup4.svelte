@@ -3,7 +3,7 @@
      One disclosure per survey chosen in step 3 ("About this group (optional)", B09 group context, R30), then the participant questions card
      (age range, gender; off by default, skippable). Disclosures are details.disc (V-12: never .dd, which means a menu; the boards still draw .dd).
      Wiring: the questions and their types are ui/v3/components/context-fields.js GROUP_FIELDS / RESPONDENT_FIELDS (the browser mirror of
-     src/context-fields.ts); the surveys are derived from step 3's checked state: a checked group's checked roles (or the group itself when it
+     src/context-fields.ts); the surveys are derived from step 3's checked state by ./draft.js (shared with step 5): a checked group's checked roles (or the group itself when it
      has no roles), with the phone reading phoneChecked where step 3's phone board unchecks a group. Answers and the open disclosure are keyed
      by survey, not by perspective. Small lens chips: .icn.icn-lens.su-icn-s, the base.css 8.10 row (see RESULTS-setup.md Round 2).
      One .btn-primary: Continue. -->
@@ -16,16 +16,15 @@
   import Field from "./Field.svelte";
   import Glyph from "./Glyph.svelte";
   import { groupFields, RESPONDENT_FIELDS } from "../../../../ui/v3/components/context-fields.js";
+  import { chosenGroups, surveys } from "./draft.js";
   import data from "../../../fixtures/setup/setup.json";
 
   // The board draws one state; the route's ?state= prop is not read, so any value (unknown included) renders it and never throws.
   let { phone = false, theme = "light" } = $props();
-  const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  // The surveys step 3 chose: per checked group, one per checked role (team, church) or the group itself (community).
-  const checked = (g) => (phone ? (g.phoneChecked ?? g.checked) : g.checked);
-  const GROUPS = $derived(data.groups.filter(checked));
-  const SURVEYS = $derived(GROUPS.flatMap((g) => (g.roles ? g.roles.filter((r) => r.checked).map((r) => ({ g, name: r.name, expected: r.expected })) : [{ g, name: g.name, expected: g.expected }]))
-    .map((s) => ({ ...s, key: slug(s.name), fields: groupFields(s.g.perspective) })));
+  // The surveys step 3 chose (./draft.js, the same list step 5 summarises): per checked group, one per checked role (team, church)
+  // or the group itself (community).
+  const GROUPS = $derived(chosenGroups(data.groups, phone));
+  const SURVEYS = $derived(surveys(data.groups, phone).map((s) => ({ ...s, fields: groupFields(s.g.perspective) })));
   const values = (s) => data.context.values[s.key] ?? {};
   const isOpen = (s) => s.key === data.context.open;
 </script>

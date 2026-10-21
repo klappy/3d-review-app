@@ -21,6 +21,12 @@ import { GROUP_FIELDS, RESPONDENT_FIELDS } from "../ui/v3/components/context-fie
 import { PERSPECTIVE_WHO } from "../ui/assess/scope.js";
 // @ts-expect-error -- plain .svelte component, rendered on its own for the status-line check
 import LangSearch from "../ui-next/src/screens/setup/LangSearch.svelte";
+// @ts-expect-error -- plain .js module, no type declarations
+import { OUT, out } from "../ui-next/src/screens/setup/links.js";
+// @ts-expect-error -- plain .js module, no type declarations
+import { surveys, whoLines, whoShort, aboutLine } from "../ui-next/src/screens/setup/draft.js";
+import setupData from "../ui-next/fixtures/setup/setup.json";
+import projectData from "../ui-next/fixtures/setup/project.json";
 
 const NAMES = ["setup1", "setup2", "setup3", "setup4", "setup5", "project"];
 const screen = (name: string, props: Record<string, unknown> = {}) => render(setup[name], { props }).container.querySelector(".app") as HTMLElement;
@@ -125,8 +131,8 @@ describe("key copy and data, per board", () => {
     expect(status({ query: "zz", matches: [] })).toBe("No matching languages.");
     expect(status({ query: "od", matches: [{ name: "Odia", code: "ory" }, { name: "Adivasi Odia", code: "ort" }] })).toBe("2 matches");
   });
-  it("no setup lane source imports ui/v3/wizard.js (F3: it wired nothing and doubled the /next/ bundle) and the lane has no stylesheet (F1)", () => {
-    for (const f of readdirSync(LANE)) expect(readFileSync(`${LANE}/${f}`, "utf8"), f).not.toMatch(/(?:from\s*|import\s*\(?\s*)["'][^"']*(?:ui\/v3\/wizard\.js|\.css)["']/);
+  it("no setup lane source imports ui/v3/wizard.js (F3) or ui/assess/scope.js (N6: each pulled a large graph into /next/) and the lane has no stylesheet (F1)", () => {
+    for (const f of readdirSync(LANE)) expect(readFileSync(`${LANE}/${f}`, "utf8"), f).not.toMatch(/(?:from\s*|import\s*\(?\s*)["'][^"']*(?:ui\/v3\/wizard\.js|ui\/assess\/scope\.js|\.css)["']/);
     expect(existsSync(`${LANE}/setup.css`)).toBe(false);
   });
   it("setup2 (Setup2): unnamed passage shows its error and a disabled Continue with the reason beside it (R16)", () => {
@@ -157,6 +163,18 @@ describe("key copy and data, per board", () => {
     // F7: a group field is described by its help.
     const g = p.querySelector("[role=group][aria-labelledby=sl-lbl]")!;
     expect(p.querySelector(`#${g.getAttribute("aria-describedby")}`)!.textContent).toBe("Participants pick their language on the first screen.");
+    // N5: Preview is the shared Button on both widths, never a link to an id that does not exist.
+    for (const s of [a, p]) expect([...s.querySelectorAll("button.btn")].filter((b) => b.textContent === "Preview").length, s === p ? "phone" : "desktop").toBe(1);
+    expect(p.querySelector("a[href='#preview']")).toBeNull();
+  });
+  it("in-page links (#id) on every lane screen point at an id on that screen (N5); the shared top bars and menus are not lane markup", () => {
+    for (const n of NAMES) for (const phone of [false, true]) {
+      const a = screen(n, { phone });
+      for (const l of a.querySelectorAll("a[href^='#']")) {
+        if (l.closest("header.top, .phone-top, .menu")) continue;
+        expect(a.querySelector(l.getAttribute("href")!), `${n}${phone ? " phone" : ""} ${l.getAttribute("href")}`).not.toBeNull();
+      }
+    }
   });
   it("in-flow links carry ?theme= and ?w= through screens/href.js (F8)", () => {
     at("?ui_next=on&screen=setup2&theme=dark");
@@ -177,9 +195,17 @@ describe("key copy and data, per board", () => {
     const a = screen("setup3");
     expect(text(a, ".su-group .h3")).toEqual(["Translation team", "Community", "Church"]);
     expect(text(a, ".su-group .h3 + p.small")).toEqual([PERSPECTIVE_WHO.team, PERSPECTIVE_WHO.community, PERSPECTIVE_WHO.church]);
+    // N6: the fixture carries the current UI's who-lines, pinned equal to ui/assess/scope.js PERSPECTIVE_WHO (the screen no longer imports it).
+    for (const g of setupData.groups) expect(g.who, g.lens).toBe(PERSPECTIVE_WHO[g.lens]);
     expect(text(a, ".su-role > span:first-of-type")).toEqual(["Translators", "Team leaders & mentors", "Pastor involved in the work", "Pastor in the community", "Denominational leader", "Consultant"]);
     expect([...a.querySelectorAll("input.su-count")].map((i) => (i as HTMLInputElement).value)).toEqual(["5", "3", "5", "2"]);
-    expect(a.querySelector(".su-num")!.textContent).toBe("15");
+    expect(a.querySelector(".su-num")!.textContent).toBe("15 expected");
+    // N4: the stepper buttons name their subject and the count is a status text (an aria-label on a role-less span is ignored).
+    const st = a.querySelector(".su-stepper")!;
+    expect([...st.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"))).toEqual(["Fewer Community participants", "More Community participants"]);
+    expect(st.querySelector(".su-num")!.getAttribute("role")).toBe("status");
+    expect(st.querySelector(".su-num")!.hasAttribute("aria-label")).toBe(false);
+    expect(st.querySelector(".su-num .sr-only")!.textContent).toBe(" expected");
     expect(text(a, ".su-group > .l-row > span.small")).toEqual(["How many? (optional) · per role below", "How many? (optional) · per role below"]);
     // F6: the group chips draw ic("people") (boards_fac.py), four paths in glyphs.js, not the two-path "person".
     expect([...a.querySelectorAll(".su-group .icn svg")].map((s) => s.querySelectorAll("path").length)).toEqual([4, 4, 4]);
@@ -221,6 +247,14 @@ describe("key copy and data, per board", () => {
     expect(a.querySelector(".btn-primary")!.textContent).toBe("Launch the survey");
     const p = screen("setup5", { phone: true });
     expect(p.querySelectorAll(".su-line").length).toBe(7);
+    // N3: step 5 says what steps 3 and 4 show. Desktop keeps the board's words; the phone leaves out Church, which SetupPhone unchecks.
+    expect(text(a, ".su-sumrow:nth-child(7) .t-15 .l-stack > span")).toEqual(["Translation team · Translators, Team leaders & mentors · 8 expected", "Community · Community · 15 expected", "Church · Pastor involved in the work, Denominational leader · 7 expected"]);
+    expect(a.querySelectorAll(".su-sumrow")[7].querySelector(".t-15")!.textContent!.trim()).toBe("Community described · 4 surveys left blankParticipants asked age range and gender (skippable)");
+    const kv = (label: string) => [...p.querySelectorAll(".su-line .su-kv")].find((k) => k.querySelector(".micro")!.textContent === label)!.querySelector(".h3")!.textContent;
+    expect(kv("Who")).toBe("Translation team · Community");
+    expect(kv("About each group")).toBe("Community described · 2 left blank");
+    const p4 = screen("setup4", { phone: true });
+    expect(kv("Who")).toBe(text(p4, ".su-groups > details.disc > summary .su-name").join(" · "));
     expect(p.querySelector(".phone-bar .btn-primary")!.textContent).toBe("Launch the survey");
     expect(p.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=collect&w=phone");
     expect(a.querySelector(".btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=collect");
@@ -247,6 +281,31 @@ describe("key copy and data, per board", () => {
     expect(p.querySelectorAll("a.su-revline").length).toBe(4);
     expect(p.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=setup1&w=phone");
     expect([...p.querySelectorAll("a.su-revline")].map((r) => r.getAttribute("href"))).toEqual(["collect", "results", "next-step", "next-step"].map((n) => `?ui_next=on&screen=${n}&w=phone`));
+  });
+});
+
+describe("setup lane links and derived lines", () => {
+  it("cross-lane destinations (links.js OUT, N1): each name is registered once its owning lane is merged; the fixture's review rows use OUT keys", () => {
+    for (const [key, [name, lane]] of Object.entries(OUT as Record<string, [string, string]>)) {
+      expect(Object.keys(LANES), key).toContain(lane);
+      expect(lane, key).not.toBe("setup");
+      if (Object.keys(LANES[lane]).length) expect(REGISTRY[name], `${lane} lane registers ${name}`).toBeDefined();
+    }
+    for (const r of projectData.reviews) expect(Object.keys(OUT), r.title).toContain(r.to);
+    expect(out("nextStep", { w: "phone" }, "?theme=dark")).toBe("?ui_next=on&screen=next-step&w=phone&theme=dark");
+    expect(() => out("nope")).toThrow(/unknown cross-lane destination/);
+  });
+  it("draft.js: one survey list for steps 4 and 5; lines follow the checked state", () => {
+    const g = setupData.groups;
+    expect(surveys(g).map((s: { key: string }) => s.key)).toEqual(["translators", "team-leaders-mentors", "community", "pastor-involved-in-the-work", "denominational-leader"]);
+    expect(surveys(g, true).map((s: { key: string }) => s.key)).toEqual(["translators", "team-leaders-mentors", "community"]);
+    expect(whoLines(g).map(([n]: [string]) => n)).toEqual(["Translation team", "Community", "Church"]);
+    expect(whoShort(g, false)).toBe("Translation team · Community · Church (2 roles)"); // the board's line, when Church is checked
+    expect(whoShort(g, true)).toBe("Translation team · Community");
+    expect(aboutLine(surveys(g), setupData.context.values)).toBe("Community described · 4 surveys left blank");
+    expect(aboutLine(surveys(g, true), setupData.context.values, true)).toBe("Community described · 2 left blank");
+    expect(aboutLine(surveys(g, true).slice(0, 2), {}, false)).toBe("2 surveys left blank");
+    expect(aboutLine(surveys(g, true).slice(2), setupData.context.values, false)).toBe("Community described");
   });
 });
 

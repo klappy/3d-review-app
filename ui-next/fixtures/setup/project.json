@@ -1,5 +1,6 @@
 {
   "_status": "provisional (playbook rule 12). Mock project for cookbook design/2026-10-15-glass-redesign/canvas Project.dc.html and ProjectPhone.dc.html.",
+  "_to": "reviews[].to is a key of screens/setup/links.js OUT (the cross-lane screen a review row opens: collect, results, next-step).",
   "workspace": {
     "name": "Bridge Connectivity Solutions · India",
     "short": "BCS · India"
@@ -15,14 +16,14 @@
       "when": "Oct 2026",
       "title": "Mark 1–4 draft",
       "stage": "collecting",
-      "screen": "collect",
+      "to": "collect",
       "note": "No results yet"
     },
     {
       "when": "Sep 2026",
       "title": "Luke 1–2 community review",
       "stage": "results",
-      "screen": "results",
+      "to": "results",
       "levels": [
         [
           "team",
@@ -43,7 +44,7 @@
       "when": "Aug 2026",
       "title": "Acts listening review",
       "stage": "done",
-      "screen": "next-step",
+      "to": "nextStep",
       "levels": [
         [
           "team",
@@ -64,7 +65,7 @@
       "when": "May 2026",
       "title": "Workshop 1 · Mark 1",
       "stage": "done",
-      "screen": "next-step",
+      "to": "nextStep",
       "levels": [
         [
           "team",
