@@ -40,7 +40,7 @@
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
-    <ReviewHead {review} phone />
+    <ReviewHead {review} phone linkGap={5} />
     <Row gap={2}>
       <Button label="See the answers" href="?screen=results-answers&w=phone" lead={list} />
       <Button label="Reports" href="?screen=report&w=phone" lead={doc} />
@@ -53,7 +53,7 @@
     <Page gap={5}>
       <ReviewHead {review} primary={{ label: "Plan the next step", href: "#next-step", trail: "arrow" }} />
       <LevelLegend />
-      <Grid cols={3} gap={4}>{#each cards as card}<Stack><LensCard {card} /></Stack>{/each}</Grid>
+      <Grid cols={3} gap={3}>{#each cards as card}<Stack><LensCard {card} /></Stack>{/each}</Grid>
       <Card hi gap={3} label="Where the perspectives disagree">
         <Row split gap={5}>
           <Stack gap={1}>

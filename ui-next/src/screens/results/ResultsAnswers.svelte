@@ -41,7 +41,7 @@
     <Row gap={2}><Button label={`${lensLabel(A.lens)} · ${A.answers}`} href="#perspective" lead={people} block /><Button label="Download CSV" href="#csv" /></Row>
     <Card pad="list" label="Questions">
       {#each A.questions as q, i}
-        <Disclosure label={q.q} open={i === 0} solid={false} gap={2}>
+        <Disclosure label={q.q} open={i === 0} solid={false} gap={1}>
           {#each q.options as [label, count]}
             <Stack gap={1}><span class="small">{label}</span><Row gap={2}><AnswerBar lens={A.lens} pct={pct(count, q.n)} /><span class="small tab-n">{count}</span></Row></Stack>
           {/each}

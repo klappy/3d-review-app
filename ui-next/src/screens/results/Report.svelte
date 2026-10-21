@@ -31,7 +31,7 @@
 </script>
 
 {#snippet eye()}<Glyph d={G.eye} />{/snippet}
-{#snippet share()}<Glyph d={G.people} />{/snippet}
+{#snippet share()}<Glyph d={G.share} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="Reports" parent="Results" back="?screen=results&w=phone" />{:else}<DocBar title={`Overview report · 1 page · ${D.review.title}`} other="Open the detailed report · 4 pages" otherHref="?screen=report-detailed" />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Download the overview (PDF)" href="#download" />{/if}{/snippet}
 

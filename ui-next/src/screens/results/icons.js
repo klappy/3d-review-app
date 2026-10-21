@@ -19,4 +19,5 @@ export const G = Object.freeze({
   edit: "M4 20l4-1 11-11-3-3L5 16z",
   printer: "M7 8V4h10v4M6 8h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2zM7 14h10v6H7z",
   x: "M6 6l12 12M18 6L6 18",
+  share: "M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5",
 });

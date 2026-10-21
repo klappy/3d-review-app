@@ -36,6 +36,7 @@
   const without = `Show results without the ${first.label.toLowerCase()}`;
 </script>
 
+{#snippet qr()}<Glyph d={G.qr} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title={P.review.title} parent={P.review.project} back="#project" />{:else}<TopBar {crumbs} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Reopen collection" href="#share" />{/if}{/snippet}
 
@@ -47,27 +48,27 @@
         <span class="icn icn-lens" data-lens={first.lens}><Glyph d={G.clock} /></span>
         <Stack gap={1}><span class="h3">Results are held</span><span class="small">The {first.label.toLowerCase()} survey has {phoneN} answers; we show a perspective at {MIN_RESPONSES} or more so no one can be picked out.</span></Stack>
       </Row>
-      <a class="link" href="?screen=results&w=phone">{without}</a>
-      <a class="link" href="?screen=results-answers&w=phone">See the answers so far</a>
+      <a class="link" href="?screen=results&w=phone">{without} <Glyph d={G.arrow} /></a>
+      <a class="link" href="?screen=results-answers&w=phone">See the answers so far <Glyph d={G.arrow} /></a>
     </Card>
   {:else}
     <Page gap={5}>
       <ReviewHead review={D.review} closedResponses={H.review.closedResponses} primary={{ label: "Reopen collection", href: "#share", lead: "qr" }} />
       <LevelLegend />
-      <Card hi gap={3} label="Results are held">
+      <Card hi pad="hero" gap={3} label="Results are held">
         <Row split gap={6}>
           <Row gap={6}>
             <span class="icn icn-lens" data-lens="team"><Glyph d={G.lock} size={30} /></span>
-            <Stack gap={2}>
+            <Stack gap={3}>
               <h2 class="h2">Results are held until every perspective has enough answers</h2>
               <p class="small t-15">Levels need at least {MIN_RESPONSES} answers from a perspective so no one can be picked out. {first.label} has {first.n} of {MIN_RESPONSES}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.</p>
               <Row wrap gap={5}>{#each lines as l}<span class="small"><LensDot lens={l.lens} decorative /> {l.text}</span>{/each}</Row>
             </Stack>
           </Row>
-          <Stack gap={2}><Button label="Reopen collection" href="#share" /><Button label={without} variant="quiet" href="?screen=results" /></Stack>
+          <Stack gap={2}><Button label="Reopen collection" href="#share" lead={qr} /><Button label={without} variant="quiet" href="?screen=results" /></Stack>
         </Row>
       </Card>
-      <Grid cols={3} gap={4}>{#each cards as card}<Stack><LensCard {card} rows={H.preview} /></Stack>{/each}</Grid>
+      <Grid cols={3} gap={3}>{#each cards as card}<Stack><LensCard {card} rows={H.preview} /></Stack>{/each}</Grid>
     </Page>
   {/if}
 </AppShell>

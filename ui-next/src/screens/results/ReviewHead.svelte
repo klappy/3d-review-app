@@ -1,7 +1,8 @@
 <!-- UI Next (v4) results lane: review head (design-system.md 9 review-head, 8.4 Page first child). Status: provisional.
      Desktop (Results.dc.html, ResultsAnswers/Gaps/Held.dc.html): title + stage pill, meta line, More actions menu (details.dd, R11:
      the refused delete is a button[aria-disabled] with its reason), the page's one primary, then the stage tabs.
-     Phone (ResultsPhone and twins): project link, title + pill + quiet More actions, then the stage tabs; the primary is the phone-bar's. -->
+     Phone (ResultsPhone and twins): project link, title + pill + quiet More actions, then the stage tabs; the primary is the phone-bar's.
+     linkGap: the --sp step under the project link (ResultsPhone draws that link as a 44px target with an inline min-height, so it passes 5). -->
 <script>
   import Row from "../../Row.svelte";
   import Stack from "../../Stack.svelte";
@@ -12,7 +13,7 @@
   import StagePill from "./StagePill.svelte";
   import StageTabs from "./StageTabs.svelte";
   import { G } from "./icons.js";
-  let { review, phone = false, primary, closedResponses } = $props();
+  let { review, phone = false, primary, closedResponses, linkGap = 2 } = $props();
   if (!review || typeof review.title !== "string") throw new TypeError("ReviewHead: review.title is required");
   if (!phone && !(primary && primary.label)) throw new TypeError("ReviewHead: the desktop head holds the page's one primary");
   const n = $derived(closedResponses ?? review.responses);
@@ -34,7 +35,7 @@
 {#snippet trail()}{#if primary?.trail}<Glyph d={G[primary.trail]} />{/if}{/snippet}
 
 {#if phone}
-  <Stack gap={3}>
+  <Stack gap={linkGap}>
     <a class="link small" href="#project">{review.project}</a>
     <Row split gap={2}>
       <h1 class="title-phone">{review.title}</h1>

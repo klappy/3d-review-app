@@ -24,7 +24,7 @@
       <Row gap={3}><span class="icn icn-lens" data-lens={card.lens}><Glyph d={G.people} size={20} /></span><Stack gap={1}><span class="h2">{card.label}</span><span class="small">{card.n} responses</span></Stack></Row>
       <Level level={card.level} />
     </Row>
-    {#each shown as r}<hr class="hr" /><Row split gap={3}><span class="t-15">{r.name}</span><Level level={r.level} /></Row>{/each}
+    {#each shown as r}<hr class="hr" /><Row split gap={1}><span class="t-15">{r.name}</span><Level level={r.level} /></Row>{/each}
     <a class="link" href={answers}>See the answers <Glyph d={G.arrow} /></a>
   </Card>
 {/if}
