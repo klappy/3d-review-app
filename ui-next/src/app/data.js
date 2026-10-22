@@ -196,11 +196,13 @@ export function qrModules(text) {
 
 // Results: the newest built report (or build one) in the shape results/data.js reads: { review, counts, payload } plus a held reason.
 export async function resultsModel(aid, { build = false } = {}) {
-  const [{ assessment: a, surveys }, res, rep] = await Promise.all([assessment(aid), results(aid).catch((e) => ({ error: e })), reports(aid).catch((e) => ({ error: e }))]);
+  // The report list and every survey count must load: a failed read is the shell's retryable error, never an empty list (which
+  // would offer a build beside an existing report) nor a zero (which would band a perspective as held and understate the total).
+  const [{ assessment: a, surveys }, res, rep] = await Promise.all([assessment(aid), results(aid).catch((e) => ({ error: e })), reports(aid)]);
   const p = await project(a.project_id).catch(() => ({ name: "Project", id: a.project_id }));
   const live = surveys.filter((s) => !s.archived_at);
   const counts = { team: 0, community: 0, church: 0 };
-  const per = await Promise.all(live.map((s) => surveyCounts(aid, s.id).catch(() => null)));
+  const per = await Promise.all(live.map((s) => surveyCounts(aid, s.id)));
   live.forEach((s, i) => { const k = lensKeyOf(s.perspective); if (k) counts[k] += Number(per[i]?.counts?.respondents ?? 0); });
   const responses = per.reduce((n, c) => n + Number(c?.counts?.responses ?? 0), 0);
   let list = Array.isArray(rep?.reports) ? rep.reports.filter((x) => x?.id) : [];
@@ -214,7 +216,7 @@ export async function resultsModel(aid, { build = false } = {}) {
   const newest = list.sort((x, y) => String(y.created_at || "").localeCompare(String(x.created_at || "")))[0];
   if (newest) built = newest.payload ? newest : await report(newest.id);
   const review = { id: a.id, project: p.name, projectId: a.project_id, language: a.language_name || "", modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: a.stage === "collect" ? "" : shortDate(a.updated_at || a.created_at), closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
-  return { aid, review, counts, payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (res?.status === "held" ? res : null), results: res, serverStage: a.stage };
+  return { aid, review, counts, payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (res?.status === "held" ? res : null), results: res, serverStage: a.stage, canBuild: ["owner", "member"].includes(a.role) };
 }
 
 // Gap names for ResultsGaps/Report (results/data.js bandRows reads the payload's cross-perspective areas by construct name):

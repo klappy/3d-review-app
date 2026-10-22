@@ -67,6 +67,7 @@ const compiled = ROUTES.map(([name, pattern]) => {
 });
 
 export const ENTRY = /^#survey=/;
+export const SAMPLE_HREF = "/?demo=1#assessment/demo-assessment/results"; // the current design's sample review (ui/demo.js)
 
 // parse(hash) -> { name, params, query: URLSearchParams }. Unknown -> home (ruling 12:53 in the current UI: never a page that shows sign-in).
 export function parse(hash = "") {
@@ -83,7 +84,10 @@ export function parse(hash = "") {
   if (qi >= 0) { query = new URLSearchParams(body.slice(qi + 1)); body = body.slice(0, qi); }
   if (!body) return { name: "home", params: {}, query, anchor };
   if (!body.startsWith("/")) {
-    const bare = { workspace: "workspaces", project: "home", review: "home", signin: "sign-in", "survey-code": "p-code", survey: "p-code", video: "help", main: "home", practice: "sandbox", results: "home", "next-step": "home", "help-h7": "help", tour: "about" }[body] ?? body;
+    // "#results" is the lanes' "Try the sample review": the sample lives in the current design (ui/demo.js, in-memory demo data at
+    // /?demo=1#assessment/demo-assessment), so the live app hands the visitor there rather than looping Home → Landing.
+    if (body === "results") return { name: "external", params: { href: SAMPLE_HREF }, query, anchor };
+    const bare = { workspace: "workspaces", project: "home", review: "home", signin: "sign-in", "survey-code": "p-code", survey: "p-code", video: "help", main: "home", practice: "sandbox", "next-step": "home", "help-h7": "help", tour: "about" }[body] ?? body;
     return { name: BY_NAME.has(bare) && !BY_NAME.get(bare).includes(":") ? bare : "home", params: {}, query, anchor };
   }
   for (const { name, re, keys } of compiled) {

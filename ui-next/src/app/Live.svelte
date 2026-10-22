@@ -45,12 +45,13 @@
   });
 
   const PARTICIPANT = new Set(["p-entry", "p-code", "p-welcome", "p-passage", "p-about", "p-question", "p-review", "p-receipt", "p-problem"]);
-  const PUBLIC = new Set(["landing", "about", "sign-in", "sign-in-check", "help", "feedback"]);
+  const PUBLIC = new Set(["landing", "about", "sign-in", "sign-in-check", "help", "feedback", "external"]);
   // Which route needs which data. Every loader resolves to the props its screen takes.
   async function loader(r) {
     const { name, params } = r;
     if (PARTICIPANT.has(name)) return participant(r);
     if (name === "home") { const me = await S.me(); if (!me) return { screen: "landing" }; const home = await D.homeModel(me); return { screen: "home", home, state: home.empty ? "first" : "reviews" }; }
+    if (name === "external") { globalThis.location.assign(params.href); return { screen: null }; } // the sample review in the current design
     if (name === "landing" || name === "about" || name === "help") return { screen: name };
     if (name === "feedback") return { screen: name, preview: true, assessment: null, editHref: "/#feedback", previewNote: "Sending feedback happens in the current design for now (its form posts to /v2/feedback)." }; // the board's fields do not map onto the contract yet (Feedback.svelte header)
     if (name === "sign-in" || name === "sign-in-check") { const me = await S.me(); return me ? { redirect: to("home") } : { screen: "sign-in" }; }
@@ -213,8 +214,8 @@
   {@const m = page.data.results}
   {@const rep = reportFor(m)}
   {#if !rep && !m.held && page.data.screen !== "results-held"}
-    <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet. Building reads the answers collected so far and keeps that report (owners and members).${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} inline back={to("collect", route.params)} backLabel="Back to Collect" />
-    <div class="l-page"><button class="btn btn-primary btn-lg" type="button" onclick={refreshResults}>Build the report</button></div>
+    <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} inline back={to("collect", route.params)} backLabel="Back to Collect" />
+    {#if m.canBuild}<div class="l-page"><button class="btn btn-primary btn-lg" type="button" onclick={refreshResults}>Build the report</button></div>{/if}
   {:else if !rep || page.data.screen === "results-held"}
     {@const Held = REGISTRY["results-held"]}
     <Held {phone} {theme} report={{ review: m.review, counts: m.counts, payload: m.payload ?? { lenses: [] }, held: m.held }} onreopen={reopenCollection} />
