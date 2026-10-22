@@ -451,3 +451,14 @@ describe("participant screens are registered and routed under the flag", () => {
     window.removeEventListener("error", onError);
   });
 });
+
+describe("PProblem after a reload on the receipt (no raw link token kept on purpose)", () => {
+  it("says the last answers were saved and how to interview the next person: no send retry, no unrelated cases", () => {
+    const live = { ...DATA, live: true, notice: "To interview the next person, open the survey link again on this device. The last answers were saved." };
+    const { container } = render(PProblem, { props: { phone: true, d: live } });
+    const text = container.textContent || "";
+    expect(text).toContain("The last answers were saved"); expect(text).toContain("open the survey link again");
+    expect(text).not.toContain("Try sending again"); expect(text).not.toContain("Other things that can happen"); expect(text).not.toContain("couldn't confirm");
+    expect(text).toContain("Enter a code instead");
+  });
+});

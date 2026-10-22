@@ -24,18 +24,18 @@
   ]);
 </script>
 
-{#snippet actions()}<ParticipantActions {phone} label="Try sending again" href={href("p-receipt")} lead="refresh" onaction={onretry} />{/snippet}
+{#snippet actions()}{#if p.saved}<ParticipantActions {phone} label="Enter a code instead" href={href("p-code")} lead="link" />{:else}<ParticipantActions {phone} label="Try sending again" href={href("p-receipt")} lead="refresh" onaction={onretry} />{/if}{/snippet}
 
 <ParticipantShell {phone} {theme} {actions}>
   <Card hi pad="hero" gap={4}>
     <Chip icon="warn" size={56} lens={null} />
-    <h1 class="title-phone">We couldn't confirm your answers were received</h1>
+    <h1 class="title-phone">{p.saved ? "The last answers were saved" : "We couldn't confirm your answers were received"}</h1>
     <p class="lead-16">{p.notice || "Your answers are still here on this phone. Check your connection and try again — nothing is lost, and sending twice won't count twice."}{#if p.retryAfter} The server asked for a wait of about {p.retryAfter} s before the next try.{/if}</p>
   </Card>
-  <Card hi pad="hero" gap={3}>
+  {#if !p.saved}<Card hi pad="hero" gap={3}>
     <span class="micro">Other things that can happen</span>
     <div class="l-stack" data-gap="3">
       {#each OTHER as [icon, t, d] (t)}<div class="l-row" data-gap="3" data-align="start"><Chip {icon} size={32} {lens} /><div><div class="h3 t-15">{t}</div><p class="small">{d}</p></div></div>{/each}
     </div>
-  </Card>
+  </Card>{/if}
 </ParticipantShell>

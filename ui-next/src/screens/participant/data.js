@@ -109,6 +109,11 @@ export function review(all = false, d = DATA) {
 // journey's own notice (ui/participate/controller.js copy) is the headline's explanation; a wait the server asked for (an upstream
 // 429 passed through) is said plainly, never retried by the page on its own.
 export function problem(state, d = DATA) {
-  if (d.live) return { busy: false, closedOn: "", receipt: d.receipt, notice: d.notice || "", retryAfter: d.rateLimited ? d.retryAfter : undefined };
+  if (d.live) {
+    // Receipt → "Interview another" after a reload: the controller keeps no raw link token on purpose (ui/participate/controller.js
+    // 9–11, 133–139), so the next person needs the original link. Nothing failed to send: no retry, no unrelated cases.
+    const saved = !!d.notice && d.notice === SURVEYOR_EN.openLinkForNext;
+    return { busy: false, closedOn: "", receipt: d.receipt, notice: d.notice || "", retryAfter: d.rateLimited ? d.retryAfter : undefined, saved };
+  }
   return { busy: false, closedOn: d.problem.closedOn, receipt: d.receipt };
 }

@@ -55,16 +55,22 @@ export async function loadTranslations(form = journey?.state?.form ?? null) {
   if (!entry) { lang = "en"; tr = { lang, form, ui: {}, items: {}, view: null, progress: null, failed: "" }; emit(); return; } // not offered by this form
   const ui = { ...UI_EN }, items = formStrings(form), total = Object.keys(ui).length + Object.keys(items).length, seen = { ui: 0, items: 0 };
   tr = { ...tr, lang, form, progress: { done: 0, total }, failed: "" }; emit();
-  const progress = () => { if (seq === trSeq) { tr = { ...tr, progress: { done: seen.ui + seen.items, total } }; emit(); } };
+  // A progress callback can fire after the other request has already failed (Promise.all settles on the first rejection); once
+  // settled, no callback may restore the "Translating" line over a terminal failure or result (root RESULTS 2026-10-22: 97 of 97 forever).
+  let settled = false;
+  const progress = () => { if (seq === trSeq && !settled) { tr = { ...tr, progress: { done: seen.ui + seen.items, total } }; emit(); } };
   try {
     const store = localStore(), bearer = journey?.bearer ?? null;
     const [u, it] = await Promise.all([
       fetchTranslationsProgressive({ lang, context: "participant-ui", sourceTexts: ui, storage: store, bearer, onProgress: (p) => { seen.ui = p.done; progress(); } }),
       fetchTranslationsProgressive({ lang, context: `participant-form:${form.template?.id || "form"}`, sourceTexts: items, storage: store, bearer, onProgress: (p) => { seen.items = p.done; progress(); } }),
     ]);
+    settled = true;
     if (seq !== trSeq) return;
-    tr = { lang, form, ui: u.map, items: it.map, view: translateForm(form, it.map), progress: null, failed: "" };
+    const partial = u.partial || it.partial; // some strings refused or missing: show what translated, say so, keep English for the rest
+    tr = { lang, form, ui: u.map, items: it.map, view: translateForm(form, it.map), progress: null, failed: partial ? "Some of this survey could not be translated; those parts stay in English." : "" };
   } catch (e) {
+    settled = true;
     if (seq !== trSeq) return;
     tr = { lang, form, ui: {}, items: {}, view: null, progress: null, failed: e?.message || "Translation is not available right now." };
   }

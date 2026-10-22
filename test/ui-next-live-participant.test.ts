@@ -73,4 +73,15 @@ describe("participant language (ui/participate/i18n.js reused)", () => {
       expect(model({ phase: "form", form: served, notice: "" })!.form.items[0].text).toBe(form.items[0].text);
     } finally { globalThis.fetch = realFetch; setLanguage("en"); }
   });
+  it("a failed /v2/translate ends as a failure, never as a 'Translating' line that a late sibling progress callback restores (root RESULTS 2026-10-22: 97 of 97 forever on real 502s)", async () => {
+    const served = { ...form, template: { ...form.template, id: "tpl_y" }, languages: [{ code: "es", name: "Spanish", endonym: "Español" }] };
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("bad gateway", { status: 502 })) as typeof fetch;
+    try {
+      setLanguage("es"); await loadTranslations(served);
+      await new Promise((r) => setTimeout(r, 20)); // let any straggling callbacks fire
+      const m = model({ phase: "form", form: served, notice: "" })!;
+      expect(m.translating).toBeNull(); expect(m.translateFailed).toBeTruthy(); expect(m.form.items[0].text).toBe(form.items[0].text);
+    } finally { globalThis.fetch = realFetch; setLanguage("en"); }
+  });
 });
