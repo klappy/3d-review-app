@@ -62,7 +62,15 @@
     const reviewQ = route.query.get("review");
     if (name === "setup5" && reviewQ) return { screen: "setup5", data: await D.setupModel(reviewQ), readOnly: true };
     if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name) && reviewQ) { const { assessment } = await D.assessment(reviewQ); return { screen: name, preview: true, assessment, editHref: `/#assessment/${encodeURIComponent(reviewQ)}` }; }
-    if (["workspaces", "workspace", "workspace-group", "people", "people-workspace", "invitations", "explore", "setup", "setup1", "setup2", "setup3", "setup4", "setup5"].includes(name)) return { screen: name === "workspaces" ? "home" : name, preview: name !== "workspaces", home: name === "workspaces" ? await D.homeModel(me) : undefined, assessment: null };
+    if (name === "workspaces") return { screen: "home", home: await D.homeModel(me), assessment: null };
+    if (["setup", "setup1", "setup2", "setup3", "setup4", "setup5"].includes(name)) return { screen: name, preview: true, assessment: null };
+    // People and workspaces read the live stores (app/data.js): a workspace's grouped projects, a scope's roster (members and owners
+    // only: a viewer's refusal is shown as such), the account's own invitations, every review it can see.
+    if (name === "explore") return { screen: name, data: await D.exploreModel(me) };
+    if (name === "workspace" || name === "workspace-group") return { screen: name, data: await D.workspaceModel(params.wid, me) };
+    if (name === "people-workspace") return { screen: name, data: await D.peopleModel({ type: "workspace", id: params.wid }, me) };
+    if (name === "people") { if (!reviewQ) return { screen: name, empty: true, emptyText: "Open People from a review's page: this page lists who has access to one review." }; return { screen: name, data: await D.peopleModel({ type: "assessment", id: reviewQ }, me) }; }
+    if (name === "invitations") return { screen: name, data: await D.invitationsModel(me) };
     if (name === "project") return { screen: "project", data: await D.projectModel(params.pid) };
     // A review's own page is the board for its stage: Setup 5 (ready to launch) while preparing, Collect while collecting, Results after.
     if (name === "review") { const { assessment } = await D.assessment(params.aid); if (assessment.stage === "collect") return { redirect: to("collect", params) }; if (assessment.stage !== "prepare") return { redirect: to("results", params) }; return { screen: "setup5", data: await D.setupModel(params.aid) }; }
@@ -171,6 +179,14 @@
   }
   async function launch() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("collect", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The survey could not be launched." } }; } }
   async function reopenCollection() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("share", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be reopened." } }; } }
+  // People actions (app/data.js: the same routes the current UI's permissions page calls); each lands on a fresh read, or the shell's error.
+  const peopleScope = () => page.data?.data?.scope;
+  const act = async (label, fn) => { try { await fn(); load(); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `${label}: ${e?.message || "the request could not be completed"}` } }; } };
+  const sendInvite = ({ email, role }) => act("Invitation not sent", async () => { const out = await D.invite(peopleScope(), { email, role }); if (out.held) throw new Error("the server held the invitation"); }); // an empty or malformed address is the server's INVALID_PARAMS, shown as is
+  const rowAction = (name, row) => act(name === "Withdraw" ? "Invitation not withdrawn" : "Access not removed", () => (row.pending ? D.revokeInvitation(row.key) : D.revokeGrant(peopleScope(), row.key)));
+  const changeRole = (row, role) => act("Role not changed", async () => { const out = await D.setRole(peopleScope(), row.key, role); if (out.held) throw new Error("the server held the change"); });
+  const acceptInvite = (id) => act("Invitation not accepted", () => D.acceptInvitation(id));
+  const groupProject = (pid) => act("Project not added", async () => { await D.addProject(route.params.wid, pid); go(to("workspace", { wid: route.params.wid })); });
   async function closeCollection() { const aid = route.params.aid; try { await D.setStage(aid, "understand"); go(to("results", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be closed." } }; } }
   const applyChrome = (s) => setLiveChrome(s ? { who: S.firstName(s.principal), initials: S.initialsOf(s.principal), workspace: "Your workspace", workspaces: [], accountItems, home: to("home"), workspaceItems: [{ kind: "micro", label: "Your workspaces" }, { label: "Home", href: to("home") }] } : { who: "", initials: "", workspace: "", workspaces: [], accountItems: [], home: to("home"), workspaceItems: [] });
   const chrome = $derived({ phone, theme, who, accountItems, session });
@@ -233,6 +249,24 @@
     {@const C = REGISTRY[page.data.screen]}
     <C {phone} {theme} report={rep} />
   {/if}
+{:else if page.data.screen === "explore"}
+  {@const C = REGISTRY.explore}
+  <C {phone} {theme} data={page.data.data} state={route.query.get("state") ?? undefined} />
+{:else if page.data.screen === "workspace" || page.data.screen === "workspace-group"}
+  {@const C = REGISTRY[page.data.screen]}
+  <C {phone} {theme} data={page.data.data} ongroup={groupProject} />
+{:else if page.data.screen === "people" || page.data.screen === "people-workspace"}
+  {#if page.data.empty}
+    <Status {phone} {theme} kind="empty" message={page.data.emptyText} back={to("home")} backLabel="Your reviews" />
+  {:else if page.data.data.refused}
+    <Status {phone} {theme} kind="refused" message="Permissions are managed by members and owners: a viewer cannot read who has access here. Ask an owner if you need to manage people." back={page.data.data.review ? to("review", { aid: page.data.data.review.id }) : to("workspace", { wid: page.data.data.workspace.id })} backLabel={page.data.data.review ? "Back to the review" : "Back to the workspace"} />
+  {:else}
+    {@const C = REGISTRY[page.data.screen]}
+    <C {phone} {theme} data={page.data.data} oninvite={sendInvite} onaction={rowAction} onrole={changeRole} />
+  {/if}
+{:else if page.data.screen === "invitations"}
+  {@const C = REGISTRY.invitations}
+  <C {phone} {theme} data={page.data.data} onaccept={acceptInvite} />
 {:else if page.data.preview}
   {@const C = REGISTRY[page.data.screen]}
   <Status {phone} {theme} kind="preview" message={`This screen is a design preview with sample data${page.data.assessment ? ` (your review: ${page.data.assessment.name})` : ""}. ${page.data.previewNote ?? (page.data.editHref ? "Editing a review's details, surveys, passage and dates happens in the current design for now." : "The current design still does this for real.")}`} inline back={page.data.editHref ?? (page.data.assessment ? to("review", { aid: page.data.assessment.id }) : to("home"))} backLabel={page.data.previewNote ? "Send feedback in the current design" : page.data.editHref ? `Edit ${page.data.assessment?.name ?? "this review"} in the current design` : page.data.assessment ? "Back to the review" : "Home"} />

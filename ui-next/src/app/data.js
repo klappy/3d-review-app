@@ -1,12 +1,13 @@
 // UI Next (v4) workspace data. Status: provisional. Reads only the /v2 routes the current UI reads (ui/assess/scope.js, views.js,
 // share.js, report-build.js); builds view models in the shapes the lane screens already draw (collect/model.js, results/data.js, home.json).
-import { api, confirmed, enc, token } from "./api.js";
+import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
 import { LEVEL_KEY } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
+import { acceptInvitationById } from "../../../ui/v3/components/invite.js";
 
 export const LENS_KEY = Object.freeze({ "Translation Team": "team", Community: "community", Church: "church" });
 export const lensKeyOf = (perspective) => LENS_KEY[perspective] ?? LENS_KEY[lensLabel(perspective) === lensLabel("Translation Team") ? "Translation Team" : lensLabel(perspective) === lensLabel("Community") ? "Community" : lensLabel(perspective) === lensLabel("Church") ? "Church" : ""] ?? null;
@@ -32,6 +33,17 @@ export const reports = async (aid) => api(`/v2/assessments/${enc(aid)}/reports`)
 export const report = async (id) => (await api(`/v2/reports/${enc(id)}`)).report;
 export const buildReport = (aid) => confirmed(`/v2/assessments/${enc(aid)}/reports`);
 export const issueLink = (aid, sid) => confirmed(`/v2/assessments/${enc(aid)}/surveys/${enc(sid)}/links`, { params: {} });
+// People and workspaces: the same routes the current UI reads and writes (ui/assess/permissions.js header, ui/workspace-manager.js).
+export const SCOPE_SEG = Object.freeze({ workspace: "workspaces", project: "projects", assessment: "assessments" });
+export const workspace = async (wid) => api(`/v2/workspaces/${enc(wid)}`); // { workspace, projects[] with assessment_count / response_count }
+export const grantsAt = async (scope) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants`); // { grants, pending_invitations }; member+ only
+export const myInvitations = async () => (await api("/v2/me/invitations")).invitations ?? [];
+export const invite = (scope, { email, role }) => confirmed(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/invitations`, { email, role });
+export const setRole = (scope, gid, role) => confirmed(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants/${enc(gid)}`, { role }, { method: "PATCH" });
+export const revokeGrant = (scope, gid) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants/${enc(gid)}`, { method: "DELETE" });
+export const revokeInvitation = (id) => api(`/v2/invitations/${enc(id)}`, { method: "DELETE" });
+export const acceptInvitation = (id) => acceptInvitationById(api, id);
+export const addProject = (wid, pid) => api(`/v2/workspaces/${enc(wid)}/projects/${enc(pid)}`, { method: "POST" });
 
 // Home: fixtures/home.json's shape from the account's real projects and reviews, so the approved screens/Home.svelte composition draws
 // it unchanged: groups by stage (results | collecting | setup), completed (stage improve), the account, the first workspace. No invitation
@@ -56,7 +68,7 @@ export async function homeModel(me) {
   const completed = all.filter(({ a }) => a.stage === "improve").map(({ a, p }) => ({ title: a.name, meta: `${p.name} · reviewed`, href: to("results", { aid: a.id }) }));
   const first = String(me?.principal?.display_name || "").trim().split(/\s+/)[0] || "You";
   const initials = (String(me?.principal?.display_name || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")) || "";
-  return { user: { first, name: me?.principal?.display_name || "", initials }, workspace: ws[0]?.name ?? "Your workspace", workspaces: ws, projects: ps, invitation: null, phoneOrder: ["collecting", "setup", "results"], groups, completed, empty: !all.length, start: "/#new" };
+  return { user: { first, name: me?.principal?.display_name || "", initials }, workspace: ws[0]?.name ?? "Your workspace", workspaces: ws, projects: ps, invitation: null, phoneOrder: ["collecting", "setup", "results"], groups, completed, empty: !all.length, start: "/#new", rows: all };
 }
 
 // Project: fixtures/setup/project.json's shape for screens/setup/Project.svelte (desktop two tracks, phone list). Levels per review come
@@ -284,4 +296,139 @@ export async function shareModel(aid, me) {
   };
   const share = { copied: -1, lead: "Each perspective — and each role inside it — has its own survey link. People answer without an account. One link can be used by everyone who answers that survey.", phoneLead: "Each survey has its own link. Send it, show the QR, or hand the phone over.", codes: { code: "", line: "", unused: "Access codes are issued from the current design's Share panel; this screen does not issue them yet" } };
   return { review, share };
+}
+
+// ---- Workspace, People, Invitations, Explore (cookbook work/active/2026-10-21-ui-next-demo-wiring: the people and explore lanes' screens
+// read the live stores; the fixtures stay for the harness). Status: provisional.
+const userOf = (me) => { const name = String(me?.principal?.display_name || "").trim(); return { first: name.split(/\s+/)[0] || "You", initials: name ? name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") : "Y", name }; };
+const PILL_OF = Object.freeze({ prepare: "setup", collect: "collecting", understand: "results", improve: "done" }); // the Workspace board's Stage pill words (Pill.svelte STAGE_LABELS)
+export const ROLES = Object.freeze({ owner: "Owner", member: "Member", viewer: "Viewer" });
+// The boards' words for what each role can do (fixtures/people/people.json); the server's gating is ui/scope-invitations.js, through people-data.js.
+export const CAN = Object.freeze({
+  assessment: { owner: "Can change everything, invite people and delete", member: "Can run the review and read results", viewer: "Can read results only" },
+  workspace: { owner: "Everything in the workspace, including deleting projects", member: "Can create projects and run reviews in all of them", viewer: "Can read results across all projects" },
+});
+export const INVITE_LABELS = Object.freeze({ viewer: "Viewer — reads results", member: "Member — runs reviews", owner: "Owner — everything" });
+const PHONE_INVITE_LABELS = Object.freeze({ member: "Member — can run reviews", viewer: "Viewer — can read results" });
+const FOOTNOTE = "Roles flow down, never up: a workspace member can run every review in it; a review viewer sees only that review. Participants never appear here — they answer through links and codes, without accounts.";
+// The service stores another person's email as a hash and holds no display name for them (ui/v3/components/member-list.js contract):
+// the signed-in account reads by its own name, everyone else "Member N" (the current UI's label), a pending invitation by its date only.
+export const OTHER_PERSON = "Member";
+export const PENDING_PERSON = "Invitation sent";
+export function rosterOf(r, me) {
+  const myId = me?.principal?.id ?? null, u = userOf(me);
+  let n = 0;
+  const grants = (r?.grants ?? []).map((g) => {
+    const you = !!myId && g.principal_id === myId;
+    if (!you) n += 1;
+    return { id: g.id, principal_id: g.principal_id, role: g.role, name: you ? (u.name ? `${u.name} (you)` : "You") : `${OTHER_PERSON} ${n}`, initials: you ? u.initials : `${OTHER_PERSON[0]}${n}` };
+  });
+  const pending_invitations = (r?.pending_invitations ?? []).map((i) => ({ id: i.id, role: i.role, status: i.status, email: PENDING_PERSON, initials: "?", invited: shortDate(i.created_at), expires: i.expires_at ? shortDate(i.expires_at) : "" }));
+  return { grants, pending_invitations };
+}
+// People at one scope (fixtures/people/people.json's shape for screens/people/People.svelte): the roster is GET /v2/{scope}/{id}/grants,
+// which the server answers for members and owners only; a viewer's refusal is reported (refused: true), never shown as nobody.
+// actions names the row actions this app performs for real (Remove = DELETE grant, Withdraw = DELETE invitation); the boards' Transfer
+// ownership and Resend stay with the current design (no resend route; transfer is its own confirmed flow there).
+export const PEOPLE_ACTIONS = Object.freeze(["Remove", "Withdraw"]);
+export async function peopleModel(scope, me) {
+  const myId = me?.principal?.id ?? null;
+  let roster = null, refused = false;
+  try { roster = rosterOf(await grantsAt(scope), me); } catch (e) { if (classify(e) !== "refused") throw e; refused = true; }
+  const base = { scope, refused, user: { ...userOf(me), workspace: "" }, inviteLabels: INVITE_LABELS, phone: { me: myId, inviteLabels: PHONE_INVITE_LABELS, roster }, roles: ROLES, footnote: FOOTNOTE, actions: PEOPLE_ACTIONS };
+  if (scope.type === "workspace") {
+    const { workspace: w } = await workspace(scope.id);
+    return { ...base, user: { ...base.user, workspace: w.name }, review: null, workspace: { id: w.id, name: w.name, short: w.name, heading: "People in this workspace", phoneTitle: "People in this workspace", me: myId, can: CAN.workspace, roster, role: w.role } };
+  }
+  const { assessment: a } = await assessment(scope.id);
+  const p = await project(a.project_id).catch(() => ({ name: "Project", id: a.project_id }));
+  const total = Number(a.response_count ?? 0);
+  const review = {
+    id: a.id, projectId: a.project_id, title: a.name, project: p.name, stage: STAGE_OF[a.stage] ?? "setup", meta: [p.name, a.language_name || "", fmt(a)].filter(Boolean).join(" · "), updated: `Updated ${ago(a.updated_at || a.created_at)}`,
+    heading: "People with access to this review", phoneTitle: "People with access", me: myId, can: CAN.assessment, roster, role: a.role ?? "viewer",
+    deleteRefused: total ? `Reviews with responses can't be deleted. This one has ${total}.` : "Deleting a review is done from the current design's review page; this screen does not delete yet.",
+  };
+  return { ...base, user: { ...base.user, workspace: "" }, review, workspace: null };
+}
+
+// A review's newest built report as { team: { score, responses }, … } (the Explore lane's levelOf input; levelWords for the Workspace
+// card). null when no report is built; a failed report read is null too, as projectModel's trend reads it (a level beside a review is
+// decoration; the review list itself is the shell's error when it fails).
+export async function reviewLenses(a) {
+  if (!["understand", "improve"].includes(a.stage)) return null;
+  try {
+    const r = await reports(a.id);
+    const newest = (r.reports ?? []).filter((x) => x?.id).sort((x, y) => String(y.created_at || "").localeCompare(String(x.created_at || "")))[0];
+    if (!newest) return null;
+    const rep = newest.payload ? newest : await report(newest.id);
+    const counts = await lensCounts(a.id);
+    const out = {};
+    for (const l of rep.payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; out[k] = { score: Number(l.score), responses: Number(counts[k] ?? 0) }; }
+    return Object.keys(out).length ? out : null;
+  } catch { return null; }
+}
+export const levelWords = (lenses) => Object.fromEntries(Object.entries(lenses ?? {}).map(([k, v]) => [k, LEVEL_KEY[v3ScoreBand(Number(v.score), Number(v.responses))] ?? "more"]));
+const monthOf = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
+const formatIconOf = (formats) => (formats.some((f) => /audio|oral/i.test(f)) ? "mic" : formats.some((f) => /video|sign/i.test(f)) ? "video" : "list");
+
+// Workspace (fixtures/people/workspace.json's shape for screens/people/Workspace.svelte): GET /v2/workspaces/{id} names the grouped
+// projects with their counts; each project's reviews give its stage, languages, formats, activity and (from the newest review with
+// a built report) its levels. The group dialog's candidates are the account's own ungrouped projects with their direct role (GET
+// /v2/projects direct_role: ui/workspace-manager.js mayGroup decides, through people-data.js groupRows).
+export async function workspaceModel(wid, me) {
+  const [{ workspace: w, projects: wps }, mine] = await Promise.all([workspace(wid), projects()]);
+  const live = (wps ?? []).filter((p) => !p.archived_at);
+  const lists = await Promise.all(live.map((p) => assessmentsOf(p.id).then((as) => as.filter((a) => !a.archived_at).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at))))));
+  const all = lists.flat();
+  const cards = await Promise.all(live.map(async (p, i) => {
+    const as = lists[i];
+    const langs = [...new Set(as.map((a) => a.language_name).filter(Boolean))];
+    const formats = [...new Set(as.map(fmt).filter(Boolean))];
+    const reported = as.find((a) => ["understand", "improve"].includes(a.stage));
+    const lenses = reported ? await reviewLenses(reported) : null;
+    return {
+      id: p.id, title: p.name, href: to("project", { pid: p.id }), stage: as[0] ? PILL_OF[as[0].stage] ?? "setup" : "setup",
+      language: langs.join(" · ") || "Language not set", format: formats.join(" · ") || "Format not set", formatIcon: formatIconOf(formats),
+      orgs: p.organization ? [[p.organization, false]] : [], reviews: Number(p.assessment_count ?? as.length), responses: Number(p.response_count ?? 0),
+      activity: as[0] ? ago(as[0].updated_at || as[0].created_at) : "no review yet", levels: lenses ? Object.entries(levelWords(lenses)) : null,
+      phone: [langs[0], formats[0]].filter(Boolean).join(" · ") || "No review yet",
+    };
+  }));
+  const year = String(new Date().getFullYear());
+  const stats = [["Projects", live.length], ["Languages", new Set(all.map((a) => a.language_name).filter(Boolean)).size], ["Reviews collecting", all.filter((a) => a.stage === "collect").length], ["Results ready", all.filter((a) => a.stage === "understand").length], ["Completed this year", all.filter((a) => a.stage === "improve" && String(a.updated_at || a.created_at).startsWith(year)).length]];
+  const candidates = (mine ?? []).filter((p) => !p.archived_at && !p.workspace_id).map((p) => ({ id: p.id, title: p.name, directRole: p.direct_role ?? null }));
+  return {
+    id: w.id, role: w.role, user: userOf(me), name: w.name, short: w.name,
+    lead: "Projects this organisation runs or has been given access to. Partners never see each other's workspaces.",
+    stats, views: ["Active", "All", "Archived"], projects: cards, group: { workspaceRole: w.role, candidates },
+  };
+}
+
+// Invitations (fixtures/people/invitations.json's shape for screens/people/Invitations.svelte): GET /v2/me/invitations, the signed-in
+// person's own live invitations with their scope names (src/handlers/grant.ts mine). The server sends no inviter name yet
+// (inviter_display_name null) and no history of accepted ones (earlier: []), so neither is drawn.
+export const INVITATION_KINDS = Object.freeze({ workspace: "workspace", project: "project", assessment: "review" });
+export async function invitationsModel(me) {
+  const list = await myInvitations();
+  const rows = list.map((i) => ({ id: i.id, scope: i.scope, role: i.role, from: i.inviter_display_name || "", expires: i.expires_at ? shortDate(i.expires_at) : "", when: ago(i.invited_at) }));
+  return {
+    user: { ...userOf(me), workspace: "" }, desktop: { invitations: rows }, phone: { invitations: rows, earlier: [] },
+    kinds: INVITATION_KINDS, can: { owner: "you can change everything", member: "you can start and run reviews", viewer: "you can read results" },
+    phoneCan: { owner: "change everything", member: "facilitate reviews", viewer: "read results" }, roles: ROLES,
+  };
+}
+
+// Explore (fixtures/explore/explore.json's shape for screens/explore/Explore.svelte): every review the account can see, from Home's real
+// projects and reviews (a failed read is the shell's error), with each review's real response count and, where a report is built, its
+// per-perspective score and count (explore-data.js levelOf bands them). No filter, grouping or saved view is wired (the server has
+// no list/roll-up capability for them), so none is claimed: the chips, group-by options and add-filter rows are empty.
+export async function exploreModel(me) {
+  const home = await homeModel(me);
+  const rows = await Promise.all(home.rows.map(async ({ a, p }) => ({
+    id: a.id, title: a.name, project: p.name, language: a.language_name || "", region: "", orgs: p.organization || "",
+    stage: Object.hasOwn(PILL_OF, a.stage) ? a.stage : "prepare", responses: { n: Number(a.response_count ?? 0) }, lenses: await reviewLenses(a),
+    updated: ago(a.updated_at || a.created_at), href: to(a.stage === "prepare" ? "review" : a.stage === "collect" ? "collect" : "results", { aid: a.id }),
+  })));
+  const phone = rows.map((r) => ({ title: r.title, href: r.href, meta: [r.project, monthOf(home.rows.find((x) => x.a.id === r.id)?.a.created_at)].filter(Boolean).join(" · "), team: r.lenses?.team ?? null }));
+  return { user: home.user, workspace: home.workspace, visible: rows.length, filters: [], groupBy: { options: ["None"], selected: "None" }, addFilter: [], reviews: rows, phone: { chips: [], rows: phone, sheet: [] } };
 }

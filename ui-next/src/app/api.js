@@ -19,10 +19,11 @@ export async function api(url, { method = "GET", body } = {}) {
   return j.result;
 }
 // A dangerous capability (links, report build): dry_run -> confirm_token -> execute, as ui/assess/share.js and report-build.js do.
-export async function confirmed(url, params = {}) {
-  const p = await api(url, { method: "POST", body: { ...params, mode: "dry_run" } });
+// method: the route's verb (POST by default; PATCH for a role change, as ui/assess/permissions.js sends it).
+export async function confirmed(url, params = {}, { method = "POST" } = {}) {
+  const p = await api(url, { method, body: { ...params, mode: "dry_run" } });
   if (p?.suppressed === true || p?.status === "held") return { held: true, preview: p };
   if (typeof p?.confirm_token !== "string") throw new Error("Invalid preview");
-  return { held: false, preview: p, result: await api(url, { method: "POST", body: { ...params, mode: "execute", confirm_token: p.confirm_token } }) };
+  return { held: false, preview: p, result: await api(url, { method, body: { ...params, mode: "execute", confirm_token: p.confirm_token } }) };
 }
 export const enc = (v) => encodeURIComponent(String(v ?? ""));

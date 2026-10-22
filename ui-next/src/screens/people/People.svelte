@@ -28,10 +28,14 @@
   import { href } from "../href.js";
   import { P } from "./people-icons.js";
   import { rosterRows, inviteOptions, ROLE_ORDER } from "./people-data.js";
-  import data from "../../../fixtures/people/people.json";
+  import fixture from "../../../fixtures/people/people.json";
 
   // ?state=: no board draws one, so any value (the route passes it as state) renders the default; the prop is not read.
-  let { scope = "review", phone = false, theme = "light" } = $props();
+  // data: the fixture, or the live roster in the same shape (app/data.js peopleModel). Live actions (absent in the harness, where the
+  // controls stay the board's): oninvite({ email, role }) sends an invitation (the confirmed dry-run → execute pair); onrole(row, role)
+  // changes a grant's role the same way; onaction(name, row) does a row action the app performs for real — data.actions names them
+  // (Remove, Withdraw); a board action without a route (Transfer ownership, Resend) is not offered on live data.
+  let { scope = "review", phone = false, theme = "light", data = fixture, oninvite, onaction, onrole } = $props();
   if (!SCOPES.includes(scope)) throw new TypeError(`People: unknown scope "${String(scope)}" (review | workspace)`);
   const review = scope === "review";
   const s = review ? data.review : data.workspace;
@@ -45,15 +49,21 @@
     { label: "Close collection now", href: href("close-collection"), icon: P.lock },
     { label: "Meeting offline? Print and paper", href: COLLECT, icon: P.print }, // the board links Collect#offline
     { kind: "hr" },
-    { label: "Delete this review", danger: true, icon: I.x, refused: "Reviews with responses can't be deleted. This one has 18." },
+    { label: "Delete this review", danger: true, icon: I.x, refused: data.review?.deleteRefused ?? "Reviews with responses can't be deleted. This one has 18." },
   ];
   const TABS = [["Prepare", href("setup5"), "done"], ["Collect", COLLECT, "now"], ["Understand", href("results"), ""], ["Improve", href("next-step"), ""]];
   const ACTION = { "Transfer ownership": { href: "#transfer", icon: I.people }, Remove: { href: "#remove", icon: I.x, danger: true }, Resend: { href: "#resend", icon: P.refresh }, Withdraw: { href: "#withdraw", icon: I.x, danger: true } };
-  function menuItems(actions) {
-    const items = actions.map((a) => ({ label: a, ...ACTION[a] }));
+  const offered = (r) => (data.actions ? r.actions.filter((a) => data.actions.includes(a)) : r.actions);
+  function menuItems(actions, row) {
+    const items = actions.map((a) => ({ label: a, ...ACTION[a], ...(onaction ? { href: undefined, onclick: () => onaction(a, row) } : {}) }));
     const safe = items.filter((it) => !it.danger), danger = items.filter((it) => it.danger);
     return safe.length && danger.length ? [...safe, { kind: "hr" }, ...danger] : [...safe, ...danger];
   }
+  // Live: the invite form's button sends what the fields hold (desktop: the form card; phone: the phone-bar's primary, by document click).
+  const read = (emailId, roleId) => ({ email: document.getElementById(emailId)?.value?.trim() ?? "", role: document.getElementById(roleId)?.value ?? "" });
+  const inviting = (el) => { const f = (e) => { if (oninvite && e.target instanceof Element && e.target.closest(".btn")) { e.preventDefault(); oninvite(read("pp-invite", "pp-as")); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
+  const barInvite = (e) => { if (phone && oninvite && e.target instanceof Element && e.target.closest(".phone-bar .btn-primary")) { e.preventDefault(); oninvite(read("pp-inv", "pp-role")); } };
+  const acting = (row) => (el) => { const f = (e) => { const b = e.target instanceof Element ? e.target.closest(".btn") : null; if (onaction && b) { e.preventDefault(); onaction(b.textContent.trim(), row); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
 </script>
 
 {#snippet dots()}<Icon d={P.dots} />{/snippet}
@@ -64,8 +74,9 @@
 {#snippet bar()}{#if phone}<PhoneBar label="Send invitation" />{/if}{/snippet}
 {#snippet person(r)}<Row gap={3}><span class="av" aria-hidden="true">{r.initials}</span><div><div>{r.name}</div><div class="small">{r.sub}</div></div></Row>{/snippet}
 {#snippet personRow(r)}<span class="av" aria-hidden="true">{r.initials}</span><div class="list-body"><div class="list-title">{r.name}</div><div class="small">{r.sub}</div></div>{/snippet}
-{#snippet roleSelect(id, label, opts, selected)}<label class="sel"><select class="in" {id} aria-label={label}>{#each opts as [value, text]}<option {value} selected={value === selected}>{text}</option>{/each}</select><Icon d={I.chev} /></label>{/snippet}
+{#snippet roleSelect(id, label, opts, selected, on)}<label class="sel"><select class="in" {id} aria-label={label} onchange={(e) => on?.(e.currentTarget.value)}>{#each opts as [value, text]}<option {value} selected={value === selected}>{text}</option>{/each}</select><Icon d={I.chev} /></label>{/snippet}
 
+<svelte:document onclick={barInvite} />
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <span class="small"><a class="link" href={back}>{review ? data.review.title : data.workspace.short}</a></span>
@@ -79,7 +90,7 @@
       {#each roster.rows as r (r.key)}
         <div class="list-row">
           {@render personRow(r)}
-          {#if r.actions.length}<Menu id={`pp-${r.key}`} summary={dots} summaryClass="btn btn-quiet" label={`Actions for ${r.name}`} items={menuItems(r.actions)} />{/if}
+          {#if offered(r).length}<Menu id={`pp-${r.key}`} summary={dots} summaryClass="btn btn-quiet" label={`Actions for ${r.name}`} items={menuItems(offered(r), r)} />{/if}
         </div>
       {/each}
     </section>
@@ -110,7 +121,7 @@
           {#if review}<p class="small t-15">Access to <strong>{data.review.title}</strong>. People on the whole <strong>{data.review.project}</strong> project see it too.</p>
           {:else}<p class="small t-15">Access to <strong>{data.workspace.name}</strong> and everything in it. Someone invited only to a project or a review does not appear here.</p>{/if}
         </div>
-        <div class="solid l-card l-grid" data-pad="form" data-tpl="invite" data-gap="3">
+        <div class="solid l-card l-grid" data-pad="form" data-tpl="invite" data-gap="3" {@attach inviting}>
           <div><label class="lbl" for="pp-invite">Invite someone</label><input class="in" type="email" placeholder="name@example.org" id="pp-invite" /></div>
           <div><label class="lbl" for="pp-as">As</label>{@render roleSelect("pp-as", undefined, options, options[0]?.[0])}</div>
           <Button label="Send invitation" lead={mail} />
@@ -121,9 +132,9 @@
             {#each roster.rows as r (r.key)}
               <tr>
                 <td class="td">{@render person(r)}</td>
-                <td class="td">{#if r.editable}{@render roleSelect(undefined, `Role for ${r.name}`, ROLE_ORDER.map((role) => [role, data.roles[role]]), r.role)}{:else}{r.roleLabel}{/if}{#if r.via}<div class="micro">from {r.via}</div>{/if}</td>
+                <td class="td">{#if r.editable}{@render roleSelect(undefined, `Role for ${r.name}`, ROLE_ORDER.map((role) => [role, data.roles[role]]), r.role, (role) => onrole?.(r, role))}{:else}{r.roleLabel}{/if}{#if r.via}<div class="micro">from {r.via}</div>{/if}</td>
                 <td class="td"><span class="small">{r.can}</span></td>
-                <td class="td" data-align="end">{#if r.note}<span class="small">{r.note}</span>{:else}{#each r.actions as a}<Button label={a} variant="quiet" />{/each}{/if}</td>
+                <td class="td" data-align="end" {@attach acting(r)}>{#if r.note}<span class="small">{r.note}</span>{:else}{#each offered(r) as a}<Button label={a} variant="quiet" />{/each}{/if}</td>
               </tr>
             {/each}
           </tbody>
