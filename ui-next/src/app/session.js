@@ -23,7 +23,7 @@ let emailLinks;
 export async function emailLinksOn() {
   if (typeof emailLinks === "boolean") return emailLinks;
   try { const r = await fetch("/v2/auth/email?probe", { headers: { accept: "application/json" }, credentials: "same-origin", redirect: "error", cache: "no-store", ...(typeof AbortSignal?.timeout === "function" ? { signal: AbortSignal.timeout(2000) } : {}) }); emailLinks = r.ok && (await r.json())?.email_links === true; }
-  catch { emailLinks = false; }
+  catch { return false; } // a failed probe is not cached: the next sign-in attempt probes again (fails safe to the Access page meanwhile)
   return emailLinks;
 }
 export const ACCESS_HREF = "/v2/auth/access";
