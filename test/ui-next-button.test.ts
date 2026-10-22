@@ -92,9 +92,57 @@ describe("renderButton icon-only", () => {
   });
 });
 
-describe("renderButton states not in this slice", () => {
-  it("refuses disabled until the contract defines it", () => {
-    expect(() => renderButton({ label: "x", disabled: true })).toThrow(/disabled/);
+describe("renderButton disabled (design-system.md section 2 Field and button states, R16 Disabled)", () => {
+  it("disabled renders the native disabled attribute; the default leaves it off", () => {
+    for (const variant of ["secondary", "primary", "quiet"]) {
+      const b = renderButton({ label: "Continue", variant, disabled: true });
+      expect(b.tagName).toBe("BUTTON");
+      expect(b.hasAttribute("disabled")).toBe(true);
+      expect((b as HTMLButtonElement).disabled).toBe(true);
+      expect(b.hasAttribute("aria-disabled")).toBe(false);
+    }
+    expect(renderButton({ label: "x" }).hasAttribute("disabled")).toBe(false);
+    expect(renderButton({ label: "x", disabled: false }).hasAttribute("disabled")).toBe(false);
+    expect(renderButton({ icon: icon(), ariaLabel: "More", disabled: true }).hasAttribute("disabled")).toBe(true);
+  });
+  it("refuses a disabled link and a non-boolean disabled", () => {
+    expect(() => renderButton({ label: "x", href: "/x", disabled: true })).toThrow(/link cannot be disabled/);
+    expect(() => renderButton({ label: "x", disabled: "true" })).toThrow(/disabled/);
+  });
+  it("the helmet styles it: .btn:disabled and .btn-primary:disabled (no opacity)", () => {
+    const helmet = read("components/base.css");
+    const d = helmet.match(/\.btn:disabled,\.btn\[aria-disabled=true\]\{([^}]*)\}/)![1];
+    expect(d).toContain("color:var(--ink-3)");
+    expect(d).toContain("cursor:not-allowed");
+    expect(helmet).toMatch(/\.btn-primary:disabled,\.btn-primary\[aria-disabled=true\]\{background:transparent;color:var\(--ink-3\)/);
+    expect(d).not.toMatch(/opacity/);
+  });
+});
+
+describe("renderButton ariaDescribedby (R16 V-41: a control names its reason; lane setup N7, shared slice 2)", () => {
+  it("passes the id refs through as aria-describedby on a button, a disabled button and a link; none by default", () => {
+    const off = renderButton({ label: "Continue", variant: "primary", disabled: true, ariaDescribedby: "cont-why" });
+    expect(off.tagName).toBe("BUTTON");
+    expect(off.getAttribute("aria-describedby")).toBe("cont-why");
+    expect((off as HTMLButtonElement).disabled).toBe(true); // stays the native disabled form, no aria-disabled
+    expect(off.hasAttribute("aria-disabled")).toBe(false);
+    expect(renderButton({ label: "Next", ariaDescribedby: " help-a   err-b " }).getAttribute("aria-describedby")).toBe("help-a err-b");
+    expect(renderButton({ label: "Open", href: "/x", ariaDescribedby: "why" }).getAttribute("aria-describedby")).toBe("why");
+    expect(renderButton({ icon: icon(), ariaLabel: "More", ariaDescribedby: "tip" }).getAttribute("aria-describedby")).toBe("tip");
+    expect(renderButton({ label: "x" }).hasAttribute("aria-describedby")).toBe(false);
+  });
+  it("names the reason in the accessibility tree: the description resolves to the referenced text", () => {
+    const host = document.createElement("div");
+    host.innerHTML = `<p id="cont-why">Add a passage to continue.</p>`;
+    document.body.append(host);
+    try {
+      const b = render(Button, { target: host, props: { label: "Continue", variant: "primary", disabled: true, ariaDescribedby: "cont-why" } }).container.querySelector("button")!;
+      const ids = b.getAttribute("aria-describedby")!.split(" ");
+      expect(ids.map((id) => document.getElementById(id)?.textContent)).toEqual(["Add a passage to continue."]);
+    } finally { host.remove(); }
+  });
+  it("refuses an empty, #-prefixed or non-string value", () => {
+    for (const bad of ["", "   ", "#cont-why", 7, ["a"]]) expect(() => renderButton({ label: "x", ariaDescribedby: bad }), String(bad)).toThrow(/ariaDescribedby/);
   });
 });
 
@@ -130,7 +178,7 @@ describe("button.css", () => {
     const tokens = read("tokens.css");
     for (const [, name] of css.matchAll(/var\((--[a-z0-9-]+)\)/g)) expect(tokens).toContain(`${name}:`);
   });
-  it("has no disabled or press rule (not ported)", () => {
+  it("adds no disabled or press rule of its own (disabled is the helmet's; press is not ported)", () => {
     expect(css.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/:disabled|\[disabled\]|:active/);
   });
   it("turns transitions off under reduced motion", () => {

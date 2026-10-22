@@ -13,7 +13,7 @@ import * as R from "../ui-next/src/copy/rachel.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { route } from "../ui-next/src/route.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { ACCOUNT_ITEMS } from "../ui-next/src/icons.js";
+import { accountItems } from "../ui-next/src/icons.js";
 // @ts-expect-error -- plain .mjs script, no type declarations
 import { parse, emit } from "../scripts/sync-rachel-copy.mjs";
 
@@ -178,8 +178,12 @@ describe("/next/ routes for About and Landing", () => {
     expect(route(p("?screen=about"), undefined).view).toBe("components");
     expect(route(p("?screen=landing"), undefined).view).toBe("components");
   });
-  it("Home's account menu reaches About", () => {
-    expect(ACCOUNT_ITEMS.find((i: { label?: string }) => i.label === "Why 3D Review exists").href).toBe("?screen=about");
+  it("Home's account menu reaches About through href(): ui_next stays on and w/theme carry (setup N8)", () => {
+    const about = (from: string) => accountItems(from).find((i: { label?: string }) => i.label === "Why 3D Review exists").href;
+    expect(about("")).toBe("?ui_next=on&screen=about");
+    expect(about("?ui_next=on&screen=project&theme=dark")).toBe("?ui_next=on&screen=about&theme=dark");
+    expect(about("?ui_next=on&screen=home&w=phone&theme=dark&state=reviews")).toBe("?ui_next=on&screen=about&w=phone&theme=dark");
+    expect(route(p(about("?theme=dark")), on())).toEqual({ view: "about", props: { phone: false, theme: "dark" } });
   });
 });
 
@@ -259,5 +263,30 @@ it("live phone CSS overrides fixed-board positioning without creating a sticky s
     const app = mount(About, { phone: true });
     expect(getComputedStyle(app.querySelector(".phone-bar")!).position).toBe("sticky");
     expect(getComputedStyle(app).overflow).toBe("clip");
+  } finally { style.remove(); }
+});
+
+it("a short phone page fills the viewport so the sticky bar sits at its foot; desktop keeps its block shell (VALIDATION-integration B1)", () => {
+  // .l-shell height:100% cannot resolve against .app's min-height alone; on a page shorter than the viewport the in-flow sticky bar
+  // then sat under the content (sign-in 482-575 at 390x844). The phone screen is a flex column one dynamic viewport tall and the
+  // shell grows, so main.l-phone (flex-grow 1) pushes the bar to the foot. Real Chromium 390x844 numbers: RESULTS-shared.md Final pass.
+  const style = document.createElement("style");
+  style.textContent = ["base.css", "phone.css", "type.css"].map((name) =>
+    readFileSync(resolve(__dirname, "../ui-next/components", name), "utf8")).join("\n");
+  document.head.append(style);
+  try {
+    const app = mount(About, { phone: true });
+    for (const c of [...app.querySelector("main.l-phone")!.children].slice(1)) c.remove(); // a one-row page, shorter than any viewport
+    const shell = app.querySelector(":scope > .l-shell") as HTMLElement;
+    expect(getComputedStyle(app).display).toBe("flex");
+    expect(getComputedStyle(app).flexDirection).toBe("column");
+    expect(getComputedStyle(app).minHeight).toBe("100dvh");
+    expect(getComputedStyle(shell).flexGrow).toBe("1");
+    expect(getComputedStyle(app.querySelector("main.l-phone")!).flexGrow).toBe("1");
+    expect(shell.lastElementChild!.matches(".phone-bar")).toBe(true);
+    expect(getComputedStyle(shell.lastElementChild!).position).toBe("sticky");
+    const desk = mount(About, {});
+    expect(getComputedStyle(desk).display).not.toBe("flex");
+    expect(getComputedStyle(desk).minHeight).toBe("100vh");
   } finally { style.remove(); }
 });
