@@ -186,6 +186,11 @@ await f.waitForSelector("h1", { timeout: 60000 }); await loaded(f, "results");
 const body = await f.textContent("body");
 ok(`results page rendered: ${/Nothing here yet|More input needed|results can/i.test(body) ? "held (too few responses)" : "report built from real answers"}`);
 await shot(f, "results");
+// Answers (TICKET done-when 3): the server holds row-level answers for everyone (D7); the screen shows that real state, no sample rows.
+await f.goto(`${BASE}/next/#/review/${a.id}/results/answers`); await f.waitForSelector("h1, [role=status]", { timeout: 60000 }); await loaded(f, "results-answers");
+const ans = (await f.textContent("body")).replace(/\s+/g, " ");
+if (!/Held by policy/.test(ans) || /Mark 1–4|Hindi New Testament/.test(ans)) fail("results-answers: expected the real held state, no sample rows");
+ok("results-answers: real server suppression shown (D7), no sample data");
 await f.goto(`${BASE}/next/#/review/${a.id}/report`); await f.waitForSelector("h1", { timeout: 60000 }); await loaded(f, "report"); ok("report page rendered");
 await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1"); await loaded(f, "collect"); ok("collect page rendered");
 // Prepare (TICKET done-when 4, read-only tonight): the stage tab carries the review; Setup 5 shows THIS review's data, no

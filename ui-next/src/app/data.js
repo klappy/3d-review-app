@@ -25,6 +25,9 @@ export const assessment = async (aid) => api(`/v2/assessments/${enc(aid)}`); // 
 export const surveyCounts = async (aid, sid) => api(`/v2/assessments/${enc(aid)}/surveys/${enc(sid)}`); // { survey, counts, expected_count? }
 export const setStage = async (aid, stage) => api(`/v2/assessments/${enc(aid)}/stage`, { method: "POST", body: { stage } });
 export const results = async (aid) => api(`/v2/assessments/${enc(aid)}/results`);
+// Answer-by-answer rows: the server answers with a typed suppression for everyone (src/handlers/response.ts list: D7 disclosure
+// policy unresolved, no row-level disclosure even to owners). The screen shows that real state, never sample rows.
+export const responsesList = async (aid) => api(`/v2/assessments/${enc(aid)}/responses`);
 export const reports = async (aid) => api(`/v2/assessments/${enc(aid)}/reports`);
 export const report = async (id) => (await api(`/v2/reports/${enc(id)}`)).report;
 export const buildReport = (aid) => confirmed(`/v2/assessments/${enc(aid)}/reports`);

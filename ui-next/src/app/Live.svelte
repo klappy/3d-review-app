@@ -74,6 +74,7 @@
     }
     if (name.startsWith("results") || name.startsWith("report")) {
       const m = await D.resultsModel(params.aid, { build: name !== "results-held" });
+      if (name === "results-answers") { const rows = await D.responsesList(params.aid).catch((e) => ({ suppressed: true, status: "error", reason: e.message })); return { screen: name, results: m, answers: rows }; }
       return { screen: name, results: m };
     }
     if (name === "share") { const sm = await D.shareModel(params.aid, me); return { screen: "share", shareData: sm.review, share: sm.share }; }
@@ -211,8 +212,11 @@
     <Held {phone} {theme} report={{ review: m.review, counts: m.counts, payload: m.payload ?? { lenses: [] } }} />
   {:else if page.data.screen === "results-answers"}
     {@const C = REGISTRY["results-answers"]}
-    <Status {phone} {theme} kind="preview" message="The answer-by-answer view is a design preview: the numbers below are sample data, not this review's answers." inline />
-    <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} />
+    {#if page.data.answers?.suppressed}
+      <Status {phone} {theme} kind="held" message={`Answer-by-answer rows are not disclosed for this review: ${page.data.answers.reason ?? "held by policy"} (the server holds them for everyone, owners included). The levels and gaps on Results are built from these answers.`} inline back={to("results", route.params)} backLabel="Back to Results" />
+    {:else}
+      <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} />
+    {/if}
   {:else if page.data.screen === "results"}
     {@const C = REGISTRY.results}
     <C {phone} {theme} report={rep} onrefresh={refreshResults} refreshed={page.data.refreshed ?? ""} />
