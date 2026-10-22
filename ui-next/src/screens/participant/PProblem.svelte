@@ -24,7 +24,6 @@
     ["check", "You already answered", `Thank you — your receipt was ${p.receipt}. Interviewing someone else? Start a new one.`],
   ]);
   const KEEPS = [
-    ["globe", "Switch to mobile data", "Shared Wi-Fi counts everyone as one visitor."],
     ["print", "Ask for a paper copy", "The facilitator can enter it later; nothing is lost."],
     ["people", "Show this screen to the facilitator", "The code at the bottom tells them what happened."],
   ];

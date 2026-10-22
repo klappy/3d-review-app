@@ -7,7 +7,6 @@
   import Mark from "../../Mark.svelte";
   import Pill from "../../Pill.svelte";
   import Button from "../../Button.svelte";
-  import RoomHealth from "./RoomHealth.svelte";
   import Glyph from "./Glyph.svelte";
   import { href } from "../href.js";
   let { m } = $props();
@@ -20,7 +19,6 @@
   <a class="brand" href={href("collect")}><Mark /><span>3D Review</span></a>
   <nav class="crumb" aria-label="Breadcrumb"><ol><li><span aria-current="page" title={m.review.title}>{m.review.title}</span></li></ol></nav>
   <div class="top-end">
-    <RoomHealth opened={m.room.opened} refused={m.room.refused} instruction={false} />
     <Pill stage={m.review.stage} />
     <span class="tag">{m.answered} answered</span>
     <Button label="Meeting offline? Print and paper" href={`${href("collect")}#offline`} lead={print} />

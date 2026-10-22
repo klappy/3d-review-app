@@ -39,14 +39,16 @@
   import LensDot, { LENSES } from "../LensDot.svelte";
   import Icon from "../Icon.svelte";
   import { I } from "../icons.js";
-  import data from "../../fixtures/home.json";
+  import fixture from "../../fixtures/home.json";
 
-  let { state = "reviews", phone = false, theme = "light" } = $props();
+  // data: the fixture, or the live model in the same shape (app/data.js homeModel); data.start: where "Start a 3D Review" goes.
+  let { state = "reviews", phone = false, theme = "light", data = fixture } = $props();
+  const START = $derived(data.start ?? "#setup");
   if (!STATES.includes(state)) throw new TypeError(`Home: unknown state "${String(state)}" (first | reviews)`);
   if (phone && state === "first") throw new TypeError("Home: the phone board draws the with-reviews state only (HomePhone.dc.html)");
   const ARROW = "M5 12h14M13 6l6 6-6 6", SEARCH = "M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14M20 20l-4-4", PLAY = "M8 5v14l11-7z";
   const STAGES = ["results", "collecting", "setup"];
-  const phoneGroups = $derived(data.phoneOrder.map((s) => data.groups.find((g) => g.stage === s)));
+  const phoneGroups = $derived(data.phoneOrder.map((s) => data.groups.find((g) => g.stage === s)).filter(Boolean));
   const PHASES = [
     ["Prepare", "Name the review, add the passage, choose who will participate. Five short steps."],
     ["Collect", "Each survey gets its own link and QR. Print paper for anyone offline."],
@@ -61,13 +63,13 @@
 {#snippet check()}<Icon d={I.check} />{/snippet}
 {#snippet play()}<Icon d={PLAY} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="root" initials={data.user.initials} />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.workspace} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Start a 3D Review" lead="plus" href="#setup" />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label="Start a 3D Review" lead="plus" href={START} />{/if}{/snippet}
 
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <Row split gap={3}><h1 class="title-phone">Your reviews</h1><a class="link small" href="#explore">Explore all</a></Row>
-    <Card href="#invitations" gap={2}><Row gap={3}><span class="icn" data-lens="church"><Icon d={I.mail} /></span><span class="small"><b>1 invitation</b> · {data.invitation.phone}</span></Row></Card>
+    {#if data.invitation}<Card href="#invitations" gap={2}><Row gap={3}><span class="icn" data-lens="church"><Icon d={I.mail} /></span><span class="small"><b>1 invitation</b> · {data.invitation.phone}</span></Row></Card>{/if}
     <Row wrap gap={2}><span class="chip">{data.workspace}</span><span class="chip">Mine</span><a class="link small" href="#explore">+ filter</a></Row>
     {#each phoneGroups as g}
       {#each g.reviews as r}
@@ -87,7 +89,7 @@
     <Page gap={5}>
       <Row split wrap gap={3}>
         <h1 class="title-page">Your reviews</h1>
-        <Row gap={2}><Button label="Explore all reviews" variant="quiet" href="#explore" lead={search} /><Button label="Start a 3D Review" variant="primary" href="#setup" lead={plus} /></Row>
+        <Row gap={2}><Button label="Explore all reviews" variant="quiet" href="#explore" lead={search} /><Button label="Start a 3D Review" variant="primary" href={START} lead={plus} /></Row>
       </Row>
       {#if state === "first"}
         <Card hi gap={5} label="Welcome">
@@ -109,17 +111,17 @@
         </Card>
         <p class="small">Coming from the old 3D Review site? Your link brought you to the new app; the old one now forwards here. <a class="link" href="#help-h7">What changed</a></p>
       {:else}
-        <Card gap={3} label="Invitation">
+        {#if data.invitation}<Card gap={3} label="Invitation">
           <Row split wrap gap={4}>
             <Row gap={3}><span class="icn" data-lens="team"><Icon d={I.mail} /></span><Stack gap={1}><h3 class="h3">{data.invitation.from} invited you to <em>{data.invitation.project}</em></h3><p class="small">{data.invitation.role}</p></Stack></Row>
             <Row gap={2}><Button label="Decline" variant="quiet" /><Button label="Accept" href="#invitations" lead={check} /></Row>
           </Row>
-        </Card>
+        </Card>{/if}
         <Row wrap gap={2}>
           <span class="small">Show</span>
           {#each data.groups as g}<label class="chip"><input class="cb" type="checkbox" checked />{g.heading} <span class="small">{g.reviews.length}</span></label>{/each}
           <label class="chip"><input class="cb" type="checkbox" />Completed <span class="small">{data.completed.length}</span></label>
-          <span class="chip">Workspace · BCS India</span><span class="chip">Facilitator · me</span>
+          <span class="chip">Workspace · {data.workspace}</span><span class="chip">Facilitator · me</span>
           <Button label="Add filter" variant="quiet" lead={plus} />
         </Row>
         {#each data.groups as g}

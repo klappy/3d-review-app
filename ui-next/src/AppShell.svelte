@@ -4,7 +4,7 @@
      Optional top (TopBar or PhoneHeader) and bar (PhoneBar) snippets: the shell level owns its chrome (section 8.4). -->
 <script>
   let { phone = false, theme, screen = false, rhythm, top, bar, children } = $props();
-  if (rhythm !== undefined && rhythm !== "marketing" && rhythm !== "read") throw new TypeError(`AppShell: rhythm must be marketing or read, got ${String(rhythm)}`);
+  if (rhythm !== undefined && rhythm !== "marketing" && rhythm !== "read" && rhythm !== "center") throw new TypeError(`AppShell: rhythm must be marketing, read or center, got ${String(rhythm)}`);
   if (theme !== undefined && theme !== "light" && theme !== "dark") throw new TypeError(`AppShell: theme must be light or dark, got ${String(theme)}`);
 </script>
 

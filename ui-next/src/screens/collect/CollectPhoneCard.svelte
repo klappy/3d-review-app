@@ -7,7 +7,6 @@
   import Row from "../../Row.svelte";
   import Button from "../../Button.svelte";
   import SurveyGroups from "./SurveyGroups.svelte";
-  import RoomHealth from "./RoomHealth.svelte";
   import Glyph from "./Glyph.svelte";
   import { plural } from "./model.js";
   import { href } from "../href.js";
@@ -20,7 +19,6 @@
 
 <Card hi pad="hero" gap={3}>
   <div class="l-row" data-gap="2" data-align="baseline"><span class="num" data-size="40">{m.answered}</span><span class="small">of {m.expected} · {plural(m.surveys.length, "survey", "surveys")}</span></div>
-  <RoomHealth opened={m.room.opened} refused={m.room.refused} wrap />
   <SurveyGroups groups={m.groups} phone />
   <div class="l-stack" data-gap="2" id="offline">
     <span class="h3">Meeting offline?</span>

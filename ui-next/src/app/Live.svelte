@@ -7,6 +7,7 @@
   import { onMount } from "svelte";
   import { parse, to } from "./router.js";
   import { setLiveContext } from "../screens/href.js";
+  import { setLiveChrome } from "./chrome.js";
   import { PHONE_QUERY } from "../route.js";
   import * as S from "./session.js";
   import * as D from "./data.js";
@@ -15,9 +16,7 @@
   import { REGISTRY } from "../screens/registry.js";
   import About from "../screens/About.svelte";
   import Landing from "../screens/Landing.svelte";
-  import HomeLive from "./HomeLive.svelte";
-  import ProjectLive from "./ProjectLive.svelte";
-  import ReviewLive from "./ReviewLive.svelte";
+  import Home from "../screens/Home.svelte";
   import SignInLive from "./SignInLive.svelte";
   import Status from "./Status.svelte";
   import { collectModel as collectView } from "../screens/collect/model.js";
@@ -49,19 +48,21 @@
   async function loader(r) {
     const { name, params } = r;
     if (PARTICIPANT.has(name)) return participant(r);
-    if (name === "home") { const me = await S.me(); if (!me) return { screen: "landing" }; return { screen: "home", home: await D.homeModel(me) }; }
+    if (name === "home") { const me = await S.me(); if (!me) return { screen: "landing" }; const home = await D.homeModel(me); return { screen: "home", home, state: home.empty ? "first" : "reviews" }; }
     if (name === "landing" || name === "about" || name === "help" || name === "feedback") return { screen: name };
     if (name === "sign-in" || name === "sign-in-check") { const me = await S.me(); return me ? { redirect: to("home") } : { screen: "sign-in" }; }
     const me = await S.me();
     if (!me) return { screen: "sign-in", next: hash };
-    if (name === "workspaces" || name === "workspace" || name === "people" || name === "people-workspace" || name === "invitations" || name === "explore" || name === "setup") return { screen: "home", home: await D.homeModel(me), note: name };
-    if (name === "project") { const [p, as] = await Promise.all([D.project(params.pid), D.assessmentsOf(params.pid)]); return { screen: "project", project: p, assessments: as }; }
-    if (name === "review") { const { assessment, surveys } = await D.assessment(params.aid); const p = await D.project(assessment.project_id).catch(() => null); return { screen: "review", assessment, surveys, project: p }; }
+    if (["workspaces", "workspace", "workspace-group", "people", "people-workspace", "invitations", "explore", "setup", "setup1", "setup2", "setup3", "setup4", "setup5"].includes(name)) return { screen: name === "workspaces" ? "home" : name, preview: name !== "workspaces", home: name === "workspaces" ? await D.homeModel(me) : undefined, assessment: null };
+    if (name === "project") return { screen: "project", data: await D.projectModel(params.pid) };
+    // A review's own page is the board for its stage: Setup 5 (ready to launch) while preparing, Collect while collecting, Results after.
+    if (name === "review") { const { assessment } = await D.assessment(params.aid); if (assessment.stage === "collect") return { redirect: to("collect", params) }; if (assessment.stage !== "prepare") return { redirect: to("results", params) }; return { screen: "setup5", data: await D.setupModel(params.aid) }; }
     if (name === "collect" || name === "close-collection") { const m = await D.collectModel(params.aid); return { screen: name, data: m }; }
     if (name === "qr-room" || name === "print-qr") {
+      // The room shows the host under each QR: the board's short 3dreview.app/s/CODE has no backend yet (RESULTS-collect debt; parity-loop row).
       const m = await D.collectModel(params.aid);
       const open = m.groups.flatMap((g) => g.surveys).filter((s) => s.open);
-      await Promise.all(open.map(async (s) => { try { const l = await D.linkFor(params.aid, s.id); s.link = `${m.origin}/next/${l.fragment}`; s.qr = D.qrModules(s.link).cells; s.code = s.id; } catch (e) { s.linkError = e.message; } }));
+      await Promise.all(open.map(async (s) => { try { const l = await D.linkFor(params.aid, s.id); s.fullLink = `${m.origin}/next/${l.fragment}`; s.qr = D.qrModules(s.fullLink).cells; s.code = s.id; s.link = name === "print-qr" ? s.fullLink : `${new URL(m.origin).host}/next`; } catch (e) { s.linkError = e.message; } }));
       m.groups = m.groups.map((g) => ({ ...g, surveys: g.surveys.filter((s) => s.qr) })).filter((g) => g.surveys.length);
       return { screen: name, data: m, empty: !m.groups.length, emptyText: open.length ? "The survey links could not be created. Try again." : "No survey is collecting yet. Open collection on the review page first." };
     }
@@ -97,6 +98,7 @@
     const my = ++seq;
     const r = route;
     setLiveContext({ ...r.params });
+    if (!PARTICIPANT.has(r.name)) { try { session = await S.me(); } catch { session = null; } applyChrome(session); }
     // The loading screen shows only when a read takes longer than a blink, so walking questions never flashes.
     const slow = setTimeout(() => { if (my === seq) page = { status: "loading", key: r.name, data: null, error: null }; }, 180);
     try {
@@ -149,9 +151,14 @@
     try { const out = await D.buildReport(r.params.aid); if (out.held) page = { ...page, data: { ...page.data, refreshed: "The results can’t be rebuilt yet: more answers are needed." } }; else load(); }
     catch (e) { page = { ...page, data: { ...page.data, refreshed: `Could not rebuild: ${e?.message || "try again"}` } }; }
   }
-  async function moveStage(stage) { await D.setStage(route.params.aid, stage); load(); }
+  async function launch() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("collect", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The survey could not be launched." } }; } }
+  async function closeCollection() { const aid = route.params.aid; try { await D.setStage(aid, "understand"); go(to("results", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be closed." } }; } }
+  const applyChrome = (s) => setLiveChrome(s ? { who: S.firstName(s.principal), initials: S.initialsOf(s.principal), workspace: "Your workspace", workspaces: [], accountItems, home: to("home"), workspaceItems: [{ kind: "micro", label: "Your workspaces" }, { label: "Home", href: to("home") }] } : { who: "", initials: "", workspace: "", workspaces: [], accountItems: [], home: to("home"), workspaceItems: [] });
   const chrome = $derived({ phone, theme, who, accountItems, session });
-  const reportFor = (m) => (m.payload ? { review: m.review, counts: m.counts, payload: m.payload, gaps: D.gapsOf(m.payload), radar: D.radarOf(m.payload), lookNext: [] } : null);
+  $effect(() => { setLiveChrome(session ? { who: who.first, initials: who.initials, workspace: page.data?.home?.workspace ?? "Your workspace", workspaces: [], accountItems, home: to("home"), workspaceItems: [{ kind: "micro", label: "Your workspaces" }, { label: "Home", href: to("home") }] } : { who: "", initials: "", workspace: "", workspaces: [], accountItems: [], home: to("home"), workspaceItems: [] }); });
+  // The phone boards (ResultsPhone.dc.html, fixtures/results/report.json "phone") draw each perspective's strongest and weakest area only.
+  const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses ?? []).map((l) => { const sd = [...(l.sub_dimensions ?? [])].filter((x) => Number.isFinite(Number(x.score))).sort((a, b) => Number(b.score) - Number(a.score)); return { ...l, sub_dimensions: sd.length > 2 ? [sd[0], sd[sd.length - 1]] : l.sub_dimensions }; }) });
+  const reportFor = (m) => (m.payload ? { review: m.review, counts: m.counts, payload: phone ? phonePayload(m.payload) : m.payload, gaps: D.gapsOf(m.payload), radar: D.radarOf(m.payload), lookNext: [] } : null);
 </script>
 
 {#if page.status === "loading"}
@@ -168,17 +175,19 @@
   {@const C = REGISTRY[page.data.screen]}
   <C {phone} {theme} />
 {:else if page.data.screen === "home"}
-  <HomeLive {phone} {theme} {chrome} home={page.data.home} note={page.data.note} />
+  <Home {phone} {theme} data={page.data.home} state={phone ? "reviews" : page.data.state} />
 {:else if page.data.screen === "project"}
-  <ProjectLive {phone} {theme} {chrome} project={page.data.project} assessments={page.data.assessments} />
-{:else if page.data.screen === "review"}
-  <ReviewLive {phone} {theme} {chrome} assessment={page.data.assessment} surveys={page.data.surveys} project={page.data.project} onstage={moveStage} />
+  {@const C = REGISTRY.project}
+  <C {phone} {theme} data={page.data.data} />
+{:else if page.data.screen === "setup5"}
+  {@const C = REGISTRY.setup5}
+  <C {phone} {theme} data={page.data.data} onlaunch={page.data.data.canLaunch ? launch : undefined} />
 {:else if page.data.screen === "collect" || page.data.screen === "close-collection" || page.data.screen === "qr-room" || page.data.screen === "print-qr"}
   {#if page.data.empty}
     <Status {phone} {theme} kind="empty" message={page.data.emptyText} back={to("review", route.params)} backLabel="Back to the review" onretry={load} />
   {:else}
     {@const C = REGISTRY[page.data.screen]}
-    <C {phone} {theme} data={page.data.data} state={route.query.get("state") ?? undefined} />
+    <C {phone} {theme} data={page.data.data} state={route.query.get("state") ?? undefined} onclose={page.data.screen === "close-collection" ? closeCollection : undefined} />
   {/if}
 {:else if page.data.screen === "results" || page.data.screen === "results-gaps" || page.data.screen === "results-answers" || page.data.screen === "report" || page.data.screen === "report-detailed" || page.data.screen === "results-held"}
   {@const m = page.data.results}

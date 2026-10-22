@@ -9,10 +9,12 @@
   import Glyph from "./Glyph.svelte";
   import { out } from "./links.js";
   import { surveys, whoLines, whoShort, aboutLine } from "./draft.js";
-  import data from "../../../fixtures/setup/setup.json";
+  import fixture from "../../../fixtures/setup/setup.json";
 
   // The board draws one state; the route's ?state= prop is not read, so any value (unknown included) renders it and never throws.
-  let { phone = false, theme = "light" } = $props();
+  // data: the fixture, or the live review in the same shape (app/data.js setupModel); onlaunch (live): opens collection for real before Collect.
+  let { phone = false, theme = "light", data = fixture, onlaunch } = $props();
+  const launching = (el) => { const f = (e) => { if (onlaunch && e.target instanceof Element && e.target.closest(".btn-primary")) { e.preventDefault(); onlaunch(); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
   // Launch goes to the collect lane's Collect screen (links.js OUT "collect", registered in screens/collect/index.js).
   const COLLECT = $derived(out("collect", phone ? { w: "phone" } : {}));
   // "Who" and "About each group" say what steps 3 and 4 show (./draft.js; VALIDATION-setup-r2 N3); the phone reads step 3's phone state.
@@ -21,7 +23,7 @@
   const value = (r) => (r.derive === "who" ? WHO : r.derive === "about" ? ABOUT : r.value);
 </script>
 
-<SetupFrame {phone} {theme} step={5} title="Ready to launch" next={{ label: "Launch the survey", href: COLLECT, play: true }}>
+<div class="l-stack" {@attach launching}><SetupFrame {phone} {theme} step={5} title="Ready to launch" next={{ label: "Launch the survey", href: COLLECT, play: true }}>
   {#if phone}
     <p class="small">Check it over. You can change dates and details later.</p>
     {#each data.phoneSummary as r}
@@ -49,4 +51,4 @@
       <div class="l-stack" data-gap="1" data-grow><div class="h3">When you launch, the questions are locked so everyone answers the same survey.</div><p class="small">You can still change the dates, the passage file and the answer languages, and add people who can see results.</p></div>
     </div>
   {/if}
-</SetupFrame>
+</SetupFrame></div>

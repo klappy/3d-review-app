@@ -18,7 +18,6 @@
   import PhoneHeader from "../../PhoneHeader.svelte";
   import LensDot from "../../LensDot.svelte";
   import RoomTop from "./RoomTop.svelte";
-  import RoomHealth from "./RoomHealth.svelte";
   import Glyph from "./Glyph.svelte";
   import Qr from "./Qr.svelte";
   import { collectModel, pickSurvey } from "./model.js";
@@ -37,7 +36,7 @@
 {#snippet arrow()}<Glyph name="arrow" />{/snippet}
 {#snippet bar()}{#if phone && s}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Previous" variant="quiet" href={href("qr-room", { state: String(((at + total - 1) % total) + 1) })} lead={back} /><Button label="Next survey" variant="primary" lg href={href("qr-room", { state: String(((at + 1) % total) + 1) })} trail={arrow} /></div>{/if}{/snippet}
 
-<AppShell {phone} {theme} screen {top} {bar}>
+<AppShell {phone} {theme} screen rhythm={phone ? undefined : "center"} {top} {bar}>
   {#if phone}
     <Row split gap={3}><span class="micro">{#if s}Survey {at + 1} of {total}{/if}</span><a class="link small" href={`${href("collect")}#offline`}>Meeting offline? Print and paper</a></Row>
     <div class="glass-hi l-card l-stack" data-pad="hero" data-gap="4" data-align="center">
@@ -49,7 +48,6 @@
         <h1 class="h2">No surveys yet</h1>
       {/if}
     </div>
-    <RoomHealth opened={m.room.opened} refused={m.room.refused} wrap />
   {:else}
     <Page gap={6}>
       <div class="l-stack" data-gap="2" data-align="center">
@@ -68,7 +66,7 @@
       </div>
       <div class="l-stack" data-gap="2" data-align="center">
         <p class="small lead">Not sure which is yours? Ask the facilitator. No phone? Ask for a paper survey.</p>
-        {#if m.room.refused}<p class="small lead">Survey not opening? Switch from the shared Wi-Fi to mobile data, or ask for a paper survey.</p>{/if}
+        
       </div>
     </Page>
   {/if}

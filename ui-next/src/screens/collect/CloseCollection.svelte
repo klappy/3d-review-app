@@ -18,7 +18,9 @@
   import { href } from "../href.js";
   import fixture from "../../../fixtures/collect/collect.json";
 
-  let { phone = false, theme = "light", data = fixture } = $props();
+  // onclose (live): closes collection for real (POST /stage understand) before going to the results; the link stays a link.
+  let { phone = false, theme = "light", data = fixture, onclose } = $props();
+  const closing = (el) => { const f = (e) => { if (onclose && e.target instanceof Element && e.target.closest(".btn-primary")) { e.preventDefault(); onclose(); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
   const m = $derived(collectModel(data));
   const enough = $derived(m.groups.length > 0 && m.groups.every((g) => g.answered >= 3));
 </script>
@@ -32,7 +34,7 @@
     <CollectPhoneCard {m} />
     <Dialog labelledby="close-title" cancel={href("collect")} sheet gap={3} title={phoneTitle}>
       <p class="small">{m.answered} of {m.expected} expected have answered. Links stop working; you can reopen later.</p>
-      <Button label="Yes, close and see results" variant="primary" lg block href={href("results")} />
+      <span class="l-stack" {@attach closing}><Button label="Yes, close and see results" variant="primary" lg block href={href("results")} /></span>
       <!-- svelte-ignore a11y_autofocus -->
       <a class="btn btn-quiet btn-block" href={href("collect")} autofocus>Keep collecting</a>
     </Dialog>
@@ -44,7 +46,7 @@
       <div class="l-row" data-gap="2" data-justify="end">
         <!-- svelte-ignore a11y_autofocus -->
         <a class="btn btn-quiet" href={href("collect")} autofocus>Keep collecting</a>
-        <Button label="Yes, close and see results" variant="primary" lg href={href("results")} trail={arrow} />
+        <span {@attach closing}><Button label="Yes, close and see results" variant="primary" lg href={href("results")} trail={arrow} /></span>
       </div>
     </Dialog>
   {/if}

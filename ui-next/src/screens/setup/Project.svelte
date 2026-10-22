@@ -23,10 +23,11 @@
   import Glyph from "./Glyph.svelte";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import data from "../../../fixtures/setup/project.json";
+  import fixture from "../../../fixtures/setup/project.json";
 
   // The board draws one state; the route's ?state= prop is not read, so any value (unknown included) renders it and never throws.
-  let { phone = false, theme = "light" } = $props();
+  // data: the fixture, or the live model in the same shape (app/data.js projectModel); a review row may carry its own href.
+  let { phone = false, theme = "light", data = fixture } = $props();
   const { workspace: ws, project: p, reviews, trend } = data;
   const W = $derived(phone ? { w: "phone" } : {});
   const to = (screen) => href(screen, W);
@@ -55,7 +56,7 @@
     <section class="glass l-card" data-pad="list" aria-labelledby="revs-h">
       <Row split gap={3}><span class="micro" id="revs-h">Reviews over time</span><span class="small">newest first</span></Row>
       {#each reviews as r}
-        <a class="card-link su-revline" href={go(r.to)}>
+        <a class="card-link su-revline" href={r.href ?? go(r.to)}>
           <span class="su-revcol" data-grow><span class="small">{r.when}</span><span class="su-clip">{r.title}</span><span class="l-row" data-gap="2"><Pill stage={r.stage} /></span></span>
           {#if r.overall}<Level level={r.overall} />{:else}<span class="small">{r.note}</span>{/if}
         </a>
@@ -71,7 +72,7 @@
         <div class="l-stack" data-gap="3">
           <h2 class="h2">Reviews, newest first</h2>
           {#each reviews as r}
-            <a class="card-link glass l-card su-rev" href={go(r.to)}>
+            <a class="card-link glass l-card su-rev" href={r.href ?? go(r.to)}>
               <span class="small tab-n">{r.when}</span>
               <span class="l-stack" data-gap="2">
                 <span class="l-row" data-gap="2"><span class="h3">{r.title}</span><Pill stage={r.stage} /></span>

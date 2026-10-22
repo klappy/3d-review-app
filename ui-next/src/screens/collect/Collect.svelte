@@ -15,7 +15,6 @@
   import ReviewFrame from "./ReviewFrame.svelte";
   import SurveyGroups from "./SurveyGroups.svelte";
   import CollectPhoneCard from "./CollectPhoneCard.svelte";
-  import RoomHealth from "./RoomHealth.svelte";
   import MenuSheet from "./MenuSheet.svelte";
   import Glyph from "./Glyph.svelte";
   import { collectModel, pickState } from "./model.js";
@@ -40,7 +39,6 @@
     <div class="l-grid" data-gap="5" data-tpl="aside">
       <div class="l-stack" data-gap="3">
         <div class="l-row" data-gap="3" data-align="baseline"><h2 class="h2">Responses</h2><span class="num" data-size="40">{m.answered}</span><span class="small">of {m.expected} expected · updated {r.updated}</span></div>
-        <RoomHealth opened={m.room.opened} refused={m.room.refused} />
         <SurveyGroups groups={m.groups} />
       </div>
       <aside class="l-stack" data-gap="4">

@@ -23,13 +23,17 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, lensCards, detailedPages } from "./data.js";
+  import { REPORT, lensCards, detailedPages, bandRows, LEVEL_WORD } from "./data.js";
 
   // report (live): { review, counts, payload } from app/data.js resultsModel; default the fixture. onrefresh (live): rebuilds from new answers.
   let { phone = false, theme = "light", report, onrefresh, refreshed = "" } = $props();
   const D = $derived(report ?? (phone ? REPORT.phone : REPORT.desktop));
   const cards = $derived(lensCards(D.payload, D.counts));
   const review = $derived(D.review);
+  // The disagreement line: the board's sentence for the fixture; for a live report, the widest cross-perspective gap in its own words.
+  const gap = $derived(report ? bandRows(D, D.counts, D.gaps?.biggest ?? []).find((r) => r.dots.length >= 2) : null);
+  const disagree = $derived(!report ? "The team feels strong about the brief and consistency; the community finds the text hard to follow and not yet part of daily life. That gap is the most useful thing in this review." : gap ? `${gap.name}: ${gap.dots.map((d) => `${d.label} ${LEVEL_WORD[d.level].toLowerCase()}`).join(", ")} — ${gap.verdict}. That gap is the most useful thing in this review.` : "No area has two perspectives to compare yet; levels above are per perspective.");
+  const built = $derived(report ? `Report built ${review.builtOn} from ${review.responses} responses.` : `Report built ${review.closed} from ${review.responses} responses.`);
   const crumbs = $derived([{ label: review.project, href: out("project") }, { label: review.title }]);
   let checked = $state(false);
   const NO_NEW = "No new answers since this report was built.";
@@ -66,14 +70,14 @@
         <Row split gap={5}>
           <Stack gap={1}>
             <h2 class="h2">Where the perspectives disagree</h2>
-            <p class="small t-15">The team feels strong about the brief and consistency; the community finds the text hard to follow and not yet part of daily life. That gap is the most useful thing in this review.</p>
+            <p class="small t-15">{disagree}</p>
           </Stack>
           <Button label="See the three biggest gaps" href={href("results-gaps")} trail={arrow} />
         </Row>
       </Card>
       <Row split gap={2}>
         <Row gap={2}>
-          <span class="small" role="status">Report built {review.closed} from {review.responses} responses.{checked ? ` ${NO_NEW}` : ""}</span>
+          <span class="small" role="status">{built}{line ? ` ${line}` : ""}</span>
           <button class="btn btn-quiet" type="button" onclick={refresh}><Glyph d={G.refresh} />Refresh with new answers</button>
         </Row>
         <Row gap={2}>
