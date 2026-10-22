@@ -69,13 +69,13 @@
     if (name === "sign-in" || name === "sign-in-check") { const me = await S.me(); return me ? { redirect: to("home") } : { screen: "sign-in" }; }
     const me = await S.me();
     if (!me) return { screen: "sign-in", next: hash };
-    // Setup, read-only tonight (TICKET done-when 4): with a review in the query, Setup 5 shows that review's own data (the review
-    // page's board while preparing) and steps 1-4 are labelled previews that hand editing to the current design's page for it.
+    // Setup: with a review in the query, Setup 5 shows that review's own data (the review page's board while preparing).
     const reviewQ = route.query.get("review");
     if (name === "setup5" && reviewQ) return { screen: "setup5", data: await D.setupModel(reviewQ), readOnly: true };
-    if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name) && reviewQ) { const { assessment } = await D.assessment(reviewQ); return { screen: name, preview: true, assessment, editHref: `/#assessment/${encodeURIComponent(reviewQ)}` }; }
+    // Steps 1–4 edit the review through the existing contracts (app/setup.js, wizard.js order); a bare #setup starts a new review.
+    if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name)) { suSt = await SU.openSetup(reviewQ || null, { pid: route.query.get("project") || liveContext()?.pid || "" }); suError = ""; bump(); const screen = name === "setup" ? "setup1" : name; return { screen, step: Number(screen.slice(-1)) }; }
     if (name === "workspaces") return { screen: "home", home: await D.homeModel(me), assessment: null };
-    if (["setup", "setup1", "setup2", "setup3", "setup4", "setup5"].includes(name)) return { screen: name, preview: true, assessment: null };
+    if (name === "setup5") return { redirect: to("home") }; // a review's own page is its Setup 5 while preparing (name === "review")
     // People and workspaces read the live stores (app/data.js): a workspace's grouped projects, a scope's roster (members and owners
     // only: a viewer's refusal is shown as such), the account's own invitations, every review it can see.
     if (name === "explore") return { screen: name, data: await D.exploreModel(me) };

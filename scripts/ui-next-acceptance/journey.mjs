@@ -225,9 +225,18 @@ if (!s5.includes(a.name)) fail("setup5: this review's name is missing"); if (/Ma
 const prim = await f.evaluate(() => [...document.querySelectorAll(".btn-primary")].map((b) => b.textContent.trim() + " -> " + (b.getAttribute("href") ?? "button")));
 if (!prim.some((x) => /Go to Collect -> #\/review\/.*\/collect$/.test(x))) fail(`setup5: primary is not "Go to Collect" for a collecting review: ${JSON.stringify(prim)}`);
 await f.goto(`${BASE}/next/#/setup/1?review=${a.id}`); await f.waitForTimeout(800); await loaded(f, "setup1");
-const editHref = await f.evaluate(() => [...document.querySelectorAll("a")].map((x) => x.getAttribute("href")).find((h) => /^\/#assessment\//.test(h)));
-if (!editHref || !(await f.textContent("body")).includes("design preview")) fail("setup1: not a labelled preview with the current-design edit handoff");
-ok(`prepare: Setup 5 shows ${a.name} read-only (primary "Go to Collect"); Setup 1 is a labelled preview handing edits to ${editHref}`);
+const s1name = await f.inputValue("#name").catch(() => null);
+if (s1name !== a.name) fail(`setup1: the live step does not carry this review's name (got ${JSON.stringify(s1name)})`);
+if ((await f.textContent("body")).includes("design preview")) fail("setup1: still a labelled preview");
+// A real edit through the live step: rename, Continue writes PATCH /v2/assessments/{id} (wizard.js contract), the server row shows it.
+const renamed = `${a.name} ✎`;
+await f.fill("#name", renamed);
+if (!(await f.inputValue("#close"))) await f.fill("#close", new Date(Date.now() + 30 * 86400e3).toISOString().slice(0, 10)); // the wizard's rule: an active-until date is required
+await f.click(".btn-primary"); await f.waitForURL(/setup\/2\?review=/); await loaded(f, "setup2");
+const s1row = await api(`/v2/assessments/${a.id}`);
+if (s1row?.assessment?.name !== renamed) fail(`setup1: Continue did not save the name (server has ${JSON.stringify(s1row?.assessment?.name)})`);
+await api(`/v2/assessments/${a.id}`, { name: a.name }, "PATCH"); // put the name back for the rest of the run
+ok(`prepare: Setup 5 shows ${a.name} read-only (primary "Go to Collect"); Setup 1 is live: renaming it and pressing Continue wrote the server row (PATCH), then restored`);
 // Print QR pages: "Print N page(s)" opens the print document in its own tab (app/print.js, the current UI's sheets) and that
 // document calls print() itself — verified by stubbing print() in the new tab, not by the modal rendering.
 await f.goto(`${BASE}/next/#/review/${a.id}/collect/print`); await f.waitForSelector(".qr", { timeout: 30000 }); await loaded(f, "print-qr");
