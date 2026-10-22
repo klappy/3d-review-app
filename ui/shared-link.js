@@ -128,13 +128,13 @@ export function deviceStorage({ device, tab, ttlMs = DEVICE_MEMORY_MS, now = Dat
       const kept = entryOf(key); if (kept && kept.v !== String(value)) dropDevice(key); // the device never contradicts this tab
     },
     removeItem: key => { dropDevice(key); try { tab?.removeItem(key); } catch { /* ignore */ } },
-    // Copy this tab's value to the device until `until` (ms), capped at ttlMs. Without a server expiry, an unchanged
-    // value keeps its stored expiry, so remembering again never extends it.
+    // Copy this tab's value to the device until `until` (ms, the server session's end), capped at ttlMs. With no known
+    // server end nothing is copied: an unknown expiry could outlive the server session (Codex review 4343213007).
     remember(key, until) {
+      if (!Number.isFinite(until)) return;
       let value = null; try { value = tab?.getItem(key) ?? null; } catch { /* ignore */ }
       if (value === null) return;
-      const cap = now() + ttlMs, kept = entryOf(key);
-      const exp = Number.isFinite(until) ? Math.min(until, cap) : kept && kept.v === value ? kept.exp : cap;
+      const exp = Math.min(until, now() + ttlMs);
       if (exp <= now()) { dropDevice(key); return; }
       try { device?.setItem(key, JSON.stringify({ v: value, exp })); } catch { /* storage loss: the tab copy still holds it */ }
     },

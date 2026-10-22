@@ -46,7 +46,8 @@ test('deviceStorage: writes stay in the tab; remember copies to the device until
   const other = deviceStorage({ device, tab: memory(), ttlMs: 50, now: () => clock });
   assert.equal(other.getItem('k'), 'v', 'another tab on the device finds it');
   assert.equal(deviceStorage({ device, tab: memory({ k: 'mine' }), now: () => clock }).getItem('k'), 'mine', 'the tab\'s own value wins');
-  clock = 1020; store.remember('k'); assert.equal(JSON.parse(device.getItem('k')).exp, 1030, 'no server end: the unchanged value keeps its expiry');
+  clock = 1020; store.remember('k'); store.remember('k', NaN); assert.equal(JSON.parse(device.getItem('k')).exp, 1030, 'no server end: nothing copied, nothing extended');
+  const bare = memory(); deviceStorage({ device: bare, tab: memory({ x: 'y' }), now: () => clock }).remember('x'); assert.equal(bare.data.size, 0, 'unknown expiry never reaches the device');
   store.remember('k', 5000); assert.equal(JSON.parse(device.getItem('k')).exp, 1070, 'capped at ttlMs');
   store.setItem('k', 'w'); assert.equal(device.getItem('k'), null, 'a different value in the tab drops the device copy');
   store.setItem('k', 'v'); store.remember('k', 1030); clock = 1030; assert.equal(other.getItem('k'), null, 'expired'); assert.equal(device.getItem('k'), null, 'expired entry is dropped');
@@ -105,6 +106,14 @@ test('Interview another person stays and forgets the remembered receipt on this 
   await submitIn(other); const reloaded = tab({ device, srv, hash: '', session: other.session }); await reloaded.journey.start();
   assert.equal(reloaded.journey.state.phase, 'receipt'); await reloaded.journey.another();
   assert.equal(device.getItem(ns + 'bearer'), null); assert.equal(other.session.getItem(ns + 'bearer'), null);
+});
+test('a submitted session with no server-derived expiry (opened before expiresAt existed) stays in its tab', async () => {
+  const device = memory(), srv = server(), ns = await digestNamespace('legacy-session');
+  const session = memory({ [CURRENT_KEY]: ns, [ns + 'bearer']: 'pt-code-legacy' }); // pt-code*: the mock server keeps it live
+  srv.submitted.add('pt-code-legacy');
+  const reloaded = tab({ device, srv, hash: '', session }); await reloaded.journey.start();
+  assert.equal(reloaded.journey.state.phase, 'receipt'); assert.equal(reloaded.journey.state.thanks.code, false);
+  assert.equal(device.data.size, 0, 'no 12h guess: nothing is copied to the device');
 });
 test('an access-code session stays in its tab and is never told it can reopen; Interview another goes to code entry', async () => {
   const device = memory(), srv = server();
