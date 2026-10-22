@@ -16,7 +16,7 @@
   import { href } from "../href.js";
   import { question, qParam, pick, hasAbout, exclusionNote, LABELS, DATA } from "./data.js";
   // d: the survey model (fixture, or the live journey's form); onanswer(id, value): live mode saves the draft on every tick.
-  let { phone = false, theme = "light", q = qParam(), d = DATA, onanswer } = $props();
+  let { phone = false, theme = "light", q = qParam(), d = DATA, onanswer, onother } = $props();
   const x = $derived(question(q, d));
   const kind = $derived(x.item.type);
   const note = $derived(exclusionNote(x.item, d));
@@ -35,11 +35,12 @@
   const described = (e) => onother?.(x.item.id, e.currentTarget.value);
   const back = $derived(x.n > 1 ? href("p-question", { q: x.n - 1 }) : hasAbout(d) ? href("p-about") : href("p-passage"));
   const next = $derived(x.n < x.total ? href("p-question", { q: x.n + 1 }) : href("p-review"));
+  const T = $derived(d.t ?? ((k, f) => f));
 </script>
 
-{#snippet actions()}<ParticipantActions {phone} {back} backLabel={LABELS.back} backLead="back" label={LABELS.next} href={next} trail="arrow" />{/snippet}
+{#snippet actions()}<ParticipantActions {phone} {back} backLabel={T("back", LABELS.back)} backLead="back" label={T("next", LABELS.next)} href={next} trail="arrow" />{/snippet}
 
-<ParticipantShell {phone} {theme} {actions}>
+<ParticipantShell {phone} {theme} {actions} dir={d.dir}>
   <Stack gap={2}>
     <div class="l-row micro" data-split><span>{x.of}</span><span>{x.perspective}</span></div>
     <ProgressBar value={x.n} max={x.total} label={x.of} />

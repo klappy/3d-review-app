@@ -111,6 +111,7 @@ const p = await part.newPage(); watch(p, "part");
 await p.goto(link);
 await p.waitForSelector("text=We'd like your perspective", { timeout: 20000 });
 ok("participant: link opens -> welcome (real form)");
+const langs = await p.locator("#p-lang option").count(); ok(`participant: language picker ${langs ? `offers ${langs - 1} language(s) besides English` : "not shown (the form offers no other language)"}`);
 await shot(p, "p-welcome");
 await p.click("text=Start"); await p.waitForURL(/#\/p\/passage/);
 await p.click("text=I've read it"); await p.waitForURL(/#\/p\/(q\/1|about)/);
@@ -126,6 +127,20 @@ for (let n = 1; n <= 2; n++) {
   await p.waitForURL(new RegExp(`#/p/(q/${n + 1}|review)`));
 }
 ok("participant: answered q1-q2, Next walks the questions");
+// An Other option's description survives Back/Next (captain CUA regression: onother was not a prop) — exercised when the form has one.
+await p.goto(`${BASE}/next/#/p/q/1`); await p.waitForSelector("text=Question 1 of", { timeout: 15000 });
+for (let n = 1; n <= 3; n++) {
+  const otherOpt = p.locator('input.rd[value="other"], input.cb[value="other"]').first();
+  if (await otherOpt.count()) {
+    await otherOpt.check(); await p.waitForSelector(`input[name="${await otherOpt.getAttribute("name")}::other"]`, { timeout: 5000 });
+    const box = p.locator('input[name$="::other"]'); await box.fill("described here"); await p.waitForTimeout(200);
+    await p.click("text=Next"); await p.waitForTimeout(300); await p.goBack(); await p.waitForSelector('input[name$="::other"]', { timeout: 10000 });
+    const kept = await p.locator('input[name$="::other"]').inputValue(); if (kept !== "described here") fail(`Other description lost after Back: "${kept}"`);
+    ok(`participant: Other description survives Next/Back on question ${n}`); break;
+  }
+  if (!(await p.locator("text=Next").count())) break; await p.click("text=Next"); await p.waitForTimeout(200); if (!/#\/p\/q\//.test(p.url())) break;
+}
+if (errors.some((e) => /onother|ReferenceError/.test(e))) fail("participant: a ReferenceError fired while answering");
 await shot(p, "p-question");
 await p.reload();
 await p.waitForSelector("h1", { timeout: 15000 });
@@ -184,7 +199,13 @@ ok("participant: a bad code shows the inline error (server 404, expected)");
 await f.goto(`${BASE}/next/#/review/${a.id}/results`);
 await f.waitForSelector("h1", { timeout: 60000 }); await loaded(f, "results");
 const body = await f.textContent("body");
-ok(`results page rendered: ${/Nothing here yet|More input needed|results can/i.test(body) ? "held (too few responses)" : "report built from real answers"}`);
+ok(`results page rendered: ${/Nothing here yet|More input needed|results can|held/i.test(body) ? "held (too few responses)" : "report built from real answers"}`);
+// A still-collecting review's held screen says Collecting (no "Results ready"/"Closed"), shows the server's global hold, and offers no "without the X" escape.
+if (a.stage === "collect" || /Collecting/.test(body)) {
+  if (/Results ready|Collection closed|Closed \w/.test(body)) fail("results-held: a collecting review is shown as ready/closed");
+  if (/Show results without/.test(body) && /holds this report|responses so far/.test(body)) fail("results-held: a server-wide hold offers a per-perspective escape");
+  ok("results-held: collecting review shows its real stage and the server's hold, no fictional escape");
+}
 await shot(f, "results");
 // Answers (TICKET done-when 3): the server holds row-level answers for everyone (D7); the screen shows that real state, no sample rows.
 await f.goto(`${BASE}/next/#/review/${a.id}/results/answers`); await f.waitForSelector("h1, [role=status]", { timeout: 60000 }); await loaded(f, "results-answers");

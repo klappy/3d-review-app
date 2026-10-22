@@ -14,7 +14,7 @@
 
 {#snippet actions()}<ParticipantActions {phone} primary={false} label={LABELS.interviewAnother} href={href("p-welcome")} lead="people" onaction={onanother} />{/snippet}
 
-<ParticipantShell {phone} {theme} {actions}>
+<ParticipantShell {phone} {theme} {actions} dir={d.dir}>
   <Card hi pad="hero" gap={4}>
     <Chip icon="check" size={64} lens={surveyLens(d)} />
     <h1 class="display">Thank you</h1>

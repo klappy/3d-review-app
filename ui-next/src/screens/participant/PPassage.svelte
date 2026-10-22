@@ -22,7 +22,7 @@
 {#snippet open()}<Icon d={P.open} />{/snippet}
 {#snippet actions()}<ParticipantActions {phone} back={href("p-welcome")} backLabel={LABELS.back} backLead="back" label="I've read it" href={hasAbout(d) ? href("p-about") : href("p-question", { q: 1 })} trail="arrow" />{/snippet}
 
-<ParticipantShell {phone} {theme} {actions}>
+<ParticipantShell {phone} {theme} {actions} dir={d.dir}>
   <Card hi pad="hero" gap={4}>
     <span class="micro">Before you answer</span>
     <h1 class="title-phone">{p.title}</h1>

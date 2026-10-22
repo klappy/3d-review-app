@@ -33,6 +33,8 @@ describe("live data helpers", () => {
     const all = qrPrintHtml({ title: "Mark 1–4 draft", surveys, per: "one", paper: "Letter" });
     expect(all).toContain("data-print-all-sheet"); expect(all.match(/<li class="share-all-item"/g)).toHaveLength(2); expect(all).not.toContain("print()},300)");
     expect(qrPrintHtml({ title: "t", surveys: [{ name: "x", fullLink: null }] })).toBe("");
+    const sheet = qrPrintHtml({ title: "Mark 1–4 draft", surveys, per: "sheet", paper: "Letter" }); // hand-out cards: one page per survey, six cards each
+    expect(sheet.match(/class="share-sheet-print share-all share-cards"/g)).toHaveLength(2); expect(sheet.match(/<li class="share-all-item"/g)).toHaveLength(12); expect(sheet.match(/link_1/g)!.length).toBe(6);
     const written: string[] = []; const fake = { open: () => ({ document: { open() {}, write: (h: string) => written.push(h), close() {} } }) };
     expect(openQrPrint(fake as never, { title: "t", surveys, per: "survey", paper: "Letter" })).toBe(true); expect(written[0]).toContain("link_1");
     expect(openQrPrint({ open: () => null } as never, { title: "t", surveys, per: "survey", paper: "Letter" })).toBe(false);

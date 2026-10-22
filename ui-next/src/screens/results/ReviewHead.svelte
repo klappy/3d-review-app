@@ -49,7 +49,7 @@
   <div class="l-row" data-gap="5" data-split data-align="start">
     <Stack gap={2}>
       <Row gap={3}><h1 class="title-page">{review.title}</h1><StagePill stage={review.stage} /></Row>
-      <p class="small t-15">{review.project} · {review.language} · {review.modality} · Closed {review.closed} · {n} responses</p>
+      <p class="small t-15">{review.project} · {review.language} · {review.modality} · {review.stage === "collecting" ? "Collecting" : `Closed ${review.closed}`} · {n} responses</p>
     </Stack>
     <Row gap={2}>
       <Menu id="more" summary={dots} summaryClass="btn btn-icon" label="More actions" title="More actions" items={MORE} />

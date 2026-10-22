@@ -132,16 +132,22 @@ const QR_DOC_CSS = `html,body{background:#fff;color:#111;margin:0;font:16px/1.4 
 .doc-tools{display:flex;gap:12px;align-items:center;margin-bottom:12mm}.share-sheet-print{break-after:page;text-align:center}
 .share-sheet-print:last-child{break-after:auto}.share-sheet-qr svg{width:90mm;height:90mm}.share-sheet-url{word-break:break-all}
 .share-all-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12mm}.share-all-item{text-align:center}
-.share-all-qr svg{width:60mm;height:60mm}@media print{.doc-tools{display:none}}`;
+.share-all-qr svg{width:60mm;height:60mm}
+.share-cards .share-all-list{gap:0}.share-cards .share-all-item{border:1px dashed #999;padding:6mm;break-inside:avoid}.share-cards .share-all-qr svg{width:48mm;height:48mm}
+@media print{.doc-tools{display:none}}`;
 
 // surveys: [{ name, fullLink, lens }] (the chosen rows); per: "survey" (one page each) | "sheet" | "one" (all on one page).
-export function qrPrintDocumentHtml({ title, surveys, per = "survey", paper = "Letter", autoPrint = false }) {
+export function qrPrintDocumentHtml({ title, surveys, per = "survey", paper = "Letter", autoPrint = false, cards = 6 }) {
   const rows = surveys.filter((s) => s.fullLink);
   if (!rows.length) return "";
   const line = title ? `${title}` : "";
+  // "sheet" (hand-out cards): one page per chosen survey carrying `cards` (six) identical cut-cards of that survey — the same
+  // escaped item markup as the all-on-one page, repeated, with cut lines from the print CSS; "one": every chosen code on one page.
   const body = per === "survey"
     ? rows.map((s) => oneSheetHtml(QR_CTX, { title: s.name, line, url: s.fullLink })).join("")
-    : printAllHtml(QR_CTX, { heading: title || "Surveys", items: rows.map((s) => ({ title: s.name, line: "", url: s.fullLink })) });
+    : per === "sheet"
+      ? rows.map((s) => printAllHtml(QR_CTX, { heading: `${s.name}${title ? ` · ${title}` : ""}`, items: Array.from({ length: cards }, () => ({ title: s.name, line: "Cut along the lines; one card per person.", url: s.fullLink })) }).replace('class="share-sheet-print share-all"', 'class="share-sheet-print share-all share-cards"')).join("")
+      : printAllHtml(QR_CTX, { heading: title || "Surveys", items: rows.map((s) => ({ title: s.name, line: "", url: s.fullLink })) });
   const size = /a4/i.test(paper) ? "A4" : "letter";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title || "QR pages")}</title><style>${QR_DOC_CSS}
 @page{size:${size}}</style></head><body><main><div class="doc-tools"><button type="button" onclick="print()">Print</button><span>${size === "A4" ? "A4" : "Letter"} · nothing personal on the page</span></div>${body}</main>${autoPrint ? '<script>addEventListener("load",function(){setTimeout(function(){print()},300)})</script>' : ""}</body></html>`;

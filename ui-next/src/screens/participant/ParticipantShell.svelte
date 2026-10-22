@@ -6,12 +6,13 @@
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
   import ParticipantHeader from "./ParticipantHeader.svelte";
-  let { phone = false, theme = "light", actions, children } = $props();
+  // dir (live): the chosen language's direction (i18n.js isRtl) on the shell, so a right-to-left translation reads right to left.
+  let { phone = false, theme = "light", actions, children, dir } = $props();
 </script>
 
 {#snippet top()}<ParticipantHeader />{/snippet}
 {#snippet bar()}{#if phone}{@render actions?.()}{/if}{/snippet}
 
-<AppShell {phone} {theme} screen {top} {bar}>
+<div class="l-stack" dir={dir === "rtl" ? "rtl" : undefined}><AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}{@render children?.()}{:else}<Page width="read" gap={4}>{@render children?.()}{@render actions?.()}</Page>{/if}
-</AppShell>
+</AppShell></div>

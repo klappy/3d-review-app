@@ -213,7 +213,7 @@ export async function resultsModel(aid, { build = false } = {}) {
   }
   const newest = list.sort((x, y) => String(y.created_at || "").localeCompare(String(x.created_at || "")))[0];
   if (newest) built = newest.payload ? newest : await report(newest.id);
-  const review = { id: a.id, project: p.name, projectId: a.project_id, language: a.language_name || "", modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: "results", closed: "", closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses }; // results lane StagePill: closed | results
+  const review = { id: a.id, project: p.name, projectId: a.project_id, language: a.language_name || "", modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: a.stage === "collect" ? "" : shortDate(a.updated_at || a.created_at), closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
   return { aid, review, counts, payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (res?.status === "held" ? res : null), results: res, serverStage: a.stage };
 }
 

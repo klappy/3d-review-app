@@ -24,7 +24,7 @@
 {#snippet chev()}<Icon d={P.chev} />{/snippet}
 {#snippet actions()}<ParticipantActions {phone} label={busy ? "Sending…" : "Send my answers"} href={href("p-receipt")} trail="arrow" onaction={onsend} disabled={busy} />{/snippet}
 
-<ParticipantShell {phone} {theme} {actions}>
+<ParticipantShell {phone} {theme} {actions} dir={d.dir}>
   <Card hi pad="hero" gap={3}>
     <h1 class="title-phone">Check your answers</h1>
     <p class="small t-15">You can change any answer before you send.</p>

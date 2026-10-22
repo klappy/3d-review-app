@@ -17,7 +17,7 @@
 
 {#snippet actions()}<ParticipantActions {phone} back={a.fields.length ? href("p-question", { q: 1 }) : undefined} backLabel="Skip" onback={() => (values = skipAbout())} label={LABELS.next} href={href("p-question", { q: 1 })} trail="arrow" />{/snippet}
 
-<ParticipantShell {phone} {theme} {actions}>
+<ParticipantShell {phone} {theme} {actions} dir={d.dir}>
   <Card hi pad="hero" gap={4}>
     {#if a.eyebrow}<span class="micro">{a.eyebrow}</span>{/if}
     <h1 class="title-phone">A little about you</h1>

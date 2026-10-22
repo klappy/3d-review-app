@@ -240,7 +240,7 @@
   {@const C = REGISTRY["p-code"]}
   <C phone={true} {theme} onredeem={redeem} message={codeError} {busy} state={codeError ? "error" : undefined} />
 {:else if pm}
-  {#if page.data.screen === "p-welcome"}{@const C = REGISTRY["p-welcome"]}<C phone={true} {theme} d={pm} />
+  {#if page.data.screen === "p-welcome"}{@const C = REGISTRY["p-welcome"]}<C phone={true} {theme} d={pm} onlang={P.setLanguage} />
   {:else if page.data.screen === "p-passage"}{@const C = REGISTRY["p-passage"]}<C phone={true} {theme} d={pm} />
   {:else if page.data.screen === "p-about"}{@const C = REGISTRY["p-about"]}<C phone={true} {theme} d={pm} onabout={P.setAbout} />
   {:else if page.data.screen === "p-question"}{@const C = REGISTRY["p-question"]}{#key q}<C phone={true} {theme} d={pm} {q} onanswer={P.answer} onother={P.other} />{/key}

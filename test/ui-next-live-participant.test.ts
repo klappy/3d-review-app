@@ -2,7 +2,7 @@
 // phase -> screen mapping. Cookbook work/active/2026-10-21-ui-next-demo-wiring/HANDOFF-wiring-2315.md step 5.
 import { describe, expect, it } from "vitest";
 // @ts-expect-error -- plain .js module, no type declarations
-import { model, screenFor, answer, other, snapshot } from "../ui-next/src/app/participant.js";
+import { model, screenFor, answer, other, snapshot, setLanguage, loadTranslations } from "../ui-next/src/app/participant.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { choices, question, review } from "../ui-next/src/screens/participant/data.js";
 
@@ -46,5 +46,31 @@ describe("answers the live journey keeps (Codex P1/P2 on PR 575)", () => {
     answer("S1", 4); answer("O1", "other"); other("O1", "because");
     const snap = snapshot(); expect(snap.draft.S1).toBe(4); expect(snap.draft._other).toEqual({ O1: "because" });
     other("O1", "   "); expect(snapshot().draft._other).toEqual({});
+  });
+});
+
+describe("participant language (ui/participate/i18n.js reused)", () => {
+  it("a chosen offered language translates questions, options and UI words through /v2/translate (ids, codes and answers unchanged); English restores the served form", async () => {
+    const served = { ...form, template: { ...form.template, id: "tpl_x" }, languages: [{ code: "hi", name: "Hindi", endonym: "हिन्दी" }] };
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      calls.push({ url, init }); const body = JSON.parse(String(init.body)); const translated: Record<string, string> = {};
+      for (const k of Object.keys(body.sourceTexts)) translated[k] = `HI:${body.sourceTexts[k]}`;
+      return new Response(JSON.stringify({ translated }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    try {
+      const en = model({ phase: "form", form: served, notice: "" })!;
+      expect(en.lang).toBe("en"); expect(en.languages.map((l: { code: string }) => l.code)).toEqual(["hi"]); expect(en.form.items[0].text).toBe(form.items[0].text);
+      setLanguage("hi"); await loadTranslations(served);
+      const hi = model({ phase: "form", form: served, notice: "" })!;
+      expect(hi.lang).toBe("hi"); expect(hi.dir).toBe("ltr");
+      expect(hi.form.items[0].text).toBe(`HI:${form.items[0].text}`); expect(hi.form.items[0].id).toBe(form.items[0].id);
+      expect(hi.form.items[0].options[0].code).toBe(form.items[0].options[0].code); expect(hi.form.items[0].options[0].text).toMatch(/^HI:/);
+      expect(hi.t("next")).toBe("HI:Next");
+      expect(calls.length).toBeGreaterThan(0); expect(calls.every((c) => c.url === "/v2/translate" && c.init.credentials === "omit")).toBe(true);
+      setLanguage("en"); await loadTranslations(served);
+      expect(model({ phase: "form", form: served, notice: "" })!.form.items[0].text).toBe(form.items[0].text);
+    } finally { globalThis.fetch = realFetch; setLanguage("en"); }
   });
 });

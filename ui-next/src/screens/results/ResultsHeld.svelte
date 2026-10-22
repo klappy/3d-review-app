@@ -43,11 +43,16 @@
   const phoneN = $derived(H.phoneCounts[first.lens]);
   const crumbs = [{ label: D.review.project, href: out("project") }, { label: D.review.title }];
   const without = `Show results without the ${first.label.toLowerCase()}`;
+  // Live: a server (assessment-wide) hold cannot be worked around per perspective, so the "without" escape is not offered; while the
+  // review is still collecting the primary goes back to Collect (nothing to reopen), otherwise it reopens collection.
+  const collecting = $derived(report?.review?.stage === "collecting");
+  const escape = $derived(!report || !srv);
+  const primary = $derived(collecting ? { label: "Back to Collect", href: out("collect"), lead: "qr" } : { label: "Reopen collection", href: out("share"), lead: "qr" });
 </script>
 
 {#snippet qr()}<Glyph d={G.qr} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title={P.review.title} parent={P.review.project} back={out("project")} menuHref={out("menu")} />{:else}<TopBar {crumbs} home={out("workspace")} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Reopen collection" href={out("share")} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label={primary.label} href={primary.href} />{/if}{/snippet}
 
 <div class="l-stack" {@attach reopening}><AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
@@ -55,26 +60,26 @@
     <Card gap={3} label="Results are held">
       <div class="l-row" data-gap="3" data-align="start">
         <span class="icn icn-lens" data-lens={first.lens}><Glyph d={G.clock} /></span>
-        <Stack gap={1}><span class="h3">Results are held</span><span class="small">The {first.label.toLowerCase()} survey has {phoneN} answers; we show a perspective at {MIN_RESPONSES} or more so no one can be picked out.</span></Stack>
+        <Stack gap={1}><span class="h3">Results are held</span><span class="small">{#if srv}{srv.responses_in} of {srv.responses_needed} responses so far; the server holds the report until then.{:else}The {first.label.toLowerCase()} survey has {phoneN} answers; we show a perspective at {MIN_RESPONSES} or more so no one can be picked out.{/if}</span></Stack>
       </div>
-      <a class="link" href={href("results")}>{without} <Glyph d={G.arrow} /></a>
+      {#if escape}<a class="link" href={href("results")}>{without} <Glyph d={G.arrow} /></a>{/if}
       <a class="link" href={href("results-answers")}>See the answers so far <Glyph d={G.arrow} /></a>
     </Card>
   {:else}
     <Page gap={5}>
-      <ReviewHead review={D.review} responses={H.review.closedResponses} primary={{ label: "Reopen collection", href: out("share"), lead: "qr" }} />
+      <ReviewHead review={D.review} responses={H.review.closedResponses} {primary} />
       <LevelLegend />
       <Card hi pad="hero" gap={3} label="Results are held">
         <Row split gap={6}>
           <Row gap={6}>
             <span class="icn" data-size="64" data-lens="team"><Glyph d={G.lock} size={30} /></span>
             <Stack gap={2}>
-              <h2 class="h2 t-24">Results are held until every perspective has enough answers</h2>
-              <p class="small t-15">{#if srv}The server holds this report: {srv.responses_in} of {srv.responses_needed} responses so far{srv.reason ? ` (${srv.reason})` : ""}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.{:else}Levels need at least {MIN_RESPONSES} answers from a perspective so no one can be picked out. {first.label} has {first.n} of {MIN_RESPONSES}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.{/if}</p>
+              <h2 class="h2 t-24">{srv ? "Results are held until enough answers are in" : "Results are held until every perspective has enough answers"}</h2>
+              <p class="small t-15">{#if srv}The server holds this report: {srv.responses_in} of {srv.responses_needed} responses so far{srv.reason ? ` (${srv.reason})` : ""}. {collecting ? "Collection is still open: share the links and come back." : "Keep collecting."}{:else}Levels need at least {MIN_RESPONSES} answers from a perspective so no one can be picked out. {first.label} has {first.n} of {MIN_RESPONSES}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.{/if}</p>
               <Row wrap gap={5}>{#each lines as l}<span class="small"><LensDot lens={l.lens} decorative /> {l.text}</span>{/each}</Row>
             </Stack>
           </Row>
-          <Stack gap={2}><Button label="Reopen collection" href={out("share")} lead={qr} /><Button label={without} variant="quiet" href={href("results")} /></Stack>
+          <Stack gap={2}><Button label={primary.label} href={primary.href} lead={qr} />{#if escape}<Button label={without} variant="quiet" href={href("results")} />{/if}</Stack>
         </Row>
       </Card>
       <div class="l-grid" data-cols="3" data-gap="4" data-state="held" inert>{#each cards as card (card.lens)}<Stack><LensCard {card} rows={H.preview} /></Stack>{/each}</div>

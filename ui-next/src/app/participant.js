@@ -8,7 +8,7 @@
 import { choseOther, OTHER_TEXT_KEY } from "../../../ui/present.js";
 import { createParticipantJourney } from "../../../ui/participate/controller.js";
 import { deviceStorage, digestNamespace, rememberCurrent, scopedStorage, parseEntryFragment } from "../../../ui/shared-link.js";
-import { passageNames } from "../../../ui/participate/i18n.js";
+import { passageNames, UI_EN, isEnglish, isRtl, pickLanguage, initialLanguage, rememberLanguage, formStrings, translateForm, makeT, fetchTranslationsProgressive } from "../../../ui/participate/i18n.js";
 import { isRateLimitedError, retryAfterSeconds } from "../../../ui/rate-limit.js";
 import { api } from "./api.js";
 import { CODE_REFUSED } from "../../../ui/assess/scope.js";
@@ -39,9 +39,42 @@ function ensure() {
 }
 // The survey model the participant screens draw (ui-next/src/screens/participant/data.js functions take it as `d`): the live form
 // in place of the fixture. No "I don't know" row is appended (it is not in the instrument; a fixture-only design row, CORRECTIONS R33).
+// Language (ui/participate/page.js loadTranslations, reused): the form offers form.languages; the participant's choice is remembered
+// (3dr.lang) and the questions, options, about fields and the UI words are machine-translated through /v2/translate with the
+// participant's own bearer (i18n.js translateInit: credentials omit), progressively, cached per text; ids, codes, answers and
+// _other never change (translateForm keeps them). English → the form as served.
+let lang = "en", tr = { lang: "en", form: null, ui: {}, items: {}, view: null, progress: null, failed: "" }, trSeq = 0;
+const localStore = () => { try { return globalThis.localStorage; } catch { return null; } };
+try { lang = initialLanguage({ search: globalThis.location?.search ?? "", storage: localStore() }); } catch { lang = "en"; }
+export const languages = () => (Array.isArray(journey?.state?.form?.languages) ? journey.state.form.languages : []);
+export function setLanguage(code) { lang = code || "en"; rememberLanguage(localStore(), lang); loadTranslations(); }
+export async function loadTranslations(form = journey?.state?.form ?? null) {
+  const seq = ++trSeq;
+  if (isEnglish(lang) || !form) { tr = { lang, form, ui: {}, items: {}, view: null, progress: null, failed: "" }; emit(); return; }
+  const entry = pickLanguage(lang, form.languages || []);
+  if (!entry) { lang = "en"; tr = { lang, form, ui: {}, items: {}, view: null, progress: null, failed: "" }; emit(); return; } // not offered by this form
+  const ui = { ...UI_EN }, items = formStrings(form), total = Object.keys(ui).length + Object.keys(items).length, seen = { ui: 0, items: 0 };
+  tr = { ...tr, lang, form, progress: { done: 0, total }, failed: "" }; emit();
+  const progress = () => { if (seq === trSeq) { tr = { ...tr, progress: { done: seen.ui + seen.items, total } }; emit(); } };
+  try {
+    const store = localStore(), bearer = journey?.bearer ?? null;
+    const [u, it] = await Promise.all([
+      fetchTranslationsProgressive({ lang, context: "participant-ui", sourceTexts: ui, storage: store, bearer, onProgress: (p) => { seen.ui = p.done; progress(); } }),
+      fetchTranslationsProgressive({ lang, context: `participant-form:${form.template?.id || "form"}`, sourceTexts: items, storage: store, bearer, onProgress: (p) => { seen.items = p.done; progress(); } }),
+    ]);
+    if (seq !== trSeq) return;
+    tr = { lang, form, ui: u.map, items: it.map, view: translateForm(form, it.map), progress: null, failed: "" };
+  } catch (e) {
+    if (seq !== trSeq) return;
+    tr = { lang, form, ui: {}, items: {}, view: null, progress: null, failed: e?.message || "Translation is not available right now." };
+  }
+  emit();
+}
 export function model(state = journey?.state) {
   if (!state) return null;
-  const form = state.form ?? { items: [], template: { perspective: "" }, passages: [] }; // a receipt or an unavailable link may arrive before any form
+  const served = state.form ?? { items: [], template: { perspective: "" }, passages: [] }; // a receipt or an unavailable link may arrive before any form
+  if (tr.form !== served && served.items?.length && !isEnglish(lang)) loadTranslations(served); // a form that arrived after the choice
+  const form = tr.view && tr.form === served ? tr.view : served;
   const items = (form.items || []).map((it) => ({ ...it, options: (it.options || []).map((o) => ({ ...o, text: o.text || o.label || o.code, exclusive: !!o.exclusive })) }));
   const passages = Array.isArray(form.passages) ? form.passages : [];
   const names = passageNames(passages.map((p) => ({ reference: p.reference || p.title || "" })).filter((p) => p.reference)) || "the passage";
@@ -61,6 +94,8 @@ export function model(state = journey?.state) {
     busy: !!state?.busy,
     rateLimited: state?.rateLimited === true,
     retryAfter: state?.retryAfter,
+    // language: the chosen code, what the form offers, the UI words (t), direction, progress while translating, a failure line
+    lang, languages: Array.isArray(served.languages) ? served.languages : [], t: makeT(tr.ui), dir: isRtl(lang) ? "rtl" : "ltr", translating: tr.progress, translateFailed: tr.failed,
   };
 }
 export function snapshot() { return { state: journey?.state ?? null, model: model(), draft }; }

@@ -436,4 +436,18 @@ describe("participant screens are registered and routed under the flag", () => {
       }
     }
   });
+  it("PQuestion: choosing an Other option shows a description field whose input reaches onother; a scale item renders a bounded number input (captain CUA regression: onother was not a prop)", async () => {
+    const errors: string[] = []; const onError = (e: ErrorEvent) => errors.push(e.message); window.addEventListener("error", onError);
+    const d = { live: true, survey: { language: "", passages: [], medium: "draft", perspective: "Community" }, form: { template: { perspective: "Community" }, items: [{ id: "O1", type: "single", text: "Why?", options: [{ code: "a", text: "A" }, { code: "other", text: "Other (please describe)", other: true }] }, { id: "S1", type: "scale", text: "How clear?", scale: { min: 1, max: 5 } }] }, current: "O1", answers: {}, about: {} };
+    const got: Array<[string, unknown]> = []; const other: Array<[string, string]> = [];
+    const a = render(PQuestion, { props: { phone: true, d, q: 1, onanswer: (id: string, v: unknown) => { got.push([id, v]); (d.answers as Record<string, unknown>)[id] = v; }, onother: (id: string, t: string) => other.push([id, t]) } }).container;
+    const radios = a.querySelectorAll("input.rd"); await fireEvent.click(radios[1]); flushSync();
+    const box = a.querySelector('input[name="O1::other"]') as HTMLInputElement | null; expect(box).not.toBeNull();
+    await fireEvent.input(box!, { target: { value: "because" } }); flushSync();
+    expect(other).toEqual([["O1", "because"]]); expect(errors).toEqual([]);
+    const b = render(PQuestion, { props: { phone: true, d: { ...d, current: "S1" }, q: 2, onanswer: (id: string, v: unknown) => got.push([id, v]) } }).container;
+    const num = b.querySelector('input[type="number"].in') as HTMLInputElement; expect(num.min).toBe("1"); expect(num.max).toBe("5");
+    await fireEvent.input(num, { target: { value: "4" } }); flushSync(); expect(got.at(-1)).toEqual(["S1", 4]);
+    window.removeEventListener("error", onError);
+  });
 });
