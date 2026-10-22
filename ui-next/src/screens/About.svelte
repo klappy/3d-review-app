@@ -22,8 +22,8 @@
   import Disclosure from "../Disclosure.svelte";
   import { C02, CAPS, HOW, WHO, LEARN_MORE, HOW_IT_WORKS } from "../copy/rachel.js";
 
-  let { phone = false, theme = "light" } = $props();
-  let HOME = $derived(screenHref("home", { phone, theme }));
+  let { phone = false, theme = "light", w } = $props();
+  let HOME = $derived(screenHref("home", { phone, theme, w }));
   const TOUR = "#results", SURVEY = "#survey-code";
   // Card labels keep UI Next casing (VALIDATION-186 product yellow 1); captions are Rachel's C03.
   const FACETS = [
