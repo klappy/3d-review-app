@@ -117,3 +117,50 @@ test('an access-code session stays in its tab and is never told it can reopen; I
   assert.equal(code.journey.state.thanks.code, true); assert.doesNotMatch(code.journey.state.notice, /Reopening your link|same link/);
   await code.journey.another(); assert.equal(code.win.assigned, '/#survey');
 });
+
+test('legacy fragment-less receipts stay in their tab until a server expiry is known', async t => {
+  const realNow = Date.now; let clock = realNow(); const initial = clock; const now = () => clock; Date.now = now; t.after(() => { Date.now = realNow; });
+  const device = memory(), srv = server(now), first = tab({ device, srv, now });
+  await submitIn(first);
+  const ns = await digestNamespace('link-secret');
+  // Previous releases remembered the bearer in the tab without expiresAt/device entries.
+  device.data.clear(); first.session.removeItem(ns + 'expiresAt');
+  clock = initial + 11 * 3600_000;
+  const legacy = tab({ device, srv, now, hash: '', session: first.session });
+  await legacy.journey.start();
+  assert.equal(legacy.journey.state.phase, 'receipt', 'do not break same-tab legacy receipts');
+  assert.equal(device.data.size, 0, 'unknown server expiry cannot grant a fresh device lifetime');
+  clock = initial + 13 * 3600_000;
+  const later = tab({ device, srv, now }); await later.journey.start();
+  assert.equal(later.journey.state.phase, 'form', 'an expired legacy token must not poison a new tab');
+  assert.deepEqual(srv.opens.at(-1), { token: 'link-secret' });
+});
+
+test('reopening the original link upgrades a legacy receipt only to its remaining server lifetime', async t => {
+  const realNow = Date.now; let clock = realNow(); const initial = clock; const now = () => clock; Date.now = now; t.after(() => { Date.now = realNow; });
+  const device = memory(), srv = server(now), first = tab({ device, srv, now });
+  await submitIn(first);
+  const ns = await digestNamespace('link-secret');
+  device.data.clear(); first.session.removeItem(ns + 'expiresAt');
+  clock = initial + 11 * 3600_000;
+  const upgraded = tab({ device, srv, now, session: first.session }); await upgraded.journey.start();
+  assert.equal(upgraded.journey.state.phase, 'receipt');
+  assert.equal(JSON.parse(device.getItem(ns + 'bearer')).exp, initial + DEVICE_MEMORY_MS);
+  const reopened = tab({ device, srv, now }); await reopened.journey.start();
+  assert.equal(reopened.journey.state.phase, 'receipt', 'valid refreshed expiry retains per-device receipt');
+  clock = initial + 13 * 3600_000;
+  const later = tab({ device, srv, now }); await later.journey.start();
+  assert.equal(later.journey.state.phase, 'form');
+});
+
+test('receipt promotion refuses malformed or elapsed stored expiry without breaking tab receipts', async () => {
+  for (const invalid of ['not-a-timestamp', 'Infinity', '0', String(Date.now() - 1000)]) {
+    const device = memory(), srv = server(), first = tab({ device, srv });
+    await submitIn(first);
+    const ns = await digestNamespace('link-secret');
+    device.data.clear(); first.session.setItem(ns + 'expiresAt', invalid);
+    const reloaded = tab({ device, srv, hash: '', session: first.session }); await reloaded.journey.start();
+    assert.equal(reloaded.journey.state.phase, 'receipt');
+    assert.equal(device.data.size, 0, `invalid expiry ${invalid} must not reach the device`);
+  }
+});

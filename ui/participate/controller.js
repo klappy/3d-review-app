@@ -25,7 +25,12 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
     const thanks = { perspective: form?.template?.perspective, code: store.get('via') === 'code' };
     // Receipt per device (captain ruling 2026-10-21): only a submitted link session is remembered on the device, until
     // the server session ends. A code works once, so a code session stays in its tab.
-    if (!thanks.code) { const until = Number(store.get('expiresAt')) || undefined; store.remember('bearer', until); store.remember('expiresAt', until); storage.remember?.(CURRENT_KEY, until); }
+    // Older tab sessions have no server expiry. They may still show their receipt,
+    // but cannot safely acquire a fresh device lifetime without opening the link.
+    const until = Number(store.get('expiresAt'));
+    if (!thanks.code && Number.isFinite(until) && until > Date.now()) {
+      store.remember('bearer', until); store.remember('expiresAt', until); storage.remember?.(CURRENT_KEY, until);
+    }
     return show('receipt', { receipt: result, notice: receiptNotice(thanks.perspective, { code: thanks.code }), thanks });
   }
   async function loadForm() {
