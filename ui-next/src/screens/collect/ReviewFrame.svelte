@@ -32,7 +32,8 @@
   const MENU = $derived([
     { label: "Edit details and dates", href: href("setup1"), icon: G.pen },
     { label: "People with access", href: href("people"), icon: G.people },
-    { label: "Close collection now", href: href("close-collection"), icon: G.lock },
+    // Stage moves are owner/member actions (the server's setStage; the current UI gates them the same way): a viewer's menu offers none.
+    ...(m.review.canClose === false ? [] : [{ label: "Close collection now", href: href("close-collection"), icon: G.lock }]),
     { label: "Meeting offline? Print and paper", href: `${href("collect")}#offline`, icon: G.print },
     { kind: "hr" },
     { label: "Delete this review", danger: true, icon: G.x, refused: deleteRefusal(m) },

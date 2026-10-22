@@ -83,7 +83,7 @@
     {/each}
     <Card href="#practice" gap={2}><Row gap={3}><span class="icn" data-lens="team"><Icon d={I.sparkle} /></span><span class="small"><b>Practice</b> · open the sample or make a practice copy</span></Row></Card>
     <details class="dd"><summary class="link small">Completed · {data.completed.length}</summary>
-      <Stack gap={2}>{#each data.completed as c}<a class="card-link solid l-card l-stack" href="#next-step" data-gap="1"><span class="h3">{c.title}</span><span class="small">{c.meta}</span></a>{/each}</Stack>
+      <Stack gap={2}>{#each data.completed as c}<a class="card-link solid l-card l-stack" href={c.href ?? "#next-step"} data-gap="1"><span class="h3">{c.title}</span><span class="small">{c.meta}</span></a>{/each}</Stack>
     </details>
   {:else}
     <Page gap={5}>
@@ -149,7 +149,7 @@
         </Card>
         <Section heading="Completed" help={`${data.completed.length} · hidden until you tick Completed above`}>
           <details><summary class="link">Show them anyway</summary>
-            <Stack gap={2}>{#each data.completed as c}<a class="card-link solid l-card l-stack" href="#next-step" data-gap="1"><span class="h3">{c.title}</span><span class="small">{c.meta}</span></a>{/each}</Stack>
+            <Stack gap={2}>{#each data.completed as c}<a class="card-link solid l-card l-stack" href={c.href ?? "#next-step"} data-gap="1"><span class="h3">{c.title}</span><span class="small">{c.meta}</span></a>{/each}</Stack>
           </details>
         </Section>
       {/if}

@@ -2,7 +2,7 @@
 // phase -> screen mapping. Cookbook work/active/2026-10-21-ui-next-demo-wiring/HANDOFF-wiring-2315.md step 5.
 import { describe, expect, it } from "vitest";
 // @ts-expect-error -- plain .js module, no type declarations
-import { model, screenFor } from "../ui-next/src/app/participant.js";
+import { model, screenFor, answer, other, snapshot } from "../ui-next/src/app/participant.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { choices, question, review } from "../ui-next/src/screens/participant/data.js";
 
@@ -36,5 +36,15 @@ describe("screenFor(state)", () => {
     expect(screenFor({ phase: "unavailable", rateLimited: true })).toEqual(["p-problem", {}]);
     expect(screenFor({ phase: "opening" })).toEqual([null, {}]);
     expect(screenFor(null)).toEqual(["p-code", {}]);
+  });
+});
+
+describe("answers the live journey keeps (Codex P1/P2 on PR 575)", () => {
+  it("a scale item is a question the screen can answer (not an empty choice list), and an Other description rides under _other for that item only", () => {
+    const d = model({ phase: "form", form: { ...form, items: [...form.items, { id: "S1", type: "scale", text: "How clear?", scale: { min: 1, max: 5 } }, { id: "O1", type: "single", text: "Why?", options: [{ code: "a", text: "A" }, { code: "other", text: "Other (please describe)" }] }] }, notice: "" });
+    const sc = question(4, d); expect(sc.item.type).toBe("scale"); expect(sc.item.scale).toEqual({ min: 1, max: 5 }); expect(sc.options).toEqual([]);
+    answer("S1", 4); answer("O1", "other"); other("O1", "because");
+    const snap = snapshot(); expect(snap.draft.S1).toBe(4); expect(snap.draft._other).toEqual({ O1: "because" });
+    other("O1", "   "); expect(snapshot().draft._other).toEqual({});
   });
 });

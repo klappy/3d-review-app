@@ -5,6 +5,7 @@
 //   opening -> (loading) · form -> p-welcome … p-question · review -> p-review · receipt -> p-receipt
 //   unavailable + rateLimited -> p-problem?state=busy · unavailable (closed, link gone, cannot resume, transient) -> p-problem
 //   redeem refused -> p-code?state=error · redeem 429 -> p-problem?state=busy
+import { choseOther, OTHER_TEXT_KEY } from "../../../ui/present.js";
 import { createParticipantJourney } from "../../../ui/participate/controller.js";
 import { deviceStorage, digestNamespace, rememberCurrent, scopedStorage, parseEntryFragment } from "../../../ui/shared-link.js";
 import { passageNames } from "../../../ui/participate/i18n.js";
@@ -87,7 +88,7 @@ export async function start({ retry = false } = {}) {
 async function open({ retry }) {
   const j = ensure();
   const s = await j.start({ retry });
-  if (s?.phase === "form" && s.draft) draft = { ...s.draft };
+  if (s?.phase === "form") draft = s.draft ? { ...s.draft } : {}; // a fresh form (controller openNext: draft null) starts empty — never the last respondent's answers
   if (s?.phase === "review" && j.state?.answers) draft = { ...j.state.answers };
   emit();
   return s;
@@ -95,6 +96,9 @@ async function open({ retry }) {
 export const state = () => journey?.state ?? null;
 export const hasSession = () => !!parseEntryFragment(globalThis.location?.hash || "") || !!(tab()?.getItem("shared:current"));
 
+// "Other (please describe)" text: kept under _other (ui/present.js OTHER_TEXT_KEY) beside the answers; cleaned() sends it only for
+// items whose chosen option is the Other one (present.js choseOther), as the current participant page does.
+export function other(id, text) { const cur = { ...(draft._other ?? {}) }; const t = String(text ?? "").slice(0, 500); if (t.trim()) cur[id] = t; else delete cur[id]; draft = { ...draft, _other: cur }; journey?.save(draft); emit(); }
 export function answer(id, value) {
   draft = { ...draft, [id]: value };
   journey?.save(draft);
@@ -119,9 +123,20 @@ export async function submit() {
   emit();
   return s;
 }
-export async function another() { const s = await ensure().another(); emit(); return s; }
+// "Interview another person": the controller opens a fresh form (link session) or hands back to code entry (code session); the
+// previous respondent's answers never carry over — the draft is cleared before the new snapshot is emitted. Returns the state plus
+// `navigated`: true when the controller itself moved the page (code entry), so the caller must not land by phase.
+export async function another() { const before = globalThis.location?.hash; const s = await ensure().another(); draft = {}; emit(); return { ...s, navigated: globalThis.location?.hash !== before }; }
 export async function recover() { const s = await ensure().recover(); emit(); return s; }
-const cleaned = (d) => { const out = {}; for (const [k, v] of Object.entries(d)) if (k !== "_about" && v !== undefined) out[k] = Array.isArray(v) && !v.length ? null : v; return out; };
+const cleaned = (d) => {
+  const out = {};
+  for (const [k, v] of Object.entries(d)) if (k !== "_about" && k !== "_other" && v !== undefined) out[k] = Array.isArray(v) && !v.length ? null : v;
+  const items = journey?.state?.form?.items ?? [];
+  const other = {};
+  for (const [id, text] of Object.entries(d._other ?? {})) { const it = items.find((i) => i.id === id); if (it && String(text).trim() && choseOther(it, out[id])) other[id] = String(text).trim(); }
+  if (Object.keys(other).length) out[OTHER_TEXT_KEY] = other;
+  return out;
+};
 
 // Code entry (ui/assess/scope.js entry.bind: POST /v2/participate/code {code}); the bearer goes into the same scoped session slot the
 // link path uses, so start() resumes it like a link. Returns { ok } | { ok:false, error, busy, retryAfter }.

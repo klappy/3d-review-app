@@ -118,9 +118,9 @@ if (/#\/p\/about/.test(p.url())) { await p.click("text=Next"); await p.waitForUR
 ok("participant: passage -> question 1");
 // answer the first question (choice or text), then the next
 for (let n = 1; n <= 2; n++) {
-  await p.waitForSelector(`text=Question ${n} of`, { timeout: 15000 }); await p.waitForSelector("fieldset.opts, textarea.in", { timeout: 15000 });
-  const radio = p.locator("input.rd, input.cb").first();
-  if (await radio.count()) await radio.check(); else await p.fill("textarea", `answer ${n}`);
+  await p.waitForSelector(`text=Question ${n} of`, { timeout: 15000 }); await p.waitForSelector("fieldset.opts, textarea.in, input[type=number].in", { timeout: 15000 });
+  const radio = p.locator("input.rd, input.cb").first(); const num = p.locator("input[type=number].in");
+  if (await radio.count()) await radio.check(); else if (await num.count()) await num.fill("3"); else await p.fill("textarea", `answer ${n}`);
   await p.waitForTimeout(300);
   await p.click("text=Next");
   await p.waitForURL(new RegExp(`#/p/(q/${n + 1}|review)`));
@@ -130,16 +130,16 @@ await shot(p, "p-question");
 await p.reload();
 await p.waitForSelector("h1", { timeout: 15000 });
 await p.goto(`${BASE}/next/#/p/q/1`); await p.waitForSelector("text=Question 1 of", { timeout: 15000 });
-const kept = await p.$("input:checked, textarea:not(:placeholder-shown)");
+const kept = await p.$("input:checked, textarea:not(:placeholder-shown), input[type=number].in:not([value=''])");
 if (!kept) fail("after reload the answer did not come back");
 ok("participant: reload keeps the page and the draft (persisted)");
 // answer the rest, then send from the review
 for (let i = 0; i <= 40; i++) {
   if (/#\/p\/review/.test(p.url())) break;
   const n = Number(/q\/(\d+)/.exec(p.url())?.[1] ?? 1);
-  await p.waitForSelector(`text=Question ${n} of`, { timeout: 15000 }); await p.waitForSelector("fieldset.opts, textarea.in", { timeout: 15000 });
-  const radio = p.locator("input.rd, input.cb").first();
-  if (await radio.count()) await radio.check(); else await p.locator("textarea.in").fill(`answer ${n}`);
+  await p.waitForSelector(`text=Question ${n} of`, { timeout: 15000 }); await p.waitForSelector("fieldset.opts, textarea.in, input[type=number].in", { timeout: 15000 });
+  const radio = p.locator("input.rd, input.cb").first(); const num = p.locator("input[type=number].in");
+  if (await radio.count()) await radio.check(); else if (await num.count()) await num.fill("3"); else await p.locator("textarea.in").fill(`answer ${n}`);
   await p.waitForTimeout(200);
   await p.click("text=Next");
   await p.waitForURL(new RegExp(`#/p/(q/${n + 1}|review)`));

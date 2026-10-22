@@ -15,10 +15,15 @@
   let { phone = false, theme = "light", onsignedin } = $props();
   let email = $state(""), code = $state(""), stage = $state("email"), status = $state(""), busy = $state(false), minutes = $state(30);
   const synthetic = $derived(/\.invalid$/i.test(email.trim()));
+  // Email links are an environment fact (production normally has them off): probed once like the current UI; off → the sign-in is
+  // the Access page (/v2/auth/access), a top-level navigation the server owns. Sandbox code sign-in needs no link.
+  let links = $state(undefined);
+  S.emailLinksOn().then((on) => { links = on; });
   async function sendLink(e) {
     e.preventDefault(); busy = true; status = "";
     try {
       if (synthetic) { const r = await S.requestCode(email.trim()); stage = "code"; if (r?.dev_only_code) code = r.dev_only_code; status = "Sandbox account: the code is filled in for you."; }
+      else if (links === false) { globalThis.location.assign(S.ACCESS_HREF); return; }
       else { const r = await S.emailLink(email.trim()); minutes = Number(r?.expires_in_minutes) || 30; stage = "sent"; }
     } catch (err) { status = err?.message || "The sign-in link could not be sent. Try again."; }
     finally { busy = false; }
@@ -52,10 +57,10 @@
       {:else}
         <form onsubmit={sendLink}>
           <Stack gap={3}>
-            <p class="small t-15">No password. We email you a link that signs you in. New here? Signing in with your email creates your account.</p>
+            <p class="small t-15">{links === false ? "Sign in on the Access page; you come back here signed in." : "No password. We email you a link that signs you in. New here? Signing in with your email creates your account."}</p>
             <div><label class="lbl" for="si-email">Email</label><input class="in" id="si-email" type="email" inputmode="email" autocomplete="email" required maxlength="254" value={email} oninput={(e) => (email = e.currentTarget.value)} /></div>
             {#if status}<p class="small field-error" role="alert">{status}</p>{/if}
-            <Row gap={2}><button class="btn btn-primary" type="submit" disabled={busy || !email.trim()}>{busy ? "Sending…" : synthetic ? "Get a sandbox code" : "Email me a sign-in link"}</button><a class="btn btn-quiet" href="/v2/auth/access" data-code-signin>Sign in with a code instead</a></Row>
+            <Row gap={2}><button class="btn btn-primary" type="submit" disabled={busy || !email.trim()}>{busy ? "Sending…" : synthetic ? "Get a sandbox code" : links === false ? "Go to sign-in" : "Email me a sign-in link"}</button><a class="btn btn-quiet" href="/v2/auth/access" data-code-signin>Sign in with a code instead</a></Row>
           </Stack>
         </form>
       {/if}

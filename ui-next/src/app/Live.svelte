@@ -8,7 +8,7 @@
   import { openQrPrint } from "./print.js";
   import { onMount } from "svelte";
   import { parse, to } from "./router.js";
-  import { setLiveContext } from "../screens/href.js";
+  import { setLiveContext, liveContext } from "../screens/href.js";
   import { setLiveChrome } from "./chrome.js";
   import { PHONE_QUERY } from "../route.js";
   import * as S from "./session.js";
@@ -51,7 +51,8 @@
     const { name, params } = r;
     if (PARTICIPANT.has(name)) return participant(r);
     if (name === "home") { const me = await S.me(); if (!me) return { screen: "landing" }; const home = await D.homeModel(me); return { screen: "home", home, state: home.empty ? "first" : "reviews" }; }
-    if (name === "landing" || name === "about" || name === "help" || name === "feedback") return { screen: name };
+    if (name === "landing" || name === "about" || name === "help") return { screen: name };
+    if (name === "feedback") return { screen: name, preview: true, assessment: null, editHref: "/#feedback", previewNote: "Sending feedback happens in the current design for now (its form posts to /v2/feedback)." }; // the board's fields do not map onto the contract yet (Feedback.svelte header)
     if (name === "sign-in" || name === "sign-in-check") { const me = await S.me(); return me ? { redirect: to("home") } : { screen: "sign-in" }; }
     const me = await S.me();
     if (!me) return { screen: "sign-in", next: hash };
@@ -73,8 +74,8 @@
       return { screen: name, data: m, empty: !m.groups.length, emptyText: open.length ? "The survey links could not be created. Try again." : "No survey is collecting yet. Open collection on the review page first." };
     }
     if (name.startsWith("results") || name.startsWith("report")) {
-      const m = await D.resultsModel(params.aid, { build: name !== "results-held" });
-      if (name === "results-answers") { const rows = await D.responsesList(params.aid).catch((e) => ({ suppressed: true, status: "error", reason: e.message })); return { screen: name, results: m, answers: rows }; }
+      const m = await D.resultsModel(params.aid, { build: false }); // read-only: a missing report is offered to build, never built on load
+      if (name === "results-answers") { const rows = await D.responsesList(params.aid); return { screen: name, results: m, answers: rows }; } // a failed read is the shell's error (retryable), not a policy hold
       return { screen: name, results: m };
     }
     if (name === "share") { const sm = await D.shareModel(params.aid, me); return { screen: "share", shareData: sm.review, share: sm.share }; }
@@ -116,6 +117,9 @@
       if (my !== seq) return;
       if (data.redirect) { replace(data.redirect); return; }
       if (data.screen === null) return;
+      // Review-scoped screens draw project crumbs (href("project") needs :pid): the loaded model's project joins the live context.
+      const pid = data?.data?.projectId ?? data?.results?.review?.projectId ?? data?.shareData?.projectId ?? null;
+      if (pid && !r.params.pid) setLiveContext({ ...liveContext(), pid });
       page = { status: "ready", key: r.name, data, error: null };
     } catch (e) {
       clearTimeout(slow);
@@ -145,14 +149,14 @@
   }
   let gaps = $state([]);
   async function send() { busy = true; gaps = []; try { const r = await P.submit(); if (r?.missing) { gaps = r.missing; return; } } finally { busy = false; } land(); }
-  async function another() { busy = true; try { await P.another(); } finally { busy = false; } land(); }
+  async function another() { busy = true; let r = null; try { r = await P.another(); } finally { busy = false; } if (!r?.navigated) land(); } // a code session already moved to code entry
   async function retry() { busy = true; try { if (P.state()?.phase === "review") await P.submit(); else await P.start({ retry: true }); } finally { busy = false; } land(); }
   const q = $derived(route.params.n);
   const pm = $derived(pstate.model);
 
   // Signed-in chrome for the live screens.
   const who = $derived(session ? { first: S.firstName(session.principal), initials: S.initialsOf(session.principal) } : null);
-  async function signOut() { await S.signOut(); session = null; go(to("landing")); }
+  async function signOut() { try { await S.signOut(); session = null; go(to("landing")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `You are still signed in: ${e?.message || "the sign-out was not confirmed"}. Try again.` } }; } }
   const accountItems = $derived(session ? [
     { kind: "head", label: session.principal?.display_name || "Signed in", sub: session.principal?.id ? "Facilitator" : "" }, { kind: "hr" },
     { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback") },
@@ -207,7 +211,10 @@
 {:else if page.data.screen === "results" || page.data.screen === "results-gaps" || page.data.screen === "results-answers" || page.data.screen === "report" || page.data.screen === "report-detailed" || page.data.screen === "results-held"}
   {@const m = page.data.results}
   {@const rep = reportFor(m)}
-  {#if !rep || page.data.screen === "results-held"}
+  {#if !rep && !m.held && page.data.screen !== "results-held"}
+    <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet. Building reads the answers collected so far and keeps that report (owners and members).${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} inline back={to("collect", route.params)} backLabel="Back to Collect" />
+    <div class="l-page"><button class="btn btn-primary btn-lg" type="button" onclick={refreshResults}>Build the report</button></div>
+  {:else if !rep || page.data.screen === "results-held"}
     {@const Held = REGISTRY["results-held"]}
     <Held {phone} {theme} report={{ review: m.review, counts: m.counts, payload: m.payload ?? { lenses: [] } }} />
   {:else if page.data.screen === "results-answers"}
@@ -226,7 +233,7 @@
   {/if}
 {:else if page.data.preview}
   {@const C = REGISTRY[page.data.screen]}
-  <Status {phone} {theme} kind="preview" message={`This screen is a design preview with sample data${page.data.assessment ? ` (your review: ${page.data.assessment.name})` : ""}. ${page.data.editHref ? "Editing a review's details, surveys, passage and dates happens in the current design for now." : "The current design still does this for real."}`} inline back={page.data.editHref ?? (page.data.assessment ? to("review", { aid: page.data.assessment.id }) : to("home"))} backLabel={page.data.editHref ? `Edit ${page.data.assessment?.name ?? "this review"} in the current design` : page.data.assessment ? "Back to the review" : "Home"} />
+  <Status {phone} {theme} kind="preview" message={`This screen is a design preview with sample data${page.data.assessment ? ` (your review: ${page.data.assessment.name})` : ""}. ${page.data.previewNote ?? (page.data.editHref ? "Editing a review's details, surveys, passage and dates happens in the current design for now." : "The current design still does this for real.")}`} inline back={page.data.editHref ?? (page.data.assessment ? to("review", { aid: page.data.assessment.id }) : to("home"))} backLabel={page.data.previewNote ? "Send feedback in the current design" : page.data.editHref ? `Edit ${page.data.assessment?.name ?? "this review"} in the current design` : page.data.assessment ? "Back to the review" : "Home"} />
   <C {phone} {theme} state={route.query.get("state") ?? undefined} />
 {:else if page.data.screen === "p-code"}
   {@const C = REGISTRY["p-code"]}
@@ -235,7 +242,7 @@
   {#if page.data.screen === "p-welcome"}{@const C = REGISTRY["p-welcome"]}<C phone={true} {theme} d={pm} />
   {:else if page.data.screen === "p-passage"}{@const C = REGISTRY["p-passage"]}<C phone={true} {theme} d={pm} />
   {:else if page.data.screen === "p-about"}{@const C = REGISTRY["p-about"]}<C phone={true} {theme} d={pm} onabout={P.setAbout} />
-  {:else if page.data.screen === "p-question"}{@const C = REGISTRY["p-question"]}{#key q}<C phone={true} {theme} d={pm} {q} onanswer={P.answer} />{/key}
+  {:else if page.data.screen === "p-question"}{@const C = REGISTRY["p-question"]}{#key q}<C phone={true} {theme} d={pm} {q} onanswer={P.answer} onother={P.other} />{/key}
   {:else if page.data.screen === "p-review"}{@const C = REGISTRY["p-review"]}<C phone={true} {theme} d={pm} onsend={send} {busy} notice={gaps.length ? `${gaps.length === 1 ? "One question still needs an answer" : `${gaps.length} questions still need an answer`} before you send: ${gaps.map((g) => g.n).join(", ")}.` : pm.notice} missing={gaps} />
   {:else if page.data.screen === "p-receipt"}{@const C = REGISTRY["p-receipt"]}<C phone={true} {theme} d={pm} onanother={another} notice={pm.notice} />
   {:else if page.data.screen === "p-problem"}{@const C = REGISTRY["p-problem"]}<C phone={true} {theme} d={pm} onretry={retry} state={route.query.get("state") ?? undefined} />

@@ -1,6 +1,6 @@
 // UI Next (v4) workspace data. Status: provisional. Reads only the /v2 routes the current UI reads (ui/assess/scope.js, views.js,
 // share.js, report-build.js); builds view models in the shapes the lane screens already draw (collect/model.js, results/data.js, home.json).
-import { api, confirmed, enc } from "./api.js";
+import { api, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
@@ -39,7 +39,9 @@ export const issueLink = (aid, sid) => confirmed(`/v2/assessments/${enc(aid)}/su
 const fmt = (a) => (a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "");
 export async function homeModel(me) {
   const [ps, ws] = await Promise.all([projects(), workspaces().catch(() => [])]);
-  const lists = await Promise.all(ps.filter((p) => !p.archived_at).map((p) => assessmentsOf(p.id).then((as) => as.map((a) => ({ a, p }))).catch(() => [])));
+  // A project's reviews failing to load is an error the shell shows (retryable), never an empty list that would draw a first-review
+  // welcome to an established account.
+  const lists = await Promise.all(ps.filter((p) => !p.archived_at).map((p) => assessmentsOf(p.id).then((as) => as.map((a) => ({ a, p })))));
   const all = lists.flat().filter(({ a }) => !a.archived_at).sort((x, y) => String(y.a.created_at).localeCompare(String(x.a.created_at)));
   const n = (a) => Number(a.response_count ?? 0);
   const row = ({ a, p }) => {
@@ -66,7 +68,7 @@ export async function projectModel(pid) {
   const w = ws.find((x) => x.id === p.workspace_id) ?? ws[0] ?? { name: "Your workspace" };
   const lvl = await Promise.all(live.map(async (a) => {
     if (!["understand", "improve"].includes(a.stage)) return null;
-    try { const r = await reports(a.id); const newest = (r.reports ?? []).filter((x) => x?.id).sort((x, y) => String(y.created_at || "").localeCompare(String(x.created_at || "")))[0]; if (!newest) return null; const rep = newest.payload ? newest : await report(newest.id); return levelsOf(rep.payload); } catch { return null; }
+    try { const r = await reports(a.id); const newest = (r.reports ?? []).filter((x) => x?.id).sort((x, y) => String(y.created_at || "").localeCompare(String(x.created_at || "")))[0]; if (!newest) return null; const rep = newest.payload ? newest : await report(newest.id); return levelsOf(rep.payload, await lensCounts(a.id)); } catch { return null; }
   }));
   const month = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
   const reviews = live.map((a, i) => {
@@ -88,9 +90,21 @@ export async function projectModel(pid) {
   };
 }
 // Lens levels of a built report's payload (results/data.js lensCards does the banding; here the lens word only).
-export function levelsOf(payload) {
+// Respondents per perspective for a review (the survey counts the Results page bands with): v3ScoreBand holds a perspective at
+// "More input needed" under three, so a trend never shows a level from one or two people.
+export async function lensCounts(aid) {
+  const { surveys } = await assessment(aid);
+  const live = surveys.filter((s) => !s.archived_at);
+  const per = await Promise.all(live.map((s) => surveyCounts(aid, s.id).catch(() => null)));
+  const counts = { team: 0, community: 0, church: 0 };
+  live.forEach((s, i) => { const k = lensKeyOf(s.perspective); if (k) counts[k] += Number(per[i]?.counts?.respondents ?? 0); });
+  return counts;
+}
+export function levelsOf(payload, counts = null) {
   const out = {};
-  for (const l of payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; const w = v3ScoreBand(Number(l.score), Number(l.n_subdims_included ?? 3) >= 0 ? 3 : 0); out[k] = LEVEL_KEY[w] ?? "more"; }
+  // v3ScoreBand holds a perspective at "More input needed" under three responses: the count comes from the payload's own evidence
+  // (n_responses / respondents per lens) when it carries one; without a count the band is held (never shown as a level on a guess).
+  for (const l of payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; const n = Number(counts?.[k] ?? NaN); const w = v3ScoreBand(Number(l.score), Number.isFinite(n) ? n : 0); out[k] = LEVEL_KEY[w] ?? "more"; }
   return Object.keys(out).length ? out : null;
 }
 
@@ -131,7 +145,7 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
     aid, projectId: a.project_id, origin,
     user: { first: "", initials: "" }, workspace: "",
     project: { name: p.name, href: to("project", { pid: a.project_id }) },
-    review: { id: a.id, title: a.name, stage, language, modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", updated: ago(a.created_at), passage, opens: period?.starts ? shortDate(period.starts) : shortDate(a.created_at), closes, activeLine: collectLine(a.period), daysLeft, serverStage: a.stage },
+    review: { id: a.id, title: a.name, stage, language, canClose: ["owner", "member"].includes(a.role), modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", updated: ago(a.created_at), passage, opens: period?.starts ? shortDate(period.starts) : shortDate(a.created_at), closes, activeLine: collectLine(a.period), daysLeft, serverStage: a.stage },
     // No room telemetry: the room-health counter is retired (cookbook PR 198; RULING-2026-10-16-scrap-app-ratelimit) and no capability
     // reports opens per minute or refusals, so nothing is invented here (root plan @6cd4cd8 step 4).
     groups, linkHost: `${origin}/next/#survey=`, hasAccessCodes: false, // no short-code backend (RESULTS-collect debt 7): the sheet prints the link only
@@ -153,9 +167,11 @@ export async function attachLinks(m, { full = false } = {}) {
   return m;
 }
 // Issue (or reuse this tab's) survey link for a survey and attach its QR modules: the raw token lives only in this tab's memory.
+// Keyed by the signed-in identity too (the tab's bearer): a link issued under one account is never handed to another in the
+// same tab (the server's issue_link needs member access; the cache must not bypass it).
 const LINKS = new Map();
 export async function linkFor(aid, sid) {
-  const k = `${aid}/${sid}`;
+  const k = `${token() ?? ""}|${aid}/${sid}`;
   if (LINKS.has(k)) return LINKS.get(k);
   const out = await issueLink(aid, sid);
   if (out.held) throw new Error("This survey is not collecting right now.");
@@ -186,6 +202,8 @@ export async function resultsModel(aid, { build = false } = {}) {
   const responses = per.reduce((n, c) => n + Number(c?.counts?.responses ?? 0), 0);
   let list = Array.isArray(rep?.reports) ? rep.reports.filter((x) => x?.id) : [];
   let built = null, held = null;
+  // Loading a route never writes: a missing report is reported as not built (the screen offers an explicit "Build the report",
+  // which runs the existing confirmed dry-run → execute pair). `build` is kept for that explicit action only.
   if (!list.length && build) {
     const out = await buildReport(aid);
     if (out.held) held = out.preview; else list = [out.result?.report].filter(Boolean);
@@ -243,7 +261,7 @@ export async function shareModel(aid, me) {
   const { assessment: a } = await assessment(aid);
   const total = m.groups.flatMap((g) => g.surveys).reduce((n, s) => n + (s.answered || 0), 0);
   const review = {
-    user: { first, initials }, workspace: "", project: m.project.name, role: a.role ?? "viewer",
+    user: { first, initials }, workspace: "", project: m.project.name, projectId: a.project_id, role: a.role ?? "viewer",
     review: { title: m.review.title, language: m.review.language, modality: m.review.modality, updated: m.review.updated },
     host: "", shortHost: "",
     // ReviewHead's menu draws "Delete this review" refused with its reason (R11). UI Next wires no delete, so the reason is always

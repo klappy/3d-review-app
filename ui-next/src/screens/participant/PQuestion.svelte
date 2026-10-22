@@ -25,6 +25,14 @@
   const on = (code) => (kind === "multi" ? (value ?? []).includes(code) : value === code);
   const tick = (code) => (e) => { value = pick(x.item, value, code, e.currentTarget.checked, d); onanswer?.(x.item.id, value); };
   const typed = (e) => { value = e.currentTarget.value; onanswer?.(x.item.id, value); };
+  // scale: a bounded whole number (ui/participate/page.js: input type=number, min/max from item.scale, saved as a Number).
+  const scaled = (e) => { const v = e.currentTarget.value; value = v === "" ? null : Number(v); onanswer?.(x.item.id, value); };
+  // "Other (please describe)": the description rides beside the answer (ui/present.js OTHER_TEXT_KEY "_other", choseOther) and is
+  // sent only when that option is chosen; onother(itemId, text) stores it in the draft.
+  const isOther = (o) => o?.other === true || o?.code === "other";
+  const choseOther = $derived((x.item.options ?? []).some((o) => isOther(o) && (kind === "multi" ? (value ?? []).includes(o.code) : value === o.code)));
+  const otherText = $derived(x.other ?? "");
+  const described = (e) => onother?.(x.item.id, e.currentTarget.value);
   const back = $derived(x.n > 1 ? href("p-question", { q: x.n - 1 }) : hasAbout(d) ? href("p-about") : href("p-passage"));
   const next = $derived(x.n < x.total ? href("p-question", { q: x.n + 1 }) : href("p-review"));
 </script>
@@ -40,11 +48,16 @@
     {#if kind === "text"}
       <h1 class="title-phone" id="p-q-text">{x.item.text}</h1>
       <textarea class="in" id="p-q-answer" name={x.item.id} aria-labelledby="p-q-text" value={x.value ?? ""} oninput={typed}></textarea>
+    {:else if kind === "scale"}
+      <h1 class="title-phone" id="p-q-text">{x.item.text}</h1>
+      <input class="in" id="p-q-answer" type="number" inputmode="numeric" name={x.item.id} min={x.item.scale?.min ?? 1} max={x.item.scale?.max ?? 5} step="1" aria-labelledby="p-q-text" aria-describedby="p-q-scale" value={value ?? ""} oninput={scaled} />
+      <p class="small field-help" id="p-q-scale">A whole number from {x.item.scale?.min ?? 1} to {x.item.scale?.max ?? 5}.</p>
     {:else}
       <fieldset class="opts">
         <legend><h1 class="title-phone">{x.item.text}</h1></legend>
         {#each x.options as o (o.code)}<label class="row-opt answer"><input class={kind === "multi" ? "cb" : "rd"} type={kind === "multi" ? "checkbox" : "radio"} name={x.item.id} value={o.code} checked={on(o.code)} aria-describedby={note && o.exclusive ? "p-q-note" : undefined} onchange={tick(o.code)} /><span>{o.text}</span></label>{/each}
         {#if note}<p class="small field-help" id="p-q-note">{note}</p>{/if}
+        {#if choseOther}<input class="in" type="text" name={`${x.item.id}::other`} maxlength="500" placeholder="Please describe" aria-label="Please describe" value={otherText} oninput={described} />{/if}
       </fieldset>
     {/if}
   </Card>

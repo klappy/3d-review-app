@@ -91,7 +91,7 @@ export function question(q, d = DATA) {
   const n = questionNumber(q, d);
   if (!n) throw new TypeError(`participant fixture: no item "${d.current}"`);
   const item = all[n - 1];
-  return { item, n, total: all.length, of: fill(UI_EN.questionOf, { n, total: all.length }), perspective: d.form.template.perspective, options: choices(item, d), value: d.answers[item.id] };
+  return { item, n, total: all.length, of: fill(UI_EN.questionOf, { n, total: all.length }), perspective: d.form.template.perspective, options: choices(item, d), value: d.answers[item.id], other: d.answers?._other?.[item.id] ?? "" };
 }
 // ?q= read from the page URL (the route passes only phone, theme and state); undefined where there is none.
 export const qParam = (from = globalThis.location?.search ?? "") => new URLSearchParams(from).get("q") ?? undefined;
