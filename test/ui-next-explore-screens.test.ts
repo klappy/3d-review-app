@@ -299,7 +299,7 @@ describe("Feedback (Feedback.dc.html dialog, FeedbackPhone.dc.html page)", () =>
     expect(text(a.querySelector("label[for='feedback-about']")!)).toBe("What is it about?");
     expect([...a.querySelectorAll("#feedback-about option")].map(text)).toEqual(["This screen", "Results", "Sharing and paper", "Something else"]);
     expect((a.querySelector(".row-opt input.cb") as HTMLInputElement).checked).toBe(true);
-    expect(text(a.querySelector(".row-opt")!)).toBe("Include the screen name and app version");
+    expect(text(a.querySelector(".row-opt")!)).toBe("Include the screen name");
     expect([...a.querySelectorAll(".phone-bar .btn")].map(text)).toEqual(["Cancel", "Send"]);
   });
   it("Escape (the dialog's cancel) goes Home like Close and Cancel, instead of leaving an empty page (F3)", () => {

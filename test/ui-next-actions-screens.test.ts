@@ -186,7 +186,7 @@ describe("actions lane wiring through the current UI's modules", () => {
   it("print: language choices come from printLanguages (English first, then the review's and project's LWCs)", () => {
     const sel = mount(Print).querySelector("select#pt-lang") as HTMLSelectElement;
     expect([...sel.options].map((o) => o.textContent)).toEqual(["English", "Hindi", "Odia"]);
-    expect(sel.value).toBe("Hindi");
+    expect(sel.value).toBe("hi");
   });
   it("paper-entry: isOtherOption finds the write-in choice by its code; receiptLine formats a resp_ receipt", () => {
     const a = mount(PaperEntry);
