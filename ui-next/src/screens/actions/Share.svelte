@@ -49,7 +49,7 @@
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
-    <ReviewHead phone {theme} title={R.review.title} project={R.project} stage="collecting" viewed="collect" live="collect" />
+    <ReviewHead phone {theme} title={R.review.title} project={R.project} stage="collecting" viewed="collect" live="collect" canClose={role === "owner" || role === "member"} />
     <p class="small">{D.phoneLead}</p>
     <Card gap={2} label="Survey links">
       {#if R.noLinks}<p class="small">{R.noLinks}</p>{/if}

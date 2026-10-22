@@ -21,7 +21,7 @@
   import { href } from "../href.js";
   import { carry } from "./links.js";
 
-  let { phone = false, theme = "light", title, project, stage, practice = false, meta, viewed, live, done = [], menu, deleteRefused, action } = $props();
+  let { phone = false, theme = "light", title, project, stage, practice = false, meta, viewed, live, done = [], menu, deleteRefused, action, canClose = true } = $props(); // canClose: owners and members (viewers never see the close row — the stage write would be refused)
   if (!(typeof title === "string" && title.trim())) throw new TypeError("ReviewHead: title is required");
   const KEYS = PHASES.map(([k]) => k);
   if (!KEYS.includes(viewed) || !KEYS.includes(live)) throw new TypeError("ReviewHead: viewed and live are phases (prepare | collect | understand | improve)");
@@ -34,7 +34,7 @@
   const reviewMenu = $derived([
     { label: "Edit details and dates", href: href("setup1", at), icon: A.pen },
     { label: "People with access", href: href("people", at), icon: A.people },
-    { label: "Close collection now", href: href("close-collection", at), icon: A.lock },
+    ...(canClose ? [{ label: "Close collection now", href: href("close-collection", at), icon: A.lock }] : []),
     { label: "Meeting offline? Print and paper", href: `${href("collect", at)}#offline`, icon: A.print },
     { kind: "hr" },
     { label: "Delete this review", danger: true, icon: A.x, refused: deleteRefused },

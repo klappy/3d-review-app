@@ -79,7 +79,15 @@ export async function homeModel(me) {
   // A project's reviews failing to load is an error the shell shows (retryable), never an empty list that would draw a first-review
   // welcome to an established account.
   const lists = await Promise.all(ps.filter((p) => !p.archived_at).map((p) => assessmentsOf(p.id).then((as) => as.map((a) => ({ a, p })))));
-  const all = lists.flat().filter(({ a }) => !a.archived_at).sort((x, y) => String(y.a.created_at).localeCompare(String(x.a.created_at)));
+  // A review the account holds a direct grant on (invited to one review, not its project): /v2/projects lists no parent for it, so
+  // the grant itself is read (as the current design does); a failed read is the shell's error. Codex round 5 P1 on e546ccca.
+  const listed = new Set(lists.flat().map(({ a }) => a.id));
+  const direct = (me?.grants ?? []).filter((g) => g.scope_type === "assessment" && !listed.has(g.scope_id)).map((g) => g.scope_id);
+  const extra = await Promise.all([...new Set(direct)].map(async (aid) => { const { assessment: a } = await api(`/v2/assessments/${enc(aid)}`); return { a, p: ps.find((p) => p.id === a.project_id) ?? { id: a.project_id, name: a.project_name || "Shared review" } }; }));
+  const rowsAll = lists.flat().concat(extra).filter(({ a }) => !a.archived_at);
+  const langCache = new Map(); // one languages read per project (Codex round 5 P2: list rows carry language_id, not language_name)
+  await Promise.all(rowsAll.map(async ({ a }) => { if (a.language_name || !a.language_id || !a.project_id) return; if (!langCache.has(a.project_id)) langCache.set(a.project_id, api(`/v2/projects/${enc(a.project_id)}/languages`).then((r) => r?.languages ?? []).catch(() => [])); a.language_name = (await langCache.get(a.project_id)).find((l) => l.id === a.language_id)?.name || ""; }));
+  const all = rowsAll.sort((x, y) => String(y.a.created_at).localeCompare(String(x.a.created_at)));
   const n = (a) => Number(a.response_count ?? 0);
   const row = ({ a, p }) => {
     const stage = STAGE_OF[a.stage] ?? "setup";
@@ -193,7 +201,7 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
     // reports opens per minute or refusals, so nothing is invented here (root plan @6cd4cd8 step 4).
     groups, linkHost: `${origin}/next/#survey=`, hasAccessCodes: false, // no short-code backend (RESULTS-collect debt 7): the sheet prints the link only
     // PrintQR's choices (every survey ticked, the three layouts the board draws) and QRRoomPhone's default survey.
-    printQr: { checked: live.map((s) => s.id), layouts: [{ title: "One page per survey", help: "A full-page code to pin up or hold up.", per: "survey" }, { title: "Hand-out cards", help: "Six cards per page, cut along the lines, one survey per sheet.", per: "sheet", cards: 6 }, { title: "All on one page", help: "Every selected code on one sheet, for the table.", per: "one" }], languages: [language || "English"], papers: ["A4", "Letter"], pageLanguages: language || "English" },
+    printQr: { checked: live.map((s) => s.id), layouts: [{ title: "One page per survey", help: "A full-page code to pin up or hold up.", per: "survey" }, { title: "Hand-out cards", help: "Six cards per page, cut along the lines, one survey per sheet.", per: "sheet", cards: 6 }, { title: "All on one page", help: "Every selected code on one sheet, for the table.", per: "one" }], languages: ["English"], papers: ["A4", "Letter"], pageLanguages: language || "English" },
     qrRoomPhone: { survey: 2 }, // "Survey 3 of N", as the QRRoomPhone board draws
   };
 }

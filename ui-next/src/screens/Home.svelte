@@ -42,10 +42,15 @@
   import fixture from "../../fixtures/home.json";
 
   // data: the fixture, or the live model in the same shape (app/data.js homeModel); data.start: where "Start a 3D Review" goes.
-  let { state = "reviews", phone = false, theme = "light", data = fixture } = $props();
+  let { state: view = "reviews", phone = false, theme = "light", data = fixture } = $props();
+  // The Show chips filter the groups on screen (Codex round 5 P2 on e546ccca: a live control must do what it says); Completed opens
+  // the completed list. Per-view state only: nothing is stored.
+  let hidden = $state({}); // stage -> true when its chip is unticked
+  let showCompleted = $state(false);
+  const shown = $derived((data.groups ?? []).filter((g) => !hidden[g.stage]));
   const START = $derived(data.start ?? "#setup");
-  if (!STATES.includes(state)) throw new TypeError(`Home: unknown state "${String(state)}" (first | reviews)`);
-  if (phone && state === "first") throw new TypeError("Home: the phone board draws the with-reviews state only (HomePhone.dc.html)");
+  if (!STATES.includes(view)) throw new TypeError(`Home: unknown state "${String(view)}" (first | reviews)`);
+  if (phone && view === "first") throw new TypeError("Home: the phone board draws the with-reviews state only (HomePhone.dc.html)");
   const ARROW = "M5 12h14M13 6l6 6-6 6", SEARCH = "M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14M20 20l-4-4", PLAY = "M8 5v14l11-7z";
   const STAGES = ["results", "collecting", "setup"];
   const phoneGroups = $derived(data.phoneOrder.map((s) => data.groups.find((g) => g.stage === s)).filter(Boolean));
@@ -91,7 +96,7 @@
         <h1 class="title-page">Your reviews</h1>
         <Row gap={2}><Button label="Explore all reviews" variant="quiet" href="#explore" lead={search} /><Button label="Start a 3D Review" variant="primary" href={START} lead={plus} /></Row>
       </Row>
-      {#if state === "first"}
+      {#if view === "first"}
         <Card hi gap={5} label="Welcome">
           <Stack gap={3}>
             <span class="micro">Welcome, {data.user.first}</span>
@@ -119,12 +124,12 @@
         </Card>{/if}
         <Row wrap gap={2}>
           <span class="small">Show</span>
-          {#each data.groups as g}<label class="chip"><input class="cb" type="checkbox" checked />{g.heading} <span class="small">{g.reviews.length}</span></label>{/each}
-          <label class="chip"><input class="cb" type="checkbox" />Completed <span class="small">{data.completed.length}</span></label>
+          {#each data.groups as g}<label class="chip"><input class="cb" type="checkbox" checked={!hidden[g.stage]} onchange={(e) => (hidden = { ...hidden, [g.stage]: !e.currentTarget.checked })} />{g.heading} <span class="small">{g.reviews.length}</span></label>{/each}
+          <label class="chip"><input class="cb" type="checkbox" checked={showCompleted} onchange={(e) => (showCompleted = e.currentTarget.checked)} />Completed <span class="small">{data.completed.length}</span></label>
           <span class="chip">Workspace · {data.workspace}</span><span class="chip">Facilitator · me</span>
-          <Button label="Add filter" variant="quiet" lead={plus} />
+          <Button label="Add filter" variant="quiet" lead={plus} disabled ariaDescribedby="home-filter-why" /><span class="small" id="home-filter-why">More filters are not in the new design yet.</span>
         </Row>
-        {#each data.groups as g}
+        {#each shown as g (g.stage)}
           <Section heading={g.heading} help={g.help}>
             {#each g.reviews as r}
               <Card href={r.href} gap={3}>
@@ -148,7 +153,7 @@
           </Row>
         </Card>
         <Section heading="Completed" help={`${data.completed.length} · hidden until you tick Completed above`}>
-          <details><summary class="link">Show them anyway</summary>
+          <details open={showCompleted}><summary class="link">Show them anyway</summary>
             <Stack gap={2}>{#each data.completed as c}<a class="card-link solid l-card l-stack" href={c.href ?? "#next-step"} data-gap="1"><span class="h3">{c.title}</span><span class="small">{c.meta}</span></a>{/each}</Stack>
           </details>
         </Section>

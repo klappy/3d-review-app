@@ -13,6 +13,8 @@
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
   import TopBar from "../../TopBar.svelte";
+  import { liveChrome } from "../../app/chrome.js";
+  const signedOut = !!liveChrome()?.signedOut; // a visitor from the landing page gets the public header (Codex round 5 P2)
   import PhoneHeader from "../../PhoneHeader.svelte";
   import Button from "../../Button.svelte";
   import Disclosure from "../../Disclosure.svelte";
@@ -42,7 +44,7 @@
 </script>
 
 {#snippet pen()}<Icon d={E.pen} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Help and FAQ" parent="Home" back={HOME} />{:else}<TopBar home={HOME} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state={signedOut ? "public" : "nested"} title="Help and FAQ" parent="Home" back={HOME} />{:else}<TopBar home={HOME} variant={signedOut ? "public" : "signed-in"} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Send app feedback" variant="primary" lg block href={FEEDBACK} lead={pen} /></div>{/if}{/snippet}
 {#snippet rows(items, label)}<section class="glass l-card" data-pad="rows" aria-label={label}>{#each items as [id, title, text, open]}<div {id}><Disclosure label={title} {open} solid={false}><p class="small">{text}</p></Disclosure></div>{/each}</section>{/snippet}
 

@@ -78,7 +78,7 @@
       <p class="small">One {paper} page per survey, with the link printed under the code.</p>
       {#each m.surveys as s (s.code)}<label class="row-opt"><input class="cb" type="checkbox" checked={picked.includes(s.code)} onchange={(e) => tick(s.code, e.currentTarget.checked)} /><span class="h3" data-grow>{s.name}</span><Glyph name="qr" size={16} /></label>{/each}
       <!-- N1: the live region is always mounted (as on desktop); only its text changes, so the reason is announced when it appears. -->
-      <p class="small field-help" role="status" id="print-qr-why">{#if !n}{WHY}{/if}</p>
+      <p class="small field-help" role="status" id="print-qr-why">{#if !n}{WHY}{:else if blocked}The browser blocked the print tab. Allow pop-ups for this site and try again.{/if}</p>
     </div>
   {:else}
     <SurveyGroups groups={m.groups} />
@@ -99,7 +99,7 @@
             <div class="l-stack" data-gap="1">
               <label class="lbl" for="print-qr-lang">Text on the page</label>
               <div class="sel"><select class="in" id="print-qr-lang" aria-describedby="print-qr-lang-help" value={language} onchange={(e) => (language = e.currentTarget.value)}>{#each p.languages as l (l)}<option value={l}>{l}</option>{/each}</select>{@render chev()}</div>
-              <p class="small field-help" id="print-qr-lang-help">The language of the "scan to answer" line. The survey itself opens in whatever language the person picks.</p>
+              <p class="small field-help" id="print-qr-lang-help">The "scan to answer" line prints in English for now (its one source, ui/assess/print.js). The survey itself opens in whatever language the person picks.</p>
             </div>
             <div class="l-stack" data-gap="1">
               <label class="lbl" for="print-qr-paper">Paper size</label>

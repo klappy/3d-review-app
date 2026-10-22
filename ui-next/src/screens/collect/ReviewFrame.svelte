@@ -42,7 +42,7 @@
 
 {#snippet more()}<Icon d={G.more} />{/snippet}
 {#snippet qr()}<Glyph name="qr" />{/snippet}
-{#snippet top()}{#if phone && phoneTitle}<PhoneHeader state="nested" title={phoneTitle} parent="Collect" back={href("collect")} initials={m.user.initials} menuHref={href("menu")} home={href("home")} />{:else if phone}<PhoneHeader state="root" initials={m.user.initials} menuHref={href("menu")} home={href("home")} />{:else}<TopBar who={m.user.first} initials={m.user.initials} workspace={m.workspace} home={href("home")} crumbs={[{ label: m.project.name, href: href("project") }, { label: r.title }]} />{/if}{/snippet}
+{#snippet top()}{#if phone && phoneTitle}<PhoneHeader state="nested" title={phoneTitle} parent="Collect" back={href("collect")} initials={m.user.initials || undefined} menuHref={href("menu")} home={href("home")} />{:else if phone}<PhoneHeader state="root" initials={m.user.initials || undefined} menuHref={href("menu")} home={href("home")} />{:else}<TopBar who={m.user.first || undefined} initials={m.user.initials || undefined} workspace={m.workspace || undefined} home={href("home")} crumbs={[{ label: m.project.name, href: href("project") }, { label: r.title }]} />{/if}{/snippet}
 {#snippet bar()}{#if phone && phoneBar}{@render phoneBar()}{:else if phone}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Share the survey" variant={shareKind} lg block href={href("share")} lead={qr} /></div>{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>

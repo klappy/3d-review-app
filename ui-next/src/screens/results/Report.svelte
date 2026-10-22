@@ -17,6 +17,8 @@
   import Grid from "../../Grid.svelte";
   import PhoneHeader from "../../PhoneHeader.svelte";
   import PhoneBar from "../../PhoneBar.svelte";
+  import { liveContext } from "../href.js";
+  const live = !!liveContext(); // live: PDF export is receipt debt 8 (DocBar says so on desktop); the phone controls say the same
   import Button from "../../Button.svelte";
   import Mark from "../../Mark.svelte";
   import Glyph from "./Glyph.svelte";
@@ -45,19 +47,20 @@
 {#snippet eye()}<Glyph d={G.eye} />{/snippet}
 {#snippet share()}<Glyph d={G.share} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="Reports" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<DocBar title={`Overview report · 1 page · ${D.review.title}`} other={`Open the detailed report · ${pages} pages`} otherHref={href("report-detailed")} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Download the overview (PDF)" href="#download" />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label="Download the overview (PDF)" href={live ? undefined : "#download"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <a class="link small" href={href("results")}>{D.review.title} · results</a>
+    {#if live}<p class="small" id="doc-pdf-why">PDF export is not in the new design yet; the current design's report page downloads it.</p>{/if}
     <h1 class="title-phone">Reports</h1>
     <Card gap={3} label="Overview · 1 page">
       <div class="l-row" data-gap="3" data-align="start"><span class="icn icn-lens" data-lens="team"><Glyph d={G.doc} /></span><Stack gap={1}><span class="h3">Overview · 1 page</span><span class="small">{overviewLine}</span></Stack></div>
-      <Row gap={2}><Button label="Preview" href={href("report")} lead={eye} block /><Button label="Share PDF" href="#share-pdf" lead={share} block /></Row>
+      <Row gap={2}><Button label="Preview" href={href("report")} lead={eye} block /><Button label="Share PDF" href={live ? undefined : "#share-pdf"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} lead={share} block /></Row>
     </Card>
     <Card gap={3} label={`Detailed · ${pages} pages`}>
       <div class="l-row" data-gap="3" data-align="start"><span class="icn icn-lens" data-lens="community"><Glyph d={G.list} /></span><Stack gap={1}><span class="h3">Detailed · {pages} pages</span><span class="small">Every area with its numbers. Best read on a bigger screen or on paper.</span></Stack></div>
-      <Row gap={2}><Button label="Share PDF" href="#share-pdf" lead={share} block /></Row>
+      <Row gap={2}><Button label="Share PDF" href={live ? undefined : "#share-pdf"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} lead={share} block /></Row>
     </Card>
     <Card pad="list" gap={4} label="Preview · overview">
       <span class="micro">Preview · overview</span>

@@ -60,7 +60,7 @@
             <p class="small t-15">{links === false ? "Sign in on the Access page; you come back here signed in." : "No password. We email you a link that signs you in. New here? Signing in with your email creates your account."}</p>
             <div><label class="lbl" for="si-email">Email</label><input class="in" id="si-email" type="email" inputmode="email" autocomplete="email" required maxlength="254" value={email} oninput={(e) => (email = e.currentTarget.value)} /></div>
             {#if status}<p class="small field-error" role="alert">{status}</p>{/if}
-            <Row gap={2}><button class="btn btn-primary" type="submit" disabled={busy || !email.trim()}>{busy ? "Sending…" : synthetic ? "Get a sandbox code" : links === false ? "Go to sign-in" : "Email me a sign-in link"}</button><a class="btn btn-quiet" href="/v2/auth/access" data-code-signin>Sign in with a code instead</a></Row>
+            <Row gap={2}><button class="btn btn-primary" type="submit" disabled={busy || !email.trim() || (links === undefined && !synthetic)}>{busy ? "Sending…" : synthetic ? "Get a sandbox code" : links === false ? "Go to sign-in" : "Email me a sign-in link"}</button><a class="btn btn-quiet" href="/v2/auth/access" data-code-signin>Sign in with a code instead</a></Row>
           </Stack>
         </form>
       {/if}

@@ -435,7 +435,7 @@ describe("PrintQR (PrintQR, PrintQRPhone): controlled choices (F5)", () => {
     expect([...d.querySelectorAll("input.rd")].map((c) => (c as HTMLInputElement).checked)).toEqual([true, false, false]);
     expect(all(d, "label.lbl")).toEqual(["Text on the page", "Paper size"]);
     expect(all(d, "#print-qr-lang option")).toEqual(["English", "Hindi", "Odia"]);
-    expect(text(d.querySelector("#print-qr-lang-help"))).toBe('The language of the "scan to answer" line. The survey itself opens in whatever language the person picks.');
+    expect(text(d.querySelector("#print-qr-lang-help"))).toMatch(/prints in English for now/);
     expect(text(a.querySelector(".btn-primary"))).toBe("Print 3 pages");
     expect(text(d.querySelector(".micro"))).toBe("Preview · one page per survey · A4 · 3 pages");
     const sheet = d.querySelector(".psheet[data-fit=a4] > .paper")!; // section 2 Paper preview row (CORRECTIONS 31): CSS scales the sheet, no SVG stand-in

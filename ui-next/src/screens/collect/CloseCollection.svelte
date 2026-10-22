@@ -41,8 +41,8 @@
   {:else}
     <SurveyGroups groups={m.groups} />
     <Dialog labelledby="close-title" cancel={href("collect")} titleTop title={deskTitle}>
-      <p class="small t-15">Links and codes stop working and the review moves to <strong>Understand</strong>. {plural(m.answered, "response is", "responses are")} in. You can reopen collection later — results refresh when you do.</p>
-      {#if m.groups.length}<div class="solid l-card l-stack"><span class="small">{m.byLens}.{#if enough}{" "}Every perspective has at least 3 answers, so results can show.{/if}</span></div>{/if}
+      <p class="small t-15">Links and codes stop working and the review moves to <strong>Understand</strong>. {m.countsUnavailable ? "Some response counts could not be read just now — reload before closing on a number." : `${plural(m.answered, "response is", "responses are")} in.`} You can reopen collection later — results refresh when you do.</p>
+      {#if m.groups.length && !m.countsUnavailable}<div class="solid l-card l-stack"><span class="small">{m.byLens}.{#if enough}{" "}Every perspective has at least 3 answers, so results can show.{/if}</span></div>{/if}
       <div class="l-row" data-gap="2" data-justify="end">
         <!-- svelte-ignore a11y_autofocus -->
         <a class="btn btn-quiet" href={href("collect")} autofocus>Keep collecting</a>
