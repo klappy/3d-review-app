@@ -267,7 +267,17 @@
   const act = async (label, fn) => { try { await fn(); load(); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `${label}: ${e?.message || "the request could not be completed"}` } }; } };
   const sendInvite = ({ email, role }) => act("Invitation not sent", async () => { const out = await D.invite(peopleScope(), { email, role }); if (out.held) throw new Error("the server held the invitation"); }); // an empty or malformed address is the server's INVALID_PARAMS, shown as is
   const rowAction = (name, row) => act(name === "Withdraw" ? "Invitation not withdrawn" : "Access not removed", () => (row.pending ? D.revokeInvitation(row.key) : D.revokeGrant(peopleScope(), row.key)));
-  const changeRole = (row, role) => act("Role not changed", async () => { const out = await D.setRole(peopleScope(), row.key, role); if (out.held) throw new Error("the server held the change"); });
+  // A role change is a danger twin: the dry run's impact is shown and the person confirms before execute (an owner elevation cannot be
+  // undone here; a downgrade can revoke the person's outstanding invitations). Codex P1 on 26a86937.
+  const changeRole = (row, role) => act("Role not changed", async () => {
+    const p = await D.previewRole(peopleScope(), row.key, role);
+    if (p?.suppressed === true || p?.status === "held") throw new Error("the server held the change");
+    if (typeof p?.confirm_token !== "string") throw new Error("the preview could not be read");
+    const impact = Array.isArray(p.impact?.affected) ? p.impact.affected.map((a) => a.will_see || a.summary || "").filter(Boolean).join(" ") : "";
+    const ok = globalThis.confirm?.(`Change ${row.name || "this person"} to ${role}? ${impact}${p.impact?.irreversible ? " This cannot be undone here." : ""}`.trim());
+    if (!ok) throw new Error("not confirmed; nothing changed");
+    await D.executeRole(peopleScope(), row.key, role, p.confirm_token);
+  });
   const acceptInvite = (id) => act("Invitation not accepted", () => D.acceptInvitation(id));
   const groupProject = (pid) => act("Project not added", async () => { await D.addProject(route.params.wid, pid); go(to("workspace", { wid: route.params.wid })); });
   async function closeCollection() { const aid = route.params.aid; try { await D.setStage(aid, "understand"); go(to("results", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be closed." } }; } }
@@ -286,7 +296,7 @@
   function suField(k, v) {
     const d = suSt.draft;
     if (k === "project") { const p = suSt.projects.find((x) => x.name === v); d.project = p?.id ?? ""; d.language = ""; d.languageQuery = ""; suSt.languages = []; suAct(() => SU.loadLanguages(suSt), undefined, "The project's languages could not be read."); return; }
-    if (k === "format") d.format = SU.formatValue(v); else d[k] = v;
+    if (k === "format") { const was = SU.COMMUNITY_TEMPLATE[d.format]; d.format = SU.formatValue(v); const now = SU.COMMUNITY_TEMPLATE[d.format]; if (was && was !== now && d.groups[was] && !suSt.pre.some((x) => x.template === was)) { const g = d.groups[was]; delete d.groups[was]; delete d.context[was]; if (g.checked) d.groups[now] = { ...g, version: String(suSt.templates.find((t) => t.id === now)?.version ?? g.version) }; } } else d[k] = v; // the Community survey follows the format (Codex P1 on 26a86937)
     suError = ""; bump();
   }
   const suLang = {

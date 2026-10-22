@@ -65,6 +65,8 @@ export const workspace = async (wid) => api(`/v2/workspaces/${enc(wid)}`); // { 
 export const grantsAt = async (scope) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants`); // { grants, pending_invitations }; member+ only
 export const myInvitations = async () => (await api("/v2/me/invitations")).invitations ?? [];
 export const invite = (scope, { email, role }) => confirmed(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/invitations`, { email, role });
+export const previewRole = async (scope, gid, role) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants/${enc(gid)}`, { method: "PATCH", body: { role, mode: "dry_run" } });
+export const executeRole = async (scope, gid, role, confirm_token) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants/${enc(gid)}`, { method: "PATCH", body: { role, mode: "execute", confirm_token } });
 export const setRole = (scope, gid, role) => confirmed(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants/${enc(gid)}`, { role }, { method: "PATCH" });
 export const revokeGrant = (scope, gid) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants/${enc(gid)}`, { method: "DELETE" });
 export const revokeInvitation = (id) => api(`/v2/invitations/${enc(id)}`, { method: "DELETE" });
@@ -277,7 +279,7 @@ export async function resultsModel(aid, { build = false } = {}) {
   // left out rather than mislabelled. Language resolves as Collect does (language_name, else language_id via the project's languages).
   const review = { id: a.id, project: p.name, projectId: a.project_id, language: await languageOf(a), modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: "", closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses, canReadResponses: member, canReopen: member }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
   // Role flags (src/handlers: report build, stage and the response list need owner/member; viewers read results and reports only).
-  return { aid, review, counts, payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (res?.status === "held" ? res : null), results: res, serverStage: a.stage, canBuild: member, canReadResponses: member, canReopen: member };
+  return { aid, review, counts, payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (res?.status === "held" && !member && !built ? res : null), results: res, serverStage: a.stage, canBuild: member, canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
 }
 
 // Gap names for ResultsGaps/Report (results/data.js bandRows reads the payload's cross-perspective areas by construct name):

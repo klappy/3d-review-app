@@ -19,13 +19,14 @@
   import { G } from "./icons.js";
   import { out } from "./links.js";
   let { review, phone = false, primary, responses, linkGap = 1 } = $props();
+  const collecting = $derived((review.stage ?? "") === "collecting"); // the close action exists only while collecting: from understand/improve the write would move the review backwards (Codex P1 on 26a86937)
   if (!review || typeof review.title !== "string") throw new TypeError("ReviewHead: review.title is required");
   if (!phone && !(primary && primary.label)) throw new TypeError("ReviewHead: the desktop head holds the page's one primary");
   const n = $derived(responses ?? review.responses);
   const MORE = $derived([
     { label: "Edit details and dates", href: out("setup1"), icon: G.edit },
     { label: "People with access", href: out("people"), icon: G.people },
-    { label: "Close collection now", href: out("closeCollection"), icon: G.lock },
+    ...(collecting ? [{ label: "Close collection now", href: out("closeCollection"), icon: G.lock }] : []),
     { label: "Meeting offline? Print and paper", href: out("collect", {}, "offline"), icon: G.print },
     { kind: "hr" },
     { label: "Delete this review", icon: I.x, danger: true, refused: `Reviews with responses can't be deleted. This one has ${n}.` },
