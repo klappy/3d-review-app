@@ -14,16 +14,18 @@
   import Card from "../../Card.svelte";
   import Stack from "../../Stack.svelte";
   import { href } from "../href.js";
-  import { question, qParam, pick, hasAbout, exclusionNote, LABELS } from "./data.js";
-  let { phone = false, theme = "light", q = qParam() } = $props();
-  const x = $derived(question(q));
+  import { question, qParam, pick, hasAbout, exclusionNote, LABELS, DATA } from "./data.js";
+  // d: the survey model (fixture, or the live journey's form); onanswer(id, value): live mode saves the draft on every tick.
+  let { phone = false, theme = "light", q = qParam(), d = DATA, onanswer } = $props();
+  const x = $derived(question(q, d));
   const kind = $derived(x.item.type);
-  const note = $derived(exclusionNote(x.item));
+  const note = $derived(exclusionNote(x.item, d));
   // The participant's answer on this page: starts from the fixture's, follows each tick (a new ?q= starts over).
   let value = $derived(x.value);
   const on = (code) => (kind === "multi" ? (value ?? []).includes(code) : value === code);
-  const tick = (code) => (e) => { value = pick(x.item, value, code, e.currentTarget.checked); };
-  const back = $derived(x.n > 1 ? href("p-question", { q: x.n - 1 }) : hasAbout() ? href("p-about") : href("p-passage"));
+  const tick = (code) => (e) => { value = pick(x.item, value, code, e.currentTarget.checked, d); onanswer?.(x.item.id, value); };
+  const typed = (e) => { value = e.currentTarget.value; onanswer?.(x.item.id, value); };
+  const back = $derived(x.n > 1 ? href("p-question", { q: x.n - 1 }) : hasAbout(d) ? href("p-about") : href("p-passage"));
   const next = $derived(x.n < x.total ? href("p-question", { q: x.n + 1 }) : href("p-review"));
 </script>
 
@@ -37,7 +39,7 @@
   <Card hi pad="hero" gap={4}>
     {#if kind === "text"}
       <h1 class="title-phone" id="p-q-text">{x.item.text}</h1>
-      <textarea class="in" id="p-q-answer" name={x.item.id} aria-labelledby="p-q-text" value={x.value ?? ""}></textarea>
+      <textarea class="in" id="p-q-answer" name={x.item.id} aria-labelledby="p-q-text" value={x.value ?? ""} oninput={typed}></textarea>
     {:else}
       <fieldset class="opts">
         <legend><h1 class="title-phone">{x.item.text}</h1></legend>

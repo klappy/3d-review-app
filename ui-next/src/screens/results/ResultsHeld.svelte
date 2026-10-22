@@ -26,13 +26,14 @@
   import { out } from "./links.js";
   import { REPORT, MIN_RESPONSES, lensCards, heldLines } from "./data.js";
 
-  let { phone = false, theme = "light" } = $props();
-  const D = REPORT.desktop, H = REPORT.held, P = REPORT.phone;
-  const cards = lensCards(D.payload, H.counts);
+  // report (live): { review, counts, payload } with too few responses in some perspective; default the fixture's held state.
+  let { phone = false, theme = "light", report } = $props();
+  const D = report ?? REPORT.desktop, H = report ? { counts: report.counts, phoneCounts: report.counts, preview: REPORT.held.preview, review: { closedResponses: report.review.responses } } : REPORT.held, P = report ?? REPORT.phone;
+  const cards = lensCards(D.payload ?? { lenses: [] }, H.counts);
   const lines = heldLines(H.counts);
   const short = lines.filter((l) => l.short > 0);
-  if (!short.length) throw new TypeError("ResultsHeld: the fixture holds no perspective under the minimum");
-  const first = short[0];
+  if (!short.length && !report) throw new TypeError("ResultsHeld: the fixture holds no perspective under the minimum");
+  const first = short[0] ?? lines[0];
   const phoneN = H.phoneCounts[first.lens];
   const crumbs = [{ label: D.review.project, href: out("project") }, { label: D.review.title }];
   const without = `Show results without the ${first.label.toLowerCase()}`;

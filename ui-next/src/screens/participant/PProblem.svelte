@@ -14,10 +14,10 @@
   import Chip from "./Chip.svelte";
   import Card from "../../Card.svelte";
   import { href } from "../href.js";
-  import { problem, surveyLens } from "./data.js";
-  let { phone = false, theme = "light", state } = $props();
-  const p = $derived(problem(state));
-  const lens = surveyLens();
+  import { problem, surveyLens, DATA } from "./data.js";
+  let { phone = false, theme = "light", state, d = DATA, onretry } = $props();
+  const p = $derived(problem(state, d));
+  const lens = $derived(surveyLens(d));
   const OTHER = $derived([
     ["cal", "This survey has closed", `Collection ended on ${p.closedOn}. Ask the person who invited you if there is a new one.`],
     ["link", "This link doesn't work", "Check for missing characters, or ask for the code and enter it on the home page."],
@@ -30,7 +30,7 @@
   ];
 </script>
 
-{#snippet actions()}<ParticipantActions {phone} label={p.busy ? "Try now" : "Try sending again"} href={href("p-receipt")} lead="refresh" />{/snippet}
+{#snippet actions()}<ParticipantActions {phone} label={p.busy ? "Try now" : "Try sending again"} href={href("p-receipt")} lead="refresh" onaction={onretry} />{/snippet}
 
 <ParticipantShell {phone} {theme} {actions}>
   <Card hi pad="hero" gap={4}>
@@ -42,7 +42,7 @@
       <p class="small" role="status">{p.retry}</p>
     {:else}
       <h1 class="title-phone">We couldn't confirm your answers were received</h1>
-      <p class="lead-16">Your answers are still here on this phone. Check your connection and try again — nothing is lost, and sending twice won't count twice.</p>
+      <p class="lead-16">{p.notice || "Your answers are still here on this phone. Check your connection and try again — nothing is lost, and sending twice won't count twice."}</p>
     {/if}
   </Card>
   <Card hi pad="hero" gap={3}>

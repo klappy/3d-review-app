@@ -14,6 +14,7 @@ import "../components/level.css";
 import "../components/phone.css";
 import "../components/type.css";
 import "../components/disclosure.css";
+import "../components/qr.css";
 import "./gallery.css";
 import App from "./App.svelte";
 import Layouts from "./Layouts.svelte";
@@ -24,12 +25,19 @@ import About from "./screens/About.svelte";
 import Landing from "./screens/Landing.svelte";
 import { REGISTRY } from "./screens/registry.js";
 import { route, wOverride, PHONE_QUERY } from "./route.js";
+import Live from "./app/Live.svelte";
 
 let storage;
 try { storage = window.localStorage; } catch { storage = undefined; }
 const VIEWS = { ...REGISTRY, home: Home, about: About, landing: Landing, components: App, layouts: Layouts, "home-parts": HomeParts };
 const params = new URLSearchParams(location.search);
 const target = document.getElementById("next");
+// The live app (app/Live.svelte) is the normal entry: /next/ with no ?page= or ?screen= (or with a #/route or #survey= hash). The fixture
+// harness (gallery, ?screen= boards for the pixel diff and tests) stays on the query form.
+const live = !params.has("page") && !params.has("screen") && !params.has("ui_next");
+if (live) {
+  mount(Live, { target });
+} else {
 // Screens follow the viewport (phone below 720px, route.js PHONE_BELOW) unless ?w= overrides; remount when the width crosses it.
 const mq = typeof window.matchMedia === "function" ? window.matchMedia(PHONE_QUERY) : null;
 let view;
@@ -40,3 +48,4 @@ const draw = () => {
 };
 let app = draw();
 if (mq && !wOverride(params) && !["components", "layouts", "home-parts"].includes(view)) mq.addEventListener("change", () => { unmount(app); target.replaceChildren(); app = draw(); });
+}

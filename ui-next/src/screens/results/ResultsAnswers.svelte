@@ -29,13 +29,13 @@
   import { REPORT, ANSWER_LENSES, SPLITS, MIN_RESPONSES, answerLens, answerView, lensLabel, pct } from "./data.js";
 
   // ?state= picks the perspective; renamed here so it never shadows the $state rune.
-  let { phone = false, theme = "light", state: asked } = $props();
+  let { phone = false, theme = "light", state: asked, report } = $props();
   const initial = answerLens(asked);
   let lens = $state(initial);
   let split = $state("everyone");
   const A = $derived(answerView(lens, phone ? "everyone" : split));
   const next = $derived(ANSWER_LENSES[(ANSWER_LENSES.indexOf(A.lens) + 1) % ANSWER_LENSES.length]);
-  const review = $derived(phone ? REPORT.phone.review : REPORT.desktop.review);
+  const review = $derived(report?.review ?? (phone ? REPORT.phone.review : REPORT.desktop.review));
   const crumbs = $derived([{ label: review.project, href: out("project") }, { label: review.title }]);
   const splitLabel = $derived(SPLITS.find((s) => s.key === A.split).label.replace(/^Split by /, "by "));
 </script>

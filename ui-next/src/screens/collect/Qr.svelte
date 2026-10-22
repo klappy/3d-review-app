@@ -7,7 +7,9 @@
   const SIZES = ["room", "phone", "page"];
   let { cells, size } = $props();
   if (!SIZES.includes(size)) throw new TypeError(`Qr: size must be room, phone or page, got ${String(size)}`);
-  if (!/^[01]{441}$/.test(cells ?? "")) throw new TypeError("Qr: cells are 441 modules (21x21) as a 0/1 string");
+  // 21x21 for the boards' placeholder codes; a real survey link (app/data.js qrModules) is a larger square (version 2+), so any n*n.
+  const n = $derived(Math.round(Math.sqrt(String(cells ?? "").length)));
+  if (!/^[01]+$/.test(cells ?? "") || n * n !== String(cells).length || n < 21) throw new TypeError("Qr: cells are an n x n (n >= 21) square of modules as a 0/1 string");
 </script>
 
-<div class="qr" data-size={size} aria-hidden="true">{#each cells as m, i (i)}<i class={m === "1" ? undefined : "o"}></i>{/each}</div>
+<div class="qr" data-size={size} data-n={n} aria-hidden="true">{#each cells as m, i (i)}<i class={m === "1" ? undefined : "o"}></i>{/each}</div>

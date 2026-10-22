@@ -9,11 +9,11 @@
   import Icon from "./Icon.svelte";
   import { I, accountItems } from "./icons.js";
   const VARIANTS = ["signed-in", "public"];
-  let { variant = "signed-in", crumbs = [], who = "Bincy", initials = "BK", workspace = "BCS · India", workspaces = ["BCS · India", "Seed Company · partners"], accountOpen = false, workspaceOpen = false, home = "#home", end = true } = $props();
+  let { variant = "signed-in", crumbs = [], who = "Bincy", initials = "BK", workspace = "BCS · India", workspaces = ["BCS · India", "Seed Company · partners"], accountOpen = false, workspaceOpen = false, home = "#home", end = true, accountItems: acctOverride, workspaceItems } = $props();
   if (!VARIANTS.includes(variant)) throw new TypeError(`TopBar: unknown variant "${variant}" (flow, document and room are not ported yet)`);
   if (variant === "public" && crumbs.length) throw new TypeError("TopBar: the public variant has no breadcrumb");
-  const acctItems = accountItems(); // built once per page load from location.search (every screen change reloads)
-  const wsItems = $derived([{ kind: "micro", label: "Your workspaces" }, ...workspaces.map((w) => ({ label: w, href: "#workspace" }))]);
+  const acctItems = $derived(acctOverride ?? accountItems()); // live mode passes the real account; the gallery builds the fixture menu
+  const wsItems = $derived(workspaceItems ?? [{ kind: "micro", label: "Your workspaces" }, ...workspaces.map((w) => ({ label: w, href: "#workspace" }))]);
 </script>
 
 {#snippet help()}<Icon d={I.help} />{/snippet}

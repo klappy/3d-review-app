@@ -8,10 +8,11 @@
   import ParticipantActions from "./ParticipantActions.svelte";
   import Card from "../../Card.svelte";
   import { href } from "../href.js";
-  import { about, skipAbout, LABELS } from "./data.js";
-  let { phone = false, theme = "light" } = $props();
-  const a = about();
+  import { about, skipAbout, LABELS, DATA } from "./data.js";
+  let { phone = false, theme = "light", d = DATA, onabout } = $props();
+  const a = about(d);
   let values = $state({ ...a.values });
+  $effect(() => { onabout?.({ ...values }); });
 </script>
 
 {#snippet actions()}<ParticipantActions {phone} back={a.fields.length ? href("p-question", { q: 1 }) : undefined} backLabel="Skip" onback={() => (values = skipAbout())} label={LABELS.next} href={href("p-question", { q: 1 })} trail="arrow" />{/snippet}

@@ -15,18 +15,20 @@
   import Icon from "../../Icon.svelte";
   import { href } from "../href.js";
   import { P } from "./icons.js";
-  import { review, pickState, LABELS } from "./data.js";
-  let { phone = false, theme = "light", state } = $props();
-  const r = $derived(review(pickState(state, STATES) === "all"));
+  import { review, pickState, LABELS, DATA } from "./data.js";
+  // onsend (live): submits through the journey instead of following the link; notice: the journey's line (draft restored, send uncertain).
+  let { phone = false, theme = "light", state, d = DATA, onsend, busy = false, notice = "", missing = [] } = $props();
+  const r = $derived(review(pickState(state, STATES) === "all" || d.live, d));
 </script>
 
 {#snippet chev()}<Icon d={P.chev} />{/snippet}
-{#snippet actions()}<ParticipantActions {phone} label="Send my answers" href={href("p-receipt")} trail="arrow" />{/snippet}
+{#snippet actions()}<ParticipantActions {phone} label={busy ? "Sending…" : "Send my answers"} href={href("p-receipt")} trail="arrow" onaction={onsend} disabled={busy} />{/snippet}
 
 <ParticipantShell {phone} {theme} {actions}>
   <Card hi pad="hero" gap={3}>
     <h1 class="title-phone">Check your answers</h1>
     <p class="small t-15">You can change any answer before you send.</p>
+    {#if notice}<p class="small" role="status">{notice}{#if missing.length} <a class="link" href={href("p-question", { q: missing[0].n })}>Go to question {missing[0].n}</a>{/if}</p>{/if}
     <Stack gap={5}>
     <div class="l-stack" data-gap="3">
       {#each r.rows as row (row.id)}

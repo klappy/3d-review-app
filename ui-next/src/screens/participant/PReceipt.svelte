@@ -9,17 +9,17 @@
   import Card from "../../Card.svelte";
   import { href } from "../href.js";
   import { DATA, surveyLens, LABELS } from "./data.js";
-  let { phone = false, theme = "light" } = $props();
+  let { phone = false, theme = "light", d = DATA, onanother, notice = "" } = $props();
 </script>
 
-{#snippet actions()}<ParticipantActions {phone} primary={false} label={LABELS.interviewAnother} href={href("p-welcome")} lead="people" />{/snippet}
+{#snippet actions()}<ParticipantActions {phone} primary={false} label={LABELS.interviewAnother} href={href("p-welcome")} lead="people" onaction={onanother} />{/snippet}
 
 <ParticipantShell {phone} {theme} {actions}>
   <Card hi pad="hero" gap={4}>
-    <Chip icon="check" size={64} lens={surveyLens()} />
+    <Chip icon="check" size={64} lens={surveyLens(d)} />
     <h1 class="display">Thank you</h1>
-    <p class="lead-16">Your answers were received. Your perspective helps the translation grow.</p>
-    <div class="solid l-card l-stack" data-gap="1" role="group" aria-label="Receipt"><span class="micro">Receipt</span><span class="kbd receipt">{DATA.receipt}</span><span class="small">Keep this in case the person who invited you asks for it.</span></div>
+    <p class="lead-16">{notice || "Your answers were received. Your perspective helps the translation grow."}</p>
+    <div class="solid l-card l-stack" data-gap="1" role="group" aria-label="Receipt"><span class="micro">Receipt</span><span class="kbd receipt">{d.receipt}</span><span class="small">Keep this in case the person who invited you asks for it.</span></div>
     <p class="small">You can close this page.</p>
   </Card>
 </ParticipantShell>

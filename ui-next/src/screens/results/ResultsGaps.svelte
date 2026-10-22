@@ -21,8 +21,8 @@
   import { out } from "./links.js";
   import { REPORT, LENS_ORDER, lensLabel, bandRows } from "./data.js";
 
-  let { phone = false, theme = "light" } = $props();
-  const src = $derived(phone ? REPORT.phone : REPORT.desktop);
+  let { phone = false, theme = "light", report } = $props();
+  const src = $derived(report ?? (phone ? REPORT.phone : REPORT.desktop));
   const biggest = $derived(bandRows(src, src.counts, src.gaps.biggest));
   const agree = $derived(bandRows(src, src.counts, src.gaps.agree));
   const review = $derived(src.review);

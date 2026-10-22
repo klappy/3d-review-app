@@ -8,10 +8,10 @@
   import Chip from "./Chip.svelte";
   import Card from "../../Card.svelte";
   import { href } from "../href.js";
-  import { welcome, surveyLens, LABELS } from "./data.js";
-  let { phone = false, theme = "light" } = $props();
-  const w = welcome();
-  const lens = surveyLens();
+  import { welcome, surveyLens, LABELS, DATA } from "./data.js";
+  let { phone = false, theme = "light", d = DATA } = $props();
+  const w = $derived(welcome(d));
+  const lens = $derived(surveyLens(d));
 </script>
 
 {#snippet actions()}<ParticipantActions {phone} label={LABELS.start} href={href("p-passage")} trail="arrow" />{/snippet}

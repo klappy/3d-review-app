@@ -25,13 +25,16 @@
   import { out } from "./links.js";
   import { REPORT, lensCards, detailedPages } from "./data.js";
 
-  let { phone = false, theme = "light" } = $props();
-  const D = REPORT.desktop, P = REPORT.phone;
-  const cards = $derived(phone ? lensCards(P.payload, P.counts) : lensCards(D.payload, D.counts));
-  const review = $derived(phone ? P.review : D.review);
+  // report (live): { review, counts, payload } from app/data.js resultsModel; default the fixture. onrefresh (live): rebuilds from new answers.
+  let { phone = false, theme = "light", report, onrefresh, refreshed = "" } = $props();
+  const D = $derived(report ?? (phone ? REPORT.phone : REPORT.desktop));
+  const cards = $derived(lensCards(D.payload, D.counts));
+  const review = $derived(D.review);
   const crumbs = $derived([{ label: review.project, href: out("project") }, { label: review.title }]);
   let checked = $state(false);
   const NO_NEW = "No new answers since this report was built.";
+  const refresh = () => { if (onrefresh) onrefresh(); else checked = true; };
+  const line = $derived(refreshed || (checked ? NO_NEW : ""));
 </script>
 
 {#snippet arrow()}<Glyph d={G.arrow} />{/snippet}
@@ -48,9 +51,9 @@
     <Row gap={2}>
       <Button label="See the answers" href={href("results-answers")} lead={list} block />
       <Button label="Reports" href={href("report")} lead={doc} block />
-      <button class="btn btn-quiet btn-icon" type="button" aria-label="Refresh with new answers" onclick={() => (checked = true)}><Glyph d={G.refresh} /></button>
+      <button class="btn btn-quiet btn-icon" type="button" aria-label="Refresh with new answers" onclick={refresh}><Glyph d={G.refresh} /></button>
     </Row>
-    {#if checked}<p class="small" role="status">{NO_NEW}</p>{/if}
+    {#if line}<p class="small" role="status">{line}</p>{/if}
     {#each cards as card (card.lens)}<LensCard {card} phone />{/each}
     <a class="link" href={href("results-gaps")}>See the three biggest gaps <Glyph d={G.arrow} /></a>
     <a class="link" href={out("people")}>Share results with someone <Glyph d={G.arrow} /></a>
@@ -71,7 +74,7 @@
       <Row split gap={2}>
         <Row gap={2}>
           <span class="small" role="status">Report built {review.closed} from {review.responses} responses.{checked ? ` ${NO_NEW}` : ""}</span>
-          <button class="btn btn-quiet" type="button" onclick={() => (checked = true)}><Glyph d={G.refresh} />Refresh with new answers</button>
+          <button class="btn btn-quiet" type="button" onclick={refresh}><Glyph d={G.refresh} />Refresh with new answers</button>
         </Row>
         <Row gap={2}>
           <Button label="Overview report · 1 page" href={href("report")} lead={download} />

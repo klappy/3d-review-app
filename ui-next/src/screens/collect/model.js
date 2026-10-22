@@ -25,7 +25,7 @@ export const pct = (a, b) => (b > 0 ? Math.floor((a / b) * 100) : 0);
 export function collectModel(fx) {
   const groups = fx.groups.map((g) => {
     if (!Object.hasOwn(LENSES, g.lens)) throw new TypeError(`collectModel: unknown lens "${String(g.lens)}"`);
-    const surveys = g.surveys.map((s) => ({ ...s, lens: g.lens, pct: pct(s.answered, s.expected), link: fx.linkHost + s.code }));
+    const surveys = g.surveys.map((s) => ({ ...s, lens: g.lens, pct: pct(s.answered, s.expected), link: s.link ?? fx.linkHost + s.code }));
     return { lens: g.lens, label: LENSES[g.lens], surveys, answered: sum(surveys, "answered"), expected: sum(surveys, "expected") };
   });
   const surveys = groups.flatMap((g) => g.surveys);

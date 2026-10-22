@@ -13,6 +13,12 @@
 // reads a dropped w as the viewport width (desktop with no width) and a dropped theme as light, so href(s, {}, from) and
 // screenHref(s, { phone, theme } of from) land on the same view and props (test/ui-next-href.test.ts).
 export const CARRY = Object.freeze(["w", "theme"]);
+// Live mode (ui-next/src/app): when the live app sets a context, every href() becomes a hash route (app/router.js) carrying the
+// current route params (aid, pid, wid…), so the lanes' links are normal in-app navigation; the gallery and tests never set it.
+import { linkFor, isRoute } from "../app/router.js";
+let LIVE = null;
+export function setLiveContext(ctx) { LIVE = ctx ? { ...ctx } : null; }
+export const liveContext = () => LIVE;
 const READ = Object.freeze({ w: (v) => v === "phone" || v === "desktop", theme: (v) => v === "dark" || v === "light" });
 const NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/; // same rule as screens/registry.js NAME
 const OWN = ["ui_next", "screen"];
@@ -20,6 +26,7 @@ const OWN = ["ui_next", "screen"];
 export function href(screen, extra = {}, from = globalThis.location?.search ?? "") {
   if (!NAME.test(screen)) throw new Error(`ui-next href: "${screen}" is not a lowercase kebab-case screen name`);
   for (const k of OWN) if (Object.hasOwn(extra, k)) throw new Error(`ui-next href: extra.${k} is set by href itself`);
+  if (LIVE && isRoute(screen)) return linkFor(screen, extra, LIVE);
   const cur = new URLSearchParams(from);
   const out = new URLSearchParams({ ui_next: "on", screen });
   for (const k of CARRY) {

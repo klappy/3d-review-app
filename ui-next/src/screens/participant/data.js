@@ -25,42 +25,44 @@ export const lensOf = (perspective) => (LENSES.includes(perspective) ? LENS_KEY[
 export const surveyLens = (d = DATA) => lensOf(d.form.template.perspective);
 
 const items = () => DATA.form.items;
-export const itemById = (id) => {
-  const item = items().find((i) => i.id === id);
+export const itemById = (id, d = DATA) => {
+  const item = d.form.items.find((i) => i.id === id);
   if (!item) throw new TypeError(`participant fixture: no item "${id}"`);
   return item;
 };
 // The board's last answer row on every choice question (design row, not yet in the app instrument: cookbook CORRECTIONS R33).
 // It carries the app's own option flag `exclusive` (ui/participant-view.js itemError: an exclusion choice cannot be combined).
-export const choices = (item) => (item.options ? [...item.options, DATA.dontKnow] : []);
+// Live (app/participant.js model, no dontKnow row): the instrument's own options only (HANDOFF-wiring-2315 step 8).
+export const choices = (item, d = DATA) => (item.options ? (d.dontKnow ? [...item.options, d.dontKnow] : [...item.options]) : []);
 // The item as the participant sees it: its options plus "I don't know", so the app's own functions (reviewAnswer, itemError) know the row.
-const asShown = (item) => (item.options ? { ...item, options: choices(item) } : item);
+const asShown = (item, d = DATA) => (item.options ? { ...item, options: choices(item, d) } : item);
 
 // A multi answer after one box is ticked (on) or unticked: an exclusive row stands alone ("I don't know", and the instrument's own
 // exclusion options, e.g. CW-Q8 "We don't use it": src/handlers/common.ts renderItems serves flag "exclusion" as exclusive); ticking
 // any other row drops it. Single answers are one code. The result always passes the app's itemError exclusion check.
-export function pick(item, value, code, on) {
+export function pick(item, value, code, on, d = DATA) {
   if (item.type !== "multi") return on ? code : value;
   const cur = Array.isArray(value) ? value : [];
   if (!on) return cur.filter((c) => c !== code);
-  const ex = new Set(choices(item).filter((o) => o.exclusive).map((o) => o.code));
+  const ex = new Set(choices(item, d).filter((o) => o.exclusive).map((o) => o.code));
   return ex.has(code) ? [code] : [...cur.filter((c) => c !== code && !ex.has(c)), code];
 }
 
 // The line under a multi field that holds an exclusive row: the app's own words (UI_EN.exclusionNote), drawn where the v3 page draws
 // it (ui/participate/page.js draw: multi item with an exclusive option); null for any other item, so nothing is drawn.
-export const exclusionNote = (item) => (item.type === "multi" && choices(item).some((o) => o.exclusive) ? UI_EN.exclusionNote : null);
+export const exclusionNote = (item, d = DATA) => (item.type === "multi" && choices(item, d).some((o) => o.exclusive) ? UI_EN.exclusionNote : null);
 
 export function welcome(d = DATA) {
   return {
-    eyebrow: `${d.survey.language} · ${passageNames(d.survey.passages)}, ${d.survey.medium}`,
+    eyebrow: [d.survey.language, d.survey.passages?.length ? `${passageNames(d.survey.passages)}, ${d.survey.medium}` : d.survey.assessment || d.survey.medium].filter(Boolean).join(" · "),
     perspective: d.form.template.perspective,
     length: `${d.form.items.length} questions · about ${d.survey.minutes} minutes`,
   };
 }
 
 export function passage(d = DATA) {
-  return { title: `Please read ${passageNames(d.survey.passages)} first`, verses: d.passage.verses, page: `Page ${d.passage.page} of ${d.passage.pages}` };
+  const named = d.survey.passages?.length ? passageNames(d.survey.passages) : "the passage";
+  return { title: `Please read ${named} first`, verses: d.passage.verses || [], page: d.passage.pages > 1 ? `Page ${d.passage.page} of ${d.passage.pages}` : "", list: d.passage.list || [] };
 }
 
 // The count is the fields drawn (aboutFields), never a stored number; one field reads "1 question, optional"; no field, no line.
@@ -90,7 +92,7 @@ export function question(q, d = DATA) {
   const n = questionNumber(q, d);
   if (!n) throw new TypeError(`participant fixture: no item "${d.current}"`);
   const item = all[n - 1];
-  return { item, n, total: all.length, of: fill(UI_EN.questionOf, { n, total: all.length }), perspective: d.form.template.perspective, options: choices(item), value: d.answers[item.id] };
+  return { item, n, total: all.length, of: fill(UI_EN.questionOf, { n, total: all.length }), perspective: d.form.template.perspective, options: choices(item, d), value: d.answers[item.id] };
 }
 // ?q= read from the page URL (the route passes only phone, theme and state); undefined where there is none.
 export const qParam = (from = globalThis.location?.search ?? "") => new URLSearchParams(from).get("q") ?? undefined;
@@ -99,13 +101,18 @@ export const qParam = (from = globalThis.location?.search ?? "") => new URLSearc
 export function review(all = false, d = DATA) {
   const ids = all ? d.form.items.map((i) => i.id) : d.reviewShown;
   const n = (id) => d.form.items.findIndex((i) => i.id === id) + 1;
-  return { rows: ids.map((id) => ({ id, n: n(id), q: itemById(id).text, a: reviewAnswer(asShown(itemById(id)), d.answers[id]) })), total: d.form.items.length, all };
+  return { rows: ids.map((id) => ({ id, n: n(id), q: itemById(id, d).text, a: reviewAnswer(asShown(itemById(id, d), d), d.answers[id], d.answers._other?.[id]) })), total: d.form.items.length, all };
 }
 
 // PProblem vs PProblemBusy: the app's own rate-limit test picks the state from the fixture's error; ?state=busy forces it; any other
 // ?state= is ignored. The busy bar is the retry attempts (attempt of attempts): decorative, the retry line is the live text.
 export function problem(state, d = DATA) {
   const s = pickState(state, ["busy"]);
+  // Live: the journey's own unavailable state (ui/participate/controller.js): rateLimited -> busy with its wait; else the notice it chose.
+  if (d.live) {
+    const busy = s === "busy" || d.rateLimited;
+    return busy ? { busy: true, attempt: 1, attempts: 3, retry: d.retryAfter ? `You can try again in ${d.retryAfter} s` : "You can try again in a moment", diag: d.notice || "", closedOn: "", receipt: d.receipt } : { busy: false, closedOn: "", receipt: d.receipt, notice: d.notice || "" };
+  }
   const busy = s === "busy" || (s === undefined && isRateLimited(d.problem.error.status, d.problem.error.code));
   if (!busy) return { busy: false, closedOn: d.problem.closedOn, receipt: d.receipt };
   const b = d.busy;

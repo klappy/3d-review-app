@@ -10,7 +10,8 @@
   import Button from "../../Button.svelte";
   import Icon from "../../Icon.svelte";
   import { P } from "./icons.js";
-  let { phone = false, label, href, primary = true, lead, trail, back, backLabel = "Back", backLead, onback } = $props();
+  // onaction (optional, live mode): runs instead of the main link's navigation (submit, redeem, interview another); the link stays a link.
+  let { phone = false, label, href, primary = true, lead, trail, back, backLabel = "Back", backLead, onback, onaction, disabled = false } = $props();
   const glyph = (k) => {
     if (k === undefined) return undefined;
     if (!Object.hasOwn(P, k)) throw new TypeError(`ParticipantActions: unknown icon "${k}"`);
@@ -22,7 +23,11 @@
     return { label, lead: glyph(lead), trail: glyph(trail), back: glyph(backLead) };
   });
   const listen = (el) => {
-    const f = (e) => { if (onback && back && e.target instanceof Element && e.target.closest(".btn-quiet")) onback(); };
+    const f = (e) => {
+      if (!(e.target instanceof Element)) return;
+      if (onback && back && e.target.closest(".btn-quiet")) return onback();
+      if (onaction && e.target.closest(".btn:not(.btn-quiet)")) { e.preventDefault(); if (!disabled) onaction(); }
+    };
     el.addEventListener("click", f);
     return () => el.removeEventListener("click", f);
   };
