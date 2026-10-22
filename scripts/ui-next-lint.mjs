@@ -80,10 +80,12 @@ function walk(dir, root = dir) {
 
 export function lintDir(dir) {
   const result = new Map();
-  for (const f of walk(dir)) {
+  const files = walk(dir);
+  for (const f of files) {
     const v = lintText(basename(f), readFileSync(f, "utf8"));
     if (v.length) result.set(relative(dir, f), v);
   }
+  result.scanned = files.length; // so the report says how many files were read, not only how many had violations
   return result;
 }
 
@@ -96,7 +98,7 @@ export function report(result) {
     for (const k of v) c.set(k, (c.get(k) ?? 0) + 1);
     lines.push(`${f}: ` + [...c].map(([k, n]) => (n > 1 ? `${k} ×${n}` : k)).join("; "));
   }
-  lines.push("", `${tot} violations in ${result.size} files`);
+  lines.push("", `${tot} violations in ${result.size} files` + (result.scanned != null ? ` (${result.scanned} scanned)` : ""));
   return { text: lines.join("\n"), total: tot };
 }
 

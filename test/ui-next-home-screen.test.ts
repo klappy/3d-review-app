@@ -108,23 +108,23 @@ describe("copy rows present verbatim (C01-C12)", () => {
 
 describe("/next/ router and the ui_next flag", () => {
   const p = (q: string) => new URLSearchParams(q);
-  it("off by default: /next/ is the gallery", () => {
-    expect(route(p(""), store()).view).toBe("components");
-    expect(route(p(""), undefined).view).toBe("components");
+  it("live by default (captain's ruling 2026-10-22, demo): bare /next/ is Home, with or without storage", () => {
+    expect(route(p(""), store()).view).toBe("home");
+    expect(route(p(""), undefined).view).toBe("home");
   });
-  it("?ui_next=on sets the flag and shows Home; it persists; ?ui_next=off clears it", () => {
+  it("?ui_next=off stores the opt-out and shows the gallery; it persists; ?ui_next=on clears it", () => {
     const s = store();
+    expect(route(p("?ui_next=off"), s).view).toBe("components");
+    expect(route(p(""), s).view).toBe("components");
     expect(route(p("?ui_next=on"), s)).toEqual({ view: "home", props: { state: "reviews", phone: false, theme: "light" } });
     expect(route(p(""), s).view).toBe("home");
-    expect(flagOn(p("?ui_next=off"), s)).toBe(false);
-    expect(route(p(""), s).view).toBe("components");
   });
-  it("localStorage.ui_next === 'on' turns Home on; other values do not", () => {
-    const s = store(); s.setItem("ui_next", "on"); expect(route(p(""), s).view).toBe("home");
-    s.setItem("ui_next", "yes"); expect(route(p(""), s).view).toBe("components");
+  it("localStorage.ui_next === 'off' turns the gallery on; other values keep Home", () => {
+    const s = store(); s.setItem("ui_next", "off"); expect(route(p(""), s).view).toBe("components");
+    s.setItem("ui_next", "yes"); expect(route(p(""), s).view).toBe("home");
   });
-  it("gallery pages stay reachable with the flag on; state, phone and theme pass through", () => {
-    const s = store(); s.setItem("ui_next", "on");
+  it("gallery pages stay reachable; state, phone and theme pass through", () => {
+    const s = store();
     expect(route(p("?page=components"), s).view).toBe("components");
     expect(route(p("?page=layouts"), s).view).toBe("layouts");
     expect(route(p("?page=home"), s).view).toBe("home-parts");
@@ -137,18 +137,18 @@ describe("/next/ router and the ui_next flag", () => {
         view: "home", props: { state: "reviews", phone: true, theme: "dark" },
       });
       expect(flagOn(p("?ui_next=off"), unavailable)).toBe(false);
-      expect(route(p(""), unavailable).view).toBe("components");
+      expect(route(p(""), unavailable).view).toBe("home");
     }
     const ignoredWrites = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
-    expect(route(p("?ui_next=on"), ignoredWrites).view).toBe("home");
-    expect(route(p(""), ignoredWrites).view).toBe("components");
-    const stale = { getItem: () => "on", setItem: () => {}, removeItem: () => { throw new Error("blocked"); } };
-    expect(flagOn(p("?ui_next=off"), stale)).toBe(false);
+    expect(route(p("?ui_next=off"), ignoredWrites).view).toBe("components");
+    expect(route(p(""), ignoredWrites).view).toBe("home");
+    const stale = { getItem: () => "off", setItem: () => { throw new Error("blocked"); }, removeItem: () => {} };
+    expect(flagOn(p("?ui_next=on"), stale)).toBe(true);
   });
   it("a storage that throws falls back to the query alone", () => {
     const bad = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); }, removeItem: () => {} };
     expect(route(p("?ui_next=on"), bad).view).toBe("home");
-    expect(route(p(""), bad).view).toBe("components");
+    expect(route(p(""), bad).view).toBe("home");
   });
 });
 

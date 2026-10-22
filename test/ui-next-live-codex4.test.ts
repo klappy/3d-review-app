@@ -1,0 +1,236 @@
+// @vitest-environment jsdom
+// UI Next (v4) live wiring: Codex review findings on 112a0f6e (status: provisional). Report list paging and the newest-by-time
+// choice, the report build's dry-run confirm before execute, Setup 5's blocked launch, viewer-safe Results / Results held actions,
+// the results review's language and (absent) closure date, and the Project model's honest workspace, trend gaps and surfaced failures.
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, waitFor } from "@testing-library/svelte";
+// @ts-expect-error -- plain .js module, no type declarations
+import { reports, newestReport, resultsModel, projectModel, setupModel, shortDate } from "../ui-next/src/app/data.js";
+// @ts-expect-error -- plain .js module, no type declarations
+import { forget } from "../ui-next/src/app/session.js";
+// @ts-expect-error -- plain .js module, no type declarations
+import { to } from "../ui-next/src/app/router.js";
+import Live from "../ui-next/src/app/Live.svelte";
+import Results from "../ui-next/src/screens/results/Results.svelte";
+import ResultsHeld from "../ui-next/src/screens/results/ResultsHeld.svelte";
+import Setup5 from "../ui-next/src/screens/setup/Setup5.svelte";
+import Project from "../ui-next/src/screens/setup/Project.svelte";
+// @ts-expect-error -- plain .js module, no type declarations
+import { REPORT } from "../ui-next/src/screens/results/data.js";
+import projectFixture from "../ui-next/fixtures/setup/project.json";
+import setupFixture from "../ui-next/fixtures/setup/setup.json";
+
+type Call = { method: string; url: string; body: unknown };
+type Route = (url: string, body: unknown, method: string) => unknown;
+const realFetch = globalThis.fetch;
+const calls: Call[] = [];
+// A fake /v2: `routes` maps "METHOD path" (query included) to a result or a function of (url, body); a missing route answers 404.
+const serve = (routes: Record<string, unknown | Route>) => {
+  calls.length = 0;
+  globalThis.fetch = (async (url: string, init: RequestInit = {}) => {
+    const method = init.method ?? "GET"; const body = init.body ? JSON.parse(String(init.body)) : undefined;
+    calls.push({ method, url, body });
+    const key = `${method} ${url}`; const r = routes[key] ?? routes[`${method} ${url.split("?")[0]}`];
+    if (r === undefined) return new Response(JSON.stringify({ ok: false, error: { code: "NOT_FOUND", message: `no route ${key}` } }), { status: 404, headers: { "content-type": "application/json" } });
+    if (r instanceof Error) return new Response(JSON.stringify({ ok: false, error: { code: "FAILED", message: r.message } }), { status: 500, headers: { "content-type": "application/json" } });
+    const result = typeof r === "function" ? (r as Route)(url, body, method) : r;
+    return new Response(JSON.stringify({ ok: true, result }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+};
+afterEach(() => { globalThis.fetch = realFetch; forget(); });
+
+const AID = "asm_1", PID = "prj_1";
+const payload = { lenses: [{ lens: "Translation Team", score: 80, sub_dimensions: [] }, { lens: "Community", score: 50, sub_dimensions: [] }], cross_lens_multi: [] };
+const assessment = (over: Record<string, unknown> = {}) => ({ assessment: { id: AID, project_id: PID, name: "Mark 1–4", stage: "understand", format: "written", language_id: "lang_1", role: "owner", created_at: "2026-10-01T00:00:00Z", ...over }, surveys: [{ id: "s1", perspective: "Translation Team", template_name: "Translators" }, { id: "s2", perspective: "Community", template_name: "Community" }] });
+const counts = { survey: {}, counts: { responses: 4, respondents: 4 } };
+const base = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+  "GET /v2/me": { principal: { id: "p1", display_name: "Kay Facilitator" } },
+  [`GET /v2/assessments/${AID}`]: assessment(),
+  [`GET /v2/assessments/${AID}/results`]: { status: "ready" },
+  [`GET /v2/projects/${PID}`]: { project: { id: PID, name: "Kikuyu", workspace_id: null } },
+  [`GET /v2/projects/${PID}/languages`]: { languages: [{ id: "lang_1", name: "Kikuyu" }] },
+  [`GET /v2/assessments/${AID}/surveys/s1`]: counts, [`GET /v2/assessments/${AID}/surveys/s2`]: counts,
+  // Three pages of five, ordered by id (report.ts list): the newest by created_at sits on the last page under an early id.
+  [`GET /v2/assessments/${AID}/reports`]: { reports: [1, 2, 3, 4, 5].map((n) => ({ id: `rep_0${n}`, created_at: `2026-10-0${n}T00:00:00Z` })), next_cursor: "c1" },
+  [`GET /v2/assessments/${AID}/reports?cursor=c1`]: { reports: [6, 7, 8, 9].map((n) => ({ id: `rep_0${n}`, created_at: `2026-10-0${n}T00:00:00Z` })).concat([{ id: "rep_10", created_at: "2026-10-10T00:00:00Z" }]), next_cursor: "c2" },
+  [`GET /v2/assessments/${AID}/reports?cursor=c2`]: { reports: [{ id: "rep_11", created_at: "2026-10-20T00:00:00Z" }], next_cursor: null },
+  "GET /v2/reports/rep_11": { report: { id: "rep_11", created_at: "2026-10-20T00:00:00Z", payload } },
+  ...over,
+});
+
+describe("report list paging (P1)", () => {
+  it("reports() follows next_cursor until exhausted and the newest report is chosen by created_at, not by the first page's ids", async () => {
+    serve(base());
+    const r = await reports(AID);
+    expect(r.reports).toHaveLength(11); expect(r.next_cursor).toBeNull();
+    expect(calls.filter((c) => c.url.includes("/reports")).map((c) => c.url)).toEqual([`/v2/assessments/${AID}/reports`, `/v2/assessments/${AID}/reports?cursor=c1`, `/v2/assessments/${AID}/reports?cursor=c2`]);
+    expect(newestReport(r.reports)?.id).toBe("rep_11");
+    expect(newestReport([{ id: "a", created_at: "2026-01-02" }, { id: "b", created_at: "2026-01-03" }, { id: "c", created_at: "2026-01-01" }])?.id).toBe("b");
+    expect(newestReport([])).toBeNull();
+    const m = await resultsModel(AID);
+    expect(m.reportId).toBe("rep_11"); expect(m.review.builtOn).toBe(shortDate("2026-10-20T00:00:00Z"));
+  });
+});
+
+describe("resultsModel (P2: language, closure date, role flags)", () => {
+  it("resolves language_id through the project's languages as Collect does, labels no created_at as a close date, and carries the role flags", async () => {
+    serve(base());
+    const m = await resultsModel(AID);
+    expect(m.review.language).toBe("Kikuyu");
+    expect(m.review.closed).toBe(""); expect(m.review.closedLong).toBe("");
+    expect(m.canBuild).toBe(true); expect(m.canReadResponses).toBe(true); expect(m.canReopen).toBe(true); expect(m.review.canReadResponses).toBe(true);
+    serve(base({ [`GET /v2/assessments/${AID}`]: assessment({ role: "viewer", language_name: "Gikuyu" }) }));
+    const v = await resultsModel(AID);
+    expect(v.review.language).toBe("Gikuyu"); expect(calls.some((c) => c.url.endsWith("/languages"))).toBe(false);
+    expect(v.canBuild).toBe(false); expect(v.canReadResponses).toBe(false); expect(v.canReopen).toBe(false); expect(v.review.canReopen).toBe(false);
+  });
+  it("Results: a viewer gets no See the answers link (desktop cards) and a disabled button with its reason (phone); Results held: a viewer's Reopen collection is disabled with its reason, no See the answers so far", () => {
+    const live = { review: { ...REPORT.desktop.review, closed: "", canReadResponses: false, canReopen: false }, counts: REPORT.desktop.counts, payload: REPORT.desktop.payload, gaps: REPORT.desktop.gaps, radar: REPORT.desktop.radar, lookNext: [] };
+    const d = render(Results as never, { props: { report: live } }).container;
+    expect(d.textContent).not.toContain("See the answers");
+    expect(d.textContent).toContain("Collection closed"); expect(d.textContent).not.toMatch(/Closed\s+·/);
+    const p = render(Results as never, { props: { report: live, phone: true } }).container;
+    const b = [...p.querySelectorAll("button")].find((x) => x.textContent?.trim() === "See the answers") as HTMLButtonElement;
+    expect(b.disabled).toBe(true); expect(p.querySelector(`#${b.getAttribute("aria-describedby")}`)?.textContent).toContain("Owners and members");
+    expect(p.querySelector('a[href*="results-answers"]')).toBeNull();
+    const ok = render(Results as never, { props: { report: { ...live, review: { ...live.review, canReadResponses: true } } } }).container;
+    expect(ok.querySelectorAll('a[href*="results-answers"]').length).toBeGreaterThan(0);
+    const held = { review: { ...REPORT.desktop.review, closed: "", canReadResponses: false, canReopen: false }, counts: { team: 2, community: 1, church: 0 }, payload: REPORT.desktop.payload, held: null };
+    const h = render(ResultsHeld as never, { props: { report: held } }).container;
+    const prim = h.querySelector(".btn-primary") as HTMLButtonElement;
+    expect(prim.tagName).toBe("BUTTON"); expect(prim.disabled).toBe(true); expect(h.querySelector("#primary-why")?.textContent).toContain("owner or member");
+    expect(h.querySelector('a[href*="share"]')).toBeNull();
+    const hp = render(ResultsHeld as never, { props: { report: held, phone: true } }).container;
+    expect((hp.querySelector(".phone-bar .btn-primary") as HTMLButtonElement).disabled).toBe(true); expect(hp.textContent).not.toContain("See the answers so far"); expect(hp.querySelector("#reopen-why")?.textContent).toContain("owner or member");
+    const hm = render(ResultsHeld as never, { props: { report: { ...held, review: { ...held.review, canReopen: true, canReadResponses: true } } } }).container;
+    expect(hm.querySelector("a.btn-primary")?.getAttribute("href")).toContain("share"); expect(hm.textContent).not.toContain("owner or member");
+  });
+});
+
+describe("projectModel (P2: workspace, trend gaps, surfaced failures)", () => {
+  const reviews = { assessments: [
+    { id: "a1", name: "First", stage: "improve", created_at: "2026-08-01T00:00:00Z", role: "owner" },
+    { id: "a2", name: "Second", stage: "understand", created_at: "2026-09-01T00:00:00Z", role: "owner" },
+  ] };
+  const two = { assessment: { id: "a1", project_id: PID, stage: "improve", role: "owner" }, surveys: [{ id: "s1", perspective: "Translation Team" }, { id: "s2", perspective: "Community" }] };
+  const one = { assessment: { id: "a2", project_id: PID, stage: "understand", role: "owner" }, surveys: [{ id: "s1", perspective: "Translation Team" }] };
+  const big = { survey: {}, counts: { responses: 6, respondents: 6 } };
+  const routes = (over: Record<string, unknown> = {}) => ({
+    "GET /v2/workspaces": { workspaces: [{ id: "ws_1", name: "Africa" }] },
+    [`GET /v2/projects/${PID}`]: { project: { id: PID, name: "Kikuyu", workspace_id: null } },
+    [`GET /v2/projects/${PID}/assessments`]: reviews,
+    "GET /v2/assessments/a1": two, "GET /v2/assessments/a2": one,
+    "GET /v2/assessments/a1/surveys/s1": big, "GET /v2/assessments/a1/surveys/s2": big, "GET /v2/assessments/a2/surveys/s1": big,
+    "GET /v2/assessments/a1/reports": { reports: [{ id: "r1", created_at: "2026-08-02T00:00:00Z" }], next_cursor: null },
+    "GET /v2/assessments/a2/reports": { reports: [{ id: "r2", created_at: "2026-09-02T00:00:00Z" }], next_cursor: null },
+    "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload } },
+    "GET /v2/reports/r2": { report: { id: "r2", created_at: "2026-09-02T00:00:00Z", payload: { lenses: [payload.lenses[0]] } } },
+    ...over,
+  });
+  it("a project with workspace_id null is not shown under the first workspace; a lens a review never surveyed is a null trend point, which the Project chart skips", async () => {
+    serve(routes());
+    const m = await projectModel(PID);
+    expect(m.workspace.name).toBe("No workspace");
+    expect(m.trend.lines.team).toEqual(["strong", "strong"]);
+    expect(m.trend.lines.community).toEqual(["support", null]);
+    const a = render(Project as never, { props: { data: m } }).container;
+    const team = a.querySelectorAll('circle[data-lens="team"]').length; // the chart may be drawn once per layout; the gap is one point fewer per drawing
+    expect(team).toBeGreaterThan(0);
+    expect(a.querySelectorAll('circle[data-lens="community"]').length).toBeLessThan(team);
+    expect(a.querySelectorAll('polyline[data-lens="community"]').length).toBe(a.querySelectorAll('polyline[data-lens="team"]').length);
+    serve(routes({ [`GET /v2/projects/${PID}`]: { project: { id: PID, name: "Kikuyu", workspace_id: "ws_1" } } }));
+    expect((await projectModel(PID)).workspace.name).toBe("Africa");
+    // The fixture still draws; a line with an inner gap draws two runs.
+    const gap = { ...projectFixture, trend: { ...projectFixture.trend, lines: { ...projectFixture.trend.lines, church: ["strong", null, "growing", "support"] } } };
+    const g = render(Project as never, { props: { data: gap } }).container;
+    expect(g.querySelectorAll('polyline[data-lens="church"]').length).toBe(2);
+    expect(g.querySelectorAll('circle[data-lens="church"]').length).toBe(4); // three points plus the legend dot;
+  });
+  it("a review's report list or count failing to read rejects the model (the shell's retryable error), never a review without levels", async () => {
+    serve(routes({ "GET /v2/assessments/a2/reports": new Error("list down") }));
+    await expect(projectModel(PID)).rejects.toThrow("list down");
+    serve(routes({ "GET /v2/assessments/a1/surveys/s2": new Error("count down") }));
+    await expect(projectModel(PID)).rejects.toThrow("count down");
+  });
+});
+
+describe("Setup 5 launch (P2)", () => {
+  it("setupModel says why a launch is blocked (viewer role, no surveys) and Setup5 draws a disabled primary with the reason instead of a link to Collect", async () => {
+    const prep = (over: Record<string, unknown>, surveys: unknown[]) => ({
+      [`GET /v2/assessments/${AID}`]: { assessment: { id: AID, project_id: PID, name: "Mark 1–4", stage: "prepare", format: "written", role: "owner", created_at: "2026-10-01T00:00:00Z", ...over }, surveys },
+      [`GET /v2/projects/${PID}`]: { project: { id: PID, name: "Kikuyu" } },
+      [`GET /v2/assessments/${AID}/passages`]: { passages: [] },
+      [`GET /v2/assessments/${AID}/surveys/s1`]: counts,
+    });
+    serve(prep({ role: "viewer" }, [{ id: "s1", perspective: "Translation Team", template_name: "Translators" }]));
+    const viewer = await setupModel(AID);
+    expect(viewer.canLaunch).toBe(false); expect(viewer.launchBlocked).toMatch(/owner or member/);
+    serve(prep({}, []));
+    const none = await setupModel(AID);
+    expect(none.canLaunch).toBe(false); expect(none.launchBlocked).toMatch(/at least one survey/);
+    serve(prep({}, [{ id: "s1", perspective: "Translation Team", template_name: "Translators" }]));
+    const ok = await setupModel(AID);
+    expect(ok.canLaunch).toBe(true); expect(ok.launchBlocked).toBe("");
+    for (const phone of [false, true]) {
+      const a = render(Setup5 as never, { props: { data: viewer, phone } }).container;
+      const prim = a.querySelector(".btn-primary") as HTMLButtonElement;
+      expect(prim.tagName).toBe("BUTTON"); expect(prim.disabled).toBe(true); expect(prim.textContent).toContain("Launch the survey");
+      expect(a.querySelector(`#${prim.getAttribute("aria-describedby")}`)?.textContent).toMatch(/owner or member/);
+      expect(a.querySelector('a[href*="collect"]')).toBeNull();
+      const live = render(Setup5 as never, { props: { data: ok, phone } }).container;
+      expect(live.querySelector(".btn-primary")?.tagName).toBe("A");
+    }
+    expect(render(Setup5 as never, { props: { data: setupFixture } }).container.querySelector(".btn-primary")?.tagName).toBe("A"); // the fixture: unchanged
+  });
+});
+
+describe("report build confirm (P1: Live.svelte)", () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  it("Build the report and Refresh with new answers run the dry run, show the response count and build only after Build the results; Not now builds nothing", async () => {
+    let executed = 0;
+    const post = (_u: string, body: { mode: string; confirm_token?: string }) => {
+      if (body.mode === "dry_run") return { assessment_id: AID, suppressed: false, status: "ready", confirm_token: "tok_1", expires_in: 60 };
+      executed++; expect(body.confirm_token).toBe("tok_1"); return { assessment_id: AID, suppressed: false, report: { id: "rep_new", created_at: "2026-10-21T00:00:00Z", payload } };
+    };
+    // No report yet: the not-built page offers Build the report.
+    serve(base({ [`GET /v2/assessments/${AID}/reports`]: { reports: [], next_cursor: null }, [`POST /v2/assessments/${AID}/reports`]: post }));
+    globalThis.location.hash = to("results", { aid: AID });
+    const a = render(Live as never, { props: {} }).container;
+    await waitFor(() => expect(a.textContent).toContain("No report has been built"));
+    const trigger = [...a.querySelectorAll("button")].find((b) => b.textContent === "Build the report")!;
+    await fireEvent.click(trigger);
+    await waitFor(() => expect(a.querySelector("[data-confirm-text]")).not.toBeNull());
+    expect(a.querySelector("[data-confirm-text]")!.textContent).toBe("Build results from 8 responses? Everyone with access can see them.");
+    expect(calls.filter((c) => c.method === "POST").map((c) => (c.body as { mode: string }).mode)).toEqual(["dry_run"]);
+    expect(executed).toBe(0);
+    expect(a.querySelectorAll(".btn-primary").length).toBe(1); // the confirm takes the page's one primary; the trigger is gone
+    await fireEvent.click(a.querySelector("[data-cancel-report]")!);
+    await flush();
+    expect(a.querySelector("[data-confirm-text]")).toBeNull(); expect(executed).toBe(0);
+    expect(a.textContent).toContain("Cancelled. Nothing was built.");
+    await fireEvent.click([...a.querySelectorAll("button")].find((b) => b.textContent === "Build the report")!);
+    await waitFor(() => expect(a.querySelector("[data-confirm-report]")).not.toBeNull());
+    // The built report is read back on the reload.
+    (globalThis.fetch as unknown as { routes?: unknown }); serve(base({ [`GET /v2/assessments/${AID}/reports`]: { reports: [{ id: "rep_new", created_at: "2026-10-21T00:00:00Z" }], next_cursor: null }, "GET /v2/reports/rep_new": { report: { id: "rep_new", created_at: "2026-10-21T00:00:00Z", payload } }, [`POST /v2/assessments/${AID}/reports`]: post }));
+    await fireEvent.click(a.querySelector("[data-confirm-report]")!);
+    await waitFor(() => expect(executed).toBe(1));
+    await waitFor(() => expect(a.textContent).toContain("Refresh with new answers"));
+    // Refresh with new answers: the same preview → confirm → execute; nothing is built before the confirm.
+    await fireEvent.click([...a.querySelectorAll("button")].find((b) => b.textContent?.includes("Refresh with new answers"))!);
+    await waitFor(() => expect(a.querySelector("[data-confirm-text]")).not.toBeNull());
+    expect(executed).toBe(1);
+    expect(a.querySelector("[data-confirm-report]")!.classList.contains("btn-primary")).toBe(false); // Results keeps its one primary (Plan the next step)
+    await fireEvent.click(a.querySelector("[data-confirm-report]")!);
+    await waitFor(() => expect(executed).toBe(2));
+  });
+  it("a held dry run builds nothing and says so", async () => {
+    serve(base({ [`GET /v2/assessments/${AID}/reports`]: { reports: [], next_cursor: null }, [`POST /v2/assessments/${AID}/reports`]: () => ({ assessment_id: AID, suppressed: true, status: "held", responses_in: 2, responses_needed: 3 }) }));
+    globalThis.location.hash = to("results", { aid: AID });
+    const a = render(Live as never, { props: {} }).container;
+    await waitFor(() => expect(a.textContent).toContain("No report has been built"));
+    await fireEvent.click([...a.querySelectorAll("button")].find((b) => b.textContent === "Build the report")!);
+    await waitFor(() => expect(a.textContent).toContain("can’t be built yet"));
+    expect(a.querySelector("[data-confirm-text]")).toBeNull();
+    expect(calls.filter((c) => c.method === "POST").length).toBe(1);
+  });
+});

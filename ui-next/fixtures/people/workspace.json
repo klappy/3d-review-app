@@ -1,0 +1,24 @@
+{
+  "_source": "3d-review-cookbook design/2026-10-15-glass-redesign/canvas Workspace.dc.html, WorkspacePhone.dc.html, WorkspaceGroup.dc.html, WorkspaceGroupPhone.dc.html. The group dialog's candidates carry the caller's workspace role and DIRECT project role, the two inputs of ui/workspace-manager.js mayGroup().",
+  "user": { "first": "Bincy", "initials": "BK" },
+  "name": "Bridge Connectivity Solutions · India",
+  "short": "BCS · India",
+  "lead": "Projects this organisation runs or has been given access to. Partners never see each other's workspaces.",
+  "stats": [["Projects", 12], ["Languages", 9], ["Reviews collecting", 3], ["Results ready", 2], ["Completed this year", 7]],
+  "views": ["Active", "All", "Archived"],
+  "projects": [
+    { "title": "Hindi New Testament", "stage": "collecting", "language": "Hindi (hin)", "format": "Written", "formatIcon": "list", "orgs": [["BCS", true], ["Seed Company", false]], "reviews": 4, "responses": 86, "activity": "today", "levels": [["team", "growing"], ["community", "support"], ["church", "growing"]], "phone": "Hindi · Written" },
+    { "title": "Odia New Testament", "stage": "setup", "language": "Odia (ory)", "format": "Written", "formatIcon": "list", "orgs": [["BCS", true]], "reviews": 1, "responses": 0, "activity": "yesterday", "levels": null, "phone": "Odia · Written" },
+    { "title": "Kurubaru Scripture", "stage": "collecting", "language": "Kurubaru Yellavaru · Kurubaru Adi Dravida", "format": "Written · Oral", "formatIcon": "mic", "orgs": [["BCS", true], ["SIL", false]], "reviews": 2, "responses": 20, "activity": "3 days ago", "levels": null, "phone": "Kurubaru · Audio" },
+    { "title": "ISL Mark", "stage": "done", "language": "Indian Sign Language (ins)", "format": "Video", "formatIcon": "video", "orgs": [["BCS", true], ["Deaf Bible Society", false]], "reviews": 1, "responses": 15, "activity": "2 weeks ago", "levels": [["team", "strong"], ["community", "growing"], ["church", "more"]], "phone": "Indian Sign Language · Video" },
+    { "title": "Lao Old Testament", "stage": "setup", "language": "Lao (lao)", "format": "Audio", "formatIcon": "mic", "orgs": [["Partner · shared", true], ["unfoldingWord", false]], "reviews": 2, "responses": 12, "activity": "26 Sep", "levels": [["team", "growing"], ["community", "growing"], ["church", "support"]], "phone": "Lao · Audio" }
+  ],
+  "group": {
+    "workspaceRole": "member",
+    "candidates": [
+      { "title": "Psalms reading group", "directRole": "owner" },
+      { "title": "Kurubaru Scripture", "directRole": "owner" },
+      { "title": "Lao Old Testament", "directRole": null }
+    ]
+  }
+}

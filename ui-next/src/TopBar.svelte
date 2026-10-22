@@ -8,12 +8,15 @@
   import Button from "./Button.svelte";
   import Icon from "./Icon.svelte";
   import { I, accountItems } from "./icons.js";
+  import { liveChrome } from "./app/chrome.js";
   const VARIANTS = ["signed-in", "public"];
-  let { variant = "signed-in", crumbs = [], who = "Bincy", initials = "BK", workspace = "BCS · India", workspaces = ["BCS · India", "Seed Company · partners"], accountOpen = false, workspaceOpen = false, home = "#home", end = true } = $props();
+  // Live (app/chrome.js): the real account, workspace and menu are the defaults; the boards' values apply only with no live chrome.
+  const L = liveChrome();
+  let { variant = "signed-in", crumbs = [], who = L?.who ?? "Bincy", initials = L?.initials ?? "BK", workspace = L?.workspace ?? "BCS · India", workspaces = L?.workspaces ?? ["BCS · India", "Seed Company · partners"], accountOpen = false, workspaceOpen = false, home = L?.home ?? "#home", end = true, accountItems: acctOverride = L?.accountItems, workspaceItems = L?.workspaceItems } = $props();
   if (!VARIANTS.includes(variant)) throw new TypeError(`TopBar: unknown variant "${variant}" (flow, document and room are not ported yet)`);
   if (variant === "public" && crumbs.length) throw new TypeError("TopBar: the public variant has no breadcrumb");
-  const acctItems = accountItems(); // built once per page load from location.search (every screen change reloads)
-  const wsItems = $derived([{ kind: "micro", label: "Your workspaces" }, ...workspaces.map((w) => ({ label: w, href: "#workspace" }))]);
+  const acctItems = $derived(acctOverride ?? accountItems()); // live mode passes the real account; the gallery builds the fixture menu
+  const wsItems = $derived(workspaceItems ?? [{ kind: "micro", label: "Your workspaces" }, ...workspaces.map((w) => ({ label: w, href: "#workspace" }))]);
 </script>
 
 {#snippet help()}<Icon d={I.help} />{/snippet}

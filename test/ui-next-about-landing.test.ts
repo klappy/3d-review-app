@@ -174,9 +174,9 @@ describe("/next/ routes for About and Landing", () => {
     expect(route(p("?screen=home"), on()).view).toBe("home");
     expect(route(p("?screen=nope"), on()).view).toBe("home");
   });
-  it("flag off: the screens stay behind the gallery", () => {
-    expect(route(p("?screen=about"), undefined).view).toBe("components");
-    expect(route(p("?screen=landing"), undefined).view).toBe("components");
+  it("opted out (?ui_next=off this navigation): the screens stay behind the gallery", () => {
+    expect(route(p("?screen=about&ui_next=off"), undefined).view).toBe("components");
+    expect(route(p("?screen=landing&ui_next=off"), undefined).view).toBe("components");
   });
   it("Home's account menu reaches About through href(): ui_next stays on and w/theme carry (setup N8)", () => {
     const about = (from: string) => accountItems(from).find((i: { label?: string }) => i.label === "Why 3D Review exists").href;
@@ -285,8 +285,12 @@ it("a short phone page fills the viewport so the sticky bar sits at its foot; de
     expect(getComputedStyle(app.querySelector("main.l-phone")!).flexGrow).toBe("1");
     expect(shell.lastElementChild!.matches(".phone-bar")).toBe(true);
     expect(getComputedStyle(shell.lastElementChild!).position).toBe("sticky");
+    // Desktop fills the viewport the same way (type.css): the board frame is 1280x800, so the live shell must be at least one viewport
+    // tall for main.l-main[data-rhythm=center] (QR room) to centre as the board does.
     const desk = mount(About, {});
-    expect(getComputedStyle(desk).display).not.toBe("flex");
+    expect(getComputedStyle(desk).display).toBe("flex");
+    expect(getComputedStyle(desk).flexDirection).toBe("column");
     expect(getComputedStyle(desk).minHeight).toBe("100vh");
+    expect(getComputedStyle(desk.querySelector(":scope > .l-shell")!).flexGrow).toBe("1");
   } finally { style.remove(); }
 });

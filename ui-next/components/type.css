@@ -1,5 +1,9 @@
 
-.app.l-screen{min-height:100vh}
+/* The board frame is a fixed 1280x800 drawing, so .l-shell's height:100% fills it. Live desktop pages have no frame: .app is at least
+   one viewport tall, the shell grows to fill it, and main.l-main[data-rhythm=center] (QR room) centres its stack the way the board
+   does. Same mechanism phone.css already gives the phone screen. */
+.app.l-screen{display:flex;flex-direction:column;min-height:100vh}
+.app.l-screen>.l-shell{flex:1 0 auto}
 /* Script focus targets (design-system.md section 2 "Dialog and sheet states", R14 Focus on open and Focus return): a dialog or page
    title with tabindex="-1" takes focus so a screen reader starts there (Print, PrintQR). It is a heading, not a control, and never
    in the Tab order, so it draws no ring: not the browser's default ring (a black or white box on arrival), not the kit's. Tab moves

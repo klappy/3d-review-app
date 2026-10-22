@@ -2,21 +2,26 @@
 // Flag (glass-v4 ASK option 1): off by default, core team only. On when localStorage.ui_next === "on", or when the URL carries
 // ?ui_next=on (which stores it); ?ui_next=off clears it. Client-only: no server change. Gallery pages stay at ?page=components|layouts|home.
 export const FLAG = "ui_next";
+// Entry contract for /next/ (main.js): the live app mounts only with the flag on (stored opt-in or ?ui_next=on this navigation) and no
+// explicit fixture selection (?screen= board, ?page= gallery); ?ui_next=off clears the opt-in and shows the gallery. Client-only.
+export function liveEntry(params, storage) {
+  return flagOn(params, storage) && !params.has("page") && !params.has("screen");
+}
 export function flagOn(params, storage) {
+  // Captain's ruling 2026-10-22 (demo): the live app is ON by default at bare /next/ — no ?ui_next=on, no stored opt-in needed.
+  // ?ui_next=off stores an opt-out (the gallery) for this browser; ?ui_next=on clears it. Fixture views stay explicit (?page=, ?screen=).
   const q = params.get(FLAG);
-  // An explicit query controls this navigation even when persistence is absent,
-  // blocked, or a storage implementation silently declines the write.
   if (q === "on" || q === "off") {
     try {
-      if (q === "on") storage?.setItem(FLAG, "on");
+      if (q === "off") storage?.setItem(FLAG, "off");
       else storage?.removeItem(FLAG);
     } catch { /* Persistence is optional for the current URL. */ }
     return q === "on";
   }
   try {
-    return storage?.getItem(FLAG) === "on";
+    return storage?.getItem(FLAG) !== "off";
   } catch {
-    return false;
+    return true;
   }
 }
 // Screens under the flag: ?screen=home (default) | about | landing (Landing = the signed-out entry; About from Landing and Home's account menu).

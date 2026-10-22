@@ -1,0 +1,53 @@
+<!-- UI Next (v4) Close collection screen. Status: provisional (playbook rule 12). Mock data: ui-next/fixtures/collect/collect.json.
+     Boards (cookbook design/2026-10-15-glass-redesign/canvas): CloseCollection.dc.html (desktop dialog over the review's survey groups),
+     CloseCollectionPhone.dc.html (phone sheet over the Collect card). Contract: "Dialog and sheet states" (R14): destructive confirm,
+     native modal <dialog>, title row with the visible Close (desktop title .h2.t-24, the §1.2 dialog-heading row); focus opens on the least destructive action ("Keep collecting", autofocus);
+     Close, Escape and the backdrop go back to Collect; the confirm reads "Yes, …" (0.22.7).
+     One .btn-primary: the dialog's / sheet's own "Yes, close and see results"; the head Share and the phone bar go secondary behind it.
+     "Every perspective has at least 3 answers, so results can show" is said only when it is true (0.27.0 held line): there is at
+     least one perspective and each has 3 (never vacuously, with none). Counts read "1 response is in" / "N responses are in".
+     The boards draw one state (the open confirm): any ?state= renders it. -->
+<script>
+  import Button from "../../Button.svelte";
+  import ReviewFrame from "./ReviewFrame.svelte";
+  import SurveyGroups from "./SurveyGroups.svelte";
+  import CollectPhoneCard from "./CollectPhoneCard.svelte";
+  import Dialog from "./Dialog.svelte";
+  import Glyph from "./Glyph.svelte";
+  import { collectModel, plural } from "./model.js";
+  import { href } from "../href.js";
+  import fixture from "../../../fixtures/collect/collect.json";
+
+  // onclose (live): closes collection for real (POST /stage understand) before going to the results; the link stays a link.
+  let { phone = false, theme = "light", data = fixture, onclose } = $props();
+  const closing = (el) => { const f = (e) => { if (onclose && e.target instanceof Element && e.target.closest(".btn-primary")) { e.preventDefault(); onclose(); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
+  const m = $derived(collectModel(data));
+  const enough = $derived(m.groups.length > 0 && m.groups.every((g) => g.answered >= 3));
+</script>
+
+{#snippet arrow()}<Glyph name="arrow" />{/snippet}
+{#snippet phoneTitle()}<h2 class="h2" id="close-title">Close collection now?</h2>{/snippet}
+{#snippet deskTitle()}<div class="l-stack" data-gap="4"><span class="icn icn-lens" data-lens="team"><Glyph name="lock" size={26} /></span><h2 class="h2 t-24" id="close-title">Close collection now?</h2></div>{/snippet}
+
+<ReviewFrame {m} {phone} {theme} shareKind="secondary">
+  {#if phone}
+    <CollectPhoneCard {m} />
+    <Dialog labelledby="close-title" cancel={href("collect")} sheet gap={3} title={phoneTitle}>
+      <p class="small">{m.countsUnavailable ? "Some response counts could not be read just now — reload before closing on a number." : `${m.answered} of ${m.expected} expected have answered.`} Links stop working; you can reopen later.</p>
+      <span class="l-stack" {@attach closing}><Button label="Yes, close and see results" variant="primary" lg block href={href("results")} /></span>
+      <!-- svelte-ignore a11y_autofocus -->
+      <a class="btn btn-quiet btn-block" href={href("collect")} autofocus>Keep collecting</a>
+    </Dialog>
+  {:else}
+    <SurveyGroups groups={m.groups} />
+    <Dialog labelledby="close-title" cancel={href("collect")} titleTop title={deskTitle}>
+      <p class="small t-15">Links and codes stop working and the review moves to <strong>Understand</strong>. {m.countsUnavailable ? "Some response counts could not be read just now — reload before closing on a number." : `${plural(m.answered, "response is", "responses are")} in.`} You can reopen collection later — results refresh when you do.</p>
+      {#if m.groups.length && !m.countsUnavailable}<div class="solid l-card l-stack"><span class="small">{m.byLens}.{#if enough}{" "}Every perspective has at least 3 answers, so results can show.{/if}</span></div>{/if}
+      <div class="l-row" data-gap="2" data-justify="end">
+        <!-- svelte-ignore a11y_autofocus -->
+        <a class="btn btn-quiet" href={href("collect")} autofocus>Keep collecting</a>
+        <span {@attach closing}><Button label="Yes, close and see results" variant="primary" lg href={href("results")} trail={arrow} /></span>
+      </div>
+    </Dialog>
+  {/if}
+</ReviewFrame>

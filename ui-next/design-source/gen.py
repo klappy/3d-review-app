@@ -52,7 +52,7 @@ details.dd>summary.dd-row{display:flex;justify-content:space-between;align-items
 .l-grid[data-tpl=aside-wide]{grid-template-columns:minmax(0,1fr) 380px;align-items:start}/* §8 Grid: work card + 380px aside (NextStep; the 340px aside is canvas-collect-gaps' aside) */
 .row-opt[data-kind=gap]{min-height:60px;display:grid;grid-template-columns:22px 230px 1fr 130px;gap:14px;align-items:center}/* §2 Option row, gap form: tick · area · mini barbell · bands apart (NextStep) */
 .l-card[data-accent=practice],.glass-hi[data-accent=practice]{border-top:var(--accent-bar) solid var(--b-support)}/* §2 practice copy accent bar (Sandbox simulate card) */
-.qr[data-size=plan]{width:72px}/* §2 QR on the plan's share line (ActionPlan) */
+.qr[data-size=plan]{width:72px;--qr-w:72px}/* §2 QR on the plan's share line (ActionPlan) */
 .link[data-tone=danger]{color:var(--b-urgent)}/* §2 Link, destructive tone (SandboxPhone "Delete this practice copy") */
 /* §2 Media card (captain 2026-10-20 22:29 ET, provisional): 16:10 dark frame, play affordance, title · duration line, caption */
 .l-media{border-radius:var(--radius-xl);padding:20px;display:flex;flex-direction:column;gap:14px}
@@ -65,7 +65,7 @@ details.dd>summary.dd-row{display:flex;justify-content:space-between;align-items
 .l-grid[data-tpl=aside-end]{grid-template-columns:minmax(0,1fr) 300px;align-items:start}.l-grid[data-tpl=aside-start]{grid-template-columns:260px minmax(0,1fr);align-items:start}/* §8 Grid: table + filter aside (Explore), section nav + article (Help) */
 .l-measure{max-width:720px}/* §8.3 reading measure inside a track (Help article) */
 .side-nav{position:sticky;top:var(--sp-5);display:flex;flex-direction:column;border-radius:var(--radius-l);padding:12px 18px}.side-nav a{display:flex;align-items:center;min-height:40px;color:var(--ink-2);font-weight:500}.side-nav a[aria-current]{font-weight:700}
-.l-card[data-pad=table]{border-radius:var(--radius-l);padding:8px 4px}.tbl-wrap{overflow-x:auto}.tbl{width:100%;border-collapse:collapse}.tbl td:first-child{font-weight:600}/* §2 Table: the card scrolls sideways, the page never does */
+.l-card[data-pad=table]{border-radius:var(--radius-l);padding:8px 4px}.l-card[data-pad=tile]{border-radius:var(--radius-xl);padding:var(--sp-4);display:flex;flex-direction:column}.qr-tile .h2{font-size:var(--t-20);line-height:26px;min-height:52px;text-align:center}.qr-tile .kbd{font-size:var(--t-14);letter-spacing:.04em}.qr-tile .micro{display:inline-flex;align-items:center;gap:8px;color:var(--ink);font-size:var(--t-14)}.qr-head .display{font-size:var(--t-56);line-height:56px}.qr-head .small{font-size:var(--t-20)}.qr-foot .small{font-size:var(--t-18)}.qr-tile-phone{gap:18px}.qr-tile-phone .lensdot{width:12px;height:12px}.qr-tile-phone .h2{font-size:var(--t-22)}.qr-tile-phone .qr-wrap{display:flex;justify-content:center}.qr-tile-phone .qr-wrap>*{width:260px}.qr-tile-phone .small{text-align:center}.pager{display:flex;justify-content:center;gap:6px}.pager i{width:8px;height:8px;border-radius:50%;background:var(--line-2)}.pager i[aria-current]{background:var(--primary)}/* §2 QR tile + §8.7 QR room head/foot (CORRECTIONS 36): the room's tile on its own pad level; the label, name, link, title, lead and footnote sizes the boards drew inline */.tbl-wrap{overflow-x:auto}.tbl{width:100%;border-collapse:collapse}.tbl td:first-child{font-weight:600}/* §2 Table: the card scrolls sideways, the page never does */
 .chip[data-on]{background:var(--sel);border-color:var(--primary)}/* §2 Field chip: an applied filter */
 .menu[data-flow]{position:static;width:auto}/* §2 Menu drawn open in the page flow (Explore "Add a filter") */
 .sel[data-size=compact]{width:170px}.sel[data-size=compact] .in{min-height:40px;padding:6px 42px 6px 12px}.seg[data-inline]{width:200px}/* §2 Field and Segmented in a toolbar row */
@@ -115,7 +115,7 @@ details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}d
 .toast{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:0 16px;border-radius: var(--radius-m);background:var(--ink);color:var(--ground);font-weight:600;font-size: var(--t-14)}
 .phone-top{display:flex;align-items:center;justify-content:space-between;padding:8px 12px 8px 16px}
 .phone-bar{position:absolute;left:0;right:0;bottom:0;padding:12px 16px 28px;border-radius:0;border-width:1px 0 0;display:flex;gap:10px}
-.qr{display:grid;grid-template-columns:repeat(21,1fr);gap:0;aspect-ratio:1;background:#fff;padding:8px;border-radius: var(--radius-s)}
+.qr{display:grid;grid-template-columns:repeat(21,1fr);gap:0;aspect-ratio:1;background:#fff;--qr-q:29;--qr-w:176px;padding:calc(var(--qr-w) * 4 / var(--qr-q));border-radius: var(--radius-s)}.qr[data-n="25"]{grid-template-columns:repeat(25,1fr);--qr-q:33}.qr[data-n="29"]{grid-template-columns:repeat(29,1fr);--qr-q:37}.qr[data-n="33"]{grid-template-columns:repeat(33,1fr);--qr-q:41}.qr[data-n="37"]{grid-template-columns:repeat(37,1fr);--qr-q:45}.qr[data-n="41"]{grid-template-columns:repeat(41,1fr);--qr-q:49}.qr[data-n="45"]{grid-template-columns:repeat(45,1fr);--qr-q:53}.qr[data-n="49"]{grid-template-columns:repeat(49,1fr);--qr-q:57}.qr[data-n="53"]{grid-template-columns:repeat(53,1fr);--qr-q:61}.qr[data-n="57"]{grid-template-columns:repeat(57,1fr);--qr-q:65}/* §8.7 QR module grid; padding = the four-module quiet zone readers expect (4/(n+8) of the box per side; Codex P2 on PR 199): n x n from the encoder (versions 2-10); 21 is the placeholder */
 .qr i{display:block;background:#111}
 .qr i.o{background:transparent}
 /* ---- semantic tokens: every board paints from these ---- */
@@ -153,7 +153,7 @@ details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}d
 .l-grid[data-tpl=aside]{grid-template-columns:minmax(0,1fr) 340px;align-items:start}
 .l-grid[data-tpl=survey-row]{grid-template-columns:minmax(0,1fr) 180px 100px auto;align-items:center;min-height:56px;border-top:1px solid var(--line)}.l-grid[data-tpl=survey-row]>.num{text-align:right}
 .num[data-size="40"]{font-size:var(--t-40)}.num[data-size="20"]{font-size:var(--t-20)}
-.qr[data-size=room]{width:176px}.qr[data-size=phone]{width:260px}.qr[data-size=page]{width:440px}
+.qr[data-size=room]{width:176px;--qr-w:176px}.qr[data-size=phone]{width:260px;--qr-w:260px}.qr[data-size=page]{width:440px;--qr-w:440px}.qr[data-size=sheet]{width:120px;--qr-w:120px}
 .app[data-w=phone] .tabs{padding:4px}.app[data-w=phone] .tab{min-height:40px;font-size:var(--t-13);padding:0 6px;gap:6px}
 dialog.glass-hi{border-radius:var(--radius-xl);padding:36px;background:var(--dialog);color:var(--ink);width:min(560px,calc(100% - 48px));max-height:calc(100dvh - 48px);overscroll-behavior:contain}
 dialog.glass-hi[data-w=wide]{width:min(1000px,calc(100% - 48px));padding:32px 36px}
@@ -332,18 +332,11 @@ def iconbtn(n, aria, href=None):
 
 YELLOW_TAG = 'background: rgba(178,118,23,.14); color: var(--ink)'  # the Practice-copy badge colours (boards_fac.sandbox)
 
-def room_health(opened, refused, wrap=False, instruction=True):
-    """Room health (ruling 8, D2 option 1): one live line on Collect and the QR room, desktop and phone.
-    Quiet: neutral .tag. Refusals: the yellow .tag plus one instruction (instruction=False when the board carries it
-    elsewhere, e.g. the projector QR room). No codes on screen. Counts are survey opens, not people (§2 Room health)."""
-    tag = (f'<span class="tag" style="{YELLOW_TAG}"><i class="lensdot" aria-hidden="true" style="width: 8px; height: 8px; background: var(--b-support)"></i>{refused} opens turned away</span>'
-           if refused else '<span class="tag">0 opens turned away</span>')
-    line = (f'<div role="status" aria-live="polite" style="display: flex; align-items: center; gap: 8px; flex-wrap: {"wrap" if wrap else "nowrap"}">'
-            f'<span class="small"><strong class="tab-n">{opened}</strong> surveys opened in the last minute</span>{tag}</div>')
-    if refused and instruction:
-        line = (f'<div style="display: flex; flex-direction: column; gap: 4px">{line}'
-                '<p class="small" style="color: var(--ink)">Ask people on shared Wi-Fi to switch to mobile data, or hand out paper surveys.</p></div>')
-    return line
+def room_health(opened=None, refused=None, wrap=False, instruction=True):
+    """Retired (record 2026-10-22 applying RULING-2026-10-16-scrap-app-ratelimit @1e0189c): the room-health counter ("surveys opened in the last minute · opens turned away")
+    and its shared-Wi-Fi instruction were rooted in app-level participant rate limits the captain already ordered removed; large
+    event groups share one network. Draws nothing; callers keep their call sites so no layout moves (parity loop row)."""
+    return ''
 
 def topbar(crumb=None, menu_open=False, who='Bincy', right=True):
     crumbs = ''
@@ -554,8 +547,26 @@ def phone_header(lang=True, brandlabel=True):
     lang_btn = f'<button class="btn btn-quiet" type="button" aria-label="Language: English">{ic("globe")} English {ic("chev",16)}</button>' if lang else ''
     return f'<header class="phone-top" data-shell="participant"><span class="brand">{MARK.format(s=26)}{"<span>3D Review</span>" if brandlabel else ""}</span>{lang_btn}</header>'
 
-def qr(seed=7):
-    cells = []
+# QR module grid (design-system §8.7 QR module grid; parity-loop debt 7 closed 2026-10-22). Real cells come from generator/qr_data.json
+# (or the file named by QR_DATA): the app's own encoder output (ui/assess/vendor-qrcode.js, typeNumber auto, error correction M) for the
+# seeded survey links the live screen draws, so board and app render the same n x n modules. qr(seed) keeps the 21x21 placeholder for
+# boards that draw a decorative code with no link (ActionPlan share line); a survey board passes cells.
+import json as _json, os as _os
+_QR_DATA = None
+def qr_data():
+    global _QR_DATA
+    if _QR_DATA is None:
+        path = _os.environ.get('QR_DATA') or _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'qr_data.json')
+        _QR_DATA = _json.load(open(path)) if _os.path.exists(path) else {'encoder': 'none', 'host': '3dreview.app', 'surveys': []}
+    return _QR_DATA
+def qr(seed=7, cells=None, size=None):
+    sz = f' data-size="{size}"' if size else ''
+    if cells:
+        n = int(round(len(cells) ** 0.5))
+        assert n * n == len(cells) and n >= 21, 'qr: cells are an n x n (n >= 21) 0/1 string'
+        body = ''.join('<i></i>' if c == '1' else '<i class="o"></i>' for c in cells)
+        return f'<div class="qr"{sz} data-n="{n}" aria-hidden="true">{body}</div>'
+    out = []
     import random
     r = random.Random(seed)
     for y in range(21):
@@ -566,8 +577,8 @@ def qr(seed=7):
                 on = fx in (0, 6) or fy in (0, 6) or (2 <= fx <= 4 and 2 <= fy <= 4)
             else:
                 on = r.random() < .45
-            cells.append('<i></i>' if on else '<i class="o"></i>')
-    return f'<div class="qr" aria-hidden="true">{"".join(cells)}</div>'
+            out.append('<i></i>' if on else '<i class="o"></i>')
+    return f'<div class="qr"{sz} aria-hidden="true">{"".join(out)}</div>'
 
 # Language field: searchable suggestions state (app 0.29.1, ui/v3/language-picker.js). Borrows .chip (Setup2),
 # the search input + icon (Setup2), .row-opt rows as result buttons and a quiet button; no new component.
