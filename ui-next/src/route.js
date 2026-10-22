@@ -25,15 +25,27 @@ export function flagOn(params, storage) {
 // returns { view: name, props: { phone, theme, state } } with state the raw ?state= value (undefined when absent).
 export const SCREENS = Object.freeze(["home", "about", "landing"]);
 export const BUILTIN_VIEWS = Object.freeze([...SCREENS, "components", "layouts", "home-parts"]);
-export function route(params, storage, screens = []) {
+// width: the viewport width in CSS px (main.js passes it). Phone breakpoint (cookbook design/2026-10-15-glass-redesign/canvas/
+// design-system.md §8.3): screens render phone below 720px by default; ?w=phone / ?w=desktop override the width (board captures,
+// gallery links). Gallery pages (?page=layouts|home) stay explicit-only so their captures never depend on the window.
+// Without a width (tests, no window) the default stays desktop, as before.
+export const PHONE_BELOW = 720;
+export const PHONE_QUERY = `(max-width: ${PHONE_BELOW - 0.02}px)`;
+export function wOverride(params) {
+  const w = params.get("w");
+  return w === "phone" || w === "desktop" ? w : null;
+}
+export function route(params, storage, screens = [], width) {
   const page = params.get("page");
   const theme = params.get("theme");
   const mode = ["light", "dark"].includes(theme) ? theme : "both";
-  const phone = params.get("w") === "phone";
+  const w = wOverride(params);
+  const explicitPhone = w === "phone";
   const on = flagOn(params, storage);
-  if (page === "layouts") return { view: "layouts", props: { mode, phone } };
-  if (page === "home") return { view: "home-parts", props: { mode, phone } };
+  if (page === "layouts") return { view: "layouts", props: { mode, phone: explicitPhone } };
+  if (page === "home") return { view: "home-parts", props: { mode, phone: explicitPhone } };
   if (page === "components" || !on) return { view: "components", props: { mode } };
+  const phone = w ? explicitPhone : typeof width === "number" && width < PHONE_BELOW;
   const screen = params.get("screen");
   if (screens.includes(screen) && !BUILTIN_VIEWS.includes(screen)) return { view: screen, props: { phone, theme: theme === "dark" ? "dark" : "light", state: params.get("state") ?? undefined } };
   if (screen === "about" || screen === "landing") return { view: screen, props: { phone, theme: theme === "dark" ? "dark" : "light" } };
