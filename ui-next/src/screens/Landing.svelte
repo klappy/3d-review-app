@@ -25,8 +25,8 @@
   import { C01, C02 } from "../copy/rachel.js";
 
   // videoSrc: the intro video through the Transcode proxy (generate_transcode_url) once it exists; absent = placeholder frame (Media card contract).
-  let { phone = false, theme = "light", videoSrc } = $props();
-  let SELF = $derived(screenHref("landing", { phone, theme }));
+  let { phone = false, theme = "light", w, videoSrc } = $props();
+  let SELF = $derived(screenHref("landing", { phone, theme, w }));
   const SAMPLE = "#results", VIDEO = "#video", CODE = "#survey-code", HELP = "#help";
   const PERSPECTIVES = [
     ["team", "Translation team", "How the team prepares, reviews and decides a passage is ready."],
