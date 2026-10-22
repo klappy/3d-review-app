@@ -35,9 +35,10 @@
   import { href } from "../href.js";
   import { exploreRows, phoneRows, matchCounts, LENS_KEYS } from "./explore-data.js";
   import { modal, backdropClose, closeTo } from "./dialog.js";
-  import data from "../../../fixtures/explore/explore.json";
+  import fixture from "../../../fixtures/explore/explore.json";
 
-  let { phone = false, theme = "light", state } = $props();
+  // data: the fixture, or every review the account can see in the same shape (app/data.js exploreModel).
+  let { phone = false, theme = "light", state, data = fixture } = $props();
   // Unknown states, and the phone-only sheet asked for on desktop, render the default board (never throw on a URL value).
   const sheet = $derived(phone && state === "filters");
   const W = $derived({ w: phone ? "phone" : null });
@@ -74,7 +75,7 @@
     </Row>
     <section class="glass l-card" data-pad="rows" aria-label="Reviews">
       {#each prows as r}
-        <a class="card-link list-row" href={RESULTS}>
+        <a class="card-link list-row" href={r.href ?? RESULTS}>
           <span class="icn icn-row" data-lens="team" aria-hidden="true"><Icon d={E.doc} /></span>
           <div class="list-body"><div class="list-title">{r.title}</div><div class="small">{r.meta}</div></div>
           <Level level={r.level} />
@@ -104,7 +105,7 @@
           <Button label="Download CSV" lead={download} />
         </Row>
       </Row>
-      <div class="l-grid" data-tpl="aside-end" data-gap="5">
+      <div class="l-grid" data-tpl={data.addFilter.length ? "aside-end" : undefined} data-gap="5">
         <Stack gap={4}>
           <div class="glass l-card l-row" data-pad="bar" data-split data-wrap data-gap="2" role="group" aria-label="Filters">
             <Row wrap gap={2}>
@@ -139,13 +140,13 @@
             </div>
           </section>
         </Stack>
-        <aside class="l-stack" data-gap="3" aria-labelledby="explore-add-title">
+        {#if data.addFilter.length}<aside class="l-stack" data-gap="3" aria-labelledby="explore-add-title">
           <h2 class="h3" id="explore-add-title">Add a filter</h2>
           <div class="glass-hi menu" data-flow role="group" aria-labelledby="explore-add-title">
             {#each data.addFilter as f}<button class="mi" type="button"><span>{f}</span><span class="small mi-end">Any</span></button>{/each}
           </div>
           <p class="small">Workspace and project are filters like any other. The Workspace and Project pages are the same table with those filters saved.</p>
-        </aside>
+        </aside>{/if}
       </div>
     </Page>
   {/if}

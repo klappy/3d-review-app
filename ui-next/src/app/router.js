@@ -126,7 +126,8 @@ export function linkFor(name, extra = {}, ctx = {}) {
   }
   // A setup screen reached from a review (the stage tabs' "Prepare", a review-page link) carries that review in the query — the
   // setup routes have no :aid (they are the new-review wizard too) — so the live app can show the review's own read-only data.
-  if (name.startsWith("setup") && ctx.aid && !(BY_NAME.get(name) ?? "").includes(":aid")) query.review = ctx.aid;
+  // The review's People page ("people", no :aid: the route is the one the lanes link by name) carries its review the same way.
+  if ((name.startsWith("setup") || name === "people") && ctx.aid && !(BY_NAME.get(name) ?? "").includes(":aid")) query.review = ctx.aid;
   // A lane link to a review-scoped screen from a page with no review in context (Home's "#setup") lands on Home, never nowhere.
   try { return to(name, params, query); } catch { return to("home"); }
 }

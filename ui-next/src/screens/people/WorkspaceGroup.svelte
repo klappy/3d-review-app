@@ -3,7 +3,7 @@
      The Workspace screen with group = true (./Workspace.svelte); the route's props pass through. -->
 <script>
   import Workspace from "./Workspace.svelte";
-  let { phone = false, theme = "light" } = $props(); // any ?state= renders the default (no board draws one)
+  let { phone = false, theme = "light", data, ongroup } = $props(); // any ?state= renders the default (no board draws one); data/ongroup: live (Workspace.svelte)
 </script>
 
-<Workspace group {phone} {theme} />
+<Workspace group {phone} {theme} {...(data ? { data } : {})} {ongroup} />

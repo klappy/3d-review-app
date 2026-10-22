@@ -34,14 +34,19 @@
   import { href } from "../href.js";
   import { P } from "./people-icons.js";
   import { groupRows } from "./people-data.js";
-  import d from "../../../fixtures/people/workspace.json";
+  import fixture from "../../../fixtures/people/workspace.json";
 
   // ?state=: no board draws one, so any value (the route passes it as state) renders the default; the prop is not read.
-  let { group = false, phone = false, theme = "light" } = $props();
+  // data: the fixture, or the live workspace in the same shape (app/data.js workspaceModel); ongroup (live): groups the picked project
+  // for real (POST /v2/workspaces/{id}/projects/{pid}) when the dialog's primary is pressed; without it the primary stays the board's link.
+  let { group = false, phone = false, theme = "light", data = fixture, ongroup } = $props();
+  const d = data;
   const LENS_ICON = { team: I.pen, community: I.people, church: P.church };
   const HOME = href("home"), PEOPLE = href("people-workspace"), BACK = href("workspace");
   const PROJECT = href("project"), SETUP = href("setup1"), MENU = href("menu");
   const rows = groupRows(d.group);
+  let picked = $state(rows.find((c) => c.can)?.id ?? rows.find((c) => c.can)?.title ?? null);
+  const grouping = (el) => { const f = (e) => { if (ongroup && e.target instanceof Element && e.target.closest(".btn-primary") && picked != null) { e.preventDefault(); ongroup(picked); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
   const FIND = "Find a project or language";
   // Escape closes the native modal (close event): drop the dialog and restore New project as the primary, at the Cancel target's address.
   let closed = $state(false);
@@ -70,7 +75,7 @@
     <section class="glass l-card" data-pad="list" aria-label={`Projects · ${d.projects.length}`}>
       <span class="micro">Projects · {d.projects.length}</span>
       {#each d.projects as p}
-        <a class="card-link list-row" href={PROJECT}>
+        <a class="card-link list-row" href={p.href ?? PROJECT}>
           <span class="icn" data-size="36" data-tone="neutral" aria-hidden="true"><Icon d={P.file} /></span>
           <div class="list-body"><div class="list-title">{p.title}</div><div class="small">{STAGE_LABELS[p.stage]} · {p.phone}</div></div>
           <Pill stage={p.stage} />
@@ -96,7 +101,7 @@
       </Row>
       <Grid cols={2} gap={4}>
         {#each d.projects as p}
-          <Card href={PROJECT} gap={4}>
+          <Card href={p.href ?? PROJECT} gap={4}>
             <Row split gap={3}><Row gap={3}><h3 class="h2">{p.title}</h3><Pill stage={p.stage} /></Row><span class="go" aria-hidden="true"><Icon d={I.arrow} /></span></Row>
             <Row split gap={4}>
               <Row wrap gap={4}><span class="small l-row" data-gap="1" title="Language"><Icon d={I.globe} />{p.language}</span><span class="small l-row" data-gap="1" title="Translation format"><Icon d={P[p.formatIcon]} />{p.format}</span></Row>
@@ -122,7 +127,7 @@
     </Page>
   {/if}
   {#if open}
-    <dialog class={phone ? "glass-hi sheet" : "glass-hi"} aria-labelledby="ws-group-title" {onclose} {@attach modal}>
+    <dialog class={phone ? "glass-hi sheet" : "glass-hi"} aria-labelledby="ws-group-title" {onclose} {@attach modal} {@attach grouping}>
       <Stack gap={phone ? 3 : 4}>
         {#if phone}<span class="sheet-handle" aria-hidden="true"></span><span class="micro" id="ws-group-title">Add a project to this workspace</span>
           <p class="small">Only a <b>direct project owner</b> can group a project. Everyone in the workspace then opens it at their workspace role.</p>
@@ -130,7 +135,7 @@
           <p class="small">Everyone in the workspace opens it at their workspace role, unless they already hold a higher project grant. Only a <b>direct project owner</b> can group it; a role inherited from a workspace is never enough.</p>{/if}
         <div class="l-stack" data-gap="2" role="radiogroup" aria-label="Projects you own">
           {#each rows as c, i}
-            <label class="row-opt"><input class="rd" type="radio" name="ws-group" checked={i === 0} disabled={!c.can} /><span class="l-stack" data-gap="1" data-grow=""><b>{c.title}</b><span class="small">{c.can ? "You own this project directly" : phone ? "Cannot group: your access comes from the workspace, not a project grant" : "Your access here comes from the workspace, not a project grant"}</span></span>{#if !phone}<Tag label={c.can ? "Direct owner" : "Inherited · cannot group"} />{/if}</label>
+            <label class="row-opt"><input class="rd" type="radio" name="ws-group" value={c.id ?? c.title} checked={(c.id ?? c.title) === picked || (picked == null && i === 0)} disabled={!c.can} onchange={() => { picked = c.id ?? c.title; }} /><span class="l-stack" data-gap="1" data-grow=""><b>{c.title}</b><span class="small">{c.can ? "You own this project directly" : phone ? "Cannot group: your access comes from the workspace, not a project grant" : "Your access here comes from the workspace, not a project grant"}</span></span>{#if !phone}<Tag label={c.can ? "Direct owner" : "Inherited · cannot group"} />{/if}</label>
           {/each}
         </div>
         {#if phone}
