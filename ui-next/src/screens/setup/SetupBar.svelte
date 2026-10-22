@@ -5,7 +5,8 @@
 <script>
   import Button from "../../Button.svelte";
   import Glyph from "./Glyph.svelte";
-  let { label = "Continue", href, backHref, play = false } = $props();
+  // href absent (live): the primary is a button the frame's onnext owns (SetupFrame going); disabled while its write runs.
+  let { label = "Continue", href, backHref, play = false, disabled = false } = $props();
   if (!(typeof label === "string" && label.trim())) throw new TypeError("SetupBar: the bar holds one primary, which needs a label");
 </script>
 
@@ -15,5 +16,5 @@
 
 <div class="glass phone-bar" role="group" aria-label="Page actions">
   {#if backHref}<Button label="Back" variant="quiet" href={backHref} lead={back} />{/if}
-  {#if play}<Button {label} variant="primary" lg {href} lead={launch} />{:else}<Button {label} variant="primary" lg {href} trail={arrow} />{/if}
+  {#if play}<Button {label} variant="primary" lg {href} lead={launch} />{:else}<Button label={disabled ? "Saving…" : label} variant="primary" lg {href} disabled={href ? false : disabled} trail={arrow} />{/if}
 </div>

@@ -22,7 +22,12 @@
   import Glyph from "./Glyph.svelte";
   import data from "../../../fixtures/setup/setup.json";
 
-  let { phone = false, theme = "light", step, title, phoneTitle, next = {}, children } = $props();
+  // Live (app/Live.svelte): onnext runs the step's save and moves on (the primary is a button, never a link, so nothing moves before
+  // the write answers); busy disables it while the write runs; error is the server's or the step's own message, shown inline
+  // (R16) just above the footer; status is the top bar's draft line ("Draft saved" | "Saving…" | "" before the first save).
+  let { phone = false, theme = "light", step, title, phoneTitle, next = {}, onnext, busy = false, error = "", status = "Draft saved", children } = $props();
+  // The primary intercepts its click only when a live step owns it (Setup5.svelte's launching does the same for Launch).
+  const going = (el) => { const f = (e) => { if (onnext && !busy && e.target instanceof Element && e.target.closest(".btn-primary")) { e.preventDefault(); onnext(); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
   if (!(Number.isInteger(step) && step >= 1 && step <= data.steps.length)) throw new TypeError(`SetupFrame: step must be 1..${data.steps.length}`);
   const label = $derived(next.label ?? "Continue");
   const nextHref = $derived(next.href ?? stepHref(step + 1, phone));
@@ -32,18 +37,20 @@
 
 {#snippet back()}<Glyph name="back" />{/snippet}
 {#snippet arrow()}<Glyph name="arrow" />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="setup-step" {step} steps={data.steps.length} home={HOME} />{:else}<FlowTop flow={data.flow} home={HOME} close={HOME} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<SetupBar {label} href={nextHref} {backHref} play={!!next.play} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="setup-step" {step} steps={data.steps.length} home={HOME} />{:else}<FlowTop flow={data.flow} {status} home={HOME} close={HOME} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<SetupBar {label} href={onnext ? undefined : nextHref} {backHref} play={!!next.play} disabled={busy} />{/if}{/snippet}
+{#snippet err()}{#if error}<p class="small field-error" id="step-err" role="alert"><Glyph name="warn" />{error}</p>{/if}{/snippet}
 
-<AppShell {phone} {theme} screen {top} {bar}>
+<div {@attach going}><AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <div class="l-stack" data-gap="2">
-      <Row split gap={3}><span class="micro">{data.flow}</span><span class="micro" role="status">Draft saved</span></Row>
+      <Row split gap={3}><span class="micro">{data.flow}</span><span class="micro" role="status">{status}</span></Row>
       <div class="bar" data-step={step} role="progressbar" aria-label="Setup progress" aria-valuemin="1" aria-valuemax={data.steps.length} aria-valuenow={step} aria-valuetext={`Step ${step} of ${data.steps.length}`}><span></span></div>
     </div>
     <section class="glass-hi l-card l-stack su-form enter" data-pad="hero" data-gap="4" aria-labelledby="step-title">
       <h1 class="title-phone" id="step-title">{phoneTitle ?? title}</h1>
       {@render children?.()}
+      {@render err()}
     </section>
   {:else}
     <Page width="narrow" gap={6}>
@@ -59,15 +66,17 @@
       <section class="glass-hi l-card l-stack enter" data-pad="setup" data-gap="6" aria-labelledby="step-title">
         <h1 class="h1" id="step-title">{title}</h1>
         {@render children?.()}
+        {@render err()}
         <Row split gap={3}>
           {#if backHref}<Button label="Back" variant="quiet" href={backHref} lead={back} />{:else}<span></span>{/if}
           {#if next.blocked}
             <!-- R16 V-41: a blocked primary says why beside it: the reason is the text just before it in reading order, and the shared
                  Button (registry f3c4238) ties it to the disabled Continue with aria-describedby="cont-why" (setup N7). -->
             <Row gap={3}><span class="small" id="cont-why">{next.blocked}</span><Button {label} variant="primary" lg disabled ariaDescribedby="cont-why" trail={arrow} /></Row>
+          {:else if onnext}<Button label={busy ? "Saving…" : label} variant="primary" lg disabled={busy} ariaDescribedby={error ? "step-err" : undefined} trail={arrow} />
           {:else}<Button {label} variant="primary" lg href={nextHref} trail={arrow} />{/if}
         </Row>
       </section>
     </Page>
   {/if}
-</AppShell>
+</AppShell></div>

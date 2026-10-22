@@ -14,6 +14,7 @@
   import * as S from "./session.js";
   import * as D from "./data.js";
   import * as P from "./participant.js";
+  import * as SU from "./setup.js";
   import { classify } from "./api.js";
   import { REGISTRY } from "../screens/registry.js";
   import About from "../screens/About.svelte";
@@ -46,6 +47,7 @@
 
   const PARTICIPANT = new Set(["p-entry", "p-code", "p-welcome", "p-passage", "p-about", "p-question", "p-review", "p-receipt", "p-problem"]);
   const PUBLIC = new Set(["landing", "about", "sign-in", "sign-in-check", "help", "feedback", "external"]);
+  const SETUP = new Set(["setup", "setup1", "setup2", "setup3", "setup4", "setup5"]);
   // Which route needs which data. Every loader resolves to the props its screen takes.
   async function loader(r) {
     const { name, params } = r;
@@ -119,7 +121,7 @@
       if (data.redirect) { replace(data.redirect); return; }
       if (data.screen === null) return;
       // Review-scoped screens draw project crumbs (href("project") needs :pid): the loaded model's project joins the live context.
-      const pid = data?.data?.projectId ?? data?.results?.review?.projectId ?? data?.shareData?.projectId ?? null;
+      const pid = data?.data?.projectId ?? data?.results?.review?.projectId ?? data?.shareData?.projectId ?? data?.projectId ?? null;
       if (pid && !r.params.pid) setLiveContext({ ...liveContext(), pid });
       page = { status: "ready", key: r.name, data, error: null };
     } catch (e) {
@@ -157,19 +159,19 @@
 
   // Signed-in chrome for the live screens.
   const who = $derived(session ? { first: S.firstName(session.principal), initials: S.initialsOf(session.principal) } : null);
-  async function signOut() { try { await S.signOut(); D.clearLinks(); session = null; go(to("landing")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `You are still signed in: ${e?.message || "the sign-out was not confirmed"}. Try again.` } }; } }
+  async function signOut() { try { await S.signOut(); D.clearLinks(); SU.forgetAll(); session = null; go(to("landing")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `You are still signed in: ${e?.message || "the sign-out was not confirmed"}. Try again.` } }; } }
   const accountItems = $derived(session ? [
     { kind: "head", label: session.principal?.display_name || "Signed in", sub: session.principal?.id ? "Facilitator" : "" }, { kind: "hr" },
     { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback") },
     { label: "Current design", href: "/" }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
   ] : []);
-  function onSignedIn() { D.clearLinks(); S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
+  function onSignedIn() { D.clearLinks(); SU.forgetAll(); S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
   async function refreshResults() {
     const r = route;
     try { const out = await D.buildReport(r.params.aid); if (out.held) page = { ...page, data: { ...page.data, refreshed: "The results can’t be rebuilt yet: more answers are needed." } }; else load(); }
     catch (e) { page = { ...page, data: { ...page.data, refreshed: `Could not rebuild: ${e?.message || "try again"}` } }; }
   }
-  async function launch() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("collect", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The survey could not be launched." } }; } }
+  async function launch() { const aid = route.params.aid ?? route.query.get("review"); try { await D.setStage(aid, "collect"); SU.forget(aid); go(to("collect", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The survey could not be launched." } }; } }
   async function reopenCollection() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("share", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be reopened." } }; } }
   async function closeCollection() { const aid = route.params.aid; try { await D.setStage(aid, "understand"); go(to("results", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be closed." } }; } }
   const applyChrome = (s) => setLiveChrome(s ? { who: S.firstName(s.principal), initials: S.initialsOf(s.principal), workspace: "Your workspace", workspaces: [], accountItems, home: to("home"), workspaceItems: [{ kind: "micro", label: "Your workspaces" }, { label: "Home", href: to("home") }] } : { who: "", initials: "", workspace: "", workspaces: [], accountItems: [], home: to("home"), workspaceItems: [] });
@@ -177,6 +179,39 @@
   $effect(() => { setLiveChrome(session ? { who: who.first, initials: who.initials, workspace: page.data?.home?.workspace ?? "Your workspace", workspaces: [], accountItems, home: to("home"), workspaceItems: [{ kind: "micro", label: "Your workspaces" }, { label: "Home", href: to("home") }] } : { who: "", initials: "", workspace: "", workspaces: [], accountItems: [], home: to("home"), workspaceItems: [] }); });
   // The phone boards (ResultsPhone.dc.html, fixtures/results/report.json "phone") draw each perspective's strongest and weakest area only.
   const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses ?? []).map((l) => { const sd = [...(l.sub_dimensions ?? [])].filter((x) => Number.isFinite(Number(x.score))).sort((a, b) => Number(b.score) - Number(a.score)); return { ...l, sub_dimensions: sd.length > 2 ? [sd[0], sd[sd.length - 1]] : l.sub_dimensions }; }) });
+  // Setup steps 1-4 (app/setup.js): the open state lives outside the page (its draft is edited in place); suRev re-derives the views.
+  let suSt = null, suRev = $state(0), suBusy = $state(false), suError = $state("");
+  const bump = () => { suRev++; };
+  const suView = $derived.by(() => { void suRev; const st = suSt; if (!st || page.status !== "ready" || !SETUP.has(page.data?.screen ?? "")) return null; return { details: SU.detailsView(st, phone), passage: SU.passageView(st), groups: SU.groupsOf(st, phone), context: SU.contextView(st), status: suBusy ? "Saving…" : st.aid ? "Draft saved" : "" }; });
+  const fail = (e, fallback) => { if (classify(e) === "unauthenticated") { S.forget(); page = { status: "ready", key: route.name, data: { screen: "sign-in", next: hash }, error: null }; return; } suError = e?.message || fallback; };
+  async function act(fn, then, fallback = "The change could not be saved.") { if (suBusy) return; suBusy = true; suError = ""; bump(); try { await fn(); suBusy = false; bump(); then?.(); } catch (e) { suBusy = false; fail(e, fallback); bump(); } }
+  const suNext = (n) => go(to(`setup${n}`, {}, { review: suSt.aid }));
+  function suField(k, v) {
+    const d = suSt.draft;
+    if (k === "project") { const p = suSt.projects.find((x) => x.name === v); d.project = p?.id ?? ""; d.language = ""; d.languageQuery = ""; suSt.languages = []; act(() => SU.loadLanguages(suSt), undefined, "The project's languages could not be read."); return; }
+    if (k === "format") d.format = SU.formatValue(v); else d[k] = v;
+    suError = ""; bump();
+  }
+  const suLang = {
+    oninput: (q) => { suSt.draft.languageQuery = q; bump(); },
+    onpick: (m) => act(() => SU.pickLanguage(suSt, m.id), undefined, "The language could not be chosen."),
+    onremove: () => { suSt.draft.language = ""; bump(); },
+    onadd: () => act(() => SU.addLanguage(suSt, suSt.draft.languageQuery), undefined, "The language could not be added."),
+  };
+  const suStep = {
+    1: () => { const errs = SU.validateDetails(suSt.draft); if (errs.length) { suError = errs.join(" "); bump(); return; } act(() => SU.saveDetails(suSt), () => suNext(2), "The review could not be saved."); },
+    2: () => { if (!suSt.draft.purpose.trim()) { suError = "Name what people will respond to first."; bump(); return; } act(() => SU.savePassage(suSt), () => suNext(3)); },
+    3: () => { const errs = SU.validateGroups(suSt.draft); if (errs.length) { suError = errs.join(" "); bump(); return; } act(() => SU.saveGroups(suSt), () => suNext(4), "The surveys could not be updated."); },
+    4: () => act(() => SU.saveContext(suSt), () => go(to("setup5", {}, { review: suSt.aid })), "The surveys could not be added."),
+  };
+  const suPassage = {
+    onfile: (f) => act(() => SU.addPassageFile(suSt, f), undefined, "The file could not be uploaded."),
+    onlink: () => { const url = globalThis.prompt?.("Paste the link (https://…), for example a sign-language video:"); if (url && url.trim()) act(() => SU.addPassageLink(suSt, url.trim()), undefined, "The link could not be added."); },
+    onremove: (id) => act(() => SU.removePassage(suSt, id), undefined, "The passage could not be removed."),
+    onlwc: (action, code) => { const d = suSt.draft; if (action === "remove") d.lwc = d.lwc.filter((c) => c !== code); else { const l = SU.lwcMatch(code); if (!l) { suError = `"${code}" is not a language the survey can be shown in.`; bump(); return; } if (d.lwc.length >= SU.MAX_LWC_COUNT && !d.lwc.includes(l.code)) { suError = `Up to ${SU.MAX_LWC_COUNT} answer languages.`; bump(); return; } if (!d.lwc.includes(l.code)) d.lwc = [...d.lwc, l.code]; } suError = ""; bump(); },
+  };
+  const suGroups = { ongroup: (tid, version, on) => { SU.setGroup(suSt, tid, version, on); suError = ""; bump(); }, onexpected: (tid, v) => { SU.setExpected(suSt, tid, v); bump(); } };
+  const suContext = { oncontext: (key, field, v) => { const tid = SU.tidOfKey(suSt, key); if (tid) SU.setContext(suSt, tid, field, v); }, ondemographics: (on) => { suSt.draft.demographics = on; bump(); } };
   const reportFor = (m) => (m.payload ? { review: m.review, counts: m.counts, payload: phone ? phonePayload(m.payload) : m.payload, gaps: D.gapsOf(m.payload), radar: D.radarOf(m.payload), lookNext: [] } : null);
 </script>
 
@@ -198,6 +233,13 @@
 {:else if page.data.screen === "project"}
   {@const C = REGISTRY.project}
   <C {phone} {theme} data={page.data.data} />
+{:else if SETUP.has(page.data.screen) && suView}
+  {@const C = REGISTRY[page.data.screen]}
+  {@const n = page.data.step}
+  {#if n === 1}<C {phone} {theme} data={suView.details} onfield={suField} lang={suLang} onnext={suStep[1]} busy={suBusy} error={suError} status={suView.status} />
+  {:else if n === 2}<C {phone} {theme} data={suView.passage} onfield={suField} onfile={suPassage.onfile} onlink={suPassage.onlink} onremove={suPassage.onremove} onlwc={suPassage.onlwc} onnext={suStep[2]} busy={suBusy} error={suError} status={suView.status} />
+  {:else if n === 3}<C {phone} {theme} data={{ groups: suView.groups }} ongroup={suGroups.ongroup} onexpected={suGroups.onexpected} onnext={suStep[3]} busy={suBusy} error={suError} status={suView.status} />
+  {:else}<C {phone} {theme} data={{ groups: suView.groups, context: suView.context }} oncontext={suContext.oncontext} ondemographics={suContext.ondemographics} onexpected={suGroups.onexpected} onnext={suStep[4]} busy={suBusy} error={suError} status={suView.status} />{/if}
 {:else if page.data.screen === "setup5"}
   {@const C = REGISTRY.setup5}
   <C {phone} {theme} data={page.data.data} onlaunch={page.data.data.canLaunch ? launch : undefined} collecting={page.data.data.stage !== "prepare"} />

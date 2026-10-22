@@ -15,7 +15,7 @@ export const chosenGroups = (groups, phone = false) => groups.filter((g) => isCh
 /** One survey per checked role of a checked group, or the group itself when it has no roles; key = slug of the survey name. */
 export function surveys(groups, phone = false) {
   return chosenGroups(groups, phone)
-    .flatMap((g) => chosenRoles(g)?.map((r) => ({ g, name: r.name, expected: r.expected })) ?? [{ g, name: g.name, expected: g.expected }])
+    .flatMap((g) => chosenRoles(g)?.map((r) => ({ g, name: r.name, expected: r.expected, tid: r.tid, pre: r.pre === true })) ?? [{ g, name: g.name, expected: g.expected, tid: g.tid, pre: g.pre === true }]) // tid / pre: live only (app/setup.js groupsOf)
     .map((s) => ({ ...s, key: slug(s.name) }));
 }
 
