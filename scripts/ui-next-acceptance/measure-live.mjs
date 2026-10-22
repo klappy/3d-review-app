@@ -18,7 +18,7 @@ const PAIRS = [
   ["ResultsGaps", 1280, 800, `#/review/${process.env.AID2 ?? aid}/results/gaps`], ["Report", 1280, 800, `#/review/${process.env.AID2 ?? aid}/report`], ["ReportPhone", 390, 844, `#/review/${process.env.AID2 ?? aid}/report`],
   ["PCode", 390, 844, "#/p/code"], ["PWelcome", 390, 844, "P:#/p/welcome"], ["PPassage", 390, 844, "P:#/p/passage"], ["PQuestion", 390, 844, "P:#/p/q/3"], ["PReview", 390, 844, "P:#/p/review"], ["PReceipt", 390, 844, "P:#/p/receipt"],
 ];
-const br = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+const br = await chromium.launch({ executablePath: process.env.CHROMIUM || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" }) // CHROMIUM: another machine's Chromium binary (README);
 const rows = [];
 async function board(b, w, h, theme) {
   const f = path.join(canvas, `${b}.dc.html`);
@@ -33,17 +33,25 @@ async function board(b, w, h, theme) {
   return file;
 }
 async function signIn(p) {
-  await p.goto(`${base}/next/#signin`); await p.fill("#si-email", EMAIL); await p.click("button[type=submit]"); await p.waitForSelector("#si-code"); await p.click("button[type=submit]"); await p.waitForSelector("text=Your reviews", { timeout: 20000 });
+  await p.goto(`${base}/next/?ui_next=on#/signin`); await p.fill("#si-email", EMAIL); await p.click("button[type=submit]"); await p.waitForSelector("#si-code"); await p.click("button[type=submit]"); await p.waitForSelector("text=Your reviews", { timeout: 20000 });
 }
 for (const [b, w, h, hash] of PAIRS.filter((x) => !ONLY || ONLY.includes(x[0]))) {
   for (const theme of ["light", "dark"]) {
     const bf = await board(b, w, h, theme);
     const ctx = await br.newContext({ viewport: { width: w, height: h }, reducedMotion: "reduce" }); const p = await ctx.newPage();
     const participant = hash.startsWith("P:"); const target = hash.replace(/^P:/, "");
-    if (participant) { await p.goto(`${base}/next/${link}`); await p.waitForSelector("text=Start", { timeout: 20000 }); if (target.includes("/p/q/") || target.includes("review") || target.includes("receipt")) { for (const q of [1, 2]) { await p.goto(`${base}/next/#/p/q/${q}`); await p.waitForSelector("fieldset.opts, textarea.in"); const r = p.locator("input.rd, input.cb").first(); if (await r.count()) await r.check(); else await p.locator("textarea.in").fill("ok"); await p.waitForTimeout(200); } } }
+    if (participant) {
+      await p.goto(`${base}/next/?ui_next=on${link}`); await p.waitForSelector("text=Start", { timeout: 20000 });
+      // Rule: every participant screen is reached by its real prerequisite — answers for q/n and review, a real submission for the receipt.
+      if (target.includes("/p/q/") || target.includes("review") || target.includes("receipt")) {
+        await p.click("text=Start"); await p.waitForURL(/#\/p\/passage/); await p.click("text=I've read it"); await p.waitForURL(/#\/p\/(q\/1|about)/); if (/#\/p\/about/.test(p.url())) { await p.click("text=Next"); await p.waitForURL(/#\/p\/q\/1/); }
+        for (let i = 0; i <= 40; i++) { if (/#\/p\/review/.test(p.url())) break; const n = Number(/q\/(\d+)/.exec(p.url())?.[1] ?? 1); await p.waitForSelector(`text=Question ${n} of`, { timeout: 15000 }); await p.waitForSelector("fieldset.opts, textarea.in", { timeout: 15000 }); const r = p.locator("input.rd, input.cb").first(); if (await r.count()) await r.check(); else await p.locator("textarea.in").fill(`answer ${n}`); await p.waitForTimeout(150); await p.click("text=Next"); await p.waitForURL(new RegExp(`#/p/(q/${n + 1}|review)`)); if (target.includes("/p/q/") && /#\/p\/review/.test(p.url())) break; }
+        if (target.includes("receipt")) { await p.goto(`${base}/next/#/p/review`); await p.waitForSelector("text=Send my answers", { timeout: 15000 }); await p.click("text=Send my answers"); await p.waitForSelector("text=Thank you", { timeout: 20000 }); }
+      }
+    }
     else if (!target.includes("welcome") && !target.includes("/p/")) await signIn(p);
     const sep = target.includes("?") ? "&" : "?";
-    await p.goto(`${base}/next/${target}${sep}theme=${theme}`); await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(1500);
+    await p.goto(`${base}/next/?ui_next=on${target}${sep}theme=${theme}`); // theme rides the hash query (app/Live.svelte reads route.query) await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(1500);
     await p.waitForFunction(() => !/Loading…/.test(document.body.textContent), null, { timeout: 30000 }).catch(() => {});
     await p.waitForTimeout(600);
     const af = path.join(out, `app-${b}-${w}x${h}-${theme}.png`); await p.screenshot({ path: af });
@@ -56,3 +64,8 @@ for (const [b, w, h, hash] of PAIRS.filter((x) => !ONLY || ONLY.includes(x[0])))
 }
 fs.writeFileSync(path.join(out, "measure-live.json"), JSON.stringify(rows, null, 1));
 await br.close();
+// Acceptance (playbook rule 15): every requested pair needs its board, and every pair must be <=5% changed pixels. Anything else fails.
+const LIMIT = Number(process.env.LIMIT ?? 5);
+const bad = rows.filter((r) => !r.boardFound || r.pct === null || r.pct > LIMIT);
+if (bad.length) { console.log(`FAIL ${bad.length} of ${rows.length}: ` + bad.map((r) => `${r.board} ${r.w}x${r.h} ${r.theme} ${r.boardFound ? r.pct + "%" : "no board"}`).join("; ")); process.exit(1); }
+console.log(`PASS ${rows.length} pairs <= ${LIMIT}%`);

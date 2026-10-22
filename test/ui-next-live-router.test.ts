@@ -77,4 +77,10 @@ describe("href bridge", () => {
     expect(href("p-question", { q: 2 })).toBe("#/p/q/2");
     expect(href("collect", { state: "menu" })).toBe("#/review/asm_9/collect?state=menu");
   });
+  it("an in-page anchor after a second # names an element, not a route (QR room's \"Meeting offline?\" -> collect#offline)", () => {
+    const r = parse("#/review/asm_9/collect#offline");
+    expect(r.name).toBe("collect"); expect(r.params).toEqual({ aid: "asm_9" }); expect(r.anchor).toBe("offline");
+    expect(parse("#/review/asm_9/collect?state=menu#offline")).toMatchObject({ name: "collect", anchor: "offline" });
+    expect(parse("#/review/asm_9/collect").anchor).toBe("");
+  });
 });

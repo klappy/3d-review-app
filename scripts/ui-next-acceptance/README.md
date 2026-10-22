@@ -35,3 +35,23 @@ Rebuilding `/next/` while `wrangler dev` runs can drop the asset until the dev s
 
 Pins: cookbook canvas at the app PIN (`ui-next/design-source/PIN`); measurements cite the canvas commit and app head in `measure-live.json`'s
 companion receipt in the cookbook unit.
+
+## Measurement rules (2026-10-22, root plan step 5/6)
+
+- `CHROMIUM=/path/to/chrome` overrides the Chromium binary in every script (another machine's Playwright cache).
+- `measure-live.mjs` exits 1 when any requested pair has no board or measures above `LIMIT` (default 5%): a missing pair or a raw
+  >5% is a failed run, never a skipped one. Participant screens are reached by their real prerequisite (answers for q/n and
+  review; a real submission for the receipt), never by navigating to the route.
+- `measure-qr.mjs <generatorDir> <base> <outDir> <aid>` is the like-for-like QR Room run: it reads the live room's encoder
+  cells (same encoder: `app/data.js qrModules` = `ui/assess/vendor-qrcode.js qrcode(0,"M")`), writes `qr_data-runtime.json`,
+  rebuilds the boards from it (`QR_DATA=…` → `build.py`) and measures 1280×800 and 390×844, light and dark, provenance off.
+- `journey.mjs` fails on any page exception, console error or failed request (except the signed-out `GET /v2/me` probe and the
+  deliberate bad-code 404), asserts each screen is the page and not the Status card, and reads the owner's survey counts back
+  from `/v2` before and after the submission: exactly one open survey moves, by exactly +1; a new tab on the same link must show
+  the same receipt id (server session via the device's remembered bearer).
+- Board-matching seed: the boards draw from the cookbook's `generator/qr_data.json`, recorded by `qr-cells.mjs` from the exact
+  seeded links (`identity.json`: host + the five real `#survey=` links of the local review `assess_3d1cbfb0-…`); a replay on a
+  fresh local store regenerates that file from the new links (the token strings differ; n and layout are what the boards keep).
+
+Local result 2026-10-22 (head of `ui-next-demo-wiring`, local Worker): QRRoom 1280×800 2.4% light / 2.4% dark; QRRoomPhone
+390×844 0.5% / 0.5%. Earlier live pairs (before the shell-fill rule in `components/type.css`) are superseded and must be re-run.

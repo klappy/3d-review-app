@@ -366,7 +366,7 @@ describe("QRRoom (QRRoom, QRRoomPhone)", () => {
     expect(text(a.querySelector(".phone-top .phone-title"))).toBe("Show a QR code");
     expect(a.textContent).toContain("Survey 3 of 5");
     expect(text(a.querySelector("h1.h2"))).toBe("Community");
-    expect(text(a.querySelector("main .l-card p.small"))).toBe("Scan to open the Hindi survey3dreview.app/s/P8L2W4");
+    expect(text(a.querySelector("main .l-card p.small"))).toBe("Scan to open the Hindi survey · Community3dreview.app/s/P8L2W4");
     const community = fixture.groups[1].surveys[0];
     expect([...a.querySelectorAll(".qr[data-size=phone] i")].map((i) => (i.classList.contains("o") ? "0" : "1")).join("")).toBe(community.qr);
     expect(a.querySelector("[role=status]")).toBeNull(); // room-health counter retired (cookbook PR 198)
@@ -374,7 +374,7 @@ describe("QRRoom (QRRoom, QRRoomPhone)", () => {
     expect(all(a, ".phone-bar .btn")).toEqual(["Previous", "Next survey"]);
     cleanup();
     const first = shot(QRRoom, { phone: true, state: "1" });
-    expect(text(first.querySelector("h1"))).toBe("Translators");
+    expect(text(first.querySelector("h1"))).toBe("Translation team");
     expect(text(first.querySelector("main .l-card b"))).toBe("3dreview.app/s/K7Q4F2");
   });
   it("a data row without the qrRoomPhone default starts on the first survey, desktop and phone, never throws", () => {
@@ -394,7 +394,7 @@ describe("QRRoom (QRRoom, QRRoomPhone)", () => {
     two.groups = [two.groups[0]];
     const a = shot(QRRoom, { phone: true, data: two });
     expect(a.textContent).toContain("Survey 2 of 2");
-    expect(text(a.querySelector("h1"))).toBe("Team leaders & mentors");
+    expect(text(a.querySelector("h1"))).toBe("Translation team"); // the board's phone h1 is the lens label; the survey name sits in the caption
     expect(links(a, ".phone-bar .btn")).toEqual(["?ui_next=on&screen=qr-room&w=phone&state=1", "?ui_next=on&screen=qr-room&w=phone&state=1"]);
     cleanup();
     const none = structuredClone(fixture);
@@ -643,8 +643,9 @@ describe("collect view model and data wiring", () => {
     expect(() => render(Bar, { props: { value: 1, max: 2, lens: "elders" } })).toThrow(/team, community, church/);
     expect(readFileSync(resolve(LANE, "Bar.svelte"), "utf8")).not.toMatch(/\["team", "community", "church"\]/);
   });
-  it("no QR encoder ships in the lane (the boards' codes are fixture placeholders; real codes are wiring debt)", () => {
-    for (const f of readdirSync(LANE)) expect(readFileSync(resolve(LANE, f), "utf8"), f).not.toMatch(/vendor-qrcode/);
+  it("the lane draws cells it is given and never encodes: the one encoder call is app/data.js qrModules (wiring debt 7 closed; §8.7)", () => {
+    for (const f of readdirSync(LANE)) expect(readFileSync(resolve(LANE, f), "utf8"), f).not.toMatch(/import .*vendor-qrcode/);
+    expect(readFileSync(resolve(LANE, "../../app/data.js"), "utf8")).toMatch(/import qrcode from .*vendor-qrcode\.js/);
   });
   it("20px glyphs use the shared Icon; the lane Glyph draws only the sizes it cannot (13, 16, 18, 26)", () => {
     for (const f of readdirSync(LANE).filter((x) => x.endsWith(".svelte"))) expect(readFileSync(resolve(LANE, f), "utf8"), f).not.toMatch(/<Glyph[^>]*size=\{20\}/);

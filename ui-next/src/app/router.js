@@ -74,21 +74,26 @@ export function parse(hash = "") {
   if (ENTRY.test(h)) return { name: "p-entry", params: {}, query: new URLSearchParams() };
   let body = h.replace(/^#/, "");
   let query = new URLSearchParams();
+  // An in-page anchor rides after a second "#" (`#/review/<aid>/collect#offline`: the lanes' literal "collect#offline" links);
+  // it names an element id on the screen, never a route.
+  let anchor = "";
+  const ai = body.indexOf("#");
+  if (ai >= 0) { anchor = body.slice(ai + 1); body = body.slice(0, ai); }
   const qi = body.indexOf("?");
   if (qi >= 0) { query = new URLSearchParams(body.slice(qi + 1)); body = body.slice(0, qi); }
-  if (!body) return { name: "home", params: {}, query };
+  if (!body) return { name: "home", params: {}, query, anchor };
   if (!body.startsWith("/")) {
     const bare = { workspace: "workspaces", project: "home", review: "home", signin: "sign-in", "survey-code": "p-code", survey: "p-code", video: "help", main: "home", practice: "sandbox", results: "home", "next-step": "home", "help-h7": "help", tour: "about" }[body] ?? body;
-    return { name: BY_NAME.has(bare) && !BY_NAME.get(bare).includes(":") ? bare : "home", params: {}, query };
+    return { name: BY_NAME.has(bare) && !BY_NAME.get(bare).includes(":") ? bare : "home", params: {}, query, anchor };
   }
   for (const { name, re, keys } of compiled) {
     const m = re.exec(body);
     if (!m) continue;
     const params = {};
     keys.forEach((k, i) => { try { params[k] = decodeURIComponent(m[i + 1]); } catch { params[k] = m[i + 1]; } });
-    return { name, params, query };
+    return { name, params, query, anchor };
   }
-  return { name: "home", params: {}, query };
+  return { name: "home", params: {}, query, anchor };
 }
 
 // to(name, params, query) -> "#/..." ; a missing param throws (a link to nowhere is a bug, not a 404).

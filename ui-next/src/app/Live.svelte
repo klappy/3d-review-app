@@ -4,6 +4,7 @@
      and retry states are drawn here once; the lane screens draw the data. Screens with no live store yet are drawn from their fixture
      and labelled as a preview (never hidden): the receipt lists them. -->
 <script>
+  import { tick } from "svelte";
   import { onMount } from "svelte";
   import { parse, to } from "./router.js";
   import { setLiveContext } from "../screens/href.js";
@@ -57,12 +58,11 @@
     if (name === "project") return { screen: "project", data: await D.projectModel(params.pid) };
     // A review's own page is the board for its stage: Setup 5 (ready to launch) while preparing, Collect while collecting, Results after.
     if (name === "review") { const { assessment } = await D.assessment(params.aid); if (assessment.stage === "collect") return { redirect: to("collect", params) }; if (assessment.stage !== "prepare") return { redirect: to("results", params) }; return { screen: "setup5", data: await D.setupModel(params.aid) }; }
-    if (name === "collect" || name === "close-collection") { const m = await D.collectModel(params.aid); return { screen: name, data: m }; }
+    if (name === "collect" || name === "close-collection") { const m = await D.attachLinks(await D.collectModel(params.aid), { full: true }); return { screen: name, data: m }; }
     if (name === "qr-room" || name === "print-qr") {
       // The room shows the host under each QR: the board's short 3dreview.app/s/CODE has no backend yet (RESULTS-collect debt; parity-loop row).
-      const m = await D.collectModel(params.aid);
+      const m = await D.attachLinks(await D.collectModel(params.aid), { full: name === "print-qr" });
       const open = m.groups.flatMap((g) => g.surveys).filter((s) => s.open);
-      await Promise.all(open.map(async (s) => { try { const l = await D.linkFor(params.aid, s.id); s.fullLink = `${m.origin}/next/${l.fragment}`; s.qr = D.qrModules(s.fullLink).cells; s.code = s.id; s.link = name === "print-qr" ? s.fullLink : `${new URL(m.origin).host}/next`; } catch (e) { s.linkError = e.message; } }));
       m.groups = m.groups.map((g) => ({ ...g, surveys: g.surveys.filter((s) => s.qr) })).filter((g) => g.surveys.length);
       return { screen: name, data: m, empty: !m.groups.length, emptyText: open.length ? "The survey links could not be created. Try again." : "No survey is collecting yet. Open collection on the review page first." };
     }
@@ -117,6 +117,8 @@
     }
   }
   $effect(() => { void route; load(); });
+  // An in-page anchor (`collect#offline`) scrolls to its element once the screen is ready; the hash still names the route, so back/forward work.
+  $effect(() => { if (page.status === "ready" && route.anchor) tick().then(() => document.getElementById(route.anchor)?.scrollIntoView({ block: "start" })); });
   $effect(() => { if (session === undefined) S.me().then((m) => { session = m; }).catch(() => { session = null; }); });
 
   // Participant actions (the journey owns persistence; these only navigate on its answer).

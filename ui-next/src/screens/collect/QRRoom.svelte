@@ -39,34 +39,34 @@
 <AppShell {phone} {theme} screen rhythm={phone ? undefined : "center"} {top} {bar}>
   {#if phone}
     <Row split gap={3}><span class="micro">{#if s}Survey {at + 1} of {total}{/if}</span><a class="link small" href={`${href("collect")}#offline`}>Meeting offline? Print and paper</a></Row>
-    <div class="glass-hi l-card l-stack" data-pad="hero" data-gap="4" data-align="center">
+    <div class="glass-hi l-card qr-tile-phone" data-pad="hero">
       {#if s}
-        <div class="l-row" data-gap="2"><LensDot lens={s.lens} decorative /><h1 class="h2">{s.name}</h1></div>
-        <Qr cells={s.qr} size="phone" />
-        <p class="small">Scan to open the {m.review.language} survey<br /><b>{s.link}</b></p>
+        <div class="l-row" data-gap="2"><LensDot lens={s.lens} decorative /><h1 class="h2">{m.groups.find((g) => g.lens === s.lens)?.label ?? s.name}</h1></div>
+        <div class="qr-wrap"><Qr cells={s.qr} size="phone" /></div>
+        <p class="small">Scan to open the {m.review.language ? `${m.review.language} ` : ""}survey · {s.name}<br /><b>{s.link}</b></p>
+        <div class="pager" aria-hidden="true">{#each m.surveys as x, i (x.code)}<i aria-current={i === at ? "true" : undefined}></i>{/each}</div>
       {:else}
         <h1 class="h2">No surveys yet</h1>
       {/if}
     </div>
   {:else}
     <Page gap={6}>
-      <div class="l-stack" data-gap="2" data-align="center">
-        <h1 class="display display-tight">Scan the code for your role</h1>
-        <p class="small lead">Find your perspective's colour, then the survey for your role. No account, no name.</p>
+      <div class="l-stack qr-head" data-gap="2" data-align="center">
+        <h1 class="display">Scan the code for your role</h1>
+        <p class="small">Find your perspective's colour, then the survey for your role. No account, no name.</p>
       </div>
       <div class="l-grid" data-gap="4" data-cols="5">
         {#each m.surveys as c (c.code)}
-          <div class="glass-hi l-card l-stack" data-lens={c.lens} data-pad="hero" data-gap="3" data-align="center">
-            <span class="lvl-pair"><LensDot lens={c.lens} decorative />{m.groups.find((g) => g.lens === c.lens).label}</span>
+          <div class="glass-hi l-card l-stack qr-tile" data-lens={c.lens} data-pad="tile" data-gap="3" data-align="center">
+            <span class="micro" data-lens={c.lens}><LensDot lens={c.lens} decorative />{m.groups.find((g) => g.lens === c.lens).label}</span>
             <Qr cells={c.qr} size="room" />
             <span class="h2">{c.room}</span>
             <span class="kbd">{c.link}</span>
           </div>
         {/each}
       </div>
-      <div class="l-stack" data-gap="2" data-align="center">
-        <p class="small lead">Not sure which is yours? Ask the facilitator. No phone? Ask for a paper survey.</p>
-        
+      <div class="l-stack qr-foot" data-gap="2" data-align="center">
+        <p class="small">Not sure which is yours? Ask the facilitator. No phone? Ask for a paper survey.</p>
       </div>
     </Page>
   {/if}

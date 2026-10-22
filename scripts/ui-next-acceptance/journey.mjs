@@ -8,15 +8,23 @@ const SHOTS = process.env.SHOTS ?? "";
 const PHONE = { width: 390, height: 844 };
 const ok = (m) => console.log("✅", m);
 const fail = (m) => { console.log("❌", m); process.exit(1); };
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" }) // CHROMIUM: another machine's Chromium binary (README);
 const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true }); };
 const errors = [];
-const watch = (page, tag) => { page.on("pageerror", (e) => errors.push(`${tag}: ${e.message}`)); page.on("console", (m) => { if (m.type() === "error") errors.push(`${tag} console: ${m.text()}`); }); };
+// A screen counts as loaded only when it is not the shell's Status card (app/Status.svelte: "Loading…", "Something went wrong", "Not found").
+const loaded = async (page, what) => { await page.waitForTimeout(300); /* Status defers "Loading…" 180ms (app/Live.svelte), so a fresh load is briefly blank */ await page.waitForFunction(() => !/Loading…/.test(document.body.textContent ?? ""), null, { timeout: 30000 }).catch(() => {}); const t = (await page.textContent("body")) ?? ""; if (/Loading…|Something went wrong|Could not load|Try again/.test(t) && !/Question \d+ of/.test(t)) fail(`${what}: screen is the Status card, not the page: ${t.replace(/\s+/g, " ").slice(0, 160)}`); };
+// Page exceptions and console errors fail the run. The one accepted line: the browser's own "Failed to load resource … 401" for the
+// signed-out session probe (GET /v2/me before sign-in), which the app makes on purpose; any other failed request is recorded by URL.
+const watch = (page, tag) => {
+  page.on("pageerror", (e) => errors.push(`${tag}: ${e.message}`));
+  page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(`${tag} console: ${m.text()}`); });
+  page.on("response", (r) => { const u = r.url().replace(BASE, ""); if (r.status() >= 400 && !(r.status() === 401 && u === "/v2/me")) errors.push(`${tag} HTTP ${r.status()} ${r.request().method()} ${u}`); });
+};
 
 // --- facilitator ---
 const fac = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const f = await fac.newPage(); watch(f, "fac");
-await f.goto(`${BASE}/next/`);
+await f.goto(`${BASE}/next/?ui_next=on`); // the documented opt-in (route.js); the current UI's account menu links here
 await f.waitForSelector("text=Sign in", { timeout: 15000 });
 ok(`entry ${BASE}/next/ -> landing (signed out)`);
 await f.click("text=Sign in");
@@ -58,25 +66,44 @@ if (!surveys.filter((s) => !s.archived_at).length) {
 ok(`data: project ${pid} · review ${a.id} (${a.stage})`);
 
 await f.goto(`${BASE}/next/#/project/${pid}`);
-await f.waitForSelector("h1", { timeout: 15000 });
-await f.click(`a[href="#/review/${encodeURIComponent(a.id)}"]`);
-await f.waitForURL(new RegExp(`#/review/${a.id}$`));
-await f.waitForSelector("h1");
-ok("project -> review page (in-app link, hash route)");
+await f.waitForSelector("h1", { timeout: 15000 }); await loaded(f, "project");
+// The project's review link is stage-aware (collecting -> …/collect, results -> …/results, preparing -> the review page).
+await f.click(`a[href^="#/review/${encodeURIComponent(a.id)}"]`);
+await f.waitForURL(new RegExp(`#/review/${a.id}(/collect|/results)?$`));
+await f.waitForSelector("h1"); await loaded(f, "review");
+ok(`project -> review (in-app link, hash route): ${f.url().replace(/.*#/, "#")}`);
 if ((await f.textContent("body")).includes("Open collection")) {
-  await f.click("button:has-text('Open collection')");
-  await f.waitForSelector("text=Open the collection room", { timeout: 15000 });
+  await f.click("button:has-text('Open collection')"); // Setup5 launch (POST /stage) when the review is still preparing
+  await f.waitForURL(/collect$/, { timeout: 15000 });
   ok("stage prepare -> collect (POST /stage) from the review page");
 }
-await f.click("text=Open the collection room");
-await f.waitForURL(/#\/review\/.*\/collect\/qr$/);
+await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1", { timeout: 30000 }); await loaded(f, "collect");
+const collectText = (await f.textContent("body")).replace(/\s+/g, " ");
+if (!/#survey=/.test(await f.evaluate(() => [...document.querySelectorAll(".kbd")].map((e) => e.textContent).join(" ")))) fail("collect: no real survey link under a survey row");
+ok(`collect page: real per-survey links; ${/Active until|Closed on/.test(collectText) ? "period shown" : "no period set on this review"}; language ${/Hindi|English|Demo language/.test(collectText) ? "shown" : "not shown (none on the review)"}`);
+// Owner count before the participant submits (same /v2 the facilitator UI reads).
+const openIds = (await api(`/v2/assessments/${a.id}`)).surveys.filter((s) => !s.archived_at && s.collection_status === "open").map((s) => s.id);
+const countOf = async (sid) => Number((await api(`/v2/assessments/${a.id}/surveys/${sid}`)).counts?.responses ?? 0); // the same GET the UI reads (app/data.js surveyCounts)
+const before = Object.fromEntries(await Promise.all(openIds.map(async (sid) => [sid, await countOf(sid)])));
+// The collect page prints every open survey's full link (the row's .kbd); the participant opens the first one.
+const firstLink = await f.evaluate(() => [...document.querySelectorAll(".kbd")].map((e) => e.textContent.trim()).find((t) => t.includes("#survey=")) ?? null);
+if (!firstLink) fail("collect: no full survey link printed");
+await f.goto(`${BASE}/next/#/review/${a.id}/collect/qr`); await f.waitForSelector(".qr", { timeout: 30000 });
+await f.click("text=Meeting offline? Print and paper"); await f.waitForURL(/collect#offline$/); await f.waitForSelector("#offline", { timeout: 15000 }); await loaded(f, "collect#offline");
+ok("QR room -> Meeting offline? lands on collect#offline (in-page anchor, not home)");
+await f.goBack(); await f.waitForURL(/collect\/qr$/); await f.waitForSelector(".qr", { timeout: 30000 }); ok("browser back restores the QR room");
+await f.goto(`${BASE}/next/#/review/${a.id}`); await f.waitForURL(/collect$/); await f.waitForSelector("h1"); await loaded(f, "review -> collect");
+ok("review page redirects to Collect while collecting");
+await f.click('[aria-label^="QR code for"], [aria-label^="QR for"]'); // the row's QR button (collect/SurveyGroups.svelte)
+await f.waitForURL(/#\/review\/.*\/collect\/qr(\?state=\d+)?$/);
 await f.waitForSelector(".qr", { timeout: 30000 });
-const link = await f.evaluate(() => [...document.querySelectorAll(".kbd")].map((e) => e.textContent).find((t) => t.includes("#survey=")));
+// The room prints the host under each code; the full link is what the code encodes (app/data.js attachLinks). Take the first tile's.
+const link = await f.evaluate(() => { const t = document.querySelector(".qr-tile, .qr-tile-phone"); return t?.__link ?? null; }) ?? await f.evaluate(() => [...document.querySelectorAll(".kbd")].map((e) => e.textContent).find((t) => t.includes("#survey=")) ?? null) ?? firstLink;
 if (!link) fail("no survey link on the QR room");
 ok(`QR room shows a real link + QR: ${link.replace(/#survey=.*/, "#survey=…")}`);
 await shot(f, "qr-room");
-await f.goBack(); await f.waitForURL(new RegExp(`#/review/${a.id}$`)); ok("browser back works");
-await f.goForward(); await f.waitForURL(/collect\/qr$/); ok("browser forward works");
+await f.goBack(); await f.waitForURL(new RegExp(`#/review/${a.id}/collect$`)); await f.waitForSelector("h1"); await loaded(f, "back -> collect"); ok("browser back works (room -> collect)");
+await f.goForward(); await f.waitForURL(/collect\/qr(\?state=\d+)?$/); await f.waitForSelector(".qr"); ok("browser forward works (collect -> room)");
 
 // --- participant on a phone, new context (no facilitator cookie) ---
 const part = await browser.newContext({ viewport: PHONE, isMobile: true, hasTouch: true });
@@ -120,27 +147,42 @@ for (let i = 0; i <= 40; i++) {
 await p.goto(`${BASE}/next/#/p/review`);
 await p.waitForSelector("text=Check your answers", { timeout: 15000 });
 await shot(p, "p-review");
-await p.click("text=Send my answers"); await p.waitForTimeout(3000); console.log("DBG", p.url(), (await p.textContent("body")).replace(/\s+/g," ").slice(0,500));
+await p.click("text=Send my answers");
 await p.waitForSelector("text=Thank you", { timeout: 20000 });
 const receipt = await p.textContent(".receipt");
 if (!receipt?.trim()) fail("no receipt code shown");
-ok(`participant: submitted -> receipt ${receipt.trim()} (persisted on the server)`);
+const shown = receipt.trim().replace(/\s+/g, "");
+// Independent readback: exactly one open survey's owner count moved, by exactly one; the receipt the server stored for this
+// submission is the one on the phone (the participant controller keeps it per device; /v2 shows the response count only).
+const after = Object.fromEntries(await Promise.all(openIds.map(async (sid) => [sid, await countOf(sid)])));
+const moved = openIds.filter((sid) => after[sid] !== before[sid]);
+if (moved.length !== 1 || after[moved[0]] !== before[moved[0]] + 1) fail(`owner counts did not move by exactly +1 on exactly one survey: before ${JSON.stringify(before)} after ${JSON.stringify(after)}`);
+ok(`participant: submitted -> receipt ${shown}; owner count for ${moved[0]} ${before[moved[0]]} -> ${after[moved[0]]} (exactly +1, read back from /v2 counts)`);
+// Server/display receipt: a NEW tab has no tab storage, only the device's remembered session (ui/shared-link.js remember), so the
+// receipt it shows comes from the server's session — it must be the same id.
+const p2 = await part.newPage(); watch(p2, "part2"); await p2.goto(link); await p2.waitForSelector("text=Thank you", { timeout: 20000 });
+const shown2 = ((await p2.textContent(".receipt")) ?? "").trim().replace(/\s+/g, "");
+if (shown2 !== shown) fail(`new tab shows receipt ${shown2}, the submit showed ${shown}`);
+await p2.close(); ok("participant: a new tab on the same link resumes the server's session and shows the same receipt id");
 await shot(p, "p-receipt");
 await p.reload(); await p.waitForSelector("text=Thank you", { timeout: 15000 }); ok("participant: reload after submit shows the receipt again (receipt per device)");
-await p.goto(`${BASE}/next/#/p/code`); await p.waitForSelector("#p-code"); await p.fill("#p-code", "NOPE00"); await p.click("text=Open my survey");
-await p.waitForSelector("[role=alert]", { timeout: 15000 }); ok("participant: a bad code shows the inline error");
+await p.goto(`${BASE}/next/#/p/code`); await p.waitForSelector("#p-code"); await p.fill("#p-code", "NOPE00");
+const n0 = errors.length; await p.click("text=Open my survey");
+await p.waitForSelector("[role=alert]", { timeout: 15000 });
+const expected404 = errors.splice(n0).filter((e) => !/HTTP 404 POST \/v2\/participate\/code/.test(e)); errors.push(...expected404); // the bad code's 404 is the point
+ok("participant: a bad code shows the inline error (server 404, expected)");
 
 // --- facilitator: results ---
 await f.goto(`${BASE}/next/#/review/${a.id}/results`);
-await f.waitForSelector("h1", { timeout: 60000 });
+await f.waitForSelector("h1", { timeout: 60000 }); await loaded(f, "results");
 const body = await f.textContent("body");
 ok(`results page rendered: ${/Nothing here yet|More input needed|results can/i.test(body) ? "held (too few responses)" : "report built from real answers"}`);
 await shot(f, "results");
-await f.goto(`${BASE}/next/#/review/${a.id}/report`); await f.waitForSelector("h1", { timeout: 60000 }); ok("report page rendered");
-await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1"); ok("collect page rendered");
+await f.goto(`${BASE}/next/#/review/${a.id}/report`); await f.waitForSelector("h1", { timeout: 60000 }); await loaded(f, "report"); ok("report page rendered");
+await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1"); await loaded(f, "collect"); ok("collect page rendered");
 await f.goto(`${BASE}/next/#/nowhere/at/all`); await f.waitForSelector("text=Your reviews"); ok("unknown deep link falls back to home");
 // sign out from the account menu
 await f.click("summary:has-text('Account menu'), #acct summary, [aria-label^='Account menu']").catch(() => {});
-if (errors.length) { console.log("⚠️ page errors:"); for (const e of errors) console.log("  ", e.slice(0, 300)); }
 await browser.close();
-console.log(errors.length ? "DONE with page errors" : "DONE clean");
+if (errors.length) { console.log("❌ page errors (the run fails):"); for (const e of errors) console.log("  ", e.slice(0, 300)); process.exit(1); }
+console.log("DONE clean");

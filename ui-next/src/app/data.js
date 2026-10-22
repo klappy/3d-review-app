@@ -2,7 +2,8 @@
 // share.js, report-build.js); builds view models in the shapes the lane screens already draw (collect/model.js, results/data.js, home.json).
 import { api, confirmed, enc } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
-import { v3ScoreBand } from "../../../ui/assess/v3-assessment.js";
+import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
+import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
 import { LEVEL_KEY } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
@@ -93,15 +94,28 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
   const { assessment: a, surveys } = await assessment(aid);
   const p = await project(a.project_id).catch(() => ({ name: "Project", id: a.project_id }));
   const live = surveys.filter((s) => !s.archived_at);
-  const counts = await Promise.all(live.map((s) => surveyCounts(aid, s.id).catch(() => null)));
+  // The same stores the current UI reads (ui/assess/assess.js): the project's languages resolve language_id when the assessment
+  // carries no language_name; passages name what to read first; the expected count per survey is browser-local (v3:expected,
+  // never an API field) — a facilitator sees the number they typed on this browser, as today.
+  const [counts, langs, passages] = await Promise.all([
+    Promise.all(live.map((s) => surveyCounts(aid, s.id).catch(() => null))),
+    a.language_name || !a.language_id ? Promise.resolve([]) : api(`/v2/projects/${enc(a.project_id)}/languages`).then((r) => r?.languages ?? []).catch(() => []),
+    api(`/v2/assessments/${enc(aid)}/passages`).then((r) => r?.passages ?? []).catch(() => []),
+  ]);
+  const language = a.language_name || langs.find((l) => l.id === a.language_id)?.name || "";
+  const passage = [...new Set(passages.map((x) => String(x?.reference || x?.title || "").trim()).filter(Boolean))].join(" · ");
+  const period = parsePeriod(a.period);
+  const closes = period ? shortDate(period.until) : "";
+  const daysLeft = period ? Math.max(0, Math.ceil((Date.parse(period.until) - Date.now()) / 86400000)) : null;
+  let store = null; try { store = globalThis.localStorage; } catch { store = null; }
   const byLens = new Map();
   live.forEach((s, i) => {
     const key = lensKeyOf(s.perspective) ?? "team";
     const c = counts[i];
     const answered = Number(c?.counts?.responses ?? 0);
-    const raw = c?.expected_count ?? c?.survey?.expected_count ?? s.expected_count;
-    const expected = Number.isFinite(Number(raw)) && Number(raw) > 0 ? Number(raw) : null; // null = no expected count set (model.js draws no bar)
-    const row = { id: s.id, name: s.template_name || s.template_id, room: s.template_name || s.template_id, code: "", answered, expected, open: s.collection_status === "open", qr: null, link: null };
+    const expected = v3ExpectedFor(s.id, store); // null = no expected count set on this browser (model.js draws no bar)
+    // code: the row's identity (the board's short 3dreview.app/s/CODE has no backend: RESULTS-collect debt); link/qr arrive from attachLinks.
+    const row = { id: s.id, name: s.template_name || s.template_id, room: s.template_name || s.template_id, code: s.id, answered, expected, open: s.collection_status === "open", qr: null, link: null };
     if (!byLens.has(key)) byLens.set(key, []);
     row.fullLink = null;
     byLens.get(key).push(row);
@@ -112,14 +126,26 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
     aid, projectId: a.project_id, origin,
     user: { first: "", initials: "" }, workspace: "",
     project: { name: p.name, href: to("project", { pid: a.project_id }) },
-    review: { id: a.id, title: a.name, stage, language: a.language_name || "", modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", updated: ago(a.created_at), passage: "", opens: shortDate(a.created_at), closes: "", daysLeft: null, serverStage: a.stage },
+    review: { id: a.id, title: a.name, stage, language, modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", updated: ago(a.created_at), passage, opens: period?.starts ? shortDate(period.starts) : shortDate(a.created_at), closes, activeLine: collectLine(a.period), daysLeft, serverStage: a.stage },
     // No room telemetry: the room-health counter is retired (cookbook PR 198; RULING-2026-10-16-scrap-app-ratelimit) and no capability
     // reports opens per minute or refusals, so nothing is invented here (root plan @6cd4cd8 step 4).
     groups, linkHost: `${origin}/next/#survey=`,
     // PrintQR's choices (every survey ticked, the three layouts the board draws) and QRRoomPhone's default survey.
-    printQr: { checked: live.map((s) => s.id), layouts: [{ title: "One page per survey", help: "A full-page code to pin up or hold up.", per: "survey" }, { title: "Hand-out cards", help: "Six cards per page, cut along the lines, one survey per sheet.", per: "sheet", cards: 6 }, { title: "All on one page", help: "Every selected code on one sheet, for the table.", per: "one" }], languages: [a.language_name || "English"], papers: ["A4", "Letter"], pageLanguages: a.language_name || "English" },
-    qrRoomPhone: { survey: 1 },
+    printQr: { checked: live.map((s) => s.id), layouts: [{ title: "One page per survey", help: "A full-page code to pin up or hold up.", per: "survey" }, { title: "Hand-out cards", help: "Six cards per page, cut along the lines, one survey per sheet.", per: "sheet", cards: 6 }, { title: "All on one page", help: "Every selected code on one sheet, for the table.", per: "one" }], languages: [language || "English"], papers: ["A4", "Letter"], pageLanguages: language || "English" },
+    qrRoomPhone: { survey: 2 }, // "Survey 3 of N", as the QRRoomPhone board draws
   };
+}
+// Resolve every open survey's real link into a collect model (memory only; the token never touches storage): fullLink carries the
+// documented opt-in (route.js flagOn) so a participant's phone needs no stored flag; qr = the encoder's cells for that exact string;
+// link = what the screen prints under the code (the host for the room, the full link for print). A survey whose link cannot be
+// issued keeps linkError and no qr. Collect, QR room and Print QR all read this one shape.
+export async function attachLinks(m, { full = false } = {}) {
+  const open = m.groups.flatMap((g) => g.surveys).filter((s) => s.open);
+  await Promise.all(open.map(async (s) => {
+    try { const l = await linkFor(m.aid, s.id); s.fullLink = `${m.origin}/next/?ui_next=on${l.fragment}`; s.qr = qrModules(s.fullLink).cells; s.link = full ? s.fullLink : `${new URL(m.origin).host}/next`; }
+    catch (e) { s.linkError = e.message; }
+  }));
+  return m;
 }
 // Issue (or reuse this tab's) survey link for a survey and attach its QR modules: the raw token lives only in this tab's memory.
 const LINKS = new Map();
@@ -134,6 +160,8 @@ export async function linkFor(aid, sid) {
   LINKS.set(k, link);
   return link;
 }
+// The one encoder call (design-system §8.7 QR module grid): ui/assess/vendor-qrcode.js, typeNumber 0 = auto, error correction M —
+// the same call scripts/ui-next-acceptance/qr-cells.mjs uses to give the boards their cells, so board and screen match for a URL.
 export function qrModules(text) {
   const q = qrcode(0, "M"); q.addData(text); q.make();
   const n = q.getModuleCount();
