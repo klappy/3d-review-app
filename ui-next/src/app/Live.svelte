@@ -5,7 +5,10 @@
      and labelled as a preview (never hidden): the receipt lists them. -->
 <script>
   import { tick } from "svelte";
-  import { openQrPrint } from "./print.js";
+  import { openQrPrint, preparePapers, openPapersPrint, paperPreview, printReadyLine, printAllowed } from "./print.js";
+  import { loadBlankPrint } from "../../../ui/stage-screens.js";
+  import { SAMPLE_HREF } from "./router.js";
+  import { api, token } from "./api.js";
   import { onMount } from "svelte";
   import { parse, to } from "./router.js";
   import { setLiveContext, liveContext } from "../screens/href.js";
@@ -55,7 +58,12 @@
     if (name === "home") { const me = await S.me(); if (!me) return { screen: "landing" }; const home = await D.homeModel(me); return { screen: "home", home, state: home.empty ? "first" : "reviews" }; }
     if (name === "external") { globalThis.location.assign(params.href); return { screen: null }; } // the sample review in the current design
     if (name === "landing" || name === "about" || name === "help") return { screen: name };
-    if (name === "feedback") return { screen: name, preview: true, assessment: null, editHref: "/#feedback", previewNote: "Sending feedback happens in the current design for now (its form posts to /v2/feedback)." }; // the board's fields do not map onto the contract yet (Feedback.svelte header)
+    // Feedback posts the existing contract (ui/assess/feedback.js: POST /v2/feedback with require_authenticated); the sample tour and the
+    // signed-out see the current UI's sign-in line instead of a form that would be refused.
+    if (name === "feedback") { const me = await S.me(); const from = r.query.get("from") ? { page: r.query.get("from"), review: r.query.get("review") ?? "" } : null; return { screen: name, me, allowed: !!me && me.principal?.kind !== "anonymous", from }; }
+    // The sample review lives in the current design (ui/demo.js, in-memory demo data): the practice route hands the visitor there, as the
+    // lanes' "Try the sample review" link does; no practice-copy store exists to fill a sandbox from.
+    if (name === "sandbox") { globalThis.location.assign(SAMPLE_HREF); return { screen: null }; }
     if (name === "sign-in" || name === "sign-in-check") { const me = await S.me(); return me ? { redirect: to("home") } : { screen: "sign-in" }; }
     const me = await S.me();
     if (!me) return { screen: "sign-in", next: hash };
@@ -82,10 +90,22 @@
       return { screen: name, results: m };
     }
     if (name === "share") { const sm = await D.shareModel(params.aid, me); return { screen: "share", shareData: sm.review, share: sm.share }; }
-    // Still design previews with sample data (labelled on screen, never claimed functional): the current design does these for real.
-    if (name === "next-step" || name === "action-plan" || name === "print" || name === "paper-entry" || name === "sandbox" || name === "menu") {
-      const { assessment } = params.aid ? await D.assessment(params.aid) : { assessment: null };
-      return { screen: name, preview: true, assessment };
+    if (name === "menu") { const home = await D.homeModel(me); return { screen: "menu", menu: D.menuModel(me, home, { onSignOut: signOut }) }; }
+    // Print paper surveys for real: the chosen surveys' blank forms through GET /v2/assessments/{aid}/surveys/{sid}/print (app/print.js);
+    // the preview sheet is the first ticked survey's form, read now (read-only) so the dialog shows the real paper before printing.
+    if (name === "print") {
+      const m = await D.printPageModel(params.aid, me);
+      const previews = {};
+      if (printAllowed(m.role)) await Promise.all(m.surveys.map(async (s) => { const b = await loadBlankPrint({ request: (u, i) => fetch(u, i), token: token(), aid: m.aid, sid: s.id, role: m.role }); if (b.visible) { previews[s.id] = paperPreview(b, m); s.pages = `${b.items.length} question${b.items.length === 1 ? "" : "s"}`; } }));
+      return { screen: "print", data: m, previews, canPrint: printAllowed(m.role) };
+    }
+    // Entering a paper answer needs the assisted-entry capability (cap.response.assisted_next, POST /v2/participate/next), which the
+    // server refuses for everyone until an assisted collector can be authorised (src/handlers/response.ts, D6): said, never faked.
+    if (name === "paper-entry") { const { assessment } = await D.assessment(params.aid); return { screen: "paper-entry", unavailable: true, assessment, message: `Entering paper answers for ${assessment.name} is not available yet: the assisted-entry capability (cap.response.assisted_next, POST /v2/participate/next) is refused by the server until an assisted collector can be authorised (D6). Hand the paper's QR link to the person instead, or wait for that capability.` }; }
+    // Next step and the plan read the built report (the same results model as Results): a review with no report is offered the build.
+    if (name === "next-step" || name === "action-plan") {
+      const m = await D.resultsModel(params.aid, { build: false });
+      return { screen: name, results: m, plan: m.payload ? D.nextStepModel(m) : null };
     }
     return { redirect: to("home") };
   }
@@ -135,6 +155,33 @@
   }
   // Print QR pages for real: the chosen surveys' sheets (ui/assess/share.js) in their own tab, printing itself (app/print.js).
   const printQr = ({ surveys, per, paper }) => openQrPrint(globalThis, { title: page.data?.data?.review?.title ?? "", surveys, per, paper });
+  // Print paper surveys for real (app/print.js): the forms are read and translated here, then open in their own tab from the result;
+  // a blocked tab is said (the current UI's words), the ready line names what printed.
+  let printStatus = $state(""), printBusy = $state(false);
+  async function printPapers({ picked, lang, paper }) {
+    const m = page.data?.data; if (!m) return;
+    printBusy = true; printStatus = "Preparing the forms…";
+    try {
+      const models = await preparePapers(m, picked, { lang, onProgress: (t) => { printStatus = t; } });
+      printStatus = openPapersPrint(globalThis, models, { paper, title: `${m.review.title} · paper surveys` }) ? models.map((x) => `${x.identity?.survey?.name ?? x.title}: ${printReadyLine(x)}`).join(" ") : "Your browser blocked the print page. Allow pop-ups for this site, then use Print again.";
+    } catch (e) { printStatus = e?.message || "The blank questionnaire could not be prepared. Try Print again."; }
+    finally { printBusy = false; }
+  }
+  // Send app feedback: the current UI's POST and receipt check (ui/assess/feedback.js), its words on refusal.
+  async function sendFeedback(body) {
+    try {
+      const r = await api("/v2/feedback", { method: "POST", body });
+      if (r?.recorded !== true || typeof r.feedback_id !== "string" || !r.feedback_id || r.stripped !== false) throw new Error("Unconfirmed receipt");
+      return r;
+    } catch (e) {
+      const code = String(e?.code || e?.status || "");
+      if (["401", "NOT_AUTHENTICATED"].includes(code)) { S.forget(); throw new Error("Your sign-in is no longer active. Your text is still here; copy it before signing in again."); }
+      if (["403", "404", "NOT_AUTHORIZED", "NOT_AUTHORIZED_AT_SCOPE", "NOT_FOUND_OR_NOT_VISIBLE"].includes(code)) throw new Error("Feedback was refused for this account. Your text is still here.");
+      if (["400", "INVALID_PARAMS"].includes(code)) throw new Error("Feedback was not accepted. Check your text length; your draft is still here.");
+      if (code === "429" || code === "RATE_LIMITED") throw new Error(`${e.message} Your draft is still here.`);
+      throw new Error("We could not confirm whether your feedback was recorded. Your text is still here. Sending again may create a duplicate; nothing will retry automatically.");
+    }
+  }
   $effect(() => { void route; load(); });
   // An in-page anchor (`collect#offline`) scrolls to its element once the screen is ready; the hash still names the route, so back/forward work.
   $effect(() => { if (page.status === "ready" && route.anchor) tick().then(() => document.getElementById(route.anchor)?.scrollIntoView({ block: "start" })); });
@@ -163,7 +210,7 @@
   async function signOut() { try { await S.signOut(); D.clearLinks(); session = null; go(to("landing")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `You are still signed in: ${e?.message || "the sign-out was not confirmed"}. Try again.` } }; } }
   const accountItems = $derived(session ? [
     { kind: "head", label: session.principal?.display_name || "Signed in", sub: session.principal?.id ? "Facilitator" : "" }, { kind: "hr" },
-    { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback") },
+    { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback", {}, { from: route.name, review: page.data?.data?.review?.title ?? page.data?.results?.review?.title ?? "" }) },
     { label: "Current design", href: "/" }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
   ] : []);
   function onSignedIn() { D.clearLinks(); S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
@@ -219,9 +266,32 @@
   <About {phone} {theme} />
 {:else if page.data.screen === "sign-in"}
   <SignInLive {phone} {theme} onsignedin={onSignedIn} />
-{:else if page.data.screen === "help" || page.data.screen === "feedback"}
-  {@const C = REGISTRY[page.data.screen]}
+{:else if page.data.screen === "help"}
+  {@const C = REGISTRY.help}
   <C {phone} {theme} />
+{:else if page.data.screen === "feedback"}
+  {@const C = REGISTRY.feedback}
+  <C {phone} {theme} user={{ first: who?.first ?? "", initials: who?.initials ?? "" }} workspace={page.data.home?.workspace ?? "Your workspace"} from={page.data.from} allowed={page.data.allowed} onsend={sendFeedback} />
+{:else if page.data.screen === "menu"}
+  {@const C = REGISTRY.menu}
+  <C {theme} data={page.data.menu} />
+{:else if page.data.screen === "print"}
+  {#if !page.data.canPrint}
+    <Status {phone} {theme} kind="refused" message="Your role here cannot print blank surveys (an owner or member can)." back={to("collect", route.params)} backLabel="Back to Collect" />
+  {:else}
+    {@const C = REGISTRY.print}
+    <C {phone} {theme} data={page.data.data} previews={page.data.previews} onprint={printPapers} status={printStatus} busy={printBusy} />
+  {/if}
+{:else if page.data.unavailable}
+  <Status {phone} {theme} kind="unavailable" message={page.data.message} back={page.data.assessment ? to("collect", { aid: page.data.assessment.id }) : to("home")} backLabel={page.data.assessment ? "Back to Collect" : "Home"} />
+{:else if page.data.screen === "next-step" || page.data.screen === "action-plan"}
+  {@const m = page.data.results}
+  {#if !page.data.plan}
+    <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet, so there is nothing to plan from. ${m.canBuild ? "Build it on Results first." : "An owner or member of the review builds it."}`} back={to("results", route.params)} backLabel="Go to Results" />
+  {:else}
+    {@const C = REGISTRY[page.data.screen]}
+    <C {phone} {theme} data={page.data.plan} user={{ first: who?.first ?? "", initials: who?.initials ?? "" }} workspace="Your workspace" />
+  {/if}
 {:else if page.data.screen === "home"}
   <Home {phone} {theme} data={page.data.home} state={phone ? "reviews" : page.data.state} />
 {:else if page.data.screen === "project"}

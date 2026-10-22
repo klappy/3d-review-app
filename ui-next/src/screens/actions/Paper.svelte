@@ -5,7 +5,9 @@
      or "letter". Always light (paper scope). Decorative (aria-hidden), as on the boards. Status: provisional. -->
 <script>
   import Qr from "./Qr.svelte";
-  let { paper, qr, practice = false, page = "1 of 3", note, fit = "a4" } = $props();
+  import LiveQr from "../collect/Qr.svelte";
+  // qr: the boards' 21x21 placeholder bits; cells: a real code's n x n modules (app/data.js qrModules, the collect lane's Qr), live.
+  let { paper, qr, cells, practice = false, page = "1 of 3", note, fit = "a4" } = $props();
   if (fit !== "a4" && fit !== "letter") throw new TypeError(`Paper: fit is "a4" or "letter", not "${fit}"`);
   const PRACTICE = "Practice copy · not a real review";
 </script>
@@ -18,9 +20,9 @@
         <div class="small t-15">{paper.line}</div>
         {#if note}<div class="micro">{note}</div>{/if}
       </div>
-      <Qr bits={qr} />
+      {#if cells}<LiveQr {cells} size="room" />{:else if qr}<Qr bits={qr} />{/if}
     </div>
-    <div class="small t-15">Code <strong>{paper.code}</strong> · {paper.codeLine}</div>
+    <div class="small t-15">{#if paper.code}Code <strong>{paper.code}</strong> · {/if}{paper.codeLine}</div>
     {#each paper.questions as q}
       <p class="q"><strong>{q.n}.</strong> {q.text}</p>
       {#each q.options as o}<div class="o"><i class={q.type === "multi" ? "sq" : undefined}></i>{o}</div>{/each}
