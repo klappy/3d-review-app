@@ -606,4 +606,18 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     const order = R.groups.flatMap((g) => g.surveys);
     expect(widths).toEqual(order.map((i) => ["100%", "0%", "0%", "100%", "0%"][i]));
   });
+  it("Share takes live data: a new review with zero responses and no open survey renders (ReviewHead's refusal reason is the honest capability line), and real links replace the fixture", () => {
+    const base = { user: { first: "A", initials: "A" }, workspace: "", project: "P", role: "owner", review: { title: "New review", language: "", modality: "", updated: "just now" }, host: "", shortHost: "", surveys: [] as Array<{ lens: string; name: string; code: string; n: number; of: string | number; pages: number }>, noLinks: "No survey is collecting yet, so there is no link to share. Open collection on the review page first.", deleteRefused: "Deleting a review is done from the current design's review page; this screen does not delete yet." };
+    const share = { copied: -1, lead: "lead", phoneLead: "phone lead", codes: { code: "", line: "", unused: "no codes yet" } };
+    for (const phone of [false, true]) {
+      const a = render(Share, { props: { phone, data: base, share } }).container;
+      expect(text(a)).toContain("No survey is collecting yet");
+      expect(a.querySelectorAll("input.in[readonly]")).toHaveLength(0);
+      expect(text(a)).not.toContain("3dreview.app");
+    }
+    const withLink = { ...base, surveys: [{ lens: "community", name: "Written", code: "http://x/next/?ui_next=on#survey=link_1", n: 0, of: "—", pages: 0 }], noLinks: "" };
+    const b = render(Share, { props: { phone: false, data: withLink, share } }).container;
+    expect((b.querySelector("input.in[readonly]") as HTMLInputElement).value).toBe("http://x/next/?ui_next=on#survey=link_1");
+    expect(text(b)).toContain("no codes yet"); expect(b.querySelector("button[aria-label='Copy link for Written']")).not.toBeNull();
+  });
 });

@@ -120,6 +120,9 @@ export function linkFor(name, extra = {}, ctx = {}) {
     if (k === "w" || k === "theme") continue; // presentation is the live shell's, not the link's
     if (EXTRA_PARAM[k]) params[EXTRA_PARAM[k]] = v; else query[k] = v;
   }
+  // A setup screen reached from a review (the stage tabs' "Prepare", a review-page link) carries that review in the query — the
+  // setup routes have no :aid (they are the new-review wizard too) — so the live app can show the review's own read-only data.
+  if (name.startsWith("setup") && ctx.aid && !(BY_NAME.get(name) ?? "").includes(":aid")) query.review = ctx.aid;
   // A lane link to a review-scoped screen from a page with no review in context (Home's "#setup") lands on Home, never nowhere.
   try { return to(name, params, query); } catch { return to("home"); }
 }

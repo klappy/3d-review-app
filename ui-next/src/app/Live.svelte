@@ -5,6 +5,7 @@
      and labelled as a preview (never hidden): the receipt lists them. -->
 <script>
   import { tick } from "svelte";
+  import { openQrPrint } from "./print.js";
   import { onMount } from "svelte";
   import { parse, to } from "./router.js";
   import { setLiveContext } from "../screens/href.js";
@@ -54,6 +55,11 @@
     if (name === "sign-in" || name === "sign-in-check") { const me = await S.me(); return me ? { redirect: to("home") } : { screen: "sign-in" }; }
     const me = await S.me();
     if (!me) return { screen: "sign-in", next: hash };
+    // Setup, read-only tonight (TICKET done-when 4): with a review in the query, Setup 5 shows that review's own data (the review
+    // page's board while preparing) and steps 1-4 are labelled previews that hand editing to the current design's page for it.
+    const reviewQ = route.query.get("review");
+    if (name === "setup5" && reviewQ) return { screen: "setup5", data: await D.setupModel(reviewQ), readOnly: true };
+    if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name) && reviewQ) { const { assessment } = await D.assessment(reviewQ); return { screen: name, preview: true, assessment, editHref: `/#assessment/${encodeURIComponent(reviewQ)}` }; }
     if (["workspaces", "workspace", "workspace-group", "people", "people-workspace", "invitations", "explore", "setup", "setup1", "setup2", "setup3", "setup4", "setup5"].includes(name)) return { screen: name === "workspaces" ? "home" : name, preview: name !== "workspaces", home: name === "workspaces" ? await D.homeModel(me) : undefined, assessment: null };
     if (name === "project") return { screen: "project", data: await D.projectModel(params.pid) };
     // A review's own page is the board for its stage: Setup 5 (ready to launch) while preparing, Collect while collecting, Results after.
@@ -99,7 +105,7 @@
   async function load() {
     const my = ++seq;
     const r = route;
-    setLiveContext({ ...r.params });
+    setLiveContext({ ...r.params, ...(r.query.get("review") && !r.params.aid ? { aid: r.query.get("review") } : {}) }); // a setup screen's review (router.linkFor)
     if (!PARTICIPANT.has(r.name)) { try { session = await S.me(); } catch { session = null; } applyChrome(session); }
     // The loading screen shows only when a read takes longer than a blink, so walking questions never flashes.
     const slow = setTimeout(() => { if (my === seq) page = { status: "loading", key: r.name, data: null, error: null }; }, 180);
@@ -118,6 +124,8 @@
       page = { status: "error", key: r.name, data: null, error: { kind, message: String(e?.message || "Request could not be completed.") } };
     }
   }
+  // Print QR pages for real: the chosen surveys' sheets (ui/assess/share.js) in their own tab, printing itself (app/print.js).
+  const printQr = ({ surveys, per, paper }) => openQrPrint(globalThis, { title: page.data?.data?.review?.title ?? "", surveys, per, paper });
   $effect(() => { void route; load(); });
   // An in-page anchor (`collect#offline`) scrolls to its element once the screen is ready; the hash still names the route, so back/forward work.
   $effect(() => { if (page.status === "ready" && route.anchor) tick().then(() => document.getElementById(route.anchor)?.scrollIntoView({ block: "start" })); });
@@ -185,7 +193,7 @@
   <C {phone} {theme} data={page.data.data} />
 {:else if page.data.screen === "setup5"}
   {@const C = REGISTRY.setup5}
-  <C {phone} {theme} data={page.data.data} onlaunch={page.data.data.canLaunch ? launch : undefined} />
+  <C {phone} {theme} data={page.data.data} onlaunch={page.data.data.canLaunch ? launch : undefined} collecting={page.data.data.stage !== "prepare"} />
 {:else if page.data.screen === "share"}{@const C = REGISTRY.share}
   <C {phone} {theme} data={page.data.shareData} share={page.data.share} role={page.data.shareData.role} />
 {:else if page.data.screen === "collect" || page.data.screen === "close-collection" || page.data.screen === "qr-room" || page.data.screen === "print-qr"}
@@ -193,7 +201,7 @@
     <Status {phone} {theme} kind="empty" message={page.data.emptyText} back={to("review", route.params)} backLabel="Back to the review" onretry={load} />
   {:else}
     {@const C = REGISTRY[page.data.screen]}
-    <C {phone} {theme} data={page.data.data} state={route.query.get("state") ?? undefined} onclose={page.data.screen === "close-collection" ? closeCollection : undefined} />
+    <C {phone} {theme} data={page.data.data} state={route.query.get("state") ?? undefined} onclose={page.data.screen === "close-collection" ? closeCollection : undefined} onprint={page.data.screen === "print-qr" ? printQr : undefined} />
   {/if}
 {:else if page.data.screen === "results" || page.data.screen === "results-gaps" || page.data.screen === "results-answers" || page.data.screen === "report" || page.data.screen === "report-detailed" || page.data.screen === "results-held"}
   {@const m = page.data.results}
@@ -214,7 +222,7 @@
   {/if}
 {:else if page.data.preview}
   {@const C = REGISTRY[page.data.screen]}
-  <Status {phone} {theme} kind="preview" message={`This screen is a design preview with sample data${page.data.assessment ? ` (your review: ${page.data.assessment.name})` : ""}. The current design still does this for real.`} inline back={page.data.assessment ? to("review", route.params) : to("home")} backLabel={page.data.assessment ? "Back to the review" : "Home"} />
+  <Status {phone} {theme} kind="preview" message={`This screen is a design preview with sample data${page.data.assessment ? ` (your review: ${page.data.assessment.name})` : ""}. ${page.data.editHref ? "Editing a review's details, surveys, passage and dates happens in the current design for now." : "The current design still does this for real."}`} inline back={page.data.editHref ?? (page.data.assessment ? to("review", { aid: page.data.assessment.id }) : to("home"))} backLabel={page.data.editHref ? `Edit ${page.data.assessment?.name ?? "this review"} in the current design` : page.data.assessment ? "Back to the review" : "Home"} />
   <C {phone} {theme} state={route.query.get("state") ?? undefined} />
 {:else if page.data.screen === "p-code"}
   {@const C = REGISTRY["p-code"]}

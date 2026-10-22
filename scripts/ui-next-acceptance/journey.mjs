@@ -188,7 +188,33 @@ ok(`results page rendered: ${/Nothing here yet|More input needed|results can/i.t
 await shot(f, "results");
 await f.goto(`${BASE}/next/#/review/${a.id}/report`); await f.waitForSelector("h1", { timeout: 60000 }); await loaded(f, "report"); ok("report page rendered");
 await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1"); await loaded(f, "collect"); ok("collect page rendered");
+// Prepare (TICKET done-when 4, read-only tonight): the stage tab carries the review; Setup 5 shows THIS review's data, no
+// fixture, and a collecting review's primary goes to Collect (never a second launch); steps 1-4 hand editing to the current design.
+await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1"); await loaded(f, "collect");
+const prepHref = await f.evaluate(() => [...document.querySelectorAll("a")].map((x) => x.getAttribute("href")).find((h) => /#\/setup\/5\?review=/.test(h)));
+if (!prepHref) fail("collect: the Prepare tab does not carry the review");
+await f.click(`a[href="${prepHref}"]`); await f.waitForURL(/setup\/5\?review=/); await f.waitForSelector("h1"); await loaded(f, "setup5");
+const s5 = (await f.textContent("body")).replace(/\s+/g, " ");
+if (!s5.includes(a.name)) fail("setup5: this review's name is missing"); if (/Mark 1–4|Hindi New Testament|Puri/.test(s5)) fail("setup5: fixture data on the live screen");
+const prim = await f.evaluate(() => [...document.querySelectorAll(".btn-primary")].map((b) => b.textContent.trim() + " -> " + (b.getAttribute("href") ?? "button")));
+if (!prim.some((x) => /Go to Collect -> #\/review\/.*\/collect$/.test(x))) fail(`setup5: primary is not "Go to Collect" for a collecting review: ${JSON.stringify(prim)}`);
+await f.goto(`${BASE}/next/#/setup/1?review=${a.id}`); await f.waitForTimeout(800); await loaded(f, "setup1");
+const editHref = await f.evaluate(() => [...document.querySelectorAll("a")].map((x) => x.getAttribute("href")).find((h) => /^\/#assessment\//.test(h)));
+if (!editHref || !(await f.textContent("body")).includes("design preview")) fail("setup1: not a labelled preview with the current-design edit handoff");
+ok(`prepare: Setup 5 shows ${a.name} read-only (primary "Go to Collect"); Setup 1 is a labelled preview handing edits to ${editHref}`);
+// Print QR pages: "Print N page(s)" opens the print document in its own tab (app/print.js, the current UI's sheets) and that
+// document calls print() itself — verified by stubbing print() in the new tab, not by the modal rendering.
+await f.goto(`${BASE}/next/#/review/${a.id}/collect/print`); await f.waitForSelector(".qr", { timeout: 30000 }); await loaded(f, "print-qr");
+const printBtn = f.locator('button:has-text("Print ")').first(); if (!(await printBtn.count())) fail("print-qr: no Print button for the chosen pages");
+await fac.addInitScript(() => { window.__printed = 0; window.print = () => { window.__printed++; }; });
+const [printTab] = await Promise.all([fac.waitForEvent("page", { timeout: 15000 }), printBtn.click()]);
+await printTab.waitForLoadState("load").catch(() => {}); await printTab.waitForFunction(() => window.__printed > 0, null, { timeout: 15000 }).catch(() => {});
+const printed = await printTab.evaluate(() => window.__printed), sheets = await printTab.evaluate(() => [...document.querySelectorAll(".share-sheet-url")].map((e) => e.textContent.trim())), svgs = await printTab.evaluate(() => document.querySelectorAll("svg").length);
+if (!printed) fail("print-qr: the print document never called print()");
+if (!sheets.length || !sheets.every((u) => u.startsWith(`${BASE}/next/?ui_next=on#survey=`)) || svgs < sheets.length) fail(`print-qr: sheets are not this review's links with QR: ${JSON.stringify(sheets)} svgs=${svgs}`);
+await printTab.close(); ok(`print-qr: Print opened the print document (${sheets.length} sheet(s), real links + QR) and it called print() ${printed}x`);
 // Share: the primary sharing action shows THIS review's real links (no sample data), and the copy control copies them.
+await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1"); await loaded(f, "collect (before share)");
 await f.click("text=Share the survey"); await f.waitForURL(/\/share$/); await f.waitForSelector("input.in[readonly]", { timeout: 30000 }); await loaded(f, "share");
 const shareLinks = await f.evaluate(() => [...document.querySelectorAll("input.in[readonly]")].map((i) => i.value));
 if (!shareLinks.length || !shareLinks.every((l) => l.startsWith(`${BASE}/next/?ui_next=on#survey=`))) fail(`share: links are not this review's real links: ${JSON.stringify(shareLinks)}`);

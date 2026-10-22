@@ -226,7 +226,7 @@ export async function setupModel(aid) {
     { label: "About each group", sub: a.demographics_enabled ? "Participants asked age range and gender (skippable)" : "Participants are not asked about themselves", step: 4, derive: "about" },
   ];
   const phoneSummary = [{ label: "Review", value: a.name, step: 1 }, { label: "Respond to", value: a.purpose || "", step: 2 }, { label: "Who", step: 3, derive: "who" }, { label: "Open", value: a.period || "", step: 1 }];
-  return { aid: a.id, summary, phoneSummary, groups, context: { open: null, values: {}, demographics: !!a.demographics_enabled }, steps: null, canLaunch: live.length > 0 && ["owner", "member"].includes(a.role) };
+  return { aid: a.id, stage: a.stage, summary, phoneSummary, groups, context: { open: null, values: {}, demographics: !!a.demographics_enabled }, steps: null, canLaunch: a.stage === "prepare" && live.length > 0 && ["owner", "member"].includes(a.role) }; // launch only while preparing (TICKET 4: Setup is read-only otherwise)
 }
 
 // Share: the shape actions/Share.svelte reads (fixtures/actions/review.json + share.json) from the real collect model with every open
@@ -243,7 +243,9 @@ export async function shareModel(aid, me) {
     user: { first, initials }, workspace: "", project: m.project.name, role: a.role ?? "viewer",
     review: { title: m.review.title, language: m.review.language, modality: m.review.modality, updated: m.review.updated },
     host: "", shortHost: "",
-    deleteRefused: total ? `Reviews with responses can't be deleted. This one has ${total}.` : "",
+    // ReviewHead's menu draws "Delete this review" refused with its reason (R11). UI Next wires no delete, so the reason is always
+    // true: the response count when there are responses, else that deleting still happens in the current design.
+    deleteRefused: total ? `Reviews with responses can't be deleted. This one has ${total}.` : "Deleting a review is done from the current design's review page; this screen does not delete yet.",
     surveys: open.map((s) => ({ lens: s.lens, name: s.name, code: s.fullLink, n: s.answered, of: s.expected ?? "—", pages: 0 })),
     noLinks: open.length ? "" : "No survey is collecting yet, so there is no link to share. Open collection on the review page first.",
   };

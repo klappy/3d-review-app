@@ -1,5 +1,5 @@
 import { renderBlankPrint } from '../stage-screens.js';
-import { qrSvg } from './share.js';
+import { qrSvg, oneSheetHtml, printAllHtml } from './share.js';
 import { shareUrl } from '../shared-link.js';
 
 // S25 — the printed survey is its own document, never the app page.
@@ -122,4 +122,38 @@ export function printIdentityFrom(a, { project = null, languages = [], survey = 
     assessment: { id: a.id, name: a.name, language: langName.get(a.language_id) || a.language_name || '' },
     survey: { id: survey.id, name: survey.template_name, perspective },
   };
+}
+
+// UI Next (/next/) Print QR pages (cookbook wiring done-when 2): the chosen surveys' sheets — the Share card's own oneSheetHtml /
+// printAllHtml (title, line, URL, QR as inline SVG) — as a self-contained print document opened from the click like
+// openPrintDocument above, so the app page never prints (S25). Nothing personal is on a page.
+const QR_CTX = { esc };
+const QR_DOC_CSS = `html,body{background:#fff;color:#111;margin:0;font:16px/1.4 system-ui,sans-serif}main{padding:16mm}
+.doc-tools{display:flex;gap:12px;align-items:center;margin-bottom:12mm}.share-sheet-print{break-after:page;text-align:center}
+.share-sheet-print:last-child{break-after:auto}.share-sheet-qr svg{width:90mm;height:90mm}.share-sheet-url{word-break:break-all}
+.share-all-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12mm}.share-all-item{text-align:center}
+.share-all-qr svg{width:60mm;height:60mm}@media print{.doc-tools{display:none}}`;
+
+// surveys: [{ name, fullLink, lens }] (the chosen rows); per: "survey" (one page each) | "sheet" | "one" (all on one page).
+export function qrPrintDocumentHtml({ title, surveys, per = "survey", paper = "Letter", autoPrint = false }) {
+  const rows = surveys.filter((s) => s.fullLink);
+  if (!rows.length) return "";
+  const line = title ? `${title}` : "";
+  const body = per === "survey"
+    ? rows.map((s) => oneSheetHtml(QR_CTX, { title: s.name, line, url: s.fullLink })).join("")
+    : printAllHtml(QR_CTX, { heading: title || "Surveys", items: rows.map((s) => ({ title: s.name, line: "", url: s.fullLink })) });
+  const size = /a4/i.test(paper) ? "A4" : "letter";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title || "QR pages")}</title><style>${QR_DOC_CSS}
+@page{size:${size}}</style></head><body><main><div class="doc-tools"><button type="button" onclick="print()">Print</button><span>${size === "A4" ? "A4" : "Letter"} · nothing personal on the page</span></div>${body}</main>${autoPrint ? '<script>addEventListener("load",function(){setTimeout(function(){print()},300)})</script>' : ""}</body></html>`;
+}
+
+// Open the document in its own tab from the click; false when the browser blocked the tab (the caller says so).
+export function openQrPrintDocument(win, opts) {
+  const html = qrPrintDocumentHtml({ ...opts, autoPrint: true });
+  if (!html) return false;
+  let w = null;
+  try { w = win.open("", "_blank"); } catch { w = null; }
+  if (!w) return false;
+  w.document.open(); w.document.write(html); w.document.close();
+  return true;
 }

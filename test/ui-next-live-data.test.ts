@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error -- plain .js module, no type declarations
 import { qrModules, gapsOf, radarOf, STAGE_OF, lensKeyOf, shortDate } from "../ui-next/src/app/data.js";
+import { qrPrintHtml, openQrPrint } from "../ui-next/src/app/print.js";
 
 describe("live data helpers", () => {
   it("a date-only period day is read as that calendar day in every timezone, never shifted through UTC (captain CUA: Oct 22 showed as Oct 21 in America/New_York)", () => {
@@ -24,5 +25,16 @@ describe("live data helpers", () => {
   it("maps server stages and perspectives to the lanes' words", () => {
     expect(STAGE_OF.prepare).toBe("setup"); expect(STAGE_OF.collect).toBe("collecting"); expect(STAGE_OF.understand).toBe("results");
     expect(lensKeyOf("Translation Team")).toBe("team"); expect(lensKeyOf("Church")).toBe("church"); expect(lensKeyOf("Other")).toBeNull();
+  });
+  it("Print QR pages: the print document carries each chosen survey's real link and QR (ui/assess/share.js sheets), one page per survey or all on one, prints itself, and reports a blocked tab", () => {
+    const surveys = [{ name: "Written", fullLink: "http://x/next/?ui_next=on#survey=link_1" }, { name: "Involved-Pastor", fullLink: "http://x/next/?ui_next=on#survey=link_2" }, { name: "held", fullLink: null }];
+    const one = qrPrintHtml({ title: "Mark 1–4 draft", surveys, per: "survey", paper: "A4", autoPrint: true });
+    expect(one.match(/class="share-sheet-print"/g)).toHaveLength(2); expect(one).toContain("link_1"); expect(one).toContain("link_2"); expect(one).toContain("<svg"); expect(one).toContain("@page{size:A4}"); expect(one).toContain("print()},300)");
+    const all = qrPrintHtml({ title: "Mark 1–4 draft", surveys, per: "one", paper: "Letter" });
+    expect(all).toContain("data-print-all-sheet"); expect(all.match(/<li class="share-all-item"/g)).toHaveLength(2); expect(all).not.toContain("print()},300)");
+    expect(qrPrintHtml({ title: "t", surveys: [{ name: "x", fullLink: null }] })).toBe("");
+    const written: string[] = []; const fake = { open: () => ({ document: { open() {}, write: (h: string) => written.push(h), close() {} } }) };
+    expect(openQrPrint(fake as never, { title: "t", surveys, per: "survey", paper: "Letter" })).toBe(true); expect(written[0]).toContain("link_1");
+    expect(openQrPrint({ open: () => null } as never, { title: "t", surveys, per: "survey", paper: "Letter" })).toBe(false);
   });
 });

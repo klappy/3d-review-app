@@ -65,7 +65,7 @@
       {#if !canShare}<p class="small">{READ_ONLY}</p>{/if}
     </Card>
     <Card gap={2} label="Access codes">
-      <Disclosure label="Access codes, for people who lose the link" solid={false}><p class="small">{D.codes.unused} · <a class="link" href="#codes">Make more</a> · <a class="link" href="#csv">Download CSV</a></p></Disclosure>
+      <Disclosure label="Access codes, for people who lose the link" solid={false}><p class="small">{D.codes.unused}{#if D.codes.code} · <a class="link" href="#codes">Make more</a> · <a class="link" href="#csv">Download CSV</a>{/if}</p></Disclosure>
     </Card>
     <a class="link" href={href("people", at)}>Email the links to someone</a>
     <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? Print and paper</a>
@@ -90,7 +90,7 @@
         <Row wrap gap={3}><Button label="Show QR codes for the room" href={href("qr-room", at)} lead={qr} /><Button label="Email the links to someone" href={href("people", at)} lead={mail} /></Row>
         <p class="small">Meeting offline? Paper surveys and QR pages print from the <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? card on Collect</a>.</p>
         <Disclosure label="Access codes, for people who lose the link" gap={3}>
-          <p class="small">A code opens the same survey from the home page. Codes are printed on paper surveys automatically.</p>
+          {#if D.codes.code}<p class="small">A code opens the same survey from the home page. Codes are printed on paper surveys automatically.</p>{/if}
           {#if D.codes.code}<Row wrap gap={3}><span class="kbd">{D.codes.code}</span><span class="small">{D.codes.line}</span><Button label="Make more codes" /><Button label="Download as CSV" lead={download} /></Row>{:else}<p class="small">{D.codes.unused}</p>{/if}
         </Disclosure>
       </div>

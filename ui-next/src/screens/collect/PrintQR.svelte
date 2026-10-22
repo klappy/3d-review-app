@@ -31,7 +31,11 @@
   import { href } from "../href.js";
   import fixture from "../../../fixtures/collect/collect.json";
 
-  let { phone = false, theme = "light", data = fixture } = $props();
+  // onprint({ surveys, per, paper }): the live app prints the chosen pages for real (app/print.js); without it (gallery) the
+  // control is the board's link back to Collect.
+  let { phone = false, theme = "light", data = fixture, onprint } = $props();
+  let blocked = $state(false);
+  const doPrint = () => { blocked = false; const ok = onprint({ surveys: chosen, per: lay.per, paper }); if (ok === false) blocked = true; };
   const m = $derived(collectModel(data));
   const p = $derived(m.printQr);
   // The user's choices, initially what the board draws (the data's ticked codes, the first layout, language and paper).
@@ -54,7 +58,7 @@
 
 {#snippet print()}<Glyph name="print" />{/snippet}
 {#snippet chev()}<Glyph name="chev" />{/snippet}
-{#snippet phoneBar()}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Cancel" variant="quiet" href={href("collect")} />{#if n}<Button label={`Print ${pagesLabel(n)}`} variant="primary" lg href={href("collect")} lead={print} />{:else}<Button label="Print" variant="primary" lg disabled ariaDescribedby="print-qr-why" lead={print} />{/if}</div>{/snippet}
+{#snippet phoneBar()}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Cancel" variant="quiet" href={href("collect")} />{#if n && onprint}<button class="btn btn-primary btn-lg" type="button" onclick={doPrint}>{@render print()}Print {pagesLabel(n)}</button>{:else if n}<Button label={`Print ${pagesLabel(n)}`} variant="primary" lg href={href("collect")} lead={print} />{:else}<Button label="Print" variant="primary" lg disabled ariaDescribedby="print-qr-why" lead={print} />{/if}</div>{/snippet}
 {#snippet title()}
   <div>
     <!-- The title sits in a row so its box hugs the words. Focused by script on open (R14, tabindex -1), it draws no ring:
@@ -103,9 +107,9 @@
             </div>
           </div>
           <div class="l-row" data-gap="2" data-justify="end">
-            <p class="small field-help" role="status" id="print-qr-why" data-grow>{#if !n}{WHY}{/if}</p>
+            <p class="small field-help" role="status" id="print-qr-why" data-grow>{#if !n}{WHY}{:else if blocked}The browser blocked the print tab. Allow pop-ups for this site and try again.{/if}</p>
             <Button label="Cancel" variant="quiet" href={href("collect")} />
-            {#if n}<Button label={`Print ${pagesLabel(n)}`} variant="primary" lg href={href("collect")} lead={print} />{:else}<Button label="Print" variant="primary" lg disabled ariaDescribedby="print-qr-why" lead={print} />{/if}
+            {#if n && onprint}<button class="btn btn-primary btn-lg" type="button" onclick={doPrint}>{@render print()}Print {pagesLabel(n)}</button>{:else if n}<Button label={`Print ${pagesLabel(n)}`} variant="primary" lg href={href("collect")} lead={print} />{:else}<Button label="Print" variant="primary" lg disabled ariaDescribedby="print-qr-why" lead={print} />{/if}
           </div>
         </div>
         <div class="l-stack" data-gap="3" data-align="center">
