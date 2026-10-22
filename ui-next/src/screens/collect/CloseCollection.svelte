@@ -33,7 +33,7 @@
   {#if phone}
     <CollectPhoneCard {m} />
     <Dialog labelledby="close-title" cancel={href("collect")} sheet gap={3} title={phoneTitle}>
-      <p class="small">{m.answered} of {m.expected} expected have answered. Links stop working; you can reopen later.</p>
+      <p class="small">{m.countsUnavailable ? "Some response counts could not be read just now — reload before closing on a number." : `${m.answered} of ${m.expected} expected have answered.`} Links stop working; you can reopen later.</p>
       <span class="l-stack" {@attach closing}><Button label="Yes, close and see results" variant="primary" lg block href={href("results")} /></span>
       <!-- svelte-ignore a11y_autofocus -->
       <a class="btn btn-quiet btn-block" href={href("collect")} autofocus>Keep collecting</a>

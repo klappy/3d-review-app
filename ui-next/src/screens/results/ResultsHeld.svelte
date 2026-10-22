@@ -27,14 +27,20 @@
   import { REPORT, MIN_RESPONSES, lensCards, heldLines } from "./data.js";
 
   // report (live): { review, counts, payload } with too few responses in some perspective; default the fixture's held state.
-  let { phone = false, theme = "light", report } = $props();
+  // onreopen (live): moves the review back to Collect (setStage) before Share, so the links the page asks people to use are open.
+  // The shared Button takes no click handler (Setup5's launching pattern): every "Reopen collection" link is intercepted here.
+  const reopening = (el) => { const f = (e) => { if (onreopen && e.target instanceof Element && e.target.closest(`a[href="${out("share")}"]`)) { e.preventDefault(); onreopen(); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
+  let { onreopen, phone = false, theme = "light", report } = $props();
   const D = report ?? REPORT.desktop, H = report ? { counts: report.counts, phoneCounts: report.counts, preview: REPORT.held.preview, review: { closedResponses: report.review.responses } } : REPORT.held, P = report ?? REPORT.phone;
   const cards = lensCards(D.payload ?? { lenses: [] }, H.counts);
-  const lines = heldLines(H.counts);
-  const short = lines.filter((l) => l.short > 0);
-  if (!short.length && !report) throw new TypeError("ResultsHeld: the fixture holds no perspective under the minimum");
-  const first = short[0] ?? lines[0];
-  const phoneN = H.phoneCounts[first.lens];
+  // Live: the server's own hold (results.ts MinimumHold: responses_in / responses_needed / reason, an assessment-wide gate) is the
+  // condition shown; the per-perspective lines keep only perspectives the review has surveys for (count > 0 or a lens the report names).
+  const srv = $derived(report?.held && typeof report.held.responses_needed === "number" ? report.held : null);
+  const lines = $derived(report ? heldLines(H.counts).filter((l) => l.n > 0 || (report.payload?.lenses ?? []).some((x) => x.lens === l.lens || x.lens === l.label)) : heldLines(H.counts));
+  const short = $derived(lines.filter((l) => l.short > 0));
+  if (!report && !heldLines(H.counts).some((l) => l.short > 0)) throw new TypeError("ResultsHeld: the fixture holds no perspective under the minimum");
+  const first = $derived(short[0] ?? lines[0] ?? heldLines(H.counts)[0]);
+  const phoneN = $derived(H.phoneCounts[first.lens]);
   const crumbs = [{ label: D.review.project, href: out("project") }, { label: D.review.title }];
   const without = `Show results without the ${first.label.toLowerCase()}`;
 </script>
@@ -43,7 +49,7 @@
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title={P.review.title} parent={P.review.project} back={out("project")} menuHref={out("menu")} />{:else}<TopBar {crumbs} home={out("workspace")} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Reopen collection" href={out("share")} />{/if}{/snippet}
 
-<AppShell {phone} {theme} screen {top} {bar}>
+<div class="l-stack" {@attach reopening}><AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <ReviewHead review={{ ...P.review, stage: "closed" }} phone />
     <Card gap={3} label="Results are held">
@@ -64,7 +70,7 @@
             <span class="icn" data-size="64" data-lens="team"><Glyph d={G.lock} size={30} /></span>
             <Stack gap={2}>
               <h2 class="h2 t-24">Results are held until every perspective has enough answers</h2>
-              <p class="small t-15">Levels need at least {MIN_RESPONSES} answers from a perspective so no one can be picked out. {first.label} has {first.n} of {MIN_RESPONSES}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.</p>
+              <p class="small t-15">{#if srv}The server holds this report: {srv.responses_in} of {srv.responses_needed} responses so far{srv.reason ? ` (${srv.reason})` : ""}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.{:else}Levels need at least {MIN_RESPONSES} answers from a perspective so no one can be picked out. {first.label} has {first.n} of {MIN_RESPONSES}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.{/if}</p>
               <Row wrap gap={5}>{#each lines as l}<span class="small"><LensDot lens={l.lens} decorative /> {l.text}</span>{/each}</Row>
             </Stack>
           </Row>
@@ -74,4 +80,4 @@
       <div class="l-grid" data-cols="3" data-gap="4" data-state="held" inert>{#each cards as card (card.lens)}<Stack><LensCard {card} rows={H.preview} /></Stack>{/each}</div>
     </Page>
   {/if}
-</AppShell>
+</AppShell></div>

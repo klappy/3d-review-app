@@ -76,7 +76,7 @@ export async function projectModel(pid) {
     const toKey = stage === "done" ? "nextStep" : stage === "results" ? "results" : "collect";
     return { id: a.id, when: month(a.created_at), title: a.name, stage, to: toKey, href: to(stage === "done" || stage === "results" ? "results" : stage === "collecting" ? "collect" : "review", { aid: a.id }), note: stage === "setup" ? "Setup not finished" : "No results yet", levels: lvl[i] ? Object.entries(lvl[i]).filter(([, l]) => l) : undefined, overall: lvl[i]?.overall };
   });
-  const withLevels = reviews.filter((r) => r.levels).reverse();
+  const withLevels = reviews.filter((r) => r.levels).reverse().slice(-4); // the board's trend is four points wide (Project.svelte X(i) = 70 + 110 i in a 420 box): the newest four
   const lines = {};
   for (const lens of ["team", "community", "church"]) { const col = withLevels.map((r) => Object.fromEntries(r.levels)[lens]).filter(Boolean); if (col.length) lines[lens] = withLevels.map((r) => Object.fromEntries(r.levels)[lens] ?? "more"); }
   const count = live.length;
@@ -131,7 +131,7 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
   live.forEach((s, i) => {
     const key = lensKeyOf(s.perspective) ?? "team";
     const c = counts[i];
-    const answered = Number(c?.counts?.responses ?? 0);
+    const answered = c ? Number(c.counts?.responses ?? 0) : null; // null = the count could not be read (never shown as a real zero)
     const expected = v3ExpectedFor(s.id, store); // null = no expected count set on this browser (model.js draws no bar)
     // code: the row's identity (the board's short 3dreview.app/s/CODE has no backend: RESULTS-collect debt); link/qr arrive from attachLinks.
     const row = { id: s.id, name: s.template_name || s.template_id, room: s.template_name || s.template_id, code: s.id, answered, expected, open: s.collection_status === "open", qr: null, link: null };
@@ -230,23 +230,30 @@ export async function setupModel(aid) {
   const { assessment: a, surveys } = await assessment(aid);
   const p = await project(a.project_id).catch(() => ({ name: "Project" }));
   const live = surveys.filter((s) => !s.archived_at);
+  // The same resolved facts Collect shows (collectModel: language via the project's languages, passages, the period, the
+  // browser-local expected count per survey), so Setup 5 never says "Not set" for what the review has.
+  const cm = await collectModel(aid).catch(() => null);
+  const language = cm?.review.language || a.language_name || "";
+  const passage = cm?.review.passage || a.purpose || "";
+  const period = cm?.review.activeLine || a.period || "";
+  const expectedOf = (sid) => cm?.groups.flatMap((g) => g.surveys).find((x) => x.id === sid)?.expected ?? null;
   const groups = ["team", "community", "church"].map((lens) => {
     const mine = live.filter((s) => lensKeyOf(s.perspective) === lens);
     const name = { team: "Translation team", community: "Community", church: "Church" }[lens];
-    return { lens, perspective: { team: "Translation Team", community: "Community", church: "Church" }[lens], name, who: "", checked: mine.length > 0, phoneNote: mine.map((s) => s.template_name || s.template_id).join(" · ") || "No survey", rolesLabel: "", roles: mine.map((s) => ({ name: s.template_name || s.template_id, note: "own survey", checked: true, expected: Number(s.expected_count ?? 0) || 0 })) };
+    return { lens, perspective: { team: "Translation Team", community: "Community", church: "Church" }[lens], name, who: "", checked: mine.length > 0, phoneNote: mine.map((s) => s.template_name || s.template_id).join(" · ") || "No survey", rolesLabel: "", roles: mine.map((s) => ({ name: s.template_name || s.template_id, note: "own survey", checked: true, expected: expectedOf(s.id) ?? 0 })) };
   });
-  const sub = [p.name, a.language_name, fmt(a)].filter(Boolean).join(" · ");
+  const sub = [p.name, language, fmt(a)].filter(Boolean).join(" · ");
   const summary = [
     { label: "Review", main: a.name, strong: true, sub, step: 1 },
-    { label: "People respond to", main: a.purpose || "", sub: "", step: 2 },
-    { label: "Answer languages", main: a.language_name || "", step: 2 },
+    { label: "People respond to", main: passage, sub: "", step: 2 },
+    { label: "Answer languages", main: language, step: 2 },
     { label: "Location or community", main: a.location || "", step: 1 },
     { label: "Facilitator", main: a.facilitator || "", step: 1 },
-    { label: "Survey open", main: a.period || "", step: 1 },
+    { label: "Survey open", main: period, step: 1 },
     { label: "Who will participate", step: 3, derive: "who" },
     { label: "About each group", sub: a.demographics_enabled ? "Participants asked age range and gender (skippable)" : "Participants are not asked about themselves", step: 4, derive: "about" },
   ];
-  const phoneSummary = [{ label: "Review", value: a.name, step: 1 }, { label: "Respond to", value: a.purpose || "", step: 2 }, { label: "Who", step: 3, derive: "who" }, { label: "Open", value: a.period || "", step: 1 }];
+  const phoneSummary = [{ label: "Review", value: a.name, step: 1 }, { label: "Respond to", value: passage, step: 2 }, { label: "Who", step: 3, derive: "who" }, { label: "Open", value: period, step: 1 }];
   return { aid: a.id, stage: a.stage, summary, phoneSummary, groups, context: { open: null, values: {}, demographics: !!a.demographics_enabled }, steps: null, canLaunch: a.stage === "prepare" && live.length > 0 && ["owner", "member"].includes(a.role) }; // launch only while preparing (TICKET 4: Setup is read-only otherwise)
 }
 

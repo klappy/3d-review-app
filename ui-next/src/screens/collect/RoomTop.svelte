@@ -20,7 +20,7 @@
   <nav class="crumb" aria-label="Breadcrumb"><ol><li><span aria-current="page" title={m.review.title}>{m.review.title}</span></li></ol></nav>
   <div class="top-end">
     <Pill stage={m.review.stage} />
-    <span class="tag">{m.answered} answered</span>
+    <span class="tag">{m.answered ?? "—"} answered</span>
     <Button label="Meeting offline? Print and paper" href={`${href("collect")}#offline`} lead={print} />
     <Button label="Exit room view" variant="quiet" href={href("collect")} lead={x} />
   </div>

@@ -169,6 +169,7 @@
     catch (e) { page = { ...page, data: { ...page.data, refreshed: `Could not rebuild: ${e?.message || "try again"}` } }; }
   }
   async function launch() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("collect", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The survey could not be launched." } }; } }
+  async function reopenCollection() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("share", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be reopened." } }; } }
   async function closeCollection() { const aid = route.params.aid; try { await D.setStage(aid, "understand"); go(to("results", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be closed." } }; } }
   const applyChrome = (s) => setLiveChrome(s ? { who: S.firstName(s.principal), initials: S.initialsOf(s.principal), workspace: "Your workspace", workspaces: [], accountItems, home: to("home"), workspaceItems: [{ kind: "micro", label: "Your workspaces" }, { label: "Home", href: to("home") }] } : { who: "", initials: "", workspace: "", workspaces: [], accountItems: [], home: to("home"), workspaceItems: [] });
   const chrome = $derived({ phone, theme, who, accountItems, session });
@@ -216,7 +217,7 @@
     <div class="l-page"><button class="btn btn-primary btn-lg" type="button" onclick={refreshResults}>Build the report</button></div>
   {:else if !rep || page.data.screen === "results-held"}
     {@const Held = REGISTRY["results-held"]}
-    <Held {phone} {theme} report={{ review: m.review, counts: m.counts, payload: m.payload ?? { lenses: [] } }} />
+    <Held {phone} {theme} report={{ review: m.review, counts: m.counts, payload: m.payload ?? { lenses: [] }, held: m.held }} onreopen={reopenCollection} />
   {:else if page.data.screen === "results-answers"}
     {@const C = REGISTRY["results-answers"]}
     {#if page.data.answers?.suppressed}

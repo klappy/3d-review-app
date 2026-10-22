@@ -18,7 +18,7 @@
 {#snippet pen()}<Glyph name="pen" />{/snippet}
 
 <Card hi pad="hero" gap={3}>
-  <div class="l-row" data-gap="2" data-align="baseline"><span class="num" data-size="40">{m.answered}</span><span class="small">of {m.expected ?? "—"} · {plural(m.surveys.length, "survey", "surveys")}</span></div>
+  <div class="l-row" data-gap="2" data-align="baseline"><span class="num" data-size="40">{m.answered ?? "—"}</span><span class="small">of {m.expected ?? "—"} · {plural(m.surveys.length, "survey", "surveys")}</span></div>
   <SurveyGroups groups={m.groups} phone />
   <div class="l-stack" data-gap="2" id="offline">
     <span class="h3">Meeting offline?</span>

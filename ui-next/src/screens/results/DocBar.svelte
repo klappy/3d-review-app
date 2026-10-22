@@ -5,6 +5,8 @@
      primary and Print. Print prints this document (window.print(): the sheets are .paper[data-sheet], break-inside:avoid); the
      shared Button takes no click handler, hence the literal button.btn. The PDF download is receipt debt 8 (#download). -->
 <script>
+  import { liveContext } from "../href.js";
+  const live = !!liveContext(); // live: the PDF export is receipt debt 8, so the control says so instead of linking nowhere
   import Mark from "../../Mark.svelte";
   import Button from "../../Button.svelte";
   import Glyph from "./Glyph.svelte";
@@ -25,7 +27,7 @@
   <div class="top-end">
     <span class="small">Two reports, built from the same answers.</span>
     <Button label={other} variant="quiet" href={otherHref} trail={arrow} />
-    <Button label="Download this report (PDF)" variant="primary" href="#download" lead={download} />
+    {#if live}<Button label="Download this report (PDF)" variant="primary" disabled ariaDescribedby="doc-pdf-why" lead={download} /><span class="small" id="doc-pdf-why">PDF export is not in the new design yet; print this page, or export from the current design.</span>{:else}<Button label="Download this report (PDF)" variant="primary" href="#download" lead={download} />{/if}
     <button class="btn" type="button" onclick={print}><Glyph d={G.printer} />Print</button>
   </div>
 </header>

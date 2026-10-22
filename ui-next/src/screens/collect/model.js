@@ -27,8 +27,9 @@ export const pct = (a, b) => (b > 0 ? Math.floor((a / b) * 100) : 0);
 export function collectModel(fx) {
   const groups = fx.groups.map((g) => {
     if (!Object.hasOwn(LENSES, g.lens)) throw new TypeError(`collectModel: unknown lens "${String(g.lens)}"`);
-    const surveys = g.surveys.map((s) => ({ ...s, lens: g.lens, pct: pct(s.answered, s.expected ?? 0), link: s.link ?? fx.linkHost + s.code }));
-    return { lens: g.lens, label: LENSES[g.lens], surveys, answered: sum(surveys, "answered"), expected: sumOrNull(surveys, "expected") };
+    const surveys = g.surveys.map((s) => ({ ...s, lens: g.lens, pct: pct(s.answered ?? 0, s.expected ?? 0), link: s.link ?? fx.linkHost + s.code }));
+    // answered null on any survey = that count could not be read; the group (and the page) says "—" rather than a false zero.
+    return { lens: g.lens, label: LENSES[g.lens], surveys, answered: surveys.some((s) => s.answered == null) ? null : sum(surveys, "answered"), expected: sumOrNull(surveys, "expected") };
   });
   const surveys = groups.flatMap((g) => g.surveys);
   surveys.forEach((s, i) => { s.n = i + 1; }); // 1-based survey number: QRRoomPhone's ?state=<n>
@@ -40,7 +41,8 @@ export function collectModel(fx) {
     // Short access codes (the boards' K7Q 4F2) exist only in the fixture: live rows carry the survey id as their identity, which is not a
     // code anyone can type, so the printed sheet offers the code line only when the data says codes exist (RESULTS-collect debt 7).
     hasAccessCodes: fx.hasAccessCodes ?? true,
-    answered: sum(groups, "answered"),
+    answered: groups.some((g) => g.answered == null) ? null : sum(groups, "answered"),
+    countsUnavailable: groups.some((g) => g.answered == null),
     expected: sumOrNull(groups, "expected"),
     meta: `${fx.project.name} · ${r.language} · ${r.modality}`,
     // CloseCollection's per-perspective line: "Translation team 6 · Community 8 · Church 4".

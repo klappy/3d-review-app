@@ -19,7 +19,9 @@
   import Icon from "../../Icon.svelte";
   import { I } from "../../icons.js";
   import { E } from "./icons.js";
-  import { href } from "../href.js";
+  import { href, liveContext } from "../href.js";
+  // Live: a section anchor must stay on the help route (`#/help#h1`; router.parse carries the anchor); the gallery keeps the bare `#h1`.
+  const anchor = (id) => (liveContext() ? `${href("help")}#${id}` : `#${id}`);
   import { INTRO, VIDEO, TOPICS, FAQ, FAQ_TITLE } from "./help-copy.js";
 
   let { phone = false, theme = "light" } = $props();
@@ -47,7 +49,7 @@
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <h1 class="title-phone">Help and FAQ</h1>
-    <nav class="l-row" data-wrap data-gap="2" aria-label="Help sections">{#each NAV as [id, title]}<a class="chip" href={`#${id}`}>{title}</a>{/each}</nav>
+    <nav class="l-row" data-wrap data-gap="2" aria-label="Help sections">{#each NAV as [id, title]}<a class="chip" href={anchor(id)}>{title}</a>{/each}</nav>
     {@render rows(TOPICS.map(([id, title, , text], i) => [id, title, text, i === 0]), "Help topics")}
     <h2 class="micro" id={FAQ_ID}>{FAQ_HEAD} · {FAQ.length}</h2>
     {@render rows(FAQ.map(([q, a]) => [undefined, q, a, false]), FAQ_HEAD)}
@@ -55,7 +57,7 @@
   {:else}
     <Page>
       <div class="l-grid" data-tpl="aside-start" data-gap="7">
-        <nav class="glass side-nav" aria-label="Help sections" {@attach follow}>{#each NAV as [id, title]}<a class="link" href={`#${id}`} aria-current={id === current ? "location" : undefined}>{title}</a>{/each}</nav>
+        <nav class="glass side-nav" aria-label="Help sections" {@attach follow}>{#each NAV as [id, title]}<a class="link" href={anchor(id)} aria-current={id === current ? "location" : undefined}>{title}</a>{/each}</nav>
         <article class="l-stack l-measure" data-gap="6">
           <div>
             <h1 class="title-page">Help and FAQ</h1>
