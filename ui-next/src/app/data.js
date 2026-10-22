@@ -223,12 +223,17 @@ export async function attachLinks(m, { full = false } = {}) {
 // same tab (the server's issue_link needs member access; the cache must not bypass it).
 const LINKS = new Map();
 // Every authentication transition empties the cache (Live: sign-in, sign-out): on a cookie session token() is "", so the key
-// alone cannot tell identities apart (SECURITY-575-8583e170 finding 1).
-export function clearLinks() { LINKS.clear(); }
+// alone cannot tell identities apart (SECURITY-575-8583e170 finding 1). The epoch guards the in-flight case (root + independent
+// read 2026-10-22 at 87f5bb2e): an issueLink started before the transition must neither repopulate the cache nor hand its
+// credential to the identity that signed in after it — the promise is cut off, not stored.
+let LINK_EPOCH = 0;
+export function clearLinks() { LINKS.clear(); LINK_EPOCH++; }
 export async function linkFor(aid, sid) {
   const k = `${token() ?? ""}|${aid}/${sid}`;
   if (LINKS.has(k)) return LINKS.get(k);
+  const epoch = LINK_EPOCH;
   const out = await issueLink(aid, sid);
+  if (epoch !== LINK_EPOCH) throw new Error("The sign-in changed while the link was being issued. Reload to issue it again."); // never cached, never returned
   if (out.held) throw new Error("This survey is not collecting right now.");
   const r = out.result;
   const fragment = r.entry_fragment || `#survey=${encodeURIComponent(r.link_token)}`;
