@@ -27,7 +27,7 @@ export const pct = (a, b) => (b > 0 ? Math.floor((a / b) * 100) : 0);
 export function collectModel(fx) {
   const groups = fx.groups.map((g) => {
     if (!Object.hasOwn(LENSES, g.lens)) throw new TypeError(`collectModel: unknown lens "${String(g.lens)}"`);
-    const surveys = g.surveys.map((s) => ({ ...s, lens: g.lens, pct: pct(s.answered ?? 0, s.expected ?? 0), link: s.link ?? fx.linkHost + s.code }));
+    const surveys = g.surveys.map((s) => ({ ...s, lens: g.lens, pct: pct(s.answered ?? 0, s.expected ?? 0), link: s.link ?? (s.open === false ? "" : fx.linkHost + s.code) })); // live: a survey not collecting has no link (never a fabricated one)
     // answered null on any survey = that count could not be read; the group (and the page) says "—" rather than a false zero.
     return { lens: g.lens, label: LENSES[g.lens], surveys, answered: surveys.some((s) => s.answered == null) ? null : sum(surveys, "answered"), expected: sumOrNull(surveys, "expected") };
   });

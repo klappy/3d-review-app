@@ -61,7 +61,7 @@
       <Row wrap gap={3}><h1 class="title-page">{title}</h1><Pill {stage} />{#if practice}<Tag kind="practice" />{/if}</Row>
       <Row gap={2}>
         {#if items.length}<Menu id="review-more" summary={dots} summaryClass="btn btn-icon" label="More actions" title="More actions" {items} />{/if}
-        {#if action}<Button label={action.label} variant={action.variant ?? "secondary"} href={action.href} lead={action.lead ? lead : undefined} trail={action.trail ? trail : undefined} />{/if}
+        {#if action?.onclick}<button class="btn btn-primary" type="button" onclick={action.onclick}>{action.label}{#if action.trail}{@render trail()}{/if}</button>{:else if action}<Button label={action.label} variant={action.variant ?? "secondary"} href={action.href} lead={action.lead ? lead : undefined} trail={action.trail ? trail : undefined} />{/if}
       </Row>
     </Row>
     {#if meta}<p class="small t-15">{@render meta()}</p>{/if}

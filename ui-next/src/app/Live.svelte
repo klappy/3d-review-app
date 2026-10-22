@@ -140,7 +140,7 @@
   async function load() {
     const my = ++seq;
     const r = route;
-    build = null; // a pending build preview never outlives the route
+    build = null; uncertainBuild = null; // a pending build preview never outlives the route; a reload re-reads the report list, which clears the uncertain lock
     setLiveContext({ ...r.params, ...(r.query.get("review") && !r.params.aid ? { aid: r.query.get("review") } : {}) }); // a setup screen's review (router.linkFor)
     if (!PARTICIPANT.has(r.name)) { try { session = await S.me(); } catch { session = null; } applyChrome(session); }
     // The loading screen shows only when a read takes longer than a blink, so walking questions never flashes.
@@ -229,10 +229,12 @@
   // Nothing is built until the confirm; the pending token never outlives the route (load() clears it).
   let build = $state(null); // { aid, text, token, expires } while a preview waits for its confirm
   let building = $state(false);
+  let uncertainBuild = $state(null); // aid whose execute response was lost: no new preview until load() re-reads the report list (ui/assess/report-build.js keeps the same lock)
   const say = (refreshed) => { page = { ...page, data: { ...page.data, refreshed } }; };
   async function refreshResults() {
     const aid = route.params.aid; const m = page.data?.results;
     if (building || build) return;
+    if (uncertainBuild === aid) { say("A report build's outcome is unknown. Reload this page to see the report list before building again."); return; }
     build = null; say("");
     try { const out = await D.previewBuild(aid); if (out.held) { say("The results can’t be built yet: more answers are needed. Nothing was built."); return; } build = { aid, text: buildConfirmText(m?.review?.responses), token: out.token, expires: out.expires }; }
     catch (e) { say(`The preview could not be loaded. Nothing was built; ${e?.message || "try again"}.`); }
@@ -243,10 +245,11 @@
     if (Date.now() >= b.expires) { build = null; say("Preview expired. Preview again before building."); return; }
     build = null; building = true;
     try { const out = await D.executeBuild(b.aid, b.token); if (out.held) say("The results can’t be built yet: more answers are needed. No report was built."); else load(); }
-    catch (e) { say(`The report build outcome could not be confirmed: ${e?.message || "refresh before trying again"}.`); }
+    catch (e) { uncertainBuild = b.aid; say(`The report build outcome could not be confirmed: ${e?.message || "reload to see whether a report was built"}. Rebuilding is locked until this page reloads the report list.`); }
     finally { building = false; }
   }
   async function launch() { const aid = route.params.aid ?? route.query.get("review"); try { await D.setStage(aid, "collect"); SU.forget(aid); go(to("collect", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The survey could not be launched." } }; } }
+  async function completeReview() { const aid = route.params.aid; try { await D.setStage(aid, "improve"); go(to("home")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The review could not be marked complete." } }; } }
   async function reopenCollection() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("share", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be reopened." } }; } }
   // People actions (app/data.js: the same routes the current UI's permissions page calls); each lands on a fresh read, or the shell's error.
   const peopleScope = () => page.data?.data?.scope;
@@ -341,14 +344,14 @@
     <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet, so there is nothing to plan from. ${m.canBuild ? "Build it on Results first." : "An owner or member of the review builds it."}`} back={to("results", route.params)} backLabel="Go to Results" />
   {:else}
     {@const C = REGISTRY[page.data.screen]}
-    <C {phone} {theme} data={page.data.plan} user={{ first: who?.first ?? "", initials: who?.initials ?? "" }} workspace="Your workspace" />
+    <C {phone} {theme} data={page.data.plan} user={{ first: who?.first ?? "", initials: who?.initials ?? "" }} workspace="Your workspace" oncomplete={m.serverStage === "understand" && m.canBuild ? completeReview : undefined} />
   {/if}
 {:else if page.data.screen === "home"}
   <Home {phone} {theme} data={page.data.home} state={phone ? "reviews" : page.data.state} />
 {:else if page.data.screen === "project"}
   {@const C = REGISTRY.project}
   <C {phone} {theme} data={page.data.data} />
-{:else if SETUP.has(page.data.screen) && suView}
+{:else if SETUP.has(page.data.screen) && page.data.step && suView}
   {@const C = REGISTRY[page.data.screen]}
   {@const n = page.data.step}
   {#if n === 1}<C {phone} {theme} data={suView.details} onfield={suField} lang={suLang} onnext={suStep[1]} busy={suBusy} error={suError} status={suView.status} />

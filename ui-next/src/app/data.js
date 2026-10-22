@@ -1,5 +1,6 @@
 // UI Next (v4) workspace data. Status: provisional. Reads only the /v2 routes the current UI reads (ui/assess/scope.js, views.js,
 // share.js, report-build.js); builds view models in the shapes the lane screens already draw (collect/model.js, results/data.js, home.json).
+import { heldContext } from "./setup.js";
 import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
@@ -101,7 +102,7 @@ export async function homeModel(me) {
   const completed = all.filter(({ a }) => a.stage === "improve").map(({ a, p }) => ({ title: a.name, meta: `${p.name} · reviewed`, href: to("results", { aid: a.id }) }));
   const first = String(me?.principal?.display_name || "").trim().split(/\s+/)[0] || "You";
   const initials = (String(me?.principal?.display_name || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")) || "";
-  return { user: { first, name: me?.principal?.display_name || "", initials }, workspace: ws[0]?.name ?? "Your workspace", workspaces: ws, projects: ps, invitation: null, phoneOrder: ["collecting", "setup", "results"], groups, completed, empty: !all.length, start: "/#new", rows: all };
+  return { user: { first, name: me?.principal?.display_name || "", initials }, workspace: ws[0]?.name ?? "Your workspace", workspaces: ws, projects: ps, invitation: null, phoneOrder: ["collecting", "setup", "results"], groups, completed, empty: !all.length, start: to("setup1"), rows: all };
 }
 
 // Project: fixtures/setup/project.json's shape for screens/setup/Project.svelte (desktop two tracks, phone list). Levels per review come
@@ -169,7 +170,7 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
     languageOf(a),
     api(`/v2/assessments/${enc(aid)}/passages`).then((r) => r?.passages ?? []).catch(() => []),
   ]);
-  const passage = [...new Set(passages.map((x) => String(x?.reference || x?.title || "").trim()).filter(Boolean))].join(" · ");
+  const passage = [...new Set(passages.map((x) => String(x?.reference || x?.title || "").trim()).filter(Boolean))].join(" · ") || String(a.purpose || "").trim(); // step 2's name when no attachment names one
   const period = parsePeriod(a.period);
   const closes = period ? shortDate(period.until) : "";
   const daysLeft = period ? Math.max(0, Math.ceil((new Date(`${period.until}T00:00:00`).getTime() - Date.now()) / 86400000)) : null;
@@ -300,13 +301,13 @@ export async function setupModel(aid) {
   const groups = ["team", "community", "church"].map((lens) => {
     const mine = live.filter((s) => lensKeyOf(s.perspective) === lens);
     const name = { team: "Translation team", community: "Community", church: "Church" }[lens];
-    return { lens, perspective: { team: "Translation Team", community: "Community", church: "Church" }[lens], name, who: "", checked: mine.length > 0, phoneNote: mine.map((s) => s.template_name || s.template_id).join(" · ") || "No survey", rolesLabel: "", roles: mine.map((s) => ({ name: s.template_name || s.template_id, note: "own survey", checked: true, expected: expectedOf(s.id) ?? 0 })) };
+    return { lens, perspective: { team: "Translation Team", community: "Community", church: "Church" }[lens], name, who: "", checked: mine.length > 0, phoneNote: mine.map((s) => s.template_name || s.template_id).join(" · ") || "No survey", rolesLabel: "", tid: mine[0]?.template_id, roles: mine.map((s) => ({ name: s.template_name || s.template_id, note: "own survey", checked: true, expected: expectedOf(s.id) ?? 0, tid: s.template_id })) };
   });
   const sub = [p.name, language, fmt(a)].filter(Boolean).join(" · ");
   const summary = [
     { label: "Review", main: a.name, strong: true, sub, step: 1 },
     { label: "People respond to", main: passage, sub: "", step: 2 },
-    { label: "Answer languages", main: language, step: 2 },
+    { label: "Answer languages", main: ["English", ...(Array.isArray(a.lwc) ? a.lwc : [])].join(", "), step: 2 }, // lwc_json [] = English only (the reviewed language is the passage's, not the survey's)
     { label: "Location or community", main: a.location || "", step: 1 },
     { label: "Facilitator", main: a.facilitator || "", step: 1 },
     { label: "Survey open", main: period, step: 1 },
@@ -317,7 +318,9 @@ export async function setupModel(aid) {
   const canLaunch = a.stage === "prepare" && live.length > 0 && ["owner", "member"].includes(a.role); // launch only while preparing (TICKET 4: Setup is read-only otherwise)
   // While preparing, a launch that cannot happen says why beside a disabled primary (Setup5 next.blocked), never a live link to Collect.
   const launchBlocked = canLaunch || a.stage !== "prepare" ? "" : !["owner", "member"].includes(a.role) ? "Only an owner or member of the review can launch it." : "Pick at least one survey before launching.";
-  return { aid: a.id, stage: a.stage, summary, phoneSummary, groups, context: { open: null, values: {}, demographics: !!a.demographics_enabled }, steps: null, canLaunch, launchBlocked };
+  const values = {}; // what step 4 wrote, keyed by template id (Setup5 aboutLine reads the survey's tid first)
+  for (const s of live) { const c = heldContext(s); if (Object.keys(c).length) values[s.template_id] = c; }
+  return { aid: a.id, stage: a.stage, summary, phoneSummary, groups, context: { open: null, values, unreadable: true, demographics: !!a.demographics_enabled }, steps: null, canLaunch, launchBlocked }; // unreadable: no API read for group context
 }
 
 // Share: the shape actions/Share.svelte reads (fixtures/actions/review.json + share.json) from the real collect model with every open
@@ -332,7 +335,7 @@ export async function shareModel(aid, me) {
   const total = m.groups.flatMap((g) => g.surveys).reduce((n, s) => n + (s.answered || 0), 0);
   const review = {
     user: { first, initials }, workspace: "", project: m.project.name, projectId: a.project_id, role: a.role ?? "viewer",
-    review: { title: m.review.title, language: m.review.language, modality: m.review.modality, updated: m.review.updated },
+    review: { title: m.review.title, language: m.review.language, modality: m.review.modality, updated: m.review.updated, stage: { prepare: "setup", collect: "collecting", understand: "results", improve: "done" }[a.stage] ?? "collecting" }, // the header says the real stage (StagePill words)
     host: "", shortHost: "",
     // ReviewHead's menu draws "Delete this review" refused with its reason (R11). UI Next wires no delete, so the reason is always
     // true: the response count when there are responses, else that deleting still happens in the current design.

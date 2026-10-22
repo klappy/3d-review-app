@@ -20,7 +20,9 @@
   const COLLECT = $derived(out("collect", phone ? { w: "phone" } : {}));
   // "Who" and "About each group" say what steps 3 and 4 show (./draft.js; VALIDATION-setup-r2 N3); the phone reads step 3's phone state.
   const WHO = $derived(phone ? whoShort(data.groups, true) : whoLines(data.groups));
-  const ABOUT = $derived(aboutLine(surveys(data.groups, phone), data.context.values, phone));
+  // Live: the API writes a survey's group details at select time but returns none of them (src/handlers/survey.ts), so the summary cannot
+  // say "left blank" of a review it cannot read; it says where the details live instead. The fixture keeps the board's line.
+  const ABOUT = $derived(data.context.unreadable ? "Saved with each survey when it was chosen (not shown here)" : aboutLine(surveys(data.groups, phone), data.context.values, phone));
   const value = (r) => (r.derive === "who" ? WHO : r.derive === "about" ? ABOUT : r.value);
 </script>
 

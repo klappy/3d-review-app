@@ -49,7 +49,7 @@
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
-    <ReviewHead phone {theme} title={R.review.title} project={R.project} stage="collecting" viewed="collect" live="collect" canClose={role === "owner" || role === "member"} />
+    <ReviewHead phone {theme} title={R.review.title} project={R.project} stage={R.review.stage ?? "collecting"} viewed="collect" live="collect" canClose={role === "owner" || role === "member"} />
     <p class="small">{D.phoneLead}</p>
     <Card gap={2} label="Survey links">
       {#if R.noLinks}<p class="small">{R.noLinks}</p>{/if}
@@ -71,7 +71,7 @@
     <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? Print and paper</a>
   {:else}
     <Page gap={5}>
-      <ReviewHead {theme} title={R.review.title} stage="collecting" {meta} viewed="collect" live="collect" done={["prepare"]} deleteRefused={R.deleteRefused} action={{ label: "Done", variant: "primary", href: href("collect", at), trail: "check" }} />
+      <ReviewHead {theme} title={R.review.title} stage={R.review.stage ?? "collecting"} {meta} viewed="collect" live="collect" done={["prepare"]} deleteRefused={R.deleteRefused} action={{ label: "Done", variant: "primary", href: href("collect", at), trail: "check" }} />
       <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label="Share the survey">
         <div><h2 class="h2 t-24">Share the survey</h2><p class="small t-15">{D.lead}</p></div>
         {#if R.noLinks}<p class="small">{R.noLinks}</p>{/if}

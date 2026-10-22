@@ -225,7 +225,7 @@ describe("key copy and data, per board", () => {
     expect(sums.map((d) => d.hasAttribute("open"))).toEqual([false, false, true, false, false]);
     expect((a.querySelector("#community-facilitator_role") as HTMLInputElement).value).toBe("Facilitator");
     expect(a.querySelectorAll("details.dd").length).toBe(0);
-    expect(text(a, "label.row-opt.compact")).toEqual(RESPONDENT_FIELDS.map((f: { label: string }) => f.label));
+    expect(text(a, "label.row-opt.compact")).toEqual([`${RESPONDENT_FIELDS.map((f: { label: string }) => f.label).join(" and ")} (one setting for both)`]); // one API boolean, one box
     expect(a.querySelector(".tag")!.textContent).toBe("Off by default");
     // Desktop step 3 checks every group; the unchecked roles (Pastor in the community, Consultant) have no survey.
     expect(text(a, ".su-ctx .su-name .h3")).not.toContain("Consultant");

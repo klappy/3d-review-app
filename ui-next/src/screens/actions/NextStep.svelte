@@ -32,7 +32,7 @@
   // data: the fixture shape (gallery) or app/data.js nextStepModel (live: the built report's gaps, weakest areas and levels through the
   // results lane's banding; recs is empty and recsNote / notesNote say what has no store yet: the recommendation capabilities are
   // RESERVED_NOT_BUILT and there is no plan store, so the note fields are drawn disabled and nothing claims to save).
-  let { phone = false, theme = "light", data = null, user = R0.user, workspace = R0.workspace } = $props();
+  let { phone = false, theme = "light", data = null, user = R0.user, workspace = R0.workspace, oncomplete } = $props(); // oncomplete (live): POST stage improve, then Home; absent → a viewer, or already completed: the action is not offered
   const live = $derived(!!data);
   const D = $derived(data ?? D0);
   const R = $derived(data ? { ...R0, user, workspace, project: data.review.project, review: { title: data.review.title, language: data.review.language, modality: data.review.modality }, deleteRefused: "Deleting a review is done from the current design's review page; this screen does not delete yet." } : R0);
@@ -62,7 +62,7 @@
     <Row wrap gap={2}><Button label="See all results" href={href("results", at)} lead={list} block /><Button label="Print or share the plan" href={href("action-plan", at)} lead={print} block /></Row>
   {:else}
     <Page gap={5}>
-      <ReviewHead {theme} title={R.review.title} stage={D.stage ?? "reviewed"} {meta} viewed="improve" live="improve" done={["prepare", "collect", "understand"]} deleteRefused={R.deleteRefused} action={{ label: "Complete the review", variant: "primary", href: href("home", at), trail: "check" }} />
+      <ReviewHead {theme} title={R.review.title} stage={D.stage ?? "reviewed"} {meta} viewed="improve" live="improve" done={["prepare", "collect", "understand"]} deleteRefused={R.deleteRefused} action={oncomplete ? { label: "Complete the review", variant: "primary", trail: "check", onclick: oncomplete } : live ? undefined : { label: "Complete the review", variant: "primary", href: href("home", at), trail: "check" }} />
       <div class="l-grid" data-tpl="aside-wide" data-gap="5">
         <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label="What will you talk about?">
           <div><h2 class="h2 t-24">What will you talk about?</h2><p class="small t-15">Suggested from the results. Keep the ones that matter; add your own.</p></div>

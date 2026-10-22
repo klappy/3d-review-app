@@ -11,6 +11,7 @@
 // Plain JS, no Svelte import, so vitest can drive it with a mocked fetch. The view builders return the shapes the approved
 // screens/setup/Setup1-4.svelte compositions already draw (ui-next/fixtures/setup/setup.json), so the design stays fixed.
 import { api, enc } from "./api.js";
+import { reconcile } from "../../../ui/v3/wizard.js";
 import { packPeriod, parsePeriod, periodErrors, todayIso } from "../../../ui/v3/components/active-until.js";
 import { LWC_LANGUAGES, MAX_LWC } from "../../../ui/v3/lwc.js";
 export const MAX_LWC_COUNT = MAX_LWC;
@@ -29,6 +30,8 @@ export const COMMUNITY_TEMPLATE = Object.freeze({ Written: "tpl_written", Audio:
 const formatLabel = (f, phone) => (phone ? f : f === "Video" || f === "Sign" ? "Video or sign" : f);
 export const formatValue = (label) => (label === "Video or sign" ? "Sign" : label);
 
+// A held survey's group context as the server stores it (context_json; the demographics key is the assessment switch, not a field).
+export function heldContext(s) { let c = {}; try { c = typeof s.context_json === "string" ? JSON.parse(s.context_json) : s.context ?? {}; } catch { c = {}; } const out = {}; for (const [k, v] of Object.entries(c || {})) if (k !== "demographics_enabled" && v != null && String(v).trim()) out[k] = String(v); return out; }
 export function freshDraft(pid = "") {
   return { name: "", project: pid, language: "", languageQuery: "", location: "", facilitator: "", format: "Written", opens: todayIso(), closes: "", purpose: "", lwc: [], groups: {}, context: {}, demographics: false };
 }
@@ -67,7 +70,7 @@ export async function openSetup(aid, { pid = "" } = {}) {
     const p = parsePeriod(a.period) || { starts: "", until: "" };
     const d = { ...freshDraft(a.project_id), name: a.name || "", language: a.language_id || "", purpose: a.purpose || "", location: a.location || "", facilitator: a.facilitator || "", format: a.format || "Written", opens: p.starts || "", closes: p.until || "", lwc: Array.isArray(a.lwc) ? [...a.lwc] : [], demographics: a.demographics_enabled === true };
     const pre = [];
-    for (const s of live) { if (d.groups[s.template_id]) continue; d.groups[s.template_id] = { checked: true, version: String(s.template_version), expected: expectedOf(s.id) ? String(expectedOf(s.id)) : "" }; pre.push({ id: s.id, template: s.template_id, version: Number(s.template_version), name: s.template_name || s.template_id }); }
+    for (const s of live) { if (d.groups[s.template_id]) continue; d.groups[s.template_id] = { checked: true, version: String(s.template_version), expected: expectedOf(s.id) ? String(expectedOf(s.id)) : "" }; pre.push({ id: s.id, context: heldContext(s), template: s.template_id, version: Number(s.template_version), name: s.template_name || s.template_id }); }
     if (!ps.some((x) => x.id === a.project_id)) ps.push({ id: a.project_id, name: "This project" });
     st = { key, aid, role: a.role ?? "viewer", stage: a.stage, draft: prior ? { ...d, ...prior.draft, project: a.project_id, groups: { ...d.groups, ...prior.draft.groups }, context: { ...prior.draft.context } } : d, snap: { ...snapOf(d), demographics_enabled: a.demographics_enabled === true }, pre, projects: ps, templates: ts, languages: [], passages: pz.passages, fileStorage: pz.fileStorage };
     // A survey the server no longer holds is unticked here too; one it gained stays ticked (another device selected it).
@@ -109,7 +112,12 @@ export async function saveDetails(st) {
     if (d.format) b.format = d.format;
     if ((d.location || "").trim()) b.location = d.location.trim();
     if ((d.facilitator || "").trim()) b.facilitator = d.facilitator.trim();
-    const r = await api(`/v2/projects/${enc(d.project)}/assessments`, { method: "POST", body: b });
+    // An uncertain earlier create (the response was lost) is read back first, exactly as the wizard does (reconcile, cap.assessment.create):
+    // a matching review of ours created since that attempt is adopted; only when none exists is the POST sent again.
+    let r = null;
+    if (st.pendingCreate) { const found = await reconcile({ cap: "cap.assessment.create" }, { pid: d.project, lid: d.language || null, pending: { at: st.pendingCreate } }, { name: d.name }, api); if (found) r = found; }
+    if (!r) { const at = Date.now(); st.pendingCreate = at; try { r = await api(`/v2/projects/${enc(d.project)}/assessments`, { method: "POST", body: b }); } catch (e) { if (e?.status !== 0) st.pendingCreate = null; throw e; } }
+    st.pendingCreate = null;
     st.aid = r.assessment.id; st.role = "owner"; st.stage = r.assessment.stage ?? "prepare"; st.snap = { ...snapOf(d), purpose: null, lwc: null };
     STATES.delete("new"); st.key = st.aid; STATES.set(st.aid, st);
     return st.aid;
@@ -224,7 +232,8 @@ export function passageView(st) {
 export const lwcMatch = (q) => { const s = String(q ?? "").trim().toLowerCase(); return s ? LWC_LANGUAGES.find((l) => l.code.toLowerCase() === s || l.name.toLowerCase() === s || l.endonym.toLowerCase() === s) ?? LWC_LANGUAGES.find((l) => l.name.toLowerCase().startsWith(s)) ?? null : null; };
 export function contextView(st) {
   const values = {};
-  for (const [tid, c] of Object.entries(st.draft.context)) { const t = st.templates.find((x) => x.id === tid); if (t && Object.keys(c).length) values[slug(t.name)] = { ...c }; }
+  for (const [tid, c] of Object.entries(st.draft.context)) if (Object.keys(c).length) values[tid] = { ...c };
+  for (const x of st.pre) if (x.context && Object.keys(x.context).length && !values[x.template]) values[x.template] = { ...x.context }; // what the server holds for a survey already selected
   return { open: null, values, demographics: st.draft.demographics === true };
 }
-export const tidOfKey = (st, key) => st.templates.find((t) => slug(t.name) === key)?.id ?? null;
+export const tidOfKey = (st, key) => (st.templates.some((t) => t.id === key) ? key : st.templates.find((t) => slug(t.name) === key)?.id ?? null);

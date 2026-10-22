@@ -28,9 +28,9 @@
   // or the group itself (community).
   const GROUPS = $derived(chosenGroups(data.groups, phone));
   const SURVEYS = $derived(surveys(data.groups, phone).map((s) => ({ ...s, fields: s.pre ? [] : groupFields(s.g.perspective) })));
-  const values = (s) => data.context.values[s.key] ?? {};
+  const values = (s) => data.context.values[s.tid] ?? data.context.values[s.key] ?? {}; // live values are keyed by template id (app/setup.js contextView); the fixture by the survey key
   const isOpen = (s) => s.key === data.context.open;
-  const edit = (s, f) => (e) => oncontext?.(s.key, f.key, e.currentTarget.value);
+  const edit = (s, f) => (e) => oncontext?.(s.tid ?? s.key, f.key, e.currentTarget.value);
 </script>
 
 {#snippet chev()}<span class="disc-chev" aria-hidden="true"><Glyph name="chev" /></span>{/snippet}
@@ -75,7 +75,8 @@
       </div>
       <div class="glass l-card l-stack" data-gap="3" role="group" aria-labelledby="dem-h">
         <Row gap={3}><span class="h3" id="dem-h">Ask each participant about themselves</span><Tag label="Off by default" /></Row>
-        <Grid cols={2} gap={2}>{#each RESPONDENT_FIELDS as f}<label class="row-opt compact"><input class="cb" type="checkbox" checked={data.context.demographics} onchange={(e) => ondemographics?.(e.currentTarget.checked)} /><span>{f.label}</span></label>{/each}</Grid>
+        <!-- One switch: the API stores one boolean for all respondent fields (demographics_enabled; src/context-fields.ts), so one box says so. -->
+        <label class="row-opt compact"><input class="cb" type="checkbox" checked={data.context.demographics} onchange={(e) => ondemographics?.(e.currentTarget.checked)} /><span>{RESPONDENT_FIELDS.map((f) => f.label).join(" and ")} (one setting for both)</span></label>
         <p class="small">Asked once, before the survey questions. Both are skippable. When on, results and the answer list can be split by them.</p>
       </div>
     </Stack>

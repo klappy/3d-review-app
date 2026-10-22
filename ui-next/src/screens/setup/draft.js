@@ -38,7 +38,7 @@ export function whoShort(groups, phone = true) {
 
 /** "About each group" (Setup5 / Setup5Phone): the surveys with an answer, then how many were left blank. */
 export function aboutLine(list, values = {}, phone = false) {
-  const described = list.filter((s) => Object.values(values[s.key] ?? {}).some((v) => String(v ?? "").trim()));
+  const described = list.filter((s) => Object.values(values[s.tid] ?? values[s.key] ?? {}).some((v) => String(v ?? "").trim()));
   const blank = list.length - described.length;
   return [
     described.length && `${described.map((s) => s.name).join(", ")} described`,
