@@ -12,7 +12,9 @@ export const LENS_KEY = Object.freeze({ "Translation Team": "team", Community: "
 export const lensKeyOf = (perspective) => LENS_KEY[perspective] ?? LENS_KEY[lensLabel(perspective) === lensLabel("Translation Team") ? "Translation Team" : lensLabel(perspective) === lensLabel("Community") ? "Community" : lensLabel(perspective) === lensLabel("Church") ? "Church" : ""] ?? null;
 // The lanes' Pill stage words (results | collecting | setup | reviewed) from the server stage ids (prepare | collect | understand | improve).
 export const STAGE_OF = Object.freeze({ prepare: "setup", collect: "collecting", understand: "results", improve: "results" });
-const shortDate = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
+// A date-only string (the period's YYYY-MM-DD, a calendar day) is read as that day, never shifted through UTC into the viewer's
+// timezone (the saved Oct 22 showed as Oct 21 in America/New_York); a full timestamp is read as an instant, as before.
+export const shortDate = (iso) => { const s = String(iso ?? ""); const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00`) : new Date(s); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
 const ago = (iso) => { const t = Date.parse(iso); if (!Number.isFinite(t)) return ""; const m = Math.round((Date.now() - t) / 60000); if (m < 2) return "just now"; if (m < 60) return `${m} min ago`; const h = Math.round(m / 60); if (h < 36) return `${h} h ago`; return shortDate(iso); };
 
 export const workspaces = async () => (await api("/v2/workspaces")).workspaces ?? [];
@@ -106,7 +108,7 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
   const passage = [...new Set(passages.map((x) => String(x?.reference || x?.title || "").trim()).filter(Boolean))].join(" · ");
   const period = parsePeriod(a.period);
   const closes = period ? shortDate(period.until) : "";
-  const daysLeft = period ? Math.max(0, Math.ceil((Date.parse(period.until) - Date.now()) / 86400000)) : null;
+  const daysLeft = period ? Math.max(0, Math.ceil((new Date(`${period.until}T00:00:00`).getTime() - Date.now()) / 86400000)) : null;
   let store = null; try { store = globalThis.localStorage; } catch { store = null; }
   const byLens = new Map();
   live.forEach((s, i) => {
@@ -225,4 +227,26 @@ export async function setupModel(aid) {
   ];
   const phoneSummary = [{ label: "Review", value: a.name, step: 1 }, { label: "Respond to", value: a.purpose || "", step: 2 }, { label: "Who", step: 3, derive: "who" }, { label: "Open", value: a.period || "", step: 1 }];
   return { aid: a.id, summary, phoneSummary, groups, context: { open: null, values: {}, demographics: !!a.demographics_enabled }, steps: null, canLaunch: live.length > 0 && ["owner", "member"].includes(a.role) };
+}
+
+// Share: the shape actions/Share.svelte reads (fixtures/actions/review.json + share.json) from the real collect model with every open
+// survey's real link resolved (attachLinks, full). code = the full link, host = "" so `${host}${code}` is the link the board's row shows;
+// no row is pre-copied (the board's copied badge is a state, not data); the access-codes disclosure names what is not wired yet.
+export async function shareModel(aid, me) {
+  const m = await attachLinks(await collectModel(aid), { full: true });
+  const open = m.groups.flatMap((g) => g.surveys.map((s) => ({ ...s, lens: g.lens }))).filter((s) => s.fullLink);
+  const first = String(me?.principal?.display_name || "").trim().split(/\s+/)[0] || "";
+  const initials = (String(me?.principal?.display_name || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")) || "";
+  const { assessment: a } = await assessment(aid);
+  const total = m.groups.flatMap((g) => g.surveys).reduce((n, s) => n + (s.answered || 0), 0);
+  const review = {
+    user: { first, initials }, workspace: "", project: m.project.name, role: a.role ?? "viewer",
+    review: { title: m.review.title, language: m.review.language, modality: m.review.modality, updated: m.review.updated },
+    host: "", shortHost: "",
+    deleteRefused: total ? `Reviews with responses can't be deleted. This one has ${total}.` : "",
+    surveys: open.map((s) => ({ lens: s.lens, name: s.name, code: s.fullLink, n: s.answered, of: s.expected ?? "—", pages: 0 })),
+    noLinks: open.length ? "" : "No survey is collecting yet, so there is no link to share. Open collection on the review page first.",
+  };
+  const share = { copied: -1, lead: "Each perspective — and each role inside it — has its own survey link. People answer without an account. One link can be used by everyone who answers that survey.", phoneLead: "Each survey has its own link. Send it, show the QR, or hand the phone over.", codes: { code: "", line: "", unused: "Access codes are issued from the current design's Share panel; this screen does not issue them yet" } };
+  return { review, share };
 }

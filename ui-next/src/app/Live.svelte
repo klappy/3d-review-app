@@ -70,7 +70,9 @@
       const m = await D.resultsModel(params.aid, { build: name !== "results-held" });
       return { screen: name, results: m };
     }
-    if (name === "next-step" || name === "action-plan" || name === "share" || name === "print" || name === "paper-entry" || name === "sandbox" || name === "menu") {
+    if (name === "share") { const sm = await D.shareModel(params.aid, me); return { screen: "share", shareData: sm.review, share: sm.share }; }
+    // Still design previews with sample data (labelled on screen, never claimed functional): the current design does these for real.
+    if (name === "next-step" || name === "action-plan" || name === "print" || name === "paper-entry" || name === "sandbox" || name === "menu") {
       const { assessment } = params.aid ? await D.assessment(params.aid) : { assessment: null };
       return { screen: name, preview: true, assessment };
     }
@@ -184,6 +186,8 @@
 {:else if page.data.screen === "setup5"}
   {@const C = REGISTRY.setup5}
   <C {phone} {theme} data={page.data.data} onlaunch={page.data.data.canLaunch ? launch : undefined} />
+{:else if page.data.screen === "share"}{@const C = REGISTRY.share}
+  <C {phone} {theme} data={page.data.shareData} share={page.data.share} role={page.data.shareData.role} />
 {:else if page.data.screen === "collect" || page.data.screen === "close-collection" || page.data.screen === "qr-room" || page.data.screen === "print-qr"}
   {#if page.data.empty}
     <Status {phone} {theme} kind="empty" message={page.data.emptyText} back={to("review", route.params)} backLabel="Back to the review" onretry={load} />

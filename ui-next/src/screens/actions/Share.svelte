@@ -28,10 +28,13 @@
   import { CAN_SHARE, READ_ONLY } from "./legacy.js";
   import { href } from "../href.js";
   import { carry } from "./links.js";
-  import R from "../../../fixtures/actions/review.json";
-  import D from "../../../fixtures/actions/share.json";
+  import R0 from "../../../fixtures/actions/review.json";
+  import D0 from "../../../fixtures/actions/share.json";
 
-  let { phone = false, theme = "light", role = R.role } = $props();
+  // data/share: the fixture shapes (gallery) or app/data.js shareModel (live: real links, this review's surveys, the signed-in user).
+  let { phone = false, theme = "light", data = R0, share = D0, role = data.role } = $props();
+  const R = $derived(data);
+  const D = $derived(share);
   const at = $derived(carry(phone, theme));
   const crumbs = $derived([{ label: R.project, href: href("project", at) }, { label: R.review.title }]);
   const canShare = $derived(CAN_SHARE.has(role));
@@ -39,7 +42,7 @@
 
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="Share the survey" parent="Collect" back={href("collect", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<TopBar home={href("home", at)} who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Show QR codes for the room" href={href("qr-room", at)} />{/if}{/snippet}
-{#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Updated just now{/snippet}
+{#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Updated {R.review.updated ?? "just now"}{/snippet}
 {#snippet qr()}<Ico d={A.qr} />{/snippet}
 {#snippet mail()}<Ico d={A.mail} />{/snippet}
 {#snippet download()}<Ico d={A.download} />{/snippet}
@@ -49,6 +52,7 @@
     <ReviewHead phone {theme} title={R.review.title} project={R.project} stage="collecting" viewed="collect" live="collect" />
     <p class="small">{D.phoneLead}</p>
     <Card gap={2} label="Survey links">
+      {#if R.noLinks}<p class="small">{R.noLinks}</p>{/if}
       {#each R.surveys as s, i}
         {#if i}<hr class="hr" />{/if}
         <Row split gap={2}><Row gap={2}><LensDot lens={s.lens} decorative /><b>{s.name}</b></Row><span class="small">{s.n}/{s.of}</span></Row>
@@ -70,6 +74,7 @@
       <ReviewHead {theme} title={R.review.title} stage="collecting" {meta} viewed="collect" live="collect" done={["prepare"]} deleteRefused={R.deleteRefused} action={{ label: "Done", variant: "primary", href: href("collect", at), trail: "check" }} />
       <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label="Share the survey">
         <div><h2 class="h2 t-24">Share the survey</h2><p class="small t-15">{D.lead}</p></div>
+        {#if R.noLinks}<p class="small">{R.noLinks}</p>{/if}
         {#each R.surveys as s, i}
           <Grid template="barbell" gap={3}>
             <Row gap={3}><LensDot lens={s.lens} decorative /><b>{s.name}</b></Row>
@@ -86,7 +91,7 @@
         <p class="small">Meeting offline? Paper surveys and QR pages print from the <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? card on Collect</a>.</p>
         <Disclosure label="Access codes, for people who lose the link" gap={3}>
           <p class="small">A code opens the same survey from the home page. Codes are printed on paper surveys automatically.</p>
-          <Row wrap gap={3}><span class="kbd">{D.codes.code}</span><span class="small">{D.codes.line}</span><Button label="Make more codes" /><Button label="Download as CSV" lead={download} /></Row>
+          {#if D.codes.code}<Row wrap gap={3}><span class="kbd">{D.codes.code}</span><span class="small">{D.codes.line}</span><Button label="Make more codes" /><Button label="Download as CSV" lead={download} /></Row>{:else}<p class="small">{D.codes.unused}</p>{/if}
         </Disclosure>
       </div>
     </Page>

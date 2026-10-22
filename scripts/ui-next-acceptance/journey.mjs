@@ -180,6 +180,19 @@ ok(`results page rendered: ${/Nothing here yet|More input needed|results can/i.t
 await shot(f, "results");
 await f.goto(`${BASE}/next/#/review/${a.id}/report`); await f.waitForSelector("h1", { timeout: 60000 }); await loaded(f, "report"); ok("report page rendered");
 await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1"); await loaded(f, "collect"); ok("collect page rendered");
+// Share: the primary sharing action shows THIS review's real links (no sample data), and the copy control copies them.
+await f.click("text=Share the survey"); await f.waitForURL(/\/share$/); await f.waitForSelector("input.in[readonly]", { timeout: 30000 }); await loaded(f, "share");
+const shareLinks = await f.evaluate(() => [...document.querySelectorAll("input.in[readonly]")].map((i) => i.value));
+if (!shareLinks.length || !shareLinks.every((l) => l.startsWith(`${BASE}/next/?ui_next=on#survey=`))) fail(`share: links are not this review's real links: ${JSON.stringify(shareLinks)}`);
+if (/3dreview\.app|Mark 1–4|Hindi New Testament/.test(await f.textContent("body"))) fail("share: sample data on the live screen");
+await fac.grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => {});
+const copyBtn = f.locator('button[aria-label^="Copy link for"]').first(); if (!(await copyBtn.count())) fail("share: no copy control for the signed-in role");
+await copyBtn.click(); await f.waitForTimeout(300);
+const clip = await f.evaluate(() => navigator.clipboard.readText().catch(() => "")).catch(() => "");
+const copiedShown = await f.evaluate(() => /Link copied/.test(document.body.textContent ?? ""));
+if (clip && !shareLinks.includes(clip)) fail(`share: clipboard holds ${clip}, not one of the review's links`);
+if (!copiedShown && !clip) fail("share: copy neither reported success nor wrote the clipboard");
+ok(`share: ${shareLinks.length} real link(s) for this review; copy ${clip ? "wrote the clipboard with a real link" : "reported Link copied"}`);
 await f.goto(`${BASE}/next/#/nowhere/at/all`); await f.waitForSelector("text=Your reviews"); ok("unknown deep link falls back to home");
 // sign out from the account menu
 await f.click("summary:has-text('Account menu'), #acct summary, [aria-label^='Account menu']").catch(() => {});
