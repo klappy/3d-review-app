@@ -131,7 +131,7 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
     review: { id: a.id, title: a.name, stage, language, modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", updated: ago(a.created_at), passage, opens: period?.starts ? shortDate(period.starts) : shortDate(a.created_at), closes, activeLine: collectLine(a.period), daysLeft, serverStage: a.stage },
     // No room telemetry: the room-health counter is retired (cookbook PR 198; RULING-2026-10-16-scrap-app-ratelimit) and no capability
     // reports opens per minute or refusals, so nothing is invented here (root plan @6cd4cd8 step 4).
-    groups, linkHost: `${origin}/next/#survey=`,
+    groups, linkHost: `${origin}/next/#survey=`, hasAccessCodes: false, // no short-code backend (RESULTS-collect debt 7): the sheet prints the link only
     // PrintQR's choices (every survey ticked, the three layouts the board draws) and QRRoomPhone's default survey.
     printQr: { checked: live.map((s) => s.id), layouts: [{ title: "One page per survey", help: "A full-page code to pin up or hold up.", per: "survey" }, { title: "Hand-out cards", help: "Six cards per page, cut along the lines, one survey per sheet.", per: "sheet", cards: 6 }, { title: "All on one page", help: "Every selected code on one sheet, for the table.", per: "one" }], languages: [language || "English"], papers: ["A4", "Letter"], pageLanguages: language || "English" },
     qrRoomPhone: { survey: 2 }, // "Survey 3 of N", as the QRRoomPhone board draws

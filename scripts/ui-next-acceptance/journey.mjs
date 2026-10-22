@@ -158,6 +158,14 @@ const after = Object.fromEntries(await Promise.all(openIds.map(async (sid) => [s
 const moved = openIds.filter((sid) => after[sid] !== before[sid]);
 if (moved.length !== 1 || after[moved[0]] !== before[moved[0]] + 1) fail(`owner counts did not move by exactly +1 on exactly one survey: before ${JSON.stringify(before)} after ${JSON.stringify(after)}`);
 ok(`participant: submitted -> receipt ${shown}; owner count for ${moved[0]} ${before[moved[0]]} -> ${after[moved[0]]} (exactly +1, read back from /v2 counts)`);
+// Independent server read of the receipt: the participant session's bearer (ui/shared-link.js scopedStorage "<namespace>bearer",
+// tab storage) against GET /v2/participate/receipt from this process — response_id comes from the response row, not the DOM.
+// Owner-side row listing is deliberately suppressed (src/handlers/response.ts list, D7), so this is the only server record readable.
+const bearer = await p.evaluate(() => { try { const k = Object.keys(sessionStorage).find((x) => x.endsWith("bearer")); return k ? sessionStorage.getItem(k) : null; } catch { return null; } });
+if (!bearer) fail("participant: no session bearer in tab storage to read the receipt back");
+const rr = await fetch(`${BASE}/v2/participate/receipt`, { headers: { accept: "application/json", authorization: `Bearer ${bearer}` } }); const rj = await rr.json();
+if (!rr.ok || !rj.ok || !rj.result?.submitted || rj.result.response_id !== shown) fail(`server receipt ${JSON.stringify(rj.result ?? rj.error)} does not match the displayed ${shown}`);
+ok(`participant: GET /v2/participate/receipt (independent read) returns response_id ${rj.result.response_id} = the displayed receipt, submitted_at ${rj.result.submitted_at}`);
 // Server/display receipt: a NEW tab has no tab storage, only the device's remembered session (ui/shared-link.js remember), so the
 // receipt it shows comes from the server's session — it must be the same id.
 const p2 = await part.newPage(); watch(p2, "part2"); await p2.goto(link); await p2.waitForSelector("text=Thank you", { timeout: 20000 });

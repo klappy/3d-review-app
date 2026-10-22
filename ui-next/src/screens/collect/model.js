@@ -37,6 +37,9 @@ export function collectModel(fx) {
     ...fx,
     groups,
     surveys,
+    // Short access codes (the boards' K7Q 4F2) exist only in the fixture: live rows carry the survey id as their identity, which is not a
+    // code anyone can type, so the printed sheet offers the code line only when the data says codes exist (RESULTS-collect debt 7).
+    hasAccessCodes: fx.hasAccessCodes ?? true,
     answered: sum(groups, "answered"),
     expected: sumOrNull(groups, "expected"),
     meta: `${fx.project.name} · ${r.language} · ${r.modality}`,

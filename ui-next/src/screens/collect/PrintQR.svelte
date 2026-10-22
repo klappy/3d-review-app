@@ -119,7 +119,7 @@
                     <Qr cells={first.qr} size="page" />
                     <span class="ptitle">{first.name}</span>
                     <span class="kbd">{first.link}</span>
-                    <span class="t-16">Scan to answer · or enter code {first.code.slice(0, 3)} {first.code.slice(3)} at {m.linkHost.split("/")[0]} · {p.pageLanguages}</span>
+                    <span class="t-16">{m.hasAccessCodes ? `Scan to answer · or enter code ${first.code.slice(0, 3)} ${first.code.slice(3)} at ${m.linkHost.split("/")[0]}` : "Scan to answer"} · {p.pageLanguages}</span>
                   </div>
                 {:else}
                   <span class="t-16">3D Review · {m.review.title}</span>
