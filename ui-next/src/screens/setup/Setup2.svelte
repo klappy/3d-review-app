@@ -21,7 +21,12 @@
   // The board draws one state; the route's ?state= prop is not read, so any value (unknown included) renders it and never throws.
   let { phone = false, theme = "light", data = fixture.passage, onfield, onfile, onlink, onremove, onlwc, onnext, busy = false, error = "", status = "Draft saved" } = $props();
   const p = $derived(data);
-  const blocked = $derived(p.name.trim() ? undefined : "Name what people will respond to first.");
+  // Sample / gallery (no onfield): what the visitor types is kept on this screen only, so Continue enables as it would live; nothing is
+  // saved anywhere (captain 2026-10-22: the sample must be clickable 1 → 5 → Launch). Live: the draft (app/setup.js) is the one source.
+  let typed = $state(null);
+  const name = $derived(onfield ? p.name : typed ?? p.name);
+  const blocked = $derived(name.trim() ? undefined : "Name what people will respond to first.");
+  const edit = (e) => (onfield ? onfield("purpose", e.currentTarget.value) : (typed = e.currentTarget.value));
   // The fixture draws one attachment (file / phoneFile); the live model lists every passage the review holds.
   const FILES = $derived(p.files ?? (phone ? [{ id: null, name: p.phoneFile.name, size: p.phoneFile.size, note: "", shows: "", href: "" }] : [{ id: null, name: p.file.name, note: p.file.note, shows: p.file.shows, size: "", href: "" }]));
   const LIVE = $derived(!!onnext);
@@ -43,7 +48,7 @@
   <input type="file" accept={PASSAGE_ACCEPT} hidden bind:this={fileInput} onchange={chosen} />
   {#if phone}
     <p class="small">What participants will read, hear or watch.</p>
-    {#if LIVE}<Field label="What will people respond to?" id="pass-p"><input class="in" id="pass-p" value={p.name} required oninput={(e) => onfield?.("purpose", e.currentTarget.value)} /></Field>{/if}
+    {#if LIVE}<Field label="What will people respond to?" id="pass-p"><input class="in" id="pass-p" value={name} required oninput={edit} /></Field>{/if}
     <div class="dz su-col" {@attach linking}>{@render choose("Choose a file", true)}<Button label="Paste a link" lead={link} block /></div>
     {#each FILES as f (f.id ?? f.name)}<div class="l-row small" data-gap="2" {@attach tile(f)}><Glyph name="file" size={16} />{f.name} · {f.size || f.note} <Button label="Preview" variant="quiet" />{#if LIVE && f.id}<Button icon={x} ariaLabel="Remove file" variant="quiet" />{/if}</div>{/each}
     <Field label="Survey languages" id="sl" group help="Participants pick their language on the first screen.">
@@ -53,7 +58,7 @@
     <Stack gap={5}>
       <p class="small t-15">Participants read, hear or watch this before they answer. You can attach it here, or just name it and play it for the group yourself.</p>
       <Field label="What will people respond to?" id="pass" help="Participants see this on their first screen." error={blocked ? "Name the passage, for example “Mark 1–4, printed draft booklet”, to continue." : undefined}>
-        <input class="in" id="pass" value={p.name} required aria-describedby={blocked ? "pass-help pass-err" : "pass-help"} aria-invalid={blocked ? "true" : undefined} oninput={(e) => onfield?.("purpose", e.currentTarget.value)} />
+        <input class="in" id="pass" value={name} required aria-describedby={blocked ? "pass-help pass-err" : "pass-help"} aria-invalid={blocked ? "true" : undefined} oninput={edit} />
       </Field>
       <Stack gap={3}>
         <span class="lbl">Attach the passage <span class="opt">(optional)</span></span>
