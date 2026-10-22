@@ -37,7 +37,8 @@
   // plot starts at x60 (labels end-anchored at x52), a review every 110 from x70, so the last point (x400, r5) stays inside the viewBox.
   const Y = { strong: 30, growing: 60, support: 90, urgent: 120, more: 150 };
   const X = (i) => 70 + 110 * i;
-  const points = (levels) => levels.map((l, i) => `${X(i)},${Y[l]}`).join(" ");
+  // A null point is a review that never surveyed that perspective: the line breaks there (one polyline per run) and draws no dot.
+  const runs = (levels) => { const out = []; let run = []; levels.forEach((l, i) => { if (l) run.push(`${X(i)},${Y[l]}`); else { if (run.length) out.push(run.join(" ")); run = []; } }); if (run.length) out.push(run.join(" ")); return out; };
 </script>
 
 {#snippet plus()}<Glyph name="plus" />{/snippet}
@@ -89,7 +90,7 @@
             {#each trend.rows as row, i}<text x="52" y={34 + 30 * i} font-size="var(--t-11)" fill="var(--ink-3)" text-anchor="end">{row}</text>{/each}
             {#each trend.months as m, i}<text x={X(i)} y="178" font-size="var(--t-11)" fill="var(--ink-2)" text-anchor="middle">{m}</text>{/each}
             {#each trend.rows as _, i}<line x1="60" x2="410" y1={30 + 30 * i} y2={30 + 30 * i} stroke="var(--line)"></line>{/each}
-            {#each Object.entries(trend.lines) as [lens, levels]}<polyline data-lens={lens} points={points(levels)} fill="none" stroke="var(--lens)" stroke-width="2.5" stroke-linejoin="round"></polyline>{#each levels as l, i}<circle data-lens={lens} cx={X(i)} cy={Y[l]} r="5" fill="var(--lens)" stroke="var(--field)" stroke-width="2"></circle>{/each}{/each}
+            {#each Object.entries(trend.lines) as [lens, levels]}{#each runs(levels) as pts}<polyline data-lens={lens} points={pts} fill="none" stroke="var(--lens)" stroke-width="2.5" stroke-linejoin="round"></polyline>{/each}{#each levels as l, i}{#if l}<circle data-lens={lens} cx={X(i)} cy={Y[l]} r="5" fill="var(--lens)" stroke="var(--field)" stroke-width="2"></circle>{/if}{/each}{/each}
           </svg>
           <Row wrap gap={4}>{#each Object.keys(trend.lines) as lens}<span class="lvl-pair"><LensDot {lens} decorative />{{ team: "Translation team", community: "Community", church: "Church" }[lens]}</span>{/each}</Row>
           <p class="small">{trend.read}</p>

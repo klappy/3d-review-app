@@ -22,6 +22,8 @@
   import SignInLive from "./SignInLive.svelte";
   import Status from "./Status.svelte";
   import { collectModel as collectView } from "../screens/collect/model.js";
+  import Card from "../Card.svelte";
+  import { buildConfirmText } from "../../../ui/assess/report-build.js";
 
   let hash = $state(globalThis.location?.hash ?? "");
   let phone = $state(typeof matchMedia === "function" ? matchMedia(PHONE_QUERY).matches : false);
@@ -108,6 +110,7 @@
   async function load() {
     const my = ++seq;
     const r = route;
+    build = null; // a pending build preview never outlives the route
     setLiveContext({ ...r.params, ...(r.query.get("review") && !r.params.aid ? { aid: r.query.get("review") } : {}) }); // a setup screen's review (router.linkFor)
     if (!PARTICIPANT.has(r.name)) { try { session = await S.me(); } catch { session = null; } applyChrome(session); }
     // The loading screen shows only when a read takes longer than a blink, so walking questions never flashes.
@@ -164,10 +167,27 @@
     { label: "Current design", href: "/" }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
   ] : []);
   function onSignedIn() { D.clearLinks(); S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
+  // Report build (first build and "Refresh with new answers" alike): the current design's contract (ui/assess/report-build.js) —
+  // the dry run first, then the person confirms a plain sentence with the response count, then execute spends the confirm token.
+  // Nothing is built until the confirm; the pending token never outlives the route (load() clears it).
+  let build = $state(null); // { aid, text, token, expires } while a preview waits for its confirm
+  let building = $state(false);
+  const say = (refreshed) => { page = { ...page, data: { ...page.data, refreshed } }; };
   async function refreshResults() {
-    const r = route;
-    try { const out = await D.buildReport(r.params.aid); if (out.held) page = { ...page, data: { ...page.data, refreshed: "The results can’t be rebuilt yet: more answers are needed." } }; else load(); }
-    catch (e) { page = { ...page, data: { ...page.data, refreshed: `Could not rebuild: ${e?.message || "try again"}` } }; }
+    const aid = route.params.aid; const m = page.data?.results;
+    if (building || build) return;
+    build = null; say("");
+    try { const out = await D.previewBuild(aid); if (out.held) { say("The results can’t be built yet: more answers are needed. Nothing was built."); return; } build = { aid, text: buildConfirmText(m?.review?.responses), token: out.token, expires: out.expires }; }
+    catch (e) { say(`The preview could not be loaded. Nothing was built; ${e?.message || "try again"}.`); }
+  }
+  function cancelBuild() { build = null; say("Cancelled. Nothing was built."); }
+  async function confirmBuild() {
+    const b = build; if (!b || building) return;
+    if (Date.now() >= b.expires) { build = null; say("Preview expired. Preview again before building."); return; }
+    build = null; building = true;
+    try { const out = await D.executeBuild(b.aid, b.token); if (out.held) say("The results can’t be built yet: more answers are needed. No report was built."); else load(); }
+    catch (e) { say(`The report build outcome could not be confirmed: ${e?.message || "refresh before trying again"}.`); }
+    finally { building = false; }
   }
   async function launch() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("collect", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The survey could not be launched." } }; } }
   async function reopenCollection() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("share", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be reopened." } }; } }
@@ -179,6 +199,15 @@
   const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses ?? []).map((l) => { const sd = [...(l.sub_dimensions ?? [])].filter((x) => Number.isFinite(Number(x.score))).sort((a, b) => Number(b.score) - Number(a.score)); return { ...l, sub_dimensions: sd.length > 2 ? [sd[0], sd[sd.length - 1]] : l.sub_dimensions }; }) });
   const reportFor = (m) => (m.payload ? { review: m.review, counts: m.counts, payload: phone ? phonePayload(m.payload) : m.payload, gaps: D.gapsOf(m.payload), radar: D.radarOf(m.payload), lookNext: [] } : null);
 </script>
+
+<!-- The build confirm (report-build.js: one plain sentence with the response count, confirm "Build the results", cancel "Not now").
+     primary: on the not-built page it takes the page's one primary (the trigger is gone while it shows); on Results it stays secondary. -->
+{#snippet buildConfirm(primary)}
+  <Card hi gap={3} label="Build the results">
+    <p class="small t-15" data-confirm-text>{build.text}</p>
+    <div class="l-row" data-gap="2"><button class={primary ? "btn btn-primary" : "btn"} type="button" data-confirm-report onclick={confirmBuild}>Build the results</button><button class="btn btn-quiet" type="button" data-cancel-report onclick={cancelBuild}>Not now</button></div>
+  </Card>
+{/snippet}
 
 {#if page.status === "loading"}
   <Status {phone} {theme} kind="loading" />
@@ -215,7 +244,7 @@
   {@const rep = reportFor(m)}
   {#if !rep && !m.held && page.data.screen !== "results-held"}
     <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} inline back={to("collect", route.params)} backLabel="Back to Collect" />
-    {#if m.canBuild}<div class="l-page"><button class="btn btn-primary btn-lg" type="button" onclick={refreshResults}>Build the report</button></div>{/if}
+    {#if m.canBuild}<div class="l-page">{#if build}{@render buildConfirm(true)}{:else}<button class="btn btn-primary btn-lg" type="button" onclick={refreshResults} disabled={building || undefined}>{building ? "Building the results…" : "Build the report"}</button>{/if}</div>{/if}
   {:else if !rep || page.data.screen === "results-held"}
     {@const Held = REGISTRY["results-held"]}
     <Held {phone} {theme} report={{ review: m.review, counts: m.counts, payload: m.payload ?? { lenses: [] }, held: m.held }} onreopen={reopenCollection} />
@@ -228,7 +257,8 @@
     {/if}
   {:else if page.data.screen === "results"}
     {@const C = REGISTRY.results}
-    <C {phone} {theme} report={rep} onrefresh={refreshResults} refreshed={page.data.refreshed ?? ""} />
+    <C {phone} {theme} report={rep} onrefresh={refreshResults} refreshed={building ? "Building the results…" : page.data.refreshed ?? ""} />
+    {#if build}<div class="l-page">{@render buildConfirm(false)}</div>{/if}
   {:else}
     {@const C = REGISTRY[page.data.screen]}
     <C {phone} {theme} report={rep} />

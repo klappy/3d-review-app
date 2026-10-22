@@ -47,12 +47,17 @@
   // review is still collecting the primary goes back to Collect (nothing to reopen), otherwise it reopens collection.
   const collecting = $derived(report?.review?.stage === "collecting");
   const escape = $derived(!report || !srv);
-  const primary = $derived(collecting ? { label: "Back to Collect", href: out("collect"), lead: "qr" } : { label: "Reopen collection", href: out("share"), lead: "qr" });
+  // Reopening sets the stage (owner/member, src/handlers/assessment.ts): a viewer sees the primary disabled with the reason; the
+  // response list is owner/member too, so a viewer gets no "See the answers so far" (the fixture: everyone).
+  const canReopen = $derived(!report || report.review?.canReopen !== false);
+  const canRead = $derived(!report || report.review?.canReadResponses !== false);
+  const WHY = "Only an owner or member of the review can reopen collection.";
+  const primary = $derived(collecting ? { label: "Back to Collect", href: out("collect"), lead: "qr" } : canReopen ? { label: "Reopen collection", href: out("share"), lead: "qr" } : { label: "Reopen collection", lead: "qr", disabled: true, why: WHY });
 </script>
 
 {#snippet qr()}<Glyph d={G.qr} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title={P.review.title} parent={P.review.project} back={out("project")} menuHref={out("menu")} />{:else}<TopBar {crumbs} home={out("workspace")} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label={primary.label} href={primary.href} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label={primary.label} href={primary.href} disabled={!!primary.disabled} ariaDescribedby={primary.disabled ? "reopen-why" : undefined} />{/if}{/snippet}
 
 <div class="l-stack" {@attach reopening}><AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
@@ -63,7 +68,8 @@
         <Stack gap={1}><span class="h3">Results are held</span><span class="small">{#if srv}{srv.responses_in} of {srv.responses_needed} responses so far; the server holds the report until then.{:else}The {first.label.toLowerCase()} survey has {phoneN} answers; we show a perspective at {MIN_RESPONSES} or more so no one can be picked out.{/if}</span></Stack>
       </div>
       {#if escape}<a class="link" href={href("results")}>{without} <Glyph d={G.arrow} /></a>{/if}
-      <a class="link" href={href("results-answers")}>See the answers so far <Glyph d={G.arrow} /></a>
+      {#if canRead}<a class="link" href={href("results-answers")}>See the answers so far <Glyph d={G.arrow} /></a>{/if}
+      {#if primary.disabled}<p class="small" id="reopen-why">{primary.why}</p>{/if}
     </Card>
   {:else}
     <Page gap={5}>
@@ -79,7 +85,7 @@
               <Row wrap gap={5}>{#each lines as l}<span class="small"><LensDot lens={l.lens} decorative /> {l.text}</span>{/each}</Row>
             </Stack>
           </Row>
-          <Stack gap={2}><Button label={primary.label} href={primary.href} lead={qr} />{#if escape}<Button label={without} variant="quiet" href={href("results")} />{/if}</Stack>
+          <Stack gap={2}>{#if primary.disabled}<Button label={primary.label} lead={qr} disabled ariaDescribedby="primary-why" />{:else}<Button label={primary.label} href={primary.href} lead={qr} />{/if}{#if escape}<Button label={without} variant="quiet" href={href("results")} />{/if}</Stack>
         </Row>
       </Card>
       <div class="l-grid" data-cols="3" data-gap="4" data-state="held" inert>{#each cards as card (card.lens)}<Stack><LensCard {card} rows={H.preview} /></Stack>{/each}</div>

@@ -39,6 +39,8 @@
   const NO_NEW = "No new answers since this report was built.";
   const refresh = () => { if (onrefresh) onrefresh(); else checked = true; };
   const line = $derived(refreshed || (checked ? NO_NEW : ""));
+  // The response list needs owner/member (src/handlers/response.ts list): a viewer gets no live "See the answers" (the fixture: everyone).
+  const canRead = $derived(!report || report.review?.canReadResponses !== false);
 </script>
 
 {#snippet arrow()}<Glyph d={G.arrow} />{/snippet}
@@ -53,10 +55,11 @@
   {#if phone}
     <ReviewHead {review} phone linkGap={5} />
     <Row gap={2}>
-      <Button label="See the answers" href={href("results-answers")} lead={list} block />
+      {#if canRead}<Button label="See the answers" href={href("results-answers")} lead={list} block />{:else}<Button label="See the answers" lead={list} block disabled ariaDescribedby="answers-why" />{/if}
       <Button label="Reports" href={href("report")} lead={doc} block />
       <button class="btn btn-quiet btn-icon" type="button" aria-label="Refresh with new answers" onclick={refresh}><Glyph d={G.refresh} /></button>
     </Row>
+    {#if !canRead}<p class="small" id="answers-why">Owners and members of the review see the answers.</p>{/if}
     {#if line}<p class="small" role="status">{line}</p>{/if}
     {#each cards as card (card.lens)}<LensCard {card} phone />{/each}
     <a class="link" href={href("results-gaps")}>See the three biggest gaps <Glyph d={G.arrow} /></a>
@@ -65,7 +68,7 @@
     <Page gap={5}>
       <ReviewHead {review} primary={{ label: "Plan the next step", href: out("nextStep"), trail: "arrow" }} />
       <LevelLegend />
-      <Grid cols={3} gap={4}>{#each cards as card (card.lens)}<Stack><LensCard {card} /></Stack>{/each}</Grid>
+      <Grid cols={3} gap={4}>{#each cards as card (card.lens)}<Stack><LensCard {card} answers={canRead} /></Stack>{/each}</Grid>
       <Card hi gap={3} label="Where the perspectives disagree">
         <Row split gap={5}>
           <Stack gap={1}>

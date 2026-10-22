@@ -33,7 +33,7 @@
 {#snippet back()}<Glyph name="back" />{/snippet}
 {#snippet arrow()}<Glyph name="arrow" />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="setup-step" {step} steps={data.steps.length} home={HOME} />{:else}<FlowTop flow={data.flow} home={HOME} close={HOME} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<SetupBar {label} href={nextHref} {backHref} play={!!next.play} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<SetupBar {label} href={nextHref} {backHref} play={!!next.play} blocked={next.blocked ?? ""} />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}

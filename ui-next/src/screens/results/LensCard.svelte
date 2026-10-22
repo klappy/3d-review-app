@@ -12,7 +12,7 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { responsesText } from "./data.js";
-  let { card, phone = false, rows } = $props();
+  let { card, phone = false, rows, answers = true } = $props(); // answers: false hides "See the answers" (the response list needs owner/member)
   const shown = $derived(rows === undefined ? card.rows : card.rows.slice(0, rows));
 </script>
 
@@ -28,6 +28,6 @@
       <Level level={card.level} />
     </Row>
     <Stack gap={1}>{#each shown as r (r.name)}<div class="lvl-row"><span class="t-15">{r.name}</span><Level level={r.level} /></div>{/each}</Stack>
-    <a class="link" href={href("results-answers", { state: card.lens })}>See the answers <Glyph d={G.arrow} /></a>
+    {#if answers}<a class="link" href={href("results-answers", { state: card.lens })}>See the answers <Glyph d={G.arrow} /></a>{/if}
   </Card>
 {/if}
